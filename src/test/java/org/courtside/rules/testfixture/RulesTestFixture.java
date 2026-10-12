@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.courtside.rules.RuleType;
 import org.courtside.rules.internal.RuleAdminService;
 
+import java.time.LocalTime;
 import java.util.Map;
 import java.util.UUID;
 
@@ -25,6 +26,14 @@ public class RulesTestFixture {
     public UUID ruleSetBoundingBookingDuration(String name, int maxMinutes) {
         UUID ruleSetId = activeRuleSet(name);
         rules.setRule(ruleSetId, RuleType.MAX_BOOKING_DURATION, Map.of("maxMinutes", maxMinutes));
+        return ruleSetId;
+    }
+
+    public UUID ruleSetLimitingBookingHours(String name, LocalTime earliestStart, LocalTime latestEnd) {
+        UUID ruleSetId = activeRuleSet(name);
+        rules.setRule(ruleSetId, RuleType.BOOKING_HOURS, Map.of(
+                "earliestStart", earliestStart.toSecondOfDay() / 60,
+                "latestEnd", latestEnd.toSecondOfDay() / 60));
         return ruleSetId;
     }
 

@@ -280,13 +280,18 @@ violation instead of stopping at the first.
 | `MAX_BOOKING_DURATION` | One booking may last this long |
 | `CANCELLATION_DEADLINE` | The member cancels before the boundary |
 | `NO_COURT_BOOKING` | The membership category may not book courts |
+| `BOOKING_HOURS` | The period lies between the category's earliest start and latest end |
 
 Membership-scoped rules come from the current membership type. A club may configure a fallback for
 people without current membership. Without it, no membership-scoped rule applies. Facility rules
 still apply.
 
 Entitlement rules are administratively overridable. Opening hours and grid alignment describe the
-calendar and are not. `NO_COURT_BOOKING` also applies when a member moves an existing booking.
+calendar and are not. `NO_COURT_BOOKING`, `MAX_BOOKING_DURATION` and `BOOKING_HOURS` also apply
+when a member moves an existing booking.
+
+`BOOKING_HOURS` narrows the opening hours for one membership category and never widens them. Its
+window holds for every weekday, is read in the club time zone and does not cross midnight.
 
 A booking request authenticates and authorizes, validates the request, evaluates all rules, writes
 booking and allocations in one transaction, translates a collision to `409 Conflict`, publishes

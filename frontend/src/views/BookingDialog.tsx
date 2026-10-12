@@ -1,6 +1,6 @@
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ApiError, api, type Allocation, type BookingGrid, type Problem, type PublicBookingCard, type PublicCourt, type PublicParticipantCard, type PublicParticipantMember } from "../api/client";
+import { ApiError, api, type Allocation, type BookingGrid, type BookingHours, type Problem, type PublicBookingCard, type PublicCourt, type PublicParticipantCard, type PublicParticipantMember } from "../api/client";
 import { idempotencyKey } from "../api/idempotency";
 import { problemReference, violationMessage } from "../api/problem-message";
 import { useReportedFailure } from "../failures/useReportedFailure";
@@ -8,6 +8,7 @@ import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
 import { Modal } from "../components/Modal";
 import { bookingTimeSlot, formatBookingPeriod, zonedDateTime } from "../time/clubZone";
+import { leavesBookingHours } from "../time/bookingHours";
 import { hoursOn } from "../time/openingHours";
 import { PERSON_SEARCH_DEBOUNCE_MS, PERSON_SEARCH_MIN_LENGTH } from "../person-search";
 import { warnAbout } from "../api/failureWarning";
@@ -20,13 +21,14 @@ export interface BookingSelection {
 }
 
 export function BookingDialog({ selection, grid, courts, allocations, canChooseSeveralCourts,
-  maxBookingMinutes, closed, created, conflicted }: {
+  maxBookingMinutes, bookingHours, closed, created, conflicted }: {
   selection: BookingSelection;
   grid: BookingGrid;
   courts: PublicCourt[];
   allocations: Allocation[];
   canChooseSeveralCourts: boolean;
   maxBookingMinutes?: number;
+  bookingHours?: BookingHours;
   closed: () => void;
   created: () => Promise<void>;
   conflicted: () => Promise<void>;
@@ -125,14 +127,17 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
 
   const fieldViolations = (field: string) => violations.filter((violation) => violation.field === field);
   const describedBy = (field: string) => fieldViolations(field).length > 0 ? `booking-${field}-errors` : undefined;
-  const durations = useMemo(() => availableDurations(selection, grid, courtIds, allocations, maxBookingMinutes),
-    [selection, grid, courtIds, allocations, maxBookingMinutes]);
+  const durations = useMemo(() => availableDurations(selection, grid, courtIds, allocations, maxBookingMinutes, bookingHours),
+    [selection, grid, courtIds, allocations, maxBookingMinutes, bookingHours]);
+  const hours = bookingHours && { earliestStart: bookingHours.earliestStart.slice(0, 5), latestEnd: bookingHours.latestEnd.slice(0, 5) };
+  const outsideHours = bookingHours !== undefined && leavesBookingHours(selection.slot, grid.slotMinutes, bookingHours);
   // A list emptied by the bound is a different thing from one emptied by an occupied court: the
   // second is the conflict the server reports on submit, and saying so is its job and not ours.
   const boundLeavesNoPeriod = maxBookingMinutes !== undefined && maxBookingMinutes !== null
     && maxBookingMinutes < grid.slotMinutes;
   const showsBound = maxBookingMinutes !== undefined && maxBookingMinutes !== null && !boundLeavesNoPeriod;
-  const durationDescription = showsBound ? "booking-duration-bound booking-duration-hint" : "booking-duration-hint";
+  const durationDescription = [showsBound && "booking-duration-bound", hours && !outsideHours && "booking-hours-bound", "booking-duration-hint"]
+    .filter(Boolean).join(" ");
   const slotTaken = refusedAsTaken && durations.length === 0;
   const selectedDuration = durations.includes(durationMinutes) || slotTaken
     ? durationMinutes : durations[0] ?? grid.slotMinutes;
@@ -158,9 +163,13 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
       {showsBound && <p id="booking-duration-bound" data-testid="booking-duration-bound" className="text-muted mt-2 text-sm">
         {t("booking.durationBound", { duration: t("booking.durationMinutes", { count: maxBookingMinutes }) })}
       </p>}
+      {hours && !outsideHours && <p id="booking-hours-bound" data-testid="booking-hours-bound" className="text-muted mt-2 text-sm">
+        {t("booking.hoursBound", hours)}
+      </p>}
       <p id="booking-duration-hint" data-testid="booking-duration-hint" className="text-muted mt-1 text-sm">{t("booking.durationHint")}</p>
       </>}
       {boundLeavesNoPeriod && <Alert tone="warning" testId="booking-no-duration">{t("booking.boundBelowSlotGrid")}</Alert>}
+      {hours && outsideHours && <Alert tone="warning" testId="booking-outside-hours">{violationMessage("booking.rule.bookingHours.outside", hours, t)}</Alert>}
       {canChooseSeveralCourts
         ? <fieldset className="mt-5 grid gap-2" aria-invalid={fieldViolations("courtIds").length > 0} aria-describedby={describedBy("courtIds")}>
           <legend className="font-semibold">{t("booking.courts")}</legend>
@@ -234,18 +243,20 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
       </div>}
       <div className="surface-panel border-structural flex shrink-0 justify-end gap-3 border-t px-6 py-4">
         <Button variant="secondary" type="button" data-testid="booking-close" onClick={closed}>{t("booking.close")}</Button>
-        <Button variant="primary" type="submit" data-testid="booking-submit" disabled={submitting || courtIds.length === 0 || !cardId || boundLeavesNoPeriod || slotTaken}>{t("booking.submit")}</Button>
+        <Button variant="primary" type="submit" data-testid="booking-submit" disabled={submitting || courtIds.length === 0 || !cardId || boundLeavesNoPeriod || outsideHours || slotTaken}>{t("booking.submit")}</Button>
       </div>
     </form>
   </Modal>;
 }
 
-function availableDurations(selection: BookingSelection, grid: BookingGrid, courtIds: string[], allocations: Allocation[], maxBookingMinutes?: number): number[] {
+function availableDurations(selection: BookingSelection, grid: BookingGrid, courtIds: string[], allocations: Allocation[], maxBookingMinutes?: number, bookingHours?: BookingHours): number[] {
   const start = bookingTimeSlot(selection.date, selection.slot, grid.timeZone, grid.slotMinutes).startsAt;
   const openingHours = hoursOn(grid, selection.date);
-  const closesAt = openingHours?.closesAt
-    ? zonedDateTime(selection.date, openingHours.closesAt.slice(0, 5), grid.timeZone)
-    : new Date(Date.parse(start) + grid.slotMinutes * 60_000).toISOString();
+  const closesAt = [openingHours?.closesAt, bookingHours?.latestEnd]
+    .filter((time): time is string => Boolean(time))
+    .map((time) => zonedDateTime(selection.date, time.slice(0, 5), grid.timeZone))
+    .sort((left, right) => Date.parse(left) - Date.parse(right))[0]
+    ?? new Date(Date.parse(start) + grid.slotMinutes * 60_000).toISOString();
   // The floor is one slot only where nothing else bounds the day; a rule set that bounds a booking
   // shorter than a slot offers no period at all rather than one the server refuses.
   const untilClosing = Math.max(grid.slotMinutes, Math.floor((Date.parse(closesAt) - Date.parse(start)) / 60_000));

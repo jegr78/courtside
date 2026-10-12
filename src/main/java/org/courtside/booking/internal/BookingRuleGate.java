@@ -9,6 +9,8 @@ import org.courtside.identity.Role;
 import org.courtside.identity.UserAccountRepository;
 import org.courtside.member.MemberService;
 import org.courtside.rules.BookingDurationLimit;
+import org.courtside.rules.BookingHoursLimit;
+import org.courtside.rules.BookingWindow;
 import org.courtside.rules.CancellationDeadline;
 import org.courtside.rules.RuleContext;
 import org.courtside.rules.CourtBookingPermission;
@@ -32,6 +34,7 @@ public class BookingRuleGate {
     private final RuleEngine ruleEngine;
     private final CourtBookingPermission bookingPermission;
     private final BookingDurationLimit durationLimit;
+    private final BookingHoursLimit hoursLimit;
     private final CancellationDeadline cancellationDeadline;
     private final MemberService members;
     private final UserAccountRepository accounts;
@@ -98,6 +101,13 @@ public class BookingRuleGate {
             return null;
         }
         return durationLimit.maxMinutesFor(membershipTypeOf(personId)).orElse(null);
+    }
+
+    public Optional<BookingWindow> bookingWindowFor(UUID personId, Set<Role> roles) {
+        if (roles.contains(Role.ADMIN)) {
+            return Optional.empty();
+        }
+        return hoursLimit.windowFor(membershipTypeOf(personId));
     }
 
     public void requireNoViolations(BookingRuleCheck check) {

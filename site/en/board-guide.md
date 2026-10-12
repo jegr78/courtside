@@ -208,9 +208,12 @@ with its state and the membership types it applies to. Choose a rule set there t
 | Maximum booking duration | Highest duration in minutes |
 | Cancellation deadline | Minimum number of minutes before the booking |
 | Booking barred | Prevents members from booking and moving without another setting |
+| Booking hours | Earliest start and latest end of a booking on every weekday |
 
-Opening hours and the booking grid apply across the club, so they sit outside rule sets.
-Administrators may override the booking prohibition for administrative work. Time and court
+Opening hours and the booking grid apply across the club, so they sit outside rule sets. Booking
+hours narrow the opening hours for one membership type and never widen them. With the facility
+open until 23:00, for example, a youth rule set can allow bookings until 20:00. Administrators may
+override the booking prohibition and the booking hours for administrative work. Time and court
 constraints still apply to them.
 
 Retiring a rule set does not stop it from applying to membership types already assigned to it. It

@@ -108,7 +108,7 @@ describe("leaving an administrative page with unsaved work", () => {
     vi.spyOn(api, "adminConfig").mockResolvedValue(config);
     vi.spyOn(api, "ruleSets").mockResolvedValue([{ id: "rule-set", name: "Standard", active: true }]);
     vi.spyOn(api, "ruleTypes").mockResolvedValue([
-      { ruleType: "ADVANCE_WINDOW", configurable: true, parameters: [{ name: "maxDays", minimum: 1, maximum: 365 }] }
+      { ruleType: "ADVANCE_WINDOW", configurable: true, parameters: [{ name: "maxDays", minimum: 1, maximum: 365, kind: "NUMBER" }] }
     ]);
     vi.spyOn(api, "rules").mockResolvedValue([{ ruleType: "ADVANCE_WINDOW", params: { maxDays: 7 } }]);
     vi.spyOn(api, "membershipTypes").mockResolvedValue([adults]);

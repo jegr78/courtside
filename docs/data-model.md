@@ -149,7 +149,9 @@ withdraws an outstanding code without anything having to listen for those events
 | `rule_definition` | One rule: its type and its parameters as `jsonb` | `rule_set` |
 
 Rules are data. A rule type is a validator class plus a row rather than a column, and the parameters
-live in `params` so a new rule kind needs no migration. A rule set holds each type at most once.
+live in `params` so a new rule kind needs no new column. The `rule_definition_rule_type_known` CHECK
+names every type, so a new type extends it in a migration of its own. A time-of-day parameter such
+as the `BOOKING_HOURS` window holds minutes after midnight. A rule set holds each type at most once.
 
 Which rule set applies to a booking comes from the booker's `membership_type`, or, for a person
 holding none, from `club_config.no_membership_type_rule_set_id`.

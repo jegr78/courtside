@@ -149,6 +149,6 @@ class SeriesQueryBudgetTest extends AbstractIntegrationTest {
                 .isLessThanOrEqualTo(openingHoursBudget);
         // One per membership-scoped rule and no more: each asks once for the whole batch rather than
         // once per occurrence, which is what prepare() is for.
-        assertThat(snapshot.category("rule-parameter")).as(snapshot.toString()).isLessThanOrEqualTo(4);
+        assertThat(snapshot.category("rule-parameter")).as(snapshot.toString()).isLessThanOrEqualTo(5);
     }
 }
