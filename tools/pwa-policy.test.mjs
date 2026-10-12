@@ -250,6 +250,8 @@ test("given a first service-worker install, when browsers are qualified, then Fi
   assert.match(playwright, /name: "firefox-periodic", testMatch: \/[^/]*pwa-first-install\\\.spec\\\.ts/);
   assert.match(playwright, /name: "webkit-pwa", testMatch: \/[^/]*pwa-first-install\\\.spec\\\.ts/);
   assert.match(firstInstall, /ignoreHTTPSErrors: browserName === "firefox"/);
+  assert.match(firstInstall, /if \(browserName === "webkit"\) await page\.evaluate\(\(\) => navigator\.serviceWorker\.ready/,
+    "only WebKit may wait for the worker, or Firefox no longer navigates during the install");
 });
 
 test("given a release on physical devices, when recording evidence, then both mobile platforms and immutable candidate identity are required", () => {
