@@ -667,6 +667,10 @@ input[type="time"] {
     .day-plan thead th {
       top: 0;
     }
+
+    .day-plan {
+      scroll-margin-top: 0;
+    }
   }
 }
 
@@ -691,6 +695,12 @@ input[type="time"] {
 .dialog-continues svg {
   width: 1.5rem;
   height: 1.5rem;
+}
+
+@media (forced-colors: active) {
+  .dialog-continues {
+    background: Canvas;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -8,6 +8,7 @@ import { violationMessage } from "../api/problem-message";
 import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
 import { DateTimeInput } from "../components/DateTimeInput";
+import { DialogBody } from "../components/DialogBody";
 import { Modal } from "../components/Modal";
 import { useReportedFailure } from "../failures/useReportedFailure";
 import { formatBookingPeriod } from "../time/clubZone";
@@ -37,14 +38,16 @@ export function CancelDialog({ booking, seriesBookings, hasMoreBookings, timeZon
   const affected = scope === "THIS" ? [booking] : scope === "WHOLE_SERIES"
     ? seriesBookings
     : seriesBookings.filter((candidate) => new Date(candidate.startsAt) >= new Date(booking.startsAt));
-  return <Modal labelledBy="cancel-personal-title" closed={closed}><div className="surface-panel grid w-full max-w-lg gap-4 rounded-2xl border p-6">
+  return <Modal labelledBy="cancel-personal-title" closed={closed}><div className="surface-panel flex w-full max-w-lg flex-col overflow-hidden rounded-2xl border">
+    <DialogBody><div className="grid gap-4">
     <h2 id="cancel-personal-title" className="text-xl font-bold">{t("booking.cancelTitle")}</h2>
     {booking.seriesId && <ScopeFields scope={scope} changed={setScope} t={t} />}
     <p className="font-semibold">{t("myBookings.affected", { count: affected.length })}</p>
     <ul className="list-disc pl-5">{affected.map((candidate) => <li key={candidate.id}>{formatBookingPeriod(candidate.startsAt, candidate.endsAt, i18n.language, timeZone)}</li>)}</ul>
     {hasMoreBookings && scope !== "THIS" && <p data-testid="incomplete-series-warning">{t("myBookings.affectedIncomplete")}</p>}
-    {error && <Alert>{error}</Alert>}
-    <div className="flex gap-2"><Button variant="destructive-confirm" data-testid="confirm-cancellation" onClick={() => void submit()}>{t("booking.cancelConfirm")}</Button><Button variant="secondary" onClick={closed}>{t("booking.close")}</Button></div>
+    </div></DialogBody>
+    {error && <div className="shrink-0 px-6 pt-3"><Alert>{error}</Alert></div>}
+    <div className="surface-panel border-structural flex shrink-0 gap-2 border-t px-6 py-4"><Button variant="destructive-confirm" data-testid="confirm-cancellation" onClick={() => void submit()}>{t("booking.cancelConfirm")}</Button><Button variant="secondary" onClick={closed}>{t("booking.close")}</Button></div>
   </div></Modal>;
 }
 
@@ -71,15 +74,17 @@ export function MoveDialog({ booking, courts, timeZone, maxBookingMinutes, close
     try { await api.moveSeries(booking.seriesId!, request); await completed(); }
     catch (failure) { report(failure); }
   }
-  return <Modal labelledBy="move-personal-title" closed={closed}><div data-testid="move-dialog" className="surface-panel grid w-full max-w-lg gap-4 rounded-2xl border p-6">
+  return <Modal labelledBy="move-personal-title" closed={closed}><div data-testid="move-dialog" className="surface-panel flex w-full max-w-lg flex-col overflow-hidden rounded-2xl border">
+    <DialogBody><div className="grid gap-4">
     <h2 id="move-personal-title" className="text-xl font-bold">{t("myBookings.moveTitle")}</h2>
     <ScopeFields scope={scope} changed={(value) => { setScope(value); setPreview(undefined); }} t={t} />
     <label className="grid gap-1 font-semibold">{t("myBookings.newStartTime")}<DateTimeInput data-testid="move-start-time" type="time" emptyHint={t("myBookings.startUnchanged")} value={startTime} onChange={(event) => { setStartTime(event.target.value); setPreview(undefined); }} className="form-control rounded border px-3 py-2" /></label>
     <label className="grid gap-1 font-semibold">{t("myBookings.newDuration")}<input data-testid="move-duration" type="number" min="1" max={maxBookingMinutes} value={duration} onChange={(event) => { setDuration(event.target.value); setPreview(undefined); }} className="form-control rounded border p-2" /></label>
     <fieldset><legend className="font-semibold">{t("booking.courts")}</legend>{courts.map((court) => <label key={court.id} className="flex gap-2"><input type="checkbox" checked={courtIds.includes(court.id)} onChange={(event) => { setCourtIds((ids) => event.target.checked ? [...ids, court.id] : ids.filter((id) => id !== court.id)); setPreview(undefined); }} />{court.name ?? t("court.number", { number: court.number })}</label>)}</fieldset>
-    {error && <Alert>{error}</Alert>}
     {preview && <div data-testid="move-preview"><p className="font-semibold">{t("myBookings.previewCount", { count: preview.moves.length })}</p><ul className="mt-2 grid gap-2">{preview.moves.map((move) => <li key={move.bookingId}><p>{formatBookingPeriod(move.fromStartsAt, move.fromEndsAt, i18n.language, timeZone)} → {formatBookingPeriod(move.toStartsAt, move.toEndsAt, i18n.language, timeZone)}</p><MoveReasons move={move} courtNames={courtNames} t={t} /></li>)}</ul></div>}
-    <div className="flex gap-2">{preview ? <Button key="confirm-move" variant="primary" data-testid="confirm-move" disabled={!preview.executable} onClick={() => void move()}>{t("myBookings.moveConfirm")}</Button> : <Button key="preview-move" variant="secondary" data-testid="preview-move" disabled={courtIds.length === 0 || (!startTime && !duration && courtIds.join() === booking.courtIds.join())} onClick={() => void previewMove()}>{t("myBookings.movePreview")}</Button>}<Button variant="secondary" onClick={closed}>{t("booking.close")}</Button></div>
+    </div></DialogBody>
+    {error && <div className="shrink-0 px-6 pt-3"><Alert>{error}</Alert></div>}
+    <div className="surface-panel border-structural flex shrink-0 gap-2 border-t px-6 py-4">{preview ? <Button key="confirm-move" variant="primary" data-testid="confirm-move" disabled={!preview.executable} onClick={() => void move()}>{t("myBookings.moveConfirm")}</Button> : <Button key="preview-move" variant="secondary" data-testid="preview-move" disabled={courtIds.length === 0 || (!startTime && !duration && courtIds.join() === booking.courtIds.join())} onClick={() => void previewMove()}>{t("myBookings.movePreview")}</Button>}<Button variant="secondary" onClick={closed}>{t("booking.close")}</Button></div>
   </div></Modal>;
 }
 
@@ -96,7 +101,8 @@ export function ManagedAppointmentDialog({ bookingId, locale, timeZone, closed }
     return () => { active = false; };
   }, [bookingId, report]);
 
-  return <Modal labelledBy="managed-appointment-detail-title" closed={closed}><div className="surface-panel grid w-full max-w-lg gap-4 rounded-2xl border p-6">
+  return <Modal labelledBy="managed-appointment-detail-title" closed={closed}><div className="surface-panel flex w-full max-w-lg flex-col overflow-hidden rounded-2xl border">
+    <DialogBody><div className="grid gap-4">
     <h2 id="managed-appointment-detail-title" className="text-xl font-bold">{t("managedAppointments.detailTitle")}</h2>
     {error && <Alert>{error}</Alert>}
     {!detail && !error && <p aria-live="polite">{t("status.loading")}</p>}
@@ -108,7 +114,8 @@ export function ManagedAppointmentDialog({ bookingId, locale, timeZone, closed }
         {detail.participants.length === 0 ? <p>{t("managedAppointments.noParticipants")}</p> : <ul className="list-disc pl-5">{detail.participants.map((participant, index) => <li key={`${participant.kind}-${index}`}>{participant.displayName} · {t(`managedAppointments.kind.${participant.kind}`)}</li>)}</ul>}
       </section>
     </>}
-    <div><Button variant="secondary" data-testid="close-managed-appointment" onClick={closed}>{t("booking.close")}</Button></div>
+    </div></DialogBody>
+    <div className="surface-panel border-structural flex shrink-0 gap-2 border-t px-6 py-4"><Button variant="secondary" data-testid="close-managed-appointment" onClick={closed}>{t("booking.close")}</Button></div>
   </div></Modal>;
 }
 

@@ -1253,6 +1253,12 @@ for (const phone of landscapePhones) {
     await selectJourneyDate(page, journeyService.visualDate);
     await expect(page.getByTestId("slot-row-15:00")).toBeVisible({ timeout: 10_000 });
 
+    // then
+    // Within a pixel, because scrolling to the start lands on whole device pixels.
+    await expect.poll(async () => Math.abs((await page.getByTestId("week-grid").boundingBox())!.y),
+      { message: "a later day starts its plan at the top of the screen, with no room kept for a strip that scrolled away", timeout: 10_000 })
+      .toBeLessThanOrEqual(1);
+
     // when
     await page.getByTestId("slot-row-15:00").evaluate((row) => row.scrollIntoView({ block: "center" }));
 
@@ -1293,6 +1299,14 @@ for (const phone of landscapePhones) {
     await expect(continues, "the dialog signals that the form continues below").toBeVisible({ timeout: 10_000 });
 
     // when
+    await page.emulateMedia({ forcedColors: "active" });
+
+    // then
+    await expect.poll(() => continues.evaluate((signal) => getComputedStyle(signal).backgroundColor),
+      { message: "in forced colours the signal keeps a solid backdrop", timeout: 10_000 }).not.toBe("rgba(0, 0, 0, 0)");
+    await page.emulateMedia({ forcedColors: "none" });
+
+    // when
     await dialog.getByTestId("booking-duration").focus();
     await dialog.getByTestId("dialog-body").evaluate((body) => {
       const field = body.querySelector('[data-testid="booking-card"]')!.getBoundingClientRect();
@@ -1317,5 +1331,78 @@ for (const phone of landscapePhones) {
     await expect(dialog.getByTestId("booking-more-summary"), "the last control of the form is reachable").toBeInViewport({ ratio: 1, timeout: 10_000 });
     await expect(continues, "the signal goes once nothing lies below").toBeHidden({ timeout: 10_000 });
     await expect(dialog.getByTestId("booking-submit"), "the book button stays on screen").toBeInViewport({ ratio: 1, timeout: 10_000 });
+  });
+}
+
+const seriesBookingId = "70000000-0000-0000-0000-000000000001";
+
+async function bodyOverflow(dialog: import("@playwright/test").Locator) {
+  return dialog.getByTestId("dialog-body").evaluate((body) => body.scrollHeight - body.clientHeight);
+}
+
+for (const phone of landscapePhones) {
+  test(`given a phone in landscape at ${phone.width} x ${phone.height}, when a series move is previewed, then its actions stay on screen`, async ({ page }) => {
+    // given
+    await page.setViewportSize(phone);
+    await signIn(page, "doe.jane");
+    await expect(page.getByTestId("my-bookings-link"), "the member is signed in").toBeVisible({ timeout: 10_000 });
+    await page.getByTestId("my-bookings-link").click();
+    await expect(page.getByTestId("my-bookings-page")).toBeVisible({ timeout: 10_000 });
+
+    // when
+    await page.locator(`[data-testid="move-booking"][data-booking-id="${seriesBookingId}"]`).click();
+    const dialog = page.getByTestId("move-dialog");
+    await dialog.getByTestId("move-duration").fill("90");
+
+    // then
+    expect(await bodyOverflow(dialog), "the move form is taller than the space the dialog gives it").toBeGreaterThan(0);
+    await expect(dialog.getByTestId("preview-move"), "the preview button is on screen").toBeInViewport({ ratio: 1, timeout: 10_000 });
+
+    // when
+    await dialog.getByTestId("preview-move").click();
+
+    // then
+    await expect(dialog.getByTestId("move-preview")).toBeAttached({ timeout: 10_000 });
+    await expect(dialog.getByTestId("confirm-move"), "the confirm button is on screen").toBeInViewport({ ratio: 1, timeout: 10_000 });
+    await dialog.getByTestId("dialog-body").evaluate((body) => body.scrollTo(0, body.scrollHeight));
+    await expect(dialog.getByTestId("move-preview"), "the preview is reachable by scrolling the form").toBeInViewport({ timeout: 10_000 });
+  });
+
+  test(`given a phone in landscape at ${phone.width} x ${phone.height}, when a long series is to be cancelled whole, then the confirmation stays on screen`, async ({ page }) => {
+    // given
+    await page.route("**/api/my/bookings?**", async (route) => {
+      const response = await route.fetch();
+      const listed = await response.json() as { items: { id: string; startsAt: string; endsAt: string }[] };
+      const series = listed.items.find((booking) => booking.id === seriesBookingId);
+      const week = 7 * 24 * 60 * 60 * 1000;
+      const later = series ? Array.from({ length: 11 }, (_, index) => ({
+        ...series,
+        id: `70000000-0000-0000-0000-0000000001${String(index).padStart(2, "0")}`,
+        startsAt: new Date(Date.parse(series.startsAt) + (index + 1) * week).toISOString(),
+        endsAt: new Date(Date.parse(series.endsAt) + (index + 1) * week).toISOString()
+      })) : [];
+      await route.fulfill({ response, json: { ...listed, items: [...listed.items, ...later] } });
+    });
+    await page.setViewportSize(phone);
+    await signIn(page, "doe.jane");
+    await expect(page.getByTestId("my-bookings-link"), "the member is signed in").toBeVisible({ timeout: 10_000 });
+    await page.getByTestId("my-bookings-link").click();
+    await expect(page.getByTestId("my-bookings-page")).toBeVisible({ timeout: 10_000 });
+
+    // when
+    await page.locator(`[data-testid="personal-cancel"][data-booking-id="${seriesBookingId}"]`).click();
+    const dialog = page.getByRole("dialog");
+    await dialog.getByTestId("scope-WHOLE_SERIES").check();
+
+    // then
+    await expect(dialog.locator("li"), "every occurrence of the series is listed").toHaveCount(12, { timeout: 10_000 });
+    expect(await bodyOverflow(dialog), "the list of occurrences is taller than the space the dialog gives it").toBeGreaterThan(0);
+    await expect(dialog.getByTestId("confirm-cancellation"), "the confirmation is on screen").toBeInViewport({ ratio: 1, timeout: 10_000 });
+    for (let step = 0; step < 10 && await page.evaluate(() => document.activeElement?.getAttribute("data-testid")) !== "confirm-cancellation"; step += 1) {
+      await page.keyboard.press("Tab");
+    }
+    await expect(dialog.getByTestId("confirm-cancellation"), "the keyboard reaches the confirmation").toBeFocused({ timeout: 10_000 });
+    await dialog.getByTestId("dialog-body").evaluate((body) => body.scrollTo(0, body.scrollHeight));
+    await expect(dialog.locator("li").last(), "the last occurrence is reachable by scrolling the list").toBeInViewport({ ratio: 1, timeout: 10_000 });
   });
 }
