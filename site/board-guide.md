@@ -6,10 +6,12 @@ bestimmt jeder Verein selbst.
 
 ## Wer die Verwaltung sieht
 
-Aktive Konten mit der Rolle **Administrator** können die vollständige Verwaltung öffnen. Konten
-mit einer zusätzlichen Vereinsrolle sehen dort ausschließlich die *Vereinstermine*, für die ihre
-Rolle zuständig ist. Reine Mitgliedskonten erhalten auch über eine direkt eingegebene Adresse
-keinen Zugriff.
+Aktive Konten mit der Rolle **Administrator** können die vollständige Verwaltung öffnen. Andere
+Konten sehen dort ausschließlich die *Vereinstermine*, und nur dann, wenn eine aktive Buchungskarte
+eine ihrer Rollen außer *Mitglied* als verwaltende Rolle nennt oder einer ihrer Rollen das Buchen
+ohne Spielerliste erlaubt. Die Liste zeigt, wofür die verwaltenden Rollen zuständig sind, das Serienformular, was die
+buchenden Rollen erlauben. Ein Konto, dem keine Karte etwas davon gibt, erhält auch über eine direkt
+eingegebene Adresse keinen Zugriff. Das ändern Vorstände an den Buchungskarten.
 
 Die Seitenleiste führt oben zur Übersicht und ordnet die Verwaltung darunter in vier Bereiche:
 

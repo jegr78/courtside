@@ -22,14 +22,17 @@ import { AdminCourtsView } from "./facility/AdminCourtsView";
 import { AdminOpeningHoursView } from "./facility/AdminOpeningHoursView";
 import { AdminSlotFillersView } from "./facility/AdminSlotFillersView";
 
-export default function AdminRoutes({ configurationChanged, administrator }: {
+export default function AdminRoutes({ configurationChanged, administrator, managesAppointments, createsSeries }: {
   configurationChanged: (config: ClubConfig) => void;
   administrator: boolean;
+  managesAppointments: boolean;
+  createsSeries: boolean;
 }) {
   return <Routes>
     <Route element={<AdminShell administrator={administrator} />}>
       <Route index element={administrator ? <AdminOverviewView /> : <Navigate to="/admin/appointments" replace />} />
-      <Route path="appointments" element={<AdminManagedAppointmentsView />} />
+      <Route path="appointments" element={<AdminManagedAppointmentsView managesAppointments={managesAppointments}
+        createsSeries={createsSeries} />} />
       {administrator && <>
       <Route path="setup" element={<AdminSetupView />} />
       <Route path="configuration" element={<AdminConfigurationView configurationChanged={configurationChanged} />} />

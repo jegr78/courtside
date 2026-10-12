@@ -18,6 +18,21 @@ public final class CardTestFixture {
                 new short[]{}, false, false, false);
     }
 
+    public UUID createBookingCard(String label, Set<Role> allowedRoles, Set<Role> managingRoles,
+                                  short... allowedPlayerCounts) {
+        return cards.createCard(label, "#34584A", allowedRoles, managingRoles, allowedPlayerCounts,
+                false, false, false).getId();
+    }
+
+    public UUID createDoublesCardForGuests(String label, Set<Role> managingRoles) {
+        return cards.createCard(label, "#34584A", Set.of(), managingRoles, new short[]{2},
+                false, true, false).getId();
+    }
+
+    public void deactivateBookingCard(UUID cardId) {
+        cards.setCardActive(cardId, false);
+    }
+
     public UUID createUnlimitedParticipantCard(String label) {
         return cards.createParticipantCard(label, null).getId();
     }

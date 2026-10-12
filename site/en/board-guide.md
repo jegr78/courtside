@@ -5,9 +5,13 @@ menu names appear in *italics*. Each club chooses its own opening hours, deadlin
 
 ## Who sees the administration
 
-Enabled accounts with the **Administrator** role can open the complete administration. Accounts
-with another club role only see the *Club appointments* covered by that role. Member-only accounts
-cannot enter by typing the address directly.
+Enabled accounts with the **Administrator** role can open the complete administration. Other
+accounts only see *Club appointments*, and only when an active booking card names one of their
+roles other than *Member* as a managing role or lets one of their roles book it without a player
+list. The list shows
+what the managing roles cover, the series form what the booking roles allow. An account no card
+grants either cannot enter, not even by typing the address directly. Board members change this on
+the booking cards.
 
 The sidebar leads to the overview at the top and divides administration below it into four areas:
 

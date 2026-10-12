@@ -7,7 +7,12 @@ import { PrimaryNavigation } from "./PrimaryNavigation";
 const anonymous: SessionStatus = { authenticated: false, roles: [], passwordChangeRequired: false };
 const member: SessionStatus = { authenticated: true, roles: ["MEMBER"], passwordChangeRequired: false };
 const administrator: SessionStatus = { authenticated: true, roles: ["ADMIN"], passwordChangeRequired: false };
-const trainer: SessionStatus = { authenticated: true, roles: ["MEMBER", "TRAINER"], passwordChangeRequired: false };
+const trainer: SessionStatus = {
+  authenticated: true, roles: ["MEMBER", "TRAINER"], passwordChangeRequired: false, managesAppointments: true, createsSeries: true
+};
+const cardlessTreasurer: SessionStatus = {
+  authenticated: true, roles: ["MEMBER", "TREASURER"], passwordChangeRequired: false, managesAppointments: false, createsSeries: false
+};
 
 const adminDestinations = [
   "admin-configuration-link", "admin-deadlines-link", "admin-rule-sets-link", "admin-courts-link", "admin-opening-hours-link",
@@ -85,6 +90,30 @@ describe("PrimaryNavigation", () => {
     show(member);
     expect(screen.getByTestId("my-bookings-link")).toBeInTheDocument();
     expect(screen.queryByTestId("administration-link")).not.toBeInTheDocument();
+  });
+
+  it("given a treasurer no active card lets book or manage, when rendered, then nothing offers administration", () => {
+    // when
+    show(cardlessTreasurer);
+
+    // then
+    expect(screen.queryByTestId("administration-link")).not.toBeInTheDocument();
+  });
+
+  it("given a treasurer a card names as managing role, when rendered, then administration is offered", () => {
+    // when
+    show({ ...cardlessTreasurer, managesAppointments: true });
+
+    // then
+    expect(screen.getByTestId("administration-link")).toHaveAttribute("href", "/admin");
+  });
+
+  it("given a treasurer who may only create series, when rendered, then administration is offered", () => {
+    // when
+    show({ ...cardlessTreasurer, createsSeries: true });
+
+    // then
+    expect(screen.getByTestId("administration-link")).toHaveAttribute("href", "/admin");
   });
 
   it("given a trainer, when rendered, then the appointment workspace is reachable through administration", () => {

@@ -17,6 +17,7 @@ import { applyAccountLocale, supportedLocale } from "./i18n";
 import {
   clearPersonalBookingsOfflineData, listenForOtherClientSessionChanges, offlineMemberState
 } from "./offlineBookings";
+import { reachesAdministration } from "./navigation/administrationAccess";
 import { lazySurface } from "./navigation/lazySurface";
 import { HomeView } from "./views/HomeView";
 import { InitialPasswordView } from "./views/InitialPasswordView";
@@ -47,7 +48,6 @@ export function AppRoutes({ session, refreshSession, passwordChanged, initialPas
   const { pathname } = useLocation();
   const administrative = pathname === "/admin" || pathname.startsWith("/admin/");
   const administrator = session.roles.includes("ADMIN");
-  const managesAppointments = session.roles.some((role) => role !== "MEMBER");
 
   if (session.passwordChangeRequired) {
     return <Routes>
@@ -79,9 +79,11 @@ export function AppRoutes({ session, refreshSession, passwordChanged, initialPas
         signedOut={() => signedOut?.()} />
       : <Navigate to="/login" replace />} />
     {/* The role is asked once for the whole surface rather than once per destination. */}
-    <Route path="/admin/*" element={managesAppointments
+    <Route path="/admin/*" element={reachesAdministration(session)
       ? <Suspense fallback={<p role="status">{t("status.loading")}</p>}>
-        <AdminRoutes administrator={administrator} configurationChanged={(changed) => configurationChanged?.(changed)} />
+        <AdminRoutes administrator={administrator} managesAppointments={administrator || Boolean(session.managesAppointments)}
+          createsSeries={administrator || Boolean(session.createsSeries)}
+          configurationChanged={(changed) => configurationChanged?.(changed)} />
       </Suspense>
       : <Navigate to="/" replace />} />
     <Route path="*" element={<Navigate to="/" replace />} />
