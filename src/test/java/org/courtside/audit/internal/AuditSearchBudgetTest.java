@@ -7,6 +7,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -34,7 +35,8 @@ class AuditSearchBudgetTest {
                 nullable(Instant.class), nullable(UUID.class), any(Limit.class))).thenReturn(ids);
         when(events.findAllByIdIn(any())).thenReturn(batch);
         when(accounts.findAllById(any())).thenReturn(List.of());
-        AuditService service = new AuditService(events, accounts, List.of(), JsonMapper.builder().build());
+        AuditService service = new AuditService(events, accounts, List.of(), subjectIds -> Map.of(),
+                JsonMapper.builder().build());
 
         // when
         AuditService.SearchResult result = service.search("not present", null, null,

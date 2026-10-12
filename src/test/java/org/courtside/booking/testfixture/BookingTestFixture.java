@@ -8,6 +8,7 @@ import org.courtside.booking.BookingStatus;
 import org.courtside.booking.internal.BookingReminders;
 import org.courtside.booking.series.BookingSeries;
 import org.courtside.booking.series.BookingSeriesRepository;
+import org.courtside.booking.series.SeriesService;
 import org.courtside.booking.series.SeriesRule;
 import org.courtside.booking.CreateBookingCommand;
 import org.courtside.booking.ParticipantSpec;
@@ -25,6 +26,7 @@ public class BookingTestFixture {
     private final BookingRepository bookings;
     private final BookingReminders reminders;
     private final BookingSeriesRepository seriesRows;
+    private final SeriesService seriesService;
 
     public UUID createBookingWithGuest(UUID courtId, UUID cardId, TimeSlot slot,
                                        UUID bookerPersonId, Set<Role> roles, String guestName) {
@@ -39,6 +41,28 @@ public class BookingTestFixture {
         return bookingService.create(new CreateBookingCommand(
                 List.of(courtId), cardId, slot, bookedBy, bookerPersonId, roles, note,
                 List.of(ParticipantSpec.guest(guestName)), null));
+    }
+
+    public UUID createBookingOnCourts(List<UUID> courtIds, UUID cardId, TimeSlot slot,
+                                      UUID bookerPersonId, Set<Role> roles) {
+        return bookingService.create(new CreateBookingCommand(
+                courtIds, cardId, slot, UUID.randomUUID(), bookerPersonId, roles, null, List.of(), null));
+    }
+
+    public void cancelBooking(UUID bookingId, UUID cancelledBy, Set<Role> roles) {
+        bookingService.cancel(bookingId, cancelledBy, roles);
+    }
+
+    public UUID createSeries(UUID courtId, UUID cardId, java.time.LocalDate startsOn,
+                             java.time.LocalTime startTime, int durationMinutes, int occurrences,
+                             UUID bookedBy, UUID bookerPersonId, Set<Role> roles) {
+        SeriesRule rule = new SeriesRule(List.of(courtId), cardId, startsOn, startTime, durationMinutes,
+                1, Set.of(startsOn.getDayOfWeek()), null, occurrences);
+        List<java.time.Instant> starts = seriesService.preview(rule, bookedBy, bookerPersonId, roles)
+                .occurrences().stream()
+                .map(occurrence -> occurrence.slot().start())
+                .toList();
+        return seriesService.create(rule, starts, bookedBy, bookerPersonId, roles, null).seriesId();
     }
 
     public UUID createBookingNamingMember(UUID courtId, UUID cardId, TimeSlot slot, UUID bookedBy,
