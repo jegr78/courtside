@@ -19,6 +19,7 @@ const pom = readFileSync(join(repository, "pom.xml"), "utf8");
 const buildWorkflow = readFileSync(join(repository, ".github/workflows/build.yml"), "utf8");
 const stability = readFileSync(join(repository, ".github/workflows/test-stability.yml"), "utf8");
 const pwa = readFileSync(join(repository, "frontend/e2e/pwa-lifecycle.spec.ts"), "utf8");
+const firstInstall = readFileSync(join(repository, "frontend/e2e/pwa-first-install.spec.ts"), "utf8");
 const supported = readFileSync(join(repository, "frontend/e2e/supported-browser.spec.ts"), "utf8");
 const browserSecurity = readFileSync(join(repository, "frontend/e2e/browser-security.spec.ts"), "utf8");
 const browserSecuritySmoke = readFileSync(join(repository, "frontend/e2e/browser-security-smoke.spec.ts"), "utf8");
@@ -243,6 +244,12 @@ test("given the installed PWA, when its lifecycle is qualified, then bounded boo
 test("given the installed PWA, when checking supported engines, then Chromium and WebKit run its signed-in journey", () => {
   assert.match(playwright, /name: "webkit-pwa".*pwa-browser-compatibility\\\.spec\\\.ts/);
   assert.match(playwright, /name: "chromium"/);
+});
+
+test("given a first service-worker install, when browsers are qualified, then Firefox and WebKit check that no update is offered", () => {
+  assert.match(playwright, /name: "firefox-periodic", testMatch: \/[^/]*pwa-first-install\\\.spec\\\.ts/);
+  assert.match(playwright, /name: "webkit-pwa", testMatch: \/[^/]*pwa-first-install\\\.spec\\\.ts/);
+  assert.match(firstInstall, /ignoreHTTPSErrors: browserName === "firefox"/);
 });
 
 test("given a release on physical devices, when recording evidence, then both mobile platforms and immutable candidate identity are required", () => {
