@@ -42,6 +42,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.MultipartException;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
@@ -346,6 +347,17 @@ class SharedExceptionHandler {
         problem.setProperty("violations", List.of(Map.of(
                 "code", "request.uploadTooLarge",
                 "params", Map.of("maxBytes", exception.getMaxUploadSize()))));
+        logAnswered(problem);
+        return problem;
+    }
+
+    @ExceptionHandler(MultipartException.class)
+    ProblemDetail handleUnparseableMultipart(MultipartException exception) {
+        refusedByValidation();
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.BAD_REQUEST, "The request body could not be parsed");
+        problem.setType(URI.create("urn:courtside:error:malformed-request-body"));
+        problem.setTitle("Malformed request body");
         logAnswered(problem);
         return problem;
     }

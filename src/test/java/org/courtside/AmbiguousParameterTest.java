@@ -4,6 +4,8 @@ import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
@@ -198,6 +200,46 @@ class AmbiguousParameterTest extends AbstractIntegrationTest {
         assertThat(answer.statusCode()).isEqualTo(400);
         assertThat(type(answer)).isEqualTo(AMBIGUOUS);
         assertThat(detail(answer)).contains("scale");
+    }
+
+    @ParameterizedTest
+    @CsvSource({"PUT, /api/admin/config/logo", "POST, /api/admin/courts"})
+    void givenAMultipartBodyWithoutABoundary_whenItIsSent_thenItIsRefusedAsUnparseable(
+            String method, String address) throws Exception {
+        // given
+        signIn(USERNAME);
+
+        // when
+        HttpResponse<String> answer = httpClient.send(HttpRequest.newBuilder(URI.create(baseUrl() + address))
+                .header("Content-Type", "multipart/form-data")
+                .header("X-XSRF-TOKEN", csrfToken())
+                .method(method, HttpRequest.BodyPublishers.ofString("x"))
+                .build(), HttpResponse.BodyHandlers.ofString());
+
+        // then
+        assertThat(answer.statusCode()).as(answer.body()).isEqualTo(400);
+        assertThat(type(answer)).isEqualTo("urn:courtside:error:malformed-request-body");
+    }
+
+    @Test
+    void givenAMultipartBodyThatEndsBeforeItsClosingBoundary_whenALogoIsUploaded_thenItIsRefusedAsUnparseable()
+            throws Exception {
+        // given
+        signIn(USERNAME);
+        String boundary = "courtsideboundary";
+        String truncated = "--" + boundary + "\r\nContent-Disposition: form-data; name=\"file\"; filename=\"a.png\"";
+
+        // when
+        HttpResponse<String> answer = httpClient.send(HttpRequest.newBuilder(
+                        URI.create(baseUrl() + "/api/admin/config/logo"))
+                .header("Content-Type", "multipart/form-data; boundary=" + boundary)
+                .header("X-XSRF-TOKEN", csrfToken())
+                .PUT(HttpRequest.BodyPublishers.ofString(truncated))
+                .build(), HttpResponse.BodyHandlers.ofString());
+
+        // then
+        assertThat(answer.statusCode()).as(answer.body()).isEqualTo(400);
+        assertThat(type(answer)).isEqualTo("urn:courtside:error:malformed-request-body");
     }
 
     private static String part(String boundary, String name, String filename) {
