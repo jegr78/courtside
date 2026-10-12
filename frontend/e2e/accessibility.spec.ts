@@ -19,6 +19,14 @@ async function axeFindings(page: import("@playwright/test").Page): Promise<strin
     violation.nodes.map((node) => `${violation.id} at ${node.target.join(" ")}`));
 }
 
+// axe reads computed colours, so a control still fading into the new theme would be judged mid-way.
+async function transitionsSettled(page: import("@playwright/test").Page) {
+  const moving = () => page.evaluate(() => document.getAnimations()
+    .filter((animation): animation is CSSTransition => animation instanceof CSSTransition && animation.playState === "running")
+    .map((transition) => `${transition.transitionProperty} on ${(transition.effect as KeyframeEffect | null)?.target?.nodeName}`));
+  await expect.poll(moving, { message: "no transition still running when axe scans", timeout: 10_000 }).toEqual([]);
+}
+
 async function expectNoWcagViolations(page: import("@playwright/test").Page) {
   expect(await axeFindings(page), "an axe rule the page breaks").toEqual([]);
 }
@@ -525,6 +533,7 @@ test.describe("every page", () => {
         const scanInBothThemes = async (where: string) => {
           for (const pass of [1, 2]) {
             const theme = await html.getAttribute("data-theme");
+            await transitionsSettled(page);
             findings.push(...(await axeFindings(page)).map((finding) => `${where} in ${theme}: ${finding}`));
             if (pass === 2) break;
             const other = theme === "dark" ? "light" : "dark";
