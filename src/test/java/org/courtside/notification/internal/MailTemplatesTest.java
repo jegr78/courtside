@@ -4,6 +4,8 @@ import org.courtside.notification.MessageKind;
 import org.courtside.shared.CancellationReason;
 import org.junit.jupiter.api.Test;
 
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Locale;
 import java.util.Map;
 
@@ -36,7 +38,12 @@ class MailTemplatesTest {
             entry("weekdays", "Tuesday"), entry("first", "Tuesday, 19 May 2026"),
             entry("last", "Tuesday, 2 June 2026"), entry("count", "3"),
             entry("reason", "Reason: the weather."), entry("previousFrom", "17:00"), entry("previousTo", "19:00"),
-            entry("previousCourts", "Court 2"), entry("until", "18:15"), entry("untilDay", "Wednesday, 13 May 2026"));
+            entry("previousCourts", "Court 2"), entry("until", "18:15"), entry("untilDay", "Wednesday, 13 May 2026"),
+            entry("instanceLink", "https://courts.example.org/my-bookings"));
+
+    private static final Set<MessageKind> CREDENTIAL_KINDS = Set.of(MessageKind.CREDENTIALS_NEW_ACCOUNT,
+            MessageKind.CREDENTIALS_PASSWORD_RESET, MessageKind.ACCOUNT_PASSWORD_RESET_CODE,
+            MessageKind.ACCOUNT_USERNAME_REMINDER);
 
     private final MailTemplates templates = new MailTemplates();
 
@@ -151,5 +158,97 @@ class MailTemplatesTest {
                 templates.render("credentials.newAccount.body", Locale.ENGLISH, Map.of()))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("credentials.newAccount.body");
+    }
+
+    @Test
+    void givenNoInstanceAddress_whenABookingMessageIsRendered_thenItReadsExactlyAsWithoutTheLinkLine() {
+        // given
+        Map<String, String> values = new HashMap<>(VALUES);
+        values.put("instanceLink", "");
+
+        // when
+        String body = templates.render("booking.confirmed.body", Locale.ENGLISH, values);
+
+        // then
+        assertThat(body).isEqualTo("Hello Jane,\n\nYour booking at Example Tennis Club is confirmed.\n\n"
+                + "Wednesday, 13 May 2026\n18:00 to 19:00\nCourt: Court 1\nBooking type: Member booking\n\n"
+                + "You can cancel the booking in Courtside.\n\nExample Tennis Club");
+    }
+
+    @Test
+    void givenAnInstanceAddress_whenABookingMessageIsRendered_thenItEndsWithTheLinkOnItsOwnLine() {
+        // when / then
+        for (Locale locale : new Locale[] {Locale.GERMAN, Locale.ENGLISH}) {
+            assertThat(templates.render("booking.reminder.body", locale, VALUES)).as("%s", locale)
+                    .endsWith("\nExample Tennis Club\nhttps://courts.example.org/my-bookings");
+        }
+    }
+
+    @Test
+    void givenAnEmptyLinkOnItsOwnLine_whenRendered_thenOnlyThatLineIsDropped() {
+        // when
+        String rendered = MailTemplates.fill("test", "First\n{instanceLink}\n\nLast\n {instanceLink} ",
+                Map.of("instanceLink", ""));
+
+        // then
+        assertThat(rendered).isEqualTo("First\n\nLast");
+    }
+
+    @Test
+    void givenAnEmptyLinkInsideASentence_whenRendered_thenItRendersEmptyAndKeepsTheLine() {
+        // when
+        String rendered = MailTemplates.fill("test", "Open {instanceLink} to see it.\n{clubName}",
+                Map.of("instanceLink", "", "clubName", "Example Tennis Club"));
+
+        // then
+        assertThat(rendered).isEqualTo("Open  to see it.\nExample Tennis Club");
+    }
+
+    @Test
+    void givenAnEmptyValueOtherThanTheLinkOnItsOwnLine_whenRendered_thenTheLineStays() {
+        // when
+        String rendered = MailTemplates.fill("test", "First\n{clubName}\nLast", Map.of("clubName", ""));
+
+        // then
+        assertThat(rendered).as("only the link may vanish with its line").isEqualTo("First\n\nLast");
+    }
+
+    @Test
+    void whenReadingTheShippedBookingMessages_thenEachBodyEndsWithTheLinkOnItsOwnLine() {
+        // when / then
+        for (Locale locale : new Locale[] {Locale.GERMAN, Locale.ENGLISH}) {
+            ResourceBundle bundle = ResourceBundle.getBundle("mail", locale);
+            for (MessageKind kind : InstanceLinks.LINKED) {
+                assertThat(bundle.getString(kind.templateKey() + ".body")).as("%s in %s", kind, locale)
+                        .endsWith("\n{instanceLink}");
+                assertThat(bundle.getString(kind.templateKey() + ".subject")).as("%s in %s", kind, locale)
+                        .doesNotContain("{instanceLink}");
+            }
+        }
+    }
+
+    @Test
+    void whenReadingTheShippedCredentialMessages_thenNoneCarriesALinkOrAnAddress() {
+        // given
+        Set<MessageKind> credentialKinds = new HashSet<>(CREDENTIAL_KINDS);
+        for (MessageKind kind : MessageKind.values()) {
+            String body = ResourceBundle.getBundle("mail", Locale.ENGLISH).getString(kind.templateKey() + ".body");
+            if (body.contains("{credential}") || body.contains("{resetCode}")) {
+                credentialKinds.add(kind);
+            }
+        }
+
+        // when / then
+        for (Locale locale : new Locale[] {Locale.GERMAN, Locale.ENGLISH}) {
+            ResourceBundle bundle = ResourceBundle.getBundle("mail", locale);
+            for (MessageKind kind : credentialKinds) {
+                for (String part : new String[] {".subject", ".body"}) {
+                    assertThat(bundle.getString(kind.templateKey() + part))
+                            .as("a credential message is what phishing imitates: %s%s in %s", kind, part, locale)
+                            .doesNotContain("{instanceLink}")
+                            .doesNotContainPattern("(?i)[a-z][a-z0-9+.-]*://|www\\.|\\b[a-z0-9-]+\\.(?:org|com|de|net)\\b");
+                }
+            }
+        }
     }
 }

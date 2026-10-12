@@ -35,6 +35,7 @@ class ParticipationMailer implements MessageComposer {
     private final PersonRepository persons;
     private final ClubIdentity club;
     private final MailTemplates templates;
+    private final InstanceLinks links;
     private final BookingWording wording;
     private final MessageOutbox outbox;
 
@@ -81,6 +82,7 @@ class ParticipationMailer implements MessageComposer {
         Locale locale = MessageLanguage.of(account.getLocale(), club.defaultLocale());
         Map<String, String> values = new HashMap<>(wording.of(booking, locale));
         values.put("firstName", account.getPerson().getFirstName());
+        values.put(InstanceLinks.PLACEHOLDER, links.of(message));
         if (message.kind() == MessageKind.BOOKING_PLAYER_WITHDREW) {
             Person player = persons.findById(message.player())
                     .orElseThrow(() -> new MessageUndeliverableException("PlayerGone"));

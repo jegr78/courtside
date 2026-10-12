@@ -2,6 +2,7 @@ package org.courtside.notification.internal;
 
 import org.springframework.stereotype.Component;
 
+import java.util.Arrays;
 import java.util.Locale;
 import java.util.Map;
 import java.util.MissingResourceException;
@@ -16,10 +17,20 @@ class MailTemplates {
 
     private static final String BUNDLE = "mail";
     private static final Pattern PLACEHOLDER = Pattern.compile("\\{([a-zA-Z]+)}");
+    private static final Pattern EMPTY_LINK_LINE =
+            Pattern.compile("[ \\t]*\\{" + InstanceLinks.PLACEHOLDER + "}[ \\t]*");
+
+    String render(String key, Locale locale, Map<String, String> values) {
+        return fill(key, bundle(locale).getString(key), values);
+    }
 
     // One pass over the template, so a value that happens to read like a placeholder stays a value.
-    String render(String key, Locale locale, Map<String, String> values) {
-        return PLACEHOLDER.matcher(bundle(locale).getString(key)).replaceAll(match -> {
+    static String fill(String key, String template, Map<String, String> values) {
+        String withoutEmptyLink = "".equals(values.get(InstanceLinks.PLACEHOLDER))
+                ? String.join("\n", Arrays.stream(template.split("\n", -1))
+                        .filter(line -> !EMPTY_LINK_LINE.matcher(line).matches()).toList())
+                : template;
+        return PLACEHOLDER.matcher(withoutEmptyLink).replaceAll(match -> {
             String name = match.group(1);
             String value = values.get(name);
             if (value == null) {

@@ -28,6 +28,7 @@ class DisplacementMailer implements MessageComposer {
     private final UserAccountRepository accounts;
     private final ClubIdentity club;
     private final MailTemplates templates;
+    private final InstanceLinks links;
     private final BookingWording wording;
     private final MessageOutbox outbox;
 
@@ -53,6 +54,7 @@ class DisplacementMailer implements MessageComposer {
         String key = MessageKind.BOOKING_DISPLACED.templateKey();
         Map<String, String> values = new HashMap<>(wording.of(booking, locale));
         values.put("firstName", account.getPerson().getFirstName());
+        values.put(InstanceLinks.PLACEHOLDER, links.of(message));
         values.put("closure", templates.render(key + "." + closureKey(closure), locale, values));
         handOver.accept(new OutgoingMail(account.getPerson().getEmail(),
                 templates.render(key + ".subject", locale, values),
