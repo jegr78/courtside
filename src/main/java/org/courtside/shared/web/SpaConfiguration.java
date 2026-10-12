@@ -1,11 +1,22 @@
 package org.courtside.shared.web;
 
+import org.springframework.boot.tomcat.servlet.TomcatServletWebServerFactory;
+import org.springframework.boot.web.server.WebServerFactoryCustomizer;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.ViewControllerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 @Configuration(proxyBeanMethods = false)
 class SpaConfiguration implements WebMvcConfigurer {
+
+    // Tomcat otherwise suspends the response under the filters' wrappers after a forward, so a HEAD,
+    // which writes no body, drops the headers the security filter writes once the chain returns.
+    @Bean
+    WebServerFactoryCustomizer<TomcatServletWebServerFactory> closeForwardsThroughTheFilters() {
+        return factory -> factory.addContextCustomizers(
+                context -> context.setSuspendWrappedResponseAfterForward(false));
+    }
 
     @Override
     public void addViewControllers(ViewControllerRegistry registry) {
