@@ -12,12 +12,13 @@ const manifestPath = ".release-please-manifest.json";
 function versionOf(version) {
   const match = typeof version === "string" ? versionPattern.exec(version) : null;
   if (!match) throw new Error(`${JSON.stringify(version)} is not a release version`);
-  return { major: match[1], minor: match[2], patch: Number(match[3]), prerelease: match[4] ?? null };
+  return { major: Number(match[1]), minor: Number(match[2]), patch: Number(match[3]), prerelease: match[4] ?? null };
 }
 
 export function releaseBranchOf(version) {
   const { major, minor, patch, prerelease } = versionOf(version);
-  return patch === 0 || prerelease !== null ? "main" : `release/${major}.${minor}`;
+  if (patch > 0 && prerelease !== null) throw new Error(`${version}: no line releases a patch candidate`);
+  return patch === 0 ? "main" : `release/${major}.${minor}`;
 }
 
 export function targetBranch(branch) {
@@ -47,6 +48,11 @@ export function releasableTypes(config) {
     .map((section) => section.type));
 }
 
+export function releaseToolingPaths(workflowTexts) {
+  return [...new Set(workflowTexts.flatMap((text) => [...text.matchAll(/(?<![\w./-])tools\/[\w.-]+\.mjs\b/g)]
+    .map(([path]) => path)))].toSorted();
+}
+
 function recordedVersion(git, revision) {
   return JSON.parse(git("show", `${revision}:${manifestPath}`))["."];
 }
@@ -69,24 +75,50 @@ function commitsBetween(git, from, to) {
     });
 }
 
+// The same split as release-please 17.6's splitMessages, which lists each part as its own entry.
 const nestedCommitPattern = /\r?\n\r?\n(?=(?:feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(?:\(.*?\))?: )/;
 
-function released(message, releasable) {
-  return message.split(nestedCommitPattern).some((part) => {
-    const header = headerPattern.exec(part);
-    return header !== null && (releasable.has(header[1]) || header[2] === "!" || /^BREAKING[ -]CHANGE: /m.test(part));
-  });
+function entriesOf(message) {
+  const [outer, ...nested] = message.split("BEGIN_NESTED_COMMIT");
+  let head = outer;
+  const entries = [];
+  for (const part of nested) {
+    const [entry, ...rest] = part.split("END_NESTED_COMMIT");
+    entries.push(entry.trim());
+    head += rest.join("END_NESTED_COMMIT");
+  }
+  return [...head.split(nestedCommitPattern), ...entries];
+}
+
+function releasedEntry(entry, releasable) {
+  const header = headerPattern.exec(entry);
+  return header !== null && (releasable.has(header[1]) || header[2] === "!" || /^BREAKING[ -]CHANGE: /m.test(entry));
+}
+
+function citedCommits(text) {
+  return [...text.matchAll(cherryPickPattern)].map(([, sha]) => sha);
+}
+
+function pickedFromMain(message, releasable, onMain) {
+  const segments = message.split(/\r?\n\r?\n(?=\* )/);
+  const considered = (segments.length > 1 ? segments.slice(1) : segments).map((segment) => segment.replace(/^\* /, ""))
+    .filter((segment) => !(headerPattern.test(segment) && !releasedEntry(segment, releasable)));
+  return considered.length > 0 && considered.every((segment) => citedCommits(segment).some(onMain));
 }
 
 export function forwardPortVerdict({ git, baseRef, headRef, mainRef, releasable }) {
   const tag = `v${recordedVersion(git, baseRef)}`;
   const tagRef = `refs/tags/${tag}`;
+  if (!succeeds(git, "rev-parse", "--verify", "--quiet", `${tagRef}^{commit}`)) {
+    return { check: "forward-port", accepted: false, missing: [],
+      detail: `${tag} is not tagged, so the changes since the last release cannot be read` };
+  }
   const onMain = (sha) => succeeds(git, "merge-base", "--is-ancestor", sha, mainRef);
-  const ports = commitsBetween(git, tagRef, mainRef).map(({ message }) => message).join("\n");
+  const ported = new Set(commitsBetween(git, tagRef, mainRef).flatMap(({ message }) => citedCommits(message)));
   const missing = commitsBetween(git, tagRef, headRef)
-    .filter(({ message }) => released(message, releasable))
-    .filter(({ message }) => ![...message.matchAll(cherryPickPattern)].some(([, origin]) => onMain(origin)))
-    .filter(({ sha }) => !ports.includes(`(cherry picked from commit ${sha})`))
+    .filter(({ message }) => entriesOf(message).some((entry) => releasedEntry(entry, releasable)))
+    .filter(({ sha }) => !ported.has(sha) && !onMain(sha))
+    .filter(({ message }) => !pickedFromMain(message, releasable, onMain))
     .map(({ sha, message }) => `${sha} ${message.split("\n")[0]}`);
   return { check: "forward-port", accepted: missing.length === 0, missing,
     detail: missing.length === 0 ? `every released change since ${tag} is on main`
@@ -94,19 +126,52 @@ export function forwardPortVerdict({ git, baseRef, headRef, mainRef, releasable 
         + "(cherry picked from commit <sha>) line" };
 }
 
-export function pullRequestVerdicts({ git, base, headRef, refOf, releasable }) {
+export function pullRequestVerdicts({ git, base, headRef, refOf, releasable, body = "" }) {
   const baseRef = refOf(targetBranch(base));
+  const override = base !== "main" && /BEGIN_COMMIT_OVERRIDE/.test(body ?? "")
+    ? [{ check: "override", accepted: false, detail: "release-please would replace this pull request's commit message "
+      + "with BEGIN_COMMIT_OVERRIDE, which the forward-port check cannot read from git" }]
+    : [];
   const version = recordedVersion(git, headRef);
   if (version === recordedVersion(git, baseRef)) {
-    return [{ check: "release", accepted: true,
+    return [...override, { check: "release", accepted: true,
       detail: "the manifest does not change, so this is not a release pull request" }];
   }
   const line = lineVerdict({ base, version });
-  if (!line.accepted || base === "main") return [line];
-  return [line, forwardPortVerdict({ git, baseRef, headRef, mainRef: refOf("main"), releasable })];
+  if (!line.accepted || base === "main") return [...override, line];
+  return [...override, line, forwardPortVerdict({ git, baseRef, headRef, mainRef: refOf("main"), releasable })];
 }
 
-export function tagAdmission({ git, tag, commit, refOf }) {
+function precedes(left, right) {
+  for (const field of ["major", "minor", "patch"]) {
+    if (left[field] !== right[field]) return left[field] < right[field];
+  }
+  return false;
+}
+
+export function newestLineVerdict(version, published) {
+  const releases = published.map((tag) => {
+    const named = /^v(.+)$/.exec(tag)?.[1];
+    try {
+      return versionOf(named);
+    } catch {
+      throw new Error(`published tags must be release tags, not ${JSON.stringify(tag)}`);
+    }
+  }).filter((release) => release.prerelease === null);
+  const candidate = versionOf(version);
+  const newerLine = releases.find((release) => release.major > candidate.major
+    || (release.major === candidate.major && release.minor > candidate.minor));
+  const latest = candidate.prerelease === null && !releases.some((release) => precedes(candidate, release));
+  if (candidate.patch > 0 && newerLine) {
+    return { check: "newest-line", accepted: false, latest: false,
+      detail: `${version} patches ${candidate.major}.${candidate.minor}, but ${newerLine.major}.${newerLine.minor}.`
+        + `${newerLine.patch} is published and only the newest line is maintained` };
+  }
+  return { check: "newest-line", accepted: true, latest,
+    detail: `no line newer than ${candidate.major}.${candidate.minor} is published` };
+}
+
+export function tagAdmission({ git, tag, commit, refOf, published }) {
   const version = /^v(.+)$/.exec(tag ?? "")?.[1];
   let branch;
   try {
@@ -127,7 +192,8 @@ export function tagAdmission({ git, tag, commit, refOf }) {
       detail: onBranch ? `${commit} is on ${branch}` : `${tag} does not point at a commit on ${branch}` },
     { check: "manifest", accepted: recorded === version,
       detail: recorded === version ? `${commit} records ${version}`
-        : `${tag} names ${version}, but ${commit} records ${recorded ?? "no released version"}` }
+        : `${tag} names ${version}, but ${commit} records ${recorded ?? "no released version"}` },
+    newestLineVerdict(version, published)
   ];
 }
 
@@ -154,12 +220,22 @@ function fetchBranches(git, branches) {
   }
 }
 
-const usage = "usage: release-line.mjs pull-request --base <branch> --head <commit-or-ref> | "
-  + "admit-tag --tag <tag> --commit <sha> [--summary <file>] [--github-output <file>]";
+function fetchTag(git, tag) {
+  try {
+    git("fetch", "--quiet", "--no-tags", "origin", `+refs/tags/${tag}:refs/tags/${tag}`);
+  } catch {
+    process.stderr.write(`origin has no tag ${tag}\n`);
+  }
+}
+
+const usage = "usage: release-line.mjs pull-request --base <branch> --head <commit-or-ref> [--summary <file>] | "
+  + "admit-tag --tag <tag> --commit <sha> --published-tags <json> [--summary <file>] [--github-output <file>]";
+const optional = ["summary", "github-output"];
 
 function optionsOf(arguments_) {
   const [command, ...rest] = arguments_;
-  const allowed = { "pull-request": ["base", "head", "summary"], "admit-tag": ["tag", "commit", "summary", "github-output"] }[command];
+  const allowed = { "pull-request": ["base", "head", "summary"],
+    "admit-tag": ["tag", "commit", "published-tags", "summary", "github-output"] }[command];
   if (!allowed || rest.length % 2 !== 0) throw new Error(usage);
   const options = { command };
   for (let index = 0; index < rest.length; index += 2) {
@@ -167,8 +243,7 @@ function optionsOf(arguments_) {
     if (!rest[index].startsWith("--") || !allowed.includes(key) || options[key] !== undefined) throw new Error(usage);
     options[key] = rest[index + 1];
   }
-  const required = allowed.filter((key) => !["summary", "github-output"].includes(key));
-  if (required.some((key) => !options[key])) throw new Error(usage);
+  if (allowed.filter((key) => !optional.includes(key)).some((key) => !options[key])) throw new Error(usage);
   return options;
 }
 
@@ -181,29 +256,36 @@ function report(verdicts, summary) {
   return verdicts.every(({ accepted }) => accepted);
 }
 
-export function main(arguments_, git = runGit) {
+export function main(arguments_, git = runGit, environment = process.env) {
   const options = optionsOf(arguments_);
-  const refOf = remoteRefOf;
   if (options.command === "pull-request") {
     if (!/^[A-Za-z0-9][A-Za-z0-9._/-]*$/.test(options.head)) {
       throw new Error("--head must name a commit or a ref, such as a full sha");
     }
     const base = targetBranch(options.base);
     const head = git("rev-parse", "--verify", `${options.head}^{commit}`);
-    const releaseBranch = releaseBranchOf(recordedVersion(git, head));
-    fetchBranches(git, [base, "main", releaseBranch]);
+    fetchBranches(git, [base, "main"]);
+    fetchTag(git, `v${recordedVersion(git, remoteRefOf(base))}`);
     const config = JSON.parse(readFileSync(new URL("../release-please-config.json", import.meta.url), "utf8"));
-    return report(pullRequestVerdicts({ git, base, headRef: head, refOf, releasable: releasableTypes(config) }),
-      options.summary);
+    return report(pullRequestVerdicts({ git, base, headRef: head, refOf: remoteRefOf,
+      releasable: releasableTypes(config), body: environment.PULL_REQUEST_BODY ?? "" }), options.summary);
   }
   if (!commitPattern.test(options.commit)) throw new Error("--commit must be a full 40-character sha");
+  const published = JSON.parse(options["published-tags"]);
+  if (!Array.isArray(published)) throw new Error("--published-tags must be a JSON array of tags");
   const version = /^v(.+)$/.exec(options.tag)?.[1];
-  if (versionPattern.test(version ?? "")) {
-    const branch = releaseBranchOf(version);
+  let branch = null;
+  try {
+    branch = releaseBranchOf(version);
     fetchBranches(git, [branch]);
-    if (options["github-output"]) appendFileSync(options["github-output"], `branch=${branch}\n`);
+  } catch {
+    branch = null;
   }
-  return report(tagAdmission({ git, tag: options.tag, commit: options.commit, refOf }), options.summary);
+  const verdicts = tagAdmission({ git, tag: options.tag, commit: options.commit, refOf: remoteRefOf, published });
+  if (options["github-output"] && branch !== null) {
+    appendFileSync(options["github-output"], `branch=${branch}\nlatest=${verdicts.at(-1).latest === true}\n`);
+  }
+  return report(verdicts, options.summary);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

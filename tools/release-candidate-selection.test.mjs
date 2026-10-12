@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+import { branchFetchArguments, remoteRefOf } from "./release-line.mjs";
 import {
-  branchFetchArguments,
   greenExactBuild,
   pendingReleasePullRequests,
   readCommitFacts,
@@ -37,6 +37,8 @@ function workflowRun(overrides = {}) {
       { number: 1290, title: "chore(main): release 0.1.0", mergeCommit, mergeCommitIsAncestor: true }
     ],
     exactBuild: { runId: 37211926310, runAttempt: 1 },
+    newestLine: { check: "newest-line", accepted: true, latest: true, detail: "no line newer than 0.1 is published" },
+    missingTooling: [],
     ...overrides
   };
 }
@@ -311,6 +313,7 @@ function patchDispatch(overrides = {}) {
       { number: 1501, title: "chore(release/0.1): release 0.1.1", mergeCommit, mergeCommitIsAncestor: true }
     ],
     exactBuild: { runId: 37311926310, runAttempt: 1 },
+    forwardPort: { check: "forward-port", accepted: true, missing: [], detail: "every released change since v0.1.0 is on main" },
     ...overrides
   });
 }
@@ -382,4 +385,39 @@ test("given the branch a release belongs to, when it is fetched, then a tag of t
   for (const branch of ["release/0.1.1", "release/x", "refs/heads/main", "release/0.1 ", "feature/release/0.1"]) {
     assert.throws(() => branchFetchArguments(branch), /not a release target/, `${branch} is not fetched as a release line`);
   }
+});
+
+test("given a patch whose fix has no port on main, when the candidate selects, then it refuses even without a required check",
+  () => {
+    // when / then
+    assert.throws(() => selectReleaseCandidate(patchDispatch({ forwardPort: { check: "forward-port", accepted: false,
+      missing: ["abc fix: correct the hours"], detail: "1 released change(s) since v0.1.0 have no commit on main" } })),
+    /1 released change\(s\) since v0\.1\.0 have no commit on main: abc fix: correct the hours/);
+    assert.throws(() => selectReleaseCandidate(patchDispatch({ forwardPort: undefined })), /forward-port check did not run/,
+      "a patch is refused when nobody checked its ports");
+    assert.equal(selectReleaseCandidate(dispatch({ forwardPort: undefined })).release, true,
+      "main's own releases owe no forward port");
+  });
+
+test("given a patch of a line a newer minor replaced, when the candidate selects, then it is refused before anything is built",
+  () => {
+    // when / then
+    assert.throws(() => selectReleaseCandidate(patchDispatch({ newestLine: { check: "newest-line", accepted: false,
+      latest: false, detail: "0.1.1 patches 0.1, but 0.2.0 is published and only the newest line is maintained" } })),
+    /only the newest line is maintained/);
+    assert.throws(() => selectReleaseCandidate(workflowRun({ newestLine: undefined })), /newest-line check did not run/);
+  });
+
+test("given a commit without the tooling the release workflows call, when the candidate selects, then it names what to port", () => {
+  // when / then
+  assert.throws(() => selectReleaseCandidate(patchDispatch({ missingTooling: ["tools/release-line.mjs"] })),
+    /lacks tools\/release-line\.mjs, which the release workflows call at the candidate; port it to release\/0\.1/);
+  assert.throws(() => selectReleaseCandidate(dispatch({ rehearsal: true, missingTooling: ["tools/release-line.mjs"] })),
+    /lacks tools\/release-line\.mjs/, "a rehearsal builds the commit with the same workflows");
+});
+
+test("given the branch helpers the selection uses, when they name a branch, then they come from the release line tool", () => {
+  // when / then
+  assert.equal(remoteRefOf("release/0.1"), "refs/remotes/origin/release/0.1");
+  assert.equal(branchFetchArguments("main").at(-1), "+refs/heads/main:refs/remotes/origin/main");
 });

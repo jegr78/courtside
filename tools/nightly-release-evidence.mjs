@@ -112,10 +112,10 @@ function findOnBranch({ branch, commit }) {
   }
 }
 
-function findArgumentsOf(args) {
+export function findArgumentsOf(args) {
   const options = {};
   for (let index = 1; index < args.length; index += 2) {
-    const key = args[index]?.slice(2);
+    const key = args[index]?.startsWith("--") ? args[index].slice(2) : undefined;
     if (!["branch", "commit"].includes(key) || args[index + 1] === undefined || options[key] !== undefined) {
       throw new Error("usage: nightly-release-evidence --find --branch <branch> --commit <sha>");
     }

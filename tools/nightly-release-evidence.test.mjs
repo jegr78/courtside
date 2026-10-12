@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-import { findNightlyRelease, nightlyRunsOf, validateNightlyReleaseEvidence } from "./nightly-release-evidence.mjs";
+import { findArgumentsOf, findNightlyRelease, nightlyRunsOf, validateNightlyReleaseEvidence } from "./nightly-release-evidence.mjs";
 
 const require = createRequire(new URL("../frontend/package.json", import.meta.url));
 const yaml = require("js-yaml");
@@ -156,4 +156,11 @@ test("given runs from a fork, another workflow or a re-run, when nightly candida
   assert.deepEqual(nightlyRunsOf([{ workflow_runs: foreign }], "release/0.1", repository), []);
   assert.throws(() => nightlyRunsOf([], "release/0.1-evil", repository), /not a release target/,
     "only main and release/<major>.<minor> carry release evidence");
+});
+
+test("given find arguments without their dashes, when they are parsed, then the lookup is refused", () => {
+  // when / then
+  assert.deepEqual(findArgumentsOf(["--find", "--branch", "main", "--commit", commit]), { branch: "main", commit });
+  assert.throws(() => findArgumentsOf(["--find", "xxbranch", "main", "--commit", commit]), /usage/,
+    "an option is named with its two dashes, not by whatever two characters precede it");
 });

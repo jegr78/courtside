@@ -1,9 +1,13 @@
 import { execFileSync } from "node:child_process";
 import { appendFileSync, readFileSync } from "node:fs";
-import { pathToFileURL } from "node:url";
-import { branchFetchArguments, releaseBranchOf } from "./release-line.mjs";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import {
+  branchFetchArguments, forwardPortVerdict, newestLineVerdict, releasableTypes, releaseBranchOf, releaseToolingPaths,
+  remoteRefOf
+} from "./release-line.mjs";
 
-export { branchFetchArguments };
+const releaseWorkflows = ["release-candidate.yml", "release-gates.yml", "release.yml", "release-plan-sync.yml"]
+  .map((name) => `.github/workflows/${name}`);
 
 const commitPattern = /^[a-f0-9]{40}$/;
 const versionPattern = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
@@ -81,7 +85,13 @@ export function selectReleaseCandidate(facts) {
   const branch = releaseBranchOf(version);
   const selected = (reason, pendingPullRequest, build) => ({ release: true, reason, commit, version,
     tag: `v${version}`, branch, rehearsal: event === "workflow_dispatch" && rehearsal, pendingPullRequest, build });
+  if (facts.missingTooling?.length > 0) {
+    throw new Error(`${commit} lacks ${facts.missingTooling.join(", ")}, which the release workflows call at the `
+      + `candidate; ${branch === "main" ? "the commit predates that tooling" : `port it to ${branch}`}`);
+  }
   if (event === "workflow_dispatch" && rehearsal) return selected("rehearsal", null, null);
+  if (facts.newestLine === undefined) throw new Error("the newest-line check did not run");
+  if (facts.newestLine.accepted !== true) throw new Error(facts.newestLine.detail);
   if (event === "workflow_run" && branch !== "main") {
     throw new Error(`${version} is released from ${branch}, not from main`);
   }
@@ -93,6 +103,12 @@ export function selectReleaseCandidate(facts) {
     if (facts.tagExists) throw new Error(`v${version} is already tagged`);
   }
   const pullRequest = pendingRelease(facts.pendingPullRequests, version, commit, branch);
+  if (branch !== "main") {
+    if (facts.forwardPort === undefined) throw new Error("the forward-port check did not run");
+    if (facts.forwardPort.accepted !== true) {
+      throw new Error(`${facts.forwardPort.detail}: ${facts.forwardPort.missing.join(", ")}`);
+    }
+  }
   const build = buildRunOf(event === "workflow_run" ? facts.build : facts.exactBuild);
   if (build === null) throw new Error(`no green build of ${commit} on ${branch}`);
   const reason = event === "workflow_run" ? "release-commit" : branch === "main" ? "re-run" : "patch-release";
@@ -185,11 +201,15 @@ export function gatherFacts(options, environment = process.env) {
     if (headSha !== commit) throw new Error(`the finished build ran ${headSha}, not ${commit}`);
     facts.build = build;
   }
+  if (event === "workflow_dispatch" || facts.manifest !== facts.parentManifest) {
+    facts.missingTooling = releaseToolingPaths(releaseWorkflows.map((path) => readFileSync(new URL(`../${path}`,
+      import.meta.url), "utf8"))).filter((path) => !succeeds("git", ["cat-file", "-e", `${commit}:${path}`]));
+  }
   const releasing = event === "workflow_dispatch" ? !rehearsal : facts.manifest !== facts.parentManifest;
   if (!releasing) return facts;
   const branch = releaseBranchOf(facts.manifest);
   git(...branchFetchArguments(branch));
-  facts.onBranch = succeeds("git", ["merge-base", "--is-ancestor", commit, `refs/remotes/origin/${branch}`]);
+  facts.onBranch = succeeds("git", ["merge-base", "--is-ancestor", commit, remoteRefOf(branch)]);
   facts.tagExists = command("git", ["ls-remote", "--tags", "origin", `refs/tags/v${facts.manifest}`]) !== "";
   const label = encodeURIComponent(pendingLabel);
   facts.pendingPullRequests = pendingReleasePullRequests(
@@ -205,6 +225,17 @@ export function gatherFacts(options, environment = process.env) {
     facts.exactBuild = greenExactBuild(
       api(`repos/${repository}/actions/workflows/build.yml/runs?head_sha=${commit}&status=success&per_page=100`),
       repository, branch);
+  }
+  facts.newestLine = newestLineVerdict(facts.manifest, JSON.parse(command(process.execPath,
+    [fileURLToPath(new URL("./published-release-tags.mjs", import.meta.url))])));
+  const merged = facts.pendingPullRequests.find((pullRequest) => pullRequest.mergeCommitIsAncestor);
+  if (branch !== "main" && merged !== undefined) {
+    git(...branchFetchArguments("main"));
+    const previous = JSON.parse(git("show", `${merged.mergeCommit}^1:.release-please-manifest.json`))["."];
+    git("fetch", "--no-tags", "origin", `+refs/tags/v${previous}:refs/tags/v${previous}`);
+    const config = JSON.parse(readFileSync(new URL("../release-please-config.json", import.meta.url), "utf8"));
+    facts.forwardPort = forwardPortVerdict({ git, baseRef: `${merged.mergeCommit}^1`, headRef: commit,
+      mainRef: remoteRefOf("main"), releasable: releasableTypes(config) });
   }
   return facts;
 }
