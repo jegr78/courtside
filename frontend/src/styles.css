@@ -657,6 +657,50 @@ input[type="time"] {
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+
+  /* A phone in landscape keeps its height for the grid, so the day strip scrolls away with the page. */
+  @media (height < 500px) {
+    .week-day-navigation {
+      position: static;
+    }
+
+    .day-plan thead th {
+      top: 0;
+    }
+
+    .day-plan {
+      scroll-margin-top: 0;
+    }
+  }
+}
+
+.dialog-body {
+  scroll-padding-block-end: 3rem;
+}
+
+.dialog-continues {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  height: 3rem;
+  padding-bottom: 0.25rem;
+  color: var(--cs-muted);
+  pointer-events: none;
+  background: linear-gradient(to bottom, transparent, var(--cs-panel) 70%);
+}
+
+.dialog-continues svg {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+@media (forced-colors: active) {
+  .dialog-continues {
+    background: Canvas;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -261,6 +261,22 @@ describe("AdminManagedAppointmentsView", () => {
     expect(api.managedAppointment).toHaveBeenCalledWith(first.id);
   });
 
+  it("given a managed appointment, when details open, then they scroll while the close button stays below the body", async () => {
+    // given
+    vi.spyOn(api, "managedAppointment").mockResolvedValue({ ...first, note: "Prepare score sheets", participants: [] });
+    show();
+    const series = await screen.findByTestId("managed-series-series-1");
+    await userEvent.click(within(series).getByTestId("managed-series-summary"));
+
+    // when
+    await userEvent.click(within(series).getAllByTestId("managed-details")[0]);
+
+    // then
+    const body = within(screen.getByRole("dialog")).getByTestId("dialog-body");
+    expect(body, "the details scroll inside the body").toContainElement(await screen.findByTestId("managed-note"));
+    expect(body, "the close button stays outside the scrolling body").not.toContainElement(screen.getByTestId("close-managed-appointment"));
+  });
+
   it("given another upcoming page is in flight, when history opens, then the stale page is discarded", async () => {
     // given
     let resolveMore!: (page: { items: ManagedAppointment[] }) => void;

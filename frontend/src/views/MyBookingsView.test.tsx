@@ -884,3 +884,37 @@ it("given a link to a booking the lists do not hold, when the bookings have load
   expect(document.activeElement).toBe(document.body);
   expect(screen.getByTestId("past-bookings")).not.toHaveAttribute("open");
 });
+
+it("given a move dialog, when it opens and previews, then its fields scroll while its actions stay below the body", async () => {
+  // given
+  render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} />);
+  await userEvent.click(await screen.findByTestId("move-booking"));
+  const body = within(screen.getByTestId("move-dialog")).getByTestId("dialog-body");
+
+  // when
+  await userEvent.type(screen.getByTestId("move-start-time"), "19:00");
+
+  // then
+  expect(body, "the fields scroll inside the body").toContainElement(screen.getByTestId("move-duration"));
+  expect(body, "the preview button stays outside the scrolling body").not.toContainElement(screen.getByTestId("preview-move"));
+
+  // when
+  await userEvent.click(screen.getByTestId("preview-move"));
+
+  // then
+  expect(body, "the preview scrolls with the fields").toContainElement(await screen.findByTestId("move-preview"));
+  expect(body, "the confirm button stays outside the scrolling body").not.toContainElement(screen.getByTestId("confirm-move"));
+});
+
+it("given a series cancellation, when the dialog opens, then the affected occurrences scroll while the confirmation stays below the body", async () => {
+  // given
+  render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} />);
+
+  // when
+  await userEvent.click(await screen.findByTestId("personal-cancel"));
+
+  // then
+  const body = within(screen.getByRole("dialog")).getByTestId("dialog-body");
+  expect(body, "the scope choice scrolls inside the body").toContainElement(screen.getByTestId("scope-WHOLE_SERIES"));
+  expect(body, "the confirmation stays outside the scrolling body").not.toContainElement(screen.getByTestId("confirm-cancellation"));
+});
