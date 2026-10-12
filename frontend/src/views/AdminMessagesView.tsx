@@ -60,6 +60,8 @@ export function AdminMessagesView() {
   }
 
   const problem = error ?? clubError;
+  const cell = "grid min-w-0 grid-cols-[minmax(0,8rem)_minmax(0,1fr)] gap-3 sm:table-cell sm:border-t sm:p-2";
+  const cellLabel = "font-medium sm:hidden";
   return <section data-testid="admin-messages-view" className="surface-panel grid gap-8 rounded-2xl border p-6 shadow-[0_20px_50px_var(--cs-shadow)] sm:p-8">
     <h1 className="text-3xl font-bold">{t("messages.title")}</h1>
     <p data-testid="messages-handover-note" className="text-muted max-w-3xl">{t("messages.handoverNote")}</p>
@@ -81,8 +83,8 @@ export function AdminMessagesView() {
         {entries.length === 0
           ? <p data-testid="messages-empty">{t(unsettled ? "messages.noneUnsettled" : "messages.empty")}</p>
           : <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead>
+            <table className="block w-full text-left sm:table">
+              <thead className="sr-only sm:not-sr-only">
                 <tr>
                   <th scope="col" className="p-2">{t("messages.column.queuedAt")}</th>
                   <th scope="col" className="p-2">{t("messages.column.recipient")}</th>
@@ -92,16 +94,32 @@ export function AdminMessagesView() {
                   <th scope="col" className="p-2">{t("messages.column.messageId")}</th>
                 </tr>
               </thead>
-              <tbody>
-                {entries.map((entry) => <tr key={entry.id} data-testid="message-row" data-entry-id={entry.id} data-state={entry.state} data-kind={entry.kind} data-person-id={entry.personId} className="border-t">
-                  <td data-testid="message-queued-at" className="p-2">{formatDateTime(entry.queuedAt, language, club.timeZone)}</td>
-                  <td className="p-2">
-                    <Link data-testid="message-person-link" to={`/admin/roster/${entry.personId}`} className="underline">{entry.personName}</Link>
+              <tbody className="grid gap-3 sm:table-row-group">
+                {entries.map((entry) => <tr key={entry.id} data-testid="message-row" data-entry-id={entry.id} data-state={entry.state} data-kind={entry.kind} data-person-id={entry.personId} className="grid gap-2 rounded-xl border p-4 sm:table-row sm:rounded-none sm:border-0 sm:p-0">
+                  <td className={cell}>
+                    <span aria-hidden="true" data-testid="message-label-queued-at" className={cellLabel}>{t("messages.column.queuedAt")}</span>
+                    <span data-testid="message-queued-at" className="min-w-0 break-words">{formatDateTime(entry.queuedAt, language, club.timeZone)}</span>
                   </td>
-                  <td data-testid="message-kind" className="p-2">{t(`messages.kind.${entry.kind}`)}</td>
-                  <td data-testid="message-state" className="p-2">{t(`messages.state.${entry.state}`)}</td>
-                  <td data-testid="message-outcome" className="p-2">{outcomeOf(entry) ?? t("messages.outcome.none")}</td>
-                  <td data-testid="message-id" className="p-2 font-mono text-sm">{entry.messageId}</td>
+                  <td className={cell}>
+                    <span aria-hidden="true" data-testid="message-label-recipient" className={cellLabel}>{t("messages.column.recipient")}</span>
+                    <Link data-testid="message-person-link" to={`/admin/roster/${entry.personId}`} className="min-w-0 break-words underline">{entry.personName}</Link>
+                  </td>
+                  <td className={cell}>
+                    <span aria-hidden="true" data-testid="message-label-kind" className={cellLabel}>{t("messages.column.kind")}</span>
+                    <span data-testid="message-kind" className="min-w-0 break-words">{t(`messages.kind.${entry.kind}`)}</span>
+                  </td>
+                  <td className={cell}>
+                    <span aria-hidden="true" data-testid="message-label-state" className={cellLabel}>{t("messages.column.state")}</span>
+                    <span data-testid="message-state" className="min-w-0 break-words">{t(`messages.state.${entry.state}`)}</span>
+                  </td>
+                  <td className={cell}>
+                    <span aria-hidden="true" data-testid="message-label-outcome" className={cellLabel}>{t("messages.column.outcome")}</span>
+                    <span data-testid="message-outcome" className="min-w-0 [overflow-wrap:anywhere]">{outcomeOf(entry) ?? t("messages.outcome.none")}</span>
+                  </td>
+                  <td className={cell}>
+                    <span aria-hidden="true" data-testid="message-label-message-id" className={cellLabel}>{t("messages.column.messageId")}</span>
+                    <span data-testid="message-id" className="min-w-0 font-mono text-sm [overflow-wrap:anywhere]">{entry.messageId}</span>
+                  </td>
                 </tr>)}
               </tbody>
             </table>

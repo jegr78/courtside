@@ -103,6 +103,37 @@ describe("AdminMessagesView", () => {
       /club's mail server accepted the message.*confirm final delivery/s);
   });
 
+  it.each([
+    ["en", ["Time", "Recipient", "Message", "State", "Finding", "Message-ID"]],
+    ["de", ["Zeitpunkt", "Empfänger", "Nachricht", "Stand", "Befund", "Message-ID"]]
+  ])("given a message on a phone in %s, when its card is read, then every field sits beside its label", async (language, labels) => {
+    // given
+    await i18n.changeLanguage(language);
+    vi.spyOn(api, "messages").mockResolvedValue({ entries: [refused], nextCursor: null });
+
+    // when
+    show();
+    const entry = await screen.findByTestId("message-row");
+
+    // then
+    expect(entry).toHaveClass("grid");
+    const fields = [
+      ["message-label-queued-at", "message-queued-at"],
+      ["message-label-recipient", "message-person-link"],
+      ["message-label-kind", "message-kind"],
+      ["message-label-state", "message-state"],
+      ["message-label-outcome", "message-outcome"],
+      ["message-label-message-id", "message-id"]
+    ];
+    fields.forEach(([labelId, valueId], index) => {
+      const label = within(entry).getByTestId(labelId);
+      expect(label, `${labelId} names its field`).toHaveTextContent(labels[index]);
+      expect(label, `${labelId} is not read twice beside the column header`).toHaveAttribute("aria-hidden", "true");
+      expect(label.closest("td"), `${labelId} shares its cell with ${valueId}`)
+        .toContainElement(within(entry).getByTestId(valueId));
+    });
+  });
+
   it.each(["en", "de"])("given the state labels in %s, when they are read, then none of them claims delivery",
 async (language) => {
     // given — the one claim this instance is in no position to make
