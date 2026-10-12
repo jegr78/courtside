@@ -703,7 +703,18 @@ test("given bookings on a phone, when the plan scrolls past the navigation, then
   }), "the court heading stays uncovered while the plan scrolls").toBe(true);
 });
 
-test("given an own booking beside a league match on four courts, when a phone shows the plan, then each booking shows its marker and a short label that fits", async ({ page, journeyService }) => {
+function lastRowOfBookingIsOccupied(page: Page, bookingId: string, slot: string): Promise<boolean> {
+  return page.evaluate(({ bookingId, slot }) => {
+    const row = document.querySelector(`[data-testid="slot-row-${slot}"]`)!;
+    row.scrollIntoView({ block: "center" });
+    const column = document.querySelector(`[data-booking-id="${bookingId}"]`)!.closest("td")!.getBoundingClientRect();
+    const bounds = row.getBoundingClientRect();
+    const hit = document.elementFromPoint(column.left + column.width / 2, bounds.top + bounds.height / 2);
+    return hit?.getAttribute("data-testid") === "allocation-extent" && getComputedStyle(hit).backgroundColor !== "rgba(0, 0, 0, 0)";
+  }, { bookingId, slot });
+}
+
+test("given an own booking beside a league match on four courts, when a phone shows the plan, then each booking shows its marker and a short label that fits and the match fills its rows", async ({ page, journeyService }) => {
   // given
   const own = "70000000-0000-0000-0000-0000000000c1";
   const match = "70000000-0000-0000-0000-0000000000c2";
@@ -746,6 +757,9 @@ test("given an own booking beside a league match on four courts, when a phone sh
       }
       await expect(page.getByTestId(`legend-card-${LEAGUE_MATCH_CARD}`), "the legend decodes the short label of the match")
         .toHaveText(await leagueMatch.getByTestId("allocation-short-label").textContent() ?? "", { timeout: 10_000 });
+      await expect.poll(() => lastRowOfBookingIsOccupied(page, match, "15:30"), {
+        message: `at ${width} px the last row of the match is drawn occupied, not left blank`, timeout: 10_000
+      }).toBe(true);
     }
 
     // when
@@ -756,6 +770,9 @@ test("given an own booking beside a league match on four courts, when a phone sh
       await expect(allocation.getByTestId("allocation-label"), "a wide column keeps the full label").toBeVisible({ timeout: 10_000 });
       await expect(allocation.getByTestId("allocation-short-label")).toBeHidden({ timeout: 10_000 });
     }
+    await expect.poll(() => lastRowOfBookingIsOccupied(page, match, "15:30"), {
+      message: "on a wide screen the last row of the match is drawn occupied", timeout: 10_000
+    }).toBe(true);
   } finally {
     await journeyService.executeSql(`DELETE FROM booking WHERE id IN ('${own}', '${match}');`);
   }

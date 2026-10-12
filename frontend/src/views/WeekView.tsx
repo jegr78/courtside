@@ -516,7 +516,7 @@ export function WeekView({ today, clock = systemClock, canBook = true,
       <li><span className="day-plan-legend unavailable" aria-hidden="true" />{t("week.unavailable")}</li>
       {hasGenericOccupancy(data) && <li>
         <span data-testid="legend-occupied" className="day-plan-legend day-plan-legend-coded occupied"
-          aria-hidden="true">{shortLabelOf.get(t("week.occupied"))}</span>{t("week.occupied")}
+          aria-hidden="true" style={genericOccupancyStyle(data)}>{shortLabelOf.get(t("week.occupied"))}</span>{t("week.occupied")}
       </li>}
       {legendCards(data).map((card) => <li key={`${card.label}:${card.color}`}>
         <span data-testid={card.id ? `legend-card-${card.id}` : "legend-allocation-card"}
@@ -610,6 +610,12 @@ function hasGenericOccupancy(data: WeekData): boolean {
       allocations.some((allocation) => allocation.showGenericOccupancy));
 }
 
+function genericOccupancyStyle(data: WeekData): CSSProperties | undefined {
+  const color = data.bookingCards.find((card) => card.showGenericOccupancy)?.color
+    ?? [...data.allocations.values()].flat().find((allocation) => allocation.showGenericOccupancy && !allocation.ownBooking)?.cardColor;
+  return color ? { backgroundColor: color, color: contrastColor(color) } : undefined;
+}
+
 function legendCards(data: WeekData): LegendCard[] {
   const entries = new Map<string, LegendCard>();
   data.bookingCards.filter((card) => !card.showGenericOccupancy).forEach((card) => {
@@ -660,6 +666,7 @@ function renderCell(
     const shortLabel = allocation.ownBooking && allocation.showGenericOccupancy ? t("booking.viewer")
       : shortLabelOf.get(allocation.showGenericOccupancy ? t("week.occupied") : allocation.cardLabel) ?? label;
     const period = formatBookingTimeRange(allocation.startsAt, allocation.endsAt, locale, timeZone);
+    const spokenLabel = allocation.ownBooking && !allocation.showGenericOccupancy ? `${t("booking.viewer")}, ${label}` : label;
     const className = "day-plan-allocation h-full w-full rounded-md px-3 py-2 text-left font-semibold";
     const state = allocation.ownBooking ? "own" : allocation.showGenericOccupancy ? "occupied" : "card";
     const style = allocation.ownBooking
@@ -673,18 +680,19 @@ function renderCell(
       </span>
       <span className="day-plan-allocation-period block text-xs">{period}</span>
     </span>;
-    return <td key={court.id} rowSpan={Math.max(1, Math.ceil(duration / slotMinutes))} className={`${cellClass} p-2 align-top`}>
+    return <td key={court.id} rowSpan={Math.max(1, Math.ceil(duration / slotMinutes))} className={`${cellClass} day-plan-allocation-cell p-2 align-top`}>
+      <span data-testid="allocation-extent" aria-hidden="true" className="day-plan-allocation-extent" style={{ backgroundColor: style.backgroundColor }} />
       {allocation.ownBooking && !isPast && !startedBeforeVisibleSlot ? <button
         type="button"
         data-testid="own-allocation"
         data-booking-id={allocation.bookingId}
         data-card-color={allocation.cardColor}
         data-state={state}
-        aria-label={t("booking.cancelLabel", { label: `${label}, ${period}` })}
+        aria-label={t("booking.cancelLabel", { label: `${spokenLabel}, ${period}` })}
         onClick={() => cancel(allocation)}
         className={className}
         style={style}
-      >{content}</button> : <div role="img" aria-label={`${label}, ${period}`} data-testid={allocation.ownBooking ? "own-allocation" : "allocation"} data-booking-id={allocation.bookingId} data-card-color={allocation.cardColor} data-state={state} className={className} style={style}>{content}</div>}
+      >{content}</button> : <div role="img" aria-label={`${spokenLabel}, ${period}`} data-testid={allocation.ownBooking ? "own-allocation" : "allocation"} data-booking-id={allocation.bookingId} data-card-color={allocation.cardColor} data-state={state} className={className} style={style}>{content}</div>}
     </td>;
   }
   const isCovered = isOccupied(allocations, court.id, slot);
