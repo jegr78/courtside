@@ -21,6 +21,9 @@ either its booking type or the neutral label *Occupied*. The club chooses this f
 type. The number of participants is public, but their names are not. You only see names on your
 own bookings.
 
+On a narrow screen a booking shows only a short form of its booking type. The legend gives the full
+name for each short form. Your own bookings also carry a person symbol.
+
 ![A week in the court plan with one column per court, coloured bookings and the legend below.](../screenshots/en/court-plan.png)
 
 ## Signing in
