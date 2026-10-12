@@ -103,6 +103,9 @@ the demo profile.
 Connect to Dev PostgreSQL with database `courtside_dev`, username `courtside`, password
 `courtside-dev`, and JDBC URL `jdbc:postgresql://127.0.0.1:5432/courtside_dev`.
 
+Dev delivers no mail. Its relay is `mail.invalid`, so a message such as a one-time password or a
+recovery link is retried for about half an hour and then given up as failed.
+
 ## User acceptance testing
 
 Start UAT with `node tools/courtside.mjs uat`. The default command verifies the current checkout,
