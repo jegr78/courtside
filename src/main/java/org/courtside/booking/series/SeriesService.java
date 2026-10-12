@@ -10,6 +10,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -32,6 +33,9 @@ import org.courtside.booking.internal.CardEligibilityPolicy;
 import org.courtside.booking.internal.CourtAllocationRepository;
 import org.courtside.booking.internal.CancellationReasonNotAllowedException;
 import org.courtside.booking.internal.CourtOccupancy;
+import org.courtside.booking.internal.CourtReservations;
+import org.courtside.booking.internal.CourtReservations.Reserved;
+import org.courtside.booking.internal.CourtReservedException;
 import org.courtside.booking.internal.CourtUnavailableException;
 import org.courtside.booking.internal.ParticipantCardCapacity;
 import org.courtside.booking.internal.ParticipantsInvalidException;
@@ -77,6 +81,7 @@ public class SeriesService {
     private final EntityManager entityManager;
     private final ApplicationEventPublisher events;
     private final TransactionTemplate transaction;
+    private final CourtReservations reservations;
 
     public SeriesService(SeriesSchedule schedule,
                          CourtAllocationRepository allocations,
@@ -94,7 +99,8 @@ public class SeriesService {
                          ClubTimeZone timeZone,
                          EntityManager entityManager,
                          ApplicationEventPublisher events,
-                         PlatformTransactionManager transactions) {
+                         PlatformTransactionManager transactions,
+                         CourtReservations reservations) {
         this.schedule = schedule;
         this.allocations = allocations;
         this.bookings = bookings;
@@ -112,6 +118,7 @@ public class SeriesService {
         this.entityManager = entityManager;
         this.events = events;
         this.transaction = new TransactionTemplate(transactions);
+        this.reservations = reservations;
     }
 
     @Transactional(readOnly = true)
@@ -127,10 +134,13 @@ public class SeriesService {
                 .toList();
         List<List<RuleViolation>> violations = ruleGate.violationsFor(checks);
         List<CourtOccupancy> occupancies = occupancies(rule, expansion.slots());
+        List<Reserved> reserved = CourtReservations.overriddenBy(callerRoles, rule.cardId(), card.permits(callerRoles))
+                ? List.of()
+                : reservedOver(expansion.slots());
         List<SeriesPreview.Occurrence> occurrences = IntStream.range(0, expansion.slots().size())
                 .mapToObj(index -> new SeriesPreview.Occurrence(
                         expansion.slots().get(index),
-                        blockedCourts(rule, expansion.slots().get(index), occupancies),
+                        blockedCourts(rule, expansion.slots().get(index), occupancies, reserved, bookedBy),
                         violations.get(index)))
                 .toList();
         return new SeriesPreview(occurrences, expansion.truncatedByHorizon(), expansion.horizonLimit());
@@ -161,7 +171,7 @@ public class SeriesService {
                             rule.courtIds(), rule.cardId(), slot,
                             bookedBy, bookedByPersonId, callerRoles, note, List.of(), series.getId()));
                     created.add(bookingId);
-                } catch (CourtUnavailableException | BookingRulesViolatedException e) {
+                } catch (CourtUnavailableException | CourtReservedException | BookingRulesViolatedException e) {
                     skipped.add(start);
                 }
             }
@@ -205,6 +215,7 @@ public class SeriesService {
     public int cancel(UUID seriesId, UUID fromBookingId, CancelScope scope,
                       UUID cancelledBy, Set<Role> cancellerRoles, CancellationReason reason) {
         requireManagementAccessTo(seriesId, fromBookingId, cancelledBy, cancellerRoles);
+        bookingGridCoordination.lock();
         BookingSeries series = lockSeries(seriesId);
         bookingRepository.lockBySeriesId(seriesId);
         discardPreLockState();
@@ -247,9 +258,12 @@ public class SeriesService {
         List<List<RuleViolation>> ruleViolations = includeViolations
                 ? moveRuleViolations(planned, callerRoles)
                 : planned.stream().map(ignored -> List.<RuleViolation>of()).toList();
+        List<Reserved> reserved = reservedAround(planned);
+        boolean overriding = overrides(planned, callerRoles);
         List<MovePreview.Move> moves = IntStream.range(0, planned.size())
                 .mapToObj(index -> toPreviewMove(
-                        planned.get(index), planned, movingIds, targets, ruleViolations.get(index)))
+                        planned.get(index), planned, movingIds, targets, ruleViolations.get(index), reserved,
+                        overriding))
                 .toList();
 
         return new MovePreview(moves);
@@ -308,6 +322,9 @@ public class SeriesService {
                 .findFirst()
                 .map(execution -> currentCourtsOf(execution.booking()))
                 .orElse(List.of());
+        Map<UUID, List<UUID>> vacatedCourts = new HashMap<>();
+        executions.forEach(execution -> vacatedCourts.put(execution.booking().getId(),
+                currentCourtsOf(execution.booking())));
         executions.forEach(execution -> execution.booking().clearAllocations());
         bookingRepository.flush();
 
@@ -323,11 +340,48 @@ public class SeriesService {
             }
             throw e;
         }
+        releaseVacated(preview.moves(), vacatedCourts);
+        settleReservations(executions, callerRoles);
         if (earliest != null) {
             events.publishEvent(new SeriesMoved(request.seriesId(), movingIds, movedBy,
                     earliest.from().start(), earliest.from().end(), previousCourts));
         }
         return executions.size();
+    }
+
+    // One window over every vacated slot keeps the hand-over at one lookup however long the series is.
+    private void releaseVacated(List<MovePreview.Move> moves, Map<UUID, List<UUID>> vacatedCourts) {
+        if (moves.isEmpty()) {
+            return;
+        }
+        Set<UUID> courts = new LinkedHashSet<>();
+        moves.forEach(move -> courts.addAll(vacatedCourts.get(move.bookingId())));
+        Instant from = moves.stream().map(move -> move.from().start()).min(Instant::compareTo).orElseThrow();
+        Instant to = moves.stream().map(move -> move.from().end()).max(Instant::compareTo).orElseThrow();
+        reservations.released(List.copyOf(courts), new TimeSlot(from, to));
+    }
+
+    // The club taking a reservation withdraws it, and an owner moving onto their own wait books it.
+    private void settleReservations(List<MoveExecution> executions, Set<Role> callerRoles) {
+        if (executions.isEmpty()) {
+            return;
+        }
+        UUID cardId = executions.getFirst().booking().getCardId();
+        if (CourtReservations.overriddenBy(callerRoles, cardId, cardEligibility.admits(cardId, callerRoles))) {
+            Instant from = executions.stream().map(execution -> execution.slot().start()).min(Instant::compareTo).orElseThrow();
+            Instant to = executions.stream().map(execution -> execution.slot().end()).max(Instant::compareTo).orElseThrow();
+            reservations.withdraw(reservations.reservedBetween(from, to).stream()
+                    .filter(held -> executions.stream().anyMatch(execution -> held.blocks(execution.courtIds(),
+                            execution.slot(), execution.booking().getBookedBy())))
+                    .map(Reserved::entryId)
+                    .toList());
+        }
+        executions.stream()
+                .filter(execution -> execution.booking().getBookedBy() != null)
+                .collect(Collectors.groupingBy(execution -> execution.booking().getBookedBy(), LinkedHashMap::new,
+                        Collectors.mapping(execution -> new CourtReservations.Placement(execution.booking().getId(),
+                                execution.courtIds(), execution.slot()), Collectors.toList())))
+                .forEach(reservations::bookedAll);
     }
 
     private record MoveExecution(Booking booking, List<UUID> courtIds, TimeSlot slot) {
@@ -366,13 +420,35 @@ public class SeriesService {
                 from, to, courts);
     }
 
+    private List<Reserved> reservedAround(List<PlannedMove> planned) {
+        if (planned.isEmpty()) {
+            return List.of();
+        }
+        Instant from = planned.stream().map(move -> move.to().start()).min(Instant::compareTo).orElseThrow();
+        Instant to = planned.stream().map(move -> move.to().end()).max(Instant::compareTo).orElseThrow();
+        return reservations.reservedBetween(from, to);
+    }
+
+    private boolean overrides(List<PlannedMove> planned, Set<Role> callerRoles) {
+        if (planned.isEmpty()) {
+            return false;
+        }
+        UUID cardId = planned.getFirst().cardId();
+        return CourtReservations.overriddenBy(callerRoles, cardId, cardEligibility.admits(cardId, callerRoles));
+    }
+
     private MovePreview.Move toPreviewMove(PlannedMove move, List<PlannedMove> planned,
                                            List<UUID> movingIds,
                                            List<ParticipantCardCapacity.Target> targets,
-                                           List<RuleViolation> ruleViolations) {
+                                           List<RuleViolation> ruleViolations,
+                                           List<Reserved> reserved, boolean overriding) {
         Set<UUID> blocked = new LinkedHashSet<>(allocations.findOccupiedCourtsExcluding(
                 move.courts(), move.to().start(), move.to().end(), movingIds));
         blocked.addAll(conflictingCourts(move, planned));
+        if (!overriding) {
+            reserved.stream().filter(held -> held.blocks(move.courts(), move.to(), move.bookedBy()))
+                    .forEach(held -> blocked.add(held.courtId()));
+        }
         Booking booking = bookingRepository.findWithParticipantsById(move.bookingId()).orElseThrow();
         List<RuleViolation> violations = new ArrayList<>(ruleViolations);
         violations.addAll(participantCardCapacity.violationsFor(
@@ -528,10 +604,21 @@ public class SeriesService {
         return allocations.findOccupancies(rule.courtIds(), from, to);
     }
 
-    private static List<UUID> blockedCourts(SeriesRule rule, TimeSlot slot, List<CourtOccupancy> occupancies) {
+    private List<Reserved> reservedOver(List<TimeSlot> slots) {
+        if (slots.isEmpty()) {
+            return List.of();
+        }
+        Instant from = slots.stream().map(TimeSlot::start).min(Instant::compareTo).orElseThrow();
+        Instant to = slots.stream().map(TimeSlot::end).max(Instant::compareTo).orElseThrow();
+        return reservations.reservedBetween(from, to);
+    }
+
+    private static List<UUID> blockedCourts(SeriesRule rule, TimeSlot slot, List<CourtOccupancy> occupancies,
+                                            List<Reserved> reserved, UUID bookedBy) {
         return rule.courtIds().stream()
                 .filter(court -> occupancies.stream()
-                        .anyMatch(occupancy -> occupancy.courtId().equals(court) && occupancy.overlaps(slot)))
+                        .anyMatch(occupancy -> occupancy.courtId().equals(court) && occupancy.overlaps(slot))
+                        || reserved.stream().anyMatch(held -> held.blocks(List.of(court), slot, bookedBy)))
                 .toList();
     }
 }

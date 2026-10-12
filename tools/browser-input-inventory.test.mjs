@@ -118,6 +118,11 @@ const BOUNDARIES = {
     classification: "names an element id the page looks up among the bookings it already shows, so an unknown id moves nothing and reaches no data",
     test: "src/views/MyBookingsView.test.tsx#given a link to a booking the lists do not hold, when the bookings have loaded, then nothing moves and nothing fails"
   },
+  "src/views/WaitlistSection.tsx location": {
+    value: "the fragment a waitlist offer in the notification centre put on the address",
+    classification: "names an element id the section looks up among the member's own entries, and an unknown id only focuses the section, so it reaches no data",
+    test: "src/views/WaitlistSection.test.tsx#given a link to an entry the list does not hold, when the entries have loaded, then the section takes the focus and nothing fails"
+  },
   "src/views/facility/AdminBookingCardView.tsx useLocation": {
     value: "the mark the card list set when it navigated here",
     classification: "compared strictly with true, so nothing else announces a created card",

@@ -56,6 +56,9 @@ class SubjectAccessServiceTest extends AbstractIntegrationTest {
     @Autowired
     private NotificationTestFixture notifications;
 
+    @Autowired
+    private org.springframework.jdbc.core.simple.JdbcClient jdbc;
+
     private UUID courtId;
 
     @BeforeEach
@@ -86,6 +89,60 @@ class SubjectAccessServiceTest extends AbstractIntegrationTest {
                 .as("whoever makes a booking is its first participant, and that is not a second"
                         + " booking somebody recorded them in")
                 .isEmpty();
+    }
+
+    @Test
+    void givenAWaitlistEntryAndOneNamingThePerson_whenTheAnswerIsProduced_thenBothAreInItWithoutTheOtherMember() {
+        // given
+        UUID personId = roster.addPerson("Jane", "Doe", "jane.doe@example.org");
+        UUID accountId = identity.createEnabledAccount(personId, "jane.doe", Set.of(Role.MEMBER));
+        UUID holderPerson = roster.addPerson("Mary", "Major", "mary.major@example.org");
+        UUID holderAccount = identity.createEnabledAccount(holderPerson, "major.mary", Set.of(Role.MEMBER));
+        UUID otherPerson = roster.addPerson("John", "Roe", "john.roe@example.org");
+        UUID otherAccount = identity.createEnabledAccount(otherPerson, "roe.john", Set.of(Role.MEMBER));
+        TimeSlot slot = new TimeSlot(SIX_PM, SEVEN_PM);
+        bookings.createBookingNamingMember(courtId, MEMBER_BOOKING_CARD, slot, holderAccount, holderPerson,
+                Set.of(Role.MEMBER), null, otherPerson);
+        UUID own = bookings.joinWaitlist(courtId, MEMBER_BOOKING_CARD, slot, accountId, personId, holderPerson);
+        UUID naming = bookings.joinWaitlist(courtId, MEMBER_BOOKING_CARD, slot, otherAccount, otherPerson, personId);
+
+        // when
+        SubjectAccessRecord answer = subjectAccess.answerFor(personId);
+
+        // then
+        assertThat(answer.waitlistEntries()).singleElement()
+                .satisfies(entry -> assertThat(entry.entryId()).isEqualTo(own))
+                .satisfies(entry -> assertThat(entry.state()).isEqualTo("WAITING"));
+        assertThat(answer.waitlistsNamedIn()).singleElement()
+                .satisfies(entry -> assertThat(entry.entryId()).isEqualTo(naming))
+                .satisfies(entry -> assertThat(entry.startsAt()).isEqualTo(SIX_PM));
+        assertThat(answer.waitlistsNamedIn().toString()).as("nothing names who made the other entry")
+                .doesNotContain(otherAccount.toString()).doesNotContain("Roe");
+    }
+
+    @Test
+    void givenAWaitlistEntryWhoseSlotHasEnded_whenTheAnswerIsProduced_thenItIsStillInIt() {
+        // given
+        UUID personId = roster.addPerson("Jane", "Doe", "jane.doe@example.org");
+        UUID accountId = identity.createEnabledAccount(personId, "jane.doe", Set.of(Role.MEMBER));
+        UUID holderPerson = roster.addPerson("Mary", "Major", "mary.major@example.org");
+        UUID holderAccount = identity.createEnabledAccount(holderPerson, "major.mary", Set.of(Role.MEMBER));
+        TimeSlot slot = new TimeSlot(SIX_PM, SEVEN_PM);
+        bookings.createBookingNamingMember(courtId, MEMBER_BOOKING_CARD, slot, holderAccount, holderPerson,
+                Set.of(Role.MEMBER), null, personId);
+        UUID own = bookings.joinWaitlist(courtId, MEMBER_BOOKING_CARD, slot, accountId, personId, holderPerson);
+        jdbc.sql("""
+                        UPDATE waitlist_entry SET starts_at = starts_at - interval '2 days',
+                            ends_at = ends_at - interval '2 days', state = 'ENDED', closed_at = starts_at
+                        WHERE id = :id
+                        """).param("id", own).update();
+
+        // when
+        SubjectAccessRecord answer = subjectAccess.answerFor(personId);
+
+        // then
+        assertThat(answer.waitlistEntries()).as("everything stored about the person is in the answer until it is deleted")
+                .singleElement().satisfies(entry -> assertThat(entry.state()).isEqualTo("ENDED"));
     }
 
     @Test

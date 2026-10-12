@@ -142,6 +142,12 @@ Statusleiste der installierten App übernimmt die Primärfarbe beim nächsten Ö
 * Stelle getrennt ein, wie lange Einmalpasswörter für neue und zurückgesetzte Konten gelten.
 * Der Code zum Zurücksetzen darf zwischen 15 Minuten und einem Tag gültig sein. Nach Ablauf muss das
   Mitglied einen neuen Code anfordern.
+* **Angebotsfrist der Warteliste** legt fest, wie viele Minuten ein frei gewordener Platz für das
+  Mitglied reserviert bleibt, das auf der Warteliste an der Reihe ist. Vorgeschlagen sind 15 Minuten.
+  Das Angebot endet spätestens mit dem Beginn der Zeit. Während es gilt, können andere Mitglieder und
+  Trainer den Platz nicht buchen, und ihre Serien überspringen diesen Termin. Der Vorstand und eine
+  Sperrung gehen vor: Bucht ein Admin den Platz, legt eine Serie darüber oder verschiebt eine dorthin,
+  oder sperrt jemand den Platz, endet das Angebot. Das Mitglied sieht das unter *Meine Buchungen*.
 
 ![Die Fristen für Einmalpasswörter und Codes und die Erinnerung vor einer Buchung.](screenshots/de/deadlines.png)
 
@@ -195,7 +201,11 @@ Punktspiel oder Sperrung. Lege für jede benötigte Art eine Karte an.
 | **Gäste erlaubt** | Erlaubt namentlich erfasste Gäste |
 | **Neutral anzeigen** | Zeigt im öffentlichen Platzplan *Belegt* statt der Kartenbezeichnung |
 
-Administratoren dürfen jede Karte verwenden und verwalten. Eine neutrale Anzeige schützt die
+Administratoren dürfen jede Karte verwenden und verwalten. Eine Buchung mit der Karte *Platz
+gesperrt* geht einer Reservierung von der Warteliste vor. Leerst du ihre berechtigten Rollen, darf
+jede angemeldete Person sperren und damit jedes Angebot auf der Warteliste beenden.
+
+Eine neutrale Anzeige schützt die
 Bezeichnung nicht vor technischem Zugriff, da die öffentliche Schnittstelle sie weiterhin liefert.
 Verwende deshalb keine vertraulichen Bezeichnungen.
 

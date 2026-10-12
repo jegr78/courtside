@@ -61,6 +61,16 @@ INSERT INTO booking_participant (id, booking_id, kind, person_id, position)
 VALUES ('79000000-0000-0000-0000-000000000001', '77000000-0000-0000-0000-000000000001',
         'MEMBER', '71000000-0000-0000-0000-000000000001', 0);
 
+INSERT INTO waitlist_entry
+    (id, account_id, court_id, card_id, starts_at, ends_at, note, state, joined_at, closed_at)
+VALUES ('79100000-0000-0000-0000-000000000001', '72000000-0000-0000-0000-000000000001',
+        '70000000-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111',
+        '2025-01-06T09:00:00Z', '2025-01-06T10:00:00Z', 'Synthetic waitlist entry', 'ENDED',
+        '2025-01-01T00:00:00Z', '2025-01-06T09:00:00Z');
+
+INSERT INTO waitlist_participant (entry_id, position, kind, person_id)
+VALUES ('79100000-0000-0000-0000-000000000001', 0, 'MEMBER', '71000000-0000-0000-0000-000000000002');
+
 INSERT INTO login_attempt_limit
     (scope, subject_hash, attempt_count, window_started_at, blocked_until)
 VALUES ('GLOBAL', repeat('b', 64), 1, '2025-01-01T00:00:00Z', NULL);

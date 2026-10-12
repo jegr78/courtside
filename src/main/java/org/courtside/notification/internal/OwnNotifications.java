@@ -8,6 +8,7 @@ import org.courtside.shared.BookingAnnouncement;
 import org.courtside.shared.BookingAnnouncer;
 import org.courtside.shared.BookingDisplaced;
 import org.courtside.shared.CancellationReason;
+import org.courtside.shared.WaitlistAnnouncer;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,6 +37,7 @@ public class OwnNotifications {
     private final CurrentUser currentUser;
     private final JdbcClient jdbc;
     private final BookingAnnouncer bookings;
+    private final WaitlistAnnouncer waitlist;
     private final ObjectMapper json;
     private final Clock clock;
 
@@ -68,7 +70,9 @@ public class OwnNotifications {
         List<Stored> shown = stored.stream().limit(limit).toList();
         Map<UUID, BookingAnnouncement> visible = bookings.describeVisibleTo(account.getId(),
                 account.getPerson().getId(), shown.stream().map(Stored::bookingId).filter(Objects::nonNull).toList());
-        List<Entry> items = shown.stream().map(entry -> entry(entry, visible)).toList();
+        Map<UUID, WaitlistAnnouncer.Offer> offers = waitlist.describeOffersOf(account.getId(),
+                shown.stream().map(Stored::waitlistEntryId).filter(Objects::nonNull).toList());
+        List<Entry> items = shown.stream().map(entry -> entry(entry, visible, offers)).toList();
         UUID next = stored.size() > limit ? items.getLast().id() : null;
         return new Page(items, next, unread(account.getId()));
     }
@@ -96,12 +100,14 @@ public class OwnNotifications {
     }
 
     // A booking the account may no longer see stays unnamed, so a player who left learns nothing more of it.
-    private static Entry entry(Stored stored, Map<UUID, BookingAnnouncement> visible) {
+    private static Entry entry(Stored stored, Map<UUID, BookingAnnouncement> visible,
+                               Map<UUID, WaitlistAnnouncer.Offer> offers) {
         BookingAnnouncement booking = stored.bookingId() == null ? null : visible.get(stored.bookingId());
+        WaitlistAnnouncer.Offer offer = stored.waitlistEntryId() == null ? null : offers.get(stored.waitlistEntryId());
         return new Entry(stored.id(), stored.kind(), stored.createdAt(), stored.readAt(), booking,
                 closureOf(stored.parameters().get(QueuedMessage.CLOSURE)),
                 StoredCancellationReasons.of(stored.parameters().get(QueuedMessage.REASON)), targetOf(stored.kind()),
-                booking == null ? null : stored.bookingId());
+                booking == null ? null : stored.bookingId(), offer, offer == null ? null : stored.waitlistEntryId());
     }
 
     private static BookingDisplaced.Closure closureOf(String stored) {
@@ -119,6 +125,7 @@ public class OwnNotifications {
                  BOOKING_REMINDER, BOOKING_CANCELLED, BOOKING_CANCELLED_BY_CLUB,
                  BOOKING_SERIES_CREATED, BOOKING_SERIES_CANCELLED_BY_CLUB,
                  BOOKING_SERIES_MOVED_BY_CLUB -> Target.BOOKINGS;
+            case WAITLIST_OFFER -> Target.WAITLIST;
         };
     }
 
@@ -134,7 +141,15 @@ public class OwnNotifications {
                           Instant readAt) {
 
         UUID bookingId() {
-            String stored = parameters.get(QueuedMessage.BOOKING);
+            return idOf(QueuedMessage.BOOKING);
+        }
+
+        UUID waitlistEntryId() {
+            return idOf(QueuedMessage.WAITLIST_ENTRY);
+        }
+
+        private UUID idOf(String name) {
+            String stored = parameters.get(name);
             if (stored == null) {
                 return null;
             }
@@ -148,7 +163,8 @@ public class OwnNotifications {
 
     public enum Target {
         BOOKINGS,
-        ACCOUNT_SECURITY
+        ACCOUNT_SECURITY,
+        WAITLIST
     }
 
     public record Page(List<Entry> items, UUID nextCursor, long unread) {
@@ -160,6 +176,6 @@ public class OwnNotifications {
 
     public record Entry(UUID id, MessageKind kind, Instant createdAt, Instant readAt, BookingAnnouncement booking,
                         BookingDisplaced.Closure closure, CancellationReason cancellationReason, Target target,
-                        UUID linkedBookingId) {
+                        UUID linkedBookingId, WaitlistAnnouncer.Offer waitlistOffer, UUID linkedWaitlistEntryId) {
     }
 }

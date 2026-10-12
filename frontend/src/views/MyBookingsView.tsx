@@ -8,6 +8,7 @@ import { Button } from "../components/Button";
 import { SuccessFeedback } from "../components/SuccessFeedback";
 import { formatBookingPeriod, formatDateTime } from "../time/clubZone";
 import { CancelDialog, MoveDialog } from "./AppointmentDialogs";
+import { WaitlistSection } from "./WaitlistSection";
 
 import { warnAbout } from "../api/failureWarning";
 function offlineBookingGrid(): BookingGrid {
@@ -187,6 +188,9 @@ export function MyBookingsView({ now, offline = false }: {
           {historyNextCursor && <Button variant="secondary" data-testid="load-more-past-bookings" className="mt-4" disabled={loadingMore} onClick={() => void loadMoreHistory()}>{t("myBookings.loadMorePast")}</Button>}
         </details>)}
     </div>}
+    {!offline && !loading && grid && <WaitlistSection courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone}
+      booked={async () => { await load(); setSuccess(t("myWaitlist.booked")); }}
+      left={(declined) => setSuccess(t(declined ? "myWaitlist.declined" : "myWaitlist.left"))} />}
     {!offline && !loading && grid && <ParticipationSection participations={participations} courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone} withdrawn={async () => { await load(); setSuccess(t("participations.withdrawn")); }} nextCursor={participationsNextCursor} loadingMore={loadingMore} loadMore={loadMoreParticipations} t={t} />}
     {grid && action?.kind === "cancel" && <CancelDialog booking={action.booking} seriesBookings={bookings.filter((booking) => booking.seriesId === action.booking.seriesId && booking.status === "CONFIRMED")} hasMoreBookings={nextCursor !== undefined} timeZone={grid.timeZone} closed={() => setAction(undefined)} completed={async () => { setAction(undefined); await load(); setSuccess(t("booking.cancelledSuccess")); }} />}
     {grid && action?.kind === "move" && <MoveDialog booking={action.booking} courts={courts} timeZone={grid.timeZone} maxBookingMinutes={maxBookingMinutes} closed={() => setAction(undefined)} completed={async () => { setAction(undefined); await load(); setSuccess(t("booking.moved")); }} />}

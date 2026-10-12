@@ -48,6 +48,11 @@
       "pages": { "de": "site/member-guide.md", "en": "site/en/member-guide.md" }
     },
     {
+      "name": "waitlist-dialog",
+      "surface": "booking-dialog",
+      "pages": { "de": "site/member-guide.md", "en": "site/en/member-guide.md" }
+    },
+    {
       "name": "my-bookings",
       "surface": "my-bookings-page",
       "pages": { "de": "site/member-guide.md", "en": "site/en/member-guide.md" }

@@ -52,6 +52,7 @@ class AuditedOperationCoverageTest {
             "ConfigService#defaultLocale",
             "ConfigService#deleteLogo",
             "ConfigService#leadTime",
+            "ConfigService#offerWindow",
             "ConfigService#lock",
             "ConfigService#logo",
             "ConfigService#resetCodeLifetime",

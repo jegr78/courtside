@@ -19,7 +19,9 @@ public enum MessageKind {
     BOOKING_CANCELLED_BY_CLUB("booking.cancelledByClub", false, false),
     BOOKING_SERIES_CREATED("booking.seriesCreated", true, false),
     BOOKING_SERIES_CANCELLED_BY_CLUB("booking.seriesCancelledByClub", false, false),
-    BOOKING_SERIES_MOVED_BY_CLUB("booking.seriesMovedByClub", false, false);
+    BOOKING_SERIES_MOVED_BY_CLUB("booking.seriesMovedByClub", false, false),
+    // Joining the waitlist is the consent, and leaving it is how a member stops hearing of it.
+    WAITLIST_OFFER("waitlist.offer", false, false);
 
     private final String templateKey;
     private final boolean declinable;

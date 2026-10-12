@@ -82,6 +82,15 @@ describe("SeriesForm", () => {
     expect(screen.getByTestId("new-series")).toHaveFocus();
   });
 
+  it("given the form opens, when the note is read, then it stops where the server stops", async () => {
+    // when
+    show();
+    await userEvent.click(await screen.findByTestId("new-series"));
+
+    // then
+    expect(await screen.findByTestId("series-note")).toHaveAttribute("maxLength", "500");
+  });
+
   it("given a rule set bounds the booking duration, when the form opens, then the duration field carries that ceiling", async () => {
     // given
     vi.spyOn(api, "bookingEligibility").mockResolvedValue({ violations: [], maxBookingMinutes: 90 });

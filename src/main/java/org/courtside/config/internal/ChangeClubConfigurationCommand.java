@@ -4,6 +4,7 @@ import org.courtside.config.BookingSlotDuration;
 import org.courtside.config.CredentialLifetime;
 import org.courtside.config.ReminderLeadTime;
 import org.courtside.config.ResetTokenLifetime;
+import org.courtside.config.WaitlistOfferWindow;
 
 import java.util.UUID;
 
@@ -23,7 +24,8 @@ public record ChangeClubConfigurationCommand(
         CredentialLifetime passwordResetCredential,
         ResetTokenLifetime passwordResetToken,
         ReminderLeadTime bookingReminder,
-        UUID noMembershipTypeRuleSetId) {
+        UUID noMembershipTypeRuleSetId,
+        WaitlistOfferWindow waitlistOffer) {
 
     // The link fields, a logo, a short name and the rule set for people holding no membership type are
     // what a club may leave unset; an absent value anywhere else is a caller that skipped its validation.

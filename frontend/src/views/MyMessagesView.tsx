@@ -13,9 +13,10 @@ import { formatBookingPeriod, formatDateTime } from "../time/clubZone";
 
 type Translate = ReturnType<typeof useTranslation>["t"];
 
-const routes: Record<Notification["link"]["target"], (bookingId?: string) => string> = {
-  BOOKINGS: (bookingId) => bookingId ? `/my-bookings#booking-${bookingId}` : "/my-bookings",
-  ACCOUNT_SECURITY: () => "/account/security"
+const routes: Record<Notification["link"]["target"], (link: Notification["link"]) => string> = {
+  BOOKINGS: ({ bookingId }) => bookingId ? `/my-bookings#booking-${bookingId}` : "/my-bookings",
+  ACCOUNT_SECURITY: () => "/account/security",
+  WAITLIST: ({ waitlistEntryId }) => waitlistEntryId ? `/my-bookings#waitlist-${waitlistEntryId}` : "/my-bookings#waitlist"
 };
 
 function summaryOf(notification: Notification, t: Translate) {
@@ -35,7 +36,8 @@ function NotificationEntry({ notification, timeZone, marking, justRead, markRead
   }, [justRead]);
   const read = Boolean(notification.readAt);
   const route = routes[notification.link.target];
-  const booking = notification.booking;
+  const booking = notification.booking ?? notification.waitlistOffer?.slot;
+  const offer = notification.waitlistOffer;
   return <li ref={item} tabIndex={-1} data-testid={`notification-${notification.id}`} data-read={String(read)}
     className={`focus-ring border-structural grid gap-1 rounded-xl border p-4 ${read ? "" : "surface-raised border-l-4"}`}>
     <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
@@ -54,11 +56,16 @@ function NotificationEntry({ notification, timeZone, marking, justRead, markRead
       {booking.courts.map((court) => court.name ?? t("court.number", { number: court.number })).join(", ")}
       {booking.cancelled && <>{" · "}{t("myBookings.cancelled")}</>}
     </p>}
+    {offer && <p data-testid="notification-offer" data-open={String(offer.open)} className="font-semibold">
+      {offer.open
+        ? t("notifications.offerOpen", { time: formatDateTime(offer.expiresAt, language, timeZone) })
+        : t("notifications.offerClosed")}
+    </p>}
     <time data-testid="notification-time" dateTime={notification.createdAt} className="text-muted text-sm">
       {formatDateTime(notification.createdAt, language, timeZone)}
     </time>
     <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-1">
-      {route && <Link to={route(notification.link.bookingId)} aria-describedby={summaryId}
+      {route && <Link to={route(notification.link)} aria-describedby={summaryId}
         className="focus-ring inline-flex min-h-11 items-center font-semibold underline underline-offset-4"
         onClick={() => { if (!read) markRead(notification.id, true); }}>
         {t(`notifications.open.${notification.link.target}`)}

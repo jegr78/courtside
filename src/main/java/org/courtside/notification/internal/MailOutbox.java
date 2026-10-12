@@ -43,10 +43,11 @@ class MailOutbox {
     // mid-delivery lets another one take its row.
     static final Duration LEASE = Duration.ofMinutes(5);
 
-    // Somebody waits at a sign-in page for these, so a busy evening of bookings goes after them.
+    // Somebody waits at a sign-in page for these, or an offer runs out within minutes, so a busy
+    // evening of bookings goes after them.
     private static final List<String> URGENT = Stream.of(MessageKind.CREDENTIALS_NEW_ACCOUNT,
                     MessageKind.CREDENTIALS_PASSWORD_RESET, MessageKind.ACCOUNT_USERNAME_REMINDER,
-                    MessageKind.ACCOUNT_PASSWORD_RESET_CODE)
+                    MessageKind.ACCOUNT_PASSWORD_RESET_CODE, MessageKind.WAITLIST_OFFER)
             .map(Enum::name)
             .toList();
 
@@ -150,6 +151,9 @@ class MailOutbox {
             settle(claimed, record -> messages.failed(record, undeliverable.reason()));
         } catch (MailRecipientRefusedException refusal) {
             settle(claimed, record -> messages.refused(record, refusal.diagnosis(), refusal.statusCode()));
+            if (refusal.mailboxRefused()) {
+                reportRefusal(message);
+            }
         } catch (RuntimeException failure) {
             String diagnosis = diagnosisOf(failure);
             if (claimed.attempts() >= ATTEMPTS) {
@@ -160,6 +164,15 @@ class MailOutbox {
                 Instant next = clock.instant().plus(gapAfter(claimed.attempts()));
                 settle(claimed, record -> messages.retry(record, diagnosis, next));
             }
+        }
+    }
+
+    private void reportRefusal(QueuedMessage message) {
+        try {
+            composerFor(message.kind()).refused(message);
+        } catch (RuntimeException failure) {
+            log.warn("A refused {} message for account {} could not be reported back: {}", message.kind(),
+                    message.accountId(), chainOf(failure));
         }
     }
 

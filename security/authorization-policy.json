@@ -2,9 +2,9 @@
   "schemaVersion": 1,
   "reviewedAt": "2026-10-12",
   "purpose": "This is the normative authorization policy for the shipped Courtside API. OpenAPI defines the transport shape; this policy defines who may perform each operation, which resource attributes narrow that permission, and which protected fields each projection may read or write.",
-  "openApiFieldInventorySha256": "48778d33c05081a15be66130cd9e58b78c7f16f5d1540be24a716cf9d73d8d57",
-  "protectedFieldInventorySha256": "a325d169844886b145c2f4bf4544eb8ef023cedad6b71f589a982568fb4eb221",
-  "productionAuthorizationSha256": "09cf9df710c3434d07a8a98128c7204c953c26aecbda3c8b9c12a4ebf56550e9",
+  "openApiFieldInventorySha256": "d80f561628608cee0066ad58efe06c9865b938e5b718eb5190058885755ca8c2",
+  "protectedFieldInventorySha256": "174231e5d10a1e24a00993b2bba95b73d1749ba62780a85d608afed778bf0512",
+  "productionAuthorizationSha256": "24f171e478bcc763121b572f0116030dee985836b4332097b55899acb808c151",
   "ordinaryFields": [
     "Problem.detail",
     "Problem.fieldErrors",
@@ -15,6 +15,17 @@
     "Problem.traceId",
     "Problem.type",
     "Problem.violations",
+    "acceptWaitlistOffer:parameter:$parameter.path.entryId",
+    "acceptWaitlistOffer:response:$response.header.Location",
+    "acceptWaitlistOffer:response:$response.header.Retry-After",
+    "acceptWaitlistOffer:response:BookingCreated.id",
+    "acceptWaitlistOffer:response:FieldError.code",
+    "acceptWaitlistOffer:response:FieldError.field",
+    "acceptWaitlistOffer:response:FieldError.params",
+    "acceptWaitlistOffer:response:FieldError.params.*",
+    "acceptWaitlistOffer:response:Violation.code",
+    "acceptWaitlistOffer:response:Violation.params",
+    "acceptWaitlistOffer:response:Violation.params.*",
     "assignMembership:parameter:$parameter.path.personId",
     "assignMembership:request:MembershipRequest.endedOn",
     "assignMembership:request:MembershipRequest.membershipTypeId",
@@ -141,12 +152,14 @@
     "changeClubConfig:request:ClubConfigRequest.shortName",
     "changeClubConfig:request:ClubConfigRequest.slotMinutes",
     "changeClubConfig:request:ClubConfigRequest.timeZone",
+    "changeClubConfig:request:ClubConfigRequest.waitlistOfferMinutes",
     "changeClubConfig:response:$response.header.Accept",
     "changeClubConfig:response:$response.header.Retry-After",
     "changeClubConfig:response:AdminClubConfig.logoFallbackUrl",
     "changeClubConfig:response:AdminClubConfig.logoUploaded",
     "changeClubConfig:response:AdminClubConfig.passwordResetTokenMinutes",
     "changeClubConfig:response:AdminClubConfig.shortName",
+    "changeClubConfig:response:AdminClubConfig.waitlistOfferMinutes",
     "changeClubConfig:response:ClubConfig.accentColor",
     "changeClubConfig:response:ClubConfig.clubName",
     "changeClubConfig:response:ClubConfig.defaultLocale",
@@ -574,6 +587,7 @@
     "deleteClubLogo:response:AdminClubConfig.logoUploaded",
     "deleteClubLogo:response:AdminClubConfig.passwordResetTokenMinutes",
     "deleteClubLogo:response:AdminClubConfig.shortName",
+    "deleteClubLogo:response:AdminClubConfig.waitlistOfferMinutes",
     "deleteClubLogo:response:ClubConfig.accentColor",
     "deleteClubLogo:response:ClubConfig.clubName",
     "deleteClubLogo:response:ClubConfig.defaultLocale",
@@ -850,6 +864,7 @@
     "getClubConfigForAdmin:response:AdminClubConfig.logoUploaded",
     "getClubConfigForAdmin:response:AdminClubConfig.passwordResetTokenMinutes",
     "getClubConfigForAdmin:response:AdminClubConfig.shortName",
+    "getClubConfigForAdmin:response:AdminClubConfig.waitlistOfferMinutes",
     "getClubConfigForAdmin:response:ClubConfig.accentColor",
     "getClubConfigForAdmin:response:ClubConfig.clubName",
     "getClubConfigForAdmin:response:ClubConfig.defaultLocale",
@@ -998,6 +1013,29 @@
     "getWebManifest:response:WebManifestIcon.type",
     "getWebManifest:response:WebManifestShortcut.name",
     "getWebManifest:response:WebManifestShortcut.url",
+    "joinWaitlist:request:JoinWaitlistRequest.cardId",
+    "joinWaitlist:request:JoinWaitlistRequest.courtId",
+    "joinWaitlist:request:JoinWaitlistRequest.endsAt",
+    "joinWaitlist:request:JoinWaitlistRequest.startsAt",
+    "joinWaitlist:response:$response.header.Accept",
+    "joinWaitlist:response:$response.header.Retry-After",
+    "joinWaitlist:response:FieldError.code",
+    "joinWaitlist:response:FieldError.field",
+    "joinWaitlist:response:FieldError.params",
+    "joinWaitlist:response:FieldError.params.*",
+    "joinWaitlist:response:Violation.code",
+    "joinWaitlist:response:Violation.params",
+    "joinWaitlist:response:Violation.params.*",
+    "joinWaitlist:response:WaitlistJoined.id",
+    "leaveWaitlist:parameter:$parameter.path.entryId",
+    "leaveWaitlist:response:$response.header.Retry-After",
+    "leaveWaitlist:response:FieldError.code",
+    "leaveWaitlist:response:FieldError.field",
+    "leaveWaitlist:response:FieldError.params",
+    "leaveWaitlist:response:FieldError.params.*",
+    "leaveWaitlist:response:Violation.code",
+    "leaveWaitlist:response:Violation.params",
+    "leaveWaitlist:response:Violation.params.*",
     "linkExternalReference:parameter:$parameter.path.sourceId",
     "linkExternalReference:request:ExternalReferenceRequest.externalId",
     "linkExternalReference:request:ExternalReferenceRequest.personId",
@@ -1266,6 +1304,7 @@
     "listOwnNotifications:response:Notification.kind",
     "listOwnNotifications:response:Notification.link",
     "listOwnNotifications:response:Notification.readAt",
+    "listOwnNotifications:response:Notification.waitlistOffer",
     "listOwnNotifications:response:NotificationBooking.cancelled",
     "listOwnNotifications:response:NotificationBooking.cardLabel",
     "listOwnNotifications:response:NotificationBooking.courts",
@@ -1275,9 +1314,13 @@
     "listOwnNotifications:response:NotificationCourt.number",
     "listOwnNotifications:response:NotificationLink.bookingId",
     "listOwnNotifications:response:NotificationLink.target",
+    "listOwnNotifications:response:NotificationLink.waitlistEntryId",
     "listOwnNotifications:response:NotificationPage.items",
     "listOwnNotifications:response:NotificationPage.nextCursor",
     "listOwnNotifications:response:NotificationPage.unread",
+    "listOwnNotifications:response:NotificationWaitlistOffer.expiresAt",
+    "listOwnNotifications:response:NotificationWaitlistOffer.open",
+    "listOwnNotifications:response:NotificationWaitlistOffer.slot",
     "listOwnNotifications:response:Violation.code",
     "listOwnNotifications:response:Violation.params",
     "listOwnNotifications:response:Violation.params.*",
@@ -1308,6 +1351,18 @@
     "listOwnSessions:response:Violation.code",
     "listOwnSessions:response:Violation.params",
     "listOwnSessions:response:Violation.params.*",
+    "listOwnWaitlistEntries:response:$response.header.Retry-After",
+    "listOwnWaitlistEntries:response:FieldError.code",
+    "listOwnWaitlistEntries:response:FieldError.field",
+    "listOwnWaitlistEntries:response:FieldError.params",
+    "listOwnWaitlistEntries:response:FieldError.params.*",
+    "listOwnWaitlistEntries:response:Violation.code",
+    "listOwnWaitlistEntries:response:Violation.params",
+    "listOwnWaitlistEntries:response:Violation.params.*",
+    "listOwnWaitlistEntries:response:WaitlistEntry.cardLabel",
+    "listOwnWaitlistEntries:response:WaitlistEntry.courtId",
+    "listOwnWaitlistEntries:response:WaitlistEntry.endsAt",
+    "listOwnWaitlistEntries:response:WaitlistEntry.startsAt",
     "listParticipantCards:response:$response.header.Retry-After",
     "listParticipantCards:response:FieldError.code",
     "listParticipantCards:response:FieldError.field",
@@ -1357,6 +1412,18 @@
     "listPersonalBookings:response:Violation.code",
     "listPersonalBookings:response:Violation.params",
     "listPersonalBookings:response:Violation.params.*",
+    "listReservedSlots:parameter:$parameter.query.date",
+    "listReservedSlots:response:$response.header.Retry-After",
+    "listReservedSlots:response:FieldError.code",
+    "listReservedSlots:response:FieldError.field",
+    "listReservedSlots:response:FieldError.params",
+    "listReservedSlots:response:FieldError.params.*",
+    "listReservedSlots:response:ReservedSlot.courtId",
+    "listReservedSlots:response:ReservedSlot.endsAt",
+    "listReservedSlots:response:ReservedSlot.startsAt",
+    "listReservedSlots:response:Violation.code",
+    "listReservedSlots:response:Violation.params",
+    "listReservedSlots:response:Violation.params.*",
     "listRuleSets:response:$response.header.Retry-After",
     "listRuleSets:response:FieldError.code",
     "listRuleSets:response:FieldError.field",
@@ -2085,6 +2152,7 @@
     "uploadClubLogo:response:AdminClubConfig.logoUploaded",
     "uploadClubLogo:response:AdminClubConfig.passwordResetTokenMinutes",
     "uploadClubLogo:response:AdminClubConfig.shortName",
+    "uploadClubLogo:response:AdminClubConfig.waitlistOfferMinutes",
     "uploadClubLogo:response:ClubConfig.accentColor",
     "uploadClubLogo:response:ClubConfig.clubName",
     "uploadClubLogo:response:ClubConfig.defaultLocale",
@@ -2311,6 +2379,10 @@
     {
       "id": "viewer-account",
       "description": "The optional current account used to select viewer-specific public fields."
+    },
+    {
+      "id": "waitlist-entry-owner",
+      "description": "The account that joined a waitlist entry."
     }
   ],
   "operationRules": [
@@ -2437,7 +2509,8 @@
         "getAppIcon",
         "getWebManifest",
         "listBookingCardLegend",
-        "listAllocations"
+        "listAllocations",
+        "listReservedSlots"
       ],
       "actors": [
         "ANONYMOUS",
@@ -2644,6 +2717,30 @@
       "decisions": [
         "permanent-account-gate",
         "booking-ownership"
+      ]
+    },
+    {
+      "id": "own-waitlist",
+      "description": "A permanent account joins, reads, leaves and accepts only its own waitlist entries; joining and accepting pass the booking-card and rule checks of a booking.",
+      "operationIds": [
+        "listOwnWaitlistEntries",
+        "joinWaitlist",
+        "leaveWaitlist",
+        "acceptWaitlistOffer"
+      ],
+      "actors": [
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN"
+      ],
+      "decisions": [
+        "permanent-account-gate",
+        "booking-card-eligibility",
+        "waitlist-ownership"
       ]
     },
     {
@@ -3021,7 +3118,12 @@
         "src/main/java/org/courtside/booking/web/SeriesController.java#createSeries",
         "src/main/java/org/courtside/booking/web/SeriesController.java#previewSeries",
         "src/main/java/org/courtside/booking/internal/BookingWriteWarmUp.java#run",
-        "src/main/java/org/courtside/booking/internal/SeriesPreviewWarmUp.java#run"
+        "src/main/java/org/courtside/booking/internal/SeriesPreviewWarmUp.java#run",
+        "src/main/java/org/courtside/booking/waitlist/WaitlistService.java#join",
+        "src/main/java/org/courtside/booking/BookingWriter.java#bookable",
+        "src/main/java/org/courtside/booking/waitlist/WaitlistQueue.java#eligible",
+        "src/main/java/org/courtside/booking/internal/CardEligibilityPolicy.java#admits",
+        "src/main/java/org/courtside/booking/BookingWriter.java#isBookable"
       ],
       "positiveTests": [
         "src/test/java/org/courtside/booking/internal/CardEligibilityPolicyTest.java#givenTheRequiredRole_whenRequiringEligibility_thenTheCardIsReturned"
@@ -3064,6 +3166,41 @@
       "negativeTests": [
         "src/test/java/org/courtside/booking/web/BookingControllerTest.java#givenAForeignBooking_whenAMemberCancelsIt_thenItIsNotFoundAndItStaysConfirmed",
         "src/test/java/org/courtside/notification/web/NotificationControllerTest.java#givenAPlayerWhoLeftTheBooking_whenTheyReadTheCentre_thenTheEntryNoLongerDescribesOrLinksIt"
+      ]
+    },
+    {
+      "id": "waitlist-ownership",
+      "title": "Waitlist entry ownership",
+      "rule": "The current account selects which waitlist entries are read, left and accepted; another account's entry answers as not found, no response names another waiting account or a position, and a reserved court refuses every other account's booking unless an admin books it or it is closed, which withdraws the offer.",
+      "attributes": [
+        "current-account",
+        "waitlist-entry-owner"
+      ],
+      "productionPaths": [
+        "src/main/java/org/courtside/booking/waitlist/WaitlistService.java#join",
+        "src/main/java/org/courtside/booking/waitlist/WaitlistService.java#leave",
+        "src/main/java/org/courtside/booking/waitlist/WaitlistService.java#accept",
+        "src/main/java/org/courtside/booking/waitlist/WaitlistService.java#ownEntries",
+        "src/main/java/org/courtside/booking/waitlist/WaitlistRows.java#lockOwn",
+        "src/main/java/org/courtside/booking/waitlist/WaitlistQueue.java#requireUnreserved",
+        "src/main/java/org/courtside/booking/web/WaitlistController.java#listOwnWaitlistEntries",
+        "src/main/java/org/courtside/booking/web/WaitlistController.java#joinWaitlist",
+        "src/main/java/org/courtside/booking/web/WaitlistController.java#leaveWaitlist",
+        "src/main/java/org/courtside/booking/web/WaitlistController.java#acceptWaitlistOffer",
+        "src/main/java/org/courtside/booking/internal/CourtReservations.java#blocks",
+        "src/main/java/org/courtside/booking/internal/CourtReservations.java#overriddenBy"
+      ],
+      "positiveTests": [
+        "src/test/java/org/courtside/booking/web/WaitlistControllerTest.java#givenATakenCourt_whenAMemberJoinsItsWaitlist_thenTheEntryIsTheirsAndNamesNoPosition",
+        "src/test/java/org/courtside/booking/web/WaitlistControllerTest.java#givenAnOffer_whenTheMemberAcceptsIt_thenTheCourtIsTheirBooking",
+        "src/test/java/org/courtside/booking/web/WaitlistControllerTest.java#givenAWaitingEntry_whenTheMemberLeavesIt_thenItIsClosed",
+        "src/test/java/org/courtside/booking/waitlist/WaitlistTest.java#givenAnOffer_whenTheBoardBooksTheReservedCourt_thenTheClubTakesItAndTheOfferIsWithdrawn"
+      ],
+      "negativeTests": [
+        "src/test/java/org/courtside/booking/web/WaitlistControllerTest.java#givenAnotherMembersOffer_whenAMemberAcceptsIt_thenItIsNotFoundAndNothingIsBooked",
+        "src/test/java/org/courtside/booking/web/WaitlistControllerTest.java#givenAnotherMembersEntry_whenAMemberLeavesIt_thenItIsNotFoundAndKeepsWaiting",
+        "src/test/java/org/courtside/booking/web/WaitlistControllerTest.java#givenAnOffer_whenAnotherMemberBooksTheCourt_thenItIsReservedForTheWaitingMember",
+        "src/test/java/org/courtside/booking/waitlist/WaitlistTest.java#givenAnOffer_whenATrainerMovesASeriesOntoTheReservedCourt_thenTheMoveIsBlocked"
       ]
     },
     {
@@ -3249,18 +3386,22 @@
         "src/main/java/org/courtside/booking/internal/AllocationVisibilityService.java#resolve",
         "src/main/java/org/courtside/booking/internal/AllocationVisibilityService.java#participantPersonIds",
         "src/main/java/org/courtside/booking/web/BookingController.java#listAllocations",
-        "src/main/java/org/courtside/booking/web/BookingController.java#toResponse"
+        "src/main/java/org/courtside/booking/web/BookingController.java#toResponse",
+        "src/main/java/org/courtside/booking/web/WaitlistController.java#listReservedSlots",
+        "src/main/java/org/courtside/booking/waitlist/WaitlistService.java#reservationsBetween"
       ],
       "positiveTests": [
         "src/test/java/org/courtside/card/web/CardControllerTest.java#givenRoleRestrictedAndInactiveCards_whenListingTheLegend_thenEveryActiveCardIsPublic",
         "src/test/java/org/courtside/booking/web/BookingControllerTest.java#givenABookingOnADay_whenRequestingThatDaysGrid_thenTheBookingIsListed",
-        "src/test/java/org/courtside/booking/web/BookingControllerTest.java#givenOwnBookingWithAnotherMember_whenLoadingTheGrid_thenOnlyOwnershipAndSurnameAreVisible"
+        "src/test/java/org/courtside/booking/web/BookingControllerTest.java#givenOwnBookingWithAnotherMember_whenLoadingTheGrid_thenOnlyOwnershipAndSurnameAreVisible",
+        "src/test/java/org/courtside/booking/web/WaitlistControllerTest.java#givenAnOffer_whenItsHolderReadsTheReservedSlots_thenTheirEntryLeadsToIt"
       ],
       "negativeTests": [
         "src/test/java/org/courtside/card/web/CardControllerTest.java#whenListingTheLegend_thenBookingRulesAreNotExposed",
         "src/test/java/org/courtside/config/web/ConfigControllerTest.java#whenReadingThePublicConfig_thenItPublishesNothingOnlyABoardShouldSee",
         "src/test/java/org/courtside/booking/web/BookingControllerTest.java#givenAnotherMembersBooking_whenLoadingTheGrid_thenOwnershipAndParticipantsAreHidden",
-        "src/test/java/org/courtside/booking/web/BookingControllerTest.java#givenAnonymousCaller_whenLoadingTheGrid_thenOwnershipAndParticipantsAreHidden"
+        "src/test/java/org/courtside/booking/web/BookingControllerTest.java#givenAnonymousCaller_whenLoadingTheGrid_thenOwnershipAndParticipantsAreHidden",
+        "src/test/java/org/courtside/booking/web/WaitlistControllerTest.java#givenAnOffer_whenAVisitorReadsTheReservedSlots_thenTheCourtIsHeldAndNobodyIsNamed"
       ]
     },
     {
@@ -4022,7 +4163,9 @@
         "SubjectAccessExport.bookingsRecordedIn",
         "SubjectAccessExport.externalReferences",
         "SubjectAccessExport.changesAsSubject",
-        "SubjectAccessExport.changesAsActor"
+        "SubjectAccessExport.changesAsActor",
+        "SubjectAccessExport.waitlistEntries",
+        "SubjectAccessExport.waitlistsNamedIn"
       ],
       "operationIds": [
         "exportPersonData"
@@ -4182,6 +4325,100 @@
       ],
       "decisions": [
         "request-boundary"
+      ]
+    },
+    {
+      "id": "waitlist-party-write",
+      "access": "write",
+      "description": "A participant's person identifier or guest name and a note are accepted only as part of the current account's own waitlist entry, checked as a booking request would be.",
+      "fields": [
+        "ParticipantRequest.personId",
+        "ParticipantRequest.guestName",
+        "ParticipantRequest.cardId",
+        "JoinWaitlistRequest.note",
+        "JoinWaitlistRequest.participants"
+      ],
+      "operationIds": [
+        "joinWaitlist"
+      ],
+      "actors": [
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN"
+      ],
+      "attributes": [
+        "current-account",
+        "booking-card",
+        "allowed-role",
+        "current-membership"
+      ],
+      "decisions": [
+        "permanent-account-gate",
+        "booking-card-eligibility"
+      ]
+    },
+    {
+      "id": "own-waitlist-read",
+      "access": "read",
+      "description": "Waitlist entry identifiers, state and booking are returned only to the account that joined; the reserved-slot projection names an entry only to its holder.",
+      "fields": [
+        "WaitlistEntry.id",
+        "WaitlistEntry.state",
+        "WaitlistEntry.offerExpiresAt",
+        "WaitlistEntry.bookingId"
+      ],
+      "operationIds": [
+        "listOwnWaitlistEntries"
+      ],
+      "actors": [
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN"
+      ],
+      "attributes": [
+        "current-account",
+        "waitlist-entry-owner"
+      ],
+      "decisions": [
+        "waitlist-ownership"
+      ]
+    },
+    {
+      "id": "reserved-slot-holder-read",
+      "access": "read",
+      "description": "A reserved slot names its entry only to the account holding the offer and nobody's identity to anyone else.",
+      "fields": [
+        "ReservedSlot.ownEntryId"
+      ],
+      "operationIds": [
+        "listReservedSlots"
+      ],
+      "actors": [
+        "ANONYMOUS",
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN",
+        "INITIAL_PASSWORD"
+      ],
+      "attributes": [
+        "viewer-account",
+        "waitlist-entry-owner"
+      ],
+      "decisions": [
+        "public-projection",
+        "waitlist-ownership"
       ]
     }
   ]

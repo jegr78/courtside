@@ -51,6 +51,32 @@ class MailHandoverTest {
                 .doesNotContain("user unknown");
     }
 
+    @Test
+    void givenAnAddressStatus_whenARefusalIsReported_thenItIsMarkedAsAboutTheMailbox() {
+        // when
+        MailRecipientRefusedException refusal = (MailRecipientRefusedException)
+                org.assertj.core.api.Assertions.catchThrowable(() -> handover.attempt(MESSAGE_ID,
+                        () -> { throw rejected("550 5.1.1 <nobody@example.org> user unknown"); }));
+
+        // then
+        assertThat(refusal.mailboxRefused()).as("5.1.x names the address itself").isTrue();
+    }
+
+    @Test
+    void givenARelayWideRefusal_whenItIsReported_thenItIsNotTakenAsAboutTheMailbox() {
+        // when
+        MailRecipientRefusedException relay = (MailRecipientRefusedException)
+                org.assertj.core.api.Assertions.catchThrowable(() -> handover.attempt(MESSAGE_ID,
+                        () -> { throw rejected("554 5.7.1 <nobody@example.org>: Relay access denied"); }));
+        MailRecipientRefusedException bare = (MailRecipientRefusedException)
+                org.assertj.core.api.Assertions.catchThrowable(() -> handover.attempt(MESSAGE_ID,
+                        () -> { throw rejected("550 rejected"); }));
+
+        // then
+        assertThat(relay.mailboxRefused()).as("a refused relay refuses every recipient alike").isFalse();
+        assertThat(bare.mailboxRefused()).as("without an address status nothing says the mailbox is wrong").isFalse();
+    }
+
     // What Spring builds for a rejected recipient: the mail library's exception is a failed message
     // and not a cause, so a walk that only follows getCause never sees the refusal at all.
     private static RuntimeException rejected(String reply) {

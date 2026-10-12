@@ -10,6 +10,7 @@ import org.courtside.api.ApiNotificationClosure;
 import org.courtside.api.ApiNotificationCourt;
 import org.courtside.api.ApiNotificationLink;
 import org.courtside.api.ApiNotificationPage;
+import org.courtside.api.ApiNotificationWaitlistOffer;
 import org.courtside.notification.internal.OwnNotifications;
 import org.courtside.shared.BookingAnnouncement;
 import org.courtside.shared.WireTypes;
@@ -41,14 +42,18 @@ class NotificationController implements AccountNotificationsApi {
 
     private static ApiNotification toResponse(OwnNotifications.Entry entry) {
         ApiNotificationLink link = new ApiNotificationLink(ApiNotificationLink.TargetEnum.fromValue(entry.target().name()))
-                .bookingId(entry.linkedBookingId());
+                .bookingId(entry.linkedBookingId())
+                .waitlistEntryId(entry.linkedWaitlistEntryId());
         return new ApiNotification(entry.id(), ApiMessageKind.fromValue(entry.kind().name()),
                 WireTypes.toOffsetDateTime(entry.createdAt()), link)
                 .readAt(WireTypes.toOffsetDateTime(entry.readAt()))
                 .booking(entry.booking() == null ? null : toResponse(entry.booking()))
                 .closure(entry.closure() == null ? null : ApiNotificationClosure.fromValue(entry.closure().name()))
                 .cancellationReason(entry.cancellationReason() == null ? null
-                        : ApiCancellationReason.fromValue(entry.cancellationReason().name()));
+                        : ApiCancellationReason.fromValue(entry.cancellationReason().name()))
+                .waitlistOffer(entry.waitlistOffer() == null ? null : new ApiNotificationWaitlistOffer(
+                        toResponse(entry.waitlistOffer().slot()),
+                        WireTypes.toOffsetDateTime(entry.waitlistOffer().expiresAt()), entry.waitlistOffer().open()));
     }
 
     private static ApiNotificationBooking toResponse(BookingAnnouncement booking) {

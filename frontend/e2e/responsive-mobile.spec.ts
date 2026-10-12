@@ -761,7 +761,7 @@ test("given an own booking beside a league match and a squad training on four co
           message: `at ${width} px the short label fits its column without being cut`, timeout: 10_000
         }).toBe(true);
         const fullLabel = escaped(await allocation.getByTestId("allocation-label").textContent());
-        await expect(allocation, "the accessible name keeps the full label").toHaveAccessibleName(new RegExp(`^${fullLabel}( \\(.+\\))?, `), { timeout: 10_000 });
+        await expect(allocation, "the accessible name keeps the full label").toHaveAccessibleName(new RegExp(`(^| )${fullLabel}( \\(.+\\))?, `), { timeout: 10_000 });
         await expect(allocation, "the accessible name contains the visible short label")
           .toHaveAccessibleName(new RegExp(escaped(await shortLabel.textContent()), "i"), { timeout: 10_000 });
       }

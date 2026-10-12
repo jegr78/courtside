@@ -208,6 +208,34 @@ ihn. Sonst erfährst du ihn beim Verein.
 
 ![Bevorstehende Buchungen mit der Schaltfläche zum Stornieren, die vergangenen eingeklappt darunter.](screenshots/de/my-bookings.png)
 
+## Auf einen belegten Platz warten
+
+Ist ein Platz zu deiner Wunschzeit belegt, kannst du dich auf seine Warteliste setzen.
+
+1. Wähle im Platzplan die belegte Zeit.
+2. Wähle Buchungsart und Mitspieler wie bei einer Buchung.
+3. Wähle *Auf die Warteliste setzen*.
+
+Courtside prüft dabei dieselben Regeln wie bei einer Buchung. Für jeden Platz und jede Zeit gibt es
+eine eigene Warteliste. Wer sich zuerst einträgt, kommt zuerst dran.
+
+Wird der Platz frei, reserviert Courtside ihn für das erste Mitglied auf der Warteliste. Dein Angebot
+steht unter *Benachrichtigungen* und unter *Meine Buchungen*, per E-Mail nur, wenn du E-Mail gewählt
+hast. Die Reservierung gilt so lange, wie der Verein es eingestellt hat, höchstens bis zum Beginn der
+Zeit. Wählst du *Buchen*, wird daraus deine Buchung mit den eingetragenen Mitspielern. Lehnst du ab
+oder läuft die Zeit ab, geht der Platz an das nächste Mitglied. Darfst du den Platz inzwischen nicht
+mehr buchen oder lehnt dein Mailserver die Nachricht mit dem Angebot ab, überspringt Courtside dich.
+Belegt der Verein den Platz selbst, etwa für eine Sperrung, endet dein Angebot.
+
+Unter *Meine Buchungen* siehst du nur deine eigenen Einträge. Wer sonst wartet und an welcher Stelle
+du stehst, zeigt Courtside niemandem. Du kannst eine Warteliste jederzeit verlassen. Buchst du den
+Platz selbst oder beginnt die Zeit, endet dein Eintrag. Auf demselben Platz kannst du nur auf eine
+Zeit zugleich warten, die sich mit einer anderen überschneidet. Du kannst höchstens 20 Einträge haben,
+deren Zeit noch nicht vorbei ist. Dazu zählen auch Einträge, die du verlassen hast, bis ihre Zeit
+vorbei ist.
+
+![Der Dialog für die Warteliste eines belegten Platzes mit Buchungsart und Mitspielern.](screenshots/de/waitlist-dialog.png)
+
 ## Serientermine
 
 Konten, deren Rolle eine aktive Buchungskarte ohne Spielerliste erlaubt, können unter *Verwaltung → Vereinstermine* Serien anlegen. Eine Serie legt
@@ -260,7 +288,8 @@ Diese Nachrichten sendet Courtside immer:
 * Mitteilung über deine Eintragung als Mitspieler,
 * Mitteilung über eine Änderung, die deine Buchung betrifft,
 * Mitteilung, dass der Verein eine Buchung storniert hat, die dich betrifft,
-* Mitteilung, dass der Verein Termine deiner Serie storniert oder verlegt hat.
+* Mitteilung, dass der Verein Termine deiner Serie storniert oder verlegt hat,
+* Angebot von einer Warteliste, auf der du stehst. Wer sie verlässt, bekommt keines mehr.
 
 Getrennt davon entscheidest du, ob du zusätzlich eine E-Mail bekommst. Ohne E-Mail stehen deine
 Nachrichten weiter hier. Von deiner Eintragung als Mitspieler, einer Änderung an deiner Buchung oder

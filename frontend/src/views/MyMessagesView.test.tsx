@@ -144,6 +144,34 @@ describe("MyMessagesView", () => {
     expect(within(cancellation).getByRole("link")).toHaveAttribute("href", `/my-bookings#booking-${cancelledByClub.link.bookingId}`);
   });
 
+  it("given a waitlist offer, when it is shown, then it names the slot and its deadline and leads to the offer", async () => {
+    // given
+    const offer: Notification = {
+      id: "88888888-8888-8888-8888-888888888888", kind: "WAITLIST_OFFER", createdAt: "2026-05-12T08:00:00Z", readAt: null,
+      waitlistOffer: {
+        slot: { startsAt: "2026-05-12T16:00:00Z", endsAt: "2026-05-12T17:00:00Z",
+          courts: [{ number: 1, name: "Centre Court" }], cardLabel: "Member booking", cancelled: false },
+        expiresAt: "2026-05-12T08:15:00Z", open: true
+      },
+      link: { target: "WAITLIST", waitlistEntryId: "99999999-9999-9999-9999-999999999999" }
+    };
+    const ended: Notification = { ...offer, id: "88888888-8888-8888-8888-888888888889",
+      waitlistOffer: { ...offer.waitlistOffer!, open: false }, link: { target: "WAITLIST" } };
+    vi.spyOn(api, "ownNotifications").mockResolvedValue({ items: [offer, ended], nextCursor: null, unread: 2 });
+
+    // when
+    show();
+
+    // then
+    const open = await screen.findByTestId(`notification-${offer.id}`);
+    expect(within(open).getByTestId("notification-summary")).toHaveTextContent("A court you are waiting for is free and reserved for you.");
+    expect(within(open).getByTestId("notification-booking")).toHaveTextContent("Centre Court");
+    expect(within(open).getByTestId("notification-offer")).toHaveTextContent("Reserved until");
+    expect(within(open).getByRole("link")).toHaveAttribute("href", "/my-bookings#waitlist-99999999-9999-9999-9999-999999999999");
+    expect(within(entry(ended.id)).getByTestId("notification-offer")).toHaveTextContent("This offer is no longer open.");
+    expect(within(entry(ended.id)).getByRole("link")).toHaveAttribute("href", "/my-bookings#waitlist");
+  });
+
   it("given an unread notification, when the member marks it read, then the instance is told and it shows as read", async () => {
     // given
     const marked = vi.spyOn(api, "markNotificationRead").mockResolvedValue(undefined);

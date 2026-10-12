@@ -12,4 +12,7 @@ interface MessageComposer {
     Set<MessageKind> kinds();
 
     void compose(QueuedMessage message, Consumer<OutgoingMail> handOver);
+
+    default void refused(QueuedMessage message) {
+    }
 }

@@ -213,6 +213,39 @@ class BookingControllerTest extends AbstractIntegrationTest {
 
     @Test
     @WithMockUser(username = "doe.jane", roles = "MEMBER")
+    void givenAnOversizedNote_whenCreatingABooking_thenSizeValidationFailureIsReturned() throws Exception {
+        // given
+        String body = bookingJson("2026-05-12T18:00:00+02:00", "2026-05-12T19:00:00+02:00")
+                .replace("\"participants\"", "\"note\": \"%s\", \"participants\"".formatted("x".repeat(501)));
+
+        // when / then
+        mockMvc.perform(bookingPost().contentType(MediaType.APPLICATION_JSON).content(body).with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("note"))
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.Size"))
+                .andExpect(jsonPath("$.fieldErrors[0].params.max").value(500));
+        assertThat(bookings.count()).isZero();
+    }
+
+    @Test
+    @WithMockUser(username = "doe.jane", roles = "MEMBER")
+    void givenMorePlayersThanACourtHolds_whenCreatingABooking_thenSizeValidationFailureIsReturned() throws Exception {
+        // given
+        String players = String.join(", ", java.util.Collections.nCopies(21, GUEST_PARTICIPANT));
+        String body = bookingJson("2026-05-12T18:00:00+02:00", "2026-05-12T19:00:00+02:00")
+                .replace("[ " + GUEST_PARTICIPANT + " ]", "[ " + players + " ]");
+
+        // when / then
+        mockMvc.perform(bookingPost().contentType(MediaType.APPLICATION_JSON).content(body).with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("participants"))
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.Size"))
+                .andExpect(jsonPath("$.fieldErrors[0].params.max").value(20));
+        assertThat(bookings.count()).isZero();
+    }
+
+    @Test
+    @WithMockUser(username = "doe.jane", roles = "MEMBER")
     void givenAnOversizedIdempotencyKey_whenCreatingABooking_thenSizeValidationFailureIsReturned()
             throws Exception {
         // when / then

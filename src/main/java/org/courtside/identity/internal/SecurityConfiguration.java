@@ -150,6 +150,7 @@ public class SecurityConfiguration {
                                         && !hasAuthority(authentication.get(),
                                         CourtsideUserDetailsService.PASSWORD_CHANGE_REQUIRED)))
                         .requestMatchers(HttpMethod.GET, "/api/bookings").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/reserved-slots").permitAll()
                         .requestMatchers("/actuator/prometheus").access((authentication, context) ->
                                 new AuthorizationDecision(performanceTelemetryEnabled))
                         .requestMatchers("/api/openapi.yaml", "/api/source").permitAll()

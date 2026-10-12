@@ -67,6 +67,10 @@ export function AdminDeadlinesView({ configurationChanged }: { configurationChan
               <TextField data-testid="booking-reminder-hours" type="number" min={0} max={168} className="max-w-32" label={t("admin.config.bookingReminderHours")} value={config.bookingReminderHours} onChange={(event) => change({ bookingReminderHours: Number(event.target.value) })} />
               <p className="text-muted text-sm">{t("admin.config.bookingReminderHoursHelp")}</p>
             </div>
+            <div className="grid gap-1">
+              <TextField data-testid="waitlist-offer-minutes" type="number" min={1} max={1440} className="max-w-32" label={t("admin.config.waitlistOfferMinutes")} value={config.waitlistOfferMinutes ?? 15} onChange={(event) => change({ waitlistOfferMinutes: Number(event.target.value) })} />
+              <p className="text-muted text-sm">{t("admin.config.waitlistOfferMinutesHelp")}</p>
+            </div>
           </div>
           <SaveBar id="deadlines" subject={t("admin.deadlines.title")} saveTestId="save-deadlines" form="deadlines-form"
                    unsaved={unsaved} pending={pending} discard={discard} />

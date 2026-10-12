@@ -87,7 +87,7 @@ class NoMembershipTypeRuleSetAssignmentTest extends AbstractIntegrationTest {
                 current.documentationUrl(), current.shortName(), current.defaultLocale(),
                 new BookingSlotDuration(current.slotMinutes()), current.timeZone(),
                 new CredentialLifetime(current.newAccountCredentialHours()),
-                new CredentialLifetime(current.passwordResetCredentialHours()), new ResetTokenLifetime(60), new ReminderLeadTime(24), ruleSetId);
+                new CredentialLifetime(current.passwordResetCredentialHours()), new ResetTokenLifetime(60), new ReminderLeadTime(24), ruleSetId, null);
     }
 
     private ChangeClubConfigurationCommand bindingTo(UUID ruleSetId) {
@@ -98,6 +98,6 @@ class NoMembershipTypeRuleSetAssignmentTest extends AbstractIntegrationTest {
                 current.documentationUrl(), current.shortName(), current.defaultLocale(),
                 new BookingSlotDuration(current.slotMinutes()), current.timeZone(),
                 new CredentialLifetime(current.newAccountCredentialHours()),
-                new CredentialLifetime(current.passwordResetCredentialHours()), new ResetTokenLifetime(60), new ReminderLeadTime(24), ruleSetId);
+                new CredentialLifetime(current.passwordResetCredentialHours()), new ResetTokenLifetime(60), new ReminderLeadTime(24), ruleSetId, null);
     }
 }

@@ -1,10 +1,11 @@
 {
   "schemaVersion": 1,
-  "reviewedAt": "2026-10-11",
+  "reviewedAt": "2026-10-12",
   "sources": {
     "openapi": "src/main/resources/api/openapi.yaml",
     "scheduledFiles": [
       "src/main/java/org/courtside/booking/internal/BookingReminderSchedule.java",
+      "src/main/java/org/courtside/booking/waitlist/WaitlistSweep.java",
       "src/main/java/org/courtside/dataexchange/internal/PreviewExpirySchedule.java",
       "src/main/java/org/courtside/identity/internal/AgedSessionSweep.java",
       "src/main/java/org/courtside/identity/internal/IdentityCleanupSchedule.java",
@@ -30,6 +31,7 @@
       "src/main/java/org/courtside/notification/internal/ReminderMailer.java",
       "src/main/java/org/courtside/notification/internal/SeriesMailer.java",
       "src/main/java/org/courtside/notification/internal/UsernameReminderMailer.java",
+      "src/main/java/org/courtside/notification/internal/WaitlistMailer.java",
       "src/main/java/org/courtside/rules/internal/ShippedRuleSetNaming.java",
       "src/main/java/org/courtside/shared/internal/StartupWarmUp.java"
     ],
@@ -100,6 +102,7 @@
         "listOwnNotifications",
         "listOwnParticipations",
         "listOwnSessions",
+        "listOwnWaitlistEntries",
         "listPersonalBookings",
         "listRuleTypes",
         "listRules",
@@ -229,8 +232,11 @@
       "id": "booking-write",
       "kind": "demanding",
       "entryPoints": [
+        "acceptWaitlistOffer",
         "cancelBooking",
-        "createBooking"
+        "createBooking",
+        "joinWaitlist",
+        "leaveWaitlist"
       ],
       "growthDrivers": "Availability checks and allocation writes grow with requested courts, while participant validation grows with the bounded request body.",
       "inputOrDataBound": "One request names at most 999 distinct courts and the reference proxy caps the complete body at 2 MiB; configured slot and rule limits also apply.",
@@ -240,6 +246,7 @@
       "consumerTimeoutBehavior": "The application rolls a request's transaction back after 30 seconds and cancels any statement after 15 seconds. The reference proxy sets no response deadline. A caller uncertain about the outcome can repeat the same idempotency key without creating another booking.",
       "productionPaths": [
         "src/main/java/org/courtside/booking/BookingService.java",
+        "src/main/java/org/courtside/booking/waitlist/WaitlistService.java",
         "src/main/java/org/courtside/shared/web/AdmissionControl.java"
       ],
       "evidence": [
@@ -263,6 +270,7 @@
         "listMembershipTypes",
         "listParticipantCards",
         "listParticipantCardsForAdmin",
+        "listReservedSlots",
         "listRuleSets",
         "searchAuditLog",
         "searchParticipantMembers",
@@ -461,7 +469,8 @@
         "SeriesMailer#on(SeriesCancelled)",
         "SeriesMailer#on(SeriesCreated)",
         "SeriesMailer#on(SeriesMoved)",
-        "UsernameReminderMailer#on(UsernameReminderRequested)"
+        "UsernameReminderMailer#on(UsernameReminderRequested)",
+        "WaitlistMailer#on(WaitlistOffered)"
       ],
       "growthDrivers": "Mail work fans out with booking participants, reminders, cancellations, series summaries, series changes and displaced future bookings; every fanned-out message is one stored outbox row, and relay latency holds an outbox worker for one handover.",
       "inputOrDataBound": "A booking has at most twenty participant positions, closure discovery pages by 100, a queued row carries identifiers only and at most the 200 occurrence ids a series can hold, and each SMTP connect and read wait stops after ten seconds.",
@@ -495,7 +504,8 @@
         "IdentityCleanupSchedule#deleteExpiredLoginAttempts",
         "IdentityCleanupSchedule#deleteExpiredResetMailWindows",
         "IdentityCleanupSchedule#deleteExpiredResetTokens",
-        "PreviewExpirySchedule#sweepNow"
+        "PreviewExpirySchedule#sweepNow",
+        "WaitlistSweep#passOnWhatIsDue"
       ],
       "growthDrivers": "Cleanup grows with expired rows, while reminder work grows with due bookings and the messages their participants receive.",
       "inputOrDataBound": "Retention and reminder windows bound age, not row count; a sweep can still span every expired or due row accumulated by the instance.",
@@ -505,6 +515,7 @@
       "consumerTimeoutBehavior": "Each sweep allows its statements ten minutes, so an accumulated backlog cannot cancel the run that clears it. There is no HTTP consumer. A delayed or failed run is retried by the next fixed-delay or cron invocation rather than by extending an arbitrary timeout.",
       "productionPaths": [
         "src/main/java/org/courtside/booking/internal/BookingReminderSchedule.java",
+        "src/main/java/org/courtside/booking/waitlist/WaitlistSweep.java",
         "src/main/java/org/courtside/dataexchange/internal/PreviewExpirySchedule.java",
         "src/main/java/org/courtside/identity/internal/AgedSessionSweep.java",
         "src/main/java/org/courtside/identity/internal/IdentityCleanupSchedule.java"
@@ -512,7 +523,8 @@
       "evidence": [
         "src/test/java/org/courtside/notification/BookingReminderTest.java#givenAReminderAlreadySent_whenTheSweepRunsAgain_thenNobodyIsRemindedTwice",
         "src/test/java/org/courtside/dataexchange/PreviewExpiryTest.java#givenASweptPreview_whenTheSweepRunsAgain_thenThereIsNothingLeftToDrop",
-        "src/test/java/org/courtside/identity/internal/AgedSessionSweepTest.java#givenASessionPastItsLifetimeButNotIdle_whenTheSweepRuns_thenItsRowGoesAndAYoungOneStays"
+        "src/test/java/org/courtside/identity/internal/AgedSessionSweepTest.java#givenASessionPastItsLifetimeButNotIdle_whenTheSweepRuns_thenItsRowGoesAndAYoungOneStays",
+        "src/test/java/org/courtside/booking/waitlist/WaitlistTest.java#givenWaitingEntries_whenTheSlotStartsAndEnds_thenTheSweepClosesAndThenForgetsThem"
       ]
     },
     {

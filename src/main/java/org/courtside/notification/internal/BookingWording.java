@@ -56,6 +56,10 @@ class BookingWording {
                 "previousCourts", courtNames(courts, locale));
     }
 
+    Map<String, String> deadline(Instant at, Locale locale) {
+        return Map.of("untilDay", day(at, locale), "until", time(at));
+    }
+
     String reason(Optional<CancellationReason> reason, Locale locale) {
         return templates.render("booking.cancellationReason." + reason.map(Enum::name).orElse("none"),
                 locale, Map.of());

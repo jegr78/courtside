@@ -12,6 +12,8 @@ import org.courtside.booking.series.CancelScope;
 import org.courtside.booking.series.MoveRequest;
 import org.courtside.booking.series.SeriesService;
 import org.courtside.booking.series.SeriesRule;
+import org.courtside.booking.waitlist.JoinWaitlistCommand;
+import org.courtside.booking.waitlist.WaitlistService;
 import org.courtside.booking.CreateBookingCommand;
 import org.courtside.booking.ParticipantSpec;
 import org.courtside.identity.Role;
@@ -30,6 +32,21 @@ public class BookingTestFixture {
     private final BookingReminders reminders;
     private final BookingSeriesRepository seriesRows;
     private final SeriesService seriesService;
+    private final WaitlistService waitlist;
+
+    public UUID joinWaitlist(UUID courtId, UUID cardId, TimeSlot slot, UUID accountId, UUID personId,
+                             UUID playerPersonId) {
+        return waitlist.join(new JoinWaitlistCommand(courtId, cardId, slot, accountId, personId, Set.of(Role.MEMBER),
+                null, List.of(ParticipantSpec.member(playerPersonId))));
+    }
+
+    public void leaveWaitlist(UUID entryId, UUID accountId) {
+        waitlist.leave(entryId, accountId);
+    }
+
+    public UUID acceptWaitlistOffer(UUID entryId, UUID accountId, UUID personId) {
+        return waitlist.accept(entryId, accountId, personId, Set.of(Role.MEMBER));
+    }
 
     public UUID createBookingWithGuest(UUID courtId, UUID cardId, TimeSlot slot,
                                        UUID bookerPersonId, Set<Role> roles, String guestName) {

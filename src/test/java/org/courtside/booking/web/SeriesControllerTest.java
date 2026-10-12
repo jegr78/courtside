@@ -105,6 +105,24 @@ class SeriesControllerTest extends AbstractIntegrationTest {
 
     @Test
     @WithMockUser(username = "trainer.john", roles = "TRAINER")
+    void givenAnOversizedNote_whenPreviewingASeries_thenSizeValidationFailureIsReturned() throws Exception {
+        // given
+        String body = previewJson(4).replace("\"occurrenceCount\"", "\"note\": \"%s\", \"occurrenceCount\""
+                .formatted("x".repeat(501)));
+
+        // when / then
+        mockMvc.perform(post("/api/booking-series-preview")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body)
+                        .with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("note"))
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.Size"))
+                .andExpect(jsonPath("$.fieldErrors[0].params.max").value(500));
+    }
+
+    @Test
+    @WithMockUser(username = "trainer.john", roles = "TRAINER")
     void givenACountLargerThanTheHorizonAllows_whenPreviewing_thenTheResponseSaysSo() throws Exception {
         // when / then
         mockMvc.perform(post("/api/booking-series-preview")

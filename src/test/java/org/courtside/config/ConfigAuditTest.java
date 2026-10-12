@@ -226,7 +226,7 @@ class ConfigAuditTest extends AbstractIntegrationTest {
                 current.timeZone(), new CredentialLifetime(current.newAccountCredentialHours()),
                 new CredentialLifetime(current.passwordResetCredentialHours()),
                 new ResetTokenLifetime(60), new ReminderLeadTime(current.bookingReminderHours()),
-                current.noMembershipTypeRuleSetId());
+                current.noMembershipTypeRuleSetId(), null);
     }
 
     private static ChangeClubConfigurationCommand withDocumentationUrl(
@@ -238,7 +238,7 @@ class ConfigAuditTest extends AbstractIntegrationTest {
                 new CredentialLifetime(current.newAccountCredentialHours()),
                 new CredentialLifetime(current.passwordResetCredentialHours()),
                 new ResetTokenLifetime(60), new ReminderLeadTime(current.bookingReminderHours()),
-                current.noMembershipTypeRuleSetId());
+                current.noMembershipTypeRuleSetId(), null);
     }
 
     private static ChangeClubConfigurationCommand withShortName(
@@ -250,7 +250,7 @@ class ConfigAuditTest extends AbstractIntegrationTest {
                 new CredentialLifetime(current.newAccountCredentialHours()),
                 new CredentialLifetime(current.passwordResetCredentialHours()),
                 new ResetTokenLifetime(60), new ReminderLeadTime(current.bookingReminderHours()),
-                current.noMembershipTypeRuleSetId());
+                current.noMembershipTypeRuleSetId(), null);
     }
 
     private static ChangeClubConfigurationCommand change(ClubConfigurationSnapshot current, String clubName,
@@ -268,6 +268,6 @@ class ConfigAuditTest extends AbstractIntegrationTest {
                 new BookingSlotDuration(minutes), timeZone,
                 new CredentialLifetime(current.newAccountCredentialHours()),
                 new CredentialLifetime(current.passwordResetCredentialHours()), new ResetTokenLifetime(60), new ReminderLeadTime(24),
-                noMembershipTypeRuleSetId);
+                noMembershipTypeRuleSetId, null);
     }
 }

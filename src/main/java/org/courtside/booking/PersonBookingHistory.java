@@ -41,7 +41,20 @@ public interface PersonBookingHistory {
         }
     }
 
+    // The account's own entries, whatever became of them, until the sweep removes them with their slot.
+    record Waiting(UUID entryId, UUID courtId, Instant startsAt, Instant endsAt, String state, Instant joinedAt,
+                   Instant offerExpiresAt, String note) {
+    }
+
+    // An entry somebody else made naming this person as a player, without who made it.
+    record NamedInWaitlist(UUID entryId, UUID courtId, Instant startsAt, Instant endsAt) {
+    }
+
     List<Made> madeBy(UUID accountId);
+
+    List<Waiting> waitlistOf(UUID accountId);
+
+    List<NamedInWaitlist> namedInWaitlists(UUID personId);
 
     List<Series> seriesCreatedBy(UUID accountId);
 

@@ -76,6 +76,8 @@ public class SubjectAccessService {
                         .toList(),
                 membershipsOf(personId), made, recordedInSomebodyElses(personId, made),
                 eachAccount(accountIds, bookings::seriesCreatedBy),
+                eachAccount(accountIds, bookings::waitlistOf),
+                bookings.namedInWaitlists(personId),
                 eachAccount(accountIds, messages::sentTo),
                 eachAccount(accountIds, messages::declinedBy),
                 eachAccount(accountIds, messages::notificationsFor),

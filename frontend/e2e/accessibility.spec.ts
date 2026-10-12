@@ -187,6 +187,21 @@ for (const locale of ["de", "en"]) {
     await expectNoWcagViolations(page);
   });
 
+  test(`${locale} the waitlist dialog for a taken court meets automated WCAG 2.2 AA checks`, async ({ page, journeyService }) => {
+    // given
+    await page.goto("/");
+    await selectPreference(page, "#locale-preference", locale);
+    await signIn(page, "doe.jane");
+    await selectJourneyDate(page, journeyService.visualDate);
+
+    // when
+    await page.locator('button[data-testid="allocation"][data-booking-id="70000000-0000-0000-0000-000000000002"]').click();
+    await expect(page.getByTestId("waitlist-explanation")).toBeVisible({ timeout: 10_000 });
+
+    // then
+    await expectNoWcagViolations(page);
+  });
+
   test(`${locale} setup and administration configuration meet automated WCAG 2.2 AA checks`, async ({ page }) => {
     // given
     await page.goto("/");
@@ -649,6 +664,30 @@ test("a booking is operable using only the keyboard", async ({ page, browserName
   // then
   await expect(page.getByRole("dialog")).not.toBeVisible();
   await expect(page.getByTestId("own-allocation")).toHaveCount(bookingsBefore + 1);
+});
+
+test("joining the waitlist of a taken court is operable using only the keyboard", async ({ page, browserName, journeyService }) => {
+  // given
+  await signIn(page, "doe.jane");
+  const tabKey = browserName === "webkit" ? "Alt+Tab" : "Tab";
+  await selectJourneyDate(page, journeyService.visualDate);
+  await page.getByTestId("court-plan-link").focus();
+  await tabToTestId(page, "allocation", tabKey);
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("waitlist-explanation")).toBeVisible({ timeout: 10_000 });
+
+  // when
+  await tabToTestId(page, "member-search", tabKey);
+  await page.keyboard.type("Mary");
+  await expect(page.getByTestId("member-match")).toBeVisible({ timeout: 10_000 });
+  await tabToTestId(page, "member-match", tabKey);
+  await page.keyboard.press("Enter");
+  await tabToTestId(page, "booking-close", tabKey);
+  await page.keyboard.press("Enter");
+
+  // then
+  await expect(page.getByRole("dialog")).not.toBeVisible({ timeout: 10_000 });
+  await expect(page.getByTestId("allocation").first()).toBeFocused({ timeout: 10_000 });
 });
 
 test("login and cancellation are operable using only the keyboard", async ({ page, browserName }) => {

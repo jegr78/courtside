@@ -41,6 +41,7 @@ beforeEach(async () => {
       status: "CONFIRMED"
     }] }));
   vi.spyOn(api, "participations").mockResolvedValue({ items: [] });
+  vi.spyOn(api, "waitlistEntries").mockResolvedValue([]);
   vi.spyOn(api, "cancelSeries").mockResolvedValue(undefined);
   vi.spyOn(api, "previewSeriesMove").mockResolvedValue({
     executable: true,

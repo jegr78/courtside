@@ -37,6 +37,11 @@
       "class": "neutral"
     },
     {
+      "name": "entryId",
+      "in": "path",
+      "class": "identifier"
+    },
+    {
       "name": "id",
       "in": "path",
       "class": "identifier"
@@ -204,7 +209,8 @@
     "publication-registry": "Deleted once its consumers finish, so nothing accumulates for a job to clean up.",
     "attempt-window": "Replaced when the next attempt window opens.",
     "club-configuration": "Lives as long as the club keeps it; a board changes it in the product and no person's lifecycle reaches it.",
-    "reset-code": "Deleted when the code is redeemed or replaced by a new request, and by the identity cleanup sweep once it has expired; removed with the account it belongs to."
+    "reset-code": "Deleted when the code is redeemed or replaced by a new request, and by the identity cleanup sweep once it has expired; removed with the account it belongs to.",
+    "waitlist-sweep": "Deleted by the waitlist sweep once the slot it waited for has ended; removed with the account it belongs to."
   },
   "inMemoryState": {
     "BookingController": {
@@ -255,6 +261,11 @@
     "ExternalReferenceService": {
       "level": "personal",
       "holds": "The links between a club member number and a person, as one page of them.",
+      "bounded": "The request that built it."
+    },
+    "JoinWaitlistCommand": {
+      "level": "personal",
+      "holds": "The participant specifications of one waitlist join, each able to name a guest.",
       "bounded": "The request that built it."
     },
     "ManagedAppointmentQuery": {
@@ -331,6 +342,26 @@
       "level": "personal",
       "holds": "The identifiers of current members selected as participants in synthetic UAT bookings.",
       "bounded": "The one-shot UAT seed process."
+    },
+    "WaitlistAnnouncements": {
+      "level": "personal",
+      "holds": "One account's waitlist entries, read to describe their offers in the notification centre or a mail.",
+      "bounded": "The centre page or the mail being composed."
+    },
+    "WaitlistController": {
+      "level": "personal",
+      "holds": "The participant specifications of one waitlist join, each able to name a guest.",
+      "bounded": "The request that built it."
+    },
+    "WaitlistRows": {
+      "level": "personal",
+      "holds": "The waitlist entries and players of one queue, account or day, as they are read or written.",
+      "bounded": "The transaction that reads them."
+    },
+    "WaitlistService": {
+      "level": "personal",
+      "holds": "One account's waitlist entries, or one entry's players turned into a booking on acceptance.",
+      "bounded": "The request or sweep that reads them."
     }
   },
   "exportedFields": {
@@ -651,6 +682,10 @@
         "lifecycle": "club-configuration"
       },
       "time_zone": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "waitlist_offer_minutes": {
         "level": "operational",
         "lifecycle": "club-configuration"
       }
@@ -1419,6 +1454,90 @@
       "user_account_id": {
         "level": "pseudonymous",
         "lifecycle": "account-cascade"
+      }
+    },
+    "waitlist_entry": {
+      "account_id": {
+        "level": "pseudonymous",
+        "lifecycle": "waitlist-sweep"
+      },
+      "booking_id": {
+        "level": "operational",
+        "lifecycle": "waitlist-sweep"
+      },
+      "card_id": {
+        "level": "operational",
+        "lifecycle": "waitlist-sweep"
+      },
+      "closed_at": {
+        "level": "operational",
+        "lifecycle": "waitlist-sweep"
+      },
+      "court_id": {
+        "level": "operational",
+        "lifecycle": "waitlist-sweep"
+      },
+      "ends_at": {
+        "level": "operational",
+        "lifecycle": "waitlist-sweep"
+      },
+      "id": {
+        "level": "pseudonymous",
+        "lifecycle": "waitlist-sweep"
+      },
+      "joined_at": {
+        "level": "operational",
+        "lifecycle": "waitlist-sweep"
+      },
+      "joined_seq": {
+        "level": "operational",
+        "lifecycle": "waitlist-sweep"
+      },
+      "note": {
+        "level": "personal",
+        "lifecycle": "waitlist-sweep"
+      },
+      "offer_expires_at": {
+        "level": "operational",
+        "lifecycle": "waitlist-sweep"
+      },
+      "offered_at": {
+        "level": "operational",
+        "lifecycle": "waitlist-sweep"
+      },
+      "starts_at": {
+        "level": "operational",
+        "lifecycle": "waitlist-sweep"
+      },
+      "state": {
+        "level": "operational",
+        "lifecycle": "waitlist-sweep"
+      }
+    },
+    "waitlist_participant": {
+      "card_id": {
+        "level": "operational",
+        "lifecycle": "waitlist-sweep"
+      },
+      "entry_id": {
+        "level": "pseudonymous",
+        "lifecycle": "waitlist-sweep"
+      },
+      "guest_name": {
+        "level": "personal",
+        "lifecycle": "waitlist-sweep"
+      },
+      "kind": {
+        "level": "operational",
+        "lifecycle": "waitlist-sweep"
+      },
+      "person_id": {
+        "level": "pseudonymous",
+        "lifecycle": "waitlist-sweep"
+      },
+      "position": {
+        "level": "operational",
+        "lifecycle": "waitlist-sweep"
       }
     }
   }

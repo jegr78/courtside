@@ -19,6 +19,8 @@ public record SubjectAccessRecord(Instant producedAt, UUID personId, String firs
                                   List<PersonBookingHistory.Made> bookingsMade,
                                   List<PersonBookingHistory.Recorded> bookingsRecordedIn,
                                   List<PersonBookingHistory.Series> bookingSeries,
+                                  List<PersonBookingHistory.Waiting> waitlistEntries,
+                                  List<PersonBookingHistory.NamedInWaitlist> waitlistsNamedIn,
                                   List<PersonMessageHistory.Message> messages,
                                   List<PersonMessageHistory.Declined> declinedMessages,
                                   List<PersonMessageHistory.Notification> notifications,

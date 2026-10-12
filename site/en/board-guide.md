@@ -134,6 +134,12 @@ Open *Club → Deadlines and reminders*.
 * Set separate lifetimes for one-time passwords issued to new and reset accounts.
 * A password reset code may remain valid for between 15 minutes and one day. The member must
   request a new code after it expires.
+* **Waitlist offer window** sets how many minutes a freed court stays reserved for the member whose
+  turn it is on its waitlist. 15 minutes is the suggested value. The offer ends when the time starts
+  at the latest. While it stands, other members and trainers cannot book the court, and their series
+  skip that date. The board and a closure go first: when an admin books the court, creates a series
+  over it or moves one onto it, or someone closes the court, the offer ends. The member sees this in
+  *My bookings*.
 
 ![Lifetimes for one-time passwords and codes and the reminder before a booking.](../screenshots/en/deadlines.png)
 
@@ -184,7 +190,11 @@ or closure. Add one card for every type the club needs.
 | **Guests allowed** | Allows named guests |
 | **Show neutral occupancy** | Shows *Occupied* instead of the card label in the public plan |
 
-Administrators may use and manage every card. A neutral display does not hide the label from
+Administrators may use and manage every card. A booking with the *Court closed* card goes before a
+reservation from the waitlist. If you clear its allowed roles, every signed-in person may close a
+court and so end any waitlist offer.
+
+A neutral display does not hide the label from
 technical access because the public API still returns it. Do not use confidential labels.
 
 Deactivate cards that are no longer needed. Existing bookings remain in place.

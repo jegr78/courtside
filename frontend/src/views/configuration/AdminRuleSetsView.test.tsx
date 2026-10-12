@@ -24,7 +24,7 @@ describe("AdminRuleSetsView", () => {
       timeZone: "Europe/Berlin",
       newAccountCredentialHours: 168,
       passwordResetCredentialHours: 24, passwordResetTokenMinutes: 60,
-      bookingReminderHours: 24,
+      bookingReminderHours: 24, waitlistOfferMinutes: 15,
       logoUploaded: false
     });
     vi.spyOn(api, "ruleSets").mockResolvedValue([{ id: "rule-set", name: "Standard", active: true }]);
@@ -60,7 +60,7 @@ describe("AdminRuleSetsView", () => {
       clubName: "Example Tennis Club", primaryColor: "#b85c38", accentColor: "#d7e24b",
       defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30,
       timeZone: "Europe/Berlin", newAccountCredentialHours: 168, passwordResetCredentialHours: 24, passwordResetTokenMinutes: 60,
-      bookingReminderHours: 24, logoUploaded: false, noMembershipTypeRuleSetId: "juniors"
+      bookingReminderHours: 24, waitlistOfferMinutes: 15, logoUploaded: false, noMembershipTypeRuleSetId: "juniors"
     });
 
     // when
@@ -106,7 +106,7 @@ describe("AdminRuleSetsView", () => {
       logoUrl: "/icon.svg", logoFallbackUrl: "/icon.svg", imprintUrl: "/imprint", privacyUrl: "/privacy",
       documentationUrl: "/documentation", defaultLocale: "en" as const, supportedLocales: ["de", "en"], slotMinutes: 15,
       timeZone: "Europe/Berlin", newAccountCredentialHours: 72, passwordResetCredentialHours: 24, passwordResetTokenMinutes: 60,
-      bookingReminderHours: 3, logoUploaded: false
+      bookingReminderHours: 3, waitlistOfferMinutes: 15, logoUploaded: false
     };
     vi.spyOn(api, "adminConfig").mockResolvedValue(stored);
     const changing = vi.spyOn(api, "changeAdminConfig").mockResolvedValue({ ...stored, noMembershipTypeRuleSetId: "rule-set" });
@@ -125,7 +125,7 @@ describe("AdminRuleSetsView", () => {
       logoUrl: "/icon.svg", imprintUrl: "/imprint", privacyUrl: "/privacy", documentationUrl: "/documentation",
       defaultLocale: "en", slotMinutes: 15, timeZone: "Europe/Berlin",
       newAccountCredentialHours: 72, passwordResetCredentialHours: 24, passwordResetTokenMinutes: 60,
-      bookingReminderHours: 3, noMembershipTypeRuleSetId: "rule-set"
+      bookingReminderHours: 3, waitlistOfferMinutes: 15, noMembershipTypeRuleSetId: "rule-set"
     });
     expect(screen.getByTestId("rule-set-applies-rule-set")).toHaveTextContent("People without a membership type");
   });
@@ -310,7 +310,7 @@ describe("AdminRuleSetsView", () => {
       clubName: "Example Tennis Club", primaryColor: "#b85c38", accentColor: "#d7e24b",
       defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30,
       timeZone: "Europe/Berlin", newAccountCredentialHours: 168, passwordResetCredentialHours: 24, passwordResetTokenMinutes: 60,
-      bookingReminderHours: 24, logoUploaded: false,
+      bookingReminderHours: 24, waitlistOfferMinutes: 15, logoUploaded: false,
       noMembershipTypeRuleSetId: "rule-set"
     });
     render(<MemoryRouter><UnsavedChangesProvider><AdminRuleSetsView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
@@ -335,7 +335,7 @@ describe("AdminRuleSetsView", () => {
       clubName: "Example Tennis Club", primaryColor: "#b85c38", accentColor: "#d7e24b",
       defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30,
       timeZone: "Europe/Berlin", newAccountCredentialHours: 168, passwordResetCredentialHours: 24, passwordResetTokenMinutes: 60,
-      bookingReminderHours: 24, logoUploaded: false,
+      bookingReminderHours: 24, waitlistOfferMinutes: 15, logoUploaded: false,
       noMembershipTypeRuleSetId: "retired"
     });
     render(<MemoryRouter><UnsavedChangesProvider><AdminRuleSetsView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);

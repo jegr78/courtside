@@ -14,6 +14,8 @@ import org.courtside.config.CredentialLifetime;
 import org.courtside.config.PasswordResetTokenValidity;
 import org.courtside.config.ResetTokenLifetime;
 import org.courtside.config.ReminderLeadTime;
+import org.courtside.config.WaitlistOfferPolicy;
+import org.courtside.config.WaitlistOfferWindow;
 import org.courtside.config.BookingGridCoordination;
 import org.courtside.config.ClubTimeZone;
 import org.courtside.config.ConfigEvent;
@@ -37,7 +39,8 @@ import java.time.ZoneId;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class ConfigService implements BookingGridSettings, BookingGridCoordination, ClubTimeZone,
-        CredentialValidity, PasswordResetTokenValidity, ClubIdentity, BookingReminderPolicy {
+        CredentialValidity, PasswordResetTokenValidity, ClubIdentity, BookingReminderPolicy,
+        WaitlistOfferPolicy {
 
     private static final String RULE_SET_CONSTRAINT = "club_config_no_membership_type_rule_set";
 
@@ -97,6 +100,11 @@ public class ConfigService implements BookingGridSettings, BookingGridCoordinati
     @Override
     public ReminderLeadTime leadTime() {
         return new ReminderLeadTime(current().bookingReminderHours());
+    }
+
+    @Override
+    public WaitlistOfferWindow offerWindow() {
+        return new WaitlistOfferWindow(current().waitlistOfferMinutes());
     }
 
     @Override
@@ -223,6 +231,10 @@ public class ConfigService implements BookingGridSettings, BookingGridCoordinati
                 configuration.getPasswordResetTokenMinutes(), command.passwordResetToken().minutes());
         addIfChanged(fields, "bookingReminderHours",
                 configuration.getBookingReminderHours(), command.bookingReminder().hours());
+        if (command.waitlistOffer() != null) {
+            addIfChanged(fields, "waitlistOfferMinutes",
+                    configuration.getWaitlistOfferMinutes(), command.waitlistOffer().minutes());
+        }
         addIfChanged(fields, "noMembershipTypeRuleSetId",
                 configuration.getNoMembershipTypeRuleSetId(), command.noMembershipTypeRuleSetId());
         return new Changes(List.copyOf(fields),
@@ -243,6 +255,9 @@ public class ConfigService implements BookingGridSettings, BookingGridCoordinati
                 command.passwordResetCredential().hours());
         configuration.expireResetCodesAfter(command.passwordResetToken().minutes());
         configuration.remindBookingsAfter(command.bookingReminder().hours());
+        if (command.waitlistOffer() != null) {
+            configuration.holdWaitlistOffersFor(command.waitlistOffer().minutes());
+        }
         configuration.bindPeopleWithoutAMembershipTypeTo(command.noMembershipTypeRuleSetId());
     }
 
