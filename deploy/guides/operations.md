@@ -1156,7 +1156,7 @@ default.
 | `COURTSIDE_DB_TLS_ROOT_CERTIFICATE` | *unset* | Path **inside the container** to that authority certificate. `compose.database-tls.yaml` sets it to `/etc/courtside/database-tls/authority.pem`; set it yourself only when running the image without that overlay. |
 | `COURTSIDE_DB_TLS_CERTIFICATE` | *required with `compose.database-tls-local.yaml`* | Host path to the certificate this deployment's own database serves. Its subject alternative name has to include `DNS:db`. |
 | `COURTSIDE_DB_TLS_KEY` | *required with `compose.database-tls-local.yaml`* | Host path to the private key belonging to that certificate. |
-| `COURTSIDE_APP_TLS_MODE` | `plaintext` | What the connection from the reverse proxy to the application guarantees: `plaintext` or `serve`. `compose.app-tls.yaml` sets it to `serve` on both services, which is how it is turned on; set it yourself only when running the image without that overlay. |
+| `COURTSIDE_APP_TLS_MODE` | `plaintext` | What the connection from the reverse proxy to the application guarantees: `plaintext` or `serve`. `compose.app-tls.yaml` sets it to `serve` on both services, which is how it is turned on; set it yourself only when running the image without that overlay. Any other value stops the proxy at start without a reason in its log; `docker compose run --rm --no-deps proxy caddy validate --config /etc/caddy/Caddyfile` names it. |
 | `COURTSIDE_APP_TLS_CERTIFICATE` | *unset* | Path **inside the container** to the certificate the application serves. `compose.app-tls.yaml` sets it to `/etc/courtside/tls/app/server.crt`; set it yourself only when running the image without that overlay. |
 | `COURTSIDE_APP_TLS_KEY` | *unset* | Path **inside the container** to the private key belonging to that certificate. `compose.app-tls.yaml` sets it to `/etc/courtside/tls/app/server.key`; set it yourself only when running the image without that overlay. |
 | `COURTSIDE_APP_TLS_MATERIAL` | `/srv/courtside/tls/app` | Host directory holding `server.crt` and `server.key`, the certificate the application serves to the proxy and the key belonging to it. Read by `compose.app-tls.yaml` only. |
@@ -1498,8 +1498,9 @@ logo must use HTTPS and discloses each visitor's IP address and the Courtside or
   handed a message to this server and learns nothing after that, so a bounce arriving here
   afterwards is the answer nobody reads, and DMARC reports have no reader either.
 - **A reload the mail server refuses leaves it serving a certificate it generated itself.**
-  Stalwart 0.16.20 does not keep the pair it had when a reload fails: it answers `notCreated`, drops
-  the certificate, and the listener falls back to a self-signed one valid from 1975 to 4096. Nothing
+  Stalwart does not keep the pair it had when a reload fails. That was measured on 0.16.20, and no
+  changelog entry up to the pinned release changes it: the server answers `notCreated`, drops the
+  certificate, and the listener falls back to a self-signed one valid from 1975 to 4096. Nothing
   about the fallback is silent here, the reload stays owed until one is accepted, so `mail-reload`
   names the refusal, retries it, and stays unhealthy while it is owed, and the instance stops
   handing messages over rather than handing them to something it cannot authenticate. That is

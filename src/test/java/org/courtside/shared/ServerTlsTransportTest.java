@@ -13,7 +13,6 @@ import org.springframework.boot.web.server.WebServer;
 import org.testcontainers.Testcontainers;
 import org.testcontainers.containers.ContainerLaunchException;
 import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.containers.output.ToStringConsumer;
 import org.testcontainers.containers.output.WaitingConsumer;
 import org.testcontainers.containers.startupcheck.OneShotStartupCheckStrategy;
 import org.testcontainers.containers.wait.strategy.Wait;
@@ -412,14 +411,24 @@ class ServerTlsTransportTest {
     @Test
     void givenAModeNoSnippetDefines_whenTheProxyStarts_thenItServesNothing() throws Exception {
         // given
-        ToStringConsumer output = new ToStringConsumer();
         GenericContainer<?> proxy = built(served.authority(), "no-such-mode", SERVED_PORT)
+                .withStartupCheckStrategy(new OneShotStartupCheckStrategy());
+        WaitingConsumer output = new WaitingConsumer();
+        // Caddy's run command exits without logging the adapt error, so validate supplies the reason.
+        GenericContainer<?> validation = built(served.authority(), "no-such-mode", SERVED_PORT)
+                .withCommand("caddy", "validate", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile")
                 .withStartupCheckStrategy(new OneShotStartupCheckStrategy())
                 .withLogConsumer(output);
 
         // when / then
         assertThatThrownBy(proxy::start).isInstanceOf(ContainerLaunchException.class);
-        assertThat(output.toUtf8String()).contains("File to import not found: no-such-mode");
+        assertThatThrownBy(validation::start).isInstanceOf(ContainerLaunchException.class);
+        try {
+            output.waitUntil(frame -> frame.getUtf8String().contains("File to import not found: no-such-mode"),
+                    5, TimeUnit.SECONDS);
+        } catch (TimeoutException missingEvent) {
+            throw new AssertionError("Caddy did not name the missing snippet as the reason", missingEvent);
+        }
     }
 
     // The authority vouches for what is served, so the name on it is the only thing left that can

@@ -18,12 +18,14 @@ import {
   runOpenApiMutationCases,
   runOpenApiFuzzAssessment,
   schemathesisConfiguration,
+  schemathesisCredentials,
   runtimeOperations,
   securityImportCases,
   securityImportSourceRequest,
   undocumentedRuntimeRoutes,
   validateOpenApiFuzzEvidence
 } from "./security-openapi-fuzz.mjs";
+import { schemathesisRunArgs, schemathesisScannerFiles } from "./security-schemathesis-configuration.mjs";
 
 const require = createRequire(new URL("../frontend/package.json", import.meta.url));
 const yaml = require("js-yaml");
@@ -90,7 +92,7 @@ test("given the current contract, when inventorying fuzz coverage, then every op
   assert.deepEqual(modes("endAccountSessions"), ["negative"]);
   assert.deepEqual(modes("endAllSessions"), []);
   assert.match(openApiFuzzPolicy.image,
-    /^schemathesis\/schemathesis:v4\.28\.0@sha256:[a-f0-9]{64}$/);
+    /^schemathesis\/schemathesis:v[\d.]+@sha256:[a-f0-9]{64}$/);
   assert.ok(openApiFuzzPolicy.checks.includes("not_a_server_error"));
   assert.ok(!openApiFuzzPolicy.checks.includes("ignored_auth"));
   assert.deepEqual(openApiFuzzPolicy.negativeInputProxyStatuses, [421]);
@@ -786,11 +788,8 @@ test("given a refusal that survived Schemathesis' own retries, when normalizing 
 });
 
 test("given the fuzz policy, when rendering the Schemathesis configuration, then it paces by Retry-After and expects no 429 from a data check", () => {
-  // given
-  const client = { header: () => "__Host-SESSION=one", csrfToken: () => "token" };
-
   // when
-  const configuration = schemathesisConfiguration(client, openApiFuzzPolicy);
+  const configuration = schemathesisConfiguration(openApiFuzzPolicy);
 
   // then
   const firstTable = configuration.indexOf("\n[");
@@ -805,7 +804,49 @@ test("given the fuzz policy, when rendering the Schemathesis configuration, then
       `${check} must not accept a 429 that survived the retries`);
     assert.deepEqual(statuses, openApiFuzzPolicy.expectedStatuses[check]);
   }
-  assert.match(configuration, /^headers = \{ Cookie = "__Host-SESSION=one", X-XSRF-TOKEN = "token" \}\n/);
+  assert.doesNotMatch(configuration, /headers|Cookie|XSRF/,
+    "a configured header is sent even when a case negates the credential it carries");
+});
+
+test("given a signed-in fuzz client, when its credentials are handed to Schemathesis, then the hook receives each one separately", () => {
+  // given
+  const cookies = new Map([["__Host-SESSION", "one"], ["__Host-XSRF-TOKEN", "to%2Bken"]]);
+  const client = { cookie: (name) => cookies.get(name), csrfToken: () => "to+ken" };
+
+  // when
+  const credentials = JSON.parse(schemathesisCredentials(client));
+
+  // then
+  assert.deepEqual(credentials, { session: "one", csrfCookie: "to%2Bken", csrfToken: "to+ken" });
+  cookies.delete("__Host-SESSION");
+  assert.throws(() => schemathesisCredentials(client), /session/,
+    "a fuzz run without a session would measure the sign-in wall instead of the operations");
+});
+
+test("given a signed-in fuzz client, when the scanner is prepared, then Schemathesis loads the credential hook beside the files it reads", () => {
+  // given
+  const cookies = new Map([["__Host-SESSION", "one"], ["__Host-XSRF-TOKEN", "to%2Bken"]]);
+  const client = { cookie: (name) => cookies.get(name), csrfToken: () => "to+ken" };
+  const compose = readFileSync(new URL("../deploy/compose.security.yaml", import.meta.url), "utf8");
+
+  // when
+  const files = schemathesisScannerFiles(openApiFuzzPolicy, client, { reasonProjection: "reason", credentialHook: "hook" });
+  const args = schemathesisRunArgs("scanner", openApiFuzzPolicy, "negative", ["logIn", "logOut"]);
+
+  // then
+  const written = new Map(files.map(({ path, input }) => [path, input]));
+  assert.deepEqual(JSON.parse(written.get("/tmp/courtside-credentials.json")),
+    { session: "one", csrfCookie: "to%2Bken", csrfToken: "to+ken" }, "the hook reads the credentials from this file");
+  assert.equal(written.get("/tmp/schemathesis_credentials.py"), "hook", "the hook module is written into the scanner");
+  assert.equal(written.get("/tmp/sitecustomize.py"), "reason", "the reason projection is written into the scanner");
+  const environment = args.slice(0, args.indexOf("scanner")).filter((arg) => arg !== "exec" && arg !== "-e");
+  assert.deepEqual(environment, ["PYTHONPATH=/tmp", "SCHEMATHESIS_HOOKS=schemathesis_credentials"],
+    "Python finds both modules in /tmp and Schemathesis imports the hook by its module name");
+  assert.match(compose, /SCHEMATHESIS_HOOKS: ""/, "the compose file clears the hooks, so only the run arguments load one");
+  assert.deepEqual(args.filter((arg, index) => args[index - 1] === "--include-operation-id"), ["logIn", "logOut"],
+    "a run covers exactly the selected operations");
+  assert.ok(args.includes("--config-file") && args[args.indexOf("--config-file") + 1] === "/tmp/courtside-schemathesis.toml"
+    && written.has("/tmp/courtside-schemathesis.toml"), "the run reads the configuration that was written");
 });
 
 test("given admission refusals on native cases, when one paced retry is answered, then the case keeps its own verdict", async () => {

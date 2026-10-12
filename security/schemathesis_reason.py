@@ -84,7 +84,7 @@ def _schema_reason(failure):
 
 def _reason(failure):
     name = type(failure).__name__
-    if name == "ServerError":
+    if "ServerError" in {kind.__name__ for kind in type(failure).__mro__}:
         return {"kind": "status", "observedStatus": _status(failure.status_code),
                 "expectedStatuses": ["non-5xx"]}
     if name == "UndefinedStatusCode":

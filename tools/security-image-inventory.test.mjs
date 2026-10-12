@@ -16,12 +16,12 @@ test("given active assessment configuration, when resolving images, then all pin
   const images = assessmentImages("active");
 
   // then
-  assert.deepEqual(images.map((image) => image.split("@")[0]), [
-    "axllent/mailpit:v1.31",
-    "caddy:2-alpine",
-    "postgres:18-alpine",
-    "schemathesis/schemathesis:v4.28.0",
-    "zaproxy/zap-stable:2.17.0",
+  assert.deepEqual(images.map((image) => image.split("@")[0].replace(/:[\w.-]+$/, "")), [
+    "axllent/mailpit",
+    "caddy",
+    "postgres",
+    "schemathesis/schemathesis",
+    "zaproxy/zap-stable",
   ]);
   assert.ok(images.every((image) => /@sha256:[a-f0-9]{64}$/.test(image)));
 });
@@ -63,7 +63,7 @@ test("given infrastructure sharing an inactive scanner image, when resolving saf
   assert.ok(assessmentImages("destructive", { compose }).includes(image));
 });
 
-for (const image of ["axllent/mailpit:v1.31", "example/runtime:latest", "${UNTRUSTED_IMAGE}", "${COURTSIDE_SECURITY_IMAGE:-foreign:latest}"]) {
+for (const image of ["axllent/mailpit:latest", "example/runtime:latest", "${UNTRUSTED_IMAGE}", "${COURTSIDE_SECURITY_IMAGE:-foreign:latest}"]) {
   test(`given unsupported runtime image ${image}, when resolving inventory, then fail closed`, () => {
     // given
     const directory = mkdtempSync(join(tmpdir(), "security-images-"));

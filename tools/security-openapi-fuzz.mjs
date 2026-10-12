@@ -5,7 +5,7 @@ import { createRequire } from "node:module";
 import { apiDocumentPath } from "./security-api-document.mjs";
 import { createCandidate } from "./security-triage.mjs";
 import { setTimeout as delay } from "node:timers/promises";
-import { schemathesisConfiguration } from "./security-schemathesis-configuration.mjs";
+import { schemathesisConfiguration, schemathesisCredentials } from "./security-schemathesis-configuration.mjs";
 import {
   admissionRefused, authorizationRequest, SecurityCookieJar, sendPacedByAdmission
 } from "./security-authorization.mjs";
@@ -1021,4 +1021,4 @@ function multipartProbe(sourceId, id, content) {
     ]) };
 }
 
-export { schemathesisConfiguration };
+export { schemathesisConfiguration, schemathesisCredentials };

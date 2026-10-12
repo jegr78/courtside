@@ -714,6 +714,10 @@ export class SecurityCookieJar {
     return [...this.#cookies].map(([name, value]) => `${name}=${value}`).join("; ");
   }
 
+  cookie(name) {
+    return this.#cookies.get(name);
+  }
+
   csrfToken() {
     const encoded = this.#cookies.get("__Host-XSRF-TOKEN");
     return encoded ? decodeURIComponent(encoded) : undefined;

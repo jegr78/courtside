@@ -4,7 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createRequire } from "node:module";
 import { test } from "node:test";
-import { openCandidateCount } from "./security-passive-deployment.mjs";
+import { openCandidateCount, zapVersion } from "./security-passive-deployment.mjs";
+import { openApiFuzzVersion } from "./security-openapi-fuzz.mjs";
 import {
   boundedAssessmentFailureReason,
   authorizeSecurityProfile, buildSecurityPlan, executeSecurityPlan, fingerprintSecurityTarget, recoverSecurityRun,
@@ -77,8 +78,8 @@ function activePlan() {
   return buildSecurityPlan(input({
     tools: [
       { id: "target-identity", version: "1.0.0", testIds: [] },
-      { id: "authenticated-zap", version: "2.17.0", testIds: ["CSA-DAST-001"] },
-      { id: "openapi-fuzzer", version: "v4.27.0", testIds: ["CSA-API-001", "CSA-IMPORT-001"] },
+      { id: "authenticated-zap", version: zapVersion, testIds: ["CSA-DAST-001"] },
+      { id: "openapi-fuzzer", version: openApiFuzzVersion, testIds: ["CSA-API-001", "CSA-IMPORT-001"] },
       { id: "authorization-matrix", version: "1.0.0", testIds: ["CSA-AUTHN-001", "CSA-AUTHZ-001"] }
     ],
     selectedTests,

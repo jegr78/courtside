@@ -1,7 +1,8 @@
 export const securityMailObservationSource = Object.freeze({
-  version: "1.31.3",
-  commit: "ae3d9e20e410bf2af1c1b7292bc3b8491b41b30a",
-  imageDigest: "sha256:ed9b00c609e77e99c79b93f1178255ebc271868920f2c69a8d166bd5634ed10d"
+  image: "axllent/mailpit:v1.31",
+  version: "1.31.5",
+  commit: "4355c8cd7dbe745c6fc6ce8619d23a1a31b746c9",
+  imageDigest: "sha256:94f6b70c1436defae6799d9ac7ff0eeff9540465b842026d5cdb018f1c0234ea"
 });
 import { failureCode } from "./failure-reason.mjs";
 
@@ -15,7 +16,8 @@ const messageId = /^<[^<>\s]{1,512}@[^<>\s]{1,255}>$/;
 const calendarUid = /^booking-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}@courtside$/;
 const listUrl = "http://mail:8025/api/v1/messages?start=0&limit=100";
 const limits = securityMailObservationLimits;
-const imageReference = `axllent/mailpit:v1.31@${securityMailObservationSource.imageDigest}`;
+export const securityMailObservationImage =
+  `${securityMailObservationSource.image}@${securityMailObservationSource.imageDigest}`;
 const dockerId = /^[a-f0-9]{64}$/;
 const digest = /^sha256:[a-f0-9]{64}$/;
 
@@ -87,14 +89,14 @@ function nativeEndpoint(member, name, ip) {
 }
 
 async function trustedSink(ctx, expectedBinding) {
-  const expectedImage = json(await output(ctx, ["image", "inspect", imageReference], limits.runtimeBytes));
+  const expectedImage = json(await output(ctx, ["image", "inspect", securityMailObservationImage], limits.runtimeBytes));
   if (!Array.isArray(expectedImage) || expectedImage.length !== 1
     || typeof expectedImage[0]?.Id !== "string" || !digest.test(expectedImage[0].Id)) throw new Error("mail-image-untrusted");
   const runtime = json(await output(ctx, ["inspect", `${ctx.project}-mail-1`], limits.runtimeBytes));
   if (!Array.isArray(runtime) || runtime.length !== 1) throw new Error("mail-sink-untrusted");
   const sink = runtime[0];
   const config = runtime[0]?.Config;
-  if (!ownedContainer(sink, ctx, "mail") || sink.Image !== expectedImage[0].Id || config?.Image !== imageReference
+  if (!ownedContainer(sink, ctx, "mail") || sink.Image !== expectedImage[0].Id || config?.Image !== securityMailObservationImage
     || JSON.stringify(config.Entrypoint) !== '["/mailpit"]'
     || (config.Cmd !== null && JSON.stringify(config.Cmd) !== "[]")
     || !Array.isArray(config.Env)) throw new Error("mail-sink-untrusted");
