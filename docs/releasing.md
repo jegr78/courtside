@@ -341,8 +341,9 @@ unqualified, in a public registry. Nightly retention removes them after 14 days.
   candidate starts when that attempt turns green.
 - A failure outside the commit, such as a runner that died or a registry that timed out: choose
   Re-run failed jobs on the candidate run. `evidence` and `tag` run again once everything is green.
-- A defect in the commit: fix it on `main` through the usual pull request. Then dispatch
-  `release-candidate.yml` with `rehearsal=false` and `commit` set to the fixed commit on `main`. The
+- A defect in the commit: fix it on the release's branch, `main` or `release/<major>.<minor>`,
+  through the usual pull request. Then dispatch `release-candidate.yml` from `main` with
+  `rehearsal=false` and `commit` set to the fixed commit on that branch. The
   candidate qualifies that commit under the version the manifest still records and tags it there.
   The fix then ships in that version without a changelog entry, because the next changelog starts
   after the tag.
