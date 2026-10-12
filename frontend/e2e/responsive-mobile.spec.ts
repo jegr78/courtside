@@ -1230,3 +1230,88 @@ test("a closed day on a phone shows its opening times as empty rather than as a 
   }
   await expectNoHorizontalOverflow(page);
 });
+
+const landscapePhones = [{ width: 852, height: 393 }, { width: 915, height: 412 }];
+
+async function gridBelowPinnedParts(page: Page) {
+  return page.evaluate(() => {
+    const navigation = document.querySelector('[data-testid="mobile-week-navigation"]')!.getBoundingClientRect();
+    const heading = document.querySelector('[data-testid="court-heading-1"]')!.getBoundingClientRect();
+    const pinned = Math.max(0, navigation.bottom, heading.bottom);
+    const wholeRows = [...document.querySelectorAll('[data-testid^="slot-row-"]')].map((row) => row.getBoundingClientRect())
+      .filter((row) => row.top >= pinned - 0.5 && row.bottom <= window.innerHeight + 0.5).length;
+    return { pinnedShare: pinned / window.innerHeight, wholeRows };
+  });
+}
+
+for (const phone of landscapePhones) {
+  test(`given a phone in landscape at ${phone.width} x ${phone.height}, when the plan scrolls to the afternoon, then the pinned parts leave most of the height to the grid`, async ({ page, journeyService }) => {
+    // given
+    await page.setViewportSize(phone);
+    await signIn(page, "doe.jane");
+    await expect(page.getByTestId("my-bookings-link"), "the member is signed in").toBeVisible({ timeout: 10_000 });
+    await selectJourneyDate(page, journeyService.visualDate);
+    await expect(page.getByTestId("slot-row-15:00")).toBeVisible({ timeout: 10_000 });
+
+    // when
+    await page.getByTestId("slot-row-15:00").evaluate((row) => row.scrollIntoView({ block: "center" }));
+
+    // then
+    await expect(page.getByTestId("court-heading-1"), "the courts stay named while the grid scrolls").toBeInViewport({ ratio: 1, timeout: 10_000 });
+    const grid = await gridBelowPinnedParts(page);
+    expect(grid.pinnedShare, "the pinned day strip and column header take at most a quarter of the height").toBeLessThanOrEqual(0.25);
+    expect(grid.wholeRows, "at least six whole time rows show below the pinned parts").toBeGreaterThanOrEqual(6);
+
+    // when
+    await page.evaluate(() => window.scrollTo(0, 0));
+
+    // then
+    await expect(page.getByTestId("mobile-week-navigation"), "the day strip is back at the top of the page").toBeInViewport({ ratio: 1, timeout: 10_000 });
+  });
+
+  test(`given a phone in landscape at ${phone.width} x ${phone.height}, when the booking dialog opens, then it shows that the form continues and keeps every field reachable`, async ({ page, journeyService }) => {
+    // given
+    await page.setViewportSize(phone);
+    await signIn(page, "doe.jane");
+    await expect(page.getByTestId("my-bookings-link"), "the member is signed in").toBeVisible({ timeout: 10_000 });
+    await selectJourneyDate(page, journeyService.visualDate);
+
+    // when
+    await page.locator('[data-testid="free-slot"][data-court-number="2"][data-slot="12:00"]:visible').tap();
+
+    // then
+    const dialog = page.getByTestId("booking-dialog");
+    const continues = dialog.getByTestId("dialog-continues");
+    await expect(dialog.getByTestId("booking-duration"), "the first field is on screen").toBeInViewport({ ratio: 1, timeout: 10_000 });
+    await expect(dialog.getByTestId("booking-submit"), "the book button is on screen").toBeInViewport({ ratio: 1, timeout: 10_000 });
+    const overflow = await dialog.getByTestId("booking-duration").evaluate((field) => {
+      let body = field.parentElement!;
+      while (!/auto|scroll/.test(getComputedStyle(body).overflowY)) body = body.parentElement!;
+      return body.scrollHeight - body.clientHeight;
+    });
+    expect(overflow, "the form is taller than the space the dialog gives it").toBeGreaterThan(0);
+    await expect(continues, "the dialog signals that the form continues below").toBeVisible({ timeout: 10_000 });
+
+    // when
+    await dialog.getByTestId("booking-duration").focus();
+    for (let step = 0; step < 20 && await page.evaluate(() => document.activeElement?.getAttribute("data-testid")) !== "booking-card"; step += 1) {
+      await page.keyboard.press("Tab");
+    }
+
+    // then
+    await expect(dialog.getByTestId("booking-card"), "the keyboard reaches the kind of booking").toBeFocused({ timeout: 10_000 });
+    await expect.poll(async () => {
+      const field = await dialog.getByTestId("booking-card").boundingBox();
+      const signal = await continues.boundingBox();
+      return signal === null || field!.y + field!.height <= signal.y + 0.5;
+    }, { message: "the focused field is scrolled clear of the signal", timeout: 10_000 }).toBe(true);
+
+    // when
+    await dialog.getByTestId("booking-more-summary").evaluate((summary) => summary.scrollIntoView({ block: "end" }));
+
+    // then
+    await expect(dialog.getByTestId("booking-more-summary"), "the last control of the form is reachable").toBeInViewport({ ratio: 1, timeout: 10_000 });
+    await expect(continues, "the signal goes once nothing lies below").toBeHidden({ timeout: 10_000 });
+    await expect(dialog.getByTestId("booking-submit"), "the book button stays on screen").toBeInViewport({ ratio: 1, timeout: 10_000 });
+  });
+}
