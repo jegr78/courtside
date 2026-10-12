@@ -132,18 +132,12 @@ test("given a candidate, when its preconditions run, then a nightly verified an 
   const gate = jobText("preconditions");
 
   // when / then
-  assert.match(gate, /actions\/workflows\/build\.yml\/runs\?branch=\$\{DEFAULT_BRANCH\}&status=success/);
-  assert.match(gate, /select\(\.event == "schedule" or \.event == "workflow_dispatch"\)/);
-  assert.match(gate, /select\(\.run_attempt == 1\)/);
-  assert.match(gate, /git merge-base --is-ancestor "\$head" "\$COMMIT"/);
-  assert.match(gate, /nightly-release-evidence-\$\{id\}-1/);
-  assert.match(gate, /node tools\/nightly-release-evidence\.mjs/);
-  assert.match(gate, /--commit "\$head" --run-id "\$id" \|\| continue/,
-    "the nightly evidence must name the commit and run it was downloaded for");
-  assert.ok(gate.indexOf("gh run download") < gate.indexOf("node tools/nightly-release-evidence.mjs"));
-  assert.ok(gate.indexOf("node tools/nightly-release-evidence.mjs") < gate.indexOf('verified="$id"'),
-    "a run counts as verified only after its evidence passed");
-  assert.match(gate, /no green first-attempt build with a completed nightly release rehearsal verified a commit this candidate builds on/);
+  const nightly = jobs.preconditions.steps.find((step) => step.name === "Demand a nightly that verified this release");
+  assert.equal(nightly.run.trim(),
+    'node tools/nightly-release-evidence.mjs --find --branch "$BRANCH" --commit "$COMMIT"');
+  assert.deepEqual(nightly.env, { BRANCH: "${{ needs.select.outputs.branch }}", GH_TOKEN: "${{ github.token }}" },
+    "a patch reads the nightly evidence of its own release branch, main's releases still read main");
+  assert.equal(jobs.select.outputs.branch, "${{ steps.selection.outputs.branch }}");
   assert.match(gate, /issues\?state=open&labels=nightly&per_page=100/);
   assert.match(gate, /courtside-nightly-fingerprint/);
   assert.match(gate, /select\(\.body \| contains\("- Workflow: `npm audit`"\) \| not\)/);

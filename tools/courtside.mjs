@@ -31,6 +31,7 @@ import { runOwnedProcess } from "./security-passive-deployment.mjs";
 import { failureReason } from "./failure-reason.mjs";
 import { containerIdentity, createMailCertificate } from "./mail-relay-certificate.mjs";
 import { executeLocalCheck, localCheckPrerequisites } from "./local-check.mjs";
+import { targetBranch } from "./release-line.mjs";
 import { isGitHubLogin } from "./nightly-failure-tracker.mjs";
 
 async function securityAssessments() {
@@ -113,7 +114,7 @@ export function parseArguments(argv) {
     state: undefined,
     qualification: undefined,
     attempt: undefined, image: undefined, fixturesImage: undefined, sourceCommit: undefined,
-    planOnly: false, forceFull: false, rerun: false
+    planOnly: false, forceFull: false, rerun: false, base: "main"
   };
   let explicitImage = false;
   for (let index = 0; index < flags.length; index++) {
@@ -130,6 +131,8 @@ export function parseArguments(argv) {
       options.forceFull = true;
     } else if (flag === "--rerun" && command === "check") {
       options.rerun = true;
+    } else if (flag === "--base" && command === "check") {
+      options.base = targetBranch(requiredOptionValue(flags, ++index, "--base"));
     } else if (flag === "--suspend" && command === "dev-debug") {
       options.suspend = true;
     } else if (flag === "--version" && command === "uat") {
@@ -2419,7 +2422,7 @@ function parseJson(value) {
 }
 
 function showHelp() {
-  process.stdout.write(`Usage: node tools/courtside.mjs <command>\n\nCommands:\n  build\n  verify\n  check [--plan] [--full] [--rerun]\n  dev\n  dev-debug [--suspend]\n  dev-stop\n  dev-reset\n  uat [--version <tag>] [--skip-verify] [--db-port] [--no-credential-output]\n  uat share\n  uat-stop\n  uat-logs\n  uat-db-shell\n  uat-cert [file]\n  uat-backup [file]\n  uat-restore <file> --confirm courtside-uat\n  uat-reset courtside-uat [--all]\n  uat-seed-bookings [--confirm courtside-uat]\n  perf --image <ENGINE_ID> --fixtures-image <ENGINE_ID> --source-commit <COMMIT> [--db-port] [--telemetry]\n  perf [--skip-verify] [--db-port] [--telemetry] [--no-credential-output]\n  perf-run <smoke|baseline|peak|stress|contention|soak|browser> [--confirm courtside-perf] [--fresh] [--remote-write]\n  perf-run funnel-smoke --target <https-origin> --confirm courtside-uat-funnel\n  perf-promote <summary.json> --confirm courtside-perf\n  perf-compare <summary.json> --baseline <baseline.json> --output <comparison.json>\n  perf-stop\n  perf-logs\n  perf-db-shell\n  perf-reset courtside-perf\n  security <RUN_ID> --image <ENGINE_ID> --fixtures-image <ENGINE_ID> --source-commit <COMMIT>\n  security <RUN_ID> <IMAGE_DIGEST> [--fixtures-image <ENGINE_ID> --source-commit <COMMIT>]\n  security-seed <RUN_ID> <IMAGE_DIGEST> --state <environment.json> [--compose-root <absolute-checkout>]\n  security-verify <RUN_ID>\n  security-plan <RUN_ID> <safe|active|destructive>\n  security-run <RUN_ID> <safe|active|destructive> --qualification <qualification.json> [--authorize <exact-authorization>]\n  security-report <RUN_ID> [--attempt <number>]\n  security-stop <RUN_ID>\n  security-cleanup <RUN_ID>\n  security-recover <RUN_ID> --attempt <number>\n  security-reset <RUN_ID> --confirm courtside-security-<RUN_ID>\n  status <dev|uat|perf> [--json]\n`);
+  process.stdout.write(`Usage: node tools/courtside.mjs <command>\n\nCommands:\n  build\n  verify\n  check [--plan] [--full] [--rerun] [--base <main|release/x.y>]\n  dev\n  dev-debug [--suspend]\n  dev-stop\n  dev-reset\n  uat [--version <tag>] [--skip-verify] [--db-port] [--no-credential-output]\n  uat share\n  uat-stop\n  uat-logs\n  uat-db-shell\n  uat-cert [file]\n  uat-backup [file]\n  uat-restore <file> --confirm courtside-uat\n  uat-reset courtside-uat [--all]\n  uat-seed-bookings [--confirm courtside-uat]\n  perf --image <ENGINE_ID> --fixtures-image <ENGINE_ID> --source-commit <COMMIT> [--db-port] [--telemetry]\n  perf [--skip-verify] [--db-port] [--telemetry] [--no-credential-output]\n  perf-run <smoke|baseline|peak|stress|contention|soak|browser> [--confirm courtside-perf] [--fresh] [--remote-write]\n  perf-run funnel-smoke --target <https-origin> --confirm courtside-uat-funnel\n  perf-promote <summary.json> --confirm courtside-perf\n  perf-compare <summary.json> --baseline <baseline.json> --output <comparison.json>\n  perf-stop\n  perf-logs\n  perf-db-shell\n  perf-reset courtside-perf\n  security <RUN_ID> --image <ENGINE_ID> --fixtures-image <ENGINE_ID> --source-commit <COMMIT>\n  security <RUN_ID> <IMAGE_DIGEST> [--fixtures-image <ENGINE_ID> --source-commit <COMMIT>]\n  security-seed <RUN_ID> <IMAGE_DIGEST> --state <environment.json> [--compose-root <absolute-checkout>]\n  security-verify <RUN_ID>\n  security-plan <RUN_ID> <safe|active|destructive>\n  security-run <RUN_ID> <safe|active|destructive> --qualification <qualification.json> [--authorize <exact-authorization>]\n  security-report <RUN_ID> [--attempt <number>]\n  security-stop <RUN_ID>\n  security-cleanup <RUN_ID>\n  security-recover <RUN_ID> --attempt <number>\n  security-reset <RUN_ID> --confirm courtside-security-<RUN_ID>\n  status <dev|uat|perf> [--json]\n`);
 }
 
 const invokedPath = process.argv[1] ? pathToFileURL(resolve(process.argv[1])).href : undefined;

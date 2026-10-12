@@ -695,6 +695,15 @@ test("given a local check, when parsing its options, then planning and escalatio
   assert.throws(() => parseArguments(["check", "--skip-verify"]), /Unknown option/);
 });
 
+test("given a fix for a release line, when parsing the check, then it names the branch it is compared against", () => {
+  // when / then
+  assert.equal(parseArguments(["check"]).base, "main", "main stays the default target");
+  assert.equal(parseArguments(["check", "--base", "release/0.1"]).base, "release/0.1");
+  assert.throws(() => parseArguments(["check", "--base", "feat/booking"]), /not a release target/);
+  assert.throws(() => parseArguments(["check", "--base"]), /--base/);
+  assert.throws(() => parseArguments(["build", "--base", "release/0.1"]), /Unknown option/);
+});
+
 test("given an unsupported argument, when parsing it, then it is rejected", () => {
   // when / then
   assert.throws(() => parseArguments(["dev", "--force"]), /Unknown option/);

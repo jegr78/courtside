@@ -7,6 +7,7 @@ import {
 import { arch, platform, release, tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { remoteRefOf, targetBranch } from "./release-line.mjs";
 import { loadProfileContract, localTasksForProfiles } from "./test-profile-contract.mjs";
 
 const repository = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -68,20 +69,21 @@ export function planTasks(classified) {
   return { ...classified, tasks: structuredClone(tasks) };
 }
 
-export function collectLocalChanges(git = runGit) {
+export function collectLocalChanges(git = runGit, base = "main") {
+  const baseRef = remoteRefOf(base);
   let baseCommit;
   let fallbackReason = null;
   try {
-    git(["fetch", "--quiet", "--no-tags", "origin", "main"]);
-    baseCommit = git(["merge-base", "origin/main", "HEAD"]).trim();
+    git(["fetch", "--quiet", "--no-tags", "origin", `+refs/heads/${targetBranch(base)}:${baseRef}`]);
+    baseCommit = git(["merge-base", baseRef, "HEAD"]).trim();
   } catch {
     baseCommit = null;
     fallbackReason = "base-refresh-failed";
   }
-  return collectLocalState(git, baseCommit, fallbackReason);
+  return { baseBranch: base, ...collectLocalState(git, baseCommit, fallbackReason, base) };
 }
 
-function collectLocalState(git, baseCommit, fallbackReason) {
+function collectLocalState(git, baseCommit, fallbackReason, base) {
   const headCommit = git(["rev-parse", "HEAD"]).trim();
   if ((baseCommit !== null && !/^[a-f0-9]{40}$/.test(baseCommit))
       || !/^[a-f0-9]{40}$/.test(headCommit)) {
@@ -95,7 +97,7 @@ function collectLocalState(git, baseCommit, fallbackReason) {
   const changeEvidence = git(["diff", "--name-status", "-z", "--find-renames",
     comparison, headCommit, "--"]);
   if (changeEvidence.length === 0 && fallbackReason === null) {
-    throw new Error("No local changes exist relative to origin/main");
+    throw new Error(`No local changes exist relative to origin/${base}`);
   }
   const fingerprint = createHash("sha256")
     .update(baseCommit ?? "")
@@ -172,7 +174,7 @@ export function localCheckPrerequisites(tasks) {
 }
 
 export async function executeLocalCheck(options, runtime = {}) {
-  const evidence = collectLocalChanges(runtime.git ?? runGit);
+  const evidence = collectLocalChanges(runtime.git ?? runGit, options.base ?? "main");
   let classified;
   try {
     const classify = runtime.classify ?? classifyProtectedChanges;
@@ -188,6 +190,7 @@ export async function executeLocalCheck(options, runtime = {}) {
     : (runtime.runtimeFingerprint ?? verificationRuntimeFingerprint(plan.tasks, runtime.executeVersion));
   const record = {
     schemaVersion: 2,
+    baseBranch: evidence.baseBranch,
     baseCommit: evidence.baseCommit,
     headCommit: evidence.headCommit,
     fallbackReason: evidence.fallbackReason,
@@ -254,7 +257,7 @@ export async function executeLocalCheck(options, runtime = {}) {
 export function reusableLocalCheckResult(previous, expected) {
   if (previous === null || typeof previous !== "object" || Array.isArray(previous)
       || previous.schemaVersion !== 2 || previous.outcome !== "passed") return false;
-  return ["baseCommit", "headCommit", "changeFingerprint", "runtimeFingerprint"]
+  return ["baseBranch", "baseCommit", "headCommit", "changeFingerprint", "runtimeFingerprint"]
     .every((field) => previous[field] === expected[field])
     && JSON.stringify(previous.profiles) === JSON.stringify(expected.profiles)
     && JSON.stringify(previous.tasks) === JSON.stringify(expected.tasks);

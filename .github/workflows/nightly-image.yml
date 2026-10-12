@@ -99,9 +99,16 @@ jobs:
               echo "::error::nightly publication requires a verified build from refs/heads/main"
               exit 1
             fi
-            git fetch --no-tags origin "$DEFAULT_BRANCH"
+            branch="$DEFAULT_BRANCH"
+            if [[ "$GITHUB_REF" =~ ^refs/heads/release/[0-9]+\.[0-9]+$ ]]; then
+              branch="${GITHUB_REF#refs/heads/}"
+            elif [[ "$GITHUB_REF" == refs/heads/release/* ]]; then
+              echo "::error::$GITHUB_REF is not a release/<major>.<minor> branch"
+              exit 1
+            fi
+            git fetch --no-tags origin "+refs/heads/$branch:refs/remotes/origin/$branch"
             git cat-file -e "${commit}^{commit}"
-            git merge-base --is-ancestor "$commit" "origin/$DEFAULT_BRANCH"
+            git merge-base --is-ancestor "$commit" "refs/remotes/origin/$branch"
             evidence="$RUNNER_TEMP/nightly-verification"
             jq -e --arg commit "$commit" --argjson runId "$verification_run" '
               .schemaVersion == 1 and .releaseReadiness == "complete" and
@@ -143,7 +150,7 @@ jobs:
 
   retention-plan:
     needs: select
-    if: github.event_name == 'workflow_dispatch' && inputs.publish != true
+    if: github.event_name == 'workflow_dispatch' && inputs.publish != true && !startsWith(github.ref, 'refs/heads/release/')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
