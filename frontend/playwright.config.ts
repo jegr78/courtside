@@ -6,8 +6,8 @@ delete process.env.NO_COLOR;
 process.env.FORCE_COLOR = "0";
 
 const periodicProjects = process.env.COURTSIDE_PERIODIC_BROWSERS === "true" ? [
-  // Firefox keeps its own certificate store, which neither the system store nor a Chromium
-  // argument reaches, so it stays on the origin that needs no certificate at all.
+  // Firefox keeps its own certificate store, which neither the system store nor a Chromium argument
+  // reaches, so it stays on the plain origin; only a worker spec ignores certificate errors for TLS.
   { name: "firefox-periodic", testMatch: /supported-browser\.spec\.ts|browser-security-smoke\.spec\.ts|pwa-first-install\.spec\.ts/, metadata: { plainOrigin: true }, use: { ...devices["Desktop Firefox"] } }
 ] : [];
 

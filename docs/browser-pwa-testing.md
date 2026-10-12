@@ -62,7 +62,12 @@ API-cache boundary after activating the updated worker.
 contexts. Its policy test requires every entry to have a matching journey assertion.
 
 Vite registers updates in prompt mode. A waiting worker stays inactive until the localized update
-control is accepted, then activates and reloads the application as one asset version. Additive API
+control is accepted, then activates and reloads the application as one asset version. The prompt
+appears only while a waiting worker would replace an active one. A first install also passes
+through the waiting slot, and Firefox can still hold it there when the next page registers. The
+first-install journey opens a person page right after the first visit and requires no prompt in
+Chromium, WebKit and the periodic Firefox project, which reaches the TLS origin with certificate
+errors ignored because its remote process does not read the shared CA. Additive API
 changes remain compatible with an already open client. A breaking published API change follows the
 compatibility policy and requires an explicit client reload path before release; it cannot be
 qualified by silently mixing incompatible assets.
