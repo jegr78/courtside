@@ -36,7 +36,7 @@ interface AppRoutesProps {
   session: SessionStatus;
   refreshSession: (signal?: AbortSignal) => Promise<void>;
   passwordChanged?: boolean;
-  initialPasswordChanged?: () => void;
+  initialPasswordChanged?: (returnQuery?: string) => void;
   signedOut?: () => void;
   configurationChanged?: (config: ClubConfig) => void;
   clubName?: string;
@@ -54,7 +54,7 @@ export function AppRoutes({ session, refreshSession, passwordChanged, initialPas
 
   if (session.passwordChangeRequired) {
     return <Routes>
-      <Route path="/initial-password" element={<InitialPasswordView changed={() => initialPasswordChanged?.()} />} />
+      <Route path="/initial-password" element={<InitialPasswordView changed={() => initialPasswordChanged?.(returnSearch(address.search))} />} />
       <Route path="*" element={<Navigate to={{ pathname: "/initial-password", search: returnSearch(address.search) }} replace />} />
     </Routes>;
   }
@@ -152,7 +152,6 @@ function FooterLink({ testId, href, label }: { testId: string; href: string; lab
 export function App() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { search } = useLocation();
   const { club, changed: configurationChanged, load: loadClub } = useClubConfiguration();
   const [session, setSession] = useState<SessionStatus>();
   const [source, setSource] = useState<SourceOffer>();
@@ -245,14 +244,14 @@ export function App() {
     };
   }, [identify, loadClub, refreshSession, source]);
 
-  function initialPasswordChanged() {
+  function initialPasswordChanged(returnQuery = "") {
     sessionInvalidations.current += 1;
     setOfflineClub(undefined);
     flushSync(() => {
       setPasswordChanged(true);
       setSession({ authenticated: false, roles: [], passwordChangeRequired: false });
     });
-    void navigate(`/login${returnSearch(search)}`);
+    void navigate(`/login${returnQuery}`);
   }
 
   // The session has to be gone before the route is chosen: signing out from a role-guarded page
