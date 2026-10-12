@@ -16,7 +16,7 @@ CREATE TABLE waitlist_entry (
     offered_at       timestamptz,
     offer_expires_at timestamptz,
     closed_at        timestamptz,
-    booking_id       uuid        REFERENCES booking ON DELETE SET NULL,
+    booking_id       uuid,
 
     CONSTRAINT waitlist_entry_period CHECK (ends_at > starts_at),
     CONSTRAINT waitlist_entry_state_known CHECK (

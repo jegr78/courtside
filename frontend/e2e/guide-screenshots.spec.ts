@@ -65,6 +65,12 @@ const drivers: Record<string, (page: Page, visualDate: string) => Promise<void>>
     await page.getByTestId("booking-more-summary").click();
     await expect(page.getByTestId("guest-participants")).toBeVisible();
   },
+  "waitlist-dialog": async (page, visualDate) => {
+    await selectVisualDate(page, visualDate);
+    await page.locator('button[data-testid="allocation"]').first().click();
+    await expect(page.getByTestId("waitlist-explanation")).toBeVisible({ timeout: 10_000 });
+    await page.evaluate(() => window.scrollTo(0, 0));
+  },
   "my-bookings": async (page) => {
     await page.getByTestId("booking-submit").click();
     await expect(page.getByTestId("booking-dialog")).toHaveCount(0);
@@ -246,6 +252,15 @@ test("every surface a booking passes through is captured", async ({ page, journe
   await capture(page, "booking-participants", journeyService.visualDate);
   await capture(page, "my-bookings", journeyService.visualDate);
   await capture(page, "participations", journeyService.visualDate);
+});
+
+test("the waitlist a member joins for a taken court is captured", async ({ page, journeyService }, info) => {
+  // given
+  await prepare(page, localeOf(info));
+  await signIn(page, "doe.jane", "court-plan-view");
+
+  // when / then
+  await capture(page, "waitlist-dialog", journeyService.visualDate);
 });
 
 test("the refusal a booking rule writes is captured", async ({ page, journeyService }, info) => {

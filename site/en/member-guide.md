@@ -227,6 +227,8 @@ member. If you may no longer book the court, Courtside skips you.
 You can leave a waitlist at any time. Your entry ends when you book the court yourself or its time
 starts. You can be on at most 20 waitlists at a time.
 
+![The dialog for the waitlist of a taken court with the kind of booking and the players.](../screenshots/en/waitlist-dialog.png)
+
 ## Series
 
 Accounts whose role an active booking card without a player list allows can create a series under *Administration → Club appointments*. A series creates normal

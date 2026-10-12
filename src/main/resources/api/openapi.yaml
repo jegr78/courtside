@@ -3160,6 +3160,28 @@ components:
           type: array
           items: { $ref: "#/components/schemas/SubjectAccessReservation" }
 
+    SubjectAccessWaitlistEntry:
+      type: object
+      required: [entryId, courtId, startsAt, endsAt, state, joinedAt]
+      properties:
+        entryId: { type: string, format: uuid }
+        courtId: { type: string, format: uuid }
+        startsAt: { type: string, format: date-time }
+        endsAt: { type: string, format: date-time }
+        state: { $ref: "#/components/schemas/WaitlistEntryState" }
+        joinedAt: { type: string, format: date-time }
+        offerExpiresAt: { type: [string, "null"], format: date-time }
+        note: { type: [string, "null"] }
+
+    SubjectAccessNamedInWaitlist:
+      type: object
+      required: [entryId, courtId, startsAt, endsAt]
+      properties:
+        entryId: { type: string, format: uuid }
+        courtId: { type: string, format: uuid }
+        startsAt: { type: string, format: date-time }
+        endsAt: { type: string, format: date-time }
+
     SubjectAccessMembership:
       type: object
       required: [membershipTypeId, membershipType]
@@ -3305,7 +3327,8 @@ components:
       type: object
       required: [producedAt, personId, firstName, lastName, accounts, memberships, bookingsMade,
                  bookingsRecordedIn, bookingSeries, messages, declinedMessages, notifications,
-                 declinedChannels, externalReferences, changesAsSubject, changesAsActor]
+                 declinedChannels, externalReferences, changesAsSubject, changesAsActor,
+                 waitlistEntries, waitlistsNamedIn]
       description: |
         Everything this instance holds about one person, and nothing it holds about anybody else.
       properties:
@@ -3334,6 +3357,16 @@ components:
         bookingSeries:
           type: array
           items: { $ref: "#/components/schemas/SubjectAccessSeries" }
+        waitlistEntries:
+          type: array
+          description: The waitlist entries the person's accounts made whose slot has not ended yet.
+          items: { $ref: "#/components/schemas/SubjectAccessWaitlistEntry" }
+        waitlistsNamedIn:
+          type: array
+          description: |
+            Waitlist entries somebody else made naming this person as a player, with the court and
+            time only.
+          items: { $ref: "#/components/schemas/SubjectAccessNamedInWaitlist" }
         messages:
           type: array
           items: { $ref: "#/components/schemas/SubjectAccessMessage" }

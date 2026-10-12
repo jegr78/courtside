@@ -1,6 +1,6 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, expect, it, vi } from "vitest";
+import { beforeEach, expect, it, onTestFinished, vi } from "vitest";
 import { ApiError, api, type WaitlistEntry } from "../api/client";
 import i18n from "../i18n";
 import { WaitlistSection } from "./WaitlistSection";
@@ -98,4 +98,17 @@ it("given no entries, when the section loads, then it adds nothing to the page",
   // then
   await waitFor(() => expect(api.waitlistEntries).toHaveBeenCalled());
   expect(screen.queryByTestId("waitlist-title")).toBeNull();
+});
+
+it("given a link to an entry the list does not hold, when the entries have loaded, then the section takes the focus and nothing fails", async () => {
+  // given
+  window.location.hash = "#waitlist-ffffffff-0000-0000-0000-000000000000";
+  onTestFinished(() => { window.location.hash = ""; });
+
+  // when
+  show();
+
+  // then
+  await waitFor(() => expect(document.activeElement).toHaveAttribute("id", "waitlist"));
+  expect(screen.queryByRole("alert")).toBeNull();
 });

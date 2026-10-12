@@ -112,7 +112,7 @@ whether a court is free.
 
 | Table | Holds | References |
 |---|---|---|
-| `waitlist_entry` | One account waiting for one court and period somebody else holds: the card, note and state, when it joined, and the offer's start and deadline | `user_account`, `court`, `booking_card`, `booking` |
+| `waitlist_entry` | One account waiting for one court and period somebody else holds: the card, note and state, when it joined, and the offer's start and deadline | `user_account`, `court`, `booking_card` |
 | `waitlist_participant` | The players named on joining, one row per slot, in the shape of `booking_participant` | `waitlist_entry`, `person`, `participant_card` |
 
 The entries for one court, start and end form that slot's queue, in the order of `joined_seq`. An
@@ -126,7 +126,8 @@ entry for a slot. An offer has a deadline no later than the slot's start, and
 An offered entry reserves its court without a `court_allocation` row. The booking write refuses the
 court to every other account while the offer stands, under the same lock that serialises booking
 writes, cancellations and the waitlist sweep. `booking_id` names the booking an accepted offer or the
-member's own booking of the slot became. The sweep deletes every entry whose slot has ended, and an
+member's own booking of the slot became; it carries no foreign key, because `court_allocation` and
+`booking_participant` stay the only rows a removed booking takes with it. The sweep deletes every entry whose slot has ended, and an
 account's entries go with the account.
 
 ## People, memberships and accounts

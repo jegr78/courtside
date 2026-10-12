@@ -67,6 +67,7 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
             "/api/public/config/logo",
             "/api/public/courts",
             "/api/public/opening-hours",
+            "/api/reserved-slots",
             "/api/session",
             "/api/source",
             "/manifest.webmanifest");
@@ -96,7 +97,10 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
             "/api/booking-series-preview",
             "/api/booking-series/{id}",
             "/api/booking-series/{id}/move",
-            "/api/booking-series/{id}/move/preview");
+            "/api/booking-series/{id}/move/preview",
+            "/api/my/waitlist",
+            "/api/my/waitlist/{entryId}",
+            "/api/my/waitlist/{entryId}/acceptance");
 
     private static final Set<String> RECENT_AUTHENTICATION_ENDPOINTS = Set.of(
             "DELETE /api/account/sessions");
@@ -376,7 +380,8 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
                     .content(endpoint.probeBody())
                     .with(anonymous())
                     .with(csrf());
-            if (endpoint.method() == HttpMethod.GET && endpoint.pattern().equals("/api/bookings")) {
+            if (endpoint.method() == HttpMethod.GET && (endpoint.pattern().equals("/api/bookings")
+                    || endpoint.pattern().equals("/api/reserved-slots"))) {
                 request.param("date", "2026-05-12");
             }
             if (endpoint.pattern().equals("/api/public/config/icon")) {

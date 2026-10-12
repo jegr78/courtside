@@ -21,6 +21,9 @@ import org.courtside.api.ApiSubjectAccessMessage;
 import org.courtside.api.ApiNotificationClosure;
 import org.courtside.api.ApiSubjectAccessNotification;
 import org.courtside.api.ApiSubjectAccessParticipation;
+import org.courtside.api.ApiSubjectAccessNamedInWaitlist;
+import org.courtside.api.ApiSubjectAccessWaitlistEntry;
+import org.courtside.api.ApiWaitlistEntryState;
 import org.courtside.api.ApiSubjectAccessReservation;
 import org.courtside.api.ApiSubjectAccessSeries;
 import org.courtside.audit.PersonAuditTrail;
@@ -57,6 +60,8 @@ class SubjectAccessAdminController implements AdminSubjectAccessApi {
                 answer.bookingsRecordedIn().stream()
                         .map(SubjectAccessAdminController::toParticipation).toList(),
                 answer.bookingSeries().stream().map(SubjectAccessAdminController::toSeries).toList(),
+                answer.waitlistEntries().stream().map(SubjectAccessAdminController::toWaiting).toList(),
+                answer.waitlistsNamedIn().stream().map(SubjectAccessAdminController::toNamedIn).toList(),
                 answer.messages().stream().map(SubjectAccessAdminController::toMessage).toList(),
                 answer.declinedMessages().stream()
                         .map(SubjectAccessAdminController::toDeclined).toList(),
@@ -68,6 +73,19 @@ class SubjectAccessAdminController implements AdminSubjectAccessApi {
                 answer.changesAsSubject().stream().map(SubjectAccessAdminController::toChange).toList(),
                 answer.changesAsActor().stream().map(SubjectAccessAdminController::toAction).toList())
                 .email(address(answer.email()));
+    }
+
+    private static ApiSubjectAccessWaitlistEntry toWaiting(PersonBookingHistory.Waiting entry) {
+        return new ApiSubjectAccessWaitlistEntry(entry.entryId(), entry.courtId(),
+                WireTypes.toOffsetDateTime(entry.startsAt()), WireTypes.toOffsetDateTime(entry.endsAt()),
+                ApiWaitlistEntryState.fromValue(entry.state()), WireTypes.toOffsetDateTime(entry.joinedAt()))
+                .offerExpiresAt(WireTypes.toOffsetDateTime(entry.offerExpiresAt()))
+                .note(entry.note());
+    }
+
+    private static ApiSubjectAccessNamedInWaitlist toNamedIn(PersonBookingHistory.NamedInWaitlist entry) {
+        return new ApiSubjectAccessNamedInWaitlist(entry.entryId(), entry.courtId(),
+                WireTypes.toOffsetDateTime(entry.startsAt()), WireTypes.toOffsetDateTime(entry.endsAt()));
     }
 
     // A person the club has no address for carries an empty one, and the document promises an

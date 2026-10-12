@@ -35,7 +35,7 @@ export function WaitlistSection({ courtNames, locale, timeZone, booked, left }: 
     const target = document.getElementById(fragment.slice(1)) ?? document.getElementById("waitlist");
     if (!target) return;
     followedFragment.current = fragment;
-    target.scrollIntoView({ block: "center" });
+    if (typeof target.scrollIntoView === "function") target.scrollIntoView({ block: "center" });
     target.focus({ preventScroll: true });
   }, [entries]);
 

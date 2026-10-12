@@ -7,9 +7,12 @@ import org.courtside.booking.CourtAllocation;
 import org.courtside.booking.PersonBookingHistory;
 import org.courtside.booking.series.BookingSeries;
 import org.courtside.booking.series.BookingSeriesRepository;
+import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.sql.Timestamp;
+import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
@@ -21,6 +24,44 @@ public class BookingHistoryService implements PersonBookingHistory {
 
     private final BookingRepository bookings;
     private final BookingSeriesRepository series;
+    private final JdbcClient jdbc;
+
+    @Override
+    public List<Waiting> waitlistOf(UUID accountId) {
+        requireIdentifier(accountId, "account");
+        return jdbc.sql("""
+                        SELECT id, court_id, starts_at, ends_at, state, joined_at, offer_expires_at, note
+                        FROM waitlist_entry WHERE account_id = :accountId ORDER BY joined_seq
+                        """)
+                .param("accountId", accountId)
+                .query((row, number) -> new Waiting(row.getObject("id", UUID.class),
+                        row.getObject("court_id", UUID.class), instant(row.getTimestamp("starts_at")),
+                        instant(row.getTimestamp("ends_at")), row.getString("state"),
+                        instant(row.getTimestamp("joined_at")), instant(row.getTimestamp("offer_expires_at")),
+                        row.getString("note")))
+                .list();
+    }
+
+    @Override
+    public List<NamedInWaitlist> namedInWaitlists(UUID personId) {
+        requireIdentifier(personId, "person");
+        return jdbc.sql("""
+                        SELECT DISTINCT w.id, w.court_id, w.starts_at, w.ends_at, w.joined_seq
+                        FROM waitlist_entry w JOIN waitlist_participant p ON p.entry_id = w.id
+                        WHERE p.person_id = :personId
+                          AND w.account_id NOT IN (SELECT id FROM user_account WHERE person_id = :personId)
+                        ORDER BY w.joined_seq
+                        """)
+                .param("personId", personId)
+                .query((row, number) -> new NamedInWaitlist(row.getObject("id", UUID.class),
+                        row.getObject("court_id", UUID.class), instant(row.getTimestamp("starts_at")),
+                        instant(row.getTimestamp("ends_at"))))
+                .list();
+    }
+
+    private static Instant instant(Timestamp timestamp) {
+        return timestamp == null ? null : timestamp.toInstant();
+    }
 
     @Override
     public List<Made> madeBy(UUID accountId) {

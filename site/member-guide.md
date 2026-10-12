@@ -231,6 +231,8 @@ du stehst, zeigt Courtside niemandem. Du kannst eine Warteliste jederzeit verlas
 Platz selbst oder beginnt die Zeit, endet dein Eintrag. Du kannst auf höchstens 20 Wartelisten
 zugleich stehen.
 
+![Der Dialog für die Warteliste eines belegten Platzes mit Buchungsart und Mitspielern.](screenshots/de/waitlist-dialog.png)
+
 ## Serientermine
 
 Konten, deren Rolle eine aktive Buchungskarte ohne Spielerliste erlaubt, können unter *Verwaltung → Vereinstermine* Serien anlegen. Eine Serie legt

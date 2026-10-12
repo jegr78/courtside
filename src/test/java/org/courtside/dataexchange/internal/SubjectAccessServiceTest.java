@@ -89,6 +89,35 @@ class SubjectAccessServiceTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenAWaitlistEntryAndOneNamingThePerson_whenTheAnswerIsProduced_thenBothAreInItWithoutTheOtherMember() {
+        // given
+        UUID personId = roster.addPerson("Jane", "Doe", "jane.doe@example.org");
+        UUID accountId = identity.createEnabledAccount(personId, "jane.doe", Set.of(Role.MEMBER));
+        UUID holderPerson = roster.addPerson("Mary", "Major", "mary.major@example.org");
+        UUID holderAccount = identity.createEnabledAccount(holderPerson, "major.mary", Set.of(Role.MEMBER));
+        UUID otherPerson = roster.addPerson("John", "Roe", "john.roe@example.org");
+        UUID otherAccount = identity.createEnabledAccount(otherPerson, "roe.john", Set.of(Role.MEMBER));
+        TimeSlot slot = new TimeSlot(SIX_PM, SEVEN_PM);
+        bookings.createBookingNamingMember(courtId, MEMBER_BOOKING_CARD, slot, holderAccount, holderPerson,
+                Set.of(Role.MEMBER), null, otherPerson);
+        UUID own = bookings.joinWaitlist(courtId, MEMBER_BOOKING_CARD, slot, accountId, personId, holderPerson);
+        UUID naming = bookings.joinWaitlist(courtId, MEMBER_BOOKING_CARD, slot, otherAccount, otherPerson, personId);
+
+        // when
+        SubjectAccessRecord answer = subjectAccess.answerFor(personId);
+
+        // then
+        assertThat(answer.waitlistEntries()).singleElement()
+                .satisfies(entry -> assertThat(entry.entryId()).isEqualTo(own))
+                .satisfies(entry -> assertThat(entry.state()).isEqualTo("WAITING"));
+        assertThat(answer.waitlistsNamedIn()).singleElement()
+                .satisfies(entry -> assertThat(entry.entryId()).isEqualTo(naming))
+                .satisfies(entry -> assertThat(entry.startsAt()).isEqualTo(SIX_PM));
+        assertThat(answer.waitlistsNamedIn().toString()).as("nothing names who made the other entry")
+                .doesNotContain(otherAccount.toString()).doesNotContain("Roe");
+    }
+
+    @Test
     void givenMessagesWentToAMemberAndTheyDeclinedAKind_whenTheAnswerIsProduced_thenBothAreInIt() {
         // given
         UUID personId = roster.addPerson("Jane", "Doe", "jane.doe@example.org");

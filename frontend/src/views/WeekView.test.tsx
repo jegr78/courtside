@@ -2426,7 +2426,8 @@ it("given the waitlist refuses a second entry, when the member joins again, then
   await userEvent.click(screen.getByTestId("booking-submit"));
 
   // then
-  expect(await screen.findByText("You are already on the waitlist for this court.")).toBeInTheDocument();
+  await waitFor(() => expect(document.querySelector('[data-code="waitlist.entry.exists"]'))
+    .toHaveTextContent("You are already on the waitlist for this court."));
   expect(screen.getByTestId("booking-dialog")).toBeInTheDocument();
 });
 
@@ -2446,7 +2447,7 @@ it("given a court reserved for somebody else, when the plan is shown, then it re
   expect(reserved).toHaveAccessibleName("Join the waitlist for Reserved, 4:00 PM – 5:00 PM");
   expect(reserved.dataset.bookingId, "a reservation has no booking a member could address").toBeUndefined();
   expect(screen.getByTestId("legend-reserved")).toHaveTextContent("Res");
-  expect(within(screen.getByTestId("court-plan-legend")).getByText("Reserved")).toBeInTheDocument();
+  expect(screen.getByTestId("legend-reserved").closest("li")).toHaveTextContent("Reserved");
 });
 
 it("given a court reserved for the viewer, when the plan is shown, then it leads to the offer instead of the waitlist", async () => {
