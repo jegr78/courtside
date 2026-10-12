@@ -82,7 +82,7 @@ export function AdminMessagesView() {
           && <p data-testid="messages-refused-hint" className="text-muted max-w-3xl">{t("messages.refusedHint")}</p>}
         {entries.length === 0
           ? <p data-testid="messages-empty">{t(unsettled ? "messages.noneUnsettled" : "messages.empty")}</p>
-          : <div className="overflow-x-auto">
+          : <div>
             <table className="block w-full text-left sm:table">
               <thead className="sr-only sm:not-sr-only">
                 <tr>
