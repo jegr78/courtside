@@ -3,17 +3,19 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { DialogBody } from "./DialogBody";
 
 let resized: (() => void) | undefined;
+const disconnect = vi.fn();
 
 beforeEach(() => {
   vi.stubGlobal("ResizeObserver", class {
     constructor(callback: () => void) { resized = callback; }
     observe() {}
-    disconnect() {}
+    disconnect = disconnect;
   });
 });
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  disconnect.mockClear();
   resized = undefined;
 });
 
@@ -75,4 +77,28 @@ it("given a form scrolled to within a fraction of a pixel of its end, when it sc
 
   // then
   expect(screen.queryByTestId("dialog-continues"), "a sub-pixel remainder is the end of the form").toBeNull();
+});
+
+it("given a dialog body on screen, when it unmounts, then it stops observing its size", () => {
+  // given
+  const { unmount } = render(<DialogBody><input /></DialogBody>);
+
+  // when
+  unmount();
+
+  // then
+  expect(disconnect, "a closed dialog leaves no observer behind").toHaveBeenCalledOnce();
+});
+
+it("given a browser without ResizeObserver, when the body renders, then it shows its content without a signal", () => {
+  // given
+  vi.stubGlobal("ResizeObserver", undefined);
+
+  // when
+  const rendering = () => render(<DialogBody><input data-testid="field" /></DialogBody>);
+
+  // then
+  expect(rendering, "a missing observer is no reason to fail").not.toThrow();
+  expect(screen.getByTestId("field"), "the content renders without the observer").toBeInTheDocument();
+  expect(screen.queryByTestId("dialog-continues"), "nothing measured means no signal").toBeNull();
 });
