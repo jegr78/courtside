@@ -6,6 +6,7 @@ public enum MessageKind {
 
     // What a member may switch off is what they can miss without losing the account or being
     // written into something they never hear about.
+    ACCOUNT_WELCOME("account.welcome", false, true),
     CREDENTIALS_NEW_ACCOUNT("credentials.newAccount", false, true),
     CREDENTIALS_PASSWORD_RESET("credentials.passwordReset", false, true),
     ACCOUNT_USERNAME_REMINDER("account.usernameReminder", false, true),

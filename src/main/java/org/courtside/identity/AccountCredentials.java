@@ -21,9 +21,18 @@ public class AccountCredentials {
 
     @Transactional
     public void issueTo(UUID accountId) {
+        issue(accountId, false);
+    }
+
+    @Transactional
+    public void issueToCreatedAccount(UUID accountId) {
+        issue(accountId, true);
+    }
+
+    private void issue(UUID accountId, boolean accountCreated) {
         UserAccount account = issuable(accountId);
         issuing.registerOrRefuse(accountId);
-        events.publishEvent(new CredentialsRequested(accountId, reasonFor(account)));
+        events.publishEvent(new CredentialsRequested(accountId, reasonFor(account), accountCreated));
     }
 
     private UserAccount issuable(UUID accountId) {

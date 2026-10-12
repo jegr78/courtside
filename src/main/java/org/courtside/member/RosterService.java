@@ -188,7 +188,7 @@ public class RosterService {
         account.enable();
         saveOrRejectTakenUsername(account);
         events.publishEvent(new RosterEvent.AccountCreated(id, account.getId(), requested));
-        credentials.issueTo(account.getId());
+        credentials.issueToCreatedAccount(account.getId());
         events.publishEvent(new RosterEvent.AccountCredentialsRequested(id, account.getId()));
         return load(List.of(id)).getFirst();
     }

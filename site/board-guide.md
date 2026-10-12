@@ -267,7 +267,8 @@ Eine Mitgliedsart hat eine Bezeichnung, ein Regelwerk und eine Einstellung für 
 aller Arten untereinander vergleichst. *Regeln bearbeiten* öffnet genau das Regelwerk der Art.
 
 Aktiviere **Zugang beim Import anlegen**, wenn importierte Mitglieder dieser Art automatisch
-ein Konto erhalten sollen. Courtside sendet das Einmalpasswort an die hinterlegte E-Mail-Adresse.
+ein Konto erhalten sollen. Courtside sendet eine Willkommensnachricht und danach das Einmalpasswort
+an die hinterlegte E-Mail-Adresse.
 Bestehende Konten bleiben unverändert.
 
 Beim Stilllegen bleiben bestehende Zuordnungen und deren Buchungsregeln erhalten. Die Mitgliedsart
@@ -298,7 +299,8 @@ Nach dem Öffnen einer Person stehen drei Bereiche bereit:
 ### Zugangsdaten senden
 
 Vor dem Senden zeigt Courtside die Zieladresse und weist auf gemeinsam verwendete Adressen hin. Das
-Einmalpasswort geht direkt an das Mitglied und wird dem Vorstand nicht angezeigt.
+Einmalpasswort geht direkt an das Mitglied und wird dem Vorstand nicht angezeigt. Ein neues Konto
+erhält vorher eine Willkommensnachricht, neue Zugangsdaten für ein bestehendes Konto nicht.
 
 Neue Zugangsdaten ersetzen ein bereits gesetztes Passwort und beenden alle Sitzungen des Kontos.
 Verwende diese Funktion nur, wenn das Mitglied sein Konto nicht selbst wiederherstellen kann.

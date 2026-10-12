@@ -252,8 +252,8 @@ one row, or one card on a phone, so the rule sets of all types can be compared o
 other. *Edit rules* opens exactly the rule set the type uses.
 
 Enable **Open an account on import** if imported members of this type should receive an account.
-Courtside sends the one-time password to the recorded email address. Existing accounts remain
-unchanged.
+Courtside sends a welcome message and then the one-time password to the recorded email address.
+Existing accounts remain unchanged.
 
 Retiring a type preserves existing assignments and booking rules. The type can no longer be
 assigned to new memberships.
@@ -283,7 +283,8 @@ After opening a person, you can edit three areas:
 ### Send credentials
 
 Before sending, Courtside shows the destination address and warns about shared addresses. The
-one-time password goes directly to the member and is not displayed to the board.
+one-time password goes directly to the member and is not displayed to the board. A new account
+receives a welcome message first; new credentials for an existing account do not.
 
 New credentials replace an existing password and end every session for the account. Only use this
 function when the member cannot recover the account without help.

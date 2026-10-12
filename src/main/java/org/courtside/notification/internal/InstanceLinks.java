@@ -24,6 +24,7 @@ class InstanceLinks {
 
     String of(QueuedMessage message) {
         String target = switch (message.kind()) {
+            case ACCOUNT_WELCOME -> "/";
             case BOOKING_CONFIRMED, BOOKING_PLAYER_RECORDED, BOOKING_PLAYER_WITHDREW, BOOKING_DISPLACED,
                  BOOKING_REMINDER -> "/my-bookings#booking-" + message.booking();
             case BOOKING_CANCELLED, BOOKING_CANCELLED_BY_CLUB, BOOKING_SERIES_CREATED,

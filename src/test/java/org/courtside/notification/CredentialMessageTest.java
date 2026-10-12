@@ -206,7 +206,7 @@ class CredentialMessageTest extends AbstractIntegrationTest {
 
     private void raise(UUID accountId, CredentialsRequested.Reason reason) {
         transactions.executeWithoutResult(status ->
-                events.publishEvent(new CredentialsRequested(accountId, reason)));
+                events.publishEvent(new CredentialsRequested(accountId, reason, false)));
     }
 
     private MimeMessage theMessageHandedOver() {

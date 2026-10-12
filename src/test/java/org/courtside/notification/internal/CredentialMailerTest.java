@@ -121,10 +121,23 @@ class CredentialMailerTest {
     }
 
     @Test
+    void givenACreatedAccount_whenItsFirstCredentialIsRequested_thenTheWelcomeIsQueuedAheadOfIt() {
+        // when
+        mailer.on(new CredentialsRequested(ACCOUNT, CredentialsRequested.Reason.NEW_ACCOUNT, true));
+
+        // then
+        ArgumentCaptor<MessageKind> kinds = ArgumentCaptor.forClass(MessageKind.class);
+        verify(outbox, org.mockito.Mockito.times(2)).queue(eq(ACCOUNT), kinds.capture(), any());
+        assertThat(kinds.getAllValues())
+                .as("the welcome is queued first, in the same operation as the first password")
+                .containsExactly(MessageKind.ACCOUNT_WELCOME, MessageKind.CREDENTIALS_NEW_ACCOUNT);
+    }
+
+    @Test
     void givenTheTwoReasonsAMemberIsWrittenTo_whenTheyAreQueued_thenTheRowCarriesTheMessagesOwnNameAndNoSecret() {
         // when
-        mailer.on(new CredentialsRequested(ACCOUNT, CredentialsRequested.Reason.NEW_ACCOUNT));
-        mailer.on(new CredentialsRequested(ACCOUNT, CredentialsRequested.Reason.PASSWORD_RESET));
+        mailer.on(new CredentialsRequested(ACCOUNT, CredentialsRequested.Reason.NEW_ACCOUNT, false));
+        mailer.on(new CredentialsRequested(ACCOUNT, CredentialsRequested.Reason.PASSWORD_RESET, false));
 
         // then — the template's own key, so a later message joins without identity's vocabulary
         ArgumentCaptor<MessageKind> kinds = ArgumentCaptor.forClass(MessageKind.class);
