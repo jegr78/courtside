@@ -442,16 +442,71 @@ input[type="time"] {
   border-radius: 0.2rem;
 }
 
+.day-plan-legend-coded {
+  width: auto;
+  min-width: 0.9rem;
+  height: auto;
+  padding-inline: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.2;
+  vertical-align: baseline;
+}
+
 .day-plan-legend.free {
   border: 1px dashed var(--cs-border);
 }
 
 .day-plan-legend.occupied {
+  color: #ffffff;
   background: var(--cs-clay);
 }
 
 .day-plan-legend.own {
+  color: var(--cs-shade);
   background: var(--cs-ball);
+}
+
+.day-plan-legend .own-marker {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.day-plan-allocation {
+  container-type: inline-size;
+}
+
+.day-plan-allocation-name {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.day-plan-allocation-full {
+  min-width: 0;
+}
+
+.own-marker {
+  flex: none;
+  width: 0.875em;
+  height: 0.875em;
+}
+
+.day-plan-allocation-short {
+  display: none;
+}
+
+@container (width < 7rem) {
+  .day-plan-allocation-full,
+  .day-plan-allocation-period {
+    display: none;
+  }
+
+  .day-plan-allocation-short {
+    display: block;
+    white-space: nowrap;
+  }
 }
 
 .day-plan-legend.unavailable {
@@ -570,7 +625,8 @@ input[type="time"] {
     line-height: 1.2;
   }
 
-  .day-plan-allocation span {
+  .day-plan-allocation-full,
+  .day-plan-allocation-period {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;

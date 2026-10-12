@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { type Page } from "@playwright/test";
 import { declaredRoutes, routePattern, type DeclaredRoute } from "./declared-routes";
 import { expect, expectAdministrationOverview, expectShownAsEmpty, selectJourneyDate, test } from "./fixtures";
+import { LEAGUE_MATCH_CARD, MEMBER_BOOKING_CARD } from "./shipped-rows";
 
 async function expectNoHorizontalOverflow(page: import("@playwright/test").Page) {
   const overflow = await page.evaluate(() => {
@@ -700,6 +701,64 @@ test("given bookings on a phone, when the plan scrolls past the navigation, then
     const bounds = element.getBoundingClientRect();
     return element.contains(document.elementFromPoint(bounds.left + bounds.width / 2, bounds.top + bounds.height / 2));
   }), "the court heading stays uncovered while the plan scrolls").toBe(true);
+});
+
+test("given an own booking beside a league match on four courts, when a phone shows the plan, then each booking shows its marker and a short label that fits", async ({ page, journeyService }) => {
+  // given
+  const own = "70000000-0000-0000-0000-0000000000c1";
+  const match = "70000000-0000-0000-0000-0000000000c2";
+  const at = (time: string) => `(DATE '${journeyService.visualDate}' + TIME '${time}') AT TIME ZONE 'Europe/Berlin'`;
+  await journeyService.executeSql(`
+    INSERT INTO booking (id, card_id, status, booked_by, note) VALUES
+      ('${own}', '${MEMBER_BOOKING_CARD}', 'CONFIRMED', '00000000-0000-0000-0000-000000000102', NULL),
+      ('${match}', '${LEAGUE_MATCH_CARD}', 'CONFIRMED', (SELECT id FROM user_account WHERE username = 'bootstrap-admin'), NULL);
+    INSERT INTO booking_participant (id, booking_id, kind, person_id, position) VALUES
+      ('71000000-0000-0000-0000-0000000000c1', '${own}', 'MEMBER', '00000000-0000-0000-0000-000000000101', 0),
+      ('71000000-0000-0000-0000-0000000000c2', '${own}', 'MEMBER', '00000000-0000-0000-0000-000000000103', 1);
+    INSERT INTO court_allocation (id, booking_id, court_id, starts_at, ends_at, status) VALUES
+      ('72000000-0000-0000-0000-0000000000c1', '${own}', 'dddddddd-0000-0000-0000-000000000002', ${at("14:00")}, ${at("15:00")}, 'CONFIRMED'),
+      ('72000000-0000-0000-0000-0000000000c2', '${match}', 'dddddddd-0000-0000-0000-000000000003', ${at("14:00")}, ${at("16:00")}, 'CONFIRMED');`);
+  try {
+    await signIn(page, "doe.jane");
+    await expect(page.getByTestId("my-bookings-link")).toBeVisible({ timeout: 10_000 });
+    await selectJourneyDate(page, journeyService.visualDate);
+    const ownBooking = page.locator(`[data-testid="own-allocation"][data-booking-id="${own}"]`);
+    const leagueMatch = page.locator(`[data-testid="allocation"][data-booking-id="${match}"]`);
+    await expect(page.locator('[data-testid^="court-column-"]')).toHaveCount(4, { timeout: 10_000 });
+
+    for (const width of [375, 320]) {
+      // when
+      await page.setViewportSize({ width, height: 800 });
+
+      // then
+      await expect(ownBooking.getByTestId("own-marker"), `at ${width} px the own booking carries its marker`)
+        .toBeVisible({ timeout: 10_000 });
+      await expect(leagueMatch.getByTestId("own-marker"), "the league match carries no own marker").toHaveCount(0, { timeout: 10_000 });
+      for (const allocation of [ownBooking, leagueMatch]) {
+        const shortLabel = allocation.getByTestId("allocation-short-label");
+        await expect(shortLabel, `at ${width} px a booking names itself in a short label`).toBeVisible({ timeout: 10_000 });
+        await expect(allocation.getByTestId("allocation-label")).toBeHidden({ timeout: 10_000 });
+        await expect.poll(() => shortLabel.evaluate((label) => label.scrollWidth <= label.clientWidth && !label.textContent?.includes("…")), {
+          message: `at ${width} px the short label fits its column without an ellipsis`, timeout: 10_000
+        }).toBe(true);
+        const fullLabel = (await allocation.getByTestId("allocation-label").textContent() ?? "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        await expect(allocation, "the accessible name keeps the full label").toHaveAccessibleName(new RegExp(`^${fullLabel}, `), { timeout: 10_000 });
+      }
+      await expect(page.getByTestId(`legend-card-${LEAGUE_MATCH_CARD}`), "the legend decodes the short label of the match")
+        .toHaveText(await leagueMatch.getByTestId("allocation-short-label").textContent() ?? "", { timeout: 10_000 });
+    }
+
+    // when
+    await page.setViewportSize({ width: 1280, height: 900 });
+
+    // then
+    for (const allocation of [ownBooking, leagueMatch]) {
+      await expect(allocation.getByTestId("allocation-label"), "a wide column keeps the full label").toBeVisible({ timeout: 10_000 });
+      await expect(allocation.getByTestId("allocation-short-label")).toBeHidden({ timeout: 10_000 });
+    }
+  } finally {
+    await journeyService.executeSql(`DELETE FROM booking WHERE id IN ('${own}', '${match}');`);
+  }
 });
 
 test("the phone plan shows every court's availability at once", async ({ page, journeyService }) => {

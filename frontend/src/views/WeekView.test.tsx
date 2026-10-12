@@ -1,5 +1,5 @@
 import { Profiler } from "react";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, expect, it, onTestFinished, vi } from "vitest";
 import { ApiError, api } from "../api/client";
@@ -833,6 +833,88 @@ it("given an own member booking, when it is shown, then the viewer marker and ot
   // then
   expect(await screen.findByTestId("own-allocation")).toHaveTextContent("You, Major, Miles");
   expect(screen.getByTestId("own-allocation")).toHaveTextContent("6:00 PM – 7:00 PM");
+});
+
+it("given an own booking, a league match and another member's booking, when the plan is shown, then each carries the short label its legend entry names and keeps its full accessible name", async () => {
+  // given
+  vi.mocked(api.allocations).mockImplementation((date) => Promise.resolve(date === "2026-08-10" ? [{
+    bookingId: "44444444-4444-4444-4444-444444444444",
+    courtId: courts[0].id,
+    startsAt: "2026-08-10T18:00:00+02:00",
+    endsAt: "2026-08-10T19:00:00+02:00",
+    cardLabel: "Member booking",
+    cardColor: "#b85c38",
+    ownBooking: true,
+    showGenericOccupancy: true,
+    participantLastNames: ["Major"],
+    participantCount: 2
+  }, {
+    bookingId: "55555555-5555-5555-5555-555555555555",
+    courtId: courts[1].id,
+    startsAt: "2026-08-10T18:00:00+02:00",
+    endsAt: "2026-08-10T21:00:00+02:00",
+    cardLabel: "League match",
+    cardColor: "#3a4a5c",
+    ownBooking: false,
+    showGenericOccupancy: false,
+    participantCount: null
+  }, {
+    bookingId: "66666666-6666-6666-6666-666666666666",
+    courtId: courts[1].id,
+    startsAt: "2026-08-10T14:00:00+02:00",
+    endsAt: "2026-08-10T15:00:00+02:00",
+    cardLabel: "Member booking",
+    cardColor: "#176b55",
+    ownBooking: false,
+    showGenericOccupancy: true,
+    participantCount: 2
+  }] : []));
+
+  // when
+  render(<WeekView today={clubInstant("12:00")} />);
+
+  // then
+  const own = await screen.findByTestId("own-allocation");
+  const [occupied, match] = screen.getAllByTestId("allocation");
+  const shortLabel = (allocation: HTMLElement) => within(allocation).getByTestId("allocation-short-label").textContent;
+  expect(within(own).getByTestId("own-marker"), "an own booking is marked by more than its colour").toBeInTheDocument();
+  expect(shortLabel(own)).toBe("You");
+  expect(own).toHaveAccessibleName("You, Major, 6:00 PM – 7:00 PM, cancel booking");
+  expect(shortLabel(match)).toBe("Lea");
+  expect(within(match).getByTestId("allocation-label")).toHaveTextContent("League match");
+  expect(match).toHaveAccessibleName("League match, 6:00 PM – 9:00 PM");
+  expect(within(match).queryByTestId("own-marker"), "only the viewer's own booking carries the marker").toBeNull();
+  expect(shortLabel(occupied)).toBe("Occ");
+  expect(occupied).toHaveAccessibleName("Booked · 2 participants, 2:00 PM – 3:00 PM");
+  expect(screen.getByTestId("legend-allocation-card").textContent, "the legend decodes the short label of the match").toBe("Lea");
+  expect(screen.getByTestId("legend-card-99999999-9999-9999-9999-999999999999").textContent).toBe("Tra");
+  expect(screen.getByTestId("legend-occupied").textContent, "the legend decodes the short label of a hidden booking").toBe("Occ");
+  expect(within(screen.getByTestId("legend-own")).getByTestId("own-marker"), "the legend shows the marker an own booking carries")
+    .toBeInTheDocument();
+});
+
+it("given an own booking on a card that names its kind, when the plan is shown, then it carries the marker beside that card's short label", async () => {
+  // given
+  vi.mocked(api.allocations).mockImplementation((date) => Promise.resolve(date === "2026-08-10" ? [{
+    bookingId: "44444444-4444-4444-4444-444444444444",
+    courtId: courts[0].id,
+    startsAt: "2026-08-10T18:00:00+02:00",
+    endsAt: "2026-08-10T19:00:00+02:00",
+    cardLabel: "Training",
+    cardColor: "#34584a",
+    ownBooking: true,
+    showGenericOccupancy: false,
+    participantCount: null
+  }] : []));
+
+  // when
+  render(<WeekView today={clubInstant("12:00")} />);
+
+  // then
+  const own = await screen.findByTestId("own-allocation");
+  expect(within(own).getByTestId("own-marker")).toBeInTheDocument();
+  expect(within(own).getByTestId("allocation-short-label").textContent).toBe("Tra");
+  expect(own).toHaveAccessibleName("Training, 6:00 PM – 7:00 PM, cancel booking");
 });
 
 it("given a free slot, when booking it with a guest, then the refreshed allocation is visible", async () => {
