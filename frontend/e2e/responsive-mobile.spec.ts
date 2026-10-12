@@ -339,6 +339,7 @@ test("given a refused message on a phone, when the board reads the message log, 
       now(), now());`);
   try {
     await signIn(page, "configuration-admin");
+    await expect(page.getByTestId("administration-link"), "the board is signed in").toBeVisible({ timeout: 10_000 });
 
     // when
     await page.goto("/admin/messages");
