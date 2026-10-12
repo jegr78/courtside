@@ -298,9 +298,12 @@ Codes zum Zurücksetzen schickt Courtside immer per E-Mail, denn dafür bist du 
 
 Hat dein Verein die Adresse von Courtside eingerichtet, endet eine E-Mail zu einer Buchung mit einem
 Link. Er führt zur Buchung oder zu *Meine Buchungen*, ein Angebot von der Warteliste zu deinem
-Platz auf der Warteliste. Der Kalendereintrag einer Bestätigung trägt denselben Link. E-Mails mit
-Zugangsdaten, deinem Benutzernamen oder einem Code zum Zurücksetzen enthalten nie einen Link. Steht
-in einer solchen E-Mail doch einer, kommt sie nicht von Courtside.
+Platz auf der Warteliste. Der Kalendereintrag einer Bestätigung trägt denselben Link.
+
+In E-Mails mit Zugangsdaten, deinem Benutzernamen oder einem Code zum Zurücksetzen setzt Courtside
+keinen Link. Manche Mailprogramme machen trotzdem etwas klickbar, etwa einen Vereinsnamen, der wie
+eine Adresse aussieht. Folge dort keinem Link, sondern öffne Courtside über die Adresse, die du
+kennst. Eigene Texte deines Vereins können von dieser Regel abweichen.
 
 Speichere die Auswahl. Die Einstellung gilt nur für künftige Nachrichten.
 

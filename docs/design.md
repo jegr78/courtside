@@ -575,8 +575,9 @@ reminder lead to the booking on `/my-bookings#booking-<id>`. Cancellations, canc
 club and series messages lead to `/my-bookings`. A waitlist offer leads to its entry on
 `/my-bookings#waitlist-<id>`, where the member takes it. The confirmation's calendar entry carries
 the same link as its `URL`. The shipped messages with a generated credential, a reset code or a
-username carry neither a link nor the address, so a link in such a message marks it as not coming
-from Courtside.
+username carry neither a link nor the address, so members learn that a genuine one does not ask
+them to follow a link. A mail client may still turn text that looks like an address into one. The
+address is written in its ASCII form, so an internationalised domain appears as Punycode.
 
 A cancelled booking is announced to its holder and its players, except the account that cancelled
 it. When the holder cancels, the message says the booking is gone. When anybody else cancels, an

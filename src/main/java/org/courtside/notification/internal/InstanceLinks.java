@@ -4,14 +4,17 @@ import org.courtside.notification.MessageKind;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import java.net.IDN;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
-// Credential messages never carry a link, so a genuine one gives members a rule to hold a fake against.
 @Component
 class InstanceLinks {
 
     static final String PLACEHOLDER = "instanceLink";
+    private static final Pattern AUTHORITY = Pattern.compile("(\\[[0-9A-Fa-f:.]+]|[^:@\\[\\]]+)(?::([0-9]{1,5}))?");
 
     private final String origin;
 
@@ -38,21 +41,34 @@ class InstanceLinks {
         if (configured == null || configured.isBlank()) {
             return "";
         }
-        URI address = parsed(configured.strip());
-        if (address == null || !"https".equalsIgnoreCase(address.getScheme()) || address.getHost() == null
-                || address.getRawUserInfo() != null || !(address.getRawPath().isEmpty() || address.getRawPath().equals("/"))
-                || address.getRawQuery() != null || address.getRawFragment() != null) {
+        String origin = asciiOrigin(configured.strip());
+        if (origin == null) {
             throw new IllegalStateException("COURTSIDE_PUBLIC_URL must be the absolute https address of this"
                     + " instance without path, query or credentials, such as https://courts.example.org;"
                     + " Courtside will not start");
         }
-        return "https://" + address.getRawAuthority();
+        return origin;
     }
 
-    private static URI parsed(String configured) {
+    private static String asciiOrigin(String configured) {
         try {
-            return new URI(configured);
-        } catch (URISyntaxException malformed) {
+            URI address = new URI(configured);
+            Matcher authority = address.getRawAuthority() == null ? null
+                    : AUTHORITY.matcher(address.getRawAuthority());
+            if (!"https".equalsIgnoreCase(address.getScheme()) || authority == null || !authority.matches()
+                    || !(address.getRawPath().isEmpty() || address.getRawPath().equals("/"))
+                    || address.getRawQuery() != null || address.getRawFragment() != null) {
+                return null;
+            }
+            int port = authority.group(2) == null ? -1 : Integer.parseInt(authority.group(2));
+            if (port == 0 || port > 65_535) {
+                return null;
+            }
+            String host = authority.group(1).startsWith("[") ? authority.group(1)
+                    : IDN.toASCII(authority.group(1), IDN.USE_STD3_ASCII_RULES);
+            URI origin = new URI("https", null, host, port, null, null, null);
+            return origin.getHost() == null ? null : origin.toString();
+        } catch (URISyntaxException | IllegalArgumentException malformed) {
             return null;
         }
     }

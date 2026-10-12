@@ -258,6 +258,32 @@ test("given every supported ingress, when its public hostname is missing, then t
   }
 });
 
+test("given every recipe, when the instance address is left to the domain, then booking links lead to the public hostname",
+  () => {
+    for (const [name, recipe] of Object.entries(recipes)) {
+      // when
+      const derived = rendered(resolved("files", name), recipe.environment).services.app.environment;
+      const emptied = rendered(resolved("files", name), { ...recipe.environment, COURTSIDE_PUBLIC_URL: "" })
+        .services.app.environment;
+      const chosen = rendered(resolved("files", name),
+        { ...recipe.environment, COURTSIDE_PUBLIC_URL: "https://club.example.org" }).services.app.environment;
+
+      // then
+      assert.equal(derived.COURTSIDE_PUBLIC_URL, `https://${caddy.COURTSIDE_DOMAIN}`, `${name} derives no address`);
+      assert.equal(emptied.COURTSIDE_PUBLIC_URL, `https://${caddy.COURTSIDE_DOMAIN}`,
+        `${name} treats an empty address as a choice rather than unset`);
+      assert.equal(chosen.COURTSIDE_PUBLIC_URL, "https://club.example.org", `${name} overrides the operator's address`);
+    }
+  });
+
+test("given the base file without a domain, when nothing names the address, then the instance starts without links", () => {
+  // when
+  const app = rendered(["compose.yaml"], { ...common, ...bundledDatabase }).services.app.environment;
+
+  // then
+  assert.equal(app.COURTSIDE_PUBLIC_URL, "", "an address appeared that nobody configured");
+});
+
 test("given the standard recipe, when it is rendered, then nothing of the self-hosted mail server remains", () => {
   // given
   const model = rendered(resolved("files", "standard"), recipes.standard.environment);

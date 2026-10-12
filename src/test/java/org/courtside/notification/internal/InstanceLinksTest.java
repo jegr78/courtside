@@ -5,10 +5,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.EnumMap;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -19,11 +16,6 @@ class InstanceLinksTest {
     private static final UUID BOOKING = UUID.fromString("11111111-2222-3333-4444-555555555555");
     private static final UUID ENTRY = UUID.fromString("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
     private static final String ADDRESS = "https://courts.example.org";
-    static final Set<MessageKind> CREDENTIAL_KINDS = Set.of(MessageKind.CREDENTIALS_NEW_ACCOUNT,
-            MessageKind.CREDENTIALS_PASSWORD_RESET, MessageKind.ACCOUNT_PASSWORD_RESET_CODE,
-            MessageKind.ACCOUNT_USERNAME_REMINDER);
-    static final Set<MessageKind> LINKED = Stream.of(MessageKind.values())
-            .filter(kind -> !CREDENTIAL_KINDS.contains(kind)).collect(Collectors.toSet());
 
     @Test
     void givenAnAddressThatIsNotTheBareHttpsOriginOfAnInstance_whenStarting_thenTheInstanceRefusesToStart() {
@@ -34,6 +26,8 @@ class InstanceLinksTest {
                 "https://courts.example.org/club", "https://courts.example.org/my-bookings/",
                 "https://courts.example.org?club=1", "https://courts.example.org/?club=1",
                 "https://courts.example.org#top", "https://", "https:///", "https://courts example.org",
+                "https://courts.example.org:", "https://courts.example.org:0", "https://courts.example.org:99999",
+                "https://under_score.example.org", "https://courts.example.org%2F",
                 "https://user:secret@courts.example.org"}) {
 
             // when / then
@@ -64,13 +58,34 @@ class InstanceLinksTest {
     }
 
     @Test
+    void givenAnAddressWithAPort_whenALinkIsBuilt_thenThePortStaysInTheOrigin() {
+        // given
+        InstanceLinks links = new InstanceLinks("https://courts.example.org:65535");
+
+        // when / then
+        assertThat(links.of(message(MessageKind.BOOKING_CANCELLED)))
+                .isEqualTo("https://courts.example.org:65535/my-bookings");
+    }
+
+    @Test
+    void givenAnInternationalisedDomain_whenALinkIsBuilt_thenItCarriesTheAsciiFormOfTheHost() {
+        // given
+        InstanceLinks links = new InstanceLinks("https://bücher.example.org");
+
+        // when / then
+        assertThat(links.of(message(MessageKind.BOOKING_CANCELLED)))
+                .as("a mail client links only what it recognises, and Punycode is what every client recognises")
+                .isEqualTo("https://xn--bcher-kva.example.org/my-bookings");
+    }
+
+    @Test
     void givenNoAddress_whenAnyBookingMessageAsksForItsLink_thenItIsEmpty() {
         // given
         for (String unset : new String[] {null, "", "   "}) {
             InstanceLinks links = new InstanceLinks(unset);
 
             // when / then
-            for (MessageKind kind : LINKED) {
+            for (MessageKind kind : ShippedMessageKinds.LINKED) {
                 assertThat(links.of(message(kind))).as("%s with %s", kind, unset).isEmpty();
             }
         }
@@ -97,7 +112,7 @@ class InstanceLinksTest {
 
         // when
         Map<MessageKind, String> resolved = new EnumMap<>(MessageKind.class);
-        LINKED.forEach(kind -> resolved.put(kind, links.of(message(kind))));
+        ShippedMessageKinds.LINKED.forEach(kind -> resolved.put(kind, links.of(message(kind))));
 
         // then
         assertThat(resolved).as("every linked kind and its target").isEqualTo(expected);
@@ -109,7 +124,7 @@ class InstanceLinksTest {
         InstanceLinks links = new InstanceLinks(ADDRESS);
 
         // when / then
-        for (MessageKind kind : CREDENTIAL_KINDS) {
+        for (MessageKind kind : ShippedMessageKinds.CREDENTIAL) {
             assertThatThrownBy(() -> links.of(message(kind))).as("%s", kind)
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining(kind.name());
@@ -117,8 +132,12 @@ class InstanceLinksTest {
     }
 
     private static QueuedMessage message(MessageKind kind) {
-        return new QueuedMessage(UUID.randomUUID(), kind, Map.of(
-                QueuedMessage.BOOKING, BOOKING.toString(),
-                QueuedMessage.WAITLIST_ENTRY, ENTRY.toString()));
+        Map<String, String> parameters = switch (kind) {
+            case BOOKING_SERIES_CREATED, BOOKING_SERIES_CANCELLED_BY_CLUB, BOOKING_SERIES_MOVED_BY_CLUB ->
+                    Map.of(QueuedMessage.SERIES, UUID.randomUUID().toString());
+            case WAITLIST_OFFER -> Map.of(QueuedMessage.WAITLIST_ENTRY, ENTRY.toString());
+            default -> Map.of(QueuedMessage.BOOKING, BOOKING.toString());
+        };
+        return new QueuedMessage(UUID.randomUUID(), kind, parameters);
     }
 }

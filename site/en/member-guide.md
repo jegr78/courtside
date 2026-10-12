@@ -292,8 +292,12 @@ because you are not signed in when you need them.
 
 When your club has set up Courtside's address, an email about a booking ends with a link. It leads to
 the booking or to *My bookings*, and a waitlist offer leads to your place on the waitlist. The
-calendar entry of a confirmation carries the same link. Emails with credentials, your username or a
-reset code never contain a link. If one of them does, it does not come from Courtside.
+calendar entry of a confirmation carries the same link.
+
+Courtside puts no link into emails with credentials, your username or a reset code. Some mail
+programs still make something clickable, such as a club name that looks like an address. Do not
+follow a link there, open Courtside at the address you know. Texts your club wrote itself may
+differ from this rule.
 
 Save your choices. They apply to future messages only.
 

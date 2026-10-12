@@ -16,12 +16,15 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
+import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 import java.nio.charset.StandardCharsets;
 import java.time.DayOfWeek;
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.time.Instant;
 import java.time.LocalTime;
 import java.util.List;
@@ -32,6 +35,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentCaptor.forClass;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.atLeast;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.verify;
 
@@ -41,6 +45,7 @@ class InstanceLinkMessageTest extends AbstractIntegrationTest {
 
     private static final String INSTANCE = "https://courts.example.org";
     private static final UUID MEMBER_CARD = UUID.fromString("11111111-1111-1111-1111-111111111111");
+    private static final UUID TRAINING_CARD = UUID.fromString("22222222-2222-2222-2222-222222222222");
     private static final TimeSlot SLOT = new TimeSlot(Instant.parse("2026-05-13T16:00:00Z"),
             Instant.parse("2026-05-13T17:00:00Z"));
 
@@ -55,6 +60,9 @@ class InstanceLinkMessageTest extends AbstractIntegrationTest {
 
     @Autowired
     private BookingTestFixture bookings;
+
+    @Autowired
+    private JdbcClient jdbc;
 
     private UUID court;
     private UUID holderAccount;
@@ -105,7 +113,7 @@ class InstanceLinkMessageTest extends AbstractIntegrationTest {
         // then
         List<MimeMessage> toHolder = sentTo("jane.doe@example.org");
         assertThat(toHolder).as("a confirmation and the club's cancellation").hasSize(2);
-        assertThat(text(toHolder.getLast())).as("a cancelled booking has no entry left to open")
+        assertThat(text(toHolder.getLast())).as("#1244 sends every cancellation to the member's bookings")
                 .endsWith("\n" + INSTANCE + "/my-bookings");
     }
 
@@ -123,6 +131,41 @@ class InstanceLinkMessageTest extends AbstractIntegrationTest {
         // then
         assertThat(text(only(sentTo("john.roe@example.org"))))
                 .endsWith("\n" + INSTANCE + "/my-bookings#waitlist-" + entry);
+    }
+
+    @Test
+    void givenAPublicAddress_whenABookingIsDue_thenTheReminderLinksToTheBooking() throws Exception {
+        // given
+        UUID booking = bookings.createBookingNamingMember(court, MEMBER_CARD, new TimeSlot(
+                Instant.parse("2026-05-12T16:00:00Z"), Instant.parse("2026-05-12T17:00:00Z")), holderAccount,
+                holderPerson, Set.of(Role.MEMBER), null, playerPerson);
+        jdbc.sql("UPDATE booking SET created_at = :at WHERE id = :id")
+                .param("at", OffsetDateTime.parse("2026-05-05T10:00:00Z")).param("id", booking).update();
+        clearInvocations(sender);
+
+        // when
+        bookings.remindWhatIsDue();
+
+        // then
+        assertThat(text(only(sentTo("jane.doe@example.org"))))
+                .endsWith("\n" + INSTANCE + "/my-bookings#booking-" + booking);
+    }
+
+    @Test
+    void givenAPublicAddress_whenASeriesIsCreated_thenItsSummaryLinksToTheMembersBookingsWithoutAnOccurrence()
+            throws Exception {
+        // given
+        UUID trainerPerson = identity.createPerson("Mary", "Major", "mary.major@example.org");
+        UUID trainer = identity.createEnabledAccount(trainerPerson, "major.mary", Set.of(Role.TRAINER));
+
+        // when
+        bookings.createSeries(court, TRAINING_CARD, LocalDate.of(2026, 5, 19), LocalTime.of(18, 0), 120, 2,
+                trainer, trainerPerson, Set.of(Role.TRAINER));
+
+        // then
+        assertThat(text(only(sentTo("mary.major@example.org"))))
+                .as("a series has no single date to lead to, though its message names the first one")
+                .endsWith("\n" + INSTANCE + "/my-bookings");
     }
 
     private UUID book() {
