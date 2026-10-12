@@ -5,8 +5,10 @@ import org.courtside.api.AdminAuditApi;
 import org.courtside.api.ApiAuditEntry;
 import org.courtside.api.ApiAuditPage;
 import org.courtside.api.ApiAuditSearchRequest;
+import org.courtside.api.ApiAuditSubjectPeriod;
 import org.courtside.audit.internal.AuditService;
 import org.courtside.shared.CursorPage;
+import org.courtside.shared.TimeSlot;
 import org.courtside.shared.WireTypes;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
@@ -49,10 +51,16 @@ class AuditAdminController implements AdminAuditApi {
                 .nextCursor(nextCursor);
     }
 
+    private static ApiAuditSubjectPeriod period(TimeSlot slot) {
+        return slot == null ? null : new ApiAuditSubjectPeriod(
+                WireTypes.toOffsetDateTime(slot.start()), WireTypes.toOffsetDateTime(slot.end()));
+    }
+
     private static ApiAuditEntry toResponse(AuditService.AuditEntry entry) {
         return new ApiAuditEntry(entry.id(), WireTypes.toOffsetDateTime(entry.occurredAt()),
                 entry.eventType(), entry.parameters(), entry.subjectId())
                 .subjectName(entry.subjectName())
+                .subjectPeriod(period(entry.subjectPeriod()))
                 .actorAccountId(entry.actorAccountId())
                 .actorUsername(entry.actorUsername());
     }

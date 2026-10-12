@@ -2680,15 +2680,32 @@ components:
           type: [string, "null"]
           description: |
             What the entity is called today, or `null` where nothing names it. A name is resolved
-            for the configuration entities and for a person; a booking subject and an account
-            subject have no resolver, so those entries are always `null` while the entity is very
-            much alive. Read `null` as "not resolvable", never as "erased".
+            for the configuration entities and for a person. A booking and a series are named by
+            the courts they occupy, in court order. An account subject has no resolver, so its
+            entries are always `null` while the account is very much alive. Read `null` as "not
+            resolvable", never as "erased".
+        subjectPeriod:
+          oneOf:
+            - $ref: "#/components/schemas/AuditSubjectPeriod"
+            - type: "null"
+          description: |
+            The period a booking subject holds today, or the earliest occurrence a series subject
+            holds today, cancelled ones included. It is today's state, not the state when the entry
+            was recorded. Absent or `null` for every other subject and for a booking or series that
+            nothing resolves.
         actorAccountId: { type: [string, "null"], format: uuid }
         actorUsername:
           type: [string, "null"]
           description: |
             The acting account's username, or `null` when no account acted, and when the account
             that acted was erased.
+
+    AuditSubjectPeriod:
+      type: object
+      required: [startsAt, endsAt]
+      properties:
+        startsAt: { type: string, format: date-time }
+        endsAt: { type: string, format: date-time }
 
     MessageKind:
       type: string

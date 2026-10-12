@@ -4,8 +4,11 @@ import lombok.RequiredArgsConstructor;
 import org.courtside.audit.PersonAuditTrail;
 import org.courtside.identity.UserAccount;
 import org.courtside.identity.UserAccountRepository;
+import org.courtside.shared.BookingSubjects;
+import org.courtside.shared.BookingSubjects.BookingSubject;
 import org.courtside.shared.ConfigurationSubjectNames;
 import org.courtside.shared.CursorPage;
+import org.courtside.shared.TimeSlot;
 import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,6 +20,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -39,6 +43,7 @@ public class AuditService implements PersonAuditTrail {
     private final DomainEventRepository events;
     private final UserAccountRepository accounts;
     private final List<ConfigurationSubjectNames> subjectNames;
+    private final BookingSubjects bookingSubjects;
     private final ObjectMapper json;
 
     public Map<UUID, String> namesFor(Collection<UUID> subjectIds) {
@@ -161,9 +166,11 @@ public class AuditService implements PersonAuditTrail {
 
     private List<AuditEntry> load(List<UUID> ids) {
         List<DomainEvent> found = events.findAllByIdIn(ids);
-        Map<UUID, String> subjectNamesById = namesFor(found.stream()
-                .map(DomainEvent::getSubjectId)
-                .collect(Collectors.toSet()));
+        Set<UUID> subjectIds = found.stream().map(DomainEvent::getSubjectId).collect(Collectors.toSet());
+        Map<UUID, BookingSubject> bookings = subjectIds.isEmpty() ? Map.of() : bookingSubjects.describe(subjectIds);
+        Set<UUID> namedIds = new HashSet<>(subjectIds);
+        bookings.values().forEach(booking -> namedIds.addAll(booking.courtIds()));
+        Map<UUID, String> namesById = namesFor(namedIds);
         Set<UUID> actorIds = found.stream()
                 .map(DomainEvent::getActorAccountId)
                 .filter(Objects::nonNull)
@@ -174,19 +181,28 @@ public class AuditService implements PersonAuditTrail {
         return ids.stream()
                 .map(byId::get)
                 .filter(Objects::nonNull)
-                .map(event -> toEntry(event, subjectNamesById, actorUsernames))
+                .map(event -> toEntry(event, namesById, bookings, actorUsernames))
                 .toList();
     }
 
-    private AuditEntry toEntry(DomainEvent event, Map<UUID, String> subjectNamesById,
-                               Map<UUID, String> actorUsernames) {
+    private AuditEntry toEntry(DomainEvent event, Map<UUID, String> namesById,
+                               Map<UUID, BookingSubject> bookings, Map<UUID, String> actorUsernames) {
         UUID actorAccountId = event.getActorAccountId();
         // An event recorded without an actor is expected, and no Map contract covers a null key.
         String actorUsername = Optional.ofNullable(actorAccountId).map(actorUsernames::get).orElse(null);
+        BookingSubject booking = bookings.get(event.getSubjectId());
+        String subjectName = booking == null ? namesById.get(event.getSubjectId()) : courtNames(booking, namesById);
         return new AuditEntry(event.getId(), event.getOccurredAt(), event.getEventType(),
-                payloadOf(event.getPayload()), event.getSubjectId(),
-                subjectNamesById.get(event.getSubjectId()),
-                actorAccountId, actorUsername);
+                payloadOf(event.getPayload()), event.getSubjectId(), subjectName,
+                booking == null ? null : booking.slot(), actorAccountId, actorUsername);
+    }
+
+    private static String courtNames(BookingSubject booking, Map<UUID, String> namesById) {
+        String names = booking.courtIds().stream()
+                .map(namesById::get)
+                .filter(Objects::nonNull)
+                .collect(Collectors.joining(", "));
+        return names.isEmpty() ? null : names;
     }
 
     private Map<String, Object> payloadOf(String payload) {
@@ -206,7 +222,8 @@ public class AuditService implements PersonAuditTrail {
     }
 
     public record AuditEntry(UUID id, Instant occurredAt, String eventType, Map<String, Object> parameters,
-                             UUID subjectId, String subjectName, UUID actorAccountId, String actorUsername) {
+                             UUID subjectId, String subjectName, TimeSlot subjectPeriod,
+                             UUID actorAccountId, String actorUsername) {
     }
 
     public record SearchResult(List<AuditEntry> items, UUID nextCursor, boolean incomplete) {

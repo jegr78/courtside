@@ -14,6 +14,25 @@ import java.util.UUID;
 
 public interface CourtAllocationRepository extends JpaRepository<CourtAllocation, UUID> {
 
+    @Query("""
+            SELECT new org.courtside.booking.internal.BookingSubjectRow(b.id, a.courtId, a.startsAt, a.endsAt)
+            FROM CourtAllocation a JOIN a.booking b, Court c
+            WHERE c.id = a.courtId AND b.id IN :bookingIds
+            ORDER BY c.number
+            """)
+    List<BookingSubjectRow> describeBookings(@Param("bookingIds") Collection<UUID> bookingIds);
+
+    @Query("""
+            SELECT new org.courtside.booking.internal.BookingSubjectRow(b.seriesId, a.courtId, a.startsAt, a.endsAt)
+            FROM CourtAllocation a JOIN a.booking b, Court c
+            WHERE c.id = a.courtId
+              AND b.seriesId IN :seriesIds
+              AND a.startsAt = (SELECT MIN(first.startsAt) FROM CourtAllocation first
+                                WHERE first.booking.seriesId = b.seriesId)
+            ORDER BY c.number
+            """)
+    List<BookingSubjectRow> describeSeriesByFirstOccurrence(@Param("seriesIds") Collection<UUID> seriesIds);
+
     @Query(value = """
             SELECT EXISTS (
                 SELECT 1 FROM court_allocation a

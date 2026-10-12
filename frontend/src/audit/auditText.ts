@@ -1,6 +1,6 @@
 import type { TFunction } from "i18next";
 import type { AuditEntry, DayOfWeek } from "../api/client";
-import { shortTime } from "../time/clubZone";
+import { formatBookingPeriod, shortTime } from "../time/clubZone";
 
 const enabledFlagByEventType: Record<string, string> = {
   "roster.account.availabilityChanged": "enabled"
@@ -70,6 +70,22 @@ export function actorLabel(entry: AuditEntry, t: TFunction): string {
   return entry.actorUsername ?? entry.actorAccountId;
 }
 
-export function subjectLabel(entry: AuditEntry, t: TFunction): string {
+function bookingSubjectKind(eventType: string): "booking" | "series" | undefined {
+  if (eventType.startsWith("booking.series.")) return "series";
+  return eventType.startsWith("booking.") ? "booking" : undefined;
+}
+
+function bookingSubjectLabel(entry: AuditEntry, kind: "booking" | "series", t: TFunction, language: string, timeZone: string): string {
+  const period = entry.subjectPeriod;
+  if (!period) return t(`audit.subject.${kind}Unresolved`, { subjectId: entry.subjectId });
+  return t(`audit.subject.${kind}`, {
+    courts: entry.subjectName ?? t("audit.subject.courtsUnknown"),
+    period: formatBookingPeriod(period.startsAt, period.endsAt, language, timeZone)
+  });
+}
+
+export function subjectLabel(entry: AuditEntry, t: TFunction, language: string, timeZone: string): string {
+  const kind = bookingSubjectKind(entry.eventType);
+  if (kind) return bookingSubjectLabel(entry, kind, t, language, timeZone);
   return entry.subjectName ?? weekdayLabel(entry, t) ?? entry.subjectId;
 }
