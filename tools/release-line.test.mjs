@@ -256,6 +256,10 @@ test("given a release pull request on either branch, when its verdicts are colle
       // when
       const onRelease = pullRequestVerdicts({ git, base: "release/0.1", headRef: "HEAD", refOf, releasable });
       const onMain = pullRequestVerdicts({ git, base: "main", headRef: "HEAD", refOf, releasable });
+      git("switch", "--quiet", "--create", "release-please--branches--main", "main");
+      manifest("0.2.0-rc.1");
+      commit("chore(main): release 0.2.0-rc.1", "CHANGELOG.md");
+      const candidate = pullRequestVerdicts({ git, base: "main", headRef: "HEAD", refOf, releasable });
       git("switch", "--quiet", "--create", "feat/plan", "main");
       commit("feat: colour the plan", "colour.txt");
       const ordinary = pullRequestVerdicts({ git, base: "main", headRef: "HEAD", refOf, releasable });
@@ -265,6 +269,8 @@ test("given a release pull request on either branch, when its verdicts are colle
         [["line", true], ["forward-port", false]], "the patch is on its line, but the fix is not on main yet");
       assert.deepEqual(onMain.map(({ check, accepted }) => [check, accepted]), [["line", false]],
         "0.1.1 proposed into main is refused before anything else is asked");
+      assert.deepEqual(candidate.map(({ check, accepted }) => [check, accepted]), [["line", true]],
+        "main's own candidates owe no forward port");
       assert.deepEqual(ordinary, [{ check: "release", accepted: true,
         detail: "the manifest does not change, so this is not a release pull request" }]);
     } finally {
