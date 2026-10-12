@@ -35,6 +35,11 @@ E-Mail. Niemand im Vorstand sieht oder bestimmt dieses Passwort.
 2. Gib deinen Benutzernamen und dein Passwort ein.
 3. Wähle erneut *Anmelden*.
 
+Hast du einen Link auf eine Seite in Courtside geöffnet, etwa auf eine Buchung, bringt dich Courtside
+nach der Anmeldung genau dorthin. Das gilt auch, wenn du vorher dein Einmalpasswort ersetzen musst.
+Endet deine Sitzung, während du eine Seite offen hast, kehrst du nach der nächsten Anmeldung
+ebenfalls dorthin zurück.
+
 Prüfe bei einer Ablehnung zuerst die Eingabe. Vielleicht sind die Zugangsdaten abgelaufen oder die
 E-Mail ist nicht angekommen. Nutze dann *Passwort oder Benutzername vergessen?*. Bei einem
 deaktivierten Konto kann nur der Vorstand helfen.

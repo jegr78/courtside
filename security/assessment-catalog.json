@@ -654,9 +654,12 @@
         },
         {
           "id": "v5.0.0-3.7.2",
-          "status": "not-applicable",
+          "status": "implemented",
           "manualProcedureId": "MAN-CLIENT-001",
-          "rationale": "The control asks that an automatic redirect to a hostname the application does not control happens only to an allowlisted destination. Courtside redirects to no other hostname: its only application-initiated navigation is the fixed same-origin path /login, and its server issues no redirect built from a request value."
+          "controlEvidence": {
+            "productionPath": "frontend/src/navigation/returnTarget.ts",
+            "falsifyingTest": "frontend/e2e/browser-security.spec.ts#a sign-in return target that could leave this origin lands on the start page of this origin"
+          }
         },
         {
           "id": "v5.0.0-4.1.1",
@@ -2230,9 +2233,12 @@
         },
         {
           "id": "WSTG-v4.2-CLNT-04",
-          "status": "not-applicable",
+          "status": "implemented",
           "manualProcedureId": "MAN-CLIENT-001",
-          "rationale": "The test looks for a redirect whose destination comes from a request parameter, so an attacker can send a member somewhere else through the application's own link. The shipped frontend performs one navigation of its own, window.location.assign(\"/login\") in ApplicationErrorView, to a fixed same-origin path with no value from the request in it, and offers no redirect parameter anywhere."
+          "controlEvidence": {
+            "productionPath": "frontend/src/navigation/returnTarget.ts",
+            "falsifyingTest": "frontend/e2e/browser-security.spec.ts#a sign-in return target that could leave this origin lands on the start page of this origin"
+          }
         },
         {
           "id": "WSTG-v4.2-CLNT-05",

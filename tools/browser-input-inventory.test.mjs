@@ -14,9 +14,9 @@ const LOCATION_READ = /\b(?:window\.)?location\.(?:protocol|href|search|hash|pat
 
 const BOUNDARIES = {
   "src/App.tsx useLocation": {
-    value: "the address the browser is on",
-    classification: "decides which shell the route is shown in, and never a right",
-    test: "src/App.test.tsx#given an admin session, when opening an administrative page, then the member bar gives way to it"
+    value: "the address the browser is on, and the returnTo target in its query",
+    classification: "sign-in follows the returnTo target only when returnTarget accepts it as a same-origin path, otherwise the start page; the rest of the address only picks the shell, never a right",
+    test: "src/App.test.tsx#given a sign-in whose target could leave this origin, when the member is signed in, then the start page is shown"
   },
   "src/api/client.ts document.cookie": {
     value: "the readable CSRF cookie the instance issued",
@@ -110,8 +110,23 @@ const BOUNDARIES = {
   },
   "src/views/ApplicationErrorView.tsx location": {
     value: "no external value",
-    classification: "writes a fixed address and reloads, and reads nothing off the location",
-    test: "src/views/ApplicationErrorView.test.tsx#given the page may just be stale, when reloading from the error page, then the browser reloads"
+    classification: "assigns the sign-in address currentSignInPath built or reloads, and reads nothing off the location itself",
+    test: "src/views/ApplicationErrorView.test.tsx#given a view faulted on a booking, when signing out from the error page, then sign-in returns to that booking"
+  },
+  "src/navigation/returnTarget.ts location": {
+    value: "the path, query and fragment the browser is on",
+    classification: "becomes the returnTo target only when returnTarget accepts it as a same-origin path, and is dropped otherwise",
+    test: "src/navigation/returnTarget.test.ts#given the browser on a booking, when sign-in is required, then the booking travels as the target"
+  },
+  "src/views/LoginView.tsx useLocation": {
+    value: "the returnTo target in the address",
+    classification: "passed on to account recovery only when returnTarget accepts it, and dropped otherwise",
+    test: "src/views/LoginView.test.tsx#given a sign-in that carries a target, when the member opens the forgotten-credentials link, then the target travels with it"
+  },
+  "src/views/AccountRecoveryView.tsx useLocation": {
+    value: "the returnTo target in the address",
+    classification: "passed back to sign-in only when returnTarget accepts it, and dropped otherwise",
+    test: "src/views/AccountRecoveryView.test.tsx#given recovery reached with a target, when the member goes back to sign in, then the target travels with them"
   },
   "src/views/MyBookingsView.tsx location": {
     value: "the fragment a notification link put on the address",

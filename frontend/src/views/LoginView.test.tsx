@@ -14,6 +14,15 @@ describe("LoginView", () => {
 
   afterEach(() => vi.useRealTimers());
 
+  it("given a sign-in that carries a target, when the member opens the forgotten-credentials link, then the target travels with it", () => {
+    // when
+    render(<MemoryRouter initialEntries={["/login?returnTo=%2Fmy-bookings%23booking-42"]}><LoginView refreshSession={() => Promise.resolve()} /></MemoryRouter>);
+
+    // then
+    expect(screen.getByTestId("forgotten-credentials-link"), "recovering an account keeps the page the member opened")
+      .toHaveAttribute("href", "/account-recovery?returnTo=%2Fmy-bookings%23booking-42");
+  });
+
   it("given refused credentials, when signing in, then the member reads that the username or password is wrong", async () => {
     // given
     vi.spyOn(api, "login").mockRejectedValue(new ApiError(401, {

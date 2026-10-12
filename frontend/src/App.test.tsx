@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
-import { createMemoryRouter, RouterProvider } from "react-router-dom";
+import { createBrowserRouter, createMemoryRouter, RouterProvider, useLocation } from "react-router-dom";
 import { useMemo, type ReactNode } from "react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { App, AppRoutes } from "./App";
@@ -23,6 +23,30 @@ function RoutedShell({ initialEntries = ["/"], children }: { initialEntries?: st
     // eslint-disable-next-line react-hooks/exhaustive-deps
     []);
   return <ClubConfigurationProvider><RouterProvider router={router} /></ClubConfigurationProvider>;
+}
+
+function CurrentAddress() {
+  const { pathname, search, hash } = useLocation();
+  return <output data-testid="current-address">{`${pathname}${search}${hash}`}</output>;
+}
+
+const signedInMember: SessionStatus = {
+  authenticated: true,
+  username: "doe.jane",
+  displayName: "Jane Doe",
+  roles: ["MEMBER"],
+  passwordChangeRequired: false
+};
+
+function holdMemberPages() {
+  const pending = () => new Promise<never>(() => undefined);
+  vi.spyOn(api, "personalBookings").mockImplementation(pending);
+  vi.spyOn(api, "participations").mockImplementation(pending);
+  vi.spyOn(api, "courts").mockImplementation(pending);
+  vi.spyOn(api, "bookingGrid").mockImplementation(pending);
+  vi.spyOn(api, "bookingEligibility").mockImplementation(pending);
+  vi.spyOn(api, "waitlistEntries").mockImplementation(pending);
+  vi.spyOn(api, "ownNotifications").mockImplementation(pending);
 }
 
 // The administration arrives as its own chunk, so it is compiled once here rather than inside a test's wait.
@@ -90,6 +114,130 @@ describe("AppRoutes", () => {
 
     // then
     expect(screen.getByTestId("login-view")).toBeInTheDocument();
+  });
+
+  it("given an anonymous visitor, when opening a booking link, then sign-in keeps the booking's address", () => {
+    // when
+    render(
+      <RoutedShell initialEntries={["/my-bookings#booking-42"]}>
+        <AppRoutes session={anonymous} refreshSession={() => Promise.resolve()} />
+        <CurrentAddress />
+      </RoutedShell>
+    );
+
+    // then
+    expect(screen.getByTestId("login-view")).toBeInTheDocument();
+    expect(screen.getByTestId("current-address"), "the booking's path and fragment wait in the sign-in address").toHaveTextContent("/login?returnTo=%2Fmy-bookings%23booking-42");
+  });
+
+  it("given a sign-in that carries a booking's address, when the member is signed in, then that booking's address is shown", async () => {
+    // given
+    holdMemberPages();
+
+    // when
+    render(
+      <RoutedShell initialEntries={["/login?returnTo=%2Fmy-bookings%23booking-42"]}>
+        <AppRoutes session={signedInMember} refreshSession={() => Promise.resolve()} />
+        <CurrentAddress />
+      </RoutedShell>
+    );
+
+    // then
+    expect(await screen.findByTestId("my-bookings-page")).toBeInTheDocument();
+    expect(screen.getByTestId("current-address"), "sign-in follows the carried target").toHaveTextContent(/^\/my-bookings#booking-42$/);
+  });
+
+  it("given a sign-in whose target could leave this origin, when the member is signed in, then the start page is shown", () => {
+    for (const target of ["%2F%2Fattacker.example", "%2F%5Cattacker.example", "https%3A%2F%2Fattacker.example",
+      "%2F%09%2Fattacker.example", "%2F%0A%2Fattacker.example"]) {
+      // when
+      const { unmount } = render(
+        <RoutedShell initialEntries={[`/login?returnTo=${target}`]}>
+          <AppRoutes session={signedInMember} refreshSession={() => Promise.resolve()} />
+          <CurrentAddress />
+        </RoutedShell>
+      );
+
+      // then
+      expect(screen.getByTestId("current-address"), `${target} must not decide where sign-in leads`)
+        .toHaveTextContent(/^\/$/);
+      unmount();
+    }
+  });
+
+  it("given an administrator who just replaced the password, when a link was opened, then the link wins over administration", async () => {
+    // given
+    holdMemberPages();
+
+    // when
+    render(
+      <RoutedShell initialEntries={["/login?returnTo=%2Fmy-bookings"]}>
+        <AppRoutes session={{ ...signedInMember, roles: ["ADMIN"] }} passwordChanged refreshSession={() => Promise.resolve()} />
+        <CurrentAddress />
+      </RoutedShell>
+    );
+
+    // then
+    expect(await screen.findByTestId("my-bookings-page")).toBeInTheDocument();
+    expect(screen.getByTestId("current-address"), "an opened link outranks administration as the landing page").toHaveTextContent(/^\/my-bookings$/);
+  });
+
+  it("given a sign-in that carries an address, when the password has to be replaced first, then the address travels to that form", () => {
+    // when
+    render(
+      <RoutedShell initialEntries={["/login?returnTo=%2Fmy-bookings%23booking-42"]}>
+        <AppRoutes session={{ ...signedInMember, passwordChangeRequired: true }} refreshSession={() => Promise.resolve()} />
+        <CurrentAddress />
+      </RoutedShell>
+    );
+
+    // then
+    expect(screen.getByTestId("initial-password-view")).toBeInTheDocument();
+    expect(screen.getByTestId("current-address"), "the target travels from sign-in to the password form")
+      .toHaveTextContent(/^\/initial-password\?returnTo=%2Fmy-bookings%23booking-42$/);
+  });
+
+  it("given an anonymous visitor, when opening an administrative page, then sign-in keeps its address", () => {
+    // when
+    render(
+      <RoutedShell initialEntries={["/admin/roster?q=doe"]}>
+        <AppRoutes session={anonymous} refreshSession={() => Promise.resolve()} />
+        <CurrentAddress />
+      </RoutedShell>
+    );
+
+    // then
+    expect(screen.getByTestId("login-view"), "administration asks who is there instead of sending them home").toBeInTheDocument();
+    expect(screen.getByTestId("current-address"), "the administrative address waits in the sign-in address").toHaveTextContent(/^\/login\?returnTo=%2Fadmin%2Froster%3Fq%3Ddoe$/);
+  });
+
+  it("given a member without administrative roles, when opening an administrative page, then the start page is shown", () => {
+    // when
+    render(
+      <RoutedShell initialEntries={["/admin/roster"]}>
+        <AppRoutes session={signedInMember} refreshSession={() => Promise.resolve()} />
+        <CurrentAddress />
+      </RoutedShell>
+    );
+
+    // then
+    expect(screen.getByTestId("current-address"), "a signed-in member without the role is not asked to sign in again")
+      .toHaveTextContent(/^\/$/);
+  });
+
+  it("given a one-time password session, when a link to another page is opened, then the password form keeps that page as the target", () => {
+    // when
+    render(
+      <RoutedShell initialEntries={["/my-messages"]}>
+        <AppRoutes session={{ ...signedInMember, passwordChangeRequired: true }} refreshSession={() => Promise.resolve()} />
+        <CurrentAddress />
+      </RoutedShell>
+    );
+
+    // then
+    expect(screen.getByTestId("initial-password-view")).toBeInTheDocument();
+    expect(screen.getByTestId("current-address"), "the opened page waits behind the password form")
+      .toHaveTextContent(/^\/initial-password\?returnTo=%2Fmy-messages$/);
   });
 
   it("given a member ends this browser session, when account security completes, then it signs out without reporting a password change", async () => {
@@ -769,6 +917,57 @@ describe("App build identity", () => {
     // then
     expect(await screen.findByTestId("login-view")).toBeInTheDocument();
     expect(screen.queryByTestId("preferences-failure")).not.toBeInTheDocument();
+  });
+
+  it("given a signed-out member who opened a booking link, when the one-time password is replaced and they sign in again, then the booking's address is shown", async () => {
+    // given
+    vi.spyOn(api, "session")
+      .mockResolvedValueOnce(anonymous)
+      .mockResolvedValueOnce({ ...signedInMember, passwordChangeRequired: true })
+      .mockResolvedValue(signedInMember);
+    vi.spyOn(api, "login").mockResolvedValue();
+    vi.spyOn(api, "changeInitialPassword").mockResolvedValue();
+    vi.spyOn(api, "config").mockResolvedValue(club);
+    vi.spyOn(api, "source").mockRejectedValue(new Error("unavailable"));
+    holdMemberPages();
+    render(<RoutedShell initialEntries={["/my-bookings#booking-42"]}><App /><CurrentAddress /></RoutedShell>);
+    await userEvent.type(await screen.findByTestId("username"), "doe.jane");
+    await userEvent.type(screen.getByTestId("password"), "one-time-password");
+    await userEvent.click(screen.getByTestId("login-submit"));
+    await userEvent.type(await screen.findByTestId("new-password"), "permanent-password");
+    await userEvent.type(screen.getByTestId("confirm-password"), "permanent-password");
+    await userEvent.click(screen.getByTestId("password-submit"));
+
+    // when
+    await userEvent.type(await screen.findByTestId("username"), "doe.jane");
+    await userEvent.type(screen.getByTestId("password"), "permanent-password");
+    await userEvent.click(screen.getByTestId("login-submit"));
+
+    // then
+    expect(await screen.findByTestId("my-bookings-page")).toBeInTheDocument();
+    expect(screen.getByTestId("current-address"), "the target survives the one-time password and the second sign-in").toHaveTextContent(/^\/my-bookings#booking-42$/);
+  });
+
+  it("given a member on the court plan of another week, when the session ends elsewhere, then sign-in keeps that page as the target", async () => {
+    // given
+    vi.spyOn(api, "session").mockResolvedValue(signedInMember);
+    vi.spyOn(api, "config").mockResolvedValue(club);
+    vi.spyOn(api, "source").mockRejectedValue(new Error("unavailable"));
+    holdMemberPages();
+    window.history.replaceState(null, "", "/courts?week=2026-10-19");
+    const router = createBrowserRouter([{ path: "*", element: <><App /><CurrentAddress /></> }]);
+    render(<ClubConfigurationProvider><RouterProvider router={router} /></ClubConfigurationProvider>);
+    await screen.findByTestId("logout");
+
+    // when
+    act(() => { window.dispatchEvent(new Event("courtside:unauthenticated")); });
+
+    // then
+    expect(await screen.findByTestId("login-view")).toBeInTheDocument();
+    expect(screen.getByTestId("current-address"), "an expired session sends the member back where they were")
+      .toHaveTextContent(/^\/login\?returnTo=%2Fcourts%3Fweek%3D2026-10-19$/);
+    router.dispose();
+    window.history.replaceState(null, "", "/");
   });
 
   it("given the account menu opened before the session arrives, when it arrives, then the menu stays open under the hand that opened it", async () => {

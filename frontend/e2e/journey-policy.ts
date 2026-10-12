@@ -1,7 +1,7 @@
 // A journey is the record of what a member can do, so it may only do what a member could. Each of
 // these reaches past the interface into the page, the network or Playwright's own escape hatches.
 const SHORTCUTS = [
-  { pattern: /\.goto\s*\(/, why: "navigate by activating what is on the screen; openTheApplication is the one entry" },
+  { pattern: /\.goto\s*\(/, why: "navigate by activating what is on the screen; openTheApplication and openTheLink are the entries" },
   { pattern: /\.fill\s*\(/, why: "writeInto sends keystrokes, fill replaces them with one input event" },
   { pattern: /\.click\s*\(/, why: "activate clicks or taps according to the device the journey runs on" },
   { pattern: /\.tap\s*\(/, why: "activate clicks or taps according to the device the journey runs on" },
