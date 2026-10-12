@@ -125,3 +125,49 @@ test("given a pull request into main or a release branch, when the release line 
       assert.doesNotMatch(step.run, /\$\{\{/, `${step.name} reads its values through env`);
     }
   });
+
+test("given the release workflow, when its triggers are read, then only a pushed tag starts it", () => {
+  // when / then
+  assert.deepEqual(triggersOf(workflow("release.yml")), { push: { tags: ["v*"] } },
+    "a dispatch of release.yml would reach publish; the checks are dispatched through release-admission.yml instead");
+});
+
+test("given a tag name and a commit, when the admission is dispatched, then it runs the release's own checks and publishes nothing",
+  () => {
+    // given
+    const loaded = workflow("release-admission.yml");
+    const source = read(".github/workflows/release-admission.yml");
+    const job = loaded.jobs.admission;
+    const admit = job.steps.find((step) => step.id === "admit");
+    const evidence = job.steps.find((step) => step.name === "Find the nightly evidence on that branch");
+
+    // when / then
+    assert.deepEqual(Object.keys(triggersOf(loaded)), ["workflow_dispatch"]);
+    assert.deepEqual(Object.keys(triggersOf(loaded).workflow_dispatch.inputs), ["tag", "commit"],
+      "the tag is named, never pushed, so the commit it would point at is named beside it");
+    assert.deepEqual(loaded.permissions, {});
+    assert.deepEqual(job.permissions, { actions: "read", contents: "read" });
+    assert.deepEqual(Object.keys(loaded.jobs), ["admission"]);
+    assert.doesNotMatch(source, /secrets\.|cosign|gh release|docker\/login-action|imagetools|git push|packages: write|contents: write/,
+      "the admission only reads");
+    assert.deepEqual(admit.env, { TAG: "${{ inputs.tag }}", COMMIT: "${{ inputs.commit }}" });
+    assert.equal(admit.run.trim(), 'node tools/release-line.mjs admit-tag --tag "$TAG" --commit "$COMMIT" '
+      + '--summary "$GITHUB_STEP_SUMMARY" --github-output "$GITHUB_OUTPUT"',
+    "the same command release.yml runs for a pushed tag");
+    assert.equal(admit["continue-on-error"], true, "every verdict is reported, not only the first refusal");
+    assert.equal(evidence.run.trim(), 'node tools/nightly-release-evidence.mjs --find --branch "$BRANCH" --commit "$COMMIT"',
+      "the same lookup the candidate's preconditions run");
+    assert.deepEqual(evidence.env, { BRANCH: "${{ steps.admit.outputs.branch }}", COMMIT: "${{ inputs.commit }}",
+      GH_TOKEN: "${{ github.token }}" });
+    const verdict = job.steps.at(-1);
+    assert.equal(verdict.if, "always()");
+    assert.equal(evidence.if, "always() && steps.admit.outputs.branch != ''",
+      "the evidence is looked up even when the manifest refused the tag, as long as the tag named a line");
+    assert.equal(evidence["continue-on-error"], true);
+    assert.deepEqual(verdict.env, { ADMISSION: "${{ steps.admit.outcome }}", EVIDENCE: "${{ steps.evidence.outcome }}" });
+    assert.match(verdict.run, /test "\$ADMISSION" = success\ntest "\$EVIDENCE" = success/,
+      "a refused tag or missing evidence turns the run red after every check reported");
+    for (const step of job.steps.filter((candidate) => candidate.run)) {
+      assert.doesNotMatch(step.run, /\$\{\{/, `${step.name} reads its values through env`);
+    }
+  });

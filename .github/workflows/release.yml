@@ -28,11 +28,8 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Refuse a tag that does not sit on main
-        run: |
-          git fetch --no-tags origin main
-          git merge-base --is-ancestor "$GITHUB_SHA" FETCH_HEAD \
-            || { echo "::error::$GITHUB_REF_NAME does not point at a commit on main"; exit 1; }
+      - name: Refuse a tag outside the branch its version belongs to
+        run: node tools/release-line.mjs admit-tag --tag "$GITHUB_REF_NAME" --commit "$GITHUB_SHA"
 
       # The tag is the only thing the release asks for its version, so a tag naming a release this
       # commit does not record would publish an image under a version nobody cut.

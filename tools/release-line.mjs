@@ -155,11 +155,11 @@ function fetchBranches(git, branches) {
 }
 
 const usage = "usage: release-line.mjs pull-request --base <branch> --head <commit-or-ref> | "
-  + "admit-tag --tag <tag> --commit <sha> [--summary <file>]";
+  + "admit-tag --tag <tag> --commit <sha> [--summary <file>] [--github-output <file>]";
 
 function optionsOf(arguments_) {
   const [command, ...rest] = arguments_;
-  const allowed = { "pull-request": ["base", "head", "summary"], "admit-tag": ["tag", "commit", "summary"] }[command];
+  const allowed = { "pull-request": ["base", "head", "summary"], "admit-tag": ["tag", "commit", "summary", "github-output"] }[command];
   if (!allowed || rest.length % 2 !== 0) throw new Error(usage);
   const options = { command };
   for (let index = 0; index < rest.length; index += 2) {
@@ -167,7 +167,7 @@ function optionsOf(arguments_) {
     if (!rest[index].startsWith("--") || !allowed.includes(key) || options[key] !== undefined) throw new Error(usage);
     options[key] = rest[index + 1];
   }
-  const required = allowed.filter((key) => key !== "summary");
+  const required = allowed.filter((key) => !["summary", "github-output"].includes(key));
   if (required.some((key) => !options[key])) throw new Error(usage);
   return options;
 }
@@ -198,7 +198,11 @@ export function main(arguments_, git = runGit) {
   }
   if (!commitPattern.test(options.commit)) throw new Error("--commit must be a full 40-character sha");
   const version = /^v(.+)$/.exec(options.tag)?.[1];
-  if (versionPattern.test(version ?? "")) fetchBranches(git, [releaseBranchOf(version)]);
+  if (versionPattern.test(version ?? "")) {
+    const branch = releaseBranchOf(version);
+    fetchBranches(git, [branch]);
+    if (options["github-output"]) appendFileSync(options["github-output"], `branch=${branch}\n`);
+  }
   return report(tagAdmission({ git, tag: options.tag, commit: options.commit, refOf }), options.summary);
 }
 

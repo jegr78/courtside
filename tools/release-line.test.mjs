@@ -375,3 +375,25 @@ test("given a head or tag argument that git could read as an option, when the to
     assert.throws(() => main(["admit-tag", "--tag", "v0.1.1", "--commit", "HEAD"], git), /full 40-character sha/);
     assert.deepEqual(calls, [], "nothing reached git");
   });
+
+test("given a dispatched admission, when the tag is admitted, then the branch its version belongs to is handed on", () => {
+  // given
+  const repository = releasedLine();
+  const output = join(repository.root, "github-output");
+  writeFileSync(output, "");
+  const previous = process.cwd();
+  try {
+    process.chdir(repository.root);
+
+    // when
+    const accepted = main(["admit-tag", "--tag", "v0.1.1", "--commit", repository.fix, "--github-output", output],
+      repository.git);
+
+    // then
+    assert.equal(accepted, false, "release/0.1 records 0.1.0, so the manifest refuses v0.1.1");
+    assert.equal(readFileSync(output, "utf8"), "branch=release/0.1\n", "the evidence lookup reads the patch's own branch");
+  } finally {
+    process.chdir(previous);
+    repository.remove();
+  }
+});
