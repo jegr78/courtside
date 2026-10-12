@@ -269,7 +269,10 @@ class BookingConfirmationMessageTest extends AbstractIntegrationTest {
     }
 
     private List<String> logLines() {
-        return logged.list.stream().map(ILoggingEvent::getFormattedMessage).toList();
+        // The outbox thread appends under the appender's lock, so the copy is taken under it too.
+        synchronized (logged) {
+            return logged.list.stream().map(ILoggingEvent::getFormattedMessage).toList();
+        }
     }
 
     private UUID book(List<UUID> courtIds) {

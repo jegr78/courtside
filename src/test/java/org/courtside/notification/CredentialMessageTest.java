@@ -192,12 +192,15 @@ class CredentialMessageTest extends AbstractIntegrationTest {
     }
 
     private List<ILoggingEvent> credentialIssueEvents() {
-        return logged.list.stream()
-                .filter(event -> event.getKeyValuePairs() != null
-                        && event.getKeyValuePairs().stream().anyMatch(pair ->
-                                pair.key.equals("event.action")
-                                        && pair.value.equals("TEMPORARY_CREDENTIAL_ISSUED")))
-                .toList();
+        // The outbox thread appends under the appender's lock, so the copy is taken under it too.
+        synchronized (logged) {
+            return logged.list.stream()
+                    .filter(event -> event.getKeyValuePairs() != null
+                            && event.getKeyValuePairs().stream().anyMatch(pair ->
+                                    pair.key.equals("event.action")
+                                            && pair.value.equals("TEMPORARY_CREDENTIAL_ISSUED")))
+                    .toList();
+        }
     }
 
     private static Logger ownLogger() {
