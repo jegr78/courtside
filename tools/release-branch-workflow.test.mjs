@@ -99,8 +99,9 @@ test("given a pull request into main or a release branch, when the release line 
     const check = job.steps.find((step) => step.name === "Check the release line and its forward ports");
 
     // when / then
-    assert.deepEqual(triggers.pull_request, { branches: ["main", "release/*"] },
-      "every pull request reports the check, so it can be required without blocking ordinary ones");
+    assert.deepEqual(triggers.pull_request, { types: ["opened", "synchronize", "reopened", "edited"],
+      branches: ["main", "release/*"] },
+      "every pull request reports the check, and an edited body with a commit override is judged again");
     assert.equal(triggers.pull_request_target, undefined, "the check reads code, so it never runs with base-repo authority");
     assert.deepEqual(Object.keys(triggers.workflow_dispatch.inputs), ["head"],
       "a dispatch on a real branch checks a head against it, which is how a refusal is exercised without a release");
@@ -247,4 +248,17 @@ test("given a build dispatched on a release branch, when the nightly image runs,
   assert.equal(workflow("nightly-image.yml").jobs["retention-plan"].if,
     "github.event_name == 'workflow_dispatch' && inputs.publish != true && !startsWith(github.ref, 'refs/heads/release/')",
     "retention belongs to main's nightly tags; a patch build only qualifies its image");
+});
+
+test("given the admission's latest decision, when publish starts, then a missing value stops it before any image is tagged", () => {
+  // given
+  const steps = workflow("release.yml").jobs.publish.steps;
+  const guard = steps.findIndex((step) => step.name === "Require a latest decision from the admission");
+  const run = (latest) => spawnSync("bash", ["-c", steps[guard].run], { env: { ...process.env, LATEST: latest } }).status;
+
+  // when / then
+  assert.deepEqual(steps[guard].env, { LATEST: "${{ needs.candidate.outputs.latest }}" });
+  assert.ok(guard >= 0 && guard < steps.findIndex((step) => step.id === "meta"), "the decision is checked before tags exist");
+  assert.deepEqual(["true", "false"].map(run), [0, 0]);
+  assert.ok(["", "yes", "True"].every((value) => run(value) !== 0), "only true or false is a decision");
 });

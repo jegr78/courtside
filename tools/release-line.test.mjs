@@ -421,8 +421,12 @@ test("given published releases, when a tag is admitted, then a patch of an older
       assert.equal(verdict("v0.2.0-rc.2", ["v0.1.0", "v0.2.0-rc.1"]).latest, false, "a candidate never becomes latest");
       assert.equal(verdict("v0.2.0", ["v0.1.0", "v0.1.1"]).latest, true);
       assert.equal(verdict("v0.2.0", ["v0.1.0", "v1.0.0"]).latest, false, "an older minor never takes latest from 1.0.0");
-      assert.throws(() => tagAdmission({ git, tag: "v0.1.1", commit: patch, refOf, published: ["main"] }),
-        /published tags must be release tags/);
+      const notes = [];
+      const ignoring = tagAdmission({ git, tag: "v0.1.1", commit: patch, refOf, published: ["docs-2026", "v0.2.0"],
+        log: (line) => notes.push(line) }).at(-1);
+      assert.equal(ignoring.accepted, false, "a release without a version tag must not hide the newer 0.2.0");
+      assert.deepEqual(notes, ['ignoring published release "docs-2026", which names no release version'],
+        "a stray release is named in the log instead of stopping every release");
     } finally {
       repository.remove();
     }
@@ -578,6 +582,31 @@ test("given a candidate tag nobody cut, when it is admitted, then the version th
     assert.deepEqual(admit("v0.1.0-rc.7"), { check: "manifest", accepted: false,
       detail: `v0.1.0-rc.7 names 0.1.0-rc.7, but ${recorded} records 0.1.0-rc.2` },
     "a candidate nobody released is refused, although its release line exists");
+  } finally {
+    repository.remove();
+  }
+});
+
+test("given a picked commit that also carries a nested fix, when the forward port is checked, then the fix needs a port", () => {
+  // given
+  const repository = releasedLine();
+  const { git, commit } = repository;
+  try {
+    git("switch", "--quiet", "main");
+    const update = commit("build(deps): bump the image base", "Dockerfile");
+    git("cherry-pick", "-x", repository.fix);
+    git("switch", "--quiet", "release/0.1");
+    const nested = commit(`build(deps): bump the image base\n\n(cherry picked from commit ${update})\n\n`
+      + "BEGIN_NESTED_COMMIT\nfix: correct the closing hours sentence\nEND_NESTED_COMMIT", "nested.txt");
+    const paragraph = commit(`build(deps): bump the image base again\n\n(cherry picked from commit ${update})\n\n`
+      + "fix: correct the closing hours sentence again", "paragraph.txt");
+
+    // when
+    const verdict = forwardPortVerdict({ git, baseRef: "release/0.1", headRef: "release/0.1", mainRef: "main", releasable });
+
+    // then
+    assert.deepEqual(verdict.missing.map((entry) => entry.split(" ")[0]), [paragraph, nested],
+      "the trailer belongs to the picked entry, not to the fix release-please lists beside it");
   } finally {
     repository.remove();
   }

@@ -102,6 +102,11 @@ jobs:
           run-id: ${{ needs.candidate.outputs.run-id }}
           github-token: ${{ github.token }}
 
+      - name: Require a latest decision from the admission
+        env:
+          LATEST: ${{ needs.candidate.outputs.latest }}
+        run: '[[ "$LATEST" == true || "$LATEST" == false ]] || { echo "::error::the admission decided no latest: \"$LATEST\""; exit 1; }'
+
       - name: Require the archive the candidate qualified
         env:
           ARCHIVE_SHA256: ${{ needs.candidate.outputs.archive-sha256 }}

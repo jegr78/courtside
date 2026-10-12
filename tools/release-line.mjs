@@ -101,7 +101,8 @@ function citedCommits(text) {
 
 function pickedFromMain(message, releasable, onMain) {
   const segments = message.split(/\r?\n\r?\n(?=\* )/);
-  const considered = (segments.length > 1 ? segments.slice(1) : segments).map((segment) => segment.replace(/^\* /, ""))
+  const considered = (segments.length > 1 ? segments.slice(1) : segments)
+    .flatMap((segment) => entriesOf(segment.replace(/^\* /, "")))
     .filter((segment) => !(headerPattern.test(segment) && !releasedEntry(segment, releasable)));
   return considered.length > 0 && considered.every((segment) => citedCommits(segment).some(onMain));
 }
@@ -149,13 +150,13 @@ function precedes(left, right) {
   return false;
 }
 
-export function newestLineVerdict(version, published) {
-  const releases = published.map((tag) => {
-    const named = /^v(.+)$/.exec(tag)?.[1];
+export function newestLineVerdict(version, published, log = (line) => process.stderr.write(`${line}\n`)) {
+  const releases = published.flatMap((tag) => {
     try {
-      return versionOf(named);
+      return [versionOf(/^v(.+)$/.exec(tag)?.[1])];
     } catch {
-      throw new Error(`published tags must be release tags, not ${JSON.stringify(tag)}`);
+      log(`ignoring published release ${JSON.stringify(tag)}, which names no release version`);
+      return [];
     }
   }).filter((release) => release.prerelease === null);
   const candidate = versionOf(version);
@@ -171,7 +172,7 @@ export function newestLineVerdict(version, published) {
     detail: `no line newer than ${candidate.major}.${candidate.minor} is published` };
 }
 
-export function tagAdmission({ git, tag, commit, refOf, published }) {
+export function tagAdmission({ git, tag, commit, refOf, published, log }) {
   const version = /^v(.+)$/.exec(tag ?? "")?.[1];
   let branch;
   try {
@@ -193,7 +194,7 @@ export function tagAdmission({ git, tag, commit, refOf, published }) {
     { check: "manifest", accepted: recorded === version,
       detail: recorded === version ? `${commit} records ${version}`
         : `${tag} names ${version}, but ${commit} records ${recorded ?? "no released version"}` },
-    newestLineVerdict(version, published)
+    newestLineVerdict(version, published, log)
   ];
 }
 
