@@ -1,5 +1,5 @@
 import { expect, test } from "../../fixtures";
-import { credentialIn, messageTo } from "../../mailbox";
+import { credentialIn, messageWith } from "../../mailbox";
 import { activate, openTheApplication, openTheLink, reachAdministration, signIn, signOut, walks, writeInto } from "../../journey-walking";
 
 test("given a new member whose account the board has just opened, when they open a link to their messages, read the one-time password the club mailed them and choose one of their own, then they are in where the link led and nobody ever saw the password they were given",
@@ -24,7 +24,7 @@ test("given a new member whose account the board has just opened, when they open
 
     // when — the member opens a link into the club, reads what reached their mailbox and signs in with it
     await openTheLink(page, language, "/my-messages");
-    const mailed = await messageTo(journeyService.mailboxURL, "richard.roe@example.org");
+    const mailed = await messageWith(journeyService.mailboxURL, "richard.roe@example.org", "Einmalpasswort:");
     await signIn(page, "roe.richard", credentialIn(mailed, "Einmalpasswort:"));
 
     // then — the club refuses to go further until they have one of their own

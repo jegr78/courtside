@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures";
-import { credentialIn, messageTo } from "./mailbox";
+import { credentialIn, messageWith } from "./mailbox";
 
 async function signInAsAdministrator(page: import("@playwright/test").Page) {
   await page.goto("/login");
@@ -89,7 +89,7 @@ test("a board mistypes an address, the log shows the refusal, and the correction
 
   // then — the log says what became of it, and says what handed over would have meant
   await openTheMessageLog(page);
-  await statesInTheLog(page, ["REFUSED"]);
+  await statesInTheLog(page, ["REFUSED", "REFUSED"]);
   const refusedRow = page.getByTestId("message-row").first();
   await expect(refusedRow.getByTestId("message-outcome")).not.toBeEmpty();
   await expect(page.getByTestId("messages-handover-note")).toBeVisible();
@@ -106,17 +106,17 @@ test("a board mistypes an address, the log shows the refusal, and the correction
   await page.getByTestId("send-credentials").click();
 
   // then — the correction goes out, and the member holds what the log never shows
-  const mailed = await messageTo(journeyService.mailboxURL, "richard.miles@example.org");
+  const mailed = await messageWith(journeyService.mailboxURL, "richard.miles@example.org", "Einmalpasswort:");
   const credential = credentialIn(mailed, "Einmalpasswort:");
   await lastMessageOnThePerson(page, "HANDED_OVER");
   await openTheMessageLog(page);
-  await statesInTheLog(page, ["HANDED_OVER", "REFUSED"]);
+  await statesInTheLog(page, ["HANDED_OVER", "REFUSED", "REFUSED"]);
   await expect(page.getByTestId("admin-messages-view")).not.toContainText(credential);
 
   // when — only what went wrong is asked for
   await page.getByTestId("messages-unsettled-filter").check();
 
   // then
-  await expect(page.getByTestId("message-row")).toHaveCount(1);
+  await expect(page.getByTestId("message-row")).toHaveCount(2);
   await expect(page.getByTestId("message-row").first()).toHaveAttribute("data-state", "REFUSED");
 });
