@@ -8,6 +8,8 @@ import org.courtside.booking.BookingStatus;
 import org.courtside.booking.internal.BookingReminders;
 import org.courtside.booking.series.BookingSeries;
 import org.courtside.booking.series.BookingSeriesRepository;
+import org.courtside.booking.series.CancelScope;
+import org.courtside.booking.series.MoveRequest;
 import org.courtside.booking.series.SeriesService;
 import org.courtside.booking.series.SeriesRule;
 import org.courtside.booking.CreateBookingCommand;
@@ -71,6 +73,11 @@ public class BookingTestFixture {
         return bookingService.create(new CreateBookingCommand(
                 List.of(courtId), cardId, slot, bookedBy, bookerPersonId, roles, note,
                 List.of(ParticipantSpec.member(namedPersonId)), null));
+    }
+
+    public void moveWholeSeries(UUID seriesId, java.time.LocalTime newStartTime, UUID movedBy, Set<Role> roles) {
+        seriesService.move(new MoveRequest(seriesId, firstOccurrenceOf(seriesId), CancelScope.WHOLE_SERIES,
+                newStartTime, null, null), movedBy, roles);
     }
 
     public UUID firstOccurrenceOf(UUID seriesId) {

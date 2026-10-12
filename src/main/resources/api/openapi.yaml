@@ -2689,8 +2689,10 @@ components:
             - $ref: "#/components/schemas/AuditSubjectPeriod"
             - type: "null"
           description: |
-            When a booking subject takes place, or when a series subject first takes place. Absent
-            or `null` for every other subject and for a booking or series that nothing resolves.
+            The period a booking subject holds today, or the earliest occurrence a series subject
+            holds today, cancelled ones included. It is today's state, not the state when the entry
+            was recorded. Absent or `null` for every other subject and for a booking or series that
+            nothing resolves.
         actorAccountId: { type: [string, "null"], format: uuid }
         actorUsername:
           type: [string, "null"]

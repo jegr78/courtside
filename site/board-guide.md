@@ -424,10 +424,11 @@ Unter **Nachweise** findest du fünf Ansichten.
   keine buchende Person. Der Mitgliederexport enthält personenbezogene Daten und erzeugt keinen
   Eintrag im Änderungsprotokoll.
 * **Änderungsprotokoll** zeigt administrative Änderungen mit Zeitpunkt, Gegenstand und
-  ausführendem Konto. Eine Buchung erscheint mit ihren Plätzen, Datum und Uhrzeit, eine Serie mit
-  ihren Plätzen und ihrem ersten Termin. Suche nach dem Namen eines Gegenstands, eines Platzes oder
-  einem Benutzernamen und grenze die Treffer bei Bedarf nach der Art der Änderung und dem Zeitraum
-  ein. *Weitere laden* behält die aktiven Filter bei; *Filter zurücksetzen* zeigt wieder das
+  ausführendem Konto. Eine Buchung erscheint mit ihren Plätzen und ihrem aktuellen Termin, eine
+  Serie mit ihren Plätzen und ihrem aktuellen ersten Termin, auch bei einem Eintrag von vor einer
+  späteren Verschiebung. Suche nach dem Namen eines Gegenstands, eines Platzes oder einem
+  Benutzernamen und grenze die Treffer bei Bedarf nach der Art der Änderung und dem Zeitraum ein.
+  *Weitere laden* behält die aktiven Filter bei; *Filter zurücksetzen* zeigt wieder das
   vollständige Protokoll.
 * **Nachrichtenprotokoll** zeigt den Versandstatus. *Übergeben* bedeutet nur, dass der Mailserver
   die Nachricht angenommen hat. Die endgültige Zustellung steht allein in dessen Protokoll.

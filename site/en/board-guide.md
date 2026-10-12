@@ -406,9 +406,10 @@ The **Records** area has five views.
 * **Data export** creates CSV files for bookings or members. The booking export omits the person who
   booked. The member export contains personal data and creates no change-log entry.
 * **Change log** lists administrative changes with time, subject and acting account. A booking
-  appears as its courts, date and time, a series as its courts and first appointment. Search by a
-  subject name, a court name or a username and narrow the result by kind of change and time range
-  when needed. *Load more* keeps the active filters; *Clear filters* returns to the complete log.
+  appears as its courts and its current time, a series as its courts and its current first
+  appointment, even for an entry recorded before a later move. Search by a subject name, a court
+  name or a username and narrow the result by kind of change and time range when needed. *Load
+  more* keeps the active filters; *Clear filters* returns to the complete log.
 * **Message log** shows delivery state. *Handed over* only means that the mail server accepted the
   message. Final delivery is recorded by the mail server, not Courtside.
 * **Operational log** shows recent records from the application, database and reverse proxy after

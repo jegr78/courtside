@@ -161,6 +161,27 @@ class BookingSubjectAuditTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenAMovedSeries_whenItsEntriesAreRead_thenEachShowsTheTimeTheSeriesHoldsToday() throws Exception {
+        // given
+        UUID seriesId = bookings.createSeries(backCourt, TRAINING_CARD, LocalDate.of(2026, 5, 14),
+                LocalTime.of(18, 0), 90, 3, administratorAccountId, administratorPersonId, Set.of(Role.ADMIN));
+        bookings.moveWholeSeries(seriesId, LocalTime.of(19, 0), administratorAccountId, Set.of(Role.ADMIN));
+
+        // when
+        String body = readLogAbout(seriesId);
+
+        // then
+        Instant movedStart = LocalDate.of(2026, 5, 14).atTime(19, 0).atZone(CLUB_ZONE).toInstant();
+        TimeSlot movedSlot = new TimeSlot(movedStart, movedStart.plusSeconds(90 * 60));
+        List<String> eventTypes = JsonPath.read(body, "$.entries[*].eventType");
+        assertThat(eventTypes).containsExactlyInAnyOrder("booking.series.created", "booking.series.moved");
+        assertThat(periodOf(body, eventTypes.indexOf("booking.series.moved"))).isEqualTo(movedSlot);
+        assertThat(periodOf(body, eventTypes.indexOf("booking.series.created")))
+                .as("an entry shows the time the series holds today, not the time it held when recorded")
+                .isEqualTo(movedSlot);
+    }
+
+    @Test
     void givenASeriesWhoseFirstOccurrenceWasCancelled_whenBothEntriesShareAPage_thenEachIsDescribed()
             throws Exception {
         // given
@@ -215,6 +236,8 @@ class BookingSubjectAuditTest extends AbstractIntegrationTest {
         // given
         UUID bookingId = bookings.createBookingOnCourts(List.of(backCourt), TRAINING_CARD,
                 WEDNESDAY_EVENING, administratorPersonId, Set.of(Role.ADMIN));
+        UUID otherCourtBooking = bookings.createBookingOnCourts(List.of(centreCourt), TRAINING_CARD,
+                WEDNESDAY_EVENING, administratorPersonId, Set.of(Role.ADMIN));
 
         // when
         String body = mockMvc.perform(post("/api/admin/audit/search").with(user(administrator)).with(csrf())
@@ -225,7 +248,8 @@ class BookingSubjectAuditTest extends AbstractIntegrationTest {
 
         // then
         List<String> subjects = JsonPath.read(body, "$.entries[*].subjectId");
-        assertThat(subjects).containsExactly(bookingId.toString());
+        assertThat(subjects).containsExactly(bookingId.toString())
+                .as("a booking on another court does not match").doesNotContain(otherCourtBooking.toString());
     }
 
     @Test
@@ -271,6 +295,8 @@ class BookingSubjectAuditTest extends AbstractIntegrationTest {
     }
 
     private static TimeSlot periodOf(String body, int index) {
+        Object period = JsonPath.read(body, "$.entries[" + index + "].subjectPeriod");
+        assertThat(period).as("entry %d carries a period", index).isNotNull();
         String startsAt = JsonPath.read(body, "$.entries[" + index + "].subjectPeriod.startsAt");
         String endsAt = JsonPath.read(body, "$.entries[" + index + "].subjectPeriod.endsAt");
         return new TimeSlot(Instant.parse(startsAt), Instant.parse(endsAt));
