@@ -201,7 +201,11 @@ Punktspiel oder Sperrung. Lege für jede benötigte Art eine Karte an.
 | **Gäste erlaubt** | Erlaubt namentlich erfasste Gäste |
 | **Neutral anzeigen** | Zeigt im öffentlichen Platzplan *Belegt* statt der Kartenbezeichnung |
 
-Administratoren dürfen jede Karte verwenden und verwalten. Eine neutrale Anzeige schützt die
+Administratoren dürfen jede Karte verwenden und verwalten. Eine Buchung mit der Karte *Platz
+gesperrt* geht einer Reservierung von der Warteliste vor. Leerst du ihre berechtigten Rollen, darf
+jede angemeldete Person sperren und damit jedes Angebot auf der Warteliste beenden.
+
+Eine neutrale Anzeige schützt die
 Bezeichnung nicht vor technischem Zugriff, da die öffentliche Schnittstelle sie weiterhin liefert.
 Verwende deshalb keine vertraulichen Bezeichnungen.
 

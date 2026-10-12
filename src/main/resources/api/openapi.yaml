@@ -3364,7 +3364,7 @@ components:
           items: { $ref: "#/components/schemas/SubjectAccessSeries" }
         waitlistEntries:
           type: array
-          description: The waitlist entries the person's accounts made whose slot has not ended yet.
+          description: Every stored waitlist entry the person's accounts made, closed ones included.
           items: { $ref: "#/components/schemas/SubjectAccessWaitlistEntry" }
         waitlistsNamedIn:
           type: array

@@ -28,6 +28,14 @@ public class CardEligibilityPolicy {
         return card;
     }
 
+    // The same verdict as requireEligible without recording a denial, for checks nobody asked to make.
+    public boolean admits(UUID cardId, Set<Role> callerRoles) {
+        return cards.findCard(cardId)
+                .filter(BookingCard::isActive)
+                .filter(card -> callerRoles.contains(Role.ADMIN) || card.permits(callerRoles))
+                .isPresent();
+    }
+
     public BookingCard requireEligible(UUID cardId, Set<Role> callerRoles) {
         BookingCard card = requireActive(cardId);
         if (!callerRoles.contains(Role.ADMIN) && !card.permits(callerRoles)) {

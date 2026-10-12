@@ -190,7 +190,11 @@ or closure. Add one card for every type the club needs.
 | **Guests allowed** | Allows named guests |
 | **Show neutral occupancy** | Shows *Occupied* instead of the card label in the public plan |
 
-Administrators may use and manage every card. A neutral display does not hide the label from
+Administrators may use and manage every card. A booking with the *Court closed* card goes before a
+reservation from the waitlist. If you clear its allowed roles, every signed-in person may close a
+court and so end any waitlist offer.
+
+A neutral display does not hide the label from
 technical access because the public API still returns it. Do not use confidential labels.
 
 Deactivate cards that are no longer needed. Existing bookings remain in place.

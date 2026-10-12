@@ -20,6 +20,7 @@ import java.util.stream.Collectors;
 class MailHandover {
 
     private static final Pattern STATUS_CODE = Pattern.compile("^[45]\\d\\d");
+    private static final Pattern ADDRESS_STATUS = Pattern.compile("^5\\d\\d[ -]5\\.1\\.\\d{1,3}\\b");
 
     // One attempt. A refused recipient leaves as its own type, because it is the one failure that
     // trying again cannot change.
@@ -30,7 +31,8 @@ class MailHandover {
             String diagnosis = diagnosis(failure);
             if (refusedRecipient(failure) != null) {
                 log.info("Handing over {} was refused: {}", messageId, diagnosis);
-                throw new MailRecipientRefusedException(messageId, diagnosis, statusCode(failure));
+                throw new MailRecipientRefusedException(messageId, diagnosis, statusCode(failure),
+                        mailboxRefused(failure));
             }
             log.info("Handing over {} failed: {}", messageId, diagnosis);
             // Without the cause: a rejected recipient reports the address it rejected.
@@ -73,6 +75,11 @@ class MailHandover {
             }
         }
         return found;
+    }
+
+    private static boolean mailboxRefused(Throwable failure) {
+        return reportedBy(failure).stream()
+                .anyMatch(reported -> ADDRESS_STATUS.matcher(String.valueOf(reported.getMessage())).find());
     }
 
     // The reply's leading status code and nothing after it: what follows is the relay's own words

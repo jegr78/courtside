@@ -12,7 +12,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.sql.Timestamp;
-import java.time.Clock;
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
@@ -26,17 +25,15 @@ public class BookingHistoryService implements PersonBookingHistory {
     private final BookingRepository bookings;
     private final BookingSeriesRepository series;
     private final JdbcClient jdbc;
-    private final Clock clock;
 
     @Override
     public List<Waiting> waitlistOf(UUID accountId) {
         requireIdentifier(accountId, "account");
         return jdbc.sql("""
                         SELECT id, court_id, starts_at, ends_at, state, joined_at, offer_expires_at, note
-                        FROM waitlist_entry WHERE account_id = :accountId AND ends_at > :now ORDER BY joined_seq
+                        FROM waitlist_entry WHERE account_id = :accountId ORDER BY joined_seq
                         """)
                 .param("accountId", accountId)
-                .param("now", Timestamp.from(clock.instant()))
                 .query((row, number) -> new Waiting(row.getObject("id", UUID.class),
                         row.getObject("court_id", UUID.class), instant(row.getTimestamp("starts_at")),
                         instant(row.getTimestamp("ends_at")), row.getString("state"),
@@ -51,12 +48,11 @@ public class BookingHistoryService implements PersonBookingHistory {
         return jdbc.sql("""
                         SELECT DISTINCT w.id, w.court_id, w.starts_at, w.ends_at, w.joined_seq
                         FROM waitlist_entry w JOIN waitlist_participant p ON p.entry_id = w.id
-                        WHERE p.person_id = :personId AND w.ends_at > :now
+                        WHERE p.person_id = :personId
                           AND w.account_id NOT IN (SELECT id FROM user_account WHERE person_id = :personId)
                         ORDER BY w.joined_seq
                         """)
                 .param("personId", personId)
-                .param("now", Timestamp.from(clock.instant()))
                 .query((row, number) -> new NamedInWaitlist(row.getObject("id", UUID.class),
                         row.getObject("court_id", UUID.class), instant(row.getTimestamp("starts_at")),
                         instant(row.getTimestamp("ends_at"))))

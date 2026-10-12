@@ -151,7 +151,9 @@ class MailOutbox {
             settle(claimed, record -> messages.failed(record, undeliverable.reason()));
         } catch (MailRecipientRefusedException refusal) {
             settle(claimed, record -> messages.refused(record, refusal.diagnosis(), refusal.statusCode()));
-            reportRefusal(message);
+            if (refusal.mailboxRefused()) {
+                reportRefusal(message);
+            }
         } catch (RuntimeException failure) {
             String diagnosis = diagnosisOf(failure);
             if (claimed.attempts() >= ATTEMPTS) {

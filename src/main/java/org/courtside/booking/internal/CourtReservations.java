@@ -13,9 +13,9 @@ import java.util.UUID;
 // Every caller holds the booking grid lock, which is what keeps a reservation and a booking apart.
 public interface CourtReservations {
 
-    // The board and a closure go before a waiting member.
-    static boolean overriddenBy(Set<Role> callerRoles, UUID cardId) {
-        return callerRoles.contains(Role.ADMIN) || BookingCard.COURT_CLOSED.equals(cardId);
+    // The board, and a closure by somebody the closure card admits, go before a waiting member.
+    static boolean overriddenBy(Set<Role> callerRoles, UUID cardId, boolean cardAdmitsCaller) {
+        return callerRoles.contains(Role.ADMIN) || (BookingCard.COURT_CLOSED.equals(cardId) && cardAdmitsCaller);
     }
 
     void requireUnreserved(List<UUID> courtIds, TimeSlot slot, UUID accountId);

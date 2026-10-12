@@ -41,7 +41,7 @@ class WaitlistMailer implements MessageComposer {
 
     @Override
     public void refused(QueuedMessage message) {
-        waitlist.offerUndeliverable(message.waitlistEntry());
+        waitlist.offerUndeliverable(message.waitlistEntry(), message.accountId());
     }
 
     // An offer taken, declined or run out before its mail left needs no mail any more.

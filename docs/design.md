@@ -355,12 +355,15 @@ minutes unless the board changes it, and ends at the slot's start at the latest.
 the booking write and a series move refuse the court to every other account, a new series and its
 preview treat that date as taken, and the court plan shows it as reserved without naming anybody.
 The board and a closure go first: a booking by an admin or on the closure card, a series an admin
-creates and a series move an admin makes take the court and close the offer as withdrawn. The
+creates and a series move an admin makes take the court and close the offer as withdrawn. A move
+of a closure series goes first only while the closure card still admits the mover's roles. A
+closure card whose allowed roles are cleared admits every account, so any account can then end an
+offer by closing the court. The
 member accepts in Courtside, which turns the reservation into an ordinary booking under every rule
 in one transaction; a refused rule leaves the offer standing until its deadline. Declining or
 leaving passes the offer on at once. The member's own booking of the slot, or a move of their own
-series onto it, closes their entry as booked. A definite refusal of the offer mail by the
-recipient's server skips an offer that is still open and passes it on, because its member will not
+series onto it, closes their entry as booked. A refusal of the offer mail that names the
+recipient's address skips an offer that is still open and passes it on, because its member will not
 hear of it by mail. A sweep every 30 seconds expires offers past their deadline, skips offers whose
 member no longer passes the checks, passes both on, closes entries whose slot has started, deletes
 entries whose slot has ended and offers any free slot a queue still waits for.
@@ -592,7 +595,9 @@ its row to the next pass after the lease, which can send that message a second t
 
 A transport failure reschedules the row after 15 seconds and then after gaps three times as long,
 and fails it on the sixth attempt, about half an hour after the first. A definite recipient refusal
-is not retried, and for a waitlist offer that is still open it skips the offer and passes it on. A message fails at once when its booking or recipient is gone, its booking was
+is not retried. When its enhanced status is 5.1.x, which names the address itself, a waitlist offer
+that is still open is skipped and passed on; a relay refusing to relay at all lists every recipient
+as refused too, so any other refusal leaves the offer standing. A message fails at once when its booking or recipient is gone, its booking was
 cancelled and the message is not the one announcing that, a series message finds no occurrence
 left, or, for a reminder, its booking has already started by the time it is due. Every outcome
 stays on the row with its reason, and the message statistics count the messages that needed a

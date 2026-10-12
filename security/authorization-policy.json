@@ -4,7 +4,7 @@
   "purpose": "This is the normative authorization policy for the shipped Courtside API. OpenAPI defines the transport shape; this policy defines who may perform each operation, which resource attributes narrow that permission, and which protected fields each projection may read or write.",
   "openApiFieldInventorySha256": "d80f561628608cee0066ad58efe06c9865b938e5b718eb5190058885755ca8c2",
   "protectedFieldInventorySha256": "174231e5d10a1e24a00993b2bba95b73d1749ba62780a85d608afed778bf0512",
-  "productionAuthorizationSha256": "cdb8f62a981afb98772436b70e965f1e7403f4d2ae1d48b2902d3b91b0b526e7",
+  "productionAuthorizationSha256": "24f171e478bcc763121b572f0116030dee985836b4332097b55899acb808c151",
   "ordinaryFields": [
     "Problem.detail",
     "Problem.fieldErrors",
@@ -3121,7 +3121,9 @@
         "src/main/java/org/courtside/booking/internal/SeriesPreviewWarmUp.java#run",
         "src/main/java/org/courtside/booking/waitlist/WaitlistService.java#join",
         "src/main/java/org/courtside/booking/BookingWriter.java#bookable",
-        "src/main/java/org/courtside/booking/waitlist/WaitlistQueue.java#eligible"
+        "src/main/java/org/courtside/booking/waitlist/WaitlistQueue.java#eligible",
+        "src/main/java/org/courtside/booking/internal/CardEligibilityPolicy.java#admits",
+        "src/main/java/org/courtside/booking/BookingWriter.java#isBookable"
       ],
       "positiveTests": [
         "src/test/java/org/courtside/booking/internal/CardEligibilityPolicyTest.java#givenTheRequiredRole_whenRequiringEligibility_thenTheCardIsReturned"

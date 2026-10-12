@@ -18,6 +18,7 @@ import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.courtside.member.testfixture.MemberTestFixture;
 import org.courtside.shared.OpeningWindow;
+import org.courtside.shared.SecurityEventLog;
 import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -25,6 +26,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 import java.time.DayOfWeek;
 import java.time.Instant;
@@ -37,6 +39,8 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 
 @Import({FacilityTestFixture.class, IdentityTestFixture.class, ConfigTestFixture.class, BookingTestFixture.class,
         MemberTestFixture.class})
@@ -75,6 +79,9 @@ class WaitlistTest extends AbstractIntegrationTest {
 
     @Autowired
     private MemberTestFixture memberships;
+
+    @MockitoSpyBean
+    private SecurityEventLog securityEvents;
 
     @Autowired
     private JdbcClient jdbc;
@@ -450,6 +457,59 @@ class WaitlistTest extends AbstractIntegrationTest {
         // then
         assertThat(offered).as("each decline passes the offer to the next in joining order")
                 .containsExactly(firstEntry, secondEntry, thirdEntry);
+    }
+
+    @Test
+    void givenAWaitingTrainerWhoLostTheRole_whenTheSlotFrees_thenTheyAreSkippedWithoutASecurityEvent() {
+        // given
+        Member trainer = member("Jane", "Roe", Role.TRAINER);
+        UUID booking = book(holder, SLOT);
+        UUID trainerEntry = waitlist.join(new JoinWaitlistCommand(court, TRAINING_CARD, SLOT, trainer.accountId(),
+                trainer.personId(), Set.of(Role.TRAINER), null, List.of()));
+        UUID secondEntry = join(second, SLOT);
+        memberships.changeAccountRoles(trainer.personId(), Set.of(Role.MEMBER));
+
+        // when
+        bookings.cancel(booking, holder.accountId(), Set.of(Role.MEMBER));
+
+        // then
+        assertThat(stateOf(trainerEntry)).isEqualTo("SKIPPED");
+        assertThat(stateOf(secondEntry)).isEqualTo("OFFERED");
+        verify(securityEvents, never()).authorizationDeniedForCurrentAccount();
+    }
+
+    @Test
+    void givenAnOffer_whenAFormerGroundskeeperMovesTheirClosureOntoTheReservedCourt_thenTheMoveIsBlocked() {
+        // given
+        UUID entry = offerTo(first);
+        Member groundskeeper = member("Mary", "Roe", Role.GROUNDSKEEPER);
+        UUID closure = bookingFixture.createSeries(court, COURT_CLOSED, LocalDate.of(2026, 5, 13),
+                LocalTime.of(20, 0), 60, 1, groundskeeper.accountId(), groundskeeper.personId(),
+                Set.of(Role.GROUNDSKEEPER));
+
+        // when / then
+        assertThatThrownBy(() -> bookingFixture.moveWholeSeries(closure, LocalTime.of(18, 0),
+                groundskeeper.accountId(), Set.of(Role.MEMBER)))
+                .as("a closure goes first only for whom the closure card admits")
+                .isInstanceOf(SeriesMoveConflictException.class);
+        assertThat(stateOf(entry)).isEqualTo("OFFERED");
+    }
+
+    @Test
+    void givenAnOffer_whenTheGroundskeeperMovesTheirClosureOntoTheReservedCourt_thenTheClosureTakesIt() {
+        // given
+        UUID entry = offerTo(first);
+        Member groundskeeper = member("Mary", "Roe", Role.GROUNDSKEEPER);
+        UUID closure = bookingFixture.createSeries(court, COURT_CLOSED, LocalDate.of(2026, 5, 13),
+                LocalTime.of(20, 0), 60, 1, groundskeeper.accountId(), groundskeeper.personId(),
+                Set.of(Role.GROUNDSKEEPER));
+
+        // when
+        bookingFixture.moveWholeSeries(closure, LocalTime.of(18, 0), groundskeeper.accountId(),
+                Set.of(Role.GROUNDSKEEPER));
+
+        // then
+        assertThat(stateOf(entry)).isEqualTo("WITHDRAWN");
     }
 
     @Test

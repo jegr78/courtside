@@ -136,7 +136,7 @@ class QueuedWaitlistOfferTest extends AbstractIntegrationTest {
         doAnswer(invocation -> {
             MimeMessage sent = invocation.getArgument(0);
             if (sent.getAllRecipients()[0].toString().contains("mary.major")) {
-                throw refusal();
+                throw refusal("550 5.1.1 user unknown");
             }
             return null;
         }).when(sender).send(any(MimeMessage.class));
@@ -151,6 +151,41 @@ class QueuedWaitlistOfferTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenAnOpenOffer_whenTheRelayRefusesToRelayAtAll_thenTheOfferStands() {
+        // given
+        UUID booking = bookings.createBookingNamingMember(court, MEMBER_CARD, SLOT, holderAccount, holderPerson,
+                Set.of(Role.MEMBER), null, partnerPerson);
+        UUID entry = bookings.joinWaitlist(court, MEMBER_CARD, SLOT, waitingAccount, waitingPerson, partnerPerson);
+        bookings.cancelBooking(booking, holderAccount, Set.of(Role.MEMBER));
+        doAnswer(invocation -> {
+            throw refusal("554 5.7.1 <mary.major@example.org>: Relay access denied");
+        }).when(sender).send(any(MimeMessage.class));
+
+        // when
+        outbox.deliverDue();
+
+        // then
+        assertThat(outcome()).containsEntry("state", "REFUSED");
+        assertThat(stateOf(entry)).as("a relay refusing everyone says nothing about this member's mailbox")
+                .isEqualTo("OFFERED");
+    }
+
+    @Test
+    void givenAnOpenOffer_whenARefusalIsReportedForAnotherAccount_thenTheOfferStands() {
+        // given
+        UUID booking = bookings.createBookingNamingMember(court, MEMBER_CARD, SLOT, holderAccount, holderPerson,
+                Set.of(Role.MEMBER), null, partnerPerson);
+        UUID entry = bookings.joinWaitlist(court, MEMBER_CARD, SLOT, waitingAccount, waitingPerson, partnerPerson);
+        bookings.cancelBooking(booking, holderAccount, Set.of(Role.MEMBER));
+
+        // when
+        announcer.offerUndeliverable(entry, holderAccount);
+
+        // then
+        assertThat(stateOf(entry)).as("only a refusal of the offer's own message ends it").isEqualTo("OFFERED");
+    }
+
+    @Test
     void givenAnOfferTakenMeanwhile_whenItsMailIsReportedRefused_thenTheBookingStands() {
         // given
         UUID booking = bookings.createBookingNamingMember(court, MEMBER_CARD, SLOT, holderAccount, holderPerson,
@@ -160,7 +195,7 @@ class QueuedWaitlistOfferTest extends AbstractIntegrationTest {
         bookings.acceptWaitlistOffer(entry, waitingAccount, waitingPerson);
 
         // when
-        announcer.offerUndeliverable(entry);
+        announcer.offerUndeliverable(entry, waitingAccount);
 
         // then
         assertThat(stateOf(entry)).as("a refusal arriving after the offer ended changes nothing").isEqualTo("BOOKED");
@@ -171,9 +206,9 @@ class QueuedWaitlistOfferTest extends AbstractIntegrationTest {
                 .query(String.class).single();
     }
 
-    private static MailSendException refusal() throws Exception {
+    private static MailSendException refusal(String reply) throws Exception {
         return new MailSendException(Map.of("<a-message-id@example.org>",
-                new SendFailedException("550 5.1.1 user unknown", null, new Address[0],
+                new SendFailedException(reply, null, new Address[0],
                         new Address[0], new Address[]{new InternetAddress("mary.major@example.org")})));
     }
 

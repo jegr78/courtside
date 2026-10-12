@@ -90,8 +90,11 @@ class BookingWriter implements SeriesOccurrenceCancellation, BookingDrafts {
         if (!facility.findUnbookableCourts(command.courtIds()).isEmpty()) {
             return false;
         }
+        if (!cardEligibility.admits(command.cardId(), command.callerRoles())) {
+            return false;
+        }
         try {
-            bookable(command);
+            checked(cardEligibility.requireActive(command.cardId()), command);
             return true;
         } catch (DomainFailure refused) {
             return false;
@@ -100,7 +103,10 @@ class BookingWriter implements SeriesOccurrenceCancellation, BookingDrafts {
 
     private List<ParticipantSpec> bookable(CreateBookingCommand command) {
         facility.requireBookableCourts(command.courtIds());
-        BookingCard card = cardEligibility.requireEligible(command.cardId(), command.callerRoles());
+        return checked(cardEligibility.requireEligible(command.cardId(), command.callerRoles()), command);
+    }
+
+    private List<ParticipantSpec> checked(BookingCard card, CreateBookingCommand command) {
         List<ParticipantSpec> slots = resolveSlots(card, command);
         ruleGate.requireNoViolations(new BookingRuleCheck(command.courtIds(), command.cardId(), command.slot(),
                 command.bookedBy(), command.bookedByPersonId(), command.callerRoles()));
@@ -110,7 +116,7 @@ class BookingWriter implements SeriesOccurrenceCancellation, BookingDrafts {
     UUID write(CreateBookingCommand command, String idempotencyKey, String requestFingerprint) {
         bookingGridCoordination.lock();
         List<ParticipantSpec> slots = bookable(command);
-        if (CourtReservations.overriddenBy(command.callerRoles(), command.cardId())) {
+        if (CourtReservations.overriddenBy(command.callerRoles(), command.cardId(), true)) {
             reservations.withdrawFor(command.courtIds(), command.slot(), command.bookedBy());
         } else {
             reservations.requireUnreserved(command.courtIds(), command.slot(), command.bookedBy());

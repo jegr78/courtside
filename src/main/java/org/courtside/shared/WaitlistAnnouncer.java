@@ -13,8 +13,8 @@ public interface WaitlistAnnouncer {
     // Only the account's own entries, read in a fixed number of statements.
     Map<UUID, Offer> describeOffersOf(UUID accountId, Collection<UUID> entryIds);
 
-    // A refused offer mail passes a still open offer on, since its member never learns of it.
-    void offerUndeliverable(UUID entryId);
+    // A refused offer mail passes the account's still open offer on, since its member never learns of it.
+    void offerUndeliverable(UUID entryId, UUID accountId);
 
     // The slot is described as a booking would be, so its wording is the booking's wording.
     record Offer(UUID accountId, BookingAnnouncement slot, Instant expiresAt, boolean open) {

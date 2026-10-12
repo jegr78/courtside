@@ -134,7 +134,7 @@ public class SeriesService {
                 .toList();
         List<List<RuleViolation>> violations = ruleGate.violationsFor(checks);
         List<CourtOccupancy> occupancies = occupancies(rule, expansion.slots());
-        List<Reserved> reserved = CourtReservations.overriddenBy(callerRoles, rule.cardId())
+        List<Reserved> reserved = CourtReservations.overriddenBy(callerRoles, rule.cardId(), card.permits(callerRoles))
                 ? List.of()
                 : reservedOver(expansion.slots());
         List<SeriesPreview.Occurrence> occurrences = IntStream.range(0, expansion.slots().size())
@@ -259,10 +259,11 @@ public class SeriesService {
                 ? moveRuleViolations(planned, callerRoles)
                 : planned.stream().map(ignored -> List.<RuleViolation>of()).toList();
         List<Reserved> reserved = reservedAround(planned);
+        boolean overriding = overrides(planned, callerRoles);
         List<MovePreview.Move> moves = IntStream.range(0, planned.size())
                 .mapToObj(index -> toPreviewMove(
                         planned.get(index), planned, movingIds, targets, ruleViolations.get(index), reserved,
-                        callerRoles))
+                        overriding))
                 .toList();
 
         return new MovePreview(moves);
@@ -365,7 +366,8 @@ public class SeriesService {
         if (executions.isEmpty()) {
             return;
         }
-        if (CourtReservations.overriddenBy(callerRoles, executions.getFirst().booking().getCardId())) {
+        UUID cardId = executions.getFirst().booking().getCardId();
+        if (CourtReservations.overriddenBy(callerRoles, cardId, cardEligibility.admits(cardId, callerRoles))) {
             Instant from = executions.stream().map(execution -> execution.slot().start()).min(Instant::compareTo).orElseThrow();
             Instant to = executions.stream().map(execution -> execution.slot().end()).max(Instant::compareTo).orElseThrow();
             reservations.withdraw(reservations.reservedBetween(from, to).stream()
@@ -427,15 +429,23 @@ public class SeriesService {
         return reservations.reservedBetween(from, to);
     }
 
+    private boolean overrides(List<PlannedMove> planned, Set<Role> callerRoles) {
+        if (planned.isEmpty()) {
+            return false;
+        }
+        UUID cardId = planned.getFirst().cardId();
+        return CourtReservations.overriddenBy(callerRoles, cardId, cardEligibility.admits(cardId, callerRoles));
+    }
+
     private MovePreview.Move toPreviewMove(PlannedMove move, List<PlannedMove> planned,
                                            List<UUID> movingIds,
                                            List<ParticipantCardCapacity.Target> targets,
                                            List<RuleViolation> ruleViolations,
-                                           List<Reserved> reserved, Set<Role> callerRoles) {
+                                           List<Reserved> reserved, boolean overriding) {
         Set<UUID> blocked = new LinkedHashSet<>(allocations.findOccupiedCourtsExcluding(
                 move.courts(), move.to().start(), move.to().end(), movingIds));
         blocked.addAll(conflictingCourts(move, planned));
-        if (!CourtReservations.overriddenBy(callerRoles, move.cardId())) {
+        if (!overriding) {
             reserved.stream().filter(held -> held.blocks(move.courts(), move.to(), move.bookedBy()))
                     .forEach(held -> blocked.add(held.courtId()));
         }

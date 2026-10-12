@@ -35,12 +35,14 @@ class WaitlistAnnouncements implements WaitlistAnnouncer {
 
     @Override
     @Transactional
-    public void offerUndeliverable(UUID entryId) {
+    public void offerUndeliverable(UUID entryId, UUID accountId) {
         grid.lock();
-        rows.find(entryId).filter(entry -> entry.state() == WaitlistState.OFFERED).ifPresent(entry -> {
-            rows.close(entry.id(), WaitlistState.SKIPPED, clock.instant());
-            queue.offerFreeQueues(List.of(entry.courtId()), entry.slot());
-        });
+        rows.find(entryId)
+                .filter(entry -> entry.accountId().equals(accountId) && entry.state() == WaitlistState.OFFERED)
+                .ifPresent(entry -> {
+                    rows.close(entry.id(), WaitlistState.SKIPPED, clock.instant());
+                    queue.offerFreeQueues(List.of(entry.courtId()), entry.slot());
+                });
     }
 
     @Override

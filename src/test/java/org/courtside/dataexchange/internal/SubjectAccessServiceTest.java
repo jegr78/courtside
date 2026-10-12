@@ -121,7 +121,7 @@ class SubjectAccessServiceTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void givenAWaitlistEntryWhoseSlotHasEnded_whenTheAnswerIsProduced_thenItIsNotInIt() {
+    void givenAWaitlistEntryWhoseSlotHasEnded_whenTheAnswerIsProduced_thenItIsStillInIt() {
         // given
         UUID personId = roster.addPerson("Jane", "Doe", "jane.doe@example.org");
         UUID accountId = identity.createEnabledAccount(personId, "jane.doe", Set.of(Role.MEMBER));
@@ -141,8 +141,8 @@ class SubjectAccessServiceTest extends AbstractIntegrationTest {
         SubjectAccessRecord answer = subjectAccess.answerFor(personId);
 
         // then
-        assertThat(answer.waitlistEntries()).as("an entry the sweep forgets is no longer part of the answer")
-                .isEmpty();
+        assertThat(answer.waitlistEntries()).as("everything stored about the person is in the answer until it is deleted")
+                .singleElement().satisfies(entry -> assertThat(entry.state()).isEqualTo("ENDED"));
     }
 
     @Test
