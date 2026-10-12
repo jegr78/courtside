@@ -19,6 +19,7 @@ import {
 } from "./offlineBookings";
 import { reachesAdministration } from "./navigation/administrationAccess";
 import { lazySurface } from "./navigation/lazySurface";
+import { returnSearch, returnTargetIn, signInPath } from "./navigation/returnTarget";
 import { HomeView } from "./views/HomeView";
 import { InitialPasswordView } from "./views/InitialPasswordView";
 import { LoginView } from "./views/LoginView";
@@ -45,14 +46,16 @@ interface AppRoutesProps {
 export function AppRoutes({ session, refreshSession, passwordChanged, initialPasswordChanged, signedOut,
   configurationChanged, clubName, offline = false }: AppRoutesProps) {
   const { t } = useTranslation();
-  const { pathname } = useLocation();
+  const location = useLocation();
+  const { pathname } = location;
+  const signInFirst = <Navigate to={signInPath(location)} replace />;
   const administrative = pathname === "/admin" || pathname.startsWith("/admin/");
   const administrator = session.roles.includes("ADMIN");
 
   if (session.passwordChangeRequired) {
     return <Routes>
       <Route path="/initial-password" element={<InitialPasswordView changed={() => initialPasswordChanged?.()} />} />
-      <Route path="*" element={<Navigate to="/initial-password" replace />} />
+      <Route path="*" element={<Navigate to={{ pathname: "/initial-password", search: returnSearch(location.search) }} replace />} />
     </Routes>;
   }
   return <UnsavedChangesProvider>
@@ -66,18 +69,18 @@ export function AppRoutes({ session, refreshSession, passwordChanged, initialPas
       ? <Navigate to="/" replace />
       : <AccountRecoveryView />} />
     <Route path="/login" element={session.authenticated
-      ? <Navigate to={passwordChanged && session.roles.includes("ADMIN") ? "/admin" : "/"} replace />
+      ? <Navigate to={returnTargetIn(location.search) ?? (passwordChanged && session.roles.includes("ADMIN") ? "/admin" : "/")} replace />
       : <LoginView refreshSession={refreshSession} passwordChanged={passwordChanged} />} />
     <Route path="/my-bookings" element={session.authenticated
       ? <MyBookingsPage session={session} offline={offline} />
-      : <Navigate to="/login" replace />} />
+      : signInFirst} />
     <Route path="/my-messages" element={session.authenticated
       ? <MyMessagesView />
-      : <Navigate to="/login" replace />} />
+      : signInFirst} />
     <Route path="/account/security" element={session.authenticated
       ? <AccountSecurityView passwordChanged={() => initialPasswordChanged?.()}
         signedOut={() => signedOut?.()} />
-      : <Navigate to="/login" replace />} />
+      : signInFirst} />
     {/* The role is asked once for the whole surface rather than once per destination. */}
     <Route path="/admin/*" element={reachesAdministration(session)
       ? <Suspense fallback={<p role="status">{t("status.loading")}</p>}>
@@ -149,6 +152,7 @@ function FooterLink({ testId, href, label }: { testId: string; href: string; lab
 export function App() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const { search } = useLocation();
   const { club, changed: configurationChanged, load: loadClub } = useClubConfiguration();
   const [session, setSession] = useState<SessionStatus>();
   const [source, setSource] = useState<SourceOffer>();
@@ -248,7 +252,7 @@ export function App() {
       setPasswordChanged(true);
       setSession({ authenticated: false, roles: [], passwordChangeRequired: false });
     });
-    void navigate("/login");
+    void navigate(`/login${returnSearch(search)}`);
   }
 
   // The session has to be gone before the route is chosen: signing out from a role-guarded page
