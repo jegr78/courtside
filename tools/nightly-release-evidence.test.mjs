@@ -93,8 +93,11 @@ test("given an incomplete or repeated run, when it is checked, then it cannot qu
   }
 });
 
+const repository = "jegr78/courtside";
+
 function run(overrides = {}) {
-  return { id: runId, head_sha: commit, head_branch: "main", event: "schedule", run_attempt: 1, ...overrides };
+  return { id: runId, head_sha: commit, head_branch: "main", event: "schedule", run_attempt: 1,
+    path: ".github/workflows/build.yml", head_repository: { full_name: repository }, ...overrides };
 }
 
 test("given recorded build runs, when the nightly candidates are read, then only first attempts on the branch count", () => {
@@ -108,9 +111,9 @@ test("given recorded build runs, when the nightly candidates are read, then only
   ] }, { workflow_runs: [run({ id: 128, event: "workflow_dispatch" })] }];
 
   // when / then
-  assert.deepEqual(nightlyRunsOf(pages, "main"), [{ id: runId, head: commit }, { id: 128, head: commit }],
+  assert.deepEqual(nightlyRunsOf(pages, "main", repository), [{ id: runId, head: commit }, { id: 128, head: commit }],
     "a push build rehearses no gates and a re-run attempt proves nothing on its first try");
-  assert.deepEqual(nightlyRunsOf(pages, "release/0.1"), [{ id: 126, head: commit }],
+  assert.deepEqual(nightlyRunsOf(pages, "release/0.1", repository), [{ id: 126, head: commit }],
     "a patch reads the dispatched build of its own release branch, never a main nightly");
 });
 
@@ -135,4 +138,22 @@ test("given no nightly whose evidence verifies, when evidence is found, then the
   assert.throws(() => findNightlyRelease({ runs: [{ id: runId, head: commit }], isAncestor: () => false,
     evidenceOf: () => generated(), branch: "main" }), /no green first-attempt build on main/,
   "a nightly of a commit the release does not build on proves nothing about it");
+});
+
+test("given runs from a fork, another workflow or a re-run, when nightly candidates are read, then none of them counts", () => {
+  // given
+  const foreign = [
+    run({ id: 140, head_repository: { full_name: "someone/courtside" } }),
+    run({ id: 141, path: ".github/workflows/nightly-image.yml" }),
+    run({ id: 142, run_attempt: 2 }),
+    run({ id: 143, head_branch: "release/0.1-evil", event: "workflow_dispatch" }),
+    run({ id: 144, head_repository: null })
+  ];
+
+  // when / then
+  assert.deepEqual(nightlyRunsOf([{ workflow_runs: foreign }], "main", repository), [],
+    "evidence comes from this repository's build workflow on its first attempt");
+  assert.deepEqual(nightlyRunsOf([{ workflow_runs: foreign }], "release/0.1", repository), []);
+  assert.throws(() => nightlyRunsOf([], "release/0.1-evil", repository), /not a release target/,
+    "only main and release/<major>.<minor> carry release evidence");
 });

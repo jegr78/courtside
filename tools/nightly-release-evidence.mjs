@@ -3,6 +3,7 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
+import { targetBranch } from "./release-line.mjs";
 
 const commitPattern = /^[a-f0-9]{40}$/;
 const evidenceFields = ["attempt", "commit", "contract", "firstAttempt", "jobs", "releaseReadiness", "runId",
@@ -42,9 +43,12 @@ export function validateNightlyReleaseEvidence(evidence, expected) {
   return { commit: expected.commit, runId: expected.runId };
 }
 
-export function nightlyRunsOf(pages, branch) {
+export function nightlyRunsOf(pages, branch, repository) {
+  targetBranch(branch);
   return pages.flatMap((page) => page.workflow_runs ?? [])
-    .filter((run) => run.head_branch === branch && (run.event === "schedule" || run.event === "workflow_dispatch")
+    .filter((run) => run.head_branch === branch && run.head_repository?.full_name === repository
+      && run.path === ".github/workflows/build.yml"
+      && (run.event === "schedule" || run.event === "workflow_dispatch")
       && run.run_attempt === 1 && commitPattern.test(run.head_sha ?? ""))
     .map((run) => ({ id: run.id, head: run.head_sha }));
 }
@@ -79,6 +83,7 @@ function succeeds(executable, arguments_) {
 }
 
 function findOnBranch({ branch, commit }) {
+  targetBranch(branch);
   const repository = process.env.GITHUB_REPOSITORY;
   if (!/^[\w.-]+\/[\w.-]+$/.test(repository ?? "")) throw new Error("GITHUB_REPOSITORY names no repository");
   if (!commitPattern.test(commit ?? "")) throw new Error("--commit must be a full 40-character sha");
@@ -87,7 +92,7 @@ function findOnBranch({ branch, commit }) {
   const directory = mkdtempSync(join(tmpdir(), "courtside-nightly-evidence-"));
   try {
     return findNightlyRelease({
-      runs: nightlyRunsOf(pages, branch),
+      runs: nightlyRunsOf(pages, branch, repository),
       branch,
       isAncestor: (head) => succeeds("git", ["cat-file", "-e", `${head}^{commit}`])
         && succeeds("git", ["merge-base", "--is-ancestor", head, commit]),

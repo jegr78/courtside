@@ -3,6 +3,7 @@ import { execFileSync } from "node:child_process";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import {
+  branchFetchArguments,
   greenExactBuild,
   pendingReleasePullRequests,
   readCommitFacts,
@@ -370,4 +371,15 @@ test("given build runs of a patch commit, when the exact build is read, then onl
     "a release-branch build does not verify a commit on main");
   assert.equal(greenExactBuild([{ workflow_runs: [{ ...dispatched, head_branch: "main" }] }], "jegr78/courtside",
     "release/0.1"), null, "a main build does not verify a patch");
+});
+
+test("given the branch a release belongs to, when it is fetched, then a tag of the same name cannot stand in for it", () => {
+  // when / then
+  assert.deepEqual(branchFetchArguments("release/0.1"),
+    ["fetch", "--no-tags", "origin", "+refs/heads/release/0.1:refs/remotes/origin/release/0.1"],
+    "git resolves a short name to refs/tags before refs/heads, so a pushed tag release/0.1 would win");
+  assert.deepEqual(branchFetchArguments("main"), ["fetch", "--no-tags", "origin", "+refs/heads/main:refs/remotes/origin/main"]);
+  for (const branch of ["release/0.1.1", "release/x", "refs/heads/main", "release/0.1 ", "feature/release/0.1"]) {
+    assert.throws(() => branchFetchArguments(branch), /not a release target/, `${branch} is not fetched as a release line`);
+  }
 });

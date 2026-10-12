@@ -20,7 +20,7 @@ export function releaseBranchOf(version) {
   return patch === 0 || prerelease !== null ? "main" : `release/${major}.${minor}`;
 }
 
-function targetBranch(branch) {
+export function targetBranch(branch) {
   if (branch !== "main" && !releaseBranchPattern.test(branch ?? "")) {
     throw new Error(`${JSON.stringify(branch)} is not a release target; use main or release/<major>.<minor>`);
   }
@@ -77,9 +77,10 @@ function released(message, releasable) {
 
 export function forwardPortVerdict({ git, baseRef, headRef, mainRef, releasable }) {
   const tag = `v${recordedVersion(git, baseRef)}`;
+  const tagRef = `refs/tags/${tag}`;
   const onMain = (sha) => succeeds(git, "merge-base", "--is-ancestor", sha, mainRef);
-  const ports = commitsBetween(git, tag, mainRef).map(({ message }) => message).join("\n");
-  const missing = commitsBetween(git, tag, headRef)
+  const ports = commitsBetween(git, tagRef, mainRef).map(({ message }) => message).join("\n");
+  const missing = commitsBetween(git, tagRef, headRef)
     .filter(({ message }) => released(message, releasable))
     .filter(({ message }) => ![...message.matchAll(cherryPickPattern)].some(([, origin]) => onMain(origin)))
     .filter(({ sha }) => !ports.includes(`(cherry picked from commit ${sha})`))
@@ -132,10 +133,18 @@ function runGit(...arguments_) {
     maxBuffer: 64 * 1024 * 1024 }).trim();
 }
 
+export function remoteRefOf(branch) {
+  return `refs/remotes/origin/${targetBranch(branch)}`;
+}
+
+export function branchFetchArguments(branch) {
+  return ["fetch", "--no-tags", "origin", `+refs/heads/${targetBranch(branch)}:refs/remotes/origin/${branch}`];
+}
+
 function fetchBranches(git, branches) {
   for (const branch of new Set(branches)) {
     try {
-      git("fetch", "--quiet", "--no-tags", "origin", `+refs/heads/${branch}:refs/remotes/origin/${branch}`);
+      git(...branchFetchArguments(branch));
     } catch {
       process.stderr.write(`origin has no branch ${branch}\n`);
     }
@@ -171,7 +180,7 @@ function report(verdicts, summary) {
 
 export function main(arguments_, git = runGit) {
   const options = optionsOf(arguments_);
-  const refOf = (branch) => `origin/${branch}`;
+  const refOf = remoteRefOf;
   if (options.command === "pull-request") {
     const base = targetBranch(options.base);
     const head = git("rev-parse", "--verify", `${options.head}^{commit}`);

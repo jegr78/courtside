@@ -1,7 +1,9 @@
 import { execFileSync } from "node:child_process";
 import { appendFileSync, readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
-import { releaseBranchOf } from "./release-line.mjs";
+import { branchFetchArguments, releaseBranchOf } from "./release-line.mjs";
+
+export { branchFetchArguments };
 
 const commitPattern = /^[a-f0-9]{40}$/;
 const versionPattern = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
@@ -186,8 +188,8 @@ export function gatherFacts(options, environment = process.env) {
   const releasing = event === "workflow_dispatch" ? !rehearsal : facts.manifest !== facts.parentManifest;
   if (!releasing) return facts;
   const branch = releaseBranchOf(facts.manifest);
-  git("fetch", "--no-tags", "origin", branch);
-  facts.onBranch = succeeds("git", ["merge-base", "--is-ancestor", commit, "FETCH_HEAD"]);
+  git(...branchFetchArguments(branch));
+  facts.onBranch = succeeds("git", ["merge-base", "--is-ancestor", commit, `refs/remotes/origin/${branch}`]);
   facts.tagExists = command("git", ["ls-remote", "--tags", "origin", `refs/tags/v${facts.manifest}`]) !== "";
   const label = encodeURIComponent(pendingLabel);
   facts.pendingPullRequests = pendingReleasePullRequests(
