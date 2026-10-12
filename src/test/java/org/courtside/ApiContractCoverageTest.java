@@ -231,6 +231,27 @@ class ApiContractCoverageTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void everyOperationRequiringACsrfTokenDocumentsTheRefusalOfAMissingOne() {
+        // when
+        TreeSet<String> silent = new TreeSet<>();
+        paths().forEach((path, methods) -> operationsOf(methods).forEach((method, operation) -> {
+            Object security = operation.getOrDefault("security", DOCUMENT_TREE.get("security"));
+            boolean guarded = security instanceof List<?> requirements && requirements.stream()
+                    .anyMatch(requirement -> requirement instanceof Map<?, ?> schemes
+                            && schemes.containsKey("csrfToken"));
+            if (guarded && !responsesOf(operation).containsKey("403")) {
+                silent.add(method.toUpperCase() + " " + path);
+            }
+        }));
+
+        // then
+        assertThat(silent)
+                .as("the CSRF token is checked before the operation runs, and a request without it"
+                        + " receives 403 urn:courtside:error:access-denied")
+                .isEmpty();
+    }
+
+    @Test
     void everyOperationWithAQueryParameterItCanRefuseDocumentsTheAnswer() {
         // when
         TreeSet<String> silent = operationsWithNo("400", ApiContractCoverageTest::canBeRefused);
