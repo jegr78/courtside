@@ -209,6 +209,10 @@ when the first message is sent. These two refusals are easy to meet on another p
 `COURTSIDE_SOURCE_URL` defaults to this repository, so an image built from modified source has to
 point it at that source.
 
+`COURTSIDE_PUBLIC_URL` is the address booking messages link to. Unset, they go out without a link.
+Set, it must be an absolute `https://` address without path, query or credentials, or the
+application refuses to start.
+
 These inputs are paths to files the container reads, so mount each one readable by UID 10001:
 
 - `COURTSIDE_APP_TLS_CERTIFICATE`
@@ -245,6 +249,8 @@ variables with other names:
 - `COURTSIDE_MAIL_RELAY_USERNAME` becomes `COURTSIDE_MAIL_USERNAME` with an external relay;
 - `COURTSIDE_MAIL_HOSTNAME` becomes `COURTSIDE_MAIL_RELAY_HOST` with this deployment's own mail
   server;
+- `COURTSIDE_DOMAIN` becomes `COURTSIDE_PUBLIC_URL` as `https://` and the domain, unless `.env` sets
+  `COURTSIDE_PUBLIC_URL` itself;
 - `COURTSIDE_DB_TLS_AUTHORITY`, `COURTSIDE_APP_TLS_MATERIAL` and `COURTSIDE_APP_TLS_AUTHORITY` name
   host directories and files that Compose mounts, and the container variables name the mounted
   paths.
@@ -317,6 +323,7 @@ they name a file on the host, in the container the path it is mounted at. The
 | `COURTSIDE_PASSWORD_RESET_MAIL_RETENTION` | `24h` |
 | `COURTSIDE_PASSWORD_RESET_MAIL_WINDOW` | `1h` |
 | `COURTSIDE_PASSWORD_TERMS_FILE` | unset |
+| `COURTSIDE_PUBLIC_URL` | unset |
 | `COURTSIDE_SESSION_ABSOLUTE_LIFETIME` | `24h` |
 | `COURTSIDE_SESSION_CLEANUP_CRON` | `0 * * * * *` |
 | `COURTSIDE_SESSION_INACTIVITY_TIMEOUT` | `30m` |

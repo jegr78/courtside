@@ -26,8 +26,8 @@ class BookingCalendar {
         this.clock = clock;
     }
 
-    MailAttachment create(UUID bookingId, BookingAnnouncement booking, String courts) {
-        List<String> lines = List.of(
+    MailAttachment create(UUID bookingId, BookingAnnouncement booking, String courts, String link) {
+        List<String> lines = new ArrayList<>(List.of(
                 "BEGIN:VCALENDAR",
                 "VERSION:2.0",
                 "PRODID:-//Courtside//Booking//EN",
@@ -39,11 +39,11 @@ class BookingCalendar {
                 "DTSTART:" + format(booking.startsAt()),
                 "DTEND:" + format(booking.endsAt()),
                 "SUMMARY:" + escape(booking.cardLabel() + " - " + courts),
-                "LOCATION:" + escape(courts),
-                "STATUS:CONFIRMED",
-                "TRANSP:OPAQUE",
-                "END:VEVENT",
-                "END:VCALENDAR");
+                "LOCATION:" + escape(courts)));
+        if (!link.isEmpty()) {
+            lines.add("URL:" + link);
+        }
+        lines.addAll(List.of("STATUS:CONFIRMED", "TRANSP:OPAQUE", "END:VEVENT", "END:VCALENDAR"));
         String calendar = lines.stream().flatMap(line -> fold(line).stream())
                 .collect(Collectors.joining("\r\n", "", "\r\n"));
         return new MailAttachment("booking.ics", "text/calendar; charset=UTF-8; method=PUBLISH",

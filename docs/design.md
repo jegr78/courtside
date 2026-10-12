@@ -565,6 +565,20 @@ receives one summary naming the card, weekdays, time, courts, first and last dat
 occurrences, and its centre entry leads to the first occurrence. Displacement informs people but
 does not cancel the booking.
 
+A booking message ends with a link to the instance on its own last line. The address is the
+operator's `COURTSIDE_PUBLIC_URL`, because it is bound to DNS and the certificate and a scheduled
+reminder has no request to derive it from. Only an absolute `https://` address without path, query
+or credentials is accepted, and anything else refuses startup. Without the setting, every message
+goes out without a link. A template line holding nothing but an empty link is dropped, and inside a
+sentence the link renders empty. Confirmation, participant addition and withdrawal, displacement and
+reminder lead to the booking on `/my-bookings#booking-<id>`. Cancellations, cancellations by the
+club and series messages lead to `/my-bookings`. A waitlist offer leads to its entry on
+`/my-bookings#waitlist-<id>`, where the member takes it. The confirmation's calendar entry carries
+the same link as its `URL`. The shipped messages with a generated credential, a reset code or a
+username carry neither a link nor the address, so members learn that a genuine one does not ask
+them to follow a link. A mail client may still turn text that looks like an address into one. The
+address is written in its ASCII form, so an internationalised domain appears as Punycode.
+
 A cancelled booking is announced to its holder and its players, except the account that cancelled
 it. When the holder cancels, the message says the booking is gone. When anybody else cancels, an
 administrator or an account the card lets manage it, the message says the club cancelled it. Neither

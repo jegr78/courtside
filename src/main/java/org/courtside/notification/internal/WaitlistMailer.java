@@ -25,6 +25,7 @@ class WaitlistMailer implements MessageComposer {
     private final UserAccountRepository accounts;
     private final ClubIdentity club;
     private final MailTemplates templates;
+    private final InstanceLinks links;
     private final BookingWording wording;
     private final MessageOutbox outbox;
 
@@ -55,6 +56,7 @@ class WaitlistMailer implements MessageComposer {
         Map<String, String> values = new HashMap<>(wording.of(offer.slot(), locale));
         values.putAll(wording.deadline(offer.expiresAt(), locale));
         values.put("firstName", account.getPerson().getFirstName());
+        values.put(InstanceLinks.PLACEHOLDER, links.of(message));
         String key = message.kind().templateKey();
         handOver.accept(new OutgoingMail(account.getPerson().getEmail(),
                 templates.render(key + ".subject", locale, values),

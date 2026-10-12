@@ -28,6 +28,7 @@ class ReminderMailer implements MessageComposer {
     private final UserAccountRepository accounts;
     private final ClubIdentity club;
     private final MailTemplates templates;
+    private final InstanceLinks links;
     private final BookingWording wording;
     private final MessageOutbox outbox;
     private final Clock clock;
@@ -55,6 +56,7 @@ class ReminderMailer implements MessageComposer {
         String key = MessageKind.BOOKING_REMINDER.templateKey();
         Map<String, String> values = new HashMap<>(wording.of(booking, locale));
         values.put("firstName", account.getPerson().getFirstName());
+        values.put(InstanceLinks.PLACEHOLDER, links.of(message));
         handOver.accept(new OutgoingMail(account.getPerson().getEmail(),
                 templates.render(key + ".subject", locale, values),
                 templates.render(key + ".body", locale, values)));

@@ -156,6 +156,20 @@ class BookingConfirmationMessageTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenNoPublicAddress_whenTheConfirmationIsRead_thenNeitherItNorItsCalendarEntryCarriesALink()
+            throws Exception {
+        // when
+        book(List.of(courtId));
+
+        // then
+        MimeMessage sent = theMessageHandedOver();
+        assertThat(body(sent)).as("the message ends with the club's name, as it did before links existed")
+                .doesNotContain("://").doesNotEndWith("\n");
+        assertThat(new String(attachment(sent, "booking.ics").getInputStream().readAllBytes(), StandardCharsets.UTF_8))
+                .doesNotContain("\r\nURL");
+    }
+
+    @Test
     void givenABookingOnSeveralCourts_whenTheConfirmationIsRead_thenEveryCourtIsNamed()
             throws Exception {
         // given

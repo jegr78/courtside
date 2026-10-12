@@ -33,6 +33,7 @@ class SeriesMailer implements MessageComposer {
     private final UserAccountRepository accounts;
     private final ClubIdentity club;
     private final MailTemplates templates;
+    private final InstanceLinks links;
     private final BookingWording wording;
     private final MessageOutbox outbox;
 
@@ -103,6 +104,7 @@ class SeriesMailer implements MessageComposer {
         Locale locale = MessageLanguage.of(account.getLocale(), club.defaultLocale());
         Map<String, String> values = new HashMap<>(wording.ofSeries(occurrences, locale));
         values.put("firstName", account.getPerson().getFirstName());
+        values.put(InstanceLinks.PLACEHOLDER, links.of(message));
         if (message.kind() == MessageKind.BOOKING_SERIES_CANCELLED_BY_CLUB) {
             values.put("reason", wording.reason(message.reason(), locale));
         }

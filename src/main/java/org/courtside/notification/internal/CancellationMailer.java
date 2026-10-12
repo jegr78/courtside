@@ -27,6 +27,7 @@ class CancellationMailer implements MessageComposer {
     private final UserAccountRepository accounts;
     private final ClubIdentity club;
     private final MailTemplates templates;
+    private final InstanceLinks links;
     private final BookingWording wording;
     private final MessageOutbox outbox;
 
@@ -60,6 +61,7 @@ class CancellationMailer implements MessageComposer {
         Locale locale = MessageLanguage.of(account.getLocale(), club.defaultLocale());
         Map<String, String> values = new HashMap<>(wording.of(booking, locale));
         values.put("firstName", account.getPerson().getFirstName());
+        values.put(InstanceLinks.PLACEHOLDER, links.of(message));
         values.put("reason", wording.reason(message.reason(), locale));
         String key = message.kind().templateKey();
         handOver.accept(new OutgoingMail(account.getPerson().getEmail(),

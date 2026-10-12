@@ -25,7 +25,7 @@ class BookingCalendarTest {
         BookingAnnouncement booking = booking("Training;\r\nATTENDEE:adults", courts);
 
         // when
-        String content = content(calendar.create(BOOKING_ID, booking, courts));
+        String content = content(calendar.create(BOOKING_ID, booking, courts, ""));
 
         // then
         String unfolded = content.replace("\r\n ", "");
@@ -46,12 +46,33 @@ class BookingCalendarTest {
         // when
         String content = content(calendar.create(BOOKING_ID, booking,
                 "Äußeres Court mit sehr langem Namen und weiteren mehrbytefähigen Zeichen "
-                        + "für Kalenderprogramme"));
+                        + "für Kalenderprogramme", ""));
 
         // then
         assertThat(content.split("\r\n"))
                 .allSatisfy(line -> assertThat(line.getBytes(StandardCharsets.UTF_8)).hasSizeLessThanOrEqualTo(75));
         assertThat(content).contains("\r\n ");
+    }
+
+    @Test
+    void givenALinkToTheBooking_whenTheEntryIsRendered_thenItCarriesThatLinkAsItsUrl() {
+        // given
+        String link = "https://courts.example.org/my-bookings#booking-" + BOOKING_ID;
+
+        // when
+        String content = content(calendar.create(BOOKING_ID, booking("Member booking", "Court 1"), "Court 1", link));
+
+        // then
+        assertThat(content.replace("\r\n ", "")).contains("\r\nURL:" + link + "\r\nSTATUS:CONFIRMED\r\n");
+    }
+
+    @Test
+    void givenNoLink_whenTheEntryIsRendered_thenItHasNoUrl() {
+        // when
+        String content = content(calendar.create(BOOKING_ID, booking("Member booking", "Court 1"), "Court 1", ""));
+
+        // then
+        assertThat(content.replace("\r\n ", "").split("\r\n")).noneMatch(line -> line.startsWith("URL"));
     }
 
     private static BookingAnnouncement booking(String card, String court) {

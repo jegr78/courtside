@@ -4,12 +4,15 @@ import org.courtside.notification.MessageKind;
 import org.courtside.shared.CancellationReason;
 import org.junit.jupiter.api.Test;
 
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Locale;
 import java.util.Map;
 
 import static java.util.Map.entry;
 import java.util.ResourceBundle;
 import java.util.Set;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -36,15 +39,18 @@ class MailTemplatesTest {
             entry("weekdays", "Tuesday"), entry("first", "Tuesday, 19 May 2026"),
             entry("last", "Tuesday, 2 June 2026"), entry("count", "3"),
             entry("reason", "Reason: the weather."), entry("previousFrom", "17:00"), entry("previousTo", "19:00"),
-            entry("previousCourts", "Court 2"), entry("until", "18:15"), entry("untilDay", "Wednesday, 13 May 2026"));
+            entry("previousCourts", "Court 2"), entry("until", "18:15"), entry("untilDay", "Wednesday, 13 May 2026"),
+            entry("instanceLink", "https://courts.example.org/my-bookings"));
+
+    private static final String ADDRESS_LIKE = "(?i)[a-z][a-z0-9+.-]*://|\\b[\\p{L}0-9-]+\\.\\p{L}{2,}\\b";
 
     private final MailTemplates templates = new MailTemplates();
 
     @Test
     void whenReadingBothLocales_thenEachDefinesTheSameKeys() {
         // when
-        Set<String> german = ResourceBundle.getBundle("mail", Locale.GERMAN).keySet();
-        Set<String> english = ResourceBundle.getBundle("mail", Locale.ENGLISH).keySet();
+        Set<String> german = shipped(Locale.GERMAN).keySet();
+        Set<String> english = shipped(Locale.ENGLISH).keySet();
 
         // then
         assertThat(german).isEqualTo(english).containsAll(KEYS);
@@ -151,5 +157,148 @@ class MailTemplatesTest {
                 templates.render("credentials.newAccount.body", Locale.ENGLISH, Map.of()))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("credentials.newAccount.body");
+    }
+
+    @Test
+    void givenNoInstanceAddress_whenABookingMessageIsRendered_thenItReadsExactlyAsWithoutTheLinkLine() {
+        // given
+        Map<String, String> values = new HashMap<>(VALUES);
+        values.put("instanceLink", "");
+
+        // when
+        String body = templates.render("booking.confirmed.body", Locale.ENGLISH, values);
+
+        // then
+        assertThat(body).isEqualTo("Hello Jane,\n\nYour booking at Example Tennis Club is confirmed.\n\n"
+                + "Wednesday, 13 May 2026\n18:00 to 19:00\nCourt: Court 1\nBooking type: Member booking\n\n"
+                + "You can cancel the booking in Courtside.\n\nExample Tennis Club");
+    }
+
+    @Test
+    void givenAnInstanceAddress_whenABookingMessageIsRendered_thenItEndsWithTheLinkOnItsOwnLine() {
+        // when / then
+        for (Locale locale : new Locale[] {Locale.GERMAN, Locale.ENGLISH}) {
+            assertThat(templates.render("booking.reminder.body", locale, VALUES)).as("%s", locale)
+                    .endsWith("\nExample Tennis Club\nhttps://courts.example.org/my-bookings");
+        }
+    }
+
+    @Test
+    void givenAnEmptyLinkOnItsOwnLine_whenRendered_thenOnlyThatLineIsDropped() {
+        // when
+        String rendered = MailTemplates.fill("test", "First\n{instanceLink}\n\nLast\n {instanceLink} ",
+                Map.of("instanceLink", ""));
+
+        // then
+        assertThat(rendered).isEqualTo("First\n\nLast");
+    }
+
+    @Test
+    void givenAnEmptyLinkInsideASentence_whenRendered_thenItRendersEmptyAndKeepsTheLine() {
+        // when
+        String rendered = MailTemplates.fill("test", "Open {instanceLink} to see it.\n{clubName}",
+                Map.of("instanceLink", "", "clubName", "Example Tennis Club"));
+
+        // then
+        assertThat(rendered).isEqualTo("Open  to see it.\nExample Tennis Club");
+    }
+
+    @Test
+    void givenAnEmptyValueOtherThanTheLinkOnItsOwnLine_whenRendered_thenTheLineStays() {
+        // when
+        String rendered = MailTemplates.fill("test", "First\n{clubName}\nLast",
+                Map.of("clubName", "", "instanceLink", ""));
+
+        // then
+        assertThat(rendered).as("only the link may vanish with its line").isEqualTo("First\n\nLast");
+    }
+
+    @Test
+    void whenReadingTheShippedBookingMessages_thenEachBodyEndsWithTheLinkOnItsOwnLine() {
+        // when / then
+        for (Locale locale : new Locale[] {Locale.GERMAN, Locale.ENGLISH}) {
+            ResourceBundle bundle = shipped(locale);
+            for (MessageKind kind : ShippedMessageKinds.LINKED) {
+                assertThat(bundle.getString(kind.templateKey() + ".body")).as("%s in %s", kind, locale)
+                        .endsWith("\n{instanceLink}");
+                assertThat(bundle.getString(kind.templateKey() + ".subject")).as("%s in %s", kind, locale)
+                        .doesNotContain("{instanceLink}");
+            }
+        }
+    }
+
+    @Test
+    void whenReadingTheShippedCredentialMessages_thenNoneCarriesALinkOrAnAddress() {
+        // given
+        Set<MessageKind> credentialKinds = new HashSet<>(ShippedMessageKinds.CREDENTIAL);
+        for (MessageKind kind : MessageKind.values()) {
+            String body = shipped(Locale.ENGLISH).getString(kind.templateKey() + ".body");
+            if (body.contains("{credential}") || body.contains("{resetCode}")) {
+                credentialKinds.add(kind);
+            }
+        }
+
+        // when / then
+        for (Locale locale : new Locale[] {Locale.GERMAN, Locale.ENGLISH}) {
+            ResourceBundle bundle = shipped(locale);
+            for (MessageKind kind : credentialKinds) {
+                for (String part : new String[] {".subject", ".body"}) {
+                    assertThat(bundle.getString(kind.templateKey() + part))
+                            .as("a credential message is what phishing imitates: %s%s in %s", kind, part, locale)
+                            .doesNotContain("{instanceLink}")
+                            .doesNotContainPattern(ADDRESS_LIKE);
+                }
+            }
+        }
+    }
+
+    @Test
+    void givenAHostWhoseLanguageIsGerman_whenTheEnglishTemplatesAreRead_thenTheyAreTheEnglishOnes() {
+        // given
+        Locale host = Locale.getDefault();
+        Locale.setDefault(Locale.GERMANY);
+        try {
+            // when
+            String body = templates.render("booking.reminder.body", Locale.ENGLISH, VALUES);
+
+            // then
+            assertThat(body).as("an English member must not get the host's German text").startsWith("Hello Jane,");
+            assertThat(shipped(Locale.ENGLISH).getString("booking.reminder.body")).startsWith("Hello {firstName},");
+        } finally {
+            Locale.setDefault(host);
+        }
+    }
+
+    @Test
+    void givenATemplateWithWindowsLineBreaks_whenTheLinkIsEmpty_thenOnlyItsLineIsDropped() {
+        // when
+        String rendered = MailTemplates.fill("test", "First\r\n{instanceLink}\r\nLast\r\n\t{instanceLink}",
+                Map.of("instanceLink", ""));
+
+        // then
+        assertThat(rendered).isEqualTo("First\r\nLast");
+    }
+
+    @Test
+    void whenTheAddressPatternReadsTheShippedBundles_thenOnlyAddressesMatchIt() {
+        // given
+        Pattern address = Pattern.compile(ADDRESS_LIKE);
+
+        // when / then
+        assertThat(address.matcher("Sign in at courts.example.org").find()).isTrue();
+        assertThat(address.matcher("Melde dich auf bücher.example.de an").find()).isTrue();
+        for (Locale locale : new Locale[] {Locale.GERMAN, Locale.ENGLISH}) {
+            ResourceBundle bundle = shipped(locale);
+            for (String key : bundle.keySet()) {
+                assertThat(address.matcher(bundle.getString(key)).find())
+                        .as("%s in %s reads like an address, so the credential guard would raise false alarms", key, locale)
+                        .isFalse();
+            }
+        }
+    }
+
+    private static ResourceBundle shipped(Locale locale) {
+        return ResourceBundle.getBundle("mail", locale,
+                ResourceBundle.Control.getNoFallbackControl(ResourceBundle.Control.FORMAT_PROPERTIES));
     }
 }
