@@ -478,57 +478,62 @@ const sweptWidths = [
   { device: "phone", viewport: { width: 393, height: 852 } }
 ];
 
-for (const theme of ["dark", "light"] as const) {
-  for (const { side, board } of sweptSides) {
-    for (const { device, viewport } of sweptWidths) {
-      test(`given the ${theme} theme on a ${device}, when every ${side} page is opened, then axe finds nothing`, async ({ page }) => {
-        // given
-        await page.addInitScript((chosen) => window.localStorage.setItem("courtside.theme", chosen), theme);
-        await page.route("**/api/admin/operational-logs/search", (route) => route.fulfill({ json: operationalLogPage }));
-        await page.setViewportSize(viewport);
-        const pages = routerPages().filter((route) => route.path.startsWith("/admin") === board);
-        const landed = new Set<string>();
-        const unresolved: string[] = [];
-        const findings: string[] = [];
-        const scan = async (where: string) => {
-          findings.push(...(await axeFindings(page)).map((finding) => `${where}: ${finding}`));
-        };
+test.describe("every page", () => {
+  // WebKit routes no request a service worker makes, so the log search would bypass its stand-in.
+  test.use({ serviceWorkers: "block" });
 
-        // when
-        for (const persona of PERSONAS) {
-          const paths = pages.filter((route) => personas(route.path).includes(persona)).map((route) => route.path);
-          if (paths.length === 0) continue;
-          await become(page, persona);
-          for (const path of paths) {
-            const concrete = await concretePath(page, path);
-            if (concrete === undefined) {
-              unresolved.push(`${path} as ${persona}`);
-              continue;
-            }
-            await page.goto(concrete);
-            await page.waitForLoadState("networkidle");
-            await expect(page.locator("html"), "the page renders in the chosen theme").toHaveAttribute("data-theme", theme, { timeout: 10_000 });
-            const at = new URL(page.url()).pathname;
-            landed.add(at);
-            if (awaitedContent[at]) await expect(page.getByTestId(awaitedContent[at]), `${at} shows its wide table`).toBeVisible({ timeout: 10_000 });
-            await scan(`${at} as ${persona}`);
-            const further = furtherStates[at];
-            if (further) {
-              await further(page);
-              await scan(`${at} further as ${persona}`);
+  for (const theme of ["dark", "light"] as const) {
+    for (const { side, board } of sweptSides) {
+      for (const { device, viewport } of sweptWidths) {
+        test(`given the ${theme} theme on a ${device}, when every ${side} page is opened, then axe finds nothing`, async ({ page }) => {
+          // given
+          await page.addInitScript((chosen) => window.localStorage.setItem("courtside.theme", chosen), theme);
+          await page.route("**/api/admin/operational-logs/search", (route) => route.fulfill({ json: operationalLogPage }));
+          await page.setViewportSize(viewport);
+          const pages = routerPages().filter((route) => route.path.startsWith("/admin") === board);
+          const landed = new Set<string>();
+          const unresolved: string[] = [];
+          const findings: string[] = [];
+          const scan = async (where: string) => {
+            findings.push(...(await axeFindings(page)).map((finding) => `${where}: ${finding}`));
+          };
+
+          // when
+          for (const persona of PERSONAS) {
+            const paths = pages.filter((route) => personas(route.path).includes(persona)).map((route) => route.path);
+            if (paths.length === 0) continue;
+            await become(page, persona);
+            for (const path of paths) {
+              const concrete = await concretePath(page, path);
+              if (concrete === undefined) {
+                unresolved.push(`${path} as ${persona}`);
+                continue;
+              }
+              await page.goto(concrete);
+              await page.waitForLoadState("networkidle");
+              await expect(page.locator("html"), "the page renders in the chosen theme").toHaveAttribute("data-theme", theme, { timeout: 10_000 });
+              const at = new URL(page.url()).pathname;
+              landed.add(at);
+              if (awaitedContent[at]) await expect(page.getByTestId(awaitedContent[at]), `${at} shows its wide table`).toBeVisible({ timeout: 10_000 });
+              await scan(`${at} as ${persona}`);
+              const further = furtherStates[at];
+              if (further) {
+                await further(page);
+                await scan(`${at} further as ${persona}`);
+              }
             }
           }
-        }
 
-        // then
-        const missed = pages.filter((route) => !route.redirect && ![...landed].some((path) => routePattern(route.path).test(path)));
-        expect.soft(unresolved, "a parameter route whose list page links to no instance").toEqual([]);
-        expect.soft(missed.map((route) => route.path), "a page the sweep never reached").toEqual([]);
-        expect(findings, "an axe rule a page breaks").toEqual([]);
-      });
+          // then
+          const missed = pages.filter((route) => !route.redirect && ![...landed].some((path) => routePattern(route.path).test(path)));
+          expect.soft(unresolved, "a parameter route whose list page links to no instance").toEqual([]);
+          expect.soft(missed.map((route) => route.path), "a page the sweep never reached").toEqual([]);
+          expect(findings, "an axe rule a page breaks").toEqual([]);
+        });
+      }
     }
   }
-}
+});
 
 test("initial password and validation states meet automated WCAG 2.2 AA checks", async ({ page }) => {
   // given
