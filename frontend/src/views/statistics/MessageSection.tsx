@@ -21,7 +21,7 @@ export function MessageSection({ from, to }: { from?: string; to?: string }) {
     {(report) => {
       const kinds = report.kinds.filter((kind) => STATES.some(([field]) => kind[field] > 0));
       if (kinds.length === 0) return <p data-testid="statistics-messages-empty">{t("admin.statistics.messages.empty")}</p>;
-      return <ScrollRegion labelledBy="statistics-messages-heading">
+      return <ScrollRegion subject={t("admin.statistics.messages.heading")} testId="statistics-messages-scroll">
         <table className="w-full border-collapse text-left">
           <thead>
             <tr className="border-b">

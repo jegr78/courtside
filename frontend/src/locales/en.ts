@@ -964,6 +964,7 @@ const en: Record<keyof typeof de, string> = {
   "validation.rejected": "This field was rejected.",
   "auth.logout": "Sign out",
   "status.loading": "Loading Courtside …",
+  "table.scrollRegion": "{{name}} table",
   "unsaved.title": "Unsaved changes",
   "unsaved.question_one": "One change is not saved yet. Leaving this page discards it.",
   "unsaved.question_other": "{{count}} changes are not saved yet. Leaving this page discards them.",

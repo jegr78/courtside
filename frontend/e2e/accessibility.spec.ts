@@ -2,18 +2,20 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, expectAdministrationOverview, selectJourneyDate, selectPreference, test } from "./fixtures";
 import { productFailure } from "./browser-diagnostics";
 import { routePattern } from "./declared-routes";
-import { become, concretePath, PERSONAS, personas, routerPages } from "./page-sweep";
+import { become, concretePath, PERSONAS, personas, routerPages, settled } from "./page-sweep";
 import { STANDARD_RULE_SET } from "./shipped-rows";
 
-// axe tags these best-practice only, so a scan by WCAG tags never runs them.
+// axe tags these best-practice only, so a scan by WCAG tags alone never runs them.
 const STRUCTURE_RULES = ["page-has-heading-one", "heading-order", "empty-table-header"];
 
 async function axeFindings(page: import("@playwright/test").Page): Promise<string[]> {
-  const scans = [
-    await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"]).analyze(),
-    await new AxeBuilder({ page }).withRules(STRUCTURE_RULES).analyze()
-  ];
-  return scans.flatMap((scan) => scan.violations).flatMap((violation) =>
+  const scan = await new AxeBuilder({ page }).options({
+    runOnly: { type: "tag", values: ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"] },
+    rules: Object.fromEntries(STRUCTURE_RULES.map((rule) => [rule, { enabled: true }]))
+  }).analyze();
+  const ran = new Set([...scan.passes, ...scan.violations, ...scan.incomplete, ...scan.inapplicable].map((rule) => rule.id));
+  expect(STRUCTURE_RULES.filter((rule) => !ran.has(rule)), "a structure rule axe left out of the scan").toEqual([]);
+  return scan.violations.flatMap((violation) =>
     violation.nodes.map((node) => `${violation.id} at ${node.target.join(" ")}`));
 }
 
@@ -456,9 +458,9 @@ const operationalLogPage = {
 };
 
 // The tables that scroll sideways on a phone, which the sweep must see rendered to judge them.
-const awaitedContent: Record<string, string> = {
-  "/admin/utilisation": "statistics-hours-scroll",
-  "/admin/operational-logs": "operational-logs-scroll"
+const awaitedContent: Record<string, string[]> = {
+  "/admin/utilisation": ["statistics-hours-scroll", "statistics-messages-scroll"],
+  "/admin/operational-logs": ["operational-logs-scroll"]
 };
 
 // A page whose content only appears after a step, so the sweep scans that state as well.
@@ -468,6 +470,18 @@ const furtherStates: Record<string, (page: import("@playwright/test").Page) => P
     await expect(page.getByTestId("series-form"), "the series form opens").toBeVisible({ timeout: 10_000 });
   }
 };
+
+async function standInsForEmptyTables(page: import("@playwright/test").Page) {
+  await page.route("**/api/admin/operational-logs/search", (route) => route.fulfill({ json: operationalLogPage }));
+  await page.route("**/api/admin/statistics/messages**", async (route) => {
+    const asked = new URL(route.request().url()).searchParams;
+    await route.fulfill({ json: {
+      period: { from: asked.get("from") ?? "2030-02-01", to: asked.get("to") ?? "2030-02-28", timeZone: "Europe/Berlin" },
+      kinds: ["BOOKING_CONFIRMED", "BOOKING_REMINDER"].map((kind) => ({ kind, queued: 1, handedOver: 12, refused: 2, failed: 1, retried: 3 })),
+      previous: null
+    } });
+  });
+}
 
 const sweptSides = [
   { side: "member", board: false },
@@ -479,61 +493,69 @@ const sweptWidths = [
 ];
 
 test.describe("every page", () => {
-  // WebKit routes no request a service worker makes, so the log search would bypass its stand-in.
+  // WebKit routes no request a service worker makes, so the stand-ins would be bypassed.
   test.use({ serviceWorkers: "block" });
 
-  for (const theme of ["dark", "light"] as const) {
-    for (const { side, board } of sweptSides) {
-      for (const { device, viewport } of sweptWidths) {
-        test(`given the ${theme} theme on a ${device}, when every ${side} page is opened, then axe finds nothing`, async ({ page }) => {
-          // given
-          await page.addInitScript((chosen) => window.localStorage.setItem("courtside.theme", chosen), theme);
-          await page.route("**/api/admin/operational-logs/search", (route) => route.fulfill({ json: operationalLogPage }));
-          await page.setViewportSize(viewport);
-          const pages = routerPages().filter((route) => route.path.startsWith("/admin") === board);
-          const landed = new Set<string>();
-          const unresolved: string[] = [];
-          const findings: string[] = [];
-          const scan = async (where: string) => {
-            findings.push(...(await axeFindings(page)).map((finding) => `${where}: ${finding}`));
-          };
+  for (const { side, board } of sweptSides) {
+    for (const { device, viewport } of sweptWidths) {
+      test(`given a ${device}, when every ${side} page is opened in both themes, then axe finds nothing`, async ({ page }) => {
+        // given
+        await standInsForEmptyTables(page);
+        await page.setViewportSize(viewport);
+        const pages = routerPages().filter((route) => route.path.startsWith("/admin") === board);
+        const landed = new Set<string>();
+        const unresolved: string[] = [];
+        const findings: string[] = [];
+        const html = page.locator("html");
+        const scanInBothThemes = async (where: string) => {
+          for (const pass of [1, 2]) {
+            const theme = await html.getAttribute("data-theme");
+            findings.push(...(await axeFindings(page)).map((finding) => `${where} in ${theme}: ${finding}`));
+            if (pass === 2) break;
+            const other = theme === "dark" ? "light" : "dark";
+            await selectPreference(page, "#theme-preference", other);
+            await expect(html, "the page switches to the other theme").toHaveAttribute("data-theme", other, { timeout: 10_000 });
+          }
+        };
 
-          // when
-          for (const persona of PERSONAS) {
-            const paths = pages.filter((route) => personas(route.path).includes(persona)).map((route) => route.path);
-            if (paths.length === 0) continue;
-            await become(page, persona);
-            for (const path of paths) {
-              const concrete = await concretePath(page, path);
-              if (concrete === undefined) {
-                unresolved.push(`${path} as ${persona}`);
-                continue;
-              }
-              await page.goto(concrete);
-              await page.waitForLoadState("networkidle");
-              await expect(page.locator("html"), "the page renders in the chosen theme").toHaveAttribute("data-theme", theme, { timeout: 10_000 });
-              const at = new URL(page.url()).pathname;
-              landed.add(at);
-              if (awaitedContent[at]) await expect(page.getByTestId(awaitedContent[at]), `${at} shows its wide table`).toBeVisible({ timeout: 10_000 });
-              await scan(`${at} as ${persona}`);
-              const further = furtherStates[at];
-              if (further) {
-                await further(page);
-                await scan(`${at} further as ${persona}`);
-              }
+        // when
+        for (const persona of PERSONAS) {
+          const paths = pages.filter((route) => personas(route.path).includes(persona)).map((route) => route.path);
+          if (paths.length === 0) continue;
+          await become(page, persona);
+          for (const path of paths) {
+            const concrete = await concretePath(page, path);
+            if (concrete === undefined) {
+              unresolved.push(`${path} as ${persona}`);
+              continue;
+            }
+            await page.goto(concrete);
+            await settled(page);
+            expect(await page.evaluate(() => navigator.serviceWorker.controller === null), "no service worker answers in place of the stand-ins").toBe(true);
+            const at = new URL(page.url()).pathname;
+            landed.add(at);
+            for (const testId of awaitedContent[at] ?? []) {
+              await expect(page.getByTestId(testId), `${at} shows its wide table ${testId}`).toBeVisible({ timeout: 10_000 });
+            }
+            await scanInBothThemes(`${at} as ${persona}`);
+            const further = furtherStates[at];
+            if (further) {
+              await further(page);
+              await scanInBothThemes(`${at} further as ${persona}`);
             }
           }
+        }
 
-          // then
-          const missed = pages.filter((route) => !route.redirect && ![...landed].some((path) => routePattern(route.path).test(path)));
-          expect.soft(unresolved, "a parameter route whose list page links to no instance").toEqual([]);
-          expect.soft(missed.map((route) => route.path), "a page the sweep never reached").toEqual([]);
-          expect(findings, "an axe rule a page breaks").toEqual([]);
-        });
-      }
+        // then
+        const missed = pages.filter((route) => !route.redirect && ![...landed].some((path) => routePattern(route.path).test(path)));
+        expect.soft(unresolved, "a parameter route whose list page links to no instance").toEqual([]);
+        expect.soft(missed.map((route) => route.path), "a page the sweep never reached").toEqual([]);
+        expect(findings, "an axe rule a page breaks").toEqual([]);
+      });
     }
   }
 });
+
 
 test("initial password and validation states meet automated WCAG 2.2 AA checks", async ({ page }) => {
   // given

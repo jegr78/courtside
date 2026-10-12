@@ -259,8 +259,10 @@ describe("AdminStatisticsView", () => {
     expect(screen.getByTestId("statistics-hour-1-7")).toHaveTextContent("closed");
     expect(screen.getByTestId("statistics-hour-1-7")).not.toHaveAttribute("data-level");
     expect(screen.queryByTestId("statistics-hour-1-20")).toBeNull();
-    expect(screen.getByTestId("statistics-hours-scroll"), "a keyboard reaches the table that scrolls sideways").toHaveAttribute("tabindex", "0");
-    expect(screen.getByTestId("statistics-hours-scroll"), "the scroller is named by the table's heading").toHaveAccessibleName(i18n.t("admin.statistics.hours.heading"));
+    const tableName = i18n.t("table.scrollRegion", { name: i18n.t("admin.statistics.hours.heading") });
+    const scroller = screen.getByRole("region", { name: tableName });
+    expect(scroller, "the hour table's scroller is the region named for it").toBe(screen.getByTestId("statistics-hours-scroll"));
+    expect(scroller, "a keyboard reaches the table that scrolls sideways").toHaveAttribute("tabindex", "0");
   });
 
   it("given courts, cards and weeks, when the utilisation shows, then each is a bar of its own share and value", async () => {
@@ -313,6 +315,10 @@ describe("AdminStatisticsView", () => {
     expect(screen.getByTestId("statistics-message-BOOKING_CONFIRMED-refused")).toHaveTextContent("2");
     expect(screen.getByTestId("statistics-message-BOOKING_CONFIRMED-retried")).toHaveTextContent("3");
     expect(screen.queryByTestId("statistics-message-BOOKING_REMINDER")).toBeNull();
+    const tableName = i18n.t("table.scrollRegion", { name: i18n.t("admin.statistics.messages.heading") });
+    const scroller = screen.getByRole("region", { name: tableName });
+    expect(scroller, "the message table's scroller is the region named for it").toBe(screen.getByTestId("statistics-messages-scroll"));
+    expect(scroller, "a keyboard reaches the table that scrolls sideways").toHaveAttribute("tabindex", "0");
   });
 
   it("given a German reader, when large figures show, then they are grouped the German way", async () => {

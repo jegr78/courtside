@@ -23,7 +23,7 @@ function HourTable({ hours, format }: { hours: Hour[]; format: StatisticsFormat 
   return <section data-testid="statistics-hours" aria-labelledby="statistics-hours-heading" className="grid min-w-0 gap-3">
     <h3 id="statistics-hours-heading" className="text-lg font-bold">{t("admin.statistics.hours.heading")}</h3>
     <p className="text-muted text-sm">{t("admin.statistics.hours.explain")}</p>
-    <ScrollRegion labelledBy="statistics-hours-heading" testId="statistics-hours-scroll" className="rounded-lg border">
+    <ScrollRegion subject={t("admin.statistics.hours.heading")} testId="statistics-hours-scroll" className="rounded-lg border">
       <table className="stat-heat-table border-collapse text-center text-xs">
         <thead>
           <tr>
