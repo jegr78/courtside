@@ -33,6 +33,8 @@ class DeploymentImageParityTest {
     private static final Pattern ANY_DIGEST = Pattern.compile("@sha256:[a-f0-9]{64}");
     private static final Pattern ANY_PIN = Pattern.compile(
             "(?:(?<=:-)|(?<![\\w./-]))([a-z0-9][\\w./-]*)(?::([\\w.-]+))?@sha256:([a-f0-9]{64})");
+    private static final Pattern REQUIRED_VARIABLE = Pattern.compile("\\$\\{\\w+(?:}|:?\\?)");
+    private static final Pattern VARIANT = Pattern.compile("-(?:alpine|with-browser)$");
     private static final Pattern IMAGE_LINE = Pattern.compile("(?m)^\\s*image:\\s*[\"']?([^\\s\"']+)");
 
     @Test
@@ -40,11 +42,11 @@ class DeploymentImageParityTest {
         // when
         Map<String, Set<String>> digestsByReference = new TreeMap<>();
         Map<String, Set<String>> versionsByRepository = new TreeMap<>();
-        Map<String, Set<String>> digestsByRepository = new TreeMap<>();
-        Map<String, Set<String>> tagsByRepository = new TreeMap<>();
+        Map<String, Set<String>> taggedDigests = new TreeMap<>();
+        Map<String, Set<String>> taglessDigests = new TreeMap<>();
         for (Pin pin : deploymentPins()) {
-            digestsByRepository.computeIfAbsent(pin.repository(), key -> new TreeSet<>()).add(pin.digest());
-            tagsByRepository.computeIfAbsent(pin.repository(), key -> new TreeSet<>()).add(String.valueOf(pin.tag()));
+            (pin.tag() == null ? taglessDigests : taggedDigests)
+                    .computeIfAbsent(pin.repository(), key -> new TreeSet<>()).add(pin.digest());
             digestsByReference.computeIfAbsent(pin.reference(), key -> new TreeSet<>()).add(pin.digest());
             if (pin.tag() != null) {
                 versionsByRepository.computeIfAbsent(pin.repository(), key -> new TreeSet<>()).add(pin.version());
@@ -58,10 +60,10 @@ class DeploymentImageParityTest {
                 .as("the files under deploy/ name one digest for %s", reference).hasSize(1));
         assertThat(versionsByRepository).allSatisfy((repository, versions) -> assertThat(versions)
                 .as("the files under deploy/ run one version of %s", repository).hasSize(1));
-        assertThat(digestsByRepository).allSatisfy((repository, digests) -> assertThat(digests)
+        assertThat(taglessDigests).allSatisfy((repository, digests) -> assertThat(
+                taggedDigests.getOrDefault(repository, digests))
                 .as("a pin of %s without a tag names a digest one of its tags already has", repository)
-                .hasSizeLessThanOrEqualTo(Math.max(1, tagsByRepository.get(repository).size() - (
-                        tagsByRepository.get(repository).contains("null") ? 1 : 0))));
+                .containsAll(digests));
     }
 
     @Test
@@ -172,7 +174,8 @@ class DeploymentImageParityTest {
             if (file.startsWith(DEPLOY)) {
                 for (MatchResult line : IMAGE_LINE.matcher(content(file)).results().toList()) {
                     String image = line.group(1);
-                    boolean candidate = image.contains("${") || image.startsWith("courtside:");
+                    boolean candidate = REQUIRED_VARIABLE.matcher(image).find()
+                            || image.replaceFirst("^\\$\\{\\w+:-", "").startsWith("courtside:");
                     if (!candidate && pinsIn(image).isEmpty()) {
                         unread.add(file + " runs " + image);
                     }
@@ -188,7 +191,7 @@ class DeploymentImageParityTest {
                 .toList();
     }
 
-    // A variant such as k6's "-with-browser" is a different image of the same release.
+    // A variant such as k6's "-with-browser" is a different image of the same release; a pre-release is not.
     private record Pin(String repository, String tag, String digest) {
 
         String reference() {
@@ -196,7 +199,7 @@ class DeploymentImageParityTest {
         }
 
         String version() {
-            return tag.split("-", 2)[0];
+            return VARIANT.matcher(tag).replaceFirst("");
         }
 
         String text() {
