@@ -64,6 +64,7 @@ const cancelledByClub: Notification = {
     startsAt: "2026-05-21T16:00:00Z", endsAt: "2026-05-21T17:00:00Z",
     courts: [{ number: 3, name: null }], cardLabel: "Member booking", cancelled: true
   },
+  cancellationReason: "MAINTENANCE",
   link: { target: "BOOKINGS", bookingId: "88888888-8888-8888-8888-888888888888" }
 };
 
@@ -139,6 +140,7 @@ describe("MyMessagesView", () => {
     expect(within(cancellation).getByTestId("notification-summary")).toHaveTextContent("The club cancelled a booking that concerns you.");
     expect(within(cancellation).getByTestId("notification-booking")).toHaveTextContent("Court 3");
     expect(within(cancellation).getByTestId("notification-booking")).toHaveTextContent("Cancelled");
+    expect(within(cancellation).getByTestId("notification-reason")).toHaveTextContent("Reason: Maintenance work");
     expect(within(cancellation).getByRole("link")).toHaveAttribute("href", `/my-bookings#booking-${cancelledByClub.link.bookingId}`);
   });
 

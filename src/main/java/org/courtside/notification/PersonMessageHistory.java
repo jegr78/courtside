@@ -1,6 +1,7 @@
 package org.courtside.notification;
 
 import org.courtside.shared.BookingDisplaced;
+import org.courtside.shared.CancellationReason;
 
 import java.time.Instant;
 import java.util.List;
@@ -17,9 +18,9 @@ public interface PersonMessageHistory {
     record Declined(MessageKind kind, Instant declinedAt) {
     }
 
-    // What a centre entry stored besides its kind: the booking it concerns and why it was displaced.
+    // What a centre entry stored besides its kind: its booking and why it was displaced or cancelled.
     record Notification(MessageKind kind, Instant createdAt, Instant readAt, UUID bookingId,
-                        BookingDisplaced.Closure closure) {
+                        BookingDisplaced.Closure closure, CancellationReason cancellationReason) {
     }
 
     record DeclinedChannel(MessageChannel channel, Instant declinedAt) {

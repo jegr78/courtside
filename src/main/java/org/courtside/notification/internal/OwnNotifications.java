@@ -7,6 +7,7 @@ import org.courtside.notification.MessageKind;
 import org.courtside.shared.BookingAnnouncement;
 import org.courtside.shared.BookingAnnouncer;
 import org.courtside.shared.BookingDisplaced;
+import org.courtside.shared.CancellationReason;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -98,7 +99,8 @@ public class OwnNotifications {
     private static Entry entry(Stored stored, Map<UUID, BookingAnnouncement> visible) {
         BookingAnnouncement booking = stored.bookingId() == null ? null : visible.get(stored.bookingId());
         return new Entry(stored.id(), stored.kind(), stored.createdAt(), stored.readAt(), booking,
-                closureOf(stored.parameters().get(QueuedMessage.CLOSURE)), targetOf(stored.kind()),
+                closureOf(stored.parameters().get(QueuedMessage.CLOSURE)),
+                CancellationReasons.of(stored.parameters().get(QueuedMessage.REASON)), targetOf(stored.kind()),
                 booking == null ? null : stored.bookingId());
     }
 
@@ -115,7 +117,8 @@ public class OwnNotifications {
                  ACCOUNT_PASSWORD_RESET_CODE -> Target.ACCOUNT_SECURITY;
             case BOOKING_CONFIRMED, BOOKING_PLAYER_RECORDED, BOOKING_PLAYER_WITHDREW, BOOKING_DISPLACED,
                  BOOKING_REMINDER, BOOKING_CANCELLED, BOOKING_CANCELLED_BY_CLUB,
-                 BOOKING_SERIES_CREATED -> Target.BOOKINGS;
+                 BOOKING_SERIES_CREATED, BOOKING_SERIES_CANCELLED_BY_CLUB,
+                 BOOKING_SERIES_MOVED_BY_CLUB -> Target.BOOKINGS;
         };
     }
 
@@ -156,6 +159,7 @@ public class OwnNotifications {
     }
 
     public record Entry(UUID id, MessageKind kind, Instant createdAt, Instant readAt, BookingAnnouncement booking,
-                        BookingDisplaced.Closure closure, Target target, UUID linkedBookingId) {
+                        BookingDisplaced.Closure closure, CancellationReason cancellationReason, Target target,
+                        UUID linkedBookingId) {
     }
 }

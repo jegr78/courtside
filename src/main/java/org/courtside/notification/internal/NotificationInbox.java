@@ -20,7 +20,8 @@ import java.util.UUID;
 class NotificationInbox {
 
     // The centre names what an entry concerns and nobody in it, so a player's id stays in the outbox.
-    private static final Set<String> KEPT = Set.of(QueuedMessage.BOOKING, QueuedMessage.CLOSURE);
+    private static final Set<String> KEPT = Set.of(QueuedMessage.BOOKING, QueuedMessage.CLOSURE,
+            QueuedMessage.REASON);
     private final JdbcClient jdbc;
     private final ObjectMapper json;
     private final Clock clock;

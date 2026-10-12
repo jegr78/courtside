@@ -124,12 +124,12 @@ class BookingChangeEventsTest extends AbstractIntegrationTest {
 
         // then
         Delivery delivery = consumer.awaitOnly(BookingCancelled.class);
-        assertThat(delivery.event()).isEqualTo(new BookingCancelled(bookingId, member));
+        assertThat(delivery.event()).isEqualTo(new BookingCancelled(bookingId, member, null));
         assertThat(delivery.seen().get(bookingId).cancelled())
                 .as("the consumer reads the cancellation the event announced, so it ran after the commit")
                 .isTrue();
         assertThat(audit.eventsOfType("booking.booking.cancelled")).extracting(RecordedEvent::payload)
-                .containsExactly(Map.of("bookingId", bookingId.toString(),
+                .containsExactly(unreasoned("bookingId", bookingId.toString(),
                         "cancelledByAccountId", member.toString()));
     }
 
@@ -145,10 +145,10 @@ class BookingChangeEventsTest extends AbstractIntegrationTest {
 
         // then
         assertThat(audit.eventsOfType("booking.booking.cancelled")).extracting(RecordedEvent::payload)
-                .containsExactly(Map.of("bookingId", bookingId.toString(),
+                .containsExactly(unreasoned("bookingId", bookingId.toString(),
                         "cancelledByAccountId", board.toString()));
         assertThat(consumer.awaitOnly(BookingCancelled.class).event())
-                .isEqualTo(new BookingCancelled(bookingId, board));
+                .isEqualTo(new BookingCancelled(bookingId, board, null));
     }
 
     @Test
@@ -165,10 +165,10 @@ class BookingChangeEventsTest extends AbstractIntegrationTest {
         // then
         assertThat(audit.eventsOfType("booking.booking.cancelled")).extracting(RecordedEvent::payload)
                 .as("a repeated cancel changes nothing and must not announce a second canceller")
-                .containsExactly(Map.of("bookingId", bookingId.toString(),
+                .containsExactly(unreasoned("bookingId", bookingId.toString(),
                         "cancelledByAccountId", member.toString()));
         assertThat(consumer.awaitOnly(BookingCancelled.class).event())
-                .isEqualTo(new BookingCancelled(bookingId, member));
+                .isEqualTo(new BookingCancelled(bookingId, member, null));
     }
 
     @Test
@@ -182,12 +182,12 @@ class BookingChangeEventsTest extends AbstractIntegrationTest {
 
         // then
         assertThat(audit.eventsOfType("booking.booking.cancelled")).extracting(RecordedEvent::payload)
-                .containsExactly(Map.of("bookingId", occurrence.toString(),
+                .containsExactly(unreasoned("bookingId", occurrence.toString(),
                         "cancelledByAccountId", trainer.toString()));
         assertThat(audit.eventsOfType("booking.series.cancelled")).as("series events for a single cancel")
                 .isEmpty();
         assertThat(consumer.awaitOnly(BookingCancelled.class).event())
-                .isEqualTo(new BookingCancelled(occurrence, trainer));
+                .isEqualTo(new BookingCancelled(occurrence, trainer, null));
     }
 
     @Test
@@ -289,7 +289,7 @@ class BookingChangeEventsTest extends AbstractIntegrationTest {
 
         // then
         Delivery delivery = consumer.awaitOnly(SeriesCancelled.class);
-        assertThat(delivery.event()).isEqualTo(new SeriesCancelled(created.seriesId(), tail, trainer));
+        assertThat(delivery.event()).isEqualTo(new SeriesCancelled(created.seriesId(), tail, trainer, null));
         assertThat(delivery.seen().values()).as("occurrences the consumer reads after the commit")
                 .hasSize(3).allMatch(BookingAnnouncement::cancelled);
         assertThat(audit.eventsOfType("booking.series.cancelled")).hasSize(1);
@@ -309,10 +309,10 @@ class BookingChangeEventsTest extends AbstractIntegrationTest {
 
         // then
         assertThat(audit.eventsOfType("booking.series.cancelled")).extracting(RecordedEvent::payload)
-                .containsExactly(Map.of("seriesId", created.seriesId().toString(),
+                .containsExactly(unreasoned("seriesId", created.seriesId().toString(),
                         "bookingIds", List.of(only.toString()), "cancelledByAccountId", trainer.toString()));
         assertThat(consumer.awaitOnly(SeriesCancelled.class).event())
-                .isEqualTo(new SeriesCancelled(created.seriesId(), List.of(only), trainer));
+                .isEqualTo(new SeriesCancelled(created.seriesId(), List.of(only), trainer, null));
     }
 
     @Test
@@ -381,7 +381,8 @@ class BookingChangeEventsTest extends AbstractIntegrationTest {
 
         // then
         Delivery delivery = consumer.awaitOnly(SeriesMoved.class);
-        assertThat(delivery.event()).isEqualTo(new SeriesMoved(created.seriesId(), moved, trainer));
+        assertThat(delivery.event()).isEqualTo(new SeriesMoved(created.seriesId(), moved, trainer,
+                Instant.parse("2026-04-14T16:00:00Z"), Instant.parse("2026-04-14T18:00:00Z")));
         assertThat(delivery.seen().values()).as("start times the consumer reads after the commit")
                 .extracting(BookingAnnouncement::startsAt)
                 .containsExactly(Instant.parse("2026-04-14T18:00:00Z"), Instant.parse("2026-04-21T18:00:00Z"),
@@ -389,7 +390,8 @@ class BookingChangeEventsTest extends AbstractIntegrationTest {
         assertThat(audit.eventsOfType("booking.series.moved")).extracting(RecordedEvent::payload)
                 .containsExactly(Map.of("seriesId", created.seriesId().toString(),
                         "bookingIds", moved.stream().map(UUID::toString).toList(),
-                        "movedByAccountId", trainer.toString()));
+                        "movedByAccountId", trainer.toString(),
+                        "previousStartsAt", "2026-04-14T16:00:00Z", "previousEndsAt", "2026-04-14T18:00:00Z"));
     }
 
     @Test
@@ -495,5 +497,14 @@ class BookingChangeEventsTest extends AbstractIntegrationTest {
                     .ifPresent(announcement -> seen.put(bookingId, announcement)));
             deliveries.add(new Delivery(event, seen));
         }
+    }
+
+    private static Map<String, Object> unreasoned(Object... keysAndValues) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        for (int index = 0; index < keysAndValues.length; index += 2) {
+            payload.put((String) keysAndValues[index], keysAndValues[index + 1]);
+        }
+        payload.put("reason", null);
+        return payload;
     }
 }

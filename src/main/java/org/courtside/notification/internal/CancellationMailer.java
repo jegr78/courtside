@@ -37,10 +37,14 @@ class CancellationMailer implements MessageComposer {
             MessageKind kind = cancelled.cancelledByAccountId().equals(booking.bookedByAccountId())
                     ? MessageKind.BOOKING_CANCELLED
                     : MessageKind.BOOKING_CANCELLED_BY_CLUB;
+            Map<String, String> parameters = new HashMap<>();
+            parameters.put(QueuedMessage.BOOKING, cancelled.bookingId().toString());
+            if (cancelled.reason() != null) {
+                parameters.put(QueuedMessage.REASON, cancelled.reason().name());
+            }
             audience.of(booking).stream()
                     .filter(account -> !account.getId().equals(cancelled.cancelledByAccountId()))
-                    .forEach(account -> outbox.queue(account.getId(), kind,
-                            Map.of(QueuedMessage.BOOKING, cancelled.bookingId().toString())));
+                    .forEach(account -> outbox.queue(account.getId(), kind, parameters));
         });
     }
 
@@ -56,6 +60,7 @@ class CancellationMailer implements MessageComposer {
         Locale locale = MessageLanguage.of(account.getLocale(), club.defaultLocale());
         Map<String, String> values = new HashMap<>(wording.of(booking, locale));
         values.put("firstName", account.getPerson().getFirstName());
+        values.put("reason", wording.reason(message.reason(), locale));
         String key = message.kind().templateKey();
         handOver.accept(new OutgoingMail(account.getPerson().getEmail(),
                 templates.render(key + ".subject", locale, values),

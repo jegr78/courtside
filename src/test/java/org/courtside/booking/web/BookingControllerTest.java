@@ -24,6 +24,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.jdbc.core.simple.JdbcClient;
+import org.courtside.shared.CancellationReason;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
@@ -530,8 +531,13 @@ class BookingControllerTest extends AbstractIntegrationTest {
                     .andExpect(jsonPath("$.items[0].cardLabel").value(labelOf(TRAINING_CARD)))
                     .andExpect(jsonPath("$.items[0].courtIds[0]").value(courtId.toString()))
                     .andExpect(jsonPath("$.items[0].participantCount").value(0))
+                    .andExpect(jsonPath("$.items[0].ownBooking").value(false))
                     .andExpect(jsonPath("$.items[0].note").doesNotExist());
         }
+        mockMvc.perform(get("/api/managed/bookings").with(user("trainer.john").roles("TRAINER")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].id").value(bookingId))
+                .andExpect(jsonPath("$.items[0].ownBooking").value(true));
     }
 
     @Test
@@ -806,6 +812,52 @@ class BookingControllerTest extends AbstractIntegrationTest {
         // then
         assertThat(bookings.findById(id).orElseThrow().getStatus())
                 .isEqualTo(BookingStatus.CONFIRMED);
+    }
+
+    @Test
+    @WithMockUser(username = "miles.richard", roles = "ADMIN")
+    void givenAForeignBooking_whenAnAdminCancelsItNamingAReason_thenTheBookingKeepsTheReason() throws Exception {
+        // given
+        UUID id = bookingOf("doe.jane");
+
+        // when
+        mockMvc.perform(delete("/api/bookings/{id}", id).param("reason", "CLUB_EVENT").with(csrf()))
+                .andExpect(status().isNoContent());
+
+        // then
+        assertThat(bookings.findById(id).orElseThrow().getCancellationReason())
+                .isEqualTo(CancellationReason.CLUB_EVENT);
+    }
+
+    @Test
+    @WithMockUser(username = "doe.jane", roles = "MEMBER")
+    void givenAnOwnBooking_whenTheHolderNamesAReason_thenTheReasonIsRefusedAndTheBookingStands() throws Exception {
+        // given
+        UUID id = bookingOf("doe.jane");
+
+        // when
+        mockMvc.perform(delete("/api/bookings/{id}", id).param("reason", "WEATHER").with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:cancellation-reason-not-allowed"))
+                .andExpect(jsonPath("$.violations[0].code").value("booking.cancellationReason.ownBooking"));
+
+        // then
+        assertThat(bookings.findById(id).orElseThrow().getStatus()).isEqualTo(BookingStatus.CONFIRMED);
+    }
+
+    @Test
+    @WithMockUser(username = "miles.richard", roles = "ADMIN")
+    void givenAnUnknownReason_whenAnAdminCancels_thenTheRequestIsRefusedAndTheBookingStands() throws Exception {
+        // given
+        UUID id = bookingOf("doe.jane");
+
+        // when
+        mockMvc.perform(delete("/api/bookings/{id}", id).param("reason", "RAIN").with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:parameter-type-mismatch"));
+
+        // then
+        assertThat(bookings.findById(id).orElseThrow().getStatus()).isEqualTo(BookingStatus.CONFIRMED);
     }
 
     @Test

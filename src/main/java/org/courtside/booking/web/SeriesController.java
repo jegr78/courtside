@@ -1,5 +1,6 @@
 package org.courtside.booking.web;
 
+import org.courtside.api.ApiCancellationReason;
 import org.courtside.api.ApiCancelScope;
 import org.courtside.api.ApiDayOfWeek;
 import org.courtside.api.ApiCreateSeriesRequest;
@@ -86,10 +87,11 @@ class SeriesController implements BookingSeriesApi {
     }
 
     @Override
-    public ResponseEntity<Void> cancelSeries(UUID id, UUID fromBookingId, ApiCancelScope scope) {
+    public ResponseEntity<Void> cancelSeries(UUID id, UUID fromBookingId, ApiCancelScope scope,
+                                             ApiCancellationReason reason) {
         UserAccount account = currentUser.requireAccount();
         series.cancel(id, fromBookingId, CancelScope.valueOf(scope.getValue()),
-                account.getId(), account.getRoles());
+                account.getId(), account.getRoles(), CancellationReasons.of(reason));
         return ResponseEntity.noContent().build();
     }
 

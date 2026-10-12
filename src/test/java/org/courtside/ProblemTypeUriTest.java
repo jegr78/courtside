@@ -47,6 +47,7 @@ class ProblemTypeUriTest {
             "urn:courtside:error:message-not-declinable",
             "urn:courtside:error:notification-not-found",
             "urn:courtside:error:booking-not-found",
+            "urn:courtside:error:cancellation-reason-not-allowed",
             "urn:courtside:error:booking-rules-violated",
             "urn:courtside:error:card-label-taken",
             "urn:courtside:error:card-not-bookable",

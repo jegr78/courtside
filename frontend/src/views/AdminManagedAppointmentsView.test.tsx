@@ -9,7 +9,7 @@ import { AdminManagedAppointmentsView } from "./AdminManagedAppointmentsView";
 const first: ManagedAppointment = {
   id: "11111111-1111-1111-1111-111111111111", cardId: "card-training", courtIds: ["court-1"],
   startsAt: "2026-10-01T16:00:00Z", endsAt: "2026-10-01T17:00:00Z", cardLabel: "Training",
-  cardColor: "#34584a", status: "CONFIRMED", participantCount: 8, seriesId: "series-1"
+  cardColor: "#34584a", status: "CONFIRMED", participantCount: 8, seriesId: "series-1", ownBooking: true
 };
 const second: ManagedAppointment = {
   ...first, id: "22222222-2222-2222-2222-222222222222", startsAt: "2026-10-08T16:00:00Z",
@@ -326,6 +326,39 @@ describe("AdminManagedAppointmentsView", () => {
     // then
     expect(screen.queryByTestId("load-failure")).not.toBeInTheDocument();
     expect(screen.getByTestId("managed-load-more")).not.toBeDisabled();
+  });
+
+  it("given somebody else's series, when the board cancels it naming a reason, then the reason travels with the cancellation", async () => {
+    // given
+    const cancel = vi.spyOn(api, "cancelSeries").mockResolvedValue(undefined);
+    vi.mocked(api.managedAppointments).mockResolvedValue({
+      items: [{ ...first, ownBooking: false }, { ...second, ownBooking: false }]
+    });
+    show();
+    await userEvent.click(within(await screen.findByTestId("managed-series-series-1")).getByTestId("managed-series-summary"));
+    await userEvent.click(within(screen.getByTestId(`booking-${first.id}`)).getByTestId("managed-cancel"));
+
+    // when
+    await userEvent.selectOptions(screen.getByTestId("cancellation-reason"), "WEATHER");
+    await userEvent.click(screen.getByTestId("confirm-cancellation"));
+
+    // then
+    await waitFor(() => expect(cancel).toHaveBeenCalledWith("series-1", first.id, "THIS", "WEATHER"));
+  });
+
+  it("given the board's own series, when cancelling it, then no reason is offered", async () => {
+    // given
+    const cancel = vi.spyOn(api, "cancelSeries").mockResolvedValue(undefined);
+    show();
+    await userEvent.click(within(await screen.findByTestId("managed-series-series-1")).getByTestId("managed-series-summary"));
+
+    // when
+    await userEvent.click(within(screen.getByTestId(`booking-${first.id}`)).getByTestId("managed-cancel"));
+
+    // then
+    expect(screen.queryByTestId("cancellation-reason")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByTestId("confirm-cancellation"));
+    await waitFor(() => expect(cancel).toHaveBeenCalledWith("series-1", first.id, "THIS"));
   });
 
   it("given a confirmed cancellation, when the next action starts, then the earlier confirmation leaves", async () => {

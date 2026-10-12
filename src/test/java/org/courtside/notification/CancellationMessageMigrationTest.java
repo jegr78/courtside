@@ -23,7 +23,7 @@ class CancellationMessageMigrationTest {
     private static final String ACCOUNT = "7f000000-0000-0000-0000-000000000012";
 
     @Container
-    private static final PostgreSQLContainer<?> DATABASE = new PostgreSQLContainer<>(TestPostgres.deployedImage());
+    private final PostgreSQLContainer<?> database = new PostgreSQLContainer<>(TestPostgres.deployedImage());
 
     @Test
     void givenAnEarlierOptOut_whenTheCancellationKindsArrive_thenItSurvivesAndOnlyTheMemberCancellationMayBeDeclined()
@@ -61,9 +61,51 @@ class CancellationMessageMigrationTest {
         }
     }
 
-    private static void migrateTo(String target) {
+    @Test
+    void givenACancelledBookingFromBefore_whenTheReasonColumnArrives_thenItNamesNoneAndOnlyAKnownCodeOnACancellationFits()
+            throws Exception {
+        // given
+        migrateTo("53");
+        try (Connection connection = connect(); var statement = connection.createStatement()) {
+            statement.execute("""
+                    INSERT INTO person (id, first_name, last_name, email)
+                    VALUES ('7f000000-0000-0000-0000-000000000011', 'Jane', 'Doe', 'jane.doe@example.org');
+                    INSERT INTO user_account (id, person_id, username, password_hash, locale, enabled)
+                    VALUES ('%1$s', '7f000000-0000-0000-0000-000000000011', 'doe.jane', '{noop}unused', 'en', true);
+                    INSERT INTO booking (id, card_id, status, booked_by, created_at, cancelled_at, cancelled_by)
+                    VALUES ('7f000000-0000-0000-0000-000000000021', '11111111-1111-1111-1111-111111111111',
+                            'CANCELLED', '%1$s', '2026-01-01T00:00:00Z', '2026-01-02T00:00:00Z', '%1$s'),
+                           ('7f000000-0000-0000-0000-000000000022', '11111111-1111-1111-1111-111111111111',
+                            'CONFIRMED', '%1$s', '2026-01-01T00:00:00Z', NULL, NULL);
+                    """.formatted(ACCOUNT));
+        }
+
+        // when
+        migrateTo("latest");
+
+        // then
+        try (Connection connection = connect(); var statement = connection.createStatement()) {
+            assertThat(strings(statement.executeQuery(
+                    "SELECT coalesce(cancellation_reason, 'none') FROM booking ORDER BY id")))
+                    .as("a cancellation recorded before reasons existed names none")
+                    .containsExactly("none", "none");
+            statement.execute("UPDATE booking SET cancellation_reason = 'WEATHER' "
+                    + "WHERE id = '7f000000-0000-0000-0000-000000000021'");
+            assertThatThrownBy(() -> statement.execute("UPDATE booking SET cancellation_reason = 'RAIN' "
+                    + "WHERE id = '7f000000-0000-0000-0000-000000000021'"))
+                    .isInstanceOf(SQLException.class)
+                    .hasMessageContaining("booking_cancellation_reason_known");
+            assertThatThrownBy(() -> statement.execute("UPDATE booking SET cancellation_reason = 'WEATHER' "
+                    + "WHERE id = '7f000000-0000-0000-0000-000000000022'"))
+                    .as("a booking that stands has no cancellation reason")
+                    .isInstanceOf(SQLException.class)
+                    .hasMessageContaining("booking_cancellation_reason_only_when_cancelled");
+        }
+    }
+
+    private void migrateTo(String target) {
         Flyway.configure()
-                .dataSource(DATABASE.getJdbcUrl(), DATABASE.getUsername(), DATABASE.getPassword())
+                .dataSource(database.getJdbcUrl(), database.getUsername(), database.getPassword())
                 .locations("classpath:db/migration")
                 .target(target)
                 .load()
@@ -78,7 +120,7 @@ class CancellationMessageMigrationTest {
         return values;
     }
 
-    private static Connection connect() throws Exception {
-        return DriverManager.getConnection(DATABASE.getJdbcUrl(), DATABASE.getUsername(), DATABASE.getPassword());
+    private Connection connect() throws Exception {
+        return DriverManager.getConnection(database.getJdbcUrl(), database.getUsername(), database.getPassword());
     }
 }

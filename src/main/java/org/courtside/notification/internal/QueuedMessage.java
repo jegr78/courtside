@@ -1,8 +1,14 @@
 package org.courtside.notification.internal;
 
 import org.courtside.notification.MessageKind;
+import org.courtside.shared.CancellationReason;
 
+import java.time.Instant;
+import java.time.format.DateTimeParseException;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 record QueuedMessage(UUID accountId, MessageKind kind, Map<String, String> parameters) {
@@ -11,6 +17,10 @@ record QueuedMessage(UUID accountId, MessageKind kind, Map<String, String> param
     static final String CLOSURE = "closure";
     static final String PLAYER = "playerId";
     static final String SERIES = "seriesId";
+    static final String REASON = "reason";
+    static final String BOOKINGS = "bookingIds";
+    static final String PREVIOUS_STARTS_AT = "previousStartsAt";
+    static final String PREVIOUS_ENDS_AT = "previousEndsAt";
 
     QueuedMessage {
         parameters = parameters == null ? Map.of() : Map.copyOf(parameters);
@@ -28,15 +38,49 @@ record QueuedMessage(UUID accountId, MessageKind kind, Map<String, String> param
         return id(SERIES);
     }
 
+    Optional<CancellationReason> reason() {
+        String stored = parameters.get(REASON);
+        if (stored == null) {
+            return Optional.empty();
+        }
+        return Optional.of(Arrays.stream(CancellationReason.values())
+                .filter(reason -> reason.name().equals(stored))
+                .findFirst()
+                .orElseThrow(() -> new MessageUndeliverableException("ParameterMalformed")));
+    }
+
+    List<UUID> bookings() {
+        return Arrays.stream(required(BOOKINGS).split(",")).map(QueuedMessage::uuid).toList();
+    }
+
+    Instant previousStartsAt() {
+        return instant(PREVIOUS_STARTS_AT);
+    }
+
+    Instant previousEndsAt() {
+        return instant(PREVIOUS_ENDS_AT);
+    }
+
     String closure() {
         return required(CLOSURE);
     }
 
     private UUID id(String name) {
-        String value = required(name);
+        return uuid(required(name));
+    }
+
+    private static UUID uuid(String value) {
         try {
             return UUID.fromString(value);
         } catch (IllegalArgumentException malformed) {
+            throw new MessageUndeliverableException("ParameterMalformed");
+        }
+    }
+
+    private Instant instant(String name) {
+        try {
+            return Instant.parse(required(name));
+        } catch (DateTimeParseException malformed) {
             throw new MessageUndeliverableException("ParameterMalformed");
         }
     }

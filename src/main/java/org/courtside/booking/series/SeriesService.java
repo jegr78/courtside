@@ -8,6 +8,7 @@ import java.time.LocalTime;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -40,6 +41,7 @@ import org.courtside.config.ClubTimeZone;
 import org.courtside.facility.FacilityService;
 import org.courtside.identity.Role;
 import org.courtside.rules.RuleViolation;
+import org.courtside.shared.CancellationReason;
 import org.courtside.shared.SeriesCancelled;
 import org.courtside.shared.SeriesCreated;
 import org.courtside.shared.SeriesMoved;
@@ -201,6 +203,12 @@ public class SeriesService {
     @Transactional
     public int cancel(UUID seriesId, UUID fromBookingId, CancelScope scope,
                       UUID cancelledBy, Set<Role> cancellerRoles) {
+        return cancel(seriesId, fromBookingId, scope, cancelledBy, cancellerRoles, null);
+    }
+
+    @Transactional
+    public int cancel(UUID seriesId, UUID fromBookingId, CancelScope scope,
+                      UUID cancelledBy, Set<Role> cancellerRoles, CancellationReason reason) {
         requireManagementAccessTo(seriesId, fromBookingId, cancelledBy, cancellerRoles);
         lockSeries(seriesId);
         bookingRepository.lockBySeriesId(seriesId);
@@ -211,9 +219,9 @@ public class SeriesService {
                 .map(Booking::getId)
                 .toList();
         affected.forEach(bookingId ->
-                occurrences.cancelOccurrence(bookingId, cancelledBy, cancellerRoles));
+                occurrences.cancelOccurrence(bookingId, cancelledBy, cancellerRoles, reason));
         if (!affected.isEmpty()) {
-            events.publishEvent(new SeriesCancelled(seriesId, affected, cancelledBy));
+            events.publishEvent(new SeriesCancelled(seriesId, affected, cancelledBy, reason));
         }
         return affected.size();
     }
@@ -310,7 +318,12 @@ public class SeriesService {
             throw e;
         }
         if (!movingIds.isEmpty()) {
-            events.publishEvent(new SeriesMoved(request.seriesId(), movingIds, movedBy));
+            TimeSlot previous = preview.moves().stream()
+                    .map(MovePreview.Move::from)
+                    .min(Comparator.comparing(TimeSlot::start))
+                    .orElseThrow();
+            events.publishEvent(new SeriesMoved(request.seriesId(), movingIds, movedBy,
+                    previous.start(), previous.end()));
         }
         return executions.size();
     }

@@ -5,10 +5,12 @@ import org.courtside.AbstractIntegrationTest;
 import org.courtside.booking.BookingService;
 import org.courtside.booking.CreateBookingCommand;
 import org.courtside.booking.ParticipantSpec;
+import org.courtside.booking.internal.CancellationReasonNotAllowedException;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.courtside.notification.testfixture.NotificationTestFixture;
+import org.courtside.shared.CancellationReason;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.BeforeEach;
@@ -27,6 +29,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentCaptor.forClass;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.atLeast;
@@ -213,6 +216,65 @@ class BookingCancellationMessageTest extends AbstractIntegrationTest {
                         """).query(String.class).list())
                 .hasSize(2)
                 .containsOnly("{\"bookingId\": \"" + bookingId + "\"}");
+    }
+
+    @Test
+    void givenAReason_whenTheBoardCancels_thenEveryoneToldReadsItInTheirLanguageAndTheCentreKeepsTheCode()
+            throws Exception {
+        // given
+        UUID bookingId = book();
+        jdbc.sql("UPDATE user_account SET locale = 'en' WHERE id = :id").param("id", playerAccountId).update();
+        clearInvocations(sender);
+
+        // when
+        bookings.cancel(bookingId, boardAccountId, Set.of(Role.ADMIN), CancellationReason.MAINTENANCE);
+
+        // then
+        assertThat(bodiesTo("jane.doe@example.org")).singleElement().asString()
+                .contains("Grund: Wartungsarbeiten.")
+                .doesNotContain("Frage deinen Verein");
+        assertThat(bodiesTo("john.roe@example.org")).singleElement().asString()
+                .contains("Reason: maintenance work.");
+        assertThat(jdbc.sql("SELECT parameters::text FROM notification WHERE kind = 'BOOKING_CANCELLED_BY_CLUB'")
+                .query(String.class).list())
+                .as("the centre keeps the code, never a sentence")
+                .containsOnly("{\"reason\": \"MAINTENANCE\", \"bookingId\": \"" + bookingId + "\"}");
+        assertThat(jdbc.sql("SELECT cancellation_reason FROM booking WHERE id = :id").param("id", bookingId)
+                .query(String.class).single())
+                .isEqualTo("MAINTENANCE");
+    }
+
+    @Test
+    void givenNoReason_whenTheBoardCancels_thenTheMessageSendsTheMemberToTheClub() throws Exception {
+        // given
+        UUID bookingId = book();
+        clearInvocations(sender);
+
+        // when
+        bookings.cancel(bookingId, boardAccountId, Set.of(Role.ADMIN));
+
+        // then
+        assertThat(bodiesTo("jane.doe@example.org")).singleElement().asString()
+                .contains("Frage deinen Verein, wenn du den Grund wissen möchtest.")
+                .doesNotContain("Grund:");
+    }
+
+    @Test
+    void givenAReason_whenTheHolderCancelsTheirOwnBooking_thenNothingIsCancelledOrSent() {
+        // given
+        UUID bookingId = book();
+
+        // when / then
+        assertThatThrownBy(() -> bookings.cancel(bookingId, bookerAccountId, Set.of(Role.MEMBER),
+                CancellationReason.WEATHER))
+                .isInstanceOfSatisfying(CancellationReasonNotAllowedException.class, failure ->
+                        assertThat(failure.getCode()).isEqualTo("booking.cancellationReason.ownBooking"));
+        assertThat(jdbc.sql("SELECT status FROM booking WHERE id = :id").param("id", bookingId)
+                .query(String.class).single())
+                .as("a refused reason refuses the cancellation it came with")
+                .isEqualTo("CONFIRMED");
+        assertThat(notifications.notificationsFor(playerAccountId))
+                .containsExactly(MessageKind.BOOKING_PLAYER_RECORDED);
     }
 
     private UUID book() {

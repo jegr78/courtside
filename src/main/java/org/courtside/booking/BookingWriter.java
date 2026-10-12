@@ -5,6 +5,7 @@ import jakarta.persistence.EntityManager;
 import org.courtside.booking.internal.BookingNotFoundException;
 import org.courtside.booking.internal.BookingAccessControl;
 import org.courtside.booking.internal.BookingRuleGate;
+import org.courtside.booking.internal.CancellationReasonNotAllowedException;
 import org.courtside.booking.internal.CardEligibilityPolicy;
 import org.courtside.booking.internal.CourtUnavailableException;
 import org.courtside.booking.internal.CourtAllocationRepository;
@@ -21,6 +22,7 @@ import org.courtside.config.BookingGridCoordination;
 import org.courtside.identity.PersonRepository;
 import org.courtside.identity.Role;
 import org.courtside.shared.BookingCancelled;
+import org.courtside.shared.CancellationReason;
 import org.courtside.shared.BookingConfirmed;
 import org.courtside.shared.ParticipantRecorded;
 import org.courtside.shared.SqlConstraintViolation;
@@ -140,24 +142,29 @@ class BookingWriter implements SeriesOccurrenceCancellation {
                         events.publishEvent(new ParticipantRecorded(bookingId, personId)));
     }
 
-    void cancel(UUID bookingId, UUID cancelledBy, Set<Role> cancellerRoles) {
-        if (cancelBooking(bookingId, cancelledBy, cancellerRoles)) {
-            events.publishEvent(new BookingCancelled(bookingId, cancelledBy));
+    void cancel(UUID bookingId, UUID cancelledBy, Set<Role> cancellerRoles, CancellationReason reason) {
+        if (cancelBooking(bookingId, cancelledBy, cancellerRoles, reason)) {
+            events.publishEvent(new BookingCancelled(bookingId, cancelledBy, reason));
         }
     }
 
     @Override
-    public void cancelOccurrence(UUID bookingId, UUID cancelledBy, Set<Role> cancellerRoles) {
-        cancelBooking(bookingId, cancelledBy, cancellerRoles);
+    public void cancelOccurrence(UUID bookingId, UUID cancelledBy, Set<Role> cancellerRoles,
+                                 CancellationReason reason) {
+        cancelBooking(bookingId, cancelledBy, cancellerRoles, reason);
     }
 
-    private boolean cancelBooking(UUID bookingId, UUID cancelledBy, Set<Role> cancellerRoles) {
+    private boolean cancelBooking(UUID bookingId, UUID cancelledBy, Set<Role> cancellerRoles,
+                                  CancellationReason reason) {
         bookings.lockById(bookingId)
                 .orElseThrow(() -> new BookingNotFoundException("No booking with id " + bookingId));
         entityManager.clear();
         Booking booking = bookings.findWithAllocationsById(bookingId)
                 .orElseThrow(() -> new BookingNotFoundException("No booking with id " + bookingId));
         accessControl.requireManagementAccess(booking, cancelledBy, cancellerRoles);
+        if (reason != null && cancelledBy.equals(booking.getBookedBy())) {
+            throw new CancellationReasonNotAllowedException();
+        }
         Instant cancelledAt = clock.instant();
         try {
             ruleGate.requireCancellationAllowed(booking, cancellerRoles, cancelledAt);
@@ -167,7 +174,7 @@ class BookingWriter implements SeriesOccurrenceCancellation {
                     .increment());
             throw failure;
         }
-        boolean changed = booking.cancel(cancelledBy, cancelledAt);
+        boolean changed = booking.cancel(cancelledBy, cancelledAt, reason);
         bookings.saveAndFlush(booking);
         return changed;
     }

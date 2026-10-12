@@ -19,10 +19,12 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.SequencedMap;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
@@ -78,23 +80,39 @@ class BookingAnnouncements implements BookingAnnouncer {
 
     @Override
     @Transactional(readOnly = true)
+    public SequencedMap<UUID, BookingAnnouncement> describeAll(Collection<UUID> bookingIds) {
+        if (bookingIds.isEmpty()) {
+            return new LinkedHashMap<>();
+        }
+        SequencedMap<UUID, BookingAnnouncement> described = new LinkedHashMap<>();
+        announcementsOf(bookings.findAllByIdIn(Set.copyOf(bookingIds))).entrySet().stream()
+                .sorted(Map.Entry.comparingByValue(Comparator.comparing(BookingAnnouncement::startsAt)))
+                .forEach(entry -> described.put(entry.getKey(), entry.getValue()));
+        return described;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public List<BookingAnnouncement> describeSeries(UUID seriesId) {
-        List<Booking> occurrences = bookings.findConfirmedBySeriesOrderedByStart(seriesId);
+        return List.copyOf(announcementsOf(bookings.findConfirmedBySeriesOrderedByStart(seriesId)).values());
+    }
+
+    private SequencedMap<UUID, BookingAnnouncement> announcementsOf(List<Booking> occurrences) {
+        SequencedMap<UUID, BookingAnnouncement> described = new LinkedHashMap<>();
         if (occurrences.isEmpty()) {
-            return List.of();
+            return described;
         }
         Map<UUID, List<UUID>> players = new HashMap<>();
         bookings.findMemberParticipantIdsByBooking(occurrences.stream().map(Booking::getId).toList()).forEach(row ->
                 players.computeIfAbsent((UUID) row[0], ignored -> new ArrayList<>()).add((UUID) row[1]));
         Map<UUID, BookingAnnouncement.AnnouncedCourt> courts = new HashMap<>();
         Map<UUID, String> cardLabels = new HashMap<>();
-        return occurrences.stream()
-                .flatMap(booking -> announcementOf(booking, players.getOrDefault(booking.getId(), List.of()),
-                        courtId -> courts.computeIfAbsent(courtId,
-                                missing -> announcedCourt(facility.requireCourt(missing))),
-                        cardId -> cardLabels.computeIfAbsent(cardId, missing -> cards.requireCard(missing).getLabel()))
-                        .stream())
-                .toList();
+        occurrences.forEach(booking -> announcementOf(booking, players.getOrDefault(booking.getId(), List.of()),
+                courtId -> courts.computeIfAbsent(courtId,
+                        missing -> announcedCourt(facility.requireCourt(missing))),
+                cardId -> cardLabels.computeIfAbsent(cardId, missing -> cards.requireCard(missing).getLabel()))
+                .ifPresent(announcement -> described.put(booking.getId(), announcement)));
+        return described;
     }
 
     private static boolean visibleTo(Booking booking, List<UUID> players, UUID accountId, UUID personId) {

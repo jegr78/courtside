@@ -458,10 +458,12 @@
         "ParticipationMailer#on(ParticipantWithdrew)",
         "PasswordResetCodeMailer#on(PasswordResetRequested)",
         "ReminderMailer#on(BookingReminderDue)",
+        "SeriesMailer#on(SeriesCancelled)",
         "SeriesMailer#on(SeriesCreated)",
+        "SeriesMailer#on(SeriesMoved)",
         "UsernameReminderMailer#on(UsernameReminderRequested)"
       ],
-      "growthDrivers": "Mail work fans out with booking participants, reminders, cancellations, series summaries and displaced future bookings; every fanned-out message is one stored outbox row, and relay latency holds an outbox worker for one handover.",
+      "growthDrivers": "Mail work fans out with booking participants, reminders, cancellations, series summaries, series changes and displaced future bookings; every fanned-out message is one stored outbox row, and relay latency holds an outbox worker for one handover.",
       "inputOrDataBound": "A booking has at most twenty participant positions, closure discovery pages by 100, a queued row carries identifiers only, and each SMTP connect and read wait stops after ten seconds.",
       "concurrencyOrRateBound": "Two outbox workers hand messages over, each holding one database connection while it composes and sends; a wake-up beyond one pending pass is discarded because that pass finds its row. Closure announcements use at most two threads and a queue of 100 with caller-run backpressure.",
       "executionModel": "A mail listener runs before commit inside the publishing transaction and only stores a queued message_record row, so the row commits with the change or not at all. The outbox workers claim due rows with FOR UPDATE SKIP LOCKED under a five-minute lease, then lock the row, compose, hand over and record the outcome in one transaction. A scheduled pass every five seconds resumes what a restart or a retry left due. Closure announcements run after commit through the publication registry, and each closure page runs in a new transaction outside the originating mutation.",

@@ -1,6 +1,7 @@
 package org.courtside.dataexchange.web;
 
 import lombok.RequiredArgsConstructor;
+import org.courtside.api.ApiCancellationReason;
 import org.courtside.api.AdminSubjectAccessApi;
 import org.courtside.api.ApiBookingStatus;
 import org.courtside.api.ApiMessageChannel;
@@ -106,7 +107,9 @@ class SubjectAccessAdminController implements AdminSubjectAccessApi {
                 .readAt(WireTypes.toOffsetDateTime(notification.readAt()))
                 .bookingId(notification.bookingId())
                 .closure(notification.closure() == null ? null
-                        : ApiNotificationClosure.fromValue(notification.closure().name()));
+                        : ApiNotificationClosure.fromValue(notification.closure().name()))
+                .cancellationReason(notification.cancellationReason() == null ? null
+                        : ApiCancellationReason.fromValue(notification.cancellationReason().name()));
     }
 
     private static ApiSubjectAccessDeclinedChannel toDeclinedChannel(PersonMessageHistory.DeclinedChannel declined) {

@@ -142,6 +142,11 @@
       "class": "neutral"
     },
     {
+      "name": "reason",
+      "in": "query",
+      "class": "neutral"
+    },
+    {
       "name": "separator",
       "in": "query",
       "class": "neutral"
@@ -369,6 +374,10 @@
       },
       "cancelled_by": {
         "level": "pseudonymous",
+        "lifecycle": "booking-pseudonymisation"
+      },
+      "cancellation_reason": {
+        "level": "operational",
         "lifecycle": "booking-pseudonymisation"
       },
       "card_id": {

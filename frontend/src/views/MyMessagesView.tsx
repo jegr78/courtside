@@ -45,6 +45,9 @@ function NotificationEntry({ notification, timeZone, marking, justRead, markRead
       </span>
     </div>
     <p id={summaryId} data-testid="notification-summary">{summaryOf(notification, t)}</p>
+    {notification.cancellationReason && <p data-testid="notification-reason">
+      {t("notifications.reason", { reason: t(`cancellationReason.${notification.cancellationReason}`) })}
+    </p>}
     {booking && <p data-testid="notification-booking" className="text-muted text-sm">
       {formatBookingPeriod(booking.startsAt, booking.endsAt, language, timeZone)}
       {" · "}

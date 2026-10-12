@@ -3,6 +3,7 @@ package org.courtside.notification.internal;
 import lombok.RequiredArgsConstructor;
 import org.courtside.config.ClubIdentity;
 import org.courtside.shared.BookingAnnouncement;
+import org.courtside.shared.CancellationReason;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
@@ -14,6 +15,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
 
@@ -46,6 +48,15 @@ class BookingWording {
         values.put("last", day(occurrences.getLast().startsAt(), locale));
         values.put("count", String.valueOf(occurrences.size()));
         return values;
+    }
+
+    Map<String, String> previous(Instant startsAt, Instant endsAt) {
+        return Map.of("previousFrom", time(startsAt), "previousTo", time(endsAt));
+    }
+
+    String reason(Optional<CancellationReason> reason, Locale locale) {
+        return templates.render("booking.cancellationReason." + reason.map(Enum::name).orElse("none"),
+                locale, Map.of());
     }
 
     private String courts(BookingAnnouncement booking, Locale locale) {

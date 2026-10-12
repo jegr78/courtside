@@ -161,7 +161,7 @@ class SeriesReminderCancellationRaceTest extends AbstractIntegrationTest {
                 awaitAnotherSessionBlockedOnALock();
             }
             return answer;
-        }).when(occurrenceCancellation).cancelOccurrence(any(), any(), any());
+        }).when(occurrenceCancellation).cancelOccurrence(any(), any(), any(), any());
     }
 
     private void awaitAnotherSessionBlockedOnALock() {

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  api, type CancelScope, type ManagedAppointment, type ManagedAppointmentDetail,
+  api, type CancellationReason, type CancelScope, type ManagedAppointment, type ManagedAppointmentDetail,
   type MovePreview, type MoveRequest, type PersonalBooking, type PublicCourt
 } from "../api/client";
 import { violationMessage } from "../api/problem-message";
@@ -12,6 +12,7 @@ import { DialogBody } from "../components/DialogBody";
 import { Modal } from "../components/Modal";
 import { useReportedFailure } from "../failures/useReportedFailure";
 import { formatBookingPeriod } from "../time/clubZone";
+import { CancellationReasonField } from "./CancellationReasonField";
 
 export type Appointment = PersonalBooking | ManagedAppointment;
 type Translate = ReturnType<typeof useTranslation>["t"];
@@ -27,11 +28,13 @@ function ScopeFields({ scope, changed, t }: { scope: CancelScope; changed: (scop
 export function CancelDialog({ booking, seriesBookings, hasMoreBookings, timeZone, closed, completed }: { booking: Appointment; seriesBookings: Appointment[]; hasMoreBookings: boolean; timeZone: string; closed: () => void; completed: () => Promise<void> }) {
   const { t, i18n } = useTranslation();
   const [scope, setScope] = useState<CancelScope>("THIS");
+  const [reason, setReason] = useState<CancellationReason>();
   const { message: error, report } = useReportedFailure();
+  const foreign = "ownBooking" in booking && !booking.ownBooking;
   async function submit() {
     try {
-      if (booking.seriesId) await api.cancelSeries(booking.seriesId, booking.id, scope);
-      else await api.cancelBooking(booking.id);
+      if (booking.seriesId) await (reason ? api.cancelSeries(booking.seriesId, booking.id, scope, reason) : api.cancelSeries(booking.seriesId, booking.id, scope));
+      else await (reason ? api.cancelBooking(booking.id, reason) : api.cancelBooking(booking.id));
       await completed();
     } catch (failure) { report(failure); }
   }
@@ -45,6 +48,7 @@ export function CancelDialog({ booking, seriesBookings, hasMoreBookings, timeZon
     <p className="font-semibold">{t("myBookings.affected", { count: affected.length })}</p>
     <ul className="list-disc pl-5">{affected.map((candidate) => <li key={candidate.id}>{formatBookingPeriod(candidate.startsAt, candidate.endsAt, i18n.language, timeZone)}</li>)}</ul>
     {hasMoreBookings && scope !== "THIS" && <p data-testid="incomplete-series-warning">{t("myBookings.affectedIncomplete")}</p>}
+    {foreign && <CancellationReasonField reason={reason} changed={setReason} />}
     </div></DialogBody>
     {error && <div className="shrink-0 px-6 pt-3"><Alert>{error}</Alert></div>}
     <div className="surface-panel border-structural flex shrink-0 gap-2 border-t px-6 py-4"><Button variant="destructive-confirm" data-testid="confirm-cancellation" onClick={() => void submit()}>{t("booking.cancelConfirm")}</Button><Button variant="secondary" onClick={closed}>{t("booking.close")}</Button></div>

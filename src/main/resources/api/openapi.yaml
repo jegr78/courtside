@@ -347,6 +347,14 @@ components:
       description: Which occurrences of a series an operation applies to.
       enum: [THIS, THIS_AND_FOLLOWING, WHOLE_SERIES]
 
+    CancellationReason:
+      type: string
+      description: |
+        Why somebody other than the holder cancelled a booking, as a code the client and the
+        messages translate. There is no free text, so a reason names nobody and never needs
+        correcting.
+      enum: [COURT_CONDITION, WEATHER, CLUB_EVENT, MAINTENANCE, OTHER]
+
     BookingStatus:
       type: string
       enum: [CONFIRMED, CANCELLED]
@@ -1924,7 +1932,8 @@ components:
 
     ManagedAppointment:
       type: object
-      required: [id, cardId, courtIds, startsAt, endsAt, cardLabel, cardColor, status, participantCount]
+      required: [id, cardId, courtIds, startsAt, endsAt, cardLabel, cardColor, status, participantCount,
+                 ownBooking]
       properties:
         id: { type: string, format: uuid }
         seriesId: { type: [string, "null"], format: uuid }
@@ -1939,6 +1948,11 @@ components:
         cardColor: { type: string }
         status: { $ref: "#/components/schemas/BookingStatus" }
         participantCount: { type: integer, minimum: 0 }
+        ownBooking:
+          type: boolean
+          description: |
+            Whether the signed-in account holds the appointment. Only somebody else's appointment
+            may be cancelled with a reason.
 
     ManagedAppointmentView:
       type: string
@@ -2716,7 +2730,7 @@ components:
              ACCOUNT_PASSWORD_RESET_CODE, BOOKING_CONFIRMED,
              BOOKING_PLAYER_RECORDED, BOOKING_PLAYER_WITHDREW, BOOKING_DISPLACED,
              BOOKING_REMINDER, BOOKING_CANCELLED, BOOKING_CANCELLED_BY_CLUB,
-             BOOKING_SERIES_CREATED]
+             BOOKING_SERIES_CREATED, BOOKING_SERIES_CANCELLED_BY_CLUB, BOOKING_SERIES_MOVED_BY_CLUB]
 
     MessageChoice:
       type: object
@@ -2728,7 +2742,7 @@ components:
           description: |
             False for what the club must be able to send: the credentials an account needs to sign
             in at all, the notice that a closure hit a booking, being told somebody wrote you
-            into one, and being told the club cancelled one.
+            into one, and being told the club cancelled or moved one.
         enabled:
           type: boolean
           description: Whether this account currently receives the kind.
@@ -2778,6 +2792,8 @@ components:
           $ref: "#/components/schemas/NotificationBooking"
         closure:
           $ref: "#/components/schemas/NotificationClosure"
+        cancellationReason:
+          $ref: "#/components/schemas/CancellationReason"
         link: { $ref: "#/components/schemas/NotificationLink" }
 
     NotificationBooking:
@@ -3181,6 +3197,8 @@ components:
           description: The booking the entry concerns, as stored, whether or not it still exists.
         closure:
           $ref: "#/components/schemas/NotificationClosure"
+        cancellationReason:
+          $ref: "#/components/schemas/CancellationReason"
 
     SubjectAccessDeclinedChannel:
       type: object
@@ -4297,6 +4315,10 @@ paths:
         A booking the caller may not act on is answered `404` with
         `urn:courtside:error:booking-not-found`, the same answer an id naming no booking
         gets: whether an id is real is not something a refusal discloses.
+        Somebody cancelling another holder's booking may name a `reason`, which the holder and
+        the players are told. The holder cancelling their own booking may not: a `reason` then
+        answers `400` with `urn:courtside:error:cancellation-reason-not-allowed` and cancels
+        nothing.
       security:
         - sessionCookie: []
           csrfToken: []
@@ -4305,6 +4327,10 @@ paths:
           in: path
           required: true
           schema: { type: string, format: uuid }
+        - name: reason
+          in: query
+          required: false
+          schema: { $ref: "#/components/schemas/CancellationReason" }
       responses:
         "204":
           description: Cancelled.
@@ -4604,6 +4630,8 @@ paths:
         not part of are both answered `400` with `booking.series.bookingNotInSeries`.
         Cancellation is atomic. If the booking holder's current rule set refuses any affected
         occurrence, none of the occurrences is cancelled. Administrators override that deadline.
+        A `reason` follows the rule of a single booking's cancellation: only somebody other than
+        the holder may name one, and the holder is told it with the cancelled occurrences.
       security:
         - sessionCookie: []
           csrfToken: []
@@ -4620,6 +4648,10 @@ paths:
           in: query
           required: true
           schema: { $ref: "#/components/schemas/CancelScope" }
+        - name: reason
+          in: query
+          required: false
+          schema: { $ref: "#/components/schemas/CancellationReason" }
       responses:
         "204":
           description: Cancelled.
