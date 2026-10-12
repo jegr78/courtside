@@ -4,6 +4,7 @@ import org.courtside.rules.internal.RuleParameterInvalidException;
 import org.courtside.rules.internal.RuleParameters;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import java.util.LinkedHashMap;
@@ -83,6 +84,53 @@ class RuleParametersTest {
                 .isInstanceOf(RuleParameterInvalidException.class)
                 .extracting(exception -> ((RuleParameterInvalidException) exception).getCode())
                 .isEqualTo("rule.parameters.unknownParameter");
+    }
+
+    @Test
+    void givenABookingWindow_whenValidating_thenBothTimesOfDayAreCarried() {
+        // when
+        Map<String, Integer> validated = RuleParameters.validated(RuleType.BOOKING_HOURS,
+                Map.of("earliestStart", 480, "latestEnd", 1200));
+
+        // then
+        assertThat(validated).isEqualTo(Map.of("earliestStart", 480, "latestEnd", 1200));
+    }
+
+    @Test
+    void whenReadingTheBookingWindowContract_thenItNamesTwoTimesOfDayStartFirst() {
+        // when
+        List<RuleParameters.Parameter> parameters = RuleParameters.parametersOf(RuleType.BOOKING_HOURS);
+
+        // then
+        assertThat(parameters).containsExactly(
+                new RuleParameters.Parameter("earliestStart", 0, 1438, RuleParameters.Kind.TIME_OF_DAY),
+                new RuleParameters.Parameter("latestEnd", 1, 1439, RuleParameters.Kind.TIME_OF_DAY));
+    }
+
+    @Test
+    void whenReadingACountingContract_thenItsParameterIsANumber() {
+        // when
+        List<RuleParameters.Parameter> parameters = RuleParameters.parametersOf(RuleType.ADVANCE_WINDOW);
+
+        // then
+        assertThat(parameters).extracting(RuleParameters.Parameter::kind)
+                .containsExactly(RuleParameters.Kind.NUMBER);
+    }
+
+    @ParameterizedTest
+    @MethodSource("windowsThatDoNotRunForward")
+    void givenABookingWindowThatDoesNotRunForward_whenValidating_thenItIsRejectedAsInverted(
+            int earliestStart, int latestEnd) {
+        // when / then
+        assertRejected(RuleType.BOOKING_HOURS,
+                Map.of("earliestStart", earliestStart, "latestEnd", latestEnd),
+                "rule.parameters.windowEndsBeforeItStarts", Map.of("ruleType", "BOOKING_HOURS"));
+    }
+
+    static Stream<Arguments> windowsThatDoNotRunForward() {
+        return Stream.of(
+                Arguments.of(1200, 1200),
+                Arguments.of(1320, 360));
     }
 
     @Test

@@ -157,7 +157,7 @@ class RuleDefinitionAdminControllerTest extends AbstractIntegrationTest {
         // when / then
         mockMvc.perform(get("/api/admin/rule-types"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(7))
+                .andExpect(jsonPath("$.length()").value(8))
                 .andExpect(jsonPath("$[?(@.ruleType == 'OPENING_HOURS')].configurable").value(false))
                 .andExpect(jsonPath("$[?(@.ruleType == 'OPENING_HOURS')].parameters.length()").value(0))
                 .andExpect(jsonPath("$[?(@.ruleType == 'NO_COURT_BOOKING')].configurable").value(true))
@@ -183,7 +183,60 @@ class RuleDefinitionAdminControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$[?(@.ruleType == 'CANCELLATION_DEADLINE')].parameters[0].minimum")
                         .value(0))
                 .andExpect(jsonPath("$[?(@.ruleType == 'CANCELLATION_DEADLINE')].parameters[0].maximum")
-                        .value(525600));
+                        .value(525600))
+                .andExpect(jsonPath("$[?(@.ruleType == 'CANCELLATION_DEADLINE')].parameters[0].kind")
+                        .value("NUMBER"))
+                .andExpect(jsonPath("$[?(@.ruleType == 'BOOKING_HOURS')].configurable").value(true))
+                .andExpect(jsonPath("$[?(@.ruleType == 'BOOKING_HOURS')].parameters[*].name")
+                        .value(Matchers.contains("earliestStart", "latestEnd")))
+                .andExpect(jsonPath("$[?(@.ruleType == 'BOOKING_HOURS')].parameters[*].kind")
+                        .value(Matchers.contains("TIME_OF_DAY", "TIME_OF_DAY")))
+                .andExpect(jsonPath("$[?(@.ruleType == 'BOOKING_HOURS')].parameters[0].maximum")
+                        .value(1438))
+                .andExpect(jsonPath("$[?(@.ruleType == 'BOOKING_HOURS')].parameters[1].maximum")
+                        .value(1439));
+    }
+
+    @Test
+    void givenAFreshRuleSet_whenSettingABookingWindow_thenBothTimesAreStoredAndListed() throws Exception {
+        // given
+        String ruleSetId = createRuleSet("Juniors");
+
+        // when
+        mockMvc.perform(put("/api/admin/rule-sets/" + ruleSetId + "/rules/BOOKING_HOURS")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"params": {"earliestStart": 480, "latestEnd": 1200}}
+                                """)
+                        .with(csrf()))
+                .andExpect(status().isOk());
+
+        // then
+        mockMvc.perform(get("/api/admin/rule-sets/" + ruleSetId + "/rules"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].ruleType").value("BOOKING_HOURS"))
+                .andExpect(jsonPath("$[0].params.earliestStart").value(480))
+                .andExpect(jsonPath("$[0].params.latestEnd").value(1200));
+    }
+
+    @Test
+    void givenABookingWindowEndingBeforeItStarts_whenSettingIt_thenItIsRejectedWithACode() throws Exception {
+        // given
+        String ruleSetId = createRuleSet("Juniors");
+
+        // when / then
+        mockMvc.perform(put("/api/admin/rule-sets/" + ruleSetId + "/rules/BOOKING_HOURS")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"params": {"earliestStart": 1320, "latestEnd": 360}}
+                                """)
+                        .with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:rule-parameter-invalid"))
+                .andExpect(jsonPath("$.violations[0].code").value("rule.parameters.windowEndsBeforeItStarts"))
+                .andExpect(jsonPath("$.violations[0].params.ruleType").value("BOOKING_HOURS"));
+        mockMvc.perform(get("/api/admin/rule-sets/" + ruleSetId + "/rules"))
+                .andExpect(jsonPath("$.length()").value(0));
     }
 
     @Test

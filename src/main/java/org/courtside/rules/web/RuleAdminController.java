@@ -7,6 +7,7 @@ import org.courtside.api.ApiRuleDefinition;
 import org.courtside.api.ApiRuleSet;
 import org.courtside.api.ApiRuleSetRequest;
 import org.courtside.api.ApiRuleParameter;
+import org.courtside.api.ApiRuleParameterKind;
 import org.courtside.api.ApiRuleType;
 import org.courtside.api.ApiRuleTypeConfiguration;
 import org.courtside.api.ApiSetRuleRequest;
@@ -75,7 +76,8 @@ class RuleAdminController implements AdminRuleSetsApi, AdminRuleTypesApi {
                         RuleParameters.isConfigurablePerRuleSet(type),
                         RuleParameters.parametersOf(type).stream()
                                 .map(parameter -> new ApiRuleParameter(
-                                        parameter.name(), parameter.minimum(), parameter.maximum()))
+                                        parameter.name(), parameter.minimum(), parameter.maximum(),
+                                        ApiRuleParameterKind.fromValue(parameter.kind().name())))
                                 .toList()))
                 .toList());
     }

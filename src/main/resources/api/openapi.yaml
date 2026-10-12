@@ -1763,11 +1763,19 @@ components:
 
     RuleParameter:
       type: object
-      required: [name, minimum, maximum]
+      required: [name, minimum, maximum, kind]
       properties:
         name: { type: string }
         minimum: { type: integer }
         maximum: { type: integer }
+        kind: { $ref: "#/components/schemas/RuleParameterKind" }
+
+    RuleParameterKind:
+      type: string
+      description: |
+        How a client reads a parameter's integer value. `NUMBER` is a plain count or length.
+        `TIME_OF_DAY` counts minutes after midnight in the club's time zone, so 1200 is 20:00.
+      enum: [NUMBER, TIME_OF_DAY]
 
     SetRuleRequest:
       type: object

@@ -9,16 +9,15 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 
 // The rendered heading of a rule card is composed at runtime from the rule type, so a type the
 // bundles do not name reaches a board as the raw key rather than as a word.
-const ruleTypes = () => readFileSync(join(root, "src/main/resources/api/openapi.yaml"), "utf8")
-  .split("\n")
-  .filter((line) => line.includes("enum: [OPENING_HOURS"))
-  .flatMap((line) => line.slice(line.indexOf("[") + 1, line.indexOf("]")).split(",").map((v) => v.trim()));
+const ruleTypes = () => (readFileSync(join(root, "src/main/resources/api/openapi.yaml"), "utf8")
+  .match(/\n {4}RuleType:\n {6}type: string\n {6}enum: \[([^\]]+)\]/)?.[1] ?? "")
+  .split(",").map((value) => value.trim()).filter(Boolean);
 
 // A parameter's label is looked up by its name, so a parameter the bundles do not name reaches a
 // board as the raw key above the input it is supposed to describe.
 const ruleParameters = () => [...readFileSync(
   join(root, "src/main/java/org/courtside/rules/internal/RuleParameters.java"), "utf8")
-  .matchAll(/Map\.of\("(\w+)", new Bounds\(/g)].map((match) => match[1]);
+  .matchAll(/new Parameter\("(\w+)"/g)].map((match) => match[1]);
 
 const backendKeys = () => readFileSync(join(root, "src/main/resources/messages.properties"), "utf8")
   .split("\n")
@@ -52,7 +51,7 @@ test("given every rule type the contract names, when checking both client bundle
   ]);
 
   // then
-  assert.ok(types.length > 0, "the contract must name at least one rule type");
+  assert.ok(types.includes("OPENING_HOURS") && types.includes("BOOKING_HOURS"), `the contract's rule types must be read whole, got ${types.join(", ")}`);
   assert.deepEqual(missing, [], `these rule cards would show their key as a heading: ${missing.join(", ")}`);
 });
 

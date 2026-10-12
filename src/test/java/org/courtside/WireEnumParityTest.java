@@ -7,6 +7,7 @@ import org.courtside.api.ApiImportAccountOutcome;
 import org.courtside.api.ApiMessageKind;
 import org.courtside.api.ApiMessageState;
 import org.courtside.api.ApiRole;
+import org.courtside.api.ApiRuleParameterKind;
 import org.courtside.api.ApiRuleType;
 import org.courtside.booking.series.CancelScope;
 import org.courtside.dataexchange.ResolvedChangeSet;
@@ -15,6 +16,7 @@ import org.courtside.identity.Role;
 import org.courtside.notification.MessageKind;
 import org.courtside.notification.MessageState;
 import org.courtside.rules.RuleType;
+import org.courtside.rules.internal.RuleParameters;
 import org.junit.jupiter.api.Test;
 
 import java.time.DayOfWeek;
@@ -33,6 +35,8 @@ class WireEnumParityTest {
     void whenComparingEveryEnumTheDocumentDeclares_thenItNamesExactlyWhatTheDomainKnows() {
         assertParity("Role", ApiRole.values(), ApiRole::getValue, Role.values());
         assertParity("RuleType", ApiRuleType.values(), ApiRuleType::getValue, RuleType.values());
+        assertParity("RuleParameterKind", ApiRuleParameterKind.values(),
+                ApiRuleParameterKind::getValue, RuleParameters.Kind.values());
         assertParity("CancelScope", ApiCancelScope.values(), ApiCancelScope::getValue,
                 CancelScope.values());
         assertParity("DayOfWeek", ApiDayOfWeek.values(), ApiDayOfWeek::getValue, DayOfWeek.values());
