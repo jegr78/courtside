@@ -7,6 +7,7 @@ import { problemMessage } from "../api/problem-message";
 import { useClubConfiguration } from "../club/registry";
 import { Alert } from "../components/Alert";
 import { LoadFailure } from "../components/LoadFailure";
+import { ScrollRegion } from "../components/ScrollRegion";
 import { useRetry } from "../failures/useRetry";
 import { Button } from "../components/Button";
 import { DateTimeInput } from "../components/DateTimeInput";
@@ -108,7 +109,7 @@ export function AdminOperationalLogsView() {
   const problem = error ?? clubError;
   return <section data-testid="admin-operational-logs-view" className="surface-panel grid gap-8 rounded-2xl border p-6 shadow-[0_20px_50px_var(--cs-shadow)] sm:p-8">
     <div className="grid gap-2">
-      <h1 className="text-3xl font-bold">{t("operationalLogs.title")}</h1>
+      <h1 id="operational-logs-title" className="text-3xl font-bold">{t("operationalLogs.title")}</h1>
       <p className="text-muted max-w-3xl">{t("operationalLogs.introduction")}</p>
     </div>
     <form className="grid gap-4 lg:grid-cols-3" onSubmit={(event) => { event.preventDefault(); setFilters({ ...draft }); }}>
@@ -155,7 +156,7 @@ export function AdminOperationalLogsView() {
             {page.droppedRecords > 0 && <Alert tone="warning" testId="operational-logs-dropped-warning">{t("operationalLogs.droppedWarning", { count: page.droppedRecords })}</Alert>}
             {entries.length === 0
               ? <p data-testid="operational-logs-empty">{t("operationalLogs.empty")}</p>
-              : <div className="overflow-x-auto"><table className="w-full text-left">
+              : <ScrollRegion labelledBy="operational-logs-title" testId="operational-logs-scroll"><table className="w-full text-left">
                 <thead><tr>
                   <th scope="col" className="p-2">{t("operationalLogs.column.time")}</th>
                   <th scope="col" className="p-2">{t("operationalLogs.column.source")}</th>
@@ -170,7 +171,7 @@ export function AdminOperationalLogsView() {
                   <td data-testid="operational-log-message" className="p-2 break-words">{entry.message}</td>
                   <td data-testid="operational-log-trace" className="p-2 font-mono text-sm break-all">{entry.traceId ?? t("operationalLogs.trace.none")}</td>
                 </tr>)}</tbody>
-              </table></div>}
+              </table></ScrollRegion>}
             {page.nextCursor && <Button variant="secondary" data-testid="operational-logs-load-more" disabled={pending} className="justify-self-start" type="button" onClick={() => void readNextPage()}>{t("operationalLogs.more")}</Button>}
           </>}
       </>}

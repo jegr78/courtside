@@ -117,6 +117,7 @@ it("given the current week, when it loads, then every day and active court is av
   expect(screen.getByTestId("court-heading-1")).toHaveTextContent("Centre Court");
   expect(screen.getByTestId("court-heading-2")).toHaveTextContent("Court 2");
   expect(screen.getByTestId("court-heading-1")).toHaveRole("columnheader");
+  expect(screen.getByTestId("court-heading-1").querySelector("[aria-hidden]"), "a column header whose text is hidden reads as empty").toBeNull();
   expect(screen.getByTestId("slot-heading-12:00")).toHaveTextContent("12:00");
   expect(screen.getByTestId("slot-heading-21:30")).toHaveTextContent("21:30");
   const booking = screen.getByTestId("allocation");

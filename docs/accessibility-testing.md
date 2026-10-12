@@ -2,7 +2,12 @@
 
 Courtside treats WCAG 2.2 AA as a functional release requirement. The required browser suite runs
 automated axe checks for the public court plan, authentication, password change, member bookings,
-booking dialogs and administration in German and English. Chromium covers all browser journeys;
+booking dialogs and administration in German and English. Every scan also runs the axe rules for
+one level-one heading per page, heading order and empty table headers, which axe files under best
+practice rather than a WCAG tag. A sweep opens every page the router declares, in the dark and the
+light theme, at desk and phone width, with the series form open and the statistics and
+operational-log tables filled, because a table only fails the scrollable-region rule while it
+overflows. Chromium covers all browser journeys;
 Chromium is the blocking automated WCAG rule gate. WebKit runs blocking core compatibility
 journeys. The WebKit plus axe combination runs in its own pull-request browser shard and blocks a
 merge as well; the scheduled reliability path repeats it. Keyboard, dialog focus, reflow, reduced-motion and forced-colour checks complement

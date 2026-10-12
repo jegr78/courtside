@@ -259,6 +259,8 @@ describe("AdminStatisticsView", () => {
     expect(screen.getByTestId("statistics-hour-1-7")).toHaveTextContent("closed");
     expect(screen.getByTestId("statistics-hour-1-7")).not.toHaveAttribute("data-level");
     expect(screen.queryByTestId("statistics-hour-1-20")).toBeNull();
+    expect(screen.getByTestId("statistics-hours-scroll"), "a keyboard reaches the table that scrolls sideways").toHaveAttribute("tabindex", "0");
+    expect(screen.getByTestId("statistics-hours-scroll"), "the scroller is named by the table's heading").toHaveAccessibleName(i18n.t("admin.statistics.hours.heading"));
   });
 
   it("given courts, cards and weeks, when the utilisation shows, then each is a bar of its own share and value", async () => {

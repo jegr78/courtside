@@ -472,8 +472,8 @@ export function WeekView({ today, clock = systemClock, canBook = true,
               const courtName = court.name || t("court.number", { number: court.number });
               return <th key={court.id} data-testid={`court-heading-${court.number}`} scope="col"
                 aria-label={courtName} className="border-structural border-b px-4 py-3 text-left">
-                <span className="court-heading-full" aria-hidden="true">{courtName}</span>
-                <span className="court-heading-compact" aria-hidden="true">{court.number}</span>
+                <span className="court-heading-full">{courtName}</span>
+                <span className="court-heading-compact">{court.number}</span>
               </th>;
             })}
           </tr>

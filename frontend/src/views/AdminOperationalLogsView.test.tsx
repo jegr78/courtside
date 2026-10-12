@@ -51,6 +51,8 @@ describe("AdminOperationalLogsView", () => {
     expect(within(row).getByTestId("operational-log-source")).toHaveTextContent("Application");
     expect(within(row).getByTestId("operational-log-severity")).toHaveTextContent("Error");
     expect(within(row).getByTestId("operational-log-trace")).toHaveTextContent("0123456789abcdef0123456789abcdef");
+    expect(screen.getByTestId("operational-logs-scroll"), "a keyboard reaches the table that scrolls sideways").toHaveAttribute("tabindex", "0");
+    expect(screen.getByTestId("operational-logs-scroll"), "the scroller is a named region").toHaveRole("region");
   });
 
   it("keeps private search criteria in the POST body and applies them together", async () => {

@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { api } from "../../api/client";
+import { ScrollRegion } from "../../components/ScrollRegion";
 import { useStatisticsFormat } from "./format";
 import { Section } from "./parts";
 import { useStatisticsRead } from "./useStatisticsRead";
@@ -20,7 +21,7 @@ export function MessageSection({ from, to }: { from?: string; to?: string }) {
     {(report) => {
       const kinds = report.kinds.filter((kind) => STATES.some(([field]) => kind[field] > 0));
       if (kinds.length === 0) return <p data-testid="statistics-messages-empty">{t("admin.statistics.messages.empty")}</p>;
-      return <div className="max-w-full overflow-x-auto">
+      return <ScrollRegion labelledBy="statistics-messages-heading">
         <table className="w-full border-collapse text-left">
           <thead>
             <tr className="border-b">
@@ -41,7 +42,7 @@ export function MessageSection({ from, to }: { from?: string; to?: string }) {
             </tr>)}
           </tbody>
         </table>
-      </div>;
+      </ScrollRegion>;
     }}
   </Section>;
 }
