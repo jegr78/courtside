@@ -163,6 +163,28 @@ export const test = base.extend<TestFixtures & JourneyOptions, WorkerFixtures>({
   }, { auto: true }]
 });
 
+export const seriesBookingId = "70000000-0000-0000-0000-000000000001";
+
+// Twelve weekly occurrences of the seeded series, so a dialog listing them is taller than a phone in landscape.
+export async function routeLongSeries(page: Page, visualDate: string): Promise<void> {
+  await page.route("**/api/my/bookings?**", async (route) => {
+    const view = new URL(route.request().url()).searchParams.get("view");
+    if (view && view !== "UPCOMING") return route.continue();
+    const week = 7 * 24 * 60 * 60 * 1000;
+    const first = Date.parse(`${visualDate}T07:00:00Z`);
+    await route.fulfill({ json: { items: Array.from({ length: 12 }, (_, index) => ({
+      id: index === 0 ? seriesBookingId : `70000000-0000-0000-0000-0000000001${String(index).padStart(2, "0")}`,
+      seriesId: "73000000-0000-0000-0000-000000000001",
+      courtIds: ["dddddddd-0000-0000-0000-000000000001"],
+      startsAt: new Date(first + index * week).toISOString(),
+      endsAt: new Date(first + index * week + 60 * 60 * 1000).toISOString(),
+      cardLabel: "Member booking",
+      cardColor: "#176b55",
+      status: "CONFIRMED"
+    })) } });
+  });
+}
+
 export async function selectJourneyDate(page: Page, visualDate: string): Promise<void> {
   await expect(page.getByTestId("week-grid")).toBeVisible();
   const day = page.getByTestId(`day-selector-${visualDate}`);

@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { type Page } from "@playwright/test";
 import { declaredRoutes, routePattern, type DeclaredRoute } from "./declared-routes";
-import { expect, expectAdministrationOverview, expectShownAsEmpty, selectJourneyDate, test } from "./fixtures";
+import { expect, expectAdministrationOverview, expectShownAsEmpty, routeLongSeries, selectJourneyDate, seriesBookingId, test } from "./fixtures";
 import { LEAGUE_MATCH_CARD, MEMBER_BOOKING_CARD } from "./shipped-rows";
 
 async function expectNoHorizontalOverflow(page: import("@playwright/test").Page) {
@@ -1334,8 +1334,6 @@ for (const phone of landscapePhones) {
   });
 }
 
-const seriesBookingId = "70000000-0000-0000-0000-000000000001";
-
 async function bodyOverflow(dialog: import("@playwright/test").Locator) {
   return dialog.getByTestId("dialog-body").evaluate((body) => body.scrollHeight - body.clientHeight);
 }
@@ -1370,22 +1368,7 @@ for (const phone of landscapePhones) {
 
   test(`given a phone in landscape at ${phone.width} x ${phone.height}, when a long series is to be cancelled whole, then the confirmation stays on screen`, async ({ page, journeyService }) => {
     // given
-    await page.route("**/api/my/bookings?**", async (route) => {
-      const view = new URL(route.request().url()).searchParams.get("view");
-      if (view && view !== "UPCOMING") return route.continue();
-      const week = 7 * 24 * 60 * 60 * 1000;
-      const first = Date.parse(`${journeyService.visualDate}T07:00:00Z`);
-      await route.fulfill({ json: { items: Array.from({ length: 12 }, (_, index) => ({
-        id: index === 0 ? seriesBookingId : `70000000-0000-0000-0000-0000000001${String(index).padStart(2, "0")}`,
-        seriesId: "73000000-0000-0000-0000-000000000001",
-        courtIds: ["dddddddd-0000-0000-0000-000000000001"],
-        startsAt: new Date(first + index * week).toISOString(),
-        endsAt: new Date(first + index * week + 60 * 60 * 1000).toISOString(),
-        cardLabel: "Member booking",
-        cardColor: "#176b55",
-        status: "CONFIRMED"
-      })) } });
-    });
+    await routeLongSeries(page, journeyService.visualDate);
     await page.setViewportSize(phone);
     await signIn(page, "doe.jane");
     await expect(page.getByTestId("my-bookings-link"), "the member is signed in").toBeVisible({ timeout: 10_000 });
