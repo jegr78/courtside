@@ -137,6 +137,7 @@ courtside:
   booking:
     series-horizon-months: 12
     reminder-sweep-interval: 5m
+    waitlist-sweep-interval: 30s
   import:
     preview-retention: ${COURTSIDE_IMPORT_PREVIEW_RETENTION:7d}
     sweep-interval: ${COURTSIDE_IMPORT_SWEEP_INTERVAL:1h}

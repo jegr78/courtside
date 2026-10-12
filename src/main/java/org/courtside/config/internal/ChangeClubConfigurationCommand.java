@@ -4,6 +4,7 @@ import org.courtside.config.BookingSlotDuration;
 import org.courtside.config.CredentialLifetime;
 import org.courtside.config.ReminderLeadTime;
 import org.courtside.config.ResetTokenLifetime;
+import org.courtside.config.WaitlistOfferWindow;
 
 import java.util.UUID;
 
@@ -23,7 +24,8 @@ public record ChangeClubConfigurationCommand(
         CredentialLifetime passwordResetCredential,
         ResetTokenLifetime passwordResetToken,
         ReminderLeadTime bookingReminder,
-        UUID noMembershipTypeRuleSetId) {
+        UUID noMembershipTypeRuleSetId,
+        WaitlistOfferWindow waitlistOffer) {
 
     // The link fields, a logo, a short name and the rule set for people holding no membership type are
     // what a club may leave unset; an absent value anywhere else is a caller that skipped its validation.
@@ -41,6 +43,19 @@ public record ChangeClubConfigurationCommand(
         if (shortName != null && !AppShortName.fits(shortName)) {
             throw new IllegalArgumentException("A short name has to fit under an app icon");
         }
+    }
+
+    // A request that leaves the offer window out keeps the one the club chose.
+    public ChangeClubConfigurationCommand(String clubName, String primaryColor, String accentColor, String logoUrl,
+                                          String imprintUrl, String privacyUrl, String documentationUrl,
+                                          String shortName, String defaultLocale, BookingSlotDuration slotDuration,
+                                          String timeZone, CredentialLifetime newAccountCredential,
+                                          CredentialLifetime passwordResetCredential,
+                                          ResetTokenLifetime passwordResetToken, ReminderLeadTime bookingReminder,
+                                          UUID noMembershipTypeRuleSetId) {
+        this(clubName, primaryColor, accentColor, logoUrl, imprintUrl, privacyUrl, documentationUrl, shortName,
+                defaultLocale, slotDuration, timeZone, newAccountCredential, passwordResetCredential,
+                passwordResetToken, bookingReminder, noMembershipTypeRuleSetId, null);
     }
 
     private static void requirePresent(Object value, String field) {

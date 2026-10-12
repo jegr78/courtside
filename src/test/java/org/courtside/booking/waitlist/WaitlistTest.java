@@ -1,0 +1,489 @@
+package org.courtside.booking.waitlist;
+
+import org.courtside.AbstractIntegrationTest;
+import org.courtside.booking.BookingRulesViolatedException;
+import org.courtside.booking.BookingService;
+import org.courtside.booking.CreateBookingCommand;
+import org.courtside.booking.ParticipantSpec;
+import org.courtside.booking.internal.CourtReservedException;
+import org.courtside.booking.series.SeriesMoveConflictException;
+import org.courtside.booking.testfixture.BookingTestFixture;
+import org.courtside.config.testfixture.ConfigTestFixture;
+import org.courtside.facility.testfixture.FacilityTestFixture;
+import org.courtside.identity.Role;
+import org.courtside.identity.testfixture.IdentityTestFixture;
+import org.courtside.shared.OpeningWindow;
+import org.courtside.shared.TimeSlot;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.jdbc.core.simple.JdbcClient;
+
+import java.time.DayOfWeek;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.temporal.ChronoUnit;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+@Import({FacilityTestFixture.class, IdentityTestFixture.class, ConfigTestFixture.class, BookingTestFixture.class})
+class WaitlistTest extends AbstractIntegrationTest {
+
+    static final UUID MEMBER_CARD = UUID.fromString("11111111-1111-1111-1111-111111111111");
+    static final UUID TRAINING_CARD = UUID.fromString("22222222-2222-2222-2222-222222222222");
+    static final Instant NOW = Instant.parse("2026-05-12T10:00:00Z");
+    static final TimeSlot SLOT = new TimeSlot(Instant.parse("2026-05-13T16:00:00Z"),
+            Instant.parse("2026-05-13T17:00:00Z"));
+
+    @Autowired
+    private WaitlistService waitlist;
+
+    @Autowired
+    private WaitlistQueue queue;
+
+    @Autowired
+    private BookingService bookings;
+
+    @Autowired
+    private BookingTestFixture bookingFixture;
+
+    @Autowired
+    private FacilityTestFixture facility;
+
+    @Autowired
+    private IdentityTestFixture identity;
+
+    @Autowired
+    private ConfigTestFixture configuration;
+
+    @Autowired
+    private JdbcClient jdbc;
+
+    private UUID court;
+    private Member holder;
+    private Member first;
+    private Member second;
+    private Member partner;
+
+    record Member(UUID accountId, UUID personId) {
+    }
+
+    @BeforeEach
+    void aCourtHeldByOneMember() {
+        court = facility.createCourt(1, "Court 1");
+        for (DayOfWeek day : DayOfWeek.values()) {
+            facility.setOpeningHours(day, new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0)));
+        }
+        holder = member("Jane", "Doe", Role.MEMBER);
+        first = member("John", "Roe", Role.MEMBER);
+        second = member("Mary", "Major", Role.MEMBER);
+        partner = member("Richard", "Miles", Role.MEMBER);
+    }
+
+    @Test
+    void givenATakenSlot_whenAMemberJoins_thenTheEntryWaitsWithoutAnOffer() {
+        // given
+        book(holder, SLOT);
+
+        // when
+        UUID entry = join(first, SLOT);
+
+        // then
+        assertThat(stateOf(entry)).as("a slot that is still taken offers nothing").isEqualTo("WAITING");
+        assertThat(waitlist.ownEntries(first.accountId())).singleElement()
+                .satisfies(own -> assertThat(own.id()).isEqualTo(entry))
+                .satisfies(own -> assertThat(own.offerExpiresAt()).isNull());
+    }
+
+    @Test
+    void givenAFreeSlot_whenAMemberJoins_thenTheQueueIsRefusedAsNotTaken() {
+        // when / then
+        assertThatThrownBy(() -> join(first, SLOT))
+                .isInstanceOfSatisfying(WaitlistSlotNotTakenException.class, failure ->
+                        assertThat(failure.getCode()).isEqualTo("waitlist.slot.free"));
+        assertThat(entries()).as("a refused join stores nothing").isZero();
+    }
+
+    @Test
+    void givenTheMembersOwnBooking_whenTheyJoin_thenTheQueueIsRefusedAsTheirOwn() {
+        // given
+        book(first, SLOT);
+
+        // when / then
+        assertThatThrownBy(() -> join(first, SLOT))
+                .isInstanceOfSatisfying(WaitlistSlotNotTakenException.class, failure ->
+                        assertThat(failure.getCode()).isEqualTo("waitlist.slot.own"));
+    }
+
+    @Test
+    void givenAnOpenEntry_whenTheMemberJoinsTheSameSlotAgain_thenTheDatabaseRefusesASecondOne() {
+        // given
+        book(holder, SLOT);
+        join(first, SLOT);
+
+        // when / then
+        assertThatThrownBy(() -> join(first, SLOT))
+                .isInstanceOfSatisfying(WaitlistEntryExistsException.class, failure ->
+                        assertThat(failure.getCode()).isEqualTo("waitlist.entry.exists"));
+        assertThat(entries()).isEqualTo(1);
+    }
+
+    @Test
+    void givenASlotOutsideTheOpeningHours_whenAMemberJoins_thenTheBookingRuleRefusesIt() {
+        // given
+        TimeSlot late = new TimeSlot(Instant.parse("2026-05-13T21:00:00Z"), Instant.parse("2026-05-13T22:00:00Z"));
+
+        // when / then
+        assertThatThrownBy(() -> join(first, late))
+                .isInstanceOfSatisfying(BookingRulesViolatedException.class, failure ->
+                        assertThat(failure.violationCodes()).contains("booking.rule.openingHours.outside"));
+        assertThat(entries()).isZero();
+    }
+
+    @Test
+    void givenAMemberAtTheEntryLimit_whenTheyJoinOnceMore_thenTheLimitRefusesIt() {
+        // given
+        for (int day = 0; day < WaitlistService.MAX_ENTRIES; day++) {
+            TimeSlot slot = shifted(SLOT, day);
+            book(holder, slot);
+            join(first, slot);
+        }
+        TimeSlot oneMore = shifted(SLOT, WaitlistService.MAX_ENTRIES);
+        book(holder, oneMore);
+
+        // when / then
+        assertThatThrownBy(() -> join(first, oneMore))
+                .isInstanceOfSatisfying(WaitlistLimitReachedException.class, failure ->
+                        assertThat(failure.getCode()).isEqualTo("waitlist.entry.limit"));
+    }
+
+    @Test
+    void givenTwoMembersWaiting_whenTheHolderCancels_thenOnlyTheFirstIsOfferedTheSlotForTheWindow() {
+        // given
+        configuration.holdWaitlistOffersFor(20);
+        UUID booking = book(holder, SLOT);
+        UUID firstEntry = join(first, SLOT);
+        UUID secondEntry = join(second, SLOT);
+
+        // when
+        bookings.cancel(booking, holder.accountId(), Set.of(Role.MEMBER));
+
+        // then
+        assertThat(stateOf(firstEntry)).isEqualTo("OFFERED");
+        assertThat(stateOf(secondEntry)).as("the second waits behind the first").isEqualTo("WAITING");
+        assertThat(expiryOf(firstEntry)).isEqualTo(NOW.plus(20, ChronoUnit.MINUTES));
+    }
+
+    @Test
+    void givenAWindowReachingPastTheStart_whenTheSlotFrees_thenTheOfferEndsAtTheStart() {
+        // given
+        configuration.holdWaitlistOffersFor(120);
+        TimeSlot soon = new TimeSlot(Instant.parse("2026-05-12T10:30:00Z"), Instant.parse("2026-05-12T11:30:00Z"));
+        UUID booking = book(holder, soon);
+        UUID entry = join(first, soon);
+
+        // when
+        bookings.cancel(booking, holder.accountId(), Set.of(Role.MEMBER));
+
+        // then
+        assertThat(expiryOf(entry)).isEqualTo(soon.start());
+    }
+
+    @Test
+    void givenAnOffer_whenSomebodyElseBooksTheSlot_thenTheCourtIsReservedForTheOfferedMember() {
+        // given
+        offerTo(first);
+
+        // when / then
+        assertThatThrownBy(() -> book(second, SLOT)).isInstanceOf(CourtReservedException.class)
+                .extracting(failure -> ((CourtReservedException) failure).problemType().slug())
+                .isEqualTo("court-reserved");
+        assertThat(confirmedOnCourt()).as("nobody holds the court while it is reserved").isZero();
+    }
+
+    @Test
+    void givenAnOffer_whenTheMemberAccepts_thenTheReservationBecomesTheirBookingOnce() {
+        // given
+        UUID entry = offerTo(first);
+
+        // when
+        UUID booking = waitlist.accept(entry, first.accountId(), first.personId(), Set.of(Role.MEMBER));
+        UUID again = waitlist.accept(entry, first.accountId(), first.personId(), Set.of(Role.MEMBER));
+
+        // then
+        assertThat(again).as("accepting again answers with the same booking").isEqualTo(booking);
+        assertThat(stateOf(entry)).isEqualTo("BOOKED");
+        assertThat(jdbc.sql("SELECT booked_by FROM booking WHERE id = :id AND status = 'CONFIRMED'")
+                .param("id", booking).query(UUID.class).single()).isEqualTo(first.accountId());
+        assertThat(jdbc.sql("SELECT person_id FROM booking_participant WHERE booking_id = :id ORDER BY position")
+                .param("id", booking).query(UUID.class).list())
+                .as("the players named on joining play in the booking")
+                .containsExactly(first.personId(), partner.personId());
+        assertThat(confirmedOnCourt()).isEqualTo(1);
+    }
+
+    @Test
+    void givenAnOffer_whenTheMemberBooksTheSlotThemselves_thenTheirEntryClosesAsBooked() {
+        // given
+        UUID entry = offerTo(first);
+
+        // when
+        UUID booking = book(first, SLOT);
+
+        // then
+        assertThat(stateOf(entry)).isEqualTo("BOOKED");
+        assertThat(jdbc.sql("SELECT booking_id FROM waitlist_entry WHERE id = :id").param("id", entry)
+                .query(UUID.class).single()).isEqualTo(booking);
+    }
+
+    @Test
+    void givenAnOffer_whenAnotherMemberAcceptsIt_thenTheEntryIsNotFoundForThem() {
+        // given
+        UUID entry = offerTo(first);
+
+        // when / then
+        assertThatThrownBy(() -> waitlist.accept(entry, second.accountId(), second.personId(), Set.of(Role.MEMBER)))
+                .isInstanceOfSatisfying(WaitlistEntryNotFoundException.class, failure ->
+                        assertThat(failure.getCode()).isEqualTo("waitlist.entry.notFound"));
+        assertThat(stateOf(entry)).isEqualTo("OFFERED");
+    }
+
+    @Test
+    void givenAWaitingEntry_whenTheMemberAccepts_thenThereIsNoOfferToTake() {
+        // given
+        book(holder, SLOT);
+        UUID entry = join(first, SLOT);
+
+        // when / then
+        assertThatThrownBy(() -> waitlist.accept(entry, first.accountId(), first.personId(), Set.of(Role.MEMBER)))
+                .isInstanceOfSatisfying(WaitlistNoOfferException.class, failure ->
+                        assertThat(failure.getCode()).isEqualTo("waitlist.offer.none"));
+    }
+
+    @Test
+    void givenAnOfferPastItsDeadline_whenTheMemberAccepts_thenItIsRefusedAndReadsAsExpired() {
+        // given
+        UUID entry = offerTo(first);
+        jdbc.sql("UPDATE waitlist_entry SET offer_expires_at = :at WHERE id = :id")
+                .param("at", java.sql.Timestamp.from(NOW)).param("id", entry).update();
+
+        // when / then
+        assertThatThrownBy(() -> waitlist.accept(entry, first.accountId(), first.personId(), Set.of(Role.MEMBER)))
+                .isInstanceOf(WaitlistNoOfferException.class);
+        assertThat(waitlist.ownEntries(first.accountId())).singleElement()
+                .satisfies(own -> assertThat(own.state()).isEqualTo(WaitlistState.EXPIRED));
+        assertThat(confirmedOnCourt()).isZero();
+    }
+
+    @Test
+    void givenAnOffer_whenTheMemberDeclines_thenTheNextMemberIsOfferedTheSlot() {
+        // given
+        UUID firstEntry = offerTo(first);
+        UUID secondEntry = jdbc.sql("SELECT id FROM waitlist_entry WHERE account_id = :account")
+                .param("account", second.accountId()).query(UUID.class).single();
+
+        // when
+        waitlist.leave(firstEntry, first.accountId());
+
+        // then
+        assertThat(stateOf(firstEntry)).isEqualTo("LEFT");
+        assertThat(stateOf(secondEntry)).isEqualTo("OFFERED");
+    }
+
+    @Test
+    void givenAnOfferThatRanOut_whenTheSweepRuns_thenItExpiresAndTheNextMemberIsOffered() {
+        // given
+        UUID firstEntry = offerTo(first);
+        UUID secondEntry = jdbc.sql("SELECT id FROM waitlist_entry WHERE account_id = :account")
+                .param("account", second.accountId()).query(UUID.class).single();
+        jdbc.sql("UPDATE waitlist_entry SET offer_expires_at = :at WHERE id = :id")
+                .param("at", java.sql.Timestamp.from(NOW)).param("id", firstEntry).update();
+
+        // when
+        queue.sweep();
+
+        // then
+        assertThat(stateOf(firstEntry)).isEqualTo("EXPIRED");
+        assertThat(stateOf(secondEntry)).isEqualTo("OFFERED");
+    }
+
+    @Test
+    void givenTheFirstMembersAccountDisabled_whenTheSlotFrees_thenTheyAreSkippedForTheNext() {
+        // given
+        UUID booking = book(holder, SLOT);
+        UUID firstEntry = join(first, SLOT);
+        UUID secondEntry = join(second, SLOT);
+        identity.disableAccount(first.accountId());
+
+        // when
+        bookings.cancel(booking, holder.accountId(), Set.of(Role.MEMBER));
+
+        // then
+        assertThat(stateOf(firstEntry)).as("an account that cannot sign in cannot hold the court").isEqualTo("SKIPPED");
+        assertThat(stateOf(secondEntry)).isEqualTo("OFFERED");
+    }
+
+    @Test
+    void givenTheFirstMembersCardWithdrawn_whenTheSlotFrees_thenTheyAreSkippedForTheNext() {
+        // given
+        Member trainer = member("Jane", "Roe", Role.TRAINER);
+        UUID booking = book(holder, SLOT);
+        UUID trainerEntry = waitlist.join(new JoinWaitlistCommand(court, TRAINING_CARD, SLOT, trainer.accountId(),
+                trainer.personId(), Set.of(Role.TRAINER), null, List.of()));
+        UUID secondEntry = join(second, SLOT);
+        jdbc.sql("UPDATE booking_card SET active = false WHERE id = :id").param("id", TRAINING_CARD).update();
+
+        // when
+        bookings.cancel(booking, holder.accountId(), Set.of(Role.MEMBER));
+
+        // then
+        assertThat(stateOf(trainerEntry)).as("a member no longer eligible is passed over").isEqualTo("SKIPPED");
+        assertThat(stateOf(secondEntry)).isEqualTo("OFFERED");
+    }
+
+    @Test
+    void givenWaitingEntries_whenTheSlotStartsAndEnds_thenTheSweepClosesAndThenForgetsThem() {
+        // given
+        TimeSlot started = new TimeSlot(NOW.minus(30, ChronoUnit.MINUTES), NOW.plus(30, ChronoUnit.MINUTES));
+        TimeSlot ended = new TimeSlot(NOW.minus(90, ChronoUnit.MINUTES), NOW.minus(30, ChronoUnit.MINUTES));
+        UUID startedEntry = insertWaiting(first, started);
+        insertWaiting(second, ended);
+
+        // when
+        queue.sweep();
+
+        // then
+        assertThat(stateOf(startedEntry)).isEqualTo("ENDED");
+        assertThat(entries()).as("an entry whose slot ended is removed").isEqualTo(1);
+    }
+
+    @Test
+    void givenAnOffer_whenAnotherMemberReadsTheirEntriesOrTheReservations_thenNothingNamesTheOfferedMember() {
+        // given
+        UUID entry = offerTo(first);
+
+        // when
+        List<WaitlistService.Reservation> seenBySecond = waitlist.reservationsBetween(SLOT.start(), SLOT.end(),
+                second.accountId());
+        List<WaitlistService.Reservation> seenByFirst = waitlist.reservationsBetween(SLOT.start(), SLOT.end(),
+                first.accountId());
+
+        // then
+        assertThat(seenBySecond).singleElement()
+                .satisfies(reservation -> assertThat(reservation.ownEntryId()).isNull());
+        assertThat(seenByFirst).singleElement()
+                .satisfies(reservation -> assertThat(reservation.ownEntryId()).isEqualTo(entry));
+        assertThat(waitlist.ownEntries(second.accountId())).singleElement()
+                .satisfies(own -> assertThat(own.accountId()).isEqualTo(second.accountId()));
+    }
+
+    @Test
+    void givenAnOffer_whenTheBoardMovesASeriesOntoTheReservedCourt_thenTheMoveIsBlocked() {
+        // given
+        offerTo(first);
+        Member board = member("Mary", "Roe", Role.ADMIN);
+        UUID series = bookingFixture.createSeries(court, TRAINING_CARD, LocalDate.of(2026, 5, 13),
+                LocalTime.of(20, 0), 60, 1, board.accountId(), board.personId(), Set.of(Role.ADMIN));
+
+        // when / then
+        assertThatThrownBy(() -> bookingFixture.moveWholeSeries(series, LocalTime.of(18, 0), board.accountId(),
+                Set.of(Role.ADMIN))).isInstanceOf(SeriesMoveConflictException.class);
+    }
+
+    @Test
+    void givenTwoOverlappingOffers_whenWrittenStraightToTheDatabase_thenTheExclusionConstraintRefusesTheSecond() {
+        // given
+        UUID one = insertWaiting(first, SLOT);
+        UUID other = insertWaiting(second, new TimeSlot(SLOT.start().plus(30, ChronoUnit.MINUTES),
+                SLOT.end().plus(30, ChronoUnit.MINUTES)));
+        offerStraight(one);
+
+        // when / then
+        assertThatThrownBy(() -> offerStraight(other))
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .hasMessageContaining("waitlist_entry_one_offer");
+    }
+
+    private void offerStraight(UUID entry) {
+        jdbc.sql("""
+                        UPDATE waitlist_entry SET state = 'OFFERED', offered_at = :now, offer_expires_at = starts_at
+                        WHERE id = :id
+                        """)
+                .param("now", java.sql.Timestamp.from(NOW)).param("id", entry).update();
+    }
+
+    private UUID offerTo(Member member) {
+        UUID booking = book(holder, SLOT);
+        UUID entry = join(member, SLOT);
+        join(member == second ? first : second, SLOT);
+        bookings.cancel(booking, holder.accountId(), Set.of(Role.MEMBER));
+        assertThat(stateOf(entry)).isEqualTo("OFFERED");
+        return entry;
+    }
+
+    private UUID insertWaiting(Member member, TimeSlot slot) {
+        UUID id = UUID.randomUUID();
+        jdbc.sql("""
+                        INSERT INTO waitlist_entry (id, account_id, court_id, card_id, starts_at, ends_at, state, joined_at)
+                        VALUES (:id, :account, :court, :card, :startsAt, :endsAt, 'WAITING', :now)
+                        """)
+                .param("id", id).param("account", member.accountId()).param("court", court)
+                .param("card", MEMBER_CARD).param("startsAt", java.sql.Timestamp.from(slot.start()))
+                .param("endsAt", java.sql.Timestamp.from(slot.end())).param("now", java.sql.Timestamp.from(NOW))
+                .update();
+        return id;
+    }
+
+    private UUID join(Member member, TimeSlot slot) {
+        return waitlist.join(new JoinWaitlistCommand(court, MEMBER_CARD, slot, member.accountId(), member.personId(),
+                Set.of(Role.MEMBER), null, List.of(ParticipantSpec.member(partner.personId()))));
+    }
+
+    private UUID book(Member member, TimeSlot slot) {
+        return bookings.create(new CreateBookingCommand(List.of(court), MEMBER_CARD, slot, member.accountId(),
+                member.personId(), Set.of(Role.MEMBER), null, List.of(ParticipantSpec.member(partner.personId())),
+                null));
+    }
+
+    private Member member(String firstName, String lastName, Role role) {
+        UUID person = identity.createPerson(firstName, lastName,
+                (firstName + "." + lastName + "." + role).toLowerCase() + "@example.org");
+        return new Member(identity.createEnabledAccount(person, (lastName + "." + firstName + "." + role).toLowerCase(),
+                Set.of(role)), person);
+    }
+
+    private static TimeSlot shifted(TimeSlot slot, int days) {
+        return new TimeSlot(slot.start().plus(days, ChronoUnit.DAYS), slot.end().plus(days, ChronoUnit.DAYS));
+    }
+
+    private String stateOf(UUID entry) {
+        return jdbc.sql("SELECT state FROM waitlist_entry WHERE id = :id").param("id", entry)
+                .query(String.class).single();
+    }
+
+    private Instant expiryOf(UUID entry) {
+        return jdbc.sql("SELECT offer_expires_at FROM waitlist_entry WHERE id = :id").param("id", entry)
+                .query(java.sql.Timestamp.class).single().toInstant();
+    }
+
+    private int entries() {
+        return jdbc.sql("SELECT count(*) FROM waitlist_entry").query(Integer.class).single();
+    }
+
+    private int confirmedOnCourt() {
+        return jdbc.sql("""
+                        SELECT count(*) FROM court_allocation
+                        WHERE court_id = :court AND status = 'CONFIRMED' AND starts_at < :endsAt AND ends_at > :startsAt
+                        """)
+                .param("court", court).param("startsAt", java.sql.Timestamp.from(SLOT.start()))
+                .param("endsAt", java.sql.Timestamp.from(SLOT.end()))
+                .query(Integer.class).single();
+    }
+}

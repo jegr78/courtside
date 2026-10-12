@@ -22,6 +22,7 @@ record QueuedMessage(UUID accountId, MessageKind kind, Map<String, String> param
     static final String PREVIOUS_STARTS_AT = "previousStartsAt";
     static final String PREVIOUS_ENDS_AT = "previousEndsAt";
     static final String PREVIOUS_COURTS = "previousCourtIds";
+    static final String WAITLIST_ENTRY = "waitlistEntryId";
 
     QueuedMessage {
         parameters = parameters == null ? Map.of() : Map.copyOf(parameters);
@@ -37,6 +38,10 @@ record QueuedMessage(UUID accountId, MessageKind kind, Map<String, String> param
 
     UUID series() {
         return id(SERIES);
+    }
+
+    UUID waitlistEntry() {
+        return id(WAITLIST_ENTRY);
     }
 
     Optional<CancellationReason> reason() {

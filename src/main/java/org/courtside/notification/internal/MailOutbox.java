@@ -43,10 +43,11 @@ class MailOutbox {
     // mid-delivery lets another one take its row.
     static final Duration LEASE = Duration.ofMinutes(5);
 
-    // Somebody waits at a sign-in page for these, so a busy evening of bookings goes after them.
+    // Somebody waits at a sign-in page for these, or an offer runs out within minutes, so a busy
+    // evening of bookings goes after them.
     private static final List<String> URGENT = Stream.of(MessageKind.CREDENTIALS_NEW_ACCOUNT,
                     MessageKind.CREDENTIALS_PASSWORD_RESET, MessageKind.ACCOUNT_USERNAME_REMINDER,
-                    MessageKind.ACCOUNT_PASSWORD_RESET_CODE)
+                    MessageKind.ACCOUNT_PASSWORD_RESET_CODE, MessageKind.WAITLIST_OFFER)
             .map(Enum::name)
             .toList();
 

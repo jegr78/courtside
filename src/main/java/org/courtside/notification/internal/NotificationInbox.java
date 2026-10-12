@@ -21,7 +21,7 @@ class NotificationInbox {
 
     // The centre names what an entry concerns and nobody in it, so a player's id stays in the outbox.
     private static final Set<String> KEPT = Set.of(QueuedMessage.BOOKING, QueuedMessage.CLOSURE,
-            QueuedMessage.REASON);
+            QueuedMessage.REASON, QueuedMessage.WAITLIST_ENTRY);
     private final JdbcClient jdbc;
     private final ObjectMapper json;
     private final Clock clock;

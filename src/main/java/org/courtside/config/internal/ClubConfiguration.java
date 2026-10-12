@@ -76,6 +76,9 @@ public class ClubConfiguration {
     @Column(name = "booking_reminder_hours", nullable = false)
     private int bookingReminderHours;
 
+    @Column(name = "waitlist_offer_minutes", nullable = false)
+    private int waitlistOfferMinutes;
+
     @Column(name = "no_membership_type_rule_set_id")
     private UUID noMembershipTypeRuleSetId;
 
@@ -104,6 +107,10 @@ public class ClubConfiguration {
 
     public void remindBookingsAfter(int hours) {
         this.bookingReminderHours = hours;
+    }
+
+    public void holdWaitlistOffersFor(int minutes) {
+        this.waitlistOfferMinutes = minutes;
     }
 
     public void bindPeopleWithoutAMembershipTypeTo(UUID ruleSetId) {

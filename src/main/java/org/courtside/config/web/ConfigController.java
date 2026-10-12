@@ -12,6 +12,7 @@ import org.courtside.api.ApiWebManifestShortcut;
 import org.courtside.config.BookingSlotDuration;
 import org.courtside.config.CredentialLifetime;
 import org.courtside.config.ReminderLeadTime;
+import org.courtside.config.WaitlistOfferWindow;
 import org.courtside.config.ResetTokenLifetime;
 import org.courtside.config.internal.AppIcon;
 import org.courtside.config.internal.ChangeClubConfigurationCommand;
@@ -71,7 +72,9 @@ class ConfigController implements ClubConfigApi, AdminConfigApi, ManifestApi {
                 new CredentialLifetime(request.getPasswordResetCredentialHours()),
                 new ResetTokenLifetime(request.getPasswordResetTokenMinutes()),
                 new ReminderLeadTime(request.getBookingReminderHours()),
-                request.getNoMembershipTypeRuleSetId()))));
+                request.getNoMembershipTypeRuleSetId(),
+                request.getWaitlistOfferMinutes() == null
+                        ? null : new WaitlistOfferWindow(request.getWaitlistOfferMinutes())))));
     }
 
     @Override
@@ -153,7 +156,8 @@ class ConfigController implements ClubConfigApi, AdminConfigApi, ManifestApi {
                 configuration.newAccountCredentialHours(),
                 configuration.passwordResetCredentialHours(),
                 configuration.passwordResetTokenMinutes(),
-                configuration.bookingReminderHours())
+                configuration.bookingReminderHours(),
+                configuration.waitlistOfferMinutes())
                 .logoUrl(configuration.logoUrl())
                 .logoFallbackUrl(configuration.logoFallbackUrl())
                 .installedAppName(configuration.effectiveShortName())

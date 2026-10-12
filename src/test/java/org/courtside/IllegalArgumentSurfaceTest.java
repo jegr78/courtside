@@ -25,6 +25,7 @@ class IllegalArgumentSurfaceTest {
             "org/courtside/config/CredentialLifetime.java",
             "org/courtside/config/ResetTokenLifetime.java",
             "org/courtside/config/ReminderLeadTime.java",
+            "org/courtside/config/WaitlistOfferWindow.java",
             "org/courtside/config/internal/ChangeClubConfigurationCommand.java",
             "org/courtside/dataexchange/internal/MemberNumber.java",
             "org/courtside/shared/CodedDomainFailure.java",

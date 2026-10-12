@@ -4,7 +4,9 @@ import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.persistence.EntityManager;
 import org.courtside.booking.internal.BookingNotFoundException;
 import org.courtside.booking.internal.BookingAccessControl;
+import org.courtside.booking.internal.BookingDrafts;
 import org.courtside.booking.internal.BookingRuleGate;
+import org.courtside.booking.internal.CourtReservations;
 import org.courtside.booking.internal.CancellationReasonNotAllowedException;
 import org.courtside.booking.internal.CardEligibilityPolicy;
 import org.courtside.booking.internal.CourtUnavailableException;
@@ -49,7 +51,7 @@ import java.util.stream.IntStream;
 @Component
 @RequiredArgsConstructor
 @Transactional
-class BookingWriter implements SeriesOccurrenceCancellation {
+class BookingWriter implements SeriesOccurrenceCancellation, BookingDrafts {
 
     private static final String OVERLAP_CONSTRAINT = "court_allocation_no_overlap";
     private static final String IDEMPOTENCY_CONSTRAINT = "booking_idempotency_by_account";
@@ -68,18 +70,31 @@ class BookingWriter implements SeriesOccurrenceCancellation {
     private final BookingGridCoordination bookingGridCoordination;
     private final MeterRegistry meters;
     private final ApplicationEventPublisher events;
+    private final CourtReservations reservations;
 
-    UUID write(CreateBookingCommand command) {
+    @Override
+    public UUID write(CreateBookingCommand command) {
         return write(command, null, null);
     }
 
-    UUID write(CreateBookingCommand command, String idempotencyKey, String requestFingerprint) {
-        bookingGridCoordination.lock();
+    @Override
+    public void requireBookable(CreateBookingCommand command) {
+        bookable(command);
+    }
+
+    private List<ParticipantSpec> bookable(CreateBookingCommand command) {
         facility.requireBookableCourts(command.courtIds());
         BookingCard card = cardEligibility.requireEligible(command.cardId(), command.callerRoles());
         List<ParticipantSpec> slots = resolveSlots(card, command);
         ruleGate.requireNoViolations(new BookingRuleCheck(command.courtIds(), command.cardId(), command.slot(),
                 command.bookedBy(), command.bookedByPersonId(), command.callerRoles()));
+        return slots;
+    }
+
+    UUID write(CreateBookingCommand command, String idempotencyKey, String requestFingerprint) {
+        bookingGridCoordination.lock();
+        List<ParticipantSpec> slots = bookable(command);
+        reservations.requireUnreserved(command.courtIds(), command.slot(), command.bookedBy());
         requireAvailableCourts(command, idempotencyKey);
 
         Booking booking = new Booking(
@@ -100,6 +115,7 @@ class BookingWriter implements SeriesOccurrenceCancellation {
             }
             throw e;
         }
+        reservations.booked(command.bookedBy(), booking.getId(), command.courtIds(), command.slot());
         countCreatedOnCommit();
         // A series is one decision and gets one message of its own, not one per occurrence.
         if (command.seriesId() == null) {
@@ -156,6 +172,7 @@ class BookingWriter implements SeriesOccurrenceCancellation {
 
     private boolean cancelBooking(UUID bookingId, UUID cancelledBy, Set<Role> cancellerRoles,
                                   CancellationReason reason) {
+        bookingGridCoordination.lock();
         bookings.lockById(bookingId)
                 .orElseThrow(() -> new BookingNotFoundException("No booking with id " + bookingId));
         entityManager.clear();
@@ -176,7 +193,17 @@ class BookingWriter implements SeriesOccurrenceCancellation {
         }
         boolean changed = booking.cancel(cancelledBy, cancelledAt, reason);
         bookings.saveAndFlush(booking);
+        if (changed) {
+            releaseCourtsOf(booking);
+        }
         return changed;
+    }
+
+    private void releaseCourtsOf(Booking booking) {
+        booking.getAllocations().stream()
+                .collect(Collectors.groupingBy(allocation -> new TimeSlot(allocation.getStartsAt(), allocation.getEndsAt()),
+                        Collectors.mapping(CourtAllocation::getCourtId, Collectors.toList())))
+                .forEach((slot, courtIds) -> reservations.released(courtIds, slot));
     }
 
     private boolean isOverlap(DataIntegrityViolationException e) {

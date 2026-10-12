@@ -100,6 +100,8 @@ tags:
     description: Finding members who can participate in a booking.
   - name: booking-series
     description: Recurring bookings — previewing, creating, moving and cancelling.
+  - name: waitlist
+    description: Queueing for a taken slot and taking it when it frees.
   - name: admin-courts
     description: Administering courts.
   - name: admin-opening-hours
@@ -633,7 +635,7 @@ components:
         - $ref: "#/components/schemas/ClubConfig"
         - type: object
           required: [newAccountCredentialHours, passwordResetCredentialHours,
-                     passwordResetTokenMinutes, bookingReminderHours, logoUploaded]
+                     passwordResetTokenMinutes, bookingReminderHours, waitlistOfferMinutes, logoUploaded]
           properties:
             logoUploaded:
               type: boolean
@@ -647,6 +649,7 @@ components:
             passwordResetCredentialHours: { type: integer, minimum: 1, maximum: 168 }
             passwordResetTokenMinutes: { type: integer, minimum: 15, maximum: 1440 }
             bookingReminderHours: { type: integer, minimum: 0, maximum: 168 }
+            waitlistOfferMinutes: { type: integer, minimum: 1, maximum: 1440 }
             shortName:
               type: [string, "null"]
               maxLength: 12
@@ -728,6 +731,14 @@ components:
           description: |
             How long before a booking starts its people are reminded of it. `0` switches reminders
             off; the club decides, because a day's notice serves one club and an hour serves another.
+        waitlistOfferMinutes:
+          type: integer
+          minimum: 1
+          maximum: 1440
+          description: |
+            How long a freed slot stays reserved for the member whose turn it is on its waitlist.
+            The offer ends at the slot's start at the latest. Leaving it out keeps the current value.
+          example: 15
         newAccountCredentialHours:
           type: integer
           minimum: 1
@@ -1847,6 +1858,70 @@ components:
           type: array
           items: { $ref: "#/components/schemas/ParticipantRequest" }
 
+    JoinWaitlistRequest:
+      type: object
+      required: [courtId, cardId, startsAt, endsAt]
+      properties:
+        courtId: { type: string, format: uuid }
+        cardId: { type: string, format: uuid }
+        startsAt:
+          type: string
+          format: date-time
+          description: Must not be before the current instant.
+        endsAt:
+          type: string
+          format: date-time
+          description: Must be after `startsAt`.
+        note: { type: [string, "null"] }
+        participants:
+          type: array
+          items: { $ref: "#/components/schemas/ParticipantRequest" }
+
+    WaitlistJoined:
+      type: object
+      required: [id]
+      properties:
+        id: { type: string, format: uuid }
+
+    WaitlistEntryState:
+      type: string
+      enum: [WAITING, OFFERED, BOOKED, LEFT, EXPIRED, SKIPPED, ENDED]
+      description: |
+        `WAITING` until the slot frees and it is this entry's turn, `OFFERED` while the slot is
+        reserved for the member, then one closed state: booked, left or declined, expired, skipped
+        because the member was no longer eligible, or ended with the slot's start.
+
+    WaitlistEntry:
+      type: object
+      required: [id, courtId, startsAt, endsAt, cardLabel, state]
+      properties:
+        id: { type: string, format: uuid }
+        courtId: { type: string, format: uuid }
+        startsAt: { type: string, format: date-time }
+        endsAt: { type: string, format: date-time }
+        cardLabel: { type: string }
+        state: { $ref: "#/components/schemas/WaitlistEntryState" }
+        offerExpiresAt:
+          type: [string, "null"]
+          format: date-time
+          description: When the offer ends, once one was made.
+        bookingId:
+          type: [string, "null"]
+          format: uuid
+          description: The booking an accepted offer or the member's own booking became.
+
+    ReservedSlot:
+      type: object
+      required: [courtId, startsAt, endsAt]
+      properties:
+        courtId: { type: string, format: uuid }
+        startsAt: { type: string, format: date-time }
+        endsAt: { type: string, format: date-time }
+        ownEntryId:
+          type: [string, "null"]
+          format: uuid
+          description: The viewer's own entry holding this reservation; null for everybody else.
+
     BookingCreated:
       type: object
       required: [id]
@@ -2730,7 +2805,8 @@ components:
              ACCOUNT_PASSWORD_RESET_CODE, BOOKING_CONFIRMED,
              BOOKING_PLAYER_RECORDED, BOOKING_PLAYER_WITHDREW, BOOKING_DISPLACED,
              BOOKING_REMINDER, BOOKING_CANCELLED, BOOKING_CANCELLED_BY_CLUB,
-             BOOKING_SERIES_CREATED, BOOKING_SERIES_CANCELLED_BY_CLUB, BOOKING_SERIES_MOVED_BY_CLUB]
+             BOOKING_SERIES_CREATED, BOOKING_SERIES_CANCELLED_BY_CLUB, BOOKING_SERIES_MOVED_BY_CLUB,
+             WAITLIST_OFFER]
 
     MessageChoice:
       type: object
@@ -2794,7 +2870,20 @@ components:
           $ref: "#/components/schemas/NotificationClosure"
         cancellationReason:
           $ref: "#/components/schemas/CancellationReason"
+        waitlistOffer:
+          $ref: "#/components/schemas/NotificationWaitlistOffer"
         link: { $ref: "#/components/schemas/NotificationLink" }
+
+    NotificationWaitlistOffer:
+      type: object
+      description: |
+        The slot a `WAITLIST_OFFER` entry offered and whether the offer is still open. Absent once
+        the entry is gone with its slot.
+      required: [slot, expiresAt, open]
+      properties:
+        slot: { $ref: "#/components/schemas/NotificationBooking" }
+        expiresAt: { type: string, format: date-time }
+        open: { type: boolean }
 
     NotificationBooking:
       type: object
@@ -2829,13 +2918,15 @@ components:
       description: |
         Where the entry leads, as one of the client's own pages rather than an address, so no entry
         can send a member off the instance. `bookingId` is present only while the booking exists and
-        the account owns it or plays in it.
+        the account owns it or plays in it, `waitlistEntryId` only while the account's own entry
+        exists.
       required: [target]
       properties:
         target:
           type: string
-          enum: [BOOKINGS, ACCOUNT_SECURITY]
+          enum: [BOOKINGS, ACCOUNT_SECURITY, WAITLIST]
         bookingId: { type: string, format: uuid }
+        waitlistEntryId: { type: string, format: uuid }
 
     NotificationPage:
       type: object
@@ -4483,6 +4574,183 @@ paths:
           $ref: "#/components/responses/Unauthenticated"
         "404":
           $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/my/waitlist:
+    get:
+      tags: [waitlist]
+      operationId: listOwnWaitlistEntries
+      summary: This member's own waitlist entries whose slot has not ended.
+      description: |
+        Only the member's own entries. No response names another waiting member, how many wait or
+        where this entry stands in its queue. An offer whose deadline has passed reads as
+        `EXPIRED` even before the sweep has passed it on.
+      responses:
+        "200":
+          description: The member's entries, earliest slot first.
+          content:
+            application/json:
+              schema:
+                type: array
+                maxItems: 20
+                items: { $ref: "#/components/schemas/WaitlistEntry" }
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+    post:
+      tags: [waitlist]
+      operationId: joinWaitlist
+      summary: Queue for a court and time somebody else holds.
+      description: |
+        Joining checks the card, the players and every booking rule as a booking of that slot
+        would, and it is the member's consent to hear of an offer in the notification centre. A
+        slot nobody else holds answers `409` with `urn:courtside:error:waitlist-slot-not-taken`,
+        a second open entry for the same slot `409` with
+        `urn:courtside:error:waitlist-entry-exists`, and a member holding 20 entries whose slot
+        has not ended `409` with `urn:courtside:error:waitlist-limit-reached`. When the slot
+        frees, the first eligible member in the queue receives an offer that reserves it for the
+        club's offer window, ending at the slot's start at the latest.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/JoinWaitlistRequest" }
+      responses:
+        "201":
+          description: Queued.
+          headers:
+            Location: { $ref: "#/components/headers/Location" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/WaitlistJoined" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          description: The slot is not held by somebody else, or the member already waits for it.
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "422":
+          description: One or more booking rules refused the slot.
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/my/waitlist/{entryId}:
+    delete:
+      tags: [waitlist]
+      operationId: leaveWaitlist
+      summary: Leave a waitlist, or decline its offer.
+      description: |
+        An open offer passes to the next eligible member at once. Leaving an entry that is
+        already closed changes nothing. Another member's entry answers `404` with
+        `urn:courtside:error:waitlist-entry-not-found`.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: entryId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "204":
+          description: The entry is closed.
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/my/waitlist/{entryId}/acceptance:
+    post:
+      tags: [waitlist]
+      operationId: acceptWaitlistOffer
+      summary: Take the offered slot as a booking.
+      description: |
+        Turns the reservation into an ordinary booking with the card, players and note given on
+        joining, in one transaction and under every booking rule. Accepting again answers with
+        the same booking. An entry without an open offer answers `409` with
+        `urn:courtside:error:waitlist-no-offer`; a refused rule answers `422` and leaves the
+        offer standing until its deadline.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: entryId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "201":
+          description: Booked.
+          headers:
+            Location: { $ref: "#/components/headers/Location" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BookingCreated" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: The entry holds no open offer, or the court was taken.
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "422":
+          description: One or more booking rules refused it.
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/reserved-slots:
+    get:
+      tags: [waitlist]
+      operationId: listReservedSlots
+      summary: The courts held for a waiting member on one day.
+      security: []
+      description: |
+        A freed slot reserved for the member whose turn it is stays unavailable to everybody else
+        until the offer is taken, declined or passed on. Nobody is named; only the holder sees
+        `ownEntryId`, so the court plan can lead them to the offer.
+      parameters:
+        - name: date
+          in: query
+          required: true
+          schema: { type: string, format: date }
+      responses:
+        "200":
+          description: One entry per reserved court and slot.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ReservedSlot" }
+        "400":
+          $ref: "#/components/responses/Invalid"
         "429":
           $ref: "#/components/responses/RateLimited"
 

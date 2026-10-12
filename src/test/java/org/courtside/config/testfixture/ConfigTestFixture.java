@@ -5,6 +5,7 @@ import org.courtside.config.BookingSlotDuration;
 import org.courtside.config.CredentialLifetime;
 import org.courtside.config.ReminderLeadTime;
 import org.courtside.config.ResetTokenLifetime;
+import org.courtside.config.WaitlistOfferWindow;
 import org.courtside.config.internal.ChangeClubConfigurationCommand;
 import org.courtside.config.internal.ClubConfigurationSnapshot;
 import org.courtside.config.internal.ConfigService;
@@ -24,6 +25,22 @@ public class ConfigTestFixture {
     public void remindBookingsAfter(int hours) {
         ClubConfigurationSnapshot current = config.current();
         config.update(commandFrom(current, hours, current.noMembershipTypeRuleSetId()));
+    }
+
+    public void holdWaitlistOffersFor(int minutes) {
+        ClubConfigurationSnapshot current = config.current();
+        ChangeClubConfigurationCommand unchanged = commandFrom(current, current.bookingReminderHours(),
+                current.noMembershipTypeRuleSetId());
+        config.update(new ChangeClubConfigurationCommand(unchanged.clubName(), unchanged.primaryColor(),
+                unchanged.accentColor(), unchanged.logoUrl(), unchanged.imprintUrl(), unchanged.privacyUrl(),
+                unchanged.documentationUrl(), unchanged.shortName(), unchanged.defaultLocale(),
+                unchanged.slotDuration(), unchanged.timeZone(), unchanged.newAccountCredential(),
+                unchanged.passwordResetCredential(), unchanged.passwordResetToken(), unchanged.bookingReminder(),
+                unchanged.noMembershipTypeRuleSetId(), new WaitlistOfferWindow(minutes)));
+    }
+
+    public int waitlistOfferMinutes() {
+        return config.current().waitlistOfferMinutes();
     }
 
     public void speak(String languageTag) {

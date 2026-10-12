@@ -32,6 +32,7 @@ import org.courtside.booking.internal.CardEligibilityPolicy;
 import org.courtside.booking.internal.CourtAllocationRepository;
 import org.courtside.booking.internal.CancellationReasonNotAllowedException;
 import org.courtside.booking.internal.CourtOccupancy;
+import org.courtside.booking.internal.CourtReservations;
 import org.courtside.booking.internal.CourtUnavailableException;
 import org.courtside.booking.internal.ParticipantCardCapacity;
 import org.courtside.booking.internal.ParticipantsInvalidException;
@@ -77,6 +78,7 @@ public class SeriesService {
     private final EntityManager entityManager;
     private final ApplicationEventPublisher events;
     private final TransactionTemplate transaction;
+    private final CourtReservations reservations;
 
     public SeriesService(SeriesSchedule schedule,
                          CourtAllocationRepository allocations,
@@ -94,7 +96,8 @@ public class SeriesService {
                          ClubTimeZone timeZone,
                          EntityManager entityManager,
                          ApplicationEventPublisher events,
-                         PlatformTransactionManager transactions) {
+                         PlatformTransactionManager transactions,
+                         CourtReservations reservations) {
         this.schedule = schedule;
         this.allocations = allocations;
         this.bookings = bookings;
@@ -112,6 +115,7 @@ public class SeriesService {
         this.entityManager = entityManager;
         this.events = events;
         this.transaction = new TransactionTemplate(transactions);
+        this.reservations = reservations;
     }
 
     @Transactional(readOnly = true)
@@ -205,6 +209,7 @@ public class SeriesService {
     public int cancel(UUID seriesId, UUID fromBookingId, CancelScope scope,
                       UUID cancelledBy, Set<Role> cancellerRoles, CancellationReason reason) {
         requireManagementAccessTo(seriesId, fromBookingId, cancelledBy, cancellerRoles);
+        bookingGridCoordination.lock();
         BookingSeries series = lockSeries(seriesId);
         bookingRepository.lockBySeriesId(seriesId);
         discardPreLockState();
@@ -308,6 +313,9 @@ public class SeriesService {
                 .findFirst()
                 .map(execution -> currentCourtsOf(execution.booking()))
                 .orElse(List.of());
+        Map<UUID, List<UUID>> vacatedCourts = new HashMap<>();
+        executions.forEach(execution -> vacatedCourts.put(execution.booking().getId(),
+                currentCourtsOf(execution.booking())));
         executions.forEach(execution -> execution.booking().clearAllocations());
         bookingRepository.flush();
 
@@ -323,6 +331,7 @@ public class SeriesService {
             }
             throw e;
         }
+        preview.moves().forEach(move -> reservations.released(vacatedCourts.get(move.bookingId()), move.from()));
         if (earliest != null) {
             events.publishEvent(new SeriesMoved(request.seriesId(), movingIds, movedBy,
                     earliest.from().start(), earliest.from().end(), previousCourts));
@@ -373,6 +382,7 @@ public class SeriesService {
         Set<UUID> blocked = new LinkedHashSet<>(allocations.findOccupiedCourtsExcluding(
                 move.courts(), move.to().start(), move.to().end(), movingIds));
         blocked.addAll(conflictingCourts(move, planned));
+        blocked.addAll(reservations.reservedCourts(move.courts(), move.to(), move.bookedBy()));
         Booking booking = bookingRepository.findWithParticipantsById(move.bookingId()).orElseThrow();
         List<RuleViolation> violations = new ArrayList<>(ruleViolations);
         violations.addAll(participantCardCapacity.violationsFor(
