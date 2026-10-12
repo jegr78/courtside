@@ -34,7 +34,13 @@ test("given an administrator's first visit, when a person page opens while the s
       const page = await context.newPage();
       await page.goto("/");
       // Playwright's WebKit leaves an install stuck when its page navigates away during it.
-      if (browserName === "webkit") await page.evaluate(() => navigator.serviceWorker.ready.then(() => undefined));
+      if (browserName === "webkit") {
+        const installed = await page.evaluate(() => Promise.race([
+          navigator.serviceWorker.ready.then(() => true),
+          new Promise<boolean>((expired) => setTimeout(() => expired(false), 10_000))
+        ]));
+        expect(installed, `visit ${visit}: the service worker activates on the first page within ten seconds`).toBe(true);
+      }
       await page.goto(personPage);
       await expect(page.getByTestId("person-first-name")).toBeVisible({ timeout: 10_000 });
       const activated = await page.evaluate(() => Promise.race([
