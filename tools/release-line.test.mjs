@@ -461,7 +461,6 @@ test("given a release-branch commit that main already contains, when the forward
   const { git } = repository;
   try {
     git("switch", "--quiet", "main");
-    git("cherry-pick", "-x", repository.fix);
     git("merge", "--quiet", "--no-edit", "--strategy=ours", "release/0.1");
 
     // when
