@@ -359,24 +359,36 @@ export function AdminRuleSetsView({ configurationChanged }: { configurationChang
 
 function RuleEditor({ type, stored, edit, disabled, changed }: { type: RuleTypeConfiguration; stored: RuleEdit; edit: RuleEdit; disabled: boolean; changed: (edit: RuleEdit) => void }) {
   const { t } = useTranslation();
+  const timeWindow = type.parameters.length > 1 && type.parameters.every((parameter) => parameter.kind === "TIME_OF_DAY");
+  const rangeId = (parameter: RuleParameter) => timeWindow ? `rule-${type.ruleType}-range` : `rule-${type.ruleType}-${parameter.name}-range`;
+  const input = (parameter: RuleParameter) => <input key={parameter.name} id={`rule-${type.ruleType}-${parameter.name}`} data-testid={`rule-${type.ruleType}-${parameter.name}`}
+    aria-label={timeWindow ? t(`admin.rules.parameter.${parameter.name}`) : undefined}
+    aria-describedby={rangeId(parameter)} disabled={disabled}
+    type={parameter.kind === "TIME_OF_DAY" ? "time" : "number"}
+    min={shown(parameter, parameter.minimum)} max={shown(parameter, parameter.maximum)}
+    className="form-control w-24 max-w-40 rounded-lg border px-3 py-1.5"
+    value={edit.params[parameter.name] === undefined ? "" : shown(parameter, edit.params[parameter.name])}
+    onChange={(event) => changed({ applies: true, params: entered(edit.params, parameter, event.target.value) })} />;
+  const first = type.parameters[0];
+  const last = type.parameters.at(-1);
   return <article className="grid gap-x-3 gap-y-1 border-t py-1.5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
     <div className="grid min-w-0 gap-1">
       <h4 data-testid={`rule-${type.ruleType}-title`} className="font-bold">{t(`admin.rules.type.${type.ruleType}`)}</h4>
-      {type.parameters.map((parameter) => <p key={parameter.name} className="text-sm">
-        <label htmlFor={`rule-${type.ruleType}-${parameter.name}`}>{t(`admin.rules.parameter.${parameter.name}`)}</label>
-        {" "}<span id={`rule-${type.ruleType}-${parameter.name}-range`} data-testid={`rule-${type.ruleType}-${parameter.name}-range`} className="text-muted whitespace-nowrap">
-          {t("admin.rules.range", { minimum: shown(parameter, parameter.minimum), maximum: shown(parameter, parameter.maximum) })}
-        </span>
-      </p>)}
+      {timeWindow && first && last
+        ? <p id={`rule-${type.ruleType}-range`} data-testid={`rule-${type.ruleType}-range`} className="text-muted text-sm">
+          {t("admin.rules.range", { minimum: shown(first, first.minimum), maximum: shown(last, last.maximum) })}
+        </p>
+        : type.parameters.map((parameter) => <p key={parameter.name} className="text-sm">
+          <label htmlFor={`rule-${type.ruleType}-${parameter.name}`}>{t(`admin.rules.parameter.${parameter.name}`)}</label>
+          {" "}<span id={rangeId(parameter)} data-testid={`rule-${type.ruleType}-${parameter.name}-range`} className="text-muted whitespace-nowrap">
+            {t("admin.rules.range", { minimum: shown(parameter, parameter.minimum), maximum: shown(parameter, parameter.maximum) })}
+          </span>
+        </p>)}
     </div>
     <div className="flex flex-wrap items-center gap-3">
-      {type.parameters.map((parameter) => <input key={parameter.name} id={`rule-${type.ruleType}-${parameter.name}`} data-testid={`rule-${type.ruleType}-${parameter.name}`}
-                                                 aria-describedby={`rule-${type.ruleType}-${parameter.name}-range`} disabled={disabled}
-                                                 type={parameter.kind === "TIME_OF_DAY" ? "time" : "number"}
-                                                 min={shown(parameter, parameter.minimum)} max={shown(parameter, parameter.maximum)}
-                                                 className={`form-control ${parameter.kind === "TIME_OF_DAY" ? "w-32" : "w-24"} max-w-40 rounded-lg border px-3 py-1.5`}
-                                                 value={edit.params[parameter.name] === undefined ? "" : shown(parameter, edit.params[parameter.name])}
-                                                 onChange={(event) => changed({ applies: true, params: entered(edit.params, parameter, event.target.value) })} />)}
+      {timeWindow && first && last
+        ? <span className="flex items-center gap-1">{input(first)}<span aria-hidden="true">–</span>{input(last)}</span>
+        : type.parameters.map(input)}
       <label className="flex items-center gap-2 text-sm font-medium">
         <input data-testid={`rule-${type.ruleType}-applies`} type="checkbox" disabled={disabled} checked={edit.applies}
                onChange={(event) => changed(event.target.checked ? { applies: true, params: stored.params } : { applies: false, params: {} })} />

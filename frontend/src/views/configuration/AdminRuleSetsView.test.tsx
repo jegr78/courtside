@@ -245,8 +245,13 @@ describe("AdminRuleSetsView", () => {
 
     // then
     expect(earliestStart, "a board thinks of 20:00, not of 1200").toHaveAttribute("type", "time");
-    expect(screen.getByTestId("rule-BOOKING_HOURS-latestEnd-range")).toHaveTextContent(
-      i18n.t("admin.rules.range", { minimum: "00:01", maximum: "23:59" }));
+    expect(earliestStart).toHaveAccessibleName(i18n.t("admin.rules.parameter.earliestStart"));
+    expect(latestEnd, "two inputs side by side still say which end of the window each sets")
+      .toHaveAccessibleName(i18n.t("admin.rules.parameter.latestEnd"));
+    const range = i18n.t("admin.rules.range", { minimum: "00:00", maximum: "23:59" });
+    expect(screen.getByTestId("rule-BOOKING_HOURS-range"), "one hint line keeps the row as low as its neighbours").toHaveTextContent(range);
+    expect(earliestStart).toHaveAccessibleDescription(range);
+    expect(latestEnd).toHaveAccessibleDescription(range);
     await waitFor(() => expect(setRule).toHaveBeenCalledWith("rule-set", "BOOKING_HOURS", { earliestStart: 540, latestEnd: 1200 }));
   });
 
