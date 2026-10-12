@@ -222,9 +222,11 @@ fest, ob das Regelwerk sie enthält. Jedes Regelwerk kann diese Regeln höchsten
 | Maximale Buchungsdauer | Höchste Dauer in Minuten |
 | Stornierungsfrist | Mindestabstand zur Buchung in Minuten |
 | Buchen gesperrt | Verbietet Mitgliedern das Buchen und Verschieben ohne weitere Einstellung |
+| Buchungszeiten | Frühester Beginn und spätestes Ende einer Buchung an jedem Wochentag |
 
 Öffnungszeiten und Buchungsraster gelten für den ganzen Verein. Sie stehen deshalb außerhalb der
-Regelwerke. Administratoren können das Buchungsverbot für Verwaltungsaufgaben übergehen. Das
+Regelwerke. Buchungszeiten engen die Öffnungszeiten für eine Mitgliedsart ein: Hat die Anlage bis
+23:00 Uhr geöffnet, kann ein Jugendregelwerk Buchungen bis 20:00 Uhr erlauben. Administratoren können das Buchungsverbot für Verwaltungsaufgaben übergehen. Das
 Zeit- und Platzraster gilt auch für sie.
 
 Beim Stilllegen bleibt ein Regelwerk für bereits zugeordnete Mitgliedsarten wirksam. Es steht nur
