@@ -220,7 +220,7 @@ with the product; read the constraint rather than a list here. A message somebod
 row at all: it did not fail, it was not sent.
 
 A `QUEUED` row is a message waiting in the outbox. Its `parameters` hold the identifiers the message
-is written from, a booking id, a closure kind or the person who withdrew, and never rendered text,
+is written from, a booking id, a series id, a closure kind or the person who withdrew, and never rendered text,
 an address or a credential: a message is composed from the current rows when it is handed over, and
 a generated credential or reset code exists only in that transaction. `next_attempt_at` says when the
 row is next due, `attempts` counts the claims made for it and `retries` the failed handovers that
@@ -231,7 +231,7 @@ that are anything but an object of strings.
 
 A `notification` row is written with the outbox row in the same transaction, and also when no mail
 is queued because the account has no address or switched email off. Its `parameters` keep only the
-booking id and closure kind; the person who withdrew stays in the outbox. `read_at` is empty until
+booking id and closure kind; the person who withdrew and the series id stay in the outbox. `read_at` is empty until
 the account marks the entry read, and a partial index over each account's unread entries serves the
 unread count. `notification.kind` follows the same CHECK as `message_record.kind`, and
 `message_channel_optout.channel` accepts `EMAIL`. No row in `message_channel_optout` means the

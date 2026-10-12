@@ -10,6 +10,7 @@ record QueuedMessage(UUID accountId, MessageKind kind, Map<String, String> param
     static final String BOOKING = "bookingId";
     static final String CLOSURE = "closure";
     static final String PLAYER = "playerId";
+    static final String SERIES = "seriesId";
 
     QueuedMessage {
         parameters = parameters == null ? Map.of() : Map.copyOf(parameters);
@@ -21,6 +22,10 @@ record QueuedMessage(UUID accountId, MessageKind kind, Map<String, String> param
 
     UUID player() {
         return id(PLAYER);
+    }
+
+    UUID series() {
+        return id(SERIES);
     }
 
     String closure() {

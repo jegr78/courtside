@@ -55,6 +55,18 @@ const displaced: Notification = {
   link: { target: "BOOKINGS", bookingId: "66666666-6666-6666-6666-666666666666" }
 };
 
+const cancelledByClub: Notification = {
+  id: "77777777-7777-7777-7777-777777777777",
+  kind: "BOOKING_CANCELLED_BY_CLUB",
+  createdAt: "2026-05-08T08:00:00Z",
+  readAt: null,
+  booking: {
+    startsAt: "2026-05-21T16:00:00Z", endsAt: "2026-05-21T17:00:00Z",
+    courts: [{ number: 3, name: null }], cardLabel: "Member booking", cancelled: true
+  },
+  link: { target: "BOOKINGS", bookingId: "88888888-8888-8888-8888-888888888888" }
+};
+
 function show() {
   render(<MemoryRouter><WithClubConfiguration><MyMessagesView /></WithClubConfiguration></MemoryRouter>);
 }
@@ -113,6 +125,21 @@ describe("MyMessagesView", () => {
     const closure = await screen.findByTestId(`notification-${displaced.id}`);
     expect(within(closure).getByTestId("notification-summary")).toHaveTextContent("The club is now closed on that day.");
     expect(within(closure).getByTestId("notification-booking")).toHaveTextContent("Court 2");
+  });
+
+  it("given a booking the club cancelled, when it is shown, then it says the club cancelled it and marks the booking cancelled", async () => {
+    // given
+    vi.spyOn(api, "ownNotifications").mockResolvedValue({ items: [cancelledByClub], nextCursor: null, unread: 1 });
+
+    // when
+    show();
+
+    // then
+    const cancellation = await screen.findByTestId(`notification-${cancelledByClub.id}`);
+    expect(within(cancellation).getByTestId("notification-summary")).toHaveTextContent("The club cancelled a booking that concerns you.");
+    expect(within(cancellation).getByTestId("notification-booking")).toHaveTextContent("Court 3");
+    expect(within(cancellation).getByTestId("notification-booking")).toHaveTextContent("Cancelled");
+    expect(within(cancellation).getByRole("link")).toHaveAttribute("href", `/my-bookings#booking-${cancelledByClub.link.bookingId}`);
   });
 
   it("given an unread notification, when the member marks it read, then the instance is told and it shows as read", async () => {

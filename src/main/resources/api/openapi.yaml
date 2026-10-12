@@ -2715,7 +2715,8 @@ components:
       enum: [CREDENTIALS_NEW_ACCOUNT, CREDENTIALS_PASSWORD_RESET, ACCOUNT_USERNAME_REMINDER,
              ACCOUNT_PASSWORD_RESET_CODE, BOOKING_CONFIRMED,
              BOOKING_PLAYER_RECORDED, BOOKING_PLAYER_WITHDREW, BOOKING_DISPLACED,
-             BOOKING_REMINDER]
+             BOOKING_REMINDER, BOOKING_CANCELLED, BOOKING_CANCELLED_BY_CLUB,
+             BOOKING_SERIES_CREATED]
 
     MessageChoice:
       type: object
@@ -2726,8 +2727,8 @@ components:
           type: boolean
           description: |
             False for what the club must be able to send: the credentials an account needs to sign
-            in at all, the notice that a closure hit a booking, and being told somebody wrote you
-            into one.
+            in at all, the notice that a closure hit a booking, being told somebody wrote you
+            into one, and being told the club cancelled one.
         enabled:
           type: boolean
           description: Whether this account currently receives the kind.

@@ -517,9 +517,17 @@ German and English notification templates ship as resource bundles. They are not
 runtime. A message uses the recipient account's language.
 
 Current messages cover generated credentials, password-reset codes, username reminders, booking
-confirmations, participant additions and withdrawals, displaced bookings and upcoming reminders. A
-series sends no confirmation per occurrence. Displacement informs people but does not cancel the
-booking.
+confirmations, participant additions and withdrawals, displaced bookings, upcoming reminders,
+booking cancellations and new series. A series sends no confirmation per occurrence. Its holder and
+any player receive one summary naming the card, weekdays, time, courts, first and last date and the
+number of occurrences, and its centre entry leads to the first occurrence. Displacement informs
+people but does not cancel the booking.
+
+A cancelled booking is announced to its holder and its players, except the account that cancelled
+it. When the holder cancels, the message says the booking is gone. When anybody else cancels, an
+administrator or an account the card lets manage it, the message says the club cancelled it. Neither
+names the person who acted. The product records no reason for a cancellation, so the club's message
+refers the member to the club. Cancelling or moving a series sends nothing yet.
 
 Each message is a `message_record` with account, kind, `Message-ID`, time and state. The states are
 `queued`, `handed_over`, `refused` and `failed`. `handed_over` means the relay accepted the message,
@@ -538,7 +546,8 @@ its row to the next pass after the lease, which can send that message a second t
 A transport failure reschedules the row after 15 seconds and then after gaps three times as long,
 and fails it on the sixth attempt, about half an hour after the first. A definite recipient refusal
 is not retried. A message fails at once when its booking or recipient is gone, its booking was
-cancelled, or, for a reminder, its booking has already started by the time it is due. Every outcome
+cancelled and the message is not the one announcing that, a series summary finds no occurrence
+left, or, for a reminder, its booking has already started by the time it is due. Every outcome
 stays on the row with its reason, and the message statistics count the messages that needed a
 retry. Credential creation and handover share a transaction, so a credential the relay never
 accepted does not replace the stored one, and no plaintext credential waits in the outbox. Credential
@@ -559,9 +568,11 @@ Members choose optional message kinds and, separately, channels. No opt-out mean
 declined kind reaches the account on no channel, the centre included. A declined email channel
 stops mail and keeps the entry. Credentials, password-reset codes and username reminders are mailed
 whatever the channel choice says, because whoever asks for them cannot sign in to read the centre.
-Credentials, displacement and participant-addition notices cannot be disabled as kinds, because no
-other product path tells the member. A declined email channel stops the mail for displacement and
-participant-addition notices as well; the centre then replaces it, and every centre page carries the
+Credentials, displacement, participant-addition and club-cancellation notices cannot be disabled as
+kinds, because no other product path tells the member that somebody else wrote them into a booking
+or took one away. A holder's own cancellation and the series summary can be declined, like the
+confirmation: My bookings already shows what they say. A declined email channel stops the mail for
+displacement, participant-addition and club-cancellation notices as well; the centre then replaces it, and every centre page carries the
 account's unread count, which the primary navigation shows beside the centre's entry. An account
 without an address still receives its entries.
 

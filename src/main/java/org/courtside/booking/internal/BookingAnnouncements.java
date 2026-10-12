@@ -76,6 +76,27 @@ class BookingAnnouncements implements BookingAnnouncer {
         return described;
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public List<BookingAnnouncement> describeSeries(UUID seriesId) {
+        List<Booking> occurrences = bookings.findConfirmedBySeriesOrderedByStart(seriesId);
+        if (occurrences.isEmpty()) {
+            return List.of();
+        }
+        Map<UUID, List<UUID>> players = new HashMap<>();
+        bookings.findMemberParticipantIdsByBooking(occurrences.stream().map(Booking::getId).toList()).forEach(row ->
+                players.computeIfAbsent((UUID) row[0], ignored -> new ArrayList<>()).add((UUID) row[1]));
+        Map<UUID, BookingAnnouncement.AnnouncedCourt> courts = new HashMap<>();
+        Map<UUID, String> cardLabels = new HashMap<>();
+        return occurrences.stream()
+                .flatMap(booking -> announcementOf(booking, players.getOrDefault(booking.getId(), List.of()),
+                        courtId -> courts.computeIfAbsent(courtId,
+                                missing -> announcedCourt(facility.requireCourt(missing))),
+                        cardId -> cardLabels.computeIfAbsent(cardId, missing -> cards.requireCard(missing).getLabel()))
+                        .stream())
+                .toList();
+    }
+
     private static boolean visibleTo(Booking booking, List<UUID> players, UUID accountId, UUID personId) {
         return accountId.equals(booking.getBookedBy()) || personId != null && players.contains(personId);
     }

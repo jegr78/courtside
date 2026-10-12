@@ -223,8 +223,11 @@ class BookingConfirmationMessageTest extends AbstractIntegrationTest {
                 List.of(SIX_PM, SIX_PM.plus(7, ChronoUnit.DAYS), SIX_PM.plus(14, ChronoUnit.DAYS)),
                 trainer, trainerPerson, Set.of(Role.TRAINER), "Team training");
 
-        // then — a series is one decision and gets one message of its own, not one per occurrence
-        verify(sender, never()).send(any(MimeMessage.class));
+        // then
+        verify(sender, times(1)).send(any(MimeMessage.class));
+        assertThat(jdbc.sql("SELECT kind FROM message_record").query(String.class).list())
+                .as("a series is one decision and gets one message of its own, not one per occurrence")
+                .containsExactly("BOOKING_SERIES_CREATED");
     }
 
     @Test

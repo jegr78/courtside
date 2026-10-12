@@ -31,7 +31,9 @@ class MailTemplatesTest {
             entry("expiresOn", "1 May 2026"), entry("day", "Wednesday, 13 May 2026"),
             entry("from", "18:00"), entry("to", "19:00"), entry("courts", "Court 1"),
             entry("card", "Member booking"), entry("player", "John Roe"),
-            entry("closure", "A court your booking is on has been taken out of service"));
+            entry("closure", "A court your booking is on has been taken out of service"),
+            entry("weekdays", "Tuesday"), entry("first", "Tuesday, 19 May 2026"),
+            entry("last", "Tuesday, 2 June 2026"), entry("count", "3"));
 
     private final MailTemplates templates = new MailTemplates();
 

@@ -9,8 +9,12 @@ import java.time.Instant;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.FormatStyle;
+import java.time.format.TextStyle;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.TreeSet;
 import java.util.stream.Collectors;
 
 @Component
@@ -28,6 +32,20 @@ class BookingWording {
                 "to", time(booking.endsAt()),
                 "courts", courts(booking, locale),
                 "card", booking.cardLabel());
+    }
+
+    // The first occurrence stands for the series' time, courts and card, which its occurrences share.
+    Map<String, String> ofSeries(List<BookingAnnouncement> occurrences, Locale locale) {
+        Map<String, String> values = new HashMap<>(of(occurrences.getFirst(), locale));
+        values.put("weekdays", occurrences.stream()
+                .map(occurrence -> ZonedDateTime.ofInstant(occurrence.startsAt(), club.zoneId()).getDayOfWeek())
+                .collect(Collectors.toCollection(TreeSet::new)).stream()
+                .map(weekday -> weekday.getDisplayName(TextStyle.FULL, locale))
+                .collect(Collectors.joining(", ")));
+        values.put("first", day(occurrences.getFirst().startsAt(), locale));
+        values.put("last", day(occurrences.getLast().startsAt(), locale));
+        values.put("count", String.valueOf(occurrences.size()));
+        return values;
     }
 
     private String courts(BookingAnnouncement booking, Locale locale) {
