@@ -144,30 +144,30 @@ export function AdminAuditView() {
         {entries.length === 0
           ? <p data-testid="audit-empty">{t("audit.empty")}</p>
           : <div>
-            <table className="block w-full text-left sm:table">
-              <thead className="sr-only sm:not-sr-only">
-                <tr>
-                  <th scope="col" className="p-2">{t("audit.column.occurredAt")}</th>
-                  <th scope="col" className="p-2">{t("audit.column.change")}</th>
-                  <th scope="col" className="p-2">{t("audit.column.subject")}</th>
-                  <th scope="col" className="p-2">{t("audit.column.actor")}</th>
+            <table role="table" className="block w-full text-left sm:table">
+              <thead role="rowgroup" className="sr-only sm:not-sr-only">
+                <tr role="row">
+                  <th role="columnheader" scope="col" className="p-2">{t("audit.column.occurredAt")}</th>
+                  <th role="columnheader" scope="col" className="p-2">{t("audit.column.change")}</th>
+                  <th role="columnheader" scope="col" className="p-2">{t("audit.column.subject")}</th>
+                  <th role="columnheader" scope="col" className="p-2">{t("audit.column.actor")}</th>
                 </tr>
               </thead>
-              <tbody className="grid gap-3 sm:table-row-group">
-                {entries.map((entry) => <tr key={entry.id} data-testid="audit-row" data-entry-id={entry.id} data-subject-id={entry.subjectId} data-event-type={entry.eventType} className="grid gap-2 rounded-xl border p-4 sm:table-row sm:rounded-none sm:border-0 sm:p-0">
-                  <td className="grid min-w-0 grid-cols-[minmax(0,8rem)_minmax(0,1fr)] gap-3 sm:table-cell sm:border-t sm:p-2">
+              <tbody role="rowgroup" className="grid gap-3 sm:table-row-group">
+                {entries.map((entry) => <tr role="row" key={entry.id} data-testid="audit-row" data-entry-id={entry.id} data-subject-id={entry.subjectId} data-event-type={entry.eventType} className="grid gap-2 rounded-xl border p-4 sm:table-row sm:rounded-none sm:border-0 sm:p-0">
+                  <td role="cell" className="grid min-w-0 grid-cols-[minmax(0,8rem)_minmax(0,1fr)] gap-3 sm:table-cell sm:border-t sm:p-2">
                     <span aria-hidden="true" data-testid="audit-label-occurred-at" className="font-medium sm:hidden">{t("audit.column.occurredAt")}</span>
                     <span data-testid="audit-occurred-at" className="min-w-0 break-words">{formatDateTime(entry.occurredAt, language, club.timeZone)}</span>
                   </td>
-                  <td className="grid min-w-0 grid-cols-[minmax(0,8rem)_minmax(0,1fr)] gap-3 sm:table-cell sm:border-t sm:p-2">
+                  <td role="cell" className="grid min-w-0 grid-cols-[minmax(0,8rem)_minmax(0,1fr)] gap-3 sm:table-cell sm:border-t sm:p-2">
                     <span aria-hidden="true" data-testid="audit-label-change" className="font-medium sm:hidden">{t("audit.column.change")}</span>
                     <span data-testid="audit-message" className="min-w-0 [overflow-wrap:anywhere]">{auditMessage(entry, t)}</span>
                   </td>
-                  <td className="grid min-w-0 grid-cols-[minmax(0,8rem)_minmax(0,1fr)] gap-3 sm:table-cell sm:border-t sm:p-2">
+                  <td role="cell" className="grid min-w-0 grid-cols-[minmax(0,8rem)_minmax(0,1fr)] gap-3 sm:table-cell sm:border-t sm:p-2">
                     <span aria-hidden="true" data-testid="audit-label-subject" className="font-medium sm:hidden">{t("audit.column.subject")}</span>
                     <span data-testid="audit-subject" className="min-w-0 [overflow-wrap:anywhere]">{subjectLabel(entry, t)}</span>
                   </td>
-                  <td className="grid min-w-0 grid-cols-[minmax(0,8rem)_minmax(0,1fr)] gap-3 sm:table-cell sm:border-t sm:p-2">
+                  <td role="cell" className="grid min-w-0 grid-cols-[minmax(0,8rem)_minmax(0,1fr)] gap-3 sm:table-cell sm:border-t sm:p-2">
                     <span aria-hidden="true" data-testid="audit-label-actor" className="font-medium sm:hidden">{t("audit.column.actor")}</span>
                     <span data-testid="audit-actor" className="min-w-0 [overflow-wrap:anywhere]">{actorLabel(entry, t)}</span>
                   </td>

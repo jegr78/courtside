@@ -6,6 +6,7 @@ import { api, ApiError, type MembershipType, type RosterEntry } from "../api/cli
 import i18n from "../i18n";
 import { UnsavedChangesProvider } from "../unsaved/UnsavedChangesProvider";
 import { UnsavedChangesGuard } from "../unsaved/UnsavedChangesGuard";
+import { expectTableRolesIndependentOfLayout } from "../test/tableRoles";
 import { AdminRosterView } from "./AdminRosterView";
 
 const withAccount: RosterEntry = {
@@ -148,6 +149,17 @@ describe("AdminRosterView", () => {
       expect(within(person).getByTestId(testId)).toHaveTextContent(label);
       expect(within(person).getByTestId(testId)).toHaveAttribute("aria-hidden", "true");
     }
+  });
+
+  it("given people, when the roster is rendered, then its table keeps its roles whatever layout the screen gives it", async () => {
+    // given
+    render(<MemoryRouter><UnsavedChangesProvider><AdminRosterView /></UnsavedChangesProvider></MemoryRouter>);
+
+    // when
+    await screen.findByTestId("roster-row-person-1");
+
+    // then
+    expectTableRolesIndependentOfLayout(screen.getByRole("table"));
   });
 
   it("given a membership type the address names but the instance refuses, when the roster is opened, then the refusal is shown instead of an unfiltered roster", async () => {

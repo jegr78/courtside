@@ -6,6 +6,7 @@ import { api, type ClubConfig, type MessageEntry } from "../api/client";
 import i18n from "../i18n";
 import { ClubConfigurationProvider } from "../club/ClubConfigurationProvider";
 import { WithClubConfiguration } from "../test/ClubConfiguration";
+import { expectTableRolesIndependentOfLayout } from "../test/tableRoles";
 import { AdminMessagesView } from "./AdminMessagesView";
 
 const handedOver: MessageEntry = {
@@ -101,6 +102,48 @@ describe("AdminMessagesView", () => {
     expect(within(entryRow).getByTestId("message-id")).toHaveTextContent("<a-message-id@example.org>");
     expect(screen.getByTestId("messages-handover-note")).toHaveTextContent(
       /club's mail server accepted the message.*confirm final delivery/s);
+  });
+
+  it.each([
+    ["en", ["Time", "Recipient", "Message", "State", "Finding", "Message-ID"]],
+    ["de", ["Zeitpunkt", "Empfänger", "Nachricht", "Stand", "Befund", "Message-ID"]]
+  ])("given a message in %s, when its row is rendered, then every value shares its cell with a label hidden from screen readers", async (language, labels) => {
+    // given
+    await i18n.changeLanguage(language);
+    vi.spyOn(api, "messages").mockResolvedValue({ entries: [refused], nextCursor: null });
+
+    // when
+    show();
+    const entry = await screen.findByTestId("message-row");
+
+    // then
+    const fields = [
+      ["message-label-queued-at", "message-queued-at"],
+      ["message-label-recipient", "message-person-link"],
+      ["message-label-kind", "message-kind"],
+      ["message-label-state", "message-state"],
+      ["message-label-outcome", "message-outcome"],
+      ["message-label-message-id", "message-id"]
+    ];
+    fields.forEach(([labelId, valueId], index) => {
+      const label = within(entry).getByTestId(labelId);
+      expect(label, `${labelId} names its field`).toHaveTextContent(labels[index]);
+      expect(label, `${labelId} is not read twice beside the column header`).toHaveAttribute("aria-hidden", "true");
+      expect(label.closest("td"), `${labelId} shares its cell with ${valueId}`)
+        .toContainElement(within(entry).getByTestId(valueId));
+    });
+  });
+
+  it("given a message, when the log is rendered, then its table keeps its roles whatever layout the screen gives it", async () => {
+    // given
+    vi.spyOn(api, "messages").mockResolvedValue({ entries: [handedOver, refused], nextCursor: null });
+
+    // when
+    show();
+    await screen.findAllByTestId("message-row");
+
+    // then
+    expectTableRolesIndependentOfLayout(screen.getByRole("table"));
   });
 
   it.each(["en", "de"])("given the state labels in %s, when they are read, then none of them claims delivery",

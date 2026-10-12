@@ -7,6 +7,7 @@ import i18n from "../../i18n";
 import { UnsavedChangesProvider } from "../../unsaved/UnsavedChangesProvider";
 import { UnsavedCount } from "../../test/UnsavedCount";
 import { WithClubConfiguration } from "../../test/ClubConfiguration";
+import { expectTableRolesIndependentOfLayout } from "../../test/tableRoles";
 import { AdminCourtsView } from "./AdminCourtsView";
 
 function show(counted = false) {
@@ -41,6 +42,15 @@ describe("AdminCourtsView", () => {
     expect(screen.getByTestId("edit-court-name-court-1")).toHaveValue("Centre Court");
     expect(screen.getByTestId("court-status-court-1")).toHaveTextContent("Active");
     expect(screen.getByTestId("edit-court-name-court-1")).toHaveAccessibleName(/Change the name/);
+  });
+
+  it("given a court, when the view loads, then its table keeps its roles whatever layout the screen gives it", async () => {
+    // when
+    show();
+    await screen.findByTestId("court-row-court-1");
+
+    // then
+    expectTableRolesIndependentOfLayout(screen.getByRole("table"));
   });
 
   it("when the view loads, then no court carries a save of its own and the page offers none yet", async () => {

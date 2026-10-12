@@ -384,6 +384,39 @@ for (const locale of ["de", "en"]) {
     // then
     await expectNoWcagViolations(page);
   });
+
+  test(`${locale} a filled message log meets automated WCAG 2.2 AA checks as a table and as phone cards`, async ({ page, journeyService }) => {
+    // given
+    const record = "7c000000-0000-0000-0000-0000000000d2";
+    await journeyService.executeSql(`
+      INSERT INTO message_record (id, account_id, kind, state, message_id, reason, status_code, queued_at, settled_at)
+      VALUES ('${record}', '00000000-0000-0000-0000-000000000102', 'CREDENTIALS_NEW_ACCOUNT', 'REFUSED',
+        '<0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0.1759349460000@relay.example.org>', 'SendFailedException', '550',
+        now(), now());`);
+    try {
+      await page.goto("/");
+      await selectPreference(page, "#locale-preference", locale);
+      await signIn(page, "configuration-admin");
+      await expect(page.getByTestId("administration-link"), "the board is signed in").toBeVisible({ timeout: 10_000 });
+
+      // when
+      await page.goto("/admin/messages");
+      const entry = page.locator(`[data-testid="message-row"][data-entry-id="${record}"]`);
+      await expect(entry, "the seeded message is listed").toBeVisible({ timeout: 10_000 });
+
+      // then
+      await expectNoWcagViolations(page);
+
+      // when
+      await page.setViewportSize({ width: 393, height: 852 });
+
+      // then
+      await expect(entry, "the message is a card at phone width").toHaveCSS("display", "grid", { timeout: 10_000 });
+      await expectNoWcagViolations(page);
+    } finally {
+      await journeyService.executeSql(`DELETE FROM message_record WHERE id = '${record}';`);
+    }
+  });
 }
 
 test("initial password and validation states meet automated WCAG 2.2 AA checks", async ({ page }) => {

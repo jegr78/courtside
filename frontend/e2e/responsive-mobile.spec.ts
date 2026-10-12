@@ -329,6 +329,48 @@ test("a member reads a notification and marks it read on the phone", async ({ pa
   }
 });
 
+test("given a refused message on a phone, when the board reads the message log, then every field of the entry is on a card inside the screen", async ({ page, journeyService }) => {
+  // given
+  const record = "7c000000-0000-0000-0000-0000000000d1";
+  await journeyService.executeSql(`
+    INSERT INTO message_record (id, account_id, kind, state, message_id, reason, status_code, queued_at, settled_at)
+    VALUES ('${record}', '00000000-0000-0000-0000-000000000102', 'CREDENTIALS_NEW_ACCOUNT', 'REFUSED',
+      '<0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0.1759349460000@relay.example.org>', 'SendFailedException', '550',
+      now(), now());`);
+  try {
+    await signIn(page, "configuration-admin");
+    await expect(page.getByTestId("administration-link"), "the board is signed in").toBeVisible({ timeout: 10_000 });
+
+    // when
+    await page.goto("/admin/messages");
+
+    // then
+    const entry = page.locator(`[data-testid="message-row"][data-entry-id="${record}"]`);
+    await expect(entry, "the seeded message is listed").toBeVisible({ timeout: 10_000 });
+    await expect.poll(() => entry.evaluate((element) => getComputedStyle(element).display),
+      { message: "a message is a card on a phone", timeout: 10_000 }).toBe("grid");
+    await expect(entry.getByRole("cell"), "the card keeps every column").toHaveCount(6, { timeout: 10_000 });
+    for (const testId of ["message-queued-at", "message-person-link", "message-kind", "message-state", "message-outcome", "message-id"]) {
+      const field = entry.getByTestId(testId);
+      await expect(field, `${testId} is shown`).toBeVisible({ timeout: 10_000 });
+      await expect.poll(() => field.evaluate((element) => element.getBoundingClientRect().right <= document.documentElement.clientWidth),
+        { message: `${testId} ends inside the screen`, timeout: 10_000 }).toBe(true);
+    }
+    const queuedAt = entry.getByTestId("message-queued-at");
+    const words = (await queuedAt.textContent())!.trim().split(/\s+/).length;
+    await expect.poll(() => queuedAt.evaluate((node) => {
+      const range = document.createRange();
+      range.selectNodeContents(node);
+      return new Set([...range.getClientRects()].map((line) => Math.round(line.top))).size;
+    }), { message: "the date is not broken after every word", timeout: 10_000 }).toBeLessThan(words);
+    await expect.poll(() => entry.evaluate((element) => element.scrollWidth <= element.clientWidth),
+      { message: "nothing on the card runs past its edge", timeout: 10_000 }).toBe(true);
+    await expectNoHorizontalOverflow(page);
+  } finally {
+    await journeyService.executeSql(`DELETE FROM message_record WHERE id = '${record}';`);
+  }
+});
+
 test("member and administration surfaces remain usable on a touch viewport", async ({ page, journeyService }) => {
   // given
   await signIn(page, "doe.jane");

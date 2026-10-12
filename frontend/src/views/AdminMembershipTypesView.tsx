@@ -148,7 +148,7 @@ export function AdminMembershipTypesView() {
           </div>
           {types.length === 0
             ? <p data-testid="membership-types-empty">{t("admin.membershipTypes.empty")}</p>
-            : <table className="block w-full text-left md:table md:table-fixed">
+            : <table role="table" className="block w-full text-left md:table md:table-fixed">
               <colgroup>
                 <col className="md:w-[26%]" />
                 <col className="md:w-[27%]" />
@@ -156,16 +156,16 @@ export function AdminMembershipTypesView() {
                 <col className="md:w-[9%]" />
                 <col className="md:w-[28%]" />
               </colgroup>
-              <thead className="sr-only md:not-sr-only">
-                <tr>
-                  <th scope="col" className="p-2">{t("admin.membershipTypes.name")}</th>
-                  <th scope="col" className="p-2">{t("admin.membershipTypes.ruleSet")}</th>
-                  <th scope="col" className="p-2">{t("admin.membershipTypes.grantsAccountColumn")}</th>
-                  <th scope="col" className="p-2">{t("admin.membershipTypes.members")}</th>
-                  <th scope="col" className="p-2"><span className="sr-only">{t("admin.membershipTypes.actions")}</span></th>
+              <thead role="rowgroup" className="sr-only md:not-sr-only">
+                <tr role="row">
+                  <th role="columnheader" scope="col" className="p-2">{t("admin.membershipTypes.name")}</th>
+                  <th role="columnheader" scope="col" className="p-2">{t("admin.membershipTypes.ruleSet")}</th>
+                  <th role="columnheader" scope="col" className="p-2">{t("admin.membershipTypes.grantsAccountColumn")}</th>
+                  <th role="columnheader" scope="col" className="p-2">{t("admin.membershipTypes.members")}</th>
+                  <th role="columnheader" scope="col" className="p-2"><span className="sr-only">{t("admin.membershipTypes.actions")}</span></th>
                 </tr>
               </thead>
-              <tbody className="grid gap-3 md:table-row-group">
+              <tbody role="rowgroup" className="grid gap-3 md:table-row-group">
                 {types.map((type) => <MembershipTypeRow
                   key={type.id}
                   type={type}
@@ -221,8 +221,8 @@ function MembershipTypeRow({ type, ruleSets, holders, disabled, value, changed, 
   const cell = "grid min-w-0 grid-cols-[minmax(0,8rem)_minmax(0,1fr)] items-center gap-3 md:table-cell md:border-t md:p-2 md:align-middle";
   const label = "font-medium md:hidden";
 
-  return <tr data-testid={`membership-type-${type.id}`} className="grid gap-2 rounded-xl border p-4 md:table-row md:rounded-none md:border-0 md:bg-transparent md:p-0">
-    <th scope="row" className={`${cell} font-normal`}>
+  return <tr role="row" data-testid={`membership-type-${type.id}`} className="grid gap-2 rounded-xl border p-4 md:table-row md:rounded-none md:border-0 md:bg-transparent md:p-0">
+    <th role="rowheader" scope="row" className={`${cell} font-normal`}>
       <span aria-hidden="true" data-testid="membership-type-label-name" className={label}>{t("admin.membershipTypes.name")}</span>
       <span className="flex min-w-0 items-center gap-2">
         <input data-testid={`membership-type-name-${type.id}`} aria-label={t("admin.membershipTypes.name")} disabled={disabled}
@@ -233,7 +233,7 @@ function MembershipTypeRow({ type, ruleSets, holders, disabled, value, changed, 
         </span>
       </span>
     </th>
-    <td className={cell}>
+    <td role="cell" className={cell}>
       <span aria-hidden="true" data-testid="membership-type-label-rule-set" className={label}>{t("admin.membershipTypes.ruleSet")}</span>
       <span className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
         <select data-testid={`membership-type-rule-set-${type.id}`} aria-label={t("admin.membershipTypes.ruleSet")} disabled={disabled}
@@ -247,12 +247,12 @@ function MembershipTypeRow({ type, ruleSets, holders, disabled, value, changed, 
         </Link>}
       </span>
     </td>
-    <td className={cell}>
+    <td role="cell" className={cell}>
       <span aria-hidden="true" data-testid="membership-type-label-grants-account" className={label}>{t("admin.membershipTypes.grantsAccount")}</span>
       <input data-testid={`membership-type-grants-account-${type.id}`} aria-label={t("admin.membershipTypes.grantsAccount")} disabled={disabled}
              type="checkbox" className="size-5" checked={grantsAccount} onChange={(event) => changed({ grantsAccount: event.target.checked })} />
     </td>
-    <td className={cell}>
+    <td role="cell" className={cell}>
       <span aria-hidden="true" data-testid="membership-type-label-members" className={label}>{t("admin.membershipTypes.members")}</span>
       {holders
         ? <Link data-testid={`membership-type-holders-${type.id}`} className="font-semibold whitespace-nowrap underline" to={`/admin/roster?membershipTypeId=${type.id}`}
@@ -263,7 +263,7 @@ function MembershipTypeRow({ type, ruleSets, holders, disabled, value, changed, 
           <span aria-hidden="true">…</span><span className="sr-only">{t("status.loading")}</span>
         </span>}
     </td>
-    <td className="min-w-0 md:border-t md:p-2 md:align-middle">
+    <td role="cell" className="min-w-0 md:border-t md:p-2 md:align-middle">
       <div className="flex flex-wrap items-center gap-2">
         <Button variant={type.active ? "destructive" : "primary"} data-testid={`toggle-membership-type-${type.id}`} disabled={disabled} type="button"
                 className="px-3 py-1.5 text-sm" onClick={() => void toggle()}>{t(type.active ? "admin.deactivate" : "admin.activate")}</Button>
