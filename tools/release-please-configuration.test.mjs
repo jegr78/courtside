@@ -233,10 +233,11 @@ test("given the token can publish under this project's name, when the workflow r
   () => {
     // given
     const triggers = workflow.on ?? workflow[true];
-    const [guard, release] = workflow.jobs["release-please"].steps;
+    const guard = workflow.jobs["release-please"].steps[0];
+    const release = workflow.jobs["release-please"].steps.find((step) => step.id === "release");
 
     // when / then
-    assert.deepEqual(triggers, { push: { branches: ["main", "release/*"] } },
+    assert.deepEqual(triggers, { push: { branches: ["main", "release/[0-9]*.[0-9]*"] } },
       "a pull_request trigger would put the token within reach of a fork's code; release/* is protected like main");
     assert.equal(release.with["target-branch"], "${{ github.ref_name }}",
       "a release branch gets its own release pull request, read from its own configuration and manifest");

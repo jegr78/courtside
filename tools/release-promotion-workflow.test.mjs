@@ -34,12 +34,11 @@ test("given a release tag, when the candidate is looked up, then only verified r
   assert.match(lookup, /node tools\/release-candidate-evidence\.mjs --verify[\s\S]+--commit "\$GITHUB_SHA"[\s\S]+--version "\$\{GITHUB_REF_NAME#v\}"[\s\S]+--mode release[\s\S]+--archive /,
     "the version comes from the tag, and the downloaded archive must carry the qualified checksum");
   const admission = release.jobs.candidate.steps.find((step) => step.name === "Refuse a tag outside the branch its version belongs to");
-  assert.equal(admission.run.trim(), 'node tools/release-line.mjs admit-tag --tag "$GITHUB_REF_NAME" --commit "$GITHUB_SHA"',
+  assert.match(admission.run, /node tools\/release-line\.mjs admit-tag --tag "\$GITHUB_REF_NAME" --commit "\$GITHUB_SHA" /,
     "a candidate or minor tag must sit on main and a patch tag on its release branch");
   assert.doesNotMatch(lookup, /git fetch --no-tags origin main/, "a patch tag is not on main and never will be");
   assert.ok(release.jobs.candidate.steps.indexOf(admission) < release.jobs.candidate.steps.findIndex((step) => step.id === "find"),
     "the tag is admitted before any evidence is looked up");
-  assert.match(lookup, /Refuse a tag the repository does not record as its release/);
 });
 
 test("given the promoted candidate, when publish addresses an image, then every digest comes from the verified evidence", () => {

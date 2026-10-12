@@ -82,6 +82,7 @@ jobs:
         run: node tools/nightly-release-evidence.mjs --find --branch "$BRANCH" --commit "$COMMIT"
 
       - name: Refuse unresolved nightly failures
+        if: needs.select.outputs.branch == 'main'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

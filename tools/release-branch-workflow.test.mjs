@@ -115,7 +115,8 @@ test("given a pull request into main or a release branch, when the release line 
     assert.match(fetch.run, /git fetch --no-tags origin "\+refs\/pull\/\$NUMBER\/head:refs\/remotes\/pull\/head"/);
     assert.deepEqual(check.env, {
       BASE: "${{ github.event_name == 'pull_request' && github.base_ref || github.ref_name }}",
-      HEAD: "${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || inputs.head }}"
+      HEAD: "${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || inputs.head }}",
+      PULL_REQUEST_BODY: "${{ github.event.pull_request.body }}"
     });
     assert.equal(check.run.trim().split("\n").at(-1),
       'node tools/release-line.mjs pull-request --base "$BASE" --head "$HEAD" --summary "$GITHUB_STEP_SUMMARY"');
@@ -150,10 +151,12 @@ test("given a tag name and a commit, when the admission is dispatched, then it r
     assert.deepEqual(Object.keys(loaded.jobs), ["admission"]);
     assert.doesNotMatch(source, /secrets\.|cosign|gh release|docker\/login-action|imagetools|git push|packages: write|contents: write/,
       "the admission only reads");
-    assert.deepEqual(admit.env, { TAG: "${{ inputs.tag }}", COMMIT: "${{ inputs.commit }}" });
-    assert.equal(admit.run.trim(), 'node tools/release-line.mjs admit-tag --tag "$TAG" --commit "$COMMIT" '
-      + '--summary "$GITHUB_STEP_SUMMARY" --github-output "$GITHUB_OUTPUT"',
-    "the same command release.yml runs for a pushed tag");
+    assert.deepEqual(admit.env, { TAG: "${{ inputs.tag }}", COMMIT: "${{ inputs.commit }}", GH_TOKEN: "${{ github.token }}" });
+    assert.equal(admit.run.trim(), [
+      "published=$(node tools/published-release-tags.mjs)",
+      'node tools/release-line.mjs admit-tag --tag "$TAG" --commit "$COMMIT" --published-tags "$published" '
+        + '--summary "$GITHUB_STEP_SUMMARY" --github-output "$GITHUB_OUTPUT"'
+    ].join("\n"), "the same command release.yml runs for a pushed tag");
     assert.equal(admit["continue-on-error"], true, "every verdict is reported, not only the first refusal");
     assert.equal(evidence.run.trim(), 'node tools/nightly-release-evidence.mjs --find --branch "$BRANCH" --commit "$COMMIT"',
       "the same lookup the candidate's preconditions run");
@@ -167,7 +170,77 @@ test("given a tag name and a commit, when the admission is dispatched, then it r
     assert.deepEqual(verdict.env, { ADMISSION: "${{ steps.admit.outcome }}", EVIDENCE: "${{ steps.evidence.outcome }}" });
     assert.match(verdict.run, /test "\$ADMISSION" = success\ntest "\$EVIDENCE" = success/,
       "a refused tag or missing evidence turns the run red after every check reported");
+    assert.match(verdict.run, /case "\$EVIDENCE" in\n\s+skipped\) evidence="not looked up, because the tag names no release line" ;;/,
+      "a skipped lookup is reported as skipped, not as an empty outcome");
     for (const step of job.steps.filter((candidate) => candidate.run)) {
       assert.doesNotMatch(step.run, /\$\{\{/, `${step.name} reads its values through env`);
     }
   });
+
+test("given a pushed tag, when the release admits it, then published releases decide the line and whether it becomes latest",
+  () => {
+    // given
+    const release = workflow("release.yml");
+    const candidate = release.jobs.candidate;
+    const admit = candidate.steps.find((step) => step.id === "admit");
+    const publishSteps = release.jobs.publish.steps;
+    const draft = publishSteps.find((step) => String(step.uses).startsWith("softprops/action-gh-release@"));
+    const visible = publishSteps.find((step) => step.name === "Publish the GitHub release");
+
+    // when / then
+    assert.equal(admit.name, "Refuse a tag outside the branch its version belongs to");
+    assert.deepEqual(admit.env, { GH_TOKEN: "${{ github.token }}" });
+    assert.equal(admit.run.trim(), [
+      "published=$(node tools/published-release-tags.mjs)",
+      'node tools/release-line.mjs admit-tag --tag "$GITHUB_REF_NAME" --commit "$GITHUB_SHA" '
+        + '--published-tags "$published" --github-output "$GITHUB_OUTPUT"'
+    ].join("\n"));
+    assert.equal(candidate.outputs.latest, "${{ steps.admit.outputs.latest }}");
+    assert.equal(candidate.steps.find((step) => step.name === "Refuse a tag the repository does not record as its release"),
+      undefined, "the admission's manifest verdict reads the same file at the same commit");
+    assert.equal(draft.with.make_latest, "false", "a draft cannot be latest, so the release decides it when it turns visible");
+    assert.deepEqual(visible.env, { GH_TOKEN: "${{ github.token }}", LATEST: "${{ needs.candidate.outputs.latest }}" });
+    assert.equal(visible.run.trim(),
+      'gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft=false --latest="$LATEST"');
+  });
+
+test("given a push to a branch named like a release line, when release-please starts, then only release/<major>.<minor> passes",
+  () => {
+    // given
+    const loaded = workflow("release-please.yml");
+    const guard = loaded.jobs["release-please"].steps.find((step) => step.name === "Refuse a branch that is no release line");
+
+    // when / then
+    assert.deepEqual(triggersOf(loaded).push.branches, ["main", "release/[0-9]*.[0-9]*"]);
+    assert.deepEqual(guard.env, { BRANCH: "${{ github.ref_name }}" });
+    assert.match(guard.run, /\[\[ "\$BRANCH" == main \|\| "\$BRANCH" =~ \^release\/\(0\|\[1-9\]\[0-9\]\*\)\\\.\(0\|\[1-9\]\[0-9\]\*\)\$ \]\]/);
+    assert.ok(loaded.jobs["release-please"].steps.indexOf(guard) < loaded.jobs["release-please"].steps.findIndex(
+      (step) => step.id === "release"), "the token is not used for a branch the guard refuses");
+  });
+
+test("given a release pull request's body, when the release line runs, then the tool reads it from the event", () => {
+  // given
+  const check = workflow("release-line.yml").jobs["release-line"].steps
+    .find((step) => step.name === "Check the release line and its forward ports");
+
+  // when / then
+  assert.equal(check.env.PULL_REQUEST_BODY, "${{ github.event.pull_request.body }}",
+    "a commit override in the body is refused, because release-please would read it and git does not carry it");
+});
+
+test("given a patch candidate, when its preconditions run, then main's nightly failures do not hold it", () => {
+  // given
+  const failures = workflow("release-candidate.yml").jobs.preconditions.steps
+    .find((step) => step.name === "Refuse unresolved nightly failures");
+
+  // when / then
+  assert.equal(failures.if, "needs.select.outputs.branch == 'main'",
+    "the tracker files scheduled failures of main; a patch is held by its own branch's complete evidence instead");
+});
+
+test("given a build dispatched on a release branch, when the nightly image runs, then it plans no registry retention", () => {
+  // when / then
+  assert.equal(workflow("nightly-image.yml").jobs["retention-plan"].if,
+    "github.event_name == 'workflow_dispatch' && inputs.publish != true && !startsWith(github.ref, 'refs/heads/release/')",
+    "retention belongs to main's nightly tags; a patch build only qualifies its image");
+});

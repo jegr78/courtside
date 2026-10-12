@@ -26,6 +26,7 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+      - uses: ./.github/actions/tool-dependencies
 
       - id: admit
         name: Admit the tag as release.yml does
@@ -33,9 +34,10 @@ jobs:
         env:
           TAG: ${{ inputs.tag }}
           COMMIT: ${{ inputs.commit }}
-        run: >
-          node tools/release-line.mjs admit-tag --tag "$TAG" --commit "$COMMIT"
-          --summary "$GITHUB_STEP_SUMMARY" --github-output "$GITHUB_OUTPUT"
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          published=$(node tools/published-release-tags.mjs)
+          node tools/release-line.mjs admit-tag --tag "$TAG" --commit "$COMMIT" --published-tags "$published" --summary "$GITHUB_STEP_SUMMARY" --github-output "$GITHUB_OUTPUT"
 
       - name: Find the nightly evidence on that branch
         id: evidence
@@ -53,6 +55,10 @@ jobs:
           ADMISSION: ${{ steps.admit.outcome }}
           EVIDENCE: ${{ steps.evidence.outcome }}
         run: |
-          echo "tag admission: $ADMISSION, nightly evidence: ${EVIDENCE:-not looked up}" | tee -a "$GITHUB_STEP_SUMMARY"
+          case "$EVIDENCE" in
+            skipped) evidence="not looked up, because the tag names no release line" ;;
+            *) evidence="$EVIDENCE" ;;
+          esac
+          echo "tag admission: $ADMISSION, nightly evidence: $evidence" | tee -a "$GITHUB_STEP_SUMMARY"
           test "$ADMISSION" = success
           test "$EVIDENCE" = success

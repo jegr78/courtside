@@ -562,3 +562,23 @@ test("given the workflows a release runs, when their tooling is listed, then eve
     "path: tools/README.md"
   ]), ["tools/nightly-release-evidence.mjs", "tools/release-line.mjs"]);
 });
+
+test("given a candidate tag nobody cut, when it is admitted, then the version the commit records refuses it", () => {
+  // given
+  const repository = gitRepository();
+  const { git, commit, manifest } = repository;
+  try {
+    manifest("0.1.0-rc.2");
+    const recorded = commit("chore(main): release 0.1.0-rc.2");
+    const admit = (tag) => tagAdmission({ git, tag, commit: recorded, refOf, published: [] })
+      .find(({ check }) => check === "manifest");
+
+    // when / then
+    assert.equal(admit("v0.1.0-rc.2").accepted, true, "the tag release-please cut from this manifest is admitted");
+    assert.deepEqual(admit("v0.1.0-rc.7"), { check: "manifest", accepted: false,
+      detail: `v0.1.0-rc.7 names 0.1.0-rc.7, but ${recorded} records 0.1.0-rc.2` },
+    "a candidate nobody released is refused, although its release line exists");
+  } finally {
+    repository.remove();
+  }
+});
