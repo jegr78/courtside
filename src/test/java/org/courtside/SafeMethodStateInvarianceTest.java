@@ -55,7 +55,6 @@ import java.util.TreeSet;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static java.util.Map.entry;
@@ -69,10 +68,6 @@ class SafeMethodStateInvarianceTest extends AbstractIntegrationTest {
     private static final String DOCUMENT = "/api/openapi.yaml";
 
     private static final Set<String> SAFE_METHODS = Set.of("get", "head", "options");
-
-    private static final List<String> SECURITY_HEADERS = List.of("Content-Security-Policy",
-            "X-Content-Type-Options", "X-Frame-Options", "Referrer-Policy", "Cache-Control", "Pragma",
-            "Expires");
 
     private static final Pattern TEMPLATED_SEGMENT = Pattern.compile("\\{([^}]+)}");
 
@@ -373,9 +368,10 @@ class SafeMethodStateInvarianceTest extends AbstractIntegrationTest {
                 failures.add("HEAD " + uri + " answered " + head.statusCode()
                         + " where GET answered " + read.statusCode());
             }
-            if (!securityHeaders(head).equals(securityHeaders(read))) {
-                failures.add("HEAD " + uri + " carried " + securityHeaders(head)
-                        + " where GET carried " + securityHeaders(read));
+            Map<String, String> headHeaders = ApplicationResponseHeaders.comparable(head.headers());
+            Map<String, String> readHeaders = ApplicationResponseHeaders.comparable(read.headers());
+            if (!headHeaders.equals(readHeaders)) {
+                failures.add("HEAD " + uri + " carried " + headHeaders + " where GET carried " + readHeaders);
             }
             HttpResponse<byte[]> options = send("OPTIONS", uri);
             if (options.statusCode() != ANSWERED) {
@@ -503,11 +499,6 @@ class SafeMethodStateInvarianceTest extends AbstractIntegrationTest {
                     .isEmpty();
         }
         return resolved + (probe.query().isEmpty() ? "" : "?" + probe.query());
-    }
-
-    private static Map<String, List<String>> securityHeaders(HttpResponse<byte[]> response) {
-        return SECURITY_HEADERS.stream().collect(Collectors.toMap(name -> name,
-                name -> response.headers().allValues(name), (first, second) -> first, TreeMap::new));
     }
 
     private HttpResponse<byte[]> send(String method, String uri) throws Exception {

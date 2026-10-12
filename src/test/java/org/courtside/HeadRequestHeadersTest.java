@@ -1,7 +1,9 @@
 package org.courtside;
 
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -18,41 +20,18 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
-import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class HeadRequestHeadersTest extends AbstractIntegrationTest {
 
-    private static final String CONTENT_SECURITY_POLICY = "content-security-policy";
-
-    private static final String CACHE_CONTROL = "cache-control";
-
-    private static final Map<String, String> FIXED_HEADERS = Map.of(
-            CONTENT_SECURITY_POLICY, "default-src 'self'; object-src 'none'; img-src 'self' https:; "
-                    + "style-src 'self'; script-src 'self'; connect-src 'self'; "
-                    + "manifest-src 'self'; worker-src 'self'; "
-                    + "frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
-            "x-content-type-options", "nosniff",
-            "x-frame-options", "DENY",
-            "referrer-policy", "strict-origin-when-cross-origin");
-
-    private static final Map<String, String> UNCACHED = Map.of(
-            CACHE_CONTROL, "no-cache, no-store, max-age=0, must-revalidate",
-            "pragma", "no-cache",
-            "expires", "0");
-
     private static final List<String> API_READS = List.of("/api/public/config", "/api/openapi.yaml");
 
-    private static final JsonNode INVENTORY = new ObjectMapper().readTree(
-            read(Path.of("security/published-web-resources.json")));
-
-    private static final Path BUILD = createBuild();
+    private static final Path BUILD = TestApplicationBuild.create();
 
     private final HttpClient anonymous = HttpClient.newHttpClient();
 
@@ -60,27 +39,50 @@ class HeadRequestHeadersTest extends AbstractIntegrationTest {
     private int port;
 
     @Autowired
-    private List<SimpleUrlHandlerMapping> urlMappings;
+    @Qualifier("applicationShellMapping")
+    private SimpleUrlHandlerMapping shellMapping;
 
     @DynamicPropertySource
     static void serveTheBuild(DynamicPropertyRegistry registry) {
-        registry.add("spring.web.resources.static-locations", () -> BUILD.toUri().toString());
+        registry.add(TestApplicationBuild.STATIC_LOCATIONS, () -> BUILD.toUri().toString());
+    }
+
+    @AfterAll
+    static void removeTheBuild() {
+        TestApplicationBuild.delete(BUILD);
     }
 
     @Test
-    void whenAClientRouteIsRequestedWithHead_thenItCarriesTheSecurityAndCacheHeadersOfGet() {
+    void whenAClientRouteIsRequestedWithHead_thenItAnswersWithEveryHeaderOfGet() {
         // given
         List<String> routes = shellRoutes();
 
         // when / then
-        assertThat(routes).as("the shell routes the view controllers forward").contains("/", "/my-bookings");
+        assertThat(routes).as("the shell routes").contains("/", "/my-bookings");
         assertThat(routes).allSatisfy(route -> answersHeadLikeGet(route, true));
     }
 
     @Test
-    void whenABuiltFileIsRequestedWithHead_thenItCarriesTheSecurityAndCacheHeadersOfGet() {
+    void whenAClientRouteIsRequestedWithGet_thenItAnswersExactlyAsTheShellDocumentDoes() {
         // given
-        List<String> files = staticPaths();
+        HttpResponse<String> document = send("GET", "/index.html");
+        Map<String, String> expected = new TreeMap<>(headers(document));
+        expected.put("content-language", "de");
+
+        // when / then
+        assertThat(shellRoutes()).allSatisfy(route -> {
+            HttpResponse<String> shell = send("GET", route);
+            assertThat(shell.body()).as("GET %s serves the shell document", route).isEqualTo(document.body());
+            assertThat(headers(shell))
+                    .as("GET %s carries the headers of GET /index.html and the locale a rendered view stated", route)
+                    .isEqualTo(expected);
+        });
+    }
+
+    @Test
+    void whenABuiltFileIsRequestedWithHead_thenItAnswersWithEveryHeaderOfGet() {
+        // given
+        List<String> files = TestApplicationBuild.staticPaths();
 
         // when / then
         assertThat(files).as("the inventoried build files").contains("/index.html", "/icon.svg");
@@ -88,10 +90,9 @@ class HeadRequestHeadersTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void whenAServedResourceOrAnApiReadIsRequestedWithHead_thenItCarriesTheSecurityHeadersOfGet() {
+    void whenAServedResourceOrAnApiReadIsRequestedWithHead_thenItAnswersWithEveryHeaderOfGet() {
         // given
-        List<String> served = INVENTORY.get("servedResources").values().stream()
-                .map(resource -> resource.get("path").asString()).toList();
+        List<String> served = servedResources();
 
         // when / then
         assertThat(served).as("the inventoried metadata resources").contains("/manifest.webmanifest");
@@ -103,42 +104,35 @@ class HeadRequestHeadersTest extends AbstractIntegrationTest {
         HttpResponse<String> get = send("GET", path);
         HttpResponse<String> head = send("HEAD", path);
         assertThat(get.statusCode()).as("GET %s is served", path).isEqualTo(200);
-        assertThat(head.statusCode()).as("HEAD %s answers as GET does", path).isEqualTo(200);
-        assertThat(headers(get, FIXED_HEADERS.keySet().stream().toList()))
-                .as("GET %s carries the application's security headers", path)
-                .isEqualTo(new TreeMap<>(FIXED_HEADERS));
+        assertThat(headers(get)).as("GET %s carries the application's security headers", path)
+                .containsAllEntriesOf(ApplicationResponseHeaders.SECURITY);
         if (uncached) {
-            assertThat(headers(get, UNCACHED.keySet().stream().toList()))
-                    .as("GET %s forbids caching", path).isEqualTo(new TreeMap<>(UNCACHED));
+            assertThat(headers(get)).as("GET %s forbids caching", path).containsAllEntriesOf(ApplicationResponseHeaders.UNCACHED);
         }
-        List<String> compared = List.of(CONTENT_SECURITY_POLICY, "x-content-type-options",
-                "x-frame-options", "referrer-policy", CACHE_CONTROL, "pragma", "expires");
-        assertThat(headers(head, compared)).as("HEAD %s carries the security and cache headers of GET", path)
-                .isEqualTo(headers(get, compared));
+        assertThat(head.statusCode()).as("HEAD %s answers as GET does", path).isEqualTo(200);
+        assertThat(headers(head)).as("HEAD %s carries every header of GET", path).isEqualTo(headers(get));
     }
 
-    private static Map<String, String> headers(HttpResponse<String> response, List<String> names) {
-        return names.stream().collect(Collectors.toMap(name -> name,
-                name -> String.join(" | ", response.headers().allValues(name)), (a, b) -> a, TreeMap::new));
+    private static Map<String, String> headers(HttpResponse<String> response) {
+        return ApplicationResponseHeaders.comparable(response.headers());
     }
 
     private List<String> shellRoutes() {
-        return urlMappings.stream()
-                .min(Comparator.comparingInt(SimpleUrlHandlerMapping::getOrder))
-                .orElseThrow()
-                .getUrlMap()
-                .keySet()
-                .stream()
+        return shellMapping.getUrlMap().keySet().stream()
                 .map(route -> route.replaceAll("\\{[^}]+}", "probe"))
                 .sorted()
                 .toList();
     }
 
-    private static List<String> staticPaths() {
-        return INVENTORY.get("anonymousStaticPaths").values().stream()
-                .map(pattern -> pattern.asString().replace("**", "probe.js").replace("*", "probe"))
-                .sorted()
-                .toList();
+    private static List<String> servedResources() {
+        try {
+            JsonNode inventory = new ObjectMapper().readTree(
+                    Files.readString(Path.of("security/published-web-resources.json")));
+            return inventory.get("servedResources").values().stream()
+                    .map(resource -> resource.get("path").asString()).toList();
+        } catch (IOException exception) {
+            throw new UncheckedIOException(exception);
+        }
     }
 
     private HttpResponse<String> send(String method, String path) {
@@ -151,28 +145,6 @@ class HeadRequestHeadersTest extends AbstractIntegrationTest {
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException(exception);
-        }
-    }
-
-    private static Path createBuild() {
-        try {
-            Path build = Files.createTempDirectory(Files.createDirectories(Path.of("target")), "head-build");
-            for (String path : staticPaths()) {
-                Path file = build.resolve(path.substring(1));
-                Files.createDirectories(file.getParent());
-                Files.writeString(file, "built " + path);
-            }
-            return build;
-        } catch (IOException exception) {
-            throw new UncheckedIOException(exception);
-        }
-    }
-
-    private static String read(Path path) {
-        try {
-            return Files.readString(path);
-        } catch (IOException exception) {
-            throw new UncheckedIOException(exception);
         }
     }
 }

@@ -20,7 +20,6 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
@@ -77,7 +76,8 @@ class PublishedWebSurfaceTest extends AbstractIntegrationTest {
     private RequestMappingHandlerMapping controllerMappings;
 
     @Autowired
-    private List<SimpleUrlHandlerMapping> urlMappings;
+    @Qualifier("applicationShellMapping")
+    private SimpleUrlHandlerMapping shellMapping;
 
     @Autowired
     private PathMappedEndpoints actuatorEndpoints;
@@ -202,13 +202,7 @@ class PublishedWebSurfaceTest extends AbstractIntegrationTest {
     }
 
     private Set<String> shellRoutes() {
-        return urlMappings.stream()
-                .min(Comparator.comparingInt(SimpleUrlHandlerMapping::getOrder))
-                .orElseThrow()
-                .getUrlMap()
-                .keySet()
-                .stream()
-                .collect(Collectors.toCollection(TreeSet::new));
+        return new TreeSet<>(shellMapping.getUrlMap().keySet());
     }
 
     private Set<String> permittedPaths() {

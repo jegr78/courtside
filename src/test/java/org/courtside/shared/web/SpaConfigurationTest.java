@@ -1,18 +1,24 @@
 package org.courtside.shared.web;
 
 import org.courtside.AbstractIntegrationTest;
+import org.courtside.TestApplicationBuild;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
+import java.nio.file.Path;
+
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.forwardedUrl;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.hamcrest.Matchers.allOf;
@@ -21,10 +27,24 @@ import static org.hamcrest.Matchers.not;
 
 class SpaConfigurationTest extends AbstractIntegrationTest {
 
+    private static final Path BUILD = TestApplicationBuild.create();
+
+    private static final String SHELL = "built /index.html";
+
     @Autowired
     private WebApplicationContext context;
 
     private MockMvc mockMvc;
+
+    @DynamicPropertySource
+    static void serveTheBuild(DynamicPropertyRegistry registry) {
+        registry.add(TestApplicationBuild.STATIC_LOCATIONS, () -> BUILD.toUri().toString());
+    }
+
+    @AfterAll
+    static void removeTheBuild() {
+        TestApplicationBuild.delete(BUILD);
+    }
 
     @BeforeEach
     void setUp() {
@@ -36,7 +56,8 @@ class SpaConfigurationTest extends AbstractIntegrationTest {
         // when / then
         mockMvc.perform(get("/login"))
                 .andExpect(status().isOk())
-                .andExpect(forwardedUrl("/index.html"))
+                .andExpect(content().contentType("text/html"))
+                .andExpect(content().string(SHELL))
                 .andExpect(header().string("X-Content-Type-Options", "nosniff"))
                 .andExpect(header().string("X-Frame-Options", "DENY"))
                 .andExpect(header().string("Referrer-Policy", "strict-origin-when-cross-origin"))
@@ -63,7 +84,8 @@ class SpaConfigurationTest extends AbstractIntegrationTest {
         // when / then
         mockMvc.perform(get("/courts"))
                 .andExpect(status().isOk())
-                .andExpect(forwardedUrl("/index.html"));
+                .andExpect(content().contentType("text/html"))
+                .andExpect(content().string(SHELL));
     }
 
     @Test
@@ -71,7 +93,8 @@ class SpaConfigurationTest extends AbstractIntegrationTest {
         // when / then
         mockMvc.perform(get("/my-bookings"))
                 .andExpect(status().isOk())
-                .andExpect(forwardedUrl("/index.html"));
+                .andExpect(content().contentType("text/html"))
+                .andExpect(content().string(SHELL));
     }
 
     @Test
@@ -80,7 +103,8 @@ class SpaConfigurationTest extends AbstractIntegrationTest {
         // when / then
         mockMvc.perform(get("/account/security"))
                 .andExpect(status().isOk())
-                .andExpect(forwardedUrl("/index.html"));
+                .andExpect(content().contentType("text/html"))
+                .andExpect(content().string(SHELL));
     }
 
     @ParameterizedTest
@@ -94,6 +118,7 @@ class SpaConfigurationTest extends AbstractIntegrationTest {
         // when / then
         mockMvc.perform(get(route))
                 .andExpect(status().isOk())
-                .andExpect(forwardedUrl("/index.html"));
+                .andExpect(content().contentType("text/html"))
+                .andExpect(content().string(SHELL));
     }
 }

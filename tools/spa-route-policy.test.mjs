@@ -10,7 +10,7 @@ const ts = frontendRequire("typescript");
 
 const ROUTER = `${repository}frontend/src/App.tsx`;
 const MOUNTED_ROUTERS = { "/admin": `${repository}frontend/src/views/AdminRoutes.tsx` };
-const VIEW_CONTROLLERS = `${repository}src/main/java/org/courtside/shared/web/SpaConfiguration.java`;
+const SHELL_ROUTES = `${repository}src/main/java/org/courtside/shared/web/SpaConfiguration.java`;
 const SHELL_ACCESS = `${repository}src/main/java/org/courtside/identity/internal/SecurityConfiguration.java`;
 
 // React names a path parameter :personId and Spring names it {personId}, so the two sides say the
@@ -35,7 +35,7 @@ test("given the router, when reading its routes, then the wildcard is not one of
 });
 
 // Administration is a layout route with its destinations nested inside it, so a child path is
-// written relative to its parent and only the two together name the route the server must forward.
+// written relative to its parent and only the two together name the route the server must serve.
 test("given nested routes, when reading them, then a child is read together with its parent", () => {
   // given
   const source = 'const a = <Routes><Route path="/admin" element={<Shell />}>'
@@ -50,7 +50,7 @@ test("given nested routes, when reading them, then a child is read together with
 });
 
 // The walk used to stop at an element's children, so a route inside an attribute of that element
-// was invisible to the gate and would have reached a server that never forwards it.
+// was invisible to the gate and would have reached a server that never serves it.
 test("given a route inside an element attribute, when reading the routes, then the gate still sees it", () => {
   // given
   const source = 'const a = <Routes><Route path="/admin" element={<Guard><Route path="hidden" element={<X />} /></Guard>}>'
@@ -80,11 +80,11 @@ test("given the application router, when it mounts another router, then the gate
     "a splat route whose router the gate does not read hides every route beneath it");
 });
 
-test("given a client route, when the server serves the shell, then it forwards to the application", () => {
+test("given a client route, when the server is asked for it, then it serves the application shell", () => {
   // when / then
   assert.deepEqual(
     applicationRoutes().map(asServerPath).toSorted(),
-    forwardedRoutes(readFileSync(VIEW_CONTROLLERS, "utf8")).toSorted()
+    shellRoutes(readFileSync(SHELL_ROUTES, "utf8")).toSorted()
   );
 });
 
@@ -157,8 +157,10 @@ function routePath(element) {
   return value && ts.isStringLiteral(value) ? value.text : undefined;
 }
 
-function forwardedRoutes(source) {
-  return [...source.matchAll(/addViewController\("([^"]+)"\)/g)].map((match) => match[1]);
+function shellRoutes(source) {
+  const declaration = source.match(/SHELL_ROUTES = List\.of\(([^;]*)\);/s);
+  assert.ok(declaration, "the server declares the shell routes as one list");
+  return [...declaration[1].matchAll(/"([^"]+)"/g)].map((match) => match[1]);
 }
 
 function permittedPaths(source) {
