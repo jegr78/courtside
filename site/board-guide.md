@@ -34,6 +34,12 @@ Buchungsart und lade weitere Treffer seitenweise nach. Geladene Termine derselbe
 eingeklappt zusammengefasst. *Details* bleibt direkt erreichbar; *Stornieren* liegt unter
 *Aktionen*. Neue Serien legst du am Anfang der Seite an.
 
+Stornierst du den Termin einer anderen Person, kannst du einen Grund wählen: Zustand des Platzes,
+Wetter, Veranstaltung des Vereins, Wartungsarbeiten oder ein anderer Grund. Die Person, die gebucht
+hat, und die Mitspieler erfahren den Grund. Ein Freitext ist nicht vorgesehen. Stornierst oder
+verlegst du Termine einer fremden Serie, bekommt die Person, der die Serie gehört, eine einzige
+Nachricht über alle betroffenen Termine.
+
 ## Die Übersicht
 
 Die Verwaltung öffnet mit der *Übersicht*. Sie zeigt die heutigen Buchungen und die, die noch

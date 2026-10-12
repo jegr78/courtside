@@ -203,8 +203,8 @@ Buchungen unter den bevorstehenden. So verdrängt sie keine Buchung, die noch gi
 sie bei den vergangenen Buchungen.
 
 Wer in der Buchung als Mitspieler eingetragen ist, erfährt von der Stornierung. Storniert der Verein
-deine Buchung, erfährst du es ebenfalls. Die Nachricht nennt keinen Grund, den erfährst du beim
-Verein.
+deine Buchung, erfährst du es ebenfalls. Hat der Verein einen Grund gewählt, nennt die Nachricht ihn.
+Sonst erfährst du ihn beim Verein.
 
 ![Bevorstehende Buchungen mit der Schaltfläche zum Stornieren, die vergangenen eingeklappt darunter.](screenshots/de/my-bookings.png)
 
@@ -222,6 +222,8 @@ Beachte dabei:
 * Vor einer Verschiebung zeigt Courtside die betroffenen Termine und mögliche Konflikte.
 * Serien enthalten keine Spielerlisten. Im Platzplan erscheinen sie als belegte Zeit.
 * Nach dem Anlegen bekommst du eine Zusammenfassung der Serie statt einer Bestätigung pro Termin.
+* Storniert oder verlegt der Verein Termine deiner Serie, bekommst du eine Nachricht über alle
+  betroffenen Termine.
 
 ![Das Formular für eine Terminserie mit Plätzen, Buchungsart, Zeitraum und Wochentagen.](screenshots/de/series-form.png)
 
@@ -257,7 +259,8 @@ Diese Nachrichten sendet Courtside immer:
 * Zugangsdaten für ein neues oder zurückgesetztes Konto,
 * Mitteilung über deine Eintragung als Mitspieler,
 * Mitteilung über eine Änderung, die deine Buchung betrifft,
-* Mitteilung, dass der Verein eine Buchung storniert hat, die dich betrifft.
+* Mitteilung, dass der Verein eine Buchung storniert hat, die dich betrifft,
+* Mitteilung, dass der Verein Termine deiner Serie storniert oder verlegt hat.
 
 Getrennt davon entscheidest du, ob du zusätzlich eine E-Mail bekommst. Ohne E-Mail stehen deine
 Nachrichten weiter hier. Von deiner Eintragung als Mitspieler, einer Änderung an deiner Buchung oder

@@ -34,6 +34,11 @@ further matches page by page. Loaded occurrences of one series start grouped and
 *Details* remains directly available; *Cancel* sits under *Actions*. Create a new series at the top
 of the page.
 
+When you cancel somebody else's appointment, you may choose a reason: court condition, weather, club
+event, maintenance work or another reason. The member who booked and the players are told it. There
+is no free text. When you cancel or move dates of somebody else's series, its holder receives one
+message covering every affected date.
+
 ## The overview
 
 Administration opens on the *Overview*. It shows today's bookings and the ones still to come, the

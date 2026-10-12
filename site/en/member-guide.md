@@ -201,7 +201,8 @@ upcoming ones, so it never pushes a booking that still stands down the list. Aft
 find it among your past bookings.
 
 Members recorded as players in the booking learn of the cancellation. If the club cancels your
-booking, you learn of it as well. The message gives no reason. Ask the club for it.
+booking, you learn of it as well. If the club chose a reason, the message names it. Otherwise ask
+the club.
 
 ![Upcoming bookings with the cancellation button, the past ones folded away below them.](../screenshots/en/my-bookings.png)
 
@@ -219,6 +220,7 @@ Keep these rules in mind:
 * Before a move, Courtside shows the affected bookings and any conflicts.
 * A series contains no player list. It appears as occupied time in the court plan.
 * Once the series exists, you receive one summary of it instead of a confirmation per date.
+* If the club cancels or moves dates of your series, you receive one message covering all of them.
 
 ![The series form with courts, booking type, period and weekdays.](../screenshots/en/series-form.png)
 
@@ -254,7 +256,8 @@ Courtside always sends:
 * credentials for a new or reset account,
 * notice that somebody added you as a player,
 * notice of a change that affects your booking,
-* notice that the club cancelled a booking that concerns you.
+* notice that the club cancelled a booking that concerns you,
+* notice that the club cancelled or moved dates of your series.
 
 Separately, you choose whether you also get an email. Without email your messages still appear
 here. You then learn only here that somebody added you as a player, that a change affects your
