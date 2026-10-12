@@ -86,17 +86,20 @@ test("given a dispatch on any ref, when the candidate runs, then nothing reads t
   }
 });
 
-test("given the rehearsal pipeline, when it runs, then it can be dispatched only and writes no tag or release", () => {
+test("given the candidate pipeline, when it runs, then no job but the tag job writes a tag or release", () => {
+  // given
+  const qualifying = Object.fromEntries(Object.entries(jobs).filter(([name]) => name !== "tag"));
+  const qualifyingSource = yaml.dump(qualifying, { lineWidth: -1 });
+
   // when / then
-  assert.deepEqual(Object.keys(candidate.on), ["workflow_dispatch"]);
+  assert.deepEqual(Object.keys(candidate.on), ["workflow_run", "workflow_dispatch"]);
   assert.equal(candidate.on.workflow_dispatch.inputs.commit.required, true);
   assert.equal(candidate.on.workflow_dispatch.inputs.rehearsal.default, true,
-    "until the promotion reads candidates, every dispatch is a rehearsal unless someone says otherwise");
-  assert.equal(jobs.tag, undefined);
+    "a dispatch is a rehearsal unless someone says otherwise");
   assert.deepEqual(candidate.permissions, {});
   for (const forbidden of [/RELEASE_PLEASE_TOKEN/, /release-please-action/, /git\/refs/, /action-gh-release/,
     /gh release/, /contents: write/, /imagetools create/]) {
-    assert.doesNotMatch(source, forbidden, `the candidate must not ${forbidden}`);
+    assert.doesNotMatch(qualifyingSource, forbidden, `a qualifying job must not ${forbidden}`);
   }
 });
 
@@ -109,7 +112,10 @@ test("given a dispatch, when the candidate selects, then the selection tool deci
   assert.match(selection.run, /--event "\$EVENT" --commit "\$REQUESTED_COMMIT" --rehearsal "\$REHEARSAL"/);
   assert.match(selection.run, /--github-output "\$GITHUB_OUTPUT"/);
   assert.deepEqual(selection.env, { GH_TOKEN: "${{ github.token }}", EVENT: "${{ github.event_name }}",
-    REQUESTED_COMMIT: "${{ inputs.commit }}", REHEARSAL: "${{ inputs.rehearsal }}" });
+    REQUESTED_COMMIT: "${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || inputs.commit }}",
+    REHEARSAL: "${{ inputs.rehearsal }}" });
+  assert.equal(jobs.select.if, "github.event_name == 'workflow_dispatch' || (github.event.workflow_run.event == 'push' && "
+    + "github.event.workflow_run.conclusion == 'success')", "a red or scheduled build costs no candidate runner");
   for (const output of ["release", "commit", "version", "tag", "rehearsal", "build-run-id", "build-run-attempt"]) {
     assert.equal(jobs.select.outputs[output], `\${{ steps.selection.outputs.${output} }}`);
   }
@@ -126,14 +132,12 @@ test("given a candidate, when its preconditions run, then a nightly verified an 
   const gate = jobText("preconditions");
 
   // when / then
-  assert.match(gate, /actions\/workflows\/build\.yml\/runs\?branch=\$\{DEFAULT_BRANCH\}&status=success/);
-  assert.match(gate, /select\(\.event == "schedule" or \.event == "workflow_dispatch"\)/);
-  assert.match(gate, /select\(\.run_attempt == 1\)/);
-  assert.match(gate, /git merge-base --is-ancestor "\$head" "\$COMMIT"/);
-  assert.match(gate, /nightly-release-evidence-\$\{id\}-1/);
-  assert.match(gate, /node tools\/nightly-release-evidence\.mjs/);
-  assert.ok(gate.indexOf("gh run download") < gate.indexOf("node tools/nightly-release-evidence.mjs"));
-  assert.match(gate, /no green first-attempt build with a completed nightly release rehearsal verified a commit this candidate builds on/);
+  const nightly = jobs.preconditions.steps.find((step) => step.name === "Demand a nightly that verified this release");
+  assert.equal(nightly.run.trim(),
+    'node tools/nightly-release-evidence.mjs --find --branch "$BRANCH" --commit "$COMMIT"');
+  assert.deepEqual(nightly.env, { BRANCH: "${{ needs.select.outputs.branch }}", GH_TOKEN: "${{ github.token }}" },
+    "a patch reads the nightly evidence of its own release branch, main's releases still read main");
+  assert.equal(jobs.select.outputs.branch, "${{ steps.selection.outputs.branch }}");
   assert.match(gate, /issues\?state=open&labels=nightly&per_page=100/);
   assert.match(gate, /courtside-nightly-fingerprint/);
   assert.match(gate, /select\(\.body \| contains\("- Workflow: `npm audit`"\) \| not\)/);
@@ -255,6 +259,9 @@ test("given a qualified candidate, when the gates run, then they bind its exact 
   const download = gates["active-security"].steps.find((entry) =>
     entry.with?.name === "${{ inputs.qualification-artifact-prefix }}amd64");
   assert.equal(download.with.path, "build/uat-smoke");
+  const assessment = gates["active-security"].steps.find((entry) => String(entry.run).includes("security-run"));
+  assert.match(assessment.run, /--qualification build\/uat-smoke\/qualification\.json/,
+    "the active assessment reads the qualification where the download puts it");
   assert.equal(jobs.qualify.steps.find((entry) => entry.with?.name === "image-qualification-${{ matrix.architecture }}")
     .with.path.trim(), "build/uat-smoke", "the qualification artifact is rooted where the active assessment reads it");
 });

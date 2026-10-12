@@ -4,10 +4,10 @@ name: release-please
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'release/[0-9]*.[0-9]*']
 
 concurrency:
-  group: release-please
+  group: release-please-${{ github.ref }}
   cancel-in-progress: false
 
 # The action authenticates with the PAT for every call it makes, so the run needs nothing of its own.
@@ -18,24 +18,32 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      # A tag pushed with GITHUB_TOKEN triggers no workflow, so a release cut without the PAT
-      # would carry no image, no signature and no qualification.
-      - name: Refuse to cut a release without the token that starts its pipeline
+      # A pull request opened with GITHUB_TOKEN starts no checks, so its release could never merge.
+      - name: Refuse to open a release pull request without the token that starts its checks
         if: env.RELEASE_PLEASE_TOKEN == ''
         env:
           RELEASE_PLEASE_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
         run: |
           echo "::error::RELEASE_PLEASE_TOKEN is not set. release-please would open a release" \
-            "pull request whose checks never run, and merging it would push a tag that starts" \
-            "no release pipeline. Add the fine-grained PAT that docs/security-risks.md scopes."
+            "pull request whose checks never run. Add the fine-grained PAT that" \
+            "docs/security-risks.md scopes."
           exit 1
+
+      - name: Refuse a branch that is no release line
+        env:
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          [[ "$BRANCH" == main || "$BRANCH" =~ ^release/(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] \
+            || { echo "::error::$BRANCH is neither main nor release/<major>.<minor>"; exit 1; }
 
       - id: release
         uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5
         with:
           token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+          target-branch: ${{ github.ref_name }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+          skip-github-release: true
 
       - name: Validate the release pull request branch
         if: steps.release.outputs.prs_created == 'true'

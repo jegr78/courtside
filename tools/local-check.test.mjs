@@ -838,3 +838,70 @@ test("given a full classification, when tasks are planned, then the Docker relea
     assert.deepEqual(localCheckPrerequisites([gate]), { java: true, docker: true }, `${gate} needs Docker`);
   }
 });
+
+test("given a fix for a release line, when collecting evidence, then the change is compared against that branch", () => {
+  // given
+  const calls = [];
+  const changes = gitFor([{ status: "M", path: "site/index.md" }]);
+  const git = (arguments_) => {
+    calls.push(arguments_);
+    return changes(arguments_);
+  };
+
+  // when
+  const evidence = collectLocalChanges(git, "release/0.1");
+  collectLocalChanges(git);
+
+  // then
+  assert.deepEqual(calls.filter((arguments_) => ["fetch", "merge-base"].includes(arguments_[0])), [
+    ["fetch", "--quiet", "--no-tags", "origin", "+refs/heads/release/0.1:refs/remotes/origin/release/0.1"],
+    ["merge-base", "refs/remotes/origin/release/0.1", "HEAD"],
+    ["fetch", "--quiet", "--no-tags", "origin", "+refs/heads/main:refs/remotes/origin/main"],
+    ["merge-base", "refs/remotes/origin/main", "HEAD"]
+  ], "a branch for release/0.1 is verified against release/0.1, and main stays the default");
+  assert.equal(evidence.baseBranch, "release/0.1");
+});
+
+test("given a base that is no release target, when collecting evidence, then git is never asked", () => {
+  // given
+  const calls = [];
+
+  // when / then
+  for (const base of ["feat/booking", "origin/main", "release/0.1.1", "--upload-pack=x"]) {
+    assert.throws(() => collectLocalChanges((arguments_) => calls.push(arguments_), base), /not a release target/);
+  }
+  assert.deepEqual(calls, []);
+});
+
+test("given no change against a release branch, when collecting evidence, then the message names that branch", () => {
+  // when / then
+  const unchanged = gitFor([]);
+  const git = (arguments_) => arguments_.includes("--name-status") ? "" : unchanged(arguments_);
+  assert.throws(() => collectLocalChanges(git, "release/0.1"), /No local changes exist relative to origin\/release\/0\.1/);
+});
+
+test("given a receipt verified against another base branch, when checking it, then verification runs again", () => {
+  // given
+  const expected = { schemaVersion: 2, baseBranch: "release/0.1", baseCommit: "a".repeat(40),
+    headCommit: "b".repeat(40), changeFingerprint: "c".repeat(64), runtimeFingerprint: "d".repeat(64),
+    profiles: ["full"], tasks: ["full-without-browser"], outcome: "running" };
+
+  // when / then
+  assert.equal(reusableLocalCheckResult({ ...expected, outcome: "passed", baseBranch: "main" }, expected), false,
+    "a run against main does not verify the branch's pairing with release/0.1");
+  assert.equal(reusableLocalCheckResult({ ...expected, outcome: "passed" }, expected), true);
+});
+
+test("given a check with a base branch, when executing it, then the record names the branch it was verified against",
+  async () => {
+    // when
+    const record = await executeLocalCheck({ planOnly: true, forceFull: false, base: "release/0.1" }, {
+      git: gitFor([{ status: "M", path: "src/main/java/org/courtside/CourtsideApplication.java" }]),
+      classify: async () => backendPlan(),
+      output: { write: () => {} },
+      writeResult: () => {}
+    });
+
+    // then
+    assert.equal(record.baseBranch, "release/0.1");
+  });

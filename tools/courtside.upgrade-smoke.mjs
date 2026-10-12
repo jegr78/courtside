@@ -82,6 +82,25 @@ export function selectUpgradeOrigins(candidateTag, tags) {
   return [...new Set([...released_, ...candidates])];
 }
 
+// Main carries the next candidate of the line the manifest records, and that candidate's origins bind a migration.
+export function nextReleaseOrigins(recorded, tags) {
+  const version = parseVersion(`v${recorded}`);
+  if (!version) throw new Error(`Recorded version is not a semantic version: ${recorded}`);
+  const counted = /^(.*?)(?:\.(\d+))?$/.exec(version.prerelease ?? "");
+  const next = version.prerelease === null
+    ? `v${version.major}.${version.minor + 1}.0-rc.0`
+    : `v${version.major}.${version.minor}.${version.patch}-${counted[1]}.${Number(counted[2] ?? 0) + 1}`;
+  return selectUpgradeOrigins(next, tags);
+}
+
+export function lineReleaseOrigins(recorded, tags) {
+  const version = parseVersion(`v${recorded}`);
+  if (!version || version.prerelease !== null) {
+    throw new Error(`a release branch records released versions only, not ${recorded}`);
+  }
+  return selectUpgradeOrigins(`v${version.major}.${version.minor}.${version.patch + 1}`, tags);
+}
+
 // A tag whose run never reached publish names no image; resolving an origin from it would pull
 // something that does not exist and block every release of that line.
 export function publishedTags(releases) {
@@ -428,6 +447,16 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   } else if (process.argv[2] === "--nightly-origins") {
     process.stdout.write(`${JSON.stringify(nightlyUpgradeOrigins(process.argv[3], JSON.parse(process.argv[4]),
       gitHistory(process.argv[5])))}\n`);
+  } else if (process.argv[2] === "--pull-request-origins") {
+    const [repository, base, candidate, published] = process.argv.slice(3);
+    const recorded = JSON.parse(readFileSync(join(root, ".release-please-manifest.json"), "utf8"))["."];
+    const origins = modifiedUpgradeInputs(base, candidate).length === 0 ? []
+      : nextReleaseOrigins(recorded, JSON.parse(published));
+    process.stdout.write(`${JSON.stringify(releaseUpgradeOrigins(repository, origins))}\n`);
+  } else if (process.argv[2] === "--line-origins") {
+    const recorded = JSON.parse(readFileSync(join(root, ".release-please-manifest.json"), "utf8"))["."];
+    process.stdout.write(`${JSON.stringify(releaseUpgradeOrigins(process.argv[3],
+      lineReleaseOrigins(recorded, JSON.parse(process.argv[4]))))}\n`);
   } else if (process.argv[2] === "--empty-origin-notice") {
     process.stdout.write(`${emptyOriginNotice(modifiedUpgradeInputs(process.argv[3], process.argv[4]))}\n`);
   } else if (process.argv[2] === "--previous-release") {

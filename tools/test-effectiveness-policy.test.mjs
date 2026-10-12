@@ -6,7 +6,6 @@ const pom = readFileSync(new URL("../pom.xml", import.meta.url), "utf8");
 const frontendPackage = JSON.parse(readFileSync(new URL("../frontend/package.json", import.meta.url)));
 const vite = readFileSync(new URL("../frontend/vite.config.ts", import.meta.url), "utf8");
 const build = readFileSync(new URL("../.github/workflows/build.yml", import.meta.url), "utf8");
-const release = readFileSync(new URL("../.github/workflows/release.yml", import.meta.url), "utf8");
 const restore = readFileSync(new URL("../.github/workflows/backup-restore-smoke.yml", import.meta.url), "utf8");
 const mutation = readFileSync(new URL("../.github/workflows/mutation-testing.yml", import.meta.url), "utf8");
 const criticalCoverage = JSON.parse(readFileSync(new URL("../quality/critical-coverage.json", import.meta.url)));
@@ -43,7 +42,6 @@ test("given concurrent local builds, when Vitest schedules files, then its worke
 test("given hosted frontend builds have outer deadlines, when the runner is slow, then Vitest adds no wall-clock deadline", () => {
   // given / when / then
   assert.match(workflowJob(build, "frontend"), /timeout-minutes: 30/);
-  assert.match(workflowJob(release, "build"), /timeout-minutes: 45/);
   assert.match(workflowJob(restore, "restore"), /timeout-minutes: 110/);
   assert.match(vite, /testTimeout: 0/);
   assert.match(vite, /hookTimeout: 0/);

@@ -102,15 +102,18 @@ test("given no release to bump from, when the first candidate is proposed, then 
     + " the complete release pipeline as rc.1 before this repository publishes 0.1.0");
 });
 
-test("given the candidates proved the release path, when the strategy is read, then the line graduates and can open again",
-  () => {
+test("given 0.1.0 is published, when the strategy is read, then a candidate line never records a patch and a release branch "
+  + "never records a candidate", () => {
     // when / then
     assert.equal(config.versioning, "prerelease");
     assert.equal(packageEntry["prerelease-type"], "rc");
-    assert.equal(config.prerelease, false,
-      "0.1.0-rc.12 passed every gate, the tag-triggered publication and the acceptance walk, so the next"
-      + " release pull request strips the suffix and proposes 0.1.0; a later line opens candidates by turning this on");
-    assert.match(manifest["."], /^0\.1\.0(-rc\.\d+)?$/, "the graduating line stays on 0.1.0 until it is released");
+    if (config.prerelease === true) {
+      assert.match(manifest["."], /^\d+\.\d+\.0(?:-rc\.\d+)?$/,
+        "main carries the next milestone as candidates; a patch comes from a release branch");
+    } else {
+      assert.match(manifest["."], /^\d+\.\d+\.\d+$/,
+        "with prerelease off this is a release branch or a graduation, which records released versions only");
+    }
   });
 
 test("given release-please writes a candidate delta, when it updates the release PR, then the changelog is normalized before review",
@@ -230,31 +233,31 @@ test("given the token can publish under this project's name, when the workflow r
   () => {
     // given
     const triggers = workflow.on ?? workflow[true];
-    const [guard, release] = workflow.jobs["release-please"].steps;
+    const guard = workflow.jobs["release-please"].steps[0];
+    const release = workflow.jobs["release-please"].steps.find((step) => step.id === "release");
 
     // when / then
-    assert.deepEqual(triggers, { push: { branches: ["main"] } },
-      "a pull_request trigger would put the token within reach of a fork's code");
+    assert.deepEqual(triggers, { push: { branches: ["main", "release/[0-9]*.[0-9]*"] } },
+      "a pull_request trigger would put the token within reach of a fork's code; release/* is protected like main");
+    assert.equal(release.with["target-branch"], "${{ github.ref_name }}",
+      "a release branch gets its own release pull request, read from its own configuration and manifest");
+    assert.equal(workflow.concurrency.group, "release-please-${{ github.ref }}",
+      "main and a release branch maintain separate pull requests and must not wait on each other");
     assert.deepEqual(workflow.permissions, {},
       "the action authenticates every call with the PAT, so the run's own token needs nothing —"
       + " and a job that grants itself nothing cannot lend anything to a step added later");
     assert.match(guard.if, /RELEASE_PLEASE_TOKEN == ''/,
-      "a tag pushed with GITHUB_TOKEN starts no pipeline, so a release without the PAT is refused");
+      "a release pull request opened with GITHUB_TOKEN starts no checks, so a run without the PAT is refused");
     assert.match(release.with.token, /secrets\.RELEASE_PLEASE_TOKEN/);
     assert.doesNotMatch(release.with.token, /github\.token/,
-      "no fallback: the guard above refuses the run rather than cutting a release nothing builds");
+      "no fallback: the guard above refuses the run rather than opening a release pull request nothing checks");
   });
 
-// release-please publishes the release the moment the release pull request is merged, which is
-// before build, qualify, the signature and the security record exist. A draft is the only state
-// that lets the tag start the pipeline without the release already claiming to be one.
-test("given a release nothing has verified yet, when the tag is written, then the release is a draft",
+test("given a merged release pull request, when release-please is configured, then it carries no release settings",
   () => {
     // when / then
-    assert.equal(config.draft, true,
-      "a published release standing before publish would be indistinguishable from one that passed"
-      + " every gate, and it would count as an upgrade origin naming an image nobody pushed");
-    assert.equal(config["force-tag-creation"], true,
-      "GitHub writes no git tag for a draft release, and without the tag the release workflow"
-      + " never starts at all");
+    for (const key of ["draft", "force-tag-creation", "skip-github-release"]) {
+      assert.equal(config[key], undefined,
+        `${key} would read as if release-please cut the release; the candidate writes the tag and publish the release`);
+    }
   });

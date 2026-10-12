@@ -1,0 +1,64 @@
+name: release admission
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: The tag name the release would answer, such as v0.1.1; nothing is tagged
+        required: true
+        type: string
+      commit:
+        description: The full sha the tag would point at
+        required: true
+        type: string
+
+permissions: {}
+
+jobs:
+  admission:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/tool-dependencies
+
+      - id: admit
+        name: Admit the tag as release.yml does
+        continue-on-error: true
+        env:
+          TAG: ${{ inputs.tag }}
+          COMMIT: ${{ inputs.commit }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          published=$(node tools/published-release-tags.mjs)
+          node tools/release-line.mjs admit-tag --tag "$TAG" --commit "$COMMIT" --published-tags "$published" --summary "$GITHUB_STEP_SUMMARY" --github-output "$GITHUB_OUTPUT"
+
+      - name: Find the nightly evidence on that branch
+        id: evidence
+        if: always() && steps.admit.outputs.branch != ''
+        continue-on-error: true
+        env:
+          BRANCH: ${{ steps.admit.outputs.branch }}
+          COMMIT: ${{ inputs.commit }}
+          GH_TOKEN: ${{ github.token }}
+        run: node tools/nightly-release-evidence.mjs --find --branch "$BRANCH" --commit "$COMMIT"
+
+      - name: Report the admission
+        if: always()
+        env:
+          ADMISSION: ${{ steps.admit.outcome }}
+          EVIDENCE: ${{ steps.evidence.outcome }}
+        run: |
+          case "$EVIDENCE" in
+            skipped) evidence="not looked up, because the tag names no release line" ;;
+            *) evidence="$EVIDENCE" ;;
+          esac
+          echo "tag admission: $ADMISSION, nightly evidence: $evidence" | tee -a "$GITHUB_STEP_SUMMARY"
+          test "$ADMISSION" = success
+          test "$EVIDENCE" = success

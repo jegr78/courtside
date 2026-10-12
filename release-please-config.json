@@ -10,8 +10,6 @@
   "commit-search-depth": 2000,
   "versioning": "prerelease",
   "prerelease": false,
-  "draft": true,
-  "force-tag-creation": true,
   "changelog-sections": [
     {
       "type": "feat",

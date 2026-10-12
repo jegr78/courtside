@@ -13,7 +13,6 @@ const applicationReadiness = readFileSync(new URL(
 const webkitReliability = readFileSync(new URL("./webkit-reliability.mjs", import.meta.url), "utf8");
 const resourceObservation = readFileSync(new URL("./browser-resource-observation.mjs", import.meta.url), "utf8");
 const buildWorkflow = readFileSync(new URL("../.github/workflows/build.yml", import.meta.url), "utf8");
-const releaseWorkflow = readFileSync(new URL("../.github/workflows/release.yml", import.meta.url), "utf8");
 const stabilityWorkflow = readFileSync(new URL(
   "../.github/workflows/test-stability.yml", import.meta.url), "utf8");
 const bookingReminders = readFileSync(new URL(
@@ -61,7 +60,6 @@ test("given hosted browser jobs have an outer deadline, when the runner is slow,
   // given / when / then
   assert.match(workflowJob(buildWorkflow, "browser_visual"), /^    timeout-minutes: 15$/m);
   assert.match(workflowJob(buildWorkflow, "browser"), /^    timeout-minutes: 30$/m);
-  assert.match(workflowJob(releaseWorkflow, "browser"), /^    timeout-minutes: 50$/m);
   assert.match(workflowJob(stabilityWorkflow, "browser-order"), /^    timeout-minutes: 40$/m);
   assert.match(workflowJob(stabilityWorkflow, "browser-compatibility"), /^    timeout-minutes: 30$/m);
   assert.match(playwright, /\n  timeout: 0,/);

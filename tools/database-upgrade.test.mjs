@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { createRequire } from "node:module";
 import { join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
@@ -11,6 +12,8 @@ import {
   emptyOriginNotice,
   gitHistory,
   modifiedUpgradeInputs,
+  lineReleaseOrigins,
+  nextReleaseOrigins,
   nightlyUpgradeOrigins,
   previousReleaseTag,
   releaseUpgradeOrigins,
@@ -21,8 +24,8 @@ import {
 } from "./courtside.upgrade-smoke.mjs";
 import { retainedNightlyCount } from "./nightly-image-retention.mjs";
 
-const releaseWorkflow = readFileSync(
-  fileURLToPath(new URL("../.github/workflows/release.yml", import.meta.url)),
+const candidateWorkflow = readFileSync(
+  fileURLToPath(new URL("../.github/workflows/release-candidate.yml", import.meta.url)),
   "utf8"
 );
 const gatesWorkflow = readFileSync(
@@ -139,6 +142,59 @@ test("given the first release of a major, when selecting origins, then the prece
     assert.deepEqual(origins, ["v0.9.1", "v1.0.0-rc.1"]);
   });
 
+test("given the version main records, when a pull request proves its migrations, then the next release's origins are used",
+  () => {
+    // when / then
+    assert.deepEqual(nextReleaseOrigins("0.1.0", ["v0.1.0-rc.12", "v0.1.0"]), ["v0.1.0"],
+      "after a release, main carries the next line, which upgrades from that release");
+    assert.deepEqual(nextReleaseOrigins("0.2.0-rc.1", ["v0.1.0", "v0.2.0-rc.1"]), ["v0.1.0", "v0.2.0-rc.1"],
+      "a published candidate of the line in progress is an origin of its next candidate");
+    assert.deepEqual(nextReleaseOrigins("0.2.0", ["v0.1.0", "v0.2.0-rc.1", "v0.2.0"]), ["v0.2.0"],
+      "a club is expected to reach the latest release before the next line");
+    assert.deepEqual(nextReleaseOrigins("0.1.0-rc.3", ["v0.1.0-rc.2", "v0.1.0-rc.3"]), [],
+      "before the first release no schema is frozen");
+    assert.throws(() => nextReleaseOrigins("0.2", []), /not a semantic version/);
+  });
+
+test("given a release branch, when its next patch resolves origins, then the line's published releases are used", () => {
+  // when / then
+  assert.deepEqual(lineReleaseOrigins("0.1.0", ["v0.1.0-rc.12", "v0.1.0", "v0.2.0-rc.1"]), ["v0.1.0"],
+    "0.1.1 upgrades from the release its branch was cut from, not from main's next candidate");
+  assert.deepEqual(lineReleaseOrigins("0.1.1", ["v0.1.0", "v0.1.1", "v0.2.0-rc.1"]), ["v0.1.1"],
+    "the next patch upgrades from the latest patch of its line");
+  assert.throws(() => lineReleaseOrigins("0.2.0-rc.1", ["v0.1.0"]), /records released versions only/,
+    "a branch recording a candidate is not a release branch");
+});
+
+test("given a pull request, when it changes a migration, then the next release's published origins prove it", () => {
+  // given
+  const tool = fileURLToPath(new URL("./courtside.upgrade-smoke.mjs", import.meta.url));
+  const origins = (base, candidate) => JSON.parse(execFileSync(process.execPath,
+    [tool, "--pull-request-origins", "jegr78/courtside", base, candidate, JSON.stringify(["v0.1.0-rc.12", "v0.1.0"])],
+    { encoding: "utf8" }));
+  const recorded = JSON.parse(readFileSync(new URL("../.release-please-manifest.json", import.meta.url), "utf8"))["."];
+  const expected = nextReleaseOrigins(recorded, ["v0.1.0-rc.12", "v0.1.0"])
+    .map((tag) => ({ ref: tag, image: `ghcr.io/jegr78/courtside:${tag.slice(1)}` }));
+
+  // when / then
+  assert.ok(expected.length > 0, "a published release exists, so a migration change has an origin");
+  assert.deepEqual(origins("70a77fbd^", "70a77fbd"), expected, "70a77fbd modified a migration");
+  assert.deepEqual(origins("b7645f0a^", "b7645f0a"), [], "a change that touches no migration needs no published origin");
+});
+
+test("given a pull request, when the gates resolve upgrade origins, then published origins join the nightly one", () => {
+  // given
+  const gates = createRequire(new URL("../frontend/package.json", import.meta.url))("js-yaml").load(gatesWorkflow);
+  const resolve = gates.jobs["upgrade-origins"].steps.find((step) => step.id === "resolve");
+
+  // when / then
+  assert.equal(resolve.env.GH_TOKEN, "${{ github.token }}", "the published releases are read through the API");
+  assert.match(resolve.run, /if \[ -n "\$UPGRADE_BASE" \]; then[\s\S]+node tools\/published-release-tags\.mjs[\s\S]+--pull-request-origins "\$GITHUB_REPOSITORY" "\$UPGRADE_BASE" "\$SOURCE_COMMIT" "\$published"/);
+  assert.match(resolve.run, /\$nightly \+ \$proven/, "a published origin is added to the nightly one, never instead of it");
+  assert.ok(resolve.run.indexOf("--pull-request-origins") < resolve.run.indexOf(`if [ "$origins" = '[]' ]`),
+    "a migration change with a published origin is no empty-origin notice");
+});
+
 // A tag whose run never reached publish names no image, so an origin resolved from it would pull
 // something that does not exist and block the whole line.
 test("given a release that was drafted or never published, when reading the tags, then it is not one", () => {
@@ -252,16 +308,17 @@ test("given an interrupted candidate, when the origin is recovered, then usabili
 
 test("given a release candidate, when release qualification runs, then every supported database origin blocks publication", () => {
   // when / then
-  assert.match(releaseWorkflow, /id: upgrade-origins/);
-  assert.match(releaseWorkflow, /--release-origins "\$GITHUB_REPOSITORY"/);
-  assert.match(releaseWorkflow, /upgrade-origins: \$\{\{ needs\.build\.outputs\.upgrade-origins \}\}/);
+  assert.match(candidateWorkflow, /id: upgrade-origins/);
+  assert.match(candidateWorkflow, /--release-origins "\$GITHUB_REPOSITORY"/);
+  assert.match(candidateWorkflow, /upgrade-origins: \$\{\{ needs\.release-build\.outputs\.upgrade-origins \}\}/);
   assert.match(gatesWorkflow, /node tools\/courtside\.upgrade-smoke\.mjs --confirm courtside-upgrade/);
   assert.match(gatesWorkflow,
     /\n  upgrade:\n[\s\S]+?uses: \.\/\.github\/actions\/gate-image\n[\s\S]+?digest: \$\{\{ inputs\.image-digest \}\}/);
   assert.match(gatesWorkflow, /COURTSIDE_UPGRADE_CANDIDATE_IMAGE: \$\{\{ steps\.image\.outputs\.reference \}\}/);
   assert.match(gatesWorkflow, /COURTSIDE_UPGRADE_ORIGIN_IMAGE: \$\{\{ matrix\.origin\.image \}\}/);
-  assert.match(releaseWorkflow, /Supported database upgrade origins/);
-  assert.match(releaseWorkflow, /needs: \[archive, build, browser, image, qualify, gates\]/);
+  assert.match(candidateWorkflow, /Supported database upgrade origins/);
+  assert.match(candidateWorkflow, /\n  evidence:\n    needs: \[select, preconditions, release-build, image, archive, qualify, gates\]/,
+    "no candidate evidence exists without the upgrade gate");
 });
 
 test("given a migration that adds a column, when comparing the proof, then the new column is not a change", () => {

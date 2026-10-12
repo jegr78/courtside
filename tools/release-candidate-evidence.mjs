@@ -230,7 +230,8 @@ function verify(options, environment) {
     archiveSha256: options.archive === undefined ? undefined : sha256Of(options.archive)
   });
   writeOutputs(options["github-output"], { version: verified.version, image: verified.image,
-    "booking-seed-image": verified.bookingSeedImage, "archive-sha256": verified.archiveSha256 });
+    "booking-seed-image": verified.bookingSeedImage, "image-digest": verified.image.split("@")[1],
+    "booking-seed-digest": verified.bookingSeedImage.split("@")[1], "archive-sha256": verified.archiveSha256 });
   process.stdout.write(`${JSON.stringify(verified)}\n`);
 }
 

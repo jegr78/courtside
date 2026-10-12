@@ -697,6 +697,7 @@ jobs:
     uses: ./.github/workflows/release-gates.yml
     with:
       image-source: artifact
+      upgrade-origins: ${{ startsWith(github.base_ref, 'release/') && 'line' || 'nightly' }}
       upgrade-base: ${{ github.event.pull_request.base.sha }}
       image-artifact: gate-image-${{ github.run_id }}
       image-digest: ${{ needs.gates-image.outputs.image-id }}
@@ -1090,7 +1091,7 @@ jobs:
 
   nightly-image:
     needs: build
-    if: ${{ always() && needs.build.result == 'success' && (github.event_name == 'schedule' || ((github.event_name == 'workflow_dispatch' || github.event_name == 'push') && github.ref == 'refs/heads/main')) }}
+    if: ${{ always() && needs.build.result == 'success' && (github.event_name == 'schedule' || ((github.event_name == 'workflow_dispatch' || github.event_name == 'push') && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/release/'))) }}
     permissions:
       actions: read
       attestations: write
@@ -1123,10 +1124,11 @@ jobs:
       qualification-artifact-prefix: nightly-image-qualification-
       fixtures-artifact: nightly-assessment-fixtures
       security-base-artifact: nightly-release-security-base
+      upgrade-origins: ${{ startsWith(github.ref, 'refs/heads/release/') && 'line' || 'nightly' }}
 
   nightly-release-evidence:
     needs: [build, nightly-image, release-gates]
-    if: ${{ always() && (github.event_name == 'schedule' || ((github.event_name == 'workflow_dispatch' || github.event_name == 'push') && github.ref == 'refs/heads/main')) }}
+    if: ${{ always() && (github.event_name == 'schedule' || ((github.event_name == 'workflow_dispatch' || github.event_name == 'push') && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/release/'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:

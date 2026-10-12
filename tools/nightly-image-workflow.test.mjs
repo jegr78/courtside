@@ -111,7 +111,7 @@ test("given a branch dispatch with a security base, when the image is qualified,
 
 test("given nightly cleanup and release publication, when registry access is scheduled, then writes cannot overlap", () => {
   // when / then
-  for (const jobName of ["image", "publish"]) {
+  for (const jobName of ["publish"]) {
     assert.equal(release.jobs[jobName].concurrency.group, "container-registry-${{ github.repository }}");
     assert.equal(release.jobs[jobName].concurrency["cancel-in-progress"], false);
   }
@@ -166,7 +166,7 @@ test("given a pull-request branch dispatch, when the candidate runs, then it use
   assert.match(String(workflow.jobs.publish.if), /needs\.select\.outputs\.publish == 'true'/);
   assert.match(String(workflow.jobs.retention.if), /needs\.select\.outputs\.publish == 'true'/);
   assert.equal(workflow.jobs["retention-plan"].if,
-    "github.event_name == 'workflow_dispatch' && inputs.publish != true");
+    "github.event_name == 'workflow_dispatch' && inputs.publish != true && !startsWith(github.ref, 'refs/heads/release/')");
   assert.equal(workflow.jobs["retention-plan"].permissions.packages, "read");
   assert.doesNotMatch(workflow.jobs["retention-plan"].steps.at(-1).run, /--apply/);
 });

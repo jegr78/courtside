@@ -128,12 +128,17 @@ Every shipped file is committed and reviewed. Deliberate obfuscation remains a r
 
 ## Release automation uses a maintainer-owned token
 
-Release Please uses a fine-grained personal access token because a tag created with the workflow's
-own token starts no release workflow. It can write contents, pull requests and issue labels in this
-repository. It cannot change workflows or publish the final release alone.
+Release Please uses a fine-grained personal access token, because a pull request or tag created with
+the workflow's own token starts no checks and no release workflow. It can write contents, pull
+requests and issue labels in this repository. It cannot change workflows or publish the final
+release alone.
 
-The token acts with its issuer's repository ceiling, including the single maintainer's admin
-bypass. The workflow runs only after a push to `main`. Reconsider when GitHub provides a repository
+Two jobs hold it. `release-please` runs only after a push to `main` or to a `release/*` branch,
+which carry the same protection, and maintains that branch's release pull request. The `tag` job of
+the release candidate runs only for a release commit on the branch its version belongs to whose
+candidate evidence succeeded, and uses the token to create the version tag and relabel the merged
+release pull request. The token acts with its issuer's repository ceiling, including the single
+maintainer's admin bypass. Reconsider when GitHub provides a repository
 identity that can trigger the same pipeline without a personal token.
 
 ## Stalwart fetches its administration interface outside the pinned image
