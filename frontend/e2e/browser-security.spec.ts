@@ -375,6 +375,34 @@ test("URL and fragment payloads are neither reflected nor executed by the DOM", 
   await expectRenderingContexts("location-input", ["location-input"]);
 });
 
+test("a sign-in return target that could leave this origin lands on the start page of this origin", async ({ page }) => {
+  for (const target of [
+    "//attacker.example/my-bookings",
+    "/\\attacker.example/my-bookings",
+    "https://attacker.example/my-bookings",
+    "/\t/attacker.example/my-bookings",
+    "/\n/attacker.example/my-bookings"
+  ]) {
+    await test.step(JSON.stringify(target), async () => {
+      // given
+      await page.context().clearCookies();
+      await page.goto(`/login?returnTo=${encodeURIComponent(target)}`);
+      await expect(page.getByTestId("login-view")).toBeVisible({ timeout: 10_000 });
+      const startPage = new URL("/", page.url()).href;
+
+      // when
+      await page.getByTestId("username").fill("doe.jane");
+      await page.getByTestId("password").fill("temporary-password");
+      await page.getByTestId("login-submit").click();
+
+      // then
+      await expect(page.getByTestId("court-plan-view")).toBeVisible({ timeout: 10_000 });
+      await expect(page, `${JSON.stringify(target)} must not decide where sign-in leads`)
+        .toHaveURL(startPage, { timeout: 10_000 });
+    });
+  }
+});
+
 test("stored text projections remain inert on administrative and managed views", async ({ page, journeyService }) => {
   // given
   await journeyService.executeSql(`

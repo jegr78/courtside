@@ -30,6 +30,13 @@ export async function openTheApplication(page: Page, language: JourneyLanguage):
   await chooseTheLanguage(page, language);
 }
 
+// A member who follows a link from a message arrives at that address rather than at the plan.
+export async function openTheLink(page: Page, language: JourneyLanguage, address: string): Promise<void> {
+  await page.addInitScript(POINTER);
+  await page.goto(address);
+  await chooseTheLanguage(page, language);
+}
+
 // The application reads the stored preference and never Accept-Language, so a journey that wants
 // to be walked in English has to say so where a member says so.
 async function chooseTheLanguage(page: Page, language: JourneyLanguage): Promise<void> {
