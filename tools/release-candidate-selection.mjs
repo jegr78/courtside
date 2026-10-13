@@ -9,6 +9,10 @@ import {
 const releaseWorkflows = ["release-candidate.yml", "release-gates.yml", "release.yml", "release-plan-sync.yml"]
   .map((name) => `.github/workflows/${name}`);
 
+// A tag push runs these from the tagged commit, so a release line must carry main's copies.
+const tagRunDefinitions = [".github/workflows/release.yml", ".github/workflows/release-plan-sync.yml",
+  ".github/actions/tool-dependencies"];
+
 const commitPattern = /^[a-f0-9]{40}$/;
 const versionPattern = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
 const titlePattern = /^chore\(([^)]+)\): release (\S+)$/;
@@ -88,6 +92,13 @@ export function selectReleaseCandidate(facts) {
   if (facts.missingTooling?.length > 0) {
     throw new Error(`${commit} lacks ${facts.missingTooling.join(", ")}, which the release workflows call at the `
       + `candidate; ${branch === "main" ? "the commit predates that tooling" : `port it to ${branch}`}`);
+  }
+  if (branch !== "main") {
+    if (facts.releaseWorkflowDrift === undefined) throw new Error("the release workflow comparison did not run");
+    if (facts.releaseWorkflowDrift.length > 0) {
+      throw new Error(`${facts.releaseWorkflowDrift.join(", ")} differs from main's, and the tag runs the copy at the `
+        + `candidate; port it to ${branch}`);
+    }
   }
   if (event === "workflow_dispatch" && rehearsal) return selected("rehearsal", null, null);
   if (facts.newestLine === undefined) throw new Error("the newest-line check did not run");
@@ -204,6 +215,11 @@ export function gatherFacts(options, environment = process.env) {
   if (event === "workflow_dispatch" || facts.manifest !== facts.parentManifest) {
     facts.missingTooling = releaseToolingPaths(releaseWorkflows.map((path) => readFileSync(new URL(`../${path}`,
       import.meta.url), "utf8"))).filter((path) => !succeeds("git", ["cat-file", "-e", `${commit}:${path}`]));
+    if (versionPattern.test(facts.manifest ?? "") && releaseBranchOf(facts.manifest) !== "main") {
+      git(...branchFetchArguments("main"));
+      facts.releaseWorkflowDrift = tagRunDefinitions.filter((path) =>
+        !succeeds("git", ["diff", "--quiet", remoteRefOf("main"), commit, "--", path]));
+    }
   }
   const releasing = event === "workflow_dispatch" ? !rehearsal : facts.manifest !== facts.parentManifest;
   if (!releasing) return facts;

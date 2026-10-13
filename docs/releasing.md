@@ -449,7 +449,10 @@ carry a `Release-As:` footer: release-please would read it on the branch and pro
 **Tooling follows every maintained line.** `release-candidate.yml` runs from `main`, but it and the
 workflows it calls run tools at the release commit. Every tool those workflows name is therefore
 ported to each maintained release branch with the change that starts calling it. The candidate's
-`select` job refuses a commit that lacks one and names it.
+`select` job refuses a commit that lacks one and names it. The tag push runs `release.yml`, together
+with `release-plan-sync.yml` and `.github/actions/tool-dependencies`, from the tagged commit, not
+from `main`. A release branch therefore carries main's copies of all three, and `select` refuses a
+candidate whose copy differs and names the path.
 
 **A fix goes to the release branch first.** Its pull request targets `release/<major>.<minor>` and
 lands as one squashed commit. Then pick that commit onto a branch from `main` with
