@@ -4630,6 +4630,9 @@ paths:
 
         A booking this member is not recorded in answers `404`, which is also the answer to a
         second attempt.
+      security:
+        - sessionCookie: []
+          csrfToken: []
       parameters:
         - name: bookingId
           in: path
@@ -4642,6 +4645,8 @@ paths:
           $ref: "#/components/responses/Invalid"
         "401":
           $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
         "429":

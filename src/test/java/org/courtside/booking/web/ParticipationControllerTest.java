@@ -123,6 +123,24 @@ class ParticipationControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenNoCsrfToken_whenAMemberWithdraws_thenTheyAreRefusedAndStillRecorded() throws Exception {
+        // given
+        bookNaming(maryPersonId, "doe.jane");
+        String bookingId = JsonPath.read(
+                mockMvc.perform(get("/api/my/participations").with(user("major.mary").roles("MEMBER")))
+                        .andReturn().getResponse().getContentAsString(), "$.items[0].id");
+
+        // when
+        mockMvc.perform(delete("/api/my/participations/" + bookingId).with(user("major.mary").roles("MEMBER")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:access-denied"));
+
+        // then
+        mockMvc.perform(get("/api/my/participations").with(user("major.mary").roles("MEMBER")))
+                .andExpect(jsonPath("$.items[0].id").value(bookingId));
+    }
+
+    @Test
     void givenABookingTheyAreNotRecordedIn_whenAMemberWithdraws_thenItSaysSoRatherThanJustFailing()
             throws Exception {
         // given
