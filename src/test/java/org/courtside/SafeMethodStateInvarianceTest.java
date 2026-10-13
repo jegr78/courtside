@@ -368,6 +368,11 @@ class SafeMethodStateInvarianceTest extends AbstractIntegrationTest {
                 failures.add("HEAD " + uri + " answered " + head.statusCode()
                         + " where GET answered " + read.statusCode());
             }
+            Map<String, String> headHeaders = ApplicationResponseHeaders.comparable(head.headers());
+            Map<String, String> readHeaders = ApplicationResponseHeaders.comparable(read.headers());
+            if (!headHeaders.equals(readHeaders)) {
+                failures.add("HEAD " + uri + " carried " + headHeaders + " where GET carried " + readHeaders);
+            }
             HttpResponse<byte[]> options = send("OPTIONS", uri);
             if (options.statusCode() != ANSWERED) {
                 failures.add("OPTIONS " + uri + " answered " + options.statusCode());

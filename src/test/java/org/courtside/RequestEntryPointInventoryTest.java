@@ -172,6 +172,10 @@ class RequestEntryPointInventoryTest extends AbstractIntegrationTest {
                             + " in, so that a name stating two values is refused before anything"
                             + " below chooses one of them",
                             List.of("getContentType", "getParameterMap"))),
+            Map.entry("org/courtside/shared/web/SpaConfiguration.java",
+                    new Boundary("the locale the dispatcher resolved from the Accept-Language header,"
+                            + " restated as the shell's content language, which chooses a language and"
+                            + " never a right", List.of("getLocale"))),
             Map.entry("org/courtside/shared/web/RefusesAmbiguity.java",
                     new Boundary("nothing of the request itself: it writes an attribute the error"
                             + " dispatch reads back", List.of())));
