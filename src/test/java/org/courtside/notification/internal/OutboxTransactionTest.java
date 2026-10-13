@@ -15,6 +15,8 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.IllegalTransactionStateException;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import javax.sql.DataSource;
@@ -90,6 +92,28 @@ class OutboxTransactionTest extends AbstractIntegrationTest {
         // then
         assertThat(rows(accountId)).as("a message about a change that never happened is never queued").isEmpty();
         assertThat(entries(accountId)).as("nor does the centre show an entry for it").isZero();
+    }
+
+    @Test
+    void givenAChangeThatFailsAsItCommits_whenItsEntryWasAlreadyWritten_thenTheEntryGoesWithIt() {
+        // given
+        UUID personId = identity.createPerson("Mary", "Roe", "mary.roe@example.org");
+        UUID accountId = identity.createEnabledAccount(personId, "roe.mary", Set.of(Role.MEMBER));
+
+        // when
+        assertThatThrownBy(() -> transactions.executeWithoutResult(status -> {
+            events.publishEvent(new UsernameReminderRequested(accountId));
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void beforeCommit(boolean readOnly) {
+                    throw new IllegalStateException("the change failed after its entry was written");
+                }
+            });
+        })).hasMessage("the change failed after its entry was written");
+
+        // then
+        assertThat(entries(accountId)).as("the centre never shows a change that did not commit").isZero();
+        assertThat(rows(accountId)).isEmpty();
     }
 
     @Test
