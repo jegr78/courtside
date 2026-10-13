@@ -121,6 +121,29 @@ class SeriesMoveTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenAPlayedOccurrence_whenPreviewingAMoveFromIt_thenThePreviewListsOnlyTheUnplayedOnes() {
+        // given
+        SeriesCreationResult series = createSeries(3);
+        UUID played = series.bookingIds().getFirst();
+        jdbc.sql("""
+                        UPDATE court_allocation
+                        SET starts_at = TIMESTAMPTZ '2026-03-24T16:00:00Z', ends_at = TIMESTAMPTZ '2026-03-24T18:00:00Z'
+                        WHERE booking_id = :booking
+                        """)
+                .param("booking", played).update();
+
+        // when
+        MovePreview preview = seriesService.previewMove(new MoveRequest(
+                series.seriesId(), played, CancelScope.THIS_AND_FOLLOWING,
+                LocalTime.of(20, 0), null, null), trainer, Set.of(Role.TRAINER));
+
+        // then
+        assertThat(preview.moves()).extracting(MovePreview.Move::bookingId)
+                .as("a played date is no part of the move")
+                .containsExactlyElementsOf(series.bookingIds().subList(1, 3));
+    }
+
+    @Test
     void givenAnOccurrenceAlreadyReminded_whenTheSeriesMoves_thenItCanRemindAgain() {
         // given
         SeriesCreationResult series = createSeries(3);
