@@ -104,4 +104,22 @@ class PartnerPlaceMessageTest extends AbstractIntegrationTest {
         assertThat(notifications.notificationsFor(holderAccount)).doesNotContain(MessageKind.BOOKING_PARTNER_FOUND);
         assertThat(notifications.notificationsFor(joinerAccount)).containsExactly(MessageKind.BOOKING_PLACE_TAKEN);
     }
+
+    @Test
+    void givenAMemberWithTwoAccounts_whenTheyTakeAPlaceWithOne_thenThatOneIsConfirmed() {
+        // given
+        UUID person = identity.createPerson("Mary", "Major", "mary.major@example.org");
+        UUID otherAccount = identity.createEnabledAccount(person, "major.mary", Set.of(Role.MEMBER));
+        UUID takingAccount = identity.createEnabledAccount(person, "major.mary2", Set.of(Role.MEMBER));
+        UUID booking = bookings.createBookingLookingForAPartner(court, MEMBER_CARD, SLOT, holderAccount, holderPerson);
+        UUID invitation = bookings.publishOpenPlace(booking, holderAccount);
+
+        // when
+        bookings.takeOpenPlace(invitation, takingAccount, person);
+
+        // then
+        assertThat(notifications.notificationsFor(takingAccount)).as("the account that took the place is told where it plays")
+                .containsExactly(MessageKind.BOOKING_PLACE_TAKEN);
+        assertThat(notifications.notificationsFor(otherAccount)).isEmpty();
+    }
 }

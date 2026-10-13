@@ -115,7 +115,7 @@ public class PartnerSearchService {
             throw failure;
         }
         rows.delete(invitationId);
-        events.publishEvent(new PartnerJoined(booking.getId(), personId));
+        events.publishEvent(new PartnerJoined(booking.getId(), personId, accountId));
         log.info("Account {} took the open place of booking {}", accountId, booking.getId());
         return booking.getId();
     }

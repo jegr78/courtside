@@ -65,7 +65,7 @@ class ParticipationMailer implements MessageComposer {
     @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT, fallbackExecution = true)
     void on(PartnerJoined joined) {
         bookings.describe(joined.bookingId()).ifPresent(booking -> {
-            queue(accountOf(joined.personId()), MessageKind.BOOKING_PLACE_TAKEN,
+            queue(accounts.findById(joined.accountId()), MessageKind.BOOKING_PLACE_TAKEN,
                     Map.of(QueuedMessage.BOOKING, joined.bookingId().toString()));
             queue(accounts.findById(booking.bookedByAccountId()), MessageKind.BOOKING_PARTNER_FOUND,
                     Map.of(QueuedMessage.BOOKING, joined.bookingId().toString(),
@@ -108,6 +108,6 @@ class ParticipationMailer implements MessageComposer {
     }
 
     private Optional<UserAccount> accountOf(UUID personId) {
-        return accounts.findByPersonIdIn(List.of(personId)).stream().findFirst();
+        return accounts.findByPersonIdIn(List.of(personId)).stream().filter(UserAccount::isEnabled).findFirst();
     }
 }

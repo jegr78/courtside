@@ -184,6 +184,21 @@ class ParticipationMessageTest extends AbstractIntegrationTest {
                 || text.contains("Jane") || text.contains("Doe");
     }
 
+    @Test
+    void givenAPlayerWithAnOldDisabledAccount_whenTheyAreRecorded_thenTheirEnabledAccountIsTold() throws Exception {
+        // given
+        UUID person = identity.createPerson("Mary", "Major", "mary.major@example.org");
+        identity.disableAccount(identity.createEnabledAccount(person, "major.mary", Set.of(Role.MEMBER)));
+        identity.createEnabledAccount(person, "major.mary2", Set.of(Role.MEMBER));
+
+        // when
+        book(person);
+
+        // then
+        assertThat(addressesWrittenTo()).as("a disabled old account does not swallow the notice")
+                .contains("mary.major@example.org");
+    }
+
     private UUID book(UUID coPlayerPersonId) {
         return bookings.create(new CreateBookingCommand(List.of(courtId), MEMBER_BOOKING_CARD,
                 new TimeSlot(SIX_PM, SEVEN_PM), bookerAccountId, bookerPersonId, Set.of(Role.MEMBER),
