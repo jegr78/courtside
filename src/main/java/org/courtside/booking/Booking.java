@@ -143,6 +143,18 @@ public class Booking implements Persistable<UUID> {
                 && participants.removeIf(participant -> personId.equals(participant.getPersonId()));
     }
 
+    // The member takes the slot the marker held, so the booking keeps its player count and positions.
+    public boolean fillOpenPlace(UUID participantId, UUID personId) {
+        return personId != null && participants.stream()
+                .filter(participant -> participant.getId().equals(participantId) && participant.getCardId() != null)
+                .findFirst()
+                .map(participant -> {
+                    participant.becomeMember(personId);
+                    return true;
+                })
+                .orElse(false);
+    }
+
     public void addParticipant(ParticipantSpec spec) {
         participants.add(new BookingParticipant(this, spec, nextPosition()));
     }

@@ -54,4 +54,10 @@ public class BookingParticipant {
         this.cardId = spec.cardId();
         this.position = position;
     }
+
+    void becomeMember(UUID personId) {
+        this.kind = ParticipantKind.MEMBER;
+        this.personId = personId;
+        this.cardId = null;
+    }
 }
