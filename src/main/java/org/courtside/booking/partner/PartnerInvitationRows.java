@@ -59,28 +59,29 @@ class PartnerInvitationRows {
     }
 
     // Everything nobody can take any more: its booking is gone, was cancelled, has started or lost the marker.
-    int deleteClosed(Instant now) {
+    int deleteClosed(UUID markerCardId, Instant now) {
         return jdbc.sql("""
                         DELETE FROM partner_invitation i
                         WHERE NOT EXISTS (SELECT 1 FROM booking b WHERE b.id = i.booking_id AND b.status = 'CONFIRMED')
                            OR EXISTS (SELECT 1 FROM court_allocation a
                                       WHERE a.booking_id = i.booking_id AND a.starts_at <= :now)
                            OR NOT EXISTS (SELECT 1 FROM booking_participant p
-                                          WHERE p.id = i.participant_id AND p.card_id IS NOT NULL)
+                                          WHERE p.id = i.participant_id AND p.card_id = :markerCardId)
                         """)
+                .param("markerCardId", markerCardId)
                 .param("now", Timestamp.from(now))
                 .update();
     }
 
     // Candidates only: whether the viewer may book the card is decided by the caller.
-    List<Candidate> offeredBeyond(UUID accountId, UUID personId, Instant now) {
+    List<Candidate> offeredBeyond(UUID accountId, UUID personId, UUID markerCardId, Instant now) {
         return jdbc.sql("""
                         SELECT i.id, b.card_id, min(a.starts_at) AS starts_at, max(a.ends_at) AS ends_at,
                                array_agg(a.court_id ORDER BY a.court_id) AS court_ids
                         FROM partner_invitation i
                         JOIN booking b ON b.id = i.booking_id
                         JOIN court_allocation a ON a.booking_id = b.id
-                        JOIN booking_participant marker ON marker.id = i.participant_id AND marker.card_id IS NOT NULL
+                        JOIN booking_participant marker ON marker.id = i.participant_id AND marker.card_id = :markerCardId
                         WHERE b.status = 'CONFIRMED' AND b.series_id IS NULL AND b.booked_by <> :accountId
                           AND NOT EXISTS (SELECT 1 FROM booking_participant p
                                           WHERE p.booking_id = b.id AND p.person_id = :personId)
@@ -90,6 +91,7 @@ class PartnerInvitationRows {
                         """)
                 .param("accountId", accountId)
                 .param("personId", personId)
+                .param("markerCardId", markerCardId)
                 .param("now", Timestamp.from(now))
                 .query((row, number) -> new Candidate(row.getObject("id", UUID.class),
                         row.getObject("card_id", UUID.class),

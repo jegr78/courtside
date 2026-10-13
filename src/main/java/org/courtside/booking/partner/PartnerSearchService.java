@@ -78,7 +78,7 @@ public class PartnerSearchService {
         if (!mayTakeAPlace(accountId, personId, roles)) {
             return List.of();
         }
-        return rows.offeredBeyond(accountId, personId, clock.instant()).stream()
+        return rows.offeredBeyond(accountId, personId, ParticipantCard.LOOKING_FOR_A_PARTNER, clock.instant()).stream()
                 .filter(candidate -> cardEligibility.admits(candidate.cardId(), roles))
                 .map(candidate -> new OpenPlace(candidate.invitationId(), candidate.cardId(), candidate.courtIds(),
                         candidate.slot()))
@@ -128,7 +128,7 @@ public class PartnerSearchService {
 
     @Transactional
     public void sweep() {
-        int removed = rows.deleteClosed(clock.instant());
+        int removed = rows.deleteClosed(ParticipantCard.LOOKING_FOR_A_PARTNER, clock.instant());
         if (removed > 0) {
             log.info("Removed {} open places nobody can take any more", removed);
         }

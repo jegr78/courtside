@@ -1,7 +1,7 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, it, vi } from "vitest";
-import { api, type OpenPlace } from "../api/client";
+import { api, ApiError, type OpenPlace } from "../api/client";
 import i18n from "../i18n";
 import { OpenPlacesSection } from "./OpenPlacesSection";
 
@@ -32,7 +32,7 @@ it("given an open place, when the section shows, then it names the slot, the cou
   expect(within(entry).getByTestId("open-place-title")).toHaveTextContent("Centre Court");
   expect(within(entry).getByTestId("open-place-card")).toHaveTextContent("Member booking");
   expect(within(entry).getByTestId("take-open-place"))
-    .toHaveAccessibleName("Take the open place on Aug 10, 2026, 6:00 PM – 7:00 PM on Centre Court");
+    .toHaveAccessibleName("Take the open place on Aug 10, 2026, 6:00 PM – 7:00 PM at Centre Court");
 });
 
 it("given an open place, when the member takes it, then the place is accepted and the bookings reload", async () => {
@@ -49,6 +49,23 @@ it("given an open place, when the member takes it, then the place is accepted an
   expect(accept).toHaveBeenCalledWith(place.invitationId);
   await waitFor(() => expect(taken).toHaveBeenCalled());
   await waitFor(() => expect(screen.queryByTestId(`open-place-${place.invitationId}`)).toBeNull());
+});
+
+it("given a place another member took first, when the member takes it, then the refusal stays visible", async () => {
+  // given
+  vi.spyOn(api, "acceptOpenPlace").mockRejectedValue(new ApiError(404, {
+    type: "urn:courtside:error:partner-invitation-not-found", title: "Not Found", status: 404
+  }));
+  show();
+  const entry = await screen.findByTestId(`open-place-${place.invitationId}`);
+  vi.mocked(api.openPlaces).mockResolvedValue([]);
+
+  // when
+  await userEvent.click(within(entry).getByTestId("take-open-place"));
+
+  // then
+  await waitFor(() => expect(screen.queryByTestId(`open-place-${place.invitationId}`)).toBeNull());
+  expect(screen.getByRole("alert")).toHaveTextContent("This open place is no longer there for you.");
 });
 
 it("given no open place, when the section shows, then it renders nothing", async () => {

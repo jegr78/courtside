@@ -1430,7 +1430,7 @@ const en: Record<keyof typeof de, string> = {
   "error.type.partner-place-unavailable": "This booking has no place a partner could take.",
   "partner.invitation.notFound": "This open place is no longer there for you.",
   "partner.place.none": "This booking holds no \"looking for a partner\" slot filler.",
-  "partner.place.closed": "The booking is cancelled or has already started.",
+  "partner.place.closed": "The booking is cancelled, has already started or belongs to a series.",
   "error.type.waitlist-entry-exists": "You are already on the waitlist for this court.",
   "error.type.waitlist-slot-not-taken": "A waitlist is only for a court somebody else holds.",
   "error.type.waitlist-no-offer": "This entry holds no open offer.",
@@ -1448,7 +1448,7 @@ const en: Record<keyof typeof de, string> = {
   "openPlaces.title": "Open places",
   "openPlaces.description": "Members looking for a partner offer these places. Nobody is named until you play.",
   "openPlaces.take": "Take the place",
-  "openPlaces.takeAccessible": "Take the open place on {{period}} on {{courts}}",
+  "openPlaces.takeAccessible": "Take the open place on {{period}} at {{courts}}",
   "openPlaces.taken": "You play in this booking now."
 };
 

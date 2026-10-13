@@ -1278,7 +1278,7 @@
         "lifecycle": "partner-sweep"
       },
       "participant_id": {
-        "level": "operational",
+        "level": "pseudonymous",
         "lifecycle": "partner-sweep"
       },
       "published_at": {

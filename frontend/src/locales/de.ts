@@ -1428,7 +1428,7 @@ const de = {
   "error.type.partner-place-unavailable": "Diese Buchung hat keinen Platz, den ein Mitspieler übernehmen könnte.",
   "partner.invitation.notFound": "Diesen offenen Platz gibt es für dich nicht mehr.",
   "partner.place.none": "In dieser Buchung steht kein Platzfüller \"Spielpartner gesucht\".",
-  "partner.place.closed": "Die Buchung ist storniert oder hat schon begonnen.",
+  "partner.place.closed": "Die Buchung ist storniert, hat schon begonnen oder gehört zu einer Serie.",
   "error.type.waitlist-entry-exists": "Du stehst für diesen Platz schon auf der Warteliste.",
   "error.type.waitlist-slot-not-taken": "Auf die Warteliste kommt nur, wer auf einen Platz wartet, den jemand anderes belegt.",
   "error.type.waitlist-no-offer": "Für diesen Eintrag gibt es kein offenes Angebot.",

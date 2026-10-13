@@ -43,13 +43,13 @@ export function OpenPlacesSection({ courtNames, locale, timeZone, taken }: {
   }
 
   if (loadError) return <LoadFailure message={loadError} retry={() => { clearLoad(); void load(); }} />;
-  if (!places || places.length === 0) return null;
+  if (!error && (!places || places.length === 0)) return null;
 
   return <section id="open-places" className="border-structural mt-10 border-t pt-8" aria-labelledby="open-places-title">
     <h2 id="open-places-title" data-testid="open-places-title" className="text-2xl font-bold">{t("openPlaces.title")}</h2>
     <p className="text-muted mt-2">{t("openPlaces.description")}</p>
     {error && <Alert>{error}</Alert>}
-    <ul data-testid="open-places" className="mt-4 grid gap-3">{places.map((place) => {
+    {places && places.length > 0 && <ul data-testid="open-places" className="mt-4 grid gap-3">{places.map((place) => {
       const period = formatBookingPeriod(place.startsAt, place.endsAt, locale, timeZone);
       const courts = place.courtIds.map((id) => courtNames.get(id) ?? t("myBookings.unknownCourt")).join(", ");
       return <li key={place.invitationId} data-testid={`open-place-${place.invitationId}`}
@@ -65,6 +65,6 @@ export function OpenPlacesSection({ courtNames, locale, timeZone, taken }: {
             disabled={taking === place.invitationId} onClick={() => void take(place)}>{t("openPlaces.take")}</Button>
         </div>
       </li>;
-    })}</ul>
+    })}</ul>}
   </section>;
 }

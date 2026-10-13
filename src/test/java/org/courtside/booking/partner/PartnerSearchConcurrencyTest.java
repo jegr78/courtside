@@ -112,7 +112,7 @@ class PartnerSearchConcurrencyTest extends AbstractIntegrationTest {
 
         // then
         boolean joined = outcomes.getFirst();
-        assertThat(bookingFixture.isConfirmed(booking)).isFalse();
+        assertThat(bookingFixture.isConfirmed(booking)).as("the cancellation stands either way").isFalse();
         assertThat(membersIn(booking)).as("a member joins only a booking that still stood when they took it")
                 .hasSize(joined ? 1 : 0);
     }

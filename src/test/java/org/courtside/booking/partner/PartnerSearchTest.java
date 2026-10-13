@@ -118,7 +118,7 @@ class PartnerSearchTest extends AbstractIntegrationTest {
         assertThat(joined).isEqualTo(booking);
         assertThat(participantsOf(booking))
                 .as("the marker's slot now holds the member, so the booking keeps its player count")
-                .contains(Map.of("kind", "MEMBER", "position", markerPosition))
+                .contains(Map.of("kind", "MEMBER", "position", markerPosition, "person_id", seeker.personId()))
                 .noneMatch(row -> "CARD".equals(row.get("kind")));
         assertThat(openPlacesFor(member("Mary", "Major", Role.MEMBER))).as("a filled place is offered to nobody")
                 .isEmpty();
@@ -198,6 +198,60 @@ class PartnerSearchTest extends AbstractIntegrationTest {
         assertThatThrownBy(() -> partnerSearch.publish(booking, holder.accountId()))
                 .isInstanceOfSatisfying(PartnerPlaceUnavailableException.class, failure ->
                         assertThat(failure.getCode()).isEqualTo("partner.place.closed"));
+        partnerSearch.sweep();
+        assertThat(invitationCount()).as("the sweep removes the place of a cancelled booking").isZero();
+    }
+
+    @Test
+    void givenASeriesOccurrence_whenItsHolderOffersItsPlace_thenThereIsNoPlaceToOffer() {
+        // given
+        UUID booking = bookLookingForAPartner(holder);
+        UUID series = bookingFixture.recordSeries(court, MEMBER_CARD, LocalDate.of(2026, 5, 13), LocalTime.of(18, 0),
+                60, Set.of(DayOfWeek.WEDNESDAY), 2, holder.accountId(), null, Instant.parse("2026-05-01T00:00:00Z"));
+        jdbc.sql("UPDATE booking SET series_id = :series WHERE id = :booking")
+                .param("series", series).param("booking", booking).update();
+
+        // when / then
+        assertThatThrownBy(() -> partnerSearch.publish(booking, holder.accountId()))
+                .isInstanceOfSatisfying(PartnerPlaceUnavailableException.class, failure ->
+                        assertThat(failure.getCode()).as("a series occurrence offers no place").isEqualTo("partner.place.closed"));
+        assertThat(partnerSearch.searchStatesOf(List.of(booking))).as("a series occurrence shows no partner search")
+                .isEmpty();
+    }
+
+    @Test
+    void givenAnInvitationPointingAtAnotherCard_whenAMemberLooksForPlaces_thenThatCardIsNeitherOfferedNorTaken() {
+        // given
+        UUID booking = book(holder, MEMBER_CARD, List.of(ParticipantSpec.card(BALL_MACHINE)));
+        UUID ballMachine = jdbc.sql("SELECT id FROM booking_participant WHERE booking_id = :booking AND card_id = :card")
+                .param("booking", booking).param("card", BALL_MACHINE).query(UUID.class).single();
+        UUID invitation = UUID.randomUUID();
+        jdbc.sql("""
+                        INSERT INTO partner_invitation (id, booking_id, participant_id, published_at)
+                        VALUES (:id, :booking, :participant, now())
+                        """)
+                .param("id", invitation).param("booking", booking).param("participant", ballMachine).update();
+
+        // when / then
+        assertThat(openPlacesFor(seeker)).as("only the partner marker is a place").isEmpty();
+        assertThatThrownBy(() -> partnerSearch.accept(invitation, seeker.accountId(), seeker.personId(),
+                seeker.roles()))
+                .isInstanceOf(PartnerInvitationNotFoundException.class);
+        partnerSearch.sweep();
+        assertThat(invitationCount()).as("the sweep removes an invitation without the marker").isZero();
+    }
+
+    @Test
+    void givenAHolderWhoDoesNotPlay_whenTheyLookForPlaces_thenTheirOwnBookingIsNotOffered() {
+        // given
+        UUID booking = bookLookingForAPartner(holder);
+        partnerSearch.publish(booking, holder.accountId());
+        UUID stranger = member("Mary", "Major", Role.MEMBER).personId();
+        jdbc.sql("UPDATE booking_participant SET person_id = :stranger WHERE booking_id = :booking AND person_id = :holder")
+                .param("stranger", stranger).param("booking", booking).param("holder", holder.personId()).update();
+
+        // when / then
+        assertThat(openPlacesFor(holder)).as("a holder is not offered their own booking").isEmpty();
     }
 
     @Test
@@ -215,8 +269,7 @@ class PartnerSearchTest extends AbstractIntegrationTest {
                 seeker.roles()))
                 .isInstanceOf(PartnerInvitationNotFoundException.class);
         partnerSearch.sweep();
-        assertThat(jdbc.sql("SELECT count(*) FROM partner_invitation").query(Integer.class).single())
-                .as("an invitation nobody can take any more is removed").isZero();
+        assertThat(invitationCount()).as("an invitation nobody can take any more is removed").isZero();
     }
 
     @Test
@@ -289,6 +342,10 @@ class PartnerSearchTest extends AbstractIntegrationTest {
                 member.personId(), member.roles(), null, participants, null));
     }
 
+    private int invitationCount() {
+        return jdbc.sql("SELECT count(*) FROM partner_invitation").query(Integer.class).single();
+    }
+
     private int positionOfTheMarker(UUID booking) {
         return jdbc.sql("SELECT position FROM booking_participant WHERE booking_id = :booking AND card_id = :card")
                 .param("booking", booking).param("card", ParticipantCard.LOOKING_FOR_A_PARTNER)
@@ -297,9 +354,15 @@ class PartnerSearchTest extends AbstractIntegrationTest {
 
     private List<Map<String, Object>> participantsOf(UUID booking) {
         return jdbc.sql("""
-                        SELECT kind, position FROM booking_participant WHERE booking_id = :booking
+                        SELECT kind, position, person_id FROM booking_participant WHERE booking_id = :booking
                         """)
-                .param("booking", booking).query().listOfRows();
+                .param("booking", booking).query().listOfRows().stream()
+                .map(row -> {
+                    Map<String, Object> present = new java.util.HashMap<>(row);
+                    present.values().removeIf(java.util.Objects::isNull);
+                    return Map.copyOf(present);
+                })
+                .toList();
     }
 
     private void startedAnHourAgo(UUID booking) {
