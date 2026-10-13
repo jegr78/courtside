@@ -118,6 +118,7 @@ for (const theme of ["dark", "light"] as const) {
 
       // then
       await capture(page.getByTestId("court-plan-view"), baseline("phone-court-plan"));
+      await capture(page.getByTestId("mobile-week-navigation"), baseline("phone-court-plan-day-strip"));
     });
 
     test("given a phone in landscape, when the court plan and its booking dialog are drawn, then both match their reviewed baselines", async ({ page, journeyService }) => {
@@ -131,6 +132,7 @@ for (const theme of ["dark", "light"] as const) {
 
       // then
       await capture(page.getByTestId("court-plan-view"), baseline("phone-landscape-court-plan"));
+      await capture(page.getByTestId("mobile-week-navigation"), baseline("phone-landscape-day-strip"));
 
       // when
       await page.locator('[data-testid="free-slot"][data-court-number="2"][data-slot="12:00"]').click();

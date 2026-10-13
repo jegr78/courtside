@@ -22,7 +22,7 @@ test("given stable product views, when qualifying the UI, then reviewed pixel ba
   const phoneSurfacesInBothThemes = [
     "phone-court-plan", "phone-landscape-court-plan", "phone-landscape-booking-dialog",
     "phone-landscape-move-dialog", "phone-landscape-cancel-dialog", "phone-message-log",
-    "phone-day-strip", "phone-german-heading"
+    "phone-day-strip", "phone-court-plan-day-strip", "phone-landscape-day-strip", "phone-german-heading"
   ];
   for (const surface of principalSurfaces) {
     assert.match(visual, new RegExp(`\\"${surface}\\.png\\"`));
