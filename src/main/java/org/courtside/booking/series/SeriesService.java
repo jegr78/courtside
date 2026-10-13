@@ -246,8 +246,11 @@ public class SeriesService {
                                     boolean includeViolations) {
         requireManagementAccessTo(request.seriesId(), request.fromBookingId(), movedBy, callerRoles);
 
+        Instant now = clock.instant();
         List<Booking> affected =
-                affectedBookings(request.seriesId(), request.fromBookingId(), request.scope());
+                affectedBookings(request.seriesId(), request.fromBookingId(), request.scope()).stream()
+                        .filter(booking -> request.scope() == CancelScope.THIS || notYetStarted(booking, now))
+                        .toList();
         affected.forEach(booking ->
                 accessControl.requireManagementAccess(booking, movedBy, callerRoles));
 
