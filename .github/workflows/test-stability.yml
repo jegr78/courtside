@@ -64,7 +64,7 @@ jobs:
 
   browser-order:
     # A release pull request changes only version numbers, which no browser order can depend on.
-    if: github.event_name != 'pull_request' || !startsWith(github.head_ref, 'release-please--')
+    if: github.event_name != 'pull_request' || !(startsWith(github.head_ref, 'release-please--') && !github.event.pull_request.head.repo.fork)
     runs-on: ubuntu-latest
     timeout-minutes: 40
     strategy:
@@ -137,7 +137,7 @@ jobs:
           retention-days: 90
 
   browser-compatibility:
-    if: github.event_name != 'pull_request' || !startsWith(github.head_ref, 'release-please--')
+    if: github.event_name != 'pull_request' || !(startsWith(github.head_ref, 'release-please--') && !github.event.pull_request.head.repo.fork)
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:

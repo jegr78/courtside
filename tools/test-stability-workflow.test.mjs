@@ -56,7 +56,7 @@ test("given a required build failure, when collecting evidence, then backend and
 
 test("given a release pull request, when it bumps the frontend version, then the stability jobs stay off it", () => {
   // given
-  const skipsReleasePullRequests = /\n    if: github\.event_name != 'pull_request' \|\| !startsWith\(github\.head_ref, 'release-please--'\)\n/;
+  const skipsReleasePullRequests = /\n    if: github\.event_name != 'pull_request' \|\| !\(startsWith\(github\.head_ref, 'release-please--'\) && !github\.event\.pull_request\.head\.repo\.fork\)\n/;
 
   // when / then
   assert.match(browserOrder, skipsReleasePullRequests, "a version bump cannot change browser order, so it must not turn the release pull request red");
