@@ -1,7 +1,6 @@
 package org.courtside.shared.web;
 
 import jakarta.servlet.http.HttpServletRequest;
-import org.apache.catalina.connector.ClientAbortException;
 import org.apache.coyote.BadRequestException;
 import org.apache.tomcat.util.http.fileupload.FileUploadException;
 import org.apache.tomcat.util.http.fileupload.MultipartStream;
@@ -24,7 +23,7 @@ final class Multipart {
     static boolean failedOnTheServer(Throwable failure) {
         Throwable link = failure;
         for (int depth = 0; depth < 16; depth++) {
-            if (link instanceof ClientAbortException || link instanceof BadRequestException
+            if (link instanceof BadRequestException
                     || link instanceof MultipartStream.MalformedStreamException
                     || (link instanceof FileUploadException && !(link instanceof IOFileUploadException))) {
                 return false;
