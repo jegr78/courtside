@@ -10,9 +10,12 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor
@@ -93,6 +96,26 @@ class PartnerInvitationRows {
                         new TimeSlot(row.getTimestamp("starts_at").toInstant(), row.getTimestamp("ends_at").toInstant()),
                         uuids(row.getArray("court_ids"))))
                 .list();
+    }
+
+    Map<UUID, PartnerSearchState> searchStates(Collection<UUID> bookingIds, UUID markerCardId, Instant now) {
+        return jdbc.sql("""
+                        SELECT p.booking_id, EXISTS (SELECT 1 FROM partner_invitation i
+                                                     WHERE i.booking_id = p.booking_id) AS published
+                        FROM booking_participant p
+                        JOIN booking b ON b.id = p.booking_id
+                        WHERE p.booking_id IN (:bookingIds) AND p.card_id = :markerCardId
+                          AND b.status = 'CONFIRMED' AND b.series_id IS NULL
+                          AND NOT EXISTS (SELECT 1 FROM court_allocation a
+                                          WHERE a.booking_id = b.id AND a.starts_at <= :now)
+                        """)
+                .param("bookingIds", bookingIds)
+                .param("markerCardId", markerCardId)
+                .param("now", Timestamp.from(now))
+                .query((row, number) -> Map.entry(row.getObject("booking_id", UUID.class),
+                        row.getBoolean("published") ? PartnerSearchState.PUBLISHED : PartnerSearchState.AVAILABLE))
+                .list().stream()
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (first, second) -> first));
     }
 
     private static List<UUID> uuids(Array array) throws SQLException {

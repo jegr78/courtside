@@ -25,7 +25,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -116,6 +118,12 @@ public class PartnerSearchService {
         events.publishEvent(new PartnerJoined(booking.getId(), personId));
         log.info("Account {} took the open place of booking {}", accountId, booking.getId());
         return booking.getId();
+    }
+
+    @Transactional(readOnly = true)
+    public Map<UUID, PartnerSearchState> searchStatesOf(Collection<UUID> bookingIds) {
+        return bookingIds.isEmpty() ? Map.of() : rows.searchStates(bookingIds, ParticipantCard.LOOKING_FOR_A_PARTNER,
+                clock.instant());
     }
 
     @Transactional
