@@ -224,7 +224,9 @@ public class SeriesService {
             throw new CancellationReasonNotAllowedException();
         }
 
+        Instant now = clock.instant();
         List<UUID> affected = affectedBookings(seriesId, fromBookingId, scope).stream()
+                .filter(booking -> scope == CancelScope.THIS || notYetStarted(booking, now))
                 .map(Booking::getId)
                 .toList();
         affected.forEach(bookingId ->
@@ -525,6 +527,10 @@ public class SeriesService {
                 .orElseThrow(() -> new BookingNotFoundException("No booking with id " + fromBookingId));
         accessControl.requireManagementAccess(from, actor, actorRoles);
         requireBookingInSeries(seriesId, fromBookingId);
+    }
+
+    private static boolean notYetStarted(Booking booking, Instant now) {
+        return booking.getAllocations().stream().map(CourtAllocation::getStartsAt).allMatch(now::isBefore);
     }
 
     private List<Booking> affectedBookings(UUID seriesId, UUID fromBookingId, CancelScope scope) {
