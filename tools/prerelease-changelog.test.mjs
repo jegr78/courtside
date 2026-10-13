@@ -5,6 +5,11 @@ import test from "node:test";
 import { normalizePrereleaseChangelog } from "./prerelease-changelog.mjs";
 import { cumulativeReleaseNotes } from "./release-notes.mjs";
 
+// A newer line on top, as in a release pull request, is not part of the history these cases replay.
+function fromTheLine(version, changelog = readFileSync(new URL("../CHANGELOG.md", import.meta.url), "utf8")) {
+  return `# Changelog\n\n${changelog.slice(changelog.indexOf(`## ${version} (`))}`;
+}
+
 test("given a generated candidate section, when it is normalized, then one cumulative release line remains", () => {
   // given — this is the shape release-please wrote to #981 after #982 merged.
   const changelog = `# Changelog
@@ -123,7 +128,7 @@ const GENERATED_CANDIDATE = `## [0.1.0-rc.2](https://github.com/jegr78/courtside
 
 test("given this repository's own changelog, when release-please prepends a candidate to it, then normalizing leaves one release line a release can be cut from", () => {
   // given
-  const changelog = readFileSync(new URL("../CHANGELOG.md", import.meta.url), "utf8");
+  const changelog = fromTheLine("0.1.0");
   assert.equal(changelog.split("## 0.1.0 (").length, 2, "the cumulative heading is the anchor here");
   const generated = changelog.replace("## 0.1.0 (", `${GENERATED_CANDIDATE}## 0.1.0 (`);
   assert.equal([...generated.matchAll(/^## .*0\.1\.0/gm)].length, 2, "which the guard refuses");
@@ -176,7 +181,7 @@ const GENERATED_NEW_LINE = `## [0.2.0-rc.1](https://github.com/jegr78/courtside/
 test("given this repository's changelog, when release-please graduates the line to 0.1.0, then one release line "
   + "remains and carries the release date", () => {
   // given
-  const changelog = readFileSync(new URL("../CHANGELOG.md", import.meta.url), "utf8");
+  const changelog = fromTheLine("0.1.0");
   const generated = changelog.replace("## 0.1.0 (", `${GENERATED_GRADUATION}## 0.1.0 (`);
   assert.equal([...generated.matchAll(/^## .*0\.1\.0/gm)].length, 2, "release-please adds a second 0.1.0 heading");
 
@@ -205,6 +210,20 @@ test("given a released 0.1.0, when release-please opens the 0.2.0 line with its 
   assert.match(normalized, /^## 0\.1\.0 \(2026-10-01\)\n\n### Features\n\n\* base$/m, "the released line is untouched");
   assert.match(cumulativeReleaseNotes(normalized, "v0.2.0-rc.1"), /^## 0\.2\.0 \(2026-10-01\)/);
   assert.equal(normalizePrereleaseChangelog(normalized), normalized, "a second run changes nothing");
+});
+
+test("given a release pull request's changelog with the next line on top, when the 0.1.0 history is replayed, then "
+  + "only that line is read", () => {
+  // given
+  const changelog = readFileSync(new URL("../CHANGELOG.md", import.meta.url), "utf8");
+  const releasePullRequest = changelog.replace("## 0.1.0 (", "## 0.2.0 (2026-10-12)\n\n### Features\n\n* next\n\n## 0.1.0 (");
+
+  // when
+  const history = fromTheLine("0.1.0", releasePullRequest);
+
+  // then
+  assert.match(history, /^# Changelog\n\n## 0\.1\.0 \(/, "the replay starts at the line it is about");
+  assert.doesNotMatch(history, /0\.2\.0/);
 });
 
 // Written by release-please 17.6.0's DefaultChangelogNotes for a fix on release/0.1 after v0.1.0.
