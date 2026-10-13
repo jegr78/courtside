@@ -25,7 +25,7 @@ test("given profile classification, when the pull request runs, then selected qu
   assert.match(workflow,
     /needs: \[docs, backend, frontend, browser_visual, browser, deployment, tooling, security, gates-image, gates, clock-shift, assessment-runtime, tool-update-comparison, test-profile-plan\]/);
   assert.match(workflow, /pull_request\)\s+test "\$PROFILE_PLAN_RESULT" = success/);
-  assert.match(workflow, /push\|schedule\|workflow_dispatch\)\s+test "\$PROFILE_PLAN_RESULT" = skipped/);
+  assert.match(workflow, /push\|merge_group\|schedule\|workflow_dispatch\)\s+test "\$PROFILE_PLAN_RESULT" = skipped/);
   assert.match(workflow,
     /backend:[\s\S]+name: Verify backend[\s\S]+\.\/mvnw -B --no-transfer-progress clean verify -Pjava-only/);
   assert.match(workflow, /docs:[\s\S]+name: Verify documentation[\s\S]+node tools\/docs-check\.mjs --check/);
@@ -64,7 +64,7 @@ test("given reduced profiles, when jobs are scheduled, then only their conservat
   assert.match(workflow,
     /security:\n\s+needs: \[test-profile-plan, dependency-graph\]\n\s+if: always\(\) && \(github\.event_name != 'pull_request' \|\| needs\.test-profile-plan\.outputs\.security == 'true'\)/);
   assert.match(workflow,
-    /dependency-graph:\n\s+if: github\.event_name != 'pull_request' \|\| github\.event\.pull_request\.head\.repo\.full_name == github\.repository/);
+    /dependency-graph:\n\s+if: github\.event_name != 'merge_group' && \(github\.event_name != 'pull_request' \|\| github\.event\.pull_request\.head\.repo\.full_name == github\.repository\)/);
   assert.match(workflow, /dependency-graph:[\s\S]+contents: write[\s\S]+dependency-snapshot\.mjs/);
   assert.match(workflow, /JOBS=\$\(jq -cer '\.ciJobs'/);
   assert.match(workflow,
@@ -194,7 +194,7 @@ test("given the gates and the shifted clock, when the aggregate decides, then ea
     /if \[\[ "\$GATES_SELECTED" = true \]\]; then\s+test "\$GATES_IMAGE_RESULT" = success\s+else\s+test "\$GATES_IMAGE_RESULT" = skipped\s+fi/,
     "a selected gate cannot pass on an image that was never built");
   assert.match(workflow,
-    /push\|schedule\|workflow_dispatch\)[\s\S]+?test "\$GATES_IMAGE_RESULT" = skipped\s+test "\$GATES_RESULT" = skipped\s+if \[\[ "\$EVENT_NAME" = push \]\]; then\s+test "\$CLOCK_SHIFT_RESULT" = skipped\s+else\s+test "\$CLOCK_SHIFT_RESULT" = success\s+fi/,
+    /push\|merge_group\|schedule\|workflow_dispatch\)[\s\S]+?test "\$GATES_IMAGE_RESULT" = skipped\s+test "\$GATES_RESULT" = skipped\s+if \[\[ "\$EVENT_NAME" = push \|\| "\$EVENT_NAME" = merge_group \]\]; then\s+test "\$CLOCK_SHIFT_RESULT" = skipped\s+else\s+test "\$CLOCK_SHIFT_RESULT" = success\s+fi/,
     "the nightly path keeps its own registry gates and runs the shifted clock");
   assert.match(workflow,
     /clock-shift:\n\s+needs: test-profile-plan\n\s+if: always\(\) && \(github\.event_name == 'schedule' \|\| github\.event_name == 'workflow_dispatch' \|\| \(github\.event_name == 'pull_request' && needs\.test-profile-plan\.outputs\.clock_shift == 'true'\)\)/);

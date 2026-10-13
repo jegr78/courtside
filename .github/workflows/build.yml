@@ -4,6 +4,8 @@ on:
   push:
     branches: [main]
   pull_request:
+  merge_group:
+    types: [checks_requested]
   schedule:
     - cron: '37 0 * * *'
   workflow_dispatch:
@@ -719,7 +721,7 @@ jobs:
       security-base-artifact: unused-on-pull-requests
 
   dependency-graph:
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event_name != 'merge_group' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -978,7 +980,7 @@ jobs:
                 test "$GATES_IMAGE_RESULT" = skipped
               fi
               ;;
-            push|schedule|workflow_dispatch)
+            push|merge_group|schedule|workflow_dispatch)
               test "$PROFILE_PLAN_RESULT" = skipped
               test "$DOCS_RESULT" = success
               test "$BACKEND_RESULT" = success
@@ -990,7 +992,7 @@ jobs:
               test "$SECURITY_RESULT" = success
               test "$GATES_IMAGE_RESULT" = skipped
               test "$GATES_RESULT" = skipped
-              if [[ "$EVENT_NAME" = push ]]; then
+              if [[ "$EVENT_NAME" = push || "$EVENT_NAME" = merge_group ]]; then
                 test "$CLOCK_SHIFT_RESULT" = skipped
               else
                 test "$CLOCK_SHIFT_RESULT" = success
