@@ -3,6 +3,7 @@ package org.courtside.dataexchange.web;
 import org.courtside.AbstractIntegrationTest;
 import org.courtside.audit.testfixture.AuditTestFixture;
 import org.courtside.booking.testfixture.BookingTestFixture;
+import org.courtside.notification.testfixture.NotificationTestFixture;
 import org.courtside.dataexchange.CanonicalField;
 import org.courtside.dataexchange.ExternalReferenceService;
 import org.courtside.dataexchange.ImportSourceService;
@@ -43,7 +44,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @Import({IdentityTestFixture.class, MemberTestFixture.class, FacilityTestFixture.class,
-        BookingTestFixture.class, AuditTestFixture.class})
+        BookingTestFixture.class, AuditTestFixture.class, NotificationTestFixture.class})
 class SubjectAccessAdminControllerTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_BOOKING_CARD =
@@ -75,6 +76,9 @@ class SubjectAccessAdminControllerTest extends AbstractIntegrationTest {
     private AuditTestFixture audit;
 
     @Autowired
+    private NotificationTestFixture notifications;
+
+    @Autowired
     private ImportSourceService sources;
 
     @Autowired
@@ -95,6 +99,27 @@ class SubjectAccessAdminControllerTest extends AbstractIntegrationTest {
     @AfterEach
     void signOut() {
         identity.signOut();
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAnOfferedPlaceAndAWaitlistOffer_whenABoardAsks_thenTheFileCarriesBoth() throws Exception {
+        // given
+        UUID personId = roster.addPerson("Jane", "Doe", "jane.doe@example.org");
+        roster.giveAccount(personId, "jane.doe", Set.of(Role.MEMBER));
+        UUID accountId = identity.accountIdOf(personId);
+        UUID bookingId = bookings.createBookingLookingForAPartner(courtId, MEMBER_BOOKING_CARD,
+                new TimeSlot(SIX_PM, SEVEN_PM), accountId, personId);
+        bookings.publishOpenPlace(bookingId, accountId);
+        UUID entryId = UUID.randomUUID();
+        notifications.notifyWaitlistOffered(accountId, entryId, SIX_PM);
+
+        // when / then
+        mockMvc.perform(export(personId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.bookingsMade[0].partnerSearchPublishedAt").value("2026-05-12T10:00:00Z"))
+                .andExpect(jsonPath("$.notifications[?(@.kind == 'WAITLIST_OFFER')].waitlistEntryId")
+                        .value(entryId.toString()));
     }
 
     @Test

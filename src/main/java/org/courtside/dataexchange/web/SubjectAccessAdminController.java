@@ -124,6 +124,7 @@ class SubjectAccessAdminController implements AdminSubjectAccessApi {
                 WireTypes.toOffsetDateTime(notification.createdAt()))
                 .readAt(WireTypes.toOffsetDateTime(notification.readAt()))
                 .bookingId(notification.bookingId())
+                .waitlistEntryId(notification.waitlistEntryId())
                 .closure(notification.closure() == null ? null
                         : ApiNotificationClosure.fromValue(notification.closure().name()))
                 .cancellationReason(notification.cancellationReason() == null ? null
@@ -159,7 +160,8 @@ class SubjectAccessAdminController implements AdminSubjectAccessApi {
                 .cancelledAt(WireTypes.toOffsetDateTime(booking.cancelledAt()))
                 .cancellationReason(booking.cancellationReason() == null ? null
                         : ApiCancellationReason.fromValue(booking.cancellationReason().name()))
-                .note(booking.note());
+                .note(booking.note())
+                .partnerSearchPublishedAt(WireTypes.toOffsetDateTime(booking.partnerSearchPublishedAt()));
     }
 
     private static ApiSubjectAccessParticipation toParticipation(PersonBookingHistory.Recorded booking) {

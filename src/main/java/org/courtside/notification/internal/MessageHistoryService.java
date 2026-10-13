@@ -51,6 +51,7 @@ public class MessageHistoryService implements PersonMessageHistory {
         requireAccount(accountId);
         return jdbc.sql("""
                         SELECT kind, created_at, read_at, parameters ->> 'bookingId' AS booking_id,
+                               parameters ->> 'waitlistEntryId' AS waitlist_entry_id,
                                parameters ->> 'closure' AS closure, parameters ->> 'reason' AS reason
                         FROM notification
                         WHERE account_id = :accountId
@@ -60,12 +61,13 @@ public class MessageHistoryService implements PersonMessageHistory {
                 .query((rs, row) -> new Notification(MessageKind.valueOf(rs.getString("kind")),
                         rs.getTimestamp("created_at").toInstant(),
                         rs.getTimestamp("read_at") == null ? null : rs.getTimestamp("read_at").toInstant(),
-                        bookingIdOf(rs.getString("booking_id")), closureOf(rs.getString("closure")),
+                        storedIdentifier(rs.getString("booking_id")), storedIdentifier(rs.getString("waitlist_entry_id")),
+                        closureOf(rs.getString("closure")),
                         StoredCancellationReasons.of(rs.getString("reason"))))
                 .list();
     }
 
-    private static UUID bookingIdOf(String stored) {
+    private static UUID storedIdentifier(String stored) {
         if (stored == null) {
             return null;
         }
