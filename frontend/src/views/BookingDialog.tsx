@@ -2,7 +2,7 @@ import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ApiError, api, type Allocation, type BookingGrid, type BookingHours, type Problem, type PublicBookingCard, type PublicCourt, type PublicParticipantCard, type PublicParticipantMember } from "../api/client";
 import { idempotencyKey } from "../api/idempotency";
-import { problemReference, violationMessage } from "../api/problem-message";
+import { violationMessage } from "../api/problem-message";
 import { useReportedFailure } from "../failures/useReportedFailure";
 import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
@@ -130,7 +130,7 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
         if (translated.some((violation) => BEHIND_THE_DISCLOSURE.includes(violation.field))) {
           setShowsMore(true);
         }
-        if (translated.length > 0) report(failure, problemReference); else report(failure);
+        report(failure);
         setRequestKey(idempotencyKey());
       } else {
         report(failure);
@@ -214,7 +214,7 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
       {requiredPlayers !== undefined && <p data-testid="booking-players" aria-live="polite" className="mt-2">
         {t("booking.players", { players: chosenPlayers, required: requiredPlayers })}
       </p>}
-      <fieldset className="mt-4 grid gap-3" aria-invalid={fieldViolations("participants").length > 0} aria-describedby={describedBy("participants")}>
+      <fieldset className="mt-4 grid gap-3" aria-invalid={fieldViolations("members").length > 0} aria-describedby={describedBy("members")}>
         <legend id="booking-members-legend" className="font-semibold">{t("booking.members")}</legend>
         <input data-testid="member-search" type="search" aria-labelledby="booking-members-legend" value={memberQuery} onChange={(event) => setMemberQuery(event.target.value)} className="form-control rounded-lg border px-3 py-3" />
         {memberMatches.length > 0 && <ul className="grid gap-2">
@@ -230,6 +230,7 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
           <Button variant="secondary" type="button" className="px-3 py-2" onClick={() => setSelectedMembers((current) => current.filter((selected) => selected.personId !== member.personId))}>{t("booking.removeMember", { name: member.displayName })}</Button>
         </div>)}
       </fieldset>
+      <FieldViolations id="booking-members-errors" violations={fieldViolations("members")} />
       <details data-testid="booking-more" open={showsMore} onToggle={(event) => setShowsMore(event.currentTarget.open)} className="mt-4">
       <summary data-testid="booking-more-summary" className="cursor-pointer font-semibold">{t("booking.more")}</summary>
       <fieldset data-testid="guest-participants" className="mt-4 grid gap-3" aria-invalid={fieldViolations("participants").length > 0} aria-describedby={describedBy("participants")}>
@@ -331,9 +332,11 @@ function courtName(courts: PublicCourt[], courtId: string, t: ReturnType<typeof 
 }
 
 const BEHIND_THE_DISCLOSURE = ["participants", "note"];
+const MEMBER_CODES = ["booking.participants.duplicate", "booking.participants.unknownPerson"];
 const COURT_UNAVAILABLE = "urn:courtside:error:court-unavailable";
 
 function violationField(code: string): string {
+  if (MEMBER_CODES.includes(code)) return "members";
   if (code.startsWith("booking.participants.")) return "participants";
   if (code === "booking.rule.maxOpenBookings.exceeded") return "cardId";
   return "startsAt";

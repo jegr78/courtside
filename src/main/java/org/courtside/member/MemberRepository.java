@@ -27,7 +27,9 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
             WHERE p.id = m.personId
               AND m.endedOn IS NULL
               AND lower(concat(p.firstName, ' ', p.lastName)) LIKE concat('%', :query, '%') ESCAPE '!'
+              AND (:searcher IS NULL OR p.id <> :searcher)
             ORDER BY lower(p.lastName), lower(p.firstName), p.id
             """)
-    List<MemberParticipant> findParticipants(@Param("query") String query, Pageable pageable);
+    List<MemberParticipant> findParticipants(@Param("query") String query, @Param("searcher") UUID searcher,
+                                             Pageable pageable);
 }

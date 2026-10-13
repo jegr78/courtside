@@ -1108,7 +1108,6 @@ const en: Record<keyof typeof de, string> = {
   "error.retry": "Try again",
   "error.surfaceUnavailable": "This area cannot be loaded right now. Reload the page.",
   "error.withReference": "{{message}} Error reference: {{reference}}",
-  "error.reference": "Error reference: {{reference}}",
   "validation.Size": "The input does not have the permitted length.",
   "validation.Pattern": "The input does not have the permitted format.",
   "validation.MultipleOf": "The input must use a permitted step value.",

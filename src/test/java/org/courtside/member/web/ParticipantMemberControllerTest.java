@@ -1,6 +1,7 @@
 package org.courtside.member.web;
 
 import org.courtside.AbstractIntegrationTest;
+import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.courtside.member.Member;
 import org.courtside.member.MemberRepository;
@@ -15,6 +16,7 @@ import org.springframework.test.web.servlet.RequestBuilder;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
+import java.util.Set;
 import java.util.UUID;
 
 import static org.courtside.member.MemberFixtures.memberSince;
@@ -72,6 +74,24 @@ class ParticipantMemberControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].personId").value(jane.toString()))
                 .andExpect(jsonPath("$[0].displayName").value("Jane Doe"));
+    }
+
+    @Test
+    @WithMockUser(username = "jane.doe", roles = "MEMBER")
+    void givenTheSearcherMatchesTheirOwnQuery_whenSearchingMembers_thenTheyAreNotOffered()
+            throws Exception {
+        // given
+        UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
+        UUID john = identity.createPerson("John", "Doe", "john.doe@example.org");
+        members.save(memberSince(jane, MEMBERSHIP_TYPE_ID));
+        members.save(memberSince(john, MEMBERSHIP_TYPE_ID));
+        identity.createEnabledAccount(jane, "jane.doe", Set.of(Role.MEMBER));
+
+        // when / then
+        mockMvc.perform(searchFor("doe"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].personId").value(john.toString()));
     }
 
     @Test

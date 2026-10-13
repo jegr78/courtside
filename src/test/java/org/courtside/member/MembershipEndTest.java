@@ -306,13 +306,13 @@ class MembershipEndTest extends AbstractIntegrationTest {
         UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
         MembershipType type = memberships.createMembershipType("Adults", null, false);
         roster.writeMembership(mary, type.getId(), new MembershipPeriod(LocalDate.of(2026, 1, 1), null));
-        assertThat(memberships.findParticipants("major")).isNotEmpty();
+        assertThat(memberships.findParticipants("major", null)).isNotEmpty();
 
         // when
         roster.endMembership(mary);
 
         // then
-        assertThat(memberships.findParticipants("major")).isEmpty();
+        assertThat(memberships.findParticipants("major", null)).isEmpty();
     }
 
     @Test

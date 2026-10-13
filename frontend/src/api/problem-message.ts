@@ -20,13 +20,6 @@ export function problemMessage(failure: unknown, t: TFunction): string {
     : message;
 }
 
-export function problemReference(failure: unknown, t: TFunction): string | undefined {
-  if (!(failure instanceof ApiError) || !failure.problem?.traceId) {
-    return undefined;
-  }
-  return t("error.reference", { reference: traceReference(failure.problem) });
-}
-
 function traceReference(problem: Problem): string | undefined {
   if (!problem.traceId) return undefined;
   return problem.spanId ? `${problem.traceId}/${problem.spanId}` : problem.traceId;
