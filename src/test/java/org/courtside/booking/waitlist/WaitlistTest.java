@@ -384,6 +384,31 @@ class WaitlistTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenAnOfferARuleRefusesToAccept_whenTheSweepRuns_thenItPassesToTheNextMember() {
+        // given
+        memberships.assignMembership(first.personId(), memberships.membershipTypeMeasuredBy("Standard",
+                UUID.fromString("aaaaaaaa-0000-0000-0000-000000000001")));
+        UUID booking = book(holder, SLOT);
+        UUID firstEntry = join(first, SLOT);
+        UUID secondEntry = join(second, SLOT);
+        bookings.cancel(booking, holder.accountId(), Set.of(Role.MEMBER));
+        assertThat(stateOf(firstEntry)).isEqualTo("OFFERED");
+        book(first, shifted(SLOT, 1));
+        book(first, shifted(SLOT, 2));
+        assertThatThrownBy(() -> waitlist.accept(firstEntry, first.accountId(), first.personId(), Set.of(Role.MEMBER)))
+                .isInstanceOf(BookingRulesViolatedException.class);
+        assertThat(stateOf(firstEntry)).as("a refused acceptance leaves the offer open").isEqualTo("OFFERED");
+
+        // when
+        queue.sweep();
+
+        // then
+        assertThat(stateOf(firstEntry)).as("the sweep passes on an offer its member still may not take")
+                .isEqualTo("SKIPPED");
+        assertThat(stateOf(secondEntry)).isEqualTo("OFFERED");
+    }
+
+    @Test
     void givenTheFirstMembersPlayersNoLongerAllowed_whenTheSlotFrees_thenTheyAreSkippedForTheNext() {
         // given
         UUID booking = book(holder, SLOT);
