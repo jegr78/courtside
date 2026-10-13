@@ -191,16 +191,6 @@
       "validators": []
     },
     {
-      "path": ".github/workflows/merge-group.yml",
-      "profiles": [
-        "full"
-      ],
-      "validators": [
-        "tools/merge-group-workflow.test.mjs",
-        "tools/workflow-action-pinning.test.mjs"
-      ]
-    },
-    {
       "path": ".github/workflows/pr-title-lint.yml",
       "profiles": [
         "tooling"
