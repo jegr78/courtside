@@ -21,6 +21,11 @@ on:
 permissions:
   contents: read
 
+# A newer head of the same pull request supersedes the run of the older one.
+concurrency:
+  group: test-stability-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   varied-order:
     if: github.event_name != 'pull_request'
@@ -58,6 +63,8 @@ jobs:
           retention-days: 14
 
   browser-order:
+    # A release pull request changes only version numbers, which no browser order can depend on.
+    if: github.event_name != 'pull_request' || !(startsWith(github.head_ref, 'release-please--') && !github.event.pull_request.head.repo.fork)
     runs-on: ubuntu-latest
     timeout-minutes: 40
     strategy:
@@ -130,6 +137,7 @@ jobs:
           retention-days: 90
 
   browser-compatibility:
+    if: github.event_name != 'pull_request' || !(startsWith(github.head_ref, 'release-please--') && !github.event.pull_request.head.repo.fork)
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
