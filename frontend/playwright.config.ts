@@ -16,7 +16,7 @@ if (projectOrder !== undefined && projectOrder !== "configured" && projectOrder 
   throw new Error(`Unsupported browser project order: ${projectOrder}`);
 }
 
-// A hung axe test fails with its trace instead of consuming the job; the slowest, a page sweep, takes three minutes.
+// A hung axe test fails with its trace instead of consuming the job; twice the slowest sweep, rounded up.
 const accessibilityTestBound = 5 * 60_000;
 
 const qualificationProjects = process.env.COURTSIDE_WEBKIT_AXE === "true" ? [
