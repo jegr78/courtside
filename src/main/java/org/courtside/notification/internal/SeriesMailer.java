@@ -37,14 +37,18 @@ class SeriesMailer implements MessageComposer {
     private final BookingWording wording;
     private final MessageOutbox outbox;
 
-    // The first occurrence is what the centre entry shows and links to.
+    // The earliest occurrence is what the centre entry shows and links to.
     @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT, fallbackExecution = true)
     void on(SeriesCreated created) {
-        String first = created.bookingIds().getFirst().toString();
-        bookings.describe(created.bookingIds().getFirst()).ifPresent(booking -> audience.of(booking).forEach(account ->
+        SequencedMap<UUID, BookingAnnouncement> occurrences = bookings.describeAll(created.bookingIds());
+        if (occurrences.isEmpty()) {
+            return;
+        }
+        String first = occurrences.firstEntry().getKey().toString();
+        audience.of(occurrences.firstEntry().getValue()).forEach(account ->
                 outbox.queue(account.getId(), MessageKind.BOOKING_SERIES_CREATED, Map.of(
                         QueuedMessage.BOOKING, first,
-                        QueuedMessage.SERIES, created.seriesId().toString()))));
+                        QueuedMessage.SERIES, created.seriesId().toString())));
     }
 
     @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT, fallbackExecution = true)
