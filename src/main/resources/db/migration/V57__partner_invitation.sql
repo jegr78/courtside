@@ -1,7 +1,7 @@
 CREATE TABLE partner_invitation (
     id             uuid PRIMARY KEY,
-    booking_id     uuid        NOT NULL REFERENCES booking ON DELETE CASCADE,
-    participant_id uuid        NOT NULL REFERENCES booking_participant ON DELETE CASCADE,
+    booking_id     uuid        NOT NULL,
+    participant_id uuid        NOT NULL,
     published_at   timestamptz NOT NULL,
 
     CONSTRAINT partner_invitation_one_per_booking UNIQUE (booking_id)

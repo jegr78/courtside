@@ -58,7 +58,7 @@ class PartnerInvitationRows {
         jdbc.sql("DELETE FROM partner_invitation WHERE booking_id = :bookingId").param("bookingId", bookingId).update();
     }
 
-    // Everything nobody can take any more: its booking was cancelled, has started or lost the marker.
+    // Everything nobody can take any more: its booking is gone, was cancelled, has started or lost the marker.
     int deleteClosed(Instant now) {
         return jdbc.sql("""
                         DELETE FROM partner_invitation i

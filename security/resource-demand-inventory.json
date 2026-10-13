@@ -5,6 +5,7 @@
     "openapi": "src/main/resources/api/openapi.yaml",
     "scheduledFiles": [
       "src/main/java/org/courtside/booking/internal/BookingReminderSchedule.java",
+      "src/main/java/org/courtside/booking/partner/PartnerSearchSweep.java",
       "src/main/java/org/courtside/booking/waitlist/WaitlistSweep.java",
       "src/main/java/org/courtside/dataexchange/internal/PreviewExpirySchedule.java",
       "src/main/java/org/courtside/identity/internal/AgedSessionSweep.java",
@@ -232,11 +233,14 @@
       "id": "booking-write",
       "kind": "demanding",
       "entryPoints": [
+        "acceptPartnerInvitation",
         "acceptWaitlistOffer",
         "cancelBooking",
         "createBooking",
         "joinWaitlist",
-        "leaveWaitlist"
+        "leaveWaitlist",
+        "publishPartnerInvitation",
+        "withdrawPartnerInvitation"
       ],
       "growthDrivers": "Availability checks and allocation writes grow with requested courts, while participant validation grows with the bounded request body.",
       "inputOrDataBound": "One request names at most 999 distinct courts and the reference proxy caps the complete body at 2 MiB; configured slot and rule limits also apply.",
@@ -247,6 +251,7 @@
       "productionPaths": [
         "src/main/java/org/courtside/booking/BookingService.java",
         "src/main/java/org/courtside/booking/waitlist/WaitlistService.java",
+        "src/main/java/org/courtside/booking/partner/PartnerSearchService.java",
         "src/main/java/org/courtside/shared/web/AdmissionControl.java"
       ],
       "evidence": [
@@ -268,6 +273,7 @@
         "listImportRuns",
         "listImportSources",
         "listMembershipTypes",
+        "listOpenPlaces",
         "listParticipantCards",
         "listParticipantCardsForAdmin",
         "listReservedSlots",
@@ -276,7 +282,7 @@
         "searchParticipantMembers",
         "searchRoster"
       ],
-      "growthDrivers": "Collection queries grow with courts, cards, members, import history, rule sets, audit history or one day of occupied court slots in the club database.",
+      "growthDrivers": "Collection queries grow with courts, cards, members, import history, rule sets, audit history, published open places or one day of occupied court slots in the club database.",
       "inputOrDataBound": "Roster pages stop at 200, participant search at 20 and filtered audit search scans at most 2,500 candidate events per request; one occupancy response spans one day and at most 999 courts. Several configuration and import-history lists have no row ceiling beyond tenant data.",
       "concurrencyOrRateBound": "Each read spends 2 tokens of its caller's request budget; the queries have no separate concurrency gate.",
       "executionModel": "Each operation is a synchronous read-only request; paged operations use a stable cursor while deliberately small configuration lists return together.",
@@ -284,6 +290,7 @@
       "consumerTimeoutBehavior": "The application rolls a request's transaction back after 30 seconds and cancels any statement after 15 seconds. The reference proxy sets no response deadline. These reads are repeatable after a caller disconnects and carry no server-side continuation contract.",
       "productionPaths": [
         "src/main/java/org/courtside/booking/BookingService.java",
+        "src/main/java/org/courtside/booking/partner/PartnerSearchService.java",
         "src/main/java/org/courtside/audit/internal/AuditService.java",
         "src/main/java/org/courtside/dataexchange/ExecutionService.java",
         "src/main/java/org/courtside/member/RosterService.java",
@@ -464,6 +471,7 @@
         "MailOutbox#poll",
         "ParticipationMailer#on(ParticipantRecorded)",
         "ParticipationMailer#on(ParticipantWithdrew)",
+        "ParticipationMailer#on(PartnerJoined)",
         "PasswordResetCodeMailer#on(PasswordResetRequested)",
         "ReminderMailer#on(BookingReminderDue)",
         "SeriesMailer#on(SeriesCancelled)",
@@ -504,6 +512,7 @@
         "IdentityCleanupSchedule#deleteExpiredLoginAttempts",
         "IdentityCleanupSchedule#deleteExpiredResetMailWindows",
         "IdentityCleanupSchedule#deleteExpiredResetTokens",
+        "PartnerSearchSweep#removeWhatNobodyCanTake",
         "PreviewExpirySchedule#sweepNow",
         "WaitlistSweep#passOnWhatIsDue"
       ],
@@ -515,6 +524,7 @@
       "consumerTimeoutBehavior": "Each sweep allows its statements ten minutes, so an accumulated backlog cannot cancel the run that clears it. There is no HTTP consumer. A delayed or failed run is retried by the next fixed-delay or cron invocation rather than by extending an arbitrary timeout.",
       "productionPaths": [
         "src/main/java/org/courtside/booking/internal/BookingReminderSchedule.java",
+        "src/main/java/org/courtside/booking/partner/PartnerSearchSweep.java",
         "src/main/java/org/courtside/booking/waitlist/WaitlistSweep.java",
         "src/main/java/org/courtside/dataexchange/internal/PreviewExpirySchedule.java",
         "src/main/java/org/courtside/identity/internal/AgedSessionSweep.java",
@@ -524,7 +534,8 @@
         "src/test/java/org/courtside/notification/BookingReminderTest.java#givenAReminderAlreadySent_whenTheSweepRunsAgain_thenNobodyIsRemindedTwice",
         "src/test/java/org/courtside/dataexchange/PreviewExpiryTest.java#givenASweptPreview_whenTheSweepRunsAgain_thenThereIsNothingLeftToDrop",
         "src/test/java/org/courtside/identity/internal/AgedSessionSweepTest.java#givenASessionPastItsLifetimeButNotIdle_whenTheSweepRuns_thenItsRowGoesAndAYoungOneStays",
-        "src/test/java/org/courtside/booking/waitlist/WaitlistTest.java#givenWaitingEntries_whenTheSlotStartsAndEnds_thenTheSweepClosesAndThenForgetsThem"
+        "src/test/java/org/courtside/booking/waitlist/WaitlistTest.java#givenWaitingEntries_whenTheSlotStartsAndEnds_thenTheSweepClosesAndThenForgetsThem",
+        "src/test/java/org/courtside/booking/partner/PartnerSearchTest.java#givenAStartedBooking_whenItsPlaceWasPublished_thenNobodySeesOrTakesItAndTheSweepRemovesIt"
       ]
     },
     {

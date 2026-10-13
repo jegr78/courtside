@@ -200,7 +200,11 @@
         "listOwnWaitlistEntries",
         "joinWaitlist",
         "leaveWaitlist",
-        "acceptWaitlistOffer"
+        "acceptWaitlistOffer",
+        "publishPartnerInvitation",
+        "withdrawPartnerInvitation",
+        "listOpenPlaces",
+        "acceptPartnerInvitation"
       ],
       "backgroundEntryPoints": [
         "BookingMailer#on(BookingConfirmed)",
@@ -211,6 +215,8 @@
         "MailOutbox#poll",
         "ParticipationMailer#on(ParticipantRecorded)",
         "ParticipationMailer#on(ParticipantWithdrew)",
+        "ParticipationMailer#on(PartnerJoined)",
+        "PartnerSearchSweep#removeWhatNobodyCanTake",
         "ReminderMailer#on(BookingReminderDue)",
         "SeriesMailer#on(SeriesCancelled)",
         "SeriesMailer#on(SeriesCreated)",
@@ -224,19 +230,22 @@
         "Cancellation releases allocations and records its actor.",
         "Participation withdrawal removes only the caller's participant record.",
         "Series creation, move and cancellation change all selected occurrences transactionally.",
-        "Joining a waitlist stores one open entry per slot and account; a freed slot is offered to the first eligible entry in the transaction that freed it, and acceptance turns the reservation into a confirmed booking."
+        "Joining a waitlist stores one open entry per slot and account; a freed slot is offered to the first eligible entry in the transaction that freed it, and acceptance turns the reservation into a confirmed booking.",
+        "A holder publishes or withdraws a partner invitation for an own booking; an eligible member who accepts it joins the booking as a participant under the booking row lock."
       ],
       "alternatePaths": [
         "Booking-card roles and ADMIN authority select which appointments a caller may create or manage.",
         "Series and move previews report blocked occurrences without mutation.",
         "Before the instance reports ready, its warm-up previews a series and writes and cancels a booking inside a transaction it rolls back.",
-        "A disabled account or an entry no longer eligible is skipped, and an offer past its deadline is passed on by the waitlist sweep."
+        "A disabled account or an entry no longer eligible is skipped, and an offer past its deadline is passed on by the waitlist sweep.",
+        "Open places list only invitations the caller may take, without names or booking ids, and the partner search sweep removes invitations nobody can take any more."
       ],
       "failurePaths": [
         "Rules, opening hours, unavailable resources and duplicate participants reject the whole write.",
         "Unauthorized access is concealed as absence where existence would disclose another person's booking.",
         "Concurrency and stale series state roll back rather than leave a partial calendar.",
-        "A reserved court refuses every other account's booking, and another account's waitlist entry answers as absent."
+        "A reserved court refuses every other account's booking, and another account's waitlist entry answers as absent.",
+        "Another account's booking answers as absent to publish and withdraw, and an invitation the caller may not take answers as absent to acceptance."
       ],
       "productionPaths": [
         "src/main/java/org/courtside/booking/BookingService.java",
@@ -246,7 +255,10 @@
         "src/main/java/org/courtside/shared/internal/StartupWarmUp.java",
         "src/main/java/org/courtside/booking/waitlist/WaitlistService.java",
         "src/main/java/org/courtside/booking/waitlist/WaitlistQueue.java",
-        "src/main/java/org/courtside/booking/web/WaitlistController.java"
+        "src/main/java/org/courtside/booking/web/WaitlistController.java",
+        "src/main/java/org/courtside/booking/partner/PartnerSearchService.java",
+        "src/main/java/org/courtside/booking/partner/PartnerSearchSweep.java",
+        "src/main/java/org/courtside/booking/web/PartnerSearchController.java"
       ],
       "evidence": [
         "src/test/java/org/courtside/booking/BookingServiceTest.java#givenAnExistingBooking_whenCreatingAnOverlappingOne_thenCourtUnavailableIsThrown",

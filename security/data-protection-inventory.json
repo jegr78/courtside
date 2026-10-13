@@ -47,6 +47,11 @@
       "class": "identifier"
     },
     {
+      "name": "invitationId",
+      "in": "path",
+      "class": "identifier"
+    },
+    {
       "name": "notificationId",
       "in": "path",
       "class": "identifier"
@@ -211,7 +216,7 @@
     "club-configuration": "Lives as long as the club keeps it; a board changes it in the product and no person's lifecycle reaches it.",
     "reset-code": "Deleted when the code is redeemed or replaced by a new request, and by the identity cleanup sweep once it has expired; removed with the account it belongs to.",
     "waitlist-sweep": "Deleted by the waitlist sweep once the slot it waited for has ended; removed with the account it belongs to.",
-    "partner-sweep": "Deleted when the place is taken or withdrawn, and by the partner sweep once its booking is cancelled or has started; removed with its booking."
+    "partner-sweep": "Deleted when the place is taken or withdrawn, and by the partner sweep once its booking is gone, cancelled or started."
   },
   "inMemoryState": {
     "BookingController": {
