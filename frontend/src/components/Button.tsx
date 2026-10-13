@@ -14,7 +14,7 @@ const variantClasses: Record<ButtonProps["variant"], string> = {
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button({ className = "", variant, ...props }, ref) {
   return <button
     ref={ref}
-    className={`focus-ring rounded-lg px-4 py-3 font-semibold shadow-sm transition hover:brightness-90 disabled:cursor-not-allowed disabled:border disabled:border-(--cs-border) disabled:bg-(--cs-raised) disabled:text-(--cs-muted) ${variantClasses[variant]} ${className}`}
+    className={`focus-ring rounded-lg px-4 py-3 font-semibold shadow-sm transition hover:brightness-90 disabled:cursor-not-allowed disabled:border disabled:border-(--cs-border) disabled:bg-(--cs-raised) disabled:text-(--cs-muted) aria-disabled:cursor-not-allowed aria-disabled:border aria-disabled:border-(--cs-border) aria-disabled:bg-(--cs-raised) aria-disabled:text-(--cs-muted) ${variantClasses[variant]} ${className}`}
     {...props}
   />;
 });

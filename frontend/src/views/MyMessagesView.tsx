@@ -72,7 +72,8 @@ function NotificationEntry({ notification, timeZone, marking, justRead, markRead
         {t(`notifications.open.${notification.link.target}`)}
       </Link>}
       {!read && <Button variant="secondary" data-testid="notification-mark-read" aria-describedby={summaryId}
-        className="min-h-11 px-3" disabled={marking} onClick={() => markRead(notification.id)}>
+        className="min-h-11 px-3" aria-disabled={marking || undefined}
+        onClick={() => { if (!marking) markRead(notification.id); }}>
         {t("notifications.markRead")}
       </Button>}
     </div>
@@ -85,6 +86,7 @@ function NotificationCentre() {
   const [entries, setEntries] = useState<Notification[]>();
   const [nextCursor, setNextCursor] = useState<string>();
   const [marking, setMarking] = useState<string>();
+  const inFlight = useRef(new Set<string>());
   const [justRead, setJustRead] = useState<string>();
   const [loadingMore, setLoadingMore] = useState(false);
   const [failure, setFailure] = useState<{ cause: unknown }>();
@@ -114,6 +116,8 @@ function NotificationCentre() {
 
   // Following a link leaves the page, so a refusal there is only logged rather than shown.
   async function markRead(id: string, quietly = false) {
+    if (inFlight.current.has(id)) return;
+    inFlight.current.add(id);
     setMarking(id);
     if (!quietly) setJustRead(undefined);
     try {
@@ -127,6 +131,7 @@ function NotificationCentre() {
       if (quietly) warnAbout("Notification not marked read", cause);
       else setFailure({ cause });
     } finally {
+      inFlight.current.delete(id);
       setMarking(undefined);
     }
   }

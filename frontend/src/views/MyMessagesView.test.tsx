@@ -227,6 +227,26 @@ describe("MyMessagesView", () => {
     expect(document.activeElement).toBe(entry(displaced.id));
   });
 
+  it("given a mark-as-read request still running, when the member presses again, then no second request leaves and the button stays focusable", async () => {
+    // given
+    let answer: () => void = () => undefined;
+    const mark = vi.spyOn(api, "markNotificationRead")
+      .mockImplementation(() => new Promise<void>((resolve) => { answer = resolve; }));
+    show();
+    const button = within(await screen.findByTestId(`notification-${confirmed.id}`)).getByTestId("notification-mark-read");
+    await userEvent.click(button);
+
+    // when
+    await userEvent.click(button);
+
+    // then
+    expect(mark, "a pressed button sends its request once").toHaveBeenCalledTimes(1);
+    expect(button).toHaveAttribute("aria-disabled", "true");
+    expect(button, "a natively disabled button drops the focus in a real browser").not.toBeDisabled();
+    act(() => answer());
+    await waitFor(() => expect(screen.getByTestId(`notification-${confirmed.id}`)).toHaveAttribute("data-read", "true"));
+  });
+
   it("given an unread notification, when it is marked read, then the navigation is told to count again", async () => {
     // given
     vi.spyOn(api, "markNotificationRead").mockResolvedValue(undefined);
