@@ -26,6 +26,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.authorization.AuthorizationDecision;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.savedrequest.NullRequestCache;
 import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.context.SecurityContextHolderFilter;
@@ -250,6 +251,8 @@ public class SecurityConfiguration {
                             }
                             response.setStatus(HttpStatus.NO_CONTENT.value());
                         }))
+                // No sign-in reads a saved request back, so saving one would only open a session for nobody.
+                .requestCache(cache -> cache.requestCache(new NullRequestCache()))
                 .exceptionHandling(handling -> handling
                         .authenticationEntryPoint(authenticationEntryPoint)
                         .accessDeniedHandler(accessDeniedHandler))
