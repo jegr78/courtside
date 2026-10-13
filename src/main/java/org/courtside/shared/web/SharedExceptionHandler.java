@@ -353,6 +353,12 @@ class SharedExceptionHandler {
 
     @ExceptionHandler(MultipartException.class)
     ProblemDetail handleUnparseableMultipart(MultipartException exception) {
+        if (Multipart.failedOnTheServer(exception)) {
+            ProblemDetail problem = ContainerErrorController.problemFor(HttpStatus.INTERNAL_SERVER_ERROR);
+            traceReference.addTo(problem);
+            log.warn("Answering {} for {}", HttpStatus.INTERNAL_SERVER_ERROR, problem.getType(), exception);
+            return problem;
+        }
         refusedByValidation();
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
                 HttpStatus.BAD_REQUEST, "The request body could not be parsed");

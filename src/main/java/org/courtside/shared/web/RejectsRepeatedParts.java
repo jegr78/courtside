@@ -46,9 +46,9 @@ class RejectsRepeatedParts extends OncePerRequestFilter {
         refusal.report(request, response, "parameter", parameter);
     }
 
-    // A body this filter cannot read is a body the resolver below reports on, and its answer says
-    // what is wrong with more than a repeated name would.
-    private static String firstRepeatedPart(HttpServletRequest request) {
+    // A body the client sent malformed is the resolver's to report, which says more than a repeated
+    // name would; a failure of the server's own is thrown on so it answers as one.
+    private static String firstRepeatedPart(HttpServletRequest request) throws ServletException, IOException {
         Set<String> seen = new HashSet<>();
         try {
             for (Part part : request.getParts()) {
@@ -57,6 +57,9 @@ class RejectsRepeatedParts extends OncePerRequestFilter {
                 }
             }
         } catch (ServletException | IOException | IllegalStateException unreadable) {
+            if (Multipart.failedOnTheServer(unreadable)) {
+                throw unreadable;
+            }
             return null;
         }
         return null;
