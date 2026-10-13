@@ -1227,6 +1227,7 @@ const en: Record<keyof typeof de, string> = {
   "audit.subject.series": "Series, {{courts}}, from {{period}}",
   "audit.subject.bookingUnresolved": "Booking not found: {{subjectId}}",
   "audit.subject.seriesUnresolved": "Series not found: {{subjectId}}",
+  "audit.subject.waitlistEntry": "Waitlist entry {{subjectId}}",
   "audit.subject.courtsUnknown": "court unknown",
   "audit.cursor.unknown": "This change-log position no longer exists. Load the first page again.",
   "audit.column.occurredAt": "Occurred",

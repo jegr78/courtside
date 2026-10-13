@@ -1225,6 +1225,7 @@ const de = {
   "audit.subject.series": "Serie, {{courts}}, ab {{period}}",
   "audit.subject.bookingUnresolved": "Buchung nicht auffindbar: {{subjectId}}",
   "audit.subject.seriesUnresolved": "Serie nicht auffindbar: {{subjectId}}",
+  "audit.subject.waitlistEntry": "Wartelisteneintrag {{subjectId}}",
   "audit.subject.courtsUnknown": "Platz unbekannt",
   "audit.cursor.unknown": "Dieser Cursor bezeichnet keinen Eintrag des Protokolls. Bitte die erste Seite neu laden.",
   "audit.column.occurredAt": "Zeitpunkt",
