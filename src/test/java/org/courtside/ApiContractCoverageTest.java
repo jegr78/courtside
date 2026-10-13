@@ -252,6 +252,29 @@ class ApiContractCoverageTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void everyWriteDeclaresTheCsrfTokenItIsRefusedWithout() {
+        // when
+        TreeSet<String> undeclared = new TreeSet<>();
+        paths().forEach((path, methods) -> operationsOf(methods).forEach((method, operation) -> {
+            if (!Set.of("post", "put", "patch", "delete").contains(method)) {
+                return;
+            }
+            Object security = operation.getOrDefault("security", DOCUMENT_TREE.get("security"));
+            boolean guarded = security instanceof List<?> requirements && requirements.stream()
+                    .anyMatch(requirement -> requirement instanceof Map<?, ?> schemes
+                            && schemes.containsKey("csrfToken"));
+            if (!guarded) {
+                undeclared.add(method.toUpperCase() + " " + path);
+            }
+        }));
+
+        // then
+        assertThat(undeclared)
+                .as("Spring's CSRF filter refuses every write without the token, so every write documents it")
+                .isEmpty();
+    }
+
+    @Test
     void everyOperationWithAQueryParameterItCanRefuseDocumentsTheAnswer() {
         // when
         TreeSet<String> silent = operationsWithNo("400", ApiContractCoverageTest::canBeRefused);
