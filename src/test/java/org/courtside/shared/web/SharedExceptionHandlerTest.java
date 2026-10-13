@@ -13,9 +13,12 @@ import org.springframework.web.bind.ServletRequestBindingException;
 import org.springframework.web.method.annotation.ExceptionHandlerMethodResolver;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.MultipartException;
+import org.apache.catalina.connector.ClientAbortException;
+import org.apache.coyote.BadRequestException;
 import org.apache.tomcat.util.http.fileupload.MultipartStream;
 import org.apache.tomcat.util.http.fileupload.impl.IOFileUploadException;
 
+import java.io.EOFException;
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.sql.SQLException;
@@ -197,6 +200,35 @@ class SharedExceptionHandlerTest {
         // then
         assertThat(problem.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value());
         assertThat(problem.getType().toString()).isEqualTo("urn:courtside:error:malformed-request-body");
+    }
+
+    @Test
+    void givenAClientThatBreaksOffItsUpload_whenAnsweringIt_thenItStaysABadRequest() {
+        // given
+        MultipartException failure = new MultipartException("Failed to parse multipart servlet request",
+                new IOFileUploadException("Processing of multipart/form-data request failed. null",
+                        new ClientAbortException(new EOFException())));
+
+        // when
+        ProblemDetail problem = handler().handleUnparseableMultipart(failure);
+
+        // then
+        assertThat(problem.getStatus()).as("a client that hangs up is not a server fault")
+                .isEqualTo(HttpStatus.BAD_REQUEST.value());
+    }
+
+    @Test
+    void givenABodyWithABrokenChunkedEncoding_whenAnsweringIt_thenItStaysABadRequest() {
+        // given
+        MultipartException failure = new MultipartException("Failed to parse multipart servlet request",
+                new BadRequestException("Invalid chunk header"));
+
+        // when
+        ProblemDetail problem = handler().handleUnparseableMultipart(failure);
+
+        // then
+        assertThat(problem.getStatus()).as("a framing error the client sent is not a server fault")
+                .isEqualTo(HttpStatus.BAD_REQUEST.value());
     }
 
     private static SharedExceptionHandler handler() {

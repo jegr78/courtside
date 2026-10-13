@@ -2,8 +2,10 @@ package org.courtside.shared.web;
 
 import jakarta.servlet.http.HttpServletRequest;
 import org.apache.catalina.connector.ClientAbortException;
+import org.apache.coyote.BadRequestException;
 import org.apache.tomcat.util.http.fileupload.FileUploadException;
 import org.apache.tomcat.util.http.fileupload.MultipartStream;
+import org.apache.tomcat.util.http.fileupload.impl.IOFileUploadException;
 import org.springframework.util.StringUtils;
 
 import java.io.IOException;
@@ -18,15 +20,21 @@ final class Multipart {
         return StringUtils.startsWithIgnoreCase(request.getContentType(), "multipart/");
     }
 
-    // The parser reports a body it cannot read as its own exception; any other I/O failure beneath is the server's.
+    // A failure is the server's only when nothing on its way up came from the client or the parser.
     static boolean failedOnTheServer(Throwable failure) {
-        Throwable root = failure;
-        while (root.getCause() != null && root.getCause() != root) {
-            root = root.getCause();
+        Throwable link = failure;
+        for (int depth = 0; depth < 16; depth++) {
+            if (link instanceof ClientAbortException || link instanceof BadRequestException
+                    || link instanceof MultipartStream.MalformedStreamException
+                    || (link instanceof FileUploadException && !(link instanceof IOFileUploadException))) {
+                return false;
+            }
+            if (link.getCause() == null || link.getCause() == link) {
+                return link instanceof IOException;
+            }
+            link = link.getCause();
         }
-        return root instanceof IOException
-                && !(root instanceof FileUploadException || root instanceof MultipartStream.MalformedStreamException
-                || root instanceof ClientAbortException);
+        return false;
     }
 
     static String firstRepeatedParameter(HttpServletRequest request) {
