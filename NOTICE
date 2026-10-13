@@ -32,6 +32,18 @@ SecLists common-password list
   release and carried out whenever SecLists has published a newer tag, so a list
   that ships is never older than the last release it went out with.
 
+German hyphenation patterns
+  Files: frontend/e2e/hyphenation/hyph_de_DE.dic
+  Copyright: Marco Huggenberger, Daniel Naber, Karl Zeiler
+  Licence: LGPL-2.0-or-later
+           https://www.gnu.org/licenses/old-licenses/lgpl-2.0.html
+
+  Copied unmodified from /usr/share/hyphen/hyph_de_DE.dic of the Ubuntu noble
+  package hyphen-de 1:24.2.1-1, which carries the LibreOffice dictionaries, SHA-256
+  2e2f5ffea6bc53f67ffe8c076921c7b1b34a2ec2b9ec57a4608374bb65a1a1e1. The browser journeys copy it into the
+  pinned browser image, which ships no hyphenation dictionary, and nothing else
+  uses it.
+
 Dependencies resolved at build time are not distributed in this repository; their
 licences are declared in their own artifacts and reported by
 `./mvnw license:aggregate-third-party-report` or an SBOM.
