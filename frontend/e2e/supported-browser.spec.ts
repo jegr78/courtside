@@ -208,6 +208,45 @@ test("a closed day shows its opening times as empty rather than as a ghost time"
   }
 });
 
+test("given a notification marked read from the keyboard, when the request runs, fails and succeeds, then the focus never falls to the page", async ({ page, journeyService }) => {
+  // given
+  const unread = "7c000000-0000-0000-0000-0000000000a3";
+  await journeyService.executeSql(`
+    INSERT INTO notification (id, account_id, kind, parameters, created_at, read_at) VALUES
+      ('${unread}', '00000000-0000-0000-0000-000000000102', 'BOOKING_DISPLACED', '{"closure": "DAY_CLOSED"}', now(), NULL);`);
+  try {
+    await signIn(page, "doe.jane");
+    await page.getByTestId("my-messages-link").click();
+    const entry = page.getByTestId(`notification-${unread}`);
+    const button = entry.getByTestId("notification-mark-read");
+    let answer: (status: number) => void = () => undefined;
+    await page.route(`**/api/account/notifications/${unread}/read`, async (route) => {
+      const status = await new Promise<number>((resolve) => { answer = resolve; });
+      if (status === 0) await route.continue();
+      else await route.fulfill({ status, contentType: "application/problem+json",
+        body: JSON.stringify({ type: "urn:courtside:error:internal", title: "Internal error", status }) });
+    });
+    await button.focus();
+
+    // when
+    await page.keyboard.press("Enter");
+
+    // then
+    await expect(button, "the pressed button keeps the focus while its request runs").toBeFocused({ timeout: 10_000 });
+    answer(500);
+    await expect(page.getByRole("alert")).toBeVisible({ timeout: 10_000 });
+    await expect(button, "a refused request leaves the focus where the member pressed").toBeFocused({ timeout: 10_000 });
+    await page.keyboard.press("Enter");
+    await expect(button).toBeFocused({ timeout: 10_000 });
+    answer(0);
+    await expect(entry).toHaveAttribute("data-read", "true", { timeout: 10_000 });
+    await expect(entry, "the read entry takes the focus from the button it no longer shows").toBeFocused({ timeout: 10_000 });
+  } finally {
+    await page.unrouteAll({ behavior: "ignoreErrors" });
+    await journeyService.executeSql(`DELETE FROM notification WHERE id = '${unread}';`);
+  }
+});
+
 test("a member's pages load without the administration and without the language nobody chose", async ({ page }) => {
   // given
   await page.addInitScript(() => window.localStorage.setItem("courtside.locale", "de"));
