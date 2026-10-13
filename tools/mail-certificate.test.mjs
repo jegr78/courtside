@@ -98,9 +98,15 @@ test("given a round that arms its watch, when it reads the store, then the watch
     assert.match(helper, /anon_inode:inotify/,
       "only the watcher's own inotify descriptor says how many watches it holds");
     assert.match(round, /until registered[^\n]*; do\n {4}kill -0 "\$watcher" 2>\/dev\/null \|\| break/,
-      "inotifyd exits when a directory vanished while arming, and would never finish registering");
-    assert.match(round, /kill -0 "\$watcher" 2>\/dev\/null; then\n {4}read -r _ <&3/,
-      "a watcher that died holds the pipe open for nobody, and the read would wait forever");
+      "a watcher that died will never finish registering");
+    assert.match(round, /until registered[^\n]*; do[\s\S]*?\[ "\$armed" = "\$\(watches\)" \] \|\| break[\s\S]*?\[ "\$attempts" -lt 50 \] \|\| break[\s\S]*?done/,
+      "inotifyd keeps running without the watch of a directory that vanished, so registering must not wait forever");
+    assert.match(round, /if registered "\$watcher" "\$expected" && \[ "\$armed" = "\$\(watches\)" \] && kill -0 "\$watcher" 2>\/dev\/null; then\n {4}read -r _ <&3/,
+      "a round that lacks a watch, or whose watcher died, would wait for an event nobody delivers");
+    assert.match(round, /kill -9 "\$watcher" 2>\/dev\/null\n {2}wait "\$watcher"/,
+      "inotifyd defers SIGTERM while it writes into a full pipe, and the wait would never return");
+    assert.match(round, /wait "\$watcher" 2>\/dev\/null\n(?: {2}#[^\n]*\n)? {2}while read -r -t 0\.05 _ <&3; do :; done\ndone/,
+      "lines left in the pipe fill it until the next watcher blocks on its first write");
   });
 
 test("given the shipped plan, when the mail server loads it, then it reads the published pair", () => {
