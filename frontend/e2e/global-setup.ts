@@ -969,6 +969,10 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
             { source: resolve("node_modules/playwright-core"), target: "/opt/courtside/node_modules/playwright-core" }
           ])
           .withEnvironment(language.environment)
+          // The image ships libhyphen without dictionaries, so WebKit could not hyphenate German.
+          .withCopyFilesToContainer([
+            { source: resolve("e2e/hyphenation/hyph_de_DE.dic"), target: "/usr/share/hyphen/hyph_de_DE.dic" }
+          ])
           .withCopyContentToContainer([
             { content: rootCertificate, target: "/usr/local/share/ca-certificates/courtside-club.crt" },
             { content: JSON.stringify(options), target: "/tmp/launch-options.json" }

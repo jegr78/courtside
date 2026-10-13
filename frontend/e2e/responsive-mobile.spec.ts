@@ -1093,11 +1093,35 @@ test("given a German word longer than a 320 px line, when a heading wraps it, th
   // when
   await page.goto("/my-messages");
   const heading = page.getByRole("heading", { level: 1 });
-  const hyphenation = await heading.evaluate((element) => getComputedStyle(element).hyphens);
+  await expect(heading).toHaveText("Benachrichtigungen", { timeout: 10_000 });
+  const secondLineStart = await heading.evaluate((element) => {
+    const range = document.createRange();
+    range.selectNodeContents(element.firstChild!);
+    const lines = [...range.getClientRects()];
+    const last = lines[lines.length - 1];
+    const x = last.left + 2;
+    const y = last.top + last.height / 2;
+    const caret = document.caretPositionFromPoint?.(x, y);
+    return { lines: new Set(lines.map((line) => Math.round(line.top))).size, offset: caret ? caret.offset : document.caretRangeFromPoint(x, y)!.startOffset };
+  });
+  await page.evaluate(() => document.fonts.ready);
+  const drawn = await heading.screenshot();
+  const hyphenateWith = (character: string) => heading.evaluate((element, value) => {
+    element.style.setProperty("hyphenate-character", value);
+    element.style.setProperty("-webkit-hyphenate-character", value);
+  }, character);
+  await hyphenateWith('"+"');
+  const redrawn = await heading.screenshot();
+  await hyphenateWith("");
+  const restored = await heading.screenshot();
 
   // then
   await expect(page.locator("html"), "the browser hyphenates by the document language").toHaveAttribute("lang", "de");
-  expect(hyphenation, "a heading word that does not fit breaks at a syllable, not at an arbitrary letter").toBe("auto");
+  expect(secondLineStart.lines, "the word does not fit one 320 px line").toBe(2);
+  expect([2, 6, 10, 12, 15], "the word breaks at a syllable of Be-nach-rich-ti-gun-gen, not at an arbitrary letter")
+    .toContain(secondLineStart.offset);
+  expect(drawn.equals(restored), "the heading draws the same twice, so a difference below is the hyphen").toBe(true);
+  expect(drawn.equals(redrawn), "the first line ends with a hyphen the browser drew").toBe(false);
 });
 
 test("every page keeps its text legible and its controls on screen at phone width", async ({ page }) => {

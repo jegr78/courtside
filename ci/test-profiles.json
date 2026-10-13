@@ -4,6 +4,7 @@
     "full": {
       "exact": [
         ".dockerignore",
+        ".gitattributes",
         ".gitignore",
         ".release-please-manifest.json",
         "Dockerfile",
