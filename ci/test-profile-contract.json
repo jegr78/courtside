@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "profileOrder": ["docs", "backend", "frontend", "tooling", "full"],
+  "profileOrder": ["docs", "backend", "frontend", "tooling", "security-tooling", "full"],
   "ciJobOrder": [
     "docs", "backend", "frontend", "browser_visual", "browser", "deployment", "tooling", "security", "gates",
     "clock_shift"
@@ -29,6 +29,17 @@
     "tooling": {
       "ciJobs": ["tooling", "security", "clock_shift"],
       "localTasks": ["frontend-toolchain", "tooling-test"]
+    },
+    "security-tooling": {
+      "ciJobs": ["tooling", "security", "gates", "clock_shift"],
+      "localTasks": [
+        "frontend-toolchain",
+        "frontend-build",
+        "frontend-package",
+        "tooling-test",
+        "gate-uat",
+        "gate-active-security"
+      ]
     },
     "full": {
       "ciJobs": [

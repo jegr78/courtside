@@ -41,7 +41,7 @@ export function validateContract(contract) {
   if (contract === null || typeof contract !== "object" || Array.isArray(contract)
       || contract.schemaVersion !== 1
       || Object.keys(contract).some((field) => !rootFields.includes(field))
-      || JSON.stringify(contract.profileOrder) !== JSON.stringify(["docs", "backend", "frontend", "tooling", "full"])
+      || JSON.stringify(contract.profileOrder) !== JSON.stringify(["docs", "backend", "frontend", "tooling", "security-tooling", "full"])
       || JSON.stringify(contract.ciJobOrder) !== JSON.stringify([
         "docs", "backend", "frontend", "browser_visual", "browser", "deployment", "tooling", "security", "gates",
         "clock_shift"

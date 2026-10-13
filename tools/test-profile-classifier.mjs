@@ -13,7 +13,7 @@ const toolManifestPath = "ci/tool-profile-manifest.json";
 const rules = JSON.parse(readFileSync(rulesUrl, "utf8"));
 const toolManifest = JSON.parse(readFileSync(toolManifestUrl, "utf8"));
 const githubManifest = JSON.parse(readFileSync(githubManifestUrl, "utf8"));
-const reducedProfiles = ["docs", "backend", "frontend", "tooling"];
+const reducedProfiles = ["docs", "backend", "frontend", "tooling", "security-tooling"];
 validateRules(rules);
 validateToolManifest(toolManifest);
 validateGitHubManifest(githubManifest, undefined, toolManifest, executedTests(toolManifest));

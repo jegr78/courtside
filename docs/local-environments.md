@@ -68,8 +68,9 @@ merge base, requires a clean committed HEAD, and classifies its changes with
 need only clean change evidence. Backend changes run the Java profile; frontend changes run lint,
 unit tests, build, audit, application packaging and browser journeys. A mixed change runs both
 profiles. Added tool tests use the tooling profile when the same change only appends their complete
-manifest entries; runners and helpers remain full. The reference deployment guide uses the
-documentation profile. Build, workflow, security, executable deployment, database, OpenAPI, shared
+manifest entries; runners and helpers remain full, except the security environment's own tools,
+whose profile runs the tool suite, the qualification and the active security gate on an image
+packaged from the change. The reference deployment guide uses the documentation profile. Build, workflow, security, executable deployment, database, OpenAPI, shared
 test-infrastructure, unknown and structural changes run the complete Maven verification, the
 browser and WebKit reliability gates, and then the Docker release gates: qualification, Stalwart,
 restore, upgrade and the active security assessment.
