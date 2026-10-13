@@ -4,9 +4,9 @@ import org.jspecify.annotations.NullMarked;
 
 import java.util.UUID;
 
-// The member who took a published place, by identifier; the messages that follow resolve the rest.
+// The member who took a published place and the account they took it with, by identifier.
 @NullMarked
-public record PartnerJoined(UUID bookingId, UUID personId) implements DomainEventRecord {
+public record PartnerJoined(UUID bookingId, UUID personId, UUID accountId) implements DomainEventRecord {
 
     static final String TYPE = "booking.partner.joined";
 
