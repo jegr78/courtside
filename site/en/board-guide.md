@@ -302,8 +302,10 @@ Bookings and reports remain intact. You can enable the account again later.
 ### Export one person's data
 
 *Answer a data access request* creates a file containing data about this person. It includes person
-and account details, membership, bookings, series, messages, notification entries with the
-booking each concerns, opt-outs, import references and related change-log entries. Inspect the file before sharing it. Creating the file is itself written
+and account details, membership, bookings with the time an open place was offered, series, the
+person's own waitlist entries and the waitlists that name them, messages, notification entries with
+the booking or waitlist entry each concerns, opt-outs, import references and related change-log
+entries. Inspect the file before sharing it. Creating the file is itself written
 to the change log.
 
 You can export the whole people list as CSV. It may also include member numbers from one import
