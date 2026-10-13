@@ -22,7 +22,7 @@ test("stable member surfaces match their reviewed baselines", async ({ page, jou
   await selectVisualDate(page, journeyService.visualDate);
 
   // then
-  await stableScreenshot(page.getByTestId("court-plan-view"), "court-plan.png", dynamicDates(page));
+  await stableScreenshot(page.getByTestId("court-plan-view"), "court-plan.png");
 
   // when
   await signIn(page, "doe.jane");
@@ -84,7 +84,7 @@ test("the phone court plan and personal bookings match their reviewed baselines"
   await selectJourneyDate(page, journeyService.visualDate);
 
   // then
-  await phoneScreenshot(page.getByTestId("court-plan-view"), "phone-public-court-plan.png", dynamicDates(page));
+  await phoneScreenshot(page.getByTestId("court-plan-view"), "phone-public-court-plan.png");
 
   // when
   await signIn(page, "doe.jane");
@@ -117,7 +117,8 @@ for (const theme of ["dark", "light"] as const) {
       await expect(page.getByTestId("own-allocation").first()).toBeVisible({ timeout: 10_000 });
 
       // then
-      await capture(page.getByTestId("court-plan-view"), baseline("phone-court-plan"), dynamicDates(page));
+      await capture(page.getByTestId("court-plan-view"), baseline("phone-court-plan"));
+      await capture(page.getByTestId("mobile-week-navigation"), baseline("phone-court-plan-day-strip"));
     });
 
     test("given a phone in landscape, when the court plan and its booking dialog are drawn, then both match their reviewed baselines", async ({ page, journeyService }) => {
@@ -130,7 +131,8 @@ for (const theme of ["dark", "light"] as const) {
       await expect(page.getByTestId("own-allocation").first()).toBeVisible({ timeout: 10_000 });
 
       // then
-      await capture(page.getByTestId("court-plan-view"), baseline("phone-landscape-court-plan"), dynamicDates(page));
+      await capture(page.getByTestId("court-plan-view"), baseline("phone-landscape-court-plan"));
+      await capture(page.getByTestId("mobile-week-navigation"), baseline("phone-landscape-day-strip"));
 
       // when
       await page.locator('[data-testid="free-slot"][data-court-number="2"][data-slot="12:00"]').click();
@@ -408,10 +410,6 @@ async function selectVisualDate(page: Page, date: string): Promise<void> {
     await page.getByTestId("week-next").click();
   }
   await day.click();
-}
-
-function dynamicDates(page: Page): Locator {
-  return page.locator('[data-testid^="day-selector-"], time');
 }
 
 // The bar is fixed to the viewport, so a stitched capture would draw it wherever scrolling left it.
