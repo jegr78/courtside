@@ -104,6 +104,8 @@ class InstanceLinksTest {
         expected.put(MessageKind.BOOKING_PLAYER_WITHDREW, booking);
         expected.put(MessageKind.BOOKING_DISPLACED, booking);
         expected.put(MessageKind.BOOKING_REMINDER, booking);
+        expected.put(MessageKind.BOOKING_PARTNER_FOUND, booking);
+        expected.put(MessageKind.BOOKING_PLACE_TAKEN, booking);
         expected.put(MessageKind.BOOKING_CANCELLED, bookings);
         expected.put(MessageKind.BOOKING_CANCELLED_BY_CLUB, bookings);
         expected.put(MessageKind.BOOKING_SERIES_CREATED, bookings);

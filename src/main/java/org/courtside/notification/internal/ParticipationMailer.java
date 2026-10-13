@@ -12,6 +12,7 @@ import org.courtside.shared.BookingAnnouncement;
 import org.courtside.shared.BookingAnnouncer;
 import org.courtside.shared.ParticipantRecorded;
 import org.courtside.shared.ParticipantWithdrew;
+import org.courtside.shared.PartnerJoined;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
@@ -61,6 +62,17 @@ class ParticipationMailer implements MessageComposer {
                                 QueuedMessage.PLAYER, withdrew.personId().toString())));
     }
 
+    @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT, fallbackExecution = true)
+    void on(PartnerJoined joined) {
+        bookings.describe(joined.bookingId()).ifPresent(booking -> {
+            queue(accountOf(joined.personId()), MessageKind.BOOKING_PLACE_TAKEN,
+                    Map.of(QueuedMessage.BOOKING, joined.bookingId().toString()));
+            queue(accounts.findById(booking.bookedByAccountId()), MessageKind.BOOKING_PARTNER_FOUND,
+                    Map.of(QueuedMessage.BOOKING, joined.bookingId().toString(),
+                            QueuedMessage.PLAYER, joined.personId().toString()));
+        });
+    }
+
     private void queue(Optional<UserAccount> recipient, MessageKind kind, Map<String, String> parameters) {
         Optional<UserAccount> enabled = MessageRecipient.enabled(recipient);
         if (enabled.isEmpty()) {
@@ -72,7 +84,8 @@ class ParticipationMailer implements MessageComposer {
 
     @Override
     public Set<MessageKind> kinds() {
-        return Set.of(MessageKind.BOOKING_PLAYER_RECORDED, MessageKind.BOOKING_PLAYER_WITHDREW);
+        return Set.of(MessageKind.BOOKING_PLAYER_RECORDED, MessageKind.BOOKING_PLAYER_WITHDREW,
+                MessageKind.BOOKING_PARTNER_FOUND, MessageKind.BOOKING_PLACE_TAKEN);
     }
 
     @Override
@@ -83,7 +96,7 @@ class ParticipationMailer implements MessageComposer {
         Map<String, String> values = new HashMap<>(wording.of(booking, locale));
         values.put("firstName", account.getPerson().getFirstName());
         values.put(InstanceLinks.PLACEHOLDER, links.of(message));
-        if (message.kind() == MessageKind.BOOKING_PLAYER_WITHDREW) {
+        if (message.kind() == MessageKind.BOOKING_PLAYER_WITHDREW || message.kind() == MessageKind.BOOKING_PARTNER_FOUND) {
             Person player = persons.findById(message.player())
                     .orElseThrow(() -> new MessageUndeliverableException("PlayerGone"));
             values.put("player", player.getFirstName() + " " + player.getLastName());
