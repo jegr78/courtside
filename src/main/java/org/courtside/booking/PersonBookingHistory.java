@@ -16,7 +16,8 @@ public interface PersonBookingHistory {
     }
 
     record Made(UUID bookingId, Instant createdAt, BookingStatus status, Instant cancelledAt,
-                CancellationReason cancellationReason, String note, List<Reservation> reservations) {
+                CancellationReason cancellationReason, String note, List<Reservation> reservations,
+                Instant partnerSearchPublishedAt) {
 
         public Made {
             reservations = List.copyOf(reservations);

@@ -319,9 +319,10 @@ werden.
 ### Daten einer Person ausgeben
 
 *Auskunft über gespeicherte Daten* erstellt eine Datei mit den Daten dieser Person. Sie enthält
-Personen- und Kontodaten, Mitgliedschaft, Buchungen, Serien, Nachrichten, Einträge der
-Benachrichtigungen mit der jeweils betroffenen Buchung, Abwahlen, Importreferenzen und zugehörige
-Einträge im Änderungsprotokoll. Prüfe die Datei vor der
+Personen- und Kontodaten, Mitgliedschaft, Buchungen mit dem Zeitpunkt, zu dem ein offener Platz
+angeboten wurde, Serien, eigene Wartelisteneinträge und Wartelisten, in denen die Person eingetragen
+ist, Nachrichten, Einträge der Benachrichtigungen mit der jeweils betroffenen Buchung oder dem
+Wartelisteneintrag, Abwahlen, Importreferenzen und zugehörige Einträge im Änderungsprotokoll. Prüfe die Datei vor der
 Weitergabe. Die Erstellung selbst erscheint danach im Änderungsprotokoll.
 
 Die gesamte Personenliste kannst du als CSV exportieren. Optional enthält sie die

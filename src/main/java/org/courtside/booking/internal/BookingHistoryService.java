@@ -13,6 +13,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.Map;
+import java.util.stream.Collectors;
 import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
@@ -66,11 +68,25 @@ public class BookingHistoryService implements PersonBookingHistory {
     @Override
     public List<Made> madeBy(UUID accountId) {
         requireIdentifier(accountId, "account");
-        return bookings.findByBookedByOrderByCreatedAtAscIdAsc(accountId).stream()
+        List<Booking> made = bookings.findByBookedByOrderByCreatedAtAscIdAsc(accountId);
+        Map<UUID, Instant> offered = partnerSearchPublications(made.stream().map(Booking::getId).toList());
+        return made.stream()
                 .map(booking -> new Made(booking.getId(), booking.getCreatedAt(), booking.getStatus(),
                         booking.getCancelledAt(), booking.getCancellationReason(), booking.getNote(),
-                        reservationsOf(booking)))
+                        reservationsOf(booking), offered.get(booking.getId())))
                 .toList();
+    }
+
+    private Map<UUID, Instant> partnerSearchPublications(List<UUID> bookingIds) {
+        if (bookingIds.isEmpty()) {
+            return Map.of();
+        }
+        return jdbc.sql("SELECT booking_id, published_at FROM partner_invitation WHERE booking_id IN (:ids)")
+                .param("ids", bookingIds)
+                .query((row, number) -> Map.entry(row.getObject("booking_id", UUID.class),
+                        row.getTimestamp("published_at").toInstant()))
+                .list().stream()
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
     }
 
     @Override

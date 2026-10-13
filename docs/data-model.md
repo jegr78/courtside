@@ -281,8 +281,8 @@ the account marks the entry read, and a partial index over each account's unread
 unread count. `notification.kind` follows the same CHECK as `message_record.kind`, and
 `message_channel_optout.channel` accepts `EMAIL`. No row in `message_channel_optout` means the
 channel is on, which is how every account received mail before the choice existed.
-A subject-access answer lists each entry with its kind, both times and the booking id, closure kind
-and cancellation reason it stored, whether or not that booking still exists.
+A subject-access answer lists each entry with its kind, both times and the booking id, waitlist entry
+id, closure kind and cancellation reason it stored, whether or not that booking or entry still exists.
 
 `event_publication` is not domain data. Spring Modulith writes it so an event survives a listener
 that was not running, and Courtside neither reads nor migrates it by hand.

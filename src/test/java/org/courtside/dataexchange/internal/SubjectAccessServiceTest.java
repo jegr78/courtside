@@ -8,6 +8,7 @@ import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.courtside.member.testfixture.MemberTestFixture;
 import org.courtside.notification.MessageKind;
+import org.courtside.booking.PersonBookingHistory;
 import org.courtside.notification.PersonMessageHistory;
 import org.courtside.notification.testfixture.NotificationTestFixture;
 import org.courtside.shared.CancellationReason;
@@ -118,6 +119,44 @@ class SubjectAccessServiceTest extends AbstractIntegrationTest {
                 .satisfies(entry -> assertThat(entry.startsAt()).isEqualTo(SIX_PM));
         assertThat(answer.waitlistsNamedIn().toString()).as("nothing names who made the other entry")
                 .doesNotContain(otherAccount.toString()).doesNotContain("Roe");
+    }
+
+    @Test
+    void givenAWaitlistOfferInTheCentre_whenTheAnswerIsProduced_thenItNamesTheEntryItConcerns() {
+        // given
+        UUID personId = roster.addPerson("Jane", "Doe", "jane.doe@example.org");
+        UUID accountId = identity.createEnabledAccount(personId, "jane.doe", Set.of(Role.MEMBER));
+        UUID entryId = UUID.randomUUID();
+        notifications.notifyWaitlistOffered(accountId, entryId, SIX_PM);
+
+        // when
+        SubjectAccessRecord answer = subjectAccess.answerFor(personId);
+
+        // then
+        assertThat(answer.notifications()).singleElement()
+                .extracting(PersonMessageHistory.Notification::waitlistEntryId)
+                .as("everything the entry stored is in the answer").isEqualTo(entryId);
+    }
+
+    @Test
+    void givenABookingWhosePlaceItsHolderOffered_whenTheAnswerIsProduced_thenItSaysWhenTheyOfferedIt() {
+        // given
+        UUID personId = roster.addPerson("Jane", "Doe", "jane.doe@example.org");
+        UUID accountId = identity.createEnabledAccount(personId, "jane.doe", Set.of(Role.MEMBER));
+        UUID offered = bookings.createBookingLookingForAPartner(courtId, MEMBER_BOOKING_CARD,
+                new TimeSlot(SIX_PM, SEVEN_PM), accountId, personId);
+        bookings.publishOpenPlace(offered, accountId);
+        UUID kept = bookings.createBookingLookingForAPartner(courtId, MEMBER_BOOKING_CARD,
+                new TimeSlot(SEVEN_PM, SEVEN_PM.plusSeconds(3600)), accountId, personId);
+
+        // when
+        SubjectAccessRecord answer = subjectAccess.answerFor(personId);
+
+        // then
+        assertThat(answer.bookingsMade())
+                .extracting(PersonBookingHistory.Made::bookingId, PersonBookingHistory.Made::partnerSearchPublishedAt)
+                .as("the answer says when the holder offered a place, and nothing for a place they kept")
+                .containsExactlyInAnyOrder(tuple(offered, Instant.parse("2026-05-12T10:00:00Z")), tuple(kept, null));
     }
 
     @Test

@@ -3174,6 +3174,10 @@ components:
         reservations:
           type: array
           items: { $ref: "#/components/schemas/SubjectAccessReservation" }
+        partnerSearchPublishedAt:
+          type: [string, "null"]
+          format: date-time
+          description: When this person offered the booking's open place to other members, and `null` while no offer stands.
 
     SubjectAccessParticipation:
       type: object
@@ -3339,6 +3343,10 @@ components:
           type: string
           format: uuid
           description: The booking the entry concerns, as stored, whether or not it still exists.
+        waitlistEntryId:
+          type: string
+          format: uuid
+          description: The waitlist entry a waitlist offer concerns, as stored, whether or not it still exists.
         closure:
           $ref: "#/components/schemas/NotificationClosure"
         cancellationReason:

@@ -18,8 +18,8 @@ public interface PersonMessageHistory {
     record Declined(MessageKind kind, Instant declinedAt) {
     }
 
-    // What a centre entry stored besides its kind: its booking and why it was displaced or cancelled.
-    record Notification(MessageKind kind, Instant createdAt, Instant readAt, UUID bookingId,
+    // What a centre entry stored besides its kind: its booking or waitlist entry and why it was displaced or cancelled.
+    record Notification(MessageKind kind, Instant createdAt, Instant readAt, UUID bookingId, UUID waitlistEntryId,
                         BookingDisplaced.Closure closure, CancellationReason cancellationReason) {
     }
 

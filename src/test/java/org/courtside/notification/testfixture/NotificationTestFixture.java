@@ -76,6 +76,21 @@ public class NotificationTestFixture {
         return id;
     }
 
+    public UUID notifyWaitlistOffered(UUID accountId, UUID entryId, Instant at) {
+        UUID id = UUID.randomUUID();
+        jdbc.sql("""
+                        INSERT INTO notification (id, account_id, kind, parameters, created_at)
+                        VALUES (:id, :accountId, 'WAITLIST_OFFER',
+                                jsonb_build_object('waitlistEntryId', CAST(:entryId AS text)), :at)
+                        """)
+                .param("id", id)
+                .param("accountId", accountId)
+                .param("entryId", entryId.toString())
+                .param("at", java.sql.Timestamp.from(at))
+                .update();
+        return id;
+    }
+
     public UUID notifyDisplaced(UUID accountId, UUID bookingId, String closure, Instant at) {
         UUID id = UUID.randomUUID();
         jdbc.sql("""
