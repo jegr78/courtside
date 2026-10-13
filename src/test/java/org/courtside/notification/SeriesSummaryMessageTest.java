@@ -93,6 +93,30 @@ class SeriesSummaryMessageTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenStartsSentLatestFirst_whenTheSeriesIsCreated_thenTheCentreLeadsToTheEarliestOccurrence() {
+        // given
+        SeriesRule rule = new SeriesRule(List.of(courtId), TRAINING_CARD, LocalDate.of(2026, 5, 19),
+                LocalTime.of(18, 0), 120, 1, Set.of(DayOfWeek.TUESDAY), null, 3);
+        List<Instant> starts = series.preview(rule, trainerAccountId, null, Set.of(Role.TRAINER))
+                .occurrences().stream()
+                .map(occurrence -> occurrence.slot().start())
+                .toList().reversed();
+
+        // when
+        series.create(rule, starts, trainerAccountId, null, Set.of(Role.TRAINER), null);
+
+        // then
+        UUID earliest = jdbc.sql("""
+                        SELECT a.booking_id FROM court_allocation a JOIN booking b ON b.id = a.booking_id
+                        WHERE b.series_id IS NOT NULL ORDER BY a.starts_at LIMIT 1
+                        """).query(UUID.class).single();
+        assertThat(jdbc.sql("SELECT parameters ->> 'bookingId' FROM notification WHERE account_id = :accountId")
+                .param("accountId", trainerAccountId).query(String.class).single())
+                .as("the entry leads to the first date of the series, whatever order the request named them in")
+                .isEqualTo(earliest.toString());
+    }
+
+    @Test
     void givenAnEnglishSpeakingHolder_whenTheSeriesIsCreated_thenTheSummaryIsInEnglish() throws Exception {
         // given
         jdbc.sql("UPDATE user_account SET locale = 'en' WHERE id = :id").param("id", trainerAccountId).update();
