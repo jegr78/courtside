@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { api, type MessageChannel, type MessageChannelChoice, type MessageChoice, type MessageKind, type Notification } from "../api/client";
@@ -31,7 +31,8 @@ function NotificationEntry({ notification, timeZone, marking, justRead, markRead
 }) {
   const summaryId = useId();
   const item = useRef<HTMLLIElement>(null);
-  useEffect(() => {
+  // The commit that removes the pressed button must already move the focus, or it falls to the page.
+  useLayoutEffect(() => {
     if (justRead) item.current?.focus();
   }, [justRead]);
   const read = Boolean(notification.readAt);
