@@ -3,12 +3,14 @@ import { X509Certificate } from "node:crypto";
 import { chmodSync, mkdirSync, readFileSync } from "node:fs";
 import { isAbsolute, join } from "node:path";
 
-export function securityMailTrustPlan(directory, image, user, identity) {
+export function securityMailTrustPlan(directory, image, user, identity, rootless = false) {
   if (!isAbsolute(directory) || directory === "/" || directory.includes(",")) {
     throw new Error("Invalid private mail trust directory");
   }
   if (!/^(?:sha256:[a-f0-9]{64}|[^\s@]+@sha256:[a-f0-9]{64})$/.test(image)
-    || !/^[1-9][0-9]*:[1-9][0-9]*$/.test(user)) throw new Error("Invalid bounded mail trust identity");
+    || !(/^[1-9][0-9]*:[1-9][0-9]*$/.test(user) || (rootless && user === "0:0"))) {
+    throw new Error("Invalid bounded mail trust identity");
+  }
   if (!/^[a-z0-9][a-z0-9-]{5,47}$/.test(identity?.runId)
     || !/^sha256:[a-f0-9]{64}$/.test(identity.seedFingerprint)
     || !/^sha256:[a-f0-9]{64}$/.test(identity.instanceFingerprint)) {

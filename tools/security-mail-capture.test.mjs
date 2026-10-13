@@ -36,6 +36,20 @@ test("given a candidate and a private relay identity, when importing trust, then
   assert.doesNotMatch(JSON.stringify(plan), /Xmx|MaxRAMPercentage|ssl\.trust|checkserveridentity/);
 });
 
+test("given a rootless Docker daemon, when importing trust, then keytool runs as container root, which that daemon maps to the host user", () => {
+  // given
+  const digest = `sha256:${"a".repeat(64)}`;
+  const identity = { runId: "relay-run-0001", seedFingerprint: digest, instanceFingerprint: digest };
+  // when
+  const plan = securityMailTrustPlan("/private/courtside/mail", digest, "0:0", identity, true);
+  // then
+  assert.equal(plan.args[plan.args.indexOf("--user") + 1], "0:0", "only root maps onto the owner of the private directory");
+  assert.throws(() => securityMailTrustPlan("/private/courtside/mail", digest, "0:0", identity),
+    /Invalid bounded mail trust identity/, "a rootful daemon never runs the import as root");
+  assert.throws(() => securityMailTrustPlan("/private/courtside/mail", digest, "0:1000", identity, true),
+    /Invalid bounded mail trust identity/, "root is accepted only as the whole identity");
+});
+
 test("given the security mail sink, when reading its deployment, then keep relay data internal and preserve application memory limits", () => {
   // given
   const yaml = createRequire(new URL("../frontend/package.json", import.meta.url))("js-yaml");

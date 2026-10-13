@@ -10,6 +10,7 @@ import { evaluateResourceSignals, evaluateSafetyLimits, resourceAbuseIntegrityDi
   resourceCompetingWrites, resourceScenarioOutcomes } from "./security-resource-abuse.mjs";
 import { fixtureImagePlan, stageFixtureClasses } from "./fixture-artifact.mjs";
 import { createSecurityMailCertificate, securityMailTrustPlan } from "./security-mail-capture.mjs";
+import { containerIdentity, dockerIsRootless } from "./mail-relay-certificate.mjs";
 import { resourceStateCatalogSql, resourceStateSnapshotSql, parseResourceState } from "./security-resource-state.mjs";
 import { captureResourceState } from "./security-resource-state.mjs";
 import { parseResourceJournal } from "./security-resource-journal.mjs";
@@ -267,7 +268,7 @@ export function securitySeedPlan(runId, image, recorded, { composeRoot } = {}) {
 }
 
 export function securityEnvironment(runId, image, password = randomBytes(24).toString("base64url"),
-    httpsPort = 0) {
+    httpsPort = 0, mailUser = containerIdentity()) {
   if (!/^(?:sha256:[a-f0-9]{64}|[^\s@]+@sha256:[a-f0-9]{64})$/.test(image)) {
     throw new Error("The security candidate must be selected by immutable image digest");
   }
@@ -277,7 +278,7 @@ export function securityEnvironment(runId, image, password = randomBytes(24).toS
   return {
     COURTSIDE_SECURITY_RUN_ID: runId,
     COURTSIDE_SECURITY_MAIL_DIRECTORY: join(stateRoot, runId, `mail-${instanceFingerprint.slice(7)}`),
-    COURTSIDE_SECURITY_MAIL_USER: `${process.getuid?.() ?? 0}:${process.getgid?.() ?? 0}`,
+    COURTSIDE_SECURITY_MAIL_USER: mailUser,
     COURTSIDE_SECURITY_IMAGE: image,
     COURTSIDE_SECURITY_FIXTURES_IMAGE: securityFixturesImageTag(runId),
     COURTSIDE_SECURITY_HTTPS_PORT: String(httpsPort),
@@ -476,7 +477,7 @@ export async function startSecurityEnvironment(runId, image, selection) {
         const trust = securityMailTrustPlan(environment.COURTSIDE_SECURITY_MAIL_DIRECTORY, image,
           environment.COURTSIDE_SECURITY_MAIL_USER, { runId,
             seedFingerprint: environment.COURTSIDE_SECURITY_SEED_FINGERPRINT,
-            instanceFingerprint: environment.COURTSIDE_SECURITY_INSTANCE_FINGERPRINT });
+            instanceFingerprint: environment.COURTSIDE_SECURITY_INSTANCE_FINGERPRINT }, dockerIsRootless());
         command(trust.command, trust.args, { ...process.env, ...environment });
         chmodSync(join(environment.COURTSIDE_SECURITY_MAIL_DIRECTORY, "mail.p12"), 0o444);
         environment = { ...environment, COURTSIDE_SECURITY_MAIL_CERTIFICATE_FINGERPRINT: certificate.fingerprint };

@@ -38,6 +38,7 @@ import {
   securityReservationArgs, securityStateFile
 } from "./security-environment.mjs";
 import { fixtureImagePlan } from "./fixture-artifact.mjs";
+import { containerIdentity } from "./mail-relay-certificate.mjs";
 
 const yaml = createRequire(new URL("../frontend/package.json", import.meta.url))("js-yaml");
 
@@ -524,7 +525,7 @@ function startupFailureHarness({ captureFailure = false, cleanupFailure = false,
     securityStateFile: () => "/private/state", securityIdentityFile: () => "/private/identity",
     securityEnvironment: () => environment, randomBytes: () => Buffer.from("opaque"), availableLoopbackPort: async () => 12345,
     reserveSecurityEnvironment: () => events.push("reserve"), writeState: (_runId, state) => states.push(JSON.parse(JSON.stringify(state))),
-    createSecurityMailCertificate: () => ({ fingerprint: "native" }), securityMailTrustPlan: () => ({ command: "docker", args: ["trust"] }),
+    createSecurityMailCertificate: () => ({ fingerprint: "native" }), securityMailTrustPlan: () => ({ command: "docker", args: ["trust"] }), dockerIsRootless: () => false,
     inspectReusableImages: () => ({ schemaVersion: 1, productionImageID: `sha256:${"a".repeat(64)}`,
       fixturesImageID: `sha256:${"b".repeat(64)}`, sourceCommit: "c".repeat(40) }),
     verifyReusableImages: () => events.push("prebuilt-verified"),
@@ -1367,11 +1368,18 @@ test("given a disposable security identity, when configuring the relay, then pri
   // given
   const image = `sha256:${"a".repeat(64)}`;
   // when
-  const environment = securityEnvironment("relay-run-0001", image);
+  const environment = securityEnvironment("relay-run-0001", image, "password", 0, "1001:1001");
   // then
   assert.match(environment.COURTSIDE_SECURITY_MAIL_DIRECTORY, /build\/security\/relay-run-0001\/mail-[a-f0-9]{64}$/);
-  assert.equal(environment.COURTSIDE_SECURITY_MAIL_USER, `${process.getuid()}:${process.getgid()}`);
-  assert.notEqual(environment.COURTSIDE_SECURITY_MAIL_USER.split(":")[0], "0");
+  assert.equal(environment.COURTSIDE_SECURITY_MAIL_USER, "1001:1001");
+});
+
+test("given no identity is named, when configuring the relay, then the mail containers run as the identity the daemon maps onto the host user", () => {
+  // when
+  const environment = securityEnvironment("relay-run-0001", `sha256:${"a".repeat(64)}`);
+  // then
+  assert.equal(environment.COURTSIDE_SECURITY_MAIL_USER, containerIdentity(),
+    "under rootless Docker only container root can read the private mail directory");
 });
 
 test("given Docker cleanup inspection failures, when classifying absence, then only an explicit missing resource is accepted", () => {
