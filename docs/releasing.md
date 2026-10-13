@@ -304,7 +304,7 @@ tag; `release.yml` answers the tag and publishes exactly what was qualified.
 | `qualify` | The exact deployment archive is checked against that digest and all four recipes, then the digest is brought up through the reference deployment on `amd64` and `arm64` and checked against the candidate-image policy |
 | `gates` | Calls `release-gates.yml` with the candidate digest, the same workflow the nightly rehearses. Its `mail` job exercises the archive's self-hosted-mail recipe against controlled DNS, TLS and SMTP peers. `active-security` runs the scanners of the `active` profile against the running candidate; the `destructive` profile does not run here. `restore` restores a backup taken from the candidate into it. `security-record` collects the build, image, qualify and active-security evidence into one file, without `upgrade` and `restore`. `archive-reproducibility` builds the archive again from the release commit and requires the same bytes. `npm-audit` holds the release npm policy. `upgrade` migrates a database from each resolved origin into the candidate; the first release has none |
 | `evidence` | The record `release-candidate-evidence-<sha>`: both digests, the archive checksum, the version, the run and the push build, written only when every job above succeeded |
-| `tag` | Writes `v<version>` at the qualified commit through the release token and marks the release pull request `autorelease: tagged`. Creating a tag that exists fails, so a tag never moves |
+| `tag` | Writes `v<version>` at the qualified commit through the release token and marks the release pull request `autorelease: tagged`. An existing tag is accepted only where it already names the qualified commit, so a re-run completes and a tag never moves |
 | `candidate` | In `release.yml`: the tag sits on the branch its version belongs to, names the version the commit records and belongs to the newest published line, and the newest release-mode candidate evidence for that commit verifies, including the archive's checksum |
 | `publish` | The qualified manifests are signed with cosign and given SBOMs and provenance attestations; the draft release receives the candidate's archive, notes and security record, the version tags are pushed, and only then is the release made visible |
 | `plan-sync` | The release plan's status comment is synchronized with the release just published |
@@ -389,7 +389,8 @@ gh workflow run release-candidate.yml --ref main -f commit=<sha> -f rehearsal=tr
 
 `commit` is the full 40-character sha to qualify. `rehearsal` defaults to `true`. A rehearsal may
 qualify any commit, a branch head included, and skips the release preconditions: a pending release
-pull request, a commit on `main`, an unused tag and a green push build of that commit. With
+pull request, a commit on the branch its version belongs to (`main`, or `release/<major>.<minor>`
+for a patch), an unused tag and a green push build of that commit. With
 `rehearsal=false` the workflow refuses to run from anything but `main`, demands all four and writes
 the tag like a run the push build started.
 GitHub dispatches a workflow only once its file exists on the default branch.
