@@ -189,6 +189,23 @@ describe("AdminAuditView", () => {
     expect(subject).not.toHaveTextContent(/deleted/i);
   });
 
+  it("given a waitlist offer, when it is shown, then the subject cell names a waitlist entry and never a missing booking", async () => {
+    // given
+    const entry: AuditEntry = {
+      ...courtAdded, eventType: "booking.waitlist.offered", parameters: {}, subjectName: null, subjectPeriod: null
+    };
+    vi.spyOn(api, "audit").mockResolvedValue({ entries: [entry], nextCursor: null });
+
+    // when
+    show();
+    await screen.findByTestId("audit-row");
+
+    // then
+    const subject = within(row(entry.id)).getByTestId("audit-subject");
+    expect(subject).toHaveTextContent(`Waitlist entry ${entry.subjectId}`);
+    expect(subject, "the subject is a waitlist entry, not a booking").not.toHaveTextContent(/booking/i);
+  });
+
   it("given a German reader and a series nothing resolves, when it is shown, then the subject cell says so in German beside the identifier", async () => {
     // given
     await i18n.changeLanguage("de");
