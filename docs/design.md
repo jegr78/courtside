@@ -361,7 +361,8 @@ of a closure series goes first only while the closure card still admits the move
 closure card whose allowed roles are cleared admits every account, so any account can then end an
 offer by closing the court. The
 member accepts in Courtside, which turns the reservation into an ordinary booking under every rule
-in one transaction; a refused rule leaves the offer standing until its deadline. Declining or
+in one transaction; a refused rule leaves the offer open until the next sweep, which passes it on if
+its member still fails the checks. Declining or
 leaving passes the offer on at once. The member's own booking of the slot, or a move of their own
 series onto it, closes their entry as booked. A refusal of the offer mail that names the
 recipient's address skips an offer that is still open and passes it on, because its member will not
