@@ -374,6 +374,30 @@ never meet on one court. GiST exclusions back this up in the database: one over 
 per court and time, one over each account's open entries per court and time. A member sees only
 their own entries and their state, never another waiting member or a position.
 
+### Partner search
+
+The "looking for a partner" participant card holds a player slot like any other card and names
+nobody. Its holder may offer that slot to other members while the booking stands, has not started
+and is not part of a series; offering it again changes nothing, and withdrawing it ends the offer.
+A booking offers one place at most, the first slot the marker holds.
+
+`GET /api/partner-invitations` lists the offered places a member may take: the slot, the courts and
+the card, and nothing that names the holder, another player or the booking. A member sees a place
+only when their account is enabled, their membership type may book, the booking's card admits their
+roles, and they neither hold nor play in the booking. The court plan shows nothing new, because it
+is readable without an account.
+
+Taking a place locks the booking row, checks all of the above again and rewrites the marker's
+participant row into the member's, so the booking keeps its player count and positions and no
+booking rule that judges the booking itself runs again. The row lock orders every acceptance against
+a second one and against a cancellation; a unique index on the booking's members refuses a member
+who already plays. The offer is deleted with the acceptance. A cancelled or started booking offers
+nothing from that moment, and a sweep every five minutes deletes those offers. A closure that
+displaces the booking leaves the offer standing, as it leaves the booking.
+
+The holder is told who took the place, as they are told who withdrew; the member is told where they
+now play. Both messages may be switched off.
+
 ## Configuration and administration
 
 | Layer | Examples | Changed by |
@@ -572,7 +596,7 @@ runtime. A message uses the recipient account's language.
 
 Current messages cover the welcome for a new account, generated credentials, password-reset codes, username reminders, booking
 confirmations, participant additions and withdrawals, displaced bookings, upcoming reminders,
-booking cancellations, new series and waitlist offers. A series sends no confirmation per occurrence. Its holder
+booking cancellations, new series, waitlist offers and a taken open place. A series sends no confirmation per occurrence. Its holder
 receives one summary naming the card, weekdays, time, courts, first and last date and the number of
 occurrences, and its centre entry leads to the first occurrence. Displacement informs people but
 does not cancel the booking.
@@ -589,8 +613,9 @@ operator's `COURTSIDE_PUBLIC_URL`, because it is bound to DNS and the certificat
 reminder has no request to derive it from. Only an absolute `https://` address without path, query
 or credentials is accepted, and anything else refuses startup. Without the setting, every message
 goes out without a link. A template line holding nothing but an empty link is dropped, and inside a
-sentence the link renders empty. Confirmation, participant addition and withdrawal, displacement and
-reminder lead to the booking on `/my-bookings#booking-<id>`. Cancellations, cancellations by the
+sentence the link renders empty. Confirmation, participant addition and withdrawal, displacement,
+reminder and both messages about a taken open place lead to the booking on
+`/my-bookings#booking-<id>`. Cancellations, cancellations by the
 club and series messages lead to `/my-bookings`. A waitlist offer leads to its entry on
 `/my-bookings#waitlist-<id>`, where the member takes it. The welcome leads to the start page `/`. The confirmation's calendar entry carries
 the same link as its `URL`. The shipped messages with a generated credential, a reset code or a

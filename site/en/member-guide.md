@@ -168,6 +168,22 @@ who created it.
 
 ![Bookings where you are recorded as a co-player, with the withdrawal button.](../screenshots/en/participations.png)
 
+## Looking for a partner
+
+When your booking holds the "Looking for a partner" slot filler, *My bookings* shows **Look for a
+partner** on it. That offers the place to other members. **Stop looking** withdraws the offer. A
+series and a booking that has already started offer no place.
+
+![One of your bookings whose open place is offered to other members.](../screenshots/en/partner-search.png)
+
+Other members see offered places in *My bookings* under **Open places**: the time, the court and the
+booking type, but no name. A place is shown only to members who may book that booking type and do
+not play in it yet. Whoever selects **Take the place** then plays in the booking in place of the slot
+filler. Only one member takes the place, even when several try at once.
+
+A message tells you who took your place, and tells the member when and where they play. Both
+messages can be switched off. The offer ends when the booking is cancelled or starts.
+
 ## When a rule refuses the booking
 
 Your membership type determines which booking rules apply to you. Courtside shows all detected
