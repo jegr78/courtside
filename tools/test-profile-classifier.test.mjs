@@ -350,6 +350,27 @@ test("given added known paths, when classifying them, then the declared reduced 
   assert.deepEqual(classifyChanges([{ status: "A", path: "unknown/new.txt" }], []).profiles, ["full"]);
 });
 
+test("given a change to the security environment's tools, when classifying it, then its own gate replaces the full run", () => {
+  // given
+  const environment = [
+    { status: "M", path: "tools/security-environment.mjs" },
+    { status: "M", path: "tools/security-mail-capture.mjs" },
+    { status: "M", path: "tools/security-environment.test.mjs" },
+    { status: "M", path: "tools/security-mail-capture.test.mjs" }
+  ];
+
+  // when / then
+  assert.deepEqual(classifyChanges(environment, []).profiles, ["tooling", "security-tooling"]);
+  assert.deepEqual(classifyChanges([...environment, { status: "M", path: "src/main/java/org/courtside/Booking.java" }],
+    []).profiles, ["backend", "tooling", "security-tooling"]);
+  assert.deepEqual(classifyChanges([{ status: "A", path: "tools/security-new-step.mjs" }], []).profiles, ["full"],
+    "an unlisted tool still selects everything");
+  assert.deepEqual(classifyChanges([{ status: "M", path: "tools/security-passive-deployment.mjs" }], []).profiles,
+    ["full"], "the scanner normalizers and the workflow tools stay on the full run");
+  assert.deepEqual(classifyChanges([{ status: "M", path: "tools/mail-relay-certificate.mjs" }], []).profiles,
+    ["full"], "the restore and performance relays share this tool");
+});
+
 test("given e2e evidence or orchestration, when classifying it, then only executable evidence is frontend", () => {
   // when / then
   for (const path of [

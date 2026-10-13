@@ -130,3 +130,18 @@ test("given the contract, when its jobs are read, then image-changing profiles s
   assert.ok(jobsOf("full").includes("clock_shift"), "a full change runs under the shifted clock");
   assert.ok(!jobsOf("docs").includes("clock_shift"), "documentation runs no tool under a shifted clock");
 });
+
+test("given the security environment's tools, when their profile is resolved, then the active gate assesses a qualified package of the change", () => {
+  // given
+  const contract = loadProfileContract();
+
+  // when
+  const tasks = localTasksForProfiles(contract, ["security-tooling"]).map((task) => task.label);
+
+  // then
+  assert.deepEqual(tasks, ["frontend-toolchain", "frontend-build", "frontend-package", "tooling-test", "gate-uat",
+    "gate-active-security"], "the assessment accepts only an image the uat gate qualified from this package");
+  assert.ok(!tasks.includes("full-without-browser") && !tasks.includes("frontend-e2e"),
+    "nothing that never loads these tools runs for them");
+  assert.deepEqual(ciJobsForProfiles(contract, ["security-tooling"]), ["tooling", "security", "gates", "clock_shift"]);
+});

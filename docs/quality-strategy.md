@@ -81,8 +81,8 @@ The pull-request workflow uses a conservative test-profile plan to select its re
 closed contract defines each profile's CI jobs and local tasks. CI reads it from the pull request's
 base commit and the local runner from its merge base with `origin/main`, so a branch cannot classify
 itself with rules it brings, and every file that decides a selection is itself classified `full`.
-Modified, explicitly classified paths may select `docs`, `backend`, `frontend`, `tooling`, or an additive
-combination. Backend changes run backend, tooling and security verification; frontend changes run frontend,
+Modified, explicitly classified paths may select `docs`, `backend`, `frontend`, `tooling`,
+`security-tooling`, or an additive combination. Backend changes run backend, tooling and security verification; frontend changes run frontend,
 tooling and security verification. Frontend compilation, lint, unit tests and coverage finish before
 the browser jobs consume the same packaged candidate. Blocking visual and guide snapshots run first;
 only then do two stable functional shards cover Chromium, WebKit, phone layouts and
@@ -129,6 +129,15 @@ tests. If the old inventory remains unchanged and the head inventory is complete
 select their declared profiles. Adding a runner or helper, removing an entry, changing an existing
 assignment, registering a file that was not added in the same change, or adding an invalid inventory
 still selects `full`.
+
+The `security-tooling` profile covers the tools that start, observe and clean up the disposable
+security environment. Nothing else in a full run executes them: Maven, the browser journeys and the
+other release gates never load them, so the full run adds cost but no evidence for such a change.
+The profile runs the tool suite, packages the application from the change, qualifies an image of
+that package with the UAT gate and runs the active security gate on it. The qualification stays,
+because the assessment accepts only an image whose digest that gate qualified. In CI it selects the tooling, security, release-gate and shifted-clock jobs. The
+scanner normalizers, the assessment gate, the supply-chain and finding tools and every tool a
+workflow calls stay `full`, as does the mail relay helper the restore and performance runs share.
 Three local first attempts of the declared tooling tasks completed in 14, 11 and 11 seconds, for an
 11-second median. Each attempt reinstalled the locked dependencies and passed the complete tool suite.
 

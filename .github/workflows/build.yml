@@ -80,8 +80,9 @@ jobs:
             --arg head "$HEAD_REF" \
             'type == "object" and .schemaVersion == 6 and .runId == $runId and
               .attempt == $attempt and .baseCommit == $base and .headCommit == $head and
-              (.profiles | type == "array" and length >= 1 and length <= 5 and
-                all(. == "docs" or . == "backend" or . == "frontend" or . == "tooling" or . == "full") and
+              (.profiles | type == "array" and length >= 1 and length <= 6 and
+                all(. == "docs" or . == "backend" or . == "frontend" or . == "tooling" or
+                  . == "security-tooling" or . == "full") and
                 (unique | length) == length) and
               (.ciJobs | type == "array" and length >= 1 and (unique | length) == length and
                 all(. == "docs" or . == "backend" or . == "frontend" or . == "browser_visual" or

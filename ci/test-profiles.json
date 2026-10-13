@@ -85,6 +85,10 @@
     "tooling": {
       "exact": [],
       "prefixes": []
+    },
+    "security-tooling": {
+      "exact": [],
+      "prefixes": []
     }
   }
 }
