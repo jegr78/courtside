@@ -723,6 +723,7 @@ const de = {
   "booking.durationBound": "Der Club erlaubt Buchungen bis {{duration}}.",
   "booking.hoursBound": "Mit deiner Mitgliedsart buchst du zwischen {{earliestStart}} und {{latestEnd}} Uhr.",
   "booking.durationHint": "Im Platzplan zieht nur die Maus über mehrere Felder. Sonst wählst du die Länge hier.",
+  "booking.chooseDuration": "Länge wählen",
   "booking.durationMinutes": "{{count}} Minuten",
   "booking.boundBelowSlotGrid": "Das Regelwerk erlaubt eine kürzere Buchung als das Zeitraster. Deshalb steht keine Dauer zur Wahl.",
   "booking.courts": "Plätze",

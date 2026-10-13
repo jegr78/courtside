@@ -725,6 +725,7 @@ const en: Record<keyof typeof de, string> = {
   "booking.durationBound": "The club allows bookings of up to {{duration}}.",
   "booking.hoursBound": "Your membership type books between {{earliestStart}} and {{latestEnd}}.",
   "booking.durationHint": "In the court plan only a mouse can drag across several slots. Otherwise, choose the length here.",
+  "booking.chooseDuration": "Choose a length",
   "booking.durationMinutes": "{{count}} minutes",
   "booking.boundBelowSlotGrid": "The rule set permits a shorter booking than one cell of the time grid, so no duration is on offer.",
   "booking.courts": "Courts",

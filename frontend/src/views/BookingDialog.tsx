@@ -57,7 +57,7 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
   const [submitting, setSubmitting] = useState(false);
   const [requestKey, setRequestKey] = useState(() => idempotencyKey());
   const [showsMore, setShowsMore] = useState(false);
-  const [refusedAsTaken, setRefusedAsTaken] = useState(false);
+  const [refusedAsTaken, setRefusedAsTaken] = useState<{ refreshFailed: boolean }>();
 
   useEffect(() => {
     void Promise.all([api.bookingCards(), api.participantCards()]).then(([cards, participants]) => {
@@ -116,10 +116,12 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
       }
       await created();
     } catch (failure) {
-      if (failure instanceof ApiError && failure.problem?.type === COURT_UNAVAILABLE) setRefusedAsTaken(true);
+      if (failure instanceof ApiError && failure.problem?.type === COURT_UNAVAILABLE) setRefusedAsTaken({ refreshFailed: false });
       if (failure instanceof ApiError && failure.status === 409) {
-        await conflicted().catch((refreshFailure: unknown) =>
-          warnAbout("Court plan refresh after a conflict failed", refreshFailure));
+        await conflicted().catch((refreshFailure: unknown) => {
+          setRefusedAsTaken((refused) => refused && { refreshFailed: true });
+          warnAbout("Court plan refresh after a conflict failed", refreshFailure);
+        });
       }
       if (failure instanceof ApiError && failure.problem) {
         const translated = translatedViolations(failure.problem, t);
@@ -151,8 +153,8 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
   const showsBound = maxBookingMinutes !== undefined && maxBookingMinutes !== null && !boundLeavesNoPeriod;
   const durationDescription = [showsBound && "booking-duration-bound", hours && !outsideHours && "booking-hours-bound", "booking-duration-hint"]
     .filter(Boolean).join(" ");
-  const slotTaken = refusedAsTaken && durations.length === 0;
-  const selectedDuration = durations.includes(durationMinutes) || slotTaken
+  const slotTaken = refusedAsTaken !== undefined && (durations.length === 0 || refusedAsTaken.refreshFailed);
+  const selectedDuration = durations.includes(durationMinutes) || refusedAsTaken
     ? durationMinutes : durations[0] ?? grid.slotMinutes;
   const period = useMemo(() => waitlist ?? bookingTimeSlot(selection.date, selection.slot, grid.timeZone, selectedDuration),
     [waitlist, selection.date, selection.slot, grid.timeZone, selectedDuration]);
@@ -170,7 +172,11 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
       {waitlist && <p data-testid="waitlist-explanation" className="text-muted mt-2 text-sm">{t("waitlist.explanation")}</p>}
       {!slotTaken && !waitlist && <>
       <label className="mt-5 grid gap-2 font-medium">{t("booking.duration")}
-        <select data-testid="booking-duration" aria-describedby={durationDescription} value={selectedDuration} onChange={(event) => setDurationMinutes(Number(event.target.value))} className="form-control rounded-lg border px-3 py-3">
+        <select data-testid="booking-duration" aria-describedby={durationDescription} value={refusedAsTaken ? "" : selectedDuration} onChange={(event) => {
+          setDurationMinutes(Number(event.target.value));
+          setRefusedAsTaken(undefined);
+        }} className="form-control rounded-lg border px-3 py-3">
+          {refusedAsTaken && <option value="" disabled>{t("booking.chooseDuration")}</option>}
           {durations.map((minutes) => <option key={minutes} value={minutes}>{t("booking.durationMinutes", { count: minutes })}</option>)}
         </select>
       </label>
@@ -188,7 +194,10 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
         ? <fieldset className="mt-5 grid gap-2" aria-invalid={fieldViolations("courtIds").length > 0} aria-describedby={describedBy("courtIds")}>
           <legend className="font-semibold">{t("booking.courts")}</legend>
           {courts.map((court) => <label key={court.id} className="flex gap-2">
-            <input data-testid={`booking-court-${court.id}`} type="checkbox" checked={courtIds.includes(court.id)} onChange={(event) => setCourtIds((current) => event.target.checked ? [...current, court.id] : current.filter((id) => id !== court.id))} />
+            <input data-testid={`booking-court-${court.id}`} type="checkbox" checked={courtIds.includes(court.id)} onChange={(event) => {
+              setRefusedAsTaken(undefined);
+              setCourtIds((current) => event.target.checked ? [...current, court.id] : current.filter((id) => id !== court.id));
+            }} />
             {court.name || t("court.number", { number: court.number })}
           </label>)}
         </fieldset>
@@ -257,7 +266,7 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
       </div>}
       <div className="surface-panel border-structural flex shrink-0 justify-end gap-3 border-t px-6 py-4">
         <Button variant="secondary" type="button" data-testid="booking-close" onClick={closed}>{t("booking.close")}</Button>
-        <Button variant="primary" type="submit" data-testid="booking-submit" disabled={submitting || courtIds.length === 0 || !cardId || boundLeavesNoPeriod || outsideHours || (slotTaken && !waitlist)}>{t(waitlist ? "waitlist.submit" : "booking.submit")}</Button>
+        <Button variant="primary" type="submit" data-testid="booking-submit" disabled={submitting || courtIds.length === 0 || !cardId || boundLeavesNoPeriod || outsideHours || (refusedAsTaken !== undefined && !waitlist)}>{t(waitlist ? "waitlist.submit" : "booking.submit")}</Button>
       </div>
     </form>
   </Modal>;

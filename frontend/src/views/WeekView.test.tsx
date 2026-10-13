@@ -764,12 +764,64 @@ it("given a slot taken in the meantime and several courts allowed, when a free c
   expect(screen.getByTestId("booking-submit")).toBeEnabled();
 });
 
+it("given the later half of a requested hour taken in the meantime, when the booking is refused, then nothing is booked until a duration is chosen again", async () => {
+  // given
+  vi.mocked(api.createBooking).mockRejectedValue(new ApiError(409, {
+    type: "urn:courtside:error:court-unavailable",
+    title: "Court unavailable",
+    status: 409
+  }));
+  render(<WeekView today={clubInstant("07:00")} />);
+  await userEvent.click(await findFreeSlot(1, "08:00"));
+  await userEvent.selectOptions(screen.getByTestId("booking-duration"), "60");
+  takeCourtOneAt("08:30", "09:00");
+
+  // when
+  await userEvent.click(screen.getByTestId("booking-submit"));
+  await screen.findByRole("alert");
+  await waitFor(() => expect([...screen.getByTestId<HTMLSelectElement>("booking-duration").options].map((option) => option.value),
+    "the refreshed plan no longer offers the hour").not.toContain("60"));
+
+  // then
+  expect(screen.getByTestId("booking-submit"), "a shorter period must not become bookable without the member choosing it").toBeDisabled();
+  expect(screen.getByTestId("booking-period"), "the header still names the refused hour").toHaveTextContent("8:00 AM – 9:00 AM");
+  expect(screen.getByTestId("booking-duration"), "no remaining duration is chosen on the member's behalf").toHaveValue("");
+
+  await userEvent.selectOptions(screen.getByTestId("booking-duration"), "30");
+  expect(screen.getByTestId("booking-submit"), "choosing a duration again makes the dialog bookable").toBeEnabled();
+  expect(screen.getByTestId("booking-period")).toHaveTextContent("8:00 AM – 8:30 AM");
+});
+
+it("given a booking conflict and a failed refresh, when submission fails, then the dialog offers nothing to book", async () => {
+  // given
+  vi.mocked(api.createBooking).mockRejectedValue(new ApiError(409, {
+    type: "urn:courtside:error:court-unavailable",
+    title: "Court unavailable",
+    status: 409
+  }));
+  render(<WeekView today={clubInstant("07:00")} />);
+  await userEvent.click(await findFreeSlot(1, "08:00"));
+  vi.mocked(api.allocations).mockRejectedValue(new Error("refresh unavailable"));
+
+  // when
+  await userEvent.click(screen.getByTestId("booking-submit"));
+  await screen.findByRole("alert");
+
+  // then
+  await waitFor(() => expect(screen.queryByTestId("booking-duration"), "a stale plan must not offer the refused slot again").toBeNull());
+  expect(screen.getByTestId("booking-submit"), "the refused slot stays refused while the plan is unknown").toBeDisabled();
+});
+
 function takeCourtOneAtEight() {
+  takeCourtOneAt("08:00", "08:30");
+}
+
+function takeCourtOneAt(start: string, end: string) {
   vi.mocked(api.allocations).mockImplementation((date) => Promise.resolve(date === "2026-08-10" ? [{
     bookingId: "44444444-4444-4444-4444-444444444444",
     courtId: courts[0].id,
-    startsAt: "2026-08-10T08:00:00+02:00",
-    endsAt: "2026-08-10T08:30:00+02:00",
+    startsAt: `2026-08-10T${start}:00+02:00`,
+    endsAt: `2026-08-10T${end}:00+02:00`,
     cardLabel: "Member booking",
     cardColor: "#176b55",
     ownBooking: false,
