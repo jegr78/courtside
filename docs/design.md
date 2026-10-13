@@ -682,15 +682,16 @@ channel can be added beside email without changing it.
 
 Members choose optional message kinds and, separately, channels. No opt-out means enabled. A
 declined kind reaches the account on no channel, the centre included. A declined email channel
-stops mail and keeps the entry. Credentials, password-reset codes and username reminders are mailed
-whatever the channel choice says, because whoever asks for them cannot sign in to read the centre.
+stops mail and keeps the entry. The welcome, credentials, password-reset codes and username
+reminders are mailed whatever the channel choice says, because whoever receives them cannot sign in
+to read the centre yet.
 A waitlist offer cannot be disabled either: joining the queue is the consent to hear of it, and
 leaving the queue is how a member stops it. It always reaches the centre, follows the email channel
 choice and is handed to the relay before ordinary booking mail because it runs out within minutes.
 A mail composed after the offer was taken, declined or expired fails instead of being sent.
-Credentials, displacement, participant-addition notices and the club's cancellations and series
-moves cannot be disabled as kinds, because no other product path tells the member that somebody
-else wrote them into a booking, took one away or moved it. A holder's own cancellation and the
+The welcome, credentials, displacement, participant-addition notices and the club's cancellations
+and series moves cannot be disabled as kinds, because no other product path tells the member that
+somebody else wrote them into a booking, took one away or moved it. A holder's own cancellation and the
 series summary can be declined, like the confirmation: My bookings already shows what they say. A
 declined email channel stops the mail for displacement, participant-addition notices and the club's
 cancellations and moves as well; the centre then replaces it, and every centre page carries the
