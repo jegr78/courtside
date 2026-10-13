@@ -10,6 +10,7 @@ import org.courtside.booking.BookingService;
 import org.courtside.booking.BookingStatus;
 import org.courtside.booking.BookingRulesViolatedException;
 import org.courtside.config.testfixture.ConfigTestFixture;
+import org.courtside.shared.CancellationReason;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.identity.Role;
 import org.courtside.rules.RuleViolation;
@@ -160,6 +161,42 @@ class SeriesCancellationTest extends AbstractIntegrationTest {
         // then
         assertThat(cancelled).isEqualTo(5);
         assertThat(statusesOf(result)).allMatch(BookingStatus.CANCELLED::equals);
+    }
+
+    @Test
+    void givenTwoPlayedOccurrences_whenTheClubCancelsTheWholeSeries_thenOnlyTheUnplayedOnesEnd() {
+        // given
+        SeriesCreationResult result = createSeries(5);
+        played(result.bookingIds().get(0), result.bookingIds().get(1));
+
+        // when
+        int cancelled = seriesService.cancel(result.seriesId(), result.bookingIds().get(2),
+                CancelScope.WHOLE_SERIES, UUID.randomUUID(), Set.of(Role.ADMIN), CancellationReason.CLUB_EVENT);
+
+        // then
+        assertThat(cancelled).as("only dates still ahead are cancelled").isEqualTo(3);
+        assertThat(statusesOf(result)).containsExactly(
+                BookingStatus.CONFIRMED, BookingStatus.CONFIRMED, BookingStatus.CANCELLED,
+                BookingStatus.CANCELLED, BookingStatus.CANCELLED);
+        assertThat(jdbc.sql("SELECT count(*) FROM booking WHERE id IN (:played) AND cancellation_reason IS NOT NULL")
+                .param("played", result.bookingIds().subList(0, 2)).query(Integer.class).single())
+                .as("history keeps no reason it never had").isZero();
+    }
+
+    @Test
+    void givenAPlayedOccurrence_whenTheClubCancelsFromItOnwards_thenOnlyTheUnplayedOnesEnd() {
+        // given
+        SeriesCreationResult result = createSeries(5);
+        played(result.bookingIds().get(0), result.bookingIds().get(1));
+
+        // when
+        int cancelled = seriesService.cancel(result.seriesId(), result.bookingIds().get(1),
+                CancelScope.THIS_AND_FOLLOWING, UUID.randomUUID(), Set.of(Role.ADMIN), CancellationReason.CLUB_EVENT);
+
+        // then
+        assertThat(cancelled).isEqualTo(3);
+        assertThat(statusesOf(result).subList(0, 2)).as("played dates stay as they were played")
+                .containsOnly(BookingStatus.CONFIRMED);
     }
 
     @Test
@@ -345,6 +382,18 @@ class SeriesCancellationTest extends AbstractIntegrationTest {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException(e);
+        }
+    }
+
+    private void played(UUID... occurrences) {
+        for (int week = 0; week < occurrences.length; week++) {
+            jdbc.sql("""
+                            UPDATE court_allocation
+                            SET starts_at = TIMESTAMPTZ '2026-03-17T17:00:00Z' + make_interval(weeks => :week),
+                                ends_at = TIMESTAMPTZ '2026-03-17T19:00:00Z' + make_interval(weeks => :week)
+                            WHERE booking_id = :booking
+                            """)
+                    .param("week", week).param("booking", occurrences[week]).update();
         }
     }
 

@@ -124,6 +124,27 @@ class SeriesChangeMessageTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenAPlayedDate_whenTheBoardCancelsTheWholeSeries_thenTheMessageNamesOnlyTheDatesAhead() throws Exception {
+        // given
+        jdbc.sql("""
+                        UPDATE court_allocation SET starts_at = TIMESTAMPTZ '2026-05-05T16:00:00Z',
+                                                    ends_at = TIMESTAMPTZ '2026-05-05T18:00:00Z'
+                        WHERE booking_id = :booking
+                        """)
+                .param("booking", created.bookingIds().getFirst()).update();
+
+        // when
+        series.cancel(created.seriesId(), created.bookingIds().get(1), CancelScope.WHOLE_SERIES,
+                boardAccountId, Set.of(Role.ADMIN), CancellationReason.WEATHER);
+
+        // then
+        assertThat(mail.bodiesTo("mary.major@example.org")).singleElement().asString()
+                .as("a played date is neither cancelled nor counted")
+                .contains("Erster stornierter Termin: Dienstag, 26. Mai 2026", "Stornierte Termine: 2")
+                .doesNotContain("5. Mai 2026");
+    }
+
+    @Test
     void givenNoReason_whenTheBoardCancelsAnEnglishHoldersSeries_thenTheMessageSendsThemToTheClub()
             throws Exception {
         // given
