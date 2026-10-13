@@ -484,6 +484,12 @@ input[type="time"] {
   border-radius: 0.375rem;
 }
 
+@media (forced-colors: active) {
+  .day-plan-allocation-extent {
+    border: 2px solid CanvasText;
+  }
+}
+
 .day-plan-allocation {
   position: relative;
 }

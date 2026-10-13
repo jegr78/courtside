@@ -709,7 +709,15 @@ function lastRowOfBookingIsOccupied(page: Page, bookingId: string, slot: string)
     const column = document.querySelector(`[data-booking-id="${bookingId}"]`)!.closest("td")!.getBoundingClientRect();
     const bounds = row.getBoundingClientRect();
     const hit = document.elementFromPoint(column.left + column.width / 2, bounds.top + bounds.height / 2);
-    return hit?.getAttribute("data-testid") === "allocation-extent" && getComputedStyle(hit).backgroundColor !== "rgba(0, 0, 0, 0)";
+    if (hit?.getAttribute("data-testid") !== "allocation-extent") return false;
+    const transparent = (color: string) => /^rgba\(.*,\s*0\)$/.test(color);
+    let behind = hit.parentElement;
+    while (behind && transparent(getComputedStyle(behind).backgroundColor)) behind = behind.parentElement;
+    const backdrop = behind ? getComputedStyle(behind).backgroundColor : "rgb(255, 255, 255)";
+    const extent = getComputedStyle(hit);
+    const filled = !transparent(extent.backgroundColor) && extent.backgroundColor !== backdrop;
+    const outlined = parseFloat(extent.borderTopWidth) > 0 && extent.borderTopColor !== backdrop;
+    return filled || outlined;
   }, { bookingId, slot });
 }
 
@@ -773,6 +781,15 @@ test("given an own booking beside a league match and a squad training on four co
         message: `at ${width} px the last row of the match is drawn occupied, not left blank`, timeout: 10_000
       }).toBe(true);
     }
+
+    // when
+    await page.emulateMedia({ forcedColors: "active" });
+
+    // then
+    await expect.poll(() => lastRowOfBookingIsOccupied(page, match, "15:30"), {
+      message: "in forced colours the last row of the match is still drawn occupied", timeout: 10_000
+    }).toBe(true);
+    await page.emulateMedia({ forcedColors: "none" });
 
     // when
     await page.setViewportSize({ width: 1280, height: 900 });
