@@ -22,7 +22,9 @@ public enum MessageKind {
     BOOKING_SERIES_CANCELLED_BY_CLUB("booking.seriesCancelledByClub", false, false),
     BOOKING_SERIES_MOVED_BY_CLUB("booking.seriesMovedByClub", false, false),
     // Joining the waitlist is the consent, and leaving it is how a member stops hearing of it.
-    WAITLIST_OFFER("waitlist.offer", false, false);
+    WAITLIST_OFFER("waitlist.offer", false, false),
+    BOOKING_PARTNER_FOUND("booking.partnerFound", true, false),
+    BOOKING_PLACE_TAKEN("booking.placeTaken", true, false);
 
     private final String templateKey;
     private final boolean declinable;

@@ -61,6 +61,14 @@ INSERT INTO booking_participant (id, booking_id, kind, person_id, position)
 VALUES ('79000000-0000-0000-0000-000000000001', '77000000-0000-0000-0000-000000000001',
         'MEMBER', '71000000-0000-0000-0000-000000000001', 0);
 
+INSERT INTO booking_participant (id, booking_id, kind, card_id, position)
+VALUES ('79000000-0000-0000-0000-000000000002', '77000000-0000-0000-0000-000000000001',
+        'CARD', '66666666-6666-6666-6666-666666666666', 1);
+
+INSERT INTO partner_invitation (id, booking_id, participant_id, published_at)
+VALUES ('79200000-0000-0000-0000-000000000001', '77000000-0000-0000-0000-000000000001',
+        '79000000-0000-0000-0000-000000000002', '2025-01-01T00:00:00Z');
+
 INSERT INTO waitlist_entry
     (id, account_id, court_id, card_id, starts_at, ends_at, note, state, joined_at, closed_at)
 VALUES ('79100000-0000-0000-0000-000000000001', '72000000-0000-0000-0000-000000000001',

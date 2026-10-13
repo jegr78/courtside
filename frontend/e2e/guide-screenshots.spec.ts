@@ -78,6 +78,19 @@ const drivers: Record<string, (page: Page, visualDate: string) => Promise<void>>
     await expect(page.getByTestId("my-bookings-page")).toBeVisible();
     await expect(page.getByTestId("upcoming-bookings")).toBeVisible();
   },
+  "partner-search": async (page, visualDate) => {
+    await selectVisualDate(page, visualDate);
+    await page.locator('[data-testid="free-slot"][data-court-number="1"][data-slot="15:00"]').click();
+    await expect(page.getByTestId("booking-dialog")).toBeVisible();
+    await page.getByTestId("booking-more-summary").click();
+    await page.getByTestId("participant-card").first().selectOption("66666666-6666-6666-6666-666666666666");
+    await page.getByTestId("booking-submit").click();
+    await expect(page.getByTestId("booking-dialog")).toHaveCount(0);
+    await page.getByTestId("my-bookings-link").click();
+    await page.getByTestId("publish-open-place").first().click();
+    await expect(page.getByTestId("withdraw-open-place").first()).toBeVisible({ timeout: 10_000 });
+    await page.evaluate(() => window.scrollTo(0, 0));
+  },
   "participations": async (page) => {
     await expect(page.getByTestId("participations")).toBeVisible();
   },
@@ -261,6 +274,15 @@ test("the waitlist a member joins for a taken court is captured", async ({ page,
 
   // when / then
   await capture(page, "waitlist-dialog", journeyService.visualDate);
+});
+
+test("the open place a member offers from their booking is captured", async ({ page, journeyService }, info) => {
+  // given
+  await prepare(page, localeOf(info));
+  await signIn(page, "doe.jane", "court-plan-view");
+
+  // when / then
+  await capture(page, "partner-search", journeyService.visualDate);
 });
 
 test("the refusal a booking rule writes is captured", async ({ page, journeyService }, info) => {

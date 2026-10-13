@@ -66,7 +66,7 @@ class MessageChoiceControllerTest extends AbstractIntegrationTest {
         assertThat(choices).allMatch(Choice::enabled, "nothing is switched off before anybody chose");
         assertThat(declinable(choices)).containsExactlyInAnyOrder(
                 "BOOKING_CONFIRMED", "BOOKING_PLAYER_WITHDREW", "BOOKING_REMINDER", "BOOKING_CANCELLED",
-                "BOOKING_SERIES_CREATED");
+                "BOOKING_SERIES_CREATED", "BOOKING_PARTNER_FOUND", "BOOKING_PLACE_TAKEN");
     }
 
     @Test

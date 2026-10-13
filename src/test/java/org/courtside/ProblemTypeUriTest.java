@@ -51,6 +51,8 @@ class ProblemTypeUriTest {
             "urn:courtside:error:court-reserved",
             "urn:courtside:error:waitlist-entry-exists",
             "urn:courtside:error:waitlist-entry-not-found",
+            "urn:courtside:error:partner-invitation-not-found",
+            "urn:courtside:error:partner-place-unavailable",
             "urn:courtside:error:waitlist-limit-reached",
             "urn:courtside:error:waitlist-no-offer",
             "urn:courtside:error:waitlist-slot-not-taken",

@@ -1,5 +1,6 @@
 package org.courtside.booking;
 
+import org.courtside.card.ParticipantCard;
 import org.courtside.shared.TimeSlot;
 import org.courtside.shared.CancellationReason;
 import jakarta.persistence.CascadeType;
@@ -141,6 +142,19 @@ public class Booking implements Persistable<UUID> {
         // A null would match every guest, whose person_id is null by design.
         return personId != null
                 && participants.removeIf(participant -> personId.equals(participant.getPersonId()));
+    }
+
+    // The member takes the slot the marker held, so the booking keeps its player count and positions.
+    public boolean fillOpenPlace(UUID participantId, UUID personId) {
+        return personId != null && participants.stream()
+                .filter(participant -> participant.getId().equals(participantId)
+                        && ParticipantCard.LOOKING_FOR_A_PARTNER.equals(participant.getCardId()))
+                .findFirst()
+                .map(participant -> {
+                    participant.becomeMember(personId);
+                    return true;
+                })
+                .orElse(false);
     }
 
     public void addParticipant(ParticipantSpec spec) {

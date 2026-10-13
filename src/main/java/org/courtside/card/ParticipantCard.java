@@ -16,6 +16,8 @@ import java.util.UUID;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ParticipantCard {
 
+    public static final UUID LOOKING_FOR_A_PARTNER = UUID.fromString("66666666-6666-6666-6666-666666666666");
+
     @Id
     private UUID id;
 

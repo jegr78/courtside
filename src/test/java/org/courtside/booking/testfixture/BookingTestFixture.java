@@ -14,6 +14,8 @@ import org.courtside.booking.series.SeriesService;
 import org.courtside.booking.series.SeriesRule;
 import org.courtside.booking.waitlist.JoinWaitlistCommand;
 import org.courtside.booking.waitlist.WaitlistService;
+import org.courtside.booking.partner.PartnerSearchService;
+import org.courtside.card.ParticipantCard;
 import org.courtside.booking.CreateBookingCommand;
 import org.courtside.booking.ParticipantSpec;
 import org.courtside.identity.Role;
@@ -33,6 +35,21 @@ public class BookingTestFixture {
     private final BookingSeriesRepository seriesRows;
     private final SeriesService seriesService;
     private final WaitlistService waitlist;
+    private final PartnerSearchService partnerSearch;
+
+    public UUID createBookingLookingForAPartner(UUID courtId, UUID cardId, TimeSlot slot, UUID bookedBy,
+                                                UUID bookerPersonId) {
+        return bookingService.create(new CreateBookingCommand(List.of(courtId), cardId, slot, bookedBy, bookerPersonId,
+                Set.of(Role.MEMBER), null, List.of(ParticipantSpec.card(ParticipantCard.LOOKING_FOR_A_PARTNER)), null));
+    }
+
+    public UUID publishOpenPlace(UUID bookingId, UUID holderAccountId) {
+        return partnerSearch.publish(bookingId, holderAccountId);
+    }
+
+    public UUID takeOpenPlace(UUID invitationId, UUID accountId, UUID personId) {
+        return partnerSearch.accept(invitationId, accountId, personId, Set.of(Role.MEMBER));
+    }
 
     public UUID joinWaitlist(UUID courtId, UUID cardId, TimeSlot slot, UUID accountId, UUID personId,
                              UUID playerPersonId) {

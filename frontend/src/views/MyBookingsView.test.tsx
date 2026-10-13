@@ -42,6 +42,7 @@ beforeEach(async () => {
     }] }));
   vi.spyOn(api, "participations").mockResolvedValue({ items: [] });
   vi.spyOn(api, "waitlistEntries").mockResolvedValue([]);
+  vi.spyOn(api, "openPlaces").mockResolvedValue([]);
   vi.spyOn(api, "cancelSeries").mockResolvedValue(undefined);
   vi.spyOn(api, "previewSeriesMove").mockResolvedValue({
     executable: true,
@@ -987,4 +988,33 @@ it("given a series cancellation, when the dialog opens, then the affected occurr
   const body = within(screen.getByRole("dialog")).getByTestId("dialog-body");
   expect(body, "the scope choice scrolls inside the body").toContainElement(screen.getByTestId("scope-WHOLE_SERIES"));
   expect(body, "the confirmation stays outside the scrolling body").not.toContainElement(screen.getByTestId("confirm-cancellation"));
+});
+
+it("given a booking looking for a partner, when its holder offers the place, then the place is published and the booking says so", async () => {
+  // given
+  const single = "55555555-5555-5555-5555-555555555555";
+  const booking = (partnerSearch: "AVAILABLE" | "PUBLISHED") => ({ items: [{
+    id: single, seriesId: null, courtIds: ["33333333-3333-3333-3333-333333333333"],
+    startsAt: "2026-08-12T16:00:00Z", endsAt: "2026-08-12T17:00:00Z",
+    cardLabel: "Member booking", cardColor: "#176b55", status: "CONFIRMED" as const, partnerSearch
+  }] });
+  let published = false;
+  vi.mocked(api.personalBookings).mockImplementation((options) => Promise.resolve(options?.view
+    ? { items: [] } : booking(published ? "PUBLISHED" : "AVAILABLE")));
+  const publish = vi.spyOn(api, "publishOpenPlace").mockImplementation(() => {
+    published = true;
+    return Promise.resolve(undefined);
+  });
+  render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} />);
+  const entry = await screen.findByTestId(`booking-${single}`);
+
+  // when
+  await userEvent.click(within(entry).getByTestId("publish-open-place"));
+
+  // then
+  expect(publish).toHaveBeenCalledWith(single);
+  await waitFor(() => expect(within(screen.getByTestId(`booking-${single}`)).getByTestId("withdraw-open-place"))
+    .toHaveTextContent("Stop looking"));
+  expect(within(screen.getByTestId(`booking-${single}`)).getByTestId("partner-search-published"))
+    .toHaveTextContent("Other members can take the open place.");
 });

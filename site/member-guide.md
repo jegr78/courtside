@@ -172,6 +172,25 @@ benachrichtigt die Person, die sie angelegt hat.
 
 ![Die als Mitspieler eingetragenen Buchungen mit der Schaltfläche zum Austragen.](screenshots/de/participations.png)
 
+## Einen Mitspieler suchen
+
+Steht in deiner Buchung der Platzfüller "Spielpartner gesucht", zeigt *Meine Buchungen* bei ihr
+**Mitspieler suchen**. Damit bietest du diesen Platz anderen Mitgliedern an. Mit **Suche beenden**
+nimmst du das Angebot zurück. Eine Serie und eine Buchung, die schon begonnen hat, bieten keinen
+Platz an.
+
+![Eine eigene Buchung, deren offener Platz anderen Mitgliedern angeboten wird.](screenshots/de/partner-search.png)
+
+Andere Mitglieder sehen angebotene Plätze in *Meine Buchungen* unter **Offene Plätze**: Zeit, Platz
+und Buchungsart, aber keinen Namen. Angezeigt wird ein Platz nur Mitgliedern, die diese Buchungsart
+buchen dürfen und noch nicht mitspielen. Wer **Platz übernehmen** wählt, steht danach an Stelle des
+Platzfüllers in der Buchung. Den Platz übernimmt nur ein Mitglied, auch wenn mehrere gleichzeitig
+zugreifen.
+
+Du erfährst per Nachricht, wer deinen Platz übernommen hat. Das Mitglied erfährt, wann und wo es
+spielt. Beide Nachrichten lassen sich abschalten. Wird die Buchung storniert oder beginnt sie, endet
+das Angebot.
+
 ## Wenn eine Regel die Buchung ablehnt
 
 Die Mitgliedsart bestimmt, welche Buchungsregeln für dich gelten. Courtside zeigt alle erkannten

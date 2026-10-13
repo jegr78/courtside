@@ -100,7 +100,10 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
             "/api/booking-series/{id}/move/preview",
             "/api/my/waitlist",
             "/api/my/waitlist/{entryId}",
-            "/api/my/waitlist/{entryId}/acceptance");
+            "/api/my/waitlist/{entryId}/acceptance",
+            "/api/my/bookings/{bookingId}/partner-invitation",
+            "/api/partner-invitations",
+            "/api/partner-invitations/{invitationId}/acceptance");
 
     private static final Set<String> RECENT_AUTHENTICATION_ENDPOINTS = Set.of(
             "DELETE /api/account/sessions");

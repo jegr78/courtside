@@ -66,7 +66,7 @@ class UpgradeFixtureTest {
             assertThat(evidence.path("accountRows").size()).as("fixture accounts").isEqualTo(1);
             assertThat(evidence.path("bookingRows").size()).as("fixture bookings").isEqualTo(2);
             assertThat(evidence.path("allocationRows").size()).as("fixture allocations").isEqualTo(2);
-            assertThat(evidence.path("participantRows").size()).as("fixture participants").isEqualTo(1);
+            assertThat(evidence.path("participantRows").size()).as("fixture participants").isEqualTo(2);
             assertThat(evidence.path("seriesRows").size()).as("fixture series").isEqualTo(1);
             assertThat(evidence.path("seriesCourtRows").size()).as("fixture series courts").isEqualTo(1);
             assertThat(evidence.path("sessionRows").size()).as("fixture sessions").isEqualTo(1);

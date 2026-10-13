@@ -8,6 +8,7 @@ import org.courtside.api.ApiBookingHours;
 import org.courtside.api.ApiViolation;
 import org.courtside.api.ApiCreateBookingRequest;
 import org.courtside.api.ApiBookingStatus;
+import org.courtside.api.ApiPartnerSearchState;
 import org.courtside.api.ApiPersonalBooking;
 import org.courtside.api.ApiParticipation;
 import org.courtside.api.ApiParticipationPage;
@@ -27,6 +28,8 @@ import org.courtside.booking.CreateBookingCommand;
 import org.courtside.booking.ParticipantSpec;
 import org.courtside.booking.ParticipationPage;
 import org.courtside.booking.ParticipationService;
+import org.courtside.booking.partner.PartnerSearchService;
+import org.courtside.booking.partner.PartnerSearchState;
 import org.courtside.booking.PersonalBookingPage;
 import org.courtside.booking.PersonalBookingView;
 import org.courtside.booking.Booking;
@@ -75,6 +78,7 @@ class BookingController implements BookingsApi {
     private final FacilityService facility;
     private final ClubIdentity club;
     private final Clock clock;
+    private final PartnerSearchService partnerSearch;
 
     BookingController(BookingService bookings,
                       CardService cards,
@@ -87,7 +91,8 @@ class BookingController implements BookingsApi {
                       BookingRuleGate ruleGate,
                       FacilityService facility,
                       ClubIdentity club,
-                      Clock clock) {
+                      Clock clock,
+                      PartnerSearchService partnerSearch) {
         this.bookings = bookings;
         this.cards = cards;
         this.currentUser = currentUser;
@@ -100,6 +105,7 @@ class BookingController implements BookingsApi {
         this.facility = facility;
         this.club = club;
         this.clock = clock;
+        this.partnerSearch = partnerSearch;
     }
 
     @Override
@@ -164,6 +170,8 @@ class BookingController implements BookingsApi {
                 .collect(Collectors.toMap(BookingCard::getId, card -> card));
         PersonalBookingPage page = bookings.personalBookings(
                 account.getId(), PersonalBookingView.valueOf(view.getValue()), cursor, limit);
+        Map<UUID, PartnerSearchState> searches = partnerSearch.searchStatesOf(
+                page.bookings().stream().map(Booking::getId).toList());
         List<ApiPersonalBooking> items = page.bookings().stream()
                 .map(booking -> {
                     List<CourtAllocation> allocations = booking.getAllocations();
@@ -178,7 +186,9 @@ class BookingController implements BookingsApi {
                             card == null ? "#999999" : card.getColor(),
                             ApiBookingStatus.fromValue(booking.getStatus().name()))
                             .seriesId(booking.getSeriesId())
-                            .note(booking.getNote());
+                            .note(booking.getNote())
+                            .partnerSearch(searches.containsKey(booking.getId())
+                                    ? ApiPartnerSearchState.fromValue(searches.get(booking.getId()).name()) : null);
                 })
                 .toList();
         List<ApiPublicCourt> courtLabels = facility.allCourts().stream()

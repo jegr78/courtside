@@ -102,6 +102,8 @@ tags:
     description: Recurring bookings — previewing, creating, moving and cancelling.
   - name: waitlist
     description: Queueing for a taken slot and taking it when it frees.
+  - name: partner-search
+    description: Offering the open place of a booking to other members and taking one.
   - name: admin-courts
     description: Administering courts.
   - name: admin-opening-hours
@@ -1949,6 +1951,28 @@ components:
         cardColor: { type: string }
         status: { $ref: "#/components/schemas/BookingStatus" }
         note: { type: [string, "null"] }
+        partnerSearch:
+          $ref: "#/components/schemas/PartnerSearchState"
+
+    PartnerSearchState:
+      type: string
+      description: |
+        Present only on a booking that holds the "looking for a partner" participant card and still
+        stands before its start. `AVAILABLE` means its place could be offered, `PUBLISHED` that it is.
+      enum: [AVAILABLE, PUBLISHED]
+
+    OpenPlace:
+      type: object
+      required: [invitationId, courtIds, startsAt, endsAt, cardLabel]
+      properties:
+        invitationId: { type: string, format: uuid }
+        courtIds:
+          type: array
+          minItems: 1
+          items: { type: string, format: uuid }
+        startsAt: { type: string, format: date-time }
+        endsAt: { type: string, format: date-time }
+        cardLabel: { type: string }
 
     PersonalBookingView:
       type: string
@@ -2811,7 +2835,7 @@ components:
              BOOKING_PLAYER_RECORDED, BOOKING_PLAYER_WITHDREW, BOOKING_DISPLACED,
              BOOKING_REMINDER, BOOKING_CANCELLED, BOOKING_CANCELLED_BY_CLUB,
              BOOKING_SERIES_CREATED, BOOKING_SERIES_CANCELLED_BY_CLUB, BOOKING_SERIES_MOVED_BY_CLUB,
-             WAITLIST_OFFER]
+             WAITLIST_OFFER, BOOKING_PARTNER_FOUND, BOOKING_PLACE_TAKEN]
 
     MessageChoice:
       type: object
@@ -4761,6 +4785,131 @@ paths:
           content:
             application/problem+json:
               schema: { $ref: "#/components/schemas/Problem" }
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/my/bookings/{bookingId}/partner-invitation:
+    put:
+      tags: [partner-search]
+      operationId: publishPartnerInvitation
+      summary: Offer the place the partner marker holds to other members.
+      description: |
+        Only the booking's holder may offer its place, and only while the booking stands, has not
+        started, is not part of a series and holds the "looking for a partner" participant card.
+        Offering it again changes nothing. Another account's booking answers `404` with
+        `urn:courtside:error:booking-not-found`; a booking without such a place answers `409` with
+        `urn:courtside:error:partner-place-unavailable`.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: bookingId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "204":
+          description: The place is offered.
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: The booking holds no place a partner could take.
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "429":
+          $ref: "#/components/responses/RateLimited"
+    delete:
+      tags: [partner-search]
+      operationId: withdrawPartnerInvitation
+      summary: Stop offering the booking's open place.
+      description: |
+        Withdrawing a place that is not offered changes nothing. Another account's booking answers
+        `404` with `urn:courtside:error:booking-not-found`.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: bookingId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "204":
+          description: The place is no longer offered.
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/partner-invitations:
+    get:
+      tags: [partner-search]
+      operationId: listOpenPlaces
+      summary: The open places this account may take.
+      description: |
+        Lists every offered place in a booking that stands and has not started, whose card this
+        account may book, which it neither holds nor plays in. An account barred from booking sees
+        none. An entry names no person and no booking: the slot, the courts and the card are all
+        that is offered.
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: The open places, earliest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/OpenPlace" }
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/partner-invitations/{invitationId}/acceptance:
+    post:
+      tags: [partner-search]
+      operationId: acceptPartnerInvitation
+      summary: Take an open place.
+      description: |
+        Records this account's member in the place the marker held, in one transaction with the
+        booking locked, so two members taking one place leave exactly one of them in it. A place
+        that is taken, withdrawn, started, cancelled or not offered to this account answers `404`
+        with `urn:courtside:error:partner-invitation-not-found`.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: invitationId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "204":
+          description: The member plays in the booking.
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
         "429":
           $ref: "#/components/responses/RateLimited"
 

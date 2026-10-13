@@ -2,9 +2,9 @@
   "schemaVersion": 1,
   "reviewedAt": "2026-10-12",
   "purpose": "This is the normative authorization policy for the shipped Courtside API. OpenAPI defines the transport shape; this policy defines who may perform each operation, which resource attributes narrow that permission, and which protected fields each projection may read or write.",
-  "openApiFieldInventorySha256": "d80f561628608cee0066ad58efe06c9865b938e5b718eb5190058885755ca8c2",
-  "protectedFieldInventorySha256": "174231e5d10a1e24a00993b2bba95b73d1749ba62780a85d608afed778bf0512",
-  "productionAuthorizationSha256": "89c39b4776b054118bd3bd021b59f7169a6c1567619b7d3cbc2c293c62ec0495",
+  "openApiFieldInventorySha256": "00bc9f613f343d90fdd32ccecc2bc0476f70049350ec6dd1411a373700a7341d",
+  "protectedFieldInventorySha256": "188857c6a912ada8ed9236fbf4218985e20586b2ff77bbfdec0d3e1a0659000e",
+  "productionAuthorizationSha256": "1b9d69da11ed34483b9a0b7bed52b6d45d4e465d8bdce356c8fdba43220de501",
   "ordinaryFields": [
     "Problem.detail",
     "Problem.fieldErrors",
@@ -15,6 +15,15 @@
     "Problem.traceId",
     "Problem.type",
     "Problem.violations",
+    "acceptPartnerInvitation:parameter:$parameter.path.invitationId",
+    "acceptPartnerInvitation:response:$response.header.Retry-After",
+    "acceptPartnerInvitation:response:FieldError.code",
+    "acceptPartnerInvitation:response:FieldError.field",
+    "acceptPartnerInvitation:response:FieldError.params",
+    "acceptPartnerInvitation:response:FieldError.params.*",
+    "acceptPartnerInvitation:response:Violation.code",
+    "acceptPartnerInvitation:response:Violation.params",
+    "acceptPartnerInvitation:response:Violation.params.*",
     "acceptWaitlistOffer:parameter:$parameter.path.entryId",
     "acceptWaitlistOffer:response:$response.header.Location",
     "acceptWaitlistOffer:response:$response.header.Retry-After",
@@ -1232,6 +1241,18 @@
     "listMembershipTypes:response:Violation.code",
     "listMembershipTypes:response:Violation.params",
     "listMembershipTypes:response:Violation.params.*",
+    "listOpenPlaces:response:$response.header.Retry-After",
+    "listOpenPlaces:response:FieldError.code",
+    "listOpenPlaces:response:FieldError.field",
+    "listOpenPlaces:response:FieldError.params",
+    "listOpenPlaces:response:FieldError.params.*",
+    "listOpenPlaces:response:OpenPlace.cardLabel",
+    "listOpenPlaces:response:OpenPlace.courtIds",
+    "listOpenPlaces:response:OpenPlace.endsAt",
+    "listOpenPlaces:response:OpenPlace.startsAt",
+    "listOpenPlaces:response:Violation.code",
+    "listOpenPlaces:response:Violation.params",
+    "listOpenPlaces:response:Violation.params.*",
     "listOpeningHours:response:$response.header.Retry-After",
     "listOpeningHours:response:FieldError.code",
     "listOpeningHours:response:FieldError.field",
@@ -1398,6 +1419,7 @@
     "listPersonalBookings:response:PersonalBooking.cardLabel",
     "listPersonalBookings:response:PersonalBooking.courtIds",
     "listPersonalBookings:response:PersonalBooking.endsAt",
+    "listPersonalBookings:response:PersonalBooking.partnerSearch",
     "listPersonalBookings:response:PersonalBooking.startsAt",
     "listPersonalBookings:response:PersonalBooking.status",
     "listPersonalBookings:response:PersonalBookingPage.clubName",
@@ -1586,6 +1608,15 @@
     "previewSeriesMove:response:Violation.code",
     "previewSeriesMove:response:Violation.params",
     "previewSeriesMove:response:Violation.params.*",
+    "publishPartnerInvitation:parameter:$parameter.path.bookingId",
+    "publishPartnerInvitation:response:$response.header.Retry-After",
+    "publishPartnerInvitation:response:FieldError.code",
+    "publishPartnerInvitation:response:FieldError.field",
+    "publishPartnerInvitation:response:FieldError.params",
+    "publishPartnerInvitation:response:FieldError.params.*",
+    "publishPartnerInvitation:response:Violation.code",
+    "publishPartnerInvitation:response:Violation.params",
+    "publishPartnerInvitation:response:Violation.params.*",
     "readAuditLog:parameter:$parameter.query.cursor",
     "readAuditLog:parameter:$parameter.query.from",
     "readAuditLog:parameter:$parameter.query.limit",
@@ -2171,7 +2202,16 @@
     "uploadClubLogo:response:FieldError.params.*",
     "uploadClubLogo:response:Violation.code",
     "uploadClubLogo:response:Violation.params",
-    "uploadClubLogo:response:Violation.params.*"
+    "uploadClubLogo:response:Violation.params.*",
+    "withdrawPartnerInvitation:parameter:$parameter.path.bookingId",
+    "withdrawPartnerInvitation:response:$response.header.Retry-After",
+    "withdrawPartnerInvitation:response:FieldError.code",
+    "withdrawPartnerInvitation:response:FieldError.field",
+    "withdrawPartnerInvitation:response:FieldError.params",
+    "withdrawPartnerInvitation:response:FieldError.params.*",
+    "withdrawPartnerInvitation:response:Violation.code",
+    "withdrawPartnerInvitation:response:Violation.params",
+    "withdrawPartnerInvitation:response:Violation.params.*"
   ],
   "principals": [
     {
@@ -2744,6 +2784,30 @@
       ]
     },
     {
+      "id": "partner-search",
+      "description": "A permanent account offers and withdraws the open place only of a booking it holds, and lists and takes only open places it may take itself; taking a place passes the booking-card check and the membership type's booking eligibility, not the rules that judge a booking itself.",
+      "operationIds": [
+        "publishPartnerInvitation",
+        "withdrawPartnerInvitation",
+        "listOpenPlaces",
+        "acceptPartnerInvitation"
+      ],
+      "actors": [
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN"
+      ],
+      "decisions": [
+        "permanent-account-gate",
+        "booking-card-eligibility",
+        "partner-invitation-ownership"
+      ]
+    },
+    {
       "id": "managed-booking",
       "description": "A permanent account sees booking management data only when one of its roles manages the booking card; administrators may manage every card.",
       "operationIds": [
@@ -3123,7 +3187,10 @@
         "src/main/java/org/courtside/booking/BookingWriter.java#bookable",
         "src/main/java/org/courtside/booking/waitlist/WaitlistQueue.java#eligible",
         "src/main/java/org/courtside/booking/internal/CardEligibilityPolicy.java#admits",
-        "src/main/java/org/courtside/booking/BookingWriter.java#isBookable"
+        "src/main/java/org/courtside/booking/BookingWriter.java#isBookable",
+        "src/main/java/org/courtside/booking/partner/PartnerSearchService.java#mayTakeAPlace",
+        "src/main/java/org/courtside/booking/partner/PartnerSearchService.java#openPlaces",
+        "src/main/java/org/courtside/booking/partner/PartnerSearchService.java#accept"
       ],
       "positiveTests": [
         "src/test/java/org/courtside/booking/internal/CardEligibilityPolicyTest.java#givenTheRequiredRole_whenRequiringEligibility_thenTheCardIsReturned"
@@ -3201,6 +3268,45 @@
         "src/test/java/org/courtside/booking/web/WaitlistControllerTest.java#givenAnotherMembersEntry_whenAMemberLeavesIt_thenItIsNotFoundAndKeepsWaiting",
         "src/test/java/org/courtside/booking/web/WaitlistControllerTest.java#givenAnOffer_whenAnotherMemberBooksTheCourt_thenItIsReservedForTheWaitingMember",
         "src/test/java/org/courtside/booking/waitlist/WaitlistTest.java#givenAnOffer_whenATrainerMovesASeriesOntoTheReservedCourt_thenTheMoveIsBlocked"
+      ]
+    },
+    {
+      "id": "partner-invitation-ownership",
+      "title": "Partner invitation holder and taker",
+      "rule": "Only the account holding a booking publishes or withdraws its open place; another account's booking answers as not found. Open places are listed to and taken by an enabled account acting as its own person, not barred from booking, whose roles the card admits, that neither holds the booking nor already plays in it, checked again under the booking row lock; any other invitation answers as not found, and no listed place names a person or a booking.",
+      "attributes": [
+        "current-account",
+        "booking-owner",
+        "booking-card",
+        "allowed-role"
+      ],
+      "productionPaths": [
+        "src/main/java/org/courtside/booking/partner/PartnerSearchService.java#publish",
+        "src/main/java/org/courtside/booking/partner/PartnerSearchService.java#withdraw",
+        "src/main/java/org/courtside/booking/partner/PartnerSearchService.java#lockedOwn",
+        "src/main/java/org/courtside/booking/partner/PartnerSearchService.java#openPlaces",
+        "src/main/java/org/courtside/booking/partner/PartnerSearchService.java#accept",
+        "src/main/java/org/courtside/booking/partner/PartnerSearchService.java#mayTakeAPlace",
+        "src/main/java/org/courtside/booking/partner/PartnerInvitationRows.java#offeredBeyond",
+        "src/main/java/org/courtside/booking/web/PartnerSearchController.java#publishPartnerInvitation",
+        "src/main/java/org/courtside/booking/web/PartnerSearchController.java#withdrawPartnerInvitation",
+        "src/main/java/org/courtside/booking/web/PartnerSearchController.java#listOpenPlaces",
+        "src/main/java/org/courtside/booking/web/PartnerSearchController.java#acceptPartnerInvitation"
+      ],
+      "positiveTests": [
+        "src/test/java/org/courtside/booking/web/PartnerSearchControllerTest.java#givenABookingLookingForAPartner_whenItsHolderOffersThePlace_thenTheirBookingSaysSo",
+        "src/test/java/org/courtside/booking/web/PartnerSearchControllerTest.java#givenAnOfferedPlace_whenAMemberListsOpenPlaces_thenTheEntryNamesNoPersonAndNoBooking",
+        "src/test/java/org/courtside/booking/web/PartnerSearchControllerTest.java#givenAnOfferedPlace_whenAMemberTakesIt_thenTheyPlayAndTheListIsEmpty",
+        "src/test/java/org/courtside/booking/partner/PartnerSearchTest.java#givenAPublishedPlace_whenTheHolderWithdrawsIt_thenNobodySeesOrTakesIt"
+      ],
+      "negativeTests": [
+        "src/test/java/org/courtside/booking/web/PartnerSearchControllerTest.java#givenSomebodyElsesBooking_whenAMemberOffersOrWithdrawsItsPlace_thenTheBookingIsNotFound",
+        "src/test/java/org/courtside/booking/partner/PartnerSearchTest.java#givenSomebodyElsesBooking_whenAMemberPublishesOrWithdrawsIt_thenTheBookingIsNotFound",
+        "src/test/java/org/courtside/booking/partner/PartnerSearchTest.java#givenACardTheAccountMayNotBook_whenItsPlaceIsPublished_thenItNeitherSeesNorTakesIt",
+        "src/test/java/org/courtside/booking/partner/PartnerSearchTest.java#givenAMemberBarredFromBooking_whenAPlaceIsPublished_thenTheyNeitherSeeNorTakeIt",
+        "src/test/java/org/courtside/booking/partner/PartnerSearchTest.java#givenADisabledAccount_whenItTriesToTakeAPlace_thenThePlaceIsNotFound",
+        "src/test/java/org/courtside/booking/partner/PartnerSearchTest.java#givenAMemberAlreadyPlaying_whenAPlaceInTheSameBookingIsPublished_thenTheyAreNotOfferedIt",
+        "src/test/java/org/courtside/booking/web/PartnerSearchControllerTest.java#givenNoSession_whenOpenPlacesAreListed_thenTheRequestIsRefused"
       ]
     },
     {
@@ -4389,6 +4495,35 @@
       ],
       "decisions": [
         "waitlist-ownership"
+      ]
+    },
+    {
+      "id": "open-place-read",
+      "access": "read",
+      "description": "An invitation identifier, the handle that takes an open place, is returned only to an account that may take that place.",
+      "fields": [
+        "OpenPlace.invitationId"
+      ],
+      "operationIds": [
+        "listOpenPlaces"
+      ],
+      "actors": [
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN"
+      ],
+      "attributes": [
+        "current-account",
+        "booking-card",
+        "allowed-role"
+      ],
+      "decisions": [
+        "booking-card-eligibility",
+        "partner-invitation-ownership"
       ]
     },
     {

@@ -130,6 +130,20 @@ member's own booking of the slot became; it carries no foreign key, because `cou
 `booking_participant` stay the only rows a removed booking takes with it. The sweep deletes every entry whose slot has ended, and an
 account's entries go with the account.
 
+## Offering an open place
+
+| Table | Holds | References |
+|---|---|---|
+| `partner_invitation` | A booking holder's offer of the place its "looking for a partner" card holds, and when it was offered | `booking`, `booking_participant` |
+
+`partner_invitation_one_per_booking` keeps a booking to one offer. The row names no person: the holder
+is the booking's `booked_by`, and the place is the participant row it points at. Taking the place
+rewrites that `booking_participant` row from the card into the member and deletes the offer;
+withdrawing it deletes the offer too. Like `waitlist_entry.booking_id`, neither reference carries a
+foreign key, so `court_allocation` and `booking_participant` stay the only rows a removed booking
+takes with it. Every read joins the booking, and a sweep deletes offers whose booking is gone,
+cancelled or started, or whose place no longer holds the card.
+
 ## People, memberships and accounts
 
 | Table | Holds | References |
