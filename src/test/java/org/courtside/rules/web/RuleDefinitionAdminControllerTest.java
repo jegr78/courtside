@@ -240,6 +240,23 @@ class RuleDefinitionAdminControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenABookingWindowEndingAtMidnight_whenSettingIt_thenItIsRejectedAtTheLastMinuteOfTheDay() throws Exception {
+        // given
+        String ruleSetId = createRuleSet("Juniors");
+
+        // when / then
+        mockMvc.perform(put("/api/admin/rule-sets/" + ruleSetId + "/rules/BOOKING_HOURS")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"params": {"earliestStart": 1080, "latestEnd": 1440}}
+                                """)
+                        .with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.violations[0].code").value("rule.parameters.outOfBounds"))
+                .andExpect(jsonPath("$.violations[0].params.max").value(1439));
+    }
+
+    @Test
     void givenARule_whenDeletingIt_thenItIsRemovedAndDeletingAgainIsStillNoContent() throws Exception {
         // given
         String ruleSetId = createRuleSet("Trial");

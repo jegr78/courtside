@@ -243,7 +243,9 @@ fest, ob das Regelwerk sie enthält. Jedes Regelwerk kann diese Regeln höchsten
 Öffnungszeiten und Buchungsraster gelten für den ganzen Verein. Sie stehen deshalb außerhalb der
 Regelwerke. Buchungszeiten engen die Öffnungszeiten für eine Mitgliedsart ein, erweitern sie aber
 nie. Hat die Anlage zum Beispiel bis 23:00 Uhr geöffnet, kann ein Jugendregelwerk Buchungen bis
-20:00 Uhr erlauben. Administratoren können das Buchungsverbot und die Buchungszeiten für
+20:00 Uhr erlauben. Wie die Öffnungszeiten enden Buchungszeiten spätestens um 23:59 Uhr. Gilt ein
+Fenster bis Betriebsschluss, trage die Schließzeit der Anlage als spätestes Ende ein.
+Administratoren können das Buchungsverbot und die Buchungszeiten für
 Verwaltungsaufgaben übergehen. Das Zeit- und Platzraster gilt auch für sie.
 
 Beim Stilllegen bleibt ein Regelwerk für bereits zugeordnete Mitgliedsarten wirksam. Es steht nur
