@@ -109,8 +109,9 @@ Two interfaces are public compatibility contracts:
 1. documented environment variables used by the application and reference deployment;
 2. the REST API published in the OpenAPI document.
 
-Renaming or removing either is a breaking change. Additive changes remain compatible when existing
-clients and configurations continue to work.
+Renaming or removing either is a breaking change, and so is narrowing what either accepts, such as a
+tighter bound on a request field. Additive changes remain compatible when existing clients and
+configurations continue to work.
 
 Flyway applies migrations at startup. Until the first published release, a correction may
 edit an unshipped migration. Afterwards, shipped migrations are immutable and every schema change
