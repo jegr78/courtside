@@ -2806,7 +2806,7 @@ components:
       description: |
         What a message was. The client resolves its label from this; the value is the message's own
         name, not the reason another part of the instance had for asking.
-      enum: [CREDENTIALS_NEW_ACCOUNT, CREDENTIALS_PASSWORD_RESET, ACCOUNT_USERNAME_REMINDER,
+      enum: [ACCOUNT_WELCOME, CREDENTIALS_NEW_ACCOUNT, CREDENTIALS_PASSWORD_RESET, ACCOUNT_USERNAME_REMINDER,
              ACCOUNT_PASSWORD_RESET_CODE, BOOKING_CONFIRMED,
              BOOKING_PLAYER_RECORDED, BOOKING_PLAYER_WITHDREW, BOOKING_DISPLACED,
              BOOKING_REMINDER, BOOKING_CANCELLED, BOOKING_CANCELLED_BY_CLUB,

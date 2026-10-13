@@ -92,12 +92,13 @@ class InstanceLinksTest {
     }
 
     @Test
-    void givenAnAddress_whenEachBookingMessageAsksForItsLink_thenItLeadsWhereTheMemberActsOnIt() {
+    void givenAnAddress_whenEachLinkedMessageAsksForItsLink_thenItLeadsWhereTheMemberActsOnIt() {
         // given
         InstanceLinks links = new InstanceLinks(ADDRESS + "/");
         Map<MessageKind, String> expected = new EnumMap<>(MessageKind.class);
         String booking = ADDRESS + "/my-bookings#booking-" + BOOKING;
         String bookings = ADDRESS + "/my-bookings";
+        expected.put(MessageKind.ACCOUNT_WELCOME, ADDRESS + "/");
         expected.put(MessageKind.BOOKING_CONFIRMED, booking);
         expected.put(MessageKind.BOOKING_PLAYER_RECORDED, booking);
         expected.put(MessageKind.BOOKING_PLAYER_WITHDREW, booking);

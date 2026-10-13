@@ -28,8 +28,9 @@ nennt zu jedem Kürzel den vollen Namen. Deine eigenen Buchungen tragen zusätzl
 
 ## Anmelden
 
-Der Vorstand legt dein Konto an. Courtside sendet dir den Benutzernamen und ein Einmalpasswort per
-E-Mail. Niemand im Vorstand sieht oder bestimmt dieses Passwort.
+Der Vorstand legt dein Konto an. Courtside schickt dir zuerst eine Willkommensnachricht und danach
+in einer eigenen E-Mail den Benutzernamen und ein Einmalpasswort. Niemand im Vorstand sieht oder
+bestimmt dieses Passwort.
 
 1. Wähle *Anmelden*.
 2. Gib deinen Benutzernamen und dein Passwort ein.
@@ -303,7 +304,8 @@ Codes zum Zurücksetzen schickt Courtside immer per E-Mail, denn dafür bist du 
 
 Hat dein Verein die Adresse von Courtside eingerichtet, endet eine E-Mail zu einer Buchung mit einem
 Link. Er führt zur Buchung oder zu *Meine Buchungen*, ein Angebot von der Warteliste zu deinem
-Platz auf der Warteliste. Der Kalendereintrag einer Bestätigung trägt denselben Link.
+Platz auf der Warteliste. Der Kalendereintrag einer Bestätigung trägt denselben Link. Die
+Willkommensnachricht endet mit einem Link zur Startseite von Courtside.
 
 In E-Mails mit Zugangsdaten, deinem Benutzernamen oder einem Code zum Zurücksetzen setzt Courtside
 keinen Link. Manche Mailprogramme machen trotzdem etwas klickbar, etwa einen Vereinsnamen, der wie

@@ -7,7 +7,7 @@ import java.util.UUID;
 // The event says which account needs a credential and why; it never carries one. The credential is
 // generated when the message is sent, so nothing that outlives this record has ever held it.
 @NullMarked
-public record CredentialsRequested(UUID accountId, Reason reason) implements DomainEventRecord {
+public record CredentialsRequested(UUID accountId, Reason reason, boolean accountCreated) implements DomainEventRecord {
 
     static final String TYPE = "identity.account.credentialsRequested";
 

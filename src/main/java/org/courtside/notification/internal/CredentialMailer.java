@@ -41,6 +41,9 @@ class CredentialMailer implements MessageComposer {
 
     @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT, fallbackExecution = true)
     void on(CredentialsRequested requested) {
+        if (requested.accountCreated()) {
+            outbox.queue(requested.accountId(), MessageKind.ACCOUNT_WELCOME, Map.of());
+        }
         outbox.queue(requested.accountId(), requested.reason() == CredentialsRequested.Reason.NEW_ACCOUNT
                 ? MessageKind.CREDENTIALS_NEW_ACCOUNT
                 : MessageKind.CREDENTIALS_PASSWORD_RESET, Map.of());

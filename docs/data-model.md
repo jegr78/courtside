@@ -236,7 +236,8 @@ board configures: `facility.court.added`, `card.bookingCard.changed`, `config.cl
 siblings. The other two arrive in the course of ordinary use, because the writer records every
 event a module publishes rather than a list it keeps: `booking.booking.confirmed` and the nine
 other booking entries, and `identity.account.credentialsRequested`, which names the account a
-credential was issued for. A board's request is written beside
+credential was issued for and says in `accountCreated` whether the account was opened by the same
+request. A board's request is written beside
 `roster.account.credentialsRequested`, which names the person, because the roster reaches
 `AccountCredentials` and publishes its own event as well. A member who asked for the credential
 themselves produces the `identity.` entry alone, so the pair says which of the two happened. Read the first segment as the publisher and not as a table, the `roster.`
@@ -246,7 +247,8 @@ entries come from `member`.
 with the product; read the constraint rather than a list here. A message somebody declined leaves no
 row at all: it did not fail, it was not sent.
 
-A `QUEUED` row is a message waiting in the outbox. Its `parameters` hold what the message is written
+A `QUEUED` row is a message waiting in the outbox. An account's first password is not claimed while
+an earlier welcome for that account is still `QUEUED`. Its `parameters` hold what the message is written
 from: a booking id, a waitlist entry id, a series id, the comma-separated ids of the series occurrences a change touched,
 a closure kind, a cancellation reason code, the previous start and end of moved occurrences or the
 person who withdrew. They never hold rendered text, an address or a credential: a message is

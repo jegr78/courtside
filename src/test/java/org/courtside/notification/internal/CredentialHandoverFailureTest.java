@@ -67,7 +67,7 @@ class CredentialHandoverFailureTest extends AbstractIntegrationTest {
 
         // when
         transactions.executeWithoutResult(status ->
-                events.publishEvent(new CredentialsRequested(accountId, CredentialsRequested.Reason.NEW_ACCOUNT)));
+                events.publishEvent(new CredentialsRequested(accountId, CredentialsRequested.Reason.NEW_ACCOUNT, false)));
         for (int retry = 1; retry < MailOutbox.ATTEMPTS + 2; retry++) {
             dueNow(accountId);
             outbox.deliverDue();
@@ -99,7 +99,7 @@ class CredentialHandoverFailureTest extends AbstractIntegrationTest {
 
         // when
         transactions.executeWithoutResult(status ->
-                events.publishEvent(new CredentialsRequested(accountId, CredentialsRequested.Reason.NEW_ACCOUNT)));
+                events.publishEvent(new CredentialsRequested(accountId, CredentialsRequested.Reason.NEW_ACCOUNT, false)));
 
         // then
         verify(sender, times(1)).send(any(MimeMessage.class));
@@ -118,7 +118,7 @@ class CredentialHandoverFailureTest extends AbstractIntegrationTest {
 
         // when
         transactions.executeWithoutResult(status ->
-                events.publishEvent(new CredentialsRequested(accountId, CredentialsRequested.Reason.NEW_ACCOUNT)));
+                events.publishEvent(new CredentialsRequested(accountId, CredentialsRequested.Reason.NEW_ACCOUNT, false)));
         dueNow(accountId);
         outbox.deliverDue();
 
@@ -139,7 +139,7 @@ class CredentialHandoverFailureTest extends AbstractIntegrationTest {
                 "major.mary." + UUID.randomUUID().toString().substring(0, 8), Set.of(Role.MEMBER));
         String hashBefore = identity.storedCredentialHash(accountId);
         transactions.executeWithoutResult(status -> events.publishEvent(
-                new CredentialsRequested(accountId, CredentialsRequested.Reason.NEW_ACCOUNT)));
+                new CredentialsRequested(accountId, CredentialsRequested.Reason.NEW_ACCOUNT, false)));
         assertThat(recorded(accountId)).as("a first failure waits for its retry").containsExactly("QUEUED");
 
         // when

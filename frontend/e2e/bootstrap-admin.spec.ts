@@ -1,5 +1,5 @@
 import { expect, expectAdministrationOverview, selectJourneyDate, selectPreference, test } from "./fixtures";
-import { credentialIn, messagesTo, messageTo } from "./mailbox";
+import { credentialIn, messagesTo, messageTo, messageWith } from "./mailbox";
 import { MEMBER_BOOKING_CARD, STANDARD_RULE_SET } from "./shipped-rows";
 
 function freeSlot(page: import("@playwright/test").Page, court: number, slot: string) {
@@ -1079,7 +1079,7 @@ test("an admin adds a person, gives them an account, and that person signs in an
   expect((await accountCreated).status()).toBe(201);
 
   // then — the board sees where the account stands, and never the password itself
-  const mailed = await messageTo(journeyService.mailboxURL, "mary.roe@example.org");
+  const mailed = await messageWith(journeyService.mailboxURL, "mary.roe@example.org", "Einmalpasswort:");
   const credential = credentialIn(mailed, "Einmalpasswort:");
   await expect(page.getByTestId("account-username")).toHaveValue("roe.mary");
   await expect(page.getByTestId("account-roles-MEMBER")).toBeChecked();

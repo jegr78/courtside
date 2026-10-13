@@ -28,8 +28,8 @@ name for each short form. Your own bookings also carry a person symbol.
 
 ## Signing in
 
-The board creates your account. Courtside emails you the username and a one-time password. Nobody
-on the board sees or chooses that password.
+The board creates your account. Courtside first sends you a welcome message, then the username and a
+one-time password in a separate email. Nobody on the board sees or chooses that password.
 
 1. Select *Sign in*.
 2. Enter your username and password.
@@ -296,7 +296,8 @@ because you are not signed in when you need them.
 
 When your club has set up Courtside's address, an email about a booking ends with a link. It leads to
 the booking or to *My bookings*, and a waitlist offer leads to your place on the waitlist. The
-calendar entry of a confirmation carries the same link.
+calendar entry of a confirmation carries the same link. The welcome message ends with a link to
+Courtside's start page.
 
 Courtside puts no link into emails with credentials, your username or a reset code. Some mail
 programs still make something clickable, such as a club name that looks like an address. Do not

@@ -45,7 +45,8 @@ class MailOutbox {
 
     // Somebody waits at a sign-in page for these, or an offer runs out within minutes, so a busy
     // evening of bookings goes after them.
-    private static final List<String> URGENT = Stream.of(MessageKind.CREDENTIALS_NEW_ACCOUNT,
+    private static final List<String> URGENT = Stream.of(MessageKind.ACCOUNT_WELCOME,
+                    MessageKind.CREDENTIALS_NEW_ACCOUNT,
                     MessageKind.CREDENTIALS_PASSWORD_RESET, MessageKind.ACCOUNT_USERNAME_REMINDER,
                     MessageKind.ACCOUNT_PASSWORD_RESET_CODE, MessageKind.WAITLIST_OFFER)
             .map(Enum::name)
@@ -113,8 +114,14 @@ class MailOutbox {
         return transactions.execute(status -> jdbc.sql("""
                         UPDATE message_record SET attempts = attempts + 1, next_attempt_at = :leaseEnd
                         WHERE id = (
-                            SELECT id FROM message_record
+                            SELECT id FROM message_record candidate
                             WHERE state = 'QUEUED' AND next_attempt_at <= :now
+                              -- a first password never overtakes the welcome that says where to use it
+                              AND NOT (kind = 'CREDENTIALS_NEW_ACCOUNT' AND EXISTS (
+                                  SELECT 1 FROM message_record welcome
+                                  WHERE welcome.account_id = candidate.account_id
+                                    AND welcome.kind = 'ACCOUNT_WELCOME' AND welcome.state = 'QUEUED'
+                                    AND welcome.queued_seq < candidate.queued_seq))
                             ORDER BY CASE WHEN kind IN (:urgent) THEN 0 ELSE 1 END, queued_seq
                             LIMIT 1
                             FOR UPDATE SKIP LOCKED)

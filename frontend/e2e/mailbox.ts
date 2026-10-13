@@ -26,6 +26,23 @@ export async function messageTo(mailboxURL: string, address: string): Promise<Ma
   return await response.json() as MailboxMessage;
 }
 
+// A new account receives a welcome before its first password, so the journey waits for the message
+// that carries the labelled line rather than taking whichever arrived first.
+export async function messageWith(mailboxURL: string, address: string, label: string): Promise<MailboxMessage> {
+  const carrying = async () => {
+    for (const listed of await messagesTo(mailboxURL, address)) {
+      const response = await fetch(`${mailboxURL}/api/v1/message/${listed.ID}`);
+      if (!response.ok) throw new Error(`The journey mailbox answered ${response.status}`);
+      const message = await response.json() as MailboxMessage;
+      if (new RegExp(`^${label}`, "m").test(message.Text)) return message;
+    }
+    return undefined;
+  };
+  await expect.poll(async () => Boolean(await carrying()),
+    { message: `no message with ${label} reached ${address}`, timeout: 20_000 }).toBe(true);
+  return (await carrying())!;
+}
+
 // The credential is whatever the message puts on the line the template labels, and the template is
 // the only place it exists, so the journey reads it the way the member does.
 export function credentialIn(message: MailboxMessage, label: string): string {
