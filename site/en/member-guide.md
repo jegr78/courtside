@@ -147,7 +147,7 @@ The board configures the booking types. The booking dialog only offers the types
 The booking dialog shows how many player slots are already filled.
 
 * Search for **Members** by name and add them. Each member can occupy only one player slot in a
-  booking.
+  booking. You hold a slot yourself as the booker, so the search does not offer you.
 * Enter **Guests** by name under *More details*. The field only appears for booking types that
   allow guests.
 * Under ***What plays***, select a slot filler such as a ball machine or a "looking for a partner"

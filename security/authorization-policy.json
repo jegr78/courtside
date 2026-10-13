@@ -3514,7 +3514,7 @@
     {
       "id": "member-directory-projection",
       "title": "Participant directory projection",
-      "rule": "Participant search returns only the stable person identifier and display name of current members, never roster, account, address or membership administration fields.",
+      "rule": "Participant search returns only the stable person identifier and display name of current members other than the searching person, never roster, account, address or membership administration fields.",
       "attributes": [
         "current-membership",
         "permanent-account",

@@ -318,7 +318,7 @@ Negative tests: `src/test/java/org/courtside/card/web/CardControllerTest.java#wh
 
 ### Participant directory projection
 
-Participant search returns only the stable person identifier and display name of current members, never roster, account, address or membership administration fields.
+Participant search returns only the stable person identifier and display name of current members other than the searching person, never roster, account, address or membership administration fields.
 
 Attributes: `current-membership`, `permanent-account`, `participant-schema`.
 

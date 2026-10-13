@@ -151,7 +151,8 @@ verwenden darfst.
 Der Buchungsdialog zeigt, wie viele Spielerplätze bereits belegt sind.
 
 * Suche **Mitglieder** nach ihrem Namen und füge sie hinzu. Jedes Mitglied kann in einer Buchung
-  nur einen Spielerplatz belegen.
+  nur einen Spielerplatz belegen. Als buchende Person hast du schon einen Platz, deshalb bietet die
+  Suche dich nicht an.
 * Trage **Gäste** unter *Weitere Angaben* namentlich ein. Das Feld erscheint nur bei passenden
   Buchungsarten.
 * Wähle unter ***Was mitspielt*** einen Platzfüller, zum Beispiel eine Ballmaschine oder einen
