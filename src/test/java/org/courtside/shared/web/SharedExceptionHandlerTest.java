@@ -13,7 +13,10 @@ import org.springframework.web.bind.ServletRequestBindingException;
 import org.springframework.web.method.annotation.ExceptionHandlerMethodResolver;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.MultipartException;
+import org.apache.tomcat.util.http.fileupload.MultipartStream;
+import org.apache.tomcat.util.http.fileupload.impl.IOFileUploadException;
 
+import java.io.IOException;
 import java.lang.reflect.Method;
 import java.sql.SQLException;
 import java.util.List;
@@ -160,6 +163,40 @@ class SharedExceptionHandlerTest {
         assertThat(problem.getType().toString()).isEqualTo("urn:courtside:error:malformed-request-body");
         assertThat(problem.getDetail()).as("the parser's message names internals and never reaches a client")
                 .doesNotContain("multipart servlet");
+    }
+
+    @Test
+    void givenAMultipartBodyTheServerCouldNotStore_whenAnsweringIt_thenItIsAServerFaultWithATraceReference() {
+        // given
+        ProblemTraceReference traceReference = mock(ProblemTraceReference.class);
+        MultipartException failure = new MultipartException("Failed to parse multipart servlet request",
+                new IOFileUploadException("Processing of multipart/form-data request failed. No space left on device",
+                        new IOException("No space left on device")));
+
+        // when
+        ProblemDetail problem = new SharedExceptionHandler(traceReference,
+                mock(org.courtside.shared.SecurityEventLog.class)).handleUnparseableMultipart(failure);
+
+        // then
+        assertThat(problem.getStatus()).as("a full disk is not the client's malformed request")
+                .isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR.value());
+        assertThat(problem.getType().toString()).isNotEqualTo("urn:courtside:error:malformed-request-body");
+        verify(traceReference).addTo(problem);
+    }
+
+    @Test
+    void givenAMultipartStreamThatBreaksOff_whenAnsweringIt_thenItStaysABadRequest() {
+        // given
+        MultipartException failure = new MultipartException("Failed to parse multipart servlet request",
+                new IOFileUploadException("Processing of multipart/form-data request failed. Stream ended unexpectedly",
+                        new MultipartStream.MalformedStreamException("Stream ended unexpectedly")));
+
+        // when
+        ProblemDetail problem = handler().handleUnparseableMultipart(failure);
+
+        // then
+        assertThat(problem.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value());
+        assertThat(problem.getType().toString()).isEqualTo("urn:courtside:error:malformed-request-body");
     }
 
     private static SharedExceptionHandler handler() {
