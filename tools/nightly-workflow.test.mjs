@@ -17,7 +17,7 @@ test("given scheduled verification, when main is checked, then the full build re
   assert.match(build, /contract: "coupled-nightly-rehearsal-v2"/);
   assert.match(build, /\$build == "success" and \$nightlyImage == "success"\n\s+and \$releaseGates == "success"/);
   assert.match(build, /retention-days: 90/);
-  assert.match(build, /push\|schedule\|workflow_dispatch\)\s+test "\$PROFILE_PLAN_RESULT" = skipped/);
+  assert.match(build, /push\|merge_group\|schedule\|workflow_dispatch\)\s+test "\$PROFILE_PLAN_RESULT" = skipped/);
   assert.match(build, /github\.event_name == 'schedule' && 30 \|\| 14/);
 });
 

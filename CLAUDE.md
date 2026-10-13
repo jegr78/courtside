@@ -347,6 +347,11 @@ is now public enough to need.
   found — is still readable in `git show`. Write commit messages as if that is where they end up,
   because it is.
 
+* **`main` merges through a merge queue.** A queued pull request is built together with the current
+  `main` and the entries ahead of it, so it no longer has to be rebased onto every new `main` to stay
+  mergeable. The queue's run of `build` is the full verification of a push to `main`; the title and
+  release-line checks answer it from `merge-group.yml`, because they judge the pull request itself.
+
 * **The pull request title is a Conventional Commit**, and it is not a formality: with
   `squash_merge_commit_title = PR_TITLE` the title *becomes* the squashed commit's subject in
   `main`'s history and is what release tooling reads to decide a version bump. `PR Title Lint`
@@ -411,11 +416,10 @@ is now public enough to need.
 
   **A clean rebase does not earn a second local verification.** It leaves the branch's own diff
   untouched — that content is what the green run verified, and it is still what will be reviewed and
-  squashed. What is unverified is only the combination with the new base, and the pull request's own
-  build tests exactly that combination, in full, before auto-merge can fire. So push, and open or
-  update the pull request with auto-merge armed: no rebased head reaches `main` without a green build
-  of the pairing. Fetch and compare once more after the rebase, and rebase again if the base moved
-  meanwhile.
+  squashed. What is unverified is only the combination with the new base, and the merge queue builds
+  exactly that combination, in full, before it merges. So push, and open or update the pull request
+  with auto-merge armed, which queues it once its own build is green: no head reaches `main` without
+  a green build of the queued pull requests on top of the current `main`.
 
   A rebase that stops on a conflict is a different case, because resolving it changes the branch's
   content. It releases the window with the lease-bound deletion below before the resolution, as does

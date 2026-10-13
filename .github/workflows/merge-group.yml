@@ -1,0 +1,24 @@
+name: merge group
+
+# The title and the release line belong to each pull request and were checked on its own head
+# before it could join the queue; a merge group answers the same required checks by name.
+on:
+  merge_group:
+    types: [checks_requested]
+
+permissions: {}
+
+jobs:
+  title:
+    name: Validate PR title
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - run: echo "::notice::Each queued pull request passed the title check on its own title"
+
+  release-line:
+    name: release line
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - run: echo "::notice::Each queued pull request passed the release line check on its own head"

@@ -54,10 +54,19 @@ test("given every workflow and composite action, when it names an action, then t
 // The count of references proves that something was read; release.yml alone carries enough of them
 // to hide every other workflow going unscanned. Reading each file is what this asserts instead.
 test("given a workflow that names no action at all, when the scan reports it, then the scan is not trusted", () => {
-  // when / then
-  assert.deepEqual(definitionsIn(workflows)
+  // given
+  const actionFree = ["workflows/merge-group.yml"];
+
+  // when
+  const unread = definitionsIn(workflows)
     .filter((path) => referencesIn(path).length === 0)
-    .map((path) => relative(github, path)), []);
+    .map((path) => relative(github, path));
+
+  // then
+  assert.deepEqual(unread, actionFree, "only a workflow declared action-free may name no action");
+  for (const path of actionFree) {
+    assert.doesNotMatch(readFileSync(join(github, path), "utf8"), /\buses:/, `${path} is declared action-free`);
+  }
 });
 
 test("given every workflow checkout, when repository code runs, then the GitHub token is not persisted", () => {
