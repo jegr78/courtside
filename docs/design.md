@@ -294,7 +294,9 @@ calendar and are not. `NO_COURT_BOOKING`, `MAX_BOOKING_DURATION` and `BOOKING_HO
 when a member moves an existing booking.
 
 `BOOKING_HOURS` narrows the opening hours for one membership category and never widens them. Its
-window holds for every weekday, is read in the club time zone and does not cross midnight.
+window holds for every weekday, is read in the club time zone and does not cross midnight. Like the
+opening hours it ends at 23:59 at the latest, so a window that lasts until closing names the
+closing time.
 
 A booking request authenticates and authorizes, validates the request, evaluates all rules, writes
 booking and allocations in one transaction, translates a collision to `409 Conflict`, publishes
