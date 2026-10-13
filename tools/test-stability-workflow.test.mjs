@@ -53,3 +53,14 @@ test("given a required build failure, when collecting evidence, then backend and
   assert.doesNotMatch(build, /frontend\/playwright-report/);
   assert.doesNotMatch(workflow, /frontend\/playwright-report/);
 });
+
+test("given a release pull request, when it bumps the frontend version, then the stability jobs stay off it", () => {
+  // given
+  const skipsReleasePullRequests = /\n    if: github\.event_name != 'pull_request' \|\| !startsWith\(github\.head_ref, 'release-please--'\)\n/;
+
+  // when / then
+  assert.match(browserOrder, skipsReleasePullRequests, "a version bump cannot change browser order, so it must not turn the release pull request red");
+  assert.match(browserCompatibility, skipsReleasePullRequests, "a version bump cannot change browser compatibility");
+  assert.match(workflow, /concurrency:\n\s+group: test-stability-\$\{\{ github\.event\.pull_request\.number \|\| github\.run_id \}\}\n\s+cancel-in-progress: \$\{\{ github\.event_name == 'pull_request' \}\}/,
+    "a newer head of the same pull request cancels the older run");
+});
