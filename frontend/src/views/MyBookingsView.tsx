@@ -8,6 +8,7 @@ import { Button } from "../components/Button";
 import { SuccessFeedback } from "../components/SuccessFeedback";
 import { formatBookingPeriod, formatDateTime } from "../time/clubZone";
 import { CancelDialog, MoveDialog } from "./AppointmentDialogs";
+import { OpenPlacesSection } from "./OpenPlacesSection";
 import { WaitlistSection } from "./WaitlistSection";
 
 import { warnAbout } from "../api/failureWarning";
@@ -159,6 +160,17 @@ export function MyBookingsView({ now, offline = false }: {
   }), [bookings, history, reference]);
 
   const courtNames = new Map(courts.map((court) => [court.id, court.name ?? t("court.number", { number: court.number })]));
+  const searchPartner = async (booking: PersonalBooking, publish: boolean) => {
+    setSuccess(undefined);
+    try {
+      await (publish ? api.publishOpenPlace(booking.id) : api.withdrawOpenPlace(booking.id));
+      clear();
+      await load();
+      setSuccess(t(publish ? "myBookings.partnerSearchStarted" : "myBookings.partnerSearchStopped"));
+    } catch (failure) {
+      report(failure);
+    }
+  };
   const chooseAction = (chosen: { kind: "cancel" | "move"; booking: PersonalBooking }) => {
     setSuccess(undefined);
     setAction(chosen);
@@ -173,7 +185,7 @@ export function MyBookingsView({ now, offline = false }: {
     {error && <Alert>{error}</Alert>}
     {success && <SuccessFeedback>{success}</SuccessFeedback>}
     {loading ? <p aria-live="polite">{t("status.loading")}</p> : grid && <div className="mt-4 grid gap-6">
-      <BookingSection testId="upcoming-bookings" title={t("myBookings.upcoming")} titleHidden empty={t("myBookings.noUpcoming")} bookings={sections.upcoming} courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone} actionable={!offline} action={chooseAction} t={t} />
+      <BookingSection testId="upcoming-bookings" title={t("myBookings.upcoming")} titleHidden empty={t("myBookings.noUpcoming")} bookings={sections.upcoming} courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone} actionable={!offline} action={chooseAction} searchPartner={searchPartner} t={t} />
       {!offline && nextCursor && <Button variant="secondary" data-testid="load-more-bookings" className="justify-self-start" disabled={loadingMore} onClick={() => void loadMore()}>{t("myBookings.loadMore")}</Button>}
       {cancelled.length > 0 && <details data-testid="cancelled-bookings">
         <summary data-testid="cancelled-bookings-summary" className="cursor-pointer font-semibold">{t(cancelledNextCursor ? "myBookings.cancelledCountMore" : "myBookings.cancelledCount", { count: cancelled.length })}</summary>
@@ -191,6 +203,8 @@ export function MyBookingsView({ now, offline = false }: {
     {!offline && !loading && grid && <WaitlistSection courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone}
       booked={async () => { await load(); setSuccess(t("myWaitlist.booked")); }}
       left={(declined) => setSuccess(t(declined ? "myWaitlist.declined" : "myWaitlist.left"))} />}
+    {!offline && !loading && grid && <OpenPlacesSection courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone}
+      taken={async () => { await load(); setSuccess(t("openPlaces.taken")); }} />}
     {!offline && !loading && grid && <ParticipationSection participations={participations} courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone} withdrawn={async () => { await load(); setSuccess(t("participations.withdrawn")); }} nextCursor={participationsNextCursor} loadingMore={loadingMore} loadMore={loadMoreParticipations} t={t} />}
     {grid && action?.kind === "cancel" && <CancelDialog booking={action.booking} seriesBookings={bookings.filter((booking) => booking.seriesId === action.booking.seriesId && booking.status === "CONFIRMED")} hasMoreBookings={nextCursor !== undefined} timeZone={grid.timeZone} closed={() => setAction(undefined)} completed={async () => { setAction(undefined); await load(); setSuccess(t("booking.cancelledSuccess")); }} />}
     {grid && action?.kind === "move" && <MoveDialog booking={action.booking} courts={courts} timeZone={grid.timeZone} maxBookingMinutes={maxBookingMinutes} closed={() => setAction(undefined)} completed={async () => { setAction(undefined); await load(); setSuccess(t("booking.moved")); }} />}
@@ -247,9 +261,10 @@ function ParticipationSection({ participations, courtNames, locale, timeZone, wi
 
 type Translate = ReturnType<typeof useTranslation>["t"];
 
-function BookingSection({ testId, title, titleHidden = false, empty, bookings, courtNames, locale, timeZone, actionable = false, action, t }: {
+function BookingSection({ testId, title, titleHidden = false, empty, bookings, courtNames, locale, timeZone, actionable = false, action, searchPartner, t }: {
   testId: string; title?: string; titleHidden?: boolean; empty: string; bookings: PersonalBooking[]; courtNames: Map<string, string>;
-  locale: string; timeZone: string; actionable?: boolean; action: (value: { kind: "cancel" | "move"; booking: PersonalBooking }) => void; t: Translate;
+  locale: string; timeZone: string; actionable?: boolean; action: (value: { kind: "cancel" | "move"; booking: PersonalBooking }) => void;
+  searchPartner?: (booking: PersonalBooking, publish: boolean) => Promise<void>; t: Translate;
 }) {
   const groups = groupBookings(bookings);
   return <section data-testid={testId}>
@@ -267,10 +282,17 @@ function BookingSection({ testId, title, titleHidden = false, empty, bookings, c
             {group.series && <span data-testid="series-marker" className="rounded-full border px-2 font-semibold">{t("myBookings.series")}</span>}
           </span>
           {booking.status === "CANCELLED" && <span>{t("myBookings.cancelled")}</span>}
+          {booking.partnerSearch === "PUBLISHED" && <span data-testid="partner-search-published">{t("myBookings.partnerSearchPublished")}</span>}
           {actionable && <div className="flex flex-wrap gap-2 pt-1">
             {booking.status === "CONFIRMED" && <>
               <Button variant="destructive" aria-label={bookingActionName("myBookings.cancelAccessible", booking, courtNames, locale, timeZone, t)} data-testid="personal-cancel" data-booking-id={booking.id} className="px-3 py-2" onClick={() => action({ kind: "cancel", booking })}>{t("myBookings.cancel")}</Button>
               {booking.seriesId && <Button variant="secondary" aria-label={bookingActionName("myBookings.moveAccessible", booking, courtNames, locale, timeZone, t)} data-testid="move-booking" data-booking-id={booking.id} className="px-3 py-2" onClick={() => action({ kind: "move", booking })}>{t("myBookings.move")}</Button>}
+              {searchPartner && booking.partnerSearch && <Button variant="secondary"
+                aria-label={bookingActionName(booking.partnerSearch === "AVAILABLE" ? "myBookings.searchPartnerAccessible" : "myBookings.stopPartnerSearchAccessible", booking, courtNames, locale, timeZone, t)}
+                data-testid={booking.partnerSearch === "AVAILABLE" ? "publish-open-place" : "withdraw-open-place"} data-booking-id={booking.id}
+                className="px-3 py-2" onClick={() => void searchPartner(booking, booking.partnerSearch === "AVAILABLE")}>
+                {t(booking.partnerSearch === "AVAILABLE" ? "myBookings.searchPartner" : "myBookings.stopPartnerSearch")}
+              </Button>}
             </>}
           </div>}
         </li>)}</ul>

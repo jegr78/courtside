@@ -789,6 +789,13 @@ const de = {
   "myBookings.cancelAccessible": "{{label}} am {{period}} auf {{courts}} stornieren",
   "myBookings.move": "Verschieben",
   "myBookings.moveAccessible": "{{label}} am {{period}} auf {{courts}} verschieben",
+  "myBookings.searchPartner": "Mitspieler suchen",
+  "myBookings.searchPartnerAccessible": "Den offenen Platz in {{label}} am {{period}} auf {{courts}} anderen Mitgliedern anbieten",
+  "myBookings.stopPartnerSearch": "Suche beenden",
+  "myBookings.stopPartnerSearchAccessible": "Den offenen Platz in {{label}} am {{period}} auf {{courts}} nicht mehr anbieten",
+  "myBookings.partnerSearchPublished": "Andere Mitglieder können den offenen Platz übernehmen.",
+  "myBookings.partnerSearchStarted": "Andere Mitglieder sehen jetzt den offenen Platz.",
+  "myBookings.partnerSearchStopped": "Der offene Platz wird nicht mehr angeboten.",
   "myBookings.scope": "Geltungsbereich",
   "myBookings.scope.THIS": "Nur dieser Termin",
   "myBookings.scope.THIS_AND_FOLLOWING": "Dieser und folgende Termine",
@@ -1408,9 +1415,13 @@ const de = {
   "myWaitlist.left": "Du stehst nicht mehr auf dieser Warteliste.",
   "notifications.open.WAITLIST": "Angebot öffnen",
   "notifications.summary.WAITLIST_OFFER": "Ein Platz, auf den du wartest, ist frei und für dich reserviert.",
+  "notifications.summary.BOOKING_PARTNER_FOUND": "Ein Mitglied hat den offenen Platz in deiner Buchung übernommen.",
+  "notifications.summary.BOOKING_PLACE_TAKEN": "Du hast einen offenen Platz übernommen und spielst in dieser Buchung mit.",
   "notifications.offerOpen": "Reserviert bis {{time}}",
   "notifications.offerClosed": "Dieses Angebot ist nicht mehr offen.",
   "messages.kind.WAITLIST_OFFER": "Angebot von der Warteliste",
+  "messages.kind.BOOKING_PARTNER_FOUND": "Mitspieler gefunden",
+  "messages.kind.BOOKING_PLACE_TAKEN": "Offener Platz übernommen",
   "error.type.court-reserved": "Dieser Platz ist für ein Mitglied von der Warteliste reserviert.",
   "error.type.waitlist-entry-not-found": "Diesen Wartelisteneintrag gibt es bei dir nicht.",
   "error.type.waitlist-entry-exists": "Du stehst für diesen Platz schon auf der Warteliste.",
@@ -1424,7 +1435,14 @@ const de = {
   "waitlist.slot.own": "Diesen Platz hältst du schon selbst.",
   "waitlist.offer.none": "Für diesen Eintrag gibt es kein offenes Angebot mehr.",
   "audit.event.booking.waitlist.offered": "Platz von der Warteliste angeboten",
-  "audit.eventType.booking.waitlist.offered": "Platz von der Warteliste angeboten"
+  "audit.event.booking.partner.joined": "Offener Platz übernommen",
+  "audit.eventType.booking.waitlist.offered": "Platz von der Warteliste angeboten",
+  "audit.eventType.booking.partner.joined": "Offener Platz übernommen",
+  "openPlaces.title": "Offene Plätze",
+  "openPlaces.description": "Mitglieder, die einen Mitspieler suchen, bieten diese Plätze an. Namen siehst du erst, wenn du mitspielst.",
+  "openPlaces.take": "Platz übernehmen",
+  "openPlaces.takeAccessible": "Den offenen Platz am {{period}} auf {{courts}} übernehmen",
+  "openPlaces.taken": "Du spielst jetzt in dieser Buchung mit."
 };
 
 export default de;

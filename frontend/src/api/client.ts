@@ -116,6 +116,7 @@ export type MoveExecuted = components["schemas"]["MoveExecuted"];
 export type JoinWaitlistRequest = components["schemas"]["JoinWaitlistRequest"];
 export type WaitlistJoined = components["schemas"]["WaitlistJoined"];
 export type WaitlistEntry = components["schemas"]["WaitlistEntry"];
+export type OpenPlace = components["schemas"]["OpenPlace"];
 export type ReservedSlot = components["schemas"]["ReservedSlot"];
 
 export interface BookingExportParameters extends Record<string, string> {
@@ -637,6 +638,16 @@ export const api = {
   ),
   reservedSlots: (date: string) => request<ReservedSlot[]>(
     `/api/reserved-slots?${new URLSearchParams({ date })}`
+  ),
+  openPlaces: () => request<OpenPlace[]>("/api/partner-invitations"),
+  acceptOpenPlace: (invitationId: string) => request<void>(
+    `/api/partner-invitations/${invitationId}/acceptance`, { method: "POST" }
+  ),
+  publishOpenPlace: (bookingId: string) => request<void>(
+    `/api/my/bookings/${bookingId}/partner-invitation`, { method: "PUT" }
+  ),
+  withdrawOpenPlace: (bookingId: string) => request<void>(
+    `/api/my/bookings/${bookingId}/partner-invitation`, { method: "DELETE" }
   ),
   waitlistEntries: () => request<WaitlistEntry[]>("/api/my/waitlist"),
   joinWaitlist: (entry: JoinWaitlistRequest) => request<WaitlistJoined>("/api/my/waitlist", {

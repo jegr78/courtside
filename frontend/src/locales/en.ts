@@ -791,6 +791,13 @@ const en: Record<keyof typeof de, string> = {
   "myBookings.cancelAccessible": "Cancel {{label}} on {{period}} at {{courts}}",
   "myBookings.move": "Move",
   "myBookings.moveAccessible": "Move {{label}} on {{period}} at {{courts}}",
+  "myBookings.searchPartner": "Look for a partner",
+  "myBookings.searchPartnerAccessible": "Offer the open place in {{label}} on {{period}} at {{courts}} to other members",
+  "myBookings.stopPartnerSearch": "Stop looking",
+  "myBookings.stopPartnerSearchAccessible": "Stop offering the open place in {{label}} on {{period}} at {{courts}}",
+  "myBookings.partnerSearchPublished": "Other members can take the open place.",
+  "myBookings.partnerSearchStarted": "Other members now see the open place.",
+  "myBookings.partnerSearchStopped": "The open place is no longer offered.",
   "myBookings.scope": "Scope",
   "myBookings.scope.THIS": "This occurrence",
   "myBookings.scope.THIS_AND_FOLLOWING": "This and following",
@@ -1410,9 +1417,13 @@ const en: Record<keyof typeof de, string> = {
   "myWaitlist.left": "You are no longer on this waitlist.",
   "notifications.open.WAITLIST": "Open the offer",
   "notifications.summary.WAITLIST_OFFER": "A court you are waiting for is free and reserved for you.",
+  "notifications.summary.BOOKING_PARTNER_FOUND": "A member took the open place in your booking.",
+  "notifications.summary.BOOKING_PLACE_TAKEN": "You took an open place and play in this booking.",
   "notifications.offerOpen": "Reserved until {{time}}",
   "notifications.offerClosed": "This offer is no longer open.",
   "messages.kind.WAITLIST_OFFER": "Waitlist offer",
+  "messages.kind.BOOKING_PARTNER_FOUND": "Partner found",
+  "messages.kind.BOOKING_PLACE_TAKEN": "Open place taken",
   "error.type.court-reserved": "This court is reserved for a member from the waitlist.",
   "error.type.waitlist-entry-not-found": "You have no such waitlist entry.",
   "error.type.waitlist-entry-exists": "You are already on the waitlist for this court.",
@@ -1426,7 +1437,14 @@ const en: Record<keyof typeof de, string> = {
   "waitlist.slot.own": "You already hold this court yourself.",
   "waitlist.offer.none": "This entry holds no open offer any more.",
   "audit.event.booking.waitlist.offered": "Court offered from the waitlist",
-  "audit.eventType.booking.waitlist.offered": "Court offered from the waitlist"
+  "audit.event.booking.partner.joined": "Open place taken",
+  "audit.eventType.booking.waitlist.offered": "Court offered from the waitlist",
+  "audit.eventType.booking.partner.joined": "Open place taken",
+  "openPlaces.title": "Open places",
+  "openPlaces.description": "Members looking for a partner offer these places. Nobody is named until you play.",
+  "openPlaces.take": "Take the place",
+  "openPlaces.takeAccessible": "Take the open place on {{period}} on {{courts}}",
+  "openPlaces.taken": "You play in this booking now."
 };
 
 export default en;
