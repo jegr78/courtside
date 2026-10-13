@@ -260,8 +260,9 @@ class ApiContractCoverageTest extends AbstractIntegrationTest {
                 return;
             }
             Object security = operation.getOrDefault("security", DOCUMENT_TREE.get("security"));
-            boolean guarded = security instanceof List<?> requirements && requirements.stream()
-                    .anyMatch(requirement -> requirement instanceof Map<?, ?> schemes
+            // Requirements are alternatives, so the token holds only if every one of them names it.
+            boolean guarded = security instanceof List<?> requirements && !requirements.isEmpty()
+                    && requirements.stream().allMatch(requirement -> requirement instanceof Map<?, ?> schemes
                             && schemes.containsKey("csrfToken"));
             if (!guarded) {
                 undeclared.add(method.toUpperCase() + " " + path);
