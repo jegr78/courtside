@@ -10,10 +10,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Import;
 import org.springframework.core.task.TaskExecutor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.IllegalTransactionStateException;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import javax.sql.DataSource;
@@ -88,6 +91,50 @@ class OutboxTransactionTest extends AbstractIntegrationTest {
 
         // then
         assertThat(rows(accountId)).as("a message about a change that never happened is never queued").isEmpty();
+        assertThat(entries(accountId)).as("nor does the centre show an entry for it").isZero();
+    }
+
+    @Test
+    void givenAChangeThatFailsAsItCommits_whenItsEntryWasAlreadyWritten_thenTheEntryGoesWithIt() {
+        // given
+        UUID personId = identity.createPerson("Mary", "Roe", "mary.roe@example.org");
+        UUID accountId = identity.createEnabledAccount(personId, "roe.mary", Set.of(Role.MEMBER));
+
+        // when
+        assertThatThrownBy(() -> transactions.executeWithoutResult(status -> {
+            events.publishEvent(new UsernameReminderRequested(accountId));
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void beforeCommit(boolean readOnly) {
+                    throw new IllegalStateException("the change failed after its entry was written");
+                }
+            });
+        })).hasMessage("the change failed after its entry was written");
+
+        // then
+        assertThat(entries(accountId)).as("the centre never shows a change that did not commit").isZero();
+        assertThat(rows(accountId)).isEmpty();
+    }
+
+    @Test
+    void givenACentreEntryThatFails_whenTheChangeCommits_thenTheChangeIsRolledBackWithIt() {
+        // given
+        UUID personId = identity.createPerson("Jane", "Major", "jane.major@example.org");
+        UUID accountId = identity.createEnabledAccount(personId, "major.jane", Set.of(Role.MEMBER));
+        jdbc.sql("ALTER TABLE notification ADD CONSTRAINT refuses_every_entry CHECK (false) NOT VALID").update();
+        try {
+            // when / then
+            assertThatThrownBy(() -> transactions.executeWithoutResult(status -> {
+                renameTo(personId, "Roe");
+                events.publishEvent(new UsernameReminderRequested(accountId));
+            })).isInstanceOf(DataIntegrityViolationException.class).hasMessageContaining("refuses_every_entry");
+        } finally {
+            jdbc.sql("ALTER TABLE notification DROP CONSTRAINT refuses_every_entry").update();
+        }
+        assertThat(lastName(personId))
+                .as("a change whose centre entry could not be stored must not commit without it")
+                .isEqualTo("Major");
+        assertThat(rows(accountId)).as("nor does its message leave").isEmpty();
     }
 
     @Test
@@ -109,6 +156,7 @@ class OutboxTransactionTest extends AbstractIntegrationTest {
                 .as("queueing a message takes no connection beside the one the change commits on")
                 .isEqualTo(1);
         assertThat(rows(accountId)).as("a committed change has its row").containsExactly("QUEUED");
+        assertThat(entries(accountId)).as("and its centre entry").isEqualTo(1);
     }
 
     @Test
@@ -140,6 +188,11 @@ class OutboxTransactionTest extends AbstractIntegrationTest {
     private String lastName(UUID personId) {
         return jdbc.sql("SELECT last_name FROM person WHERE id = :id").param("id", personId)
                 .query(String.class).single();
+    }
+
+    private int entries(UUID accountId) {
+        return jdbc.sql("SELECT count(*) FROM notification WHERE account_id = :id").param("id", accountId)
+                .query(Integer.class).single();
     }
 
     private List<String> rows(UUID accountId) {
