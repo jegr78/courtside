@@ -48,8 +48,8 @@ test("when the run ends, then no reserved slot holds a booking of this run, no w
   const { removed, left, foreign } = await sweep(admin, allSlots());
   const weeks = await clearWeekend();
   for (const username of disposables) await restoreDisposable(username);
-  for (const key of MEMBERS) await leaveWaitlist(key);
-  const queued = Object.fromEntries(await Promise.all(MEMBERS.map(async (key) => [key, (await openWaitlistEntries(key)).length])));
+  for (const key of MEMBERS) await leaveWaitlist(key, allSlots());
+  const queued = Object.fromEntries(await Promise.all(MEMBERS.map(async (key) => [key, (await openWaitlistEntries(key, allSlots())).length])));
   writeFileSync(runPath("postflight.json"), JSON.stringify({ removed, left, foreign, weeks: weeks.removed, foreignWeeks: weeks.foreign, queued }, null, 2));
   // then
   expect(left, "no reserved slot holds a booking of this run").toEqual([]);

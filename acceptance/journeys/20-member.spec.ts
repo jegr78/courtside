@@ -246,7 +246,7 @@ test("given two members on the same slot, when both submit, then the second is r
       const joined = second.waitForResponse(answers("POST", "/api/my/waitlist"));
       await second.getByTestId("booking-submit").click();
       expect((await joined).status(), "product: joining the waitlist is accepted").toBeLessThan(300);
-      expect(await openWaitlistEntries("memberC", slot), "product: memberC waits for the slot").toHaveLength(1);
+      expect(await openWaitlistEntries("memberC", [slot]), "product: memberC waits for the slot").toHaveLength(1);
     });
     const unreadBefore = await unreadNotifications("memberC");
     const offeredSince = new Date();
@@ -267,7 +267,7 @@ test("given two members on the same slot, when both submit, then the second is r
       const offer = second.locator('[data-testid="notification-offer"][data-open="true"]').first();
       await expect(offer, "product: the notification centre shows the open offer").toBeVisible();
       await capture(second, "notification-offer");
-      const [entry] = await openWaitlistEntries("memberC", slot);
+      const [entry] = await openWaitlistEntries("memberC", [slot]);
       expect(entry?.state, "product: the waiting entry is offered the slot").toBe("OFFERED");
       await second.getByTestId("my-bookings-link").click();
       const offered = second.getByTestId(`waitlist-entry-${entry.id}`);
@@ -287,7 +287,7 @@ test("given two members on the same slot, when both submit, then the second is r
       expect(await latestMailTo(discovery.emails["memberC"], offeredSince, undefined, offerAnswered), "product: the offer reached Mailpit before it was taken").not.toBeNull();
     });
   } finally {
-    await leaveWaitlist("memberC", slot).catch(() => undefined);
+    await leaveWaitlist("memberC", [slot]).catch(() => undefined);
     await cancelQuietly(first, ids); await first.context().close(); await second.context().close();
   }
 });
