@@ -19,10 +19,11 @@ const operationalLogPage = {
   }))
 };
 
-// The tables that scroll sideways on a phone, which the sweep must see rendered to judge them.
+// Content that only appears once its data has loaded, which the sweep must see rendered to judge it.
 const awaitedContent: Record<string, string[]> = {
   "/admin/utilisation": ["statistics-hours-scroll", "statistics-messages-scroll"],
-  "/admin/operational-logs": ["operational-logs-scroll"]
+  "/admin/operational-logs": ["operational-logs-scroll"],
+  "/admin/appointments": ["managed-single-appointments"]
 };
 
 // A page whose content only appears after a step, so the sweep scans that state as well.
@@ -33,7 +34,19 @@ const furtherStates: Record<string, (page: import("@playwright/test").Page) => P
   }
 };
 
+const appointment = (index: number, seriesId: string | null) => ({
+  id: `7e000000-0000-0000-0000-00000000000${index}`, cardId: "7e000000-0000-0000-0000-0000000000c1", courtIds: [],
+  startsAt: `2030-03-1${index}T16:00:00Z`, endsAt: `2030-03-1${index}T17:00:00Z`, cardLabel: "Training", cardColor: "#34584a",
+  status: "CONFIRMED", participantCount: 4, seriesId, ownBooking: true
+});
+
+// Single appointments between and after two series, the list shape that repeated a landmark.
+const managedAppointmentsPage = {
+  items: [appointment(1, "series-a"), appointment(2, null), appointment(3, "series-b"), appointment(4, null)]
+};
+
 async function standInsForEmptyTables(page: import("@playwright/test").Page) {
+  await page.route("**/api/managed/bookings?**", (route) => route.fulfill({ json: managedAppointmentsPage }));
   await page.route("**/api/admin/operational-logs/search", (route) => route.fulfill({ json: operationalLogPage }));
   await page.route("**/api/admin/statistics/messages**", async (route) => {
     const asked = new URL(route.request().url()).searchParams;
@@ -98,7 +111,7 @@ test.describe("every page", () => {
             const at = new URL(page.url()).pathname;
             landed.add(at);
             for (const testId of awaitedContent[at] ?? []) {
-              await expect(page.getByTestId(testId), `${at} shows its wide table ${testId}`).toBeVisible({ timeout: 10_000 });
+              await expect(page.getByTestId(testId).first(), `${at} shows ${testId}`).toBeVisible({ timeout: 10_000 });
             }
             await scanInBothThemes(`${at} as ${persona}`);
             const further = furtherStates[at];

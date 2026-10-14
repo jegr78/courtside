@@ -3,7 +3,7 @@ import { expect } from "./fixtures";
 import { productFailure } from "./browser-diagnostics";
 
 // axe tags these best-practice only, so a scan by WCAG tags alone never runs them.
-const STRUCTURE_RULES = ["page-has-heading-one", "heading-order", "empty-table-header"];
+const STRUCTURE_RULES = ["page-has-heading-one", "heading-order", "empty-table-header", "landmark-unique"];
 
 export async function axeFindings(page: import("@playwright/test").Page): Promise<string[]> {
   const scan = await new AxeBuilder({ page }).options({

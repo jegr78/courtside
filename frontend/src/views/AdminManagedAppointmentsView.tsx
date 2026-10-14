@@ -178,13 +178,10 @@ export function AdminManagedAppointmentsView({ managesAppointments, createsSerie
               actionsOpen={openActionsId === appointment.id} toggleActions={setOpenActionsId} moveAvailable={courtsReady}
               showDetail={setDetail} cancel={startCancelling} move={startMoving} t={t} />)}</ul>
           </details>
-          : <section key={group.key} aria-labelledby={`managed-singles-${group.key}`}>
-            <h2 id={`managed-singles-${group.key}`} className="text-muted px-2 text-sm font-semibold">{t("managedAppointments.singleAppointments")}</h2>
-            <ul data-testid="managed-single-appointments" className="mt-1 divide-y border-y">{group.items.map((appointment) => <AppointmentRow
-              key={appointment.id} appointment={appointment} courtNames={courtNames} locale={i18n.language} timeZone={timeZone}
-              actionsOpen={openActionsId === appointment.id} toggleActions={setOpenActionsId} moveAvailable={courtsReady}
-              showDetail={setDetail} cancel={startCancelling} move={startMoving} t={t} />)}</ul>
-          </section>)}
+          : <ul key={group.key} data-testid="managed-single-appointments" className="divide-y border-y">{group.items.map((appointment) => <AppointmentRow
+            key={appointment.id} appointment={appointment} courtNames={courtNames} locale={i18n.language} timeZone={timeZone}
+            actionsOpen={openActionsId === appointment.id} toggleActions={setOpenActionsId} moveAvailable={courtsReady}
+            showDetail={setDetail} cancel={startCancelling} move={startMoving} t={t} />)}</ul>)}
       </div>)}
 
     {managesAppointments && nextCursor && <Button data-testid="managed-load-more" variant="secondary" className="mt-5" disabled={loadingMore}
