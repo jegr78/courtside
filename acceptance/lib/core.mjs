@@ -75,3 +75,11 @@ export async function sweepSlots({ slots, read, cancel, ours }) {
 export function weeksToClear({ scheduled, ours }) {
   return { remove: scheduled.filter((date) => ours.has(date)), foreign: scheduled.filter((date) => !ours.has(date)) };
 }
+
+export function answers(method, path) {
+  return (response) => {
+    if (response.request().method() !== method) return false;
+    const { pathname } = new URL(response.url());
+    return typeof path === "string" ? pathname === path : path.test(pathname);
+  };
+}

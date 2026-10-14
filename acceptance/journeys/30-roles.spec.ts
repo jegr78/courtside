@@ -8,6 +8,7 @@ import { openAs, xsrf } from "../lib/session";
 import { step } from "../lib/steps";
 import { addPartner, bookAt, cancelQuietly, discovery, onDesksAndTablet, projectName } from "../lib/journey";
 import type { PersonaKey } from "../lib/context";
+import { answers } from "../lib/core.mjs";
 
 test.beforeEach(() => { test.skip(!onDesksAndTablet(), "role journeys run on desks, tablet and one phone"); });
 
@@ -30,7 +31,7 @@ async function createSeries(page: Page, who: PersonaKey, card: string, courtValu
   await page.getByTestId("preview-series").click();
   await expect(page.getByTestId("series-occurrence-0").or(page.getByTestId("series-skipped"))).toBeVisible();
   await capture(page, "series-preview");
-  const created = page.waitForResponse((r) => r.url().endsWith("/api/booking-series") && r.request().method() === "POST");
+  const created = page.waitForResponse(answers("POST", "/api/booking-series"));
   await page.getByTestId("confirm-series").click();
   const response = await created;
   const body = await response.json();
@@ -100,7 +101,7 @@ for (const key of ["trainer", "youth"] as const) {
         await page.getByTestId("move-start-time").fill(target.start);
         await page.getByTestId("preview-move").click();
         await capture(page, "move-preview");
-        const moved = page.waitForResponse((r) => /\/move$/.test(r.url()) && r.request().method() === "POST");
+        const moved = page.waitForResponse(answers("POST", /\/move$/));
         await page.getByTestId("confirm-move").click();
         const answer = await moved;
         expect(answer.status(), `product: the move is accepted (${await answer.text()})`).toBeLessThan(300);

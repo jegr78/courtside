@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 
 const json = (path) => JSON.parse(readFileSync(new URL(`../${path}`, import.meta.url), "utf8"));
 
@@ -248,7 +248,7 @@ test("given club bookings on the window's weekend, when the weekend journeys are
   assert.deepEqual(conflicts, ["early", "sunday"], "a booking before the latest later opening and every Sunday booking would be displaced");
 });
 
-import { admitted, sweepSlots, weeksToClear, attribute, classify, classifyErrors, occupying, replayEntries } from "../acceptance/lib/core.mjs";
+import { admitted, answers, sweepSlots, weeksToClear, attribute, classify, classifyErrors, occupying, replayEntries } from "../acceptance/lib/core.mjs";
 import { claimRunDirectory, harnessCommit } from "../acceptance/lib/run-directory.mjs";
 import { findExecutable } from "../acceptance/lib/executable.mjs";
 import { mkdtempSync, writeFileSync, mkdirSync, chmodSync, rmSync } from "node:fs";
@@ -662,4 +662,40 @@ test("given no reset limit or a configured one, when parsed, then the instance d
   assert.equal(parseConfig(valid(), env).resetCodesPerHour, 5);
   assert.equal(parseConfig({ ...valid(), resetCodesPerHour: 8 }, env).resetCodesPerHour, 8);
   assert.equal(field({ ...valid(), resetCodesPerHour: 0 }), "resetCodesPerHour");
+});
+
+
+const response = (method, url) => ({ url: () => url, request: () => ({ method: () => method }) });
+
+test("given a request the client sends with a query, when a journey waits for its path, then the answer is recognised", () => {
+  // given
+  const cancel = answers("DELETE", "/api/bookings/42");
+  // when / then
+  assert.equal(cancel(response("DELETE", "https://club.example.org/api/bookings/42?")), true, "an empty query still names the booking");
+  assert.equal(cancel(response("DELETE", "https://club.example.org/api/bookings/42?reason=RAIN")), true, "a reason in the query still names the booking");
+  assert.equal(cancel(response("DELETE", "https://club.example.org/api/bookings/42")), true, "a request without query still names the booking");
+});
+
+test("given another path or method, when a journey waits for an answer, then it is not taken for the awaited one", () => {
+  // given
+  const cancel = answers("DELETE", "/api/bookings/42");
+  // when / then
+  assert.equal(cancel(response("GET", "https://club.example.org/api/bookings/42")), false, "a read is no cancellation");
+  assert.equal(cancel(response("DELETE", "https://club.example.org/api/bookings/420")), false, "another booking is not this one");
+  assert.equal(cancel(response("DELETE", "https://club.example.org/archive/api/bookings/42")), false, "a path that only ends alike is not this one");
+  assert.equal(answers("POST", /\/move$/)(response("POST", "https://club.example.org/api/booking-series/7/move?scope=THIS")), true,
+    "a pattern matches the path without the query");
+});
+
+test("given the acceptance journeys, when they wait for an answer, then they name it by method and path", () => {
+  // given
+  const directory = new URL("../acceptance/journeys/", import.meta.url);
+  const waits = readdirSync(directory).filter((name) => name.endsWith(".ts"))
+    .flatMap((name) => [...readFileSync(new URL(name, directory), "utf8").matchAll(/waitForResponse\(([^\n]*)/g)]
+      .map((match) => `${name}: ${match[1]}`));
+  // when
+  const handWritten = waits.filter((wait) => !/: answers\(/.test(wait));
+  // then
+  assert.ok(waits.length >= 5, "the journeys wait for their answers");
+  assert.deepEqual(handWritten, [], "a hand-written URL comparison breaks on the next query the client adds");
 });
