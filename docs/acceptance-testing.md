@@ -37,6 +37,15 @@ created.
 - The Mailpit API of that catcher for the journeys that read mail. Without `mail.url` those
   journeys are reported as not checkable, never as passed.
 
+- For the booking-hours journey, `personas.restricted`: a member whose membership type carries a
+  `BOOKING_HOURS` rule that the earliest lane hour of the day lies outside, for example from 16:00.
+  The journey opens that hour, expects the dialog to refuse it and sends the booking to the server
+  as well. Without the persona, or with hours the lane hour lies inside, it is reported as not
+  checkable.
+- For the welcome, `welcomeAccounts`. An account cannot be removed, only deactivated, so the
+  journey that creates one to read its welcome runs only when the operator allows it, on
+  desktop-chrome, and deactivates the account again. Its person stays on the roster.
+
 The member journeys also walk what members hear. The contention journey queues the refused member
 on the waitlist, cancels the holder's booking and takes the offer from the notification centre;
 the singles journey tells the partner of a cancellation. A queue a journey leaves behind is left
@@ -52,7 +61,7 @@ shows the shape with placeholder accounts.
 | --- | --- | --- |
 | `baseUrl` | Instance under test | yes |
 | `expectedVersion` | Version the preflight must read from the instance | yes |
-| `personas` | Username per journey actor: `admin`, `trainer`, `youth`, `sport`, `grounds`, `treasurer`, `memberA`, `memberB`, `memberC`; `disposable` takes one username or a list | yes |
+| `personas` | Username per journey actor: `admin`, `trainer`, `youth`, `sport`, `grounds`, `treasurer`, `memberA`, `memberB`, `memberC`; `disposable` takes one username or a list; `restricted` names a member whose category has booking hours | yes, `restricted` no |
 | `timeZone` | Club time zone; default the zone the instance reports | no |
 | `window.start` | Monday of the booking window; default the first Monday after the run starts | no |
 | `courts` | Court numbers the journeys use; default the first three active courts | no |
@@ -63,6 +72,7 @@ shows the shape with placeholder accounts.
 | `loadLimit` | One-minute load average the run waits to fall below before it starts; default 5.5 | no |
 | `resetCodesPerHour` | Password-reset codes the instance mails per account and hour; default 5, the instance's own default | no |
 | `notifyClubBookings` | Let the weekend journeys run over club bookings and notify their bookers; only for an instance whose mail reaches a catcher; default false | no |
+| `welcomeAccounts` | Let one profile create an account to read its welcome; each such run leaves one deactivated account; default false | no |
 
 The file is validated before any browser starts. A missing or malformed field, two actors sharing
 one username, a window start that is not a Monday or fewer than two courts stop the run and name
