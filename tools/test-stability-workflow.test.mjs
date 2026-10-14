@@ -53,7 +53,7 @@ test("given a required build failure, when collecting evidence, then backend and
   assert.doesNotMatch(workflow, /frontend\/playwright-report/);
 });
 
-test("given a pull request, when the stability evidence is collected, then it runs every night and never on the pull request", () => {
+test("given the stability workflow, when its triggers are read, then it runs every night and never on a pull request", () => {
   // given
   const triggers = workflow.slice(workflow.indexOf("\non:"), workflow.indexOf("\npermissions:"));
 
