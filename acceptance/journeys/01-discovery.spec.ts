@@ -5,6 +5,7 @@ import { resolveWindowStart } from "../config/calendar.mjs";
 import { governingHours, planLanes } from "../config/lanes.mjs";
 import { openAs } from "../lib/session";
 import { apiAs, readRoster } from "../lib/api";
+import { PARTNER_MARKER } from "../lib/journey";
 
 test("when the admin reads the club, then discovery, lanes and baseline are written", async ({ browser }) => {
   // when
@@ -34,7 +35,7 @@ test("when the admin reads the club, then discovery, lanes and baseline are writ
   for (const key of keys) expect(entryOf(key), `${key} is on the roster`).toBeTruthy();
   disposables.forEach((username, index) => expect(entryNamed(username), `disposable ${index + 1} is on the roster`).toBeTruthy());
   writeFileSync(runPath("discovery.json"), JSON.stringify({
-    cards, participantCards,
+    cards, participantCards, partnerMarker: PARTNER_MARKER,
     cardFor: { training: byRole("TRAINER"), youth: byRole("YOUTH_DIRECTOR"), league: byRole("SPORT_DIRECTOR"), closure: byRole("GROUNDSKEEPER"), treasurer: byRole("TREASURER") },
     personIds: Object.fromEntries(keys.map((k) => [k, entryOf(k).personId])),
     emails: Object.fromEntries(keys.map((k) => [k, entryOf(k).email])),

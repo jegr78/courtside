@@ -8,7 +8,10 @@ import { allSlots, lanePlan } from "../lib/lanes";
 import { sweep } from "../lib/sweep";
 import { clearWeekend } from "../lib/weekend";
 import { canSignIn, restoreDisposable } from "../lib/disposable";
-import { disposables, PASSWORD } from "../lib/context";
+import { disposables, PASSWORD, type PersonaKey } from "../lib/context";
+import { leaveWaitlist, openWaitlistEntries } from "../lib/waitlist";
+
+const MEMBERS: PersonaKey[] = ["memberA", "memberB", "memberC"];
 
 const ids = (day: unknown) => new Set((day as { bookingId?: string; id?: string }[]).map((a) => a.bookingId ?? a.id));
 
@@ -45,8 +48,11 @@ test("when the run ends, then no reserved slot holds a booking of this run, no w
   const { removed, left, foreign } = await sweep(admin, allSlots());
   const weeks = await clearWeekend();
   for (const username of disposables) await restoreDisposable(username);
-  writeFileSync(runPath("postflight.json"), JSON.stringify({ removed, left, foreign, weeks: weeks.removed, foreignWeeks: weeks.foreign }, null, 2));
+  for (const key of MEMBERS) await leaveWaitlist(key, allSlots());
+  const queued = Object.fromEntries(await Promise.all(MEMBERS.map(async (key) => [key, (await openWaitlistEntries(key, allSlots())).length])));
+  writeFileSync(runPath("postflight.json"), JSON.stringify({ removed, left, foreign, weeks: weeks.removed, foreignWeeks: weeks.foreign, queued }, null, 2));
   // then
   expect(left, "no reserved slot holds a booking of this run").toEqual([]);
+  expect(queued, "no member is left waiting on a waitlist").toEqual({ memberA: 0, memberB: 0, memberC: 0 });
   for (const [index, username] of disposables.entries()) expect(await canSignIn(PASSWORD, username), `disposable ${index + 1} signs in`).toBe(true);
 });

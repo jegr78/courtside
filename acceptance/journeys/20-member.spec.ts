@@ -1,15 +1,19 @@
+import type { Locator, Page } from "@playwright/test";
 import { test, expect } from "../lib/fixtures";
 import { apiAs } from "../lib/api";
 import { capture } from "../lib/checks";
 import { latestMailTo } from "../lib/mail";
-import { openAs } from "../lib/session";
+import { openAs, xsrf } from "../lib/session";
 import { step } from "../lib/steps";
-import { addPartner, bookAt, cancelQuietly, discovery, onPhonesAndChrome, openSlot, submitBooking } from "../lib/journey";
+import { addPartner, bookAt, cancelQuietly, discovery, onPhonesAndChrome, openSlot, projectName, submitBooking } from "../lib/journey";
+import { instantOf } from "../lib/lanes";
+import { recordCreated } from "../lib/ledger";
+import { latestNotificationKinds, leaveWaitlist, openWaitlistEntries, unreadNotifications } from "../lib/waitlist";
 import { answers } from "../lib/core.mjs";
 
 test.beforeEach(() => { test.skip(!onPhonesAndChrome(), "member journeys run on phones and desktop chrome"); });
 
-test("given a member, when a singles court is booked with a partner, then the plan shows it and a confirmation is mailed", async ({ browser, lanes }) => {
+test("given a member, when a singles court is booked with a partner and cancelled, then the confirmation is mailed and the partner is told of the cancellation", async ({ browser, lanes }) => {
   // given
   const slot = await lanes.take("singles");
   const page = await openAs(browser, "memberA");
@@ -25,6 +29,18 @@ test("given a member, when a singles court is booked with a partner, then the pl
     await step("memberA", "confirmation mail", async () => {
       const mail = await latestMailTo(discovery.emails["memberA"], since, new RegExp(slot.start));
       expect(mail, "product: booking confirmation reached Mailpit").not.toBeNull();
+    });
+    // when — the booker cancels
+    const cancelledSince = new Date();
+    await step("memberA", "cancel", async () => {
+      const cancelled = await page.request.delete(`/api/bookings/${ids[0]}`, { headers: { "X-XSRF-TOKEN": await xsrf(page) } });
+      expect(cancelled.status(), "product: the cancellation is accepted").toBeLessThan(300);
+    });
+    // then — the partner hears of it in the notification centre and by mail
+    await step("memberB", "cancellation notice", async () => {
+      await expect.poll(() => latestNotificationKinds("memberB", cancelledSince),
+        { message: "product: the partner's notification centre lists the cancellation", timeout: 30_000 }).toContain("BOOKING_CANCELLED");
+      expect(await latestMailTo(discovery.emails["memberB"], cancelledSince), "product: the cancellation reached the partner in Mailpit").not.toBeNull();
     });
   } finally { await cancelQuietly(page, ids); await page.context().close(); }
 });
@@ -57,21 +73,64 @@ test("given a member, when a court is booked with a guest, then the booking is m
   } finally { await cancelQuietly(page, ids); await page.context().close(); }
 });
 
-test("given a member, when a court is booked with a participant card, then the booking is made", async ({ browser, lanes }) => {
+test("given a member looking for a partner, when the open place is offered, then another member takes it and the holder is told", async ({ browser, lanes }) => {
   // given
-  const card = discovery.participantCards.find((c: { active: boolean }) => c.active);
-  test.skip(!card, "no active participant card");
   const slot = await lanes.take("participant");
-  const page = await openAs(browser, "memberA");
+  const holder = await openAs(browser, "memberA");
   const ids: string[] = [];
   try {
-    // when / then
-    ids.push(await step("memberA", "book with participant card", () => bookAt(page, "memberA", slot, async (p) => {
+    ids.push(await step("memberA", "book looking for a partner", () => bookAt(holder, "memberA", slot, async (p) => {
       await p.getByTestId("booking-more-summary").click();
-      await p.getByTestId("participant-card").selectOption(card.id);
+      await p.getByTestId("participant-card").selectOption(discovery.partnerMarker);
     })));
-  } finally { await cancelQuietly(page, ids); await page.context().close(); }
+    // when — the holder offers the open place
+    await step("memberA", "offer the open place", async () => {
+      await holder.getByTestId("my-bookings-link").click();
+      const offer = holder.locator(`[data-testid="publish-open-place"][data-booking-id="${ids[0]}"]`);
+      await showInMyBookings(holder, offer);
+      const published = holder.waitForResponse(answers("PUT", `/api/my/bookings/${ids[0]}/partner-invitation`));
+      await offer.click();
+      expect((await published).status(), "product: offering the open place is accepted").toBeLessThan(300);
+      await expect(holder.locator(`[data-testid="withdraw-open-place"][data-booking-id="${ids[0]}"]`), "product: the offer can be withdrawn").toBeVisible();
+      await capture(holder, "open-place-offered");
+    });
+    const takenSince = new Date();
+    const taker = await openAs(browser, "memberC");
+    try {
+      // then — another member finds it and takes it
+      await step("memberC", "take the open place", async () => {
+        const places = await (await (await apiAs("memberC")).get("/api/partner-invitations")).json() as { invitationId: string; startsAt: string }[];
+        const place = places.find((candidate) => Date.parse(candidate.startsAt) === instantOf(slot, "start").getTime());
+        expect(place, "product: memberC is offered the open place").toBeTruthy();
+        await taker.getByTestId("my-bookings-link").click();
+        const take = taker.locator(`[data-testid="take-open-place"][data-invitation-id="${place!.invitationId}"]`);
+        await expect(take, "product: My bookings lists the open place").toBeVisible();
+        await capture(taker, "open-places");
+        const accepted = taker.waitForResponse(answers("POST", `/api/partner-invitations/${place!.invitationId}/acceptance`));
+        await take.click();
+        expect((await accepted).status(), "product: taking the open place is accepted").toBeLessThan(300);
+      });
+    } finally { await taker.context().close(); }
+    // then — the holder is told who plays
+    await step("memberA", "partner found notice", async () => {
+      await expect.poll(() => latestNotificationKinds("memberA", takenSince),
+        { message: "product: the holder's notification centre lists the partner", timeout: 30_000 }).toContain("BOOKING_PARTNER_FOUND");
+      expect(await latestMailTo(discovery.emails["memberA"], takenSince), "product: the partner notice reached Mailpit").not.toBeNull();
+    });
+  } finally { await cancelQuietly(holder, ids); await holder.context().close(); }
 });
+
+async function showInMyBookings(page: Page, target: Locator) {
+  const entries = page.locator('[data-testid="my-bookings-page"] li');
+  await expect(entries.first()).toBeAttached();
+  const more = page.getByTestId("load-more-bookings");
+  for (let pageNo = 0; pageNo < 10 && !(await target.isVisible()) && await more.isVisible(); pageNo++) {
+    const shown = await entries.count();
+    await more.click();
+    await expect.poll(() => entries.count()).toBeGreaterThan(shown);
+  }
+  await expect(target, "product: My bookings lists the booking").toBeVisible();
+}
 
 test("given a member, when a booking is made, cancelled and made again, then my bookings follows each step", async ({ browser, lanes }) => {
   // given
@@ -153,7 +212,7 @@ test("given a member, when the message choices are changed and changed back, the
   }
 });
 
-test("given two members on the same slot, when both submit, then the second is refused with a reason", async ({ browser, lanes }) => {
+test("given two members on the same slot, when both submit, then the second is refused with a reason, queues for it and takes it when it frees", async ({ browser, lanes }) => {
   // given
   const slot = await lanes.take("contention");
   const first = await openAs(browser, "memberB");
@@ -174,7 +233,63 @@ test("given two members on the same slot, when both submit, then the second is r
     expect(lost.status, "product: the second submission is refused").toBeGreaterThanOrEqual(400);
     await expect(second.getByTestId("booking-dialog").getByRole("alert"), "product: the refusal gives a reason").toBeVisible();
     await capture(second, "conflict", { expectedStatuses: [409, 422, 400] });
-  } finally { await cancelQuietly(first, ids); await first.context().close(); await second.context().close(); }
+
+    // when — the refused member queues for the taken slot
+    await step("memberC", "join the waitlist", async () => {
+      await second.getByTestId("booking-close").click();
+      const taken = second.locator(`[data-testid="allocation"][data-booking-id="${won.id}"]`);
+      await expect(taken, "product: the taken slot offers its waitlist").toBeVisible();
+      await taken.click();
+      await expect(second.getByTestId("waitlist-explanation"), "product: the dialog explains the waitlist").toBeVisible();
+      await addPartner(second, "treasurer");
+      await capture(second, "waitlist-dialog");
+      const joined = second.waitForResponse(answers("POST", "/api/my/waitlist"));
+      await second.getByTestId("booking-submit").click();
+      expect((await joined).status(), "product: joining the waitlist is accepted").toBeLessThan(300);
+      expect(await openWaitlistEntries("memberC", [slot]), "product: memberC waits for the slot").toHaveLength(1);
+    });
+    const unreadBefore = await unreadNotifications("memberC");
+    const offeredSince = new Date();
+    let offerAnswered = new Date();
+
+    // when — the holder cancels
+    await step("memberB", "cancel the queued slot", async () => {
+      const cancelled = await first.request.delete(`/api/bookings/${won.id}`, { headers: { "X-XSRF-TOKEN": await xsrf(first) } });
+      expect(cancelled.status(), "product: the holder's cancellation is accepted").toBeLessThan(300);
+    });
+
+    // then — the offer reaches the waiting member, and taking it books the slot
+    await step("memberC", "take the offer", async () => {
+      await expect.poll(() => unreadNotifications("memberC"), { message: "product: the offer counts as unread", timeout: 30_000 }).toBeGreaterThan(unreadBefore);
+      await second.goto("/");
+      await expect(second.getByTestId("my-messages-unread"), "product: the navigation shows unread messages").toBeVisible();
+      await second.getByTestId("my-messages-link").click();
+      const offer = second.locator('[data-testid="notification-offer"][data-open="true"]').first();
+      await expect(offer, "product: the notification centre shows the open offer").toBeVisible();
+      await capture(second, "notification-offer");
+      const [entry] = await openWaitlistEntries("memberC", [slot]);
+      expect(entry?.state, "product: the waiting entry is offered the slot").toBe("OFFERED");
+      await second.getByTestId("my-bookings-link").click();
+      const offered = second.getByTestId(`waitlist-entry-${entry.id}`);
+      await expect(offered).toHaveAttribute("data-state", "OFFERED");
+      await capture(second, "waitlist-offered");
+      offerAnswered = new Date();
+      const accepted = second.waitForResponse(answers("POST", `/api/my/waitlist/${entry.id}/acceptance`));
+      await offered.getByTestId("waitlist-accept").click();
+      const answer = await accepted;
+      expect(answer.status(), "product: taking the offer books the slot").toBeLessThan(300);
+      const booked = (await answer.json()).id as string;
+      recordCreated({ kind: "booking", id: booked, by: "memberC", project: projectName() });
+      ids.push(booked);
+      await expect(offered, "product: the entry turns into a booking").toHaveAttribute("data-state", "BOOKED");
+    });
+    await step("memberC", "offer mail", async () => {
+      expect(await latestMailTo(discovery.emails["memberC"], offeredSince, undefined, offerAnswered), "product: the offer reached Mailpit before it was taken").not.toBeNull();
+    });
+  } finally {
+    await leaveWaitlist("memberC", [slot]).catch(() => undefined);
+    await cancelQuietly(first, ids); await first.context().close(); await second.context().close();
+  }
 });
 
 test("given a member, when the preferences menu is opened and the theme switched, then both themes render", async ({ browser }) => {
