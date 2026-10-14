@@ -139,9 +139,9 @@ commit, creates the branch `release-anchor/v<version>/<sha>` at it. The candidat
 runs only for a selected release and creates that branch when it is missing; it installs no
 packages. The `tag` job runs only for a release commit on the branch its version belongs to whose
 candidate evidence succeeded, and uses the token to create the version tag, relabel the merged
-release pull request and remove the version's anchors. The token acts with its issuer's repository ceiling, including the single
-maintainer's admin bypass. Reconsider when GitHub provides a repository
-identity that can trigger the same pipeline without a personal token.
+release pull request and remove the version's anchors. The token acts with its issuer's repository
+ceiling, including the single maintainer's admin bypass. Reconsider when GitHub provides a
+repository identity that can trigger the same pipeline without a personal token.
 
 ## Stalwart fetches its administration interface outside the pinned image
 
