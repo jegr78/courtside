@@ -8,7 +8,7 @@ import { weekendConflicts } from "../config/lanes.mjs";
 import { config, disposables, PASSWORD, runPath, type PersonaKey } from "../lib/context";
 import { mailAvailable } from "../lib/mail";
 import { profilesOf, resetQuota } from "../config/disposables.mjs";
-import { occupying } from "../lib/core.mjs";
+import { leavesBookingHours, occupying } from "../lib/core.mjs";
 import { PARTNER_MARKER } from "../lib/journey";
 
 
@@ -49,6 +49,13 @@ test("when the environment is checked before a run, then every precondition hold
     checks.futureWeeks = weeks.slice(1).map((w) => w.effectiveFrom);
     const participantCards = await (await admin.get("/api/admin/participant-cards")).json() as { id: string; active: boolean }[];
     checks.partnerMarkerActive = participantCards.some((card) => card.id === PARTNER_MARKER && card.active);
+    if (config.personas.restricted) {
+      const restricted = await apiAs("restricted");
+      const { bookingHours } = await (await restricted.get("/api/booking-eligibility")).json() as { bookingHours?: { earliestStart: string; latestEnd: string } | null };
+      const earliest = allSlots().filter((slot) => slot.journey === "singles");
+      checks.restrictedHours = bookingHours ?? null;
+      checks.restrictedLanesInside = bookingHours ? earliest.filter((slot) => !leavesBookingHours(slot, bookingHours)).map((slot) => `${slot.profile} ${slot.start}`) : [];
+    }
     const roster = { entries: await readRoster(admin) };
     const resetQuotas: Record<string, unknown> = {};
     for (const [index, username] of disposables.entries()) {
@@ -76,6 +83,10 @@ test("when the environment is checked before a run, then every precondition hold
   }
   expect.soft(checks.futureWeeks, "PRECONDITION: no opening week is scheduled after today").toEqual([]);
   expect.soft(checks.partnerMarkerActive, "PRECONDITION: the looking-for-a-partner participant card is active").toBe(true);
+  if (config.personas.restricted) {
+    expect.soft(checks.restrictedHours, "PRECONDITION: the restricted member's category sets booking hours").toBeTruthy();
+    expect.soft(checks.restrictedLanesInside, "PRECONDITION: the earliest lane hour lies outside the restricted member's booking hours").toEqual([]);
+  }
   for (const [account, quota] of Object.entries(checks.resetQuotas as Record<string, { ok: boolean; sentInLastHour: number; freeAt: string | null }>)) {
     expect.soft(quota.ok, `PRECONDITION: ${account} can still receive the reset codes this run needs (${quota.sentInLastHour} sent in the last hour, enough again at ${quota.freeAt})`).toBe(true);
   }
