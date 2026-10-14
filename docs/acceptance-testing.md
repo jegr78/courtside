@@ -132,7 +132,7 @@ Signed in as `memberA`, the run checks:
 | `saved-message` | the confirmation is in view after saving the message choices |
 | `service-worker` | a service worker controls the page |
 | `outage` | the instance becomes unreachable for the iPhone and comes back |
-| `offline-bookings` | with the instance unreachable, My bookings lists a fresh booking with its offline note, and the plan says it is offline |
+| `offline-bookings` | with the instance unreachable, My bookings lists a fresh booking with its offline note within 15 s, and the plan says it is offline |
 
 Each check writes screenshots and measurements to `result.json` in its own directory under
 `build/acceptance-device/` and prints its verdict; any verdict other than `pass` ends the run with
