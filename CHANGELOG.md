@@ -1,11 +1,6 @@
 # Changelog
 
-## [0.2.0-rc.1](https://github.com/jegr78/courtside/compare/v0.1.0...v0.2.0-rc.1) (2026-10-14)
-
-
-### ⚠ BREAKING CHANGES
-
-* The note of a booking request and of a series request is limited to 500 characters. A client that sends a longer note now gets 400 instead of 201.
+## 0.2.0 (2026-10-14)
 
 ### Features
 
@@ -19,7 +14,6 @@
 * return a signed-out member to the page they opened after signing in ([#1425](https://github.com/jegr78/courtside/issues/1425)) ([5660fbd](https://github.com/jegr78/courtside/commit/5660fbde8974ea41e5e3bf8fb100058e0153864e))
 * verify a change to the security environment's tools with its own gates instead of the full run ([68c1bdb](https://github.com/jegr78/courtside/commit/68c1bdb81b2fca93ef8f3689899ef00102d350f5))
 * welcome a new member with the instance's address before their first password ([#1430](https://github.com/jegr78/courtside/issues/1430)) ([218b751](https://github.com/jegr78/courtside/commit/218b751b04e8a9c84075e8ae5ff703291b81fdb8))
-
 
 ### Bug fixes
 
@@ -60,7 +54,6 @@
 * start the security environment on a rootless Docker daemon ([#1435](https://github.com/jegr78/courtside/issues/1435)) ([dbf36d1](https://github.com/jegr78/courtside/commit/dbf36d1b7c0ee45578bf8feb5d68a3d9692a5640))
 * tell two series of the same card apart in the appointment list ([#1396](https://github.com/jegr78/courtside/issues/1396)) ([452cd98](https://github.com/jegr78/courtside/commit/452cd98bcba9c2f1182f0409339cc60d41597913)), closes [#1273](https://github.com/jegr78/courtside/issues/1273)
 
-
 ### Documentation
 
 * declare the 500-character limit on booking and series notes ([#1479](https://github.com/jegr78/courtside/issues/1479)) ([f1e6ed4](https://github.com/jegr78/courtside/commit/f1e6ed49fac325e1a3e40ff1c073195bbeceaac1)), closes [#1441](https://github.com/jegr78/courtside/issues/1441)
@@ -71,12 +64,15 @@
 * state that a booking-hours window ends at 23:59 like the opening hours ([#1466](https://github.com/jegr78/courtside/issues/1466)) ([c1f6946](https://github.com/jegr78/courtside/commit/c1f69464efcd1b9dd3ff7fdfbcc0f585af70fccf))
 * state that the waitlist sweep passes on an offer a rule refused ([#1465](https://github.com/jegr78/courtside/issues/1465)) ([e565ece](https://github.com/jegr78/courtside/commit/e565ece819219ddaf621dce5534956e447d789ab))
 
-
 ### Build and dependencies
 
 * **deps:** update the deployment images and pin each to one version everywhere ([#1407](https://github.com/jegr78/courtside/issues/1407)) ([bc58544](https://github.com/jegr78/courtside/commit/bc58544acaa6e7bec08469f9470a1127be1bb3bc))
 * open the 0.2.0 candidate line on main ([#1390](https://github.com/jegr78/courtside/issues/1390)) ([77fa2ca](https://github.com/jegr78/courtside/commit/77fa2cac7cfc451ce8432ab3b168104c8e7af26e)), closes [#1225](https://github.com/jegr78/courtside/issues/1225)
 * start the dev environment again ([#1429](https://github.com/jegr78/courtside/issues/1429)) ([4fb152a](https://github.com/jegr78/courtside/commit/4fb152ac3288963e39c6a0a4675ebf683c0aa273))
+
+### ⚠ BREAKING CHANGES
+
+* The note of a booking request and of a series request is limited to 500 characters. A client that sends a longer note now gets 400 instead of 201.
 
 ## 0.1.0 (2026-10-11)
 
