@@ -12,6 +12,7 @@ import {
   emptyOriginNotice,
   gitHistory,
   modifiedUpgradeInputs,
+  changedUpgradeInputs,
   lineReleaseOrigins,
   nextReleaseOrigins,
   nightlyUpgradeOrigins,
@@ -179,6 +180,7 @@ test("given a pull request, when it changes a migration, then the next release's
   // when / then
   assert.ok(expected.length > 0, "a published release exists, so a migration change has an origin");
   assert.deepEqual(origins("70a77fbd^", "70a77fbd"), expected, "70a77fbd modified a migration");
+  assert.deepEqual(origins("028d158a^", "028d158a"), expected, "028d158a only added a migration, the one legal change after a release");
   assert.deepEqual(origins("b7645f0a^", "b7645f0a"), [], "a change that touches no migration needs no published origin");
 });
 
@@ -561,6 +563,21 @@ test("given a change that only adds a migration, when no nightly origin remains,
     // then
     assert.deepEqual(paths, [], "an added migration upgrades from every nightly before it");
     assert.throws(() => emptyOriginNotice(paths), /no upgrade origin/);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("given a change that only adds a migration, when the pull request selects its proof, then the added file counts", () => {
+  // given
+  const { directory, git, commit, base } = upgradeHistory();
+  try {
+    git(["switch", "-q", "-c", "change"]);
+    const candidate = commit("src/main/resources/db/migration/V2__more.sql", "create table b();");
+
+    // when / then
+    assert.deepEqual(changedUpgradeInputs(base, candidate, directory), ["src/main/resources/db/migration/V2__more.sql"],
+      "an added migration is a migration change the published releases must prove");
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }

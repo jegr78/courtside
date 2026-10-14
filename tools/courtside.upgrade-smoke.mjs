@@ -145,10 +145,19 @@ export function gitHistory(candidate, cwd = root) {
   };
 }
 
-export function modifiedUpgradeInputs(base, candidate, cwd = root) {
+function upgradeInputsChangedBy(filter, base, candidate, cwd) {
   const mergeBase = run("git", ["merge-base", base, candidate], { cwd }).stdout.trim();
-  return run("git", ["diff", "--name-only", "--diff-filter=MDR", mergeBase, candidate, "--",
+  return run("git", ["diff", "--name-only", `--diff-filter=${filter}`, mergeBase, candidate, "--",
     "src/main/resources/db/migration", originVerification], { cwd }).stdout.split("\n").filter(Boolean);
+}
+
+export function modifiedUpgradeInputs(base, candidate, cwd = root) {
+  return upgradeInputsChangedBy("MDR", base, candidate, cwd);
+}
+
+// Adding a migration is the only legal change after a release, so it alone already needs the published origins.
+export function changedUpgradeInputs(base, candidate, cwd = root) {
+  return upgradeInputsChangedBy("AMDR", base, candidate, cwd);
 }
 
 export function emptyOriginNotice(paths) {
@@ -450,7 +459,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   } else if (process.argv[2] === "--pull-request-origins") {
     const [repository, base, candidate, published] = process.argv.slice(3);
     const recorded = JSON.parse(readFileSync(join(root, ".release-please-manifest.json"), "utf8"))["."];
-    const origins = modifiedUpgradeInputs(base, candidate).length === 0 ? []
+    const origins = changedUpgradeInputs(base, candidate).length === 0 ? []
       : nextReleaseOrigins(recorded, JSON.parse(published));
     process.stdout.write(`${JSON.stringify(releaseUpgradeOrigins(repository, origins))}\n`);
   } else if (process.argv[2] === "--line-origins") {
