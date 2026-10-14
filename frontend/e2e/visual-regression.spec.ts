@@ -250,6 +250,7 @@ for (const theme of ["dark", "light"] as const) {
       // then
       const overflow = await page.getByTestId("operational-logs-scroll").evaluate((region) => region.scrollWidth - region.clientWidth);
       expect(overflow, "the entry fits the phone without sideways scrolling").toBeLessThanOrEqual(0);
+      await entry.scrollIntoViewIfNeeded();
       await expect(entry.getByTestId("operational-log-trace"), "the trace ID is on screen beside the entry").toBeInViewport({ ratio: 1 });
       await capture(page.getByTestId("admin-operational-logs-view"), baseline("phone-operational-log"));
 

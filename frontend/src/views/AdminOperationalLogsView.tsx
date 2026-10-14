@@ -107,6 +107,8 @@ export function AdminOperationalLogsView() {
   }
 
   const problem = error ?? clubError;
+  const cell = "grid min-w-0 grid-cols-[minmax(0,8rem)_minmax(0,1fr)] gap-3 sm:table-cell sm:border-t sm:p-2";
+  const cellLabel = "font-medium sm:hidden";
   return <section data-testid="admin-operational-logs-view" className="surface-panel grid gap-8 rounded-2xl border p-6 shadow-[0_20px_50px_var(--cs-shadow)] sm:p-8">
     <div className="grid gap-2">
       <h1 className="text-3xl font-bold">{t("operationalLogs.title")}</h1>
@@ -156,20 +158,35 @@ export function AdminOperationalLogsView() {
             {page.droppedRecords > 0 && <Alert tone="warning" testId="operational-logs-dropped-warning">{t("operationalLogs.droppedWarning", { count: page.droppedRecords })}</Alert>}
             {entries.length === 0
               ? <p data-testid="operational-logs-empty">{t("operationalLogs.empty")}</p>
-              : <ScrollRegion subject={t("operationalLogs.title")} testId="operational-logs-scroll"><table className="w-full text-left">
-                <thead><tr>
-                  <th scope="col" className="p-2">{t("operationalLogs.column.time")}</th>
-                  <th scope="col" className="p-2">{t("operationalLogs.column.source")}</th>
-                  <th scope="col" className="p-2">{t("operationalLogs.column.severity")}</th>
-                  <th scope="col" className="p-2">{t("operationalLogs.column.message")}</th>
-                  <th scope="col" className="p-2">{t("operationalLogs.column.trace")}</th>
+              : <ScrollRegion subject={t("operationalLogs.title")} testId="operational-logs-scroll"><table role="table" className="block w-full text-left sm:table">
+                <thead role="rowgroup" className="sr-only sm:not-sr-only"><tr role="row">
+                  <th role="columnheader" scope="col" className="p-2">{t("operationalLogs.column.time")}</th>
+                  <th role="columnheader" scope="col" className="p-2">{t("operationalLogs.column.source")}</th>
+                  <th role="columnheader" scope="col" className="p-2">{t("operationalLogs.column.severity")}</th>
+                  <th role="columnheader" scope="col" className="p-2">{t("operationalLogs.column.message")}</th>
+                  <th role="columnheader" scope="col" className="p-2">{t("operationalLogs.column.trace")}</th>
                 </tr></thead>
-                <tbody>{entries.map((entry) => <tr key={entry.id} data-testid="operational-log-row" className="border-t align-top">
-                  <td className="p-2 whitespace-nowrap">{formatDateTime(entry.occurredAt, language, club.timeZone)}</td>
-                  <td data-testid="operational-log-source" className="p-2">{t(`operationalLogs.source.${entry.source}`)}</td>
-                  <td data-testid="operational-log-severity" className="p-2">{t(`operationalLogs.severity.${entry.severity}`)}</td>
-                  <td data-testid="operational-log-message" className="p-2 break-words">{entry.message}</td>
-                  <td data-testid="operational-log-trace" className="p-2 font-mono text-sm break-all">{entry.traceId ?? t("operationalLogs.trace.none")}</td>
+                <tbody role="rowgroup" className="grid gap-3 sm:table-row-group">{entries.map((entry) => <tr role="row" key={entry.id} data-testid="operational-log-row" className="grid gap-2 rounded-xl border p-4 align-top sm:table-row sm:rounded-none sm:border-0 sm:p-0">
+                  <td role="cell" className={cell}>
+                    <span aria-hidden="true" className={cellLabel}>{t("operationalLogs.column.time")}</span>
+                    <span className="min-w-0 sm:whitespace-nowrap">{formatDateTime(entry.occurredAt, language, club.timeZone)}</span>
+                  </td>
+                  <td role="cell" className={cell}>
+                    <span aria-hidden="true" className={cellLabel}>{t("operationalLogs.column.source")}</span>
+                    <span data-testid="operational-log-source" className="min-w-0 break-words">{t(`operationalLogs.source.${entry.source}`)}</span>
+                  </td>
+                  <td role="cell" className={cell}>
+                    <span aria-hidden="true" className={cellLabel}>{t("operationalLogs.column.severity")}</span>
+                    <span data-testid="operational-log-severity" className="min-w-0 break-words">{t(`operationalLogs.severity.${entry.severity}`)}</span>
+                  </td>
+                  <td role="cell" className={cell}>
+                    <span aria-hidden="true" className={cellLabel}>{t("operationalLogs.column.message")}</span>
+                    <span data-testid="operational-log-message" className="min-w-0 [overflow-wrap:anywhere]">{entry.message}</span>
+                  </td>
+                  <td role="cell" className={cell}>
+                    <span aria-hidden="true" className={cellLabel}>{t("operationalLogs.column.trace")}</span>
+                    <span data-testid="operational-log-trace" className="min-w-0 font-mono text-sm [overflow-wrap:anywhere] sm:inline-block sm:min-w-[16ch]">{entry.traceId ?? t("operationalLogs.trace.none")}</span>
+                  </td>
                 </tr>)}</tbody>
               </table></ScrollRegion>}
             {page.nextCursor && <Button variant="secondary" data-testid="operational-logs-load-more" disabled={pending} className="justify-self-start" type="button" onClick={() => void readNextPage()}>{t("operationalLogs.more")}</Button>}
