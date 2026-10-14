@@ -83,3 +83,7 @@ export function answers(method, path) {
     return typeof path === "string" ? pathname === path : path.test(pathname);
   };
 }
+
+export function leavesBookingHours(slot, hours) {
+  return slot.start < hours.earliestStart.slice(0, 5) || slot.end > hours.latestEnd.slice(0, 5);
+}

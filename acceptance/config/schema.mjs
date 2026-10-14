@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 
 export const PERSONA_KEYS = ["admin", "trainer", "youth", "sport", "grounds", "treasurer", "memberA", "memberB", "memberC", "disposable"];
-const TOP_LEVEL = ["baseUrl", "expectedVersion", "personas", "timeZone", "window", "courts", "mail", "logs", "metrics", "browsers", "loadLimit", "resetCodesPerHour", "notifyClubBookings"];
+const TOP_LEVEL = ["baseUrl", "expectedVersion", "personas", "timeZone", "window", "courts", "mail", "logs", "metrics", "browsers", "loadLimit", "resetCodesPerHour", "notifyClubBookings", "welcomeAccounts"];
 
 export class ConfigError extends Error {
   constructor(field, problem) {
@@ -44,10 +44,11 @@ export function parseConfig(raw, env) {
     browsers: {},
     loadLimit: 5.5,
     notifyClubBookings: false,
+    welcomeAccounts: false,
     resetCodesPerHour: 5
   };
   const personas = object(input.personas, "personas");
-  onlyKeys(personas, PERSONA_KEYS, "personas");
+  onlyKeys(personas, [...PERSONA_KEYS, "restricted"], "personas");
   const seen = new Set();
   for (const key of PERSONA_KEYS) {
     const many = key === "disposable" && Array.isArray(personas[key]);
@@ -59,6 +60,11 @@ export function parseConfig(raw, env) {
     }
     config.personas[key] = usernames[0];
     if (key === "disposable") config.disposables = usernames;
+  }
+  if (personas.restricted !== undefined) {
+    const restricted = text(personas.restricted, "personas.restricted");
+    if (seen.has(restricted)) throw new ConfigError("personas.restricted", "repeats another actor's username");
+    config.personas.restricted = restricted;
   }
   if (input.timeZone !== undefined) {
     try { new Intl.DateTimeFormat("en", { timeZone: text(input.timeZone, "timeZone") }); } catch (error) {
@@ -116,6 +122,10 @@ export function parseConfig(raw, env) {
   if (input.resetCodesPerHour !== undefined) {
     if (!Number.isInteger(input.resetCodesPerHour) || input.resetCodesPerHour < 1) throw new ConfigError("resetCodesPerHour", "must be a positive whole number");
     config.resetCodesPerHour = input.resetCodesPerHour;
+  }
+  if (input.welcomeAccounts !== undefined) {
+    if (typeof input.welcomeAccounts !== "boolean") throw new ConfigError("welcomeAccounts", "must be true or false");
+    config.welcomeAccounts = input.welcomeAccounts;
   }
   if (input.notifyClubBookings !== undefined) {
     if (typeof input.notifyClubBookings !== "boolean") throw new ConfigError("notifyClubBookings", "must be true or false");

@@ -1,8 +1,9 @@
 import { test, expect } from "@playwright/test";
-import { disposables, PASSWORD, persona, stateKey, type PersonaKey } from "../lib/context";
+import { config, disposables, PASSWORD, persona, stateKey, type PersonaKey } from "../lib/context";
 import { signInByForm, statePath } from "../lib/session";
 
-const KEYS: PersonaKey[] = ["admin", "trainer", "youth", "sport", "grounds", "treasurer", "memberA", "memberB", "memberC"];
+const KEYS: PersonaKey[] = ["admin", "trainer", "youth", "sport", "grounds", "treasurer", "memberA", "memberB", "memberC",
+  ...(config.personas.restricted ? ["restricted" as const] : [])];
 const ACCOUNTS = [
   ...KEYS.map((key) => ({ label: key, username: persona(key, "").username, state: stateKey(key, persona(key, "").username) })),
   ...disposables.map((username, index) => ({ label: `disposable ${index + 1}`, username, state: stateKey("disposable", username) }))

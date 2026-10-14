@@ -699,3 +699,29 @@ test("given the acceptance journeys, when they wait for an answer, then they nam
   assert.ok(waits.length >= 5, "the journeys wait for their answers");
   assert.deepEqual(handWritten, [], "a hand-written URL comparison breaks on the next query the client adds");
 });
+
+test("given an account in a category with booking hours, when the restricted persona is configured, then it is kept and an account another actor uses is refused", () => {
+  // when / then
+  assert.equal(parseConfig({ ...valid(), personas: { ...valid().personas, restricted: "jane.restricted" } }, env).personas.restricted, "jane.restricted");
+  assert.equal(parseConfig(valid(), env).personas.restricted, undefined, "the booking-hours journey is optional");
+  assert.equal(field({ ...valid(), personas: { ...valid().personas, restricted: "jane.membera" } }), "personas.restricted");
+});
+
+test("given welcomeAccounts, when parsed, then it is off unless the operator turns it on and anything but a boolean is refused", () => {
+  // when / then
+  assert.equal(parseConfig(valid(), env).welcomeAccounts, false, "a run creates no account unless asked to");
+  assert.equal(parseConfig({ ...valid(), welcomeAccounts: true }, env).welcomeAccounts, true);
+  assert.equal(field({ ...valid(), welcomeAccounts: "yes" }), "welcomeAccounts");
+});
+
+import { leavesBookingHours } from "../acceptance/lib/core.mjs";
+
+test("given booking hours, when a lane slot is judged, then a slot that starts before or ends after them leaves them and one inside does not", () => {
+  // given
+  const hours = { earliestStart: "16:00:00", latestEnd: "21:00:00" };
+  // when / then
+  assert.equal(leavesBookingHours({ start: "08:00", end: "09:00" }, hours), true, "a morning slot starts before the window");
+  assert.equal(leavesBookingHours({ start: "20:00", end: "21:00" }, hours), false, "a slot that ends with the window lies inside it");
+  assert.equal(leavesBookingHours({ start: "16:00", end: "17:00" }, hours), false, "a slot that starts with the window lies inside it");
+  assert.equal(leavesBookingHours({ start: "20:30", end: "21:30" }, hours), true, "a slot that runs past the window leaves it");
+});
