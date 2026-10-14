@@ -25,7 +25,26 @@ const pass = (reason) => ({ verdict: "pass", reason });
 const notFound = (names) => ({ verdict: "fail", reason: `not found: ${names.join(", ")}` });
 const fail = (reason) => ({ verdict: "fail", reason });
 
+export const MIN_INPUT_FONT_PX = 16;
+
+function judgeSurfaces({ surfaces }) {
+  const faults = surfaces.flatMap((surface) => [
+    surface.error && `${surface.name}: ${surface.error}`,
+    surface.documentOverflow && `${surface.name}: the page scrolls sideways`,
+    surface.overflow?.length && `${surface.name}: ${surface.overflow.length} element(s) beyond the screen edge`,
+    surface.zoom?.length && `${surface.name}: ${surface.zoom.map((field) => `${field.selector} ${field.fontSize}`).join(", ")} below ${MIN_INPUT_FONT_PX} px, so Safari zooms in`
+  ].filter(Boolean));
+  if (faults.length > 0) return fail(faults.join("; "));
+  const small = surfaces.reduce((sum, surface) => sum + (surface.smallTargets?.length ?? 0), 0);
+  const truncated = surfaces.reduce((sum, surface) => sum + (surface.truncated?.length ?? 0), 0);
+  const covered = surfaces.reduce((sum, surface) => sum + (surface.occluded?.length ?? 0), 0);
+  return pass(`${surfaces.length} pages fit the screen; observed ${small} targets below ${MIN_TOUCH_TARGET} px, ${truncated} truncated texts and ${covered} controls under sticky bars`);
+}
+
 const JUDGES = {
+  "member-pages": judgeSurfaces,
+  "visitor-pages": judgeSurfaces,
+  "admin-pages": judgeSurfaces,
   "theme-switch": ({ afterOneSecond }) => {
     const missing = afterOneSecond.filter((label) => label.missing);
     if (missing.length > 0) return notFound(missing.map((label) => label.label));

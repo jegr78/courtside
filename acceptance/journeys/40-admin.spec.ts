@@ -5,12 +5,7 @@ import { capture } from "../lib/checks";
 import { openAs } from "../lib/session";
 import { step } from "../lib/steps";
 import { discovery, onDesksAndTablet } from "../lib/journey";
-
-const LINKS = ["admin-overview-link", "admin-setup-link", "admin-configuration-link", "admin-deadlines-link",
-  "admin-rule-sets-link", "admin-courts-link", "admin-opening-hours-link", "admin-booking-cards-link",
-  "admin-slot-fillers-link", "admin-roster-link", "admin-membership-types-link", "admin-import-link",
-  "admin-export-link", "admin-utilisation-link", "admin-audit-link", "admin-messages-link",
-  "admin-operational-logs-link", "admin-appointments-link"];
+import { ADMIN_LINKS } from "../lib/surfaces.mjs";
 
 test.beforeEach(() => { test.skip(!onDesksAndTablet(), "admin journeys run on desks, tablet and one phone"); });
 test.setTimeout(120_000);
@@ -21,7 +16,7 @@ test("when the admin visits every administration page, then each renders", async
   try {
     await page.getByTestId("administration-link").click();
     let previousHeading = "";
-    for (const link of LINKS) {
+    for (const link of ADMIN_LINKS) {
       await step("admin", link, async () => {
         await expect(page.getByTestId("admin-navigation")).toBeVisible();
         const destination = page.getByTestId(link);

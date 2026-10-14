@@ -166,3 +166,52 @@ test("given an unknown check, when judged, then it refuses rather than passing",
   // when / then
   assert.throws(() => judge({ check: "unknown" }), /no verdict defined/);
 });
+
+const surface = (overrides = {}) => ({ name: "plan", documentOverflow: false, overflow: [], occluded: [], zoom: [], smallTargets: [], truncated: [], ...overrides });
+
+test("given pages that fit with small targets, when judged, then they pass and count the targets as observations", () => {
+  // given
+  const check = { check: "member-pages", surfaces: [surface({ smallTargets: ["a#x"] }), surface({ name: "my-bookings", truncated: [{ selector: "span" }] })] };
+  // when
+  const { verdict, reason } = judge(check);
+  // then
+  assert.equal(verdict, "pass");
+  assert.equal(reason, "2 pages fit the screen; observed 1 targets below 44 px, 1 truncated texts and 0 controls under sticky bars");
+});
+
+test("given a field below 16 px, when the pages are judged, then they fail because Safari zooms into it", () => {
+  // given
+  const check = { check: "visitor-pages", surfaces: [surface({ name: "sign-in", zoom: [{ selector: "input#username", fontSize: "14px" }] })] };
+  // when
+  const { verdict, reason } = judge(check);
+  // then
+  assert.equal(verdict, "fail");
+  assert.equal(reason, "sign-in: input#username 14px below 16 px, so Safari zooms in");
+});
+
+test("given a page that scrolls sideways and one with an element past the edge, when judged, then each fault names its page", () => {
+  // given
+  const check = { check: "admin-pages", surfaces: [surface({ name: "audit", documentOverflow: true }), surface({ name: "roster", overflow: [{ selector: "table" }] })] };
+  // when
+  const { verdict, reason } = judge(check);
+  // then
+  assert.equal(verdict, "fail");
+  assert.equal(reason, "audit: the page scrolls sideways; roster: 1 element(s) beyond the screen edge");
+});
+
+test("given a control under the sticky tab bar, when judged, then it is an observation and not a fault", () => {
+  // given
+  const check = { check: "member-pages", surfaces: [surface({ occluded: [{ selector: "a", by: "nav" }] })] };
+  // when
+  const { verdict, reason } = judge(check);
+  // then
+  assert.equal(verdict, "pass", "the plan scrolls under its sticky bars by design");
+  assert.match(reason, /1 controls under sticky bars/);
+});
+
+test("given a page that could not be opened, when judged, then the pages fail instead of passing unmeasured", () => {
+  // given
+  const check = { check: "admin-pages", surfaces: [{ name: "export", error: "waited 30 s for the page" }] };
+  // when / then
+  assert.equal(judge(check).verdict, "fail");
+});
