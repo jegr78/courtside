@@ -2,7 +2,7 @@ import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ApiError, api, type Allocation, type BookingGrid, type BookingHours, type Problem, type PublicBookingCard, type PublicCourt, type PublicParticipantCard, type PublicParticipantMember } from "../api/client";
 import { idempotencyKey } from "../api/idempotency";
-import { violationMessage } from "../api/problem-message";
+import { problemMessage, violationMessage, withReference } from "../api/problem-message";
 import { useReportedFailure } from "../failures/useReportedFailure";
 import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
@@ -130,7 +130,7 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
         if (translated.some((violation) => BEHIND_THE_DISCLOSURE.includes(violation.field))) {
           setShowsMore(true);
         }
-        report(failure);
+        report(failure, describeRefusal);
         setRequestKey(idempotencyKey());
       } else {
         report(failure);
@@ -302,6 +302,17 @@ function FieldViolations({ id, violations }: { id: string; violations: Array<{ f
   return <div id={id} className="mt-2 grid gap-1">
     {violations.map((violation, index) => <p key={`${violation.field}-${index}`} data-field={violation.field} data-code={violation.code} className="text-destructive text-sm">{violation.message}</p>)}
   </div>;
+}
+
+// The outcome already lists general refusals, so the alert names the first one shown elsewhere.
+function describeRefusal(failure: unknown, t: ReturnType<typeof useTranslation>["t"]): string {
+  if (!(failure instanceof ApiError) || !failure.problem) return problemMessage(failure, t);
+  const translated = translatedViolations(failure.problem, t);
+  if (translated.length === 0) return problemMessage(failure, t);
+  const [first, ...rest] = translated.filter((violation) => violation.field !== "general");
+  const message = !first ? "" : rest.length === 0
+    ? first.message : t("booking.refusalMore", { message: first.message, count: rest.length });
+  return withReference(failure, message, t);
 }
 
 function translatedViolations(problem: Problem, t: ReturnType<typeof useTranslation>["t"]): Array<{ field: string; code: string; message: string }> {

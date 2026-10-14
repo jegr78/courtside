@@ -14,10 +14,13 @@ export function problemMessage(failure: unknown, t: TFunction): string {
     return t("error.generic");
   }
   const message = translatedProblem(failure.problem, t);
-  const reference = traceReference(failure.problem);
-  return reference
-    ? t("error.withReference", { message, reference })
-    : message;
+  return withReference(failure, message, t);
+}
+
+export function withReference(failure: unknown, message: string, t: TFunction): string {
+  const reference = failure instanceof ApiError && failure.problem ? traceReference(failure.problem) : undefined;
+  if (!reference) return message;
+  return message ? t("error.withReference", { message, reference }) : t("error.reference", { reference });
 }
 
 function traceReference(problem: Problem): string | undefined {

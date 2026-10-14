@@ -40,12 +40,12 @@ public class MemberService {
         return members.findCurrentByPersonId(personId).map(Member::getMembershipTypeId);
     }
 
-    public List<MemberParticipant> findParticipants(String query, UUID searcherPersonId) {
+    public List<MemberParticipant> findParticipants(String query, UUID searcherAccountId) {
         String normalized = query.trim().toLowerCase(Locale.ROOT);
         if (normalized.isEmpty()) {
             return List.of();
         }
-        return members.findParticipants(escapeLikePattern(normalized), searcherPersonId, PageRequest.of(0, 20));
+        return members.findParticipants(escapeLikePattern(normalized), searcherAccountId, PageRequest.of(0, 20));
     }
 
     private String escapeLikePattern(String value) {

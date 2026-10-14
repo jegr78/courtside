@@ -1272,8 +1272,34 @@ it("given booking rules reject a slot, when submitting it, then violations and t
   expect(document.querySelector('[data-code="booking.rule.advanceWindow.exceeded"]')).toBeInTheDocument();
   expect(timeViolations).not.toHaveTextContent("booking.rule.advanceWindow.exceeded");
   expect(screen.getByRole("alert")).toHaveTextContent(
-    "You can book at most 14 days in advance. Error reference: 0123456789abcdef0123456789abcdef/0123456789abcdef"
+    "You can book at most 14 days in advance. One more point is marked at its field. Error reference: 0123456789abcdef0123456789abcdef/0123456789abcdef"
   );
+});
+
+it("given a refusal the outcome already lists, when it arrives, then the outcome names it once and adds only the reference", async () => {
+  // given
+  vi.mocked(api.createBooking).mockRejectedValue(new ApiError(400, {
+    type: "urn:courtside:error:validation-failed",
+    title: "Validation failed",
+    status: 400,
+    traceId: "0123456789abcdef0123456789abcdef",
+    spanId: "0123456789abcdef",
+    fieldErrors: [{ field: "body", code: "validation.NotNull", params: {} }]
+  }));
+  render(<WeekView today={clubInstant("07:00")} />);
+  await userEvent.click(await findFreeSlot(1, "08:00"));
+  await screen.findByTestId("booking-dialog");
+
+  // when
+  await userEvent.click(screen.getByTestId("booking-submit"));
+
+  // then
+  const outcome = await screen.findByTestId("booking-outcome");
+  await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(
+    "Error reference: 0123456789abcdef0123456789abcdef/0123456789abcdef"
+  ));
+  expect(outcome.textContent?.split("This field is required.").length, "the outcome says the sentence once").toBe(2);
+  expect(screen.getByRole("alert")).not.toHaveTextContent("This field is required.");
 });
 
 it("given a matching club member, when selecting them, then their person id is submitted", async () => {
