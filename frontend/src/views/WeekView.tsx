@@ -321,7 +321,8 @@ export function WeekView({ today, clock = systemClock, canBook = true,
       allocations: new Map(current.allocations).set(date, allocations),
       reservations: new Map(current.reservations).set(date, reservations)
     } : current);
-  }, []);
+    clear();
+  }, [clear]);
 
   useEffect(() => {
     if (!selectedDate || !data) return;
