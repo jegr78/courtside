@@ -31,6 +31,7 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
                               WHERE a.id = :searcherAccountId AND a.person.id = p.id)
             ORDER BY lower(p.lastName), lower(p.firstName), p.id
             """)
-    List<MemberParticipant> findParticipants(@Param("query") String query, @Param("searcherAccountId") UUID searcherAccountId,
+    List<MemberParticipant> findParticipants(@Param("query") String query,
+                                             @Param("searcherAccountId") UUID searcherAccountId,
                                              Pageable pageable);
 }
