@@ -1,4 +1,5 @@
 import type { Locator, Page } from "@playwright/test";
+import { randomUUID } from "node:crypto";
 import { test, expect } from "../lib/fixtures";
 import { apiAs } from "../lib/api";
 import { capture } from "../lib/checks";
@@ -201,13 +202,13 @@ test("given a member whose category books only within set hours, when a slot out
     const refused = await api.post("/api/bookings", {
       courtIds: [courts.find((court) => court.number === slot.court)!.id], cardId: card.id,
       startsAt: instantOf(slot, "start").toISOString(), endsAt: instantOf(slot, "end").toISOString()
-    });
+    }, { "Idempotency-Key": randomUUID() });
     const body = await refused.json().catch(() => ({}));
     if (refused.ok() && body.id) {
       recordCreated({ kind: "booking", id: body.id, by: "restricted", project: projectName() });
       await api.del(`/api/bookings/${body.id}`);
     }
-    expect((body.violations ?? []).map((violation: { code: string }) => violation.code), `product: the server refuses the hours (${refused.status()})`)
+    expect((body.violations ?? []).map((violation: { code: string }) => violation.code), `product: the server refuses the hours (${refused.status()} ${JSON.stringify(body)})`)
       .toContain("booking.rule.bookingHours.outside");
   } finally { await page.context().close(); }
 });
