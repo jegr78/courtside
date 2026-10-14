@@ -150,6 +150,8 @@ function FooterLink({ testId, href, label }: { testId: string; href: string; lab
     rel="noopener noreferrer">{label} <span className="sr-only">{t("footer.opensInNewTab")}</span></a>;
 }
 
+const STARTUP_SESSION_DEADLINE_MS = 5_000;
+
 export function App() {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -200,15 +202,24 @@ export function App() {
       void navigate(currentSignInPath());
     };
     const startupInvalidations = sessionInvalidations.current;
+    let answered = false;
+    let restoring = false;
+    const restoreOffline = async (failure: unknown) => {
+      if (restoring) return;
+      restoring = true;
+      warnAbout("Session refresh failed", failure);
+      setOffline(true);
+      const member = await offlineMemberState();
+      if (answered || startupInvalidations !== sessionInvalidations.current) return;
+      setOfflineClub(member?.clubName);
+      setSession(member?.session ?? { authenticated: false, roles: [], passwordChangeRequired: false });
+    };
+    // A request that gets no answer at all, as on a weak connection, would otherwise keep the loading
+    // screen until the network stack gives up; the request keeps running and still wins if it answers.
+    const deadline = window.setTimeout(() => void restoreOffline(new Error("no answer within the startup deadline")),
+      STARTUP_SESSION_DEADLINE_MS);
     void Promise.all([
-      refreshSession().catch(async (failure: unknown) => {
-        warnAbout("Session refresh failed", failure);
-        setOffline(true);
-        const member = await offlineMemberState();
-        if (startupInvalidations !== sessionInvalidations.current) return;
-        setOfflineClub(member?.clubName);
-        setSession(member?.session ?? { authenticated: false, roles: [], passwordChangeRequired: false });
-      }),
+      refreshSession().then(() => { answered = true; }, restoreOffline).finally(() => window.clearTimeout(deadline)),
       identify()
     ]);
     const stopListeningForSessionChanges = listenForOtherClientSessionChanges(unauthenticated);
