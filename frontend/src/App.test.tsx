@@ -709,7 +709,7 @@ describe("App build identity", () => {
     await act(() => vi.advanceTimersByTimeAsync(5_000));
 
     // when
-    await act(async () => { fail(new Error("refused")); });
+    await act(async () => { fail(new Error("refused")); await vi.advanceTimersByTimeAsync(0); });
 
     // then
     expect(screen.getByTestId("offline-status")).toBeVisible();
@@ -729,7 +729,7 @@ describe("App build identity", () => {
     expect(screen.getByTestId("offline-status")).toBeVisible();
 
     // when
-    await act(async () => { answer({ authenticated: true, roles: ["MEMBER"], passwordChangeRequired: false }); });
+    await act(async () => { answer({ authenticated: true, roles: ["MEMBER"], passwordChangeRequired: false }); await vi.advanceTimersByTimeAsync(0); });
 
     // then
     expect(screen.queryByTestId("offline-status"), "the late answer lifts the offline view").not.toBeInTheDocument();
@@ -760,7 +760,7 @@ describe("App build identity", () => {
     expect(matchBooking, "the deadline started the offline restore").toHaveBeenCalledOnce();
 
     // when
-    await act(async () => { answer(anonymous); });
+    await act(async () => { answer(anonymous); await vi.advanceTimersByTimeAsync(0); });
     await act(async () => {
       resolveCached(new Response(JSON.stringify({ refreshedAt: new Date().toISOString(), clubName: "Example Tennis Club" }), {
         headers: { "content-type": "application/json", "x-courtside-cache-generation": generation }
