@@ -9,7 +9,9 @@ import { addPartner, bookAt, cancelQuietly, discovery, onPhonesAndChrome, openSl
 import { instantOf } from "../lib/lanes";
 import { recordCreated } from "../lib/ledger";
 import { latestNotificationKinds, leaveWaitlist, openWaitlistEntries, unreadNotifications } from "../lib/waitlist";
-import { answers } from "../lib/core.mjs";
+import { answers, leavesBookingHours } from "../lib/core.mjs";
+import { config } from "../lib/context";
+import { precondition } from "../lib/precondition";
 
 test.beforeEach(() => { test.skip(!onPhonesAndChrome(), "member journeys run on phones and desktop chrome"); });
 
@@ -175,6 +177,39 @@ test("given a member, when a booking is made, cancelled and made again, then my 
     // when / then — the slot can be booked again
     ids.push(await step("memberB", "book again", () => bookAt(page, "memberB", slot, (p) => addPartner(p, "memberC"))));
   } finally { await cancelQuietly(page, ids); await page.context().close(); }
+});
+
+test("given a member whose category books only within set hours, when a slot outside them is chosen, then the dialog and the server refuse it", async ({ browser, lanes }) => {
+  // given
+  precondition(config.personas.restricted !== undefined, "personas.restricted is not configured, so booking hours are not checkable");
+  const slot = await lanes.take("singles");
+  const api = await apiAs("restricted");
+  const { bookingHours } = await (await api.get("/api/booking-eligibility")).json() as { bookingHours?: { earliestStart: string; latestEnd: string } };
+  precondition(bookingHours !== undefined && bookingHours !== null, "the restricted member's category sets booking hours");
+  precondition(leavesBookingHours(slot, bookingHours!), `the ${slot.start} lane lies outside the booking hours ${bookingHours!.earliestStart} to ${bookingHours!.latestEnd}`);
+  const page = await openAs(browser, "restricted");
+  try {
+    // when
+    await openSlot(page, slot);
+    // then — the dialog names the hours and offers no booking
+    await expect(page.getByTestId("booking-outside-hours"), "product: the dialog names the booking hours").toBeVisible();
+    await expect(page.getByTestId("booking-submit"), "product: the dialog offers no booking outside them").toBeDisabled();
+    await capture(page, "booking-outside-hours");
+    // when / then — a request that bypasses the dialog is refused for the hours
+    const courts = await (await api.get("/api/public/courts")).json() as { id: string; number: number }[];
+    const card = discovery.cards.find((candidate: { active: boolean; allowedRoles: string[] }) => candidate.active && candidate.allowedRoles.length === 0);
+    const refused = await api.post("/api/bookings", {
+      courtIds: [courts.find((court) => court.number === slot.court)!.id], cardId: card.id,
+      startsAt: instantOf(slot, "start").toISOString(), endsAt: instantOf(slot, "end").toISOString()
+    });
+    const body = await refused.json().catch(() => ({}));
+    if (refused.ok() && body.id) {
+      recordCreated({ kind: "booking", id: body.id, by: "restricted", project: projectName() });
+      await api.del(`/api/bookings/${body.id}`);
+    }
+    expect((body.violations ?? []).map((violation: { code: string }) => violation.code), `product: the server refuses the hours (${refused.status()})`)
+      .toContain("booking.rule.bookingHours.outside");
+  } finally { await page.context().close(); }
 });
 
 let choicesBefore: { kind: string; declinable: boolean; enabled: boolean }[] | undefined;

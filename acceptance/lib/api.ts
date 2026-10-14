@@ -47,13 +47,16 @@ export async function anonymousApi(): Promise<Api> {
 }
 
 // Reauthenticates only when the write asks for it, so a healthy account costs no credential check.
-export async function adminPut(admin: Api, path: string, data: unknown): Promise<APIResponse> {
-  const first = await admin.put(path, data);
+async function adminWrite(admin: Api, write: (path: string, data: unknown) => Promise<APIResponse>, path: string, data: unknown): Promise<APIResponse> {
+  const first = await write(path, data);
   if (first.status() !== 401 && first.status() !== 403) return first;
   const reauthenticated = await admin.post("/api/session/reauthentication", { password: PASSWORD });
   precondition(reauthenticated.ok(), `admin reauthentication answered ${reauthenticated.status()}`);
-  return admin.put(path, data);
+  return write(path, data);
 }
+
+export const adminPut = (admin: Api, path: string, data: unknown) => adminWrite(admin, admin.put, path, data);
+export const adminPost = (admin: Api, path: string, data: unknown) => adminWrite(admin, (p, d) => admin.post(p, d), path, data);
 
 export type RosterEntry = { personId: string; username: string | null; roles?: string[]; firstName: string; lastName: string; email: string | null; enabled: boolean; locale?: string | null };
 

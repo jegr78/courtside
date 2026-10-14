@@ -1,10 +1,13 @@
-import { runPath } from "../lib/context";
 import { test, expect } from "@playwright/test";
 import { appendFileSync } from "node:fs";
 import { capture } from "../lib/checks";
 import { openAs } from "../lib/session";
 import { step } from "../lib/steps";
-import { discovery, onDesksAndTablet } from "../lib/journey";
+import { discovery, onDesksAndTablet, projectName } from "../lib/journey";
+import { adminPost, adminPut, apiAs } from "../lib/api";
+import { config, runPath } from "../lib/context";
+import { mailsTo } from "../lib/mail";
+import { precondition } from "../lib/precondition";
 
 const LINKS = ["admin-overview-link", "admin-setup-link", "admin-configuration-link", "admin-deadlines-link",
   "admin-rule-sets-link", "admin-courts-link", "admin-opening-hours-link", "admin-booking-cards-link",
@@ -64,4 +67,31 @@ test("when the admin opens a member and a booking card, then the detail pages re
       await capture(page, "booking-card-detail");
     });
   } finally { await page.context().close(); }
+});
+
+test("given welcome accounts are allowed, when the admin creates an account, then its welcome names the instance and comes before the first password", async () => {
+  // given
+  test.skip(projectName() !== "desktop-chrome", "one account per run is enough to read the welcome");
+  precondition(config.welcomeAccounts, "welcomeAccounts is off, so the welcome mail is not checkable");
+  const admin = await apiAs("admin");
+  const tag = Date.now().toString(36);
+  const email = `acceptance-welcome-${tag}@${discovery.emails["memberA"].split("@")[1]}`;
+  const since = new Date();
+  const person = await adminPost(admin, "/api/admin/roster", { firstName: "Acceptance", lastName: `Welcome ${tag}`, email });
+  expect(person.status(), "product: the admin adds the person").toBeLessThan(300);
+  const { personId } = await person.json() as { personId: string };
+  try {
+    // when
+    const account = await adminPost(admin, `/api/admin/roster/${personId}/account`, { username: `acceptance-welcome-${tag}`, roles: ["MEMBER"] });
+    expect(account.status(), `product: the admin creates the account (${await account.text()})`).toBeLessThan(300);
+    // then
+    const [welcome, credentials] = await mailsTo(email, since, 2);
+    expect(welcome, "product: two messages reach the new member").toBeTruthy();
+    expect(welcome.text, "product: the first message, the welcome, names the instance").toContain(new URL(config.baseUrl).host);
+    expect(credentials, "product: the sign-in details follow the welcome").toBeTruthy();
+    expect(welcome.text, "product: the welcome is not the message with the sign-in details").not.toBe(credentials.text);
+  } finally {
+    const deactivated = await adminPut(admin, `/api/admin/roster/${personId}/account/active`, { active: false });
+    expect(deactivated.status(), "the account this run created is deactivated again").toBeLessThan(300);
+  }
 });
