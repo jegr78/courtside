@@ -60,6 +60,19 @@ test("given the visual baselines, when the browser shards are scheduled, then th
     "the aggregate must still require the visual baselines on their own");
 });
 
+test("given a four-core runner, when the backend tests run, then Surefire and Failsafe spread them over parallel forks", () => {
+  // when
+  const forks = pom.match(/<test\.forks>(\d+)<\/test\.forks>/)?.[1];
+
+  // then
+  assert.equal(forks, "3", "one JVM leaves three of the runner's four cores idle for most of the backend job");
+  for (const plugin of ["maven-surefire-plugin", "maven-failsafe-plugin"]) {
+    const configuration = pom.match(new RegExp(`<artifactId>${plugin}</artifactId>[\\s\\S]*?</plugin>`))?.[0] ?? "";
+    assert.match(configuration, /<forkCount>\$\{test\.forks\}<\/forkCount>/, `${plugin} runs in the configured forks`);
+    assert.match(configuration, /<reuseForks>true<\/reuseForks>/, `${plugin} keeps a fork's Spring contexts for its next classes`);
+  }
+});
+
 test("given a selected quality job, when it does not succeed, then the aggregate fails closed", () => {
   // when / then
   assert.match(workflow, /build:\n\s+if: always\(\)/);

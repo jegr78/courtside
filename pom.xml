@@ -36,6 +36,8 @@
         <jackson-bom.version>3.1.7</jackson-bom.version>
         <lombok.version>1.18.48</lombok.version>
         <surefire.runOrder>alphabetical</surefire.runOrder>
+        <!-- Each fork starts its own PostgreSQL container, so three leave a core of the CI runner for them. -->
+        <test.forks>3</test.forks>
         <skipTests>false</skipTests>
         <frontend.skip>false</frontend.skip>
         <frontend.test.skip>${skipTests}</frontend.test.skip>
@@ -553,11 +555,17 @@
                 <configuration>
                     <argLine>@{jacocoArgLine} -Xshare:off --sun-misc-unsafe-memory-access=deny -javaagent:${settings.localRepository}/org/mockito/mockito-core/${mockito.version}/mockito-core-${mockito.version}.jar</argLine>
                     <runOrder>${surefire.runOrder}</runOrder>
+                    <forkCount>${test.forks}</forkCount>
+                    <reuseForks>true</reuseForks>
                 </configuration>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-failsafe-plugin</artifactId>
+                <configuration>
+                    <forkCount>${test.forks}</forkCount>
+                    <reuseForks>true</reuseForks>
+                </configuration>
                 <executions>
                     <execution>
                         <goals>
