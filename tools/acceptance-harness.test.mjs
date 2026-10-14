@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 
 const json = (path) => JSON.parse(readFileSync(new URL(`../${path}`, import.meta.url), "utf8"));
 
@@ -685,4 +685,17 @@ test("given another path or method, when a journey waits for an answer, then it 
   assert.equal(cancel(response("DELETE", "https://club.example.org/archive/api/bookings/42")), false, "a path that only ends alike is not this one");
   assert.equal(answers("POST", /\/move$/)(response("POST", "https://club.example.org/api/booking-series/7/move?scope=THIS")), true,
     "a pattern matches the path without the query");
+});
+
+test("given the acceptance journeys, when they wait for an answer, then they name it by method and path", () => {
+  // given
+  const directory = new URL("../acceptance/journeys/", import.meta.url);
+  const waits = readdirSync(directory).filter((name) => name.endsWith(".ts"))
+    .flatMap((name) => [...readFileSync(new URL(name, directory), "utf8").matchAll(/waitForResponse\(([^\n]*)/g)]
+      .map((match) => `${name}: ${match[1]}`));
+  // when
+  const handWritten = waits.filter((wait) => !/: answers\(/.test(wait));
+  // then
+  assert.ok(waits.length >= 5, "the journeys wait for their answers");
+  assert.deepEqual(handWritten, [], "a hand-written URL comparison breaks on the next query the client adds");
 });
