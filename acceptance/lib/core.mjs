@@ -87,3 +87,37 @@ export function answers(method, path) {
 export function leavesBookingHours(slot, hours) {
   return slot.start < hours.earliestStart.slice(0, 5) || slot.end > hours.latestEnd.slice(0, 5);
 }
+
+const PERSON_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+// Courtside has no erasure path yet, so the accounts a run created to read its welcome are removed in the database.
+export function welcomeErasureSql(personIds) {
+  if (personIds.length === 0) return null;
+  for (const id of personIds) if (!PERSON_ID.test(id)) throw new Error(`not a person id: ${id}`);
+  const ids = personIds.map((id) => `'${id}'`).join(", ");
+  return `BEGIN;
+CREATE TEMP TABLE erased ON COMMIT DROP AS
+  SELECT p.id AS person_id FROM person p JOIN user_account ua ON ua.person_id = p.id
+  WHERE p.id IN (${ids}) AND ua.username LIKE 'acceptance-welcome-%' AND NOT ua.enabled
+    AND NOT EXISTS (SELECT 1 FROM booking b WHERE b.booked_by = ua.id)
+    AND NOT EXISTS (SELECT 1 FROM member m WHERE m.person_id = p.id)
+    AND NOT EXISTS (SELECT 1 FROM booking_participant bp WHERE bp.person_id = p.id)
+    AND NOT EXISTS (SELECT 1 FROM waitlist_participant wp WHERE wp.person_id = p.id)
+    AND NOT EXISTS (SELECT 1 FROM import_external_reference e WHERE e.person_id = p.id);
+DELETE FROM user_account WHERE person_id IN (SELECT person_id FROM erased);
+DELETE FROM person WHERE id IN (SELECT person_id FROM erased);
+SELECT 'erased ' || count(*) FROM erased;
+COMMIT;
+`;
+}
+
+// ssh hands the remote shell one string, so the command is quoted here; the container name holds no shell character.
+export function erasureCommand({ ssh, container }) {
+  return ["ssh", ["-o", "BatchMode=yes", "--", ssh,
+    `docker exec -i ${container} sh -c 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -At'`]];
+}
+
+export function erasedCount(output) {
+  const match = /^erased (\d+)$/m.exec(output);
+  return match ? Number(match[1]) : null;
+}
