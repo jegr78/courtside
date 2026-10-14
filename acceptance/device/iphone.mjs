@@ -3,6 +3,8 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadConfig } from "../config/schema.mjs";
+import { layoutProbe, layoutProbeArguments } from "../lib/layout-probe.mjs";
+import { ADMIN_LINKS } from "../lib/surfaces.mjs";
 import { restoreCommand, sameServeConfiguration } from "./outage.mjs";
 import { judge } from "./verdicts.mjs";
 
@@ -78,7 +80,7 @@ function browser(session) {
   };
 }
 
-async function signIn(b) {
+async function signIn(b, username = config.personas.memberA) {
   await b.go("/");
   await b.exec("localStorage.setItem('courtside.theme', 'dark'); localStorage.setItem('courtside.locale', 'de');");
   await b.go("/");
@@ -86,7 +88,7 @@ async function signIn(b) {
   if (await b.exec("return [...document.querySelectorAll('[data-testid=sign-in-link]')].some((e) => e.getClientRects().length > 0);")) {
     await b.click("[data-testid=sign-in-link]");
     await b.visible("[data-testid=login-view]");
-    await b.type("[data-testid=username]", config.personas.memberA);
+    await b.type("[data-testid=username]", username);
     await b.type("[data-testid=password]", config.password);
     await b.click("[data-testid=login-submit]");
     await b.until("the member session", "return !document.querySelector('[data-testid=sign-in-link]') && !!document.querySelector('[data-testid=court-plan-view]');");
@@ -159,6 +161,129 @@ async function savedMessage(b) {
       await b.until("the choice to be restored", "return document.querySelector(arguments[0]).checked === arguments[1];", choice, before);
     }
   }
+}
+
+const SETTLED = "return !document.querySelector('p[role=status]:not([data-testid])');";
+const ZOOM_PROBE = `return [...document.querySelectorAll('input, select, textarea')]
+  .filter((e) => e.getClientRects().length > 0 && e.checkVisibility({ opacityProperty: true, visibilityProperty: true }) && !['checkbox', 'radio', 'hidden', 'submit', 'button', 'file', 'range', 'color'].includes(e.type))
+  .filter((e) => parseFloat(getComputedStyle(e).fontSize) < 16)
+  .map((e) => ({ selector: e.localName + (e.id ? '#' + e.id : '') + (e.dataset.testid ? '[data-testid=' + e.dataset.testid + ']' : ''), fontSize: getComputedStyle(e).fontSize }));`;
+
+async function measureSurface(b, name, open, close = async () => {}) {
+  try {
+    await open();
+    await b.until(`${name} to settle`, SETTLED);
+    await b.exec("return document.fonts.ready.then(() => true);");
+    const layout = await b.exec(`return (${layoutProbe})(arguments[0]);`, layoutProbeArguments("de"));
+    const surface = { name, ...layout, zoom: await b.exec(ZOOM_PROBE), shot: await b.screenshot(`page-${name}`) };
+    await close().catch((error) => { surface.closeError = error.message; });
+    return surface;
+  } catch (error) {
+    return { name, error: error.message, shot: await b.screenshot(`page-${name}-error`).catch(() => null) };
+  }
+}
+
+async function signOut(b) {
+  await b.go("/");
+  await b.until("the plan", PLAN_READY);
+  await b.exec("window.scrollTo(0, 0);");
+  await b.click("[data-testid=preferences-menu]");
+  await b.click("[data-testid=logout]");
+  await b.until("the visitor session", "return [...document.querySelectorAll('[data-testid=sign-in-link], [data-testid=login-view]')].some((e) => e.getClientRects().length > 0);");
+}
+
+async function reauthenticateIfAsked(b) {
+  await b.until("the page or a password prompt", `return !!document.querySelector('[data-testid=admin-reauthentication-submit]')
+    || (!!document.querySelector('main h1, main h2') && !document.querySelector('p[role=status]:not([data-testid])'));`);
+  let asked = false;
+  for (let attempt = 0; attempt < 10 && !asked; attempt++) {
+    asked = await b.exec("return !!document.querySelector('[data-testid=admin-reauthentication-submit]');");
+    if (!asked) await pause(500);
+  }
+  if (!asked) return;
+  await b.type("#admin-reauthentication-password", config.password);
+  await b.click("[data-testid=admin-reauthentication-submit]");
+  await b.until("the password prompt to close", "return !document.querySelector('[data-testid=admin-reauthentication-submit]');");
+}
+
+async function memberPages(b) {
+  const slot = "button[data-testid=free-slot][data-state=free]";
+  const surfaces = [
+    await measureSurface(b, "plan", async () => { await b.go("/"); await b.until("the plan", PLAN_READY); }),
+    await measureSurface(b, "booking-dialog", async () => {
+      await b.until("a free slot", "return !!document.querySelector(arguments[0]);", slot);
+      await b.exec("document.querySelector(arguments[0]).scrollIntoView({ block: 'center' });", slot);
+      await b.click(slot);
+      await b.visible("[data-testid=booking-dialog]");
+      await b.click("[data-testid=booking-more-summary]");
+      await b.visible("[data-testid=guest-name]");
+    }, async () => {
+      await b.click("[data-testid=booking-close]");
+      await b.until("the dialog to close", "return !document.querySelector('[data-testid=booking-dialog]');");
+    }),
+    await measureSurface(b, "preferences", async () => {
+      await b.exec("window.scrollTo(0, 0);");
+      await b.click("[data-testid=preferences-menu]");
+      await b.visible("#theme-preference");
+    }, () => b.click("[data-testid=preferences-menu]")),
+    await measureSurface(b, "my-bookings", async () => { await b.click("[data-testid=my-bookings-link]"); await b.visible("[data-testid=my-bookings-page]"); }),
+    await measureSurface(b, "my-messages", async () => { await b.click("[data-testid=my-messages-link]"); await b.visible("[data-testid=my-messages-view]"); })
+  ];
+  return { check: "member-pages", surfaces };
+}
+
+async function asOtherSession(b, username, measure) {
+  const surfaces = [];
+  try {
+    await signOut(b);
+    if (username) await signIn(b, username);
+    surfaces.push(...await measure());
+  } catch (error) {
+    surfaces.push({ name: "session", error: error.message });
+  }
+  try {
+    if (username) await signOut(b);
+    await signIn(b);
+  } catch (error) {
+    surfaces.push({ name: "sign-in again", error: error.message });
+  }
+  return surfaces;
+}
+
+async function visitorPages(b) {
+  const surfaces = await asOtherSession(b, undefined, async () => [
+    await measureSurface(b, "plan-visitor", async () => { await b.go("/"); await b.until("the plan", PLAN_READY); }),
+    await measureSurface(b, "sign-in", async () => { await b.click("[data-testid=sign-in-link]"); await b.visible("[data-testid=login-view]"); }),
+    await measureSurface(b, "account-recovery", async () => { await b.click("[data-testid=forgotten-credentials-link]"); await b.visible("[data-testid=account-recovery-view]"); })
+  ]);
+  return { check: "visitor-pages", surfaces };
+}
+
+async function adminPages(b) {
+  const surfaces = await asOtherSession(b, config.personas.admin, async () => {
+    const measured = [];
+    for (const link of ADMIN_LINKS) {
+      measured.push(await measureSurface(b, link.replace(/^admin-|-link$/g, ""), async () => {
+        if (!await b.exec("return !!document.querySelector('[data-testid=admin-navigation]');")) {
+          await b.go("/");
+          await b.until("the plan", PLAN_READY);
+          if (!await b.exec("return [...document.querySelectorAll('[data-testid=administration-link]')].some((e) => e.getClientRects().length > 0);")) {
+            await b.exec("window.scrollTo(0, 0);");
+            await b.click("[data-testid=preferences-menu]");
+          }
+          await b.click("[data-testid=administration-link]");
+          await reauthenticateIfAsked(b);
+        }
+        const href = await b.exec("return document.querySelector('[data-testid=' + arguments[0] + ']')?.getAttribute('href') ?? null;", link);
+        if (!href) throw new Error(`no ${link} in the administration navigation`);
+        await b.go(href);
+        await reauthenticateIfAsked(b);
+        await b.until("the page heading", "return !!document.querySelector('main h1, main h2')?.textContent.trim();");
+      }));
+    }
+    return measured;
+  });
+  return { check: "admin-pages", surfaces };
 }
 
 async function serviceWorker(b) {
@@ -299,7 +424,7 @@ async function offlineBookings(b) {
 }
 
 const CHECKS = { "theme-switch": themeSwitch, "select-heights": selectHeights, "saved-message": savedMessage,
-  "service-worker": serviceWorker, "outage": outage, "offline-bookings": offlineBookings };
+  "member-pages": memberPages, "visitor-pages": visitorPages, "admin-pages": adminPages, "service-worker": serviceWorker, "outage": outage, "offline-bookings": offlineBookings };
 const NEEDS_OUTAGE = new Set(["outage", "offline-bookings"]);
 
 const driver = await startDriver();
@@ -314,7 +439,7 @@ try {
   for (const [name, check] of Object.entries(CHECKS).filter(([name]) => !only || only.includes(name))) {
     if (NEEDS_OUTAGE.has(name) && !outageHost) {
       result.checks.push({ check: name, skipped: "DEVICE_OUTAGE_HOST is not set" });
-    } else if (name === "offline-bookings" && result.checks.some((c) => c.check === "outage" && c.error)) {
+    } else if (name !== "outage" && NEEDS_OUTAGE.has(name) && result.checks.some((c) => c.check === "outage" && c.error)) {
       result.checks.push({ check: name, skipped: "the outage did not take effect" });
     } else {
       try { result.checks.push(await check(b)); } catch (error) {
@@ -329,7 +454,10 @@ try {
   await attempt("serve configuration", () => { if (takenDown) setServerUp(true); });
   for (const id of session ? [...pending] : []) await attempt(`booking ${id}`, async () => { result.cleanup = { ...result.cleanup, [id]: await cancel(browser(session), id) }; });
   for (const check of result.checks) Object.assign(check, judge(check));
+  if (session) result.finalPage = await browser(session).exec(`return { path: location.pathname,
+    alerts: [...document.querySelectorAll('[role=alert]')].filter((e) => e.getClientRects().length > 0).map((e) => e.textContent.trim()) };`).catch((error) => ({ error: error.message }));
   writeFileSync(join(out, "result.json"), JSON.stringify(result, null, 2));
+  if (session) await call("POST", `/session/${session}/url`, { url: "about:blank" }).catch(() => undefined);
   if (session) await call("DELETE", `/session/${session}`).catch(() => undefined);
   driver.kill();
   if (result.error) console.log(`error   ${result.error}`);

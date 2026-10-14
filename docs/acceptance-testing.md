@@ -133,16 +133,25 @@ Advanced, a way to reach `baseUrl`, and an unlocked screen for the whole run. Qu
 first; `safaridriver` ships with macOS and needs no Xcode. Safari locks the iPhone's screen while
 the run drives it, and every session starts without cookies, storage or a service worker.
 
-Signed in as `memberA`, the run checks:
+Signed in as `memberA`, and as `admin` for the administration pages, the run checks:
 
 | Check | Passes when |
 |---|---|
 | `theme-switch` | inherited text has 4.5:1 contrast one second after switching to light |
 | `select-heights` | every select in the booking dialog is at least 44 px high |
 | `saved-message` | the confirmation is in view after saving the message choices |
+| `member-pages` | the plan, the booking dialog, the preferences, My bookings and My messages fit the screen and have no field Safari zooms into |
+| `visitor-pages` | the same for the signed-out plan, the sign-in and the account recovery |
+| `admin-pages` | the same for every page of the administration navigation |
 | `service-worker` | a service worker controls the page |
 | `outage` | the instance becomes unreachable for the iPhone and comes back |
 | `offline-bookings` | with the instance unreachable, My bookings lists a fresh booking with its offline note within 15 s, and the plan says it is offline |
+
+The page checks run the layout probe the journeys use, `acceptance/lib/layout-probe.mjs`, with
+Safari's own font metrics. A page fails when it scrolls sideways, when an element reaches past the
+screen edge, or when a visible text field or select is set below 16 px, because Safari on iOS zooms
+into such a field when it is tapped. Small targets, truncated text and controls under the sticky
+bars are recorded as observations: the plan scrolls under its own bars by design.
 
 Each check writes screenshots and measurements to `result.json` in its own directory under
 `build/acceptance-device/` and prints its verdict; any verdict other than `pass` ends the run with
