@@ -22,15 +22,20 @@ export function contrast(foreground, background) {
 }
 
 const pass = (reason) => ({ verdict: "pass", reason });
+const notFound = (names) => ({ verdict: "fail", reason: `not found: ${names.join(", ")}` });
 const fail = (reason) => ({ verdict: "fail", reason });
 
 const JUDGES = {
   "theme-switch": ({ afterOneSecond }) => {
+    const missing = afterOneSecond.filter((label) => label.missing);
+    if (missing.length > 0) return notFound(missing.map((label) => label.label));
     const faint = afterOneSecond.filter((label) => contrast(label.color, label.background) < MIN_TEXT_CONTRAST);
     return faint.length === 0 ? pass("inherited text is readable one second after switching to light")
       : fail(`below ${MIN_TEXT_CONTRAST}:1 one second after the switch: ${faint.map((label) => label.label).join(", ")}`);
   },
   "select-heights": ({ fields }) => {
+    const missing = fields.filter((field) => field.missing);
+    if (missing.length > 0) return notFound(missing.map((field) => field.testId));
     const low = fields.filter((field) => field.tag === "select" && !(field.height >= MIN_TOUCH_TARGET));
     return low.length === 0 ? pass(`every select is at least ${MIN_TOUCH_TARGET} px high`)
       : fail(`lower than ${MIN_TOUCH_TARGET} px: ${low.map((field) => `${field.testId} ${field.height} px`).join(", ")}`);

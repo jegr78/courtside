@@ -94,13 +94,13 @@ async function signIn(b) {
   await b.until("the plan", PLAN_READY);
 }
 
-const INHERITED_TEXT = `const pick = (label, element) => element && { label, color: getComputedStyle(element).color, background: getComputedStyle(document.body).backgroundColor };
+const INHERITED_TEXT = `const pick = (label, element) => element ? { label, color: getComputedStyle(element).color, background: getComputedStyle(document.body).backgroundColor } : { label, missing: true };
   return [
     pick("theme label", document.querySelector('label[for=theme-preference]')),
     pick("first weekday", document.querySelector('[data-testid^=day-selector-]')),
     pick("plan header cell", document.querySelector('[data-testid=day-plan-table] th')),
     pick("tab bar link", document.querySelector('[data-testid=my-messages-link]'))
-  ].filter(Boolean);`;
+  ];`;
 
 async function themeSwitch(b) {
   await b.exec("window.scrollTo(0, 0);");
@@ -144,17 +144,21 @@ async function savedMessage(b) {
   await b.visible("[data-testid=my-messages-view]");
   await b.visible(choice);
   const before = await b.exec("return document.querySelector(arguments[0]).checked;", choice);
-  await b.click(choice);
-  await b.exec("document.querySelector('[data-testid=my-messages-save]').scrollIntoView({ block: 'center' });");
-  await b.click("[data-testid=my-messages-save]");
-  await b.visible("[data-testid=my-messages-saved]");
-  const placement = await b.exec(`const box = document.querySelector('[data-testid=my-messages-saved]').getBoundingClientRect();
-    return { top: Math.round(box.top), bottom: Math.round(box.bottom), viewport: innerHeight, inView: box.bottom > 0 && box.top < innerHeight };`);
-  const shots = [await b.screenshot("saved-message")];
-  await b.click(choice);
-  await b.click("[data-testid=my-messages-save]");
-  await b.until("the choice to be restored", "return document.querySelector(arguments[0]).checked === arguments[1];", choice, before);
-  return { check: "saved-message", placement, shots };
+  try {
+    await b.click(choice);
+    await b.exec("document.querySelector('[data-testid=my-messages-save]').scrollIntoView({ block: 'center' });");
+    await b.click("[data-testid=my-messages-save]");
+    await b.visible("[data-testid=my-messages-saved]");
+    const placement = await b.exec(`const box = document.querySelector('[data-testid=my-messages-saved]').getBoundingClientRect();
+      return { top: Math.round(box.top), bottom: Math.round(box.bottom), viewport: innerHeight, inView: box.bottom > 0 && box.top < innerHeight };`);
+    return { check: "saved-message", placement, shots: [await b.screenshot("saved-message")] };
+  } finally {
+    if (await b.exec("return document.querySelector(arguments[0])?.checked !== arguments[1];", choice, before)) {
+      await b.click(choice);
+      await b.click("[data-testid=my-messages-save]");
+      await b.until("the choice to be restored", "return document.querySelector(arguments[0]).checked === arguments[1];", choice, before);
+    }
+  }
 }
 
 async function serviceWorker(b) {
@@ -164,7 +168,7 @@ async function serviceWorker(b) {
   return { check: "service-worker", controlled: await b.exec("return !!navigator.serviceWorker.controller;") };
 }
 
-const onBox = (...command) => execFileSync("ssh", [outageHost, "sudo", "-n", ...command], { stdio: ["ignore", "pipe", "pipe"] }).toString().trim();
+const onBox = (...command) => execFileSync("ssh", ["--", outageHost, "sudo", "-n", ...command], { stdio: ["ignore", "pipe", "pipe"] }).toString().trim();
 const serveStatus = () => JSON.parse(onBox("tailscale", "serve", "status", "--json"));
 let takenDown;
 
@@ -219,7 +223,7 @@ const OFFLINE_VIEW = `return {
   text: document.body.innerText.replace(/\\s+/g, ' ').slice(0, 240)
 };`;
 
-const pending = [];
+const pending = process.env.DEVICE_CANCEL?.split(",").filter(Boolean) ?? [];
 
 async function bookTwoDaysAhead(b) {
   await b.go("/");
@@ -263,11 +267,13 @@ async function offlineBookings(b) {
     result.shots.push(await b.screenshot("offline-0-online"));
     await reachable(b, false);
     await b.exec("location.assign('/my-bookings');");
-    for (let second = 2; second <= 92; second += 10) {
-      await pause(second === 2 ? 2_000 : 10_000);
+    for (let second = 1; second <= 90; second++) {
+      await pause(1_000);
       const view = await b.exec(OFFLINE_VIEW, id).catch((error) => ({ error: error.message }));
-      result.timeline.push({ second, ...view });
-      result.shots.push(await b.screenshot(`offline-1-after-${second}s`).catch(() => null));
+      if (second % 10 === 0 || view.listed) {
+        result.timeline.push({ second, ...view });
+        result.shots.push(await b.screenshot(`offline-1-after-${second}s`).catch(() => null));
+      }
       if (view.listed) {
         result.offline = { ...view, within: second };
         break;
@@ -279,10 +285,15 @@ async function offlineBookings(b) {
         return !!document.querySelector('[data-testid=court-plan-view]') && !!notice && { notice: notice.textContent };`).catch(() => null);
       result.shots.push(await b.screenshot("offline-2-plan"));
     }
-  } finally {
+  } catch (error) {
+    result.error = error.message;
+  }
+  try {
     await reachable(b, true);
     result.cancelled = await cancel(b, id);
     if (result.cancelled.endsWith("verified")) pending.splice(pending.indexOf(id), 1);
+  } catch (error) {
+    result.error = [result.error, `restoring: ${error.message}`].filter(Boolean).join("; ");
   }
   return result;
 }
@@ -311,16 +322,20 @@ try {
       }
     }
   }
-  for (const id of process.env.DEVICE_CANCEL?.split(",") ?? []) pending.push(id);
+} catch (error) {
+  result.error = error.message;
 } finally {
-  if (takenDown) setServerUp(true);
-  if (session) for (const id of pending) result.cleanup = { ...result.cleanup, [id]: await cancel(browser(session), id).catch((error) => error.message) };
+  const attempt = async (step, action) => { try { await action(); } catch (error) { result.cleanupErrors = { ...result.cleanupErrors, [step]: error.message }; } };
+  await attempt("serve configuration", () => { if (takenDown) setServerUp(true); });
+  for (const id of session ? [...pending] : []) await attempt(`booking ${id}`, async () => { result.cleanup = { ...result.cleanup, [id]: await cancel(browser(session), id) }; });
   for (const check of result.checks) Object.assign(check, judge(check));
   writeFileSync(join(out, "result.json"), JSON.stringify(result, null, 2));
   if (session) await call("DELETE", `/session/${session}`).catch(() => undefined);
   driver.kill();
+  if (result.error) console.log(`error   ${result.error}`);
+  for (const [step, message] of Object.entries(result.cleanupErrors ?? {})) console.log(`cleanup failed, ${step}: ${message}`);
   for (const check of result.checks) console.log(`${check.verdict.padEnd(7)} ${check.check}: ${check.reason}`);
   for (const [id, state] of Object.entries(result.cleanup ?? {})) console.log(`cleanup ${id}: ${state}`);
   console.log(`results in ${out}`);
 }
-process.exitCode = result.checks.length > 0 && result.checks.every((check) => check.verdict === "pass") ? 0 : 1;
+process.exitCode = !result.error && !result.cleanupErrors && result.checks.length > 0 && result.checks.every((check) => check.verdict === "pass") ? 0 : 1;
