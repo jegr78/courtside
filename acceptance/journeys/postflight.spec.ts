@@ -3,7 +3,7 @@ import { test, expect } from "@playwright/test";
 import { readFileSync, writeFileSync } from "node:fs";
 import { readLedger, replay } from "../lib/ledger";
 import { openAs, xsrf } from "../lib/session";
-import { apiAs } from "../lib/api";
+import { adminPut, apiAs } from "../lib/api";
 import { allSlots, lanePlan } from "../lib/lanes";
 import { sweep } from "../lib/sweep";
 import { clearWeekend } from "../lib/weekend";
@@ -49,10 +49,13 @@ test("when the run ends, then no reserved slot holds a booking of this run, no w
   const weeks = await clearWeekend();
   for (const username of disposables) await restoreDisposable(username);
   for (const key of MEMBERS) await leaveWaitlist(key, allSlots());
+  const accounts = await Promise.all(readLedger().filter((entry) => entry.kind === "account").map(async (entry) =>
+    ({ personId: entry.id, status: (await adminPut(admin, `/api/admin/roster/${entry.id}/account/active`, { active: false })).status() })));
   const queued = Object.fromEntries(await Promise.all(MEMBERS.map(async (key) => [key, (await openWaitlistEntries(key, allSlots())).length])));
-  writeFileSync(runPath("postflight.json"), JSON.stringify({ removed, left, foreign, weeks: weeks.removed, foreignWeeks: weeks.foreign, queued }, null, 2));
+  writeFileSync(runPath("postflight.json"), JSON.stringify({ removed, left, foreign, weeks: weeks.removed, foreignWeeks: weeks.foreign, queued, accounts }, null, 2));
   // then
   expect(left, "no reserved slot holds a booking of this run").toEqual([]);
   expect(queued, "no member is left waiting on a waitlist").toEqual({ memberA: 0, memberB: 0, memberC: 0 });
+  expect(accounts.filter((account) => account.status >= 300), "every account this run created is deactivated").toEqual([]);
   for (const [index, username] of disposables.entries()) expect(await canSignIn(PASSWORD, username), `disposable ${index + 1} signs in`).toBe(true);
 });

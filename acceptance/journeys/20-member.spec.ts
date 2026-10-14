@@ -209,7 +209,7 @@ test("given a member whose category books only within set hours, when a slot out
       recordCreated({ kind: "booking", id: body.id, by: "restricted", project: projectName() });
       await api.del(`/api/bookings/${body.id}`);
     }
-    expect((body.violations ?? []).map((violation: { code: string }) => violation.code), `product: the server refuses the hours (${refused.status()} ${JSON.stringify(body)})`)
+    expect((body.violations ?? []).map((violation: { code: string }) => violation.code), `product: the server refuses the hours (${refused.status()} ${body.type ?? ""})`)
       .toContain("booking.rule.bookingHours.outside");
   } finally { await page.context().close(); }
 });

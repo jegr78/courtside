@@ -6,7 +6,8 @@ import { step } from "../lib/steps";
 import { discovery, onDesksAndTablet, projectName } from "../lib/journey";
 import { adminPost, adminPut, apiAs } from "../lib/api";
 import { config, runPath } from "../lib/context";
-import { mailsTo } from "../lib/mail";
+import { mailAvailable, mailsTo, type Mail } from "../lib/mail";
+import { recordCreated } from "../lib/ledger";
 import { precondition } from "../lib/precondition";
 
 const LINKS = ["admin-overview-link", "admin-setup-link", "admin-configuration-link", "admin-deadlines-link",
@@ -73,6 +74,7 @@ test("given welcome accounts are allowed, when the admin creates an account, the
   // given
   test.skip(projectName() !== "desktop-chrome", "one account per run is enough to read the welcome");
   precondition(config.welcomeAccounts, "welcomeAccounts is off, so the welcome mail is not checkable");
+  precondition(mailAvailable(), "mail.url is not configured, so no account is created to read its welcome");
   const admin = await apiAs("admin");
   const tag = Date.now().toString(36);
   const email = `acceptance-welcome-${tag}@${discovery.emails["memberA"].split("@")[1]}`;
@@ -80,18 +82,26 @@ test("given welcome accounts are allowed, when the admin creates an account, the
   const person = await adminPost(admin, "/api/admin/roster", { firstName: "Acceptance", lastName: `Welcome ${tag}`, email });
   expect(person.status(), "product: the admin adds the person").toBeLessThan(300);
   const { personId } = await person.json() as { personId: string };
+  recordCreated({ kind: "account", id: personId, by: "admin", project: projectName() });
+  let created = false;
   try {
     // when
     const account = await adminPost(admin, `/api/admin/roster/${personId}/account`, { username: `acceptance-welcome-${tag}`, roles: ["MEMBER"] });
-    expect(account.status(), `product: the admin creates the account (${await account.text()})`).toBeLessThan(300);
-    // then
-    const [welcome, credentials] = await mailsTo(email, since, 2);
-    expect(welcome, "product: two messages reach the new member").toBeTruthy();
-    expect(welcome.text, "product: the first message, the welcome, names the instance").toContain(new URL(config.baseUrl).host);
-    expect(credentials, "product: the sign-in details follow the welcome").toBeTruthy();
-    expect(welcome.text, "product: the welcome is not the message with the sign-in details").not.toBe(credentials.text);
+    expect(account.status(), "product: the admin creates the account").toBeLessThan(300);
+    created = true;
+    // then — the messages are told apart by content, and no assertion prints their text
+    const mails = await mailsTo(email, since, 2);
+    const carriesCredential = (mail: Mail) => /One-time password|Einmalpasswort/.test(mail.text);
+    const welcome = mails.find((mail) => !carriesCredential(mail));
+    const credentials = mails.find(carriesCredential);
+    expect(welcome !== undefined, "product: a welcome without a password reaches the new member").toBe(true);
+    expect(credentials !== undefined, "product: the sign-in details reach the new member").toBe(true);
+    expect(welcome!.text.includes(new URL(config.baseUrl).host), "product: the welcome names the instance").toBe(true);
+    expect(Date.parse(welcome!.created!) <= Date.parse(credentials!.created!), "product: the welcome comes before the sign-in details").toBe(true);
   } finally {
-    const deactivated = await adminPut(admin, `/api/admin/roster/${personId}/account/active`, { active: false });
-    expect(deactivated.status(), "the account this run created is deactivated again").toBeLessThan(300);
+    if (created) {
+      const deactivated = await adminPut(admin, `/api/admin/roster/${personId}/account/active`, { active: false });
+      expect.soft(deactivated.status(), "the account this run created is deactivated again").toBeLessThan(300);
+    }
   }
 });
