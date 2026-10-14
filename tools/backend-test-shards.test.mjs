@@ -26,6 +26,7 @@ test("given test sources, when the classes are listed, then exactly the concrete
     "org/example/TestClock.java": "final class TestClock {}",
     "org/example/LegacyTestCase.java": "class LegacyTestCase {}",
     "org/example/AbstractStoreTest.java": "public abstract class AbstractStoreTest {}",
+    "org/example/HelperShapeTest.java": "class HelperShapeTest {\n  // an abstract class below\n  abstract static class Shape {}\n}",
     "org/example/ProductionArtifactIT.java": "class ProductionArtifactIT {}",
     "org/example/testfixture/BookingFixture.java": "class BookingFixture {}"
   });
@@ -36,6 +37,7 @@ test("given test sources, when the classes are listed, then exactly the concrete
   // then
   assert.deepEqual(classes, [
     "org/example/BookingTest.java",
+    "org/example/HelperShapeTest.java",
     "org/example/LegacyTestCase.java",
     "org/example/TestClock.java",
     "org/example/web/RulesTests.java"
@@ -91,4 +93,19 @@ test("given the build workflow, when its backend matrix is read, then every back
   // then
   assert.deepEqual(scheduled, Array.from({ length: BACKEND_SHARDS }, (_, index) => `${index + 1}/${BACKEND_SHARDS}`),
     "a shard the matrix leaves out never runs on a pull request");
+});
+
+test("given the build workflow, when a job downloads an artifact by name, then a job of the same workflow uploads it", () => {
+  // given
+  const workflow = yaml.load(readFileSync(new URL("../.github/workflows/build.yml", import.meta.url), "utf8"));
+  const steps = Object.values(workflow.jobs).flatMap((job) => job.steps ?? []);
+  const named = (action) => steps.filter((step) => step.uses?.startsWith(`actions/${action}@`) && step.with?.name)
+    .map((step) => step.with.name);
+
+  // when
+  const uploaded = new Set(named("upload-artifact"));
+  const orphaned = named("download-artifact").filter((name) => !uploaded.has(name));
+
+  // then
+  assert.deepEqual(orphaned, [], "a download whose upload was renamed fails the job that needs it");
 });

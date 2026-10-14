@@ -13,9 +13,14 @@ export function backendTestClasses(root) {
   return files
     .filter((path) => SUREFIRE_DEFAULT_INCLUDES.some((pattern) => pattern.test(path.split("/").at(-1))))
     .map((path) => ({ path, source: readFileSync(join(root, path), "utf8") }))
-    .filter(({ source }) => !/\babstract\s+class\b/.test(source))
+    .filter(({ path, source }) => !isAbstract(path, source))
     .map(({ path, source }) => classPath(path, source))
     .toSorted();
+}
+
+function isAbstract(path, source) {
+  const name = path.split("/").at(-1).replace(/\.java$/, "");
+  return new RegExp(`\\babstract\\s+(?:[a-z-]+\\s+)*class\\s+${name}\\b`).test(source);
 }
 
 // Surefire matches the compiled class, so a source filed under another directory goes by its package.

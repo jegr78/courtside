@@ -1086,6 +1086,7 @@ jobs:
           SECURITY_RESULT: ${{ needs.security.result }}
           GATES_RESULT: ${{ needs.gates.result }}
           CLOCK_SHIFT_RESULT: ${{ needs.clock-shift.result }}
+          BACKEND_COVERAGE_RESULT: ${{ needs.backend-coverage.result }}
           DOCS_SELECTED: ${{ needs.test-profile-plan.outputs.docs }}
           BACKEND_SELECTED: ${{ needs.test-profile-plan.outputs.backend }}
           FRONTEND_SELECTED: ${{ needs.test-profile-plan.outputs.frontend }}
@@ -1117,6 +1118,7 @@ jobs:
               fi
               echo "| $job | $result | $reason |"
             done
+            echo "| backend_coverage | $BACKEND_COVERAGE_RESULT | follows the backend selection |"
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Upload nightly verification
         if: ${{ always() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')) }}
@@ -1139,8 +1141,8 @@ jobs:
       - if: github.event_name == 'pull_request' && needs.test-profile-plan.outputs.backend == 'true'
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
-          name: backend-test-evidence-${{ github.run_id }}
-          path: build/aggregate/backend
+          name: backend-coverage-evidence-${{ github.run_id }}
+          path: build/aggregate/backend/site/jacoco
       - if: github.event_name == 'pull_request' && needs.test-profile-plan.outputs.frontend == 'true'
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
