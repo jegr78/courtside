@@ -530,13 +530,22 @@ jobs:
           retention-days: ${{ github.event_name == 'schedule' && 30 || 14 }}
 
   browser:
-    name: browser-${{ matrix.group }}
+    name: browser-${{ matrix.label }}
     needs: [test-profile-plan, frontend]
     if: always() && (github.event_name != 'pull_request' || needs.test-profile-plan.outputs.browser == 'true') && needs.frontend.result == 'success'
     strategy:
       fail-fast: false
       matrix:
-        group: [functional-a, functional-b, chromium-accessibility, webkit-accessibility]
+        include:
+          - { label: functional-1, group: functional, shard: 1/3 }
+          - { label: functional-2, group: functional, shard: 2/3 }
+          - { label: functional-3, group: functional, shard: 3/3 }
+          - { label: phone-iphone, group: phone-iphone, shard: "" }
+          - { label: phone-android, group: phone-android, shard: "" }
+          - { label: chromium-accessibility-1, group: chromium-accessibility, shard: 1/2 }
+          - { label: chromium-accessibility-2, group: chromium-accessibility, shard: 2/2 }
+          - { label: webkit-accessibility-1, group: webkit-accessibility, shard: 1/2 }
+          - { label: webkit-accessibility-2, group: webkit-accessibility, shard: 2/2 }
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -559,13 +568,14 @@ jobs:
         working-directory: frontend
         env:
           COURTSIDE_BROWSER_GROUP: ${{ matrix.group }}
+          COURTSIDE_BROWSER_SHARD: ${{ matrix.shard }}
           COURTSIDE_WEBKIT_AXE: ${{ matrix.group == 'webkit-accessibility' && 'true' || 'false' }}
         run: npm run test:e2e
       - name: Upload functional browser evidence
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
-          name: browser-${{ matrix.group }}-evidence-${{ github.run_id }}
+          name: browser-${{ matrix.label }}-evidence-${{ github.run_id }}
           path: |
             frontend/test-results/browser-security/browser-storage-evidence.json
             frontend/test-results/browser-security/browser-csp-evidence.json

@@ -190,7 +190,8 @@ test("given the browser matrix, when WebKit accessibility runs, then only its sh
   const shard = browser.steps.find((step) => step.name === "Run the functional browser shard");
 
   // then
-  assert.deepEqual(browser.strategy.matrix.group, ["functional-a", "functional-b", "chromium-accessibility", "webkit-accessibility"]);
+  assert.deepEqual([...new Set(browser.strategy.matrix.include.map(({ group }) => group))],
+    ["functional", "phone-iphone", "phone-android", "chromium-accessibility", "webkit-accessibility"]);
   assert.equal(shard.env.COURTSIDE_WEBKIT_AXE, "${{ matrix.group == 'webkit-accessibility' && 'true' || 'false' }}");
 });
 

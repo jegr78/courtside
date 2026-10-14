@@ -1,6 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
 import type { JourneyOptions } from "./e2e/fixtures";
-import { browserProjectGroup } from "./e2e/browser-project-groups";
+import { browserProjectGroup, browserShard } from "./e2e/browser-project-groups";
 
 delete process.env.NO_COLOR;
 process.env.FORCE_COLOR = "0";
@@ -70,6 +70,8 @@ const orderedProjects = projectOrder === "reversed"
   ? [...configuredProjects].reverse()
   : configuredProjects;
 const projects = browserProjectGroup(orderedProjects, process.env.COURTSIDE_BROWSER_GROUP);
+const shard = process.env.COURTSIDE_BROWSER_GROUP === undefined
+  ? undefined : browserShard(process.env.COURTSIDE_BROWSER_GROUP, process.env.COURTSIDE_BROWSER_SHARD);
 
 export default defineConfig<JourneyOptions>({
   testDir: "./e2e",
@@ -77,6 +79,7 @@ export default defineConfig<JourneyOptions>({
   snapshotPathTemplate: "{testDir}/{testFilePath}-snapshots/{arg}{ext}",
   fullyParallel: false,
   workers: 1,
+  shard,
   timeout: 0,
   expect: { timeout: 0, toHaveScreenshot: { maxDiffPixelRatio: 0.005 } },
   // Pinned so nobody reaches "changed" or "all", under which a missing baseline passes silently.
