@@ -5,6 +5,7 @@ import { latestMailTo } from "../lib/mail";
 import { openAs } from "../lib/session";
 import { step } from "../lib/steps";
 import { addPartner, bookAt, cancelQuietly, discovery, onPhonesAndChrome, openSlot, submitBooking } from "../lib/journey";
+import { answers } from "../lib/core.mjs";
 
 test.beforeEach(() => { test.skip(!onPhonesAndChrome(), "member journeys run on phones and desktop chrome"); });
 
@@ -103,7 +104,7 @@ test("given a member, when a booking is made, cancelled and made again, then my 
       await capture(page, "my-bookings-with-new");
       await row.click();
       await capture(page, "cancel-confirmation");
-      const cancelled = page.waitForResponse((r) => r.url().endsWith(`/api/bookings/${first}`) && r.request().method() === "DELETE");
+      const cancelled = page.waitForResponse(answers("DELETE", `/api/bookings/${first}`));
       await page.getByTestId("confirm-cancellation").click();
       expect((await cancelled).status(), "product: the cancellation is accepted").toBeLessThan(300);
       await expect(page.locator('p[role="status"]:not([data-testid])'), "product: My bookings finishes loading after the cancellation").toHaveCount(0);

@@ -248,7 +248,7 @@ test("given club bookings on the window's weekend, when the weekend journeys are
   assert.deepEqual(conflicts, ["early", "sunday"], "a booking before the latest later opening and every Sunday booking would be displaced");
 });
 
-import { admitted, sweepSlots, weeksToClear, attribute, classify, classifyErrors, occupying, replayEntries } from "../acceptance/lib/core.mjs";
+import { admitted, answers, sweepSlots, weeksToClear, attribute, classify, classifyErrors, occupying, replayEntries } from "../acceptance/lib/core.mjs";
 import { claimRunDirectory, harnessCommit } from "../acceptance/lib/run-directory.mjs";
 import { findExecutable } from "../acceptance/lib/executable.mjs";
 import { mkdtempSync, writeFileSync, mkdirSync, chmodSync, rmSync } from "node:fs";
@@ -662,4 +662,27 @@ test("given no reset limit or a configured one, when parsed, then the instance d
   assert.equal(parseConfig(valid(), env).resetCodesPerHour, 5);
   assert.equal(parseConfig({ ...valid(), resetCodesPerHour: 8 }, env).resetCodesPerHour, 8);
   assert.equal(field({ ...valid(), resetCodesPerHour: 0 }), "resetCodesPerHour");
+});
+
+
+const response = (method, url) => ({ url: () => url, request: () => ({ method: () => method }) });
+
+test("given a request the client sends with a query, when a journey waits for its path, then the answer is recognised", () => {
+  // given
+  const cancel = answers("DELETE", "/api/bookings/42");
+  // when / then
+  assert.equal(cancel(response("DELETE", "https://club.example.org/api/bookings/42?")), true, "an empty query still names the booking");
+  assert.equal(cancel(response("DELETE", "https://club.example.org/api/bookings/42?reason=RAIN")), true, "a reason in the query still names the booking");
+  assert.equal(cancel(response("DELETE", "https://club.example.org/api/bookings/42")), true, "a request without query still names the booking");
+});
+
+test("given another path or method, when a journey waits for an answer, then it is not taken for the awaited one", () => {
+  // given
+  const cancel = answers("DELETE", "/api/bookings/42");
+  // when / then
+  assert.equal(cancel(response("GET", "https://club.example.org/api/bookings/42")), false, "a read is no cancellation");
+  assert.equal(cancel(response("DELETE", "https://club.example.org/api/bookings/420")), false, "another booking is not this one");
+  assert.equal(cancel(response("DELETE", "https://club.example.org/api/my/bookings/42")), false, "a path that only ends alike is not this one");
+  assert.equal(answers("POST", /\/move$/)(response("POST", "https://club.example.org/api/booking-series/7/move?scope=THIS")), true,
+    "a pattern matches the path without the query");
 });

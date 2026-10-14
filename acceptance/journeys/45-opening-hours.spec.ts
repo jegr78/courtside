@@ -10,6 +10,7 @@ import { step } from "../lib/steps";
 import { addPartner, bookAt, cancelQuietly, discovery, onDesksAndTablet } from "../lib/journey";
 import { boundWeek, clearWeekend, recordWeek } from "../lib/weekend";
 import { precondition } from "../lib/precondition";
+import { answers } from "../lib/core.mjs";
 
 test.beforeEach(() => { test.skip(!onDesksAndTablet(), "opening-hours journeys run on desks, tablet and one phone"); });
 test.beforeEach(async () => {
@@ -34,7 +35,7 @@ async function openOpeningHours(page: Page, effectiveFrom: string) {
 }
 
 async function saveWeek(page: Page, effectiveFrom: string) {
-  const saved = page.waitForResponse((r) => r.url().includes("/api/admin/opening-hours") && r.request().method() === "PUT");
+  const saved = page.waitForResponse(answers("PUT", "/api/admin/opening-hours"));
   await page.getByTestId("save-opening-hours").click();
   expect((await saved).status(), "product: the scheduled week is stored").toBeLessThan(300);
   recordWeek(effectiveFrom);
@@ -43,7 +44,7 @@ async function saveWeek(page: Page, effectiveFrom: string) {
 }
 
 async function removeWeek(page: Page, effectiveFrom: string) {
-  const removed = page.waitForResponse((r) => r.url().endsWith(`/api/admin/opening-hours/schedule/${effectiveFrom}`) && r.request().method() === "DELETE");
+  const removed = page.waitForResponse(answers("DELETE", `/api/admin/opening-hours/schedule/${effectiveFrom}`));
   await page.getByTestId(`remove-opening-week-${effectiveFrom}`).click();
   expect((await removed).status(), "product: the scheduled week is removed").toBeLessThan(300);
   await expect(page.getByTestId(`opening-week-${effectiveFrom}`), "product: the removed week leaves the list").toHaveCount(0);
