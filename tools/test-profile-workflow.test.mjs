@@ -23,7 +23,7 @@ test("given profile classification, when the pull request runs, then selected qu
     /git worktree add --detach "\$PROFILE_ROOT" "\$BASE_REF"[\s\S]+node "\$PROFILE_ROOT\/tools\/test-profile-classifier\.mjs"/);
   assert.match(workflow, /outputs:[\s\S]+backend: \$\{\{ steps\.selection\.outputs\.backend \}\}/);
   assert.match(workflow,
-    /needs: \[docs, backend, frontend, browser_visual, browser, deployment, tooling, security, gates-image, gates, clock-shift, assessment-runtime, tool-update-comparison, test-profile-plan\]/);
+    /needs: \[docs, backend, backend-coverage, frontend, browser_visual, browser, deployment, tooling, security, gates-image, gates, clock-shift, assessment-runtime, tool-update-comparison, test-profile-plan\]/);
   assert.match(workflow, /pull_request\)\s+test "\$PROFILE_PLAN_RESULT" = success/);
   assert.match(workflow, /push\|schedule\|workflow_dispatch\)\s+test "\$PROFILE_PLAN_RESULT" = skipped/);
   assert.match(workflow,
@@ -70,7 +70,7 @@ test("given a selected quality job, when it does not succeed, then the aggregate
 test("given reduced profiles, when jobs are scheduled, then only their conservative job set runs", () => {
   // when / then
   assert.match(workflow,
-    /backend:\n\s+needs: test-profile-plan\n\s+if: always\(\) && \(github\.event_name != 'pull_request' \|\| needs\.test-profile-plan\.outputs\.backend == 'true'\)/);
+    /backend:\n\s+name: backend-\$\{\{ strategy\.job-index \}\}\n\s+needs: test-profile-plan\n\s+if: always\(\) && \(github\.event_name != 'pull_request' \|\| needs\.test-profile-plan\.outputs\.backend == 'true'\)/);
   assert.match(workflow,
     /frontend:\n\s+needs: test-profile-plan\n\s+if: always\(\) && \(github\.event_name != 'pull_request' \|\| needs\.test-profile-plan\.outputs\.frontend == 'true'\)/);
   assert.match(workflow,

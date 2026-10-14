@@ -207,6 +207,7 @@ function aggregate(event, results, selected = {}) {
     environment[`${job.toUpperCase()}_RESULT`] = isSelected || event !== "pull_request" ? "success" : "skipped";
   }
   environment.GATES_IMAGE_RESULT = environment.GATES_RESULT;
+  environment.BACKEND_COVERAGE_RESULT = environment.BACKEND_RESULT;
   Object.assign(environment, results);
   return spawnSync("bash", ["-e", "-c", enforce], { env: environment, encoding: "utf8" }).status;
 }
@@ -219,6 +220,18 @@ test("given a pull request that selects the gates, when the aggregate decides, t
   assert.notEqual(aggregate("pull_request", { GATES_IMAGE_RESULT: "skipped" }), 0, "gates without the image they test");
   assert.notEqual(aggregate("pull_request", { GATES_IMAGE_RESULT: "failure" }), 0, "an image that failed to build");
   assert.notEqual(aggregate("pull_request", { CLOCK_SHIFT_RESULT: "skipped" }), 0, "a selected shifted clock that never ran");
+});
+
+test("given split backend tests, when the aggregate decides, then only shards and a merged coverage check together pass", () => {
+  // when / then
+  assert.equal(aggregate("pull_request", {}), 0, "shards and coverage succeeded");
+  assert.notEqual(aggregate("pull_request", { BACKEND_COVERAGE_RESULT: "failure" }), 0, "coverage below its floor");
+  assert.notEqual(aggregate("pull_request", { BACKEND_COVERAGE_RESULT: "skipped" }), 0, "shards without the coverage check");
+  assert.notEqual(aggregate("pull_request", { BACKEND_COVERAGE_RESULT: "success" }, { backend: false }), 0,
+    "a coverage check for an unselected backend");
+  assert.equal(aggregate("pull_request", {}, { backend: false }), 0, "an unselected backend and no coverage check");
+  assert.notEqual(aggregate("push", { GATES_RESULT: "skipped", GATES_IMAGE_RESULT: "skipped", CLOCK_SHIFT_RESULT: "skipped",
+    BACKEND_COVERAGE_RESULT: "skipped" }), 0, "a push always checks the merged coverage");
 });
 
 test("given a pull request that does not select the gates, when the aggregate decides, then a gate that ran anyway fails it", () => {

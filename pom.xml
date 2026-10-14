@@ -36,6 +36,7 @@
         <jackson-bom.version>3.1.7</jackson-bom.version>
         <lombok.version>1.18.48</lombok.version>
         <surefire.runOrder>alphabetical</surefire.runOrder>
+        <coverage.skip>false</coverage.skip>
         <skipTests>false</skipTests>
         <frontend.skip>false</frontend.skip>
         <frontend.test.skip>${skipTests}</frontend.test.skip>
@@ -511,6 +512,7 @@
                         <phase>verify</phase>
                         <goals><goal>report</goal></goals>
                         <configuration>
+                            <skip>${coverage.skip}</skip>
                             <excludes>
                                 <exclude>org/courtside/api/**</exclude>
                                 <exclude>org/openapitools/**</exclude>
@@ -522,6 +524,7 @@
                         <phase>verify</phase>
                         <goals><goal>check</goal></goals>
                         <configuration>
+                            <skip>${coverage.skip}</skip>
                             <excludes>
                                 <exclude>org/courtside/api/**</exclude>
                                 <exclude>org/openapitools/**</exclude>

@@ -407,8 +407,13 @@ jobs:
           if-no-files-found: error
 
   backend:
+    name: backend-${{ strategy.job-index }}
     needs: test-profile-plan
     if: always() && (github.event_name != 'pull_request' || needs.test-profile-plan.outputs.backend == 'true')
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1/2, 2/2]
     runs-on: ubuntu-latest
     timeout-minutes: 40
     permissions:
@@ -423,18 +428,69 @@ jobs:
           java-version: '25'
           distribution: 'temurin'
           cache: maven
+      - uses: ./.github/actions/tool-dependencies
+      - name: Select the backend shard
+        env:
+          SHARD: ${{ matrix.shard }}
+        run: node tools/backend-test-shards.mjs "$SHARD" > "$RUNNER_TEMP/backend-shard.txt"
       - name: Verify backend
+        env:
+          SKIP_INTEGRATION: ${{ strategy.job-index != 0 }}
         run: >
           ./mvnw -B --no-transfer-progress clean verify -Pjava-only
           -Dmaven.test.redirectTestOutputToFile=true
+          -Dsurefire.includesFile="$RUNNER_TEMP/backend-shard.txt"
+          -Dcoverage.skip=true -DskipITs="$SKIP_INTEGRATION"
       - name: Upload backend test evidence
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
-          name: backend-test-evidence-${{ github.run_id }}
+          name: backend-test-evidence-${{ strategy.job-index }}-${{ github.run_id }}
+          path: target/surefire-reports/*.xml
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Upload backend coverage data
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: backend-coverage-${{ strategy.job-index }}-${{ github.run_id }}
           path: |
-            target/surefire-reports/*.xml
-            target/site/jacoco
+            target/jacoco.exec
+            ${{ strategy.job-index == 0 && 'target/classes' || '' }}
+          if-no-files-found: error
+          retention-days: 1
+
+  backend-coverage:
+    needs: [test-profile-plan, backend]
+    if: always() && (github.event_name != 'pull_request' || needs.test-profile-plan.outputs.backend == 'true') && needs.backend.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6
+        with:
+          java-version: '25'
+          distribution: 'temurin'
+          cache: maven
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          pattern: backend-coverage-*-${{ github.run_id }}
+          path: ${{ runner.temp }}/coverage
+      - name: Check the merged backend coverage
+        run: |
+          mkdir -p target
+          cp -R "$RUNNER_TEMP/coverage/backend-coverage-0-${GITHUB_RUN_ID}/classes" target/classes
+          cat "$RUNNER_TEMP"/coverage/backend-coverage-*-"${GITHUB_RUN_ID}"/jacoco.exec > target/jacoco.exec
+          ./mvnw -B --no-transfer-progress -Pjava-only jacoco:report@coverage-report jacoco:check@coverage-check
+      - name: Upload backend coverage evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: backend-coverage-evidence-${{ github.run_id }}
+          path: target/site/jacoco
           if-no-files-found: warn
           retention-days: 14
 
@@ -897,7 +953,7 @@ jobs:
 
   build:
     if: always()
-    needs: [docs, backend, frontend, browser_visual, browser, deployment, tooling, security, gates-image, gates, clock-shift, assessment-runtime, tool-update-comparison, test-profile-plan]
+    needs: [docs, backend, backend-coverage, frontend, browser_visual, browser, deployment, tooling, security, gates-image, gates, clock-shift, assessment-runtime, tool-update-comparison, test-profile-plan]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -907,6 +963,7 @@ jobs:
         env:
           DOCS_RESULT: ${{ needs.docs.result }}
           BACKEND_RESULT: ${{ needs.backend.result }}
+          BACKEND_COVERAGE_RESULT: ${{ needs.backend-coverage.result }}
           FRONTEND_RESULT: ${{ needs.frontend.result }}
           BROWSER_VISUAL_RESULT: ${{ needs.browser_visual.result }}
           BROWSER_RESULT: ${{ needs.browser.result }}
@@ -915,6 +972,7 @@ jobs:
           SECURITY_RESULT: ${{ needs.security.result }}
         run: |
           mkdir -p build/nightly
+          if [[ "$BACKEND_RESULT" = success ]]; then BACKEND_RESULT="$BACKEND_COVERAGE_RESULT"; fi
           jq -n \
             --arg commit "${{ github.sha }}" \
             --argjson runId "${{ github.run_id }}" \
@@ -947,6 +1005,7 @@ jobs:
           DEPLOYMENT_RESULT: ${{ needs.deployment.result }}
           TOOLING_RESULT: ${{ needs.tooling.result }}
           SECURITY_RESULT: ${{ needs.security.result }}
+          BACKEND_COVERAGE_RESULT: ${{ needs.backend-coverage.result }}
           GATES_IMAGE_RESULT: ${{ needs.gates-image.result }}
           GATES_RESULT: ${{ needs.gates.result }}
           CLOCK_SHIFT_RESULT: ${{ needs.clock-shift.result }}
@@ -987,11 +1046,17 @@ jobs:
               else
                 test "$GATES_IMAGE_RESULT" = skipped
               fi
+              if [[ "$BACKEND_SELECTED" = true ]]; then
+                test "$BACKEND_COVERAGE_RESULT" = success
+              else
+                test "$BACKEND_COVERAGE_RESULT" = skipped
+              fi
               ;;
             push|schedule|workflow_dispatch)
               test "$PROFILE_PLAN_RESULT" = skipped
               test "$DOCS_RESULT" = success
               test "$BACKEND_RESULT" = success
+              test "$BACKEND_COVERAGE_RESULT" = success
               test "$FRONTEND_RESULT" = success
               test "$BROWSER_VISUAL_RESULT" = success
               test "$BROWSER_RESULT" = success
