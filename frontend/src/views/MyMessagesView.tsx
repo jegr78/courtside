@@ -244,8 +244,7 @@ function MessageSettings() {
   return <section className="border-structural grid gap-6 border-t pt-6" aria-labelledby="message-settings-title">
     <h2 id="message-settings-title" className="text-2xl font-bold">{t("myMessages.settings")}</h2>
     <p className="text-muted">{t("myMessages.description")}</p>
-    {error && <Alert>{error}{failure?.reloaded && <> {t("myMessages.savedStateShown")}</>}</Alert>}
-    {saved && <SuccessFeedback testId="my-messages-saved">{t("myMessages.saved")}</SuccessFeedback>}
+    {error && !(choices && channels) && <Alert>{error}</Alert>}
     {choices && channels && <>
       <MessageChoiceGroup
         heading={t("myMessages.declinable")}
@@ -274,7 +273,11 @@ function MessageSettings() {
           </li>)}
         </ul>
       </section>
-      <div><Button variant="primary" type="button" data-testid="my-messages-save" disabled={pending} onClick={() => void save()}>{t("myMessages.save")}</Button></div>
+      <div data-testid="my-messages-actions" className="grid gap-3">
+        {error && <Alert>{error}{failure?.reloaded && <> {t("myMessages.savedStateShown")}</>}</Alert>}
+        {saved && <SuccessFeedback testId="my-messages-saved">{t("myMessages.saved")}</SuccessFeedback>}
+        <div><Button variant="primary" type="button" data-testid="my-messages-save" disabled={pending} onClick={() => void save()}>{t("myMessages.save")}</Button></div>
+      </div>
     </>}
   </section>;
 }

@@ -426,6 +426,54 @@ describe("MyMessagesView", () => {
     expect(screen.getByTestId("message-choice-BOOKING_REMINDER")).not.toBeChecked();
   });
 
+  it("given a choice is saved, when the confirmation appears, then it stands with the save button", async () => {
+    // given
+    vi.spyOn(api, "chooseOwnMessages").mockResolvedValue(undefined);
+    vi.spyOn(api, "chooseOwnMessageChannels").mockResolvedValue(undefined);
+    show();
+    await screen.findByTestId("message-choice-BOOKING_CONFIRMED");
+
+    // when
+    await userEvent.click(screen.getByTestId("message-choice-BOOKING_CONFIRMED"));
+    await userEvent.click(screen.getByTestId("my-messages-save"));
+
+    // then
+    const actions = screen.getByTestId("my-messages-actions");
+    expect(await within(actions).findByTestId("my-messages-saved"), "a phone shows the answer where the member tapped").toBeVisible();
+    expect(within(actions).getByTestId("my-messages-save")).toBeInTheDocument();
+  });
+
+  it("given the instance refuses the choice, when it is saved, then the refusal stands with the save button", async () => {
+    // given
+    vi.spyOn(api, "chooseOwnMessages").mockRejectedValue(new ApiError(409, {
+      type: "urn:courtside:error:message-not-declinable", title: "Not declinable", status: 409,
+      violations: [{ code: "notification.message.notDeclinable", params: { kind: "BOOKING_DISPLACED" } }]
+    }));
+    vi.spyOn(api, "chooseOwnMessageChannels").mockResolvedValue(undefined);
+    show();
+    await screen.findByTestId("message-choice-BOOKING_CONFIRMED");
+
+    // when
+    await userEvent.click(screen.getByTestId("message-choice-BOOKING_CONFIRMED"));
+    await userEvent.click(screen.getByTestId("my-messages-save"));
+
+    // then
+    await waitFor(() => expect(within(screen.getByTestId("my-messages-actions")).getByRole("alert"))
+      .toHaveTextContent('"Closure under a booking" cannot be switched off.'));
+  });
+
+  it("given the choices cannot be read, when the settings open, then the failure is shown without a save button", async () => {
+    // given
+    vi.spyOn(api, "ownMessageChoices").mockRejectedValue(new ApiError(503, { type: "urn:courtside:error:service-unavailable", title: "Unavailable", status: 503 }));
+
+    // when
+    show();
+
+    // then
+    expect(await screen.findByRole("alert"), "a load failure still reaches the member").toBeVisible();
+    expect(screen.queryByTestId("my-messages-actions")).toBeNull();
+  });
+
   it("given the instance refuses the choice, when it is saved, then the refusal is shown and nothing claims success", async () => {
     // given
     vi.spyOn(api, "chooseOwnMessages").mockRejectedValue(new ApiError(409, {
