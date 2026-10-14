@@ -160,6 +160,16 @@ for (const viewport of [undefined, { width: 320, height: 568 }]) {
     await expect(refusal, "the reason for the refusal is on screen where the member pressed Book").toBeInViewport({ ratio: 1 });
     const overflow = await refusal.evaluate((element) => element.scrollWidth - element.clientWidth);
     expect(overflow, "the reference wraps inside the alert").toBeLessThanOrEqual(0);
+    const alertHeight = (await refusal.boundingBox())!.height;
+    const dialogHeight = (await page.getByTestId("booking-dialog").boundingBox())!.height;
+    expect(alertHeight, "the refusal leaves most of the dialog to the form").toBeLessThanOrEqual(dialogHeight / 4);
+    await expect(page.getByTestId("booking-duration"), "the form stays usable beside the refusal").toBeInViewport({ ratio: 1 });
+
+    // when
+    await refusal.getByTestId("booking-reference").tap();
+
+    // then
+    await expect(refusal.getByTestId("booking-reference-value"), "the reference opens for support").toBeInViewport({ ratio: 1 });
   });
 }
 

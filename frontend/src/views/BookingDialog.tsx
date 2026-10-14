@@ -2,7 +2,7 @@ import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ApiError, api, type Allocation, type BookingGrid, type BookingHours, type Problem, type PublicBookingCard, type PublicCourt, type PublicParticipantCard, type PublicParticipantMember } from "../api/client";
 import { idempotencyKey } from "../api/idempotency";
-import { problemMessage, violationMessage, withReference } from "../api/problem-message";
+import { failureReference, problemText, violationMessage } from "../api/problem-message";
 import { useReportedFailure } from "../failures/useReportedFailure";
 import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
@@ -53,7 +53,8 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
   const [selectedMembers, setSelectedMembers] = useState<PublicParticipantMember[]>([]);
   const [note, setNote] = useState("");
   const [violations, setViolations] = useState<Array<{ field: string; code: string; message: string }>>([]);
-  const { message: error, report, clear } = useReportedFailure();
+  const { message: error, failure, report, clear } = useReportedFailure();
+  const reference = failureReference(failure);
   const [submitting, setSubmitting] = useState(false);
   const [requestKey, setRequestKey] = useState(() => idempotencyKey());
   const [showsMore, setShowsMore] = useState(false);
@@ -261,9 +262,15 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
       </div>
       </DialogBody>
       {/* Outside the scrolling form, so a refusal shows beside the button that caused it. */}
-      {(fieldViolations("general").length > 0 || error) && <div data-testid="booking-outcome" className="shrink-0 grid gap-2 px-6 pt-3">
+      {(fieldViolations("general").length > 0 || error || reference) && <div data-testid="booking-outcome" className="shrink-0 grid gap-2 px-6 pt-3">
         <FieldViolations id="booking-general-errors" violations={fieldViolations("general")} />
-        {error && <Alert>{error}</Alert>}
+        {(error || reference) && <Alert>
+          {error && <p data-testid="booking-refusal">{error}</p>}
+          {reference && <details className="mt-1 text-xs">
+            <summary data-testid="booking-reference" className="cursor-pointer">{t("error.referenceLabel")}</summary>
+            <code data-testid="booking-reference-value" className="font-mono">{reference}</code>
+          </details>}
+        </Alert>}
       </div>}
       <div className="surface-panel border-structural flex shrink-0 justify-end gap-3 border-t px-6 py-4">
         <Button variant="secondary" type="button" data-testid="booking-close" onClick={closed}>{t("booking.close")}</Button>
@@ -306,13 +313,12 @@ function FieldViolations({ id, violations }: { id: string; violations: Array<{ f
 
 // The outcome already lists general refusals, so the alert names the first one shown elsewhere.
 function describeRefusal(failure: unknown, t: ReturnType<typeof useTranslation>["t"]): string {
-  if (!(failure instanceof ApiError) || !failure.problem) return problemMessage(failure, t);
+  if (!(failure instanceof ApiError) || !failure.problem) return problemText(failure, t);
   const translated = translatedViolations(failure.problem, t);
-  if (translated.length === 0) return problemMessage(failure, t);
+  if (translated.length === 0) return problemText(failure, t);
   const [first, ...rest] = translated.filter((violation) => violation.field !== "general");
-  const message = !first ? "" : rest.length === 0
+  return !first ? "" : rest.length === 0
     ? first.message : t("booking.refusalMore", { message: first.message, count: rest.length });
-  return withReference(failure, message, t);
 }
 
 function translatedViolations(problem: Problem, t: ReturnType<typeof useTranslation>["t"]): Array<{ field: string; code: string; message: string }> {
