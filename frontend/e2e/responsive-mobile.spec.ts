@@ -151,6 +151,39 @@ test("given the booking dialog on a touch screen, when its fields are drawn, the
   expect(select.height, "the duration select is a full touch target").toBeGreaterThanOrEqual(44);
 });
 
+test("given the dark theme, when a member switches to light, then every control takes the light colours at once", async ({ page, journeyService }) => {
+  // given
+  await page.addInitScript(() => {
+    if (sessionStorage.getItem("theme-seeded")) return;
+    sessionStorage.setItem("theme-seeded", "1");
+    localStorage.setItem("courtside.theme", "dark");
+  });
+  await signIn(page, "doe.jane");
+  await selectJourneyDate(page, journeyService.visualDate);
+  await page.getByTestId("preferences-menu").tap();
+
+  // when
+  await page.locator("#theme-preference").selectOption("light");
+
+  // then
+  const drawn = await page.evaluate(() => {
+    const colours = (element: Element) => ({ color: getComputedStyle(element).color, background: getComputedStyle(element).backgroundColor });
+    const fresh = document.createElement("button");
+    fresh.className = "button-secondary";
+    document.body.append(fresh);
+    const reference = colours(fresh);
+    fresh.remove();
+    return {
+      reference, page: getComputedStyle(document.body).color,
+      now: colours(document.querySelector('[data-testid="mobile-current-time"]')!),
+      header: getComputedStyle(document.querySelector('[data-testid^="court-column-"]')!).color
+    };
+  });
+  expect(drawn.now, "the Now button is restyled like a secondary button drawn in the light theme").toEqual(drawn.reference);
+  expect(drawn.header, "the plan header inherits the light text colour").toBe(drawn.page);
+  expect(drawn.page, "the page text is the light theme's").toBe(drawn.reference.color);
+});
+
 for (const viewport of [undefined, { width: 320, height: 568 }]) {
   test(`given a phone ${viewport ? `${viewport.width} px wide` : "of the project's size"}, when a booking is refused, then the reason and its reference are on screen inside the alert`, async ({ page, journeyService }) => {
     // given
