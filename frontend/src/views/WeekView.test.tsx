@@ -657,6 +657,23 @@ it("given the plan is open, when the refresh interval elapses and focus returns,
   expect(scrollIntoView.mock.instances.filter((target) => target === activeDay)).toHaveLength(0);
 });
 
+it("given a refresh failed, when a later refresh succeeds, then its failure notice is gone", async () => {
+  // given
+  render(<WeekView today={clubInstant("12:00")} />);
+  await screen.findByTestId("week-grid");
+  await act(async () => {});
+  vi.mocked(api.allocations).mockRejectedValueOnce(new Error("no network"));
+  window.dispatchEvent(new Event("focus"));
+  const notice = await screen.findByRole("alert");
+  expect(notice).toHaveTextContent("That did not work. Please try again.");
+
+  // when
+  window.dispatchEvent(new Event("focus"));
+
+  // then
+  await waitFor(() => expect(notice, "a plan that refreshed again no longer claims it failed").not.toBeInTheDocument());
+});
+
 it("given a booking conflict, when submission fails, then the affected day is refreshed", async () => {
   // given
   vi.mocked(api.createBooking).mockRejectedValue(new ApiError(409, {
