@@ -190,19 +190,26 @@ while true; do
   # shellcheck disable=SC2086
   inotifyd - $armed >&3 2>/dev/null &
   watcher=$!
-  # inotifyd exits when a directory vanished while it armed, which ends this wait as well.
-  until registered "$watcher" "$(printf '%s\n' "$armed" | grep -c .)"; do
+  # inotifyd keeps running without the watch of a directory that vanished before it was added.
+  expected="$(printf '%s\n' "$armed" | grep -c .)"
+  attempts=0
+  until registered "$watcher" "$expected"; do
     kill -0 "$watcher" 2>/dev/null || break
+    [ "$armed" = "$(watches)" ] || break
+    attempts=$((attempts + 1))
+    [ "$attempts" -lt 50 ] || break
     sleep 0.1
   done
   publish
-  # A directory that appeared or vanished while this round was arming carries its events to nobody,
-  # so the round ends here rather than on an event that will never arrive.
-  if [ "$armed" = "$(watches)" ] && kill -0 "$watcher" 2>/dev/null; then
+  # A round without every watch carries some events to nobody, so it ends rather than waits for one.
+  if registered "$watcher" "$expected" && [ "$armed" = "$(watches)" ] && kill -0 "$watcher" 2>/dev/null; then
     read -r _ <&3
   else
     sleep 1
   fi
-  kill "$watcher" 2>/dev/null
+  # inotifyd defers SIGTERM while it writes into a full pipe, and only this loop drains that pipe.
+  kill -9 "$watcher" 2>/dev/null
   wait "$watcher" 2>/dev/null
+  # What these lines announced is read from the store by the next round, so they are dropped.
+  while read -r -t 0.05 _ <&3; do :; done
 done
