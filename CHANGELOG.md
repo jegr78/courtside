@@ -1,22 +1,7 @@
 # Changelog
 
-## [0.2.0-rc.2](https://github.com/jegr78/courtside/compare/v0.2.0-rc.1...v0.2.0-rc.2) (2026-10-14)
-
-
-### Bug fixes
-
-* clear the plan's failure notice once a later refresh succeeds ([#1526](https://github.com/jegr78/courtside/issues/1526)) ([ba9ab7a](https://github.com/jegr78/courtside/commit/ba9ab7aebae7ba0b6cbd33a092884a1853dcbe72))
-* draw the now-line behind running bookings in the court plan ([#1512](https://github.com/jegr78/courtside/issues/1512)) ([d2e792f](https://github.com/jegr78/courtside/commit/d2e792f07261bf17c30c7c4df61d57f9cc89f960))
-* fold the error reference of a refused booking behind a disclosure ([#1511](https://github.com/jegr78/courtside/issues/1511)) ([b86be1b](https://github.com/jegr78/courtside/commit/b86be1bd36def7d1e7e5cb7ce8056208ebd7e513))
-* give selects the height of text inputs in every engine ([#1514](https://github.com/jegr78/courtside/issues/1514)) ([7b0eea3](https://github.com/jegr78/courtside/commit/7b0eea3fe93c08879b700207d3d84e5df822ef8a))
-* keep every small form field at 16 px on touch screens so Safari does not zoom in ([#1525](https://github.com/jegr78/courtside/issues/1525)) ([b3fe4cc](https://github.com/jegr78/courtside/commit/b3fe4cc674c5dd5e3c81a873e53932e0b0d5f89e))
-* list single appointments without a repeated landmark between series ([#1509](https://github.com/jegr78/courtside/issues/1509)) ([47db06d](https://github.com/jegr78/courtside/commit/47db06ddc1fc3129454aec019d2bd8a57a15a0c9))
-* show operational log entries as labelled cards on a phone ([#1513](https://github.com/jegr78/courtside/issues/1513)) ([bb58d91](https://github.com/jegr78/courtside/commit/bb58d91f99d85c4f0562a81aed3fa01b4123e84d))
-* show the offline view when the instance does not answer at startup ([#1527](https://github.com/jegr78/courtside/issues/1527)) ([84936b1](https://github.com/jegr78/courtside/commit/84936b1af86aebc9d959623dbb63f951d214ce00))
-* show the saved confirmation for message choices where the save button is ([#1524](https://github.com/jegr78/courtside/issues/1524)) ([2b1d0d3](https://github.com/jegr78/courtside/commit/2b1d0d328f6446e438ee89534918a4c8bb4a3621))
-* switch every colour at once when the theme changes ([#1515](https://github.com/jegr78/courtside/issues/1515)) ([daf0de7](https://github.com/jegr78/courtside/commit/daf0de70a234111a09adf28072587fe1a91e5456))
-
 ## 0.2.0 (2026-10-14)
+
 
 ### Features
 
@@ -32,6 +17,17 @@
 * welcome a new member with the instance's address before their first password ([#1430](https://github.com/jegr78/courtside/issues/1430)) ([218b751](https://github.com/jegr78/courtside/commit/218b751b04e8a9c84075e8ae5ff703291b81fdb8))
 
 ### Bug fixes
+
+* clear the plan's failure notice once a later refresh succeeds ([#1526](https://github.com/jegr78/courtside/issues/1526)) ([ba9ab7a](https://github.com/jegr78/courtside/commit/ba9ab7aebae7ba0b6cbd33a092884a1853dcbe72))
+* draw the now-line behind running bookings in the court plan ([#1512](https://github.com/jegr78/courtside/issues/1512)) ([d2e792f](https://github.com/jegr78/courtside/commit/d2e792f07261bf17c30c7c4df61d57f9cc89f960))
+* fold the error reference of a refused booking behind a disclosure ([#1511](https://github.com/jegr78/courtside/issues/1511)) ([b86be1b](https://github.com/jegr78/courtside/commit/b86be1bd36def7d1e7e5cb7ce8056208ebd7e513))
+* give selects the height of text inputs in every engine ([#1514](https://github.com/jegr78/courtside/issues/1514)) ([7b0eea3](https://github.com/jegr78/courtside/commit/7b0eea3fe93c08879b700207d3d84e5df822ef8a))
+* keep every small form field at 16 px on touch screens so Safari does not zoom in ([#1525](https://github.com/jegr78/courtside/issues/1525)) ([b3fe4cc](https://github.com/jegr78/courtside/commit/b3fe4cc674c5dd5e3c81a873e53932e0b0d5f89e))
+* list single appointments without a repeated landmark between series ([#1509](https://github.com/jegr78/courtside/issues/1509)) ([47db06d](https://github.com/jegr78/courtside/commit/47db06ddc1fc3129454aec019d2bd8a57a15a0c9))
+* show operational log entries as labelled cards on a phone ([#1513](https://github.com/jegr78/courtside/issues/1513)) ([bb58d91](https://github.com/jegr78/courtside/commit/bb58d91f99d85c4f0562a81aed3fa01b4123e84d))
+* show the offline view when the instance does not answer at startup ([#1527](https://github.com/jegr78/courtside/issues/1527)) ([84936b1](https://github.com/jegr78/courtside/commit/84936b1af86aebc9d959623dbb63f951d214ce00))
+* show the saved confirmation for message choices where the save button is ([#1524](https://github.com/jegr78/courtside/issues/1524)) ([2b1d0d3](https://github.com/jegr78/courtside/commit/2b1d0d328f6446e438ee89534918a4c8bb4a3621))
+* switch every colour at once when the theme changes ([#1515](https://github.com/jegr78/courtside/issues/1515)) ([daf0de7](https://github.com/jegr78/courtside/commit/daf0de70a234111a09adf28072587fe1a91e5456))
 
 * answer a multipart failure caused by the server with 500, not 400 ([#1463](https://github.com/jegr78/courtside/issues/1463)) ([7047b73](https://github.com/jegr78/courtside/commit/7047b73d72097f94a06eebd417bc4fef84c44410))
 * answer waitlist offers and offered places in a person's data export ([#1464](https://github.com/jegr78/courtside/issues/1464)) ([7f1bcd8](https://github.com/jegr78/courtside/commit/7f1bcd8cc1fe976a702aa9fe6f6962f1429b0668))
