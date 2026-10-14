@@ -1,5 +1,79 @@
 # Changelog
 
+## 0.2.0 (2026-10-14)
+
+### Features
+
+* collect every member notification in an in-app notification centre ([#1400](https://github.com/jegr78/courtside/issues/1400)) ([e959563](https://github.com/jegr78/courtside/commit/e959563b9db13a114450466bd5c505f52c859d63))
+* let a member queue for a taken slot and take it when it frees ([#1418](https://github.com/jegr78/courtside/issues/1418)) ([a340a62](https://github.com/jegr78/courtside/commit/a340a6242b82847911646d10907ce52a0312191a))
+* let a rule set restrict the hours its members may book ([#1405](https://github.com/jegr78/courtside/issues/1405)) ([bce8ef9](https://github.com/jegr78/courtside/commit/bce8ef9c5f7847f501cd6761b8eca62928f93df4))
+* let members offer the open place of a booking to a partner ([#1433](https://github.com/jegr78/courtside/issues/1433)) ([028d158](https://github.com/jegr78/courtside/commit/028d158a62c06039410e75e3da3287778ea98a25))
+* link a member's booking messages to the club's instance ([#1426](https://github.com/jegr78/courtside/issues/1426)) ([6810522](https://github.com/jegr78/courtside/commit/681052281a32bc8fbacc498f22e829767ab4fbcc))
+* notify participants of cancellations and summarise a new series ([#1412](https://github.com/jegr78/courtside/issues/1412)) ([6cc5774](https://github.com/jegr78/courtside/commit/6cc57745efb865c467dc39dbd3b52cb969b41df9))
+* publish domain events for booking cancellation and series changes ([#1399](https://github.com/jegr78/courtside/issues/1399)) ([a10d718](https://github.com/jegr78/courtside/commit/a10d718b9f48639a8f5b821a1b0f7121c0ce8111))
+* return a signed-out member to the page they opened after signing in ([#1425](https://github.com/jegr78/courtside/issues/1425)) ([5660fbd](https://github.com/jegr78/courtside/commit/5660fbde8974ea41e5e3bf8fb100058e0153864e))
+* verify a change to the security environment's tools with its own gates instead of the full run ([68c1bdb](https://github.com/jegr78/courtside/commit/68c1bdb81b2fca93ef8f3689899ef00102d350f5))
+* welcome a new member with the instance's address before their first password ([#1430](https://github.com/jegr78/courtside/issues/1430)) ([218b751](https://github.com/jegr78/courtside/commit/218b751b04e8a9c84075e8ae5ff703291b81fdb8))
+
+### Bug fixes
+
+* answer a multipart failure caused by the server with 500, not 400 ([#1463](https://github.com/jegr78/courtside/issues/1463)) ([7047b73](https://github.com/jegr78/courtside/commit/7047b73d72097f94a06eebd417bc4fef84c44410))
+* answer waitlist offers and offered places in a person's data export ([#1464](https://github.com/jegr78/courtside/issues/1464)) ([7f1bcd8](https://github.com/jegr78/courtside/commit/7f1bcd8cc1fe976a702aa9fe6f6962f1429b0668))
+* confirm a taken partner place to the account that took it ([#1460](https://github.com/jegr78/courtside/issues/1460)) ([cf317e1](https://github.com/jegr78/courtside/commit/cf317e14d95947b8e5c0da8cd482313aab4e1cc7))
+* document the 403 a request without its CSRF token receives ([#1406](https://github.com/jegr78/courtside/issues/1406)) ([eab7f5f](https://github.com/jegr78/courtside/commit/eab7f5f292223d5ee7c515952ab86ae82f084043))
+* document the CSRF token on removing one's own participation and require it on every write ([#1469](https://github.com/jegr78/courtside/issues/1469)) ([5ff744e](https://github.com/jegr78/courtside/commit/5ff744ee61b45565e86b3511bc96ca131c7f66d7))
+* give the court plan's grid and the dialogs room on a phone in landscape ([#1411](https://github.com/jegr78/courtside/issues/1411)) ([7e52032](https://github.com/jegr78/courtside/commit/7e52032b89ee18ab75405f8801604dc1984393c2))
+* hyphenate a long heading word at a syllable instead of an arbitrary letter ([#1394](https://github.com/jegr78/courtside/issues/1394)) ([851544f](https://github.com/jegr78/courtside/commit/851544f3742cfe9fb6a043794797d979bc0e4177)), closes [#1272](https://github.com/jegr78/courtside/issues/1272)
+* identify bookings in the phone court plan and draw long bookings over their rows ([#1408](https://github.com/jegr78/courtside/issues/1408)) ([4e54cfa](https://github.com/jegr78/courtside/commit/4e54cfa778d9ece2a5e6dc06b12633392b0968ab))
+* keep a booker out of their own co-player search and explain the refusal beside the members ([#1485](https://github.com/jegr78/courtside/issues/1485)) ([8036322](https://github.com/jegr78/courtside/commit/8036322bba683c32e02930a4942edc81ad5873f8))
+* keep long bookings visible in the phone court plan under forced colours ([#1474](https://github.com/jegr78/courtside/issues/1474)) ([23e1577](https://github.com/jegr78/courtside/commit/23e1577d77c8a8003a1fa09c078c61e57fd7b696)), closes [#1453](https://github.com/jegr78/courtside/issues/1453)
+* keep the booking dialog consistent when a conflict takes its slot ([#1397](https://github.com/jegr78/courtside/issues/1397)) ([e8e25ab](https://github.com/jegr78/courtside/commit/e8e25abcf4b024285bbc8afab126cd4fc83a0701)), closes [#1275](https://github.com/jegr78/courtside/issues/1275)
+* keep the booking dialog refused after a partial conflict or a failed refresh ([#1472](https://github.com/jegr78/courtside/issues/1472)) ([0ddddc1](https://github.com/jegr78/courtside/commit/0ddddc1c4173ec7f251e12efb8806511e7096c9e)), closes [#1451](https://github.com/jegr78/courtside/issues/1451)
+* keep the focus on a notification while it is marked read ([#1434](https://github.com/jegr78/courtside/issues/1434)) ([805d2a8](https://github.com/jegr78/courtside/commit/805d2a8674870ba528037a1656a501236a050119))
+* keep the focus on a notification's mark-as-read button while it runs ([#1459](https://github.com/jegr78/courtside/issues/1459)) ([249af1b](https://github.com/jegr78/courtside/commit/249af1bba2ee6098cfded988732939ed847a2988))
+* keep the mail certificate helper publishing when the proxy's store churns ([#1484](https://github.com/jegr78/courtside/issues/1484)) ([c82596b](https://github.com/jegr78/courtside/commit/c82596bd343a8de3451eab3f02fb8ad481053526))
+* keep the selected day whole in the court plan's day strip ([#1401](https://github.com/jegr78/courtside/issues/1401)) ([031d29d](https://github.com/jegr78/courtside/commit/031d29de5ad6ec8d5afb8a221b6bcc1b1889eb20))
+* label a waitlist offer in the change log instead of reporting a missing booking ([#1471](https://github.com/jegr78/courtside/issues/1471)) ([23739f4](https://github.com/jegr78/courtside/commit/23739f45887a389d61e2025fc1921f5919ae47a5)), closes [#1445](https://github.com/jegr78/courtside/issues/1445)
+* leave played occurrences in place when a series moves ([#1483](https://github.com/jegr78/courtside/issues/1483)) ([88dec1a](https://github.com/jegr78/courtside/commit/88dec1ae0927e8065035bcbf04360274abdcd8d5))
+* leave played occurrences untouched when a series is cancelled ([#1461](https://github.com/jegr78/courtside/issues/1461)) ([19566e4](https://github.com/jegr78/courtside/commit/19566e42eaa54f6518715c47c6a3a312d86d6c1e))
+* let the axe gate catch heading, table header and scroll region rules on every page ([#1417](https://github.com/jegr78/courtside/issues/1417)) ([071d335](https://github.com/jegr78/courtside/commit/071d3357f6fd75fdf6ae83cf596c07c924ab75d8))
+* link a new series' centre entry to its earliest occurrence ([d4ba639](https://github.com/jegr78/courtside/commit/d4ba6395ffc0a2a4087d0cc77525b9088eb447c7))
+* link a new series' notification to its earliest occurrence ([#1462](https://github.com/jegr78/courtside/issues/1462)) ([d4ba639](https://github.com/jegr78/courtside/commit/d4ba6395ffc0a2a4087d0cc77525b9088eb447c7))
+* move the focus to a notification in the same commit that marks it read ([805d2a8](https://github.com/jegr78/courtside/commit/805d2a8674870ba528037a1656a501236a050119))
+* name bookings and series in the change log by court and time ([#1410](https://github.com/jegr78/courtside/issues/1410)) ([a359b9b](https://github.com/jegr78/courtside/commit/a359b9bad58e92eea5be1d27dc3474f18f43cc57))
+* offer an update only when a new service worker waits beside an active one ([#1409](https://github.com/jegr78/courtside/issues/1409)) ([c0d29cd](https://github.com/jegr78/courtside/commit/c0d29cdf3e656f701c70e70f524de29d7b283b9a))
+* open club appointments only to roles a booking card serves ([#1398](https://github.com/jegr78/courtside/issues/1398)) ([5ae5c9c](https://github.com/jegr78/courtside/commit/5ae5c9c3e46b4fa52dd03a4452b68340d170a140)), closes [#1241](https://github.com/jegr78/courtside/issues/1241)
+* open no session for a request the application refuses ([#1432](https://github.com/jegr78/courtside/issues/1432)) ([bc968a3](https://github.com/jegr78/courtside/commit/bc968a3b0c057fd6542f95e61ef862e9947e6ec6))
+* prove the upgrade from every published release when a pull request adds a migration ([#1480](https://github.com/jegr78/courtside/issues/1480)) ([13a983b](https://github.com/jegr78/courtside/commit/13a983bb290a329f84f71bb84e6fd8e484ce46b5))
+* read the message log as cards on a phone ([#1404](https://github.com/jegr78/courtside/issues/1404)) ([d40c141](https://github.com/jegr78/courtside/commit/d40c14184173c55bc1fb720a9c5ffc3a6e5d6e83))
+* refuse a release-branch candidate whose release workflow differs from main's ([#1481](https://github.com/jegr78/courtside/issues/1481)) ([3f3be62](https://github.com/jegr78/courtside/commit/3f3be62c4e7511b15271c28d66f6be070c6a991a)), closes [#1438](https://github.com/jegr78/courtside/issues/1438)
+* refuse an unparseable multipart body with 400 instead of 500 ([#1402](https://github.com/jegr78/courtside/issues/1402)) ([a2af0be](https://github.com/jegr78/courtside/commit/a2af0becbc4b8932682d4938ce629b7197b6b4b6))
+* run the security mail trust and sink as the identity rootless Docker maps onto the host user ([dbf36d1](https://github.com/jegr78/courtside/commit/dbf36d1b7c0ee45578bf8feb5d68a3d9692a5640))
+* send the security headers on HEAD requests to the app's pages ([#1428](https://github.com/jegr78/courtside/issues/1428)) ([a799dc1](https://github.com/jegr78/courtside/commit/a799dc1996123b51d909e40105e5eefe1837a741))
+* show empty date and time fields as empty in every browser ([#1403](https://github.com/jegr78/courtside/issues/1403)) ([cc8597d](https://github.com/jegr78/courtside/commit/cc8597d0f230721005233146cc79a2e2c2182181))
+* start the security environment on a rootless Docker daemon ([#1435](https://github.com/jegr78/courtside/issues/1435)) ([dbf36d1](https://github.com/jegr78/courtside/commit/dbf36d1b7c0ee45578bf8feb5d68a3d9692a5640))
+* tell two series of the same card apart in the appointment list ([#1396](https://github.com/jegr78/courtside/issues/1396)) ([452cd98](https://github.com/jegr78/courtside/commit/452cd98bcba9c2f1182f0409339cc60d41597913)), closes [#1273](https://github.com/jegr78/courtside/issues/1273)
+
+### Documentation
+
+* declare the 500-character limit on booking and series notes ([#1479](https://github.com/jegr78/courtside/issues/1479)) ([f1e6ed4](https://github.com/jegr78/courtside/commit/f1e6ed49fac325e1a3e40ff1c073195bbeceaac1)), closes [#1441](https://github.com/jegr78/courtside/issues/1441)
+* describe re-run tags and the branch of a patch commit as the release workflows do ([35da7a6](https://github.com/jegr78/courtside/commit/35da7a6b98f7b5aa8d6aaa6b7cdf2eb082f85294))
+* describe re-run tags and the branch of a patch commit in the releasing guide ([#1468](https://github.com/jegr78/courtside/issues/1468)) ([35da7a6](https://github.com/jegr78/courtside/commit/35da7a6b98f7b5aa8d6aaa6b7cdf2eb082f85294))
+* name the welcome among the messages a member cannot decline ([#1467](https://github.com/jegr78/courtside/issues/1467)) ([28777a1](https://github.com/jegr78/courtside/commit/28777a101fcca0fe4d388f2654db4bd73fdf6fe8))
+* record the measured duration behind the accessibility test bound ([#1473](https://github.com/jegr78/courtside/issues/1473)) ([10a9a1f](https://github.com/jegr78/courtside/commit/10a9a1f8e94c49b45989f355aceb91f9ef86aac4)), closes [#1450](https://github.com/jegr78/courtside/issues/1450)
+* state that a booking-hours window ends at 23:59 like the opening hours ([#1466](https://github.com/jegr78/courtside/issues/1466)) ([c1f6946](https://github.com/jegr78/courtside/commit/c1f69464efcd1b9dd3ff7fdfbcc0f585af70fccf))
+* state that the waitlist sweep passes on an offer a rule refused ([#1465](https://github.com/jegr78/courtside/issues/1465)) ([e565ece](https://github.com/jegr78/courtside/commit/e565ece819219ddaf621dce5534956e447d789ab))
+
+### Build and dependencies
+
+* **deps:** update the deployment images and pin each to one version everywhere ([#1407](https://github.com/jegr78/courtside/issues/1407)) ([bc58544](https://github.com/jegr78/courtside/commit/bc58544acaa6e7bec08469f9470a1127be1bb3bc))
+* open the 0.2.0 candidate line on main ([#1390](https://github.com/jegr78/courtside/issues/1390)) ([77fa2ca](https://github.com/jegr78/courtside/commit/77fa2cac7cfc451ce8432ab3b168104c8e7af26e)), closes [#1225](https://github.com/jegr78/courtside/issues/1225)
+* start the dev environment again ([#1429](https://github.com/jegr78/courtside/issues/1429)) ([4fb152a](https://github.com/jegr78/courtside/commit/4fb152ac3288963e39c6a0a4675ebf683c0aa273))
+
+### ⚠ BREAKING CHANGES
+
+* The note of a booking request and of a series request is limited to 500 characters. A client that sends a longer note now gets 400 instead of 201.
+
 ## 0.1.0 (2026-10-11)
 
 ### Notable changes
@@ -631,4 +705,3 @@ the same way.
   longer reach it.
 - **fix: let a member book when the club serves Courtside without TLS**
   ([#319](https://github.com/jegr78/courtside/pull/319))
-
