@@ -20,6 +20,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
+import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -62,6 +63,9 @@ class SeriesMoveTest extends AbstractIntegrationTest {
     @Autowired
     private TransactionTemplate transactions;
 
+    @Autowired
+    private JdbcClient jdbc;
+
     private UUID courtOne;
     private UUID courtTwo;
     private final UUID trainer = UUID.randomUUID();
@@ -90,6 +94,53 @@ class SeriesMoveTest extends AbstractIntegrationTest {
         assertThat(moved).isEqualTo(3);
         assertThat(startOf(series.bookingIds().getFirst()))
                 .isEqualTo(Instant.parse("2026-04-07T18:00:00Z"));
+    }
+
+    @Test
+    void givenAPlayedOccurrence_whenTheWholeSeriesMoves_thenOnlyTheUnplayedOnesShift() {
+        // given
+        SeriesCreationResult series = createSeries(3);
+        UUID played = series.bookingIds().getFirst();
+        jdbc.sql("""
+                        UPDATE court_allocation
+                        SET starts_at = TIMESTAMPTZ '2026-03-24T16:00:00Z', ends_at = TIMESTAMPTZ '2026-03-24T18:00:00Z'
+                        WHERE booking_id = :booking
+                        """)
+                .param("booking", played).update();
+
+        // when
+        int moved = seriesService.move(new MoveRequest(
+                series.seriesId(), series.bookingIds().get(1), CancelScope.WHOLE_SERIES,
+                LocalTime.of(20, 0), null, null), trainer, Set.of(Role.TRAINER));
+
+        // then
+        assertThat(moved).as("only dates still ahead move").isEqualTo(2);
+        assertThat(startOf(played)).as("a played date stays where it was played")
+                .isEqualTo(Instant.parse("2026-03-24T16:00:00Z"));
+        assertThat(startOf(series.bookingIds().get(1))).isEqualTo(Instant.parse("2026-04-14T18:00:00Z"));
+    }
+
+    @Test
+    void givenAPlayedOccurrence_whenPreviewingAMoveFromIt_thenThePreviewListsOnlyTheUnplayedOnes() {
+        // given
+        SeriesCreationResult series = createSeries(3);
+        UUID played = series.bookingIds().getFirst();
+        jdbc.sql("""
+                        UPDATE court_allocation
+                        SET starts_at = TIMESTAMPTZ '2026-03-24T16:00:00Z', ends_at = TIMESTAMPTZ '2026-03-24T18:00:00Z'
+                        WHERE booking_id = :booking
+                        """)
+                .param("booking", played).update();
+
+        // when
+        MovePreview preview = seriesService.previewMove(new MoveRequest(
+                series.seriesId(), played, CancelScope.THIS_AND_FOLLOWING,
+                LocalTime.of(20, 0), null, null), trainer, Set.of(Role.TRAINER));
+
+        // then
+        assertThat(preview.moves()).extracting(MovePreview.Move::bookingId)
+                .as("a played date is no part of the move")
+                .containsExactlyElementsOf(series.bookingIds().subList(1, 3));
     }
 
     @Test

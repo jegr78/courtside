@@ -267,8 +267,8 @@ configured horizon, and the preview reports truncation.
 Creation tolerates partial success because the creator approves skipped dates. Each occurrence is
 checked again when written and commits on its own, and the series is announced with the occurrences
 that committed. Moving and cancelling a series are atomic across the selected scope:
-one occurrence, this and following, or the complete series. Cancelling this and following or the
-complete series leaves occurrences that have already started as they were played.
+one occurrence, this and following, or the complete series. Moving or cancelling this and following
+or the complete series leaves occurrences that have already started as they were played.
 
 ## Booking rules and flow
 
