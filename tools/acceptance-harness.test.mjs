@@ -757,9 +757,9 @@ test("given an erasure target, when the command is built, then ssh runs psql in 
   const [program, args] = erasureCommand({ ssh: "ops-host", container: "club-db-1" });
   // then
   assert.equal(program, "ssh");
-  assert.deepEqual(args.slice(0, 6), ["-o", "BatchMode=yes", "--", "ops-host", "docker", "exec"]);
-  assert.deepEqual(args.slice(6, 8), ["-i", "club-db-1"]);
-  assert.ok(args.at(-1).includes("psql -v ON_ERROR_STOP=1"), "psql stops at the first error");
+  assert.deepEqual(args, ["-o", "BatchMode=yes", "--", "ops-host",
+    `docker exec -i club-db-1 sh -c 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -At'`],
+    "the remote shell receives one quoted command, so the container's shell expands its own variables");
   assert.equal(erasedCount("erased 2\n"), 2);
   assert.equal(erasedCount("ERROR: relation"), null);
 });

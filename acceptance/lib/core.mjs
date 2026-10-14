@@ -111,9 +111,10 @@ COMMIT;
 `;
 }
 
+// ssh hands the remote shell one string, so the command is quoted here; the container name holds no shell character.
 export function erasureCommand({ ssh, container }) {
-  return ["ssh", ["-o", "BatchMode=yes", "--", ssh, "docker", "exec", "-i", container, "sh", "-c",
-    'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -At']];
+  return ["ssh", ["-o", "BatchMode=yes", "--", ssh,
+    `docker exec -i ${container} sh -c 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -At'`]];
 }
 
 export function erasedCount(output) {
