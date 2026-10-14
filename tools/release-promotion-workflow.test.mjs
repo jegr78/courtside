@@ -254,3 +254,15 @@ test("given anchors of the tagged version, when they are removed, then a failed 
   assert.equal(failed.failed, false, "the release run has already started, so a leftover anchor does not fail the candidate");
   assert.match(failed.output, /::warning::/, "a leftover anchor is reported");
 });
+
+test("given a ref that is no anchor of the tagged version, when anchors are removed, then it is left alone", () => {
+  // given
+  const foreign = ["refs/heads/main", `refs/heads/release-anchor/v0.2.0-rc.10/${"c".repeat(40)}`,
+    "refs/heads/release-anchor/v0.2.0-rc.1/../../main"].join(" ");
+
+  // when
+  const { deleted } = removeAnchors(foreign);
+
+  // then
+  assert.equal(deleted, "", "only refs/heads/release-anchor/<tag>/<sha> is ever deleted");
+});

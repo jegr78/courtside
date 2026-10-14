@@ -718,6 +718,7 @@ jobs:
           GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
         run: |
           for ref in $(gh api "repos/$GITHUB_REPOSITORY/git/matching-refs/heads/release-anchor/$TAG/" --jq '.[].ref'); do
+            [[ "$ref" == "refs/heads/release-anchor/$TAG/${ref##*/}" && "${ref##*/}" =~ ^[0-9a-f]{40}$ ]] || continue
             gh api -X DELETE "repos/$GITHUB_REPOSITORY/git/$ref" \
               || echo "::warning::$ref remains; delete it once the release run has published"
           done
