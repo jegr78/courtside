@@ -292,6 +292,35 @@ input[type="time"] {
   }
 }
 
+/* WebKit sizes a native menulist by its own metrics and ignores padding, so a select drops below an input. */
+@layer utilities {
+  select.form-control {
+    appearance: none;
+    padding-inline-end: 2.5rem;
+    background-image:
+      linear-gradient(45deg, transparent 50%, var(--cs-muted) 50%),
+      linear-gradient(135deg, var(--cs-muted) 50%, transparent 50%);
+    background-position: calc(100% - 1.25rem) 50%, calc(100% - 0.9rem) 50%;
+    background-size: 0.35rem 0.35rem;
+    background-repeat: no-repeat;
+    line-height: 1.5;
+  }
+
+  @media (pointer: coarse) {
+    .form-control {
+      min-height: 2.75rem;
+    }
+  }
+
+  @media (forced-colors: active) {
+    select.form-control {
+      appearance: auto;
+      padding-inline-end: 0.75rem;
+      background-image: none;
+    }
+  }
+}
+
 @media (forced-colors: active) {
   .occupancy-bar-fill {
     background: CanvasText;

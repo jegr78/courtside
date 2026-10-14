@@ -136,6 +136,21 @@ test("the booking dialog keeps its actions on screen while the browser bar cover
   expect(actions, "the actions stay in place while the form scrolls").toEqual(submit);
 });
 
+test("given the booking dialog on a touch screen, when its fields are drawn, then a select is as tall as a text input and a full touch target", async ({ page, journeyService }) => {
+  // given
+  await signIn(page, "doe.jane");
+  await selectJourneyDate(page, journeyService.visualDate);
+
+  // when
+  await page.locator('[data-testid="free-slot"][data-court-number="2"][data-slot="12:00"]:visible').tap();
+
+  // then
+  const select = (await page.getByTestId("booking-duration").boundingBox())!;
+  const input = (await page.getByTestId("member-search").boundingBox())!;
+  expect(Math.round(select.height), "the duration select matches the members field").toBe(Math.round(input.height));
+  expect(select.height, "the duration select is a full touch target").toBeGreaterThanOrEqual(44);
+});
+
 for (const viewport of [undefined, { width: 320, height: 568 }]) {
   test(`given a phone ${viewport ? `${viewport.width} px wide` : "of the project's size"}, when a booking is refused, then the reason and its reference are on screen inside the alert`, async ({ page, journeyService }) => {
     // given
