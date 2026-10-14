@@ -415,7 +415,7 @@ input[type="time"] {
 
 .current-time-line {
   position: absolute;
-  z-index: 5;
+  z-index: 0;
   right: 0;
   left: 5rem;
   height: 2px;
@@ -474,8 +474,10 @@ input[type="time"] {
   height: 100%;
 }
 
+/* Above the now-line, so the line passes behind a booking instead of through its label. */
 .day-plan-allocation-cell {
   position: relative;
+  z-index: 1;
 }
 
 .day-plan-allocation-extent {

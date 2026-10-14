@@ -121,6 +121,33 @@ for (const theme of ["dark", "light"] as const) {
       await capture(page.getByTestId("mobile-week-navigation"), baseline("phone-court-plan-day-strip"));
     });
 
+    test("given a booking of another member running under the now-line, when a phone draws today's plan, then its label stays above the line", async ({ page, journeyService }) => {
+      // given
+      await page.setViewportSize({ width: 390, height: 844 });
+      await signIn(page, "doe.jane");
+      await page.clock.setFixedTime(new Date(`${journeyService.visualDate}T07:15:00Z`));
+
+      // when
+      await page.reload();
+      await selectJourneyDate(page, journeyService.visualDate);
+      const running = page.locator('[data-testid="allocation"][data-booking-id="70000000-0000-0000-0000-000000000002"]');
+      const line = (await page.getByTestId("current-time-line").boundingBox())!;
+      const label = (await running.getByTestId("allocation-short-label").boundingBox())!;
+
+      // then
+      expect(line.y, "the now-line runs through the label").toBeGreaterThan(label.y);
+      expect(line.y + line.height, "the now-line runs through the label").toBeLessThan(label.y + label.height);
+      const onTop = await page.getByTestId("current-time-line").evaluate((element, point) => {
+        const nowLine = element as HTMLElement;
+        nowLine.style.pointerEvents = "auto";
+        const hit = document.elementFromPoint(point.x, point.y);
+        nowLine.style.pointerEvents = "";
+        return hit?.closest("[data-booking-id]")?.getAttribute("data-booking-id");
+      }, { x: label.x + label.width / 2, y: line.y + line.height / 2 });
+      expect(onTop, "the running booking is drawn above the now-line where they cross").toBe("70000000-0000-0000-0000-000000000002");
+      await capture(running.locator(".."), baseline("phone-court-plan-now-line"));
+    });
+
     test("given a phone in landscape, when the court plan and its booking dialog are drawn, then both match their reviewed baselines", async ({ page, journeyService }) => {
       // given
       await page.setViewportSize({ width: 852, height: 393 });
