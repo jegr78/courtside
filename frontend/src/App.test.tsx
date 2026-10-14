@@ -663,6 +663,117 @@ describe("App build identity", () => {
     expect(warn).toHaveBeenCalledWith("Session refresh failed: status 503 urn:courtside:error:database-lock-unavailable");
   });
 
+  it("given the session request never answers, when the startup deadline passes, then the offline view appears", async () => {
+    // given
+    vi.useFakeTimers();
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.spyOn(api, "session").mockReturnValue(new Promise<SessionStatus>(() => {}));
+    vi.spyOn(api, "config").mockRejectedValue(new Error("offline"));
+    vi.spyOn(api, "source").mockRejectedValue(new Error("offline"));
+    render(<RoutedShell initialEntries={["/my-bookings"]}><App /></RoutedShell>);
+    await act(() => vi.advanceTimersByTimeAsync(4_900));
+    expect(screen.queryByTestId("offline-status"), "a slow answer is still awaited before the deadline").not.toBeInTheDocument();
+
+    // when
+    await act(() => vi.advanceTimersByTimeAsync(100));
+
+    // then
+    expect(screen.getByTestId("offline-status"), "an unanswered session request counts as offline after five seconds").toBeVisible();
+  });
+
+  it("given the session answers at once, when the startup deadline passes later, then the app stays online", async () => {
+    // given
+    vi.useFakeTimers();
+    vi.spyOn(api, "session").mockResolvedValue(anonymous);
+    vi.spyOn(api, "config").mockRejectedValue(new Error("offline"));
+    vi.spyOn(api, "source").mockRejectedValue(new Error("offline"));
+    render(<RoutedShell initialEntries={["/"]}><App /></RoutedShell>);
+    await act(() => vi.advanceTimersByTimeAsync(0));
+
+    // when
+    await act(() => vi.advanceTimersByTimeAsync(10_000));
+
+    // then
+    expect(screen.queryByTestId("offline-status"), "an answered startup never falls back to offline").not.toBeInTheDocument();
+  });
+
+  it("given the deadline showed the offline view, when the request then fails, then the failure is restored and named once", async () => {
+    // given
+    vi.useFakeTimers();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    let fail!: (reason: Error) => void;
+    vi.spyOn(api, "session").mockReturnValue(new Promise<SessionStatus>((_, reject) => { fail = reject; }));
+    vi.spyOn(api, "config").mockRejectedValue(new Error("offline"));
+    vi.spyOn(api, "source").mockRejectedValue(new Error("offline"));
+    render(<RoutedShell initialEntries={["/my-bookings"]}><App /></RoutedShell>);
+    await act(() => vi.advanceTimersByTimeAsync(5_000));
+
+    // when
+    await act(async () => { fail(new Error("refused")); await vi.advanceTimersByTimeAsync(0); });
+
+    // then
+    expect(screen.getByTestId("offline-status")).toBeVisible();
+    expect(warn.mock.calls.filter(([line]) => String(line).startsWith("Session refresh failed")), "one offline fallback per launch").toHaveLength(1);
+  });
+
+  it("given the deadline showed the offline view, when the session answers late, then the app goes online with it", async () => {
+    // given
+    vi.useFakeTimers();
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    let answer!: (value: SessionStatus) => void;
+    vi.spyOn(api, "session").mockReturnValue(new Promise<SessionStatus>((resolve) => { answer = resolve; }));
+    vi.spyOn(api, "config").mockRejectedValue(new Error("offline"));
+    vi.spyOn(api, "source").mockRejectedValue(new Error("offline"));
+    render(<RoutedShell initialEntries={["/my-bookings"]}><App /></RoutedShell>);
+    await act(() => vi.advanceTimersByTimeAsync(5_000));
+    expect(screen.getByTestId("offline-status")).toBeVisible();
+
+    // when
+    await act(async () => { answer({ authenticated: true, roles: ["MEMBER"], passwordChangeRequired: false }); await vi.advanceTimersByTimeAsync(0); });
+
+    // then
+    expect(screen.queryByTestId("offline-status"), "the late answer lifts the offline view").not.toBeInTheDocument();
+    expect(screen.getAllByTestId("my-bookings-link")[0], "the late answer's session is the one shown").toBeInTheDocument();
+  });
+
+  it("given the deadline started an offline restore, when the session answers before the cache, then the cached club name does not return", async () => {
+    // given
+    vi.useFakeTimers();
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const generation = "generation-1";
+    const request = new Request("http://localhost/api/my/bookings?limit=50");
+    let resolveCached!: (response: Response) => void;
+    const cached = new Promise<Response>((resolve) => { resolveCached = resolve; });
+    const matchBooking = vi.fn().mockReturnValue(cached);
+    vi.stubGlobal("caches", {
+      delete: vi.fn().mockResolvedValue(true),
+      open: vi.fn().mockImplementation((name: string) => Promise.resolve(name === "courtside-personal-bookings" ? {
+        keys: () => Promise.resolve([request]), match: matchBooking
+      } : { match: vi.fn().mockResolvedValue({ text: () => Promise.resolve(generation) }), delete: () => Promise.resolve(true), put: () => Promise.resolve() }))
+    });
+    let answer!: (value: SessionStatus) => void;
+    vi.spyOn(api, "session").mockReturnValue(new Promise<SessionStatus>((resolve) => { answer = resolve; }));
+    vi.spyOn(api, "config").mockRejectedValue(new Error("offline"));
+    vi.spyOn(api, "source").mockRejectedValue(new Error("offline"));
+    render(<RoutedShell initialEntries={["/my-bookings"]}><App /></RoutedShell>);
+    await act(() => vi.advanceTimersByTimeAsync(5_000));
+    expect(matchBooking, "the deadline started the offline restore").toHaveBeenCalledOnce();
+
+    // when
+    await act(async () => { answer(anonymous); await vi.advanceTimersByTimeAsync(0); });
+    await act(async () => {
+      resolveCached(new Response(JSON.stringify({ refreshedAt: new Date().toISOString(), clubName: "Example Tennis Club" }), {
+        headers: { "content-type": "application/json", "x-courtside-cache-generation": generation }
+      }));
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    // then
+    expect(screen.queryByTestId("offline-status")).not.toBeInTheDocument();
+    expect(screen.getByTestId("club-brand-name"), "a restore the live answer overtook is not shown").toHaveTextContent("Courtside");
+    expect(screen.queryAllByTestId("my-bookings-link"), "the cached member session does not replace the live anonymous one").toHaveLength(0);
+  });
+
   it("given a member's cached bookings, when the app opens offline, then the header names the club they came from", async () => {
     // given
     const request = new Request("http://localhost/api/my/bookings?limit=50");
