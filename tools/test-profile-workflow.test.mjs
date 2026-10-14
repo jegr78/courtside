@@ -161,6 +161,14 @@ test("given maven downloads fail transiently, when any wrapper command runs, the
   }
 });
 
+test("given a maven resolution failure, when any wrapper command fails, then its cause is printed", () => {
+  // given
+  const mavenConfig = readFileSync(new URL("../.mvn/maven.config", import.meta.url), "utf8");
+
+  // when / then
+  assert.match(mavenConfig, /^-e$/m, "maven.config must print the exception chain of a failed build");
+});
+
 test("given workflow jobs invoke the frontend plugin, when maven resolves it, then no prefix lookup is needed", () => {
   // when / then
   assert.doesNotMatch(workflow, /(?:^|\s)frontend:(?:install-node-and-npm|npm@npm-ci)/);
