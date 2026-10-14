@@ -531,8 +531,8 @@ jobs:
 
   browser:
     name: browser-${{ matrix.group }}
-    needs: [test-profile-plan, frontend, browser_visual]
-    if: always() && (github.event_name != 'pull_request' || needs.test-profile-plan.outputs.browser == 'true') && needs.frontend.result == 'success' && needs.browser_visual.result == 'success'
+    needs: [test-profile-plan, frontend]
+    if: always() && (github.event_name != 'pull_request' || needs.test-profile-plan.outputs.browser == 'true') && needs.frontend.result == 'success'
     strategy:
       fail-fast: false
       matrix:

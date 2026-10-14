@@ -48,6 +48,18 @@ test("given profile classification, when the pull request runs, then selected qu
     /node tools\/node-toolchain\.mjs --github-output "\$GITHUB_OUTPUT"[\s\S]+node-version: \$\{\{ steps\.toolchain\.outputs\.node \}\}[\s\S]+NPM_VERSION: \$\{\{ steps\.toolchain\.outputs\.npm \}\}[\s\S]+npm install --global "npm@\$NPM_VERSION"[\s\S]+test "\$\(node --version\)" = "v\$NODE_VERSION"[\s\S]+test "\$\(npm --version\)" = "\$NPM_VERSION"[\s\S]+working-directory: frontend\n\s+run: npm ci/);
 });
 
+test("given the visual baselines, when the browser shards are scheduled, then they start beside them and the gate still needs both", () => {
+  // given
+  const browserJob = workflow.match(/\n  browser:\n[\s\S]*?(?=\n  [a-z_-]+:\n)/)?.[0] ?? "";
+
+  // when / then
+  assert.match(browserJob, /\n    needs: \[test-profile-plan, frontend\]\n/,
+    "a shard waiting for the visual job adds its whole duration to every pull request");
+  assert.doesNotMatch(browserJob, /browser_visual/, "no shard condition may depend on the visual job");
+  assert.match(workflow, /\n\s+test "\$BROWSER_VISUAL_RESULT" = success\n\s+test "\$BROWSER_RESULT" = success\n/,
+    "the aggregate must still require the visual baselines on their own");
+});
+
 test("given a selected quality job, when it does not succeed, then the aggregate fails closed", () => {
   // when / then
   assert.match(workflow, /build:\n\s+if: always\(\)/);
