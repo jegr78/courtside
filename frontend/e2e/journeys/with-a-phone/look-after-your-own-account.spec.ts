@@ -15,7 +15,7 @@ test("given a member who wants their account in order, when they choose a new pa
     await activate(page.getByTestId("my-messages-save"));
 
     // then — and it is the stored choice that the page shows again, not the one still on screen
-    await expect(page.getByTestId("my-messages-saved")).toBeVisible();
+    await expect(page.getByTestId("my-messages-saved"), "the answer appears where the member tapped").toBeInViewport();
     await activate(page.getByTestId("court-plan-link"));
     await expect(page.getByTestId("court-plan-view")).toBeVisible();
     await activate(page.getByTestId("my-messages-link"));
