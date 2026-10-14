@@ -6,7 +6,8 @@ import test from "node:test";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 
-const accessibility = readFileSync(join(root, "frontend/e2e/accessibility.spec.ts"), "utf8");
+const accessibility = ["accessibility-checks.ts", "accessibility.spec.ts", "every-page-accessibility.spec.ts"]
+  .map((file) => readFileSync(join(root, "frontend/e2e", file), "utf8")).join("\n");
 const concurrentSession = readFileSync(join(root, "frontend/e2e/concurrent-session.spec.ts"), "utf8");
 const documentation = readFileSync(join(root, "docs/accessibility-testing.md"), "utf8");
 const fixtures = readFileSync(join(root, "frontend/e2e/fixtures.ts"), "utf8");
@@ -157,6 +158,6 @@ test("given WebKit plus axe runs in its own pull-request shard, when the documen
       `${path} still describes WebKit plus axe as outside the merge gate`);
     assert.doesNotMatch(text, /used to run only/, `${path} narrates history instead of the current gate`);
   }
-  assert.match(documents[0][1], /WebKit plus axe combination runs in its own pull-request browser shard/);
-  assert.match(documents[1][1], /WebKit plus axe combination runs in its own pull-request browser shard/);
+  assert.match(documents[0][1], /WebKit plus axe combination runs in two pull-request browser shards of its own/);
+  assert.match(documents[1][1], /WebKit plus axe combination runs in two pull-request browser shards of its own/);
 });

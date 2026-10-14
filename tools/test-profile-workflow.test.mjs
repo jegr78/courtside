@@ -37,7 +37,7 @@ test("given profile classification, when the pull request runs, then selected qu
   assert.match(workflow,
     /browser_visual:[\s\S]+COURTSIDE_BROWSER_GROUP: visual[\s\S]+npm run test:e2e/);
   assert.match(workflow,
-    /browser:[\s\S]+group: \[functional-a, functional-b, chromium-accessibility, webkit-accessibility\][\s\S]+COURTSIDE_BROWSER_GROUP: \$\{\{ matrix\.group \}\}/);
+    /browser:[\s\S]+include:\n(?:\s+- \{ label: [a-z0-9-]+, group: [a-z-]+, shard: [^}]+\}\n)+[\s\S]+COURTSIDE_BROWSER_GROUP: \$\{\{ matrix\.group \}\}\n\s+COURTSIDE_BROWSER_SHARD: \$\{\{ matrix\.shard \}\}/);
   assert.match(workflow,
     /deployment:[\s\S]+name: Exercise Compose wait with a fresh immutable image[\s\S]+node tools\/compose-wait-smoke\.mjs/);
   assert.doesNotMatch(workflow, /npm-cli\.js audit/);
