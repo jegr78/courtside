@@ -44,8 +44,14 @@ test("given the anchor already names the commit, when the candidate ensures it, 
   // given
   const api = github(commit);
 
-  // when / then
-  assert.equal(ensureAnchor({ version: "0.2.0-rc.1", commit, branch: "main", github: api }), "present");
+  // when
+  let outcome;
+  assert.doesNotThrow(() => {
+    outcome = ensureAnchor({ version: "0.2.0-rc.1", commit, branch: "main", github: api });
+  }, "an anchor at the release commit is the one the push wrote");
+
+  // then
+  assert.equal(outcome, "present");
   assert.deepEqual(api.created, [], "a re-run finds the anchor the push wrote");
 });
 

@@ -226,11 +226,18 @@ case "$*" in
 esac
 `);
   chmodSync(join(directory, "gh"), 0o755);
-  const output = execFileSync("bash", ["-e", "-c", step.run], { encoding: "utf8", env: { ...process.env,
-    PATH: `${directory}:${process.env.PATH}`, DIRECTORY: directory, REFS: refs, FAILING: failing ? "1" : "",
-    TAG: "v0.2.0-rc.1", GITHUB_REPOSITORY: "jegr78/courtside" } });
+  let output;
+  let failed = false;
+  try {
+    output = execFileSync("bash", ["-e", "-c", step.run], { encoding: "utf8", env: { ...process.env,
+      PATH: `${directory}:${process.env.PATH}`, DIRECTORY: directory, REFS: refs, FAILING: failing ? "1" : "",
+      TAG: "v0.2.0-rc.1", GITHUB_REPOSITORY: "jegr78/courtside" } });
+  } catch (error) {
+    output = `${error.stdout}${error.stderr}`;
+    failed = true;
+  }
   const deleted = existsSync(join(directory, "deleted")) ? readFileSync(join(directory, "deleted"), "utf8") : "";
-  return { output, deleted };
+  return { output, deleted, failed };
 }
 
 test("given anchors of the tagged version, when they are removed, then a failed removal warns instead of failing the tagged run", () => {
@@ -243,5 +250,7 @@ test("given anchors of the tagged version, when they are removed, then a failed 
 
   // then
   assert.match(removed.deleted, new RegExp(`-X DELETE repos/jegr78/courtside/git/${anchor}`));
-  assert.match(failed.output, /::warning::/, "the release run has already started, so a leftover anchor only warns");
+  assert.equal(removed.failed, false);
+  assert.equal(failed.failed, false, "the release run has already started, so a leftover anchor does not fail the candidate");
+  assert.match(failed.output, /::warning::/, "a leftover anchor is reported");
 });
