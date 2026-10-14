@@ -201,7 +201,8 @@ test("given a member whose category books only within set hours, when a slot out
     const card = discovery.cards.find((candidate: { active: boolean; allowedRoles: string[] }) => candidate.active && candidate.allowedRoles.length === 0);
     const refused = await api.post("/api/bookings", {
       courtIds: [courts.find((court) => court.number === slot.court)!.id], cardId: card.id,
-      startsAt: instantOf(slot, "start").toISOString(), endsAt: instantOf(slot, "end").toISOString()
+      startsAt: instantOf(slot, "start").toISOString(), endsAt: instantOf(slot, "end").toISOString(),
+      participants: [{ personId: discovery.personIds["memberB"] }]
     }, { "Idempotency-Key": randomUUID() });
     const body = await refused.json().catch(() => ({}));
     if (refused.ok() && body.id) {
