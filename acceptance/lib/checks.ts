@@ -1,8 +1,8 @@
 import { runPath } from "./context";
-import { layoutProbe, layoutProbeArguments } from "./layout-probe.mjs";
 import { appendFileSync, mkdirSync } from "node:fs";
 import AxeBuilder from "@axe-core/playwright";
 import { test, type Page } from "@playwright/test";
+import { layoutProbe, layoutProbeArguments } from "./layout-probe.mjs";
 
 export async function measure(page: Page, locale: "de" | "en") {
   return page.evaluate(layoutProbe, layoutProbeArguments(locale));
