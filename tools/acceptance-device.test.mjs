@@ -33,6 +33,22 @@ test("given no handler on port 443, when the restore command is derived, then th
   assert.throws(() => restoreCommand(status), /no HTTPS handler on port 443/);
 });
 
+test("given a second path handler on port 443, when the restore command is derived, then the outage refuses to start", () => {
+  // given
+  const status = served(true);
+  status.Web["box.example.org:443"].Handlers["/docs"] = { Path: "/srv/docs" };
+  // when / then
+  assert.throws(() => restoreCommand(status), /exactly one handler/, "turning 443 off would drop a handler the restore cannot bring back");
+});
+
+test("given a proxy target that is not a plain URL, when the restore command is derived, then the outage refuses to start", () => {
+  // given
+  const status = served(true);
+  status.Web["box.example.org:443"].Handlers["/"].Proxy = "http://127.0.0.1:8080; reboot";
+  // when / then
+  assert.throws(() => restoreCommand(status), /not a plain URL/, "the target reaches a remote shell, so only a plain URL may pass");
+});
+
 test("given the same serve status in another key order, when compared, then it counts as restored", () => {
   // given
   const before = served(true);
@@ -66,6 +82,26 @@ test("given white text on the light background, when the theme switch is judged,
   // then
   assert.equal(verdict, "fail");
   assert.match(reason, /first weekday/);
+});
+
+test("given a select the dialog no longer renders, when the select heights are judged, then it fails instead of passing unmeasured", () => {
+  // given
+  const check = { check: "select-heights", fields: [{ testId: "booking-duration", missing: true }, { tag: "select", testId: "booking-card", height: 45 }] };
+  // when
+  const { verdict, reason } = judge(check);
+  // then
+  assert.equal(verdict, "fail");
+  assert.equal(reason, "not found: booking-duration");
+});
+
+test("given a label the page no longer renders, when the theme switch is judged, then it fails instead of passing unmeasured", () => {
+  // given
+  const check = { check: "theme-switch", afterOneSecond: [{ label: "theme label", missing: true }] };
+  // when
+  const { verdict, reason } = judge(check);
+  // then
+  assert.equal(verdict, "fail");
+  assert.equal(reason, "not found: theme label");
 });
 
 test("given a select lower than a touch target, when the select heights are judged, then it fails on that select only", () => {

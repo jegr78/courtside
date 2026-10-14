@@ -138,12 +138,15 @@ Each check writes screenshots and measurements to `result.json` in its own direc
 `build/acceptance-device/` and prints its verdict; any verdict other than `pass` ends the run with
 exit code 1. `DEVICE_CHECKS` selects checks by name, `DEVICE_DIAGNOSE=1` makes `safaridriver` log
 its protocol under `~/Library/Logs/com.apple.WebDriver/`, and `DEVICE_CANCEL` names booking ids a
-broken run left behind.
+broken run left behind. That protocol log holds the shared password in plain text, because the run
+types it through a script; delete it once it has served its purpose.
 
 Safari cannot be told to go offline, and its screen lock rules out airplane mode during a run.
-`outage` and `offline-bookings` therefore take the instance's HTTPS handler down for everyone for
-up to a minute. They expect an instance published through `tailscale serve` or `tailscale funnel`
-and an SSH host on which `sudo -n` may run `tailscale` and `systemd-run`. The run records the
+`outage` and `offline-bookings` therefore take the instance's HTTPS handler down for everyone, for
+up to two minutes each. They expect an instance published through `tailscale serve` or
+`tailscale funnel` with a single proxy handler on `/` of port 443, and an SSH host on which
+`sudo -n` may run `tailscale` and `systemd-run`; any other serve configuration stops them before
+anything is taken down. The run records the
 serve status, restores it afterwards and fails if the status differs; a timer restores it after
 five minutes whatever happens to the run. Without `DEVICE_OUTAGE_HOST` both checks are skipped.
 The booking `offline-bookings` makes lies two days ahead, outside the cancellation deadline, and
