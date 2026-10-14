@@ -310,6 +310,11 @@ input[type="time"] {
     .form-control {
       min-height: 2.75rem;
     }
+
+    /* Safari on iOS zooms into a focused field below 16 px and stays zoomed after it. */
+    :is(input, select, textarea).form-control:is(.text-xs, .text-sm) {
+      font-size: 1rem;
+    }
   }
 
   @media (forced-colors: active) {

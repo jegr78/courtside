@@ -31,6 +31,14 @@ function renderedTextWidth(element: import("@playwright/test").Locator): Promise
   });
 }
 
+async function expectNoFieldSafariZoomsInto(page: Page) {
+  const small = await page.locator("input, select, textarea").evaluateAll((fields) => fields
+    .filter((field) => field.checkVisibility() && !["checkbox", "radio", "hidden", "submit", "button"].includes((field as HTMLInputElement).type))
+    .filter((field) => parseFloat(getComputedStyle(field).fontSize) < 16)
+    .map((field) => `${field.id || field.getAttribute("data-testid")} ${getComputedStyle(field).fontSize}`));
+  expect(small, "a touch screen keeps every field at 16 px, or Safari on iOS zooms into it").toEqual([]);
+}
+
 async function signIn(page: import("@playwright/test").Page, username: string) {
   await page.goto("/login");
   await page.getByTestId("username").fill(username);
@@ -452,6 +460,8 @@ test("member and administration surfaces remain usable on a touch viewport", asy
   // when
   await page.getByTestId("booking-close").tap();
   await page.getByTestId("preferences-menu").tap();
+  await expect(page.locator("#theme-preference")).toBeVisible();
+  await expectNoFieldSafariZoomsInto(page);
   await page.getByTestId("logout").tap();
   await signIn(page, "configuration-admin");
   await page.getByTestId("administration-link").tap();
@@ -518,6 +528,8 @@ test("member and administration surfaces remain usable on a touch viewport", asy
   const ruleSetRow = page.getByTestId("rule-set-overview").locator("tbody tr").first();
   expect(await ruleSetRow.evaluate((element) => getComputedStyle(element).display), "a rule set is a card on a phone").toBe("grid");
   await expectNoHorizontalOverflow(page);
+  await expect(page.getByTestId("rule-BOOKING_HOURS-earliestStart")).toBeVisible();
+  await expectNoFieldSafariZoomsInto(page);
 
   // when
   await page.getByTestId("admin-menu").tap();
