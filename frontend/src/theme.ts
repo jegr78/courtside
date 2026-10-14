@@ -13,7 +13,12 @@ export function applyTheme(theme: Theme): void {
 
 export function setTheme(theme: Theme): void {
   window.localStorage?.setItem("courtside.theme", theme);
+  const root = document.documentElement;
+  root.classList.add("theme-switching");
   applyTheme(theme);
+  // Reading a computed value settles the new colours while transitions are off, so none fades in.
+  void window.getComputedStyle(root).color;
+  root.classList.remove("theme-switching");
 }
 
 applyTheme(initialTheme());

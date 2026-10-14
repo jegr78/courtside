@@ -321,6 +321,13 @@ input[type="time"] {
   }
 }
 
+.theme-switching,
+.theme-switching *,
+.theme-switching *::before,
+.theme-switching *::after {
+  transition: none !important;
+}
+
 @media (forced-colors: active) {
   .occupancy-bar-fill {
     background: CanvasText;
