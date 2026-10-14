@@ -38,7 +38,7 @@ async function openSession() {
   const capabilities = { alwaysMatch: { platformName: "iOS", "safari:deviceType": "iPhone", "safari:diagnose": process.env.DEVICE_DIAGNOSE === "1" } };
   for (let attempt = 0; ; attempt++) {
     try { return (await call("POST", "/session", { capabilities })).sessionId; } catch (error) {
-      if (!/device is (locked|not paired)|already paired/.test(error.message) || attempt === 60) throw error;
+      if (!/could not be used|already paired/.test(error.message) || attempt === 60) throw error;
       if (attempt === 0) console.log("unlock the iPhone, keep its screen on and end any automation session Safari still shows");
       await pause(2_000);
     }
