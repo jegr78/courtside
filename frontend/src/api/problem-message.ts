@@ -10,22 +10,24 @@ export function isUnauthenticated(failure: unknown): boolean {
 }
 
 export function problemMessage(failure: unknown, t: TFunction): string {
-  if (!(failure instanceof ApiError) || !failure.problem) {
-    return t("error.generic");
-  }
-  const message = translatedProblem(failure.problem, t);
-  return withReference(failure, message, t);
+  return withReference(failure, problemText(failure, t), t);
+}
+
+export function problemText(failure: unknown, t: TFunction): string {
+  if (!(failure instanceof ApiError) || !failure.problem) return t("error.generic");
+  return translatedProblem(failure.problem, t);
 }
 
 export function withReference(failure: unknown, message: string, t: TFunction): string {
-  const reference = failure instanceof ApiError && failure.problem ? traceReference(failure.problem) : undefined;
+  const reference = failureReference(failure);
   if (!reference) return message;
   return message ? t("error.withReference", { message, reference }) : t("error.reference", { reference });
 }
 
-function traceReference(problem: Problem): string | undefined {
-  if (!problem.traceId) return undefined;
-  return problem.spanId ? `${problem.traceId}/${problem.spanId}` : problem.traceId;
+export function failureReference(failure: unknown): string | undefined {
+  if (!(failure instanceof ApiError) || !failure.problem?.traceId) return undefined;
+  const { traceId, spanId } = failure.problem;
+  return spanId ? `${traceId}/${spanId}` : traceId;
 }
 
 export function violationMessage(code: string, params: Record<string, unknown>, t: (key: string, options?: Record<string, unknown>) => string): string {

@@ -22,5 +22,7 @@ export function useReportedFailure() {
     ? undefined
     : "message" in reported ? reported.message : reported.describe(reported.failure, t);
 
-  return { message, report, refuse, clear };
+  const failure = reported !== undefined && "failure" in reported ? reported.failure : undefined;
+
+  return { message, failure, report, refuse, clear };
 }

@@ -1108,6 +1108,7 @@ const de = {
   "error.surfaceUnavailable": "Dieser Bereich lässt sich gerade nicht laden. Lade die Seite neu.",
   "error.withReference": "{{message}} Fehlerreferenz: {{reference}}",
   "error.reference": "Fehlerreferenz: {{reference}}",
+  "error.referenceLabel": "Fehlerreferenz",
   "validation.Size": "Die Eingabe hat nicht die erlaubte Länge.",
   "validation.Pattern": "Die Eingabe hat nicht das erlaubte Format.",
   "validation.MultipleOf": "Die Eingabe muss ein zulässiger Schrittwert sein.",

@@ -696,6 +696,36 @@ it("given a booking conflict and a failed refresh, when submission fails, then t
   expect(screen.getByRole("dialog")).toBeInTheDocument();
 });
 
+it("given a conflict with a trace, when the booking is refused, then the reason stands alone and the reference waits behind its disclosure", async () => {
+  // given
+  vi.mocked(api.createBooking).mockRejectedValue(new ApiError(409, {
+    type: "urn:courtside:error:court-unavailable",
+    title: "Court unavailable",
+    status: 409,
+    traceId: "0123456789abcdef0123456789abcdef",
+    spanId: "0123456789abcdef"
+  }));
+  render(<WeekView today={clubInstant("07:00")} />);
+  await userEvent.click(await findFreeSlot(1, "08:00"));
+
+  // when
+  await userEvent.click(screen.getByTestId("booking-submit"));
+
+  // then
+  expect(await screen.findByTestId("booking-refusal")).toHaveTextContent(/^Someone else just booked this court\. Choose another time\.$/);
+  const reference = screen.getByTestId("booking-reference-value");
+  expect(reference, "the reference sits inside the alert").toHaveTextContent("0123456789abcdef0123456789abcdef/0123456789abcdef");
+  expect(screen.getByRole("alert")).toContainElement(reference);
+  expect(reference, "the reference stays folded until support asks for it").not.toBeVisible();
+  expect(screen.getByTestId("booking-close"), "the form keeps its way out").toBeVisible();
+
+  // when
+  await userEvent.click(screen.getByTestId("booking-reference"));
+
+  // then
+  expect(reference, "the reference opens on request").toBeVisible();
+});
+
 it("given a slot taken in the meantime, when the booking is refused, then the dialog keeps the refused period and offers no duration to book", async () => {
   // given
   vi.mocked(api.createBooking).mockRejectedValue(new ApiError(409, {
@@ -1271,9 +1301,8 @@ it("given booking rules reject a slot, when submitting it, then violations and t
   expect(screen.getByTestId("guest-participants")).toHaveAttribute("aria-describedby", "booking-participants-errors");
   expect(document.querySelector('[data-code="booking.rule.advanceWindow.exceeded"]')).toBeInTheDocument();
   expect(timeViolations).not.toHaveTextContent("booking.rule.advanceWindow.exceeded");
-  expect(screen.getByRole("alert")).toHaveTextContent(
-    "You can book at most 14 days in advance. One more point is marked at its field. Error reference: 0123456789abcdef0123456789abcdef/0123456789abcdef"
-  );
+  expect(screen.getByTestId("booking-refusal")).toHaveTextContent("You can book at most 14 days in advance. One more point is marked at its field.");
+  expect(screen.getByTestId("booking-reference-value")).toHaveTextContent("0123456789abcdef0123456789abcdef/0123456789abcdef");
 });
 
 it("given a refusal the outcome already lists, when it arrives, then the outcome names it once and adds only the reference", async () => {
@@ -1295,9 +1324,9 @@ it("given a refusal the outcome already lists, when it arrives, then the outcome
 
   // then
   const outcome = await screen.findByTestId("booking-outcome");
-  await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(
-    "Error reference: 0123456789abcdef0123456789abcdef/0123456789abcdef"
-  ));
+  await waitFor(() => expect(screen.getByRole("alert")).toContainElement(screen.getByTestId("booking-reference-value")));
+  expect(screen.getByTestId("booking-reference-value")).toHaveTextContent("0123456789abcdef0123456789abcdef/0123456789abcdef");
+  expect(screen.queryByTestId("booking-refusal"), "the alert adds no sentence of its own").toBeNull();
   expect(outcome.textContent?.split("This field is required.").length, "the outcome says the sentence once").toBe(2);
   expect(screen.getByRole("alert")).not.toHaveTextContent("This field is required.");
 });
@@ -1576,9 +1605,8 @@ it("given a refusal of a chosen member, when it arrives, then it is explained be
   expect(screen.getByTestId("member-search").closest("fieldset")).toHaveAttribute("aria-describedby", "booking-members-errors");
   expect(document.getElementById("booking-participants-errors"), "the refusal is not repeated under guests and extras").toBeNull();
   expect(screen.getByTestId("guest-name"), "a refusal about members leaves the further details closed").not.toBeVisible();
-  expect(screen.getByRole("alert")).toHaveTextContent(
-    "A player can only occupy one slot of a booking. Error reference: 0123456789abcdef0123456789abcdef/0123456789abcdef"
-  );
+  expect(screen.getByTestId("booking-refusal")).toHaveTextContent("A player can only occupy one slot of a booking.");
+  expect(screen.getByTestId("booking-reference-value")).toHaveTextContent("0123456789abcdef0123456789abcdef/0123456789abcdef");
 });
 
 function dragAcross(from: HTMLElement, over: HTMLElement[]) {
