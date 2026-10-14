@@ -9,6 +9,7 @@ import { config, disposables, PASSWORD, runPath, type PersonaKey } from "../lib/
 import { mailAvailable } from "../lib/mail";
 import { profilesOf, resetQuota } from "../config/disposables.mjs";
 import { occupying } from "../lib/core.mjs";
+import { PARTNER_MARKER } from "../lib/journey";
 
 
 test("when the environment is checked before a run, then every precondition holds", async () => {
@@ -46,6 +47,8 @@ test("when the environment is checked before a run, then every precondition hold
     checks.disposablesSignIn = Object.fromEntries(await Promise.all(disposables.map(async (username, index) => [`disposable ${index + 1}`, await canSignIn(PASSWORD, username)])));
     const weeks = await (await admin.get("/api/admin/opening-hours/schedule")).json() as { effectiveFrom: string | null }[];
     checks.futureWeeks = weeks.slice(1).map((w) => w.effectiveFrom);
+    const participantCards = await (await admin.get("/api/admin/participant-cards")).json() as { id: string; active: boolean }[];
+    checks.partnerMarkerActive = participantCards.some((card) => card.id === PARTNER_MARKER && card.active);
     const roster = { entries: await readRoster(admin) };
     const resetQuotas: Record<string, unknown> = {};
     for (const [index, username] of disposables.entries()) {
@@ -72,6 +75,7 @@ test("when the environment is checked before a run, then every precondition hold
     expect.soft(signsIn, `PRECONDITION: ${account} signs in with the shared password`).toBe(true);
   }
   expect.soft(checks.futureWeeks, "PRECONDITION: no opening week is scheduled after today").toEqual([]);
+  expect.soft(checks.partnerMarkerActive, "PRECONDITION: the looking-for-a-partner participant card is active").toBe(true);
   for (const [account, quota] of Object.entries(checks.resetQuotas as Record<string, { ok: boolean; sentInLastHour: number; freeAt: string | null }>)) {
     expect.soft(quota.ok, `PRECONDITION: ${account} can still receive the reset codes this run needs (${quota.sentInLastHour} sent in the last hour, enough again at ${quota.freeAt})`).toBe(true);
   }

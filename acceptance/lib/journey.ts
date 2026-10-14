@@ -11,6 +11,8 @@ let loaded: Record<string, any> | undefined;
 // Read on first use: the discovery project writes the file after this module is first imported.
 export const discovery: Record<string, any> = new Proxy({}, { get: (_target, key: string) => (loaded ??= JSON.parse(readFileSync(runPath("discovery.json"), "utf8")))[key] });
 export const projectName = () => test.info().project.name;
+// The shipped "looking for a partner" participant card; its open place is what a member offers.
+export const PARTNER_MARKER = "66666666-6666-6666-6666-666666666666";
 export type DisposableRecord = { personId: string; email: string; enabled: boolean; locale: string | null };
 export const disposableRecord = (username: string): DisposableRecord => discovery.disposables[username];
 export const onPhonesAndChrome = () => /iphone|pixel|narrow|desktop-chrome|desktop-firefox/.test(projectName());
