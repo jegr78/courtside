@@ -137,7 +137,15 @@ for (const theme of ["dark", "light"] as const) {
       // then
       expect(line.y, "the now-line runs through the label").toBeGreaterThan(label.y);
       expect(line.y + line.height, "the now-line runs through the label").toBeLessThan(label.y + label.height);
-      await capture(page.getByTestId("week-grid"), baseline("phone-court-plan-now-line"));
+      const onTop = await page.getByTestId("current-time-line").evaluate((element, point) => {
+        const nowLine = element as HTMLElement;
+        nowLine.style.pointerEvents = "auto";
+        const hit = document.elementFromPoint(point.x, point.y);
+        nowLine.style.pointerEvents = "";
+        return hit?.closest("[data-booking-id]")?.getAttribute("data-booking-id");
+      }, { x: label.x + label.width / 2, y: line.y + line.height / 2 });
+      expect(onTop, "the running booking is drawn above the now-line where they cross").toBe("70000000-0000-0000-0000-000000000002");
+      await capture(running.locator(".."), baseline("phone-court-plan-now-line"));
     });
 
     test("given a phone in landscape, when the court plan and its booking dialog are drawn, then both match their reviewed baselines", async ({ page, journeyService }) => {
