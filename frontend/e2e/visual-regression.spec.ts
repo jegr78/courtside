@@ -229,6 +229,42 @@ for (const theme of ["dark", "light"] as const) {
       }
     });
 
+    test("given a logged warning with a trace, when the board reads the operational log on a phone, then each entry is a readable card", async ({ page }) => {
+      // given
+      await page.route("**/api/admin/operational-logs/search", (route) => route.fulfill({ json: {
+        availability: "AVAILABLE", retentionTruncated: false, searchIncomplete: false, droppedRecords: 0,
+        entries: [{
+          id: "7d000000-0000-0000-0000-000000000001", occurredAt: journeyInstant, source: "APPLICATION", severity: "WARN",
+          message: "Mail relay relay.example.org refused the connection on port 587 and the message stays queued",
+          traceId: "4bf92f3577b34da6a3ce929d0e0e4736"
+        }]
+      } }));
+      await page.setViewportSize({ width: 412, height: 915 });
+      await signIn(page, "configuration-admin");
+
+      // when
+      await page.goto("/admin/operational-logs");
+      const entry = page.getByTestId("operational-log-row");
+      await expect(entry).toBeVisible({ timeout: 10_000 });
+
+      // then
+      const overflow = await page.getByTestId("operational-logs-scroll").evaluate((region) => region.scrollWidth - region.clientWidth);
+      expect(overflow, "the entry fits the phone without sideways scrolling").toBeLessThanOrEqual(0);
+      await expect(entry.getByTestId("operational-log-trace"), "the trace ID is on screen beside the entry").toBeInViewport({ ratio: 1 });
+      await capture(page.getByTestId("admin-operational-logs-view"), baseline("phone-operational-log"));
+
+      // when
+      await page.setViewportSize({ width: 1440, height: 900 });
+
+      // then
+      const traceLines = await entry.getByTestId("operational-log-trace").evaluate((trace) => {
+        const text = document.createRange();
+        text.selectNodeContents(trace);
+        return new Set([...text.getClientRects()].map((line) => Math.round(line.top))).size;
+      });
+      expect(traceLines, "a desk shows the trace ID on one or two lines").toBeLessThanOrEqual(2);
+    });
+
     test("given a 320 px phone, when the last day of the week is chosen, then the day strip matches its reviewed baseline", async ({ page }) => {
       // given
       await page.setViewportSize({ width: 320, height: 640 });
