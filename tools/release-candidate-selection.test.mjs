@@ -39,6 +39,7 @@ function workflowRun(overrides = {}) {
     exactBuild: { runId: 37211926310, runAttempt: 1 },
     newestLine: { check: "newest-line", accepted: true, latest: true, detail: "no line newer than 0.1 is published" },
     missingTooling: [],
+    releaseWorkflowDrift: [],
     ...overrides
   };
 }
@@ -415,6 +416,17 @@ test("given a commit without the tooling the release workflows call, when the ca
   assert.throws(() => selectReleaseCandidate(dispatch({ rehearsal: true, missingTooling: ["tools/release-line.mjs"] })),
     /lacks tools\/release-line\.mjs/, "a rehearsal builds the commit with the same workflows");
 });
+
+test("given a release-branch commit whose own release workflow differs from main's, when the candidate selects, then it names that path",
+  () => {
+    // when / then
+    assert.throws(() => selectReleaseCandidate(patchDispatch({ releaseWorkflowDrift: [".github/workflows/release.yml"] })),
+      /\.github\/workflows\/release\.yml differs from main's, and the tag runs the copy at the candidate; port it to release\/0\.1/);
+    assert.throws(() => selectReleaseCandidate(patchDispatch({ releaseWorkflowDrift: undefined })),
+      /release workflow comparison did not run/, "a missing comparison is no evidence that the copies agree");
+    assert.equal(selectReleaseCandidate(dispatch({ releaseWorkflowDrift: [".github/workflows/release.yml"] })).release, true,
+      "a commit on main runs main's own workflow");
+  });
 
 test("given the branch helpers the selection uses, when they name a branch, then they come from the release line tool", () => {
   // when / then
