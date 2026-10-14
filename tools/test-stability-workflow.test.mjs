@@ -9,7 +9,6 @@ const browserCompatibility = workflow.slice(workflow.indexOf("  browser-compatib
 
 test("given periodic stability evidence, when reading its workflow, then backend and browser order proofs retain first attempts", () => {
   assert.match(workflow, /schedule:/);
-  assert.match(workflow, /pull_request:[\s\S]*test-stability\.yml[\s\S]*frontend\/e2e\/\*\*/);
   assert.doesNotMatch(workflow, /resource_profile|COURTSIDE_BROWSER_RESOURCE_PROFILE|--resource-profile/);
   assert.match(workflow, /reversealphabetical, random/);
   assert.match(workflow, /surefire\.runOrder\.random\.seed/);
@@ -54,13 +53,13 @@ test("given a required build failure, when collecting evidence, then backend and
   assert.doesNotMatch(workflow, /frontend\/playwright-report/);
 });
 
-test("given a release pull request, when it bumps the frontend version, then the stability jobs stay off it", () => {
+test("given the stability workflow, when its triggers are read, then it runs every night and never on a pull request", () => {
   // given
-  const skipsReleasePullRequests = /\n    if: github\.event_name != 'pull_request' \|\| !\(startsWith\(github\.head_ref, 'release-please--'\) && !github\.event\.pull_request\.head\.repo\.fork\)\n/;
+  const triggers = workflow.slice(workflow.indexOf("\non:"), workflow.indexOf("\npermissions:"));
 
   // when / then
-  assert.match(browserOrder, skipsReleasePullRequests, "a version bump cannot change browser order, so it must not turn the release pull request red");
-  assert.match(browserCompatibility, skipsReleasePullRequests, "a version bump cannot change browser compatibility");
-  assert.match(workflow, /concurrency:\n\s+group: test-stability-\$\{\{ github\.event\.pull_request\.number \|\| github\.run_id \}\}\n\s+cancel-in-progress: \$\{\{ github\.event_name == 'pull_request' \}\}/,
-    "a newer head of the same pull request cancels the older run");
+  assert.doesNotMatch(triggers, /pull_request/, "its three jobs hold places a pull request's required build needs");
+  assert.match(triggers, /cron: '17 2 \* \* \*'/, "every night, so a regression surfaces the next morning");
+  assert.match(triggers, /workflow_dispatch:/, "a scheduled workflow keeps a manual path");
+  assert.doesNotMatch(workflow, /github\.event\.pull_request|github\.head_ref/, "no condition may wait for an event that never comes");
 });
