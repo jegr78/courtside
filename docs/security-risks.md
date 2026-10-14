@@ -133,11 +133,13 @@ the workflow's own token starts no checks and no release workflow. It can write 
 requests and issue labels in this repository. It cannot change workflows or publish the final
 release alone.
 
-Two jobs hold it. `release-please` runs only after a push to `main` or to a `release/*` branch,
-which carry the same protection, and maintains that branch's release pull request. The `tag` job of
-the release candidate runs only for a release commit on the branch its version belongs to whose
-candidate evidence succeeded, and uses the token to create the version tag and relabel the merged
-release pull request. The token acts with its issuer's repository ceiling, including the single
+Three jobs hold it. `release-please` runs only after a push to `main` or to a `release/*` branch,
+which carry the same protection, maintains that branch's release pull request and, for a release
+commit, creates the branch `release-anchor/v<version>/<sha>` at it. The candidate's `anchor` job
+runs only for a selected release and creates that branch when it is missing; it installs no
+packages. The `tag` job runs only for a release commit on the branch its version belongs to whose
+candidate evidence succeeded, and uses the token to create the version tag, relabel the merged
+release pull request and remove the version's anchors. The token acts with its issuer's repository ceiling, including the single
 maintainer's admin bypass. Reconsider when GitHub provides a repository
 identity that can trigger the same pipeline without a personal token.
 

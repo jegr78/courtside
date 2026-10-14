@@ -109,8 +109,9 @@ test("given qualified release evidence, when the candidate finishes, then it alo
   const relabel = tag.steps.find((step) => step.name === "Mark the release pull request as tagged");
 
   // when / then
-  assert.deepEqual(tag.needs, ["select", "evidence"]);
+  assert.deepEqual(tag.needs, ["select", "anchor", "evidence"]);
   assert.match(tag.if, /needs\.evidence\.result == 'success'/);
+  assert.match(tag.if, /needs\.anchor\.result == 'success'/, "a commit no branch names cannot be tagged");
   assert.match(tag.if, /needs\.select\.outputs\.rehearsal != 'true'/);
   assert.deepEqual(tag.permissions, {}, "the tag job writes through the release token alone");
   assert.equal(tag.env.COMMIT, "${{ needs.select.outputs.commit }}");
@@ -164,4 +165,83 @@ test("given the tag job, when it runs, then it creates a missing tag, accepts it
   assert.deepEqual(writeTag(""), { refused: false, created: true }, "a missing tag is written at the qualified commit");
   assert.deepEqual(writeTag("c".repeat(40)), { refused: false, created: false }, "a re-run finds the tag it wrote and goes on");
   assert.deepEqual(writeTag("d".repeat(40)), { refused: true, created: false }, "a tag at another commit stops the run and is not moved");
+});
+
+test("given a pushed release commit, when release-please runs, then it anchors the commit before anything else can move the branch", () => {
+  // given
+  const steps = releasePlease.jobs["release-please"].steps;
+  const checkout = steps.find((step) => step.name === "Check out the pushed commit");
+  const anchor = steps.find((step) => step.name === "Anchor a release commit while it heads its branch");
+  const action = steps.find((step) => step.id === "release");
+
+  // when / then
+  assert.equal(checkout.with.ref, "${{ github.sha }}");
+  assert.equal(checkout.with["fetch-depth"], 2, "the parent's manifest tells a release commit from an ordinary one");
+  assert.equal(checkout.with["persist-credentials"], false);
+  assert.match(anchor.run, /^node tools\/release-anchor\.mjs release-commit --commit "\$GITHUB_SHA"$/m);
+  assert.equal(anchor.env.GH_TOKEN, "${{ secrets.RELEASE_PLEASE_TOKEN }}");
+  assert.ok(steps.indexOf(checkout) < steps.indexOf(anchor) && steps.indexOf(anchor) < steps.indexOf(action),
+    "the anchor is written in the minute the release commit still heads its branch");
+});
+
+test("given a release candidate, when it starts, then its anchor is ensured before anything is built", () => {
+  // given
+  const anchor = candidate.jobs.anchor;
+  const ensure = anchor.steps.find((step) => step.name === "Ensure a branch names the release commit");
+
+  // when / then
+  assert.equal(anchor.needs, "select");
+  assert.match(anchor.if, /needs\.select\.outputs\.release == 'true'/);
+  assert.match(anchor.if, /needs\.select\.outputs\.rehearsal != 'true'/, "a rehearsal writes no tag and needs no anchor");
+  assert.deepEqual(anchor.permissions, {});
+  assert.equal(ensure.env.GH_TOKEN, "${{ secrets.RELEASE_PLEASE_TOKEN }}");
+  assert.match(ensure.run, /node tools\/release-anchor\.mjs ensure --version "\$VERSION" --commit "\$COMMIT" --branch "\$BRANCH"/);
+  assert.doesNotMatch(stepsText(anchor), /tool-dependencies|npm ci/, "no installed package runs beside the release token");
+  for (const name of ["preconditions", "release-build"]) {
+    assert.ok(candidate.jobs[name].needs.includes("anchor"), `${name} waits for the anchor`);
+    assert.match(candidate.jobs[name].if, /needs\.anchor\.result != 'failure'/,
+      `${name} does not spend a qualification on a commit that cannot be tagged`);
+  }
+});
+
+test("given a written tag, when the candidate finishes, then it removes the anchors of that version", () => {
+  // given
+  const steps = candidate.jobs.tag.steps;
+  const remove = steps.find((step) => step.name === "Remove the anchors of the tagged version");
+
+  // when / then
+  assert.ok(steps.indexOf(steps.find((step) => step.name === "Write the tag at the qualified commit")) < steps.indexOf(remove),
+    "the anchor outlives the tag write, or a re-run could not tag the commit");
+  assert.equal(remove.env.GH_TOKEN, "${{ secrets.RELEASE_PLEASE_TOKEN }}");
+  assert.match(remove.run, /git\/matching-refs\/heads\/release-anchor\/\$TAG\//, "only this version's anchors are removed");
+});
+
+function removeAnchors(refs, failing = false) {
+  const step = candidate.jobs.tag.steps.find((each) => each.name === "Remove the anchors of the tagged version");
+  const directory = mkdtempSync(join(tmpdir(), "courtside-anchors-"));
+  writeFileSync(join(directory, "gh"), `#!/usr/bin/env bash
+case "$*" in
+  *matching-refs*) printf '%s\\n' $REFS ;;
+  *"-X DELETE"*) [ -z "$FAILING" ] || exit 1; echo "$*" >> "$DIRECTORY/deleted" ;;
+esac
+`);
+  chmodSync(join(directory, "gh"), 0o755);
+  const output = execFileSync("bash", ["-e", "-c", step.run], { encoding: "utf8", env: { ...process.env,
+    PATH: `${directory}:${process.env.PATH}`, DIRECTORY: directory, REFS: refs, FAILING: failing ? "1" : "",
+    TAG: "v0.2.0-rc.1", GITHUB_REPOSITORY: "jegr78/courtside" } });
+  const deleted = existsSync(join(directory, "deleted")) ? readFileSync(join(directory, "deleted"), "utf8") : "";
+  return { output, deleted };
+}
+
+test("given anchors of the tagged version, when they are removed, then a failed removal warns instead of failing the tagged run", () => {
+  // given
+  const anchor = `refs/heads/release-anchor/v0.2.0-rc.1/${"c".repeat(40)}`;
+
+  // when
+  const removed = removeAnchors(anchor);
+  const failed = removeAnchors(anchor, true);
+
+  // then
+  assert.match(removed.deleted, new RegExp(`-X DELETE repos/jegr78/courtside/git/${anchor}`));
+  assert.match(failed.output, /::warning::/, "the release run has already started, so a leftover anchor only warns");
 });

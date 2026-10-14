@@ -49,7 +49,7 @@ test("given a candidate, when it builds, then it neither stamps a version nor re
   assert.match(step("release-build", "Package the selected commit").run, /^\.\/mvnw -B package -DskipTests$/);
 });
 
-const controlJobs = ["preconditions", "evidence"];
+const controlJobs = ["preconditions", "evidence", "anchor"];
 
 test("given a job that judges the candidate, when it runs, then its tools come from the dispatched workflow's commit", () => {
   // when
@@ -88,7 +88,7 @@ test("given a dispatch on any ref, when the candidate runs, then nothing reads t
 
 test("given the candidate pipeline, when it runs, then no job but the tag job writes a tag or release", () => {
   // given
-  const qualifying = Object.fromEntries(Object.entries(jobs).filter(([name]) => name !== "tag"));
+  const qualifying = Object.fromEntries(Object.entries(jobs).filter(([name]) => !["tag", "anchor"].includes(name)));
   const qualifyingSource = yaml.dump(qualifying, { lineWidth: -1 });
 
   // when / then
@@ -100,6 +100,9 @@ test("given the candidate pipeline, when it runs, then no job but the tag job wr
   for (const forbidden of [/RELEASE_PLEASE_TOKEN/, /release-please-action/, /git\/refs/, /action-gh-release/,
     /gh release/, /contents: write/, /imagetools create/]) {
     assert.doesNotMatch(qualifyingSource, forbidden, `a qualifying job must not ${forbidden}`);
+  }
+  for (const forbidden of [/refs\/tags/, /gh release/, /contents: write/, /-X DELETE/]) {
+    assert.doesNotMatch(jobText("anchor"), forbidden, `the anchor job only names the release commit, it must not ${forbidden}`);
   }
 });
 
@@ -123,7 +126,8 @@ test("given a dispatch, when the candidate selects, then the selection tool deci
   assert.deepEqual(jobs.select.permissions, { actions: "read", contents: "read", issues: "read", "pull-requests": "read" },
     "the selection lists labelled release pull requests through the issues endpoint");
   for (const job of ["preconditions", "release-build"]) {
-    assert.equal(jobs[job].if, "needs.select.outputs.release == 'true'", `${job} runs without a selected candidate`);
+    assert.equal(jobs[job].if, "${{ !cancelled() && needs.select.outputs.release == 'true' && needs.anchor.result != 'failure' }}",
+      `${job} runs without a selected candidate`);
   }
 });
 

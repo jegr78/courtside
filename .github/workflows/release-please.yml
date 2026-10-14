@@ -36,6 +36,20 @@ jobs:
           [[ "$BRANCH" == main || "$BRANCH" =~ ^release/(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] \
             || { echo "::error::$BRANCH is neither main nor release/<major>.<minor>"; exit 1; }
 
+      - name: Check out the pushed commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 2
+          persist-credentials: false
+
+      # The candidate tags this commit later, and GitHub refuses that once no branch names it.
+      - name: Anchor a release commit while it heads its branch
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+        run: |
+          node tools/release-anchor.mjs release-commit --commit "$GITHUB_SHA"
+
       - id: release
         uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5
         with:

@@ -135,6 +135,8 @@
     { "path": "tools/release-branch-workflow.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/release-candidate-evidence.mjs", "profiles": ["full"], "test": false },
     { "path": "tools/release-candidate-evidence.test.mjs", "profiles": ["tooling"], "test": true },
+    { "path": "tools/release-anchor.mjs", "profiles": ["full"], "test": false },
+    { "path": "tools/release-anchor.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/release-candidate-selection.mjs", "profiles": ["full"], "test": false },
     { "path": "tools/release-candidate-selection.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/release-candidate-workflow.test.mjs", "profiles": ["tooling"], "test": true },
