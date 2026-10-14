@@ -164,6 +164,29 @@ describe("AdminManagedAppointmentsView", () => {
       "the list keeps the loaded order").toBeTruthy();
   });
 
+  it("given single appointments between and after two series, when the list loads, then no region and no heading repeats", async () => {
+    // given
+    const between: ManagedAppointment = {
+      ...first, id: "44444444-4444-4444-4444-444444444444", seriesId: null, startsAt: "2026-10-02T16:00:00Z", endsAt: "2026-10-02T17:00:00Z"
+    };
+    const other: ManagedAppointment = { ...second, id: "55555555-5555-5555-5555-555555555555", seriesId: "series-2" };
+    const after: ManagedAppointment = {
+      ...first, id: "66666666-6666-6666-6666-666666666666", seriesId: null, startsAt: "2026-10-09T16:00:00Z", endsAt: "2026-10-09T17:00:00Z"
+    };
+    vi.mocked(api.managedAppointments).mockResolvedValue({ items: [first, between, other, after] });
+
+    // when
+    show();
+
+    // then
+    await screen.findByTestId("managed-series-series-2");
+    expect(screen.getAllByTestId("managed-single-appointments"), "each run of single appointments keeps its place").toHaveLength(2);
+    const names = screen.queryAllByRole("region").map((region) => region.getAttribute("aria-label")
+      ?? document.getElementById(region.getAttribute("aria-labelledby") ?? "")?.textContent);
+    expect(new Set(names).size, `every region has its own name: ${names.join(", ")}`).toBe(names.length);
+    expect(within(screen.getByTestId("managed-bookings")).queryAllByRole("heading"), "no heading repeats between the series").toHaveLength(0);
+  });
+
   it("given the upcoming view, when history and filters are chosen, then each criterion reaches the server", async () => {
     // given
     show();

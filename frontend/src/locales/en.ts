@@ -832,7 +832,6 @@ const en: Record<keyof typeof de, string> = {
   "managedAppointments.allCards": "All booking types",
   "managedAppointments.loadedCount_one": "one loaded appointment",
   "managedAppointments.loadedCount_other": "{{count}} loaded appointments",
-  "managedAppointments.singleAppointments": "Single appointments",
   "managedAppointments.actions": "Actions",
   "managedAppointments.appointments": "Club appointments",
   "managedAppointments.empty": "Appointments covered by your club role appear here. Create an appointment series above or wait for a matching booking.",

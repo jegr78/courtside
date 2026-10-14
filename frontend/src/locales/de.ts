@@ -830,7 +830,6 @@ const de = {
   "managedAppointments.allCards": "Alle Buchungsarten",
   "managedAppointments.loadedCount_one": "ein geladener Termin",
   "managedAppointments.loadedCount_other": "{{count}} geladene Termine",
-  "managedAppointments.singleAppointments": "Einzeltermine",
   "managedAppointments.actions": "Aktionen",
   "managedAppointments.appointments": "Vereinstermine",
   "managedAppointments.empty": "Hier erscheinen Termine, die deine Vereinsrolle verwalten darf. Lege oben eine Terminserie an oder warte auf eine passende Buchung.",
