@@ -681,6 +681,41 @@ describe("App build identity", () => {
     expect(screen.getByTestId("offline-status"), "an unanswered session request counts as offline after five seconds").toBeVisible();
   });
 
+  it("given the session answers at once, when the startup deadline passes later, then the app stays online", async () => {
+    // given
+    vi.useFakeTimers();
+    vi.spyOn(api, "session").mockResolvedValue(anonymous);
+    vi.spyOn(api, "config").mockRejectedValue(new Error("offline"));
+    vi.spyOn(api, "source").mockRejectedValue(new Error("offline"));
+    render(<RoutedShell initialEntries={["/"]}><App /></RoutedShell>);
+    await act(() => vi.advanceTimersByTimeAsync(0));
+
+    // when
+    await act(() => vi.advanceTimersByTimeAsync(10_000));
+
+    // then
+    expect(screen.queryByTestId("offline-status"), "an answered startup never falls back to offline").not.toBeInTheDocument();
+  });
+
+  it("given the deadline showed the offline view, when the request then fails, then the failure is restored and named once", async () => {
+    // given
+    vi.useFakeTimers();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    let fail!: (reason: Error) => void;
+    vi.spyOn(api, "session").mockReturnValue(new Promise<SessionStatus>((_, reject) => { fail = reject; }));
+    vi.spyOn(api, "config").mockRejectedValue(new Error("offline"));
+    vi.spyOn(api, "source").mockRejectedValue(new Error("offline"));
+    render(<RoutedShell initialEntries={["/my-bookings"]}><App /></RoutedShell>);
+    await act(() => vi.advanceTimersByTimeAsync(5_000));
+
+    // when
+    await act(async () => { fail(new Error("refused")); });
+
+    // then
+    expect(screen.getByTestId("offline-status")).toBeVisible();
+    expect(warn.mock.calls.filter(([line]) => String(line).startsWith("Session refresh failed")), "one offline fallback per launch").toHaveLength(1);
+  });
+
   it("given the deadline showed the offline view, when the session answers late, then the app goes online with it", async () => {
     // given
     vi.useFakeTimers();
