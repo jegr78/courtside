@@ -19,7 +19,8 @@ created.
   the harness restores it afterwards. The disposable journeys run on three profiles; with three
   disposable accounts each profile uses its own.
 - Active booking cards that the trainer, youth director, sport director and groundskeeper may use,
-  and an active participant card for the participant journey.
+  and the shipped "looking for a partner" participant card active. The participant journey books
+  with it, offers the open place and lets a second member take it.
 - At least two active courts. Weekday lanes use the first two courts of `courts`; the five
   Saturday lanes spread over every court in `courts`.
 - Opening hours that leave fifteen hours from opening on each weekday of the window. On its
@@ -35,6 +36,11 @@ created.
   instance tells members about bookings those changes affect.
 - The Mailpit API of that catcher for the journeys that read mail. Without `mail.url` those
   journeys are reported as not checkable, never as passed.
+
+The member journeys also walk what members hear. The contention journey queues the refused member
+on the waitlist, cancels the holder's booking and takes the offer from the notification centre;
+the singles journey tells the partner of a cancellation. A queue a journey leaves behind is left
+as its member, because only that member sees it, and the postflight requires none to remain.
 
 ## Configuration
 
