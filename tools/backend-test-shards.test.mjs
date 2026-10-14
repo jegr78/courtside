@@ -4,7 +4,7 @@ import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
-import { BACKEND_SHARDS, backendShard, backendTestClasses, parseShard } from "./backend-test-shards.mjs";
+import { BACKEND_SHARDS, backendShard, backendTestClasses, parseShard, shardList } from "./backend-test-shards.mjs";
 
 const require = createRequire(new URL("../frontend/package.json", import.meta.url));
 const yaml = require("js-yaml");
@@ -32,7 +32,7 @@ test("given test sources, when the classes are listed, then exactly the concrete
   });
 
   // when
-  const classes = backendTestClasses(root);
+  const classes = backendTestClasses(root).map(({ name }) => name);
 
   // then
   assert.deepEqual(classes, [
@@ -52,7 +52,7 @@ test("given a test whose package differs from its directory, when the classes ar
   });
 
   // when
-  const classes = backendTestClasses(root);
+  const classes = backendTestClasses(root).map(({ name }) => name);
 
   // then
   assert.deepEqual(classes, ["org/example/SeederTest.java", "org/example/web/RulesTest.java"],
@@ -62,16 +62,71 @@ test("given a test whose package differs from its directory, when the classes ar
 test("given the repository's tests, when every shard is taken, then together they run each class exactly once", () => {
   // given
   const classes = backendTestClasses(new URL("../src/test/java", import.meta.url).pathname);
+  const names = classes.map(({ name }) => name);
 
   // when
   const shards = Array.from({ length: BACKEND_SHARDS }, (_, index) => backendShard(classes, index + 1, BACKEND_SHARDS));
 
   // then
   assert.ok(classes.length > 400, "the listing must see the real test tree");
-  assert.deepEqual(shards.flat().toSorted(), classes, "a class in no shard would silently stop running");
+  assert.deepEqual(shards.flat().toSorted(), names, "a class in no shard would silently stop running");
   assert.equal(new Set(shards.flat()).size, classes.length, "a class in two shards runs twice");
   assert.ok(shards.every((shard) => shard.length > 0), "every shard carries tests");
   assert.deepEqual(backendShard(classes, 1, BACKEND_SHARDS), shards[0], "the split is stable between runs");
+});
+
+test("given classes of unequal weight, when they are split, then each cut lands nearest the even share", () => {
+  // given
+  const classes = [["a", 1], ["b", 1], ["c", 10], ["d", 1]].map(([name, weight]) => ({ name, weight }));
+
+  // when
+  const shards = [1, 2].map((current) => backendShard(classes, current, 2));
+
+  // then
+  assert.deepEqual(shards, [["a", "b"], ["c", "d"]],
+    "cutting after the heavy class would leave one shard with almost everything");
+});
+
+test("given one heavy class among light ones, when they are split, then the share follows weight rather than count", () => {
+  // given
+  const classes = [["a", 10], ["b", 1], ["c", 1], ["d", 1]].map(([name, weight]) => ({ name, weight }));
+
+  // when
+  const shards = [1, 2].map((current) => backendShard(classes, current, 2));
+
+  // then
+  assert.deepEqual(shards, [["a"], ["b", "c", "d"]], "half the classes would put eleven of thirteen units in one shard");
+});
+
+test("given any weights, when they are split into any number of shards, then every class lands in exactly one", () => {
+  // given
+  let seed = 7;
+  const next = () => (seed = (seed * 48271) % 2147483647);
+  const cases = Array.from({ length: 200 }, (_, run) => ({
+    total: 1 + (run % 5),
+    classes: Array.from({ length: next() % 12 }, (_, index) =>
+      ({ name: `c${index}`, weight: [0, 1, 7, 1000][next() % 4] }))
+  }));
+
+  // when / then
+  for (const { total, classes } of cases) {
+    const shards = Array.from({ length: total }, (_, index) => backendShard(classes, index + 1, total));
+    assert.deepEqual(shards.flat(), classes.map(({ name }) => name),
+      `${JSON.stringify(classes)} in ${total} shards loses, repeats or reorders a class`);
+  }
+});
+
+test("given one class outweighing the rest, when a shard comes out empty, then the listing refuses it", () => {
+  // given
+  const root = sourceTree({
+    "org/example/HeavyTest.java": `class HeavyTest {${" ".repeat(10_000)}}`,
+    "org/example/LightTest.java": "class LightTest {}"
+  });
+
+  // when / then
+  assert.throws(() => shardList(root, `1/${BACKEND_SHARDS}`), /would run no class/,
+    "Surefire runs every class when its includes file is empty, so an empty shard repeats the whole suite");
+  assert.ok(shardList(root, `${BACKEND_SHARDS}/${BACKEND_SHARDS}`).length > 0);
 });
 
 test("given a shard argument, when it is parsed, then only one of the declared shards is accepted", () => {
