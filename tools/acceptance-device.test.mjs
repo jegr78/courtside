@@ -99,6 +99,16 @@ test("given every offline element and a verified cancellation, when the offline 
   assert.equal(judge(check).verdict, "pass");
 });
 
+test("given an offline view that took 92 s, when the offline bookings are judged, then they fail on the wait", () => {
+  // given
+  const check = { check: "offline-bookings", offline: { listed: true, offlineStatus: true, asOf: "as of", within: 92 }, plan: { notice: "offline" }, cancelled: "204 verified" };
+  // when
+  const { verdict, reason } = judge(check);
+  // then
+  assert.equal(verdict, "fail");
+  assert.equal(reason, "missing: the offline view within 15 s (took up to 92 s)", "a member waiting a minute and a half for the offline view is not a pass");
+});
+
 test("given an offline view without the booking and an unverified cancellation, when judged, then both are named", () => {
   // given
   const check = { check: "offline-bookings", offline: { listed: false, offlineStatus: true, asOf: "as of", within: 92 }, plan: { notice: "offline" }, cancelled: "422 not among cancelled bookings" };

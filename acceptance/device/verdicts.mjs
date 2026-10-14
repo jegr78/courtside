@@ -1,5 +1,6 @@
 export const MIN_TOUCH_TARGET = 44;
 export const MIN_TEXT_CONTRAST = 4.5;
+export const MAX_OFFLINE_SECONDS = 15;
 
 const channels = (rgb) => {
   const match = /rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(rgb ?? "");
@@ -45,6 +46,7 @@ const JUDGES = {
       !offline?.asOf && "the as-of note",
       !plan?.notice && "the plan's offline notice"
     ].filter(Boolean);
+    if (offline?.listed && !(offline.within <= MAX_OFFLINE_SECONDS)) missing.push(`the offline view within ${MAX_OFFLINE_SECONDS} s (took up to ${offline.within} s)`);
     if (!cancelled?.endsWith("verified")) missing.push("a verified cancellation of the test booking");
     return missing.length === 0 ? pass(`offline view after at most ${offline.within} s`) : fail(`missing: ${missing.join(", ")}`);
   }
