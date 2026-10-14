@@ -725,3 +725,41 @@ test("given booking hours, when a lane slot is judged, then a slot that starts b
   assert.equal(leavesBookingHours({ start: "16:00", end: "17:00" }, hours), false, "a slot that starts with the window lies inside it");
   assert.equal(leavesBookingHours({ start: "20:30", end: "21:30" }, hours), true, "a slot that runs past the window leaves it");
 });
+
+test("given an erasure target, when parsed, then host and container are kept, and a host that could pass for an option or carries a shell character is refused", () => {
+  // when / then
+  assert.deepEqual(parseConfig({ ...valid(), erasure: { ssh: "ops-host", container: "club-db-1" } }, env).erasure, { ssh: "ops-host", container: "club-db-1" });
+  assert.equal(parseConfig(valid(), env).erasure, undefined, "without a target nothing is erased");
+  assert.equal(field({ ...valid(), erasure: { ssh: "-oProxyCommand=x", container: "club-db-1" } }), "erasure.ssh");
+  assert.equal(field({ ...valid(), erasure: { ssh: "ops-host", container: "db;rm" } }), "erasure.container");
+  assert.equal(field({ ...valid(), erasure: { ssh: "ops-host", container: "club-db-1", user: "root" } }), "erasure.user");
+});
+
+import { erasureCommand, erasedCount, welcomeErasureSql } from "../acceptance/lib/core.mjs";
+
+test("given the persons a run recorded, when the erasure is written, then it names exactly them and erases only a deactivated welcome account nothing depends on", () => {
+  // given
+  const ids = ["3f2b1c4d-0000-4000-8000-000000000001", "3f2b1c4d-0000-4000-8000-000000000002"];
+  // when
+  const sql = welcomeErasureSql(ids);
+  // then
+  for (const id of ids) assert.ok(sql.includes(`'${id}'`), `the erasure names ${id}`);
+  assert.match(sql, /^BEGIN;[\s\S]*COMMIT;\s*$/, "the erasure is one transaction");
+  for (const guard of ["NOT ua.enabled", "LIKE 'acceptance-welcome-%'", "booking b WHERE b.booked_by", "member m WHERE", "booking_participant", "waitlist_participant", "import_external_reference"]) {
+    assert.ok(sql.includes(guard), `the erasure keeps the guard ${guard}`);
+  }
+  assert.equal(welcomeErasureSql([]), null, "a run that created no account erases nothing");
+  assert.throws(() => welcomeErasureSql(["1'; DROP TABLE person; --"]), /not a person id/);
+});
+
+test("given an erasure target, when the command is built, then ssh runs psql in the named container and the statement travels on standard input", () => {
+  // when
+  const [program, args] = erasureCommand({ ssh: "ops-host", container: "club-db-1" });
+  // then
+  assert.equal(program, "ssh");
+  assert.deepEqual(args.slice(0, 6), ["-o", "BatchMode=yes", "--", "ops-host", "docker", "exec"]);
+  assert.deepEqual(args.slice(6, 8), ["-i", "club-db-1"]);
+  assert.ok(args.at(-1).includes("psql -v ON_ERROR_STOP=1"), "psql stops at the first error");
+  assert.equal(erasedCount("erased 2\n"), 2);
+  assert.equal(erasedCount("ERROR: relation"), null);
+});

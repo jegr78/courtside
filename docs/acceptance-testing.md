@@ -42,9 +42,13 @@ created.
   The journey opens that hour, expects the dialog to refuse it and sends the booking to the server
   as well. Without the persona, or with hours the lane hour lies inside, it is reported as not
   checkable.
-- For the welcome, `welcomeAccounts`. An account cannot be removed, only deactivated, so the
-  journey that creates one to read its welcome runs only when the operator allows it, on
-  desktop-chrome, and deactivates the account again. Its person stays on the roster.
+- For the welcome, `welcomeAccounts`. The journey creates one account on desktop-chrome to read
+  its welcome and deactivates it again. Courtside has no erasure path yet, so with `erasure` the
+  postflight removes that account and its person in the database: over `ssh` it runs `psql` in the
+  named container, in one transaction, and only for persons this run recorded whose
+  `acceptance-welcome-` account is deactivated and holds no booking, membership, participation,
+  queue or import reference. Without `erasure` the run writes the statement to
+  `erase-welcome-accounts.sql` and the person stays on the roster.
 
 The member journeys also walk what members hear. The contention journey queues the refused member
 on the waitlist, cancels the holder's booking and takes the offer from the notification centre;
@@ -72,7 +76,8 @@ shows the shape with placeholder accounts.
 | `loadLimit` | One-minute load average the run waits to fall below before it starts; default 5.5 | no |
 | `resetCodesPerHour` | Password-reset codes the instance mails per account and hour; default 5, the instance's own default | no |
 | `notifyClubBookings` | Let the weekend journeys run over club bookings and notify their bookers; only for an instance whose mail reaches a catcher; default false | no |
-| `welcomeAccounts` | Let one profile create an account to read its welcome; each such run leaves one deactivated account; default false | no |
+| `welcomeAccounts` | Let one profile create an account to read its welcome; default false | no |
+| `erasure.ssh`, `erasure.container` | SSH host and database container through which the postflight erases the welcome accounts the run created | no |
 
 The file is validated before any browser starts. A missing or malformed field, two actors sharing
 one username, a window start that is not a Monday or fewer than two courts stop the run and name

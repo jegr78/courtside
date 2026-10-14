@@ -1,4 +1,3 @@
-import { runPath } from "../lib/context";
 import { test, expect } from "@playwright/test";
 import { readFileSync, writeFileSync } from "node:fs";
 import { readLedger, replay } from "../lib/ledger";
@@ -8,7 +7,11 @@ import { allSlots, lanePlan } from "../lib/lanes";
 import { sweep } from "../lib/sweep";
 import { clearWeekend } from "../lib/weekend";
 import { canSignIn, restoreDisposable } from "../lib/disposable";
-import { disposables, PASSWORD, type PersonaKey } from "../lib/context";
+import { config, disposables, PASSWORD, runPath, type PersonaKey } from "../lib/context";
+import { erasedCount, erasureCommand, welcomeErasureSql } from "../lib/core.mjs";
+import { findExecutable } from "../lib/executable.mjs";
+import { precondition } from "../lib/precondition";
+import { spawnSync } from "node:child_process";
 import { leaveWaitlist, openWaitlistEntries } from "../lib/waitlist";
 
 const MEMBERS: PersonaKey[] = ["memberA", "memberB", "memberC"];
@@ -51,11 +54,25 @@ test("when the run ends, then no reserved slot holds a booking of this run, no w
   for (const key of MEMBERS) await leaveWaitlist(key, allSlots());
   const accounts = await Promise.all(readLedger().filter((entry) => entry.kind === "account").map(async (entry) =>
     ({ personId: entry.id, status: (await adminPut(admin, `/api/admin/roster/${entry.id}/account/active`, { active: false })).status() })));
+  const erasure = eraseWelcomeAccounts(accounts.map((account) => account.personId));
   const queued = Object.fromEntries(await Promise.all(MEMBERS.map(async (key) => [key, (await openWaitlistEntries(key, allSlots())).length])));
-  writeFileSync(runPath("postflight.json"), JSON.stringify({ removed, left, foreign, weeks: weeks.removed, foreignWeeks: weeks.foreign, queued, accounts }, null, 2));
+  writeFileSync(runPath("postflight.json"), JSON.stringify({ removed, left, foreign, weeks: weeks.removed, foreignWeeks: weeks.foreign, queued, accounts, erasure }, null, 2));
   // then
   expect(left, "no reserved slot holds a booking of this run").toEqual([]);
   expect(queued, "no member is left waiting on a waitlist").toEqual({ memberA: 0, memberB: 0, memberC: 0 });
   expect(accounts.filter((account) => account.status >= 300), "every account this run created is deactivated").toEqual([]);
+  if (erasure.attempted) expect(erasure.erased, `every welcome account this run created is erased (exit ${erasure.exit})`).toBe(accounts.length);
   for (const [index, username] of disposables.entries()) expect(await canSignIn(PASSWORD, username), `disposable ${index + 1} signs in`).toBe(true);
 });
+
+function eraseWelcomeAccounts(personIds: string[]) {
+  const sql = welcomeErasureSql(personIds);
+  if (!sql) return { attempted: false };
+  writeFileSync(runPath("erase-welcome-accounts.sql"), sql);
+  if (!config.erasure) return { attempted: false, sql: "erase-welcome-accounts.sql" };
+  const [program, args] = erasureCommand(config.erasure) as [string, string[]];
+  const executable = findExecutable(program);
+  precondition(executable, `${program} is not on PATH, so the welcome accounts are not erased`);
+  const result = spawnSync(executable, args, { input: sql, encoding: "utf8", timeout: 60_000 });
+  return { attempted: true, exit: result.status, erased: erasedCount(result.stdout ?? "") };
+}

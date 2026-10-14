@@ -10,6 +10,7 @@ export type Config = {
   disposables: string[]; timeZone?: string; window: { start?: string }; courts?: number[];
   mail?: { url: string }; logs: { app?: string; proxy?: string }; metrics?: { url: string };
   browsers: { firefox?: { wsEndpoint: string } }; loadLimit: number; resetCodesPerHour: number; notifyClubBookings: boolean; welcomeAccounts: boolean;
+  erasure?: { ssh: string; container: string };
 };
 export const config = loadConfig() as unknown as Config;
 export const PASSWORD: string = config.password;

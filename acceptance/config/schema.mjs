@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 
 export const PERSONA_KEYS = ["admin", "trainer", "youth", "sport", "grounds", "treasurer", "memberA", "memberB", "memberC", "disposable"];
-const TOP_LEVEL = ["baseUrl", "expectedVersion", "personas", "timeZone", "window", "courts", "mail", "logs", "metrics", "browsers", "loadLimit", "resetCodesPerHour", "notifyClubBookings", "welcomeAccounts"];
+const TOP_LEVEL = ["baseUrl", "expectedVersion", "personas", "timeZone", "window", "courts", "mail", "logs", "metrics", "browsers", "loadLimit", "resetCodesPerHour", "notifyClubBookings", "welcomeAccounts", "erasure"];
 
 export class ConfigError extends Error {
   constructor(field, problem) {
@@ -126,6 +126,14 @@ export function parseConfig(raw, env) {
   if (input.welcomeAccounts !== undefined) {
     if (typeof input.welcomeAccounts !== "boolean") throw new ConfigError("welcomeAccounts", "must be true or false");
     config.welcomeAccounts = input.welcomeAccounts;
+  }
+  if (input.erasure !== undefined) {
+    const erasure = object(input.erasure, "erasure");
+    onlyKeys(erasure, ["ssh", "container"], "erasure");
+    const name = /^[A-Za-z0-9][A-Za-z0-9._@-]*$/;
+    if (!name.test(text(erasure.ssh, "erasure.ssh"))) throw new ConfigError("erasure.ssh", "must be an ssh host name");
+    if (!name.test(text(erasure.container, "erasure.container"))) throw new ConfigError("erasure.container", "must be a container name");
+    config.erasure = { ssh: erasure.ssh, container: erasure.container };
   }
   if (input.notifyClubBookings !== undefined) {
     if (typeof input.notifyClubBookings !== "boolean") throw new ConfigError("notifyClubBookings", "must be true or false");
