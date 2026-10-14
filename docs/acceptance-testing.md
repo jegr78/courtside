@@ -118,6 +118,59 @@ that runs the instance.
 Contact sheets and report images need ImageMagick on `PATH`; without it the run skips the sheets
 and the report embeds the original screenshots.
 
+## A real iPhone
+
+The iPhone profiles run Playwright's WebKit, which is not Safari. `acceptance/device/iphone.mjs`
+checks the same instance in Safari on an iPhone connected to a Mac by cable:
+
+```bash
+cd acceptance
+ACCEPTANCE_CONFIG=/path/to/config.json ACCEPTANCE_PASSWORD=… DEVICE_OUTAGE_HOST=<ssh host> npm run device
+```
+
+The iPhone needs Web Inspector and Remote Automation switched on under Settings > Apps > Safari >
+Advanced, a way to reach `baseUrl`, and an unlocked screen for the whole run. Quit Safari on the Mac
+first; `safaridriver` ships with macOS and needs no Xcode. Safari locks the iPhone's screen while
+the run drives it, and every session starts without cookies, storage or a service worker.
+
+Signed in as `memberA`, and as `admin` for the administration pages, the run checks:
+
+| Check | Passes when |
+|---|---|
+| `theme-switch` | inherited text has 4.5:1 contrast one second after switching to light |
+| `select-heights` | every select in the booking dialog is at least 44 px high |
+| `saved-message` | the confirmation is in view after saving the message choices |
+| `member-pages` | the plan, the booking dialog, the preferences, My bookings and My messages fit the screen and have no field Safari zooms into |
+| `visitor-pages` | the same for the signed-out plan, the sign-in and the account recovery |
+| `admin-pages` | the same for every page of the administration navigation |
+| `service-worker` | a service worker controls the page |
+| `outage` | the instance becomes unreachable for the iPhone and comes back |
+| `offline-bookings` | with the instance unreachable, My bookings lists a fresh booking with its offline note within 15 s, and the plan says it is offline |
+
+The page checks run the layout probe the journeys use, `acceptance/lib/layout-probe.mjs`, with
+Safari's own font metrics. A page fails when it scrolls sideways, when an element reaches past the
+screen edge, or when a visible text field or select is set below 16 px, because Safari on iOS zooms
+into such a field when it is tapped. Small targets, truncated text and controls under the sticky
+bars are recorded as observations: the plan scrolls under its own bars by design.
+
+Each check writes screenshots and measurements to `result.json` in its own directory under
+`build/acceptance-device/` and prints its verdict; any verdict other than `pass` ends the run with
+exit code 1. `DEVICE_CHECKS` selects checks by name, `DEVICE_DIAGNOSE=1` makes `safaridriver` log
+its protocol under `~/Library/Logs/com.apple.WebDriver/`, and `DEVICE_CANCEL` names booking ids a
+broken run left behind. That protocol log holds the shared password in plain text, because the run
+types it through a script; delete it once it has served its purpose.
+
+Safari cannot be told to go offline, and its screen lock rules out airplane mode during a run.
+`outage` and `offline-bookings` therefore take the instance's HTTPS handler down for everyone, for
+up to two minutes each. They expect an instance published through `tailscale serve` or
+`tailscale funnel` with a single proxy handler on `/` of port 443, and an SSH host on which
+`sudo -n` may run `tailscale` and `systemd-run`; any other serve configuration stops them before
+anything is taken down. The run records the
+serve status, restores it afterwards and fails if the status differs; a timer restores it after
+five minutes whatever happens to the run. Without `DEVICE_OUTAGE_HOST` both checks are skipped.
+The booking `offline-bookings` makes lies two days ahead, outside the cancellation deadline, and
+the run cancels it and confirms the cancellation.
+
 ## Review
 
 Every finding in the report carries a stable key: `axe:<rule>`, `console:<digest>`,

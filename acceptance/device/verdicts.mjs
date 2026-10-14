@@ -1,0 +1,85 @@
+export const MIN_TOUCH_TARGET = 44;
+export const MIN_TEXT_CONTRAST = 4.5;
+export const MAX_OFFLINE_SECONDS = 15;
+
+const channels = (rgb) => {
+  const match = /rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(rgb ?? "");
+  if (!match) throw new Error(`not an rgb colour: ${rgb}`);
+  return match.slice(1, 4).map(Number);
+};
+
+const luminance = (rgb) => {
+  const [r, g, b] = channels(rgb).map((value) => {
+    const s = value / 255;
+    return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+
+export function contrast(foreground, background) {
+  const [light, dark] = [luminance(foreground), luminance(background)].sort((a, b) => b - a);
+  return (light + 0.05) / (dark + 0.05);
+}
+
+const pass = (reason) => ({ verdict: "pass", reason });
+const notFound = (names) => ({ verdict: "fail", reason: `not found: ${names.join(", ")}` });
+const fail = (reason) => ({ verdict: "fail", reason });
+
+export const MIN_INPUT_FONT_PX = 16;
+
+function judgeSurfaces({ surfaces }) {
+  const faults = surfaces.flatMap((surface) => [
+    surface.error && `${surface.name}: ${surface.error}`,
+    surface.documentOverflow && `${surface.name}: the page scrolls sideways`,
+    surface.overflow?.length && `${surface.name}: ${surface.overflow.length} element(s) beyond the screen edge`,
+    surface.zoom?.length && `${surface.name}: ${surface.zoom.map((field) => `${field.selector} ${field.fontSize}`).join(", ")} below ${MIN_INPUT_FONT_PX} px, so Safari zooms in`
+  ].filter(Boolean));
+  if (faults.length > 0) return fail(faults.join("; "));
+  const small = surfaces.reduce((sum, surface) => sum + (surface.smallTargets?.length ?? 0), 0);
+  const truncated = surfaces.reduce((sum, surface) => sum + (surface.truncated?.length ?? 0), 0);
+  const covered = surfaces.reduce((sum, surface) => sum + (surface.occluded?.length ?? 0), 0);
+  return pass(`${surfaces.length} pages fit the screen; observed ${small} targets below ${MIN_TOUCH_TARGET} px, ${truncated} truncated texts and ${covered} controls under sticky bars`);
+}
+
+const JUDGES = {
+  "member-pages": judgeSurfaces,
+  "visitor-pages": judgeSurfaces,
+  "admin-pages": judgeSurfaces,
+  "theme-switch": ({ afterOneSecond }) => {
+    const missing = afterOneSecond.filter((label) => label.missing);
+    if (missing.length > 0) return notFound(missing.map((label) => label.label));
+    const faint = afterOneSecond.filter((label) => contrast(label.color, label.background) < MIN_TEXT_CONTRAST);
+    return faint.length === 0 ? pass("inherited text is readable one second after switching to light")
+      : fail(`below ${MIN_TEXT_CONTRAST}:1 one second after the switch: ${faint.map((label) => label.label).join(", ")}`);
+  },
+  "select-heights": ({ fields }) => {
+    const missing = fields.filter((field) => field.missing);
+    if (missing.length > 0) return notFound(missing.map((field) => field.testId));
+    const low = fields.filter((field) => field.tag === "select" && !(field.height >= MIN_TOUCH_TARGET));
+    return low.length === 0 ? pass(`every select is at least ${MIN_TOUCH_TARGET} px high`)
+      : fail(`lower than ${MIN_TOUCH_TARGET} px: ${low.map((field) => `${field.testId} ${field.height} px`).join(", ")}`);
+  },
+  "saved-message": ({ placement }) => placement.inView ? pass("the confirmation is in view after saving")
+    : fail(`the confirmation sits ${placement.top < 0 ? -placement.top : placement.top - placement.viewport} px outside the viewport`),
+  "service-worker": ({ controlled }) => controlled ? pass("a service worker controls the page") : fail("no service worker controls the page"),
+  "outage": () => pass("the server became unreachable for the iPhone and came back"),
+  "offline-bookings": ({ offline, plan, cancelled }) => {
+    const missing = [
+      !offline?.listed && "the booking in My bookings",
+      !offline?.offlineStatus && "the offline status",
+      !offline?.asOf && "the as-of note",
+      !plan?.notice && "the plan's offline notice"
+    ].filter(Boolean);
+    if (offline?.listed && !(offline.within <= MAX_OFFLINE_SECONDS)) missing.push(`the offline view within ${MAX_OFFLINE_SECONDS} s (took up to ${offline.within} s)`);
+    if (!cancelled?.endsWith("verified")) missing.push("a verified cancellation of the test booking");
+    return missing.length === 0 ? pass(`offline view after at most ${offline.within} s`) : fail(`missing: ${missing.join(", ")}`);
+  }
+};
+
+export function judge(check) {
+  if (check.skipped) return { verdict: "skipped", reason: check.skipped };
+  if (check.error) return { verdict: "error", reason: check.error };
+  const judgeOf = JUDGES[check.check];
+  if (!judgeOf) throw new Error(`no verdict defined for ${check.check}`);
+  return judgeOf(check);
+}
