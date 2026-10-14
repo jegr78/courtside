@@ -148,7 +148,7 @@ function jobsRunningATool() {
             .map((match) => match[1].slice("tools/".length)))],
           installsAt: job.text.search(/npm ci|npm install|\.\/mvnw/),
           runsADependentToolAt: job.text.search(
-            /node tools\/(?!node-toolchain\.mjs)[\w.-]+\.mjs/)
+            /node tools\/(?!node-toolchain\.mjs|backend-test-shards\.mjs)[\w.-]+\.mjs/)
         }));
     });
 }
