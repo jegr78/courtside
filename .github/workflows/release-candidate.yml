@@ -57,9 +57,29 @@ jobs:
           --event "$EVENT" --commit "$REQUESTED_COMMIT" --rehearsal "$REHEARSAL"
           --github-output "$GITHUB_OUTPUT"
 
-  preconditions:
+  anchor:
     needs: select
-    if: needs.select.outputs.release == 'true'
+    if: needs.select.outputs.release == 'true' && needs.select.outputs.rehearsal != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+
+      - name: Ensure a branch names the release commit
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+          VERSION: ${{ needs.select.outputs.version }}
+          COMMIT: ${{ needs.select.outputs.commit }}
+          BRANCH: ${{ needs.select.outputs.branch }}
+        run: node tools/release-anchor.mjs ensure --version "$VERSION" --commit "$COMMIT" --branch "$BRANCH"
+
+  preconditions:
+    needs: [select, anchor]
+    if: ${{ !cancelled() && needs.select.outputs.release == 'true' && needs.anchor.result != 'failure' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -94,8 +114,8 @@ jobs:
           test "$count" = 0 || { echo "::error::$count nightly failure issue(s) remain open"; exit 1; }
 
   release-build:
-    needs: select
-    if: needs.select.outputs.release == 'true'
+    needs: [select, anchor]
+    if: ${{ !cancelled() && needs.select.outputs.release == 'true' && needs.anchor.result != 'failure' }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
@@ -654,8 +674,8 @@ jobs:
           if-no-files-found: error
 
   tag:
-    needs: [select, evidence]
-    if: ${{ always() && needs.evidence.result == 'success' && needs.select.outputs.release == 'true' && needs.select.outputs.rehearsal != 'true' }}
+    needs: [select, anchor, evidence]
+    if: ${{ always() && needs.anchor.result == 'success' && needs.evidence.result == 'success' && needs.select.outputs.release == 'true' && needs.select.outputs.rehearsal != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions: {}
@@ -692,3 +712,13 @@ jobs:
           if gh api "repos/$GITHUB_REPOSITORY/issues/$PULL_REQUEST/labels" --jq '.[].name' | grep -qx 'autorelease: pending'; then
             gh api -X DELETE "repos/$GITHUB_REPOSITORY/issues/$PULL_REQUEST/labels/autorelease:%20pending" > /dev/null
           fi
+
+      - name: Remove the anchors of the tagged version
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+        run: |
+          for ref in $(gh api "repos/$GITHUB_REPOSITORY/git/matching-refs/heads/release-anchor/$TAG/" --jq '.[].ref'); do
+            [[ "$ref" == "refs/heads/release-anchor/$TAG/${ref##*/}" && "${ref##*/}" =~ ^[0-9a-f]{40}$ ]] || continue
+            gh api -X DELETE "repos/$GITHUB_REPOSITORY/git/$ref" \
+              || echo "::warning::$ref remains; delete it once the release run has published"
+          done

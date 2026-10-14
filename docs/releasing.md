@@ -257,6 +257,15 @@ ancestor passed every gate, not necessarily the release commit. What verifies th
 its own green push `build`, which ran the test suite and every browser group, and the candidate's own
 call of the same gates on its exact digests.
 
+**A branch has to name the release commit.** GitHub refuses a token without the Workflows
+permission to create a tag at a commit that no ref names when `main` has changed a workflow since,
+and that holds for the release token and the workflow token alike. The qualification takes about 45
+minutes, long enough for that to happen, so the release commit is anchored while it still heads its
+branch: on the push of the release commit, `release-please` creates the branch
+`release-anchor/v<version>/<sha>`, and the candidate's `anchor` job accepts it or, for a dispatched
+release, creates it then. A commit that heads no branch any more and has no anchor is refused before
+anything is built. The `tag` job removes the anchors once the tag exists.
+
 **No tracker-written `nightly` failure issue may be open.** The check counts open issues carrying
 the `nightly` label whose title starts with `[nightly] ` and whose body holds the tracker's
 fingerprint, the issues the scheduled-run tracker wrote. An issue a human opened about a failing
@@ -297,6 +306,7 @@ tag; `release.yml` answers the tag and publishes exactly what was qualified.
 | Job | What it establishes |
 |---|---|
 | `select` | The green push `build` that finished belongs to a release commit, or for a patch the build dispatched on its release branch, recorded as `patch-release`: the manifest changed, exactly one merged `autorelease: pending` pull request is titled for that version, the commit is on the branch the version belongs to, carries the tools the release workflows call, is no patch of a retired line and, for a patch, has every fix ported to `main`, and the version is not tagged yet |
+| `anchor` | A branch `release-anchor/v<version>/<sha>` names the release commit. Release Please writes it on the push of the release commit; a dispatched release writes it here, which succeeds only while the commit still heads its branch |
 | `preconditions` | A first-attempt build on the release's branch, its nightly-image workflow and its release-gate rehearsal completed for an ancestor of the release commit, and, for a release from `main`, no tracker-written nightly failure remains open |
 | `release-build` | Dependency-remediation deadlines hold, CodeQL analyses the sources, npm audit evidence is captured, the release-build security policy holds, and the release notes and upgrade origins are collected. The test suite and the complete browser matrix already ran in the commit's own green push `build`, which `select` requires |
 | `image` | One multi-architecture image and its booking-seed image, pushed as `release-candidate-<sha>-<run id>` |
@@ -304,7 +314,7 @@ tag; `release.yml` answers the tag and publishes exactly what was qualified.
 | `qualify` | The exact deployment archive is checked against that digest and all four recipes, then the digest is brought up through the reference deployment on `amd64` and `arm64` and checked against the candidate-image policy |
 | `gates` | Calls `release-gates.yml` with the candidate digest, the same workflow the nightly rehearses. Its `mail` job exercises the archive's self-hosted-mail recipe against controlled DNS, TLS and SMTP peers. `active-security` runs the scanners of the `active` profile against the running candidate; the `destructive` profile does not run here. `restore` restores a backup taken from the candidate into it. `security-record` collects the build, image, qualify and active-security evidence into one file, without `upgrade` and `restore`. `archive-reproducibility` builds the archive again from the release commit and requires the same bytes. `npm-audit` holds the release npm policy. `upgrade` migrates a database from each resolved origin into the candidate; the first release has none |
 | `evidence` | The record `release-candidate-evidence-<sha>`: both digests, the archive checksum, the version, the run and the push build, written only when every job above succeeded |
-| `tag` | Writes `v<version>` at the qualified commit through the release token and marks the release pull request `autorelease: tagged`. An existing tag is accepted only where it already names the qualified commit, so a re-run completes and a tag never moves |
+| `tag` | Writes `v<version>` at the qualified commit through the release token, marks the release pull request `autorelease: tagged` and removes the version's anchors. An existing tag is accepted only where it already names the qualified commit, so a re-run completes and a tag never moves |
 | `candidate` | In `release.yml`: the tag sits on the branch its version belongs to, names the version the commit records and belongs to the newest published line, and the newest release-mode candidate evidence for that commit verifies, including the archive's checksum |
 | `publish` | The qualified manifests are signed with cosign and given SBOMs and provenance attestations; the draft release receives the candidate's archive, notes and security record, the version tags are pushed, and only then is the release made visible |
 | `plan-sync` | The release plan's status comment is synchronized with the release just published |
@@ -341,6 +351,9 @@ unqualified, in a public registry. Nightly retention removes them after 14 days.
   candidate starts when that attempt turns green.
 - A failure outside the commit, such as a runner that died or a registry that timed out: choose
   Re-run failed jobs on the candidate run. `evidence` and `tag` run again once everything is green.
+- A refused `anchor` job: the release commit no longer heads its branch and no anchor names it,
+  because the push's anchor step failed or predates this check. Treat it like a defect in the
+  commit below and dispatch the candidate for the head of the branch.
 - A defect in the commit: fix it on the release's branch, `main` or `release/<major>.<minor>`,
   through the usual pull request. Then dispatch `release-candidate.yml` from `main` with
   `rehearsal=false` and `commit` set to the fixed commit on that branch. The
@@ -400,6 +413,7 @@ The jobs, in order:
 | Job | What it proves |
 | --- | --- |
 | `select` | The commit, its version and tag, and whether it qualifies at all |
+| `anchor` | For a release only: a branch names the commit, so the tag can be written after qualification |
 | `preconditions` | A nightly verified an ancestor, and no nightly failure issue is open |
 | `release-build` | The release-build security and dependency policy, release notes and upgrade origins, without running the test suite again |
 | `image` | The image and booking-seed image of that commit, pushed as `release-candidate-<sha>-<run id>` and `booking-seed-release-candidate-<sha>-<run id>` |
@@ -407,7 +421,7 @@ The jobs, in order:
 | `qualify` | The reference deployment and image policy on `amd64` and `arm64` |
 | `gates` | Every release gate on those exact digests and that archive |
 | `evidence` | The record `release-candidate-evidence-<sha>`, written only when every job above succeeded |
-| `tag` | For a release only: the tag at the qualified commit, which starts `release.yml` |
+| `tag` | For a release only: the tag at the qualified commit, which starts `release.yml`, then the anchors of that version are removed |
 
 A rehearsal writes no git tag, no GitHub release and no version tag. Its only registry writes are the
 two candidate image tags above, which nightly retention removes after 14 days. A rehearsal uploads
