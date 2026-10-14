@@ -158,6 +158,6 @@ test("given WebKit plus axe runs in its own pull-request shard, when the documen
       `${path} still describes WebKit plus axe as outside the merge gate`);
     assert.doesNotMatch(text, /used to run only/, `${path} narrates history instead of the current gate`);
   }
-  assert.match(documents[0][1], /WebKit plus axe combination runs in its own pull-request browser shard/);
-  assert.match(documents[1][1], /WebKit plus axe combination runs in its own pull-request browser shard/);
+  assert.match(documents[0][1], /WebKit plus axe combination runs in two pull-request browser shards of its own/);
+  assert.match(documents[1][1], /WebKit plus axe combination runs in two pull-request browser shards of its own/);
 });

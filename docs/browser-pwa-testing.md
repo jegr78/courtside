@@ -3,7 +3,7 @@
 Courtside treats Chromium and WebKit as required desktop engines. The merge gate runs Chromium
 core and accessibility projects plus core member, administration and installed-PWA journeys in
 WebKit. Chromium owns the blocking automated WCAG rule scan. The WebKit plus axe combination runs
-in its own pull-request browser shard and blocks a merge as well; the scheduled reliability path
+in two pull-request browser shards of its own and blocks a merge as well; the scheduled reliability path
 repeats it. The scheduled stability workflow adds
 Firefox, iPhone/Safari emulation and Android/Chrome emulation. Emulation exercises layout, touch
 input and browser-engine behaviour; it is not evidence for operating-system integration or a

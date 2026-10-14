@@ -86,7 +86,7 @@ Modified, explicitly classified paths may select `docs`, `backend`, `frontend`, 
 `security-tooling`, or an additive combination. Backend changes run backend, tooling and security verification; frontend changes run frontend,
 tooling and security verification. Frontend compilation, lint, unit tests and coverage finish before
 the browser jobs consume the same packaged candidate. Blocking visual and guide snapshots run beside
-two stable functional shards that cover Chromium, WebKit, phone layouts and the journey catalogue. The Chromium and the WebKit accessibility projects each run in a shard of their own. On both phone projects, every page the router declares must render its text
+three functional shards that cover Chromium, WebKit and the journey catalogue, and each phone layout runs in a shard of its own. The Chromium and the WebKit accessibility projects each run in two shards of their own. On both phone projects, every page the router declares must render its text
 at 10 px or more and keep each control inside the viewport's width. A full selection also starts a fresh Compose project from an image built for
 that commit and proves its application, database and log-collector wait contract.
 Backend, frontend and full selections can change the image, so they also build and qualify an image
