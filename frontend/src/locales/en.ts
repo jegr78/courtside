@@ -730,6 +730,8 @@ const en: Record<keyof typeof de, string> = {
   "booking.boundBelowSlotGrid": "The rule set permits a shorter booking than one cell of the time grid, so no duration is on offer.",
   "booking.courts": "Courts",
   "booking.players": "{{players}} of {{required}} players",
+  "booking.refusalMore_one": "{{message}} One more point is marked at its field.",
+  "booking.refusalMore_other": "{{message}} {{count}} more points are marked at their fields.",
   "booking.more": "More details",
   "booking.card": "Kind of booking",
   "booking.members": "Members",

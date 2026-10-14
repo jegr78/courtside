@@ -728,6 +728,8 @@ const de = {
   "booking.boundBelowSlotGrid": "Das Regelwerk erlaubt eine kürzere Buchung als das Zeitraster. Deshalb steht keine Dauer zur Wahl.",
   "booking.courts": "Plätze",
   "booking.players": "{{players}} von {{required}} Spielenden",
+  "booking.refusalMore_one": "{{message}} Ein weiterer Punkt ist an seinem Feld markiert.",
+  "booking.refusalMore_other": "{{message}} {{count}} weitere Punkte sind an ihren Feldern markiert.",
   "booking.more": "Weitere Angaben",
   "booking.card": "Art der Buchung",
   "booking.members": "Mitglieder",

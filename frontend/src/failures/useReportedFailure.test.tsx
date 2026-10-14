@@ -2,7 +2,7 @@ import { act, render, screen } from "@testing-library/react";
 import { useEffect, useState } from "react";
 import { beforeEach, describe, expect, it } from "vitest";
 import { ApiError } from "../api/client";
-import { problemReference } from "../api/problem-message";
+import { problemMessage } from "../api/problem-message";
 import i18n from "../i18n";
 import { useReportedFailure } from "./useReportedFailure";
 
@@ -24,7 +24,7 @@ function Zone() {
     <button data-testid="report" type="button" onClick={() => report(new Error("unreachable"))}>report</button>
     <button data-testid="refuse" type="button" onClick={() => refuse("a form refused its own body")}>refuse</button>
     <button data-testid="clear" type="button" onClick={() => clear()}>clear</button>
-    <button data-testid="refer" type="button" onClick={() => report(traced, problemReference)}>refer</button>
+    <button data-testid="refer" type="button" onClick={() => report(traced, problemMessage)}>refer</button>
   </>;
 }
 

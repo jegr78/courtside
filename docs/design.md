@@ -253,8 +253,9 @@ booking roles.
 
 A participant card fills a player slot without identifying a person. A free-text guest is another
 participant kind. A booking card defines exact allowed player counts. The booker fills one slot;
-each remaining slot contains a member, guest or participant card. Cards with no player count do not
-track participants.
+each remaining slot contains a member, guest or participant card. The member search that fills those
+slots leaves out the searching person, because the booker already holds a slot. Cards with no player
+count do not track participants.
 
 ### Series
 

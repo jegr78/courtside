@@ -4,7 +4,7 @@
   "purpose": "This is the normative authorization policy for the shipped Courtside API. OpenAPI defines the transport shape; this policy defines who may perform each operation, which resource attributes narrow that permission, and which protected fields each projection may read or write.",
   "openApiFieldInventorySha256": "5ae51a7e1249d9a16218c00ad608e7530a5d202e2af387c1662f1d5af39d14f9",
   "protectedFieldInventorySha256": "188857c6a912ada8ed9236fbf4218985e20586b2ff77bbfdec0d3e1a0659000e",
-  "productionAuthorizationSha256": "ce4e3b85f8adbf2d091830021741c7b7ab0e72e1a3d227605e1b45e0406381da",
+  "productionAuthorizationSha256": "4ee0bbdfff7173c085e006a79d2ceb64170503c3b830f4ff1cc536642911cd46",
   "ordinaryFields": [
     "Problem.detail",
     "Problem.fieldErrors",
@@ -3514,7 +3514,7 @@
     {
       "id": "member-directory-projection",
       "title": "Participant directory projection",
-      "rule": "Participant search returns only the stable person identifier and display name of current members, never roster, account, address or membership administration fields.",
+      "rule": "Participant search returns only the stable person identifier and display name of current members other than the searching person, never roster, account, address or membership administration fields.",
       "attributes": [
         "current-membership",
         "permanent-account",

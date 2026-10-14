@@ -4343,11 +4343,12 @@ paths:
       x-courtside-state-invariant: true
       summary: Members matching a name fragment for participant selection.
       description: |
-        Any authenticated account may search the entire member directory by a name fragment,
+        Any authenticated account may search the member directory by a name fragment,
         matched case-insensitively anywhere in the full name and returning at most 20 rows with no
         contact details. This reach is deliberate, for the co-player picker — the way
         `Allocation.bookedByName` documents its own visibility rule rather than leaving it
-        implicit. The current authorization does not verify club membership. Before authenticated
+        implicit. The searching person is left out, because a booking already gives its booker a
+        slot. The current authorization does not verify club membership. Before authenticated
         external guest accounts are introduced, this endpoint must gain that boundary so those
         accounts do not inherit the directory reach.
 

@@ -1272,8 +1272,34 @@ it("given booking rules reject a slot, when submitting it, then violations and t
   expect(document.querySelector('[data-code="booking.rule.advanceWindow.exceeded"]')).toBeInTheDocument();
   expect(timeViolations).not.toHaveTextContent("booking.rule.advanceWindow.exceeded");
   expect(screen.getByRole("alert")).toHaveTextContent(
-    "Error reference: 0123456789abcdef0123456789abcdef/0123456789abcdef"
+    "You can book at most 14 days in advance. One more point is marked at its field. Error reference: 0123456789abcdef0123456789abcdef/0123456789abcdef"
   );
+});
+
+it("given a refusal the outcome already lists, when it arrives, then the outcome names it once and adds only the reference", async () => {
+  // given
+  vi.mocked(api.createBooking).mockRejectedValue(new ApiError(400, {
+    type: "urn:courtside:error:validation-failed",
+    title: "Validation failed",
+    status: 400,
+    traceId: "0123456789abcdef0123456789abcdef",
+    spanId: "0123456789abcdef",
+    fieldErrors: [{ field: "body", code: "validation.NotNull", params: {} }]
+  }));
+  render(<WeekView today={clubInstant("07:00")} />);
+  await userEvent.click(await findFreeSlot(1, "08:00"));
+  await screen.findByTestId("booking-dialog");
+
+  // when
+  await userEvent.click(screen.getByTestId("booking-submit"));
+
+  // then
+  const outcome = await screen.findByTestId("booking-outcome");
+  await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(
+    "Error reference: 0123456789abcdef0123456789abcdef/0123456789abcdef"
+  ));
+  expect(outcome.textContent?.split("This field is required.").length, "the outcome says the sentence once").toBe(2);
+  expect(screen.getByRole("alert")).not.toHaveTextContent("This field is required.");
 });
 
 it("given a matching club member, when selecting them, then their person id is submitted", async () => {
@@ -1509,7 +1535,7 @@ it("given a refusal about a field behind the disclosure, when it arrives, then t
     type: "urn:courtside:error:participants-invalid",
     title: "Participants invalid",
     status: 422,
-    violations: [{ code: "booking.participants.duplicate", params: {} }]
+    violations: [{ code: "booking.participants.guestNotAllowed", params: { cardLabel: "Member booking" } }]
   }));
   render(<WeekView today={clubInstant("07:00")} />);
   await userEvent.click(await findFreeSlot(1, "08:00"));
@@ -1521,6 +1547,38 @@ it("given a refusal about a field behind the disclosure, when it arrives, then t
 
   // then
   await waitFor(() => expect(screen.getByTestId("guest-name")).toBeVisible());
+});
+
+it("given a refusal of a chosen member, when it arrives, then it is explained beside the members and in the outcome", async () => {
+  // given
+  vi.mocked(api.createBooking).mockRejectedValue(new ApiError(400, {
+    type: "urn:courtside:error:participants-invalid",
+    title: "Participants invalid",
+    status: 400,
+    traceId: "0123456789abcdef0123456789abcdef",
+    spanId: "0123456789abcdef",
+    violations: [{ code: "booking.participants.duplicate", params: {} }]
+  }));
+  render(<WeekView today={clubInstant("07:00")} />);
+  await userEvent.click(await findFreeSlot(1, "08:00"));
+  await screen.findByTestId("booking-dialog");
+
+  // when
+  await userEvent.click(screen.getByTestId("booking-submit"));
+
+  // then
+  const memberViolations = await waitFor(() => {
+    const element = document.getElementById("booking-members-errors");
+    expect(element, "the refusal sits beside the members it is about").not.toBeNull();
+    return element as HTMLElement;
+  });
+  expect(memberViolations).toHaveTextContent("A player can only occupy one slot of a booking.");
+  expect(screen.getByTestId("member-search").closest("fieldset")).toHaveAttribute("aria-describedby", "booking-members-errors");
+  expect(document.getElementById("booking-participants-errors"), "the refusal is not repeated under guests and extras").toBeNull();
+  expect(screen.getByTestId("guest-name"), "a refusal about members leaves the further details closed").not.toBeVisible();
+  expect(screen.getByRole("alert")).toHaveTextContent(
+    "A player can only occupy one slot of a booking. Error reference: 0123456789abcdef0123456789abcdef/0123456789abcdef"
+  );
 });
 
 function dragAcross(from: HTMLElement, over: HTMLElement[]) {

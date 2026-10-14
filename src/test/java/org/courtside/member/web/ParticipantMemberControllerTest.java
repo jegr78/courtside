@@ -1,6 +1,7 @@
 package org.courtside.member.web;
 
 import org.courtside.AbstractIntegrationTest;
+import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.courtside.member.Member;
 import org.courtside.member.MemberRepository;
@@ -11,15 +12,18 @@ import org.springframework.context.annotation.Import;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.RequestBuilder;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
+import java.util.Set;
 import java.util.UUID;
 
 import static org.courtside.member.MemberFixtures.memberSince;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -39,9 +43,12 @@ class ParticipantMemberControllerTest extends AbstractIntegrationTest {
     @Autowired
     private MemberRepository members;
 
+    @Autowired
+    private UserDetailsService userDetails;
+
     private MockMvc mockMvc;
 
-    private static RequestBuilder searchFor(String query) {
+    private static MockHttpServletRequestBuilder searchFor(String query) {
         return post("/api/public/participant-members").with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"query\":" + quoted(query) + "}");
@@ -72,6 +79,23 @@ class ParticipantMemberControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].personId").value(jane.toString()))
                 .andExpect(jsonPath("$[0].displayName").value("Jane Doe"));
+    }
+
+    @Test
+    void givenTheSearcherMatchesTheirOwnQuery_whenSearchingMembers_thenTheyAreNotOffered()
+            throws Exception {
+        // given
+        UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
+        UUID john = identity.createPerson("John", "Doe", "john.doe@example.org");
+        members.save(memberSince(jane, MEMBERSHIP_TYPE_ID));
+        members.save(memberSince(john, MEMBERSHIP_TYPE_ID));
+        identity.createEnabledAccount(jane, "jane.doe", Set.of(Role.MEMBER));
+
+        // when / then
+        mockMvc.perform(searchFor("doe").with(user(userDetails.loadUserByUsername("jane.doe"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].personId").value(john.toString()));
     }
 
     @Test

@@ -27,7 +27,11 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
             WHERE p.id = m.personId
               AND m.endedOn IS NULL
               AND lower(concat(p.firstName, ' ', p.lastName)) LIKE concat('%', :query, '%') ESCAPE '!'
+              AND NOT EXISTS (SELECT 1 FROM org.courtside.identity.UserAccount a
+                              WHERE a.id = :searcherAccountId AND a.person.id = p.id)
             ORDER BY lower(p.lastName), lower(p.firstName), p.id
             """)
-    List<MemberParticipant> findParticipants(@Param("query") String query, Pageable pageable);
+    List<MemberParticipant> findParticipants(@Param("query") String query,
+                                             @Param("searcherAccountId") UUID searcherAccountId,
+                                             Pageable pageable);
 }
