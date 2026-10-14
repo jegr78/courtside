@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "test": "ACCEPTANCE_CONFIG=config.example.json ACCEPTANCE_PASSWORD=unused ACCEPTANCE_RUN_DIR=../build/acceptance-selftest playwright test --config test/playwright.config.ts",
-    "typecheck": "tsc -p ."
+    "typecheck": "tsc -p .",
+    "device": "node device/iphone.mjs"
   },
   "dependencies": {
     "@axe-core/playwright": "4.13.0",

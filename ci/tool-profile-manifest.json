@@ -1,6 +1,7 @@
 {
   "schemaVersion": 1,
   "entries": [
+    { "path": "tools/acceptance-device.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/acceptance-harness.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/acceptance-literals.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/accessibility-policy.test.mjs", "profiles": ["tooling"], "test": true },
