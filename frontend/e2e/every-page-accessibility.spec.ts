@@ -111,7 +111,7 @@ test.describe("every page", () => {
             const at = new URL(page.url()).pathname;
             landed.add(at);
             for (const testId of awaitedContent[at] ?? []) {
-              await expect(page.getByTestId(testId), `${at} shows ${testId}`).toBeVisible({ timeout: 10_000 });
+              await expect(page.getByTestId(testId).first(), `${at} shows ${testId}`).toBeVisible({ timeout: 10_000 });
             }
             await scanInBothThemes(`${at} as ${persona}`);
             const further = furtherStates[at];
