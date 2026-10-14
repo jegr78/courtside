@@ -682,7 +682,7 @@ test("given another path or method, when a journey waits for an answer, then it 
   // when / then
   assert.equal(cancel(response("GET", "https://club.example.org/api/bookings/42")), false, "a read is no cancellation");
   assert.equal(cancel(response("DELETE", "https://club.example.org/api/bookings/420")), false, "another booking is not this one");
-  assert.equal(cancel(response("DELETE", "https://club.example.org/api/my/bookings/42")), false, "a path that only ends alike is not this one");
+  assert.equal(cancel(response("DELETE", "https://club.example.org/archive/api/bookings/42")), false, "a path that only ends alike is not this one");
   assert.equal(answers("POST", /\/move$/)(response("POST", "https://club.example.org/api/booking-series/7/move?scope=THIS")), true,
     "a pattern matches the path without the query");
 });
