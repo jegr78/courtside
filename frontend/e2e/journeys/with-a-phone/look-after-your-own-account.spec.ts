@@ -1,5 +1,11 @@
 import { expect, test } from "../../fixtures";
+import type { Page } from "@playwright/test";
 import { activate, openTheAccountMenu, openTheApplication, signIn, walks, writeInto } from "../../journey-walking";
+
+const fieldsSafariZoomsInto = (page: Page) => page.locator("input, select, textarea").evaluateAll((fields) => fields
+  .filter((field) => field.checkVisibility() && !["checkbox", "radio", "hidden", "submit", "button"].includes((field as HTMLInputElement).type))
+  .filter((field) => parseFloat(getComputedStyle(field).fontSize) < 16)
+  .map((field) => `${field.id || field.getAttribute("data-testid")} ${getComputedStyle(field).fontSize}`));
 
 test("given a member who wants their account in order, when they choose a new password, review the browsers they are signed in on and pick what the club writes to them, then each choice is the one the next visit reads",
   walks("session-and-own-account"), async ({ page, language }) => {
@@ -23,6 +29,7 @@ test("given a member who wants their account in order, when they choose a new pa
 
     // when — the browsers this account is signed in on are read
     await openTheAccountMenu(page);
+    expect(await fieldsSafariZoomsInto(page), "a phone keeps every field at 16 px, or Safari zooms into it").toEqual([]);
     await activate(page.getByTestId("account-security-link"));
     await expect(page.getByTestId("account-security-view")).toBeVisible();
     await expect(page.getByTestId("end-current-session")).toHaveCount(1);
