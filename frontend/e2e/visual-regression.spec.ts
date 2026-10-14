@@ -235,7 +235,9 @@ for (const theme of ["dark", "light"] as const) {
         availability: "AVAILABLE", retentionTruncated: false, searchIncomplete: false, droppedRecords: 0,
         entries: [{
           id: "7d000000-0000-0000-0000-000000000001", occurredAt: journeyInstant, source: "APPLICATION", severity: "WARN",
-          message: "Mail relay relay.example.org refused the connection on port 587 and the message stays queued",
+          message: "Mail relay relay.example.org refused the connection on port 587 and the message stays queued: 421 4.7.0 Try again later, "
+            + "closing connection after 3 attempts within 15 minutes; the next attempt for <0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0@relay.example.org> "
+            + "follows the exponential backoff of the outbox",
           traceId: "4bf92f3577b34da6a3ce929d0e0e4736"
         }]
       } }));
