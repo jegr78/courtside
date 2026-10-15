@@ -11,6 +11,7 @@ import { profilesOf, resetQuota } from "../config/disposables.mjs";
 import { leavesBookingHours, occupying, waitlistErasureSql } from "../lib/core.mjs";
 import { erase } from "../lib/erasure";
 import { PARTNER_MARKER } from "../lib/journey";
+import { MEMBERS } from "../lib/waitlist";
 
 
 test("when the environment is checked before a run, then every precondition holds", async () => {
@@ -24,7 +25,9 @@ test("when the environment is checked before a run, then every precondition hold
     checks.metrics = config.metrics ? await fetch(`${config.metrics.url}?query=up`).then((r) => r.json()).then((j) => j.status, () => "unreachable") : "not configured";
     checks.windowStart = allSlots()[0]?.date ?? null;
     checks.load = loadavg()[0];
-    checks.waitlistErasure = erase(waitlistErasureSql((["memberA", "memberB", "memberC"] as const).map((key) => config.personas[key])), "erase-waitlist-entries-before.sql");
+    checks.waitlistErasure = checks.version === config.expectedVersion
+      ? erase(waitlistErasureSql(MEMBERS.map((key) => config.personas[key])), "erase-waitlist-entries-before.sql")
+      : { attempted: false };
     const courts = await (await admin.get("/api/public/courts")).json() as { id: string; number: number }[];
     const days = new Map<string, unknown>();
     for (const slot of allSlots()) if (!days.has(slot.date)) days.set(slot.date, await (await admin.get(`/api/bookings?date=${slot.date}`)).json());

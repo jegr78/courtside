@@ -7,12 +7,10 @@ import { allSlots, lanePlan } from "../lib/lanes";
 import { sweep } from "../lib/sweep";
 import { clearWeekend } from "../lib/weekend";
 import { canSignIn, restoreDisposable } from "../lib/disposable";
-import { config, disposables, PASSWORD, runPath, type PersonaKey } from "../lib/context";
+import { config, disposables, PASSWORD, runPath } from "../lib/context";
 import { deactivationLeftover, waitlistErasureSql, welcomeErasureSql } from "../lib/core.mjs";
 import { erase } from "../lib/erasure";
-import { leaveWaitlist, openWaitlistEntries } from "../lib/waitlist";
-
-const MEMBERS: PersonaKey[] = ["memberA", "memberB", "memberC"];
+import { leaveWaitlist, MEMBERS, openWaitlistEntries } from "../lib/waitlist";
 
 const ids = (day: unknown) => new Set((day as { bookingId?: string; id?: string }[]).map((a) => a.bookingId ?? a.id));
 
