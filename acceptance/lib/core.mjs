@@ -97,8 +97,9 @@ export function welcomeErasureSql(personIds) {
   const ids = personIds.map((id) => `'${id}'`).join(", ");
   return `BEGIN;
 CREATE TEMP TABLE erased ON COMMIT DROP AS
-  SELECT p.id AS person_id FROM person p JOIN user_account ua ON ua.person_id = p.id
-  WHERE p.id IN (${ids}) AND ua.username LIKE 'acceptance-welcome-%' AND NOT ua.enabled
+  SELECT p.id AS person_id FROM person p LEFT JOIN user_account ua ON ua.person_id = p.id
+  WHERE p.id IN (${ids}) AND p.email LIKE 'acceptance-welcome-%'
+    AND (ua.id IS NULL OR (ua.username LIKE 'acceptance-welcome-%' AND NOT ua.enabled))
     AND NOT EXISTS (SELECT 1 FROM booking b WHERE b.booked_by = ua.id)
     AND NOT EXISTS (SELECT 1 FROM member m WHERE m.person_id = p.id)
     AND NOT EXISTS (SELECT 1 FROM booking_participant bp WHERE bp.person_id = p.id)
@@ -115,6 +116,10 @@ COMMIT;
 export function erasureCommand({ ssh, container }) {
   return ["ssh", ["-o", "BatchMode=yes", "--", ssh,
     `docker exec -i ${container} sh -c 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -At'`]];
+}
+
+export function deactivationLeftover(answers) {
+  return answers.filter((answer) => answer.status >= 300 && answer.type !== "urn:courtside:error:account-not-found");
 }
 
 export function erasedCount(output) {

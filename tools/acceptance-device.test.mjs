@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { restoreCommand, sameServeConfiguration } from "../acceptance/device/outage.mjs";
+import { restoreCommand, restoreTimer, sameServeConfiguration } from "../acceptance/device/outage.mjs";
 import { contrast, judge } from "../acceptance/device/verdicts.mjs";
 
 const served = (funnel) => ({
@@ -24,6 +24,16 @@ test("given a tailnet-only HTTPS handler, when the restore command is derived, t
   const command = restoreCommand(served(false));
   // then
   assert.equal(command[1], "serve", "a handler that was never public stays off the funnel");
+});
+
+test("given a restore command, when its safety timer is derived, then it is armed under one fixed name that a later restore stops", () => {
+  // when
+  const timer = restoreTimer(["tailscale", "funnel", "--bg", "--https=443", "http://127.0.0.1:8080"]);
+  // then
+  assert.deepEqual(timer.arm, ["systemd-run", "--unit=courtside-serve-restore", "--on-active=300",
+    "/usr/bin/tailscale", "funnel", "--bg", "--https=443", "http://127.0.0.1:8080"], "the timer runs the restore by absolute path after five minutes");
+  assert.deepEqual(timer.disarm, [["systemctl", "stop", "courtside-serve-restore.timer"], ["systemctl", "reset-failed", "courtside-serve-restore.service"]],
+    "a restored run stops its timer, so no outdated configuration returns five minutes later");
 });
 
 test("given no handler on port 443, when the restore command is derived, then the outage refuses to start", () => {

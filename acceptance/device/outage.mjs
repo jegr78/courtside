@@ -10,6 +10,15 @@ export function restoreCommand(status) {
   return ["tailscale", status.AllowFunnel?.[sites[0]] ? "funnel" : "serve", "--bg", "--https=443", target];
 }
 
+const RESTORE_UNIT = "courtside-serve-restore";
+
+export function restoreTimer(restore) {
+  return {
+    arm: ["systemd-run", `--unit=${RESTORE_UNIT}`, "--on-active=300", `/usr/bin/${restore[0]}`, ...restore.slice(1)],
+    disarm: [["systemctl", "stop", `${RESTORE_UNIT}.timer`], ["systemctl", "reset-failed", `${RESTORE_UNIT}.service`]]
+  };
+}
+
 const canonical = (value) => Array.isArray(value) ? value.map(canonical)
   : value && typeof value === "object" ? Object.fromEntries(Object.keys(value).sort().map((key) => [key, canonical(value[key])]))
     : value;
