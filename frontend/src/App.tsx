@@ -176,9 +176,10 @@ export function App() {
 
   // The account's language is applied before the session is published, so the signed-in navigation
   // is painted once instead of moving its links out from under whoever is already reaching for one.
-  const refreshSession = useCallback(async (signal?: AbortSignal) => {
+  const refreshSession = useCallback(async (signal?: AbortSignal, answered?: () => void) => {
     const requestedBefore = sessionInvalidations.current;
     const current = await api.session(signal);
+    answered?.();
     signal?.throwIfAborted();
     if (requestedBefore !== sessionInvalidations.current) return;
     const accountLocale = supportedLocale(current.locale);
@@ -203,6 +204,7 @@ export function App() {
     };
     const startupInvalidations = sessionInvalidations.current;
     let answered = false;
+    let settled = false;
     let restoring = false;
     const restoreOffline = async (failure: unknown) => {
       if (restoring) return;
@@ -210,21 +212,24 @@ export function App() {
       warnAbout("Session refresh failed", failure);
       setOffline(true);
       const member = await offlineMemberState();
-      if (answered || startupInvalidations !== sessionInvalidations.current) return;
+      if (settled || startupInvalidations !== sessionInvalidations.current) return;
       setOfflineClub(member?.clubName);
       setSession(member?.session ?? { authenticated: false, roles: [], passwordChangeRequired: false });
     };
     // A request that gets no answer at all, as on a weak connection, would otherwise keep the loading
     // screen until the network stack gives up; the request keeps running and still wins if it answers.
-    const deadline = window.setTimeout(() => void restoreOffline(new Error("no answer within the startup deadline")),
-      STARTUP_SESSION_DEADLINE_MS);
+    const deadline = window.setTimeout(() => {
+      if (!answered) void restoreOffline(new Error("no answer within the startup deadline"));
+    }, STARTUP_SESSION_DEADLINE_MS);
     void Promise.all([
-      refreshSession().then(() => { answered = true; }, restoreOffline).finally(() => window.clearTimeout(deadline)),
+      refreshSession(undefined, () => { answered = true; })
+        .then(() => { settled = true; }, restoreOffline).finally(() => window.clearTimeout(deadline)),
       identify()
     ]);
     const stopListeningForSessionChanges = listenForOtherClientSessionChanges(unauthenticated);
     window.addEventListener("courtside:unauthenticated", unauthenticated);
     return () => {
+      window.clearTimeout(deadline);
       stopListeningForSessionChanges();
       window.removeEventListener("courtside:unauthenticated", unauthenticated);
     };
