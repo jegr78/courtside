@@ -198,6 +198,8 @@ violations at once next to the relevant fields.
 | The duration must be a multiple of the grid | The duration does not match the grid |
 | You can only book a certain number of days ahead | The allowed advance period was exceeded |
 | A booking may only last a certain number of minutes | The selected duration is too long |
+| One booking must run at least a certain number of minutes | The selected duration is too short |
+| You may book at most a certain number of hours a week | With this booking you would have booked more hours from Monday to Sunday than your membership type allows |
 | You have reached the number of open bookings | You must finish or cancel an open booking first |
 | You must cancel a certain number of minutes before the start | The cancellation deadline has passed |
 | A booking cannot start in the past | The selected start is in the past |
