@@ -560,6 +560,8 @@ export function WeekView({ today, clock = systemClock, canBook = true,
       allocations={data.allocations.get(bookingSelection.date) ?? []}
       canChooseSeveralCourts={canChooseSeveralCourts}
       maxBookingMinutes={eligibility?.maxBookingMinutes ?? undefined}
+      minBookingMinutes={eligibility?.minBookingMinutes ?? undefined}
+      maxWeeklyBookedHours={eligibility?.maxWeeklyBookedHours ?? undefined}
       bookingHours={eligibility?.bookingHours ?? undefined}
       closed={() => setBookingSelection(undefined)}
       created={async () => {
