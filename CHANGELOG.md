@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.0-rc.3](https://github.com/jegr78/courtside/compare/v0.2.0-rc.2...v0.2.0-rc.3) (2026-10-15)
+
+
+### Bug fixes
+
+* draw no dropdown arrow on a select that lists its options ([#1530](https://github.com/jegr78/courtside/issues/1530)) ([0b6c635](https://github.com/jegr78/courtside/commit/0b6c63595d62b530c38042935398a78d17a4ed84))
+* let the startup deadline wait for the session answer only ([#1531](https://github.com/jegr78/courtside/issues/1531)) ([c83b77b](https://github.com/jegr78/courtside/commit/c83b77bd3e4e75a9aef095c145198457d00132ac))
+
 ## 0.2.0 (2026-10-14)
 
 
