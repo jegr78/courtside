@@ -42,6 +42,14 @@ created.
   The journey opens that hour, expects the dialog to refuse it and sends the booking to the server
   as well. Without the persona, or with hours the lane hour lies inside, it is reported as not
   checkable.
+- For the weekly-hours journey, the same `personas.restricted` with a rule set that also carries
+  `WEEKLY_BOOKED_HOURS`, for example 1 hour, and `MIN_BOOKING_DURATION` longer than one grid cell,
+  for example 60 minutes. The journey opens a lane, expects the dialog to name the weekly hours and
+  to offer no duration below the minimum, and sends one booking short of the minimum and one past
+  the week. Both are refused, so the persona never holds a booking that counts toward its week.
+  Without both rules it is reported as not checkable. The preflight refuses a run in which a lane
+  persona's category limits the weekly hours or asks for a booking longer than a lane hour, because
+  a run books several lanes per persona in one week.
 - For the welcome, `welcomeAccounts`. The journey creates one account on desktop-chrome to read
   its welcome and deactivates it again. Courtside has no erasure path yet, so with `erasure` the
   postflight removes that account and its person in the database: over `ssh` it runs `psql` in the
