@@ -4,6 +4,7 @@
 
 
 
+
 ### Features
 
 * collect every member notification in an in-app notification centre ([#1400](https://github.com/jegr78/courtside/issues/1400)) ([e959563](https://github.com/jegr78/courtside/commit/e959563b9db13a114450466bd5c505f52c859d63))
@@ -18,6 +19,8 @@
 * welcome a new member with the instance's address before their first password ([#1430](https://github.com/jegr78/courtside/issues/1430)) ([218b751](https://github.com/jegr78/courtside/commit/218b751b04e8a9c84075e8ae5ff703291b81fdb8))
 
 ### Bug fixes
+
+* stop counting waitlist entries whose booking holds the slot toward the limit ([#1535](https://github.com/jegr78/courtside/issues/1535)) ([77280ad](https://github.com/jegr78/courtside/commit/77280add847b799c6583589ae2ac8777f66eb4ef)), closes [#1534](https://github.com/jegr78/courtside/issues/1534)
 
 * draw no dropdown arrow on a select that lists its options ([#1530](https://github.com/jegr78/courtside/issues/1530)) ([0b6c635](https://github.com/jegr78/courtside/commit/0b6c63595d62b530c38042935398a78d17a4ed84))
 * let the startup deadline wait for the session answer only ([#1531](https://github.com/jegr78/courtside/issues/1531)) ([c83b77b](https://github.com/jegr78/courtside/commit/c83b77bd3e4e75a9aef095c145198457d00132ac))
