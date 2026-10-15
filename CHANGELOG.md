@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.0](https://github.com/jegr78/courtside/compare/v0.2.0-rc.4...v0.2.0) (2026-10-15)
+
+
+### Build and dependencies
+
+* graduate the 0.2.0 candidate line from rc.4 ([#1538](https://github.com/jegr78/courtside/issues/1538)) ([4d8cc12](https://github.com/jegr78/courtside/commit/4d8cc12c86e053b28131defacca0874b5ea7992e))
+
 ## 0.2.0 (2026-10-14)
 
 
