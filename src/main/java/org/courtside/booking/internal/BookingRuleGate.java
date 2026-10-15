@@ -138,7 +138,7 @@ public class BookingRuleGate {
 
     private RuleContext contextOf(BookingRuleCheck check) {
         return new RuleContext(check.courtIds().getFirst(), check.cardId(), check.slot(),
-                check.bookedBy(), membershipTypeOf(check.bookedByPersonId()));
+                check.bookedBy(), membershipTypeOf(check.bookedByPersonId()), check.movedBookingIds());
     }
 
     private RuleContext contextOf(BookingRuleCheck check, Map<UUID, Optional<UUID>> membershipTypes) {
@@ -147,7 +147,7 @@ public class BookingRuleGate {
                 : membershipTypes.computeIfAbsent(
                         check.bookedByPersonId(), members::membershipTypeIdOf).orElse(null);
         return new RuleContext(check.courtIds().getFirst(), check.cardId(), check.slot(),
-                check.bookedBy(), membershipTypeId);
+                check.bookedBy(), membershipTypeId, check.movedBookingIds());
     }
 
     private static void requireEmpty(List<RuleViolation> violations) {

@@ -13,14 +13,21 @@ public record BookingRuleCheck(
         TimeSlot slot,
         UUID bookedBy,
         UUID bookedByPersonId,
-        Set<Role> callerRoles) {
+        Set<Role> callerRoles,
+        Set<UUID> movedBookingIds) {
 
     public BookingRuleCheck {
         courtIds = courtIds == null ? List.of() : List.copyOf(courtIds);
         callerRoles = callerRoles == null ? Set.of() : Set.copyOf(callerRoles);
+        movedBookingIds = movedBookingIds == null ? Set.of() : Set.copyOf(movedBookingIds);
         if (courtIds.isEmpty()) {
             throw new IllegalArgumentException("A rule check needs at least one court");
         }
+    }
+
+    public BookingRuleCheck(List<UUID> courtIds, UUID cardId, TimeSlot slot, UUID bookedBy, UUID bookedByPersonId,
+                            Set<Role> callerRoles) {
+        this(courtIds, cardId, slot, bookedBy, bookedByPersonId, callerRoles, Set.of());
     }
 
 }

@@ -107,10 +107,10 @@ class WeeklyBookedHoursRuleTest extends AbstractIntegrationTest {
         book(WEDNESDAY, LocalTime.of(10, 0), 60, MEMBER_BOOKING_CARD, Role.MEMBER);
 
         // when
-        UUID bookingId = book(THURSDAY, LocalTime.of(10, 0), 60, MEMBER_BOOKING_CARD, Role.MEMBER);
+        List<RuleViolation> violations = rule.check(context(MEMBER_BOOKING_CARD, THURSDAY, LocalTime.of(10, 0), 60));
 
         // then
-        assertThat(bookingId).as("reaching the limit is allowed, only passing it is refused").isNotNull();
+        assertThat(violations).as("reaching the limit is allowed, only passing it is refused").isEmpty();
     }
 
     @Test
@@ -211,9 +211,40 @@ class WeeklyBookedHoursRuleTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void whenAskingTheRuleWhetherItJudgesAMove_thenItDoesNotAndAnAdministratorOverridesIt() {
+    void givenAFullWeek_whenOneOfItsBookingsIsJudgedAsMovedWithinTheWeek_thenItsOwnTimeIsNotCountedTwice() {
+        // given
+        ruleAdmin.setRule(STANDARD_RULE_SET, RuleType.WEEKLY_BOOKED_HOURS, TWO_HOURS);
+        UUID moved = book(WEDNESDAY, LocalTime.of(10, 0), 120, MEMBER_BOOKING_CARD, Role.MEMBER);
+
+        // when
+        List<RuleViolation> violations = rule.check(new RuleContext(courtId, MEMBER_BOOKING_CARD,
+                clubSlot(THURSDAY, LocalTime.of(10, 0), 120), account, ACTIVE, Set.of(moved)));
+
+        // then
+        assertThat(violations).as("the moved booking leaves its old place").isEmpty();
+    }
+
+    @Test
+    void givenAnHourBookedThisWeek_whenAnotherBookingIsMovedIntoTheWeekAndPastTheLimit_thenTheMoveIsRefused() {
+        // given
+        ruleAdmin.setRule(STANDARD_RULE_SET, RuleType.WEEKLY_BOOKED_HOURS, TWO_HOURS);
+        book(WEDNESDAY, LocalTime.of(10, 0), 60, MEMBER_BOOKING_CARD, Role.MEMBER);
+        UUID moved = book(NEXT_MONDAY, LocalTime.of(10, 0), 90, MEMBER_BOOKING_CARD, Role.MEMBER);
+
+        // when
+        List<RuleViolation> violations = rule.check(new RuleContext(courtId, MEMBER_BOOKING_CARD,
+                clubSlot(THURSDAY, LocalTime.of(10, 0), 90), account, ACTIVE, Set.of(moved)));
+
+        // then
+        assertThat(violations).as("a move must not carry a booking into a week past its limit")
+                .extracting(RuleViolation::code).containsExactly("booking.rule.weeklyBookedHours.exceeded");
+    }
+
+    @Test
+    void whenAskingTheRuleWhetherItJudgesAMove_thenItDoesAndAnAdministratorOverridesIt() {
         // when / then
-        assertThat(rule.appliesToAMove()).as("a move adds no booking to the week").isFalse();
+        assertThat(rule.appliesToAMove()).as("a move can lengthen a booking or carry it into a fuller week")
+                .isTrue();
         assertThat(rule.isOverridable()).isTrue();
     }
 

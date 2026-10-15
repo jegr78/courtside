@@ -36,7 +36,13 @@ public class WeeklyBookedHoursRule implements BookingRule {
             return List.of();
         }
         Week week = weekOf(context.slot().start());
-        return check(context, maxHours.get(), () -> bookedIn(context.userAccountId(), week));
+        return check(context, maxHours.get(), () -> bookedIn(context, week));
+    }
+
+    // A move can lengthen a booking or carry it into a fuller week; the moved bookings leave their old place.
+    @Override
+    public boolean appliesToAMove() {
+        return true;
     }
 
     // Occurrences of one series are judged together, so each one that passes counts for the next.
@@ -54,7 +60,7 @@ public class WeeklyBookedHoursRule implements BookingRule {
             }
             WeekOfAccount key = new WeekOfAccount(context.userAccountId(), weekOf(context.slot().start()));
             List<RuleViolation> violations = check(context, maxHours.get(),
-                    () -> booked.computeIfAbsent(key, k -> bookedIn(k.accountId(), k.week())));
+                    () -> booked.computeIfAbsent(key, k -> bookedIn(context, k.week())));
             if (violations.isEmpty()) {
                 booked.merge(key, context.slot().duration(), Duration::plus);
             }
@@ -71,10 +77,11 @@ public class WeeklyBookedHoursRule implements BookingRule {
                 Map.of("maxHours", maxHours, "bookedMinutes", booked.toMinutes())));
     }
 
-    private Duration bookedIn(UUID accountId, Week week) {
-        return accountId == null
+    private Duration bookedIn(RuleContext context, Week week) {
+        return context.userAccountId() == null
                 ? Duration.ZERO
-                : bookingCounter.bookedTimeStartingBetween(accountId, week.from(), week.until());
+                : bookingCounter.bookedTimeStartingBetween(
+                        context.userAccountId(), week.from(), week.until(), context.movedBookingIds());
     }
 
     private Week weekOf(Instant instant) {
