@@ -3,6 +3,7 @@
 ## 0.2.0 (2026-10-14)
 
 
+
 ### Features
 
 * collect every member notification in an in-app notification centre ([#1400](https://github.com/jegr78/courtside/issues/1400)) ([e959563](https://github.com/jegr78/courtside/commit/e959563b9db13a114450466bd5c505f52c859d63))
@@ -17,6 +18,9 @@
 * welcome a new member with the instance's address before their first password ([#1430](https://github.com/jegr78/courtside/issues/1430)) ([218b751](https://github.com/jegr78/courtside/commit/218b751b04e8a9c84075e8ae5ff703291b81fdb8))
 
 ### Bug fixes
+
+* draw no dropdown arrow on a select that lists its options ([#1530](https://github.com/jegr78/courtside/issues/1530)) ([0b6c635](https://github.com/jegr78/courtside/commit/0b6c63595d62b530c38042935398a78d17a4ed84))
+* let the startup deadline wait for the session answer only ([#1531](https://github.com/jegr78/courtside/issues/1531)) ([c83b77b](https://github.com/jegr78/courtside/commit/c83b77bd3e4e75a9aef095c145198457d00132ac))
 
 * clear the plan's failure notice once a later refresh succeeds ([#1526](https://github.com/jegr78/courtside/issues/1526)) ([ba9ab7a](https://github.com/jegr78/courtside/commit/ba9ab7aebae7ba0b6cbd33a092884a1853dcbe72))
 * draw the now-line behind running bookings in the court plan ([#1512](https://github.com/jegr78/courtside/issues/1512)) ([d2e792f](https://github.com/jegr78/courtside/commit/d2e792f07261bf17c30c7c4df61d57f9cc89f960))
