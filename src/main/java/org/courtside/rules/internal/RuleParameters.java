@@ -29,7 +29,9 @@ public final class RuleParameters {
             RuleType.NO_COURT_BOOKING, List.of(),
             RuleType.BOOKING_HOURS, List.of(
                     new Parameter("earliestStart", 0, 1438, Kind.TIME_OF_DAY),
-                    new Parameter("latestEnd", 1, 1439, Kind.TIME_OF_DAY)));
+                    new Parameter("latestEnd", 1, 1439, Kind.TIME_OF_DAY)),
+            RuleType.WEEKLY_BOOKED_HOURS, List.of(new Parameter("maxHours", 1, 168, Kind.NUMBER)),
+            RuleType.MIN_BOOKING_DURATION, List.of(new Parameter("minDurationMinutes", 5, 1440, Kind.NUMBER)));
 
     private RuleParameters() {
     }

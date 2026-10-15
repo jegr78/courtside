@@ -68,6 +68,25 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
             """)
     long countOpenBookings(@Param("bookedBy") UUID bookedBy, @Param("now") Instant now);
 
+    @Query(value = "SELECT counts_against_limits FROM booking_card WHERE id = :cardId", nativeQuery = true)
+    Optional<Boolean> cardCountsAgainstLimits(@Param("cardId") UUID cardId);
+
+    @Query(value = """
+            SELECT COALESCE(SUM(EXTRACT(EPOCH FROM (span.ends_at - span.starts_at))), 0)::bigint
+            FROM (SELECT min(a.starts_at) AS starts_at, max(a.ends_at) AS ends_at
+                  FROM booking b
+                  JOIN court_allocation a ON a.booking_id = b.id
+                  JOIN booking_card c ON c.id = b.card_id
+                  WHERE b.booked_by = :bookedBy
+                    AND b.status = 'CONFIRMED'
+                    AND c.counts_against_limits
+                  GROUP BY b.id) span
+            WHERE span.starts_at >= :from AND span.starts_at < :until
+            """,
+            nativeQuery = true)
+    long secondsBookedStartingBetween(@Param("bookedBy") UUID bookedBy, @Param("from") Instant from,
+                                     @Param("until") Instant until);
+
     @Query("""
             SELECT p.booking.id, count(p) FROM BookingParticipant p
             WHERE p.booking.id IN :bookingIds

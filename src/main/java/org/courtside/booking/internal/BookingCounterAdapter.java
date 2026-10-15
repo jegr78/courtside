@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -19,5 +20,15 @@ class BookingCounterAdapter implements BookingCounter {
     @Override
     public long countOpenBookingsOf(UUID userAccountId, Instant now) {
         return bookings.countOpenBookings(userAccountId, now);
+    }
+
+    @Override
+    public Duration bookedTimeStartingBetween(UUID userAccountId, Instant from, Instant until) {
+        return Duration.ofSeconds(bookings.secondsBookedStartingBetween(userAccountId, from, until));
+    }
+
+    @Override
+    public boolean countsAgainstLimits(UUID cardId) {
+        return bookings.cardCountsAgainstLimits(cardId).orElse(true);
     }
 }
