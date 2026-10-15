@@ -111,7 +111,14 @@ class WaitlistRows {
     }
 
     int countNotEnded(UUID accountId, Instant now) {
-        return jdbc.sql("SELECT count(*) FROM waitlist_entry WHERE account_id = :accountId AND ends_at > :now")
+        return jdbc.sql("""
+                        SELECT count(*) FROM waitlist_entry w
+                         WHERE w.account_id = :accountId AND w.ends_at > :now
+                           AND NOT (w.state = 'BOOKED' AND EXISTS (
+                                   SELECT 1 FROM court_allocation a
+                                    WHERE a.booking_id = w.booking_id AND a.status = 'CONFIRMED'
+                                      AND a.court_id = w.court_id AND a.starts_at < w.ends_at AND a.ends_at > w.starts_at))
+                        """)
                 .param("accountId", accountId)
                 .param("now", timestamp(now))
                 .query(Integer.class)

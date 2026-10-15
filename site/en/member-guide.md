@@ -247,7 +247,8 @@ Courtside skips you. If the club takes the court itself, for a closure for examp
 *My bookings* lists only your own entries. Courtside shows nobody who else waits or where you stand.
 You can leave a waitlist at any time. Your entry ends when you book the court yourself or its time
 starts. On one court you can wait for only one of several overlapping times. You can hold at most 20
-entries whose time has not passed yet. Entries you left count too until their time has passed.
+entries whose time has not passed yet. Entries you left or that ended without a booking count too.
+An entry that became a booking you still hold on that court and time does not.
 
 ![The dialog for the waitlist of a taken court with the kind of booking and the players.](../screenshots/en/waitlist-dialog.png)
 
