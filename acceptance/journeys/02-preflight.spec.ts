@@ -8,7 +8,8 @@ import { weekendConflicts } from "../config/lanes.mjs";
 import { config, disposables, PASSWORD, runPath, type PersonaKey } from "../lib/context";
 import { mailAvailable } from "../lib/mail";
 import { profilesOf, resetQuota } from "../config/disposables.mjs";
-import { leavesBookingHours, occupying } from "../lib/core.mjs";
+import { leavesBookingHours, occupying, waitlistErasureSql } from "../lib/core.mjs";
+import { erase } from "../lib/erasure";
 import { PARTNER_MARKER } from "../lib/journey";
 
 
@@ -23,6 +24,7 @@ test("when the environment is checked before a run, then every precondition hold
     checks.metrics = config.metrics ? await fetch(`${config.metrics.url}?query=up`).then((r) => r.json()).then((j) => j.status, () => "unreachable") : "not configured";
     checks.windowStart = allSlots()[0]?.date ?? null;
     checks.load = loadavg()[0];
+    checks.waitlistErasure = erase(waitlistErasureSql((["memberA", "memberB", "memberC"] as const).map((key) => config.personas[key])), "erase-waitlist-entries-before.sql");
     const courts = await (await admin.get("/api/public/courts")).json() as { id: string; number: number }[];
     const days = new Map<string, unknown>();
     for (const slot of allSlots()) if (!days.has(slot.date)) days.set(slot.date, await (await admin.get(`/api/bookings?date=${slot.date}`)).json());
@@ -76,6 +78,8 @@ test("when the environment is checked before a run, then every precondition hold
   if (config.mail) expect.soft(checks.mail, "PRECONDITION: the mail API answers").toBe(true);
   if (config.metrics) expect.soft(checks.metrics, "PRECONDITION: the metrics endpoint answers").toBe("success");
   expect.soft(checks.occupiedSlots, "PRECONDITION: every reserved slot is free").toEqual([]);
+  const waitlistErasure = checks.waitlistErasure as { attempted: boolean; exit?: number };
+  if (waitlistErasure.attempted) expect.soft(waitlistErasure.exit, "PRECONDITION: the members' closed waitlist entries are erased").toBe(0);
   if (!config.notifyClubBookings) expect.soft(checks.weekendConflicts, "PRECONDITION: no club booking lies before a Saturday later opening or on the window's Sunday").toEqual([]);
   for (const [key, count] of Object.entries(checks.openBookings as Record<string, number>)) expect.soft(count, `PRECONDITION: ${key} has at most 6 open bookings`).toBeLessThanOrEqual(6);
   for (const [account, signsIn] of Object.entries(checks.disposablesSignIn as Record<string, boolean>)) {

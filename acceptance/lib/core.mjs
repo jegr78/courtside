@@ -112,6 +112,22 @@ COMMIT;
 `;
 }
 
+const USERNAME = /^[A-Za-z0-9][A-Za-z0-9._@-]*$/;
+
+export function waitlistErasureSql(usernames) {
+  if (usernames.length === 0) return null;
+  for (const name of usernames) if (!USERNAME.test(name)) throw new Error(`not a username: ${name}`);
+  const names = usernames.map((name) => `'${name}'`).join(", ");
+  return `BEGIN;
+CREATE TEMP TABLE erased ON COMMIT DROP AS
+  SELECT w.id FROM waitlist_entry w JOIN user_account ua ON ua.id = w.account_id
+  WHERE ua.username IN (${names}) AND w.state NOT IN ('WAITING', 'OFFERED');
+DELETE FROM waitlist_entry WHERE id IN (SELECT id FROM erased);
+SELECT 'erased ' || count(*) FROM erased;
+COMMIT;
+`;
+}
+
 // ssh hands the remote shell one string, so the command is quoted here; the container name holds no shell character.
 export function erasureCommand({ ssh, container }) {
   return ["ssh", ["-o", "BatchMode=yes", "--", ssh,

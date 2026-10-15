@@ -54,7 +54,11 @@ created.
 The member journeys also walk what members hear. The contention journey queues the refused member
 on the waitlist, cancels the holder's booking and takes the offer from the notification centre;
 the singles journey tells the partner of a cancellation. A queue a journey leaves behind is left
-as its member, because only that member sees it, and the postflight requires none to remain.
+as its member, because only that member sees it, and the postflight requires none to remain. Every
+closed entry still counts toward a member's waitlist limit until its slot ends, so with `erasure`
+the preflight and the postflight delete the closed waitlist entries of `memberA`, `memberB` and
+`memberC` in the database. Without it the run writes the statements to
+`erase-waitlist-entries-before.sql` and `erase-waitlist-entries.sql`.
 
 ## Configuration
 
@@ -78,7 +82,7 @@ shows the shape with placeholder accounts.
 | `resetCodesPerHour` | Password-reset codes the instance mails per account and hour; default 5, the instance's own default | no |
 | `notifyClubBookings` | Let the weekend journeys run over club bookings and notify their bookers; only for an instance whose mail reaches a catcher; default false | no |
 | `welcomeAccounts` | Let one profile create an account to read its welcome; default false | no |
-| `erasure.ssh`, `erasure.container` | SSH host and database container through which the postflight erases the welcome accounts the run created | no |
+| `erasure.ssh`, `erasure.container` | SSH host and database container through which the postflight erases the welcome accounts the run created and the members' closed waitlist entries | no |
 
 The file is validated before any browser starts. A missing or malformed field, two actors sharing
 one username, a window start that is not a Monday or fewer than two courts stop the run and name
