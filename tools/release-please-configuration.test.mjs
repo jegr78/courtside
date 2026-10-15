@@ -111,8 +111,9 @@ test("given 0.1.0 is published, when the strategy is read, then a candidate line
       assert.match(manifest["."], /^\d+\.\d+\.0(?:-rc\.\d+)?$/,
         "main carries the next milestone as candidates; a patch comes from a release branch");
     } else {
-      assert.match(manifest["."], /^\d+\.\d+\.\d+$/,
-        "with prerelease off this is a release branch or a graduation, which records released versions only");
+      assert.match(manifest["."], /^\d+\.\d+\.(?:\d+|0-rc\.\d+)$/,
+        "with prerelease off this is a release branch, which records released versions only, or a graduation"
+        + " whose last candidate stays in the manifest until the release pull request writes the version");
     }
   });
 
