@@ -1,16 +1,6 @@
 # Changelog
 
-## [0.2.0](https://github.com/jegr78/courtside/compare/v0.2.0-rc.4...v0.2.0) (2026-10-15)
-
-
-### Build and dependencies
-
-* graduate the 0.2.0 candidate line from rc.4 ([#1538](https://github.com/jegr78/courtside/issues/1538)) ([4d8cc12](https://github.com/jegr78/courtside/commit/4d8cc12c86e053b28131defacca0874b5ea7992e))
-
-## 0.2.0 (2026-10-14)
-
-
-
+## 0.2.0 (2026-10-15)
 
 ### Features
 
@@ -91,6 +81,8 @@
 * state that the waitlist sweep passes on an offer a rule refused ([#1465](https://github.com/jegr78/courtside/issues/1465)) ([e565ece](https://github.com/jegr78/courtside/commit/e565ece819219ddaf621dce5534956e447d789ab))
 
 ### Build and dependencies
+
+* graduate the 0.2.0 candidate line from rc.4 ([#1538](https://github.com/jegr78/courtside/issues/1538)) ([4d8cc12](https://github.com/jegr78/courtside/commit/4d8cc12c86e053b28131defacca0874b5ea7992e))
 
 * **deps:** update the deployment images and pin each to one version everywhere ([#1407](https://github.com/jegr78/courtside/issues/1407)) ([bc58544](https://github.com/jegr78/courtside/commit/bc58544acaa6e7bec08469f9470a1127be1bb3bc))
 * open the 0.2.0 candidate line on main ([#1390](https://github.com/jegr78/courtside/issues/1390)) ([77fa2ca](https://github.com/jegr78/courtside/commit/77fa2cac7cfc451ce8432ab3b168104c8e7af26e)), closes [#1225](https://github.com/jegr78/courtside/issues/1225)
