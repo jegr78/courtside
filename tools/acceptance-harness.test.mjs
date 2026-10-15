@@ -735,7 +735,7 @@ test("given an erasure target, when parsed, then host and container are kept, an
   assert.equal(field({ ...valid(), erasure: { ssh: "ops-host", container: "club-db-1", user: "root" } }), "erasure.user");
 });
 
-import { erasureCommand, erasedCount, welcomeErasureSql } from "../acceptance/lib/core.mjs";
+import { deactivationLeftover, erasureCommand, erasedCount, welcomeErasureSql } from "../acceptance/lib/core.mjs";
 
 test("given the persons a run recorded, when the erasure is written, then it names exactly them and erases only a deactivated welcome account nothing depends on", () => {
   // given
@@ -745,9 +745,11 @@ test("given the persons a run recorded, when the erasure is written, then it nam
   // then
   for (const id of ids) assert.ok(sql.includes(`'${id}'`), `the erasure names ${id}`);
   assert.match(sql, /^BEGIN;[\s\S]*COMMIT;\s*$/, "the erasure is one transaction");
-  for (const guard of ["NOT ua.enabled", "LIKE 'acceptance-welcome-%'", "booking b WHERE b.booked_by", "member m WHERE", "booking_participant", "waitlist_participant", "import_external_reference"]) {
+  for (const guard of ["NOT ua.enabled", "ua.username LIKE 'acceptance-welcome-%'", "p.email LIKE 'acceptance-welcome-%'", "booking b WHERE b.booked_by", "member m WHERE", "booking_participant", "waitlist_participant", "import_external_reference"]) {
     assert.ok(sql.includes(guard), `the erasure keeps the guard ${guard}`);
   }
+  assert.match(sql, /LEFT JOIN user_account ua ON ua\.person_id = p\.id/, "a person whose account was never created is erased too");
+  assert.match(sql, /ua\.id IS NULL OR/, "a missing account passes the account guards");
   assert.equal(welcomeErasureSql([]), null, "a run that created no account erases nothing");
   assert.throws(() => welcomeErasureSql(["1'; DROP TABLE person; --"]), /not a person id/);
 });
@@ -762,4 +764,19 @@ test("given an erasure target, when the command is built, then ssh runs psql in 
     "the remote shell receives one quoted command, so the container's shell expands its own variables");
   assert.equal(erasedCount("erased 2\n"), 2);
   assert.equal(erasedCount("ERROR: relation"), null);
+});
+
+test("given the deactivation answers, when the postflight judges them, then only a refusal for an existing account is left over", () => {
+  // given
+  const answers = [
+    { personId: "a", status: 200 },
+    { personId: "b", status: 404, type: "urn:courtside:error:account-not-found" },
+    { personId: "c", status: 404, type: "urn:courtside:error:person-not-found" },
+    { personId: "d", status: 403, type: "urn:courtside:error:recent-authentication-required" }
+  ];
+  // when
+  const leftover = deactivationLeftover(answers);
+  // then
+  assert.deepEqual(leftover.map((answer) => answer.personId), ["c", "d"],
+    "a person the run recorded before its account existed has nothing to deactivate, anything else is a leftover");
 });

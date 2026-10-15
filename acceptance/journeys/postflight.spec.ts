@@ -8,7 +8,7 @@ import { sweep } from "../lib/sweep";
 import { clearWeekend } from "../lib/weekend";
 import { canSignIn, restoreDisposable } from "../lib/disposable";
 import { config, disposables, PASSWORD, runPath, type PersonaKey } from "../lib/context";
-import { erasedCount, erasureCommand, welcomeErasureSql } from "../lib/core.mjs";
+import { deactivationLeftover, erasedCount, erasureCommand, welcomeErasureSql } from "../lib/core.mjs";
 import { findExecutable } from "../lib/executable.mjs";
 import { precondition } from "../lib/precondition";
 import { spawnSync } from "node:child_process";
@@ -52,15 +52,18 @@ test("when the run ends, then no reserved slot holds a booking of this run, no w
   const weeks = await clearWeekend();
   for (const username of disposables) await restoreDisposable(username);
   for (const key of MEMBERS) await leaveWaitlist(key, allSlots());
-  const accounts = await Promise.all(readLedger().filter((entry) => entry.kind === "account").map(async (entry) =>
-    ({ personId: entry.id, status: (await adminPut(admin, `/api/admin/roster/${entry.id}/account/active`, { active: false })).status() })));
+  const accounts = await Promise.all(readLedger().filter((entry) => entry.kind === "account").map(async (entry) => {
+    const answer = await adminPut(admin, `/api/admin/roster/${entry.id}/account/active`, { active: false });
+    const type = answer.status() >= 300 ? (await answer.json().catch(() => ({})) as { type?: string }).type : undefined;
+    return { personId: entry.id, status: answer.status(), type };
+  }));
   const erasure = eraseWelcomeAccounts(accounts.map((account) => account.personId));
   const queued = Object.fromEntries(await Promise.all(MEMBERS.map(async (key) => [key, (await openWaitlistEntries(key, allSlots())).length])));
   writeFileSync(runPath("postflight.json"), JSON.stringify({ removed, left, foreign, weeks: weeks.removed, foreignWeeks: weeks.foreign, queued, accounts, erasure }, null, 2));
   // then
   expect(left, "no reserved slot holds a booking of this run").toEqual([]);
   expect(queued, "no member is left waiting on a waitlist").toEqual({ memberA: 0, memberB: 0, memberC: 0 });
-  expect(accounts.filter((account) => account.status >= 300), "every account this run created is deactivated").toEqual([]);
+  expect(deactivationLeftover(accounts), "every account this run created is deactivated").toEqual([]);
   if (erasure.attempted) expect(erasure.erased, `every welcome account this run created is erased (exit ${erasure.exit})`).toBe(accounts.length);
   for (const [index, username] of disposables.entries()) expect(await canSignIn(PASSWORD, username), `disposable ${index + 1} signs in`).toBe(true);
 });

@@ -45,10 +45,11 @@ created.
 - For the welcome, `welcomeAccounts`. The journey creates one account on desktop-chrome to read
   its welcome and deactivates it again. Courtside has no erasure path yet, so with `erasure` the
   postflight removes that account and its person in the database: over `ssh` it runs `psql` in the
-  named container, in one transaction, and only for persons this run recorded whose
-  `acceptance-welcome-` account is deactivated and holds no booking, membership, participation,
-  queue or import reference. Without `erasure` the run writes the statement to
-  `erase-welcome-accounts.sql` and the person stays on the roster.
+  named container, in one transaction, and only for persons this run recorded with an
+  `acceptance-welcome-` address whose `acceptance-welcome-` account is deactivated or was never
+  created, and who hold no booking, membership, participation, queue or import reference. A person
+  whose account creation failed therefore leaves nothing behind either. Without `erasure` the run
+  writes the statement to `erase-welcome-accounts.sql` and the person stays on the roster.
 
 The member journeys also walk what members hear. The contention journey queues the refused member
 on the waitlist, cancels the holder's booking and takes the offer from the notification centre;
@@ -169,10 +170,10 @@ Safari cannot be told to go offline, and its screen lock rules out airplane mode
 `outage` and `offline-bookings` therefore take the instance's HTTPS handler down for everyone, for
 up to two minutes each. They expect an instance published through `tailscale serve` or
 `tailscale funnel` with a single proxy handler on `/` of port 443, and an SSH host on which
-`sudo -n` may run `tailscale` and `systemd-run`; any other serve configuration stops them before
-anything is taken down. The run records the
-serve status, restores it afterwards and fails if the status differs; a timer restores it after
-five minutes whatever happens to the run. Without `DEVICE_OUTAGE_HOST` both checks are skipped.
+`sudo -n` may run `tailscale`, `systemd-run` and `systemctl`; any other serve configuration stops
+them before anything is taken down. The run records the serve status, restores it afterwards and
+fails if the status differs. A timer named `courtside-serve-restore` restores it after five minutes
+if the run does not, and a successful restore stops that timer. Without `DEVICE_OUTAGE_HOST` both checks are skipped.
 The booking `offline-bookings` makes lies two days ahead, outside the cancellation deadline, and
 the run cancels it and confirms the cancellation.
 

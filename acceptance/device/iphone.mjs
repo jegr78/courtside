@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { loadConfig } from "../config/schema.mjs";
 import { layoutProbe, layoutProbeArguments } from "../lib/layout-probe.mjs";
 import { ADMIN_LINKS } from "../lib/surfaces.mjs";
-import { restoreCommand, sameServeConfiguration } from "./outage.mjs";
+import { restoreCommand, restoreTimer, sameServeConfiguration } from "./outage.mjs";
 import { judge } from "./verdicts.mjs";
 
 const config = loadConfig();
@@ -295,6 +295,8 @@ async function serviceWorker(b) {
 
 const onBox = (...command) => execFileSync("ssh", ["--", outageHost, "sudo", "-n", ...command], { stdio: ["ignore", "pipe", "pipe"] }).toString().trim();
 const serveStatus = () => JSON.parse(onBox("tailscale", "serve", "status", "--json"));
+// A timer that already fired or was never armed has no unit left to stop.
+const disarm = (timer) => timer.disarm.forEach((command) => { try { onBox(...command); } catch { /* nothing to stop */ } });
 let takenDown;
 
 // Funnel terminates TLS inside tailscaled, so a firewall never sees the iPhone; only removing the handler cuts it off.
@@ -302,12 +304,15 @@ function setServerUp(up) {
   if (!up) {
     const before = serveStatus();
     const restore = restoreCommand(before);
-    onBox("systemd-run", "--on-active=300", `/usr/bin/${restore[0]}`, ...restore.slice(1));
+    const timer = restoreTimer(restore);
+    disarm(timer);
+    onBox(...timer.arm);
     onBox(restore[0], restore[1], "--https=443", "off");
-    takenDown = { before, restore };
+    takenDown = { before, restore, timer };
   } else if (takenDown) {
     onBox(...takenDown.restore);
     if (!sameServeConfiguration(takenDown.before, serveStatus())) throw new Error("the serve configuration differs from the one taken down");
+    disarm(takenDown.timer);
     takenDown = undefined;
   }
 }
