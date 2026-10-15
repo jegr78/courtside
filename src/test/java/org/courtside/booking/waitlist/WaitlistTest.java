@@ -38,6 +38,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -198,6 +199,100 @@ class WaitlistTest extends AbstractIntegrationTest {
         assertThatThrownBy(() -> join(first, oneMore))
                 .isInstanceOfSatisfying(WaitlistLimitReachedException.class, failure ->
                         assertThat(failure.getCode()).isEqualTo("waitlist.entry.limit"));
+    }
+
+    @Test
+    void givenAMemberWhoLeftAsManyWaitlistsAsTheLimit_whenTheyJoinAnother_thenTheLimitRefusesIt() {
+        // given
+        for (int day = 0; day < WaitlistService.MAX_ENTRIES; day++) {
+            TimeSlot slot = shifted(SLOT, day);
+            book(holder, slot);
+            waitlist.leave(join(first, slot), first.accountId());
+        }
+        TimeSlot oneMore = shifted(SLOT, WaitlistService.MAX_ENTRIES);
+        book(holder, oneMore);
+
+        // when / then
+        assertThatThrownBy(() -> join(first, oneMore))
+                .as("joining and leaving in turn cannot get round the limit")
+                .isInstanceOfSatisfying(WaitlistLimitReachedException.class, failure ->
+                        assertThat(failure.getCode()).isEqualTo("waitlist.entry.limit"));
+    }
+
+    @Test
+    void givenAMemberWhoTookAndCancelledAsManyOffersAsTheLimit_whenTheyJoinAnother_thenTheLimitRefusesIt() {
+        // given
+        for (int day = 0; day < WaitlistService.MAX_ENTRIES; day++) {
+            TimeSlot slot = shifted(SLOT, day);
+            UUID held = book(holder, slot);
+            UUID entry = join(first, slot);
+            bookings.cancel(held, holder.accountId(), Set.of(Role.MEMBER));
+            UUID taken = waitlist.accept(entry, first.accountId(), first.personId(), Set.of(Role.MEMBER));
+            bookings.cancel(taken, first.accountId(), Set.of(Role.MEMBER));
+        }
+        TimeSlot oneMore = shifted(SLOT, WaitlistService.MAX_ENTRIES);
+        book(holder, oneMore);
+
+        // when / then
+        assertThatThrownBy(() -> join(first, oneMore))
+                .as("taking an offer and cancelling its booking cannot get round the limit")
+                .isInstanceOfSatisfying(WaitlistLimitReachedException.class, failure ->
+                        assertThat(failure.getCode()).isEqualTo("waitlist.entry.limit"));
+    }
+
+    @Test
+    void givenAsManyBookedEntriesAsTheLimitWhoseBookingMovedAway_whenTheMemberJoinsAnother_thenTheLimitRefusesIt() {
+        // given
+        UUID elsewhere = book(first, shifted(SLOT, WaitlistService.MAX_ENTRIES + 1));
+        for (int day = 0; day < WaitlistService.MAX_ENTRIES; day++) {
+            insertClosed(first, shifted(SLOT, day), "BOOKED", elsewhere);
+        }
+        TimeSlot oneMore = shifted(SLOT, WaitlistService.MAX_ENTRIES);
+        book(holder, oneMore);
+
+        // when / then
+        assertThatThrownBy(() -> join(first, oneMore))
+                .as("a booking that no longer holds the entry's court and time frees no place")
+                .isInstanceOfSatisfying(WaitlistLimitReachedException.class, failure ->
+                        assertThat(failure.getCode()).isEqualTo("waitlist.entry.limit"));
+    }
+
+    @Test
+    void givenAsManyWithdrawnEntriesAsTheLimit_whenTheMemberJoinsAnother_thenTheLimitRefusesIt() {
+        // given
+        for (int day = 0; day < WaitlistService.MAX_ENTRIES; day++) {
+            insertClosed(first, shifted(SLOT, day), "WITHDRAWN", null);
+        }
+        TimeSlot oneMore = shifted(SLOT, WaitlistService.MAX_ENTRIES);
+        book(holder, oneMore);
+
+        // when / then
+        assertThatThrownBy(() -> join(first, oneMore))
+                .as("withdrawn entries count until their slot ends")
+                .isInstanceOfSatisfying(WaitlistLimitReachedException.class, failure ->
+                        assertThat(failure.getCode()).isEqualTo("waitlist.entry.limit"));
+    }
+
+    @Test
+    void givenAMemberWhoTookAsManyOffersAsTheLimit_whenTheyJoinAnother_thenTheEntryIsTaken() {
+        // given
+        for (int day = 0; day < WaitlistService.MAX_ENTRIES; day++) {
+            TimeSlot slot = shifted(SLOT, day);
+            UUID held = book(holder, slot);
+            UUID entry = join(first, slot);
+            bookings.cancel(held, holder.accountId(), Set.of(Role.MEMBER));
+            waitlist.accept(entry, first.accountId(), first.personId(), Set.of(Role.MEMBER));
+        }
+        TimeSlot oneMore = shifted(SLOT, WaitlistService.MAX_ENTRIES);
+        book(holder, oneMore);
+
+        // when / then
+        assertThatCode(() -> join(first, oneMore))
+                .as("an entry that became a booking leaves room under the limit")
+                .doesNotThrowAnyException();
+        assertThat(waitlist.ownEntries(first.accountId()))
+                .filteredOn(own -> own.state() == WaitlistState.WAITING)
+                .extracting(WaitlistEntry::slot).containsExactly(oneMore);
     }
 
     @Test
@@ -800,6 +895,19 @@ class WaitlistTest extends AbstractIntegrationTest {
                 .param("endsAt", java.sql.Timestamp.from(slot.end())).param("now", java.sql.Timestamp.from(NOW))
                 .update();
         return id;
+    }
+
+    private void insertClosed(Member member, TimeSlot slot, String state, UUID bookingId) {
+        jdbc.sql("""
+                        INSERT INTO waitlist_entry (id, account_id, court_id, card_id, starts_at, ends_at, state, joined_at,
+                                                    closed_at, booking_id)
+                        VALUES (:id, :account, :court, :card, :startsAt, :endsAt, :state, :now, :now, :booking)
+                        """)
+                .param("id", UUID.randomUUID()).param("account", member.accountId()).param("court", court)
+                .param("card", MEMBER_CARD).param("startsAt", java.sql.Timestamp.from(slot.start()))
+                .param("endsAt", java.sql.Timestamp.from(slot.end())).param("state", state)
+                .param("now", java.sql.Timestamp.from(NOW)).param("booking", bookingId)
+                .update();
     }
 
     private UUID join(Member member, TimeSlot slot) {

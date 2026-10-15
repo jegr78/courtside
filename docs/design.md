@@ -345,8 +345,10 @@ A member may queue for a court and period somebody else holds by selecting it in
 entry names the card, players and note the eventual booking will carry, and joining runs every check
 a booking of that slot runs except that its court is free. A slot nobody else holds, a second open
 entry on the same court at an overlapping time and a 21st entry whose slot has not ended are
-refused. The 21 counts closed entries too until their slot ends, so joining and leaving in turn
-cannot get round it. Each court, start and end has its own first-in, first-out queue.
+refused. The 21 counts every entry until its slot ends except one whose booking still holds its court
+at an overlapping time, so neither leaving nor cancelling or moving the booking an entry became can
+get round it.
+Each court, start and end has its own first-in, first-out queue.
 
 The waitlist is part of `booking`, in `booking.waitlist`. The booking write has to refuse a
 reservation and an acceptance has to write a booking, so a module of its own would depend on

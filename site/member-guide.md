@@ -257,8 +257,9 @@ Unter *Meine Buchungen* siehst du nur deine eigenen Einträge. Wer sonst wartet 
 du stehst, zeigt Courtside niemandem. Du kannst eine Warteliste jederzeit verlassen. Buchst du den
 Platz selbst oder beginnt die Zeit, endet dein Eintrag. Auf demselben Platz kannst du nur auf eine
 Zeit zugleich warten, die sich mit einer anderen überschneidet. Du kannst höchstens 20 Einträge haben,
-deren Zeit noch nicht vorbei ist. Dazu zählen auch Einträge, die du verlassen hast, bis ihre Zeit
-vorbei ist.
+deren Zeit noch nicht vorbei ist. Dazu zählen auch Einträge, die du verlassen hast oder die ohne
+Buchung geendet haben. Ein Eintrag, aus dem deine Buchung wurde, zählt nicht, solange sie den Platz
+zu dieser Zeit noch belegt.
 
 ![Der Dialog für die Warteliste eines belegten Platzes mit Buchungsart und Mitspielern.](screenshots/de/waitlist-dialog.png)
 
