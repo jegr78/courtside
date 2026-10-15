@@ -735,7 +735,7 @@ test("given an erasure target, when parsed, then host and container are kept, an
   assert.equal(field({ ...valid(), erasure: { ssh: "ops-host", container: "club-db-1", user: "root" } }), "erasure.user");
 });
 
-import { deactivationLeftover, erasureCommand, erasedCount, welcomeErasureSql } from "../acceptance/lib/core.mjs";
+import { deactivationLeftover, erasureCommand, erasedCount, waitlistErasureSql, welcomeErasureSql } from "../acceptance/lib/core.mjs";
 
 test("given the persons a run recorded, when the erasure is written, then it names exactly them and erases only a deactivated welcome account nothing depends on", () => {
   // given
@@ -752,6 +752,21 @@ test("given the persons a run recorded, when the erasure is written, then it nam
   assert.match(sql, /ua\.id IS NULL OR/, "a missing account passes the account guards");
   assert.equal(welcomeErasureSql([]), null, "a run that created no account erases nothing");
   assert.throws(() => welcomeErasureSql(["1'; DROP TABLE person; --"]), /not a person id/);
+});
+
+test("given the member personas, when the waitlist erasure is written, then it removes only their closed entries in one transaction", () => {
+  // given
+  const usernames = ["acceptance.member-a", "acceptance.member-b"];
+  // when
+  const sql = waitlistErasureSql(usernames);
+  // then
+  assert.match(sql, /^BEGIN;[\s\S]*COMMIT;\s*$/, "the erasure is one transaction");
+  assert.ok(sql.includes("ua.username IN ('acceptance.member-a', 'acceptance.member-b')"), "the erasure names exactly the personas");
+  assert.ok(sql.includes("w.state NOT IN ('WAITING', 'OFFERED')"), "an open entry stays, so a queue is never cut");
+  assert.match(sql, /DELETE FROM waitlist_entry WHERE id IN \(SELECT id FROM erased\)/);
+  assert.equal(erasedCount("erased 7\n"), 7, "the count line has the shape the postflight reads");
+  assert.throws(() => waitlistErasureSql(["x'); DELETE FROM booking; --"]), /not a username/);
+  assert.equal(waitlistErasureSql([]), null, "no persona, no statement");
 });
 
 test("given an erasure target, when the command is built, then ssh runs psql in the named container and the statement travels on standard input", () => {

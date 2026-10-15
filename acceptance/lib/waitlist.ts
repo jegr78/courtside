@@ -5,6 +5,8 @@ import { instantOf, type Slot } from "./lanes";
 type Entry = { id: string; startsAt: string; state: string };
 const OPEN = ["WAITING", "OFFERED"];
 
+export const MEMBERS = ["memberA", "memberB", "memberC"] as const satisfies readonly PersonaKey[];
+
 export async function openWaitlistEntries(key: PersonaKey, slots: Slot[]): Promise<Entry[]> {
   const starts = new Set(slots.map((slot) => instantOf(slot, "start").getTime()));
   const entries = await (await (await apiAs(key)).get("/api/my/waitlist")).json() as Entry[];
