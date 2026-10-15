@@ -294,7 +294,7 @@ input[type="time"] {
 
 /* WebKit sizes a native menulist by its own metrics and ignores padding, so a select drops below an input. */
 @layer utilities {
-  select.form-control {
+  select.form-control:not([multiple]) {
     appearance: none;
     padding-inline-end: 2.5rem;
     background-image:
@@ -318,7 +318,7 @@ input[type="time"] {
   }
 
   @media (forced-colors: active) {
-    select.form-control {
+    select.form-control:not([multiple]) {
       appearance: auto;
       padding-inline-end: 0.75rem;
       background-image: none;

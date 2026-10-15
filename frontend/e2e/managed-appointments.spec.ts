@@ -95,3 +95,16 @@ test("an officer creates a weekly series and finds its appointments in the manag
     await expect(page.getByTestId(`booking-${bookingId}`)).toBeVisible();
   }
 });
+
+test("given the series form, when its fields are drawn, then the court list shows no dropdown arrow and the card choice keeps one", async ({ page }) => {
+  // given
+  await signIn(page, "sport.major");
+
+  // when
+  await page.getByTestId("new-series").click();
+
+  // then
+  const arrow = (testId: string) => page.getByTestId(testId).evaluate((element) => getComputedStyle(element).backgroundImage);
+  expect(await arrow("series-courts"), "a list of courts never opens, so it draws no arrow").toBe("none");
+  expect(await arrow("series-card"), "the card choice opens a menu and draws its arrow").not.toBe("none");
+});
