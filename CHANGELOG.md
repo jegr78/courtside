@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.0-rc.4](https://github.com/jegr78/courtside/compare/v0.2.0-rc.3...v0.2.0-rc.4) (2026-10-15)
+
+
+### Bug fixes
+
+* stop counting waitlist entries whose booking holds the slot toward the limit ([#1535](https://github.com/jegr78/courtside/issues/1535)) ([77280ad](https://github.com/jegr78/courtside/commit/77280add847b799c6583589ae2ac8777f66eb4ef)), closes [#1534](https://github.com/jegr78/courtside/issues/1534)
+
 ## 0.2.0 (2026-10-14)
 
 
