@@ -16,6 +16,7 @@ import org.courtside.rules.RuleContext;
 import org.courtside.rules.CourtBookingPermission;
 import org.courtside.rules.RuleEngine;
 import org.courtside.rules.RuleViolation;
+import org.courtside.rules.WeeklyHoursLimit;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -35,6 +36,7 @@ public class BookingRuleGate {
     private final CourtBookingPermission bookingPermission;
     private final BookingDurationLimit durationLimit;
     private final BookingHoursLimit hoursLimit;
+    private final WeeklyHoursLimit weeklyHoursLimit;
     private final CancellationDeadline cancellationDeadline;
     private final MemberService members;
     private final UserAccountRepository accounts;
@@ -101,6 +103,20 @@ public class BookingRuleGate {
             return null;
         }
         return durationLimit.maxMinutesFor(membershipTypeOf(personId)).orElse(null);
+    }
+
+    public Integer minBookingMinutesFor(UUID personId, Set<Role> roles) {
+        if (roles.contains(Role.ADMIN)) {
+            return null;
+        }
+        return durationLimit.minMinutesFor(membershipTypeOf(personId)).orElse(null);
+    }
+
+    public Integer maxWeeklyBookedHoursFor(UUID personId, Set<Role> roles) {
+        if (roles.contains(Role.ADMIN)) {
+            return null;
+        }
+        return weeklyHoursLimit.maxHoursFor(membershipTypeOf(personId)).orElse(null);
     }
 
     public Optional<BookingWindow> bookingWindowFor(UUID personId, Set<Role> roles) {

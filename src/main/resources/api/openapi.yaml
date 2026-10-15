@@ -344,7 +344,8 @@ components:
     RuleType:
       type: string
       enum: [OPENING_HOURS, SLOT_GRID, ADVANCE_WINDOW, MAX_OPEN_BOOKINGS, MAX_BOOKING_DURATION,
-             CANCELLATION_DEADLINE, NO_COURT_BOOKING, BOOKING_HOURS]
+             CANCELLATION_DEADLINE, NO_COURT_BOOKING, BOOKING_HOURS, WEEKLY_BOOKED_HOURS,
+             MIN_BOOKING_DURATION]
 
     CancelScope:
       type: string
@@ -382,7 +383,8 @@ components:
       type: object
       description: |
         Standing rule violations that prevent the signed-in account from booking a court, and the
-        bounds its rule set puts on one booking's length and on the hours it may book.
+        bounds its rule set puts on one booking's length, on the hours of the day it may book and on
+        the hours it may book in a week.
       required: [violations]
       properties:
         violations:
@@ -395,6 +397,19 @@ components:
             bounds it. A client offers no longer period than this; the server refuses one anyway
             with `booking.rule.maxBookingDuration.exceeded`, so the field shortens a list rather
             than deciding anything.
+        minBookingMinutes:
+          type: [integer, "null"]
+          description: |
+            The shortest single booking this account may take, in minutes, or absent where nothing
+            bounds it. The server refuses a shorter one with
+            `booking.rule.minBookingDuration.notReached`.
+        maxWeeklyBookedHours:
+          type: [integer, "null"]
+          description: |
+            The hours this account may have booked in one club-local week, Monday to Sunday, or
+            absent where nothing limits it. Its confirmed bookings on cards that count against limits
+            count by the week they start in. The server refuses a booking past the limit with
+            `booking.rule.weeklyBookedHours.exceeded`.
         bookingHours:
           oneOf:
             - $ref: "#/components/schemas/BookingHours"
