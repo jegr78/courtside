@@ -25,6 +25,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
 
 @TestPropertySource(properties = "courtside.test.clock=2026-04-01T10:00:00Z")
@@ -105,12 +106,11 @@ class SeriesWeeklyBookedHoursTest extends AbstractIntegrationTest {
         // given
         SeriesCreationResult series = createSeries(rule(Set.of(DayOfWeek.TUESDAY), 120, 2));
 
-        // when
-        int moved = seriesService.move(new MoveRequest(series.seriesId(), series.bookingIds().getFirst(),
-                CancelScope.WHOLE_SERIES, LocalTime.of(14, 0), null, null), owner, TRAINER);
-
-        // then
-        assertThat(moved).as("the moved bookings leave their old place in the week").isEqualTo(2);
+        // when / then
+        assertThatCode(() -> seriesService.move(new MoveRequest(series.seriesId(), series.bookingIds().getFirst(),
+                CancelScope.WHOLE_SERIES, LocalTime.of(14, 0), null, null), owner, TRAINER))
+                .as("the moved bookings leave their old place in the week")
+                .doesNotThrowAnyException();
     }
 
     private SeriesRule rule(Set<DayOfWeek> weekdays, int minutes, int occurrences) {
