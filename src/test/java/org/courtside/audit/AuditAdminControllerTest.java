@@ -143,6 +143,28 @@ class AuditAdminControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenAnEntryAboutTheWholeInstance_whenTheLogIsReadAndSearched_thenItCarriesNoSubject() throws Exception {
+        // given
+        UUID eventId = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO domain_event (id, event_type, subject_id, occurred_at, payload)
+                VALUES (?, ?, NULL, ?, CAST(? AS jsonb))
+                """, eventId, "dataexchange.log.exported", Timestamp.from(clock.instant()), "{\"log\":\"audit\"}");
+
+        // when / then
+        mockMvc.perform(get("/api/admin/audit").with(user(administrator)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.entries[0].id").value(eventId.toString()))
+                .andExpect(jsonPath("$.entries[0].subjectName").doesNotExist())
+                .andExpect(jsonPath("$.entries[0].subjectId").doesNotExist());
+        mockMvc.perform(post("/api/admin/audit/search").with(user(administrator)).with(csrf())
+                        .contentType("application/json")
+                        .content("{\"query\":\"" + UUID.randomUUID() + "\",\"limit\":50}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.entries", hasSize(0)));
+    }
+
+    @Test
     void givenACursorOutsideTheFilteredResult_whenTheLogIsSearched_thenItIsRejected() throws Exception {
         // given
         UUID excluded = facilityFixture.createCourt(7, "Excluded Court");
