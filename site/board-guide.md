@@ -153,7 +153,8 @@ Statusleiste der installierten App übernimmt die Primärfarbe beim nächsten Ö
   *Termine* hältst du fest, ob die Spieler erschienen sind. Eine Buchung, für die nichts erfasst ist,
   zählt nie als Nichterscheinen. **Platz freigeben nach** storniert eine Mitgliederbuchung, für die 5
   bis 120 Minuten nach Beginn niemand eingecheckt hat, und gibt den Platz frei. Leer gelassen gibt
-  Courtside keinen Platz frei. Eine Freigabe zählt nicht als Nichterscheinen.
+  Courtside keinen Platz frei. Bucher und Mitspieler bekommen bei einer Freigabe eine Nachricht. Eine
+  Freigabe zählt nicht als Nichterscheinen.
 
 ![Die Fristen für Einmalpasswörter und Codes und die Erinnerung vor einer Buchung.](screenshots/de/deadlines.png)
 

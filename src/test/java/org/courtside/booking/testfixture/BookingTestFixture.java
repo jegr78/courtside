@@ -7,6 +7,7 @@ import org.courtside.booking.BookingService;
 import org.courtside.booking.BookingStatus;
 import org.courtside.booking.attendance.AttendanceOutcome;
 import org.courtside.booking.attendance.AttendancePolicy;
+import org.courtside.booking.attendance.AttendanceRelease;
 import org.courtside.booking.attendance.AttendanceService;
 import org.courtside.booking.internal.BookingReminders;
 import org.courtside.booking.series.BookingSeries;
@@ -44,6 +45,7 @@ public class BookingTestFixture {
     private final WaitlistService waitlist;
     private final PartnerSearchService partnerSearch;
     private final AttendanceService attendance;
+    private final AttendanceRelease release;
     private final JdbcClient jdbc;
 
     public UUID createBookingLookingForAPartner(UUID courtId, UUID cardId, TimeSlot slot, UUID bookedBy,
@@ -182,6 +184,10 @@ public class BookingTestFixture {
 
     public void trackAttendance(Integer releaseAfterMinutes) {
         attendance.changePolicy(new AttendancePolicy(true, releaseAfterMinutes));
+    }
+
+    public int releaseUnattended() {
+        return release.releaseDue();
     }
 
     public void stopTrackingAttendance() {

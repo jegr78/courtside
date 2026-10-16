@@ -290,13 +290,15 @@
         "liftNoShows"
       ],
       "backgroundEntryPoints": [
-        "AttendanceReleaseSweep#releaseWhatIsDue"
+        "AttendanceReleaseSweep#releaseWhatIsDue",
+        "ReleaseMailer#on(BookingReleased)"
       ],
       "stateTransitions": [
         "An administrator switches attendance on or off and sets the release time.",
         "The member who holds a booking checks in from 15 minutes before its start until its end.",
         "An administrator records, replaces or clears the attendance of a started booking.",
         "The release sweep cancels a started member booking nobody checked in for by the release time and frees its courts under the booking-grid lock.",
+        "A release tells the booker and every player of the booking once, in the centre and by mail unless they switched mail off.",
         "An administrator lifts a person's counting no-shows, which stay recorded."
       ],
       "alternatePaths": [
@@ -316,12 +318,15 @@
         "src/main/java/org/courtside/booking/attendance/AttendanceRows.java",
         "src/main/java/org/courtside/booking/web/AttendanceAdminController.java",
         "src/main/java/org/courtside/booking/web/CheckInController.java",
+        "src/main/java/org/courtside/notification/internal/ReleaseMailer.java",
         "src/main/java/org/courtside/rules/internal/NoShowLimitRule.java"
       ],
       "evidence": [
         "src/test/java/org/courtside/booking/attendance/AttendanceTest.java#givenSomebodyElsesBooking_whenAMemberChecksIn_thenItIsAnsweredLikeABookingThatDoesNotExist",
         "src/test/java/org/courtside/booking/attendance/AttendanceTest.java#givenAReleaseTime_whenNobodyCheckedInByThen_thenTheBookingIsCancelledItsCourtFreedAndTheReleaseAudited",
         "src/test/java/org/courtside/booking/web/AttendanceControllerTest.java#givenTheClubRecordsNoAttendance_whenTheBoardRecordsANoShow_thenTheConflictNamesItsType",
+        "src/test/java/org/courtside/notification/BookingReleaseMessageTest.java#givenNobodyCheckedIn_whenTheReleaseTimePasses_thenTheBookerAndThePlayerAreToldOnce",
+        "src/test/java/org/courtside/notification/BookingReleaseMessageTest.java#givenABookingWhoseReleaseTimeHasNotPassed_whenTheSweepRuns_thenNobodyIsTold",
         "src/test/java/org/courtside/rules/NoShowLimitRuleTest.java#givenPastBookingsWithNothingRecorded_whenTheMemberBooks_thenAnUnrecordedAttendanceCountsForNothing"
       ]
     },

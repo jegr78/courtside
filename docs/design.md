@@ -326,7 +326,9 @@ wait for and takes no record. A booking with nothing recorded is never a no-show
 
 The policy may name a release time of 5 to 120 minutes. A sweep then cancels every confirmed
 booking on a card that counts against limits whose start lies that long in the past while nobody
-checked in, frees its courts under the booking grid lock and records the release. A release is not
+checked in, frees its courts under the booking grid lock and records the release. The booker and
+every player with an account receive one `BOOKING_RELEASED` message, because only the booker can
+check in and a player at the court would otherwise not learn why it is gone. A release is not
 a no-show. A board lifts a person's counting no-shows: they stay recorded and stop counting, which
 lifts a `NO_SHOW_LIMIT` refusal.
 
@@ -684,7 +686,7 @@ out instead, so no message, a security message least of all, is lost to a club's
 
 Current messages cover the welcome for a new account, generated credentials, password-reset codes, username reminders, booking
 confirmations, participant additions and withdrawals, displaced bookings, upcoming reminders,
-booking cancellations, new series, waitlist offers and a taken open place. A series sends no confirmation per occurrence. Its holder
+booking cancellations, bookings freed without a check-in, new series, waitlist offers and a taken open place. A series sends no confirmation per occurrence. Its holder
 receives one summary naming the card, weekdays, time, courts, first and last date and the number of
 occurrences, and its centre entry leads to the first occurrence. Displacement informs people but
 does not cancel the booking.
@@ -774,8 +776,8 @@ A waitlist offer cannot be disabled either: joining the queue is the consent to 
 leaving the queue is how a member stops it. It always reaches the centre, follows the email channel
 choice and is handed to the relay before ordinary booking mail because it runs out within minutes.
 A mail composed after the offer was taken, declined or expired fails instead of being sent.
-The welcome, credentials, displacement, participant-addition notices and the club's cancellations
-and series moves cannot be disabled as kinds, because no other product path tells the member that
+The welcome, credentials, displacement, participant-addition notices, the club's cancellations,
+freed bookings and series moves cannot be disabled as kinds, because no other product path tells the member that
 somebody else wrote them into a booking, took one away or moved it. A holder's own cancellation and the
 series summary can be declined, like the confirmation: My bookings already shows what they say. A
 declined email channel stops the mail for displacement, participant-addition notices and the club's

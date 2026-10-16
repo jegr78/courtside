@@ -237,7 +237,8 @@ the club.
 If your club records attendance, you check in under *My bookings* with **Check in** from 15 minutes
 before the start until the end of your booking. If the club has set a release time and nobody
 checks in by then, Courtside cancels the booking and frees the court. It then shows as freed among
-your cancelled bookings.
+your cancelled bookings. You and every player of the booking receive a message about it. Only the
+member who booked can check in.
 
 ## Waiting for a taken court
 

@@ -144,8 +144,8 @@ Open *Club → Deadlines and reminders*.
   start until the end of their booking in *My bookings*, and in an appointment that has started you
   record under *Appointments* whether its players came. A booking with nothing recorded never counts
   as a no-show. **Free the court after** cancels a member booking nobody checked in for 5 to 120
-  minutes after its start and frees the court. Left empty, Courtside frees no court. A freed court
-  does not count as a no-show.
+  minutes after its start and frees the court. Left empty, Courtside frees no court. The booker and
+  the players receive a message when a court is freed. A freed court does not count as a no-show.
 
 ![Lifetimes for one-time passwords and codes and the reminder before a booking.](../screenshots/en/deadlines.png)
 

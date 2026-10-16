@@ -245,7 +245,8 @@ ihn. Sonst erfährst du ihn beim Verein.
 Erfasst dein Verein die Anwesenheit, checkst du unter *Meine Buchungen* ab 15 Minuten vor Beginn bis
 zum Ende deiner Buchung mit **Einchecken** ein. Hat der Verein eine Freigabezeit eingestellt und
 niemand checkt bis dahin ein, storniert Courtside die Buchung und gibt den Platz frei. Sie steht
-dann als freigegeben unter deinen stornierten Buchungen.
+dann als freigegeben unter deinen stornierten Buchungen. Du und alle Mitspieler der Buchung bekommen
+darüber eine Nachricht. Einchecken kann nur, wer gebucht hat.
 
 ## Auf einen belegten Platz warten
 

@@ -3,6 +3,7 @@ package org.courtside.booking.attendance;
 import lombok.RequiredArgsConstructor;
 import org.courtside.booking.internal.UnattendedRelease;
 import org.courtside.config.BookingGridCoordination;
+import org.courtside.shared.BookingReleased;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -68,7 +69,7 @@ public class AttendanceRelease {
             return false;
         }
         rows.markReleased(bookingId, now);
-        events.publishEvent(new AttendanceEvent.Released(bookingId));
+        events.publishEvent(new BookingReleased(bookingId));
         return true;
     }
 }

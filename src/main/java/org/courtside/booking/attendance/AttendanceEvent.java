@@ -40,21 +40,6 @@ public sealed interface AttendanceEvent extends DomainEventRecord {
         }
     }
 
-    record Released(UUID bookingId) implements AttendanceEvent {
-
-        static final String TYPE = "booking.attendance.released";
-
-        @Override
-        public String eventType() {
-            return TYPE;
-        }
-
-        @Override
-        public UUID subjectId() {
-            return bookingId;
-        }
-    }
-
     record NoShowsLifted(UUID personId, UUID accountId, int lifted) implements AttendanceEvent {
 
         static final String TYPE = "booking.attendance.noShowsLifted";
