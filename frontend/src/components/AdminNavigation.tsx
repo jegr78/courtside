@@ -141,7 +141,7 @@ export function AdminNavigation({ administrator = true }: { administrator?: bool
       </Link>
       <NavigationLink destination={appointments} pathname={pathname} chosen={() => { if (!laidOpen) setUnfolded(false); }} />
       {administrator && <NavigationLink destination={overview} pathname={pathname} chosen={() => { if (!laidOpen) setUnfolded(false); }} />}
-      {administrator && groups.map((group) => <div key={group.testId} data-testid={group.testId} role="group" aria-labelledby={`${group.testId}-heading`} className="grid gap-2 lg:gap-1">
+      {administrator && groups.map((group) => <div key={group.testId} data-testid={group.testId} role="group" aria-labelledby={`${group.testId}-heading`} className="grid gap-2 lg:gap-0.5">
         <p id={`${group.testId}-heading`} className="text-muted text-xs font-bold tracking-wide uppercase">{t(group.heading)}</p>
         {group.destinations.map((destination) => <NavigationLink key={destination.testId} destination={destination}
           pathname={pathname} chosen={() => { if (!laidOpen) setUnfolded(false); }} />)}
