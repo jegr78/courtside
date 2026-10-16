@@ -937,3 +937,21 @@ it("given the token reissue is refused for the request budget, when signing in, 
   expect(reissues).toBe(2);
   expect(sent).toBe("reissued-token");
 });
+
+it("given no period, when the message log is exported, then only the format reaches the query string", async () => {
+  // given
+  document.cookie = "XSRF-TOKEN=csrf-token; Path=/";
+  const send = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("queuedAt", {
+    status: 200,
+    headers: { "Content-Type": "text/csv", "Content-Disposition": "attachment; filename=\"message-log-2026-05-12.csv\"" }
+  }));
+
+  // when
+  const offered = await api.exportMessageLog({ from: "", to: "", separator: ";", encoding: "UTF-8" });
+
+  // then
+  const [path, init] = send.mock.calls[0];
+  expect(path).toBe("/api/admin/export/messages?separator=%3B&encoding=UTF-8");
+  expect(init?.method).toBe("POST");
+  expect(offered.fileName).toBe("message-log-2026-05-12.csv");
+});

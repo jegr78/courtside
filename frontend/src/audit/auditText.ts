@@ -39,6 +39,9 @@ function contextFor(entry: AuditEntry): string | undefined {
     const flagKey = enabledFlagByEventType[entry.eventType] ?? "active";
     return entry.parameters[flagKey] ? "active" : "inactive";
   }
+  if (entry.eventType === "dataexchange.log.exported" && typeof entry.parameters.log === "string") {
+    return entry.parameters.log;
+  }
   return nullSafeContexts.find((candidate) => candidate.eventType === entry.eventType
     && isNullish(entry.parameters[candidate.field]))?.context;
 }
@@ -97,6 +100,7 @@ function bookingSubjectLabel(entry: AuditEntry, kind: "booking" | "series", t: T
 }
 
 export function subjectLabel(entry: AuditEntry, t: TFunction, language: string, timeZone: string): string {
+  if (!entry.subjectId) return t("audit.subject.instance");
   const kind = BOOKING_MODULE_SUBJECTS[entry.eventType];
   if (kind === "waitlistEntry") return entry.subjectName ?? t("audit.subject.waitlistEntry", { subjectId: entry.subjectId });
   if (kind) return bookingSubjectLabel(entry, kind, t, language, timeZone);

@@ -131,6 +131,20 @@ export interface BookingExportParameters extends Record<string, string> {
   encoding: string;
 }
 
+export type ExportedLog = "audit" | "messages";
+
+function logExportQuery(parameters: LogExportParameters): string {
+  return new URLSearchParams(Object.entries(parameters)
+    .filter((entry): entry is [string, string] => Boolean(entry[1]))).toString();
+}
+
+export interface LogExportParameters {
+  from?: string;
+  to?: string;
+  separator: string;
+  encoding: string;
+}
+
 export interface RosterExportParameters extends Record<string, string> {
   query: string;
   membershipTypeId: string;
@@ -573,6 +587,10 @@ export const api = {
     request<MessageStatistics>(withPeriod("/api/admin/statistics/messages", period)),
   exportBookings: (parameters: BookingExportParameters) => requestFile(
     `/api/admin/export/bookings?${new URLSearchParams(parameters).toString()}`, { method: "POST" }),
+  exportAuditLog: (parameters: LogExportParameters) => requestFile(
+    `/api/admin/export/audit?${logExportQuery(parameters)}`, { method: "POST" }),
+  exportMessageLog: (parameters: LogExportParameters) => requestFile(
+    `/api/admin/export/messages?${logExportQuery(parameters)}`, { method: "POST" }),
   exportRoster: (parameters: RosterExportParameters) => requestFile(
     "/api/admin/export/roster", {
       method: "POST", headers: { "Content-Type": "application/json" },

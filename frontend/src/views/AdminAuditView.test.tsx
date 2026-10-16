@@ -130,7 +130,24 @@ describe("AdminAuditView", () => {
     await screen.findByTestId("audit-row");
 
     // then
-    expect(within(row(entry.id)).getByTestId("audit-subject")).toHaveTextContent(entry.subjectId);
+    expect(within(row(entry.id)).getByTestId("audit-subject")).toHaveTextContent(entry.subjectId ?? "");
+  });
+
+  it("given an export of the message log, when it is shown, then it names that log and the whole instance as its subject", async () => {
+    // given
+    const entry: AuditEntry = {
+      ...courtAdded, eventType: "dataexchange.log.exported", parameters: { log: "messages", from: null, to: null },
+      subjectId: null, subjectName: null
+    };
+    vi.spyOn(api, "audit").mockResolvedValue({ entries: [entry], nextCursor: null });
+
+    // when
+    show();
+    await screen.findByTestId("audit-row");
+
+    // then
+    expect(within(row(entry.id)).getByTestId("audit-message")).toHaveTextContent("Message log exported");
+    expect(within(row(entry.id)).getByTestId("audit-subject")).toHaveTextContent("Whole instance");
   });
 
   it("given a booking entry, when it is shown, then the subject cell names its courts and its slot in the club time zone", async () => {
@@ -150,7 +167,7 @@ describe("AdminAuditView", () => {
     expect(subject).toHaveTextContent(
       `Centre Court, Back Court, ${formatBookingPeriod("2026-05-13T16:00:00Z", "2026-05-13T17:00:00Z", "en", "America/New_York")}`);
     expect(subject).not.toHaveTextContent(formatBookingPeriod("2026-05-13T16:00:00Z", "2026-05-13T17:00:00Z", "en", "UTC"));
-    expect(subject).not.toHaveTextContent(entry.subjectId);
+    expect(subject).not.toHaveTextContent(entry.subjectId ?? "");
   });
 
   it("given a series entry, when it is shown, then the subject cell names it a series with its courts and first appointment", async () => {
@@ -247,7 +264,7 @@ describe("AdminAuditView", () => {
     await screen.findByTestId("audit-row");
 
     // then
-    expect(within(row(entry.id)).getByTestId("audit-subject")).toHaveTextContent(entry.subjectId);
+    expect(within(row(entry.id)).getByTestId("audit-subject")).toHaveTextContent(entry.subjectId ?? "");
   });
 
   it("given the occurred-at cell, when the club has its own time zone and the browser has a language, then both are honoured, never the browser's own zone", async () => {
@@ -398,7 +415,7 @@ describe("AdminAuditView", () => {
     expect(options[0].value, "the first choice leaves the log unfiltered").toBe("");
     expect(options[0]).toHaveTextContent(unfiltered);
     const kinds = options.slice(1);
-    expect(kinds, "every audited kind of change is offered").toHaveLength(58);
+    expect(kinds, "every audited kind of change is offered").toHaveLength(59);
     expect(kinds.find((option) => option.value === "facility.court.added")).toHaveTextContent(courtAddedLabel);
     expect(kinds.filter((option) => /\w\.\w/.test(option.text)).map((option) => option.text), "no choice shows an identifier").toEqual([]);
     const labels = kinds.map((option) => option.text);

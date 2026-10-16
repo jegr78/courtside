@@ -554,19 +554,23 @@
       "actors": [
         "ADMIN"
       ],
-      "entryPoints": "Roster, booking and per-person export endpoints.",
+      "entryPoints": "Roster, booking, audit-log, message-log and per-person export endpoints.",
       "operationIds": [
         "exportRoster",
         "exportBookings",
+        "exportAuditLog",
+        "exportMessageLog",
         "exportPersonData"
       ],
       "backgroundEntryPoints": [],
       "stateTransitions": [
-        "A subject-access export records that the answer was produced; ordinary CSV exports do not change domain state."
+        "A subject-access export records that the answer was produced; ordinary CSV exports do not change domain state.",
+        "An audit-log or message-log export records one whole-instance audit entry naming the log and the period."
       ],
       "alternatePaths": [
         "Roster and booking exports select bounded fields and periods.",
-        "Subject access assembles every record about one person while omitting other people's data."
+        "Subject access assembles every record about one person while omitting other people's data.",
+        "Audit-log and message-log exports stream every entry up to the moment of the request in batches, optionally bounded by a period."
       ],
       "failurePaths": [
         "Unauthorized callers are refused.",
@@ -578,7 +582,10 @@
       ],
       "evidence": [
         "src/test/java/org/courtside/dataexchange/web/SubjectAccessAdminControllerTest.java#givenAPersonTheInstanceHoldsEverythingAbout_whenABoardAsks_thenEachOfThoseThingsIsAnswered",
-        "src/test/java/org/courtside/dataexchange/web/SubjectAccessAdminControllerTest.java#givenAMemberRatherThanTheBoard_whenTheyAskWhatIsHeldAboutSomebody_thenItIsRefused"
+        "src/test/java/org/courtside/dataexchange/web/SubjectAccessAdminControllerTest.java#givenAMemberRatherThanTheBoard_whenTheyAskWhatIsHeldAboutSomebody_thenItIsRefused",
+        "src/test/java/org/courtside/dataexchange/web/LogExportAdminControllerTest.java#givenMoreEntriesThanOneReadHolds_whenTheAuditLogIsExported_thenEachEntryAppearsExactlyOnce",
+        "src/test/java/org/courtside/dataexchange/web/LogExportAdminControllerTest.java#givenAnExport_whenItIsAnswered_thenTheLogRecordsItForTheWholeInstanceAndLeavesItOutOfTheFile",
+        "src/test/java/org/courtside/dataexchange/web/LogExportAdminControllerTest.java#givenAMember_whenTheyAskForEitherLog_thenTheyAreRefusedAndNothingIsRecorded"
       ]
     }
   ]
