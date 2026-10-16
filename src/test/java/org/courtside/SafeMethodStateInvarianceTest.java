@@ -180,6 +180,7 @@ class SafeMethodStateInvarianceTest extends AbstractIntegrationTest {
             entry("/api/admin/statistics/members", read("from=2026-05-01&to=2026-05-31")),
             entry("/api/admin/statistics/messages", read("from=2026-05-01&to=2026-05-31")),
             entry("/api/admin/messages", read()),
+            entry("/api/admin/message-templates", read()),
             entry("/api/admin/audit", read()),
             entry("/actuator/health", read()),
             entry("/actuator/health/liveness", read()),
