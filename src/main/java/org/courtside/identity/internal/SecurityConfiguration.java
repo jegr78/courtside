@@ -158,7 +158,7 @@ public class SecurityConfiguration {
                         .requestMatchers("/", "/courts", "/login", "/initial-password", "/my-bookings",
                                 "/my-messages", "/account/security", "/account-recovery",
                                 "/admin", "/admin/appointments", "/admin/setup",
-                                "/admin/configuration", "/admin/deadlines", "/admin/rule-sets",
+                                "/admin/configuration", "/admin/deadlines", "/admin/rule-sets", "/admin/message-wording",
                                 "/admin/facility",
                                 "/admin/facility/courts", "/admin/facility/opening-hours",
                                 "/admin/facility/opening-hours/exceptions",

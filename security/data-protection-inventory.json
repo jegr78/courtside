@@ -57,6 +57,16 @@
       "class": "identifier"
     },
     {
+      "name": "kind",
+      "in": "path",
+      "class": "neutral"
+    },
+    {
+      "name": "language",
+      "in": "path",
+      "class": "neutral"
+    },
+    {
       "name": "notificationId",
       "in": "path",
       "class": "identifier"
@@ -1218,6 +1228,28 @@
       "status_code": {
         "level": "operational",
         "lifecycle": "account-cascade"
+      }
+    },
+    "message_template_override": {
+      "kind": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "language": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "subject": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "body": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "changed_at": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
       }
     },
     "notification": {

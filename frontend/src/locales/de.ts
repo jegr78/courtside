@@ -1140,6 +1140,7 @@ const de = {
   "error.type.membership-type-not-found": "Diese Mitgliedsart gibt es nicht mehr. Lade die Seite neu.",
   "error.type.message-cursor-unknown": "Das Nachrichtenprotokoll hat sich geändert. Lade die erste Seite neu.",
   "error.type.message-not-declinable": "Diese Nachricht muss der Verein schicken können. Sie lässt sich nicht abbestellen.",
+  "error.type.message-template-refused": "Dieser Text passt nicht zur Nachricht. Korrigiere die Platzhalter und versuche es erneut.",
   "error.type.method-not-supported": "Die Seite hat eine Anfrage gesendet, die Courtside nicht verarbeiten kann. Lade die Seite neu und versuche es erneut.",
   "error.type.missing-parameter": "Die Seite hat eine Anfrage gesendet, die Courtside nicht verarbeiten kann. Lade die Seite neu und versuche es erneut.",
   "error.type.missing-request-part": "Die Seite hat eine Anfrage gesendet, die Courtside nicht verarbeiten kann. Lade die Seite neu und versuche es erneut.",

@@ -1142,6 +1142,7 @@ const en: Record<keyof typeof de, string> = {
   "error.type.membership-type-not-found": "This membership type no longer exists. Reload the page.",
   "error.type.message-cursor-unknown": "The message log has changed. Reload the first page.",
   "error.type.message-not-declinable": "The club has to be able to send this message, so it cannot be switched off.",
+  "error.type.message-template-refused": "This wording cannot be used for the message. Correct the placeholders and try again.",
   "error.type.method-not-supported": "The page sent a request Courtside cannot process. Reload the page and try again.",
   "error.type.missing-parameter": "The page sent a request Courtside cannot process. Reload the page and try again.",
   "error.type.missing-request-part": "The page sent a request Courtside cannot process. Reload the page and try again.",

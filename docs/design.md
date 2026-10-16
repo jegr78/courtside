@@ -642,8 +642,24 @@ neither raw user agents nor source addresses.
 
 ## Notifications
 
-German and English notification templates ship as resource bundles. They are not editable at
-runtime. A message uses the recipient account's language.
+German and English notification templates ship as resource bundles. A message uses the recipient
+account's language.
+
+An administrator may store the club's own subject and body of a message, per language, in
+`message_template_override`, preview it filled with example values and reset it to the shipped
+wording. The wording is plain text. Only the subject and body of a message are replaceable; the
+fragments inside them, such as a closure or a cancellation reason, stay shipped. A wording may name
+only placeholders the message fills in either language, plus `{instanceLink}`. It must keep the
+placeholders the message exists to deliver: the username and generated credential of the two
+credential messages, the username and code of a reset code, the username of a reminder. A credential
+or reset code may not appear in the subject, and the subject stays on one line. Nothing else is
+refused, links included. The wording changes what a message says and never who receives it, whether
+it is sent or whether a member may decline it. Changing or resetting a wording needs a recent
+full-password proof, because it decides what the credential and reset-code mails say, and each
+change is recorded as `notification.template.changed` or `notification.template.reset`. When a
+message is composed, a stored wording is checked again with the same rules and the same placeholder
+parser; a wording that fails that check or cannot be filled is skipped, and the shipped wording goes
+out instead, so no message, a security message least of all, is lost to a club's wording.
 
 Current messages cover the welcome for a new account, generated credentials, password-reset codes, username reminders, booking
 confirmations, participant additions and withdrawals, displaced bookings, upcoming reminders,
@@ -671,7 +687,8 @@ club and series messages lead to `/my-bookings`. A waitlist offer leads to its e
 `/my-bookings#waitlist-<id>`, where the member takes it. The welcome leads to the start page `/`. The confirmation's calendar entry carries
 the same link as its `URL`. The shipped messages with a generated credential, a reset code or a
 username carry neither a link nor the address, so members learn that a genuine one does not ask
-them to follow a link. A mail client may still turn text that looks like an address into one. The
+them to follow a link. Those messages still fill `{instanceLink}` with the start page `/`, so a club
+that words them itself may place the address. A mail client may still turn text that looks like an address into one. The
 address is written in its ASCII form, so an internationalised domain appears as Punycode.
 
 A cancelled booking is announced to its holder and its players, except the account that cancelled

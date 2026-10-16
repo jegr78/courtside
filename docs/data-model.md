@@ -222,6 +222,13 @@ and digest together or not at all, at most one megabyte, PNG or JPEG. The short 
 `club_config_short_name_fits_an_icon_label` keeps a stored one between one and twelve characters and
 not blank.
 
+`message_template_override` holds a club's own wording of a message: one row per message kind and
+language, with a subject and a body. No row means the shipped wording applies, and a reset deletes
+the row. CHECK constraints accept only `de` and `en`, keep the subject on one line between 1 and 200
+characters and the body between 1 and 10,000. The row stores placeholders such as `{username}`, never
+filled text. Which placeholders a wording may use is checked by the application when it is saved and
+again when a message is composed, so a row that no longer passes falls back to the shipped wording.
+
 ## Importing a roster
 
 | Table | Holds | References |
@@ -254,10 +261,11 @@ the whole instance, `dataexchange.log.exported`, which records an export of the 
 message log; `domain_event_subject_required` refuses an empty subject for every other event type.
 
 `domain_event.event_type` is a dotted name whose first segment says which module published it, and
-the table holds two kinds of entry. Six segments are the administrative surfaces, one per thing a
+the table holds two kinds of entry. Seven segments are the administrative surfaces, one per thing a
 board configures: `facility.court.added`, `card.bookingCard.changed`, `config.club.changed`,
-`rules.ruleSet.changed`, `roster.person.corrected` and `dataexchange.source.described`, each with
-siblings. The other two arrive in the course of ordinary use, because the writer records every
+`rules.ruleSet.changed`, `roster.person.corrected`, `dataexchange.source.described` and
+`notification.template.changed`, each with siblings. A message wording has no row id of its own, so
+its entries name a subject derived from the message kind and language. The other two arrive in the course of ordinary use, because the writer records every
 event a module publishes rather than a list it keeps: `booking.booking.confirmed` and the nine
 other booking entries, and `identity.account.credentialsRequested`, which names the account a
 credential was issued for and says in `accountCreated` whether the account was opened by the same

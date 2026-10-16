@@ -41,6 +41,7 @@ class SpaConfiguration {
             "/admin/configuration",
             "/admin/deadlines",
             "/admin/rule-sets",
+            "/admin/message-wording",
             "/admin/facility",
             "/admin/facility/courts",
             "/admin/facility/opening-hours",
