@@ -1,29 +1,62 @@
 package org.courtside.notification.internal;
 
+import lombok.RequiredArgsConstructor;
+import org.courtside.notification.MessageKind;
 import org.springframework.stereotype.Component;
 
+import java.util.Arrays;
 import java.util.Locale;
 import java.util.Map;
 import java.util.MissingResourceException;
 import java.util.ResourceBundle;
+import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 // Plain text, and the placeholders are named rather than positional: a translator moving a value
 // inside a sentence must not have to count arguments to keep it correct.
 @Component
+@RequiredArgsConstructor
 class MailTemplates {
 
+    static final Pattern PLACEHOLDER = Pattern.compile("\\{([a-zA-Z]+)}");
     private static final String BUNDLE = "mail";
-    private static final Pattern PLACEHOLDER = Pattern.compile("\\{([a-zA-Z]+)}");
     private static final ResourceBundle.Control SHIPPED_LANGUAGE_ONLY =
             ResourceBundle.Control.getNoFallbackControl(ResourceBundle.Control.FORMAT_PROPERTIES);
     private static final String EMPTY_LINK = "[ \\t]*\\{" + InstanceLinks.PLACEHOLDER + "}[ \\t]*";
     private static final Pattern EMPTY_LINK_LINE =
             Pattern.compile("^" + EMPTY_LINK + "(?:\\R|$)|\\R" + EMPTY_LINK + "(?=\\R|$)");
+    private static final Map<String, MessageKind> SUBJECTS = byKey(".subject");
+    private static final Map<String, MessageKind> BODIES = byKey(".body");
+
+    private final MessageTemplateOverrides overrides;
 
     String render(String key, Locale locale, Map<String, String> values) {
-        return fill(key, bundle(locale).getString(key), values);
+        return fill(key, wording(key, locale), values);
+    }
+
+    // A club's own wording replaces a message's subject or body; the fragments inside them stay shipped.
+    private String wording(String key, Locale locale) {
+        String language = languageOf(locale);
+        if (SUBJECTS.containsKey(key)) {
+            return overrides.of(SUBJECTS.get(key), language).map(MessageText::subject)
+                    .orElseGet(() -> shipped(key, locale));
+        }
+        if (BODIES.containsKey(key)) {
+            return overrides.of(BODIES.get(key), language).map(MessageText::body)
+                    .orElseGet(() -> shipped(key, locale));
+        }
+        return shipped(key, locale);
+    }
+
+    static String languageOf(Locale locale) {
+        return "de".equals(locale.getLanguage()) ? "de" : "en";
+    }
+
+    static String shipped(String key, Locale locale) {
+        return bundle(locale).getString(key);
     }
 
     // One pass over the template, so a value that happens to read like a placeholder stays a value.
@@ -40,6 +73,11 @@ class MailTemplates {
             }
             return Matcher.quoteReplacement(value);
         });
+    }
+
+    private static Map<String, MessageKind> byKey(String part) {
+        return Arrays.stream(MessageKind.values())
+                .collect(Collectors.toUnmodifiableMap(kind -> kind.templateKey() + part, Function.identity()));
     }
 
     private static ResourceBundle bundle(Locale locale) {

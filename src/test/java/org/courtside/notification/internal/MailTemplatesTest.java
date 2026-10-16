@@ -18,6 +18,7 @@ import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
 
 class MailTemplatesTest {
 
@@ -44,7 +45,7 @@ class MailTemplatesTest {
 
     private static final String ADDRESS_LIKE = "(?i)[a-z][a-z0-9+.-]*://|\\b[\\p{L}0-9-]+\\.\\p{L}{2,}\\b";
 
-    private final MailTemplates templates = new MailTemplates();
+    private final MailTemplates templates = new MailTemplates(mock(MessageTemplateOverrides.class));
 
     @Test
     void whenReadingBothLocales_thenEachDefinesTheSameKeys() {
