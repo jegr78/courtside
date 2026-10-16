@@ -284,6 +284,23 @@ describe("AdminManagedAppointmentsView", () => {
     expect(api.managedAppointment).toHaveBeenCalledWith(first.id);
   });
 
+  it("given a past appointment whose guest names were pseudonymised, when details open, then the guest carries a neutral label", async () => {
+    // given
+    vi.spyOn(api, "managedAppointment").mockResolvedValue({
+      ...first, note: null, participants: [{ kind: "GUEST", displayName: "" }]
+    });
+    show();
+    const series = await screen.findByTestId("managed-series-series-1");
+    await userEvent.click(within(series).getByTestId("managed-series-summary"));
+
+    // when
+    await userEvent.click(within(series).getAllByTestId("managed-details")[0]);
+
+    // then
+    const guest = await screen.findByTestId("appointment-participant");
+    expect(guest, "an empty name reads as a neutral label").toHaveTextContent(`${i18n.t("managedAppointments.unnamedGuest")} · Guest`);
+  });
+
   it("given a managed appointment, when details open, then they scroll while the close button stays below the body", async () => {
     // given
     vi.spyOn(api, "managedAppointment").mockResolvedValue({ ...first, note: "Prepare score sheets", participants: [] });

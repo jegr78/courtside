@@ -175,7 +175,7 @@ export function ManagedAppointmentDialog({ bookingId, locale, timeZone, administ
       <span data-testid="managed-period">{formatBookingPeriod(detail.startsAt, detail.endsAt, locale, timeZone)}</span>
       <section data-testid="managed-note"><h3 className="font-semibold">{t("managedAppointments.note")}</h3><p>{detail.note || t("managedAppointments.noNote")}</p></section>
       <section data-testid="managed-participants"><h3 className="font-semibold">{t("managedAppointments.participantDetails")}</h3>
-        {detail.participants.length === 0 ? <p>{t("managedAppointments.noParticipants")}</p> : <ul className="list-disc pl-5">{detail.participants.map((participant, index) => <li key={`${participant.kind}-${index}`}>{participant.displayName} · {t(`managedAppointments.kind.${participant.kind}`)}</li>)}</ul>}
+        {detail.participants.length === 0 ? <p>{t("managedAppointments.noParticipants")}</p> : <ul className="list-disc pl-5">{detail.participants.map((participant, index) => <li key={`${participant.kind}-${index}`} data-testid="appointment-participant">{participant.displayName || t("managedAppointments.unnamedGuest")} · {t(`managedAppointments.kind.${participant.kind}`)}</li>)}</ul>}
       </section>
       {(detail.attendance || (tracked && begun)) && <AttendanceSection detail={detail} recordable={tracked && begun}
         changed={changeAttendance} t={t} />}

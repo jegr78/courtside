@@ -54,6 +54,7 @@ class SpaConfiguration {
             "/admin/membership-types",
             "/admin/import",
             "/admin/export",
+            "/admin/retention",
             "/admin/utilisation",
             "/admin/usage",
             "/admin/audit",
