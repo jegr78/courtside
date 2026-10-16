@@ -27,6 +27,7 @@ import {
   undocumentedRuntimeRoutes,
   validateOpenApiFuzzEvidence
 } from "./security-openapi-fuzz.mjs";
+import { contractOperationIds } from "./contract-operations.mjs";
 import { schemathesisRunArgs, schemathesisScannerFiles } from "./security-schemathesis-configuration.mjs";
 
 const require = createRequire(new URL("../frontend/package.json", import.meta.url));
@@ -53,8 +54,7 @@ test("given the current contract, when inventorying fuzz coverage, then every op
   const inventory = buildOpenApiFuzzInventory(api);
 
   // then
-  assert.equal(inventory.length, 158);
-  assert.equal(new Set(inventory.map(({ operationId }) => operationId)).size, 158);
+  assert.deepEqual(inventory.map(({ operationId }) => operationId).toSorted(), contractOperationIds(api));
   assert.deepEqual(inventory.find(({ operationId }) => operationId === "getBookingEligibility"), {
     operationId: "getBookingEligibility",
     method: "GET",
