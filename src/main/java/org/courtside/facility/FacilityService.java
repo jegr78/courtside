@@ -1,7 +1,11 @@
 package org.courtside.facility;
 
+import org.courtside.facility.internal.CourtClosureRepository;
+import org.courtside.facility.internal.CourtClosureRow;
 import org.courtside.facility.internal.CourtNumberTakenException;
 import org.courtside.facility.internal.CourtRepository;
+import org.courtside.facility.internal.OpeningPeriodRepository;
+import org.courtside.facility.internal.OpeningPeriodRow;
 import org.courtside.facility.internal.OpeningHoursRepository;
 import org.courtside.facility.internal.OpeningHoursVersion;
 import org.courtside.facility.internal.OpeningHoursVersionRepository;
@@ -26,6 +30,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
@@ -41,11 +46,14 @@ public class FacilityService {
 
     private static final String UNIQUE_NUMBER_CONSTRAINT = "court_unique_number";
     private static final LocalDate LATEST_START = LocalDate.of(9999, 12, 31);
+    private static final int AVAILABILITY_NAME_LENGTH = 80;
 
     private final CourtRepository courts;
     private final OpeningHoursRepository openingHours;
     private final OpeningHoursVersionRepository versions;
     private final OpeningSchedules schedules;
+    private final OpeningPeriodRepository periods;
+    private final CourtClosureRepository closures;
     private final ClubTimeZone clubTimeZone;
     private final Clock clock;
     private final BookingGridSettings bookingGridSettings;
@@ -311,6 +319,135 @@ public class FacilityService {
                             LocalDate until) {
         events.publishEvent(new FacilityEvent.OpeningHoursSet(row.getId(), row.getDayOfWeek().getValue(),
                 window.opensAt(), window.closesAt(), row.getVersionId(), effectiveFrom, until));
+    }
+
+    public List<OpeningPeriod> openingPeriods() {
+        return periods.findAll().stream().map(OpeningPeriodRow::toPeriod)
+                .sorted(Comparator.comparing(OpeningPeriod::startsOn)).toList();
+    }
+
+    @Transactional
+    public OpeningPeriod createOpeningPeriod(OpeningPeriod.Kind kind, String name, LocalDate startsOn,
+                                             LocalDate endsOn, List<WeeklyOpeningHours> week) {
+        if (kind == null) {
+            throw new IllegalStateException("A period has a kind");
+        }
+        return storePeriod(new OpeningPeriodRow(kind), name, startsOn, endsOn, week);
+    }
+
+    @Transactional
+    public OpeningPeriod changeOpeningPeriod(UUID periodId, String name, LocalDate startsOn, LocalDate endsOn,
+                                             List<WeeklyOpeningHours> week) {
+        bookingGridCoordination.lock();
+        OpeningPeriodRow row = periods.findById(periodId).orElseThrow(AvailabilityEntryNotFoundException::new);
+        requireNotEnded(row.getEndsOn());
+        return storePeriod(row, name, startsOn, endsOn, week);
+    }
+
+    @Transactional
+    public void removeOpeningPeriod(UUID periodId) {
+        bookingGridCoordination.lock();
+        OpeningPeriodRow row = periods.findById(periodId).orElseThrow(AvailabilityEntryNotFoundException::new);
+        requireNotEnded(row.getEndsOn());
+        periods.delete(row);
+        periods.flush();
+        events.publishEvent(new FacilityEvent.OpeningPeriodRemoved(
+                row.getId(), row.getKind().name(), row.getStartsOn(), row.getEndsOn()));
+    }
+
+    public List<CourtClosure> courtClosures() {
+        return closures.findAll().stream().map(CourtClosureRow::toClosure)
+                .sorted(Comparator.comparing(CourtClosure::startsOn)).toList();
+    }
+
+    @Transactional
+    public CourtClosure createCourtClosure(UUID courtId, String name, LocalDate startsOn, LocalDate endsOn) {
+        Court court = requireCourt(courtId);
+        return storeClosure(new CourtClosureRow(court.getId()), court, name, startsOn, endsOn);
+    }
+
+    @Transactional
+    public CourtClosure changeCourtClosure(UUID closureId, String name, LocalDate startsOn, LocalDate endsOn) {
+        bookingGridCoordination.lock();
+        CourtClosureRow row = closures.findById(closureId).orElseThrow(AvailabilityEntryNotFoundException::new);
+        requireNotEnded(row.getEndsOn());
+        return storeClosure(row, requireCourt(row.getCourtId()), name, startsOn, endsOn);
+    }
+
+    @Transactional
+    public void removeCourtClosure(UUID closureId) {
+        bookingGridCoordination.lock();
+        CourtClosureRow row = closures.findById(closureId).orElseThrow(AvailabilityEntryNotFoundException::new);
+        requireNotEnded(row.getEndsOn());
+        Court court = requireCourt(row.getCourtId());
+        closures.delete(row);
+        closures.flush();
+        events.publishEvent(new FacilityEvent.CourtClosureRemoved(
+                row.getId(), court.getId(), court.getNumber(), row.getStartsOn(), row.getEndsOn()));
+    }
+
+    private OpeningPeriod storePeriod(OpeningPeriodRow row, String name, LocalDate startsOn, LocalDate endsOn,
+                                      List<WeeklyOpeningHours> week) {
+        Map<DayOfWeek, WeeklyOpeningHours> requested = everyWeekdayOnce(week);
+        bookingGridCoordination.lock();
+        String stored = requireDates(name, startsOn, endsOn);
+        Map<DayOfWeek, OpeningWindow> windows = storable(requested, bookingGridSettings.slotDuration());
+        windows.values().removeIf(Objects::isNull);
+        row.changeTo(stored, startsOn, endsOn, windows);
+        try {
+            periods.saveAndFlush(row);
+        } catch (DataIntegrityViolationException e) {
+            throw overlapOr(e, "opening_period_no_overlap");
+        }
+        events.publishEvent(new FacilityEvent.OpeningPeriodSet(
+                row.getId(), row.getKind().name(), startsOn, endsOn));
+        return row.toPeriod();
+    }
+
+    private CourtClosure storeClosure(CourtClosureRow row, Court court, String name, LocalDate startsOn,
+                                      LocalDate endsOn) {
+        bookingGridCoordination.lock();
+        String stored = requireDates(name, startsOn, endsOn);
+        row.changeTo(stored, startsOn, endsOn);
+        try {
+            closures.saveAndFlush(row);
+        } catch (DataIntegrityViolationException e) {
+            throw overlapOr(e, "court_closure_no_overlap");
+        }
+        events.publishEvent(new FacilityEvent.CourtClosureSet(
+                row.getId(), court.getId(), court.getNumber(), startsOn, endsOn));
+        return row.toClosure();
+    }
+
+    private String requireDates(String name, LocalDate startsOn, LocalDate endsOn) {
+        String trimmed = name == null ? "" : name.strip();
+        if (trimmed.isEmpty()) {
+            throw AvailabilityRejectedException.nameRequired();
+        }
+        if (trimmed.length() > AVAILABILITY_NAME_LENGTH) {
+            throw AvailabilityRejectedException.nameTooLong(AVAILABILITY_NAME_LENGTH);
+        }
+        if (startsOn == null || endsOn == null) {
+            throw new IllegalStateException("A period names its first and its last day");
+        }
+        if (endsOn.isBefore(startsOn)) {
+            throw AvailabilityRejectedException.endsBeforeStart();
+        }
+        requireNotEnded(endsOn);
+        return trimmed;
+    }
+
+    private void requireNotEnded(LocalDate endsOn) {
+        LocalDate today = today();
+        if (endsOn.isBefore(today)) {
+            throw AvailabilityRejectedException.ended(today);
+        }
+    }
+
+    private static RuntimeException overlapOr(DataIntegrityViolationException failure, String constraint) {
+        return SqlConstraintViolation.matches(failure, SqlConstraintViolation.EXCLUSION_VIOLATION, constraint)
+                ? AvailabilityRejectedException.overlap()
+                : failure;
     }
 
     public List<UUID> findUnbookableCourts(Collection<UUID> courtIds) {

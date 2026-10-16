@@ -83,6 +83,74 @@ public sealed interface FacilityEvent extends DomainEventRecord {
 
     }
 
+    record OpeningPeriodSet(UUID periodId, String kind, LocalDate startsOn, LocalDate endsOn)
+            implements FacilityEvent {
+
+        static final String TYPE = "facility.openingPeriod.set";
+
+        @Override
+        public String eventType() {
+            return TYPE;
+        }
+
+        @Override
+        public UUID subjectId() {
+            return periodId;
+        }
+
+    }
+
+    record OpeningPeriodRemoved(UUID periodId, String kind, LocalDate startsOn, LocalDate endsOn)
+            implements FacilityEvent {
+
+        static final String TYPE = "facility.openingPeriod.removed";
+
+        @Override
+        public String eventType() {
+            return TYPE;
+        }
+
+        @Override
+        public UUID subjectId() {
+            return periodId;
+        }
+
+    }
+
+    record CourtClosureSet(UUID closureId, UUID courtId, int number, LocalDate startsOn, LocalDate endsOn)
+            implements FacilityEvent {
+
+        static final String TYPE = "facility.courtClosure.set";
+
+        @Override
+        public String eventType() {
+            return TYPE;
+        }
+
+        @Override
+        public UUID subjectId() {
+            return closureId;
+        }
+
+    }
+
+    record CourtClosureRemoved(UUID closureId, UUID courtId, int number, LocalDate startsOn, LocalDate endsOn)
+            implements FacilityEvent {
+
+        static final String TYPE = "facility.courtClosure.removed";
+
+        @Override
+        public String eventType() {
+            return TYPE;
+        }
+
+        @Override
+        public UUID subjectId() {
+            return closureId;
+        }
+
+    }
+
     /** From {@code effectiveFrom} until the day before {@code until}; a null bound is open. */
     record OpeningHoursClosed(@Nullable UUID openingHoursId, int dayOfWeek, UUID versionId,
                               @Nullable LocalDate effectiveFrom, @Nullable LocalDate until)

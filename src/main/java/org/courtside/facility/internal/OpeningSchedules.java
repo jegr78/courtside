@@ -20,13 +20,15 @@ public class OpeningSchedules {
 
     private final OpeningHoursVersionRepository versions;
     private final OpeningHoursRepository openingHours;
+    private final OpeningPeriodRepository periods;
 
     public OpeningSchedule load() {
         Map<UUID, List<OpeningHours>> rows = openingHours.findAll().stream()
                 .collect(Collectors.groupingBy(OpeningHours::getVersionId));
         return new OpeningSchedule(versions.findAll().stream()
                 .map(version -> toWeek(version, rows.getOrDefault(version.getId(), List.of())))
-                .toList());
+                .toList(),
+                periods.findAll().stream().map(OpeningPeriodRow::toPeriod).toList());
     }
 
     private static OpeningWeek toWeek(OpeningHoursVersion version, List<OpeningHours> rows) {
