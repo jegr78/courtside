@@ -27,6 +27,7 @@ export function AdminMessageWordingView() {
   const [error, setError] = useState<string>();
   const [success, setSuccess] = useState<string>();
   const [retry, setRetry] = useState<Write>();
+  const [reauthenticationFailure, setReauthenticationFailure] = useState<string>();
   const [pending, setPending] = useState(false);
   const [loadAttempt, retryLoad] = useRetry();
 
@@ -105,14 +106,21 @@ export function AdminMessageWordingView() {
 
   async function reauthenticate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const password = new FormData(event.currentTarget).get("wording-reauthentication-password");
+    const password = new FormData(event.currentTarget).get("admin-reauthentication-password");
     const requested = retry;
-    if (typeof password !== "string" || !requested) return;
-    setRetry(undefined);
-    await run(async () => {
+    if (typeof password !== "string" || !requested || pending) return;
+    setPending(true);
+    setReauthenticationFailure(undefined);
+    try {
       await api.reauthenticate(password);
-      await perform(requested);
-    });
+    } catch (failure) {
+      setReauthenticationFailure(problemMessage(failure, t));
+      setPending(false);
+      return;
+    }
+    setRetry(undefined);
+    setPending(false);
+    await run(() => perform(requested), requested);
   }
 
   return <section data-testid="admin-message-wording-view" className="surface-panel min-w-0 grid gap-6 rounded-2xl border p-6 shadow-[0_20px_50px_var(--cs-shadow)] [&>*]:min-w-0 [&>*]:max-w-5xl sm:p-8">
@@ -164,12 +172,16 @@ export function AdminMessageWordingView() {
           <p data-testid="wording-preview-body" className="whitespace-pre-wrap [overflow-wrap:anywhere]">{preview.body}</p>
         </div>}
       </>}
-    {retry && <Modal labelledBy="wording-reauthentication-title" closed={() => setRetry(undefined)}>
+    {retry && <Modal labelledBy="admin-reauthentication-title" closed={() => {
+      setRetry(undefined);
+      setReauthenticationFailure(undefined);
+    }}>
       <form className="grid gap-4" onSubmit={(event) => void reauthenticate(event)}>
-        <h2 id="wording-reauthentication-title" className="text-2xl font-bold">{t("accountSecurity.reauthenticateTitle")}</h2>
+        <h2 id="admin-reauthentication-title" className="text-2xl font-bold">{t("accountSecurity.reauthenticateTitle")}</h2>
         <p>{t("accountSecurity.reauthenticate")}</p>
-        <TextField data-testid="wording-reauthentication-password" id="wording-reauthentication-password" name="wording-reauthentication-password" type="password" autoComplete="current-password" required label={t("auth.password")} />
-        <Button data-testid="confirm-wording-reauthentication" variant="primary" disabled={pending} type="submit">{t("accountSecurity.continue")}</Button>
+        {reauthenticationFailure && <Alert testId="admin-reauthentication-failure">{reauthenticationFailure}</Alert>}
+        <TextField data-testid="admin-reauthentication-password" id="admin-reauthentication-password" name="admin-reauthentication-password" type="password" autoComplete="current-password" required label={t("auth.password")} />
+        <Button data-testid="admin-reauthentication-submit" variant="primary" disabled={pending} type="submit">{t("accountSecurity.continue")}</Button>
       </form>
     </Modal>}
   </section>;

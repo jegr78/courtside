@@ -100,14 +100,33 @@ describe("AdminMessageWordingView", () => {
     await userEvent.click(screen.getByTestId("wording-save"));
 
     // when
-    await userEvent.type(await screen.findByTestId("wording-reauthentication-password"), "admin-password");
-    await userEvent.click(screen.getByTestId("confirm-wording-reauthentication"));
+    await userEvent.type(await screen.findByTestId("admin-reauthentication-password"), "admin-password");
+    await userEvent.click(screen.getByTestId("admin-reauthentication-submit"));
 
     // then
     await waitFor(() => expect(changing).toHaveBeenCalledTimes(2));
     expect(proving).toHaveBeenCalledWith("admin-password");
     expect(changing).toHaveBeenLastCalledWith("ACCOUNT_USERNAME_REMINDER", "en", shippedEn);
     expect(await screen.findByTestId("wording-success")).toBeInTheDocument();
+  });
+
+  it("given a wrong password at the prompt, when it is confirmed, then the prompt stays with the reason and nothing is saved", async () => {
+    // given
+    const changing = vi.spyOn(api, "changeMessageTemplate")
+      .mockRejectedValue(new ApiError(403, { type: "urn:courtside:error:recent-authentication-required", title: "Recent authentication required", status: 403 }));
+    vi.spyOn(api, "reauthenticate").mockRejectedValue(new ApiError(401, { type: "urn:courtside:error:reauthentication-failed", title: "Reauthentication failed", status: 401 }));
+    show();
+    await screen.findByTestId("wording-body");
+    await userEvent.click(screen.getByTestId("wording-save"));
+
+    // when
+    await userEvent.type(await screen.findByTestId("admin-reauthentication-password"), "wrong-password");
+    await userEvent.click(screen.getByTestId("admin-reauthentication-submit"));
+
+    // then
+    expect(await screen.findByTestId("admin-reauthentication-failure")).toBeInTheDocument();
+    expect(screen.getByTestId("admin-reauthentication-submit")).toBeEnabled();
+    expect(changing).toHaveBeenCalledTimes(1);
   });
 
   it("given a club wording, when reset, then the shipped wording is shown again", async () => {
