@@ -470,15 +470,17 @@ holiday governs first, then a season, then the version in force. Seasons do not 
 and holidays do not overlap each other, which an exclusion constraint on `opening_period` enforces;
 a holiday inside a season is the intended case. A court closure takes one court out of the plan for
 whole days while the other courts keep the hours of the day, and closures of one court do not
-overlap, enforced the same way. The public booking grid carries seasons and holidays with their
-names, which the court plan shows, and closures without the reason the board entered.
+overlap, enforced the same way. The public booking grid carries the seasons and holidays that
+overlap the days it is asked for, today by default, with their names, which the court plan shows,
+and the closures on those days without the reason the board entered.
 
 These entries are correctable while they lie ahead: an entry starts today or later and ends by
 9999-12-31, and until it starts every field can change, its kind and court included, and it can be
-removed. Once it has started its first day and its hours
-are fixed and it cannot be removed, but it can be renamed and ended as early as yesterday. An entry
-that has ended is read-only. This is the one exception to correcting whatever a club entered: the
-days before today keep the hours that governed them, so statistics and the audit trail stay true.
+removed. Once it has started, its first day, its kind, its court and its hours are fixed and it
+cannot be removed; it can only be renamed and ended early, as early as yesterday. An entry that has
+ended is read-only. This is a deliberate exception to correcting whatever a club entered: the days
+before today keep the hours that governed them, so statistics and the audit trail stay true. A
+board corrects a running entry by ending it yesterday and adding a new one from today.
 Bookings already on a day that a new entry closes stay; the opening-hours rule refuses every booking
 written or moved after it, a closed court with `booking.rule.openingHours.courtClosed`. Utilisation
 counts open time from the hours that governed each day and does not subtract court closures from

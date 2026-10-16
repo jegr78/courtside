@@ -553,12 +553,12 @@ components:
         openingPeriods:
           type: array
           description: |
-            Seasons and holidays in the order they start. On the days a holiday covers its hours
-            govern, then a season's, then the weekly hours.
+            Seasons and holidays that overlap the requested days, in the order they start. On the
+            days a holiday covers its hours govern, then a season's, then the weekly hours.
           items: { $ref: "#/components/schemas/OpeningPeriod" }
         courtClosures:
           type: array
-          description: Days on which one court is closed while the others keep the hours of the day.
+          description: Court closures that overlap the requested days; on them one court is closed while the others keep the hours of the day.
           items: { $ref: "#/components/schemas/PublicCourtClosure" }
 
     OpeningWeek:
@@ -4288,13 +4288,28 @@ paths:
       tags: [opening-hours]
       operationId: getBookingGrid
       summary: The time zone, slot duration and weekly opening windows that define the booking grid.
+      description: |
+        Seasons, holidays and court closures come back only where they overlap the days from `from`
+        to `to`, both inclusive in the club's time zone. A missing bound takes the other one, and
+        without either the range is today.
       security: []
+      parameters:
+        - name: from
+          in: query
+          required: false
+          schema: { type: string, format: date }
+        - name: to
+          in: query
+          required: false
+          schema: { type: string, format: date }
       responses:
         "200":
           description: The booking grid configuration.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/BookingGrid" }
+        "400":
+          $ref: "#/components/responses/Invalid"
         "429":
           $ref: "#/components/responses/RateLimited"
 

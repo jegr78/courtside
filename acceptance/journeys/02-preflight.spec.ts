@@ -55,7 +55,7 @@ test("when the environment is checked before a run, then every precondition hold
     checks.disposablesSignIn = Object.fromEntries(await Promise.all(disposables.map(async (username, index) => [`disposable ${index + 1}`, await canSignIn(PASSWORD, username)])));
     const weeks = await (await admin.get("/api/admin/opening-hours/schedule")).json() as { effectiveFrom: string | null }[];
     checks.futureWeeks = weeks.slice(1).map((w) => w.effectiveFrom);
-    const grid = await (await admin.get("/api/public/booking-grid")).json();
+    const grid = await (await admin.get(`/api/public/booking-grid?from=${plan.days[0]}&to=${plan.days.at(-1)}`)).json();
     checks.availabilityConflicts = availabilityConflicts(grid, { ...plan, slots: allSlots() }, courts);
     const participantCards = await (await admin.get("/api/admin/participant-cards")).json() as { id: string; active: boolean }[];
     checks.partnerMarkerActive = participantCards.some((card) => card.id === PARTNER_MARKER && card.active);

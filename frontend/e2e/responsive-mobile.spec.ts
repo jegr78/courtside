@@ -933,7 +933,7 @@ test("a vertical gesture over the phone plan scrolls the page rather than a nest
 test("a booking on a day the club has since closed stays in the phone plan", async ({ page }) => {
   // given
   const week = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"];
-  await page.route("**/api/public/booking-grid", async (route) => route.fulfill({ json: {
+  await page.route(/\/api\/public\/booking-grid(\?|$)/, async (route) => route.fulfill({ json: {
     timeZone: "Europe/Berlin",
     slotMinutes: 30,
     openingWeeks: [], openingPeriods: [], courtClosures: [],

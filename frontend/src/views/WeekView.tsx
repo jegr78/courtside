@@ -120,7 +120,10 @@ export function WeekView({ today, clock = systemClock, canBook = true,
     clear();
     clearLoad();
     if (offline) return () => { active = false; };
-    void Promise.all([api.bookingGrid(), api.courts(), api.bookingCardLegend()])
+    const browserWeek = addDays(startOfWeek(new Date(referenceInstant.getFullYear(), referenceInstant.getMonth(),
+      referenceInstant.getDate())), weekOffset * 7);
+    const range = { from: formatDate(addDays(browserWeek, -1)), to: formatDate(addDays(browserWeek, 7)) };
+    void Promise.all([api.bookingGrid(range), api.courts(), api.bookingCardLegend()])
       .then(async ([grid, courts, currentBookingCards]) => {
         const clubToday = dateInTimeZone(referenceInstant, grid.timeZone);
         const weekStart = addDays(startOfWeek(clubToday), weekOffset * 7);

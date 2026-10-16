@@ -62,7 +62,7 @@ test("given a day beyond the lanes, when the admin adds a holiday and closes a c
   const closed = addDays(holiday, 1);
   const admin = await apiAs("admin");
   const member = await apiAs("memberA");
-  const grid = await (await admin.get("/api/public/booking-grid")).json() as Grid;
+  const grid = await (await admin.get(`/api/public/booking-grid?from=${holiday}&to=${closed}`)).json() as Grid;
   const courts = await (await admin.get("/api/public/courts")).json() as { id: string; number: number }[];
   const court = courts[0];
   const hours = governingHours(grid, closed);
@@ -122,7 +122,7 @@ test("given a day beyond the lanes, when the admin adds a holiday and closes a c
     });
     // then
     await step("admin", "days open again", async () => {
-      const after = await (await admin.get("/api/public/booking-grid")).json() as Grid;
+      const after = await (await admin.get(`/api/public/booking-grid?from=${holiday}&to=${closed}`)).json() as Grid;
       expect(covers(after.openingPeriods, holiday) || covers(after.courtClosures, closed), "product: nothing of the journey is left").toBe(false);
       await page.goto("/");
       await gotoDayBeyondWindow(page, closed);

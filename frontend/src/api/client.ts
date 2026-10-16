@@ -622,7 +622,8 @@ export const api = {
     ),
   source: () => request<SourceOffer>("/api/source"),
   courts: () => request<PublicCourt[]>("/api/public/courts"),
-  bookingGrid: () => request<BookingGrid>("/api/public/booking-grid"),
+  bookingGrid: (range?: { from: string; to: string }) => request<BookingGrid>(
+    `/api/public/booking-grid${range ? `?${new URLSearchParams(range).toString()}` : ""}`),
   allocations: (date: string) => request<Allocation[]>(
     `/api/bookings?${new URLSearchParams({ date })}`
   ),
