@@ -32,6 +32,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.EnumMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -329,19 +330,16 @@ public class FacilityService {
     @Transactional
     public OpeningPeriod createOpeningPeriod(OpeningPeriod.Kind kind, String name, LocalDate startsOn,
                                              LocalDate endsOn, List<WeeklyOpeningHours> week) {
-        if (kind == null) {
-            throw new IllegalStateException("A period has a kind");
-        }
         bookingGridCoordination.lock();
-        return storePeriod(new OpeningPeriodRow(kind), null, name, startsOn, endsOn, week);
+        return storePeriod(new OpeningPeriodRow(UUID.randomUUID()), null, kind, name, startsOn, endsOn, week);
     }
 
     @Transactional
-    public OpeningPeriod changeOpeningPeriod(UUID periodId, String name, LocalDate startsOn, LocalDate endsOn,
-                                             List<WeeklyOpeningHours> week) {
+    public OpeningPeriod changeOpeningPeriod(UUID periodId, OpeningPeriod.Kind kind, String name, LocalDate startsOn,
+                                             LocalDate endsOn, List<WeeklyOpeningHours> week) {
         bookingGridCoordination.lock();
         OpeningPeriodRow row = periods.findById(periodId).orElseThrow(AvailabilityEntryNotFoundException::new);
-        return storePeriod(row, row.toPeriod(), name, startsOn, endsOn, week);
+        return storePeriod(row, row.toPeriod(), kind, name, startsOn, endsOn, week);
     }
 
     @Transactional
@@ -363,16 +361,15 @@ public class FacilityService {
     @Transactional
     public CourtClosure createCourtClosure(UUID courtId, String name, LocalDate startsOn, LocalDate endsOn) {
         bookingGridCoordination.lock();
-        Court court = requireCourt(courtId);
-        return storeClosure(new CourtClosureRow(court.getId()), null, court, name, startsOn, endsOn);
+        return storeClosure(new CourtClosureRow(UUID.randomUUID()), null, courtId, name, startsOn, endsOn);
     }
 
     @Transactional
-    public CourtClosure changeCourtClosure(UUID closureId, String name, LocalDate startsOn, LocalDate endsOn) {
+    public CourtClosure changeCourtClosure(UUID closureId, UUID courtId, String name, LocalDate startsOn,
+                                           LocalDate endsOn) {
         bookingGridCoordination.lock();
         CourtClosureRow row = closures.findById(closureId).orElseThrow(AvailabilityEntryNotFoundException::new);
-        CourtClosure previous = row.toClosure();
-        return storeClosure(row, previous, requireCourt(row.getCourtId()), name, startsOn, endsOn);
+        return storeClosure(row, row.toClosure(), courtId, name, startsOn, endsOn);
     }
 
     @Transactional
@@ -387,42 +384,84 @@ public class FacilityService {
                 row.getId(), court.getId(), court.getNumber(), row.getStartsOn(), row.getEndsOn()));
     }
 
-    private OpeningPeriod storePeriod(OpeningPeriodRow row, OpeningPeriod previous, String name, LocalDate startsOn,
-                                      LocalDate endsOn, List<WeeklyOpeningHours> week) {
+    private OpeningPeriod storePeriod(OpeningPeriodRow row, OpeningPeriod previous, OpeningPeriod.Kind kind,
+                                      String name, LocalDate startsOn, LocalDate endsOn,
+                                      List<WeeklyOpeningHours> week) {
+        if (kind == null) {
+            throw new IllegalStateException("A period has a kind");
+        }
         Map<DayOfWeek, WeeklyOpeningHours> requested = everyWeekdayOnce(week);
         String stored = previous == null
                 ? requireDates(name, startsOn, endsOn, null, null)
                 : requireDates(name, startsOn, endsOn, previous.startsOn(), previous.endsOn());
         Map<DayOfWeek, OpeningWindow> windows = storable(requested, bookingGridSettings.slotDuration());
+        if (kind == OpeningPeriod.Kind.HOLIDAY && new HashSet<>(windows.values()).size() > 1) {
+            throw AvailabilityRejectedException.holidayHoursDiffer();
+        }
         windows.values().removeIf(Objects::isNull);
-        if (previous != null && previous.startsOn().isBefore(today()) && !windows.equals(previous.days())) {
+        boolean started = previous != null && previous.startsOn().isBefore(today());
+        if (started && (kind != previous.kind() || !windows.equals(previous.days()))) {
             throw AvailabilityRejectedException.started(previous.startsOn());
         }
-        row.changeTo(stored, startsOn, endsOn, windows);
+        row.changeTo(kind, stored, startsOn, endsOn, windows);
         try {
             periods.saveAndFlush(row);
         } catch (DataIntegrityViolationException e) {
             throw overlapOr(e, "opening_period_no_overlap");
         }
+        OpeningPeriod saved = row.toPeriod();
         events.publishEvent(new FacilityEvent.OpeningPeriodSet(
-                row.getId(), row.getKind().name(), startsOn, endsOn));
-        return row.toPeriod();
+                row.getId(), kind.name(), startsOn, endsOn, changedFields(previous, saved)));
+        return saved;
     }
 
-    private CourtClosure storeClosure(CourtClosureRow row, CourtClosure previous, Court court, String name,
+    private static List<String> changedFields(OpeningPeriod previous, OpeningPeriod saved) {
+        if (previous == null) {
+            return List.of("kind", "name", "startsOn", "endsOn", "days");
+        }
+        List<String> changed = new ArrayList<>();
+        if (previous.kind() != saved.kind()) changed.add("kind");
+        if (!previous.name().equals(saved.name())) changed.add("name");
+        if (!previous.startsOn().equals(saved.startsOn())) changed.add("startsOn");
+        if (!previous.endsOn().equals(saved.endsOn())) changed.add("endsOn");
+        if (!previous.days().equals(saved.days())) changed.add("days");
+        return changed;
+    }
+
+    private CourtClosure storeClosure(CourtClosureRow row, CourtClosure previous, UUID courtId, String name,
                                       LocalDate startsOn, LocalDate endsOn) {
+        if (courtId == null) {
+            throw new IllegalStateException("A closure names its court");
+        }
+        Court court = requireCourt(courtId);
         String stored = previous == null
                 ? requireDates(name, startsOn, endsOn, null, null)
                 : requireDates(name, startsOn, endsOn, previous.startsOn(), previous.endsOn());
-        row.changeTo(stored, startsOn, endsOn);
+        if (previous != null && previous.startsOn().isBefore(today()) && !previous.courtId().equals(courtId)) {
+            throw AvailabilityRejectedException.started(previous.startsOn());
+        }
+        row.changeTo(court.getId(), stored, startsOn, endsOn);
         try {
             closures.saveAndFlush(row);
         } catch (DataIntegrityViolationException e) {
             throw overlapOr(e, "court_closure_no_overlap");
         }
+        CourtClosure saved = row.toClosure();
         events.publishEvent(new FacilityEvent.CourtClosureSet(
-                row.getId(), court.getId(), court.getNumber(), startsOn, endsOn));
-        return row.toClosure();
+                row.getId(), court.getId(), court.getNumber(), startsOn, endsOn, changedFields(previous, saved)));
+        return saved;
+    }
+
+    private static List<String> changedFields(CourtClosure previous, CourtClosure saved) {
+        if (previous == null) {
+            return List.of("courtId", "name", "startsOn", "endsOn");
+        }
+        List<String> changed = new ArrayList<>();
+        if (!previous.courtId().equals(saved.courtId())) changed.add("courtId");
+        if (!previous.name().equals(saved.name())) changed.add("name");
+        if (!previous.startsOn().equals(saved.startsOn())) changed.add("startsOn");
+        if (!previous.endsOn().equals(saved.endsOn())) changed.add("endsOn");
+        return changed;
     }
 
     /** A stored entry passes its own dates: days before today keep the hours they had. */
@@ -444,6 +483,9 @@ public class FacilityService {
         }
         if (endsOn.isBefore(startsOn)) {
             throw AvailabilityRejectedException.endsBeforeStart();
+        }
+        if (endsOn.isAfter(LATEST_START)) {
+            throw AvailabilityRejectedException.tooLate(LATEST_START);
         }
         if (startedOn != null && startedOn.isBefore(today)) {
             if (!startsOn.equals(startedOn)) {

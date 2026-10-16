@@ -59,10 +59,10 @@ export function AdminAvailabilityView() {
     if (period.days.some((day) => !day.closed && (!day.opensAt || !day.closesAt))) {
       return Promise.resolve(refuse(t("admin.facility.dayNeedsBothTimes")));
     }
-    const body = { name: period.name, startsOn: period.startsOn, endsOn: period.endsOn, days: toRequest(period) };
+    const body = { kind: period.kind, name: period.name, startsOn: period.startsOn, endsOn: period.endsOn, days: toRequest(period) };
     return save("opening-period", async () => {
       if (period.id) await api.changeAdminOpeningPeriod(period.id, body);
-      else await api.createAdminOpeningPeriod({ ...body, kind: period.kind });
+      else await api.createAdminOpeningPeriod(body);
       setPeriods(await api.adminOpeningPeriods());
       setPeriod(newPeriod());
     });
@@ -73,10 +73,10 @@ export function AdminAvailabilityView() {
     if (!closure.courtId || !closure.name.trim() || !closure.startsOn || !closure.endsOn) {
       return Promise.resolve(refuse(t("admin.availability.incomplete")));
     }
-    const body = { name: closure.name, startsOn: closure.startsOn, endsOn: closure.endsOn };
+    const body = { courtId: closure.courtId, name: closure.name, startsOn: closure.startsOn, endsOn: closure.endsOn };
     return save("court-closure", async () => {
       if (closure.id) await api.changeAdminCourtClosure(closure.id, body);
-      else await api.createAdminCourtClosure({ ...body, courtId: closure.courtId });
+      else await api.createAdminCourtClosure(body);
       setClosures(await api.adminCourtClosures());
       setClosure(newClosure());
     });
@@ -178,8 +178,8 @@ function PeriodForm({ draft, today, started, disabled, changed, submit, cancel }
     <h3 className="font-bold">{t(draft.id ? "admin.availability.editPeriod" : "admin.availability.newPeriod")}</h3>
     <label className="grid gap-2 font-medium">{t("admin.availability.kindLabel")}
       <select data-testid="opening-period-kind" className="form-control rounded-lg border px-3 py-3" value={draft.kind}
-              disabled={disabled || !!draft.id}
-              onChange={(event) => changed({ ...draft, kind: event.target.value as Kind })}>
+              disabled={disabled || started}
+              onChange={(event) => changed(holidayHours({ ...draft, kind: event.target.value as Kind }))}>
         <option value="HOLIDAY">{t("admin.availability.kind.HOLIDAY")}</option>
         <option value="SEASON">{t("admin.availability.kind.SEASON")}</option>
       </select>
@@ -234,7 +234,7 @@ function ClosureForm({ draft, courts, today, started, disabled, changed, submit,
     <h3 className="font-bold">{t(draft.id ? "admin.availability.editClosure" : "admin.availability.newClosure")}</h3>
     <label className="grid gap-2 font-medium">{t("admin.availability.court")}
       <select data-testid="court-closure-court" className="form-control rounded-lg border px-3 py-3" value={draft.courtId}
-              disabled={disabled || !!draft.id} onChange={(event) => changed({ ...draft, courtId: event.target.value })}>
+              disabled={disabled || started} onChange={(event) => changed({ ...draft, courtId: event.target.value })}>
         <option value="">{t("admin.availability.chooseCourt")}</option>
         {courts.map((court) => <option key={court.id} value={court.id}>{courtLabel(courts, court.id, t)}</option>)}
       </select>
@@ -261,6 +261,12 @@ function courtLabel(courts: AdminCourt[], courtId: string, t: ReturnType<typeof 
   const court = courts.find((candidate) => candidate.id === courtId);
   if (!court) return t("admin.availability.unknownCourt");
   return court.name ? `${t("court.number", { number: court.number })}, ${court.name}` : t("court.number", { number: court.number });
+}
+
+// A holiday holds one window for every weekday, so switching to it keeps Monday's for all.
+function holidayHours(draft: PeriodDraft): PeriodDraft {
+  if (draft.kind !== "HOLIDAY") return draft;
+  return { ...draft, days: draft.days.map((day) => ({ ...draft.days[0], dayOfWeek: day.dayOfWeek })) };
 }
 
 function toDraft(period: OpeningPeriod): PeriodDraft {

@@ -260,6 +260,8 @@ const en: Record<keyof typeof de, string> = {
   "facility.availability.started": "This entry has been running since {{startsOn}}. Its first day and hours stay as they were; you can still rename it or end it earlier.",
   "facility.availability.ended": "Entries that ended before {{today}} stay as they were.",
   "facility.availability.overlap": "Another entry of the same kind already covers one of these days.",
+  "facility.availability.tooLate": "The last day can be {{latest}} at the latest.",
+  "facility.availability.holidayHoursDiffer": "A holiday has the same hours, or none, on every weekday.",
   "facility.availability.notFound": "This entry no longer exists. Reload the page.",
   "admin.rules.title": "Booking rules",
   "admin.ruleSets.overview": "Rule sets",

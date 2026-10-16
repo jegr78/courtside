@@ -43,6 +43,14 @@ public class AvailabilityRejectedException extends CodedDomainFailure {
                 Map.of("startsOn", startsOn.toString()));
     }
 
+    static AvailabilityRejectedException tooLate(LocalDate latest) {
+        return new AvailabilityRejectedException("facility.availability.tooLate", Map.of("latest", latest.toString()));
+    }
+
+    static AvailabilityRejectedException holidayHoursDiffer() {
+        return new AvailabilityRejectedException("facility.availability.holidayHoursDiffer", Map.of());
+    }
+
     static AvailabilityRejectedException overlap() {
         return new AvailabilityRejectedException("facility.availability.overlap", Map.of());
     }

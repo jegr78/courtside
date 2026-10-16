@@ -5,14 +5,13 @@ import org.courtside.api.AdminOpeningHoursApi;
 import org.courtside.api.ApiActiveRequest;
 import org.courtside.api.ApiCourt;
 import org.courtside.api.ApiCourtClosure;
-import org.courtside.api.ApiCourtClosureRequest;
 import org.courtside.api.ApiCourtRequest;
 import org.courtside.api.ApiCreateCourtClosureRequest;
 import org.courtside.api.ApiCreateOpeningPeriodRequest;
 import org.courtside.api.ApiOpeningHours;
 import org.courtside.api.ApiOpeningPeriod;
 import org.courtside.api.ApiOpeningPeriodKind;
-import org.courtside.api.ApiOpeningPeriodRequest;
+import org.courtside.api.ApiPublicCourtClosure;
 import org.courtside.api.ApiOpeningWeek;
 import org.courtside.api.ApiSetWeeklyOpeningHoursRequest;
 import org.courtside.facility.Court;
@@ -109,7 +108,7 @@ class FacilityAdminController implements AdminCourtsApi, AdminOpeningHoursApi {
     @Override
     public ResponseEntity<ApiOpeningPeriod> createOpeningPeriod(ApiCreateOpeningPeriodRequest request) {
         OpeningPeriod period = facility.createOpeningPeriod(
-                OpeningPeriod.Kind.valueOf(request.getKind().getValue()), request.getName(),
+                toKind(request.getKind()), request.getName(),
                 request.getStartsOn(), request.getEndsOn(), toWeek(request.getDays()));
         return ResponseEntity
                 .created(URI.create("/api/admin/opening-periods/" + period.id()))
@@ -117,8 +116,8 @@ class FacilityAdminController implements AdminCourtsApi, AdminOpeningHoursApi {
     }
 
     @Override
-    public ResponseEntity<ApiOpeningPeriod> changeOpeningPeriod(UUID periodId, ApiOpeningPeriodRequest request) {
-        return ResponseEntity.ok(toResponse(facility.changeOpeningPeriod(periodId, request.getName(),
+    public ResponseEntity<ApiOpeningPeriod> changeOpeningPeriod(UUID periodId, ApiCreateOpeningPeriodRequest request) {
+        return ResponseEntity.ok(toResponse(facility.changeOpeningPeriod(periodId, toKind(request.getKind()), request.getName(),
                 request.getStartsOn(), request.getEndsOn(), toWeek(request.getDays()))));
     }
 
@@ -145,9 +144,9 @@ class FacilityAdminController implements AdminCourtsApi, AdminOpeningHoursApi {
     }
 
     @Override
-    public ResponseEntity<ApiCourtClosure> changeCourtClosure(UUID closureId, ApiCourtClosureRequest request) {
+    public ResponseEntity<ApiCourtClosure> changeCourtClosure(UUID closureId, ApiCreateCourtClosureRequest request) {
         return ResponseEntity.ok(toResponse(facility.changeCourtClosure(
-                closureId, request.getName(), request.getStartsOn(), request.getEndsOn())));
+                closureId, request.getCourtId(), request.getName(), request.getStartsOn(), request.getEndsOn())));
     }
 
     @Override
@@ -163,6 +162,14 @@ class FacilityAdminController implements AdminCourtsApi, AdminOpeningHoursApi {
                         .map(window -> toResponse(day, window.opensAt(), window.closesAt()))
                         .orElseGet(() -> toResponse(day, null, null)))
                 .toList());
+    }
+
+    private static OpeningPeriod.Kind toKind(ApiOpeningPeriodKind kind) {
+        return kind == null ? null : OpeningPeriod.Kind.valueOf(kind.getValue());
+    }
+
+    static ApiPublicCourtClosure toPublicResponse(CourtClosure closure) {
+        return new ApiPublicCourtClosure(closure.id(), closure.courtId(), closure.startsOn(), closure.endsOn());
     }
 
     static ApiCourtClosure toResponse(CourtClosure closure) {

@@ -559,7 +559,7 @@ components:
         courtClosures:
           type: array
           description: Days on which one court is closed while the others keep the hours of the day.
-          items: { $ref: "#/components/schemas/CourtClosure" }
+          items: { $ref: "#/components/schemas/PublicCourtClosure" }
 
     OpeningWeek:
       type: object
@@ -606,8 +606,8 @@ components:
       type: object
       description: |
         The dates and hours of a season or holiday. A weekday with no window is closed on the days
-        it covers. Its last day cannot lie before today, and seasons and holidays each do not overlap
-        another of their kind.
+        it covers, and a holiday holds the same window, or none, on every weekday. It starts today or
+        later, and seasons and holidays each do not overlap another of their kind.
       required: [name, startsOn, endsOn, days]
       properties:
         name: { type: string, minLength: 1, maxLength: 80 }
@@ -637,11 +637,21 @@ components:
         startsOn: { type: string, format: date }
         endsOn: { type: string, format: date }
 
+    PublicCourtClosure:
+      type: object
+      description: A court closure as anyone may read it, without the reason the board entered.
+      required: [id, courtId, startsOn, endsOn]
+      properties:
+        id: { type: string, format: uuid }
+        courtId: { type: string, format: uuid }
+        startsOn: { type: string, format: date }
+        endsOn: { type: string, format: date }
+
     CourtClosureRequest:
       type: object
       description: |
-        The days one court is closed, both inclusive. Its last day cannot lie before today, and the
-        closures of one court do not overlap.
+        The days one court is closed, both inclusive. It starts today or later, and the closures of
+        one court do not overlap.
       required: [name, startsOn, endsOn]
       properties:
         name: { type: string, minLength: 1, maxLength: 80 }
@@ -7557,7 +7567,7 @@ paths:
     put:
       tags: [admin-opening-hours]
       operationId: changeOpeningPeriod
-      summary: Correct a season or holiday whose last day has not passed.
+      summary: Correct a season or holiday. Once started only its name and last day change; once ended it is kept.
       security:
         - sessionCookie: []
           csrfToken: []
@@ -7570,7 +7580,7 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/OpeningPeriodRequest" }
+            schema: { $ref: "#/components/schemas/CreateOpeningPeriodRequest" }
       responses:
         "200":
           description: The corrected season or holiday.
@@ -7592,7 +7602,7 @@ paths:
     delete:
       tags: [admin-opening-hours]
       operationId: removeOpeningPeriod
-      summary: Remove a season or holiday whose last day has not passed.
+      summary: Remove a season or holiday that has not started yet.
       security:
         - sessionCookie: []
           csrfToken: []
@@ -7671,7 +7681,7 @@ paths:
     put:
       tags: [admin-opening-hours]
       operationId: changeCourtClosure
-      summary: Correct a court closure whose last day has not passed.
+      summary: Correct a court closure. Once started only its reason and last day change; once ended it is kept.
       security:
         - sessionCookie: []
           csrfToken: []
@@ -7684,7 +7694,7 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/CourtClosureRequest" }
+            schema: { $ref: "#/components/schemas/CreateCourtClosureRequest" }
       responses:
         "200":
           description: The corrected court closure.
@@ -7706,7 +7716,7 @@ paths:
     delete:
       tags: [admin-opening-hours]
       operationId: removeCourtClosure
-      summary: Remove a court closure whose last day has not passed.
+      summary: Remove a court closure that has not started yet.
       security:
         - sessionCookie: []
           csrfToken: []

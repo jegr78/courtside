@@ -1,4 +1,4 @@
-import type { BookingGrid, CourtClosure, DayOfWeek, OpeningHours, OpeningPeriod } from "../api/client";
+import type { BookingGrid, DayOfWeek, OpeningHours, OpeningPeriod, PublicCourtClosure } from "../api/client";
 
 const dayNames: DayOfWeek[] = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"];
 
@@ -22,6 +22,6 @@ export function periodOn(grid: BookingGrid, kind: OpeningPeriod["kind"], date: s
   return grid.openingPeriods.find((period) => period.kind === kind && period.startsOn <= date && date <= period.endsOn);
 }
 
-export function closureOn(grid: BookingGrid, courtId: string, date: string): CourtClosure | undefined {
+export function closureOn(grid: BookingGrid, courtId: string, date: string): PublicCourtClosure | undefined {
   return grid.courtClosures.find((closure) => closure.courtId === courtId && closure.startsOn <= date && date <= closure.endsOn);
 }

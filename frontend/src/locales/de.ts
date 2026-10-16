@@ -258,6 +258,8 @@ const de = {
   "facility.availability.started": "Dieser Eintrag läuft seit {{startsOn}}. Erster Tag und Zeiten bleiben, wie sie waren; umbenennen oder früher beenden kannst du ihn weiterhin.",
   "facility.availability.ended": "Einträge, die vor dem {{today}} geendet haben, bleiben, wie sie waren.",
   "facility.availability.overlap": "Ein anderer Eintrag derselben Art deckt schon einen dieser Tage ab.",
+  "facility.availability.tooLate": "Der letzte Tag ist spätestens der {{latest}}.",
+  "facility.availability.holidayHoursDiffer": "Ein Feiertag hat an jedem Wochentag dieselben Zeiten oder keine.",
   "facility.availability.notFound": "Diesen Eintrag gibt es nicht mehr. Lade die Seite neu.",
   "admin.rules.title": "Buchungsregeln",
   "admin.ruleSets.overview": "Regelwerke",

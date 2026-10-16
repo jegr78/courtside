@@ -39,7 +39,7 @@ class OpeningHoursController implements OpeningHoursApi {
                 timeZone.id(), bookingGridSettings.slotMinutes(), openingHours(),
                 schedule.weeks().stream().map(FacilityAdminController::toResponse).toList(),
                 schedule.periods().stream().map(FacilityAdminController::toResponse).toList(),
-                facility.courtClosures().stream().map(FacilityAdminController::toResponse).toList()));
+                facility.courtClosures().stream().map(FacilityAdminController::toPublicResponse).toList()));
     }
 
     private List<ApiOpeningHours> openingHours() {

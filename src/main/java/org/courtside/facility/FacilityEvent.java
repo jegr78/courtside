@@ -83,10 +83,14 @@ public sealed interface FacilityEvent extends DomainEventRecord {
 
     }
 
-    record OpeningPeriodSet(UUID periodId, String kind, LocalDate startsOn, LocalDate endsOn)
-            implements FacilityEvent {
+    record OpeningPeriodSet(UUID periodId, String kind, LocalDate startsOn, LocalDate endsOn,
+                            List<String> changedFields) implements FacilityEvent {
 
         static final String TYPE = "facility.openingPeriod.set";
+
+        public OpeningPeriodSet {
+            changedFields = List.copyOf(changedFields);
+        }
 
         @Override
         public String eventType() {
@@ -117,10 +121,14 @@ public sealed interface FacilityEvent extends DomainEventRecord {
 
     }
 
-    record CourtClosureSet(UUID closureId, UUID courtId, int number, LocalDate startsOn, LocalDate endsOn)
-            implements FacilityEvent {
+    record CourtClosureSet(UUID closureId, UUID courtId, int number, LocalDate startsOn, LocalDate endsOn,
+                           List<String> changedFields) implements FacilityEvent {
 
         static final String TYPE = "facility.courtClosure.set";
+
+        public CourtClosureSet {
+            changedFields = List.copyOf(changedFields);
+        }
 
         @Override
         public String eventType() {

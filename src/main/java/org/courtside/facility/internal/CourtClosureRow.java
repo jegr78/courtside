@@ -33,12 +33,12 @@ public class CourtClosureRow {
     @Column(name = "ends_on", nullable = false)
     private LocalDate endsOn;
 
-    public CourtClosureRow(UUID courtId) {
-        this.id = UUID.randomUUID();
-        this.courtId = courtId;
+    public CourtClosureRow(UUID id) {
+        this.id = id;
     }
 
-    public void changeTo(String name, LocalDate startsOn, LocalDate endsOn) {
+    public void changeTo(UUID courtId, String name, LocalDate startsOn, LocalDate endsOn) {
+        this.courtId = courtId;
         this.name = name;
         this.startsOn = startsOn;
         this.endsOn = endsOn;

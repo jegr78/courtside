@@ -67,7 +67,7 @@ class AvailabilityAdminControllerTest extends AbstractIntegrationTest {
 
         // when / then
         mockMvc.perform(json(put("/api/admin/opening-periods/" + id),
-                        period("Founding day", "2026-07-08", "2026-07-08", week(null, null))))
+                        "{\"kind\": \"HOLIDAY\", " + period("Founding day", "2026-07-08", "2026-07-08", week(null, null)).substring(1)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.startsOn").value("2026-07-08"))
                 .andExpect(jsonPath("$.days[0].opensAt").doesNotExist());
@@ -135,14 +135,15 @@ class AvailabilityAdminControllerTest extends AbstractIntegrationTest {
 
         // then
         mockMvc.perform(json(put("/api/admin/court-closures/" + id),
-                        closure("Lights", "2026-06-02", "2026-06-03")))
+                        "{\"courtId\": \"%s\", ".formatted(court.getId()) + closure("Lights", "2026-06-02", "2026-06-03").substring(1)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.name").value("Lights"));
         mockMvc.perform(get("/api/admin/court-closures"))
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].endsOn").value("2026-06-03"));
         mockMvc.perform(get("/api/public/booking-grid").with(anonymous()))
-                .andExpect(jsonPath("$.courtClosures[0].courtId").value(court.getId().toString()));
+                .andExpect(jsonPath("$.courtClosures[0].courtId").value(court.getId().toString()))
+                .andExpect(jsonPath("$.courtClosures[0].name").doesNotExist());
         mockMvc.perform(delete("/api/admin/court-closures/" + id).with(csrf()))
                 .andExpect(status().isNoContent());
     }

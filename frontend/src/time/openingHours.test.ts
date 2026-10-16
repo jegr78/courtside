@@ -82,7 +82,7 @@ describe("hoursOn", () => {
 
 describe("closureOn", () => {
   const closed = grid([], undefined, [], [
-    { id: "c", courtId: "court-2", name: "Resurfacing", startsOn: "2026-06-01", endsOn: "2026-06-03" }
+    { id: "c", courtId: "court-2", startsOn: "2026-06-01", endsOn: "2026-06-03" }
   ]);
 
   it("given a closure, when reading a court on one of its days, then the closure answers", () => {

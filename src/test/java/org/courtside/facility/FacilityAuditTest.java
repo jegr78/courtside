@@ -60,6 +60,44 @@ class FacilityAuditTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenAClosure_whenOnlyItsReasonChanges_thenTheLogNamesTheFieldWithoutItsValue() {
+        // given
+        Court court = facility.createCourt(7, "Centre Court");
+        CourtClosure closure = facility.createCourtClosure(court.getId(), "Resurfacing",
+                LocalDate.of(2026, 6, 1), LocalDate.of(2026, 6, 30));
+
+        // when
+        facility.changeCourtClosure(closure.id(), court.getId(), "Private lesson",
+                LocalDate.of(2026, 6, 1), LocalDate.of(2026, 6, 30));
+
+        // then
+        List<Object> changes = audit.eventsAbout(closure.id(), FacilityEvent.CourtClosureSet.TYPE).stream()
+                .map(event -> event.payload().get("changedFields")).toList();
+        assertThat(changes).containsExactlyInAnyOrder(List.of("courtId", "name", "startsOn", "endsOn"), List.of("name"));
+        assertThat(audit.eventsAbout(closure.id()).toString()).doesNotContain("Private lesson");
+    }
+
+    @Test
+    void givenASeason_whenItsHoursChange_thenTheLogNamesTheHours() {
+        // given
+        List<WeeklyOpeningHours> early = Arrays.stream(DayOfWeek.values())
+                .map(day -> new WeeklyOpeningHours(day, LocalTime.of(8, 0), LocalTime.of(20, 0))).toList();
+        List<WeeklyOpeningHours> late = Arrays.stream(DayOfWeek.values())
+                .map(day -> new WeeklyOpeningHours(day, LocalTime.of(10, 0), LocalTime.of(20, 0))).toList();
+        OpeningPeriod season = facility.createOpeningPeriod(OpeningPeriod.Kind.SEASON, "Summer",
+                LocalDate.of(2026, 6, 1), LocalDate.of(2026, 9, 30), early);
+
+        // when
+        facility.changeOpeningPeriod(season.id(), OpeningPeriod.Kind.SEASON, "Summer",
+                LocalDate.of(2026, 6, 1), LocalDate.of(2026, 9, 30), late);
+
+        // then
+        assertThat(audit.eventsAbout(season.id(), FacilityEvent.OpeningPeriodSet.TYPE).stream()
+                .map(event -> event.payload().get("changedFields")).toList())
+                .containsExactlyInAnyOrder(List.of("kind", "name", "startsOn", "endsOn", "days"), List.of("days"));
+    }
+
+    @Test
     void givenAnActiveCourt_whenItIsActivatedAgain_thenNothingIsRecorded() {
         // given
         Court court = facility.createCourt(7, "Centre Court");

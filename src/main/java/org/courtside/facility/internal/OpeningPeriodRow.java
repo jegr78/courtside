@@ -52,12 +52,13 @@ public class OpeningPeriodRow {
     @CollectionTable(name = "opening_period_hours", joinColumns = @JoinColumn(name = "period_id"))
     private Set<Hours> hours = new HashSet<>();
 
-    public OpeningPeriodRow(OpeningPeriod.Kind kind) {
-        this.id = UUID.randomUUID();
-        this.kind = kind;
+    public OpeningPeriodRow(UUID id) {
+        this.id = id;
     }
 
-    public void changeTo(String name, LocalDate startsOn, LocalDate endsOn, Map<DayOfWeek, OpeningWindow> days) {
+    public void changeTo(OpeningPeriod.Kind kind, String name, LocalDate startsOn, LocalDate endsOn,
+                         Map<DayOfWeek, OpeningWindow> days) {
+        this.kind = kind;
         this.name = name;
         this.startsOn = startsOn;
         this.endsOn = endsOn;

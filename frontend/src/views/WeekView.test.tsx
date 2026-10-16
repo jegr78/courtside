@@ -2720,7 +2720,7 @@ it("given a court closed today, when showing the plan, then its free cells read 
   const now = clubInstant("12:15");
   vi.mocked(api.allocations).mockResolvedValue([]);
   vi.spyOn(api, "bookingGrid").mockResolvedValue({ ...openingHoursWith({}), courtClosures: [{
-    id: "aaaaaaaa-0000-0000-0000-000000000004", courtId: courts[1].id, name: "Resurfacing",
+    id: "aaaaaaaa-0000-0000-0000-000000000004", courtId: courts[1].id,
     startsOn: "2026-08-10", endsOn: "2026-08-12"
   }] });
 
@@ -2740,7 +2740,7 @@ it("given a court closed today, when showing the plan, then its free cells read 
 it("given a closed court, when several courts can be chosen, then the closed one cannot be added", async () => {
   // given
   vi.spyOn(api, "bookingGrid").mockResolvedValue({ ...openingHoursWith({}), courtClosures: [{
-    id: "aaaaaaaa-0000-0000-0000-000000000005", courtId: courts[1].id, name: "Resurfacing",
+    id: "aaaaaaaa-0000-0000-0000-000000000005", courtId: courts[1].id,
     startsOn: "2026-08-10", endsOn: "2026-08-10"
   }] });
   render(<WeekView today={clubInstant("07:00")} canChooseSeveralCourts />);

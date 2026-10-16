@@ -139,7 +139,7 @@ describe("AdminAvailabilityView", () => {
     const remove = vi.spyOn(api, "removeAdminCourtClosure").mockResolvedValue(undefined);
     show();
     await userEvent.click(await screen.findByTestId("edit-court-closure-closure-1"));
-    expect(screen.getByTestId("court-closure-court"), "the court of a closure stays").toBeDisabled();
+    expect(screen.getByTestId("court-closure-court"), "a closure ahead can move to another court").toBeEnabled();
     fireEvent.change(screen.getByTestId("court-closure-name"), { target: { value: "Lights" } });
 
     // when
@@ -148,7 +148,7 @@ describe("AdminAvailabilityView", () => {
 
     // then
     await waitFor(() => expect(remove).toHaveBeenCalledWith("closure-1"));
-    expect(change).toHaveBeenCalledWith("closure-1", { name: "Lights", startsOn: "2099-06-01", endsOn: "2099-06-30" });
+    expect(change).toHaveBeenCalledWith("closure-1", { courtId: "court-2", name: "Lights", startsOn: "2099-06-01", endsOn: "2099-06-30" });
   });
 
   it("given a running season, when it is edited, then its first day and hours are fixed", async () => {
@@ -160,6 +160,7 @@ describe("AdminAvailabilityView", () => {
 
     // then
     expect(screen.getByTestId("opening-period-starts-on")).toBeDisabled();
+    expect(screen.getByTestId("opening-period-kind"), "a running season stays a season").toBeDisabled();
     expect(screen.getByTestId("opening-period-opens-MONDAY")).toBeDisabled();
     expect(screen.getByTestId("opening-period-ends-on")).toBeEnabled();
     expect(screen.getByTestId("opening-period-started")).toBeInTheDocument();
