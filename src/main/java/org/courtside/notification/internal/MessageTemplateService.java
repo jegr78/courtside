@@ -71,6 +71,9 @@ public class MessageTemplateService {
     }
 
     private static void requireAcceptable(MessageKind kind, String language, MessageText text) {
+        if (text == null || text.subject() == null || text.body() == null) {
+            throw new IllegalStateException("A message wording reached the service without a subject and body");
+        }
         requireKnown(language);
         List<MessageTemplateCatalog.Violation> violations = MessageTemplateCatalog.check(kind, text);
         if (!violations.isEmpty()) {

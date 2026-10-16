@@ -91,6 +91,32 @@ class MessageTemplateServiceTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenEveryMessageAndLanguage_whenItsWordingNamesEveryPlaceholder_thenThePreviewFillsThemAll() {
+        for (MessageTemplateService.Template template : templates.templates()) {
+            for (MessageTemplateService.Wording wording : template.languages()) {
+                // given
+                String everyPlaceholder = String.join(" ", template.placeholders().stream().map(name -> "{" + name + "}").toList());
+
+                // when
+                MessageText preview = templates.preview(template.kind(), wording.language(),
+                        new MessageText(wording.shipped().subject(), wording.shipped().body() + "\n" + everyPlaceholder));
+
+                // then
+                assertThat(preview.subject() + preview.body())
+                        .as("%s %s leaves no placeholder unfilled", template.kind(), wording.language())
+                        .doesNotContainPattern("\\{[a-zA-Z]+}");
+            }
+        }
+    }
+
+    @Test
+    void givenAWordingWithoutText_whenPreviewed_thenTheServiceRefusesToGuess() {
+        // when / then
+        assertThatThrownBy(() -> templates.preview(MessageKind.BOOKING_CONFIRMED, "en", new MessageText(null, "{day}")))
+                .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
     void givenAnUnsupportedLanguage_whenSaved_thenItIsRefusedWithAReason() {
         // when / then
         assertThatThrownBy(() -> templates.change(MessageKind.BOOKING_CONFIRMED, "fr",
