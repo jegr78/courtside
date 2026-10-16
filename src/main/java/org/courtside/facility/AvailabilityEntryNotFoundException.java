@@ -13,7 +13,7 @@ public class AvailabilityEntryNotFoundException extends CodedDomainFailure {
             "No such season, holiday or court closure",
             "No season, holiday or court closure has that id");
 
-    AvailabilityEntryNotFoundException() {
+    public AvailabilityEntryNotFoundException() {
         super("facility.availability.notFound", Map.of());
     }
 

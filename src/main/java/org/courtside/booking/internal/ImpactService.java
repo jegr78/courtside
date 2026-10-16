@@ -3,8 +3,11 @@ package org.courtside.booking.internal;
 import org.courtside.booking.CourtAllocation;
 import org.courtside.card.CardNotFoundException;
 import org.courtside.card.CardService;
+import org.courtside.facility.AvailabilityEntryNotFoundException;
+import org.courtside.facility.CourtClosure;
 import org.courtside.facility.CourtNotFoundException;
 import org.courtside.facility.FacilityService;
+import org.courtside.facility.OpeningPeriod;
 import org.courtside.shared.OpeningWindow;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -19,6 +22,7 @@ import java.time.ZoneId;
 import org.courtside.config.ClubTimeZone;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -29,6 +33,8 @@ public class ImpactService {
 
     private static final int MAX_PAGE_SIZE = 100;
     private static final UUID FIRST_PAGE_CURSOR = new UUID(0, 0);
+    // PostgreSQL holds no instant this late, and nothing is booked there.
+    private static final LocalDate LAST_COUNTED_DAY = LocalDate.of(9999, 12, 31);
 
     private final CourtAllocationRepository allocations;
     private final FacilityService facility;
@@ -103,6 +109,91 @@ public class ImpactService {
     ImpactPage pageOfOpeningHours(DayOfWeek day, OpeningWindow window, Period period, UUID cursor, int limit) {
         OpeningWindow required = OpeningWindow.required(window);
         return openingHoursPage(day, false, required.opensAt(), required.closesAt(), period, cursor, limit);
+    }
+
+    /** Bookings that storing this season or holiday, replacing {@code periodId} when given, would newly leave closed. */
+    public Impact ofOpeningPeriod(UUID periodId, OpeningPeriod.Kind kind, LocalDate startsOn, LocalDate endsOn,
+                                  Map<DayOfWeek, OpeningWindow> days, UUID cursor, int limit) {
+        validateLimit(limit);
+        if (kind == null || startsOn == null || endsOn == null || days == null) {
+            throw new IllegalStateException("A season or holiday has a kind, its dates and its days");
+        }
+        Availability current = currentAvailability();
+        if (periodId != null && current.period(periodId).isEmpty()) {
+            throw new AvailabilityEntryNotFoundException();
+        }
+        OpeningPeriod proposed = new OpeningPeriod(periodId == null ? UUID.randomUUID() : periodId,
+                kind, "", startsOn, endsOn, days);
+        return pagedImpact(newlyUnavailable(current, current.withPeriod(proposed), startsOn, endsOn,
+                clock.instant()), cursor, limit);
+    }
+
+    /** Bookings that storing this closure, replacing {@code closureId} when given, would newly leave closed. */
+    public Impact ofCourtClosure(UUID closureId, UUID courtId, LocalDate startsOn, LocalDate endsOn,
+                                 UUID cursor, int limit) {
+        validateLimit(limit);
+        if (courtId == null || startsOn == null || endsOn == null) {
+            throw new IllegalStateException("A closure names its court and its dates");
+        }
+        facility.findCourt(courtId).orElseThrow(
+                () -> new CourtNotFoundException("No court with id " + courtId));
+        Availability current = currentAvailability();
+        if (closureId != null && current.closure(closureId).isEmpty()) {
+            throw new AvailabilityEntryNotFoundException();
+        }
+        CourtClosure proposed = new CourtClosure(closureId == null ? UUID.randomUUID() : closureId,
+                courtId, "", startsOn, endsOn);
+        return pagedImpact(newlyUnavailable(current, current.withClosure(proposed), startsOn, endsOn,
+                clock.instant()), cursor, limit);
+    }
+
+    Availability currentAvailability() {
+        return new Availability(facility.openingSchedule(), facility.courtClosures());
+    }
+
+    /** Future bookings from {@code startsOn} to {@code endsOn} that {@code after} refuses and {@code before} admitted. */
+    List<AffectedBooking> newlyUnavailable(Availability before, Availability after, LocalDate startsOn,
+                                           LocalDate endsOn, Instant now) {
+        ZoneId zone = timeZone.zoneId();
+        Instant from = latest(now, startOfDay(startsOn, zone));
+        Instant until = startOfDay(endsOn.isBefore(LAST_COUNTED_DAY) ? endsOn.plusDays(1) : LAST_COUNTED_DAY, zone);
+        if (!from.isBefore(until)) {
+            return List.of();
+        }
+        Map<UUID, List<BookedSlot>> byBooking = new LinkedHashMap<>();
+        allocations.findConfirmedSlotsStartingBetween(from, until).forEach(slot ->
+                byBooking.computeIfAbsent(slot.bookingId(), ignored -> new ArrayList<>()).add(slot));
+        return byBooking.values().stream()
+                .filter(booking -> !after.admits(booking, zone) && before.admits(booking, zone))
+                .map(ImpactService::affectedBy)
+                .toList();
+    }
+
+    private static Instant startOfDay(LocalDate date, ZoneId zone) {
+        return (date.isBefore(LAST_COUNTED_DAY) ? date : LAST_COUNTED_DAY).atStartOfDay(zone).toInstant();
+    }
+
+    private static Instant latest(Instant first, Instant second) {
+        return first.isAfter(second) ? first : second;
+    }
+
+    private static Impact pagedImpact(List<AffectedBooking> affected, UUID cursor, int limit) {
+        int start = 0;
+        if (cursor != null) {
+            List<UUID> ids = affected.stream().map(AffectedBooking::bookingId).toList();
+            start = ids.contains(cursor) ? ids.indexOf(cursor) + 1 : affected.size();
+        }
+        List<AffectedBooking> rest = affected.subList(start, affected.size());
+        boolean truncated = rest.size() > limit;
+        List<AffectedBooking> visible = truncated ? rest.subList(0, limit) : rest;
+        return new Impact(affected.size(), truncated, truncated ? visible.getLast().bookingId() : null,
+                List.copyOf(visible));
+    }
+
+    private static AffectedBooking affectedBy(List<BookedSlot> slots) {
+        BookedSlot first = slots.getFirst();
+        return new AffectedBooking(first.bookingId(), slots.stream().map(BookedSlot::courtId).toList(),
+                first.startsAt(), first.endsAt());
     }
 
     /** The instants from {@code from} up to {@code until} over which one version of the hours governs. */
