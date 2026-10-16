@@ -2,7 +2,9 @@ package org.courtside.dataexchange;
 
 import org.courtside.shared.DomainEventRecord;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -107,6 +109,25 @@ public sealed interface DataExchangeEvent extends DomainEventRecord {
         @Override
         public UUID subjectId() {
             return personId;
+        }
+    }
+
+    // A whole log leaves the instance, so the entry concerns no single subject.
+    record LogExported(String log, @Nullable LocalDate from, @Nullable LocalDate to) implements DataExchangeEvent {
+
+        static final String TYPE = "dataexchange.log.exported";
+
+        public static final String AUDIT = "audit";
+        public static final String MESSAGES = "messages";
+
+        @Override
+        public String eventType() {
+            return TYPE;
+        }
+
+        @Override
+        public @Nullable UUID subjectId() {
+            return null;
         }
     }
 }

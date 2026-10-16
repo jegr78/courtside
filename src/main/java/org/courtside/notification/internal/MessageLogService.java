@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.courtside.identity.UserAccount;
 import org.courtside.identity.UserAccountRepository;
 import org.courtside.notification.MessageKind;
+import org.courtside.notification.MessageLogExport;
 import org.courtside.notification.MessageState;
 import org.courtside.shared.CursorPage;
 import org.springframework.data.domain.Limit;
@@ -19,9 +20,10 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-public class MessageLogService {
+public class MessageLogService implements MessageLogExport {
 
     private static final int MAX_PAGE_SIZE = 100;
+    private static final int MAX_EXPORT_BATCH = 1_000;
 
     private final MessageRecordRepository records;
     private final UserAccountRepository accounts;
@@ -33,6 +35,21 @@ public class MessageLogService {
         List<UUID> ids = records.findPage(personId != null, accountIdsFor(personId), state, unsettled,
                 from, to, start == null ? null : start.getQueuedSeq(), Limit.of(limit + 1));
         return CursorPage.of(ids, limit, this::load, MessageEntry::id);
+    }
+
+    @Override
+    public List<ExportedMessage> messages(Instant from, Instant before, UUID after, int size) {
+        if (size < 1 || size > MAX_EXPORT_BATCH) {
+            throw new IllegalStateException("Message export batch must be between 1 and " + MAX_EXPORT_BATCH);
+        }
+        MessageRecord start = cursorRecord(after);
+        List<UUID> ids = records.findPage(false, List.of(), null, false, from, before,
+                start == null ? null : start.getQueuedSeq(), Limit.of(size));
+        return CursorPage.of(ids, size, this::load, MessageEntry::id).items().stream()
+                .map(entry -> new ExportedMessage(entry.id(), entry.queuedAt(), entry.settledAt(), entry.kind(),
+                        entry.state(), entry.messageId(), entry.personId(), entry.personName(), entry.reason(),
+                        entry.statusCode()))
+                .toList();
     }
 
     private List<UUID> accountIdsFor(UUID personId) {

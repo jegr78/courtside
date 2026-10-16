@@ -2894,7 +2894,7 @@ components:
 
     AuditEntry:
       type: object
-      required: [id, occurredAt, eventType, parameters, subjectId]
+      required: [id, occurredAt, eventType, parameters]
       properties:
         id: { type: string, format: uuid }
         occurredAt: { type: string, format: date-time }
@@ -2908,7 +2908,12 @@ components:
           type: object
           additionalProperties: true
           description: The recorded payload, as the message's parameters.
-        subjectId: { type: string, format: uuid }
+        subjectId:
+          type: [string, "null"]
+          format: uuid
+          description: |
+            The entity the change concerns. Absent or `null` for an activity that concerns the
+            whole instance rather than one entity, such as `dataexchange.log.exported`.
         subjectName:
           type: [string, "null"]
           description: |
@@ -8618,6 +8623,142 @@ paths:
             Content-Disposition:
               description: |
                 `attachment` with a fixed ASCII file name carrying the period it covers.
+              schema: { type: string }
+          content:
+            text/csv:
+              schema: { type: string, format: binary }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/admin/export/audit:
+    post:
+      tags: [admin-export]
+      operationId: exportAuditLog
+      summary: The change log as a CSV file.
+      description: |
+        Every entry `/api/admin/audit` pages through, in one file and in the same order: newest
+        first, by `occurredAt` and then by id. The columns are the fields an entry carries there:
+        `occurredAt` in the club time zone with its offset, `eventType`, `subjectId`,
+        `subjectName`, `actorAccountId`, `actorUsername` and `parameters` as the recorded JSON.
+        The interactive log stays paged; this file holds every entry of the period and is written
+        while it is read, so its size does not depend on what fits in memory.
+
+        The file ends with the entries recorded before the request arrived, so the entry this
+        export records about itself is never in it. A cell that a spreadsheet would read as a
+        formula is written with a leading apostrophe.
+
+        Administrators only, as the log itself. The export is recorded as
+        `dataexchange.log.exported`, an entry with no subject because it concerns the whole
+        instance rather than one entity.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: from
+          in: query
+          required: false
+          description: The first day to include, in the club time zone. Without it the file starts at the first entry.
+          schema: { type: string, format: date }
+        - name: to
+          in: query
+          required: false
+          description: The last day to include, in the club time zone. Without it the file ends with the newest entry.
+          schema: { type: string, format: date }
+        - name: separator
+          in: query
+          required: false
+          description: The single character between two cells.
+          schema: { type: string, pattern: '^[,;|\t]$', minLength: 1, maxLength: 1, default: "," }
+        - name: encoding
+          in: query
+          required: false
+          description: |
+            One of the names `/api/admin/import/encodings` lists that can write a file; a
+            decode-only one is answered `400`.
+          schema:
+            type: string
+            pattern: "^[A-Za-z0-9][A-Za-z0-9._:+-]{0,39}$"
+            maxLength: 40
+            default: "UTF-8"
+      responses:
+        "200":
+          description: The change log, one row per entry.
+          headers:
+            Content-Disposition:
+              description: |
+                `attachment` with a fixed ASCII file name carrying the date the file was produced.
+              schema: { type: string }
+          content:
+            text/csv:
+              schema: { type: string, format: binary }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/admin/export/messages:
+    post:
+      tags: [admin-export]
+      operationId: exportMessageLog
+      summary: The message log as a CSV file.
+      description: |
+        Every entry `/api/admin/messages` pages through, in one file and in the same order, newest
+        first. The columns are the fields an entry carries there: `queuedAt` and `settledAt` in
+        the club time zone with their offset, `kind`, `state`, `messageId`, `personId`,
+        `personName`, `reason` and `statusCode`. Who was written to and when is personal data, so
+        the file is for administrators only, as the log is. The interactive log stays paged; this
+        file holds every entry of the period and is written while it is read.
+
+        The file ends with the messages queued before the request arrived. A cell that a
+        spreadsheet would read as a formula is written with a leading apostrophe. The export is
+        recorded as `dataexchange.log.exported`.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: from
+          in: query
+          required: false
+          description: The first day to include, in the club time zone. Without it the file starts at the first entry.
+          schema: { type: string, format: date }
+        - name: to
+          in: query
+          required: false
+          description: The last day to include, in the club time zone. Without it the file ends with the newest entry.
+          schema: { type: string, format: date }
+        - name: separator
+          in: query
+          required: false
+          description: The single character between two cells.
+          schema: { type: string, pattern: '^[,;|\t]$', minLength: 1, maxLength: 1, default: "," }
+        - name: encoding
+          in: query
+          required: false
+          description: |
+            One of the names `/api/admin/import/encodings` lists that can write a file; a
+            decode-only one is answered `400`.
+          schema:
+            type: string
+            pattern: "^[A-Za-z0-9][A-Za-z0-9._:+-]{0,39}$"
+            maxLength: 40
+            default: "UTF-8"
+      responses:
+        "200":
+          description: The message log, one row per message.
+          headers:
+            Content-Disposition:
+              description: |
+                `attachment` with a fixed ASCII file name carrying the date the file was produced.
               schema: { type: string }
           content:
             text/csv:
