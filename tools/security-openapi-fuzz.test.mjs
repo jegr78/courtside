@@ -12,6 +12,8 @@ import {
   normalizeSchemathesisEvents,
   openApiFuzzPolicy,
   openApiFuzzPolicyDigest,
+  openApiNativeFixtureRequests,
+  openApiNativeRequestReserve,
   openApiSpecificationDigest,
   runOpenApiImportCases,
   runOpenApiInputCases,
@@ -916,19 +918,37 @@ test("given a refusal that survives the paced retry, when running native cases, 
   assert.equal(mutation.requestCount + input.requestCount + imports.requestCount, sent);
 });
 
-test("given the native reserve, when every native case needs its one retry, then the reserve still covers the fixture", () => {
+test("given every native case refused until its retry runs out, when the cases run, then the derived reserve holds them and the fixture", async () => {
   // given
-  const inventory = buildOpenApiFuzzInventory(api);
-  const mutationCases = inventory.filter(({ modes }) => !modes.includes("positive") && modes.includes("negative")).length;
-  const fixtureRequests = 4;
+  const fixture = { client: {}, sourceId: "00000000-0000-0000-0000-000000000001" };
+  let sent = 0;
+  const context = { ca: "certificate", timeoutMilliseconds: 1_000, wait: async () => {},
+    request: async () => { sent++; return admissionRefusal; } };
 
   // when
-  const worstCase = fixtureRequests + (securityImportCases().length + openApiFuzzPolicy.inputClasses.length
-    + mutationCases) * 2;
+  for (const run of [runOpenApiMutationCases, runOpenApiInputCases, runOpenApiImportCases]) {
+    await run({ target: "https://127.0.0.1:9443" }, fixture, context);
+  }
 
   // then
-  assert.ok(worstCase <= openApiFuzzPolicy.nativeRequestReserve,
-    `${worstCase} native requests must fit the ${openApiFuzzPolicy.nativeRequestReserve} reserve`);
+  assert.equal(openApiNativeRequestReserve() - sent, openApiNativeFixtureRequests,
+    "the reserve names the worst case of the native cases plus the fixture, no more and no less");
+});
+
+test("given a contract with one more operation only curated cases probe, when deriving the native reserve, then it grows by that case and its retry", () => {
+  // given
+  const grown = structuredClone(api);
+  grown.paths["/api/admin/security-reserve-probe/{id}"] = { delete: { operationId: "securityReserveProbe",
+    parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } }],
+    responses: { 204: { description: "Removed." } } } };
+  const added = buildOpenApiFuzzInventory(grown).find(({ operationId }) => operationId === "securityReserveProbe");
+
+  // when
+  const growth = openApiNativeRequestReserve(grown) - openApiNativeRequestReserve(api);
+
+  // then
+  assert.deepEqual(added.modes, ["negative"], "a write outside Schemathesis is probed by a curated case");
+  assert.equal(growth, 2, "the reserve follows the contract instead of a number in the policy");
 });
 
 test("given operations whose own limiters advertise long waits, when Schemathesis selects operations, then none of them reaches it", () => {

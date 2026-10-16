@@ -38,6 +38,10 @@ export const openApiFuzzPolicy = Object.freeze(JSON.parse(readFileSync(
 export const openApiFuzzVersion = openApiFuzzPolicy.image.slice(
   openApiFuzzPolicy.image.indexOf(":") + 1, openApiFuzzPolicy.image.indexOf("@"));
 
+const nativeRetries = 1;
+export const openApiNativeFixtureRequests = 4;
+const nativeFixtureRequests = openApiNativeFixtureRequests;
+
 function nativeSender(context, send) {
   const wait = context.wait ?? ((milliseconds) => delay(milliseconds));
   let requestCount = 0;
@@ -45,9 +49,17 @@ function nativeSender(context, send) {
     send: (...request) => sendPacedByAdmission(() => {
       requestCount++;
       return send(...request);
-    }, wait, { retries: 1 }),
+    }, wait, { retries: nativeRetries }),
     requestCount: () => requestCount
   };
+}
+
+/** The native requests the suite sends beside Schemathesis when every curated case needs its retry. */
+export function openApiNativeRequestReserve(contract = api, policy = openApiFuzzPolicy) {
+  const mutationCases = buildOpenApiFuzzInventory(contract, policy)
+    .filter(({ modes }) => !modes.includes("positive") && modes.includes("negative")).length;
+  return nativeFixtureRequests
+    + (securityImportCases().length + policy.inputClasses.length + mutationCases) * (nativeRetries + 1);
 }
 
 export function openApiFuzzPolicyDigest(policy = openApiFuzzPolicy) {
@@ -171,6 +183,7 @@ export async function runOpenApiFuzzAssessment(plan, context) {
     policyDigest: openApiFuzzPolicyDigest(),
     specificationDigest: openApiSpecificationDigest(),
     maxRequests: context.maxRequests,
+    nativeRequestReserve: openApiNativeRequestReserve(),
     attempt: context.attempt,
     timeoutMilliseconds: Math.max(1, context.deadline.getTime() - Date.now())
   });
@@ -260,6 +273,9 @@ export async function prepareOpenApiFuzzFixtures(plan, context) {
   const mappings = await request({ method: "GET", path: "/__security/runtime-mappings", headers: {} },
     { maxResponseBytes: 2 * 1024 * 1024 });
   if (mappings.status !== 200 || !mappings.json) throw new Error("Runtime route inventory is unavailable");
+  if (requestCount !== nativeFixtureRequests) {
+    throw new Error(`The fuzz fixture sent ${requestCount} requests, not the ${nativeFixtureRequests} its reserve counts`);
+  }
   return { client, sourceId: source.json.id, observedRoutes: runtimeOperations(mappings.json), requestCount,
     close: () => control.close() };
 }
