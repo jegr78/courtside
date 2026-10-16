@@ -6,4 +6,6 @@ import java.util.UUID;
 public interface BookingDurationLimit {
 
     Optional<Integer> maxMinutesFor(UUID membershipTypeId);
+
+    Optional<Integer> minMinutesFor(UUID membershipTypeId);
 }

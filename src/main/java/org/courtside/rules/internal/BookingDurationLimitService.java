@@ -19,4 +19,10 @@ class BookingDurationLimitService implements BookingDurationLimit {
         return ruleParameters.findIntParameter(
                 membershipTypeId, RuleType.MAX_BOOKING_DURATION, "maxMinutes");
     }
+
+    @Override
+    public Optional<Integer> minMinutesFor(UUID membershipTypeId) {
+        return ruleParameters.findIntParameter(
+                membershipTypeId, RuleType.MIN_BOOKING_DURATION, "minDurationMinutes");
+    }
 }

@@ -726,6 +726,33 @@ test("given booking hours, when a lane slot is judged, then a slot that starts b
   assert.equal(leavesBookingHours({ start: "20:30", end: "21:30" }, hours), true, "a slot that runs past the window leaves it");
 });
 
+import { laneLimitConflicts, limitRefusals } from "../acceptance/lib/core.mjs";
+
+test("given the personas' eligibility, when the lanes are checked, then a weekly limit or a minimum longer than a lane is named and absent limits pass", () => {
+  // given
+  const eligibility = {
+    memberA: { violations: [] },
+    memberB: { violations: [], maxWeeklyBookedHours: 40 },
+    memberC: { violations: [], minBookingMinutes: 90 },
+    trainer: { violations: [], minBookingMinutes: 60, maxBookingMinutes: 120 }
+  };
+  // when
+  const conflicts = laneLimitConflicts(eligibility, 60);
+  // then
+  assert.deepEqual(conflicts, ["memberB: at most 40 h a week", "memberC: at least 90 minutes per booking"],
+    "a weekly limit can stop a later lane and a minimum longer than a lane stops every one; a minimum a lane meets passes");
+});
+
+test("given a weekly limit and a minimum, when the journey plans its refused requests, then one is short of the minimum and one passes the week", () => {
+  // when
+  const refusals = limitRefusals({ maxWeeklyBookedHours: 1, minBookingMinutes: 60 }, 30);
+  // then
+  assert.deepEqual(refusals, { shortMinutes: 30, longMinutes: 90 }, "30 minutes miss a 60-minute minimum and 90 pass a one-hour week");
+  assert.equal(limitRefusals({ maxWeeklyBookedHours: 1, minBookingMinutes: 30 }, 30), null,
+    "a minimum of one grid cell leaves no shorter period on the grid, so the journey cannot ask for one");
+  assert.equal(limitRefusals({ minBookingMinutes: 60 }, 30), null, "without a weekly limit the journey has nothing to pass");
+});
+
 test("given an erasure target, when parsed, then host and container are kept, and a host that could pass for an option or carries a shell character is refused", () => {
   // when / then
   assert.deepEqual(parseConfig({ ...valid(), erasure: { ssh: "ops-host", container: "club-db-1" } }, env).erasure, { ssh: "ops-host", container: "club-db-1" });

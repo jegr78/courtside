@@ -24,6 +24,10 @@ public final class CardTestFixture {
                 false, false, false).getId();
     }
 
+    public UUID createCardCountingAgainstLimits(String label, Set<Role> allowedRoles) {
+        return cards.createCard(label, "#34584A", allowedRoles, Set.of(), new short[]{}, true, false, false).getId();
+    }
+
     public UUID createDoublesCardForGuests(String label, Set<Role> managingRoles) {
         return cards.createCard(label, "#34584A", Set.of(), managingRoles, new short[]{2},
                 false, true, false).getId();

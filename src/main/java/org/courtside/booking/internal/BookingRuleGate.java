@@ -16,6 +16,7 @@ import org.courtside.rules.RuleContext;
 import org.courtside.rules.CourtBookingPermission;
 import org.courtside.rules.RuleEngine;
 import org.courtside.rules.RuleViolation;
+import org.courtside.rules.WeeklyHoursLimit;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -35,6 +36,7 @@ public class BookingRuleGate {
     private final CourtBookingPermission bookingPermission;
     private final BookingDurationLimit durationLimit;
     private final BookingHoursLimit hoursLimit;
+    private final WeeklyHoursLimit weeklyHoursLimit;
     private final CancellationDeadline cancellationDeadline;
     private final MemberService members;
     private final UserAccountRepository accounts;
@@ -103,6 +105,20 @@ public class BookingRuleGate {
         return durationLimit.maxMinutesFor(membershipTypeOf(personId)).orElse(null);
     }
 
+    public Integer minBookingMinutesFor(UUID personId, Set<Role> roles) {
+        if (roles.contains(Role.ADMIN)) {
+            return null;
+        }
+        return durationLimit.minMinutesFor(membershipTypeOf(personId)).orElse(null);
+    }
+
+    public Integer maxWeeklyBookedHoursFor(UUID personId, Set<Role> roles) {
+        if (roles.contains(Role.ADMIN)) {
+            return null;
+        }
+        return weeklyHoursLimit.maxHoursFor(membershipTypeOf(personId)).orElse(null);
+    }
+
     public Optional<BookingWindow> bookingWindowFor(UUID personId, Set<Role> roles) {
         if (roles.contains(Role.ADMIN)) {
             return Optional.empty();
@@ -138,7 +154,7 @@ public class BookingRuleGate {
 
     private RuleContext contextOf(BookingRuleCheck check) {
         return new RuleContext(check.courtIds().getFirst(), check.cardId(), check.slot(),
-                check.bookedBy(), membershipTypeOf(check.bookedByPersonId()));
+                check.bookedBy(), membershipTypeOf(check.bookedByPersonId()), check.movedBookingIds());
     }
 
     private RuleContext contextOf(BookingRuleCheck check, Map<UUID, Optional<UUID>> membershipTypes) {
@@ -147,7 +163,7 @@ public class BookingRuleGate {
                 : membershipTypes.computeIfAbsent(
                         check.bookedByPersonId(), members::membershipTypeIdOf).orElse(null);
         return new RuleContext(check.courtIds().getFirst(), check.cardId(), check.slot(),
-                check.bookedBy(), membershipTypeId);
+                check.bookedBy(), membershipTypeId, check.movedBookingIds());
     }
 
     private static void requireEmpty(List<RuleViolation> violations) {

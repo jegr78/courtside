@@ -286,14 +286,25 @@ violation instead of stopping at the first.
 | `CANCELLATION_DEADLINE` | The member cancels before the boundary |
 | `NO_COURT_BOOKING` | The membership category may not book courts |
 | `BOOKING_HOURS` | The period lies between the category's earliest start and latest end |
+| `WEEKLY_BOOKED_HOURS` | The member's booked time in one week stays within this many hours |
+| `MIN_BOOKING_DURATION` | One booking lasts at least this long |
 
 Membership-scoped rules come from the current membership type. A club may configure a fallback for
 people without current membership. Without it, no membership-scoped rule applies. Facility rules
 still apply.
 
 Entitlement rules are administratively overridable. Opening hours and grid alignment describe the
-calendar and are not. `NO_COURT_BOOKING`, `MAX_BOOKING_DURATION` and `BOOKING_HOURS` also apply
-when a member moves an existing booking.
+calendar and are not. `NO_COURT_BOOKING`, `MAX_BOOKING_DURATION`, `MIN_BOOKING_DURATION`,
+`BOOKING_HOURS` and `WEEKLY_BOOKED_HOURS` also apply when a member moves an existing booking.
+
+`WEEKLY_BOOKED_HOURS` measures the club-local week, Monday 00:00 to Monday 00:00 in the club time
+zone. It sums the confirmed bookings the member booked on cards that count against limits, each
+with its duration once whatever the number of courts, by the week its start falls in. A booking on
+a card that does not count against limits is not judged. Bookings judged together, such as the
+occurrences of a series, count for each other, and a move leaves the moved bookings out of the
+week they leave. The booking grid lock serialises the check with the write, so concurrent
+requests cannot together pass the limit. Taking a waitlist offer is a booking and is judged like
+one, and a member past the limit is skipped when the slot frees.
 
 `BOOKING_HOURS` narrows the opening hours for one membership category and never widens them. Its
 window holds for every weekday, is read in the club time zone and does not cross midnight. Like the

@@ -251,7 +251,7 @@ export function AdminRuleSetsView({ configurationChanged }: { configurationChang
       : <>
         {error && <Alert testId="admin-error">{error}</Alert>}
         {success && <SuccessFeedback testId="admin-save-success">{success}</SuccessFeedback>}
-        <div data-testid="booking-rules" className="grid gap-6 [&>*]:min-w-0 xl:grid-cols-[minmax(0,4fr)_minmax(0,6fr)] xl:items-start">
+        <div data-testid="booking-rules" className="grid gap-6 [&>*]:min-w-0 xl:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] xl:items-start">
           <div className="grid gap-4">
             <h2 id="rule-set-overview-heading" className="text-2xl font-bold">{t("admin.ruleSets.overview")}</h2>
             <table role="table" data-testid="rule-set-overview" aria-labelledby="rule-set-overview-heading" className="w-full border-collapse text-left">
@@ -340,6 +340,7 @@ export function AdminRuleSetsView({ configurationChanged }: { configurationChang
             />}
             <div data-testid="rule-set-rules" className="grid gap-2">
               <h3 data-testid="rule-set-rules-heading" className="text-xl font-bold">{t("admin.rules.ofRuleSet")}</h3>
+              <p aria-hidden="true" data-testid="rule-set-applies-heading" className="text-muted hidden justify-self-end text-sm font-medium xl:block">{t("admin.rules.applies")}</p>
               <div data-testid="rule-set-rules-list" className="grid [&>*]:min-w-0">
                 {configurableTypes.map((type) => {
                   const stored = storedRule(definitionOf(type.ruleType));
@@ -366,13 +367,13 @@ function RuleEditor({ type, stored, edit, disabled, changed }: { type: RuleTypeC
     aria-describedby={rangeId(parameter)} disabled={disabled}
     type={parameter.kind === "TIME_OF_DAY" ? "time" : "number"}
     min={shown(parameter, parameter.minimum)} max={shown(parameter, parameter.maximum)}
-    className={`form-control ${parameter.kind === "TIME_OF_DAY" ? "w-[7rem] px-1.5 text-sm" : "w-24 px-3"} max-w-40 rounded-lg border py-1.5`}
+    className={`form-control ${parameter.kind === "TIME_OF_DAY" ? "w-[7rem] px-1.5 text-sm" : "w-24 px-3"} max-w-40 rounded-lg border py-1`}
     value={edit.params[parameter.name] === undefined ? "" : shown(parameter, edit.params[parameter.name])}
     onChange={(event) => changed({ applies: true, params: entered(edit.params, parameter, event.target.value) })} />;
   const first = type.parameters[0];
   const last = type.parameters.at(-1);
-  return <article className="grid gap-x-3 gap-y-1 border-t py-1.5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
-    <div className="grid min-w-0 gap-1">
+  return <article className="grid gap-x-3 gap-y-1 border-t py-1 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+    <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-0.5">
       <h4 data-testid={`rule-${type.ruleType}-title`} className="font-bold">{t(`admin.rules.type.${type.ruleType}`)}</h4>
       {timeWindow && first && last
         ? <p id={`rule-${type.ruleType}-range`} data-testid={`rule-${type.ruleType}-range`} className="sr-only">
@@ -380,7 +381,10 @@ function RuleEditor({ type, stored, edit, disabled, changed }: { type: RuleTypeC
         </p>
         : type.parameters.map((parameter) => <p key={parameter.name} className="text-sm">
           <label htmlFor={`rule-${type.ruleType}-${parameter.name}`}>{t(`admin.rules.parameter.${parameter.name}`)}</label>
-          {" "}<span id={rangeId(parameter)} data-testid={`rule-${type.ruleType}-${parameter.name}-range`} className="text-muted whitespace-nowrap">
+          {" "}<span aria-hidden="true" data-testid={`rule-${type.ruleType}-${parameter.name}-range-short`} className="text-muted whitespace-nowrap">
+            {t("admin.rules.rangeShort", { minimum: shown(parameter, parameter.minimum), maximum: shown(parameter, parameter.maximum) })}
+          </span>
+          <span id={rangeId(parameter)} data-testid={`rule-${type.ruleType}-${parameter.name}-range`} className="sr-only">
             {t("admin.rules.range", { minimum: shown(parameter, parameter.minimum), maximum: shown(parameter, parameter.maximum) })}
           </span>
         </p>)}
@@ -392,7 +396,7 @@ function RuleEditor({ type, stored, edit, disabled, changed }: { type: RuleTypeC
       <label className="flex items-center gap-2 text-sm font-medium">
         <input data-testid={`rule-${type.ruleType}-applies`} type="checkbox" disabled={disabled} checked={edit.applies}
                onChange={(event) => changed(event.target.checked ? { applies: true, params: stored.params } : { applies: false, params: {} })} />
-        {t("admin.rules.applies")}
+        <span className="sr-only sm:not-sr-only xl:sr-only">{t("admin.rules.applies")}</span>
       </label>
     </div>
     {type.parameters.length === 0 && <p data-testid={`rule-${type.ruleType}-description`} className="text-muted text-sm sm:col-span-2">{t(`admin.rules.description.${type.ruleType}`, { defaultValue: "" })}</p>}

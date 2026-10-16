@@ -224,14 +224,18 @@ with its state and the membership types it applies to. Choose a rule set there t
 | Cancellation deadline | Minimum number of minutes before the booking |
 | Booking barred | Prevents members from booking and moving without another setting |
 | Booking hours | Earliest start and latest end of a booking on every weekday |
+| Weekly booked hours | Highest number of hours a member may have booked from Monday to Sunday |
+| Minimum booking duration | Shortest duration in minutes |
 
 Opening hours and the booking grid apply across the club, so they sit outside rule sets. Booking
 hours narrow the opening hours for one membership type and never widen them. With the facility
 open until 23:00, for example, a youth rule set can allow bookings until 20:00. Like the opening
 hours, booking hours end at 23:59 at the latest. For a window that lasts until closing, enter the
-facility's closing time as the latest end. Administrators may
-override the booking prohibition and the booking hours for administrative work. Time and court
-constraints still apply to them.
+facility's closing time as the latest end. The weekly booked hours count the confirmed bookings a
+member booked, by the week they start in. Cancelled bookings and booking kinds that do not count
+against limits, such as training or closures, stay out. Administrators may override the booking
+prohibition, the booking hours, the weekly booked hours and the minimum duration for
+administrative work. Time and court constraints still apply to them.
 
 Retiring a rule set does not stop it from applying to membership types already assigned to it. It
 only removes the set from new selections. Assign another rule set first if the affected members

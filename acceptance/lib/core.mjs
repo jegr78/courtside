@@ -88,6 +88,20 @@ export function leavesBookingHours(slot, hours) {
   return slot.start < hours.earliestStart.slice(0, 5) || slot.end > hours.latestEnd.slice(0, 5);
 }
 
+// A run books several lanes per persona in one week, so any weekly limit on a lane persona can refuse a later lane.
+export function laneLimitConflicts(eligibilityByPersona, laneMinutes) {
+  return Object.entries(eligibilityByPersona).flatMap(([key, eligibility]) => [
+    ...(eligibility.maxWeeklyBookedHours ? [`${key}: at most ${eligibility.maxWeeklyBookedHours} h a week`] : []),
+    ...(eligibility.minBookingMinutes > laneMinutes ? [`${key}: at least ${eligibility.minBookingMinutes} minutes per booking`] : [])
+  ]);
+}
+
+export function limitRefusals(limits, slotMinutes) {
+  const { maxWeeklyBookedHours, minBookingMinutes } = limits;
+  if (!maxWeeklyBookedHours || !minBookingMinutes || minBookingMinutes <= slotMinutes) return null;
+  return { shortMinutes: slotMinutes, longMinutes: maxWeeklyBookedHours * 60 + slotMinutes };
+}
+
 const PERSON_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 // Courtside has no erasure path yet, so the accounts a run created to read its welcome are removed in the database.
