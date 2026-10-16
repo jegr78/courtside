@@ -51,8 +51,8 @@ test("given the current contract, when inventorying fuzz coverage, then every op
   const inventory = buildOpenApiFuzzInventory(api);
 
   // then
-  assert.equal(inventory.length, 143);
-  assert.equal(new Set(inventory.map(({ operationId }) => operationId)).size, 143);
+  assert.equal(inventory.length, 145);
+  assert.equal(new Set(inventory.map(({ operationId }) => operationId)).size, 145);
   assert.deepEqual(inventory.find(({ operationId }) => operationId === "getBookingEligibility"), {
     operationId: "getBookingEligibility",
     method: "GET",
@@ -637,8 +637,28 @@ test("given the operation that had only optional query parameters, when the prob
     "a filter left in the query string is a personal value back in a URL");
 });
 
-// The branch that corrupts an optional query parameter has nothing to exercise it while no
-// operation has that shape, so this says when it comes back rather than leaving it unnoticed.
+test("given a log export whose every input is an optional query parameter, when the probe is built, then a constrained one is corrupted", async () => {
+  // given
+  const probes = new Map();
+  const fixture = { client: {} };
+
+  // when
+  await runOpenApiMutationCases({ target: "https://127.0.0.1:9443" }, fixture, {
+    ca: "certificate", timeoutMilliseconds: 1_000,
+    request: async (probe) => {
+      probes.set(probe.path.split("?")[0], probe);
+      return { status: 400, problemType: "urn:courtside:error:validation-failed" };
+    }
+  });
+
+  // then
+  for (const path of ["/api/admin/export/audit", "/api/admin/export/messages"]) {
+    assert.equal(probes.get(path)?.path, `${path}?from=invalid`,
+      `${path} must be probed with a value its date parameter refuses, or the probe sends a valid request`);
+    assert.equal(probes.get(path)?.body, undefined);
+  }
+});
+
 test("given the contract, when an operation offers only optional query parameters, then a probe case covers it", () => {
   // given
   const shapes = buildOpenApiFuzzInventory(api)
@@ -655,9 +675,8 @@ test("given the contract, when an operation offers only optional query parameter
     });
 
   // when / then
-  assert.deepEqual(shapes.map(({ operationId }) => operationId), [],
-    "an operation whose probe can only corrupt an optional query parameter is back, so the test"
-    + " above needs a case for it again rather than only the roster export's body");
+  assert.deepEqual(shapes.map(({ operationId }) => operationId), ["exportAuditLog", "exportMessageLog"],
+    "an operation whose probe can only corrupt an optional query parameter needs its own case in the test above");
 });
 
 // A probe that could not corrupt anything sends a valid request and then reports the correct answer

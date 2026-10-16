@@ -1,6 +1,7 @@
 package org.courtside.audit.internal;
 
 import lombok.RequiredArgsConstructor;
+import org.courtside.audit.AuditLogExport;
 import org.courtside.audit.PersonAuditTrail;
 import org.courtside.identity.UserAccount;
 import org.courtside.identity.UserAccountRepository;
@@ -34,11 +35,12 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-public class AuditService implements PersonAuditTrail {
+public class AuditService implements PersonAuditTrail, AuditLogExport {
 
     private static final int MAX_PAGE_SIZE = 100;
     private static final int SEARCH_SCAN_SIZE = 250;
     private static final int MAX_SEARCH_SCAN = 2_500;
+    private static final int MAX_EXPORT_BATCH = 1_000;
 
     private final DomainEventRepository events;
     private final UserAccountRepository accounts;
@@ -89,6 +91,23 @@ public class AuditService implements PersonAuditTrail {
                 cursorEvent == null ? null : cursorEvent.getId(),
                 Limit.of(limit + 1));
         return CursorPage.of(ids, limit, this::load, AuditEntry::id);
+    }
+
+    @Override
+    public List<ExportedChange> changes(Instant from, Instant before, UUID after, int size) {
+        if (size < 1 || size > MAX_EXPORT_BATCH) {
+            throw new IllegalStateException("Audit export batch must be between 1 and " + MAX_EXPORT_BATCH);
+        }
+        DomainEvent cursorEvent = cursorEvent(after);
+        List<UUID> ids = events.findPage(null, from, before,
+                cursorEvent == null ? null : cursorEvent.getOccurredAt(),
+                cursorEvent == null ? null : cursorEvent.getId(),
+                Limit.of(size));
+        return load(ids).stream()
+                .map(entry -> new ExportedChange(entry.id(), entry.occurredAt(), entry.eventType(),
+                        entry.subjectId(), entry.subjectName(), entry.actorAccountId(), entry.actorUsername(),
+                        json.writeValueAsString(entry.parameters())))
+                .toList();
     }
 
     public SearchResult search(String query, String eventType, UUID subjectId,
@@ -144,7 +163,7 @@ public class AuditService implements PersonAuditTrail {
         String normalized = term.toLowerCase(Locale.ROOT);
         return contains(entry.subjectName(), normalized)
                 || contains(entry.actorUsername(), normalized)
-                || entry.subjectId().toString().equalsIgnoreCase(term)
+                || entry.subjectId() != null && entry.subjectId().toString().equalsIgnoreCase(term)
                 || entry.actorAccountId() != null && entry.actorAccountId().toString().equalsIgnoreCase(term);
     }
 
@@ -166,7 +185,8 @@ public class AuditService implements PersonAuditTrail {
 
     private List<AuditEntry> load(List<UUID> ids) {
         List<DomainEvent> found = events.findAllByIdIn(ids);
-        Set<UUID> subjectIds = found.stream().map(DomainEvent::getSubjectId).collect(Collectors.toSet());
+        Set<UUID> subjectIds = found.stream().map(DomainEvent::getSubjectId).filter(Objects::nonNull)
+                .collect(Collectors.toSet());
         Map<UUID, BookingSubject> bookings = subjectIds.isEmpty() ? Map.of() : bookingSubjects.describe(subjectIds);
         Set<UUID> namedIds = new HashSet<>(subjectIds);
         bookings.values().forEach(booking -> namedIds.addAll(booking.courtIds()));
@@ -190,8 +210,10 @@ public class AuditService implements PersonAuditTrail {
         UUID actorAccountId = event.getActorAccountId();
         // An event recorded without an actor is expected, and no Map contract covers a null key.
         String actorUsername = Optional.ofNullable(actorAccountId).map(actorUsernames::get).orElse(null);
-        BookingSubject booking = bookings.get(event.getSubjectId());
-        String subjectName = booking == null ? namesById.get(event.getSubjectId()) : courtNames(booking, namesById);
+        UUID subjectId = event.getSubjectId();
+        BookingSubject booking = subjectId == null ? null : bookings.get(subjectId);
+        String subjectName = subjectId == null ? null
+                : booking == null ? namesById.get(subjectId) : courtNames(booking, namesById);
         return new AuditEntry(event.getId(), event.getOccurredAt(), event.getEventType(),
                 payloadOf(event.getPayload()), event.getSubjectId(), subjectName,
                 booking == null ? null : booking.slot(), actorAccountId, actorUsername);

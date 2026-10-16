@@ -2,9 +2,9 @@
   "schemaVersion": 1,
   "reviewedAt": "2026-10-16",
   "purpose": "This is the normative authorization policy for the shipped Courtside API. OpenAPI defines the transport shape; this policy defines who may perform each operation, which resource attributes narrow that permission, and which protected fields each projection may read or write.",
-  "openApiFieldInventorySha256": "9bdc4f3ea34b8a197077f9ab66bccfeb7cd3b0e8237140dc1501d53e809375f6",
+  "openApiFieldInventorySha256": "7ed29fec474b6e46b460c4f433dc7001455befe2d43e3aa8cc61418d1e095b03",
   "protectedFieldInventorySha256": "188857c6a912ada8ed9236fbf4218985e20586b2ff77bbfdec0d3e1a0659000e",
-  "productionAuthorizationSha256": "2ed4002ab8d2a23904d853f94d6d2d28349b5ed76b5b4b577b6e280fc7288df1",
+  "productionAuthorizationSha256": "9f8f00ff117e60c898a4af27e320a864b9d2f97c9e1d3670b24233b09b5e28d8",
   "ordinaryFields": [
     "Problem.detail",
     "Problem.fieldErrors",
@@ -774,6 +774,19 @@
     "executeImportPreview:response:Violation.code",
     "executeImportPreview:response:Violation.params",
     "executeImportPreview:response:Violation.params.*",
+    "exportAuditLog:parameter:$parameter.query.encoding",
+    "exportAuditLog:parameter:$parameter.query.from",
+    "exportAuditLog:parameter:$parameter.query.separator",
+    "exportAuditLog:parameter:$parameter.query.to",
+    "exportAuditLog:response:$response.header.Content-Disposition",
+    "exportAuditLog:response:$response.header.Retry-After",
+    "exportAuditLog:response:FieldError.code",
+    "exportAuditLog:response:FieldError.field",
+    "exportAuditLog:response:FieldError.params",
+    "exportAuditLog:response:FieldError.params.*",
+    "exportAuditLog:response:Violation.code",
+    "exportAuditLog:response:Violation.params",
+    "exportAuditLog:response:Violation.params.*",
     "exportBookings:parameter:$parameter.query.encoding",
     "exportBookings:parameter:$parameter.query.from",
     "exportBookings:parameter:$parameter.query.separator",
@@ -787,6 +800,19 @@
     "exportBookings:response:Violation.code",
     "exportBookings:response:Violation.params",
     "exportBookings:response:Violation.params.*",
+    "exportMessageLog:parameter:$parameter.query.encoding",
+    "exportMessageLog:parameter:$parameter.query.from",
+    "exportMessageLog:parameter:$parameter.query.separator",
+    "exportMessageLog:parameter:$parameter.query.to",
+    "exportMessageLog:response:$response.header.Content-Disposition",
+    "exportMessageLog:response:$response.header.Retry-After",
+    "exportMessageLog:response:FieldError.code",
+    "exportMessageLog:response:FieldError.field",
+    "exportMessageLog:response:FieldError.params",
+    "exportMessageLog:response:FieldError.params.*",
+    "exportMessageLog:response:Violation.code",
+    "exportMessageLog:response:Violation.params",
+    "exportMessageLog:response:Violation.params.*",
     "exportPersonData:parameter:$parameter.path.personId",
     "exportPersonData:response:$response.header.Retry-After",
     "exportPersonData:response:FieldError.code",
@@ -3087,6 +3113,8 @@
         "searchOperationalLogs",
         "exportRoster",
         "exportBookings",
+        "exportAuditLog",
+        "exportMessageLog",
         "exportPersonData"
       ],
       "actors": [
@@ -3721,7 +3749,9 @@
         "src/main/java/org/courtside/dataexchange/web/ImportPreviewAdminController.java#toResponse",
         "src/main/java/org/courtside/dataexchange/web/ImportExecutionAdminController.java#toResponse",
         "src/main/java/org/courtside/dataexchange/web/ExportAdminController.java#exportRoster",
-        "src/main/java/org/courtside/dataexchange/web/ExportAdminController.java#exportBookings"
+        "src/main/java/org/courtside/dataexchange/web/ExportAdminController.java#exportBookings",
+        "src/main/java/org/courtside/dataexchange/web/ExportAdminController.java#exportAuditLog",
+        "src/main/java/org/courtside/dataexchange/web/ExportAdminController.java#exportMessageLog"
       ],
       "positiveTests": [
         "src/test/java/org/courtside/dataexchange/web/SubjectAccessAdminControllerTest.java#givenAPersonTheInstanceHoldsEverythingAbout_whenABoardAsks_thenEachOfThoseThingsIsAnswered",
@@ -3729,7 +3759,8 @@
       ],
       "negativeTests": [
         "src/test/java/org/courtside/dataexchange/web/SubjectAccessAdminControllerTest.java#givenABookingSomebodyElseMade_whenABoardAsksAboutTheNamedMember_thenNeitherMakerNorNoteIsNamed",
-        "src/test/java/org/courtside/operations/OperationalLogAdminControllerTest.java#givenAMemberOrMissingCsrf_whenSearching_thenAccessIsRefused"
+        "src/test/java/org/courtside/operations/OperationalLogAdminControllerTest.java#givenAMemberOrMissingCsrf_whenSearching_thenAccessIsRefused",
+        "src/test/java/org/courtside/dataexchange/web/LogExportAdminControllerTest.java#givenAMember_whenTheyAskForEitherLog_thenTheyAreRefusedAndNothingIsRecorded"
       ]
     }
   ],

@@ -3,9 +3,10 @@ import { appendFileSync } from "node:fs";
 import { capture } from "../lib/checks";
 import { openAs } from "../lib/session";
 import { step } from "../lib/steps";
-import { discovery, onDesksAndTablet, projectName } from "../lib/journey";
+import { discovery, disposableRecord, onDesksAndTablet, projectName } from "../lib/journey";
 import { adminPost, adminPut, apiAs } from "../lib/api";
-import { config, runPath } from "../lib/context";
+import { config, persona, runPath } from "../lib/context";
+import type { Page } from "@playwright/test";
 import { mailAvailable, mailsTo, type Mail } from "../lib/mail";
 import { recordCreated } from "../lib/ledger";
 import { precondition } from "../lib/precondition";
@@ -97,6 +98,65 @@ test("given welcome accounts are allowed, when the admin creates an account, the
     if (created) {
       const deactivated = await adminPut(admin, `/api/admin/roster/${personId}/account/active`, { active: false });
       expect.soft(deactivated.status(), "the account this run created is deactivated again").toBeLessThan(300);
+    }
+  }
+});
+
+async function downloadLog(page: Page, log: "audit" | "messages", from: string, to: string): Promise<string[]> {
+  const id = `${log}-log-export`;
+  await page.getByTestId(`${id}-from`).fill(from);
+  await page.getByTestId(`${id}-to`).fill(to);
+  await page.getByTestId(`${id}-separator`).selectOption(";");
+  await page.getByTestId(`${id}-encoding`).selectOption("UTF-8");
+  const [download] = await Promise.all([page.waitForEvent("download"), page.getByTestId(`${id}-download`).click()]);
+  const chunks: Buffer[] = [];
+  for await (const chunk of await download.createReadStream()) chunks.push(chunk as Buffer);
+  return new TextDecoder("utf-8", { ignoreBOM: true }).decode(Buffer.concat(chunks)).split("\r\n").filter((line) => line !== "");
+}
+
+test("given a name that reads like a formula, when the admin downloads both logs, then each file has its header and separator and the name stays text", async ({ browser }) => {
+  // given — the disposable person's first name starts with "=" for the length of this test
+  test.skip(projectName() !== "desktop-chrome", "one pair of log exports per run is enough");
+  const admin = await apiAs("admin");
+  const personId = disposableRecord(persona("disposable").username).personId;
+  const read = await admin.get(`/api/admin/roster/${personId}`);
+  precondition(read.ok(), `reading the disposable person answered ${read.status()}`);
+  const original = await read.json() as { firstName: string; lastName: string; email: string | null };
+  const formula = `=${original.firstName}`.slice(0, 60);
+  const day = (offset: number) => new Date(Date.now() + offset * 86_400_000).toISOString().slice(0, 10);
+  const page = await openAs(browser, "admin");
+  let renamed = false;
+  try {
+    const rename = await adminPut(admin, `/api/admin/roster/${personId}`,
+      { firstName: formula, lastName: original.lastName, email: original.email });
+    expect(rename.status(), "product: the admin corrects the disposable person's name").toBeLessThan(300);
+    renamed = true;
+    await page.goto("/admin/export");
+    await expect(page.getByTestId("audit-log-export-encoding")).toContainText("UTF-8");
+
+    // when
+    const audit = await step("admin", "audit log export", () => downloadLog(page, "audit", day(-1), day(1)));
+    const messages = await step("admin", "message log export", () => downloadLog(page, "messages", day(-1), day(1)));
+
+    // then — names are compared, never printed
+    expect(audit[0], "product: the audit log file opens with a byte order mark and its header in the chosen separator")
+      .toBe("﻿occurredAt;eventType;subjectId;subjectName;actorAccountId;actorUsername;parameters");
+    expect(messages[0], "product: the message log file opens with a byte order mark and its header in the chosen separator")
+      .toBe("﻿queuedAt;settledAt;kind;state;messageId;personId;personName;reason;statusCode");
+    const subjectNames = audit.slice(1).map((line) => line.split(";")[3]);
+    const fullName = `${formula} ${original.lastName}`;
+    expect(subjectNames.includes(`'${fullName}`), "product: the correction appears with its formula-looking name neutralised").toBe(true);
+    expect(subjectNames.includes(fullName), "product: no cell starts with the formula itself").toBe(false);
+    const recorded = await admin.get("/api/admin/audit?limit=20");
+    const entries = (await recorded.json() as { entries: { eventType: string; subjectId?: string | null }[] }).entries;
+    expect(entries.filter((entry) => entry.eventType === "dataexchange.log.exported" && !entry.subjectId).length,
+      "product: both exports are recorded for the whole instance").toBeGreaterThanOrEqual(2);
+  } finally {
+    await page.context().close();
+    if (renamed) {
+      const restored = await adminPut(admin, `/api/admin/roster/${personId}`,
+        { firstName: original.firstName, lastName: original.lastName, email: original.email });
+      expect.soft(restored.status(), "the disposable person carries their own name again").toBeLessThan(300);
     }
   }
 });

@@ -2,6 +2,7 @@ import { useTranslation } from "react-i18next";
 import { Alert } from "../components/Alert";
 import { useReportedFailure } from "../failures/useReportedFailure";
 import { BookingsExport } from "./BookingsExport";
+import { LogExport } from "./LogExport";
 import { RosterExport } from "./RosterExport";
 
 export function AdminExportView() {
@@ -14,5 +15,7 @@ export function AdminExportView() {
     {error && <Alert>{error}</Alert>}
     <RosterExport disabled={false} onFailure={reportError} />
     <BookingsExport onFailure={reportError} />
+    <LogExport log="audit" onFailure={reportError} />
+    <LogExport log="messages" onFailure={reportError} />
   </section>;
 }

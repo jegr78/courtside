@@ -18,6 +18,9 @@ created.
 - A disposable account may have its password, language and active state changed during the run;
   the harness restores it afterwards. The disposable journeys run on three profiles; with three
   disposable accounts each profile uses its own.
+- The first disposable person's first name starts with `=` while the administrator downloads the
+  audit log and the message log on `desktop-chrome`, so the audit export shows that a name reading
+  like a formula leaves as text. The journey puts the name back in the same test.
 - Active booking cards that the trainer, youth director, sport director and groundskeeper may use,
   and the shipped "looking for a partner" participant card active. The participant journey books
   with it, offers the open place and lets a second member take it.

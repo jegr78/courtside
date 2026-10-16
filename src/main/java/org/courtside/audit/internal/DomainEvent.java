@@ -25,7 +25,7 @@ public class DomainEvent {
     @Column(nullable = false, updatable = false)
     private String eventType;
 
-    @Column(nullable = false, updatable = false)
+    @Column(updatable = false)
     private UUID subjectId;
 
     @Column(updatable = false)

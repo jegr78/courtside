@@ -33,7 +33,7 @@ public final class ExportCsv {
 
     // A spreadsheet reads a cell opening with one of these as a formula, quoted or not, and the
     // value reaching here came from whoever fills the club's membership system.
-    private static String cell(String value) {
+    static String cell(String value) {
         if (value == null || value.isEmpty()) {
             return "";
         }

@@ -11,6 +11,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -140,6 +141,40 @@ class AuditAdminControllerTest extends AbstractIntegrationTest {
                         .content("{\"query\":\"DOE.JANE\",\"eventType\":\"facility.court.added\",\"limit\":50}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.entries", hasSize(2)));
+    }
+
+    @Test
+    void givenAnEventTypeOtherThanAnInstanceWideExport_whenItIsStoredWithoutASubject_thenTheDatabaseRefusesIt() {
+        // when / then
+        assertThatThrownBy(() -> jdbc.update("""
+                INSERT INTO domain_event (id, event_type, subject_id, occurred_at, payload)
+                VALUES (?, ?, NULL, ?, CAST(? AS jsonb))
+                """, UUID.randomUUID(), "member.updated", Timestamp.from(clock.instant()), "{}"))
+                .as("only an instance-wide export may name no subject")
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .hasMessageContaining("domain_event_subject_required");
+    }
+
+    @Test
+    void givenAnEntryAboutTheWholeInstance_whenTheLogIsReadAndSearched_thenItCarriesNoSubject() throws Exception {
+        // given
+        UUID eventId = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO domain_event (id, event_type, subject_id, occurred_at, payload)
+                VALUES (?, ?, NULL, ?, CAST(? AS jsonb))
+                """, eventId, "dataexchange.log.exported", Timestamp.from(clock.instant()), "{\"log\":\"audit\"}");
+
+        // when / then
+        mockMvc.perform(get("/api/admin/audit").with(user(administrator)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.entries[0].id").value(eventId.toString()))
+                .andExpect(jsonPath("$.entries[0].subjectName").doesNotExist())
+                .andExpect(jsonPath("$.entries[0].subjectId").doesNotExist());
+        mockMvc.perform(post("/api/admin/audit/search").with(user(administrator)).with(csrf())
+                        .contentType("application/json")
+                        .content("{\"query\":\"" + UUID.randomUUID() + "\",\"limit\":50}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.entries", hasSize(0)));
     }
 
     @Test

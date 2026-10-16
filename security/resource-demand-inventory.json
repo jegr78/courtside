@@ -342,25 +342,31 @@
       "id": "bulk-export",
       "kind": "demanding",
       "entryPoints": [
+        "exportAuditLog",
         "exportBookings",
+        "exportMessageLog",
         "exportPersonData",
         "exportRoster"
       ],
-      "growthDrivers": "Roster export grows with matching members, subject access with one person's retained history, and booking export with allocations in the selected period.",
-      "inputOrDataBound": "Booking export periods stop at 366 days and subject access stops at one person. Roster and retained person history have no row ceiling beyond the club's own data set.",
+      "growthDrivers": "Roster export grows with matching members, subject access with one person's retained history, booking export with allocations in the selected period, and the audit-log and message-log exports with the retained log.",
+      "inputOrDataBound": "Booking export periods stop at 366 days and subject access stops at one person. Roster, retained person history and the retained logs have no row ceiling beyond the club's own data set; a log export ends at the moment of the request, so a growing log still gives one finite file.",
       "concurrencyOrRateBound": "Admission control runs at most two exports at a time per instance, one per caller, and charges 20 tokens of the caller's request budget.",
-      "executionModel": "The application reads and renders each response synchronously; roster pagination uses pages of 200 internally before constructing one response file.",
+      "executionModel": "The application reads and renders roster, booking and subject-access responses synchronously; roster pagination uses pages of 200 internally before constructing one response file. Log exports stream the file and read 500 entries per keyset query while the response is written, so neither the file nor one transaction holds the whole log.",
       "failureBehavior": "Invalid periods and encodings fail before export; a database or rendering failure returns no successful file rather than a partial application state change.",
       "consumerTimeoutBehavior": "The application rolls this request's transaction back after 120 seconds and cancels any statement after 15 seconds. The reference proxy sets no shorter response timeout. Client cancellation can discard the response but is not claimed to cancel every database or rendering step.",
       "productionPaths": [
         "src/main/java/org/courtside/dataexchange/internal/BookingExportService.java",
+        "src/main/java/org/courtside/dataexchange/internal/LogExportService.java",
         "src/main/java/org/courtside/dataexchange/internal/RosterExportService.java",
+        "src/main/java/org/courtside/dataexchange/internal/StreamedCsv.java",
         "src/main/java/org/courtside/dataexchange/internal/SubjectAccessService.java",
         "src/main/java/org/courtside/shared/web/AdmissionControl.java"
       ],
       "evidence": [
         "src/test/java/org/courtside/dataexchange/internal/RosterExportServiceTest.java#givenMorePeopleThanOnePageHolds_whenTheRosterIsExported_thenTheFileHoldsEveryOne",
-        "src/test/java/org/courtside/shared/web/AdmissionPlanTest.java#whenLoadingTheShippedPlan_thenEveryDemandingClassHasItsDecidedCostAndBulkhead"
+        "src/test/java/org/courtside/shared/web/AdmissionPlanTest.java#whenLoadingTheShippedPlan_thenEveryDemandingClassHasItsDecidedCostAndBulkhead",
+        "src/test/java/org/courtside/dataexchange/web/LogExportAdminControllerTest.java#givenMoreEntriesThanOneReadHolds_whenTheAuditLogIsExported_thenEachEntryAppearsExactlyOnce",
+        "src/test/java/org/courtside/dataexchange/web/LogExportAdminControllerTest.java#givenMoreMessagesThanOneReadHolds_whenTheMessageLogIsExported_thenEachAppearsExactlyOnce"
       ]
     },
     {

@@ -468,9 +468,14 @@ Unter **Nachweise** findest du fünf Ansichten.
     eine bestätigte Buchung angelegt hat oder darin eingetragen war. Für Zeiträume, deren Buchungen
     schon pseudonymisiert sind, fehlt diese Zahl.
   * Die Nachrichten zählen je Art, wie viele in Arbeit, übergeben, abgelehnt oder fehlgeschlagen sind.
-* **Datenexport** erstellt CSV-Dateien für Buchungen oder Mitglieder. Der Buchungsexport enthält
-  keine buchende Person. Der Mitgliederexport enthält personenbezogene Daten und erzeugt keinen
-  Eintrag im Änderungsprotokoll.
+* **Datenexport** erstellt CSV-Dateien für Buchungen, Mitglieder, das Änderungsprotokoll und das
+  Nachrichtenprotokoll. Trennzeichen und Zeichensatz wählst du bei jedem Download, die Einstellungen
+  der Importquelle bleiben dabei unverändert. Der Buchungsexport enthält keine buchende Person. Der
+  Mitgliederexport enthält personenbezogene Daten und erzeugt keinen Eintrag im Änderungsprotokoll.
+  Die beiden Protokollexporte enthalten ohne Zeitraum alle Einträge bis zum Moment des Downloads,
+  mit Namen wie in den Protokollansichten. Jeder Protokollexport erscheint im Änderungsprotokoll mit
+  "Ganze Instanz" als Gegenstand. Beginnt ein Wert mit `=`, `+`, `-` oder `@`, steht ein Apostroph
+  davor, damit die Tabellenkalkulation ihn als Text liest und keine Formel ausführt.
 * **Änderungsprotokoll** zeigt administrative Änderungen mit Zeitpunkt, Gegenstand und
   ausführendem Konto. Eine Buchung erscheint mit ihren Plätzen und ihrem aktuellen Termin, eine
   Serie mit ihren Plätzen und ihrem aktuellen ersten Termin, auch bei einem Eintrag von vor einer
