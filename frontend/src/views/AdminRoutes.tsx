@@ -34,7 +34,7 @@ export default function AdminRoutes({ configurationChanged, administrator, manag
     <Route element={<AdminShell administrator={administrator} />}>
       <Route index element={administrator ? <AdminOverviewView /> : <Navigate to="/admin/appointments" replace />} />
       <Route path="appointments" element={<AdminManagedAppointmentsView managesAppointments={managesAppointments}
-        createsSeries={createsSeries} />} />
+        createsSeries={createsSeries} administrator={administrator} />} />
       {administrator && <>
       <Route path="setup" element={<AdminSetupView />} />
       <Route path="configuration" element={<AdminConfigurationView configurationChanged={configurationChanged} />} />

@@ -6,7 +6,7 @@ import { Alert } from "../components/Alert";
 import { LoadFailure } from "../components/LoadFailure";
 import { Button } from "../components/Button";
 import { SuccessFeedback } from "../components/SuccessFeedback";
-import { formatBookingPeriod, formatDateTime } from "../time/clubZone";
+import { formatBookingPeriod, formatDateTime, formatTime } from "../time/clubZone";
 import { CancelDialog, MoveDialog } from "./AppointmentDialogs";
 import { OpenPlacesSection } from "./OpenPlacesSection";
 import { WaitlistSection } from "./WaitlistSection";
@@ -171,6 +171,17 @@ export function MyBookingsView({ now, offline = false }: {
       report(failure);
     }
   };
+  const checkIn = async (booking: PersonalBooking) => {
+    setSuccess(undefined);
+    try {
+      await api.checkIn(booking.id);
+      clear();
+      await load();
+      setSuccess(t("myBookings.checkedInSuccess"));
+    } catch (failure) {
+      report(failure);
+    }
+  };
   const chooseAction = (chosen: { kind: "cancel" | "move"; booking: PersonalBooking }) => {
     setSuccess(undefined);
     setAction(chosen);
@@ -185,7 +196,7 @@ export function MyBookingsView({ now, offline = false }: {
     {error && <Alert>{error}</Alert>}
     {success && <SuccessFeedback>{success}</SuccessFeedback>}
     {loading ? <p aria-live="polite">{t("status.loading")}</p> : grid && <div className="mt-4 grid gap-6">
-      <BookingSection testId="upcoming-bookings" title={t("myBookings.upcoming")} titleHidden empty={t("myBookings.noUpcoming")} bookings={sections.upcoming} courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone} actionable={!offline} action={chooseAction} searchPartner={searchPartner} t={t} />
+      <BookingSection testId="upcoming-bookings" title={t("myBookings.upcoming")} titleHidden empty={t("myBookings.noUpcoming")} bookings={sections.upcoming} courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone} actionable={!offline} action={chooseAction} searchPartner={searchPartner} checkIn={checkIn} reference={reference} t={t} />
       {!offline && nextCursor && <Button variant="secondary" data-testid="load-more-bookings" className="justify-self-start" disabled={loadingMore} onClick={() => void loadMore()}>{t("myBookings.loadMore")}</Button>}
       {cancelled.length > 0 && <details data-testid="cancelled-bookings">
         <summary data-testid="cancelled-bookings-summary" className="cursor-pointer font-semibold">{t(cancelledNextCursor ? "myBookings.cancelledCountMore" : "myBookings.cancelledCount", { count: cancelled.length })}</summary>
@@ -261,10 +272,11 @@ function ParticipationSection({ participations, courtNames, locale, timeZone, wi
 
 type Translate = ReturnType<typeof useTranslation>["t"];
 
-function BookingSection({ testId, title, titleHidden = false, empty, bookings, courtNames, locale, timeZone, actionable = false, action, searchPartner, t }: {
+function BookingSection({ testId, title, titleHidden = false, empty, bookings, courtNames, locale, timeZone, actionable = false, action, searchPartner, checkIn, reference, t }: {
   testId: string; title?: string; titleHidden?: boolean; empty: string; bookings: PersonalBooking[]; courtNames: Map<string, string>;
   locale: string; timeZone: string; actionable?: boolean; action: (value: { kind: "cancel" | "move"; booking: PersonalBooking }) => void;
-  searchPartner?: (booking: PersonalBooking, publish: boolean) => Promise<void>; t: Translate;
+  searchPartner?: (booking: PersonalBooking, publish: boolean) => Promise<void>; checkIn?: (booking: PersonalBooking) => Promise<void>;
+  reference?: Date; t: Translate;
 }) {
   const groups = groupBookings(bookings);
   return <section data-testid={testId}>
@@ -281,10 +293,15 @@ function BookingSection({ testId, title, titleHidden = false, empty, bookings, c
             {booking.cardLabel}
             {group.series && <span data-testid="series-marker" className="rounded-full border px-2 font-semibold">{t("myBookings.series")}</span>}
           </span>
-          {booking.status === "CANCELLED" && <span>{t("myBookings.cancelled")}</span>}
+          {booking.status === "CANCELLED" && <span>{t(booking.released ? "myBookings.released" : "myBookings.cancelled")}</span>}
           {booking.partnerSearch === "PUBLISHED" && <span data-testid="partner-search-published">{t("myBookings.partnerSearchPublished")}</span>}
+          {booking.checkIn?.checkedIn && <span data-testid="checked-in">{t("myBookings.checkedIn")}</span>}
+          {booking.checkIn && !booking.checkIn.checkedIn && reference && checkInToday(booking.checkIn, reference)
+            && <span data-testid="check-in-from" className="text-muted text-sm">{t("myBookings.checkInFrom", { time: formatTime(booking.checkIn.opensAt, timeZone) })}</span>}
           {actionable && <div className="flex flex-wrap gap-2 pt-1">
             {booking.status === "CONFIRMED" && <>
+              {checkIn && reference && booking.checkIn && !booking.checkIn.checkedIn && checkInOpen(booking.checkIn, reference)
+                && <Button aria-label={bookingActionName("myBookings.checkInAccessible", booking, courtNames, locale, timeZone, t)} data-testid="check-in" data-booking-id={booking.id} className="px-3 py-2" onClick={() => void checkIn(booking)}>{t("myBookings.checkIn")}</Button>}
               <Button variant="destructive" aria-label={bookingActionName("myBookings.cancelAccessible", booking, courtNames, locale, timeZone, t)} data-testid="personal-cancel" data-booking-id={booking.id} className="px-3 py-2" onClick={() => action({ kind: "cancel", booking })}>{t("myBookings.cancel")}</Button>
               {booking.seriesId && <Button variant="secondary" aria-label={bookingActionName("myBookings.moveAccessible", booking, courtNames, locale, timeZone, t)} data-testid="move-booking" data-booking-id={booking.id} className="px-3 py-2" onClick={() => action({ kind: "move", booking })}>{t("myBookings.move")}</Button>}
               {searchPartner && booking.partnerSearch && <Button variant="secondary"
@@ -298,6 +315,15 @@ function BookingSection({ testId, title, titleHidden = false, empty, bookings, c
         </li>)}</ul>
       </article>)}</div>}
   </section>;
+}
+
+function checkInToday(checkIn: NonNullable<PersonalBooking["checkIn"]>, reference: Date) {
+  const opensIn = Date.parse(checkIn.opensAt) - reference.getTime();
+  return opensIn > 0 && opensIn < 24 * 60 * 60 * 1000;
+}
+
+function checkInOpen(checkIn: NonNullable<PersonalBooking["checkIn"]>, reference: Date) {
+  return Date.parse(checkIn.opensAt) <= reference.getTime() && reference.getTime() < Date.parse(checkIn.closesAt);
 }
 
 function bookingActionName(key: string, booking: PersonalBooking, courtNames: Map<string, string>, locale: string, timeZone: string, t: Translate) {

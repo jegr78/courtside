@@ -60,6 +60,9 @@ export function auditMessage(entry: AuditEntry, t: TFunction): string {
   const kind = entry.eventType.startsWith("facility.openingPeriod.") && typeof entry.parameters.kind === "string"
     ? t(`admin.availability.kind.${entry.parameters.kind}`)
     : undefined;
+  const outcome = typeof entry.parameters.outcome === "string"
+    ? t(`managedAppointments.attendance.${entry.parameters.outcome}`)
+    : undefined;
   return t(`audit.event.${entry.eventType}`, {
     ...entry.parameters,
     ...(weekday !== undefined ? { weekday } : {}),
@@ -68,6 +71,7 @@ export function auditMessage(entry: AuditEntry, t: TFunction): string {
     ...(opensAt !== undefined ? { opensAt } : {}),
     ...(closesAt !== undefined ? { closesAt } : {}),
     ...(kind !== undefined ? { kind } : {}),
+    ...(outcome !== undefined ? { outcome } : {}),
     ...(context ? { context } : {})
   });
 }
@@ -86,6 +90,9 @@ const BOOKING_MODULE_SUBJECTS: Record<string, "booking" | "series" | "waitlistEn
   "booking.participant.recorded": "booking",
   "booking.participant.withdrew": "booking",
   "booking.partner.joined": "booking",
+  "booking.attendance.recorded": "booking",
+  "booking.attendance.cleared": "booking",
+  "booking.attendance.released": "booking",
   "booking.series.created": "series",
   "booking.series.cancelled": "series",
   "booking.series.moved": "series",

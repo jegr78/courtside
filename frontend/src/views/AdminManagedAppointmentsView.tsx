@@ -15,9 +15,10 @@ import { SeriesForm } from "./SeriesForm";
 
 const PAGE_SIZE = 20;
 
-export function AdminManagedAppointmentsView({ managesAppointments, createsSeries }: {
+export function AdminManagedAppointmentsView({ managesAppointments, createsSeries, administrator = false }: {
   managesAppointments: boolean;
   createsSeries: boolean;
+  administrator?: boolean;
 }) {
   const { t, i18n } = useTranslation();
   const [view, setView] = useState<ManagedAppointmentView>("UPCOMING");
@@ -186,7 +187,8 @@ export function AdminManagedAppointmentsView({ managesAppointments, createsSerie
 
     {managesAppointments && nextCursor && <Button data-testid="managed-load-more" variant="secondary" className="mt-5" disabled={loadingMore}
       onClick={() => void loadMore()}>{t("managedAppointments.loadMore")}</Button>}
-    {grid && detail && <ManagedAppointmentDialog bookingId={detail.id} locale={i18n.language} timeZone={grid.timeZone} closed={() => setDetail(undefined)} />}
+    {grid && detail && <ManagedAppointmentDialog bookingId={detail.id} locale={i18n.language} timeZone={grid.timeZone}
+      administrator={administrator} closed={() => setDetail(undefined)} />}
     {grid && cancelling && <CancelDialog booking={cancelling}
       seriesBookings={appointments.filter((appointment) => appointment.seriesId === cancelling.seriesId && appointment.status === "CONFIRMED")}
       hasMoreBookings={nextCursor !== undefined} timeZone={grid.timeZone} closed={() => setCancelling(undefined)}
