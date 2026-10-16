@@ -102,6 +102,7 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
             "/api/my/waitlist/{entryId}",
             "/api/my/waitlist/{entryId}/acceptance",
             "/api/my/bookings/{bookingId}/partner-invitation",
+            "/api/my/bookings/{bookingId}/check-in",
             "/api/partner-invitations",
             "/api/partner-invitations/{invitationId}/acceptance");
 

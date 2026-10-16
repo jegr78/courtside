@@ -5289,7 +5289,9 @@ paths:
       tags: [admin-attendance]
       operationId: listNoShows
       summary: The no-shows that still count against a person's account, latest first.
-      description: A person without an account has none.
+      description: |
+        A person without an account has none. An unknown person answers `404` with
+        `urn:courtside:error:no-show-person-not-found`.
       parameters:
         - name: personId
           in: path
@@ -5309,6 +5311,8 @@ paths:
           $ref: "#/components/responses/Unauthenticated"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
         "429":
           $ref: "#/components/responses/RateLimited"
 
@@ -5317,7 +5321,9 @@ paths:
       tags: [admin-attendance]
       operationId: liftNoShows
       summary: Stop every recorded no-show of a person from counting, which lifts a no-show limit.
-      description: The no-shows stay recorded; a no-show recorded afterwards counts again.
+      description: |
+        The no-shows stay recorded; a no-show recorded afterwards counts again. An unknown person
+        answers `404` with `urn:courtside:error:no-show-person-not-found`.
       security:
         - sessionCookie: []
           csrfToken: []
@@ -5338,6 +5344,8 @@ paths:
           $ref: "#/components/responses/Unauthenticated"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
         "429":
           $ref: "#/components/responses/RateLimited"
 

@@ -157,7 +157,10 @@ class RuleDefinitionAdminControllerTest extends AbstractIntegrationTest {
         // when / then
         mockMvc.perform(get("/api/admin/rule-types"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(10))
+                .andExpect(jsonPath("$.length()").value(11))
+                .andExpect(jsonPath("$[?(@.ruleType == 'NO_SHOW_LIMIT')].parameters[*].name")
+                        .value(Matchers.contains("maxNoShows", "windowDays")))
+                .andExpect(jsonPath("$[?(@.ruleType == 'NO_SHOW_LIMIT')].parameters[1].maximum").value(365))
                 .andExpect(jsonPath("$[?(@.ruleType == 'WEEKLY_BOOKED_HOURS')].parameters[0].name").value("maxHours"))
                 .andExpect(jsonPath("$[?(@.ruleType == 'WEEKLY_BOOKED_HOURS')].parameters[0].maximum").value(168))
                 .andExpect(jsonPath("$[?(@.ruleType == 'MIN_BOOKING_DURATION')].parameters[0].name")

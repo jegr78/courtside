@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.courtside.booking.attendance.AttendanceRows.BookingState;
 import org.courtside.booking.attendance.AttendanceRows.NoShow;
 import org.courtside.booking.internal.BookingNotFoundException;
+import org.courtside.identity.PersonRepository;
 import org.courtside.identity.UserAccount;
 import org.courtside.identity.UserAccountRepository;
 import org.springframework.context.ApplicationEventPublisher;
@@ -32,6 +33,7 @@ public class AttendanceService {
 
     private final AttendanceRows rows;
     private final UserAccountRepository accounts;
+    private final PersonRepository persons;
     private final ApplicationEventPublisher events;
     private final Clock clock;
 
@@ -118,12 +120,14 @@ public class AttendanceService {
 
     @Transactional(readOnly = true)
     public List<NoShow> noShowsOf(UUID personId) {
+        requirePerson(personId);
         return accounts.findByPersonId(personId)
                 .map(account -> rows.countingNoShowsOf(account.getId()))
                 .orElse(List.of());
     }
 
     public int liftNoShows(UUID personId, UUID liftedBy) {
+        requirePerson(personId);
         Optional<UserAccount> account = accounts.findByPersonId(personId);
         if (account.isEmpty()) {
             return 0;
@@ -150,6 +154,12 @@ public class AttendanceService {
     private boolean hasBegun(BookingState booking) {
         return !booking.startsAt().isAfter(clock.instant())
                 && (booking.cancelledAt() == null || !booking.cancelledAt().isBefore(booking.startsAt()));
+    }
+
+    private void requirePerson(UUID personId) {
+        if (!persons.existsById(personId)) {
+            throw new NoShowPersonNotFoundException("No person with id " + personId);
+        }
     }
 
     private void requireTracked() {
