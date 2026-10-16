@@ -55,7 +55,7 @@ export function AdminRetentionView() {
   }, [loadAttempt, t]);
 
   const monthsOf = (category: RetentionCategory) =>
-    policies?.find((policy) => policy.category === category)?.retainMonths;
+    policies?.find((policy) => policy.category === category)?.retainMonths ?? undefined;
   const configured = CATEGORIES.some((category) => monthsOf(category) !== undefined);
   const instantDay = (instant: string) =>
     dateTimeFormatter(language, { dateStyle: "medium", timeZone: club?.timeZone }).format(new Date(instant));

@@ -11,7 +11,8 @@ const MARY = "00000000-0000-0000-0000-000000000103";
 const RICHARD = "00000000-0000-0000-0000-000000000106";
 const PREVIEW = "6a000000-0000-0000-0000-000000000001";
 
-const unset: RetentionPolicy[] = [{ category: "BOOKINGS" }, { category: "FORMER_MEMBERS" }];
+// The instance writes an unset period as null rather than leaving it out.
+const unset = [{ category: "BOOKINGS", retainMonths: null }, { category: "FORMER_MEMBERS" }] as unknown as RetentionPolicy[];
 const configured: RetentionPolicy[] = [{ category: "BOOKINGS", retainMonths: 24 }, { category: "FORMER_MEMBERS", retainMonths: 12 }];
 
 const preview: RetentionPreview = {
