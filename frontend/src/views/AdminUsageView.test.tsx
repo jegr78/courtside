@@ -68,6 +68,19 @@ describe("AdminUsageView", () => {
     expect(screen.getByTestId("usage-to")).toHaveValue("2026-04-30");
   });
 
+  it("given an address whose period ends before it starts, when the page opens, then the default period is read instead", async () => {
+    // given
+    const read = vi.spyOn(api, "usageReport").mockResolvedValue(usage);
+
+    // when
+    show("/admin/usage?from=2026-04-01&to=2026-03-31");
+
+    // then
+    await screen.findByTestId("usage-period");
+    expect(read).toHaveBeenCalledExactlyOnceWith(undefined);
+    await waitFor(() => expect(screen.getByTestId("usage-from")).toHaveValue("2026-04-01"));
+  });
+
   it("given a report, when it is shown, then each of the four parts carries its figures and small groups read as Other", async () => {
     // given
     vi.spyOn(api, "usageReport").mockResolvedValue(usage);

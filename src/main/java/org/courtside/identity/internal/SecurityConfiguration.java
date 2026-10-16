@@ -167,7 +167,7 @@ public class SecurityConfiguration {
                                 "/admin/facility/slot-fillers",
                                 "/admin/roster",
                                 "/admin/roster/{personId}", "/admin/membership-types", "/admin/import",
-                                "/admin/export", "/admin/utilisation",
+                                "/admin/export", "/admin/utilisation", "/admin/usage",
                                 "/admin/audit",
                                 "/admin/messages",
                                 "/admin/operational-logs",
