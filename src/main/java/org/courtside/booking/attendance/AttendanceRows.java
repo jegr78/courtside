@@ -5,6 +5,7 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Component;
 
 import java.sql.Timestamp;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
@@ -154,10 +155,11 @@ public class AttendanceRows {
                         JOIN booking_card c ON c.id = b.card_id AND c.counts_against_limits
                         JOIN court_allocation a ON a.booking_id = b.id
                         WHERE b.status = 'CONFIRMED' AND b.booked_by IS NOT NULL
+                          AND a.starts_at > :earliest AND a.starts_at <= :startedBy AND a.ends_at > :now
                           AND NOT EXISTS (SELECT 1 FROM booking_attendance ba WHERE ba.booking_id = b.id)
                         GROUP BY b.id
-                        HAVING min(a.starts_at) <= :startedBy AND max(a.ends_at) > :now
                         """)
+                .param("earliest", Timestamp.from(now.minus(Duration.ofDays(1))))
                 .param("startedBy", Timestamp.from(startedBy))
                 .param("now", Timestamp.from(now))
                 .query(UUID.class)
