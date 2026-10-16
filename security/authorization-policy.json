@@ -923,6 +923,8 @@
     "getBookingEligibility:response:Violation.code",
     "getBookingEligibility:response:Violation.params",
     "getBookingEligibility:response:Violation.params.*",
+    "getBookingGrid:parameter:$parameter.query.from",
+    "getBookingGrid:parameter:$parameter.query.to",
     "getBookingGrid:response:$response.header.Retry-After",
     "getBookingGrid:response:BookingGrid.courtClosures",
     "getBookingGrid:response:BookingGrid.openingHours",
