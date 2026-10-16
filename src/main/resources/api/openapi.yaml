@@ -2662,8 +2662,9 @@ components:
     CapacityUse:
       type: object
       description: |
-        Confirmed bookings of one card whose holder had one membership type on the day the booking
-        starts. A holder without a running membership, or a booking without a holder, has no type.
+        Confirmed bookings of one card whose holder holds one membership type, counted when that
+        membership ran on the day the booking starts; type changes keep no history. A holder without
+        a running membership, or a booking without a holder, has no type.
         `bookedMinutes` sums the court minutes of those bookings, one court at a time.
       required: [cardId, cardLabel, membershipTypeId, membershipTypeName, bookings, bookedMinutes, share]
       properties:
