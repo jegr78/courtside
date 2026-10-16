@@ -7,8 +7,7 @@ import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.courtside.member.testfixture.MemberTestFixture;
 import org.courtside.shared.OpeningWindow;
-import org.courtside.rules.RuleType;
-import org.courtside.rules.internal.RuleParameters;
+import org.courtside.rules.testfixture.RulesTestFixture;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -28,12 +27,8 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @TestPropertySource(properties = "courtside.test.clock=2026-04-01T10:00:00Z")
-@Import({FacilityTestFixture.class, IdentityTestFixture.class, MemberTestFixture.class})
+@Import({FacilityTestFixture.class, IdentityTestFixture.class, MemberTestFixture.class, RulesTestFixture.class})
 class SeriesQueryBudgetTest extends AbstractIntegrationTest {
-
-    // A membership-scoped rule asks once for the whole batch, so the bound grows with the rules and not the occurrences.
-    private static final long CONFIGURABLE_RULE_TYPES = Arrays.stream(RuleType.values())
-            .filter(RuleParameters::isConfigurablePerRuleSet).count();
 
     private static final UUID TRAINING_CARD =
             UUID.fromString("22222222-2222-2222-2222-222222222222");
@@ -54,6 +49,9 @@ class SeriesQueryBudgetTest extends AbstractIntegrationTest {
 
     @Autowired
     private MemberTestFixture members;
+
+    @Autowired
+    private RulesTestFixture rules;
 
     private UUID courtId;
     private UUID trainer;
@@ -153,8 +151,9 @@ class SeriesQueryBudgetTest extends AbstractIntegrationTest {
         assertThat(snapshot.category("membership")).as(snapshot.toString()).isLessThanOrEqualTo(1);
         assertThat(snapshot.category("opening-hours")).as(snapshot.toString())
                 .isLessThanOrEqualTo(openingHoursBudget);
+        // A membership-scoped rule asks once for the whole batch, so the bound grows with the rules and not the occurrences.
         assertThat(snapshot.category("rule-parameter")).as(snapshot.toString())
-                .isLessThanOrEqualTo(CONFIGURABLE_RULE_TYPES);
+                .isLessThanOrEqualTo(rules.configurableRuleTypeCount());
     }
 
     private static long withoutRuleParameters(SqlStatementCounter.Snapshot snapshot) {

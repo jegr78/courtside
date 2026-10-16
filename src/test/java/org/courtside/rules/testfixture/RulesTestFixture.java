@@ -3,8 +3,10 @@ package org.courtside.rules.testfixture;
 import lombok.RequiredArgsConstructor;
 import org.courtside.rules.RuleType;
 import org.courtside.rules.internal.RuleAdminService;
+import org.courtside.rules.internal.RuleParameters;
 
 import java.time.LocalTime;
+import java.util.Arrays;
 import java.util.Map;
 import java.util.UUID;
 
@@ -70,5 +72,9 @@ public class RulesTestFixture {
         UUID ruleSetId = activeRuleSet(name);
         rules.setRuleSetActive(ruleSetId, false);
         return ruleSetId;
+    }
+
+    public long configurableRuleTypeCount() {
+        return Arrays.stream(RuleType.values()).filter(RuleParameters::isConfigurablePerRuleSet).count();
     }
 }
