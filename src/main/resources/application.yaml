@@ -134,6 +134,7 @@ courtside:
       statistics-reads: { cost: 5, concurrency: 2 }
       bulk-export: { cost: 20, concurrency: 2 }
       roster-import: { cost: 20, concurrency: 1 }
+      retention-run: { cost: 20, concurrency: 1 }
       operational-log-search: { cost: 10, concurrency: 1 }
       logo-normalization: { cost: 10, concurrency: 1 }
       global-session-revocation: { cost: 5, concurrency: 1 }

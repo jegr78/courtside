@@ -57,6 +57,11 @@
       "class": "identifier"
     },
     {
+      "name": "category",
+      "in": "path",
+      "class": "neutral"
+    },
+    {
       "name": "kind",
       "in": "path",
       "class": "neutral"
@@ -237,7 +242,8 @@
     "reset-code": "Deleted when the code is redeemed or replaced by a new request, and by the identity cleanup sweep once it has expired; removed with the account it belongs to.",
     "waitlist-sweep": "Deleted by the waitlist sweep once the slot it waited for has ended; removed with the account it belongs to.",
     "partner-sweep": "Deleted when the place is taken or withdrawn, and by the partner sweep once its booking is gone, cancelled or started.",
-    "usage-record": "Names nobody and is kept as long as the club keeps its usage history; only a board's retention decision bounds it."
+    "usage-record": "Names nobody and is kept as long as the club keeps its usage history; only a board's retention decision bounds it.",
+    "retention-preview": "Deleted when its run starts, and by the preview sweep once it has expired; removed with the account that created it."
   },
   "inMemoryState": {
     "BookingController": {
@@ -495,6 +501,10 @@
       "status": {
         "level": "operational",
         "lifecycle": "booking-pseudonymisation"
+      },
+      "pseudonymised_at": {
+        "level": "operational",
+        "lifecycle": "booking-pseudonymisation"
       }
     },
     "booking_attendance": {
@@ -685,6 +695,10 @@
         "lifecycle": "booking-pseudonymisation"
       },
       "weekdays": {
+        "level": "operational",
+        "lifecycle": "booking-pseudonymisation"
+      },
+      "pseudonymised_at": {
         "level": "operational",
         "lifecycle": "booking-pseudonymisation"
       }
@@ -1761,6 +1775,46 @@
       "position": {
         "level": "operational",
         "lifecycle": "waitlist-sweep"
+      }
+    },
+    "retention_policy": {
+      "category": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "retain_months": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      }
+    },
+    "retention_preview": {
+      "id": {
+        "level": "operational",
+        "lifecycle": "retention-preview"
+      },
+      "created_by": {
+        "level": "pseudonymous",
+        "lifecycle": "retention-preview"
+      },
+      "created_at": {
+        "level": "operational",
+        "lifecycle": "retention-preview"
+      },
+      "expires_at": {
+        "level": "operational",
+        "lifecycle": "retention-preview"
+      },
+      "bookings_ended_before": {
+        "level": "operational",
+        "lifecycle": "retention-preview"
+      },
+      "memberships_ended_before": {
+        "level": "operational",
+        "lifecycle": "retention-preview"
+      },
+      "former_member_ids": {
+        "level": "pseudonymous",
+        "lifecycle": "retention-preview"
       }
     }
   }
