@@ -250,8 +250,8 @@ a different file than the one previewed is visible after the fact.
 | `event_publication` | Spring Modulith's transactional outbox for events between modules | None |
 
 `domain_event.subject_id` names the entity an entry concerns. It is empty only for an activity about
-the whole instance, such as `dataexchange.log.exported`, which records an export of the audit log
-or the message log.
+the whole instance, `dataexchange.log.exported`, which records an export of the audit log or the
+message log; `domain_event_subject_required` refuses an empty subject for every other event type.
 
 `domain_event.event_type` is a dotted name whose first segment says which module published it, and
 the table holds two kinds of entry. Six segments are the administrative surfaces, one per thing a

@@ -11,6 +11,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -140,6 +141,18 @@ class AuditAdminControllerTest extends AbstractIntegrationTest {
                         .content("{\"query\":\"DOE.JANE\",\"eventType\":\"facility.court.added\",\"limit\":50}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.entries", hasSize(2)));
+    }
+
+    @Test
+    void givenAnEventTypeOtherThanAnInstanceWideExport_whenItIsStoredWithoutASubject_thenTheDatabaseRefusesIt() {
+        // when / then
+        assertThatThrownBy(() -> jdbc.update("""
+                INSERT INTO domain_event (id, event_type, subject_id, occurred_at, payload)
+                VALUES (?, ?, NULL, ?, CAST(? AS jsonb))
+                """, UUID.randomUUID(), "member.updated", Timestamp.from(clock.instant()), "{}"))
+                .as("only an instance-wide export may name no subject")
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .hasMessageContaining("domain_event_subject_required");
     }
 
     @Test
