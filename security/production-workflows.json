@@ -273,7 +273,7 @@
       "actors": [
         "ADMIN"
       ],
-      "entryPoints": "Administrative court, opening-hour, booking-card, participant-card and membership-type endpoints.",
+      "entryPoints": "Administrative court, opening-hour, season, holiday, court-closure, booking-card, participant-card and membership-type endpoints.",
       "operationIds": [
         "listCourtsForAdmin",
         "createCourt",
@@ -298,7 +298,15 @@
         "listOpeningHoursForAdmin",
         "setWeeklyOpeningHours",
         "listOpeningScheduleForAdmin",
-        "removeScheduledOpeningHours"
+        "removeScheduledOpeningHours",
+        "listOpeningPeriods",
+        "createOpeningPeriod",
+        "changeOpeningPeriod",
+        "removeOpeningPeriod",
+        "listCourtClosures",
+        "createCourtClosure",
+        "changeCourtClosure",
+        "removeCourtClosure"
       ],
       "backgroundEntryPoints": [
         "ClosureAnnouncements#on(CardEvent.BookingCardAvailabilityChanged)",

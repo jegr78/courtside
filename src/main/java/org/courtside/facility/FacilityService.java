@@ -332,7 +332,8 @@ public class FacilityService {
         if (kind == null) {
             throw new IllegalStateException("A period has a kind");
         }
-        return storePeriod(new OpeningPeriodRow(kind), name, startsOn, endsOn, week);
+        bookingGridCoordination.lock();
+        return storePeriod(new OpeningPeriodRow(kind), null, name, startsOn, endsOn, week);
     }
 
     @Transactional
@@ -340,15 +341,14 @@ public class FacilityService {
                                              List<WeeklyOpeningHours> week) {
         bookingGridCoordination.lock();
         OpeningPeriodRow row = periods.findById(periodId).orElseThrow(AvailabilityEntryNotFoundException::new);
-        requireNotEnded(row.getEndsOn());
-        return storePeriod(row, name, startsOn, endsOn, week);
+        return storePeriod(row, row.toPeriod(), name, startsOn, endsOn, week);
     }
 
     @Transactional
     public void removeOpeningPeriod(UUID periodId) {
         bookingGridCoordination.lock();
         OpeningPeriodRow row = periods.findById(periodId).orElseThrow(AvailabilityEntryNotFoundException::new);
-        requireNotEnded(row.getEndsOn());
+        requireNotStarted(row.getStartsOn(), row.getEndsOn());
         periods.delete(row);
         periods.flush();
         events.publishEvent(new FacilityEvent.OpeningPeriodRemoved(
@@ -362,23 +362,24 @@ public class FacilityService {
 
     @Transactional
     public CourtClosure createCourtClosure(UUID courtId, String name, LocalDate startsOn, LocalDate endsOn) {
+        bookingGridCoordination.lock();
         Court court = requireCourt(courtId);
-        return storeClosure(new CourtClosureRow(court.getId()), court, name, startsOn, endsOn);
+        return storeClosure(new CourtClosureRow(court.getId()), null, court, name, startsOn, endsOn);
     }
 
     @Transactional
     public CourtClosure changeCourtClosure(UUID closureId, String name, LocalDate startsOn, LocalDate endsOn) {
         bookingGridCoordination.lock();
         CourtClosureRow row = closures.findById(closureId).orElseThrow(AvailabilityEntryNotFoundException::new);
-        requireNotEnded(row.getEndsOn());
-        return storeClosure(row, requireCourt(row.getCourtId()), name, startsOn, endsOn);
+        CourtClosure previous = row.toClosure();
+        return storeClosure(row, previous, requireCourt(row.getCourtId()), name, startsOn, endsOn);
     }
 
     @Transactional
     public void removeCourtClosure(UUID closureId) {
         bookingGridCoordination.lock();
         CourtClosureRow row = closures.findById(closureId).orElseThrow(AvailabilityEntryNotFoundException::new);
-        requireNotEnded(row.getEndsOn());
+        requireNotStarted(row.getStartsOn(), row.getEndsOn());
         Court court = requireCourt(row.getCourtId());
         closures.delete(row);
         closures.flush();
@@ -386,13 +387,17 @@ public class FacilityService {
                 row.getId(), court.getId(), court.getNumber(), row.getStartsOn(), row.getEndsOn()));
     }
 
-    private OpeningPeriod storePeriod(OpeningPeriodRow row, String name, LocalDate startsOn, LocalDate endsOn,
-                                      List<WeeklyOpeningHours> week) {
+    private OpeningPeriod storePeriod(OpeningPeriodRow row, OpeningPeriod previous, String name, LocalDate startsOn,
+                                      LocalDate endsOn, List<WeeklyOpeningHours> week) {
         Map<DayOfWeek, WeeklyOpeningHours> requested = everyWeekdayOnce(week);
-        bookingGridCoordination.lock();
-        String stored = requireDates(name, startsOn, endsOn);
+        String stored = previous == null
+                ? requireDates(name, startsOn, endsOn, null, null)
+                : requireDates(name, startsOn, endsOn, previous.startsOn(), previous.endsOn());
         Map<DayOfWeek, OpeningWindow> windows = storable(requested, bookingGridSettings.slotDuration());
         windows.values().removeIf(Objects::isNull);
+        if (previous != null && previous.startsOn().isBefore(today()) && !windows.equals(previous.days())) {
+            throw AvailabilityRejectedException.started(previous.startsOn());
+        }
         row.changeTo(stored, startsOn, endsOn, windows);
         try {
             periods.saveAndFlush(row);
@@ -404,10 +409,11 @@ public class FacilityService {
         return row.toPeriod();
     }
 
-    private CourtClosure storeClosure(CourtClosureRow row, Court court, String name, LocalDate startsOn,
-                                      LocalDate endsOn) {
-        bookingGridCoordination.lock();
-        String stored = requireDates(name, startsOn, endsOn);
+    private CourtClosure storeClosure(CourtClosureRow row, CourtClosure previous, Court court, String name,
+                                      LocalDate startsOn, LocalDate endsOn) {
+        String stored = previous == null
+                ? requireDates(name, startsOn, endsOn, null, null)
+                : requireDates(name, startsOn, endsOn, previous.startsOn(), previous.endsOn());
         row.changeTo(stored, startsOn, endsOn);
         try {
             closures.saveAndFlush(row);
@@ -419,7 +425,13 @@ public class FacilityService {
         return row.toClosure();
     }
 
-    private String requireDates(String name, LocalDate startsOn, LocalDate endsOn) {
+    /** A stored entry passes its own dates: days before today keep the hours they had. */
+    private String requireDates(String name, LocalDate startsOn, LocalDate endsOn, LocalDate startedOn,
+                                LocalDate endedOn) {
+        LocalDate today = today();
+        if (endedOn != null) {
+            requireNotEnded(endedOn);
+        }
         String trimmed = name == null ? "" : name.strip();
         if (trimmed.isEmpty()) {
             throw AvailabilityRejectedException.nameRequired();
@@ -433,8 +445,24 @@ public class FacilityService {
         if (endsOn.isBefore(startsOn)) {
             throw AvailabilityRejectedException.endsBeforeStart();
         }
-        requireNotEnded(endsOn);
+        if (startedOn != null && startedOn.isBefore(today)) {
+            if (!startsOn.equals(startedOn)) {
+                throw AvailabilityRejectedException.started(startedOn);
+            }
+            if (endsOn.isBefore(today.minusDays(1))) {
+                throw AvailabilityRejectedException.ended(today);
+            }
+        } else if (startsOn.isBefore(today)) {
+            throw AvailabilityRejectedException.startsInPast(today);
+        }
         return trimmed;
+    }
+
+    private void requireNotStarted(LocalDate startsOn, LocalDate endsOn) {
+        requireNotEnded(endsOn);
+        if (startsOn.isBefore(today())) {
+            throw AvailabilityRejectedException.started(startsOn);
+        }
     }
 
     private void requireNotEnded(LocalDate endsOn) {

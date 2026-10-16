@@ -1,7 +1,11 @@
 package org.courtside.facility;
 
 import org.courtside.AbstractIntegrationTest;
+import org.courtside.facility.internal.CourtClosureRepository;
+import org.courtside.facility.internal.CourtClosureRow;
 import org.courtside.facility.internal.CourtRepository;
+import org.courtside.facility.internal.OpeningPeriodRepository;
+import org.courtside.facility.internal.OpeningPeriodRow;
 import org.courtside.facility.internal.WeeklyOpeningHours;
 import org.courtside.shared.OpeningWindow;
 import org.junit.jupiter.api.Test;
@@ -11,7 +15,9 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.Arrays;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -27,6 +33,12 @@ class AvailabilityServiceTest extends AbstractIntegrationTest {
 
     @Autowired
     private CourtRepository courts;
+
+    @Autowired
+    private OpeningPeriodRepository periods;
+
+    @Autowired
+    private CourtClosureRepository closures;
 
     @Test
     void givenASummerSeason_whenReadingADayInsideIt_thenTheScheduleUsesItsHours() {
@@ -70,10 +82,105 @@ class AvailabilityServiceTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void givenAPeriodThatEndedYesterday_whenItIsCreated_thenTheHistoryIsKept() {
+    void givenAFirstDayBeforeToday_whenAPeriodIsCreated_thenThePastKeepsItsHours() {
         // when / then
         assertThatThrownBy(() -> facility.createOpeningPeriod(OpeningPeriod.Kind.HOLIDAY, "Past",
-                TODAY.minusDays(3), TODAY.minusDays(1), closedWeek()))
+                TODAY.minusDays(1), TODAY.plusDays(1), closedWeek()))
+                .isInstanceOfSatisfying(AvailabilityRejectedException.class, failure -> {
+                    assertThat(failure.getCode()).isEqualTo("facility.availability.startsInPast");
+                    assertThat(failure.getParams()).containsEntry("today", "2026-05-12");
+                });
+        assertThatThrownBy(() -> facility.createCourtClosure(courts.save(new Court(4, null)).getId(), "Past",
+                TODAY.minusDays(1), TODAY))
+                .isInstanceOfSatisfying(AvailabilityRejectedException.class, failure ->
+                        assertThat(failure.getCode()).isEqualTo("facility.availability.startsInPast"));
+    }
+
+    @Test
+    void givenARunningSeason_whenItsHoursOrFirstDayChange_thenThePastKeepsItsHours() {
+        // given
+        OpeningPeriodRow season = storedSeason(TODAY.minusDays(10), TODAY.plusDays(10));
+
+        // when / then
+        assertThatThrownBy(() -> facility.changeOpeningPeriod(season.getId(), "Summer",
+                TODAY.minusDays(10), TODAY.plusDays(10), closedWeek()))
+                .isInstanceOfSatisfying(AvailabilityRejectedException.class, failure -> {
+                    assertThat(failure.getCode()).isEqualTo("facility.availability.started");
+                    assertThat(failure.getParams()).containsEntry("startsOn", "2026-05-02");
+                });
+        assertThatThrownBy(() -> facility.changeOpeningPeriod(season.getId(), "Summer",
+                TODAY.minusDays(9), TODAY.plusDays(10), every(EIGHT, NINE_PM)))
+                .isInstanceOfSatisfying(AvailabilityRejectedException.class, failure ->
+                        assertThat(failure.getCode()).isEqualTo("facility.availability.started"));
+        assertThatThrownBy(() -> facility.removeOpeningPeriod(season.getId()))
+                .isInstanceOfSatisfying(AvailabilityRejectedException.class, failure ->
+                        assertThat(failure.getCode()).isEqualTo("facility.availability.started"));
+    }
+
+    @Test
+    void givenARunningSeason_whenItIsEndedYesterday_thenTheWeeklyHoursGovernFromToday() {
+        // given
+        OpeningPeriodRow season = storedSeason(TODAY.minusDays(10), TODAY.plusDays(10));
+
+        // when
+        OpeningPeriod ended = facility.changeOpeningPeriod(season.getId(), "Short summer",
+                TODAY.minusDays(10), TODAY.minusDays(1), every(EIGHT, NINE_PM));
+
+        // then
+        assertThat(ended.name()).isEqualTo("Short summer");
+        assertThat(facility.openingSchedule().windowOn(TODAY.minusDays(1)))
+                .contains(new OpeningWindow(EIGHT, NINE_PM));
+        assertThat(facility.openingSchedule().windowOn(TODAY))
+                .isNotEqualTo(facility.openingSchedule().windowOn(TODAY.minusDays(1)));
+        assertThatThrownBy(() -> facility.changeOpeningPeriod(season.getId(), "Short summer",
+                TODAY.minusDays(10), TODAY.minusDays(2), every(EIGHT, NINE_PM)))
+                .isInstanceOfSatisfying(AvailabilityRejectedException.class, failure ->
+                        assertThat(failure.getCode()).isEqualTo("facility.availability.ended"));
+    }
+
+    @Test
+    void givenAnEndedSeason_whenItIsChangedOrRemoved_thenItIsRefused() {
+        // given
+        OpeningPeriodRow season = storedSeason(TODAY.minusDays(10), TODAY.minusDays(1));
+
+        // when / then
+        assertThatThrownBy(() -> facility.changeOpeningPeriod(season.getId(), "Summer",
+                TODAY.minusDays(10), TODAY.plusDays(10), every(EIGHT, NINE_PM)))
+                .isInstanceOfSatisfying(AvailabilityRejectedException.class, failure ->
+                        assertThat(failure.getCode()).isEqualTo("facility.availability.ended"));
+        assertThatThrownBy(() -> facility.removeOpeningPeriod(season.getId()))
+                .isInstanceOfSatisfying(AvailabilityRejectedException.class, failure ->
+                        assertThat(failure.getCode()).isEqualTo("facility.availability.ended"));
+    }
+
+    @Test
+    void givenARunningClosure_whenItIsMovedOrRemoved_thenItIsRefusedButItCanEndYesterday() {
+        // given
+        CourtClosureRow closure = storedClosure(TODAY.minusDays(3), TODAY.plusDays(3));
+
+        // when / then
+        assertThatThrownBy(() -> facility.changeCourtClosure(closure.getId(), "Resurfacing",
+                TODAY, TODAY.plusDays(3)))
+                .isInstanceOfSatisfying(AvailabilityRejectedException.class, failure ->
+                        assertThat(failure.getCode()).isEqualTo("facility.availability.started"));
+        assertThatThrownBy(() -> facility.removeCourtClosure(closure.getId()))
+                .isInstanceOfSatisfying(AvailabilityRejectedException.class, failure ->
+                        assertThat(failure.getCode()).isEqualTo("facility.availability.started"));
+        assertThat(facility.changeCourtClosure(closure.getId(), "Resurfacing", TODAY.minusDays(3),
+                TODAY.minusDays(1)).endsOn()).isEqualTo(TODAY.minusDays(1));
+    }
+
+    @Test
+    void givenAnEndedClosure_whenItIsChangedOrRemoved_thenItIsRefused() {
+        // given
+        CourtClosureRow closure = storedClosure(TODAY.minusDays(3), TODAY.minusDays(1));
+
+        // when / then
+        assertThatThrownBy(() -> facility.changeCourtClosure(closure.getId(), "Resurfacing",
+                TODAY.minusDays(3), TODAY.plusDays(3)))
+                .isInstanceOfSatisfying(AvailabilityRejectedException.class, failure ->
+                        assertThat(failure.getCode()).isEqualTo("facility.availability.ended"));
+        assertThatThrownBy(() -> facility.removeCourtClosure(closure.getId()))
                 .isInstanceOfSatisfying(AvailabilityRejectedException.class, failure ->
                         assertThat(failure.getCode()).isEqualTo("facility.availability.ended"));
     }
@@ -179,6 +286,20 @@ class AvailabilityServiceTest extends AbstractIntegrationTest {
         assertThat(facility.courtClosures()).isEmpty();
         assertThatThrownBy(() -> facility.removeCourtClosure(closure.id()))
                 .isInstanceOf(AvailabilityEntryNotFoundException.class);
+    }
+
+    private OpeningPeriodRow storedSeason(LocalDate startsOn, LocalDate endsOn) {
+        OpeningPeriodRow row = new OpeningPeriodRow(OpeningPeriod.Kind.SEASON);
+        Map<DayOfWeek, OpeningWindow> days = new EnumMap<>(DayOfWeek.class);
+        Arrays.stream(DayOfWeek.values()).forEach(day -> days.put(day, new OpeningWindow(EIGHT, NINE_PM)));
+        row.changeTo("Summer", startsOn, endsOn, days);
+        return periods.saveAndFlush(row);
+    }
+
+    private CourtClosureRow storedClosure(LocalDate startsOn, LocalDate endsOn) {
+        CourtClosureRow row = new CourtClosureRow(courts.save(new Court(4, null)).getId());
+        row.changeTo("Resurfacing", startsOn, endsOn);
+        return closures.saveAndFlush(row);
     }
 
     private static List<WeeklyOpeningHours> every(LocalTime opensAt, LocalTime closesAt) {

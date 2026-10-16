@@ -34,6 +34,15 @@ public class AvailabilityRejectedException extends CodedDomainFailure {
         return new AvailabilityRejectedException("facility.availability.ended", Map.of("today", today.toString()));
     }
 
+    static AvailabilityRejectedException startsInPast(LocalDate today) {
+        return new AvailabilityRejectedException("facility.availability.startsInPast", Map.of("today", today.toString()));
+    }
+
+    static AvailabilityRejectedException started(LocalDate startsOn) {
+        return new AvailabilityRejectedException("facility.availability.started",
+                Map.of("startsOn", startsOn.toString()));
+    }
+
     static AvailabilityRejectedException overlap() {
         return new AvailabilityRejectedException("facility.availability.overlap", Map.of());
     }
