@@ -13,34 +13,35 @@ describe("playwright deadlines", () => {
     vi.unstubAllEnvs();
   });
 
-  it("given an accessibility test hangs, when its project runs, then the test fails on its own bound long before the job deadline", async () => {
-    // given
-    const { projects } = await configuredProjects();
-
-    // when
-    const bounds = projects
-      .filter(({ name }) => name?.endsWith("-accessibility"))
-      .map(({ name, timeout }) => ({ name, timeout }));
-
-    // then
-    expect(bounds, "both accessibility projects carry a five-minute bound").toEqual([
-      { name: "chromium-accessibility", timeout: 5 * 60_000 },
-      { name: "webkit-accessibility", timeout: 5 * 60_000 }
-    ]);
-  });
-
-  it("given a slow but progressing runner, when any other project runs, then Playwright adds no wall-clock deadline", async () => {
+  it("given a test hangs in any project, when it runs, then it fails on the shared bound long before the job deadline", async () => {
     // given
     const { config, projects } = await configuredProjects();
 
     // when
-    const bounded = projects
-      .filter(({ name }) => !name?.endsWith("-accessibility"))
+    const ownBounds = projects
       .filter(({ timeout }) => timeout !== undefined)
       .map(({ name }) => name);
 
     // then
-    expect(config.timeout, "the outer hosted job owns the deadline of every other project").toBe(0);
-    expect(bounded).toEqual([]);
+    expect(config.timeout, "every test fails on a five-minute bound with its trace instead of the job being cancelled")
+      .toBe(5 * 60_000);
+    expect(ownBounds, "no project carries a bound of its own beside the shared one").toEqual([]);
+  });
+
+  it("given a slow but progressing runner, when a step takes long, then Playwright adds no deadline to the step itself", async () => {
+    // given
+    const { config } = await configuredProjects();
+
+    // when
+    const steps = {
+      expect: config.expect?.timeout,
+      action: config.use?.actionTimeout,
+      navigation: config.use?.navigationTimeout
+    };
+
+    // then
+    expect(steps, "only a whole test that stops progressing fails, never a slow step").toEqual({
+      expect: 0, action: 0, navigation: 0
+    });
   });
 });

@@ -56,20 +56,20 @@ test("given several browser projects, when Playwright runs them, then one global
   assert.match(playwright, /Unsupported browser project order/);
 });
 
-test("given hosted browser jobs have an outer deadline, when the runner is slow, then only accessibility tests carry their own bound", () => {
+test("given hosted browser jobs have an outer deadline, when a test hangs, then it fails on its own bound naming its step while slow steps stay unbounded", () => {
   // given / when / then
   assert.match(workflowJob(buildWorkflow, "browser_visual"), /^    timeout-minutes: 15$/m);
   assert.match(workflowJob(buildWorkflow, "browser"), /^    timeout-minutes: 30$/m);
   assert.match(workflowJob(stabilityWorkflow, "browser-order"), /^    timeout-minutes: 40$/m);
   assert.match(workflowJob(stabilityWorkflow, "browser-compatibility"), /^    timeout-minutes: 30$/m);
-  assert.match(playwright, /\n  timeout: 0,/);
+  assert.match(playwright, /const stalledTestBound = 5 \* 60_000;/);
+  assert.match(playwright, /\n  timeout: stalledTestBound,/,
+    "every project shares one test bound, so a hang fails with its trace instead of the job being cancelled without one");
+  assert.doesNotMatch(playwright, /timeout: (?!stalledTestBound|0)[\w\d]/,
+    "no project carries a bound of its own beside the shared one");
   assert.match(playwright, /expect: \{ timeout: 0,/);
   assert.match(playwright, /actionTimeout: 0/);
   assert.match(playwright, /navigationTimeout: 0/);
-  assert.doesNotMatch(playwright, /\n  timeout: (?!0,)\d/);
-  assert.match(playwright, /const accessibilityTestBound = 5 \* 60_000;/);
-  assert.equal(playwright.match(/timeout: accessibilityTestBound/g)?.length, 2,
-    "a hung axe test fails with its trace in both engines, and no other project carries a test bound");
 });
 
 test("given release-critical journey commands, when the runner is slow, then only the outer gate owns their deadline", () => {
