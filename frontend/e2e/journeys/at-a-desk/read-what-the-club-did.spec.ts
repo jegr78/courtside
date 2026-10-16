@@ -27,6 +27,17 @@ test("given a board preparing its annual meeting, when they read how busy the co
     await expect(page.getByTestId("utilisation-period")).not.toHaveText(lastMonth);
     await expect(page.locator('[data-testid^="utilisation-row-"]').first()).toBeVisible();
 
+    // when — how the courts were used, cancelled, missed and refused
+    await reachAdministration(page, "admin-usage-link");
+
+    // then — four parts in counts, none of them naming a member
+    await expect(page.getByTestId("admin-usage-view")).toBeVisible();
+    await expect(page.getByTestId("usage-capacity")).toBeVisible();
+    await expect(page.getByTestId("usage-cancelled")).toBeVisible();
+    await expect(page.getByTestId("usage-no-shows")).toBeVisible();
+    await expect(page.getByTestId("usage-refused-attempts")).toBeVisible();
+    await expect(page.getByTestId("usage-report")).not.toContainText("@example.org");
+
     // when — what the club changed
     await reachAdministration(page, "admin-audit-link");
 

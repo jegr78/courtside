@@ -567,7 +567,7 @@ period between them. Each read runs its statements under a 30-second statement t
 - Messages are counted per kind and state by the time they were queued. Retried counts the
   messages whose handover failed at least once and was scheduled again, whatever became of them.
 
-The usage report under `/api/admin/reports/usage` answers four further questions for a period with
+The usage report under `/api/admin/reports/usage`, shown at `/admin/usage` in the records group, answers four further questions for a period with
 the utilisation report's rules: both dates or none, the last full month by default, at most 366
 days. It counts the bookings whose earliest allocation starts in the period, closures left out, and
 names no person, account or booking.

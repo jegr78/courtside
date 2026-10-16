@@ -20,7 +20,7 @@ Die Seitenleiste führt oben zur Übersicht und ordnet die Verwaltung darunter i
 | **Verein** | Einrichtung, Vereinsprofil, Fristen und Erinnerungen, Buchungsregeln, Nachrichtentexte |
 | **Anlage** | Plätze, Öffnungszeiten, Buchungskarten und Platzfüller |
 | **Mitglieder** | Personen, Konten, Mitgliedsarten und Import |
-| **Nachweise** | Statistik, Datenexport, Änderungsprotokoll und Nachrichtenprotokoll |
+| **Nachweise** | Statistik, Nutzung, Datenexport, Änderungsprotokoll und Nachrichtenprotokoll |
 
 Über dieselbe Leiste kehrst du zum Platzplan zurück.
 
@@ -493,7 +493,7 @@ aktivieren und Mitgliedsrollen neu vergeben.
 
 ## Nachweise
 
-Unter **Nachweise** findest du fünf Ansichten.
+Unter **Nachweise** findest du sechs Ansichten.
 
 * **Statistik** zeigt beim Öffnen den letzten vollen Monat. Oben wählst du einen anderen Zeitraum:
   7 Tage, 1, 3, 6 oder 12 Monate bis heute, alles seit der ersten Buchung, das letzte Kalenderjahr
@@ -511,6 +511,21 @@ Unter **Nachweise** findest du fünf Ansichten.
     eine bestätigte Buchung angelegt hat oder darin eingetragen war. Für Zeiträume, deren Buchungen
     schon pseudonymisiert sind, fehlt diese Zahl.
   * Die Nachrichten zählen je Art, wie viele in Arbeit, übergeben, abgelehnt oder fehlgeschlagen sind.
+* **Nutzung** beantwortet vier Fragen für einen Zeitraum, ohne Angabe den letzten vollen Monat,
+  oder für zwei Daten deiner Wahl. Gezählt werden die Buchungen, die im Zeitraum beginnen, und
+  niemand wird genannt.
+  * Die Kapazität zeigt, welche Buchungskarte und Mitgliedsart wie viel der offenen Platzzeit belegt
+    hat.
+  * Die Stornierungen teilen sich auf in die durch das Mitglied, die durch den Verein und die ohne
+    Check-in freigegebenen Buchungen. Die Stornierungen des Vereins stehen nach seinem Grund.
+  * Die Anwesenheit zählt erschienene Buchungen, zählende und aufgehobene No-Shows. Eine Buchung
+    ohne Erfassung zählt nirgends mit.
+  * Von den Regeln abgelehnt zählt die Buchungs-, Serien- und Stornoversuche, die die Regeln
+    abgelehnt haben, je Regel.
+
+  Eine Karte oder Mitgliedsart, hinter der weniger als drei Mitglieder stehen, erscheint nie in
+  einer eigenen Zeile. Sie geht in *Sonstige* auf, die Summen bleiben vollständig, und aus einer
+  kleinen Gruppe lässt sich niemand ablesen.
 * **Datenexport** erstellt CSV-Dateien für Buchungen, Mitglieder, das Änderungsprotokoll und das
   Nachrichtenprotokoll. Trennzeichen und Zeichensatz wählst du bei jedem Download, die Einstellungen
   der Importquelle bleiben dabei unverändert. Der Buchungsexport enthält keine buchende Person. Der

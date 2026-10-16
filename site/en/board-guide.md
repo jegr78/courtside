@@ -20,7 +20,7 @@ The sidebar leads to the overview at the top and divides administration below it
 | **Club** | Setup, club profile, deadlines and reminders, booking rules, message wording |
 | **Facility** | Courts, opening hours, booking cards and slot fillers |
 | **People** | People, accounts, membership types and imports |
-| **Records** | Statistics, data exports, change log and message log |
+| **Records** | Statistics, usage, data exports, change log and message log |
 
 The same sidebar returns you to the court plan.
 
@@ -470,7 +470,7 @@ roles again.
 
 ## Records
 
-The **Records** area has five views.
+The **Records** area has six views.
 
 * **Statistics** opens on the last full month. At the top you choose another period: 7 days, 1, 3,
   6 or 12 months up to today, everything since the first booking, the previous calendar year or two
@@ -488,6 +488,18 @@ The **Records** area has five views.
     was entered into a confirmed booking within it. For periods whose bookings have been
     pseudonymised, this figure is unavailable.
   * Messages counts per kind how many are in progress, handed over, refused or failed.
+* **Usage** answers four questions for a period, by default the last full month, or for two dates
+  of your own. It counts the bookings that start in the period and names nobody.
+  * Capacity shows which booking card and membership type took how much of the open court time.
+  * Cancellations splits into those by the member, by the club and the bookings released without a
+    check-in. The club's cancellations appear by the reason it gave.
+  * Attendance counts attended bookings, no-shows that still count and lifted ones. A booking with
+    nothing recorded counts in none of them.
+  * Refused by the rules counts the booking, series and cancellation attempts the rules refused,
+    by rule.
+
+  A card or membership type fewer than three members stand behind never appears on its own line.
+  It joins *Other*, so the totals stay whole and nobody can be read from a small group.
 * **Data export** creates CSV files for bookings, members, the change log and the message log. You
   pick the separator and character set for each download; the import source's settings stay as they
   are. The booking export omits the person who booked. The member export contains personal data and
