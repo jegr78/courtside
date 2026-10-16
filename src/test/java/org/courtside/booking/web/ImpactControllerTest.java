@@ -26,15 +26,19 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneOffset;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -471,6 +475,83 @@ class ImpactControllerTest extends AbstractIntegrationTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:invalid-opening-window"))
                 .andExpect(jsonPath("$.violations[0].code").value("openingWindow.incomplete"));
+    }
+
+    @Test
+    void givenABookingOnACourt_whenAskingWhatClosingThatCourtOnItsDayWouldAffect_thenTheBookingIsListed()
+            throws Exception {
+        // given
+        UUID court = facilityFixture.createCourt(1, null);
+        setStandardOpeningHours();
+        UUID booking = book(court, identity.createPerson("Jane", "Doe", "jane@example.org"),
+                "2026-05-13T16:00:00Z", "2026-05-13T17:00:00Z");
+
+        // when / then
+        mockMvc.perform(post("/api/admin/impact/court-closures").with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"courtId":"%s","startsOn":"2026-05-13","endsOn":"2026-05-13"}
+                                """.formatted(court)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.affectedCount").value(1))
+                .andExpect(jsonPath("$.bookings[0].bookingId").value(booking.toString()));
+    }
+
+    @Test
+    void givenABookingOnADay_whenAskingWhatAHolidayClosingThatDayWouldAffect_thenTheBookingIsListed()
+            throws Exception {
+        // given
+        UUID court = facilityFixture.createCourt(1, null);
+        setStandardOpeningHours();
+        UUID booking = book(court, identity.createPerson("Jane", "Doe", "jane@example.org"),
+                "2026-05-13T16:00:00Z", "2026-05-13T17:00:00Z");
+
+        // when / then
+        mockMvc.perform(post("/api/admin/impact/opening-periods").with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(holiday("null", closedWeek())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.affectedCount").value(1))
+                .andExpect(jsonPath("$.bookings[0].bookingId").value(booking.toString()));
+    }
+
+    @Test
+    void givenAnUnknownClosure_whenAskingWhatChangingItWouldAffect_thenItIsNotFound() throws Exception {
+        // given
+        UUID court = facilityFixture.createCourt(1, null);
+
+        // when / then
+        mockMvc.perform(post("/api/admin/impact/court-closures").with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"closureId":"%s","courtId":"%s","startsOn":"2026-05-13","endsOn":"2026-05-13"}
+                                """.formatted(UUID.randomUUID(), court)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:availability-entry-not-found"));
+    }
+
+    @Test
+    void givenAWeekNamingADayTwice_whenAskingWhatAHolidayWouldAffect_thenItIsRefusedAsIncomplete() throws Exception {
+        // given
+        String mondayTwice = closedWeek().replace("\"SUNDAY\"", "\"MONDAY\"");
+
+        // when / then
+        mockMvc.perform(post("/api/admin/impact/opening-periods").with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(holiday("null", mondayTwice)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:opening-week-incomplete"));
+    }
+
+    private static String holiday(String periodId, String days) {
+        return """
+                {"periodId":%s,"kind":"HOLIDAY","startsOn":"2026-05-13","endsOn":"2026-05-13","days":%s}
+                """.formatted(periodId, days);
+    }
+
+    private static String closedWeek() {
+        return Arrays.stream(DayOfWeek.values()).map(day -> "{\"dayOfWeek\":\"" + day + "\"}")
+                .collect(Collectors.joining(",", "[", "]"));
     }
 
     private void setStandardOpeningHours() {
