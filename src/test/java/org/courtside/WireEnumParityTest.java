@@ -6,11 +6,13 @@ import org.courtside.api.ApiDayOfWeek;
 import org.courtside.api.ApiImportAccountOutcome;
 import org.courtside.api.ApiMessageKind;
 import org.courtside.api.ApiMessageState;
+import org.courtside.api.ApiOpeningPeriodKind;
 import org.courtside.api.ApiRole;
 import org.courtside.api.ApiRuleParameterKind;
 import org.courtside.api.ApiRuleType;
 import org.courtside.booking.series.CancelScope;
 import org.courtside.dataexchange.ResolvedChangeSet;
+import org.courtside.facility.OpeningPeriod;
 import org.courtside.identity.CredentialState;
 import org.courtside.identity.Role;
 import org.courtside.notification.MessageKind;
@@ -48,6 +50,8 @@ class WireEnumParityTest {
                 ApiImportAccountOutcome::getValue, ResolvedChangeSet.AccountOutcome.values());
         assertParity("CredentialState", ApiCredentialState.values(), ApiCredentialState::getValue,
                 CredentialState.values());
+        assertParity("OpeningPeriodKind", ApiOpeningPeriodKind.values(), ApiOpeningPeriodKind::getValue,
+                OpeningPeriod.Kind.values());
     }
 
     private static <T> void assertParity(

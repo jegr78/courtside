@@ -40,8 +40,11 @@ class OpeningScheduleQueryPlanTest extends AbstractIntegrationTest {
             facility.openingSchedule();
             var hours = statistics.getQueryStatistics("SELECT h FROM OpeningHours h");
             var versions = statistics.getQueryStatistics("SELECT v FROM OpeningHoursVersion v");
-            long misses = hours.getPlanCacheMissCount() + versions.getPlanCacheMissCount();
-            long hits = hours.getPlanCacheHitCount() + versions.getPlanCacheHitCount();
+            var periods = statistics.getQueryStatistics("SELECT DISTINCT p FROM OpeningPeriodRow p LEFT JOIN FETCH p.hours");
+            long misses = hours.getPlanCacheMissCount() + versions.getPlanCacheMissCount()
+                    + periods.getPlanCacheMissCount();
+            long hits = hours.getPlanCacheHitCount() + versions.getPlanCacheHitCount()
+                    + periods.getPlanCacheHitCount();
             queries.reset();
 
             // when
@@ -50,10 +53,13 @@ class OpeningScheduleQueryPlanTest extends AbstractIntegrationTest {
             }
 
             // then
-            assertThat(hours.getPlanCacheMissCount() + versions.getPlanCacheMissCount() - misses).isZero();
-            assertThat(hours.getPlanCacheHitCount() + versions.getPlanCacheHitCount() - hits)
-                    .isGreaterThanOrEqualTo(20);
-            assertThat(queries.snapshot().total()).isEqualTo(20);
+            assertThat(hours.getPlanCacheMissCount() + versions.getPlanCacheMissCount()
+                    + periods.getPlanCacheMissCount() - misses).isZero();
+            assertThat(hours.getPlanCacheHitCount() + versions.getPlanCacheHitCount()
+                    + periods.getPlanCacheHitCount() - hits)
+                    .isGreaterThanOrEqualTo(30);
+            assertThat(queries.snapshot().total()).as("weekly hours, versions and periods, one query each per read")
+                    .isEqualTo(30);
         } finally {
             queries.pause();
             statistics.setStatisticsEnabled(enabled);

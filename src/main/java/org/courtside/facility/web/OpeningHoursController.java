@@ -4,6 +4,7 @@ import org.courtside.api.ApiBookingGrid;
 import org.courtside.api.ApiOpeningHours;
 import org.courtside.api.OpeningHoursApi;
 import org.courtside.facility.FacilityService;
+import org.courtside.facility.OpeningSchedule;
 import org.courtside.config.BookingGridSettings;
 import org.courtside.config.ClubTimeZone;
 import org.springframework.http.ResponseEntity;
@@ -33,9 +34,12 @@ class OpeningHoursController implements OpeningHoursApi {
 
     @Override
     public ResponseEntity<ApiBookingGrid> getBookingGrid() {
+        OpeningSchedule schedule = facility.openingSchedule();
         return ResponseEntity.ok(new ApiBookingGrid(
                 timeZone.id(), bookingGridSettings.slotMinutes(), openingHours(),
-                facility.openingSchedule().weeks().stream().map(FacilityAdminController::toResponse).toList()));
+                schedule.weeks().stream().map(FacilityAdminController::toResponse).toList(),
+                schedule.periods().stream().map(FacilityAdminController::toResponse).toList(),
+                facility.courtClosures().stream().map(FacilityAdminController::toResponse).toList()));
     }
 
     private List<ApiOpeningHours> openingHours() {

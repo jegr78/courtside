@@ -536,7 +536,7 @@ components:
 
     BookingGrid:
       type: object
-      required: [timeZone, slotMinutes, openingHours, openingWeeks]
+      required: [timeZone, slotMinutes, openingHours, openingWeeks, openingPeriods, courtClosures]
       properties:
         timeZone: { type: string, example: Europe/Berlin }
         slotMinutes: { type: integer, minimum: 5, maximum: 120, multipleOf: 5 }
@@ -550,6 +550,16 @@ components:
             Every version of the weekly hours in the order they take effect. A day is governed by
             the last version that has started on it, so a past week keeps the hours it had.
           items: { $ref: "#/components/schemas/OpeningWeek" }
+        openingPeriods:
+          type: array
+          description: |
+            Seasons and holidays in the order they start. On the days a holiday covers its hours
+            govern, then a season's, then the weekly hours.
+          items: { $ref: "#/components/schemas/OpeningPeriod" }
+        courtClosures:
+          type: array
+          description: Days on which one court is closed while the others keep the hours of the day.
+          items: { $ref: "#/components/schemas/CourtClosure" }
 
     OpeningWeek:
       type: object
@@ -565,6 +575,86 @@ components:
           minItems: 7
           maxItems: 7
           items: { $ref: "#/components/schemas/OpeningHours" }
+
+    OpeningPeriodKind:
+      type: string
+      enum: [SEASON, HOLIDAY]
+      description: A season replaces the weekly hours for its dates; a holiday replaces a season too.
+
+    OpeningPeriod:
+      type: object
+      required: [id, kind, name, startsOn, endsOn, days]
+      properties:
+        id: { type: string, format: uuid }
+        kind: { $ref: "#/components/schemas/OpeningPeriodKind" }
+        name: { type: string, minLength: 1, maxLength: 80 }
+        startsOn:
+          type: string
+          format: date
+          description: The first day it governs, in the club's time zone.
+        endsOn:
+          type: string
+          format: date
+          description: The last day it governs, in the club's time zone.
+        days:
+          type: array
+          minItems: 7
+          maxItems: 7
+          items: { $ref: "#/components/schemas/OpeningHours" }
+
+    OpeningPeriodRequest:
+      type: object
+      description: |
+        The dates and hours of a season or holiday. A weekday with no window is closed on the days
+        it covers. Its last day cannot lie before today, and seasons and holidays each do not overlap
+        another of their kind.
+      required: [name, startsOn, endsOn, days]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 80 }
+        startsOn: { type: string, format: date }
+        endsOn: { type: string, format: date }
+        days:
+          type: array
+          minItems: 7
+          maxItems: 7
+          items: { $ref: "#/components/schemas/OpeningHours" }
+
+    CreateOpeningPeriodRequest:
+      allOf:
+        - $ref: "#/components/schemas/OpeningPeriodRequest"
+        - type: object
+          required: [kind]
+          properties:
+            kind: { $ref: "#/components/schemas/OpeningPeriodKind" }
+
+    CourtClosure:
+      type: object
+      required: [id, courtId, name, startsOn, endsOn]
+      properties:
+        id: { type: string, format: uuid }
+        courtId: { type: string, format: uuid }
+        name: { type: string, minLength: 1, maxLength: 80 }
+        startsOn: { type: string, format: date }
+        endsOn: { type: string, format: date }
+
+    CourtClosureRequest:
+      type: object
+      description: |
+        The days one court is closed, both inclusive. Its last day cannot lie before today, and the
+        closures of one court do not overlap.
+      required: [name, startsOn, endsOn]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 80 }
+        startsOn: { type: string, format: date }
+        endsOn: { type: string, format: date }
+
+    CreateCourtClosureRequest:
+      allOf:
+        - $ref: "#/components/schemas/CourtClosureRequest"
+        - type: object
+          required: [courtId]
+          properties:
+            courtId: { type: string, format: uuid }
 
     SetWeeklyOpeningHoursRequest:
       type: object
@@ -7410,6 +7500,232 @@ paths:
           $ref: "#/components/responses/NotFound"
         "409":
           $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/admin/opening-periods:
+    get:
+      tags: [admin-opening-hours]
+      operationId: listOpeningPeriods
+      summary: Every season and holiday in the order they start.
+      responses:
+        "200":
+          description: The seasons and holidays, past ones included.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/OpeningPeriod" }
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+    post:
+      tags: [admin-opening-hours]
+      operationId: createOpeningPeriod
+      summary: Add a season or a holiday.
+      description: |
+        Bookings already on its days stay; its hours bind every booking written or moved after it.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateOpeningPeriodRequest" }
+      responses:
+        "201":
+          description: The stored season or holiday.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OpeningPeriod" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/admin/opening-periods/{periodId}:
+    put:
+      tags: [admin-opening-hours]
+      operationId: changeOpeningPeriod
+      summary: Correct a season or holiday whose last day has not passed.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: periodId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/OpeningPeriodRequest" }
+      responses:
+        "200":
+          description: The corrected season or holiday.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OpeningPeriod" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+    delete:
+      tags: [admin-opening-hours]
+      operationId: removeOpeningPeriod
+      summary: Remove a season or holiday whose last day has not passed.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: periodId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "204":
+          description: The season or holiday is removed.
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/admin/court-closures:
+    get:
+      tags: [admin-opening-hours]
+      operationId: listCourtClosures
+      summary: Every court closure in the order it starts.
+      responses:
+        "200":
+          description: The court closures, past ones included.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/CourtClosure" }
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+    post:
+      tags: [admin-opening-hours]
+      operationId: createCourtClosure
+      summary: Close one court for whole days.
+      description: |
+        Bookings already on the court stay; the closure binds every booking written or moved after it.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateCourtClosureRequest" }
+      responses:
+        "201":
+          description: The stored court closure.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CourtClosure" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/admin/court-closures/{closureId}:
+    put:
+      tags: [admin-opening-hours]
+      operationId: changeCourtClosure
+      summary: Correct a court closure whose last day has not passed.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: closureId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CourtClosureRequest" }
+      responses:
+        "200":
+          description: The corrected court closure.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CourtClosure" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+    delete:
+      tags: [admin-opening-hours]
+      operationId: removeCourtClosure
+      summary: Remove a court closure whose last day has not passed.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: closureId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "204":
+          description: The court closure is removed.
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
         "429":
           $ref: "#/components/responses/RateLimited"
 

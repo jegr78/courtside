@@ -39,7 +39,8 @@ public class SqlStatementCounter {
 
     private static String categoryOf(String sql) {
         String normalized = sql.toLowerCase(Locale.ROOT).replaceAll("\\s+", " ").trim();
-        if (normalized.contains(" opening_hours")) {
+        if (normalized.contains(" opening_hours") || normalized.contains(" opening_period")
+                || normalized.contains(" court_closure")) {
             return "opening-hours";
         }
         if (normalized.contains(" membership_period") || normalized.contains(" member ")) {

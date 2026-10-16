@@ -1,5 +1,7 @@
 package org.courtside.rules.internal;
 
+import org.courtside.facility.Court;
+import org.courtside.facility.CourtClosure;
 import org.courtside.facility.FacilityService;
 import org.courtside.facility.OpeningSchedule;
 import org.courtside.rules.RuleContext;
@@ -8,6 +10,7 @@ import org.courtside.config.ClubTimeZone;
 import org.courtside.shared.OpeningWindow;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.List;
@@ -32,16 +35,17 @@ public class OpeningHoursRule implements BookingRule {
 
     @Override
     public List<RuleViolation> check(RuleContext context) {
-        return check(context, facility.openingSchedule());
+        return check(context, facility.openingSchedule(), facility.courtClosures());
     }
 
     @Override
     public Prepared prepare() {
         OpeningSchedule schedule = facility.openingSchedule();
-        return context -> check(context, schedule);
+        List<CourtClosure> closures = facility.courtClosures();
+        return context -> check(context, schedule, closures);
     }
 
-    private List<RuleViolation> check(RuleContext context, OpeningSchedule schedule) {
+    private List<RuleViolation> check(RuleContext context, OpeningSchedule schedule, List<CourtClosure> closures) {
         ZoneId zone = timeZone.zoneId();
         ZonedDateTime start = context.slot().start().atZone(zone);
         ZonedDateTime end = context.slot().end().atZone(zone);
@@ -59,6 +63,16 @@ public class OpeningHoursRule implements BookingRule {
                     Map.of("opensAt", window.opensAt().toString(),
                            "closesAt", window.closesAt().toString())));
         }
-        return List.of();
+        return closedCourt(context, start.toLocalDate(), closures).stream().toList();
+    }
+
+    private Optional<RuleViolation> closedCourt(RuleContext context, LocalDate date, List<CourtClosure> closures) {
+        return context.courtIds().stream()
+                .flatMap(courtId -> closures.stream()
+                        .filter(closure -> closure.courtId().equals(courtId) && closure.covers(date)))
+                .findFirst()
+                .map(closure -> new RuleViolation("booking.rule.openingHours.courtClosed",
+                        Map.of("court", facility.findCourt(closure.courtId()).map(Court::getNumber).orElse(0),
+                               "endsOn", closure.endsOn().toString())));
     }
 }
