@@ -20,6 +20,7 @@ export function AttendancePolicySection() {
   const [saved, setSaved] = useState<AttendancePolicy>();
   const [pending, setPending] = useState(false);
   const [success, setSuccess] = useState<string>();
+  const [unreadable, setUnreadable] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -29,13 +30,13 @@ export function AttendancePolicySection() {
         setPolicy(normalised(read));
         setSaved(normalised(read));
       })
-      .catch((failure) => {
-        if (active) report(failure);
+      .catch(() => {
+        if (active) setUnreadable(true);
       });
     return () => {
       active = false;
     };
-  }, [report]);
+  }, []);
 
   async function save(event: FormEvent) {
     event.preventDefault();
@@ -57,6 +58,7 @@ export function AttendancePolicySection() {
 
   return <section data-testid="attendance-policy" aria-labelledby="attendance-policy-title" className="grid gap-4">
     <h2 id="attendance-policy-title" className="text-xl font-semibold">{t("admin.attendance.title")}</h2>
+    {unreadable && <p data-testid="attendance-policy-unreadable" className="text-muted text-sm">{t("admin.attendance.unreadable")}</p>}
     {error && <Alert testId="attendance-policy-error">{error}</Alert>}
     {success && <SuccessFeedback testId="attendance-policy-saved">{success}</SuccessFeedback>}
     {policy && <form id="attendance-policy-form" noValidate onSubmit={(event) => void save(event)} className="grid gap-4">

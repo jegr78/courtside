@@ -499,14 +499,15 @@ function NoShowsSection({ personId, timeZone }: { personId: string; timeZone: st
   const [noShows, setNoShows] = useState<NoShow[]>();
   const [lifting, setLifting] = useState(false);
   const [lifted, setLifted] = useState<number>();
+  const [unreadable, setUnreadable] = useState(false);
 
   useEffect(() => {
     let active = true;
     void api.noShows(personId)
       .then((read) => { if (active) setNoShows(read); })
-      .catch((failure) => { if (active) report(failure); });
+      .catch(() => { if (active) setUnreadable(true); });
     return () => { active = false; };
-  }, [personId, report]);
+  }, [personId]);
 
   async function lift() {
     setLifting(true);
@@ -524,6 +525,7 @@ function NoShowsSection({ personId, timeZone }: { personId: string; timeZone: st
   return <section data-testid="person-no-shows" className="grid gap-3 rounded-xl border p-4">
     <h2 className="text-2xl font-bold">{t("admin.person.noShows")}</h2>
     {error && <Alert>{error}</Alert>}
+    {unreadable && <p data-testid="no-shows-unreadable" className="text-muted text-sm">{t("admin.person.noShowsUnreadable")}</p>}
     {lifted !== undefined && <SuccessFeedback testId="no-shows-lifted">{t("admin.person.noShowsLifted", { count: lifted })}</SuccessFeedback>}
     {noShows && (noShows.length === 0
       ? <p data-testid="no-shows-none" className="text-muted">{t("admin.person.noShowsNone")}</p>
