@@ -121,7 +121,7 @@ class AttendanceTest extends AbstractIntegrationTest {
         assertThat(recorded).isEqualTo(AttendanceOutcome.NO_SHOW);
         assertThat(attendance.outcomeOf(booking)).as("a cleared attendance is unrecorded again").isEmpty();
         assertThat(eventTypesAbout(booking))
-                .containsExactly("booking.attendance.recorded", "booking.attendance.cleared");
+                .as("the fixed clock gives both the same instant").containsExactlyInAnyOrder("booking.attendance.recorded", "booking.attendance.cleared");
     }
 
     @Test

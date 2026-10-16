@@ -13,7 +13,7 @@ INSERT INTO attendance_policy (id, enabled, release_after_minutes)
 VALUES ('a77e0000-0000-0000-0000-000000000001', false, NULL);
 
 CREATE TABLE booking_attendance (
-    booking_id  uuid        PRIMARY KEY REFERENCES booking ON DELETE CASCADE,
+    booking_id  uuid        PRIMARY KEY,
     outcome     text        NOT NULL,
     recorded_at timestamptz NOT NULL,
     recorded_by uuid        REFERENCES user_account ON DELETE SET NULL,
@@ -28,7 +28,7 @@ CREATE INDEX booking_attendance_counting_no_shows ON booking_attendance (booking
     WHERE outcome = 'NO_SHOW' AND lifted_at IS NULL;
 
 CREATE TABLE booking_release (
-    booking_id  uuid        PRIMARY KEY REFERENCES booking ON DELETE CASCADE,
+    booking_id  uuid        PRIMARY KEY,
     released_at timestamptz NOT NULL
 );
 

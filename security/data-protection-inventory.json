@@ -420,6 +420,20 @@
     }
   },
   "storedFields": {
+    "attendance_policy": {
+      "enabled": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "id": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "release_after_minutes": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      }
+    },
     "booking": {
       "booked_by": {
         "level": "pseudonymous",
@@ -479,6 +493,32 @@
       },
       "status": {
         "level": "operational",
+        "lifecycle": "booking-pseudonymisation"
+      }
+    },
+    "booking_attendance": {
+      "booking_id": {
+        "level": "operational",
+        "lifecycle": "booking-pseudonymisation"
+      },
+      "lifted_at": {
+        "level": "operational",
+        "lifecycle": "booking-pseudonymisation"
+      },
+      "lifted_by": {
+        "level": "pseudonymous",
+        "lifecycle": "booking-pseudonymisation"
+      },
+      "outcome": {
+        "level": "pseudonymous",
+        "lifecycle": "booking-pseudonymisation"
+      },
+      "recorded_at": {
+        "level": "operational",
+        "lifecycle": "booking-pseudonymisation"
+      },
+      "recorded_by": {
+        "level": "pseudonymous",
         "lifecycle": "booking-pseudonymisation"
       }
     },
@@ -562,6 +602,16 @@
         "lifecycle": "booking-pseudonymisation"
       },
       "position": {
+        "level": "operational",
+        "lifecycle": "booking-pseudonymisation"
+      }
+    },
+    "booking_release": {
+      "booking_id": {
+        "level": "operational",
+        "lifecycle": "booking-pseudonymisation"
+      },
+      "released_at": {
         "level": "operational",
         "lifecycle": "booking-pseudonymisation"
       }

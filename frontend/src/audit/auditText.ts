@@ -82,7 +82,7 @@ export function actorLabel(entry: AuditEntry, t: TFunction): string {
 }
 
 // Named per type, because a booking-module event may concern something other than a booking.
-const BOOKING_MODULE_SUBJECTS: Record<string, "booking" | "series" | "waitlistEntry"> = {
+const BOOKING_MODULE_SUBJECTS: Record<string, "booking" | "series" | "waitlistEntry" | "named"> = {
   "booking.booking.confirmed": "booking",
   "booking.booking.displaced": "booking",
   "booking.booking.reminderDue": "booking",
@@ -93,6 +93,8 @@ const BOOKING_MODULE_SUBJECTS: Record<string, "booking" | "series" | "waitlistEn
   "booking.attendance.recorded": "booking",
   "booking.attendance.cleared": "booking",
   "booking.attendance.released": "booking",
+  "booking.attendance.noShowsLifted": "named",
+  "booking.attendance.policyChanged": "named",
   "booking.series.created": "series",
   "booking.series.cancelled": "series",
   "booking.series.moved": "series",
@@ -112,6 +114,6 @@ export function subjectLabel(entry: AuditEntry, t: TFunction, language: string, 
   if (!entry.subjectId) return t("audit.subject.instance");
   const kind = BOOKING_MODULE_SUBJECTS[entry.eventType];
   if (kind === "waitlistEntry") return entry.subjectName ?? t("audit.subject.waitlistEntry", { subjectId: entry.subjectId });
-  if (kind) return bookingSubjectLabel(entry, kind, t, language, timeZone);
+  if (kind === "booking" || kind === "series") return bookingSubjectLabel(entry, kind, t, language, timeZone);
   return entry.subjectName ?? weekdayLabel(entry, t) ?? entry.subjectId;
 }

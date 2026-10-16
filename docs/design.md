@@ -288,6 +288,7 @@ violation instead of stopping at the first.
 | `BOOKING_HOURS` | The period lies between the category's earliest start and latest end |
 | `WEEKLY_BOOKED_HOURS` | The member's booked time in one week stays within this many hours |
 | `MIN_BOOKING_DURATION` | One booking lasts at least this long |
+| `NO_SHOW_LIMIT` | The member has fewer than this many counting no-shows in the last days |
 
 Membership-scoped rules come from the current membership type. A club may configure a fallback for
 people without current membership. Without it, no membership-scoped rule applies. Facility rules
@@ -310,6 +311,24 @@ one, and a member past the limit is skipped when the slot frees.
 window holds for every weekday, is read in the club time zone and does not cross midnight. Like the
 opening hours it ends at 23:59 at the latest, so a window that lasts until closing names the
 closing time.
+
+`NO_SHOW_LIMIT` counts the unlifted no-shows recorded for bookings the member holds whose start lies
+within its window of days before now. It counts nothing while the club records no attendance, and
+it does not judge a move, because a move adds no booking.
+
+### Attendance
+
+A club switches attendance on in its attendance policy. Without it nothing below has an effect and
+existing installations keep their behaviour. The member who holds a booking checks in from 15
+minutes before its start until its end, and a board records `ATTENDED` or `NO_SHOW` for a booking
+that has started, replaces it or removes it. A booking cancelled before its start has nobody to
+wait for and takes no record. A booking with nothing recorded is never a no-show.
+
+The policy may name a release time of 5 to 120 minutes. A sweep then cancels every confirmed
+booking on a card that counts against limits whose start lies that long in the past while nobody
+checked in, frees its courts under the booking grid lock and records the release. A release is not
+a no-show. A board lifts a person's counting no-shows: they stay recorded and stop counting, which
+lifts a `NO_SHOW_LIMIT` refusal.
 
 A booking request authenticates and authorizes, validates the request, evaluates all rules, writes
 booking and allocations in one transaction, translates a collision to `409 Conflict`, publishes
