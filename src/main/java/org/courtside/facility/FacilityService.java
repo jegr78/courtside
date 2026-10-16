@@ -412,7 +412,7 @@ public class FacilityService {
         OpeningPeriod saved = row.toPeriod();
         events.publishEvent(new FacilityEvent.OpeningPeriodSet(
                 row.getId(), kind.name(), startsOn, endsOn, changedFields(previous, saved)));
-        events.publishEvent(new AvailabilityChange.PeriodStored(previous, saved));
+        events.publishEvent(AvailabilityChange.PeriodStored.of(previous, saved));
         return saved;
     }
 
@@ -450,7 +450,7 @@ public class FacilityService {
         CourtClosure saved = row.toClosure();
         events.publishEvent(new FacilityEvent.CourtClosureSet(
                 row.getId(), court.getId(), court.getNumber(), startsOn, endsOn, changedFields(previous, saved)));
-        events.publishEvent(new AvailabilityChange.ClosureStored(previous, saved));
+        events.publishEvent(AvailabilityChange.ClosureStored.of(previous, saved));
         return saved;
     }
 

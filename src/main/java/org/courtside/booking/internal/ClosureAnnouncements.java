@@ -82,10 +82,10 @@ class ClosureAnnouncements {
     @TransactionalEventListener
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     void on(AvailabilityChange.PeriodStored stored) {
-        OpeningPeriod period = stored.after();
+        OpeningPeriod period = stored.after().toPeriod();
         Availability current = impact.currentAvailability();
         Availability before = stored.before() == null
-                ? current.withoutPeriod(period.id()) : current.withPeriod(stored.before());
+                ? current.withoutPeriod(period.id()) : current.withPeriod(stored.before().toPeriod());
         announce(impact.newlyUnavailable(before, current.withPeriod(period), period.startsOn(), period.endsOn(),
                 clock.instant()), period.kind() == OpeningPeriod.Kind.HOLIDAY
                 ? BookingDisplaced.Closure.HOLIDAY : BookingDisplaced.Closure.SEASON);
@@ -95,10 +95,10 @@ class ClosureAnnouncements {
     @TransactionalEventListener
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     void on(AvailabilityChange.ClosureStored stored) {
-        CourtClosure closure = stored.after();
+        CourtClosure closure = stored.after().toClosure();
         Availability current = impact.currentAvailability();
         Availability before = stored.before() == null
-                ? current.withoutClosure(closure.id()) : current.withClosure(stored.before());
+                ? current.withoutClosure(closure.id()) : current.withClosure(stored.before().toClosure());
         announce(impact.newlyUnavailable(before, current.withClosure(closure), closure.startsOn(),
                 closure.endsOn(), clock.instant()), BookingDisplaced.Closure.COURT_CLOSED);
     }
