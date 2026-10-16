@@ -139,6 +139,7 @@ courtside:
     series-horizon-months: 12
     reminder-sweep-interval: 5m
     waitlist-sweep-interval: 30s
+    attendance-release-interval: 1m
     partner-sweep-interval: 5m
   import:
     preview-retention: ${COURTSIDE_IMPORT_PREVIEW_RETENTION:7d}

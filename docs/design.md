@@ -288,6 +288,7 @@ violation instead of stopping at the first.
 | `BOOKING_HOURS` | The period lies between the category's earliest start and latest end |
 | `WEEKLY_BOOKED_HOURS` | The member's booked time in one week stays within this many hours |
 | `MIN_BOOKING_DURATION` | One booking lasts at least this long |
+| `NO_SHOW_LIMIT` | The member has fewer than this many counting no-shows in the last days |
 
 Membership-scoped rules come from the current membership type. A club may configure a fallback for
 people without current membership. Without it, no membership-scoped rule applies. Facility rules
@@ -310,6 +311,26 @@ one, and a member past the limit is skipped when the slot frees.
 window holds for every weekday, is read in the club time zone and does not cross midnight. Like the
 opening hours it ends at 23:59 at the latest, so a window that lasts until closing names the
 closing time.
+
+`NO_SHOW_LIMIT` counts the unlifted no-shows recorded for bookings the member holds whose start lies
+within its window of days before now. It counts nothing while the club records no attendance, and
+it does not judge a move, because a move adds no booking.
+
+### Attendance
+
+A club switches attendance on in its attendance policy. Without it nothing below has an effect and
+existing installations keep their behaviour. The member who holds a booking checks in from 15
+minutes before its start until its end, and a board records `ATTENDED` or `NO_SHOW` for a booking
+that has started, replaces it or removes it. A booking cancelled before its start has nobody to
+wait for and takes no record. A booking with nothing recorded is never a no-show.
+
+The policy may name a release time of 5 to 120 minutes. A sweep then cancels every confirmed
+booking on a card that counts against limits whose start lies that long in the past while nobody
+checked in, frees its courts under the booking grid lock and records the release. The booker and
+every player with an account receive one `BOOKING_RELEASED` message, because only the booker can
+check in and a player at the court would otherwise not learn why it is gone. A release is not
+a no-show. A board lifts a person's counting no-shows: they stay recorded and stop counting, which
+lifts a `NO_SHOW_LIMIT` refusal.
 
 A booking request authenticates and authorizes, validates the request, evaluates all rules, writes
 booking and allocations in one transaction, translates a collision to `409 Conflict`, publishes
@@ -665,7 +686,7 @@ out instead, so no message, a security message least of all, is lost to a club's
 
 Current messages cover the welcome for a new account, generated credentials, password-reset codes, username reminders, booking
 confirmations, participant additions and withdrawals, displaced bookings, upcoming reminders,
-booking cancellations, new series, waitlist offers and a taken open place. A series sends no confirmation per occurrence. Its holder
+booking cancellations, bookings freed without a check-in, new series, waitlist offers and a taken open place. A series sends no confirmation per occurrence. Its holder
 receives one summary naming the card, weekdays, time, courts, first and last date and the number of
 occurrences, and its centre entry leads to the first occurrence. Displacement informs people but
 does not cancel the booking.
@@ -755,8 +776,8 @@ A waitlist offer cannot be disabled either: joining the queue is the consent to 
 leaving the queue is how a member stops it. It always reaches the centre, follows the email channel
 choice and is handed to the relay before ordinary booking mail because it runs out within minutes.
 A mail composed after the offer was taken, declined or expired fails instead of being sent.
-The welcome, credentials, displacement, participant-addition notices and the club's cancellations
-and series moves cannot be disabled as kinds, because no other product path tells the member that
+The welcome, credentials, displacement, participant-addition notices, the club's cancellations,
+freed bookings and series moves cannot be disabled as kinds, because no other product path tells the member that
 somebody else wrote them into a booking, took one away or moved it. A holder's own cancellation and the
 series summary can be declined, like the confirmation: My bookings already shows what they say. A
 declined email channel stops the mail for displacement, participant-addition notices and the club's

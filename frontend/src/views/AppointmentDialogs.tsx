@@ -1,7 +1,7 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  api, type CancellationReason, type CancelScope, type ManagedAppointment, type ManagedAppointmentDetail,
+  api, type AttendanceOutcome, type CancellationReason, type CancelScope, type ManagedAppointment, type ManagedAppointmentDetail,
   type MovePreview, type MoveRequest, type PersonalBooking, type PublicCourt
 } from "../api/client";
 import { violationMessage } from "../api/problem-message";
@@ -102,18 +102,68 @@ export function MoveDialog({ booking, courts, timeZone, maxBookingMinutes, close
   </div></Modal>;
 }
 
-export function ManagedAppointmentDialog({ bookingId, locale, timeZone, closed }: { bookingId: string; locale: string; timeZone: string; closed: () => void }) {
+function AttendanceSection({ detail, recordable, changed, t }: {
+  detail: ManagedAppointmentDetail;
+  recordable: boolean;
+  changed: (outcome?: AttendanceOutcome) => Promise<void>;
+  t: Translate;
+}) {
+  const [pending, setPending] = useState(false);
+  async function change(outcome?: AttendanceOutcome) {
+    setPending(true);
+    try {
+      await changed(outcome);
+    } finally {
+      setPending(false);
+    }
+  }
+  return <section data-testid="managed-attendance" className="grid gap-2"><h3 className="font-semibold">{t("managedAppointments.attendance")}</h3>
+    <p data-testid="managed-attendance-state">{detail.attendance ? t(`managedAppointments.attendance.${detail.attendance}`) : t("managedAppointments.attendance.none")}</p>
+    {recordable && <div className="flex flex-wrap gap-2">
+      <Button variant="secondary" data-testid="attendance-attended" className="px-3 py-2" disabled={pending || detail.attendance === "ATTENDED"}
+        onClick={() => void change("ATTENDED")}>{t("managedAppointments.attendance.record.ATTENDED")}</Button>
+      <Button variant="secondary" data-testid="attendance-no-show" className="px-3 py-2" disabled={pending || detail.attendance === "NO_SHOW"}
+        onClick={() => void change("NO_SHOW")}>{t("managedAppointments.attendance.record.NO_SHOW")}</Button>
+      {detail.attendance && <Button variant="secondary" data-testid="attendance-clear" className="px-3 py-2" disabled={pending}
+        onClick={() => void change(undefined)}>{t("managedAppointments.attendance.clear")}</Button>}
+    </div>}
+  </section>;
+}
+
+export function ManagedAppointmentDialog({ bookingId, locale, timeZone, administrator = false, closed }: { bookingId: string; locale: string; timeZone: string; administrator?: boolean; closed: () => void }) {
   const { t } = useTranslation();
   const [detail, setDetail] = useState<ManagedAppointmentDetail>();
-  const { message: error, report } = useReportedFailure();
+  const [tracked, setTracked] = useState(false);
+  const [begun, setBegun] = useState(false);
+  const { message: error, report, clear } = useReportedFailure();
 
   useEffect(() => {
     let active = true;
     void api.managedAppointment(bookingId)
-      .then((appointment) => { if (active) setDetail(appointment); })
+      .then((appointment) => {
+        if (!active) return;
+        setDetail(appointment);
+        setBegun(Date.parse(appointment.startsAt) <= Date.now());
+      })
       .catch((failure) => { if (active) report(failure); });
+    if (administrator) {
+      void api.attendancePolicy()
+        .then((policy) => { if (active) setTracked(policy.enabled); })
+        .catch((failure) => { if (active) report(failure); });
+    }
     return () => { active = false; };
-  }, [bookingId, report]);
+  }, [administrator, bookingId, report]);
+
+  async function changeAttendance(outcome?: AttendanceOutcome) {
+    clear();
+    try {
+      if (outcome) await api.recordAttendance(bookingId, outcome);
+      else await api.clearAttendance(bookingId);
+      setDetail(await api.managedAppointment(bookingId));
+    } catch (failure) {
+      report(failure);
+    }
+  }
 
   return <Modal labelledBy="managed-appointment-detail-title" closed={closed}><div className="surface-panel flex w-full max-w-lg flex-col overflow-hidden rounded-2xl border">
     <DialogBody><div className="grid gap-4">
@@ -127,6 +177,8 @@ export function ManagedAppointmentDialog({ bookingId, locale, timeZone, closed }
       <section data-testid="managed-participants"><h3 className="font-semibold">{t("managedAppointments.participantDetails")}</h3>
         {detail.participants.length === 0 ? <p>{t("managedAppointments.noParticipants")}</p> : <ul className="list-disc pl-5">{detail.participants.map((participant, index) => <li key={`${participant.kind}-${index}`}>{participant.displayName} · {t(`managedAppointments.kind.${participant.kind}`)}</li>)}</ul>}
       </section>
+      {(detail.attendance || (tracked && begun)) && <AttendanceSection detail={detail} recordable={tracked && begun}
+        changed={changeAttendance} t={t} />}
     </>}
     </div></DialogBody>
     <div className="surface-panel border-structural flex shrink-0 gap-2 border-t px-6 py-4"><Button variant="secondary" data-testid="close-managed-appointment" onClick={closed}>{t("booking.close")}</Button></div>

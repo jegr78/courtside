@@ -88,7 +88,7 @@ class SeriesQueryBudgetTest extends AbstractIntegrationTest {
         // The time zone has its own lightweight entity so repeated reads share the persistence
         // context without making the main configuration query carry the uploaded logo bytes.
         assertThat(snapshot.total()).as("occupancy, reservations, seasons and court closures are read once for the whole series, " + snapshot)
-                .isLessThanOrEqualTo(19L);
+                .isLessThanOrEqualTo(20L);
     }
 
     @ParameterizedTest
@@ -149,6 +149,6 @@ class SeriesQueryBudgetTest extends AbstractIntegrationTest {
                 .isLessThanOrEqualTo(openingHoursBudget);
         // One per membership-scoped rule and no more: each asks once for the whole batch rather than
         // once per occurrence, which is what prepare() is for.
-        assertThat(snapshot.category("rule-parameter")).as(snapshot.toString()).isLessThanOrEqualTo(7);
+        assertThat(snapshot.category("rule-parameter")).as(snapshot.toString()).isLessThanOrEqualTo(8);
     }
 }

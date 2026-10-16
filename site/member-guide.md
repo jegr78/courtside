@@ -215,6 +215,7 @@ Verstöße gleichzeitig am jeweiligen Feld an.
 | Du musst eine bestimmte Zahl von Minuten vor Beginn stornieren | Die Stornierungsfrist ist abgelaufen |
 | Eine Buchung darf nicht in der Vergangenheit beginnen | Der gewählte Beginn liegt in der Vergangenheit |
 | Platzbuchungen sind für dich nicht freigegeben | Deine Mitgliedsart darf selbst keine Plätze buchen |
+| Du bist in den letzten Tagen zu einer Zahl von Buchungen nicht erschienen | Der Verein nimmt keine Buchung an, bis der Vorstand die Nichterscheinen aufhebt |
 
 Die konkrete Zahl steht in der Meldung. Ändere die markierten Angaben und sende die Buchung erneut.
 
@@ -238,6 +239,14 @@ deine Buchung, erfährst du es ebenfalls. Hat der Verein einen Grund gewählt, n
 ihn. Sonst erfährst du ihn beim Verein.
 
 ![Bevorstehende Buchungen mit der Schaltfläche zum Stornieren, die vergangenen eingeklappt darunter.](screenshots/de/my-bookings.png)
+
+### Einchecken
+
+Erfasst dein Verein die Anwesenheit, checkst du unter *Meine Buchungen* ab 15 Minuten vor Beginn bis
+zum Ende deiner Buchung mit **Einchecken** ein. Hat der Verein eine Freigabezeit eingestellt und
+niemand checkt bis dahin ein, storniert Courtside die Buchung und gibt den Platz frei. Sie steht
+dann als freigegeben unter deinen stornierten Buchungen. Du und alle Mitspieler der Buchung bekommen
+darüber eine Nachricht. Einchecken kann nur, wer gebucht hat.
 
 ## Auf einen belegten Platz warten
 

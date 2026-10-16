@@ -43,7 +43,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 class AdminSurfaceTest extends AbstractIntegrationTest {
 
-    private static final int KNOWN_PRIVILEGED_ENDPOINT_COUNT = 95;
+    private static final int KNOWN_PRIVILEGED_ENDPOINT_COUNT = 101;
 
     private static final String CATCH_ALL_UUID = "11111111-1111-1111-1111-111111111111";
 
@@ -102,6 +102,7 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
             "/api/my/waitlist/{entryId}",
             "/api/my/waitlist/{entryId}/acceptance",
             "/api/my/bookings/{bookingId}/partner-invitation",
+            "/api/my/bookings/{bookingId}/check-in",
             "/api/partner-invitations",
             "/api/partner-invitations/{invitationId}/acceptance");
 

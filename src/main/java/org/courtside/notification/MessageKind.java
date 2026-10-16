@@ -18,6 +18,7 @@ public enum MessageKind {
     BOOKING_REMINDER("booking.reminder", true, false),
     BOOKING_CANCELLED("booking.cancelled", true, false),
     BOOKING_CANCELLED_BY_CLUB("booking.cancelledByClub", false, false),
+    BOOKING_RELEASED("booking.released", false, false),
     BOOKING_SERIES_CREATED("booking.seriesCreated", true, false),
     BOOKING_SERIES_CANCELLED_BY_CLUB("booking.seriesCancelledByClub", false, false),
     BOOKING_SERIES_MOVED_BY_CLUB("booking.seriesMovedByClub", false, false),

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useLocation, useParams } from "react-router-dom";
-import { api, ApiError, type ClubConfig, type MembershipType, type MessageEntry, type PersonRequest, type Role, type RosterEntry } from "../api/client";
+import { api, ApiError, type ClubConfig, type MembershipType, type MessageEntry, type NoShow, type PersonRequest, type Role, type RosterEntry } from "../api/client";
 import { problemMessage } from "../api/problem-message";
 import { useReportedFailure } from "../failures/useReportedFailure";
 import { useClubConfiguration } from "../club/registry";
@@ -15,6 +15,7 @@ import { SuccessFeedback } from "../components/SuccessFeedback";
 import { TextField } from "../components/TextField";
 import { downloadJson } from "../downloads/downloadJson";
 import { formString } from "../forms/formString";
+import { formatBookingPeriod } from "../time/clubZone";
 import { differs } from "../unsaved/differs";
 import { SaveBar } from "../unsaved/SaveBar";
 import { saveInTurn, StepFailed, type SaveStep } from "../unsaved/saveInTurn";
@@ -333,6 +334,7 @@ export function AdminPersonView() {
             disabled={pending}
             create={(request) => mutate(() => api.createAccount(personId, request))}
           />}
+        {entry.accountId && <NoShowsSection personId={personId} timeZone={club.timeZone} />}
         <section className="grid gap-3 rounded-xl border p-4">
           <h2 className="text-2xl font-bold">{t("admin.person.subjectAccess")}</h2>
           <p className="text-muted text-sm">{t("admin.person.subjectAccessExplain")}</p>
@@ -488,6 +490,53 @@ function AccountSection({ entry, disabled, supportedLocales, username, locale, c
         </div>
       </div>
     </Modal>}
+  </section>;
+}
+
+function NoShowsSection({ personId, timeZone }: { personId: string; timeZone: string }) {
+  const { t, i18n } = useTranslation();
+  const { message: error, report, clear } = useReportedFailure();
+  const [noShows, setNoShows] = useState<NoShow[]>();
+  const [lifting, setLifting] = useState(false);
+  const [lifted, setLifted] = useState<number>();
+  const [unreadable, setUnreadable] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    void api.noShows(personId)
+      .then((read) => { if (active) setNoShows(read); })
+      .catch(() => { if (active) setUnreadable(true); });
+    return () => { active = false; };
+  }, [personId]);
+
+  async function lift() {
+    setLifting(true);
+    clear();
+    try {
+      setLifted((await api.liftNoShows(personId)).lifted);
+      setNoShows(await api.noShows(personId));
+    } catch (failure) {
+      report(failure);
+    } finally {
+      setLifting(false);
+    }
+  }
+
+  return <section data-testid="person-no-shows" className="grid gap-3 rounded-xl border p-4">
+    <h2 className="text-2xl font-bold">{t("admin.person.noShows")}</h2>
+    {error && <Alert>{error}</Alert>}
+    {unreadable && <p data-testid="no-shows-unreadable" className="text-muted text-sm">{t("admin.person.noShowsUnreadable")}</p>}
+    {lifted !== undefined && <SuccessFeedback testId="no-shows-lifted">{t("admin.person.noShowsLifted", { count: lifted })}</SuccessFeedback>}
+    {noShows && (noShows.length === 0
+      ? <p data-testid="no-shows-none" className="text-muted">{t("admin.person.noShowsNone")}</p>
+      : <>
+        <ul data-testid="no-shows-list" className="list-disc pl-5">
+          {noShows.map((noShow) => <li key={noShow.bookingId}>{formatBookingPeriod(noShow.startsAt, noShow.endsAt, i18n.language, timeZone)}</li>)}
+        </ul>
+        <p className="text-muted text-sm">{t("admin.person.noShowsExplain")}</p>
+        <Button variant="secondary" data-testid="lift-no-shows" disabled={lifting} className="justify-self-start" type="button"
+                onClick={() => void lift()}>{t("admin.person.liftNoShows")}</Button>
+      </>)}
   </section>;
 }
 

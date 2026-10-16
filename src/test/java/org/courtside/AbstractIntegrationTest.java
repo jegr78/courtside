@@ -23,6 +23,7 @@ public abstract class AbstractIntegrationTest {
 
     private static final String BASELINE_SCHEMA = "test_baseline";
     private static final Set<String> SEEDED_TABLES = Set.of(
+            "attendance_policy",
             "booking_card",
             "booking_card_allowed_role",
             "booking_card_managing_role",

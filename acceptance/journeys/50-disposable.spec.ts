@@ -2,13 +2,19 @@ import { runPath } from "../lib/context";
 import { type Page } from "@playwright/test";
 import { test, expect } from "../lib/fixtures";
 import { restoreDisposable } from "../lib/disposable";
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomInt, randomUUID } from "node:crypto";
+import { adminPut, apiAs } from "../lib/api";
+import { runSql } from "../lib/erasure";
+import { recordCreated } from "../lib/ledger";
+import { precondition } from "../lib/precondition";
+import { noShowLimitFor } from "../lib/attendance";
+import { seededBookingId, startedBookingSql, violationCodes } from "../lib/core.mjs";
 import { capture } from "../lib/checks";
 import { latestMailTo } from "../lib/mail";
 import { PASSWORD, persona } from "../lib/context";
 import { openAs, reauthenticateIfAsked, signInByForm } from "../lib/session";
 import { step } from "../lib/steps";
-import { disposableRecord, projectName } from "../lib/journey";
+import { discovery, disposableRecord, projectName } from "../lib/journey";
 import { DISPOSABLE_PROFILES } from "../config/disposables.mjs";
 
 test.beforeEach(() => { test.skip(!DISPOSABLE_PROFILES.includes(projectName()), "disposable journeys run on three profiles"); });
@@ -182,6 +188,54 @@ test("given the disposable member, when the language is switched in the preferen
     await page.context().close();
     await restoreDisposable(username());
   }
+});
+
+// A booking three days back is refused for its start whatever else holds, so it probes the rules without writing one.
+async function probeRefusals(): Promise<string[]> {
+  const api = await apiAs("disposable");
+  const courts = await (await api.get("/api/public/courts")).json() as { id: string }[];
+  const card = discovery.cards.find((candidate: { active: boolean; allowedRoles: string[] }) => candidate.active && candidate.allowedRoles.length === 0);
+  const start = new Date(Math.floor(Date.now() / 3_600_000) * 3_600_000 - 3 * 86_400_000);
+  const answer = await api.post("/api/bookings", {
+    courtIds: [courts[0].id], cardId: card.id, startsAt: start.toISOString(),
+    endsAt: new Date(start.getTime() + 3_600_000).toISOString(), participants: [{ guestName: "Acceptance Partner" }]
+  }, { "Idempotency-Key": randomUUID() });
+  const body = await answer.json().catch(() => ({}));
+  if (answer.ok() && body.id) recordCreated({ kind: "booking", id: body.id, by: "disposable", project: projectName() });
+  return violationCodes(body);
+}
+
+test("given a disposable member who did not turn up, when the board records the no-show and later lifts it, then the club refuses the member's bookings only until the lift", async ({ browser }) => {
+  test.skip(projectName() !== DISPOSABLE_PROFILES[0], "a lift acts on every no-show of the account, so one profile walks it");
+  // given
+  const admin = await apiAs("admin");
+  const policy = await (await admin.get("/api/admin/attendance-policy")).json() as { enabled: boolean };
+  precondition(policy.enabled, "the club records attendance (Fristen und Erinnerungen, Anwesenheit erfassen)");
+  const record = disposableRecord(username());
+  const limit = await noShowLimitFor(admin, record.personId);
+  precondition(limit?.maxNoShows === 1, `the disposable member's rule set refuses bookings from one no-show, it holds ${JSON.stringify(limit)}`);
+  const bookingId = seededBookingId(runSql(startedBookingSql(username(), randomInt(0, 171)), `seed-no-show-${projectName()}.sql`));
+  precondition(bookingId, "the started booking of the disposable member was seeded");
+  // when — the board records that nobody came
+  const recorded = await adminPut(admin, `/api/admin/bookings/${bookingId}/attendance`, { outcome: "NO_SHOW" });
+  expect(recorded.status(), `product: the no-show is recorded (${await recorded.text()})`).toBe(204);
+  // then — the member's next booking is refused for it
+  expect(await probeRefusals(), "product: the no-show limit refuses the member").toContain("booking.rule.noShowLimit.reached");
+  // when — the board lifts it on the person page
+  const page = await openAs(browser, "admin");
+  try {
+    await page.goto(`/admin/roster/${record.personId}`);
+    await expect(page.getByTestId("no-shows-list"), "product: the person page lists the counting no-show").toBeVisible();
+    await capture(page, "person-no-shows");
+    await page.getByTestId("lift-no-shows").click();
+    await expect(page.getByTestId("no-shows-lifted"), "product: the board lifts the no-shows").toBeVisible();
+    await expect(page.getByTestId("no-shows-none"), "product: nothing counts after the lift").toBeVisible();
+    await capture(page, "person-no-shows-lifted");
+  } finally { await page.context().close(); }
+  // then — the rules still judge the probe, but the no-show no longer refuses it
+  const after = await probeRefusals();
+  expect(after, "product: the probe is still judged by the rules").toContain("booking.rule.startsInPast");
+  expect(after, "product: a lifted no-show refuses nothing").not.toContain("booking.rule.noShowLimit.reached");
 });
 
 async function renderMail(browser: import("@playwright/test").Browser, html: string, label: string) {

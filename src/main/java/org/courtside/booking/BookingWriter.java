@@ -15,6 +15,7 @@ import org.courtside.booking.internal.ParticipantKind;
 import org.courtside.booking.internal.ParticipantCardCapacity;
 import org.courtside.booking.internal.ParticipantsInvalidException;
 import org.courtside.booking.internal.SeriesOccurrenceCancellation;
+import org.courtside.booking.internal.UnattendedRelease;
 import org.courtside.booking.internal.IdempotencyKeyRaceException;
 import org.courtside.card.BookingCard;
 import org.courtside.card.CardService;
@@ -53,7 +54,7 @@ import java.util.stream.IntStream;
 @Component
 @RequiredArgsConstructor
 @Transactional
-class BookingWriter implements SeriesOccurrenceCancellation, BookingDrafts {
+class BookingWriter implements SeriesOccurrenceCancellation, BookingDrafts, UnattendedRelease {
 
     private static final String OVERLAP_CONSTRAINT = "court_allocation_no_overlap";
     private static final String IDEMPOTENCY_CONSTRAINT = "booking_idempotency_by_account";
@@ -223,6 +224,23 @@ class BookingWriter implements SeriesOccurrenceCancellation, BookingDrafts {
             releaseCourtsOf(booking);
         }
         return changed;
+    }
+
+    @Override
+    public boolean release(UUID bookingId) {
+        bookingGridCoordination.lock();
+        if (bookings.lockById(bookingId).isEmpty()) {
+            return false;
+        }
+        entityManager.clear();
+        Booking booking = bookings.findWithAllocationsById(bookingId)
+                .orElseThrow(() -> new BookingNotFoundException("No booking with id " + bookingId));
+        if (!booking.cancel(null, clock.instant(), null)) {
+            return false;
+        }
+        bookings.saveAndFlush(booking);
+        releaseCourtsOf(booking);
+        return true;
     }
 
     private void releaseCourtsOf(Booking booking) {

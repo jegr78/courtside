@@ -115,6 +115,11 @@ export type ParticipationPage = components["schemas"]["ParticipationPage"];
 export type ManagedAppointment = components["schemas"]["ManagedAppointment"];
 export type ManagedAppointmentPage = components["schemas"]["ManagedAppointmentPage"];
 export type ManagedAppointmentDetail = components["schemas"]["ManagedAppointmentDetail"];
+export type AttendanceOutcome = components["schemas"]["AttendanceOutcome"];
+export type AttendancePolicy = components["schemas"]["AttendancePolicy"];
+export type CheckIn = components["schemas"]["CheckIn"];
+export type NoShow = components["schemas"]["NoShow"];
+export type NoShowsLifted = components["schemas"]["NoShowsLifted"];
 export type ManagedAppointmentView = components["schemas"]["ManagedAppointmentView"];
 export type CancelScope = components["schemas"]["CancelScope"];
 export type CancellationReason = components["schemas"]["CancellationReason"];
@@ -724,6 +729,23 @@ export const api = {
   ),
   managedAppointment: (bookingId: string) => request<ManagedAppointmentDetail>(
     `/api/managed/bookings/${bookingId}`
+  ),
+  checkIn: (bookingId: string) => request<void>(`/api/my/bookings/${bookingId}/check-in`, { method: "POST" }),
+  attendancePolicy: () => request<AttendancePolicy>("/api/admin/attendance-policy"),
+  changeAttendancePolicy: (policy: AttendancePolicy) => request<AttendancePolicy>("/api/admin/attendance-policy", {
+    method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(policy)
+  }),
+  recordAttendance: (bookingId: string, outcome: AttendanceOutcome) => request<void>(
+    `/api/admin/bookings/${bookingId}/attendance`, {
+      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ outcome })
+    }
+  ),
+  clearAttendance: (bookingId: string) => request<void>(
+    `/api/admin/bookings/${bookingId}/attendance`, { method: "DELETE" }
+  ),
+  noShows: (personId: string) => request<NoShow[]>(`/api/admin/roster/${personId}/no-shows`),
+  liftNoShows: (personId: string) => request<NoShowsLifted>(
+    `/api/admin/roster/${personId}/no-shows/lift`, { method: "POST" }
   ),
   previewSeries: (rule: SeriesRuleRequest) => request<SeriesPreview>("/api/booking-series-preview", {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(rule)

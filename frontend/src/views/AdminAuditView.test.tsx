@@ -326,6 +326,8 @@ describe("AdminAuditView", () => {
     ["config.club.timeZoneChanged", { timeZone: "Europe/Berlin" }, "Time zone changed to Europe/Berlin"],
     ["rules.definition.set", { ruleType: "ADVANCE_WINDOW", params: { maxDays: 14 } }, "Rule Advance booking window set: Maximum days in advance: 14"],
     ["rules.definition.removed", { ruleType: "ADVANCE_WINDOW" }, "Rule Advance booking window removed"],
+    ["booking.attendance.recorded", { outcome: "NO_SHOW" }, "Attendance recorded: No-show"],
+    ["booking.attendance.noShowsLifted", { lifted: 2 }, "2 no-shows lifted"],
     ["roster.membership.written", { startedOn: "2026-01-01" }, "Membership recorded from 2026-01-01"],
     ["roster.membership.written", { startedOn: null }, "Membership recorded"]
   ])("given a %s event, when it is shown, then its interpolated values are resolved, not left as template text", async (eventType, parameters, expected) => {
@@ -432,7 +434,7 @@ describe("AdminAuditView", () => {
     expect(options[0].value, "the first choice leaves the log unfiltered").toBe("");
     expect(options[0]).toHaveTextContent(unfiltered);
     const kinds = options.slice(1);
-    expect(kinds, "every audited kind of change is offered").toHaveLength(61);
+    expect(kinds, "every audited kind of change is offered").toHaveLength(66);
     expect(kinds.find((option) => option.value === "facility.court.added")).toHaveTextContent(courtAddedLabel);
     expect(kinds.filter((option) => /\w\.\w/.test(option.text)).map((option) => option.text), "no choice shows an identifier").toEqual([]);
     const labels = kinds.map((option) => option.text);

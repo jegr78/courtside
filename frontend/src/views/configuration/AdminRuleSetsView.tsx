@@ -372,7 +372,7 @@ function RuleEditor({ type, stored, edit, disabled, changed }: { type: RuleTypeC
     onChange={(event) => changed({ applies: true, params: entered(edit.params, parameter, event.target.value) })} />;
   const first = type.parameters[0];
   const last = type.parameters.at(-1);
-  return <article className="grid gap-x-3 gap-y-1 border-t py-1 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+  return <article className="grid gap-x-3 gap-y-1 border-t py-0.5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
     <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-0.5">
       <h4 data-testid={`rule-${type.ruleType}-title`} className="font-bold">{t(`admin.rules.type.${type.ruleType}`)}</h4>
       {timeWindow && first && last

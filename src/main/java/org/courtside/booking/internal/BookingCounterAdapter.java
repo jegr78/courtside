@@ -1,6 +1,7 @@
 package org.courtside.booking.internal;
 
 import org.courtside.booking.BookingRepository;
+import org.courtside.booking.attendance.AttendanceRows;
 import org.courtside.rules.BookingCounter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -17,6 +18,7 @@ import java.util.UUID;
 class BookingCounterAdapter implements BookingCounter {
 
     private final BookingRepository bookings;
+    private final AttendanceRows attendance;
 
     @Override
     public long countOpenBookingsOf(UUID userAccountId, Instant now) {
@@ -33,5 +35,10 @@ class BookingCounterAdapter implements BookingCounter {
     @Override
     public boolean countsAgainstLimits(UUID cardId) {
         return bookings.cardCountsAgainstLimits(cardId).orElse(true);
+    }
+
+    @Override
+    public long countNoShowsSince(UUID userAccountId, Instant since) {
+        return attendance.policy().enabled() ? attendance.countNoShowsSince(userAccountId, since) : 0;
     }
 }

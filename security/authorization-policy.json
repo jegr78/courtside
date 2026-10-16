@@ -2,9 +2,9 @@
   "schemaVersion": 1,
   "reviewedAt": "2026-10-16",
   "purpose": "This is the normative authorization policy for the shipped Courtside API. OpenAPI defines the transport shape; this policy defines who may perform each operation, which resource attributes narrow that permission, and which protected fields each projection may read or write.",
-  "openApiFieldInventorySha256": "7283dc660f12d139200c5af3de55e11f4eb228f94b24639cbcbabbebc53159e6",
-  "protectedFieldInventorySha256": "188857c6a912ada8ed9236fbf4218985e20586b2ff77bbfdec0d3e1a0659000e",
-  "productionAuthorizationSha256": "37bf016944dd22dbe3b576c2b021879898e2265421fd3122a159f0aec2f6f583",
+  "openApiFieldInventorySha256": "c6eca4c82d4824496bc8edaf79dca2ce031b24ee52f89d559b47062aec68969d",
+  "protectedFieldInventorySha256": "10670996757e5300500a16ba654826a53bce0e5e37a70e067e29ef4cf58656d6",
+  "productionAuthorizationSha256": "a760610e52c2d4abdfe2898d495220754e21d7057ee3be55df903abfffa2f09b",
   "ordinaryFields": [
     "Problem.detail",
     "Problem.fieldErrors",
@@ -120,6 +120,19 @@
     "changeAccountUsername:response:Violation.code",
     "changeAccountUsername:response:Violation.params",
     "changeAccountUsername:response:Violation.params.*",
+    "changeAttendancePolicy:request:AttendancePolicy.enabled",
+    "changeAttendancePolicy:request:AttendancePolicy.releaseAfterMinutes",
+    "changeAttendancePolicy:response:$response.header.Accept",
+    "changeAttendancePolicy:response:$response.header.Retry-After",
+    "changeAttendancePolicy:response:AttendancePolicy.enabled",
+    "changeAttendancePolicy:response:AttendancePolicy.releaseAfterMinutes",
+    "changeAttendancePolicy:response:FieldError.code",
+    "changeAttendancePolicy:response:FieldError.field",
+    "changeAttendancePolicy:response:FieldError.params",
+    "changeAttendancePolicy:response:FieldError.params.*",
+    "changeAttendancePolicy:response:Violation.code",
+    "changeAttendancePolicy:response:Violation.params",
+    "changeAttendancePolicy:response:Violation.params.*",
     "changeBookingCard:parameter:$parameter.path.id",
     "changeBookingCard:request:BookingCardRequest.allowedPlayerCounts",
     "changeBookingCard:request:BookingCardRequest.allowedRoles",
@@ -382,6 +395,15 @@
     "changeRuleSet:response:Violation.code",
     "changeRuleSet:response:Violation.params",
     "changeRuleSet:response:Violation.params.*",
+    "checkIn:parameter:$parameter.path.bookingId",
+    "checkIn:response:$response.header.Retry-After",
+    "checkIn:response:FieldError.code",
+    "checkIn:response:FieldError.field",
+    "checkIn:response:FieldError.params",
+    "checkIn:response:FieldError.params.*",
+    "checkIn:response:Violation.code",
+    "checkIn:response:Violation.params",
+    "checkIn:response:Violation.params.*",
     "chooseOwnMessageChannels:request:MessageChannelChoiceRequest.declined",
     "chooseOwnMessageChannels:response:$response.header.Accept",
     "chooseOwnMessageChannels:response:$response.header.Retry-After",
@@ -402,6 +424,15 @@
     "chooseOwnMessages:response:Violation.code",
     "chooseOwnMessages:response:Violation.params",
     "chooseOwnMessages:response:Violation.params.*",
+    "clearAttendance:parameter:$parameter.path.bookingId",
+    "clearAttendance:response:$response.header.Retry-After",
+    "clearAttendance:response:FieldError.code",
+    "clearAttendance:response:FieldError.field",
+    "clearAttendance:response:FieldError.params",
+    "clearAttendance:response:FieldError.params.*",
+    "clearAttendance:response:Violation.code",
+    "clearAttendance:response:Violation.params",
+    "clearAttendance:response:Violation.params.*",
     "courtImpact:parameter:$parameter.path.courtId",
     "courtImpact:parameter:$parameter.query.cursor",
     "courtImpact:parameter:$parameter.query.limit",
@@ -927,6 +958,16 @@
     "getAppIcon:response:Violation.code",
     "getAppIcon:response:Violation.params",
     "getAppIcon:response:Violation.params.*",
+    "getAttendancePolicy:response:$response.header.Retry-After",
+    "getAttendancePolicy:response:AttendancePolicy.enabled",
+    "getAttendancePolicy:response:AttendancePolicy.releaseAfterMinutes",
+    "getAttendancePolicy:response:FieldError.code",
+    "getAttendancePolicy:response:FieldError.field",
+    "getAttendancePolicy:response:FieldError.params",
+    "getAttendancePolicy:response:FieldError.params.*",
+    "getAttendancePolicy:response:Violation.code",
+    "getAttendancePolicy:response:Violation.params",
+    "getAttendancePolicy:response:Violation.params.*",
     "getBookingCard:parameter:$parameter.path.id",
     "getBookingCard:response:$response.header.Retry-After",
     "getBookingCard:response:BookingCard.active",
@@ -1191,6 +1232,16 @@
     "leaveWaitlist:response:Violation.code",
     "leaveWaitlist:response:Violation.params",
     "leaveWaitlist:response:Violation.params.*",
+    "liftNoShows:parameter:$parameter.path.personId",
+    "liftNoShows:response:$response.header.Retry-After",
+    "liftNoShows:response:FieldError.code",
+    "liftNoShows:response:FieldError.field",
+    "liftNoShows:response:FieldError.params",
+    "liftNoShows:response:FieldError.params.*",
+    "liftNoShows:response:NoShowsLifted.lifted",
+    "liftNoShows:response:Violation.code",
+    "liftNoShows:response:Violation.params",
+    "liftNoShows:response:Violation.params.*",
     "linkExternalReference:parameter:$parameter.path.sourceId",
     "linkExternalReference:request:ExternalReferenceRequest.externalId",
     "linkExternalReference:request:ExternalReferenceRequest.personId",
@@ -1417,6 +1468,15 @@
     "listMessageTemplates:response:Violation.code",
     "listMessageTemplates:response:Violation.params",
     "listMessageTemplates:response:Violation.params.*",
+    "listNoShows:parameter:$parameter.path.personId",
+    "listNoShows:response:$response.header.Retry-After",
+    "listNoShows:response:FieldError.code",
+    "listNoShows:response:FieldError.field",
+    "listNoShows:response:FieldError.params",
+    "listNoShows:response:FieldError.params.*",
+    "listNoShows:response:Violation.code",
+    "listNoShows:response:Violation.params",
+    "listNoShows:response:Violation.params.*",
     "listOpenPlaces:response:$response.header.Retry-After",
     "listOpenPlaces:response:FieldError.code",
     "listOpenPlaces:response:FieldError.field",
@@ -1604,15 +1664,20 @@
     "listPersonalBookings:parameter:$parameter.query.limit",
     "listPersonalBookings:parameter:$parameter.query.view",
     "listPersonalBookings:response:$response.header.Retry-After",
+    "listPersonalBookings:response:CheckIn.checkedIn",
+    "listPersonalBookings:response:CheckIn.closesAt",
+    "listPersonalBookings:response:CheckIn.opensAt",
     "listPersonalBookings:response:FieldError.code",
     "listPersonalBookings:response:FieldError.field",
     "listPersonalBookings:response:FieldError.params",
     "listPersonalBookings:response:FieldError.params.*",
     "listPersonalBookings:response:PersonalBooking.cardColor",
     "listPersonalBookings:response:PersonalBooking.cardLabel",
+    "listPersonalBookings:response:PersonalBooking.checkIn",
     "listPersonalBookings:response:PersonalBooking.courtIds",
     "listPersonalBookings:response:PersonalBooking.endsAt",
     "listPersonalBookings:response:PersonalBooking.partnerSearch",
+    "listPersonalBookings:response:PersonalBooking.released",
     "listPersonalBookings:response:PersonalBooking.startsAt",
     "listPersonalBookings:response:PersonalBooking.status",
     "listPersonalBookings:response:PersonalBookingPage.clubName",
@@ -2097,6 +2162,17 @@
     "reauthenticate:response:Violation.code",
     "reauthenticate:response:Violation.params",
     "reauthenticate:response:Violation.params.*",
+    "recordAttendance:parameter:$parameter.path.bookingId",
+    "recordAttendance:request:AttendanceRequest.outcome",
+    "recordAttendance:response:$response.header.Accept",
+    "recordAttendance:response:$response.header.Retry-After",
+    "recordAttendance:response:FieldError.code",
+    "recordAttendance:response:FieldError.field",
+    "recordAttendance:response:FieldError.params",
+    "recordAttendance:response:FieldError.params.*",
+    "recordAttendance:response:Violation.code",
+    "recordAttendance:response:Violation.params",
+    "recordAttendance:response:Violation.params.*",
     "redeemPasswordReset:response:$response.header.Accept",
     "redeemPasswordReset:response:$response.header.Retry-After",
     "redeemPasswordReset:response:FieldError.code",
@@ -2979,7 +3055,8 @@
         "cancelBooking",
         "listPersonalBookings",
         "listOwnParticipations",
-        "removeOwnParticipation"
+        "removeOwnParticipation",
+        "checkIn"
       ],
       "actors": [
         "MEMBER",
@@ -3172,7 +3249,13 @@
         "exportBookings",
         "exportAuditLog",
         "exportMessageLog",
-        "exportPersonData"
+        "exportPersonData",
+        "getAttendancePolicy",
+        "changeAttendancePolicy",
+        "recordAttendance",
+        "clearAttendance",
+        "listNoShows",
+        "liftNoShows"
       ],
       "actors": [
         "ADMIN"
@@ -3352,7 +3435,9 @@
         "password-change-required"
       ],
       "productionPaths": [
-        "src/main/java/org/courtside/identity/internal/SecurityConfiguration.java#filterChain"
+        "src/main/java/org/courtside/identity/internal/SecurityConfiguration.java#filterChain",
+        "src/main/java/org/courtside/booking/web/AttendanceAdminController.java#recordAttendance",
+        "src/main/java/org/courtside/booking/web/AttendanceAdminController.java#liftNoShows"
       ],
       "positiveTests": [
         "src/test/java/org/courtside/identity/AdminAuthorizationTest.java#givenAnAdmin_whenCallingAnAdminEndpoint_thenItIsServed"
@@ -3468,7 +3553,7 @@
     {
       "id": "booking-ownership",
       "title": "Booking and participation ownership",
-      "rule": "Personal queries derive identity from the current account; cancellation requires the booking owner or ADMIN and withdrawal removes only the current person's participation. A notification describes and links a booking only to its owner or a current participant. The start-up warm-up also acts here as an in-process caller without an account or request input, and it rolls back every write it makes.",
+      "rule": "Personal queries derive identity from the current account; cancellation requires the booking owner or ADMIN, check-in requires the booking owner and withdrawal removes only the current person's participation. A notification describes and links a booking only to its owner or a current participant. The start-up warm-up also acts here as an in-process caller without an account or request input, and it rolls back every write it makes.",
       "attributes": [
         "current-account",
         "booking-owner",
@@ -3490,15 +3575,19 @@
         "src/main/java/org/courtside/booking/web/BookingController.java#listOwnParticipations",
         "src/main/java/org/courtside/booking/web/BookingController.java#removeOwnParticipation",
         "src/main/java/org/courtside/booking/web/BookingController.java#cancelBooking",
-        "src/main/java/org/courtside/booking/internal/BookingWriteWarmUp.java#run"
+        "src/main/java/org/courtside/booking/internal/BookingWriteWarmUp.java#run",
+        "src/main/java/org/courtside/booking/attendance/AttendanceService.java#checkIn",
+        "src/main/java/org/courtside/booking/web/CheckInController.java#checkIn"
       ],
       "positiveTests": [
         "src/test/java/org/courtside/booking/web/BookingControllerTest.java#givenAnOwnBooking_whenCancellingIt_thenItDisappearsFromTheGrid",
-        "src/test/java/org/courtside/notification/web/NotificationControllerTest.java#givenAPlayerStillInABooking_whenTheyReadTheCentre_thenTheEntryDescribesAndLinksTheBooking"
+        "src/test/java/org/courtside/notification/web/NotificationControllerTest.java#givenAPlayerStillInABooking_whenTheyReadTheCentre_thenTheEntryDescribesAndLinksTheBooking",
+        "src/test/java/org/courtside/booking/web/AttendanceControllerTest.java#givenTheCheckInWindowIsOpen_whenTheMemberChecksIn_thenTheirBookingShowsItAsCheckedIn"
       ],
       "negativeTests": [
         "src/test/java/org/courtside/booking/web/BookingControllerTest.java#givenAForeignBooking_whenAMemberCancelsIt_thenItIsNotFoundAndItStaysConfirmed",
-        "src/test/java/org/courtside/notification/web/NotificationControllerTest.java#givenAPlayerWhoLeftTheBooking_whenTheyReadTheCentre_thenTheEntryNoLongerDescribesOrLinksIt"
+        "src/test/java/org/courtside/notification/web/NotificationControllerTest.java#givenAPlayerWhoLeftTheBooking_whenTheyReadTheCentre_thenTheEntryNoLongerDescribesOrLinksIt",
+        "src/test/java/org/courtside/booking/attendance/AttendanceTest.java#givenSomebodyElsesBooking_whenAMemberChecksIn_thenItIsAnsweredLikeABookingThatDoesNotExist"
       ]
     },
     {
@@ -4110,7 +4199,8 @@
       "fields": [
         "ManagedAppointmentDetail.note",
         "ManagedAppointmentDetail.participants",
-        "ManagedParticipant.displayName"
+        "ManagedParticipant.displayName",
+        "ManagedAppointmentDetail.attendance"
       ],
       "operationIds": [
         "getManagedAppointment"
@@ -4825,6 +4915,30 @@
       "decisions": [
         "public-projection",
         "waitlist-ownership"
+      ]
+    },
+    {
+      "id": "no-show-record-read",
+      "access": "read",
+      "description": "A person's list of missed bookings is visible only to ADMIN; the attendance outcome of a single booking appears to whoever may manage that booking.",
+      "fields": [
+        "NoShow.bookingId",
+        "NoShow.startsAt",
+        "NoShow.endsAt"
+      ],
+      "operationIds": [
+        "listNoShows"
+      ],
+      "actors": [
+        "ADMIN"
+      ],
+      "attributes": [
+        "administrator",
+        "target-person"
+      ],
+      "decisions": [
+        "administrator-gate",
+        "administrative-projection"
       ]
     }
   ]

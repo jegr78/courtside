@@ -8,6 +8,7 @@ import { TextField } from "../../components/TextField";
 import { useReportedFailure } from "../../failures/useReportedFailure";
 import { useRetry } from "../../failures/useRetry";
 import { SaveBar } from "../../unsaved/SaveBar";
+import { AttendancePolicySection } from "./AttendancePolicySection";
 import { ownedFields, useClubConfigForm } from "./clubConfigForm";
 
 export function AdminDeadlinesView({ configurationChanged }: { configurationChanged: (config: ClubConfig) => void }) {
@@ -75,6 +76,7 @@ export function AdminDeadlinesView({ configurationChanged }: { configurationChan
           <SaveBar id="deadlines" subject={t("admin.deadlines.title")} saveTestId="save-deadlines" form="deadlines-form"
                    unsaved={unsaved} pending={pending} discard={discard} />
         </form>
+        <AttendancePolicySection />
       </>}
   </section>;
 }

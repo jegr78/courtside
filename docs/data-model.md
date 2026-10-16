@@ -154,6 +154,22 @@ foreign key, so `court_allocation` and `booking_participant` stay the only rows 
 takes with it. Every read joins the booking, and a sweep deletes offers whose booking is gone,
 cancelled or started, or whose place no longer holds the card.
 
+## Who turned up
+
+| Table | Holds | References |
+|---|---|---|
+| `attendance_policy` | The one row saying whether the club records attendance and after how many minutes an unattended member booking is released | None |
+| `booking_attendance` | What was recorded for one started booking, `ATTENDED` or `NO_SHOW`, who recorded it and when, and when a no-show was lifted | `user_account` |
+| `booking_release` | When the release sweep cancelled a booking because nobody had checked in | None |
+
+A booking without a `booking_attendance` row has nothing recorded and is never a no-show. A member's
+check-in and a board's record write the same row, and a board's later record replaces it. Lifting a
+no-show sets `lifted_at` and keeps the row, so the no-show stays visible but stops counting towards
+`NO_SHOW_LIMIT`, which counts the unlifted no-shows of the bookings an account holds. Like
+`waitlist_entry.booking_id`, neither `booking_id` carries a foreign key, so `court_allocation` and
+`booking_participant` stay the only rows a removed booking takes with it.
+`attendance_policy_release_needs_attendance` refuses a release time while attendance is off.
+
 ## People, memberships and accounts
 
 | Table | Holds | References |
