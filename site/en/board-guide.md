@@ -447,8 +447,13 @@ The **Records** area has five views.
     was entered into a confirmed booking within it. For periods whose bookings have been
     pseudonymised, this figure is unavailable.
   * Messages counts per kind how many are in progress, handed over, refused or failed.
-* **Data export** creates CSV files for bookings or members. The booking export omits the person who
-  booked. The member export contains personal data and creates no change-log entry.
+* **Data export** creates CSV files for bookings, members, the change log and the message log. You
+  pick the separator and character set for each download; the import source's settings stay as they
+  are. The booking export omits the person who booked. The member export contains personal data and
+  creates no change-log entry. Without a period the two log exports hold every entry up to the
+  moment of the download, with names as the log views show them. Each log export appears in the
+  change log with "Whole instance" as its subject. A value starting with `=`, `+`, `-` or `@` gets a
+  leading apostrophe, so the spreadsheet reads it as text and runs no formula.
 * **Change log** lists administrative changes with time, subject and acting account. A booking
   appears as its courts and its current time, a series as its courts and its current first
   appointment, even for an entry recorded before a later move. Search by a subject name, a court

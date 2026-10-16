@@ -36,7 +36,7 @@ The current product includes:
 - configurable booking rules;
 - people, memberships, accounts, roles and sessions;
 - repeatable membership snapshot imports;
-- roster, booking and per-person data exports;
+- roster, booking, audit-log, message-log and per-person data exports;
 - an in-app notification centre, localized email notifications and a message log;
 - an append-only audit log;
 - court-utilisation reporting and board statistics for any period;
@@ -568,9 +568,19 @@ mailed and never returned to the board.
 When membership disappears, an account holding only `MEMBER` is disabled. An account with another
 role remains enabled and loses `MEMBER`. Import never re-enables an account or disables an admin.
 
-Current exports cover the roster, confirmed bookings for a club-local period and all data held about
-one person. CSV exports use configurable separator and character set. The per-person JSON export is
-available from the roster and records that the request was answered.
+Current exports cover the roster, confirmed bookings for a club-local period, the audit log, the
+message log and all data held about one person. CSV exports use a separator and character set the
+board picks per download; a configured import source only preselects them. A cell opening with
+`=`, `+`, `-`, `@`, a tab or a carriage return gets a leading apostrophe so a spreadsheet reads it
+as text. The per-person JSON export is available from the roster and records that the request was
+answered.
+
+The two log exports carry the columns the administrative log views show, names included, and admit
+only administrators. They hold every entry up to the moment of the request, optionally limited to
+club-local days, and stream the file in batches of 500 read by keyset, so neither the response nor a
+transaction holds the whole log while the interactive views stay paginated. Each export records a
+`dataexchange.log.exported` entry naming the log and the period. That entry concerns the whole
+instance, so its `subject_id` is empty, and it is never part of the file it records.
 
 ## Identity and credentials
 

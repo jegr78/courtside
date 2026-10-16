@@ -249,9 +249,9 @@ a different file than the one previewed is visible after the fact.
 | `notification` | The notification centre: one row per message addressed to an account, and when the account read it | `user_account` |
 | `event_publication` | Spring Modulith's transactional outbox for events between modules | None |
 
-`domain_event.subject_id` is `NOT NULL`, so every entry names something. An operation that concerns
-no single entity, a bulk export, for instance, therefore records nothing, which
-`docs/security-risks.md` carries as an accepted limitation rather than an implementation gap.
+`domain_event.subject_id` names the entity an entry concerns. It is empty only for an activity about
+the whole instance, such as `dataexchange.log.exported`, which records an export of the audit log
+or the message log.
 
 `domain_event.event_type` is a dotted name whose first segment says which module published it, and
 the table holds two kinds of entry. Six segments are the administrative surfaces, one per thing a
