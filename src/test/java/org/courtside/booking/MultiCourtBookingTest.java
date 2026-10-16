@@ -5,6 +5,7 @@ import org.courtside.AbstractIntegrationTest;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.identity.Role;
+import org.courtside.rules.RuleViolation;
 import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -13,8 +14,10 @@ import org.springframework.context.annotation.Import;
 
 import java.time.DayOfWeek;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -93,6 +96,21 @@ class MultiCourtBookingTest extends AbstractIntegrationTest {
         // when / then
         assertThatThrownBy(() -> book(List.of(courtOne, courtOne)))
                 .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void givenTheSecondOfTwoCourtsIsClosed_whenBookingBoth_thenTheClosureRefusesTheBooking() {
+        // given
+        facilityFixture.closeCourt(courtThree, LocalDate.of(2026, 5, 13), LocalDate.of(2026, 5, 13));
+
+        // when / then
+        assertThatThrownBy(() -> book(List.of(courtOne, courtThree)))
+                .isInstanceOfSatisfying(BookingRulesViolatedException.class, failure ->
+                        assertThat(failure.getViolations())
+                                .as("the closed court is named although it is not the first")
+                                .contains(new RuleViolation("booking.rule.openingHours.courtClosed",
+                                        Map.of("court", 3, "endsOn", "2026-05-13"))));
+        assertThat(bookings.findAll()).isEmpty();
     }
 
     private UUID book(List<UUID> courtIds) {
