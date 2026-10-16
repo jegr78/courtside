@@ -70,15 +70,20 @@ describe("AppRoutes", () => {
     // when
     render(
       <RoutedShell initialEntries={["/"]}>
-        <AppRoutes session={anonymous} refreshSession={() => Promise.resolve()} clubName="Example Tennis Club" />
+        <AppRoutes session={anonymous} refreshSession={() => Promise.resolve()} />
       </RoutedShell>
     );
 
     // then
-    expect(await screen.findByTestId("court-plan-view")).toBeInTheDocument();
+    const plan = await screen.findByTestId("court-plan-view");
     expect(screen.getByTestId("sign-in-link")).toHaveAttribute("href", "/login");
-    expect(screen.getByTestId("public-club-name")).toHaveTextContent("Example Tennis Club");
-    expect(screen.getByTestId("guest-guidance")).toHaveTextContent("Belegungsplan");
+    expect(within(plan).getAllByRole("heading", { level: 1 }).map((heading) => heading.textContent),
+      "the plan heading is the page's only h1 and repeats neither the club nor the page name")
+      .toEqual(["Platzbelegung"]);
+    expect(screen.queryByTestId("public-club-name")).not.toBeInTheDocument();
+    expect(screen.getByTestId("guest-guidance")).toHaveTextContent("öffentliche Belegung");
+    expect(screen.getByTestId("guest-sign-in"), "the notice offers the sign-in it asks for")
+      .toHaveAttribute("href", "/login");
   });
 
   it("given a member, when opening the landing page, then guest guidance stays out of the member workflow", async () => {
@@ -95,12 +100,15 @@ describe("AppRoutes", () => {
     render(
       <RoutedShell initialEntries={["/"]}>
         <AppRoutes session={{ ...anonymous, authenticated: true }} refreshSession={() => Promise.resolve()}
-          clubName="Example Tennis Club" />
+          />
       </RoutedShell>
     );
 
     // then
-    expect(await screen.findByTestId("court-plan-view")).toBeInTheDocument();
+    const plan = await screen.findByTestId("court-plan-view");
+    expect(within(plan).getAllByRole("heading", { level: 1 }).map((heading) => heading.textContent),
+      "a member reads the plan heading once, not a second page title above it")
+      .toEqual(["Platzbelegung"]);
     expect(screen.queryByTestId("guest-guidance")).not.toBeInTheDocument();
   });
 
