@@ -286,15 +286,19 @@ were judged against. A preview row is deleted when its run starts, by the previe
 expired, and with the account that created it.
 
 A run sets `booking.pseudonymised_at` and `booking_series.pseudonymised_at`.
-`booking_pseudonymised_names_nobody` and `booking_series_pseudonymised_names_nobody` then require the
-booker, the canceller, the mover, the creator and the notes to be empty. `booking_move_actor_complete`
-still allows a mover only beside a move time, and `booking_move_actor_kept_until_pseudonymised`
-lets a move time outlive its mover only on a pseudonymised booking. The run also deletes the
-`MEMBER` rows of `booking_participant`, empties `guest_name` on its `GUEST` rows and clears who
-recorded or lifted an attendance, so court time, status, card and the number of guest places stay
-countable. Removing a former member deletes their `person`, `member`, `import_external_reference`
-and `user_account` rows, and the account takes its own rows with it. `domain_event` keeps its
-entries, which then name an identifier nobody holds.
+`booking_pseudonymised_names_nobody` and `booking_series_pseudonymised_names_nobody` then require
+the booker, the canceller, the mover, the creator and the notes to be empty.
+`booking_move_actor_complete` still allows a mover only beside a move time, and
+`booking_move_actor_kept_until_pseudonymised` lets a move time outlive its mover only on a
+pseudonymised booking. The run also deletes the `MEMBER` rows of `booking_participant`, empties
+`guest_name` on its `GUEST` rows and clears who recorded or lifted an attendance, so court time,
+status, card and the number of guest places stay countable. For the bookings and series it
+pseudonymised, the run clears `actor_account_id` and every payload field ending in `personId` or
+`accountId` from the `domain_event` entries that name them, while their type, time and subject stay;
+it deletes the `notification` rows and queued `message_record` rows that carry their ids, and the
+unfinished `event_publication` rows that mention them. Removing a former member deletes their
+`person`, `member`, `import_external_reference` and `user_account` rows, and the account takes its
+own rows with it. `domain_event` keeps its entries, which then name an identifier nobody holds.
 
 ## What the instance records
 

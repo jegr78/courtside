@@ -39,6 +39,9 @@ public class RetentionRows {
     private static final String NOT_COVERED = "(CAST(:endedBefore AS timestamptz) IS NULL OR "
             + BOOKING_END + " >= CAST(:endedBefore AS timestamptz))";
 
+    /** A change-log payload field that names a person or an account, matched case-insensitively. */
+    public static final String PERSONAL_PAYLOAD_FIELD = "(person|account)id$";
+
     private final JdbcClient jdbc;
 
     public Map<RetentionCategory, Integer> policies() {
@@ -121,7 +124,56 @@ public class RetentionRows {
                         """)
                 .param("now", utc(now))
                 .update();
+        forgetWhoTouched(jdbc.sql("""
+                        SELECT id FROM booking WHERE pseudonymised_at = :now
+                        UNION ALL SELECT id FROM booking_series WHERE pseudonymised_at = :now
+                        """)
+                .param("now", utc(now))
+                .query(String.class)
+                .list());
         return new long[]{bookings, series};
+    }
+
+    // The change log, the notification centre and the outbox would otherwise still tie these records to a person.
+    private void forgetWhoTouched(List<String> recordIds) {
+        if (recordIds.isEmpty()) {
+            return;
+        }
+        String ids = recordIds.stream().collect(Collectors.joining(",", "{", "}"));
+        jdbc.sql("""
+                        UPDATE domain_event
+                        SET actor_account_id = NULL,
+                            payload = payload - ARRAY(SELECT key FROM jsonb_object_keys(payload) key
+                                                      WHERE key ~* :personal)
+                        WHERE jsonb_typeof(payload) = 'object'
+                          AND (subject_id = ANY (CAST(:ids AS uuid[]))
+                               OR payload ->> 'bookingId' = ANY (CAST(:ids AS text[]))
+                               OR payload ->> 'seriesId' = ANY (CAST(:ids AS text[]))
+                               OR (jsonb_typeof(payload -> 'bookingIds') = 'array'
+                                   AND jsonb_exists_any(payload -> 'bookingIds', CAST(:ids AS text[]))))
+                        """)
+                .param("ids", ids)
+                .param("personal", PERSONAL_PAYLOAD_FIELD)
+                .update();
+        jdbc.sql("DELETE FROM notification WHERE parameters ->> 'bookingId' = ANY (CAST(:ids AS text[]))")
+                .param("ids", ids)
+                .update();
+        jdbc.sql("""
+                        DELETE FROM message_record
+                        WHERE parameters ->> 'bookingId' = ANY (CAST(:ids AS text[]))
+                           OR parameters ->> 'seriesId' = ANY (CAST(:ids AS text[]))
+                           OR string_to_array(parameters ->> 'bookingIds', ',') && CAST(:ids AS text[])
+                        """)
+                .param("ids", ids)
+                .update();
+        jdbc.sql("""
+                        DELETE FROM event_publication
+                        WHERE completion_date IS NULL
+                          AND EXISTS (SELECT 1 FROM unnest(CAST(:ids AS text[])) id
+                                      WHERE strpos(serialized_event, id) > 0)
+                        """)
+                .param("ids", ids)
+                .update();
     }
 
     public List<UUID> formerMembers(LocalDate membershipEndedBefore, Instant activeSince) {

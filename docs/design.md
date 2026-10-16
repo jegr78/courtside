@@ -933,9 +933,12 @@ administrator role, a booking or series the run keeps still names them, or they 
 Every run starts as a preview that changes nothing, counts what it would change and lists the
 blocked people with their reason. Only the account that took the preview can run it, with a recent
 full-password proof, once and before it expires. A run re-checks each former member under a lock and
-skips one who became ineligible. The change log records periods and run counts, never whom a run
-removed. Courtside ships no period and gives no legal advice: the club chooses the period its own
-lawful basis allows.
+skips one who became ineligible. Pseudonymising a booking also reaches the records that would tie it
+back to a person: its change log entries lose their actor and the person and account fields of their
+payload but keep type, time and subject, and its notification entries and queued messages are
+deleted. Removing a person leaves their entries untouched, as described above. The change log
+records periods and run counts, never whom a run removed. Courtside ships no period and gives no
+legal advice: the club chooses the period its own lawful basis allows.
 
 Session rows are deleted after inactivity or absolute expiry. Import previews retain their resolved
 change set only for the configured period and never store the uploaded file. Message records,

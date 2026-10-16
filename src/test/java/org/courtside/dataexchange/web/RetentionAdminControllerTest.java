@@ -7,6 +7,8 @@ import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.courtside.member.testfixture.MemberTestFixture;
+import org.courtside.notification.MessageKind;
+import org.courtside.notification.testfixture.NotificationTestFixture;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.AfterEach;
@@ -39,7 +41,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@Import({IdentityTestFixture.class, MemberTestFixture.class, FacilityTestFixture.class, BookingTestFixture.class})
+@Import({IdentityTestFixture.class, MemberTestFixture.class, FacilityTestFixture.class, BookingTestFixture.class,
+        NotificationTestFixture.class})
 class RetentionAdminControllerTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_BOOKING_CARD = UUID.fromString("11111111-1111-1111-1111-111111111111");
@@ -63,6 +66,9 @@ class RetentionAdminControllerTest extends AbstractIntegrationTest {
 
     @Autowired
     private BookingTestFixture bookings;
+
+    @Autowired
+    private NotificationTestFixture notifications;
 
     @Autowired
     private JdbcClient jdbc;
@@ -182,6 +188,63 @@ class RetentionAdminControllerTest extends AbstractIntegrationTest {
         assertThat(bookingNames(recent)).as("a recent booking is untouched")
                 .containsExactly(jane.toString(), "Keep me");
         assertThat(guestNames(recent)).containsExactly("Richard Miles");
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenRecordsThatTieAnOldBookingToPeople_whenTheRunApplies_thenNoTableKeepsItBesideAPersonOrAccount()
+            throws Exception {
+        // given
+        UUID janePerson = roster.addPerson("Jane", "Doe", "jane.doe@example.org");
+        roster.giveAccount(janePerson, "jane.doe", Set.of(Role.MEMBER));
+        UUID jane = identity.accountIdOf(janePerson);
+        UUID john = roster.addPerson("John", "Roe", "john.roe@example.org");
+        UUID old = bookings.createBookingWithGuest(courtId, MEMBER_BOOKING_CARD, TOMORROW_SIX_PM, jane, janePerson,
+                Set.of(Role.MEMBER), null, "Mary Major");
+        UUID recent = bookings.createBookingWithGuest(courtId, MEMBER_BOOKING_CARD, TOMORROW_EIGHT_PM, jane,
+                janePerson, Set.of(Role.MEMBER), null, "Richard Miles");
+        shiftBack(old, 500);
+        for (UUID booking : java.util.List.of(old, recent)) {
+            logEvent("booking.participant.recorded", booking, jane,
+                    "{\"bookingId\": \"" + booking + "\", \"personId\": \"" + john + "\"}");
+            notifications.notify(jane, MessageKind.BOOKING_CONFIRMED, booking, clock.instant());
+        }
+        logEvent("booking.booking.cancelled", old, jane,
+                "{\"bookingId\": \"" + old + "\", \"cancelledByAccountId\": \"" + jane + "\"}");
+        logEvent("booking.series.created", UUID.randomUUID(), jane,
+                "{\"seriesId\": \"" + UUID.randomUUID() + "\", \"bookingIds\": [\"" + old + "\"]}");
+        jdbc.sql("""
+                        INSERT INTO message_record (id, account_id, kind, state, message_id, queued_at,
+                                                    next_attempt_at, parameters)
+                        VALUES (:id, :account, 'BOOKING_CONFIRMED', 'QUEUED', 'retention-old', :at, :at,
+                                jsonb_build_object('bookingId', CAST(:booking AS text)))
+                        """)
+                .param("id", UUID.randomUUID()).param("account", jane).param("booking", old.toString())
+                .param("at", java.sql.Timestamp.from(clock.instant())).update();
+        jdbc.sql("""
+                        INSERT INTO event_publication (id, listener_id, event_type, serialized_event, publication_date)
+                        VALUES (:id, 'retention-test-listener', 'BookingConfirmed', :event, :at)
+                        """)
+                .param("id", UUID.randomUUID())
+                .param("event", "{\"bookingId\":\"" + old + "\",\"accountId\":\"" + jane + "\"}")
+                .param("at", java.sql.Timestamp.from(clock.instant())).update();
+        long oldEntries = entriesAbout(old);
+        keep("BOOKINGS", 12);
+        String preview = mockMvc.perform(post("/api/admin/retention/previews").with(csrf()))
+                .andReturn().getResponse().getContentAsString();
+
+        // when
+        mockMvc.perform(post("/api/admin/retention/previews/{id}/run", previewId(preview)).with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.bookingsPseudonymised").value(1));
+
+        // then
+        assertThat(recordsNamingSomebodyBeside(old)).as("no table ties the pseudonymised booking to a person")
+                .isEmpty();
+        assertThat(entriesAbout(old)).as("the change log still shows that each thing happened")
+                .isEqualTo(oldEntries);
+        assertThat(recordsNamingSomebodyBeside(recent)).as("a booking the run keeps keeps its records")
+                .contains("domain_event:booking.participant.recorded", "notification");
     }
 
     @Test
@@ -369,6 +432,39 @@ class RetentionAdminControllerTest extends AbstractIntegrationTest {
                         + "last_login_at = TIMESTAMPTZ '2023-06-01 10:00Z' WHERE person_id = :id")
                 .param("id", personId).update();
         return personId;
+    }
+
+    private void logEvent(String type, UUID subject, UUID actor, String payload) {
+        jdbc.sql("""
+                        INSERT INTO domain_event (id, event_type, subject_id, actor_account_id, occurred_at, payload)
+                        VALUES (:id, :type, :subject, :actor, :at, CAST(:payload AS jsonb))
+                        """)
+                .param("id", UUID.randomUUID()).param("type", type).param("subject", subject).param("actor", actor)
+                .param("at", java.sql.Timestamp.from(clock.instant())).param("payload", payload).update();
+    }
+
+    private long entriesAbout(UUID bookingId) {
+        return jdbc.sql("SELECT count(*) FROM domain_event WHERE subject_id = :id OR strpos(payload::text, :text) > 0")
+                .param("id", bookingId).param("text", bookingId.toString()).query(Long.class).single();
+    }
+
+    private java.util.List<String> recordsNamingSomebodyBeside(UUID bookingId) {
+        java.util.List<String> found = new java.util.ArrayList<>(jdbc.sql("""
+                        SELECT 'domain_event:' || event_type FROM domain_event e
+                        WHERE (e.subject_id = :id OR strpos(e.payload::text, :text) > 0)
+                          AND (e.actor_account_id IS NOT NULL
+                               OR EXISTS (SELECT 1 FROM jsonb_object_keys(e.payload) key WHERE key ~* :personal))
+                        """)
+                .param("id", bookingId).param("text", bookingId.toString())
+                .param("personal", org.courtside.dataexchange.internal.RetentionRows.PERSONAL_PAYLOAD_FIELD)
+                .query(String.class).list());
+        for (String table : java.util.List.of("notification", "message_record")) {
+            found.addAll(jdbc.sql("SELECT '" + table + "' FROM " + table + " WHERE strpos(parameters::text, :text) > 0")
+                    .param("text", bookingId.toString()).query(String.class).list());
+        }
+        found.addAll(jdbc.sql("SELECT 'event_publication' FROM event_publication WHERE strpos(serialized_event, :text) > 0")
+                .param("text", bookingId.toString()).query(String.class).list());
+        return found;
     }
 
     private void keep(String category, int months) throws Exception {
