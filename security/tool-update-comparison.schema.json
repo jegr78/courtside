@@ -67,6 +67,27 @@
     },
     "resolvedFindings": {
       "$ref": "#/$defs/findings"
+    },
+    "notComparable": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "tool",
+          "reason"
+        ],
+        "properties": {
+          "tool": {
+            "const": "authorization-matrix"
+          },
+          "reason": {
+            "const": "not comparable: base exhausted its request budget"
+          }
+        }
+      }
     }
   },
   "$defs": {

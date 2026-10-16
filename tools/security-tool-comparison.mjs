@@ -41,9 +41,9 @@ function fail(message) {
   throw new Error(`Invalid security tool comparison: ${message}`);
 }
 
-function fingerprints(directory) {
+function fingerprints(directory, excluded = []) {
   const values = new Set();
-  for (const name of readdirSync(directory).filter((entry) => entry.endsWith(".json"))) {
+  for (const name of readdirSync(directory).filter((entry) => entry.endsWith(".json") && !excluded.includes(entry))) {
     const evidence = JSON.parse(readFileSync(join(directory, name), "utf8"));
     for (const candidate of evidence.candidates ?? []) {
       if (typeof candidate?.fingerprint !== "string") fail(`${name} contains an invalid candidate fingerprint`);
@@ -102,8 +102,20 @@ function incompleteCases(evidence) {
   return cases.length === 0 ? "none, so the outcome disagrees with every case it was drawn from" : cases.join(", ");
 }
 
+export const exhaustedAuthorizationBudget = "The authorization request budget was exceeded";
+export const exhaustedAuthorizationRemark = "not comparable: base exhausted its request budget";
+
+// A base toolchain that split its budget before the matrix was planned can run out on the
+// candidate's contract; only that one result may be missing, and only when the rest passed.
+function exhaustedAuthorizationOnly(manifest) {
+  const missing = manifest.tools.filter((tool) => !manifest.toolResults.some((result) => result.id === tool.id));
+  return manifest.reason === exhaustedAuthorizationBudget
+    && missing.length === 1 && missing[0].id === "authorization-matrix"
+    && manifest.toolResults.every(({ outcome }) => outcome === "passed");
+}
+
 function normalizeRun(root, manifestPath, evidenceDirectory, runtimeDigest, contractPath, catalogPath,
-  allowUnattributedIncomplete = false) {
+  allowUnattributedIncomplete = false, allowExhaustedAuthorization = false) {
   const bytes = readFileSync(manifestPath, "utf8");
   const manifest = JSON.parse(bytes);
   if (!validateManifest(manifest)) fail(JSON.stringify(validateManifest.errors));
@@ -115,14 +127,17 @@ function normalizeRun(root, manifestPath, evidenceDirectory, runtimeDigest, cont
       fail(`${property} differs from the runtime contract and catalog`);
     }
   }
-  if (manifest.toolResults.length !== manifest.tools.length) {
+  const authorizationExhausted = manifest.toolResults.length !== manifest.tools.length
+    && allowExhaustedAuthorization && exhaustedAuthorizationOnly(manifest);
+  if (manifest.toolResults.length !== manifest.tools.length && !authorizationExhausted) {
     fail(`both runs must retain every tool result, and this run ended with: ${manifest.reason ?? "no reason"}`);
   }
-  for (const tool of manifest.tools) {
+  const retainedTools = manifest.tools.filter(({ id }) => !(authorizationExhausted && id === "authorization-matrix"));
+  for (const tool of retainedTools) {
     const results = manifest.toolResults.filter((result) => result.id === tool.id && result.version === tool.version);
     if (results.length !== 1) fail("each planned tool must have one result with the planned version");
   }
-  const expectedEvidence = manifest.tools.filter(({ id }) => id !== "target-identity")
+  const expectedEvidence = retainedTools.filter(({ id }) => id !== "target-identity")
     .map(({ id }) => evidenceFiles[id] ?? fail(`no evidence contract is registered for ${id}`)).toSorted();
   const actualEvidence = readdirSync(evidenceDirectory).filter((name) => name.endsWith(".json")).toSorted();
   if (JSON.stringify(actualEvidence) !== JSON.stringify(expectedEvidence)) {
@@ -145,7 +160,7 @@ function normalizeRun(root, manifestPath, evidenceDirectory, runtimeDigest, cont
     if (result.outcome === "incomplete" && evidence.candidates.length === 0) unattributedIncomplete = true;
   }
   const toolOutcomes = manifest.toolResults.map(({ outcome }) => outcome);
-  const expectedOutcome = toolOutcomes.includes("failed") ? "failed"
+  const expectedOutcome = authorizationExhausted ? "incomplete" : toolOutcomes.includes("failed") ? "failed"
     : toolOutcomes.includes("incomplete") ? "incomplete" : "passed";
   if (manifest.outcome !== expectedOutcome) fail("run outcome differs from its tool outcomes");
   const startedAt = Date.parse(manifest.startedAt);
@@ -153,6 +168,7 @@ function normalizeRun(root, manifestPath, evidenceDirectory, runtimeDigest, cont
   if (!Number.isFinite(startedAt) || !Number.isFinite(finishedAt) || finishedAt < startedAt) fail("run chronology is invalid");
   return {
     unattributedIncomplete,
+    authorizationExhausted,
     identity: {
       profile: manifest.profile,
       application: manifest.application,
@@ -183,7 +199,7 @@ export function compareSecurityToolRuns(input) {
   const baseRuntimeDigest = runtimeDigest(input.baseRoot, input.candidateRoot);
   const candidateRuntimeDigest = runtimeDigest(input.candidateRoot, input.baseRoot);
   const base = normalizeRun(input.baseRoot, input.baseManifest, input.baseEvidence, baseRuntimeDigest,
-    input.baseContract, input.baseCatalog, true);
+    input.baseContract, input.baseCatalog, true, true);
   const candidate = normalizeRun(input.candidateRoot, input.candidateManifest, input.candidateEvidence, candidateRuntimeDigest,
     input.candidateContract, input.candidateCatalog);
   if (!["active", "destructive"].includes(base.identity.profile) || base.identity.profile !== candidate.identity.profile) {
@@ -203,6 +219,13 @@ export function compareSecurityToolRuns(input) {
   if (base.unattributedIncomplete && candidate.result.outcome !== "passed") {
     fail("an incomplete baseline without finding candidates requires a passing candidate runtime");
   }
+  const candidateMatrix = candidate.result.toolResults.find(({ id }) => id === "authorization-matrix");
+  if (base.authorizationExhausted && candidateMatrix?.outcome !== "passed") {
+    fail("a baseline that exhausted its authorization budget requires the candidate's matrix to pass");
+  }
+  const comparable = base.authorizationExhausted
+    ? fingerprints(input.candidateEvidence, [evidenceFiles["authorization-matrix"]])
+    : candidate.result.findingFingerprints;
   const comparison = {
     schemaVersion: 1,
     generatedAt: new Date().toISOString(),
@@ -213,8 +236,10 @@ export function compareSecurityToolRuns(input) {
     seedFingerprint: base.identity.seedFingerprint,
     base: base.result,
     candidate: candidate.result,
-    newFindings: difference(candidate.result.findingFingerprints, base.result.findingFingerprints),
-    resolvedFindings: difference(base.result.findingFingerprints, candidate.result.findingFingerprints)
+    newFindings: difference(comparable, base.result.findingFingerprints),
+    resolvedFindings: difference(base.result.findingFingerprints, comparable),
+    ...(base.authorizationExhausted
+      ? { notComparable: [{ tool: "authorization-matrix", reason: exhaustedAuthorizationRemark }] } : {})
   };
   if (!validateComparison(comparison)) fail(JSON.stringify(validateComparison.errors));
   return comparison;
@@ -255,6 +280,7 @@ export function comparisonSummary(comparison) {
     "",
     `New findings: ${named(comparison.newFindings)}`,
     `Resolved findings: ${named(comparison.resolvedFindings)}`,
+    ...(comparison.notComparable ?? []).map(({ tool, reason }) => `\`${tool}\`: ${reason}`),
     ""
   ].join("\n");
 }
