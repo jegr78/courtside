@@ -4,11 +4,13 @@ import org.courtside.api.ApiBookingGrid;
 import org.courtside.api.ApiOpeningHours;
 import org.courtside.api.OpeningHoursApi;
 import org.courtside.facility.FacilityService;
+import org.courtside.facility.OpeningSchedule;
 import org.courtside.config.BookingGridSettings;
 import org.courtside.config.ClubTimeZone;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -32,10 +34,19 @@ class OpeningHoursController implements OpeningHoursApi {
     }
 
     @Override
-    public ResponseEntity<ApiBookingGrid> getBookingGrid() {
+    public ResponseEntity<ApiBookingGrid> getBookingGrid(LocalDate from, LocalDate to) {
+        LocalDate first = from != null ? from : to != null ? to : facility.today();
+        LocalDate last = to != null ? to : first;
+        OpeningSchedule schedule = facility.openingSchedule();
         return ResponseEntity.ok(new ApiBookingGrid(
                 timeZone.id(), bookingGridSettings.slotMinutes(), openingHours(),
-                facility.openingSchedule().weeks().stream().map(FacilityAdminController::toResponse).toList()));
+                schedule.weeks().stream().map(FacilityAdminController::toResponse).toList(),
+                schedule.periods().stream()
+                        .filter(period -> !period.endsOn().isBefore(first) && !period.startsOn().isAfter(last))
+                        .map(FacilityAdminController::toResponse).toList(),
+                facility.courtClosures().stream()
+                        .filter(closure -> !closure.endsOn().isBefore(first) && !closure.startsOn().isAfter(last))
+                        .map(FacilityAdminController::toPublicResponse).toList()));
     }
 
     private List<ApiOpeningHours> openingHours() {

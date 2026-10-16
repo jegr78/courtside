@@ -21,7 +21,8 @@ test("when the ledger is replayed, then the window holds no booking of this run"
   const ledgerIds = new Set(readLedger().map((e) => e.id));
   const before = Object.fromEntries(await Promise.all(lanePlan().days.map(async (d) => [d, await (await page.request.get(`/api/bookings?date=${d}`)).json()])));
   const open = lanePlan().days.flatMap((d) => [...ids(before[d])].filter((id) => ledgerIds.has(id!)).map((id) => ({ date: d, id })));
-  const outcome = dry ? [] : await replay(page.request, await xsrf(page), readLedger().filter((e) => open.some((o) => o.id === e.id) || e.kind === "series" || e.kind === "opening-week"));
+  const outcome = dry ? [] : await replay(page.request, await xsrf(page), readLedger().filter((e) => open.some((o) => o.id === e.id) || e.kind === "series" || e.kind === "opening-week"
+    || e.kind === "opening-period" || e.kind === "court-closure"));
   const baseline = JSON.parse(readFileSync(runPath("baseline.json"), "utf8")).days;
   const diff = [];
   for (const date of lanePlan().days) {
@@ -34,11 +35,17 @@ test("when the ledger is replayed, then the window holds no booking of this run"
   const weeks = (await (await page.request.get("/api/admin/opening-hours/schedule")).json()) as { effectiveFrom: string | null }[];
   const ourWeeks = new Set(readLedger().filter((e) => e.kind === "opening-week").map((e) => e.id));
   const weeksLeft = weeks.map((w) => w.effectiveFrom).filter((d): d is string => d !== null && ourWeeks.has(d));
-  writeFileSync(runPath(`cleanup${dry ? "-dry" : ""}.json`), JSON.stringify({ open, outcome, diff, weeksLeft }, null, 2));
+  const ourAvailability = new Set(readLedger().filter((e) => e.kind === "opening-period" || e.kind === "court-closure").map((e) => e.id));
+  const availability = [
+    ...(await (await page.request.get("/api/admin/opening-periods")).json()) as { id: string }[],
+    ...(await (await page.request.get("/api/admin/court-closures")).json()) as { id: string }[]];
+  const availabilityLeft = availability.map((entry) => entry.id).filter((id) => ourAvailability.has(id));
+  writeFileSync(runPath(`cleanup${dry ? "-dry" : ""}.json`), JSON.stringify({ open, outcome, diff, weeksLeft, availabilityLeft }, null, 2));
   console.log(JSON.stringify({ open: open.length, failed: outcome.filter((o) => o.outcome === "failed").length, diff }));
   // then
   if (!dry) expect(diff.flatMap((d) => d.ours), "no booking of this run is left in the window").toEqual([]);
   if (!dry) expect(weeksLeft, "no opening week this run scheduled is left").toEqual([]);
+  if (!dry) expect(availabilityLeft, "no holiday, season or court closure this run added is left").toEqual([]);
 });
 
 test("when the run ends, then no reserved slot holds a booking of this run, no week is scheduled and the disposable member signs in with the shared password", async () => {

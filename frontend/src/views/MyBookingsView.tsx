@@ -14,7 +14,7 @@ import { WaitlistSection } from "./WaitlistSection";
 import { warnAbout } from "../api/failureWarning";
 function offlineBookingGrid(): BookingGrid {
   return {
-    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC", slotMinutes: 30, openingWeeks: [], openingHours: []
+    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC", slotMinutes: 30, openingWeeks: [], openingPeriods: [], courtClosures: [], openingHours: []
   };
 }
 

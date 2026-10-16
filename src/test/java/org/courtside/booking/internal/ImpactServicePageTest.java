@@ -73,7 +73,7 @@ class ImpactServicePageTest extends AbstractIntegrationTest {
         assertThat(preview.affectedCount()).isZero();
         assertThat(preview.bookings()).isEmpty();
         assertThat(statistics.getQueryExecutionCount())
-                .as("the schedule's two reads, the booking ids and the count")
-                .isEqualTo(4);
+                .as("the schedule's three reads, the booking ids and the count")
+                .isEqualTo(5);
     }
 }

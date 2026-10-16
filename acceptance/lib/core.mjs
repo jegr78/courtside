@@ -10,7 +10,9 @@ export function occupying(allocations, courtId, from, to) {
 
 export const removalPath = (entry) => entry.kind === "series"
   ? `/api/booking-series/${entry.id}?scope=WHOLE_SERIES${entry.anchor ? `&fromBookingId=${entry.anchor}` : ""}`
-  : entry.kind === "opening-week" ? `/api/admin/opening-hours/schedule/${entry.id}` : `/api/bookings/${entry.id}`;
+  : entry.kind === "opening-week" ? `/api/admin/opening-hours/schedule/${entry.id}`
+    : entry.kind === "opening-period" ? `/api/admin/opening-periods/${entry.id}`
+      : entry.kind === "court-closure" ? `/api/admin/court-closures/${entry.id}` : `/api/bookings/${entry.id}`;
 
 export async function replayEntries(entries, remove) {
   const results = [];

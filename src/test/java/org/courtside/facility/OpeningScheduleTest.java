@@ -91,4 +91,43 @@ class OpeningScheduleTest {
         assertThat(weeks).as("the origin week has been replaced and drops out")
                 .containsExactly(winter, spring);
     }
+
+    @Test
+    void givenASeasonOverTheWeeklyHours_whenReadingADayInsideIt_thenTheSeasonGoverns() {
+        // given
+        OpeningPeriod season = period(OpeningPeriod.Kind.SEASON, LocalDate.of(2026, 5, 1), LocalDate.of(2026, 9, 30),
+                Map.of(DayOfWeek.MONDAY, WINTER));
+        OpeningSchedule schedule = new OpeningSchedule(List.of(origin), List.of(season));
+
+        // when / then
+        assertThat(schedule.windowOn(LocalDate.of(2026, 6, 1))).as("a Monday in the season").contains(WINTER);
+        assertThat(schedule.windowOn(LocalDate.of(2026, 6, 7))).as("the season names no Sunday, so it closes")
+                .isEmpty();
+        assertThat(schedule.windowOn(LocalDate.of(2026, 10, 5))).as("after the season the weekly hours return")
+                .contains(SUMMER);
+    }
+
+    @Test
+    void givenAHolidayInsideASeason_whenReadingThatDay_thenTheHolidayGoverns() {
+        // given
+        OpeningPeriod season = period(OpeningPeriod.Kind.SEASON, LocalDate.of(2026, 5, 1), LocalDate.of(2026, 9, 30),
+                Map.of(DayOfWeek.MONDAY, SUMMER));
+        OpeningPeriod closed = period(OpeningPeriod.Kind.HOLIDAY, LocalDate.of(2026, 5, 25), LocalDate.of(2026, 5, 25),
+                Map.of());
+        OpeningPeriod shortened = period(OpeningPeriod.Kind.HOLIDAY, LocalDate.of(2026, 6, 1), LocalDate.of(2026, 6, 1),
+                Map.of(DayOfWeek.MONDAY, WINTER));
+        OpeningSchedule schedule = new OpeningSchedule(List.of(origin), List.of(season, closed, shortened));
+
+        // when / then
+        assertThat(schedule.windowOn(LocalDate.of(2026, 5, 25))).as("a closed holiday closes the day").isEmpty();
+        assertThat(schedule.windowOn(LocalDate.of(2026, 6, 1))).as("a holiday with hours replaces the season")
+                .contains(WINTER);
+        assertThat(schedule.windowOn(LocalDate.of(2026, 6, 8))).as("the next Monday is the season's again")
+                .contains(SUMMER);
+    }
+
+    private static OpeningPeriod period(OpeningPeriod.Kind kind, LocalDate startsOn, LocalDate endsOn,
+                                        Map<DayOfWeek, OpeningWindow> days) {
+        return new OpeningPeriod(UUID.randomUUID(), kind, "Period", startsOn, endsOn, days);
+    }
 }

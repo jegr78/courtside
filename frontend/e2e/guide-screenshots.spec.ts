@@ -176,6 +176,22 @@ const drivers: Record<string, (page: Page, visualDate: string) => Promise<void>>
     await page.getByTestId("edit-opening-week-2026-11-02").click();
     await expect(page.getByTestId("hours-close-MONDAY")).toHaveValue("20:00");
   },
+  "availability": async (page) => {
+    await page.getByTestId("admin-opening-hours-link").click();
+    await page.getByTestId("opening-hours-exceptions-link").click();
+    await expect(page.getByTestId("opening-period-form")).toBeVisible();
+    await page.getByTestId("opening-period-name").fill("Winter break");
+    await page.getByTestId("opening-period-starts-on").fill("2026-12-24");
+    await page.getByTestId("opening-period-ends-on").fill("2026-12-26");
+    await page.getByTestId("save-opening-period").click();
+    await expect(page.getByTestId("opening-periods")).toBeVisible();
+    await page.getByTestId("court-closure-court").selectOption({ index: 1 });
+    await page.getByTestId("court-closure-name").fill("Resurfacing");
+    await page.getByTestId("court-closure-starts-on").fill("2026-11-16");
+    await page.getByTestId("court-closure-ends-on").fill("2026-11-20");
+    await page.getByTestId("save-court-closure").click();
+    await expect(page.getByTestId("court-closures")).toBeVisible();
+  },
   "booking-card": async (page) => {
     await page.getByTestId("admin-booking-cards-link").click();
     await expect(page.getByTestId("create-card")).toBeVisible();
@@ -337,6 +353,7 @@ test("every surface the facility is described on is captured", async ({ page, jo
   // when / then
   await capture(page, "courts", journeyService.visualDate);
   await capture(page, "opening-hours", journeyService.visualDate);
+  await capture(page, "availability", journeyService.visualDate);
   await capture(page, "booking-card", journeyService.visualDate);
   await capture(page, "slot-fillers", journeyService.visualDate);
   await capture(page, "save-bar", journeyService.visualDate);

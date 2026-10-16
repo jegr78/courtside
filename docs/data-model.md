@@ -57,6 +57,9 @@ a check the application ran first.
 | `court` | A court: its number, an optional name, whether it is active | None |
 | `opening_hours_version` | One version of the weekly opening hours and the day it takes effect | None |
 | `opening_hours` | When the facility opens and closes on one weekday of one version | `opening_hours_version` |
+| `opening_period` | A season or holiday, its name and its first and last day | None |
+| `opening_period_hours` | When the facility opens and closes on one weekday of a season or holiday | `opening_period` |
+| `court_closure` | Whole days on which one court is closed, with a reason | `court` |
 
 `court.number` is unique and positive, and `active` is what takes a court out of service without
 losing it. A version's `effective_from` is a date in the club's time zone and unique; the one
@@ -65,6 +68,13 @@ one. A day is governed by the latest version that has started on it. `opening_ho
 one row per version and `day_of_week`, numbered the way `java.time.DayOfWeek` numbers them, 1 is
 Monday, with `closes_at` after `opens_at`; a weekday without a row is closed in that version.
 Deleting a version deletes its rows.
+
+`opening_period.kind` is `SEASON` or `HOLIDAY`, and `ends_on` is not before `starts_on`, both
+inclusive dates in the club's time zone. A GiST exclusion constraint keeps two periods of the same
+kind from sharing a day. `opening_period_hours` has the same shape as `opening_hours`; a weekday
+without a row is closed on the days the period covers, and deleting a period deletes its rows.
+`court_closure` follows the same date rules, and its exclusion constraint keeps the closures of one
+court apart.
 
 ## Cards
 

@@ -166,14 +166,34 @@ then the current hours stay. Past weeks always keep the hours they had. *Weeks* 
 force and every scheduled one. You can edit a scheduled week, move it to another day or remove it.
 You do not remove the week in force; you replace it from a day with a new one.
 
-*Closed* is the wrong tool for a temporary closure, such as a court renovation. Block the courts
-with a booking card for closures instead.
+*Closed* is the wrong tool for a temporary closure. *Seasons, holidays and court closures* has
+entries of their own for that, see the next section.
 
 Courtside does not save a day when either time is missing. Members cannot book outside the opening
 hours. If you shorten opening hours later, Courtside notifies members with affected bookings. Those
 bookings stay and remain visible in the court plan.
 
 ![Winter hours from 2 November, scheduled beside the week in force and open for editing.](../screenshots/en/opening-hours.png)
+
+## Facility → Opening hours → Seasons, holidays and court closures
+
+The link below *Weeks* leads to entries that govern a range of days.
+
+- A **season** replaces the weekly hours from its first to its last day, with hours of its own
+  for every weekday. Seasons do not overlap.
+- A **holiday** governs before seasons and weekly hours. It is closed all day or has one window
+  of its own. A holiday may lie inside a season; two holidays do not overlap.
+- A **court closure** takes one court out of the plan for whole days, such as a renovation. The
+  other courts stay open. Two closures of the same court do not overlap.
+
+An entry starts today or later. Until its first day you can change everything or remove it. Once it
+has started, its first day and hours stay fixed; you can still rename it or end it earlier. Ended
+entries stay as they were, so past days keep their hours.
+
+Bookings already on a closed day stay. Courtside refuses new bookings and moves there. The court
+plan names a holiday, and a closed court reads *Court closed*.
+
+![A winter break as a closed holiday and one court closed for a week.](../screenshots/en/availability.png)
 
 ## Facility → Booking cards
 

@@ -38,7 +38,7 @@ beforeEach(async () => {
   vi.spyOn(api, "bookingGrid").mockResolvedValue({
     timeZone: "Europe/Berlin",
     slotMinutes: 30,
-    openingWeeks: [],
+    openingWeeks: [], openingPeriods: [], courtClosures: [],
     openingHours: [
       { dayOfWeek: "MONDAY", opensAt: "08:00:00", closesAt: "22:00:00" },
       { dayOfWeek: "TUESDAY", opensAt: "08:00:00", closesAt: "22:00:00" },
@@ -162,7 +162,7 @@ it("given short booking slots, when rendering the plan, then rows retain their u
   vi.mocked(api.bookingGrid).mockResolvedValue({
     timeZone: "Europe/Berlin",
     slotMinutes: 15,
-    openingWeeks: [],
+    openingWeeks: [], openingPeriods: [], courtClosures: [],
     openingHours: [{ dayOfWeek: "MONDAY", opensAt: "08:00:00", closesAt: "22:00:00" }]
   });
 
@@ -882,7 +882,7 @@ it("given the browser and club have different dates, when loading, then the club
   vi.mocked(api.bookingGrid).mockResolvedValue({
     timeZone: "Pacific/Auckland",
     slotMinutes: 30,
-    openingWeeks: [],
+    openingWeeks: [], openingPeriods: [], courtClosures: [],
     openingHours: [{ dayOfWeek: "TUESDAY", opensAt: "08:00:00", closesAt: "22:00:00" }]
   });
 
@@ -1229,7 +1229,7 @@ it("given opening hours cross a spring-forward gap, when choosing a duration, th
   vi.mocked(api.bookingGrid).mockResolvedValue({
     timeZone: "Europe/Berlin",
     slotMinutes: 30,
-    openingWeeks: [],
+    openingWeeks: [], openingPeriods: [], courtClosures: [],
     openingHours: [{ dayOfWeek: "SUNDAY", opensAt: "01:00:00", closesAt: "04:00:00" }]
   });
   vi.mocked(api.allocations).mockResolvedValue([]);
@@ -2055,7 +2055,7 @@ function openingHoursWith(overrides: Partial<Record<string, [string | null, stri
   return {
     timeZone: "Europe/Berlin",
     slotMinutes: 30,
-    openingWeeks: [],
+    openingWeeks: [], openingPeriods: [], courtClosures: [],
     openingHours: days.map((dayOfWeek) => {
       const [opensAt, closesAt] = overrides[dayOfWeek] ?? ["08:00:00", "22:00:00"];
       return { dayOfWeek, opensAt, closesAt };
@@ -2694,4 +2694,61 @@ it("given a visitor who cannot book, when the plan is shown, then a taken court 
   const taken = await screen.findByTestId("allocation");
   expect(taken).toHaveAttribute("role", "img");
   expect(api.joinWaitlist).not.toHaveBeenCalled();
+});
+
+it("given a closed holiday, when selecting its day, then the plan is closed and names the holiday", async () => {
+  // given
+  vi.spyOn(api, "bookingGrid").mockResolvedValue({ ...openingHoursWith({}), openingPeriods: [{
+    id: "aaaaaaaa-0000-0000-0000-000000000003", kind: "HOLIDAY", name: "Founding day",
+    startsOn: "2026-08-11", endsOn: "2026-08-11",
+    days: openingHoursWith({}).openingHours.map((hours) => ({ ...hours, opensAt: null, closesAt: null }))
+  }] });
+  render(<WeekView today={clubInstant("09:00")} />);
+  await screen.findByTestId("day-selector-2026-08-11");
+
+  // when
+  await userEvent.click(screen.getByTestId("day-selector-2026-08-11"));
+
+  // then
+  expect(await screen.findByTestId("day-closed")).toBeInTheDocument();
+  expect(screen.getByTestId("day-holiday-notice")).toHaveTextContent("Founding day");
+  expect(screen.getByTestId("day-free-count-2026-08-11")).toHaveAttribute("data-free-count", "0");
+});
+
+it("given a court closed today, when showing the plan, then its free cells read as closed and do not count", async () => {
+  // given
+  const now = clubInstant("12:15");
+  vi.mocked(api.allocations).mockResolvedValue([]);
+  vi.spyOn(api, "bookingGrid").mockResolvedValue({ ...openingHoursWith({}), courtClosures: [{
+    id: "aaaaaaaa-0000-0000-0000-000000000004", courtId: courts[1].id,
+    startsOn: "2026-08-10", endsOn: "2026-08-12"
+  }] });
+
+  // when
+  render(<WeekView clock={() => now} />);
+
+  // then
+  expect(await screen.findByTestId("day-free-count-2026-08-10"), "only the open court counts")
+    .toHaveAttribute("data-free-count", "19");
+  const closed = screen.getAllByTestId("closed-court-slot");
+  expect(closed.every((cell) => cell.dataset.courtNumber === "2"), "only court 2 is closed").toBe(true);
+  expect(closed[0]).toHaveTextContent("Court closed");
+  expect(screen.getAllByTestId("free-slot").some((cell) => cell.dataset.courtNumber === "2")).toBe(false);
+  expect(screen.getByTestId("court-heading-2")).toHaveAttribute("data-closed-until", "2026-08-12");
+});
+
+it("given a closed court, when several courts can be chosen, then the closed one cannot be added", async () => {
+  // given
+  vi.spyOn(api, "bookingGrid").mockResolvedValue({ ...openingHoursWith({}), courtClosures: [{
+    id: "aaaaaaaa-0000-0000-0000-000000000005", courtId: courts[1].id,
+    startsOn: "2026-08-10", endsOn: "2026-08-10"
+  }] });
+  render(<WeekView today={clubInstant("07:00")} canChooseSeveralCourts />);
+
+  // when
+  await userEvent.click(await findFreeSlot(1, "08:00"));
+
+  // then
+  expect(screen.getByTestId(`booking-court-${courts[1].id}`), "a closed court is not offered").toBeDisabled();
+  expect(screen.getByTestId(`booking-court-${courts[0].id}`)).toBeEnabled();
 });

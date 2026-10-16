@@ -66,6 +66,11 @@ fails on the missing `BuildProperties` bean.
   it does not describe anybody. Deletion is separate and stays governed by the data-protection
   section of the design spec — the answer to bad data is correcting it, and the answer to a departed
   member is deactivation, not erasure.
+
+  Seasons, holidays and court closures are a deliberate exception once they have started: their
+  first day, kind, court and hours are fixed, and they can only be renamed or ended early. Past days
+  keep the history that governed them. A board corrects a running entry by ending it yesterday and
+  adding a new one from today.
 * **Keep controllers thin.** HTTP handling only. Business logic lives in services, never in
   controllers or repositories.
 * **Rules are data.** Booking rules are declarative rows evaluated by `RuleEngine`, not nested

@@ -176,8 +176,8 @@ die an ihnen galten. Unter *Wochen* stehen die geltende Woche und alle geplanten
 Woche kannst du bearbeiten, auf einen anderen Tag verschieben oder entfernen. Die geltende Woche
 entfernst du nicht, du ersetzt sie ab einem Tag durch eine neue.
 
-Für eine vorübergehende Schließung, etwa eine Platzsanierung, ist *Geschlossen* das falsche
-Werkzeug. Sperre die Plätze dafür mit einer Buchungskarte für Sperrungen.
+Für eine vorübergehende Schließung ist *Geschlossen* das falsche Werkzeug. Dafür gibt es unter
+*Saisons, Feiertage und Platzsperrungen* eigene Einträge, siehe den nächsten Abschnitt.
 
 Courtside speichert keinen Tag, bei dem eine der beiden Zeiten fehlt. Außerhalb der Öffnungszeiten
 sind keine Buchungen möglich. Wenn du Öffnungszeiten später verkürzt, benachrichtigt Courtside
@@ -185,6 +185,28 @@ die Mitglieder mit betroffenen Buchungen. Diese Buchungen bleiben bestehen und i
 sichtbar.
 
 ![Winterzeiten ab dem 2. November, geplant neben der geltenden Woche und zum Bearbeiten geöffnet.](screenshots/de/opening-hours.png)
+
+## Anlage → Öffnungszeiten → Saisons, Feiertage und Platzsperrungen
+
+Der Link unter *Wochen* führt zu Einträgen, die für eine Zeitspanne gelten.
+
+- Eine **Saison** ersetzt vom ersten bis zum letzten Tag die Wochenzeiten, mit eigenen Zeiten je
+  Wochentag. Saisons überschneiden sich nicht.
+- Ein **Feiertag** gilt vor Saison und Wochenzeiten. Er ist ganz geschlossen oder hat ein
+  eigenes Zeitfenster. Ein Feiertag darf in einer Saison liegen, zwei Feiertage überschneiden sich
+  nicht.
+- Eine **Platzsperrung** nimmt einen Platz für ganze Tage aus dem Plan, etwa für eine Sanierung.
+  Die anderen Plätze bleiben offen. Zwei Sperrungen desselben Platzes überschneiden sich nicht.
+
+Ein Eintrag beginnt frühestens heute. Bis zu seinem ersten Tag kannst du alles ändern oder ihn
+entfernen. Hat er begonnen, bleiben erster Tag und Zeiten fest, umbenennen oder früher beenden geht
+weiterhin. Beendete Einträge bleiben unverändert, damit vergangene Tage ihre Zeiten behalten.
+
+Buchungen, die schon auf einem gesperrten Tag liegen, bleiben bestehen. Neue Buchungen und
+Verschiebungen dorthin lehnt Courtside ab. Im Platzplan steht ein Feiertag mit seinem Namen, ein
+gesperrter Platz zeigt *Gesperrt*.
+
+![Weihnachtspause als geschlossener Feiertag und eine Woche Sperrung für einen Platz.](screenshots/de/availability.png)
 
 ## Anlage → Buchungskarten
 

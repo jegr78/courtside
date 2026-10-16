@@ -4,7 +4,7 @@ import { writeFileSync } from "node:fs";
 import { apiAs, readRoster } from "../lib/api";
 import { canSignIn } from "../lib/disposable";
 import { allSlots, instantOf, lanePlan } from "../lib/lanes";
-import { weekendConflicts } from "../config/lanes.mjs";
+import { availabilityConflicts, weekendConflicts } from "../config/lanes.mjs";
 import { config, disposables, PASSWORD, runPath, type PersonaKey } from "../lib/context";
 import { mailAvailable } from "../lib/mail";
 import { profilesOf, resetQuota } from "../config/disposables.mjs";
@@ -55,6 +55,8 @@ test("when the environment is checked before a run, then every precondition hold
     checks.disposablesSignIn = Object.fromEntries(await Promise.all(disposables.map(async (username, index) => [`disposable ${index + 1}`, await canSignIn(PASSWORD, username)])));
     const weeks = await (await admin.get("/api/admin/opening-hours/schedule")).json() as { effectiveFrom: string | null }[];
     checks.futureWeeks = weeks.slice(1).map((w) => w.effectiveFrom);
+    const grid = await (await admin.get(`/api/public/booking-grid?from=${plan.days[0]}&to=${plan.days.at(-1)}`)).json();
+    checks.availabilityConflicts = availabilityConflicts(grid, { ...plan, slots: allSlots() }, courts);
     const participantCards = await (await admin.get("/api/admin/participant-cards")).json() as { id: string; active: boolean }[];
     checks.partnerMarkerActive = participantCards.some((card) => card.id === PARTNER_MARKER && card.active);
     if (config.personas.restricted) {
@@ -95,6 +97,7 @@ test("when the environment is checked before a run, then every precondition hold
     expect.soft(signsIn, `PRECONDITION: ${account} signs in with the shared password`).toBe(true);
   }
   expect.soft(checks.futureWeeks, "PRECONDITION: no opening week is scheduled after today").toEqual([]);
+  expect.soft(checks.availabilityConflicts, "PRECONDITION: no season, holiday or court closure changes a lane or the hours of the window's weekend").toEqual([]);
   expect.soft(checks.partnerMarkerActive, "PRECONDITION: the looking-for-a-partner participant card is active").toBe(true);
   if (config.personas.restricted) {
     expect.soft(checks.restrictedHours, "PRECONDITION: the restricted member's category sets booking hours").toBeTruthy();

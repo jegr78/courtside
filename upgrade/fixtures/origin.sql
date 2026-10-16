@@ -3,6 +3,16 @@ BEGIN;
 INSERT INTO court (id, number, name, active)
 VALUES ('70000000-0000-0000-0000-000000000001', 7, 'Upgrade court', true);
 
+INSERT INTO opening_period (id, kind, name, starts_on, ends_on)
+VALUES ('70100000-0000-0000-0000-000000000001', 'SEASON', 'Upgrade summer', '2025-05-01', '2025-09-30');
+
+INSERT INTO opening_period_hours (period_id, day_of_week, opens_at, closes_at)
+VALUES ('70100000-0000-0000-0000-000000000001', 1, '08:00', '21:00');
+
+INSERT INTO court_closure (id, court_id, name, starts_on, ends_on)
+VALUES ('70200000-0000-0000-0000-000000000001', '70000000-0000-0000-0000-000000000001',
+        'Upgrade resurfacing', '2025-04-01', '2025-04-30');
+
 INSERT INTO person (id, first_name, last_name, email) VALUES
     ('71000000-0000-0000-0000-000000000001', 'John', 'Roe', 'upgrade-fixture@example.org'),
     ('71000000-0000-0000-0000-000000000002', 'Mary', 'Major', 'history-fixture@example.org');

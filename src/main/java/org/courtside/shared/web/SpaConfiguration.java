@@ -44,6 +44,7 @@ class SpaConfiguration {
             "/admin/facility",
             "/admin/facility/courts",
             "/admin/facility/opening-hours",
+            "/admin/facility/opening-hours/exceptions",
             "/admin/facility/booking-cards",
             "/admin/facility/booking-cards/{cardId}",
             "/admin/facility/slot-fillers",

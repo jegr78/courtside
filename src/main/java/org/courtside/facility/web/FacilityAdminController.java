@@ -4,12 +4,20 @@ import org.courtside.api.AdminCourtsApi;
 import org.courtside.api.AdminOpeningHoursApi;
 import org.courtside.api.ApiActiveRequest;
 import org.courtside.api.ApiCourt;
+import org.courtside.api.ApiCourtClosure;
 import org.courtside.api.ApiCourtRequest;
+import org.courtside.api.ApiCreateCourtClosureRequest;
+import org.courtside.api.ApiCreateOpeningPeriodRequest;
 import org.courtside.api.ApiOpeningHours;
+import org.courtside.api.ApiOpeningPeriod;
+import org.courtside.api.ApiOpeningPeriodKind;
+import org.courtside.api.ApiPublicCourtClosure;
 import org.courtside.api.ApiOpeningWeek;
 import org.courtside.api.ApiSetWeeklyOpeningHoursRequest;
 import org.courtside.facility.Court;
+import org.courtside.facility.CourtClosure;
 import org.courtside.facility.FacilityService;
+import org.courtside.facility.OpeningPeriod;
 import org.courtside.facility.OpeningWeek;
 import org.courtside.facility.internal.WeeklyOpeningHours;
 import org.courtside.shared.WireTypes;
@@ -73,11 +81,7 @@ class FacilityAdminController implements AdminCourtsApi, AdminOpeningHoursApi {
     @Override
     public ResponseEntity<List<ApiOpeningHours>> setWeeklyOpeningHours(
             ApiSetWeeklyOpeningHoursRequest request) {
-        List<WeeklyOpeningHours> week = Optional.ofNullable(request.getDays())
-                .orElseGet(List::of).stream()
-                .map(FacilityAdminController::toWeekday)
-                .toList();
-        OpeningWeek stored = facility.scheduleOpeningHours(request.getEffectiveFrom(), week);
+        OpeningWeek stored = facility.scheduleOpeningHours(request.getEffectiveFrom(), toWeek(request.getDays()));
         return ResponseEntity.ok(toResponse(stored).getDays());
     }
 
@@ -92,6 +96,91 @@ class FacilityAdminController implements AdminCourtsApi, AdminOpeningHoursApi {
     public ResponseEntity<Void> removeScheduledOpeningHours(LocalDate effectiveFrom) {
         facility.removeScheduledOpeningHours(effectiveFrom);
         return ResponseEntity.noContent().build();
+    }
+
+    @Override
+    public ResponseEntity<List<ApiOpeningPeriod>> listOpeningPeriods() {
+        return ResponseEntity.ok(facility.openingPeriods().stream()
+                .map(FacilityAdminController::toResponse)
+                .toList());
+    }
+
+    @Override
+    public ResponseEntity<ApiOpeningPeriod> createOpeningPeriod(ApiCreateOpeningPeriodRequest request) {
+        OpeningPeriod period = facility.createOpeningPeriod(
+                toKind(request.getKind()), request.getName(),
+                request.getStartsOn(), request.getEndsOn(), toWeek(request.getDays()));
+        return ResponseEntity
+                .created(URI.create("/api/admin/opening-periods/" + period.id()))
+                .body(toResponse(period));
+    }
+
+    @Override
+    public ResponseEntity<ApiOpeningPeriod> changeOpeningPeriod(UUID periodId, ApiCreateOpeningPeriodRequest request) {
+        return ResponseEntity.ok(toResponse(facility.changeOpeningPeriod(periodId, toKind(request.getKind()), request.getName(),
+                request.getStartsOn(), request.getEndsOn(), toWeek(request.getDays()))));
+    }
+
+    @Override
+    public ResponseEntity<Void> removeOpeningPeriod(UUID periodId) {
+        facility.removeOpeningPeriod(periodId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @Override
+    public ResponseEntity<List<ApiCourtClosure>> listCourtClosures() {
+        return ResponseEntity.ok(facility.courtClosures().stream()
+                .map(FacilityAdminController::toResponse)
+                .toList());
+    }
+
+    @Override
+    public ResponseEntity<ApiCourtClosure> createCourtClosure(ApiCreateCourtClosureRequest request) {
+        CourtClosure closure = facility.createCourtClosure(
+                request.getCourtId(), request.getName(), request.getStartsOn(), request.getEndsOn());
+        return ResponseEntity
+                .created(URI.create("/api/admin/court-closures/" + closure.id()))
+                .body(toResponse(closure));
+    }
+
+    @Override
+    public ResponseEntity<ApiCourtClosure> changeCourtClosure(UUID closureId, ApiCreateCourtClosureRequest request) {
+        return ResponseEntity.ok(toResponse(facility.changeCourtClosure(
+                closureId, request.getCourtId(), request.getName(), request.getStartsOn(), request.getEndsOn())));
+    }
+
+    @Override
+    public ResponseEntity<Void> removeCourtClosure(UUID closureId) {
+        facility.removeCourtClosure(closureId);
+        return ResponseEntity.noContent().build();
+    }
+
+    static ApiOpeningPeriod toResponse(OpeningPeriod period) {
+        return new ApiOpeningPeriod(period.id(), ApiOpeningPeriodKind.fromValue(period.kind().name()),
+                period.name(), period.startsOn(), period.endsOn(), Arrays.stream(DayOfWeek.values())
+                .map(day -> Optional.ofNullable(period.days().get(day))
+                        .map(window -> toResponse(day, window.opensAt(), window.closesAt()))
+                        .orElseGet(() -> toResponse(day, null, null)))
+                .toList());
+    }
+
+    private static OpeningPeriod.Kind toKind(ApiOpeningPeriodKind kind) {
+        return kind == null ? null : OpeningPeriod.Kind.valueOf(kind.getValue());
+    }
+
+    static ApiPublicCourtClosure toPublicResponse(CourtClosure closure) {
+        return new ApiPublicCourtClosure(closure.id(), closure.courtId(), closure.startsOn(), closure.endsOn());
+    }
+
+    static ApiCourtClosure toResponse(CourtClosure closure) {
+        return new ApiCourtClosure(
+                closure.id(), closure.courtId(), closure.name(), closure.startsOn(), closure.endsOn());
+    }
+
+    private static List<WeeklyOpeningHours> toWeek(List<ApiOpeningHours> days) {
+        return Optional.ofNullable(days).orElseGet(List::of).stream()
+                .map(FacilityAdminController::toWeekday)
+                .toList();
     }
 
     static ApiOpeningWeek toResponse(OpeningWeek week) {

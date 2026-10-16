@@ -22,6 +22,11 @@
       "class": "identifier"
     },
     {
+      "name": "closureId",
+      "in": "path",
+      "class": "identifier"
+    },
+    {
       "name": "courtId",
       "in": "path",
       "class": "identifier"
@@ -53,6 +58,11 @@
     },
     {
       "name": "notificationId",
+      "in": "path",
+      "class": "identifier"
+    },
+    {
+      "name": "periodId",
       "in": "path",
       "class": "identifier"
     },
@@ -740,6 +750,28 @@
         "lifecycle": "booking-pseudonymisation"
       }
     },
+    "court_closure": {
+      "court_id": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "ends_on": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "id": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "name": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "starts_on": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      }
+    },
     "credential_issue_limit": {
       "account_id": {
         "level": "pseudonymous",
@@ -1246,6 +1278,46 @@
         "lifecycle": "club-configuration"
       },
       "id": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      }
+    },
+    "opening_period": {
+      "ends_on": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "id": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "kind": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "name": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "starts_on": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      }
+    },
+    "opening_period_hours": {
+      "closes_at": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "day_of_week": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "opens_at": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "period_id": {
         "level": "operational",
         "lifecycle": "club-configuration"
       }
