@@ -173,7 +173,8 @@ class AuditedOperationCoverageTest {
             "StatisticsService#messages",
             "StatisticsService#range",
             "StatisticsService#utilisation",
-            "SubjectAccessService#answerFor");
+            "SubjectAccessService#answerFor",
+            "UsageReportService#report");
 
     @Test
     void givenAWriteOperation_whenItIsNotInTheInventory_thenTheBuildSaysSo() {

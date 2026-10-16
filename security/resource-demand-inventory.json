@@ -387,14 +387,15 @@
       "kind": "demanding",
       "entryPoints": [
         "facilityUtilisation",
+        "usageReport",
         "readStatisticsRange",
         "readUtilisationStatistics",
         "readBookingStatistics",
         "readMemberStatistics",
         "readMessageStatistics"
       ],
-      "growthDrivers": "Utilisation reports grow with allocations in the selected period, and statistics with allocations, members, accounts and messages in the period plus one progression bucket per week or month of it.",
-      "inputOrDataBound": "Utilisation report periods stop at 366 days. Statistics periods stop at 36,525 days in the years 0001 to 9999, so the progression answers at most about 1,200 monthly buckets. Open time is computed per weekday and per daylight-saving change rather than per day. Each allocation is clipped to the period before it is split into days and open hours, so that splitting is bounded by the period even though an allocation itself has no length ceiling. Every statistics read runs under a 30-second statement timeout.",
+      "growthDrivers": "Utilisation and usage reports grow with allocations, attendance records and refused attempts in the selected period, and statistics with allocations, members, accounts and messages in the period plus one progression bucket per week or month of it.",
+      "inputOrDataBound": "Utilisation and usage report periods stop at 366 days. Statistics periods stop at 36,525 days in the years 0001 to 9999, so the progression answers at most about 1,200 monthly buckets. Open time is computed per weekday and per daylight-saving change rather than per day. Each allocation is clipped to the period before it is split into days and open hours, so that splitting is bounded by the period even though an allocation itself has no length ceiling. Every statistics read runs under a 30-second statement timeout.",
       "concurrencyOrRateBound": "Admission control runs at most two of these administrator reads at a time per instance, one per caller with the caller's further reads waiting their turn, and charges 5 tokens of the caller's request budget; statistics reads also stop at their 30-second statement timeout.",
       "executionModel": "The application computes and returns each report synchronously; a statistics page asks for its sections separately.",
       "failureBehavior": "Invalid periods fail before any query; a database failure returns no partial report and changes no application state.",
@@ -413,7 +414,8 @@
         "src/test/java/org/courtside/reporting/StatisticsQueryBudgetTest.java#givenMoreBookingsCourtsAndARetiredCourt_whenReadingEverySection_thenTheStatementCountStaysTheSame",
         "src/test/java/org/courtside/reporting/web/StatisticsControllerTest.java#givenAHundredYearsAndADay_whenReadingUtilisation_thenThePeriodIsRefusedAsTooLong",
         "src/test/java/org/courtside/reporting/web/StatisticsStatementTimeoutTest.java#givenEveryStatisticsRead_whenItQueriesTheDatabase_thenItsTransactionCarriesTheStatementTimeout",
-        "src/test/java/org/courtside/shared/web/AdmissionPlanTest.java#whenLoadingTheShippedPlan_thenEveryDemandingClassHasItsDecidedCostAndBulkhead"
+        "src/test/java/org/courtside/shared/web/AdmissionPlanTest.java#whenLoadingTheShippedPlan_thenEveryDemandingClassHasItsDecidedCostAndBulkhead",
+        "src/test/java/org/courtside/booking/web/UsageReportControllerTest.java#givenNoPeriod_whenReportingUsage_thenTheLastFullMonthIsReported"
       ]
     },
     {

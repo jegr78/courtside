@@ -60,6 +60,7 @@ const groups: Group[] = [
     heading: "nav.adminRecords",
     destinations: [
       { to: "/admin/utilisation", testId: "admin-utilisation-link", label: "nav.adminStatistics" },
+      { to: "/admin/usage", testId: "admin-usage-link", label: "nav.adminUsage" },
       { to: "/admin/export", testId: "admin-export-link", label: "nav.adminExport" },
       { to: "/admin/audit", testId: "admin-audit-link", label: "nav.adminAudit" },
       { to: "/admin/messages", testId: "admin-messages-link", label: "nav.adminMessages" },
@@ -140,7 +141,7 @@ export function AdminNavigation({ administrator = true }: { administrator?: bool
       </Link>
       <NavigationLink destination={appointments} pathname={pathname} chosen={() => { if (!laidOpen) setUnfolded(false); }} />
       {administrator && <NavigationLink destination={overview} pathname={pathname} chosen={() => { if (!laidOpen) setUnfolded(false); }} />}
-      {administrator && groups.map((group) => <div key={group.testId} data-testid={group.testId} role="group" aria-labelledby={`${group.testId}-heading`} className="grid gap-2 lg:gap-1">
+      {administrator && groups.map((group) => <div key={group.testId} data-testid={group.testId} role="group" aria-labelledby={`${group.testId}-heading`} className="grid gap-2 lg:gap-0.5">
         <p id={`${group.testId}-heading`} className="text-muted text-xs font-bold tracking-wide uppercase">{t(group.heading)}</p>
         {group.destinations.map((destination) => <NavigationLink key={destination.testId} destination={destination}
           pathname={pathname} chosen={() => { if (!laidOpen) setUnfolded(false); }} />)}

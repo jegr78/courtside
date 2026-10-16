@@ -108,6 +108,11 @@ const BOUNDARIES = {
     classification: "the type is passed to the instance, which answers the refusal the view reports; the access state is compared with the filters the roster offers and dropped otherwise",
     test: "src/views/AdminRosterView.test.tsx#given an access filter the address names but the roster does not offer, when the roster is opened, then it reads everybody"
   },
+  "src/views/AdminUsageView.tsx useSearchParams": {
+    value: "the period the usage report is read for",
+    classification: "taken only as two real dates with the start not after the end, and the default period otherwise; the instance checks the period again",
+    test: "src/views/AdminUsageView.test.tsx#given an address whose period ends before it starts, when the page opens, then the default period is read instead"
+  },
   "src/views/ApplicationErrorView.tsx location": {
     value: "no external value",
     classification: "assigns the sign-in address currentSignInPath built or reloads, and reads nothing off the location itself",

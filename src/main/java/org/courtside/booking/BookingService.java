@@ -7,9 +7,11 @@ import org.courtside.shared.CancellationReason;
 import org.courtside.booking.internal.CourtAllocationRepository;
 import org.courtside.booking.internal.IdempotencyKeyRaceException;
 import org.courtside.booking.internal.IdempotencyKeyReusedException;
+import org.courtside.booking.internal.RuleRejectionLog;
 import org.courtside.identity.Role;
 import org.courtside.shared.CursorPage;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -26,6 +28,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class BookingService {
@@ -38,6 +41,7 @@ public class BookingService {
     private final BookingRequestFingerprint fingerprints;
     private final BookingAccessControl accessControl;
     private final MeterRegistry meters;
+    private final RuleRejectionLog rejections;
     private final Clock clock;
 
     public UUID create(CreateBookingCommand command) {
@@ -49,7 +53,7 @@ public class BookingService {
                 return writer.write(command);
             }
         } catch (BookingRulesViolatedException failure) {
-            recordRejections(failure);
+            recordRejections(failure, command);
             throw failure;
         }
     }
@@ -64,7 +68,7 @@ public class BookingService {
                 return createIdempotently(command, idempotencyKey, fingerprint);
             }
         } catch (BookingRulesViolatedException failure) {
-            recordRejections(failure);
+            recordRejections(failure, command);
             throw failure;
         }
     }
@@ -74,10 +78,20 @@ public class BookingService {
                 .orElseGet(() -> createNew(command, idempotencyKey, fingerprint));
     }
 
-    private void recordRejections(BookingRulesViolatedException failure) {
+    private void recordRejections(BookingRulesViolatedException failure, CreateBookingCommand command) {
         failure.getViolations().forEach(violation -> meters
                 .counter("courtside.bookings.rejected", "rule", violation.code())
                 .increment());
+        countRejection(failure, command.cardId());
+    }
+
+    // Counting a refusal for the usage report must never replace the refusal the caller receives.
+    private void countRejection(BookingRulesViolatedException failure, UUID cardId) {
+        try {
+            rejections.record(failure.getViolations(), cardId);
+        } catch (RuntimeException counting) {
+            log.warn("A refused booking attempt could not be counted for the usage report", counting);
+        }
     }
 
     private static void validateIdempotencyKey(String idempotencyKey) {
@@ -118,7 +132,12 @@ public class BookingService {
         Booking visibleBooking = bookings.findWithAllocationsById(bookingId)
                 .orElseThrow(() -> new BookingNotFoundException("No booking with id " + bookingId));
         accessControl.requireManagementAccess(visibleBooking, cancelledBy, cancellerRoles);
-        writer.cancel(bookingId, cancelledBy, cancellerRoles, reason);
+        try {
+            writer.cancel(bookingId, cancelledBy, cancellerRoles, reason);
+        } catch (BookingRulesViolatedException failure) {
+            countRejection(failure, visibleBooking.getCardId());
+            throw failure;
+        }
     }
 
     @Transactional(readOnly = true)

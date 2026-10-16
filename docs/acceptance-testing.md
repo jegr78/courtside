@@ -76,6 +76,14 @@ created.
   gone. The preflight checks all three and refuses the run without them. Preflight and postflight
   erase the attendance recorded for every persona and the bookings the journey seeded, so a lifted
   no-show never stays behind and repeated runs never accumulate one.
+- The usage journey needs nothing beyond the no-show journey. On the desktop browsers the admin
+  opens the usage report from three days before today to the last lane day and expects the four
+  parts to load, and neither the page nor the API answer to carry a persona's full name, address or
+  person id, read from the discovery. On desktop-firefox it runs after the no-show journey of the
+  same profile and expects refused attempts, a booking in the capacity and a lifted no-show.
+  Cancellations are only checked for their shape, because no journey keeps a cancellation in the
+  window for certain. The admin page walk follows the navigation the product renders, so a new
+  administration page is walked without a change to the harness.
 - For the welcome, `welcomeAccounts`. The journey creates one account on desktop-chrome to read
   its welcome and deactivates it again. Courtside has no erasure path yet, so with `erasure` the
   postflight removes that account and its person in the database: over `ssh` it runs `psql` in the

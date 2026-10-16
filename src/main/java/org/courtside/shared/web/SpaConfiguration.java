@@ -55,6 +55,7 @@ class SpaConfiguration {
             "/admin/import",
             "/admin/export",
             "/admin/utilisation",
+            "/admin/usage",
             "/admin/audit",
             "/admin/messages",
             "/admin/operational-logs");

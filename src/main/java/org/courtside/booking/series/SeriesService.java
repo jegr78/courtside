@@ -58,7 +58,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
+import lombok.extern.slf4j.Slf4j;
+import org.courtside.booking.internal.RuleRejectionLog;
 
+@Slf4j
 @Service
 public class SeriesService {
 
@@ -82,6 +85,7 @@ public class SeriesService {
     private final ApplicationEventPublisher events;
     private final TransactionTemplate transaction;
     private final CourtReservations reservations;
+    private final RuleRejectionLog rejections;
 
     public SeriesService(SeriesSchedule schedule,
                          CourtAllocationRepository allocations,
@@ -100,7 +104,8 @@ public class SeriesService {
                          EntityManager entityManager,
                          ApplicationEventPublisher events,
                          PlatformTransactionManager transactions,
-                         CourtReservations reservations) {
+                         CourtReservations reservations,
+                         RuleRejectionLog rejections) {
         this.schedule = schedule;
         this.allocations = allocations;
         this.bookings = bookings;
@@ -119,6 +124,7 @@ public class SeriesService {
         this.events = events;
         this.transaction = new TransactionTemplate(transactions);
         this.reservations = reservations;
+        this.rejections = rejections;
     }
 
     @Transactional(readOnly = true)
@@ -314,7 +320,7 @@ public class SeriesService {
                         .toList());
         IntStream.range(0, executions.size()).forEach(index -> {
             MoveExecution execution = executions.get(index);
-            requireNoViolations(ruleViolations.get(index));
+            requireNoViolations(ruleViolations.get(index), execution.booking().getCardId());
             participantCardCapacity.requireAvailableForParticipants(
                     execution.booking().getParticipants(), execution.slot(), execution.booking().getId(),
                     movingIds, targets);
@@ -476,10 +482,17 @@ public class SeriesService {
                 movedBookingIds);
     }
 
-    private void requireNoViolations(List<RuleViolation> violations) {
-        if (!violations.isEmpty()) {
-            throw new BookingRulesViolatedException(violations);
+    private void requireNoViolations(List<RuleViolation> violations, UUID cardId) {
+        if (violations.isEmpty()) {
+            return;
         }
+        // Counting a refusal for the usage report must never replace the refusal the caller receives.
+        try {
+            rejections.record(violations, cardId);
+        } catch (RuntimeException counting) {
+            log.warn("A refused series move could not be counted for the usage report", counting);
+        }
+        throw new BookingRulesViolatedException(violations);
     }
 
     private List<List<RuleViolation>> moveRuleViolations(List<PlannedMove> planned,

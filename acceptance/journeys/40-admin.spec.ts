@@ -10,7 +10,7 @@ import type { Page } from "@playwright/test";
 import { latestMailTo, mailAvailable, mailsTo, type Mail } from "../lib/mail";
 import { recordCreated } from "../lib/ledger";
 import { precondition } from "../lib/precondition";
-import { ADMIN_LINKS } from "../lib/surfaces.mjs";
+import { adminLinks } from "../lib/surfaces.mjs";
 
 test.beforeEach(() => { test.skip(!onDesksAndTablet(), "admin journeys run on desks, tablet and one phone"); });
 test.setTimeout(120_000);
@@ -21,7 +21,11 @@ test("when the admin visits every administration page, then each renders", async
   try {
     await page.getByTestId("administration-link").click();
     let previousHeading = "";
-    for (const link of ADMIN_LINKS) {
+    await expect(page.getByTestId("admin-navigation")).toBeVisible();
+    const links = adminLinks(await page.getByTestId("admin-navigation").locator("a[data-testid]")
+      .evaluateAll((anchors) => anchors.map((anchor) => anchor.getAttribute("data-testid"))));
+    expect(links, "product: the navigation offers the usage report").toContain("admin-usage-link");
+    for (const link of links) {
       await step("admin", link, async () => {
         await expect(page.getByTestId("admin-navigation")).toBeVisible();
         const destination = page.getByTestId(link);

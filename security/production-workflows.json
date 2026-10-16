@@ -231,7 +231,8 @@
         "Participation withdrawal removes only the caller's participant record.",
         "Series creation, move and cancellation change all selected occurrences transactionally.",
         "Joining a waitlist stores one open entry per slot and account; a freed slot is offered to the first eligible entry in the transaction that freed it, and acceptance turns the reservation into a confirmed booking.",
-        "A holder publishes or withdraws a partner invitation for an own booking; an eligible member who accepts it joins the booking as a participant under the booking row lock."
+        "A holder publishes or withdraws a partner invitation for an own booking; an eligible member who accepts it joins the booking as a participant under the booking row lock.",
+        "A booking or cancellation the rules refuse is counted with its rule codes, card and the holder's membership type, in a transaction of its own."
       ],
       "alternatePaths": [
         "Booking-card roles and ADMIN authority select which appointments a caller may create or manage.",
@@ -249,6 +250,7 @@
       ],
       "productionPaths": [
         "src/main/java/org/courtside/booking/BookingService.java",
+        "src/main/java/org/courtside/booking/internal/RuleRejectionLog.java",
         "src/main/java/org/courtside/booking/web/BookingValidationPreparation.java",
         "src/main/java/org/courtside/booking/ParticipationService.java",
         "src/main/java/org/courtside/booking/series/SeriesService.java",
@@ -265,7 +267,8 @@
         "src/test/java/org/courtside/booking/web/BookingValidationPreparationTest.java#givenAServletClassLoader_whenTheWebServerStarts_thenValidationIsPreparedWithoutCallingTheController",
         "src/test/java/org/courtside/booking/web/BookingValidationPreparationTest.java#givenFailedMvcBindingValidation_whenTheWebServerStarts_thenStartupFailsAndTheClassLoaderIsRestored",
         "src/test/java/org/courtside/booking/ParticipationServiceTest.java#givenAMemberNamedInSomebodyElsesBooking_whenTheyWithdraw_thenTheBookingKeepsEverythingElse",
-        "src/test/java/org/courtside/shared/internal/StartupWarmUpIntegrationTest.java#givenAClubWithACourt_whenTheWarmUpRuns_thenEveryStepRunsAndNoTableChanges"
+        "src/test/java/org/courtside/shared/internal/StartupWarmUpIntegrationTest.java#givenAClubWithACourt_whenTheWarmUpRuns_thenEveryStepRunsAndNoTableChanges",
+        "src/test/java/org/courtside/booking/web/UsageReportControllerTest.java#givenABookingTheRulesRefuse_whenReportingThatDay_thenTheRefusalIsCountedByItsCodeAndType"
       ]
     },
     {
@@ -597,7 +600,7 @@
       "actors": [
         "ADMIN"
       ],
-      "entryPoints": "Impact, utilisation, statistics, message-history, audit-log and bounded operational-log endpoints.",
+      "entryPoints": "Impact, utilisation, usage, statistics, message-history, audit-log and bounded operational-log endpoints.",
       "operationIds": [
         "courtImpact",
         "bookingCardImpact",
@@ -605,6 +608,7 @@
         "openingPeriodImpact",
         "courtClosureImpact",
         "facilityUtilisation",
+        "usageReport",
         "readStatisticsRange",
         "readUtilisationStatistics",
         "readBookingStatistics",
@@ -623,9 +627,10 @@
       ],
       "alternatePaths": [
         "Impact reads page through all affected future bookings before a configuration write.",
-        "Reports use the club time zone; utilisation reports stop at 366 days, statistics accept periods of at most 36,525 days in the years 0001 to 9999.",
+        "Reports use the club time zone; utilisation and usage reports stop at 366 days, statistics accept periods of at most 36,525 days in the years 0001 to 9999.",
         "Message and audit records expose privacy-safe event metadata to the permitted board role.",
-        "Operational records come only from the fixed application, database and proxy sources and are redacted before bounded storage."
+        "Operational records come only from the fixed application, database and proxy sources and are redacted before bounded storage.",
+        "The usage report counts capacity by card and membership type, cancellations, attendance and refused attempts without naming a person, an account or a booking."
       ],
       "failurePaths": [
         "Unknown subjects, cross-scope cursors and invalid report periods refuse without disclosing another set.",
@@ -635,6 +640,7 @@
       "productionPaths": [
         "src/main/java/org/courtside/booking/internal/ImpactService.java",
         "src/main/java/org/courtside/booking/internal/FacilityUtilisationService.java",
+        "src/main/java/org/courtside/booking/internal/UsageReportService.java",
         "src/main/java/org/courtside/reporting/internal/StatisticsService.java",
         "src/main/java/org/courtside/booking/internal/BookingStatisticsService.java",
         "src/main/java/org/courtside/member/internal/MembershipStatisticsService.java",
@@ -651,7 +657,9 @@
         "src/test/java/org/courtside/booking/web/FacilityUtilisationControllerTest.java#givenTheEndPrecedesTheStart_whenReportingUtilisation_thenThePeriodViolationIsReturned",
         "src/test/java/org/courtside/operations/OperationalLogAdminControllerTest.java#givenAMemberOrMissingCsrf_whenSearching_thenAccessIsRefused",
         "src/test/java/org/courtside/reporting/web/StatisticsControllerTest.java#givenAnEndBeforeTheStart_whenReadingUtilisation_thenThePeriodOrderIsRefused",
-        "src/test/java/org/courtside/reporting/web/StatisticsControllerTest.java#givenMembersWhoPlayedLeftOrOnlyCancelled_whenReadingLastMonth_thenOnlyRunningPlayersAreActive"
+        "src/test/java/org/courtside/reporting/web/StatisticsControllerTest.java#givenMembersWhoPlayedLeftOrOnlyCancelled_whenReadingLastMonth_thenOnlyRunningPlayersAreActive",
+        "src/test/java/org/courtside/booking/web/UsageReportControllerTest.java#givenBookingsOfNamedMembers_whenReporting_thenNoPersonAccountOrBookingIsNamed",
+        "src/test/java/org/courtside/booking/web/UsageReportControllerTest.java#givenAMember_whenReadingTheUsageReport_thenItIsForbidden"
       ]
     },
     {

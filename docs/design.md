@@ -567,6 +567,27 @@ period between them. Each read runs its statements under a 30-second statement t
 - Messages are counted per kind and state by the time they were queued. Retried counts the
   messages whose handover failed at least once and was scheduled again, whatever became of them.
 
+The usage report under `/api/admin/reports/usage`, shown at `/admin/usage` in the records group, answers four further questions for a period with
+the utilisation report's rules: both dates or none, the last full month by default, at most 366
+days. It counts the bookings whose earliest allocation starts in the period, closures left out, and
+names no person, account or booking.
+
+- Capacity groups confirmed bookings by card and by the holder's membership type, with their court
+  minutes and their share of the open court minutes that were not closed.
+- Cancellations split into those by the holder, by the club and by the release of an unattended
+  booking, and the club's are counted by the reason it gave. They are also grouped by card.
+- A card or membership-type group fewer than three accounts stand behind
+  (`UsageReportService.MINIMUM_GROUP_ACCOUNTS`) is never shown on its own. It joins one `other` row
+  without card or type, so the totals stay whole and a type one member holds does not expose that
+  member's bookings. When every group is small, the other row is the only one. The minimum group
+  keeps a single person from being read off the report by chance; it is not built to withstand an
+  admin, who manages personal data anyway, deliberately comparing different periods.
+- Attendance counts attended bookings, no-shows that still count and lifted ones. A booking with
+  nothing recorded counts in none of them.
+- Rule rejections count the booking and cancellation attempts the rules refused in the period, per
+  violation code. A refused attempt is written to `booking_rule_rejection` in a transaction of its
+  own with the card and the club-local hour, nothing that names the holder.
+
 ## Membership data exchange
 
 A source describes one external export. It stores column mapping, separator, character set,

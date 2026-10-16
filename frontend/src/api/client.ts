@@ -82,6 +82,7 @@ export type ExternalReferenceRequest = components["schemas"]["ExternalReferenceR
 export type AccountRequest = components["schemas"]["AccountRequest"];
 export type SubjectAccessExport = components["schemas"]["SubjectAccessExport"];
 export type FacilityUtilisation = components["schemas"]["FacilityUtilisation"];
+export type UsageReport = components["schemas"]["UsageReport"];
 export type CourtUtilisation = components["schemas"]["CourtUtilisation"];
 export type StatisticsPeriodQuery = { from: string; to: string };
 export type StatisticsRange = components["schemas"]["StatisticsRange"];
@@ -592,6 +593,8 @@ export const api = {
     period
       ? `/api/admin/reports/facility-utilisation?${new URLSearchParams(period).toString()}`
       : "/api/admin/reports/facility-utilisation"),
+  usageReport: (period?: StatisticsPeriodQuery) =>
+    request<UsageReport>(withPeriod("/api/admin/reports/usage", period)),
   statisticsRange: () => request<StatisticsRange>("/api/admin/statistics/range"),
   utilisationStatistics: (period?: StatisticsPeriodQuery) =>
     request<UtilisationStatistics>(withPeriod("/api/admin/statistics/utilisation", period)),
