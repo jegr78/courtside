@@ -459,6 +459,17 @@ Einmalpasswörter und Codes zur Kontowiederherstellung.
 
 Die Beispieldatei für die Spaltenzuordnung bleibt im Browser und wird nicht hochgeladen.
 
+Hat dein Export keine Kopfzeile, wähle *Nach Position*. Courtside zeigt dann die ersten Zeilen der
+Beispieldatei in nummerierten Spalten, und du ordnest jedem Feld eine Spaltennummer zu. Die
+Spaltenzahl übernimmt das Formular aus der Beispieldatei. Kann der Browser den Zeichensatz nicht
+anzeigen, trägst du sie selbst ein. Sieht die erste Zeile wie eine Kopfzeile aus, weist das
+Formular darauf hin, denn nach Position gelesen würde sie als Mitglied importiert.
+
+Eine Datei mit anderer Spaltenzahl lehnt Courtside ab, bevor eine Zeile gelesen wird. So landet
+kein Wert in einem falschen Feld, wenn das Vereinsprogramm eine Spalte ergänzt oder entfernt.
+Wechselst du die Lesart einer gespeicherten Quelle, fragt das Formular vor dem Speichern nach.
+Die nächste Datei wird dann auf die neue Art gelesen.
+
 ![Die Importquelle mit Dateiformat, Spaltenzuordnung und den von der Quelle geführten Feldern.](screenshots/de/import-source.png)
 
 ### 2. Datei prüfen
