@@ -31,9 +31,9 @@ public class RuleRejectionLog {
         Timestamp now = Timestamp.from(clock.instant());
         violations.stream().map(RuleViolation::code).distinct().forEach(code -> jdbc.sql("""
                         INSERT INTO booking_rule_rejection (id, attempt_id, rule_code, rejected_at, card_id)
-                        VALUES (:id, :attemptId, :code, date_trunc('hour', CAST(:now AS timestamptz), :zone), :cardId)
+                        VALUES (:id, :attemptId, :ruleCode, date_trunc('hour', CAST(:now AS timestamptz), :zone), :cardId)
                         """)
-                .param("id", UUID.randomUUID()).param("attemptId", attemptId).param("code", code)
+                .param("id", UUID.randomUUID()).param("attemptId", attemptId).param("ruleCode", code)
                 .param("now", now).param("zone", clubTimeZone.zoneId().getId()).param("cardId", cardId)
                 .update());
     }
