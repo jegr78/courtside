@@ -54,15 +54,17 @@ class MailTemplatesTest {
         // given
         MessageTemplateOverrides overrides = mock(MessageTemplateOverrides.class);
         when(overrides.of(MessageKind.ACCOUNT_PASSWORD_RESET_CODE, "en"))
-                .thenReturn(Optional.of(new MessageText("Code for {nickname}", "Hello {nickname}")));
-        MailTemplates withBrokenWording = new MailTemplates(overrides);
+                .thenReturn(Optional.of(new MessageText("Your code", "{username}: {resetCode}\n{instanceLink}")));
+        MailTemplates withUnfillableWording = new MailTemplates(overrides);
+        Map<String, String> withoutLink = new HashMap<>(VALUES);
+        withoutLink.remove("instanceLink");
 
         // when
-        String body = withBrokenWording.render("account.passwordResetCode.body", Locale.ENGLISH, VALUES);
+        String body = withUnfillableWording.render("account.passwordResetCode.body", Locale.ENGLISH, withoutLink);
 
         // then
         assertThat(body).as("a security message is never lost to a club's wording")
-                .isEqualTo(templates.render("account.passwordResetCode.body", Locale.ENGLISH, VALUES));
+                .isEqualTo(templates.render("account.passwordResetCode.body", Locale.ENGLISH, withoutLink));
     }
 
     @Test
