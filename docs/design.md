@@ -594,10 +594,19 @@ A source describes one external export. It stores column mapping, separator, cha
 category mapping, source-owned fields, default membership type and the threshold for confirming
 disappearing memberships.
 
+A source reads its files in one of two modes. By header, the default, the first row names the
+columns and each field is found by the header mapped to it. By position, for an export without a
+header row, each field comes from a numbered column and the source stores how many columns a file
+has. A file whose first row has a different count is refused before a preview exists, because its
+columns can no longer be trusted to mean what they did; a single short row inside an intact file
+fails as a row. Switching a source between the modes needs an explicit confirmation, and nothing
+guesses a mapping in place of the stored one.
+
 Source plus member number identifies an external record. Names and email addresses do not. One
 person may hold references from several sources.
 
-The browser reads a selected file locally to offer its headers and category values. Uploading a
+The browser reads a selected file locally to offer its headers, numbered columns and category
+values, so describing a source uploads no personal data. Uploading a
 snapshot creates a preview with creations, changes, ending memberships, invalid rows, possible
 duplicates, shared mailboxes and accounts to create. It writes no roster data.
 

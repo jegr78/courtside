@@ -15,6 +15,8 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.courtside.dataexchange.CanonicalField;
+import org.courtside.dataexchange.ColumnLayout;
+import org.courtside.dataexchange.ColumnMode;
 
 import java.time.Instant;
 import java.util.HashMap;
@@ -60,6 +62,20 @@ public class ImportSource {
     @Column(name = "canonical_field", nullable = false)
     private Map<String, CanonicalField> columns = new HashMap<>();
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "column_mode", nullable = false)
+    private ColumnMode columnMode = ColumnMode.HEADER;
+
+    @Column(name = "column_count")
+    private Integer columnCount;
+
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "import_column_position", joinColumns = @JoinColumn(name = "source_id"))
+    @MapKeyColumn(name = "position")
+    @Enumerated(EnumType.STRING)
+    @Column(name = "canonical_field", nullable = false)
+    private Map<Integer, CanonicalField> positions = new HashMap<>();
+
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "import_type_mapping", joinColumns = @JoinColumn(name = "source_id"))
     @MapKeyColumn(name = "source_value")
@@ -78,7 +94,7 @@ public class ImportSource {
     }
 
     public void changeTo(String sourceKey, String displayName, String separator, String encoding,
-                         Map<String, CanonicalField> columns,
+                         ColumnLayout layout,
                          Map<String, UUID> membershipTypes, UUID defaultMembershipTypeId,
                          Set<CanonicalField> ownedFields, int removalWarningPercent) {
         this.sourceKey = sourceKey;
@@ -87,8 +103,12 @@ public class ImportSource {
         this.encoding = encoding;
         this.defaultMembershipTypeId = defaultMembershipTypeId;
         this.removalWarningPercent = removalWarningPercent;
+        this.columnMode = layout.mode();
+        this.columnCount = layout.columnCount();
         this.columns.clear();
-        this.columns.putAll(columns);
+        this.columns.putAll(layout.headers());
+        this.positions.clear();
+        this.positions.putAll(layout.positions());
         this.membershipTypes.clear();
         this.membershipTypes.putAll(membershipTypes);
         this.ownedFields.clear();

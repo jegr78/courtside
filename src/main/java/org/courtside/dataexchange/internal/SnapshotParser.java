@@ -48,6 +48,73 @@ public final class SnapshotParser {
         }
     }
 
+    public static CsvSnapshot parsePositions(byte[] content, Map<Integer, CanonicalField> positions,
+                                             int columnCount, Charset chosen, char separator) {
+        String text = decoded(content, chosen);
+        try (CSVParser parser = headerless(separator).parse(new StringReader(text))) {
+            List<CSVRecord> records = parser.getRecords();
+            int found = records.isEmpty() ? 0 : records.getFirst().size();
+            if (found != columnCount) {
+                throw new SnapshotHeaderInvalidException("import.snapshot.columns.countChanged",
+                        Map.of("expected", columnCount, "found", found));
+            }
+            return readPositions(records, positions, columnCount);
+        } catch (IOException e) {
+            throw new SnapshotHeaderInvalidException("import.snapshot.unreadable", Map.of());
+        }
+    }
+
+    private static CsvSnapshot readPositions(List<CSVRecord> records, Map<Integer, CanonicalField> positions,
+                                             int columnCount) {
+        List<CsvSnapshot.SnapshotRow> rows = new ArrayList<>();
+        List<CsvSnapshot.RowError> errors = new ArrayList<>();
+        Set<String> seen = new HashSet<>();
+        int rowNumber = 0;
+        for (CSVRecord record : records) {
+            rowNumber++;
+            if (record.size() != columnCount) {
+                errors.add(new CsvSnapshot.RowError(rowNumber, record.size() < columnCount
+                        ? "import.snapshot.row.columnsMissing" : "import.snapshot.row.columnsUnexpected",
+                        Map.of("expected", columnCount, "found", record.size())));
+                continue;
+            }
+            Map<CanonicalField, String> values = new EnumMap<>(CanonicalField.class);
+            positions.forEach((position, field) -> values.put(field,
+                    FormulaCharacters.withoutTheEscape(record.get(position - 1).strip())));
+            addRow(rows, errors, seen, rowNumber, values);
+        }
+        List<String> ignored = new ArrayList<>();
+        for (int position = 1; position <= columnCount; position++) {
+            if (!positions.containsKey(position)) {
+                ignored.add(String.valueOf(position));
+            }
+        }
+        return new CsvSnapshot(rows, errors, ignored);
+    }
+
+    private static void addRow(List<CsvSnapshot.SnapshotRow> rows, List<CsvSnapshot.RowError> errors,
+                               Set<String> seen, int rowNumber, Map<CanonicalField, String> values) {
+        String externalId = values.remove(CanonicalField.EXTERNAL_ID);
+        if (!MemberNumber.isUsable(externalId)) {
+            errors.add(new CsvSnapshot.RowError(rowNumber,
+                    "import.snapshot.row.externalIdUnusable",
+                    Map.of("maxLength", MemberNumber.MAX_LENGTH)));
+        } else if (!seen.add(externalId)) {
+            errors.add(new CsvSnapshot.RowError(rowNumber,
+                    "import.snapshot.row.duplicateExternalId", Map.of("externalId", externalId)));
+        } else {
+            rows.add(new CsvSnapshot.SnapshotRow(rowNumber, externalId, values));
+        }
+    }
+
+    private static CSVFormat headerless(char delimiter) {
+        return CSVFormat.DEFAULT.builder()
+                .setDelimiter(delimiter)
+                .setIgnoreEmptyLines(true)
+                .setTrim(true)
+                .get();
+    }
+
     private static CSVFormat format(char delimiter) {
         return CSVFormat.DEFAULT.builder()
                 .setDelimiter(delimiter)
@@ -72,18 +139,7 @@ public final class SnapshotParser {
                 errors.add(shape);
                 continue;
             }
-            Map<CanonicalField, String> values = valuesOf(record, header);
-            String externalId = values.remove(CanonicalField.EXTERNAL_ID);
-            if (!MemberNumber.isUsable(externalId)) {
-                errors.add(new CsvSnapshot.RowError(rowNumber,
-                        "import.snapshot.row.externalIdUnusable",
-                        Map.of("maxLength", MemberNumber.MAX_LENGTH)));
-            } else if (!seen.add(externalId)) {
-                errors.add(new CsvSnapshot.RowError(rowNumber,
-                        "import.snapshot.row.duplicateExternalId", Map.of("externalId", externalId)));
-            } else {
-                rows.add(new CsvSnapshot.SnapshotRow(rowNumber, externalId, values));
-            }
+            addRow(rows, errors, seen, rowNumber, valuesOf(record, header));
         }
         return new CsvSnapshot(rows, errors, ignoredColumns);
     }

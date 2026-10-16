@@ -1194,10 +1194,33 @@ components:
         system holds and is what a record is matched by; the other four are the person's data.
       enum: [EXTERNAL_ID, FIRST_NAME, LAST_NAME, EMAIL, MEMBERSHIP_TYPE]
 
+    ImportColumnMode:
+      type: string
+      description: |
+        How a source finds its fields in a file. `HEADER` reads the first row as column names and
+        finds each field by the name mapped to it, wherever the column stands. `POSITION` reads a
+        file without a header row and takes each field from the numbered column mapped to it, so
+        every file must keep the same number of columns in the same order. `HEADER` is the safer
+        default: a reordered export still reads correctly, where a reordered headerless one would
+        put values into the wrong fields, which is why a changed column count refuses the file.
+      enum: [HEADER, POSITION]
+
+    ImportColumnPosition:
+      type: object
+      required: [position, field]
+      properties:
+        position:
+          type: integer
+          minimum: 1
+          maximum: 200
+          description: The column, counted from 1 at the left of the file.
+        field: { $ref: "#/components/schemas/CanonicalField" }
+
     ImportSource:
       type: object
-      required: [id, sourceKey, displayName, separator, encoding, columns, membershipTypes,
-                 defaultMembershipTypeId, ownedFields, removalWarningPercent]
+      required: [id, sourceKey, displayName, separator, encoding, columnMode, columns, positions,
+                 columnCount, membershipTypes, defaultMembershipTypeId, ownedFields,
+                 removalWarningPercent]
       properties:
         id: { type: string, format: uuid }
         sourceKey: { type: string }
@@ -1226,9 +1249,20 @@ components:
 
             A byte order mark and valid UTF-8 remain facts about the content and outrank both.
 
+        columnMode: { $ref: "#/components/schemas/ImportColumnMode" }
         columns:
           type: object
+          description: The header mapping; empty for a source read by position.
           additionalProperties: { $ref: "#/components/schemas/CanonicalField" }
+        positions:
+          type: array
+          description: The position mapping, ordered by position; empty for a source read by header.
+          items: { $ref: "#/components/schemas/ImportColumnPosition" }
+        columnCount:
+          type: [integer, "null"]
+          description: |
+            The number of columns every file of a source read by position must have; `null` for a
+            source read by header, whose files may carry columns it does not map.
         membershipTypes:
           type: object
           additionalProperties: { type: string, format: uuid }
@@ -1248,9 +1282,40 @@ components:
         `membershipTypes` and `ownedFields` may be omitted, and the source then holds neither: no
         exported category maps to a type, and the source owns no field. `ImportSource` reports both
         as empty rather than absent, which is why it requires what this does not.
-      required: [sourceKey, displayName, separator, encoding, columns, defaultMembershipTypeId,
+
+        `columnMode` omitted means `HEADER`. A source read by header gives `columns` and leaves
+        `positions` and `columnCount` out; a source read by position gives `positions` and
+        `columnCount` and leaves `columns` out or empty. Either side given for the other mode is
+        refused rather than ignored, so nothing a club sent is silently dropped.
+      required: [sourceKey, displayName, separator, encoding, defaultMembershipTypeId,
                  removalWarningPercent]
       properties:
+        columnMode: { $ref: "#/components/schemas/ImportColumnMode" }
+        positions:
+          type: array
+          maxItems: 200
+          description: |
+            For a source read by position, the column each field comes from. `EXTERNAL_ID`,
+            `FIRST_NAME` and `LAST_NAME` are required for the same reason they are required as
+            headers; no two entries may name the same position or the same field, and every
+            position must lie within `columnCount`.
+          items: { $ref: "#/components/schemas/ImportColumnPosition" }
+        columnCount:
+          type: integer
+          minimum: 1
+          maximum: 200
+          description: |
+            For a source read by position, the number of columns its files have. The browser
+            counts them from a local sample of the export, so describing a source uploads no
+            personal data. A file with a different count in its first row is refused before any
+            preview exists, because its columns can no longer be trusted to mean what they did.
+        confirmColumnModeChange:
+          type: boolean
+          description: |
+            Must be `true` when a change switches the source between `HEADER` and `POSITION`. The
+            next snapshot is then read the other way: by position, a header row in the file would
+            be read as a member; by header, a file without one is refused. A switch sent without
+            this is refused and nothing changes. It is ignored when the mode stays the same.
         sourceKey:
           type: string
           minLength: 1
@@ -1296,7 +1361,8 @@ components:
         columns:
           type: object
           description: |
-            The header in the club's export, mapped to the field it holds. `EXTERNAL_ID`,
+            For a source read by header, the header in the club's export, mapped to the field it
+            holds. `EXTERNAL_ID`,
             `FIRST_NAME` and `LAST_NAME` are required — a snapshot creates people, and a record
             with no name, or without the number that identifies it, describes nobody this product
             could create. `EMAIL` and `MEMBERSHIP_TYPE` are optional, because a club's own member

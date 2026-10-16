@@ -23,6 +23,7 @@ import org.courtside.shared.DatabaseDeadlines;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
 
+import java.nio.charset.Charset;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Collection;
@@ -58,9 +59,8 @@ public class PreviewService {
         byte[] content = requiredUpload(upload).content();
         SourceConfiguration configuration = sources.configurationForUpdate(sourceId);
         SnapshotMode requested = requiredMode(mode);
-        CsvSnapshot snapshot = SnapshotParser.parse(content, configuration.columns(),
-                SupportedEncodings.resolve(encodingInForce(encoding, configuration)),
-                configuration.separator());
+        CsvSnapshot snapshot = parsed(content, configuration,
+                SupportedEncodings.resolve(encodingInForce(encoding, configuration)));
         CurrentRoster roster = currentRosterFor(sourceId, snapshot);
         ResolvedChangeSet resolved = ChangeSetResolver.resolve(snapshot, configuration, requested, roster);
         Instant now = clock.instant();
@@ -72,6 +72,21 @@ public class PreviewService {
                 resolved.removals().percent(), configuration.removalWarningPercent(), now,
                 requiredAccountId(accountId), now.plus(properties.previewRetention())));
         return toSummary(preview);
+    }
+
+    private static CsvSnapshot parsed(byte[] content, SourceConfiguration configuration, Charset charset) {
+        if (configuration.columnMode() == ColumnMode.POSITION) {
+            return SnapshotParser.parsePositions(content, configuration.positions(),
+                    requiredColumnCount(configuration), charset, configuration.separator());
+        }
+        return SnapshotParser.parse(content, configuration.columns(), charset, configuration.separator());
+    }
+
+    private static int requiredColumnCount(SourceConfiguration configuration) {
+        if (configuration.columnCount() == null) {
+            throw new IllegalStateException("A source read by position has no column count: " + configuration.sourceId());
+        }
+        return configuration.columnCount();
     }
 
     // One file may come out differently; the source stays the answer for every other.

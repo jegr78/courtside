@@ -1,5 +1,6 @@
 package org.courtside.dataexchange.web;
 
+import org.courtside.dataexchange.ColumnLayout;
 import org.courtside.AbstractIntegrationTest;
 import org.courtside.audit.testfixture.AuditTestFixture;
 import org.courtside.booking.testfixture.BookingTestFixture;
@@ -384,10 +385,10 @@ class SubjectAccessAdminControllerTest extends AbstractIntegrationTest {
 
     private UUID importSource() {
         return sources.create("roster-system", "Membership system", ",", "UTF-8",
-                Map.of("Member number", CanonicalField.EXTERNAL_ID,
+                ColumnLayout.headers(Map.of("Member number", CanonicalField.EXTERNAL_ID,
                         "First name", CanonicalField.FIRST_NAME,
                         "Last name", CanonicalField.LAST_NAME,
-                        "Email", CanonicalField.EMAIL),
+                        "Email", CanonicalField.EMAIL)),
                 Map.of(), ACTIVE_TYPE, Set.of(), 10).sourceId();
     }
 }
