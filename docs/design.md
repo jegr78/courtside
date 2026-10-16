@@ -584,7 +584,7 @@ names no person, account or booking.
   nothing recorded counts in none of them.
 - Rule rejections count the booking and cancellation attempts the rules refused in the period, per
   violation code. A refused attempt is written to `booking_rule_rejection` in a transaction of its
-  own with the card and the membership type the holder had that day.
+  own with the card and the club-local hour, nothing that names the holder.
 
 ## Membership data exchange
 

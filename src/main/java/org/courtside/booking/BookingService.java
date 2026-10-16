@@ -82,13 +82,13 @@ public class BookingService {
         failure.getViolations().forEach(violation -> meters
                 .counter("courtside.bookings.rejected", "rule", violation.code())
                 .increment());
-        countRejection(failure, command.cardId(), command.bookedByPersonId(), command.bookedBy());
+        countRejection(failure, command.cardId());
     }
 
     // Counting a refusal for the usage report must never replace the refusal the caller receives.
-    private void countRejection(BookingRulesViolatedException failure, UUID cardId, UUID personId, UUID accountId) {
+    private void countRejection(BookingRulesViolatedException failure, UUID cardId) {
         try {
-            rejections.record(failure.getViolations(), cardId, personId, accountId);
+            rejections.record(failure.getViolations(), cardId);
         } catch (RuntimeException counting) {
             log.warn("A refused booking attempt could not be counted for the usage report", counting);
         }
@@ -135,7 +135,7 @@ public class BookingService {
         try {
             writer.cancel(bookingId, cancelledBy, cancellerRoles, reason);
         } catch (BookingRulesViolatedException failure) {
-            countRejection(failure, visibleBooking.getCardId(), null, visibleBooking.getBookedBy());
+            countRejection(failure, visibleBooking.getCardId());
             throw failure;
         }
     }

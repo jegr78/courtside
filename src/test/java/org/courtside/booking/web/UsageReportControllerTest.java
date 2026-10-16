@@ -227,9 +227,9 @@ class UsageReportControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.ruleRejections.attempts").value(1))
                 .andExpect(jsonPath("$.ruleRejections.rules[?(@.code == 'booking.rule.startsInPast')].attempts")
                         .value(1));
-        assertThat(jdbc.sql("SELECT membership_type_id FROM booking_rule_rejection").query(UUID.class).list())
-                .as("the refusal keeps the holder's membership type and nothing that names them")
-                .isNotEmpty().containsOnly(adultType);
+        assertThat(jdbc.sql("SELECT card_id FROM booking_rule_rejection").query(UUID.class).list())
+                .as("the refusal keeps the card it asked for and nothing that names the holder")
+                .isNotEmpty().containsOnly(MEMBER_BOOKING_CARD);
     }
 
     @Test

@@ -320,8 +320,7 @@ public class SeriesService {
                         .toList());
         IntStream.range(0, executions.size()).forEach(index -> {
             MoveExecution execution = executions.get(index);
-            requireNoViolations(ruleViolations.get(index), execution.booking().getCardId(),
-                    execution.booking().getBookedBy());
+            requireNoViolations(ruleViolations.get(index), execution.booking().getCardId());
             participantCardCapacity.requireAvailableForParticipants(
                     execution.booking().getParticipants(), execution.slot(), execution.booking().getId(),
                     movingIds, targets);
@@ -483,13 +482,13 @@ public class SeriesService {
                 movedBookingIds);
     }
 
-    private void requireNoViolations(List<RuleViolation> violations, UUID cardId, UUID holderAccountId) {
+    private void requireNoViolations(List<RuleViolation> violations, UUID cardId) {
         if (violations.isEmpty()) {
             return;
         }
         // Counting a refusal for the usage report must never replace the refusal the caller receives.
         try {
-            rejections.record(violations, cardId, null, holderAccountId);
+            rejections.record(violations, cardId);
         } catch (RuntimeException counting) {
             log.warn("A refused series move could not be counted for the usage report", counting);
         }

@@ -74,9 +74,9 @@ VALUES ('77000000-0000-0000-0000-000000000001', 'NO_SHOW', '2025-01-05T10:30:00Z
 INSERT INTO booking_release (booking_id, released_at)
 VALUES ('77000000-0000-0000-0000-000000000002', '2025-01-06T09:20:00Z');
 
-INSERT INTO booking_rule_rejection (id, attempt_id, rule_code, rejected_at, card_id, membership_type_id)
+INSERT INTO booking_rule_rejection (id, attempt_id, rule_code, rejected_at, card_id)
 VALUES ('77100000-0000-0000-0000-000000000001', '77100000-0000-0000-0000-000000000002',
-        'booking.rule.startsInPast', '2025-01-07T09:00:00Z', '11111111-1111-1111-1111-111111111111', NULL);
+        'booking.rule.startsInPast', '2025-01-07T09:00:00Z', '11111111-1111-1111-1111-111111111111');
 
 INSERT INTO booking_participant (id, booking_id, kind, person_id, position)
 VALUES ('79000000-0000-0000-0000-000000000001', '77000000-0000-0000-0000-000000000001',

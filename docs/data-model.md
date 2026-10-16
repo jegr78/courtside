@@ -161,7 +161,7 @@ cancelled or started, or whose place no longer holds the card.
 | `attendance_policy` | The one row saying whether the club records attendance and after how many minutes an unattended member booking is released | None |
 | `booking_attendance` | What was recorded for one started booking, `ATTENDED` or `NO_SHOW`, who recorded it and when, and when a no-show was lifted | `user_account` |
 | `booking_release` | When the release sweep cancelled a booking because nobody had checked in | None |
-| `booking_rule_rejection` | One row per rule a refused booking or cancellation attempt broke: the rule code, when, the card asked for and the membership type the holder had that day | None |
+| `booking_rule_rejection` | One row per rule a refused booking, series or cancellation attempt broke: the rule code, the club-local hour it happened in and the card asked for | None |
 
 A booking without a `booking_attendance` row has nothing recorded and is never a no-show. A member's
 check-in and a board's record write the same row, and a board's later record replaces it. Lifting a
@@ -174,6 +174,8 @@ no-show sets `lifted_at` and keeps the row, so the no-show stays visible but sto
 `booking_rule_rejection` feeds the usage report and names nobody: no person, no account and no
 booking. `attempt_id` groups the rules one attempt broke, so the report counts attempts as well as
 rules. A refused attempt writes it in a transaction of its own, because the attempt itself rolls back.
+`rejected_at` holds only the start of the club-local hour, so a row cannot be matched to a request
+in a log by its time, and a day the report counts still starts at club-local midnight.
 A refused single booking, booking series and cancellation each write it. Nothing deletes its rows
 yet; how long a club keeps them belongs to the retention controls by record category.
 

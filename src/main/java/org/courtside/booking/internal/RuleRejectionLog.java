@@ -10,8 +10,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.sql.Timestamp;
 import java.time.Clock;
-import java.time.Instant;
-import java.time.LocalDate;
 import java.util.Collection;
 import java.util.UUID;
 
@@ -23,28 +21,20 @@ public class RuleRejectionLog {
     private final ClubTimeZone clubTimeZone;
     private final Clock clock;
 
-    // Its own transaction, because the refused attempt rolls back; it keeps nothing that names the holder.
+    // Its own transaction, because the refused attempt rolls back; the club-local hour is all it keeps of when.
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void record(Collection<RuleViolation> violations, UUID cardId, UUID holderPersonId, UUID holderAccountId) {
+    public void record(Collection<RuleViolation> violations, UUID cardId) {
         if (cardId == null) {
             throw new IllegalStateException("A refused attempt is counted against the card it asked for");
         }
-        Instant now = clock.instant();
-        LocalDate today = LocalDate.ofInstant(now, clubTimeZone.zoneId());
         UUID attemptId = UUID.randomUUID();
+        Timestamp now = Timestamp.from(clock.instant());
         violations.stream().map(RuleViolation::code).distinct().forEach(code -> jdbc.sql("""
-                        INSERT INTO booking_rule_rejection
-                            (id, attempt_id, rule_code, rejected_at, card_id, membership_type_id)
-                        SELECT :id, :attemptId, :code, :rejectedAt, :cardId,
-                               (SELECT m.membership_type_id FROM member m
-                                 WHERE m.person_id = COALESCE(CAST(:personId AS uuid),
-                                           (SELECT u.person_id FROM user_account u WHERE u.id = :accountId))
-                                   AND m.started_on <= :today
-                                   AND (m.ended_on IS NULL OR m.ended_on > :today))
+                        INSERT INTO booking_rule_rejection (id, attempt_id, rule_code, rejected_at, card_id)
+                        VALUES (:id, :attemptId, :code, date_trunc('hour', CAST(:now AS timestamptz), :zone), :cardId)
                         """)
                 .param("id", UUID.randomUUID()).param("attemptId", attemptId).param("code", code)
-                .param("rejectedAt", Timestamp.from(now)).param("cardId", cardId)
-                .param("personId", holderPersonId).param("accountId", holderAccountId).param("today", today)
+                .param("now", now).param("zone", clubTimeZone.zoneId().getId()).param("cardId", cardId)
                 .update());
     }
 }

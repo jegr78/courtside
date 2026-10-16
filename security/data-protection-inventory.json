@@ -630,10 +630,6 @@
         "level": "operational",
         "lifecycle": "usage-record"
       },
-      "membership_type_id": {
-        "level": "operational",
-        "lifecycle": "usage-record"
-      },
       "rejected_at": {
         "level": "operational",
         "lifecycle": "usage-record"

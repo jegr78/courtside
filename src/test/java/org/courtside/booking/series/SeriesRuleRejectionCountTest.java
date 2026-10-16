@@ -54,7 +54,6 @@ class SeriesRuleRejectionCountTest extends AbstractIntegrationTest {
     private UUID court;
     private UUID ownerPersonId;
     private UUID owner;
-    private UUID juniors;
 
     @BeforeEach
     void setUp() {
@@ -64,7 +63,7 @@ class SeriesRuleRejectionCountTest extends AbstractIntegrationTest {
         }
         ownerPersonId = identity.createPerson("Jane", "Doe", "jane@example.org");
         owner = identity.createAccount(ownerPersonId, "doe.jane", Set.of(Role.TRAINER));
-        juniors = members.membershipTypeMeasuredBy("Juniors",
+        UUID juniors = members.membershipTypeMeasuredBy("Juniors",
                 rules.ruleSetLimitingBookingHours("Junior hours", LocalTime.of(9, 0), LocalTime.of(20, 0)));
         members.assignMembership(ownerPersonId, juniors);
     }
@@ -76,8 +75,8 @@ class SeriesRuleRejectionCountTest extends AbstractIntegrationTest {
 
         // then
         assertThat(result.skipped()).hasSize(2);
-        assertThat(rejections()).as("each refused occurrence is one counted attempt with the holder's type")
-                .hasSize(2).containsOnly(OUTSIDE_HOURS + "/" + juniors);
+        assertThat(rejections()).as("each refused occurrence is one counted attempt")
+                .hasSize(2).containsOnly(OUTSIDE_HOURS);
     }
 
     @Test
@@ -90,7 +89,7 @@ class SeriesRuleRejectionCountTest extends AbstractIntegrationTest {
                 .isInstanceOf(BookingRulesViolatedException.class);
 
         // then
-        assertThat(rejections()).as("the refused move is counted").containsExactly(OUTSIDE_HOURS + "/" + juniors);
+        assertThat(rejections()).as("the refused move is counted").containsExactly(OUTSIDE_HOURS);
     }
 
     @Test
@@ -125,7 +124,7 @@ class SeriesRuleRejectionCountTest extends AbstractIntegrationTest {
     }
 
     private List<String> rejections() {
-        return jdbc.sql("SELECT rule_code || '/' || membership_type_id FROM booking_rule_rejection")
+        return jdbc.sql("SELECT rule_code FROM booking_rule_rejection")
                 .query(String.class).list();
     }
 
