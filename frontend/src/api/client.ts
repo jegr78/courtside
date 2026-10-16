@@ -23,6 +23,8 @@ export type CourtClosure = components["schemas"]["CourtClosure"];
 export type CreateOpeningPeriodRequest = components["schemas"]["CreateOpeningPeriodRequest"];
 export type PublicCourtClosure = components["schemas"]["PublicCourtClosure"];
 export type CreateCourtClosureRequest = components["schemas"]["CreateCourtClosureRequest"];
+export type OpeningPeriodImpactRequest = components["schemas"]["OpeningPeriodImpactRequest"];
+export type CourtClosureImpactRequest = components["schemas"]["CourtClosureImpactRequest"];
 export type DayOfWeek = components["schemas"]["DayOfWeek"];
 export type BookingCard = components["schemas"]["BookingCard"];
 export type BookingCardRequest = components["schemas"]["BookingCardRequest"];
@@ -420,6 +422,12 @@ export const api = {
       ...(closesAt ? { closesAt } : {})
     }).toString()}`
   ),
+  openingPeriodImpact: (period: OpeningPeriodImpactRequest) => request<Impact>("/api/admin/impact/opening-periods?limit=1", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(period)
+  }),
+  courtClosureImpact: (closure: CourtClosureImpactRequest) => request<Impact>("/api/admin/impact/court-closures?limit=1", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(closure)
+  }),
   adminCourts: () => request<AdminCourt[]>("/api/admin/courts"),
   createAdminCourt: (court: CourtRequest) => request<AdminCourt>("/api/admin/courts", {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(court)

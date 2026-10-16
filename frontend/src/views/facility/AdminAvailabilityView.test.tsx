@@ -24,6 +24,9 @@ const courts = [
   { id: "court-2", number: 2, name: null, active: true }
 ];
 
+const noImpact = { affectedCount: 0, truncated: false, bookings: [] };
+const impactOf = (affectedCount: number) => ({ ...noImpact, affectedCount });
+
 function show() {
   render(<MemoryRouter><WithClubConfiguration><UnsavedChangesProvider>
     <AdminAvailabilityView />
@@ -39,6 +42,8 @@ describe("AdminAvailabilityView", () => {
       { id: "closure-1", courtId: "court-2", name: "Resurfacing", startsOn: "2099-06-01", endsOn: "2099-06-30" }
     ]);
     vi.spyOn(api, "adminCourts").mockResolvedValue(courts);
+    vi.spyOn(api, "openingPeriodImpact").mockResolvedValue(noImpact);
+    vi.spyOn(api, "courtClosureImpact").mockResolvedValue(noImpact);
   });
 
   it("given entries in the past, running and ahead, when the view loads, then only what may still change offers it", async () => {
@@ -164,5 +169,74 @@ describe("AdminAvailabilityView", () => {
     expect(screen.getByTestId("opening-period-opens-MONDAY")).toBeDisabled();
     expect(screen.getByTestId("opening-period-ends-on")).toBeEnabled();
     expect(screen.getByTestId("opening-period-started")).toBeInTheDocument();
+  });
+  it("given a new holiday over two bookings, when its days are entered, then the form says how many it affects before saving", async () => {
+    // given
+    const ask = vi.spyOn(api, "openingPeriodImpact").mockResolvedValue(impactOf(2));
+    show();
+    await screen.findByTestId("opening-period-form");
+
+    // when
+    fireEvent.change(screen.getByTestId("opening-period-starts-on"), { target: { value: "2099-07-07" } });
+    fireEvent.change(screen.getByTestId("opening-period-ends-on"), { target: { value: "2099-07-07" } });
+
+    // then
+    expect(await screen.findByTestId("opening-period-affected")).toHaveTextContent("affects 2 existing bookings");
+    expect(ask).toHaveBeenLastCalledWith({
+      periodId: null, kind: "HOLIDAY", startsOn: "2099-07-07", endsOn: "2099-07-07", days: closedDays
+    });
+  });
+
+  it("given a closure that affects nothing, when its days are entered, then no notice is shown", async () => {
+    // given
+    const ask = vi.spyOn(api, "courtClosureImpact").mockResolvedValue(noImpact);
+    show();
+    await screen.findByTestId("court-closure-form");
+
+    // when
+    fireEvent.change(screen.getByTestId("court-closure-court"), { target: { value: "court-1" } });
+    fireEvent.change(screen.getByTestId("court-closure-starts-on"), { target: { value: "2099-08-01" } });
+    fireEvent.change(screen.getByTestId("court-closure-ends-on"), { target: { value: "2099-08-02" } });
+
+    // then
+    await waitFor(() => expect(ask).toHaveBeenCalledWith({
+      closureId: null, courtId: "court-1", startsOn: "2099-08-01", endsOn: "2099-08-02"
+    }));
+    expect(screen.queryByTestId("court-closure-affected"), "a change that touches nothing needs no warning")
+      .not.toBeInTheDocument();
+  });
+
+  it("given a stored closure being widened over one booking, when the new last day is entered, then the notice names its own closure", async () => {
+    // given
+    const ask = vi.spyOn(api, "courtClosureImpact").mockResolvedValue(impactOf(1));
+    show();
+    await userEvent.click(await screen.findByTestId("edit-court-closure-closure-1"));
+    expect(screen.queryByTestId("court-closure-affected"), "an unchanged entry is not asked about").not.toBeInTheDocument();
+
+    // when
+    fireEvent.change(screen.getByTestId("court-closure-ends-on"), { target: { value: "2099-07-05" } });
+
+    // then
+    expect(await screen.findByTestId("court-closure-affected")).toHaveTextContent("affects 1 existing booking.");
+    expect(ask).toHaveBeenLastCalledWith({
+      closureId: "closure-1", courtId: "court-2", startsOn: "2099-06-01", endsOn: "2099-07-05"
+    });
+  });
+
+  it("given a closure whose last day comes before its first, when it is entered, then nothing is asked", async () => {
+    // given
+    const ask = vi.spyOn(api, "courtClosureImpact").mockResolvedValue(impactOf(3));
+    show();
+    await screen.findByTestId("court-closure-form");
+
+    // when
+    fireEvent.change(screen.getByTestId("court-closure-court"), { target: { value: "court-1" } });
+    fireEvent.change(screen.getByTestId("court-closure-starts-on"), { target: { value: "2099-08-02" } });
+    fireEvent.change(screen.getByTestId("court-closure-ends-on"), { target: { value: "2099-08-01" } });
+    await new Promise((resolve) => setTimeout(resolve, 600));
+
+    // then
+    expect(ask, "an impossible range has no bookings to count").not.toHaveBeenCalled();
+    expect(screen.queryByTestId("court-closure-affected")).not.toBeInTheDocument();
   });
 });

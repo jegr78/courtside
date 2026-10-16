@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  api, type AdminCourt, type CourtClosure, type DayOfWeek, type OpeningHours, type OpeningPeriod
+  api, type AdminCourt, type CourtClosure, type DayOfWeek, type Impact, type OpeningHours, type OpeningPeriod
 } from "../../api/client";
 import { useClubConfiguration } from "../../club/registry";
 import { Button } from "../../components/Button";
@@ -19,6 +19,9 @@ type ClosureDraft = { id?: string; courtId: string; name: string; startsOn: stri
 
 const weekdays: DayOfWeek[] = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"];
 const MAX_NAME = 80;
+const IMPACT_DELAY_MS = 400;
+const askPeriodImpact = (question: string) => api.openingPeriodImpact(JSON.parse(question));
+const askClosureImpact = (question: string) => api.courtClosureImpact(JSON.parse(question));
 
 const newPeriod = (): PeriodDraft => ({
   kind: "HOLIDAY", name: "", startsOn: "", endsOn: "",
@@ -51,6 +54,17 @@ export function AdminAvailabilityView() {
   const editedClosure = closures?.find((entry) => entry.id === closure.id);
   useUnsavedMark("opening-period", differs(period, editedPeriod ? toDraft(editedPeriod) : newPeriod()));
   useUnsavedMark("court-closure", differs(closure, editedClosure ? { ...editedClosure } : newClosure()));
+  const periodQuestion = period.startsOn && period.endsOn && period.endsOn >= period.startsOn
+    && period.days.every((day) => day.closed || (day.opensAt && day.closesAt))
+    && (!editedPeriod || differs(period, toDraft(editedPeriod)))
+    ? JSON.stringify({ periodId: period.id ?? null, kind: period.kind, startsOn: period.startsOn, endsOn: period.endsOn, days: toRequest(period) })
+    : undefined;
+  const closureQuestion = closure.courtId && closure.startsOn && closure.endsOn && closure.endsOn >= closure.startsOn
+    && (!editedClosure || differs(closure, { ...editedClosure }))
+    ? JSON.stringify({ closureId: closure.id ?? null, courtId: closure.courtId, startsOn: closure.startsOn, endsOn: closure.endsOn })
+    : undefined;
+  const periodAffected = useAffected(periodQuestion, askPeriodImpact, reportError);
+  const closureAffected = useAffected(closureQuestion, askClosureImpact, reportError);
 
   function savePeriod(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -114,6 +128,7 @@ export function AdminAvailabilityView() {
           edit={(id) => setPeriod(toDraft(periods.find((entry) => entry.id === id)!))}
           remove={(id) => removePeriod(periods.find((entry) => entry.id === id)!)} />
         <PeriodForm draft={period} today={today} started={!!editedPeriod && editedPeriod.startsOn < today}
+                    affected={periodAffected}
                     disabled={pending.has("opening-period")} changed={setPeriod}
                     submit={(event) => void savePeriod(event)} cancel={() => setPeriod(newPeriod())} />
       </section>
@@ -128,7 +143,7 @@ export function AdminAvailabilityView() {
           today={today} disabled={pending.size > 0}
           edit={(id) => setClosure({ ...closures.find((entry) => entry.id === id)! })}
           remove={(id) => removeClosure(closures.find((entry) => entry.id === id)!)} />
-        <ClosureForm draft={closure} courts={courts} today={today}
+        <ClosureForm draft={closure} courts={courts} today={today} affected={closureAffected}
                      started={!!editedClosure && editedClosure.startsOn < today}
                      disabled={pending.has("court-closure")} changed={setClosure}
                      submit={(event) => void saveClosure(event)} cancel={() => setClosure(newClosure())} />
@@ -163,8 +178,8 @@ function EntryList({ testId, empty, entries, today, disabled, edit, remove }: {
   </ul>;
 }
 
-function PeriodForm({ draft, today, started, disabled, changed, submit, cancel }: {
-  draft: PeriodDraft; today: string; started: boolean; disabled: boolean;
+function PeriodForm({ draft, today, started, affected, disabled, changed, submit, cancel }: {
+  draft: PeriodDraft; today: string; started: boolean; affected: number; disabled: boolean;
   changed: (draft: PeriodDraft) => void; submit: (event: FormEvent<HTMLFormElement>) => void; cancel: () => void;
 }) {
   const { t } = useTranslation();
@@ -200,6 +215,7 @@ function PeriodForm({ draft, today, started, disabled, changed, submit, cancel }
                                     changed={hours} />)}
     </fieldset>
     {started && <p data-testid="opening-period-started" className="text-sm text-[var(--cs-muted)]">{t("admin.availability.startedHint")}</p>}
+    <AffectedNotice testId="opening-period-affected" affected={affected} />
     <div className="flex flex-wrap gap-3">
       <Button variant="primary" type="submit" data-testid="save-opening-period" disabled={disabled}>{t("admin.availability.save")}</Button>
       {draft.id && <Button variant="secondary" type="button" data-testid="cancel-opening-period" disabled={disabled} onClick={cancel}>
@@ -225,8 +241,8 @@ function HoursRow({ day, label, changed }: { day: Hours; label?: string; changed
   </div>;
 }
 
-function ClosureForm({ draft, courts, today, started, disabled, changed, submit, cancel }: {
-  draft: ClosureDraft; courts: AdminCourt[]; today: string; started: boolean; disabled: boolean;
+function ClosureForm({ draft, courts, today, started, affected, disabled, changed, submit, cancel }: {
+  draft: ClosureDraft; courts: AdminCourt[]; today: string; started: boolean; affected: number; disabled: boolean;
   changed: (draft: ClosureDraft) => void; submit: (event: FormEvent<HTMLFormElement>) => void; cancel: () => void;
 }) {
   const { t } = useTranslation();
@@ -249,12 +265,38 @@ function ClosureForm({ draft, courts, today, started, disabled, changed, submit,
                  label={t("admin.availability.endsOn")} disabled={disabled} value={draft.endsOn}
                  onChange={(event) => changed({ ...draft, endsOn: event.target.value })} />
     </div>
+    <AffectedNotice testId="court-closure-affected" affected={affected} />
     <div className="flex flex-wrap gap-3">
       <Button variant="primary" type="submit" data-testid="save-court-closure" disabled={disabled}>{t("admin.availability.save")}</Button>
       {draft.id && <Button variant="secondary" type="button" data-testid="cancel-court-closure" disabled={disabled} onClick={cancel}>
         {t("admin.availability.cancel")}</Button>}
     </div>
   </form>;
+}
+
+// Asked again whenever the draft settles; an answer to an older draft is dropped.
+function useAffected(question: string | undefined, ask: (question: string) => Promise<Impact>,
+                     reportError: (failure: unknown) => void): number {
+  const [answer, setAnswer] = useState<{ question: string; affected: number }>();
+  useEffect(() => {
+    if (!question) return;
+    let current = true;
+    const timer = setTimeout(() => {
+      ask(question)
+        .then((impact) => { if (current) setAnswer({ question, affected: impact.affectedCount }); })
+        .catch((failure: unknown) => { if (current) reportError(failure); });
+    }, IMPACT_DELAY_MS);
+    return () => { current = false; clearTimeout(timer); };
+  }, [question, ask, reportError]);
+  return question && answer?.question === question ? answer.affected : 0;
+}
+
+function AffectedNotice({ testId, affected }: { testId: string; affected: number }) {
+  const { t } = useTranslation();
+  if (affected === 0) return null;
+  return <p data-testid={testId} role="status" className="rounded-lg border p-3 text-sm">
+    {t("admin.availability.affected", { count: affected })}
+  </p>;
 }
 
 function courtLabel(courts: AdminCourt[], courtId: string, t: ReturnType<typeof useTranslation>["t"]): string {
