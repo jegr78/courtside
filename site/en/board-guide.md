@@ -199,6 +199,11 @@ entries stay as they were, so past days keep their hours.
 Bookings already on a closed day stay. Courtside refuses new bookings and moves there. The court
 plan names a holiday, and a closed court reads *Court closed*.
 
+When an entry affects existing bookings, the form shows how many before you save. On saving, the
+booker and the other players get a message in Courtside and by mail. It names the day, the court
+and whether a holiday, a season or a closure is the reason, but not the name you gave the entry.
+Whoever has been told hears nothing a second time when you extend the same entry.
+
 ![A winter break as a closed holiday and one court closed for a week.](../screenshots/en/availability.png)
 
 ## Facility → Booking cards
