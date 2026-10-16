@@ -16,6 +16,7 @@ public class PreviewExpiry {
 
     private final DatabaseDeadlines deadlines;
     private final ImportPreviewRepository previews;
+    private final RetentionRows retention;
     private final Clock clock;
 
     @Transactional
@@ -27,8 +28,9 @@ public class PreviewExpiry {
     @Transactional
     public int sweep(Instant cutoff) {
         int forgotten = previews.forgetExpired(cutoff);
-        log.info("Swept previews past their retention: {} lost their change set and fingerprints",
-                forgotten);
+        int retentionPreviews = retention.deleteExpiredPreviews(cutoff);
+        log.info("Swept previews past their retention: {} lost their change set and fingerprints, "
+                + "{} retention previews deleted", forgotten, retentionPreviews);
         return forgotten;
     }
 }

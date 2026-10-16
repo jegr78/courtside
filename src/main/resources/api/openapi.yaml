@@ -132,6 +132,8 @@ tags:
     description: What an uploaded roster snapshot would change, before anything is written.
   - name: admin-import-runs
     description: Executing a reviewed snapshot, and the log of what was executed.
+  - name: admin-retention
+    description: How long the club keeps personal records, and the reviewed runs that apply it.
   - name: admin-audit
     description: The changes this instance recorded.
   - name: admin-messages
@@ -195,6 +197,11 @@ components:
       in: query
       required: false
       schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+    RetentionCategory:
+      name: category
+      in: path
+      required: true
+      schema: { $ref: "#/components/schemas/RetentionCategory" }
     MessageTemplateKind:
       name: kind
       in: path
@@ -1679,6 +1686,91 @@ components:
             Required only when the preview reported `needsConfirmation`. It is a deliberate second
             statement about one reviewed preview, not a setting: a truncated export is the accident
             this exists to catch, and catching it is worth one extra click.
+
+    RetentionCategory:
+      type: string
+      enum: [BOOKINGS, FORMER_MEMBERS]
+      description: |
+        `BOOKINGS` covers bookings and series by when they ended. `FORMER_MEMBERS` covers people
+        by when their membership ended, with their accounts.
+
+    RetentionPolicy:
+      type: object
+      required: [category]
+      properties:
+        category: { $ref: "#/components/schemas/RetentionCategory" }
+        retainMonths:
+          type: integer
+          minimum: 1
+          maximum: 1200
+          description: Months a record is kept after it ended; absent when the category is not configured.
+
+    RetentionPeriod:
+      type: object
+      required: [retainMonths]
+      properties:
+        retainMonths:
+          type: integer
+          minimum: 1
+          maximum: 1200
+
+    RetentionPreview:
+      type: object
+      required: [previewId, expiresAt, blocked]
+      properties:
+        previewId: { type: string, format: uuid }
+        expiresAt: { type: string, format: date-time }
+        bookings: { $ref: "#/components/schemas/RetentionBookingsPreview" }
+        formerMembers: { $ref: "#/components/schemas/RetentionFormerMembersPreview" }
+        blocked:
+          type: array
+          description: Former members eligible by date whom a run cannot remove yet, with the reason.
+          items: { $ref: "#/components/schemas/RetentionBlockedRecord" }
+
+    RetentionBookingsPreview:
+      type: object
+      required: [endedBefore, bookings, series]
+      properties:
+        endedBefore: { type: string, format: date-time }
+        bookings: { type: integer }
+        series: { type: integer }
+
+    RetentionFormerMembersPreview:
+      type: object
+      required: [membershipEndedBefore, people, accounts]
+      properties:
+        membershipEndedBefore: { type: string, format: date }
+        people: { type: integer }
+        accounts: { type: integer }
+
+    RetentionBlockedRecord:
+      type: object
+      required: [personId, reason]
+      properties:
+        personId: { type: string, format: uuid }
+        reason: { $ref: "#/components/schemas/RetentionBlockReason" }
+
+    RetentionBlockReason:
+      type: string
+      enum: [ADMINISTRATOR, NAMED_IN_BOOKINGS, ON_A_WAITING_LIST]
+      description: |
+        `ADMINISTRATOR`: an account of the person holds the administrator role.
+        `NAMED_IN_BOOKINGS`: a booking or series that this run does not pseudonymise still names
+        the person. `ON_A_WAITING_LIST`: the person waits for a court.
+
+    RetentionRun:
+      type: object
+      required: [runId, bookingsPseudonymised, seriesPseudonymised, formerMembersRemoved,
+                 accountsRemoved, formerMembersSkipped]
+      properties:
+        runId: { type: string, format: uuid }
+        bookingsPseudonymised: { type: integer }
+        seriesPseudonymised: { type: integer }
+        formerMembersRemoved: { type: integer }
+        accountsRemoved: { type: integer }
+        formerMembersSkipped:
+          type: integer
+          description: Former members the preview listed who were no longer eligible when the run reached them.
 
     MembershipTypeRequest:
       type: object
@@ -7930,6 +8022,167 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/admin/retention/policies:
+    get:
+      tags: [admin-retention]
+      operationId: listRetentionPolicies
+      summary: How long the club keeps each category of personal record.
+      description: |
+        One entry per record category the instance can apply retention to, in a fixed order. A
+        category without `retainMonths` is not configured, and nothing in it is ever changed.
+        Courtside prescribes no period: the club chooses what its own lawful basis allows.
+        Administrators only.
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: The categories and their periods.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/RetentionPolicy" }
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/admin/retention/policies/{category}:
+    put:
+      tags: [admin-retention]
+      operationId: setRetentionPolicy
+      summary: Keep one category of record for the given number of months.
+      description: |
+        Setting a period changes no record. Only a previewed and confirmed run applies it.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/RetentionCategory"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RetentionPeriod" }
+      responses:
+        "200":
+          description: The category with its new period.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RetentionPolicy" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+    delete:
+      tags: [admin-retention]
+      operationId: removeRetentionPolicy
+      summary: Stop applying retention to one category.
+      description: |
+        Removing a period that is not set changes nothing.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/RetentionCategory"
+      responses:
+        "204":
+          description: The category is no longer configured.
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/admin/retention/previews:
+    post:
+      tags: [admin-retention]
+      operationId: previewRetention
+      summary: Count what a retention run would change now, and who it cannot reach yet.
+      description: |
+        The preview changes no record. It fixes the cut-off of every configured category and the
+        former members it would remove, and a run executes exactly that. A former member who is
+        eligible by date but cannot be removed yet is listed with the reason, never removed.
+
+        `BOOKINGS` pseudonymises bookings and series that ended before the cut-off: the booker, the
+        canceller, the mover, notes, the players who were members and the names of guests leave
+        the booking, while its card, courts, times, status and the number of guest places stay, so
+        utilisation and booking counts keep their figures. `FORMER_MEMBERS` removes a person whose
+        membership ended before the cut-off and whose accounts have not signed in or been opened
+        since, together with those accounts and everything they hold. The change log keeps its
+        entries, which then name an identifier nobody holds.
+
+        A preview is kept for a limited time and only the account that created it can run it.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      responses:
+        "201":
+          description: What a run would change.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RetentionPreview" }
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/admin/retention/previews/{id}/run:
+    post:
+      tags: [admin-retention]
+      operationId: runRetention
+      summary: Apply exactly the reviewed retention preview.
+      description: |
+        The run uses the cut-offs the preview fixed. A former member who stopped being eligible
+        since the preview, because they signed in, rejoined or were added to a booking, is skipped
+        and counted, never removed. The run is one transaction, and the preview is used up by it:
+        two requests for the same preview run it once, the second is answered `404`.
+
+        This operation requires a full reauthentication within the configured window, capped at
+        five minutes. Missing or stale proof is answered `403` with
+        `urn:courtside:error:recent-authentication-required` and changes nothing.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: What the run changed.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RetentionRun" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
         "429":
           $ref: "#/components/responses/RateLimited"
 
