@@ -340,6 +340,45 @@ class AvailabilityServiceTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenTwoSeasons_whenOneIsCorrectedOntoTheOtherOrBackwards_thenEachCorrectionIsRefused() {
+        // given
+        facility.createOpeningPeriod(OpeningPeriod.Kind.SEASON, "Summer",
+                LocalDate.of(2026, 6, 1), LocalDate.of(2026, 9, 30), every(EIGHT, NINE_PM));
+        OpeningPeriod autumn = facility.createOpeningPeriod(OpeningPeriod.Kind.SEASON, "Autumn",
+                LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 31), every(EIGHT, NINE_PM));
+
+        // when / then
+        assertThatThrownBy(() -> facility.changeOpeningPeriod(autumn.id(), OpeningPeriod.Kind.SEASON, "Autumn",
+                LocalDate.of(2026, 9, 30), LocalDate.of(2026, 10, 31), every(EIGHT, NINE_PM)))
+                .isInstanceOfSatisfying(AvailabilityRejectedException.class, failure ->
+                        assertThat(failure.getCode()).isEqualTo("facility.availability.overlap"));
+        assertThatThrownBy(() -> facility.changeOpeningPeriod(autumn.id(), OpeningPeriod.Kind.SEASON, "Autumn",
+                LocalDate.of(2026, 10, 31), LocalDate.of(2026, 10, 1), every(EIGHT, NINE_PM)))
+                .isInstanceOfSatisfying(AvailabilityRejectedException.class, failure ->
+                        assertThat(failure.getCode()).isEqualTo("facility.availability.endsBeforeStart"));
+        assertThatThrownBy(() -> facility.changeOpeningPeriod(autumn.id(), OpeningPeriod.Kind.HOLIDAY, "Autumn",
+                LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 31), Arrays.stream(DayOfWeek.values())
+                        .map(day -> day == DayOfWeek.SUNDAY ? new WeeklyOpeningHours(day, null, null)
+                                : new WeeklyOpeningHours(day, EIGHT, NINE_PM)).toList()))
+                .isInstanceOfSatisfying(AvailabilityRejectedException.class, failure ->
+                        assertThat(failure.getCode()).isEqualTo("facility.availability.holidayHoursDiffer"));
+    }
+
+    @Test
+    void givenAClosure_whenItIsMovedToAnUnknownCourt_thenTheCourtIsNotFound() {
+        // given
+        Court court = courts.save(new Court(4, null));
+        CourtClosure closure = facility.createCourtClosure(court.getId(), "Resurfacing",
+                LocalDate.of(2026, 6, 1), LocalDate.of(2026, 6, 30));
+
+        // when / then
+        assertThatThrownBy(() -> facility.changeCourtClosure(closure.id(), UUID.randomUUID(), "Resurfacing",
+                LocalDate.of(2026, 6, 1), LocalDate.of(2026, 6, 30)))
+                .isInstanceOf(CourtNotFoundException.class);
+        assertThat(facility.courtClosures()).extracting(CourtClosure::courtId).containsExactly(court.getId());
+    }
+
+    @Test
     void givenARunningClosure_whenItsCourtChanges_thenItIsRefused() {
         // given
         CourtClosureRow closure = storedClosure(TODAY.minusDays(3), TODAY.plusDays(3));
