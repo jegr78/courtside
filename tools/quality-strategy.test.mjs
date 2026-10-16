@@ -9,7 +9,10 @@ const instructions = readFileSync(new URL("../CLAUDE.md", import.meta.url), "utf
 
 test("given the quality strategy, when reviewing product risks, then the generated register is current", () => {
   // when / then
-  assert.equal(checkRiskRegister().riskCount, 18);
+  const maintained = JSON.parse(readFileSync(new URL("../quality/risk-register.json", import.meta.url), "utf8"))
+    .areas.flatMap((area) => area.risks);
+  assert.ok(maintained.length > 0, "the register keeps at least one risk");
+  assert.equal(checkRiskRegister().riskCount, maintained.length);
   for (const area of [
     "Identity and security",
     "Booking",
