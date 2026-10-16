@@ -123,7 +123,7 @@ export function AdminMessageWordingView() {
     await run(() => perform(requested), requested);
   }
 
-  return <section data-testid="admin-message-wording-view" className="surface-panel min-w-0 grid gap-6 rounded-2xl border p-6 shadow-[0_20px_50px_var(--cs-shadow)] [&>*]:min-w-0 [&>*]:max-w-5xl sm:p-8">
+  return <section data-testid="admin-message-wording-view" className="surface-panel min-w-0 grid gap-5 rounded-2xl border p-6 shadow-[0_20px_50px_var(--cs-shadow)] [&>*]:min-w-0 [&>*]:max-w-5xl sm:p-8">
     <h1 className="text-3xl font-bold">{t("admin.messageWording.title")}</h1>
     <p className="text-muted">{t("admin.messageWording.explain")}</p>
     {!templates || !template || !wording
@@ -159,7 +159,7 @@ export function AdminMessageWordingView() {
         </div>
         <TextField data-testid="wording-subject" maxLength={200} label={t("admin.messageWording.subject")} value={draft.subject} onChange={(event) => setDraft({ ...draft, subject: event.target.value })} />
         <label className="grid gap-2 font-medium">{t("admin.messageWording.body")}
-          <textarea data-testid="wording-body" rows={10} maxLength={10000} className="form-control w-full min-w-0 rounded-lg border px-3 py-3 font-mono text-sm" value={draft.body} onChange={(event) => setDraft({ ...draft, body: event.target.value })} />
+          <textarea data-testid="wording-body" rows={7} maxLength={10000} className="form-control w-full min-w-0 rounded-lg border px-3 py-3 font-mono text-sm" value={draft.body} onChange={(event) => setDraft({ ...draft, body: event.target.value })} />
         </label>
         <div className="flex flex-wrap gap-3">
           <Button data-testid="wording-preview" variant="secondary" disabled={pending} type="button" onClick={showPreview}>{t("admin.messageWording.preview")}</Button>
