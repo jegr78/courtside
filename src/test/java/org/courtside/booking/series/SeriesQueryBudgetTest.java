@@ -7,6 +7,8 @@ import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.courtside.member.testfixture.MemberTestFixture;
 import org.courtside.shared.OpeningWindow;
+import org.courtside.rules.RuleType;
+import org.courtside.rules.internal.RuleParameters;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -28,6 +30,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 @TestPropertySource(properties = "courtside.test.clock=2026-04-01T10:00:00Z")
 @Import({FacilityTestFixture.class, IdentityTestFixture.class, MemberTestFixture.class})
 class SeriesQueryBudgetTest extends AbstractIntegrationTest {
+
+    // A membership-scoped rule asks once for the whole batch, so the bound grows with the rules and not the occurrences.
+    private static final long CONFIGURABLE_RULE_TYPES = Arrays.stream(RuleType.values())
+            .filter(RuleParameters::isConfigurablePerRuleSet).count();
 
     private static final UUID TRAINING_CARD =
             UUID.fromString("22222222-2222-2222-2222-222222222222");
@@ -87,8 +93,8 @@ class SeriesQueryBudgetTest extends AbstractIntegrationTest {
         assertStableRuleQueriesAreBounded(snapshot);
         // The time zone has its own lightweight entity so repeated reads share the persistence
         // context without making the main configuration query carry the uploaded logo bytes.
-        assertThat(snapshot.total()).as("occupancy, reservations, seasons and court closures are read once for the whole series, " + snapshot)
-                .isLessThanOrEqualTo(20L);
+        assertThat(withoutRuleParameters(snapshot)).as("occupancy, reservations, seasons and court closures are read once for the whole series, " + snapshot)
+                .isLessThanOrEqualTo(12L);
     }
 
     @ParameterizedTest
@@ -115,9 +121,9 @@ class SeriesQueryBudgetTest extends AbstractIntegrationTest {
         assertStableRuleQueriesAreBounded(moveSnapshot, 14);
         // One more than before, and constant: a move resolves the person holding the series once for
         // the whole batch, because the bar is measured against them and not against whoever moves it.
-        assertThat(previewSnapshot.total()).as(previewSnapshot.toString())
+        assertThat(withoutRuleParameters(previewSnapshot)).as(previewSnapshot.toString())
                 .isLessThanOrEqualTo(3L * count + 15);
-        assertThat(moveSnapshot.total()).as(moveSnapshot.toString())
+        assertThat(withoutRuleParameters(moveSnapshot)).as(moveSnapshot.toString())
                 .isLessThanOrEqualTo(8L * count + 31);
     }
 
@@ -147,8 +153,11 @@ class SeriesQueryBudgetTest extends AbstractIntegrationTest {
         assertThat(snapshot.category("membership")).as(snapshot.toString()).isLessThanOrEqualTo(1);
         assertThat(snapshot.category("opening-hours")).as(snapshot.toString())
                 .isLessThanOrEqualTo(openingHoursBudget);
-        // One per membership-scoped rule and no more: each asks once for the whole batch rather than
-        // once per occurrence, which is what prepare() is for.
-        assertThat(snapshot.category("rule-parameter")).as(snapshot.toString()).isLessThanOrEqualTo(8);
+        assertThat(snapshot.category("rule-parameter")).as(snapshot.toString())
+                .isLessThanOrEqualTo(CONFIGURABLE_RULE_TYPES);
+    }
+
+    private static long withoutRuleParameters(SqlStatementCounter.Snapshot snapshot) {
+        return snapshot.total() - snapshot.category("rule-parameter");
     }
 }
