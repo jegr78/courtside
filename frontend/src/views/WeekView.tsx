@@ -403,10 +403,10 @@ export function WeekView({ today, clock = systemClock, canBook = true,
     }
   }, [renderedWeekStart, selectedDate]);
 
-  return <section ref={sectionRef} aria-labelledby="occupancy-heading" className="mt-8">
+  return <section ref={sectionRef} aria-labelledby="occupancy-heading">
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div>
-        <h2 id="occupancy-heading" data-testid="occupancy-heading" className="text-2xl font-bold">{t("week.title")}</h2>
+        <h1 id="occupancy-heading" data-testid="occupancy-heading" className="text-3xl font-bold">{t("week.title")}</h1>
         {days.length > 0 && hasCourts && <p className="text-muted text-sm">{formatWeekRange(days, language, calendarTimeZone)}</p>}
       </div>
       {(!data || hasCourts) && <div className="desktop-week-controls flex gap-2">

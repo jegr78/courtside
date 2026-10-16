@@ -39,12 +39,11 @@ interface AppRoutesProps {
   initialPasswordChanged?: (returnQuery?: string) => void;
   signedOut?: () => void;
   configurationChanged?: (config: ClubConfig) => void;
-  clubName?: string;
   offline?: boolean;
 }
 
 export function AppRoutes({ session, refreshSession, passwordChanged, initialPasswordChanged, signedOut,
-  configurationChanged, clubName, offline = false }: AppRoutesProps) {
+  configurationChanged, offline = false }: AppRoutesProps) {
   const { t } = useTranslation();
   const address = useLocation();
   const { pathname } = address;
@@ -64,8 +63,8 @@ export function AppRoutes({ session, refreshSession, passwordChanged, initialPas
     <UnsavedChangesGuard />
     {!administrative && <PrimaryNavigation session={session} />}
     <Routes>
-    <Route path="/" element={<HomeView session={session} clubName={clubName} offline={offline} />} />
-    <Route path="/courts" element={<HomeView session={session} clubName={clubName} offline={offline} />} />
+    <Route path="/" element={<HomeView session={session} offline={offline} />} />
+    <Route path="/courts" element={<HomeView session={session} offline={offline} />} />
     <Route path="/account-recovery" element={session.authenticated
       ? <Navigate to="/" replace />
       : <AccountRecoveryView />} />
@@ -298,7 +297,7 @@ export function App() {
       {session
         ? <AppRoutes session={session} refreshSession={refreshSession} passwordChanged={passwordChanged}
           initialPasswordChanged={initialPasswordChanged} signedOut={signOut}
-          configurationChanged={configurationChanged} clubName={club?.clubName} offline={offline} />
+          configurationChanged={configurationChanged} offline={offline} />
         : <p role="status">{t("status.loading")}</p>}
       </div>
     </main>

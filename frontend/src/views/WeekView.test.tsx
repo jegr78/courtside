@@ -1289,6 +1289,8 @@ it("given an own booking is opened for cancellation, when the dialog appears, th
 
   // then
   expect(screen.getByTestId("cancellation-period")).toHaveTextContent("Aug 10, 2026, 6:00 PM – 7:00 PM");
+  expect(within(screen.getByRole("dialog")).queryAllByRole("heading", { level: 2 }),
+    "the cancellation sits one level below the plan's h1").toHaveLength(1);
 });
 
 it("given booking rules reject a slot, when submitting it, then violations and the trace reference are shown", async () => {
@@ -1372,7 +1374,10 @@ it("given the booking dialog is open, when pressing escape, then focus returns t
   render(<WeekView today={clubInstant("07:00")} />);
   const slot = await findFreeSlot(1, "08:00");
   await userEvent.click(slot);
-  expect((await screen.findByTestId("booking-dialog")).closest('[role="dialog"]')).toBeInTheDocument();
+  const dialog = (await screen.findByTestId("booking-dialog")).closest<HTMLElement>('[role="dialog"]');
+  expect(dialog).toBeInTheDocument();
+  expect(within(dialog!).queryAllByRole("heading", { level: 2 }), "the dialog sits one level below the plan's h1")
+    .toHaveLength(1);
 
   // when
   await userEvent.keyboard("{Escape}");

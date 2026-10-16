@@ -6,7 +6,8 @@ und Menüpunkten stehen *kursiv*. Öffnungszeiten, Fristen und Obergrenzen legt 
 ## Der Platzplan ist öffentlich
 
 Die Startseite zeigt den Platzplan auch ohne Anmeldung. Auf einem großen Bildschirm siehst du eine
-Woche, auf einem schmalen Bildschirm einen Tag.
+Woche, auf einem schmalen Bildschirm einen Tag. Ohne Anmeldung steht über dem Plan ein Hinweis. Zum
+Buchen wählst du dort *Anmelden*.
 
 1. Wähle unter *Datum auswählen* einen Tag, um direkt dorthin zu springen, auch über Wochen hinweg.
 2. Wähle *Vorherige Woche* oder *Nächste Woche*, um schrittweise zu blättern.

@@ -35,7 +35,7 @@ const MEMBER_LIST = [
 const drivers: Record<string, (page: Page, visualDate: string) => Promise<void>> = {
   "court-plan": async (page, visualDate) => {
     await page.goto("/");
-    await expect(page.getByTestId("public-club-name")).toBeVisible();
+    await expect(page.getByTestId("guest-guidance")).toBeVisible();
     await selectVisualDate(page, visualDate);
     await expectDesktopCourtPlanToFit(page);
   },
