@@ -883,7 +883,9 @@ test("given admission refusals during identity checks, when executing them, then
     () => ({ method: "GET", path: "/api/admin/roster?limit=1", headers: {} }));
 
   // then
-  assert.equal(checks.length, 9);
+  assert.deepEqual(checks.map(({ actor }) => actor).toSorted(), [
+    ...authorizationActors.filter((actor) => !["ANONYMOUS", "INITIAL_PASSWORD"].includes(actor)),
+    "MANAGER_COMBINATION_1", "MANAGER_COMBINATION_2"].toSorted());
   for (const check of checks) {
     assert.equal(check.outcome, "incomplete", `${check.actor} was refused before its boundary answered`);
     assert.equal(check.observation, "admission-refused");

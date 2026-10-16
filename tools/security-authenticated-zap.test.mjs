@@ -161,6 +161,9 @@ test("given isolated role sessions and a canary-only scan, when assessing, then 
   const forgedRetestChronology = structuredClone(evidence);
   forgedRetestChronology.canaryRetest.fixedAt = "2026-08-21T07:59:59.000Z";
   assert.throws(() => validateAuthenticatedZapEvidence(forgedRetestChronology), /lifecycle proof/);
+  const missingRole = structuredClone(evidence);
+  missingRole.roles = missingRole.roles.slice(1);
+  assert.throws(() => validateAuthenticatedZapEvidence(missingRole), /contradicts its pinned policy/);
   assert.doesNotMatch(readFileSync(join(evidenceDirectory, "authenticated-zap.json"), "utf8"), /secret-/);
 });
 
