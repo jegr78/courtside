@@ -8,6 +8,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -38,6 +40,9 @@ class ConcurrentRetentionRunTest extends AbstractIntegrationTest {
 
     @Autowired
     private JdbcClient jdbc;
+
+    @Autowired
+    private PlatformTransactionManager transactions;
 
     @Test
     void givenOnePreview_whenTwoBoardsConfirmItAtOnce_thenItRunsOnceAndTheOtherFindsNoPreview() throws Exception {
@@ -78,6 +83,42 @@ class ConcurrentRetentionRunTest extends AbstractIntegrationTest {
         assertThat(jdbc.sql("SELECT count(*) FROM domain_event WHERE event_type = 'dataexchange.retention.run'")
                 .query(Long.class).single()).as("the change log records a single run").isOne();
         assertThat(identity.personExists(formerMember)).isFalse();
+    }
+
+    @Test
+    void givenAMembershipResumedWhileTheRunStarts_whenTheRunReachesThatPerson_thenItWaitsForTheChangeAndSkipsThem()
+            throws Exception {
+        // given
+        UUID board = identity.createPerson("Richard", "Miles", "richard.miles@example.org");
+        UUID admin = identity.createAccount(board, "admin", Set.of(Role.ADMIN));
+        UUID returning = roster.addPerson("Jane", "Doe", "jane.doe@example.org");
+        roster.assignMembership(returning, ACTIVE_TYPE, LocalDate.of(2018, 1, 1));
+        jdbc.sql("UPDATE member SET ended_on = DATE '2023-06-30' WHERE person_id = :id")
+                .param("id", returning).update();
+        retention.setPolicy(RetentionCategory.FORMER_MEMBERS, 24);
+        UUID previewId = retention.preview(admin).previewId();
+        CountDownLatch resumed = new CountDownLatch(1);
+
+        // when
+        RetentionPlan.Run run;
+        try (ExecutorService pool = Executors.newSingleThreadExecutor()) {
+            Future<?> resuming = pool.submit(() -> new TransactionTemplate(transactions).executeWithoutResult(status -> {
+                jdbc.sql("UPDATE member SET ended_on = NULL WHERE person_id = :id").param("id", returning).update();
+                resumed.countDown();
+                try {
+                    Thread.sleep(1500);
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                }
+            }));
+            resumed.await();
+            run = retention.run(previewId, admin);
+            resuming.get();
+        }
+
+        // then
+        assertThat(run.formerMembersSkipped()).as("the run waits for the resumed membership and skips it").isOne();
+        assertThat(identity.personExists(returning)).as("a member who resumed is kept").isTrue();
     }
 
     @Test

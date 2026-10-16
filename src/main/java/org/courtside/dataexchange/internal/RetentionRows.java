@@ -253,6 +253,8 @@ public class RetentionRows {
         }
         jdbc.sql("SELECT id FROM user_account WHERE person_id = :id FOR UPDATE")
                 .param("id", personId).query(UUID.class).list();
+        jdbc.sql("SELECT id FROM member WHERE person_id = :id FOR UPDATE")
+                .param("id", personId).query(UUID.class).list();
         if (!formerMembers(membershipEndedBefore, activeSince).contains(personId)
                 || blocks(List.of(personId), null).containsKey(personId)) {
             return Optional.empty();
