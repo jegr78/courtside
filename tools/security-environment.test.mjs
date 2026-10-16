@@ -1592,10 +1592,19 @@ test("given the security Compose file, when inspecting boundaries, then resource
 
   // when / then
   assert.match(compose, /127\.0\.0\.1:\$\{COURTSIDE_SECURITY_HTTPS_PORT:\?required\}:443/);
-  assert.equal((compose.match(/internal: true/g) ?? []).length, 4);
-  assert.equal((compose.match(/pull_policy: never/g) ?? []).length, 10);
-  assert.equal((compose.match(/org\.courtside\.security\.run-id:/g) ?? []).length, 15);
-  assert.equal((compose.match(/org\.courtside\.security\.instance-fingerprint:/g) ?? []).length, 15);
+  const declared = yaml.load(compose);
+  const labelsOf = (entry) => Array.isArray(entry?.labels) ? entry.labels.map((label) => label.split("=")[0])
+    : Object.keys(entry?.labels ?? {});
+  const services = Object.entries(declared.services);
+  const networks = Object.entries(declared.networks ?? {});
+  assert.ok(services.length > 0, "the security environment declares its services");
+  assert.deepEqual(networks.filter(([name, network]) => name !== "exposure" && network?.internal !== true)
+    .map(([name]) => name), [], "every network but the published exposure is internal");
+  assert.deepEqual(services.filter(([, service]) => service.pull_policy !== "never").map(([name]) => name), [],
+    "every service runs a pinned or preloaded image without pulling");
+  assert.deepEqual([...services, ...networks].filter(([, entry]) => !labelsOf(entry).includes("org.courtside.security.run-id")
+    || !labelsOf(entry).includes("org.courtside.security.instance-fingerprint")).map(([name]) => name), [],
+    "every service and network carries the run and instance labels");
   assert.match(compose, /\/var\/lib\/postgresql\/18\/docker:size=512m/);
   assert.match(compose, /https:\/\/localhost\/api\/source/);
   assert.match(compose, /zaproxy\/zap-stable:[\w.]+@sha256:[a-f0-9]{64}/);
