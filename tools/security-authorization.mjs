@@ -17,6 +17,11 @@ const multipartBoundary = "courtside-security-boundary";
 const methods = new Set(["get", "post", "put", "patch", "delete"]);
 const roles = ["MEMBER", "TRAINER", "SPORT_DIRECTOR", "YOUTH_DIRECTOR", "GROUNDSKEEPER", "TREASURER", "ADMIN"];
 export const authorizationActors = Object.freeze(["ANONYMOUS", ...roles, "INITIAL_PASSWORD"]);
+const loginTimingSamplesPerClass = 12;
+const managerCombinationCount = 2;
+const mutationBoundaries = Object.freeze(["csrf", "cors", "host", "forwarded-host"]);
+const signInRequests = 2;
+const objectProbeRequests = 10;
 const actorUsernames = Object.freeze({
   MEMBER: "security.member.1",
   TRAINER: "security.trainer.1",
@@ -400,7 +405,7 @@ function parameterValue(parameter) {
 }
 
 export function evaluateLoginTiming(knownSamples, unknownSamples) {
-  if (knownSamples.length !== unknownSamples.length || knownSamples.length < 12
+  if (knownSamples.length !== unknownSamples.length || knownSamples.length < loginTimingSamplesPerClass
       || [...knownSamples, ...unknownSamples].some((sample) => !Number.isFinite(sample) || sample <= 0)) {
     throw new Error("Login timing requires twelve positive paired samples per class");
   }
@@ -422,7 +427,7 @@ export async function executeAuthenticationChecks(send, password, beforeLogin, a
   await send(client, { method: "GET", path: "/api/session", headers: {} });
   const knownSamples = [];
   const unknownSamples = [];
-  for (let sample = 0; sample < 12; sample += 1) {
+  for (let sample = 0; sample < loginTimingSamplesPerClass; sample += 1) {
     const responses = {};
     for (const identity of loginTimingSampleOrder(sample)) {
       responses[identity] = await failedLogin(send, client, "/api/session",
@@ -478,7 +483,7 @@ export async function executeSecondaryIdentityChecks(send, password, beforeLogin
         && (role === "ADMIN" || response.problemType === "urn:courtside:error:access-denied")]]) });
   }
   const managerRoles = ["MEMBER", "SPORT_DIRECTOR", "TRAINER", "YOUTH_DIRECTOR"];
-  for (let index = 1; index <= 2; index += 1) {
+  for (let index = 1; index <= managerCombinationCount; index += 1) {
     const client = new SecurityCookieJar();
     await signInSecurityUsername(send, client, `security.manager.${index}`, password, "MANAGER_COMBINATION",
       beforeLogin);
@@ -543,14 +548,15 @@ export function validateAuthorizationEvidence(evidence, matrix) {
     throw new Error("The authorization evidence is missing an object boundary");
   }
   const expectedBoundaries = matrix.filter(({ mutation }) => mutation).flatMap(({ operationId }) =>
-    ["csrf", "cors", "host", "forwarded-host"].map((boundary) => `${operationId}:${boundary}`)).toSorted();
+    mutationBoundaries.map((boundary) => `${operationId}:${boundary}`)).toSorted();
   const actualBoundaries = evidence.boundaryChecks
     .map(({ operationId, boundary }) => `${operationId}:${boundary}`).toSorted();
   if (new Set(actualBoundaries).size !== actualBoundaries.length
       || JSON.stringify(expectedBoundaries) !== JSON.stringify(actualBoundaries)) {
     throw new Error("The authorization evidence is missing a mutation boundary");
   }
-  const expectedIdentities = [...roles, "MANAGER_COMBINATION_1", "MANAGER_COMBINATION_2"].toSorted();
+  const expectedIdentities = [...roles, ...Array.from({ length: managerCombinationCount },
+    (_, index) => `MANAGER_COMBINATION_${index + 1}`)].toSorted();
   if (JSON.stringify(evidence.identityChecks.map(({ actor }) => actor).toSorted())
       !== JSON.stringify(expectedIdentities)) {
     throw new Error("The authorization evidence is missing an independent role identity");
@@ -579,6 +585,32 @@ export function validateAuthorizationEvidence(evidence, matrix) {
   }
 }
 
+/** The requests the suite sends for this contract when every probe is answered on its first attempt. */
+export function planAuthorizationRequests(api, { attemptsBeforeLimit, durationSeconds }) {
+  if (!Number.isSafeInteger(attemptsBeforeLimit) || attemptsBeforeLimit < 1
+      || !Number.isSafeInteger(durationSeconds) || durationSeconds < 1) {
+    throw new Error("The authorization request plan needs the login limit and the run duration");
+  }
+  const matrix = buildOperationAuthorizationMatrix(api);
+  const signedIn = authorizationActors.filter((actor) => actor !== "ANONYMOUS");
+  const proven = signedIn.filter((actor) => actor !== "INITIAL_PASSWORD");
+  const terminal = matrix.filter(({ operationId }) => terminalOperationOrder.has(operationId)).length;
+  const logIn = matrix.filter(({ operationId }) => operationId === "logIn").length;
+  const phases = {
+    signIn: (signedIn.length + 1) * signInRequests,
+    identity: roles.length * (signInRequests + 2) + managerCombinationCount * (signInRequests + 3),
+    boundary: matrix.filter(({ mutation }) => mutation).length * mutationBoundaries.length,
+    object: objectProbeRequests,
+    matrix: matrix.length * authorizationActors.length
+      + logIn * authorizationActors.length * (signInRequests - 1)
+      + terminal * signedIn.length * signInRequests,
+    csrfBootstrap: 1,
+    authentication: 1 + loginTimingSamplesPerClass * (2 + signInRequests + 2) + attemptsBeforeLimit + 1,
+    proofRenewals: proven.length * Math.ceil(durationSeconds * 1000 / recentProofRenewalMilliseconds)
+  };
+  return { ...phases, total: Object.values(phases).reduce((sum, count) => sum + count, 0) };
+}
+
 export async function runAuthorizationAssessment(plan, context) {
   if (plan.profile !== "active" || plan.environment !== "SECURITY"
       || !["CSA-AUTHN-001", "CSA-AUTHZ-001", "CSA-DAST-001"]
@@ -604,7 +636,7 @@ export async function runAuthorizationAssessment(plan, context) {
   const send = async (client, probe, options = {}) => sendPacedByAdmission(() => {
     control.beforeRequest();
     if (++requestCount > context.maxRequests) throw new Error("The authorization request budget was exceeded");
-    return authorizationRequest(plan.target, client, probe, {
+    return (context.transport ?? authorizationRequest)(plan.target, client, probe, {
       ca: context.ca,
       signal: control.signal,
       timeoutMilliseconds: control.remainingMilliseconds(),

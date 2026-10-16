@@ -27,7 +27,9 @@ import {
   deriveAuthorizationOutcome,
   executeSecondaryIdentityChecks,
   sendPacedByAdmission,
-  validateAuthorizationEvidence
+  validateAuthorizationEvidence,
+  planAuthorizationRequests,
+  runAuthorizationAssessment
 } from "./security-authorization.mjs";
 
 const require = createRequire(new URL("../frontend/package.json", import.meta.url));
@@ -958,3 +960,91 @@ async function startAnsweringServer(answer) {
     close: () => { server.closeAllConnections(); return new Promise((closed) => server.close(closed)); }
   };
 }
+
+function inMemoryAuthorizationTarget(attemptsBeforeLimit) {
+  const unauthenticated = "urn:courtside:error:unauthenticated";
+  const denied = "urn:courtside:error:access-denied";
+  const notFound = "urn:courtside:error:booking-not-found";
+  const personId = "30000000-0000-0000-0000-000000000001";
+  const bookings = { items: [
+    { id: "10000000-0000-0000-0000-000000000001", seriesId: null, status: "CONFIRMED" },
+    { id: "10000000-0000-0000-0000-000000000002", seriesId: "20000000-0000-0000-0000-000000000001",
+      status: "CONFIRMED" }] };
+  const roster = { entries: [{ personId, username: "security.member.1", firstName: "Jane", lastName: "Doe",
+    email: "jane.doe@example.org", enabled: true, roles: ["MEMBER"],
+    accountId: "40000000-0000-0000-0000-000000000001", membershipTypeId: null }] };
+  const listing = rosterListingProbe(api, 200);
+  const users = new WeakMap();
+  let encodedFailures = 0;
+  const rolesOf = (username) => username.startsWith("security.manager.")
+    ? ["MEMBER", "SPORT_DIRECTOR", "TRAINER", "YOUTH_DIRECTOR"]
+    : [username.replace(/^security\./, "").replace(/\.\d+$/, "").replaceAll(".", "_").toUpperCase()];
+  const answer = (status, extra = {}) => ({ status, elapsedMilliseconds: 1, accessControlAllowed: false, ...extra });
+  return async (_origin, client, probe, options = {}) => {
+    if (options.csrf && !client.csrfToken()) throw new Error(`${probe.method} ${probe.path} has no CSRF token`);
+    const path = probe.path.split("?")[0];
+    if (path === "/api/session" && probe.method === "GET") client.update(["__Host-XSRF-TOKEN=token"]);
+    const admin = rolesOf(users.get(client) ?? "").includes("ADMIN");
+    if (path === "/api/sessio%6E") {
+      encodedFailures += 1;
+      return answer(401, { problemType: unauthenticated });
+    }
+    if (path === "/api/session" && probe.method === "POST") {
+      const form = new URLSearchParams(probe.body);
+      if (!form.get("password")?.endsWith("-wrong")) {
+        users.set(client, form.get("username"));
+        return answer(200);
+      }
+      return encodedFailures >= attemptsBeforeLimit
+        ? answer(429, { problemType: "urn:courtside:error:login-rate-limited" })
+        : answer(401, { problemType: unauthenticated });
+    }
+    if (path === "/api/session") return answer(200, { json: { roles: rolesOf(users.get(client) ?? "") } });
+    if (path === "/api/session/logout") {
+      users.delete(client);
+      return answer(204);
+    }
+    if (path === "/api/session/reauthentication") return answer(204);
+    if (path === "/api/my/bookings") return answer(200, { json: bookings });
+    if (path === listing.path.split("?")[0] && probe.method === listing.method) {
+      return admin ? answer(200, { json: roster }) : answer(403, { problemType: denied });
+    }
+    if (path === `/api/admin/roster/${personId}` && probe.method === "PUT") {
+      return answer(400, { problemType: "urn:courtside:error:validation-failed" });
+    }
+    if (path.startsWith("/api/managed/bookings/")) return admin ? answer(200) : answer(404, { problemType: notFound });
+    if (path.startsWith("/api/bookings/") || path.startsWith("/api/booking-series/")) {
+      return answer(404, { problemType: notFound });
+    }
+    if (path === "/__security/request-observation") return answer(400, { observedHost: "localhost" });
+    return answer(200);
+  };
+}
+
+test("given the shipped contract and a target that answers every probe at once, when the whole suite runs, then it sends exactly the requests its plan names", async () => {
+  // given
+  const attemptsBeforeLimit = 5;
+  const evidenceDirectory = mkdtempSync(join(tmpdir(), "courtside-authorization-plan-"));
+  const plan = planAuthorizationRequests(api, { attemptsBeforeLimit, durationSeconds: 1800 });
+
+  // when
+  const evidence = await runAuthorizationAssessment({
+    profile: "active", environment: "SECURITY", target: "https://127.0.0.1:9443",
+    selectedTests: ["CSA-AUTHN-001", "CSA-AUTHZ-001", "CSA-DAST-001"],
+    targetFingerprint: `sha256:${"0".repeat(64)}`, budgets: { evidenceMegabytes: 100 }
+  }, {
+    evidenceDirectory, stopFile: join(evidenceDirectory, "stop"), deadline: new Date(Date.now() + 600_000),
+    maxRequests: plan.total, maxAddressFailures: attemptsBeforeLimit, sharedPassword: "secret",
+    resetLoginAttempts: async () => {}, wait: async () => {}, now: () => 0,
+    transport: inMemoryAuthorizationTarget(attemptsBeforeLimit)
+  });
+
+  // then
+  assert.equal(evidence.requestCount, plan.total - plan.proofRenewals,
+    "the plan the runner budgets from has drifted from the requests the suite actually sends");
+  const minimumRequests = evidence.results.length + evidence.identityChecks.length * 2
+    + evidence.objectChecks.length + evidence.boundaryChecks.length
+    + evidence.timing.samplesPerClass * 2 + evidence.bruteForce.attemptsBeforeLimit + 1;
+  assert.ok(plan.total >= minimumRequests,
+    `the plan of ${plan.total} requests is below the ${minimumRequests} the evidence check demands`);
+});
