@@ -17,6 +17,7 @@ import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.courtside.member.testfixture.MemberTestFixture;
+import org.courtside.rules.testfixture.RulesTestFixture;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.shared.SecurityEventLog;
 import org.courtside.shared.TimeSlot;
@@ -44,7 +45,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 @Import({FacilityTestFixture.class, IdentityTestFixture.class, ConfigTestFixture.class, BookingTestFixture.class,
-        MemberTestFixture.class})
+        MemberTestFixture.class, RulesTestFixture.class})
 class WaitlistTest extends AbstractIntegrationTest {
 
     static final UUID MEMBER_CARD = UUID.fromString("11111111-1111-1111-1111-111111111111");
@@ -77,6 +78,9 @@ class WaitlistTest extends AbstractIntegrationTest {
 
     @Autowired
     private ConfigTestFixture configuration;
+
+    @Autowired
+    private RulesTestFixture rulesFixture;
 
     @Autowired
     private MemberTestFixture memberships;
@@ -358,6 +362,23 @@ class WaitlistTest extends AbstractIntegrationTest {
                 .as("the players named on joining play in the booking")
                 .containsExactly(first.personId(), partner.personId());
         assertThat(confirmedOnCourt()).isEqualTo(1);
+    }
+
+    @Test
+    void givenAWeekFilledAfterJoining_whenTheSlotFrees_thenTheMemberIsSkippedAndCannotTakeIt() {
+        // given
+        configuration.bindPeopleWithoutAMembershipTypeTo(rulesFixture.ruleSetLimitingWeeklyHours("An hour a week", 1));
+        UUID held = book(holder, SLOT);
+        UUID entry = join(first, SLOT);
+        book(first, shifted(SLOT, 1));
+
+        // when
+        bookings.cancel(held, holder.accountId(), Set.of(Role.MEMBER));
+
+        // then
+        assertThat(stateOf(entry)).as("a member past the weekly limit is not offered the slot").isEqualTo("SKIPPED");
+        assertThatThrownBy(() -> waitlist.accept(entry, first.accountId(), first.personId(), Set.of(Role.MEMBER)))
+                .isInstanceOf(WaitlistNoOfferException.class);
     }
 
     @Test

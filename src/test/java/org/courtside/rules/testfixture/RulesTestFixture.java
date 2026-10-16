@@ -37,6 +37,18 @@ public class RulesTestFixture {
         return ruleSetId;
     }
 
+    public UUID ruleSetLimitingWeeklyHours(String name, int maxHours) {
+        UUID ruleSetId = activeRuleSet(name);
+        rules.setRule(ruleSetId, RuleType.WEEKLY_BOOKED_HOURS, Map.of("maxHours", maxHours));
+        return ruleSetId;
+    }
+
+    public UUID ruleSetRequiringMinimumDuration(String name, int minDurationMinutes) {
+        UUID ruleSetId = activeRuleSet(name);
+        rules.setRule(ruleSetId, RuleType.MIN_BOOKING_DURATION, Map.of("minDurationMinutes", minDurationMinutes));
+        return ruleSetId;
+    }
+
     public void renameRuleSet(UUID ruleSetId, String name) {
         rules.changeRuleSet(ruleSetId, name);
     }

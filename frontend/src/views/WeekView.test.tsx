@@ -1782,6 +1782,52 @@ it("given a bound that is not a multiple of the slot, when the dialog opens, the
   expect(duration).not.toContainHTML('value="60"');
 });
 
+it("given a rule set requires a minimum duration, when the dialog opens, then it offers nothing shorter and names the minimum", async () => {
+  // given
+  vi.mocked(api.bookingEligibility).mockResolvedValue({ violations: [], minBookingMinutes: 60 });
+  render(<WeekView today={clubInstant("07:00")} />);
+
+  // when
+  await userEvent.click(await findFreeSlot(2, "08:00"));
+
+  // then
+  const duration = await screen.findByTestId("booking-duration");
+  expect(duration).not.toContainHTML('value="30"');
+  expect(duration).toContainHTML('value="60"');
+  const minimum = screen.getByTestId("booking-minimum-bound");
+  expect(minimum, "the member reads the minimum before submitting").toHaveTextContent(
+    i18n.t("booking.minimumBound", { duration: i18n.t("booking.durationMinutes", { count: 60 }) }));
+  expect(duration.getAttribute("aria-describedby")?.split(" ")).toContain(minimum.id);
+  expect(screen.getByTestId("booking-submit")).toBeEnabled();
+});
+
+it("given a minimum longer than the free time from the chosen start, when the dialog opens, then it says so and refuses to submit", async () => {
+  // given
+  vi.mocked(api.bookingEligibility).mockResolvedValue({ violations: [], minBookingMinutes: 1440 });
+  render(<WeekView today={clubInstant("07:00")} />);
+
+  // when
+  await userEvent.click(await findFreeSlot(2, "08:00"));
+
+  // then
+  expect(await screen.findByTestId("booking-below-minimum")).toHaveTextContent(i18n.t("booking.minimumBeyondFreeTime"));
+  expect(screen.getByTestId("booking-submit"), "no period the server would accept is on offer").toBeDisabled();
+});
+
+it("given a rule set limits the weekly hours, when the dialog opens, then it names the limit before booking", async () => {
+  // given
+  vi.mocked(api.bookingEligibility).mockResolvedValue({ violations: [], maxWeeklyBookedHours: 4 });
+  render(<WeekView today={clubInstant("07:00")} />);
+
+  // when
+  await userEvent.click(await findFreeSlot(2, "08:00"));
+
+  // then
+  const weekly = await screen.findByTestId("booking-weekly-bound");
+  expect(weekly).toHaveTextContent(i18n.t("booking.weeklyBound", { hours: 4 }));
+  expect(screen.getByTestId("booking-duration").getAttribute("aria-describedby")?.split(" ")).toContain(weekly.id);
+});
+
 it("given no bound is reported, when the dialog opens, then the closing time is still what bounds it", async () => {
   // given — the field is absent for anybody no rule set bounds, and absence must change nothing
   render(<WeekView today={clubInstant("07:00")} />);

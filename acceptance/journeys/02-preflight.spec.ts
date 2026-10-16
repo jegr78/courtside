@@ -8,7 +8,7 @@ import { weekendConflicts } from "../config/lanes.mjs";
 import { config, disposables, PASSWORD, runPath, type PersonaKey } from "../lib/context";
 import { mailAvailable } from "../lib/mail";
 import { profilesOf, resetQuota } from "../config/disposables.mjs";
-import { leavesBookingHours, occupying, waitlistErasureSql } from "../lib/core.mjs";
+import { laneLimitConflicts, leavesBookingHours, occupying, waitlistErasureSql } from "../lib/core.mjs";
 import { erase } from "../lib/erasure";
 import { PARTNER_MARKER } from "../lib/journey";
 import { MEMBERS } from "../lib/waitlist";
@@ -37,8 +37,10 @@ test("when the environment is checked before a run, then every precondition hold
     checks.weekendConflicts = weekendConflicts({ plan, saturday: days.get(plan.saturday) as never ?? [],
       sunday: await (await admin.get(`/api/bookings?date=${plan.sunday}`)).json() });
     const open: Record<string, number> = {};
+    const eligibility: Record<string, { maxWeeklyBookedHours?: number; minBookingMinutes?: number }> = {};
     for (const key of ["memberA", "memberB", "memberC", "trainer", "youth", "sport", "grounds"] as PersonaKey[]) {
       const api = await apiAs(key);
+      eligibility[key] = await (await api.get("/api/booking-eligibility")).json();
       let count = 0; let cursor: string | undefined;
       do {
         const page = await (await api.get(`/api/my/bookings?limit=50${cursor ? `&cursor=${cursor}` : ""}`)).json();
@@ -49,6 +51,7 @@ test("when the environment is checked before a run, then every precondition hold
       await api.dispose();
     }
     checks.openBookings = open;
+    checks.laneLimitConflicts = laneLimitConflicts(eligibility, 60);
     checks.disposablesSignIn = Object.fromEntries(await Promise.all(disposables.map(async (username, index) => [`disposable ${index + 1}`, await canSignIn(PASSWORD, username)])));
     const weeks = await (await admin.get("/api/admin/opening-hours/schedule")).json() as { effectiveFrom: string | null }[];
     checks.futureWeeks = weeks.slice(1).map((w) => w.effectiveFrom);
@@ -59,6 +62,8 @@ test("when the environment is checked before a run, then every precondition hold
       const { bookingHours } = await (await restricted.get("/api/booking-eligibility")).json() as { bookingHours?: { earliestStart: string; latestEnd: string } | null };
       const earliest = allSlots().filter((slot) => slot.journey === "singles");
       checks.restrictedHours = bookingHours ?? null;
+      const limits = await (await restricted.get("/api/booking-eligibility")).json() as { maxWeeklyBookedHours?: number; minBookingMinutes?: number };
+      checks.restrictedLimits = { maxWeeklyBookedHours: limits.maxWeeklyBookedHours ?? null, minBookingMinutes: limits.minBookingMinutes ?? null };
       checks.restrictedLanesInside = bookingHours ? earliest.filter((slot) => !leavesBookingHours(slot, bookingHours)).map((slot) => `${slot.profile} ${slot.start}`) : [];
     }
     const roster = { entries: await readRoster(admin) };
@@ -85,6 +90,7 @@ test("when the environment is checked before a run, then every precondition hold
   if (waitlistErasure.attempted) expect.soft(waitlistErasure.exit, "PRECONDITION: the members' closed waitlist entries are erased").toBe(0);
   if (!config.notifyClubBookings) expect.soft(checks.weekendConflicts, "PRECONDITION: no club booking lies before a Saturday later opening or on the window's Sunday").toEqual([]);
   for (const [key, count] of Object.entries(checks.openBookings as Record<string, number>)) expect.soft(count, `PRECONDITION: ${key} has at most 6 open bookings`).toBeLessThanOrEqual(6);
+  expect.soft(checks.laneLimitConflicts, "PRECONDITION: no lane persona's category limits the weekly hours or asks for a booking longer than a lane").toEqual([]);
   for (const [account, signsIn] of Object.entries(checks.disposablesSignIn as Record<string, boolean>)) {
     expect.soft(signsIn, `PRECONDITION: ${account} signs in with the shared password`).toBe(true);
   }

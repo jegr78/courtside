@@ -309,7 +309,8 @@ public class SeriesService {
         List<List<RuleViolation>> ruleViolations = ruleGate.moveViolationsFor(
                 executions.stream().map(execution -> ownerCheck(
                         execution.courtIds(), execution.booking().getCardId(),
-                        execution.slot(), execution.booking().getBookedBy(), callerRoles, owners))
+                        execution.slot(), execution.booking().getBookedBy(), callerRoles, owners,
+                        Set.copyOf(movingIds)))
                         .toList());
         IntStream.range(0, executions.size()).forEach(index -> {
             MoveExecution execution = executions.get(index);
@@ -467,11 +468,12 @@ public class SeriesService {
     // mover's, because the override is a property of who is acting. One series, one owner, one read.
     private BookingRuleCheck ownerCheck(List<UUID> courtIds, UUID cardId, TimeSlot slot,
                                         UUID bookedBy, Set<Role> callerRoles,
-                                        Map<UUID, Optional<UUID>> owners) {
+                                        Map<UUID, Optional<UUID>> owners, Set<UUID> movedBookingIds) {
         UUID bookedByPersonId = owners
                 .computeIfAbsent(bookedBy, account -> Optional.ofNullable(ruleGate.personBehind(account)))
                 .orElse(null);
-        return new BookingRuleCheck(courtIds, cardId, slot, bookedBy, bookedByPersonId, callerRoles);
+        return new BookingRuleCheck(courtIds, cardId, slot, bookedBy, bookedByPersonId, callerRoles,
+                movedBookingIds);
     }
 
     private void requireNoViolations(List<RuleViolation> violations) {
@@ -483,9 +485,10 @@ public class SeriesService {
     private List<List<RuleViolation>> moveRuleViolations(List<PlannedMove> planned,
                                                          Set<Role> callerRoles) {
         Map<UUID, Optional<UUID>> owners = new HashMap<>();
+        Set<UUID> moved = planned.stream().map(PlannedMove::bookingId).collect(Collectors.toSet());
         return ruleGate.moveViolationsFor(planned.stream()
                 .map(move -> ownerCheck(move.courts(), move.cardId(), move.to(), move.bookedBy(),
-                        callerRoles, owners))
+                        callerRoles, owners, moved))
                 .toList());
     }
 

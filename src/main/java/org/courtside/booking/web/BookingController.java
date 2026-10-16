@@ -118,6 +118,8 @@ class BookingController implements BookingsApi {
         return ResponseEntity.ok(new ApiBookingEligibility(violations)
                 .maxBookingMinutes(ruleGate.maxBookingMinutesFor(
                         personIdOf(account), account.getRoles()))
+                .minBookingMinutes(ruleGate.minBookingMinutesFor(personIdOf(account), account.getRoles()))
+                .maxWeeklyBookedHours(ruleGate.maxWeeklyBookedHoursFor(personIdOf(account), account.getRoles()))
                 .bookingHours(ruleGate.bookingWindowFor(personIdOf(account), account.getRoles())
                         .map(window -> new ApiBookingHours(window.earliestStart(), window.latestEnd()))
                         .orElse(null)));

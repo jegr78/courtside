@@ -208,6 +208,72 @@ class BookingEligibilityControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.maxBookingMinutes").value(90));
     }
 
+    @Test
+    @WithMockUser(username = "miles.richard", roles = "MEMBER")
+    void givenAMemberWhoseRuleSetLimitsTheWeek_whenReadingEligibility_thenTheWeeklyHoursAreReturned()
+            throws Exception {
+        // given
+        UUID personId = identity.createPerson("Richard", "Miles", "miles.richard@example.org");
+        identity.createEnabledAccount(personId, "miles.richard", Set.of(Role.MEMBER));
+        members.assignMembership(personId, members.membershipTypeMeasuredBy("Weekly",
+                rules.ruleSetLimitingWeeklyHours("Four hours a week", 4)));
+
+        // when / then
+        mockMvc.perform(get("/api/booking-eligibility"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.maxWeeklyBookedHours").value(4))
+                .andExpect(jsonPath("$.minBookingMinutes").doesNotExist());
+    }
+
+    @Test
+    @WithMockUser(username = "miles.richard", roles = "MEMBER")
+    void givenAMemberWhoseRuleSetRequiresAMinimumDuration_whenReadingEligibility_thenTheMinimumIsReturned()
+            throws Exception {
+        // given
+        UUID personId = identity.createPerson("Richard", "Miles", "miles.richard@example.org");
+        identity.createEnabledAccount(personId, "miles.richard", Set.of(Role.MEMBER));
+        members.assignMembership(personId, members.membershipTypeMeasuredBy("Long slots",
+                rules.ruleSetRequiringMinimumDuration("Long slots", 60)));
+
+        // when / then
+        mockMvc.perform(get("/api/booking-eligibility"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.minBookingMinutes").value(60))
+                .andExpect(jsonPath("$.maxWeeklyBookedHours").doesNotExist());
+    }
+
+    @Test
+    @WithMockUser(username = "major.mary", roles = "ADMIN")
+    void givenAnAdministratorWhoseRuleSetLimitsTheWeek_whenReadingEligibility_thenNoLimitIsReturned()
+            throws Exception {
+        // given
+        UUID personId = identity.createPerson("Mary", "Major", "major.mary@example.org");
+        identity.createEnabledAccount(personId, "major.mary", Set.of(Role.ADMIN));
+        members.assignMembership(personId, members.membershipTypeMeasuredBy("Weekly",
+                rules.ruleSetLimitingWeeklyHours("Four hours a week", 4)));
+
+        // when / then
+        mockMvc.perform(get("/api/booking-eligibility"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.maxWeeklyBookedHours").doesNotExist());
+    }
+
+    @Test
+    @WithMockUser(username = "major.mary", roles = "ADMIN")
+    void givenAnAdministratorWhoseRuleSetRequiresAMinimumDuration_whenReadingEligibility_thenNoMinimumIsReturned()
+            throws Exception {
+        // given
+        UUID personId = identity.createPerson("Mary", "Major", "major.mary@example.org");
+        identity.createEnabledAccount(personId, "major.mary", Set.of(Role.ADMIN));
+        members.assignMembership(personId, members.membershipTypeMeasuredBy("Long slots",
+                rules.ruleSetRequiringMinimumDuration("Long slots", 60)));
+
+        // when / then
+        mockMvc.perform(get("/api/booking-eligibility"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.minBookingMinutes").doesNotExist());
+    }
+
     private void createAccountWithMembership(String firstName, String lastName, String username,
                                              Role role, boolean barred) {
         UUID personId = identity.createPerson(firstName, lastName, username + "@example.org");

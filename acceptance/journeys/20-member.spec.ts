@@ -10,7 +10,7 @@ import { addPartner, bookAt, cancelQuietly, discovery, onPhonesAndChrome, openSl
 import { instantOf } from "../lib/lanes";
 import { recordCreated } from "../lib/ledger";
 import { latestNotificationKinds, leaveWaitlist, openWaitlistEntries, unreadNotifications } from "../lib/waitlist";
-import { answers, leavesBookingHours } from "../lib/core.mjs";
+import { answers, leavesBookingHours, limitRefusals } from "../lib/core.mjs";
 import { config } from "../lib/context";
 import { precondition } from "../lib/precondition";
 
@@ -211,6 +211,47 @@ test("given a member whose category books only within set hours, when a slot out
     }
     expect((body.violations ?? []).map((violation: { code: string }) => violation.code), `product: the server refuses the hours (${refused.status()} ${body.type ?? ""})`)
       .toContain("booking.rule.bookingHours.outside");
+  } finally { await page.context().close(); }
+});
+
+test("given a member whose category limits the week and the booking length, when a slot is opened and either is passed, then the dialog names both and the server refuses each", async ({ browser, lanes }) => {
+  // given
+  precondition(config.personas.restricted !== undefined, "personas.restricted is not configured, so the weekly hours and the minimum duration are not checkable");
+  const slot = await lanes.take("singles");
+  const api = await apiAs("restricted");
+  const eligibility = await (await api.get("/api/booking-eligibility")).json() as { maxWeeklyBookedHours?: number; minBookingMinutes?: number };
+  const grid = await (await api.get("/api/public/booking-grid")).json() as { slotMinutes: number };
+  const refusals = limitRefusals(eligibility, grid.slotMinutes);
+  precondition(refusals !== null, `the restricted member's category sets a weekly limit and a minimum longer than one ${grid.slotMinutes}-minute cell (${JSON.stringify(eligibility)})`);
+  const page = await openAs(browser, "restricted");
+  try {
+    // when
+    await openSlot(page, slot);
+    // then — both limits are named before anything is submitted
+    await expect(page.getByTestId("booking-weekly-bound"), "product: the dialog names the weekly hours").toBeVisible();
+    await expect(page.getByTestId("booking-weekly-bound"), "product: the weekly bound carries the limit")
+      .toContainText(String(eligibility.maxWeeklyBookedHours));
+    const offered = await page.getByTestId("booking-duration").locator("option").evaluateAll((options) => options.map((option) => Number((option as HTMLOptionElement).value)));
+    expect(offered.every((minutes) => minutes >= eligibility.minBookingMinutes!), `product: no duration below the minimum is offered (${offered.join(", ")})`).toBe(true);
+    await capture(page, "booking-weekly-and-minimum");
+    // when / then — requests that bypass the dialog are refused for the minimum and for the week
+    const courts = await (await api.get("/api/public/courts")).json() as { id: string; number: number }[];
+    const card = discovery.cards.find((candidate: { active: boolean; allowedRoles: string[] }) => candidate.active && candidate.allowedRoles.length === 0);
+    const start = instantOf(slot, "start");
+    for (const [minutes, code] of [[refusals!.shortMinutes, "booking.rule.minBookingDuration.notReached"], [refusals!.longMinutes, "booking.rule.weeklyBookedHours.exceeded"]] as const) {
+      const refused = await api.post("/api/bookings", {
+        courtIds: [courts.find((court) => court.number === slot.court)!.id], cardId: card.id,
+        startsAt: start.toISOString(), endsAt: new Date(start.getTime() + minutes * 60_000).toISOString(),
+        participants: [{ personId: discovery.personIds["memberB"] }]
+      }, { "Idempotency-Key": randomUUID() });
+      const body = await refused.json().catch(() => ({}));
+      if (refused.ok() && body.id) {
+        recordCreated({ kind: "booking", id: body.id, by: "restricted", project: projectName() });
+        await api.del(`/api/bookings/${body.id}`);
+      }
+      expect((body.violations ?? []).map((violation: { code: string }) => violation.code), `product: the server refuses ${minutes} minutes (${refused.status()} ${body.type ?? ""})`)
+        .toContain(code);
+    }
   } finally { await page.context().close(); }
 });
 

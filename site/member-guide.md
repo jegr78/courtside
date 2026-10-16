@@ -206,6 +206,8 @@ Verstöße gleichzeitig am jeweiligen Feld an.
 | Die Dauer muss ein Vielfaches der Rasterlänge sein | Die Dauer passt nicht in das Raster |
 | Du kannst höchstens eine bestimmte Zahl von Tagen im Voraus buchen | Der erlaubte Vorlauf ist überschritten |
 | Eine Buchung darf höchstens eine bestimmte Zahl von Minuten dauern | Die gewählte Dauer ist zu lang |
+| Eine Buchung muss mindestens eine bestimmte Zahl von Minuten dauern | Die gewählte Dauer ist zu kurz |
+| Du kannst pro Woche höchstens eine bestimmte Zahl von Stunden buchen | Mit dieser Buchung hättest du in der Woche von Montag bis Sonntag mehr Stunden gebucht, als deine Mitgliedsart erlaubt |
 | Du hast die erlaubte Zahl offener Buchungen erreicht | Du musst zuerst eine offene Buchung beenden oder stornieren |
 | Du musst eine bestimmte Zahl von Minuten vor Beginn stornieren | Die Stornierungsfrist ist abgelaufen |
 | Eine Buchung darf nicht in der Vergangenheit beginnen | Der gewählte Beginn liegt in der Vergangenheit |

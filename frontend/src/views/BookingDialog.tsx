@@ -27,13 +27,15 @@ export interface WaitlistSelection {
 }
 
 export function BookingDialog({ selection, grid, courts, allocations, canChooseSeveralCourts,
-  maxBookingMinutes, bookingHours, closed, created, conflicted, waitlist }: {
+  maxBookingMinutes, minBookingMinutes, maxWeeklyBookedHours, bookingHours, closed, created, conflicted, waitlist }: {
   selection: BookingSelection;
   grid: BookingGrid;
   courts: PublicCourt[];
   allocations: Allocation[];
   canChooseSeveralCourts: boolean;
   maxBookingMinutes?: number;
+  minBookingMinutes?: number;
+  maxWeeklyBookedHours?: number;
   bookingHours?: BookingHours;
   closed: () => void;
   created: () => Promise<void>;
@@ -143,8 +145,11 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
 
   const fieldViolations = (field: string) => violations.filter((violation) => violation.field === field);
   const describedBy = (field: string) => fieldViolations(field).length > 0 ? `booking-${field}-errors` : undefined;
-  const durations = useMemo(() => waitlist ? [] : availableDurations(selection, grid, courtIds, allocations, maxBookingMinutes, bookingHours),
+  const freeDurations = useMemo(() => waitlist ? [] : availableDurations(selection, grid, courtIds, allocations, maxBookingMinutes, bookingHours),
     [waitlist, selection, grid, courtIds, allocations, maxBookingMinutes, bookingHours]);
+  const durations = useMemo(() => freeDurations.filter((minutes) => !minBookingMinutes || minutes >= minBookingMinutes),
+    [freeDurations, minBookingMinutes]);
+  const minimumLeavesNoPeriod = !waitlist && freeDurations.length > 0 && durations.length === 0;
   const hours = bookingHours && { earliestStart: bookingHours.earliestStart.slice(0, 5), latestEnd: bookingHours.latestEnd.slice(0, 5) };
   const outsideHours = !waitlist && bookingHours !== undefined && leavesBookingHours(selection.slot, grid.slotMinutes, bookingHours);
   // A list emptied by the bound is a different thing from one emptied by an occupied court: the
@@ -152,9 +157,12 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
   const boundLeavesNoPeriod = !waitlist && maxBookingMinutes !== undefined && maxBookingMinutes !== null
     && maxBookingMinutes < grid.slotMinutes;
   const showsBound = maxBookingMinutes !== undefined && maxBookingMinutes !== null && !boundLeavesNoPeriod;
-  const durationDescription = [showsBound && "booking-duration-bound", hours && !outsideHours && "booking-hours-bound", "booking-duration-hint"]
+  const showsMinimum = !waitlist && Boolean(minBookingMinutes) && !minimumLeavesNoPeriod;
+  const showsWeekly = !waitlist && Boolean(maxWeeklyBookedHours);
+  const durationDescription = [showsBound && "booking-duration-bound", showsMinimum && "booking-minimum-bound",
+    hours && !outsideHours && "booking-hours-bound", showsWeekly && "booking-weekly-bound", "booking-duration-hint"]
     .filter(Boolean).join(" ");
-  const slotTaken = refusedAsTaken !== undefined && (durations.length === 0 || refusedAsTaken.refreshFailed);
+  const slotTaken = refusedAsTaken !== undefined && (freeDurations.length === 0 || refusedAsTaken.refreshFailed);
   const selectedDuration = durations.includes(durationMinutes) || refusedAsTaken
     ? durationMinutes : durations[0] ?? grid.slotMinutes;
   const period = useMemo(() => waitlist ?? bookingTimeSlot(selection.date, selection.slot, grid.timeZone, selectedDuration),
@@ -184,12 +192,19 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
       {showsBound && <p id="booking-duration-bound" data-testid="booking-duration-bound" className="text-muted mt-2 text-sm">
         {t("booking.durationBound", { duration: t("booking.durationMinutes", { count: maxBookingMinutes }) })}
       </p>}
+      {showsMinimum && <p id="booking-minimum-bound" data-testid="booking-minimum-bound" className="text-muted mt-2 text-sm">
+        {t("booking.minimumBound", { duration: t("booking.durationMinutes", { count: minBookingMinutes }) })}
+      </p>}
       {hours && !outsideHours && <p id="booking-hours-bound" data-testid="booking-hours-bound" className="text-muted mt-2 text-sm">
         {t("booking.hoursBound", hours)}
+      </p>}
+      {showsWeekly && <p id="booking-weekly-bound" data-testid="booking-weekly-bound" className="text-muted mt-2 text-sm">
+        {t("booking.weeklyBound", { hours: maxWeeklyBookedHours })}
       </p>}
       <p id="booking-duration-hint" data-testid="booking-duration-hint" className="text-muted mt-1 text-sm">{t("booking.durationHint")}</p>
       </>}
       {boundLeavesNoPeriod && <Alert tone="warning" testId="booking-no-duration">{t("booking.boundBelowSlotGrid")}</Alert>}
+      {minimumLeavesNoPeriod && !boundLeavesNoPeriod && <Alert tone="warning" testId="booking-below-minimum">{t("booking.minimumBeyondFreeTime")}</Alert>}
       {hours && outsideHours && <Alert tone="warning" testId="booking-outside-hours">{violationMessage("booking.rule.bookingHours.outside", hours, t)}</Alert>}
       {canChooseSeveralCourts && !waitlist
         ? <fieldset className="mt-5 grid gap-2" aria-invalid={fieldViolations("courtIds").length > 0} aria-describedby={describedBy("courtIds")}>
@@ -274,7 +289,7 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
       </div>}
       <div className="surface-panel border-structural flex shrink-0 justify-end gap-3 border-t px-6 py-4">
         <Button variant="secondary" type="button" data-testid="booking-close" onClick={closed}>{t("booking.close")}</Button>
-        <Button variant="primary" type="submit" data-testid="booking-submit" disabled={submitting || courtIds.length === 0 || !cardId || boundLeavesNoPeriod || outsideHours || (refusedAsTaken !== undefined && !waitlist)}>{t(waitlist ? "waitlist.submit" : "booking.submit")}</Button>
+        <Button variant="primary" type="submit" data-testid="booking-submit" disabled={submitting || courtIds.length === 0 || !cardId || boundLeavesNoPeriod || minimumLeavesNoPeriod || outsideHours || (refusedAsTaken !== undefined && !waitlist)}>{t(waitlist ? "waitlist.submit" : "booking.submit")}</Button>
       </div>
     </form>
   </Modal>;
