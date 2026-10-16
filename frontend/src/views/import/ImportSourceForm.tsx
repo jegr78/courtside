@@ -26,6 +26,9 @@ function positionsOf(source: ImportSource | undefined): Positions {
   return positions;
 }
 
+const countOf = (source: ImportSource | undefined) =>
+  typeof source?.columnCount === "number" ? String(source.columnCount) : "";
+
 function positionList(positions: Positions) {
   return FIELDS.filter((field) => positions[field])
     .map((field) => ({ position: Number(positions[field]), field }))
@@ -49,7 +52,7 @@ function described(source: ImportSource | undefined) {
     separator: source?.separator ?? ",",
     encoding: source?.encoding ?? "UTF-8",
     ...layoutOf(source?.columnMode ?? "HEADER", source?.columns ?? {}, positionsOf(source),
-      source?.columnCount == null ? "" : String(source.columnCount)),
+      countOf(source)),
     membershipTypes: source?.membershipTypes ?? {},
     defaultMembershipTypeId: source?.defaultMembershipTypeId ?? "",
     ownedFields: OWNABLE.filter((field) => (source?.ownedFields ?? []).includes(field)),
@@ -108,7 +111,7 @@ export function ImportSourceForm({ source, types, disabled, save }: {
   const [asksEncoding, setAsksEncoding] = useState(false);
   const [mode, setMode] = useState<ColumnMode>(source?.columnMode ?? "HEADER");
   const [positions, setPositions] = useState<Positions>(positionsOf(source));
-  const [columnCount, setColumnCount] = useState(source?.columnCount == null ? "" : String(source.columnCount));
+  const [columnCount, setColumnCount] = useState(countOf(source));
   const [sample, setSample] = useState<string[][]>([]);
   const [confirmingMode, setConfirmingMode] = useState(false);
 
@@ -225,7 +228,7 @@ export function ImportSourceForm({ source, types, disabled, save }: {
     setEncoding(confirmed.encoding);
     setMode(confirmed.columnMode);
     setPositions(positionsOf(source));
-    setColumnCount(source?.columnCount == null ? "" : String(source.columnCount));
+    setColumnCount(countOf(source));
     setConfirmingMode(false);
   }
 
