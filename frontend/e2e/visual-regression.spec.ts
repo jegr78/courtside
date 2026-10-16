@@ -18,7 +18,7 @@ const screenshotOptions = {
 test("stable member surfaces match their reviewed baselines", async ({ page, journeyService }) => {
   // given
   await page.goto("/");
-  await expect(page.getByTestId("public-club-name")).toBeVisible();
+  await expect(page.getByTestId("guest-guidance")).toBeVisible();
   await selectVisualDate(page, journeyService.visualDate);
 
   // then
@@ -80,7 +80,7 @@ test("the phone court plan and personal bookings match their reviewed baselines"
   // given
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
-  await expect(page.getByTestId("public-club-name")).toBeVisible();
+  await expect(page.getByTestId("guest-guidance")).toBeVisible();
   await selectJourneyDate(page, journeyService.visualDate);
 
   // then

@@ -5,7 +5,7 @@ test("given four members who want to play doubles, when they open the applicatio
   walks("public-club-and-availability", "session-and-own-account", "booking-participation-and-series"), async ({ page, language }) => {
     // given
     await openTheApplication(page, language);
-    await expect(page.getByTestId("public-club-name")).toBeVisible();
+    await expect(page.getByTestId("guest-guidance")).toBeVisible();
 
     // when
     await activate(page.getByTestId("sign-in-link"));

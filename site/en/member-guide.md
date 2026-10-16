@@ -6,7 +6,8 @@ This handbook explains the features you need as a member. Button and menu names 
 ## The court plan is public
 
 The home page shows the court plan without requiring you to sign in. A wide screen shows one week.
-A narrow screen shows one day.
+A narrow screen shows one day. Signed out, a notice above the plan offers *Sign in*, which you need
+before you can book.
 
 1. Use *Choose date* to jump straight to a day, across weeks as well.
 2. Select *Previous week* or *Next week* to step through the periods.

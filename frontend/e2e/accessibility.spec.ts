@@ -37,7 +37,7 @@ for (const locale of ["de", "en"]) {
     // when / then
     const pageHeading = page.getByRole("heading", { level: 1 });
     await expect(pageHeading).toBeVisible();
-    await expect(pageHeading).toHaveText(locale === "de" ? "Platzplan" : "Court plan");
+    await expect(pageHeading).toHaveText(locale === "de" ? "Platzbelegung" : "Court occupancy");
     await expectNoWcagViolations(page);
     await selectJourneyDate(page, journeyService.visualDate);
     await page.locator('[data-testid="free-slot"][data-state="free"]').first().click();
