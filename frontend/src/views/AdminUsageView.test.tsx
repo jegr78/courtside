@@ -4,7 +4,8 @@ import { MemoryRouter, useLocation } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api, ApiError, type UsageReport } from "../api/client";
 import i18n from "../i18n";
-import { AdminUsageView, ruleLabel } from "./AdminUsageView";
+import { AdminUsageView } from "./AdminUsageView";
+import { ruleLabel } from "./ruleLabel";
 
 const MEMBER_CARD = "22222222-0000-0000-0000-000000000001";
 const ADULT = "44444444-0000-0000-0000-000000000001";
