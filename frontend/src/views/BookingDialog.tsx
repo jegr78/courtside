@@ -175,7 +175,7 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
   return <Modal labelledBy="booking-heading" closed={closed}>
     <form data-testid="booking-dialog" onSubmit={(event) => void submit(event)} className="surface-panel flex w-full max-w-xl flex-col overflow-hidden rounded-2xl border shadow-2xl">
       <DialogBody>
-      <h3 id="booking-heading" className="text-xl font-bold">{t(waitlist ? "waitlist.title" : "booking.title")}</h3>
+      <h2 id="booking-heading" className="text-xl font-bold">{t(waitlist ? "waitlist.title" : "booking.title")}</h2>
       <p data-testid="booking-period" aria-live="polite" className="mt-2 font-semibold">{formatBookingPeriod(period.startsAt, period.endsAt, i18n.language, grid.timeZone)}</p>
       <FieldViolations id="booking-startsAt-errors" violations={fieldViolations("startsAt")} />
       {waitlist && <p data-testid="waitlist-explanation" className="text-muted mt-2 text-sm">{t("waitlist.explanation")}</p>}
