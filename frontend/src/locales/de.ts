@@ -294,6 +294,7 @@ const de = {
   "admin.rules.parameter.maxHours": "Höchstens Stunden pro Woche",
   "admin.rules.parameter.minDurationMinutes": "Mindestens Minuten pro Buchung",
   "admin.rules.range": "Erlaubt: {{minimum}} bis {{maximum}}",
+  "admin.rules.rangeShort": "({{minimum}}–{{maximum}})",
   "admin.cancel": "Abbrechen",
   "admin.person.title": "Person",
   "admin.person.person": "Person",

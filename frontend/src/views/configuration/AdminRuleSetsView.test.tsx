@@ -180,6 +180,10 @@ describe("AdminRuleSetsView", () => {
     expect(screen.getByTestId("rule-SLOT_GRID-global")).toHaveAttribute("href", "/admin/configuration#slot-minutes");
     await waitFor(() => expect(screen.getByTestId("rule-ADVANCE_WINDOW-maxDays")).toHaveValue(7));
     expect(screen.getByTestId("rule-ADVANCE_WINDOW-maxDays-range")).toHaveTextContent("Allowed: 1 to 365");
+    expect(screen.getByTestId("rule-ADVANCE_WINDOW-maxDays-range-short"), "the visible range stays on the parameter's line")
+      .toHaveTextContent("(1–365)");
+    expect(screen.getByTestId("rule-ADVANCE_WINDOW-maxDays"), "screen readers still hear the full range")
+      .toHaveAccessibleDescription("Allowed: 1 to 365");
     expect(screen.getByTestId("rule-ADVANCE_WINDOW-maxDays")).toHaveAccessibleDescription("Allowed: 1 to 365");
     expect(screen.getByTestId("rule-ADVANCE_WINDOW-maxDays"), "the browser knows the range too").toHaveAttribute("min", "1");
     expect(screen.getByTestId("rule-ADVANCE_WINDOW-maxDays")).toHaveAttribute("max", "365");
@@ -191,7 +195,7 @@ describe("AdminRuleSetsView", () => {
     await screen.findByTestId("rule-ADVANCE_WINDOW-maxDays");
 
     // then
-    expect(screen.getByTestId("booking-rules")).toHaveClass("xl:grid-cols-[minmax(0,4fr)_minmax(0,6fr)]");
+    expect(screen.getByTestId("booking-rules")).toHaveClass("xl:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]");
     expect(screen.getByTestId("rule-set-editor"), "the rules sit beside the overview, not below it")
       .toContainElement(screen.getByTestId("rule-set-rules"));
     expect(screen.getByTestId("rule-set-editor")).not.toContainElement(screen.getByTestId("rule-set-overview"));

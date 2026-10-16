@@ -296,6 +296,7 @@ const en: Record<keyof typeof de, string> = {
   "admin.rules.parameter.maxHours": "Maximum hours per week",
   "admin.rules.parameter.minDurationMinutes": "Minimum minutes per booking",
   "admin.rules.range": "Allowed: {{minimum}} to {{maximum}}",
+  "admin.rules.rangeShort": "({{minimum}}–{{maximum}})",
   "admin.cancel": "Cancel",
   "admin.person.title": "Person",
   "admin.person.person": "Person",
