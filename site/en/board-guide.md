@@ -17,7 +17,7 @@ The sidebar leads to the overview at the top and divides administration below it
 
 | Area | Contents |
 |---|---|
-| **Club** | Setup, club profile, deadlines and reminders, booking rules |
+| **Club** | Setup, club profile, deadlines and reminders, booking rules, message wording |
 | **Facility** | Courts, opening hours, booking cards and slot fillers |
 | **People** | People, accounts, membership types and imports |
 | **Records** | Statistics, data exports, change log and message log |
@@ -270,6 +270,28 @@ saved together. If you choose another rule set before saving, Courtside asks fir
 and the rules belong to the selected set.
 
 ![Booking rules with the overview of rule sets, permitted ranges and links to global settings.](../screenshots/en/booking-rules.png)
+
+## Club → Message wording
+
+Open *Club → Message wording*. Courtside ships every message in German and English. Here you give a
+message your club's own subject and text.
+
+* Choose the **Message** and the **Language**. The page says whether the shipped wording or your own
+  applies.
+* The list below names the placeholders this message fills, such as `{firstName}` or
+  `{instanceLink}` for the address of your Courtside. Placeholders marked *(required)* must stay in
+  the text: the username and one-time password, the username and code. A one-time password or code
+  may not appear in the subject, and the subject stays on one line.
+* *Preview* fills your draft with example values and stores nothing.
+* *Save wording* may ask for your password once more, because the wording also covers messages that
+  carry sign-in details. The next message of this kind and language uses it.
+* *Restore shipped wording* removes your wording for that language.
+
+The wording changes only what a message says. Who receives it, whether it is sent and whether a
+member may switch it off stay the same. If Courtside cannot fill a stored wording when it sends the
+message, the shipped wording goes out. Every change appears in the change log.
+
+![Message wording with the choice of message and language, placeholders, subject and text.](../screenshots/en/message-wording.png)
 
 ## People → Membership types
 

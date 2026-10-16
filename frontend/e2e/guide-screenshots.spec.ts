@@ -158,6 +158,10 @@ const drivers: Record<string, (page: Page, visualDate: string) => Promise<void>>
     await page.getByTestId("admin-rule-sets-link").click();
     await expect(page.getByTestId("rule-set-name")).toBeVisible();
   },
+  "message-wording": async (page) => {
+    await page.getByTestId("admin-message-wording-link").click();
+    await expect(page.getByTestId("wording-body")).toBeEnabled();
+  },
   "courts": async (page) => {
     await page.getByTestId("admin-courts-link").click();
     await expect(page.getByTestId("create-court")).toBeVisible();
@@ -342,6 +346,7 @@ test("every surface the club's own configuration shows is captured", async ({ pa
   await capture(page, "club-appearance", journeyService.visualDate);
   await capture(page, "deadlines", journeyService.visualDate);
   await capture(page, "booking-rules", journeyService.visualDate);
+  await capture(page, "message-wording", journeyService.visualDate);
 });
 
 test("every surface the facility is described on is captured", async ({ page, journeyService }, info) => {
