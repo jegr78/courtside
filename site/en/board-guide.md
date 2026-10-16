@@ -20,7 +20,7 @@ The sidebar leads to the overview at the top and divides administration below it
 | **Club** | Setup, club profile, deadlines and reminders, booking rules, message wording |
 | **Facility** | Courts, opening hours, booking cards and slot fillers |
 | **People** | People, accounts, membership types and imports |
-| **Records** | Statistics, usage, data exports, change log and message log |
+| **Records** | Statistics, usage, data exports, retention, change log and message log |
 
 The same sidebar returns you to the court plan.
 
@@ -481,7 +481,7 @@ roles again.
 
 ## Records
 
-The **Records** area has seven views.
+The **Records** area has eight views. The next section describes *Retention*.
 
 * **Statistics** opens on the last full month. At the top you choose another period: 7 days, 1, 3,
   6 or 12 months up to today, everything since the first booking, the previous calendar year or two
@@ -541,11 +541,50 @@ The **Records** area has seven views.
 
 ![Statistics with the period choice and the utilisation key figures with their change.](../screenshots/en/utilisation.png)
 
+## Records → Retention
+
+Here the club decides how long it keeps personal records after they end. Courtside sets no period.
+A category without a period stays untouched, however old its records are. Which period is lawful
+is the club's decision as the controller. The [privacy kit](privacy-kit) helps to document that
+decision but is no legal advice.
+
+There are two categories, each with a period in months from 1 to 1200:
+
+* **Bookings** pseudonymises bookings and series that ended before the period. Bookers, the
+  accounts that cancelled or moved them, notes, member players and guest names disappear. Card,
+  courts, times, status and the number of guest places stay, so utilisation, usage and booking
+  counts keep counting these bookings.
+* **Former members** removes a person whose membership ended before the period and whose accounts
+  have neither signed in nor been opened since. Their accounts and everything attached to them go
+  with them.
+
+Before you set a booking period, know what you lose: for pseudonymised periods the statistics no
+longer count active members, and usage can no longer attribute that capacity to a membership type.
+A departure is not handled by retention: a member who leaves is recorded with *End membership*,
+and only the period removes the person later.
+
+A run always starts with *Create preview*. The preview changes nothing. It counts how many
+bookings, series, former members and accounts a run would cover now and names the people it cannot
+reach yet, with the reason:
+
+* An account of the person holds the *Administrator* role.
+* A booking or series that stays still names the person.
+* The person is waiting for a court.
+
+*Open person* takes you to that person so you can resolve the reason. Only after you confirm in the
+form that the run cannot be undone does *Run for good* apply exactly that preview. Without a fresh
+password proof Courtside asks for your password. A preview is valid for 30 minutes, only the
+account that created it can run it, and it runs at most once. Anybody who signed in again since the
+preview is skipped and counted. The change log records the periods and the figures of a run, never
+the names.
+
+![Retention with one period for bookings and one for former members.](../screenshots/en/retention.png)
+
 ## Two rules that hold everywhere
 
 Courtside keeps the domain history. Deactivate or retire courts, booking cards, rule sets,
 membership types and accounts. End memberships. Do not delete these records if past activity must
-remain traceable.
+remain traceable. Only *Retention* removes personal records once a period has passed.
 
 Input mistakes remain correctable. Edit names, usernames and dates in the relevant administration
 page. No direct database access is needed.

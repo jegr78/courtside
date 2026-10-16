@@ -259,6 +259,16 @@ const drivers: Record<string, (page: Page, visualDate: string) => Promise<void>>
     await page.getByTestId("admin-operator-health-link").click();
     await expect(page.getByTestId("operator-check-mail"), "the example, not the live instance, is drawn").toHaveAttribute("data-state", "FAILING");
     await expect(page.getByTestId("operator-health-refresh")).toBeEnabled();
+  },
+  "retention": async (page) => {
+    await page.getByTestId("admin-retention-link").click();
+    for (const [category, months] of [["BOOKINGS", "24"], ["FORMER_MEMBERS", "12"]]) {
+      await page.getByTestId(`retention-months-${category}`).fill(months);
+      await page.getByTestId(`retention-save-${category}`).click();
+      await expect(page.getByTestId(`retention-state-${category}`)).toHaveAttribute("data-configured", "true");
+    }
+    await expect(page.getByTestId("retention-preview")).toBeEnabled();
+    await expect(page.getByTestId("retention-success")).toBeVisible();
   }
 };
 
@@ -420,6 +430,16 @@ test("the overview a board reads the instance's own health from is captured", as
 
   // when / then
   await capture(page, "operator-health", journeyService.visualDate);
+});
+
+test("the periods a board keeps personal records for are captured", async ({ page, journeyService }, info) => {
+  // given
+  await prepare(page, localeOf(info));
+  await signIn(page, "configuration-admin", "court-plan-view");
+  await page.getByTestId("administration-link").click();
+
+  // when / then
+  await capture(page, "retention", journeyService.visualDate);
 });
 
 async function prepare(page: Page, locale: string): Promise<void> {
