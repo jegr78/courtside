@@ -227,3 +227,21 @@ export function erasedCount(output) {
   const match = /^erased (\d+)$/m.exec(output);
   return match ? Number(match[1]) : null;
 }
+
+// The run window reaches back past the no-show seeded two days ago and forward to the last lane day.
+export function usagePeriod(today, laneDays, daysBack = 3) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(today) || laneDays.length === 0) throw new Error(`no usage period from ${today} and ${laneDays.length} lane days`);
+  const back = new Date(`${today}T00:00:00Z`);
+  back.setUTCDate(back.getUTCDate() - daysBack);
+  const last = [...laneDays].sort().at(-1);
+  return { from: back.toISOString().slice(0, 10), to: last > today ? last : today };
+}
+
+// What would name a persona on a page: the full name as the roster writes it and the address.
+export function personaIdentities(roster, usernames, emails) {
+  const named = new Set(usernames);
+  return [...new Set([
+    ...roster.filter((entry) => entry.username && named.has(entry.username)).map((entry) => `${entry.firstName} ${entry.lastName}`),
+    ...emails.filter((email) => typeof email === "string" && email.length > 0)
+  ])];
+}

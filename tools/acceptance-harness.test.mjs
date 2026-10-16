@@ -959,3 +959,41 @@ test("given the deactivation answers, when the postflight judges them, then only
   assert.deepEqual(leftover.map((answer) => answer.personId), ["c", "d"],
     "a person the run recorded before its account existed has nothing to deactivate, anything else is a leftover");
 });
+
+import { personaIdentities, usagePeriod } from "../acceptance/lib/core.mjs";
+import { adminLinks } from "../acceptance/lib/surfaces.mjs";
+import { readFileSync as readSource } from "node:fs";
+
+test("given the administration navigation, when its links are read, then every page link is walked and nothing else", () => {
+  // given
+  const source = readSource(new URL("../frontend/src/components/AdminNavigation.tsx", import.meta.url), "utf8");
+  const declared = [...source.matchAll(/testId: "(admin-[a-z-]+-link)"/g)].map((match) => match[1]);
+  // when
+  const walked = adminLinks(["court-plan-link", ...declared, null, declared[0]]);
+  // then
+  assert.deepEqual(walked, [...new Set(declared)], "the walk follows the navigation the product declares, the court plan aside");
+  assert.ok(walked.includes("admin-usage-link"), "a page added to the navigation is walked without editing the harness");
+  assert.throws(() => adminLinks(["court-plan-link"]), /offers no page/);
+});
+
+test("given today and the lane days, when the usage period is drawn, then it reaches back past the seeded no-show and forward to the last lane day", () => {
+  // when
+  const period = usagePeriod("2026-10-16", ["2026-10-24", "2026-10-18", "2026-10-25"]);
+  // then
+  assert.deepEqual(period, { from: "2026-10-13", to: "2026-10-25" }, "the no-show is seeded two days back, the lanes end on their latest day");
+  assert.deepEqual(usagePeriod("2026-03-02", ["2026-02-27"]), { from: "2026-02-27", to: "2026-03-02" }, "a window already past ends today");
+  assert.throws(() => usagePeriod("2026-10-16", []), /no usage period/);
+});
+
+test("given the roster and persona addresses, when identities are drawn, then only the personas' full names and addresses are named", () => {
+  // given
+  const roster = [
+    { username: "acceptance.member-a", firstName: "Jane", lastName: "Doe" },
+    { username: "someone.else", firstName: "John", lastName: "Roe" },
+    { username: null, firstName: "Mary", lastName: "Major" }
+  ];
+  // when
+  const identities = personaIdentities(roster, ["acceptance.member-a"], ["jane@example.org", null, ""]);
+  // then
+  assert.deepEqual(identities, ["Jane Doe", "jane@example.org"], "a member outside the run and a missing address name nobody");
+});
