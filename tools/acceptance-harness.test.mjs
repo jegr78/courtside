@@ -153,7 +153,7 @@ test("given a week that ends with the change from summer time, when local hours 
   assert.equal(sunday.toISOString(), "2026-10-25T09:00:00.000Z");
 });
 
-import { governingHours, journeysOf, LaneError, laterOpeningOf, planLanes, PROFILE_NAMES, slotIn, weekInForce, weekendConflicts } from "../acceptance/config/lanes.mjs";
+import { availabilityConflicts, governingHours, journeysOf, LaneError, laterOpeningOf, planLanes, PROFILE_NAMES, slotIn, weekInForce, weekendConflicts } from "../acceptance/config/lanes.mjs";
 import { zonedInstant as at } from "../acceptance/config/calendar.mjs";
 
 const open = (opensAt, closesAt) => () => ({ opensAt, closesAt });
@@ -226,6 +226,59 @@ test("given a later week in the schedule, when the week in force on a day is rea
   assert.equal(days.length, 7);
   assert.ok(days.every((day) => day.opensAt === "09:00"), "the later week governs");
   assert.ok(days.every((day) => !("effectiveFrom" in day)));
+});
+
+const lanePlanOf = (slots) => ({ saturday: "2030-03-16", sunday: "2030-03-17", slots });
+const lane = { profile: "desktop-chrome", journey: "singles", date: "2030-03-13", court: 2, start: "08:00", end: "09:00" };
+const everyDay = (opensAt, closesAt) => ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"]
+  .map((dayOfWeek) => ({ dayOfWeek, opensAt, closesAt }));
+const courtsOf = [{ id: "court-1", number: 1 }, { id: "court-2", number: 2 }];
+
+test("given a holiday that closes a lane's day, when the lanes are checked, then the holiday and the lane are named", () => {
+  // given
+  const grid = { openingPeriods: [{ kind: "HOLIDAY", name: "Founding day", startsOn: "2030-03-13", endsOn: "2030-03-13", days: everyDay(null, null) }], courtClosures: [] };
+  // when
+  const conflicts = availabilityConflicts(grid, lanePlanOf([lane]), courtsOf);
+  // then
+  assert.deepEqual(conflicts, ['holiday "Founding day" closes 2030-03-13, the day of lane desktop-chrome/singles 08:00-09:00']);
+});
+
+test("given a season whose hours leave out a lane, when the lanes are checked, then its hours are named", () => {
+  // given
+  const grid = { openingPeriods: [{ kind: "SEASON", name: "Winter", startsOn: "2030-03-01", endsOn: "2030-03-31", days: everyDay("09:00:00", "20:00:00") }], courtClosures: [] };
+  // when
+  const conflicts = availabilityConflicts(grid, { ...lanePlanOf([lane]), saturday: "2030-04-06", sunday: "2030-04-07" }, courtsOf);
+  // then
+  assert.deepEqual(conflicts, ['season "Winter" opens 2030-03-13 only 09:00 to 20:00, outside lane desktop-chrome/singles 08:00-09:00']);
+});
+
+test("given a season with longer hours and a holiday inside it that keeps the lane open, when the lanes are checked, then the holiday decides and nothing conflicts", () => {
+  // given
+  const grid = { openingPeriods: [
+    { kind: "SEASON", name: "Winter", startsOn: "2030-03-01", endsOn: "2030-03-12", days: everyDay("09:00:00", "20:00:00") },
+    { kind: "HOLIDAY", name: "Open day", startsOn: "2030-03-13", endsOn: "2030-03-13", days: everyDay("07:00:00", "21:00:00") }], courtClosures: [] };
+  // when / then
+  assert.deepEqual(availabilityConflicts(grid, lanePlanOf([lane]), courtsOf), []);
+});
+
+test("given a closure of a lane's court and one of another court, when the lanes are checked, then only the lane's court is named", () => {
+  // given
+  const grid = { openingPeriods: [], courtClosures: [
+    { courtId: "court-2", name: "Resurfacing", startsOn: "2030-03-10", endsOn: "2030-03-14" },
+    { courtId: "court-1", name: "Lights", startsOn: "2030-03-13", endsOn: "2030-03-13" }] };
+  // when
+  const conflicts = availabilityConflicts(grid, lanePlanOf([lane]), courtsOf);
+  // then
+  assert.deepEqual(conflicts, ['court closure "Resurfacing" closes court 2 on 2030-03-13, lane desktop-chrome/singles 08:00-09:00']);
+});
+
+test("given a season over the window's weekend, when the lanes are checked, then it is named for the weekend journeys", () => {
+  // given
+  const grid = { openingPeriods: [{ kind: "SEASON", name: "Spring", startsOn: "2030-03-17", endsOn: "2030-04-30", days: everyDay("06:00:00", "23:00:00") }], courtClosures: [] };
+  // when
+  const conflicts = availabilityConflicts(grid, lanePlanOf([]), courtsOf);
+  // then
+  assert.deepEqual(conflicts, ['season "Spring" covers 2030-03-17 and would override the weekly hours the weekend journeys change']);
 });
 
 test("given a Saturday slot, when its later opening is read, then it is one hour after the slot ends", () => {
@@ -309,6 +362,15 @@ test("given a ledger with an opening week, when replayed, then that week's sched
   await replayEntries([{ kind: "opening-week", id: "2030-03-16" }], async (path) => { paths.push(path); return { status: () => 204 }; });
   // then
   assert.deepEqual(paths, ["/api/admin/opening-hours/schedule/2030-03-16"]);
+});
+
+test("given a ledger with a season and a court closure, when replayed, then each is removed through its own path", async () => {
+  // given
+  const paths = [];
+  // when
+  await replayEntries([{ kind: "opening-period", id: "p-1" }, { kind: "court-closure", id: "c-1" }], async (path) => { paths.push(path); return { status: () => 204 }; });
+  // then
+  assert.deepEqual(paths, ["/api/admin/opening-periods/p-1", "/api/admin/court-closures/c-1"]);
 });
 
 const answer = (status, retryAfter) => ({ status: () => status, headers: () => (retryAfter ? { "retry-after": retryAfter } : {}) });

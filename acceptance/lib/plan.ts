@@ -18,6 +18,15 @@ export async function gotoDay(page: Page, date: string) {
   await expect(page.locator(`[data-testid="free-slot"][data-date="${date}"], [data-testid="outside-slot"][data-date="${date}"], [data-testid="day-closed"], [data-testid="day-closed-notice"]`).first()).toBeAttached();
 }
 
+// Only a day after the window: the lanes and their bookings stay out of reach of a journey that changes availability.
+export async function gotoDayBeyondWindow(page: Page, date: string) {
+  if (date <= lanePlan().days.at(-1)!) throw new Error(`refusing a day inside or before the booking window: ${date}`);
+  await expect(page.getByTestId("day-plan-table")).toBeVisible();
+  await page.getByTestId("week-date").fill(date);
+  const day = page.getByTestId(`day-selector-${date}`);
+  await expect(day).toHaveAttribute("aria-pressed", "true");
+}
+
 export async function pickFreeSlot(page: Page, court?: number, from = 0): Promise<Locator | null> {
   for (const date of lanePlan().days.slice(from)) {
     await gotoDay(page, date);

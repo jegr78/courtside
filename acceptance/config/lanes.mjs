@@ -23,6 +23,36 @@ export const weekInForce = (grid, date) => governingWeek(grid, date).days.map(({
 
 export const laterOpeningOf = (slot) => hh(hourOf(slot.end) + 1);
 
+const covering = (entries, date) => (entries ?? []).filter((entry) => entry.startsOn <= date && date <= entry.endsOn);
+const KIND_NAMES = { HOLIDAY: "holiday", SEASON: "season" };
+
+export function availabilityConflicts(grid, { saturday, sunday, slots }, courts) {
+  const conflicts = [];
+  for (const slot of slots) {
+    const lane = `lane ${slot.profile}/${slot.journey} ${slot.start}-${slot.end}`;
+    const periods = covering(grid.openingPeriods, slot.date);
+    const period = periods.find((entry) => entry.kind === "HOLIDAY") ?? periods.find((entry) => entry.kind === "SEASON");
+    if (period) {
+      const day = period.days.find((candidate) => candidate.dayOfWeek === weekdayOf(slot.date));
+      const opensAt = day?.opensAt?.slice(0, 5);
+      const closesAt = day?.closesAt?.slice(0, 5);
+      const named = `${KIND_NAMES[period.kind]} "${period.name}"`;
+      if (!opensAt || !closesAt) conflicts.push(`${named} closes ${slot.date}, the day of ${lane}`);
+      else if (slot.start < opensAt || slot.end > closesAt) conflicts.push(`${named} opens ${slot.date} only ${opensAt} to ${closesAt}, outside ${lane}`);
+    }
+    const court = courts.find((candidate) => candidate.number === slot.court);
+    for (const closure of covering(grid.courtClosures, slot.date).filter((entry) => entry.courtId === court?.id)) {
+      conflicts.push(`court closure "${closure.name}" closes court ${slot.court} on ${slot.date}, ${lane}`);
+    }
+  }
+  for (const date of [saturday, sunday]) {
+    for (const period of covering(grid.openingPeriods, date)) {
+      conflicts.push(`${KIND_NAMES[period.kind]} "${period.name}" covers ${date} and would override the weekly hours the weekend journeys change`);
+    }
+  }
+  return [...new Set(conflicts)];
+}
+
 export function weekendConflicts({ plan, saturday, sunday }) {
   const latest = plan.slots.filter((slot) => slot.journey === "saturday-opening").map(laterOpeningOf).sort().at(-1);
   const until = latest ? zonedInstant(plan.saturday, latest, plan.timeZone).getTime() : -Infinity;

@@ -32,6 +32,12 @@ created.
   Saturday before the latest later opening the weekend journeys schedule. The preflight names
   each one it finds. With `notifyClubBookings` such bookings stay in place and their bookers are
   told about the changed hours; the report counts them.
+- No season, holiday or court closure that closes a lane's day or court, leaves a lane outside its
+  hours, or covers the window's Saturday or Sunday, where it would override the weekly hours the
+  weekend journeys change. The preflight names each entry and the lane it hits.
+- On the eighth and ninth day after the window, no season, holiday or court closure of the club,
+  and weekly hours that open both days. The availability journey adds a holiday on the first and
+  closes the first court on the second.
 - Mail delivered to a catcher, never to members. The journeys change opening hours, and the
   instance tells members about bookings those changes affect.
 - The Mailpit API of that catcher for the journeys that read mail. Without `mail.url` those
@@ -123,10 +129,13 @@ and preflight, the journeys on all ten profiles, the postflight and the report.
 Discovery writes `lanes.json`: the window, and for each profile and journey its day, court and
 hour. Preflight then proves every lane slot free before a journey starts.
 
-The harness cancels only bookings and removes only opening weeks it recorded in its ledger. A
+The harness cancels only bookings and removes only opening weeks, holidays and court closures it
+recorded in its ledger. A
 booking or week of the club in its way stops the preflight or the journey that needs it and is
 never touched; choose another `window.start` or other `courts`. Each opening week a journey
 schedules is followed the next day by a copy of the hours in force, so the change governs one day.
+The availability journey removes its holiday and court closure itself; the postflight removes any
+the ledger still holds and fails when one of them is left.
 
 The harness starts no log or tunnel process. To attribute server log lines to journey steps, follow
 the instance's logs into the files `logs.app` and `logs.proxy` name for the duration of the run,
