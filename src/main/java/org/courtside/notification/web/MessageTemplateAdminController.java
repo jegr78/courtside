@@ -7,6 +7,7 @@ import org.courtside.api.ApiMessageTemplate;
 import org.courtside.api.ApiMessageTemplateLanguage;
 import org.courtside.api.ApiMessageTemplateText;
 import org.courtside.api.ApiMessageTemplateWording;
+import org.courtside.identity.RecentAuthentication;
 import org.courtside.notification.MessageKind;
 import org.courtside.notification.internal.MessageTemplateService;
 import org.courtside.notification.internal.MessageText;
@@ -20,6 +21,7 @@ import java.util.List;
 class MessageTemplateAdminController implements AdminMessageTemplatesApi {
 
     private final MessageTemplateService templates;
+    private final RecentAuthentication recentAuthentication;
 
     @Override
     public ResponseEntity<List<ApiMessageTemplate>> listMessageTemplates() {
@@ -33,12 +35,14 @@ class MessageTemplateAdminController implements AdminMessageTemplatesApi {
     @Override
     public ResponseEntity<Void> changeMessageTemplate(ApiMessageKind kind, ApiMessageTemplateLanguage language,
                                                       ApiMessageTemplateText text) {
+        recentAuthentication.requireRecent();
         templates.change(MessageKind.valueOf(kind.getValue()), language.getValue(), toText(text));
         return ResponseEntity.noContent().build();
     }
 
     @Override
     public ResponseEntity<Void> resetMessageTemplate(ApiMessageKind kind, ApiMessageTemplateLanguage language) {
+        recentAuthentication.requireRecent();
         templates.reset(MessageKind.valueOf(kind.getValue()), language.getValue());
         return ResponseEntity.noContent().build();
     }

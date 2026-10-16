@@ -8446,6 +8446,10 @@ paths:
         keeps a secret out of the subject, which also stays on one line. Anything else, links
         included, is the club's to word. The wording changes what a message says, never who
         receives it or whether it is sent.
+
+        This operation requires a full reauthentication within the configured window, capped at
+        five minutes. Missing or stale proof is answered `403` with
+        `urn:courtside:error:recent-authentication-required` and changes nothing.
       security:
         - sessionCookie: []
           csrfToken: []
@@ -8482,7 +8486,12 @@ paths:
       tags: [admin-message-templates]
       operationId: resetMessageTemplate
       summary: Return one message in one language to the shipped wording.
-      description: Resetting a message that already uses the shipped wording changes nothing.
+      description: |
+        Resetting a message that already uses the shipped wording changes nothing.
+
+        This operation requires a full reauthentication within the configured window, capped at
+        five minutes. Missing or stale proof is answered `403` with
+        `urn:courtside:error:recent-authentication-required` and changes nothing.
       security:
         - sessionCookie: []
           csrfToken: []

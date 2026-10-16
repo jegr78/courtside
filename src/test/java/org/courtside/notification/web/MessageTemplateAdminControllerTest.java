@@ -11,6 +11,9 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
+import java.time.Clock;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.nullValue;
@@ -34,12 +37,39 @@ class MessageTemplateAdminControllerTest extends AbstractIntegrationTest {
     @Autowired
     private JdbcClient jdbc;
 
+    @Autowired
+    private Clock clock;
+
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
+        mockMvc = MockMvcBuilders.webAppContextSetup(context)
+                .defaultRequest(get("/").sessionAttr("courtside.authenticated-at", clock.instant().toEpochMilli()))
+                .apply(springSecurity()).build();
         jdbc.sql("DELETE FROM message_template_override").update();
+    }
+
+    @Test
+    void givenNoRecentProof_whenAWordingIsStoredOrReset_thenBothAreRefusedAndNothingChanges() throws Exception {
+        // given
+        jdbc.sql("INSERT INTO message_template_override VALUES ('ACCOUNT_USERNAME_REMINDER', 'de', 'S', '{username}', now())")
+                .update();
+        MockMvc unproven = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
+
+        // when / then
+        unproven.perform(put(REMINDER).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"subject\": \"Login\", \"body\": \"{username}\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:recent-authentication-required"));
+        unproven.perform(delete("/api/admin/message-templates/ACCOUNT_USERNAME_REMINDER/de").with(csrf()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:recent-authentication-required"));
+        unproven.perform(post(REMINDER + "/preview").with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"subject\": \"Login\", \"body\": \"{username}\"}"))
+                .andExpect(status().isOk());
+        assertThat(jdbc.sql("SELECT language FROM message_template_override").query(String.class).list())
+                .as("the refused writes leave the stored wording as it was").containsExactly("de");
     }
 
     @Test

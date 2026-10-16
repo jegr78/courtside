@@ -39,8 +39,8 @@ test("given the OpenAPI contract, when generating authorization cases, then ever
   const matrix = buildOperationAuthorizationMatrix(api);
 
   // then
-  assert.equal(matrix.length, 145);
-  assert.equal(new Set(matrix.map((entry) => entry.operationId)).size, 145);
+  assert.equal(matrix.length, 149);
+  assert.equal(new Set(matrix.map((entry) => entry.operationId)).size, 149);
   assert.deepEqual(Object.keys(matrix[0].expectations).toSorted(), [...authorizationActors].toSorted());
   assert.ok(matrix.every((entry) => Object.keys(entry.expectations).length === authorizationActors.length));
   assert.deepEqual(matrix.find((entry) => entry.operationId === "getBookingEligibility").expectations, {

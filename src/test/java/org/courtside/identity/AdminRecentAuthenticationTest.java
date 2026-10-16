@@ -90,7 +90,10 @@ class AdminRecentAuthenticationTest extends AbstractIntegrationTest {
                 put("/api/admin/roster/{personId}/account/active", targetPersonId)
                         .content("{\"active\":false}"),
                 delete("/api/admin/roster/{personId}/account/sessions", targetPersonId),
-                delete("/api/admin/sessions"));
+                delete("/api/admin/sessions"),
+                put("/api/admin/message-templates/ACCOUNT_PASSWORD_RESET_CODE/de")
+                        .content("{\"subject\":\"Code\",\"body\":\"{username} {resetCode}\"}"),
+                delete("/api/admin/message-templates/ACCOUNT_PASSWORD_RESET_CODE/de"));
 
         // when / then
         for (MockHttpServletRequestBuilder request : sensitiveRequests) {
