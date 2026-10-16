@@ -54,6 +54,7 @@ export function auditMessage(entry: AuditEntry, t: TFunction): string {
     : undefined;
   const opensAt = typeof entry.parameters.opensAt === "string" ? shortTime(entry.parameters.opensAt) : undefined;
   const closesAt = typeof entry.parameters.closesAt === "string" ? shortTime(entry.parameters.closesAt) : undefined;
+  const kind = typeof entry.parameters.kind === "string" ? t(`admin.availability.kind.${entry.parameters.kind}`) : undefined;
   return t(`audit.event.${entry.eventType}`, {
     ...entry.parameters,
     ...(weekday !== undefined ? { weekday } : {}),
@@ -61,6 +62,7 @@ export function auditMessage(entry: AuditEntry, t: TFunction): string {
     ...(params !== undefined ? { params } : {}),
     ...(opensAt !== undefined ? { opensAt } : {}),
     ...(closesAt !== undefined ? { closesAt } : {}),
+    ...(kind !== undefined ? { kind } : {}),
     ...(context ? { context } : {})
   });
 }

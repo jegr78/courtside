@@ -936,7 +936,7 @@ test("a booking on a day the club has since closed stays in the phone plan", asy
   await page.route("**/api/public/booking-grid", async (route) => route.fulfill({ json: {
     timeZone: "Europe/Berlin",
     slotMinutes: 30,
-    openingWeeks: [],
+    openingWeeks: [], openingPeriods: [], courtClosures: [],
     openingHours: week.map((dayOfWeek) => ({ dayOfWeek, opensAt: null, closesAt: null }))
   } }));
   await page.route("**/api/bookings?*", async (route) => {

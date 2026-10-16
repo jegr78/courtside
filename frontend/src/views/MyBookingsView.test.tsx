@@ -15,7 +15,7 @@ beforeEach(async () => {
     { id: "33333333-3333-3333-3333-333333333333", number: 1, name: "Centre Court" }
   ]);
   vi.spyOn(api, "bookingGrid").mockResolvedValue({
-    timeZone: "Europe/Berlin", slotMinutes: 30, openingWeeks: [], openingHours: []
+    timeZone: "Europe/Berlin", slotMinutes: 30, openingWeeks: [], openingPeriods: [], courtClosures: [], openingHours: []
   });
   vi.spyOn(api, "personalBookings").mockImplementation((options) => Promise.resolve(options?.view === "CANCELLED"
     ? { items: [] }
@@ -277,7 +277,7 @@ it("given more bookings exist, when previewing a series cancellation, then the i
 it("given the browser and club use different zones, when loaded, then booking times use the club zone", async () => {
   // given
   vi.mocked(api.bookingGrid).mockResolvedValue({
-    timeZone: "Pacific/Auckland", slotMinutes: 30, openingWeeks: [], openingHours: []
+    timeZone: "Pacific/Auckland", slotMinutes: 30, openingWeeks: [], openingPeriods: [], courtClosures: [], openingHours: []
   });
 
   // when

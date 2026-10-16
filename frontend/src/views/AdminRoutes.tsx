@@ -19,6 +19,7 @@ import { AdminRuleSetsView } from "./configuration/AdminRuleSetsView";
 import { AdminBookingCardView } from "./facility/AdminBookingCardView";
 import { AdminBookingCardsView } from "./facility/AdminBookingCardsView";
 import { AdminCourtsView } from "./facility/AdminCourtsView";
+import { AdminAvailabilityView } from "./facility/AdminAvailabilityView";
 import { AdminOpeningHoursView } from "./facility/AdminOpeningHoursView";
 import { AdminSlotFillersView } from "./facility/AdminSlotFillersView";
 
@@ -42,6 +43,7 @@ export default function AdminRoutes({ configurationChanged, administrator, manag
         <Route index element={<Navigate to="/admin/facility/courts" replace />} />
         <Route path="courts" element={<AdminCourtsView />} />
         <Route path="opening-hours" element={<AdminOpeningHoursView />} />
+        <Route path="opening-hours/exceptions" element={<AdminAvailabilityView />} />
         <Route path="booking-cards" element={<AdminBookingCardsView />} />
         <Route path="booking-cards/:cardId" element={<AdminBookingCardView />} />
         <Route path="slot-fillers" element={<AdminSlotFillersView />} />

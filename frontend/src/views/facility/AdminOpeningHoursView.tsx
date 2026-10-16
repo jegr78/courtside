@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
+import { Link } from "react-router-dom";
 import type { TFunction } from "i18next";
 import { ApiError, api, type DayOfWeek, type OpeningHours, type OpeningWeek } from "../../api/client";
 import { useClubConfiguration } from "../../club/registry";
@@ -121,6 +122,10 @@ export function AdminOpeningHoursView() {
     {weeks !== undefined && draft !== undefined && club !== undefined && today !== undefined && <div className="grid gap-4">
       <OpeningWeeks weeks={weeks} selected={selected} disabled={saving || unsaved}
                     choose={(index) => show(weeks, index, today)} remove={remove} />
+      <p data-testid="opening-hours-exceptions" className="text-sm">
+        <Link data-testid="opening-hours-exceptions-link" className="font-medium underline" to="/admin/facility/opening-hours/exceptions">
+          {t("admin.availability.link")}</Link>
+      </p>
       <form id={FORM} noValidate onSubmit={(event) => void saveWeek(event)} className="grid gap-4">
         <article className="grid gap-2 rounded-xl border p-4">
           <TextField disabled={saving} data-testid="opening-hours-effective-from" type="date" min={today} required

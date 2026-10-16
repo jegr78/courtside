@@ -21,7 +21,7 @@ import {
   formatDate, formatTime, isValidZonedDateTime, parseDate, startOfWeek, timeToMinutes,
   weekDays, zonedDateTime
 } from "../time/clubZone";
-import { hoursOn } from "../time/openingHours";
+import { closureOn, hoursOn, periodOn } from "../time/openingHours";
 import { leavesBookingHours } from "../time/bookingHours";
 import { dateTimeFormatter } from "../time/dateTimeFormatter";
 import { violationMessage } from "../api/problem-message";
@@ -77,6 +77,7 @@ interface DayPlanCellProps {
   queue: (allocation: Allocation) => void;
   past: boolean;
   outside: boolean;
+  courtClosed: boolean;
   canBook: boolean;
   firstVisible: boolean;
   selected: boolean;
@@ -196,7 +197,7 @@ export function WeekView({ today, clock = systemClock, canBook = true,
     }))]))
     : new Map<string, AllocationBoundary[]>(), [data]);
   const remainingCounts = useMemo(() => data && data.courts.length > 0
-    ? new Map(data.days.map((day) => [formatDate(day), remainingFreeSlots(data, currentInstant,
+    ? new Map(data.days.map((day) => [formatDate(day), remainingFreeSlots(data, formatDate(day), currentInstant,
       allocationBoundaries.get(formatDate(day)) ?? [], weekSlotGeometry.get(formatDate(day)) ?? [])] as const))
     : new Map<string, number>(), [data, currentInstant, allocationBoundaries, weekSlotGeometry]);
   const hasCourts = (data?.courts.length ?? 0) > 0;
@@ -216,6 +217,12 @@ export function WeekView({ today, clock = systemClock, canBook = true,
     ? slotsOutsideHours(selectedDate, daySlots, selectedAllocations, grid) : [],
   [selectedDate, daySlots, selectedAllocations, grid]);
   const isToday = selectedDate === dateInTimeZoneValue(currentInstant, data?.grid.timeZone);
+  const holiday = selectedDate && grid ? periodOn(grid, "HOLIDAY", selectedDate) : undefined;
+  const closures = useMemo(() => new Map(selectedDate && data
+    ? data.courts.flatMap((court) => {
+      const closure = closureOn(data.grid, court.id, selectedDate);
+      return closure ? [[court.id, closure.endsOn] as const] : [];
+    }) : []), [selectedDate, data]);
   const currentTime = data ? formatTime(currentInstant.toISOString(), data.grid.timeZone) : undefined;
   const slots = useMemo(() => [...daySlots, ...outsideSlots].sort(), [daySlots, outsideSlots]);
   const slotStarts = useMemo(() => new Map([
@@ -474,6 +481,8 @@ export function WeekView({ today, clock = systemClock, canBook = true,
         ? scrollToSlot(planRef.current, currentSlot)
         : selectDate(dateInTimeZoneValue(currentInstant, data.grid.timeZone))}>{t("week.now")}</Button>
     </div>}
+    {data && hasCourts && holiday && <p data-testid="day-holiday-notice" data-period-id={holiday.id}
+      className="text-muted mt-4">{t("week.holiday", { name: holiday.name })}</p>}
     {data && hasCourts && daySlots.length === 0 && slots.length > 0 && <p data-testid="day-closed-notice"
       className="text-muted mt-4">{t("week.closed")}</p>}
     {data && hasCourts && <div
@@ -494,9 +503,12 @@ export function WeekView({ today, clock = systemClock, canBook = true,
             <th scope="col" className="border-structural border-b px-4 py-3 text-left">{t("week.time")}</th>
             {data.courts.map((court) => {
               const courtName = court.name || t("court.number", { number: court.number });
+              const closedUntil = closures.get(court.id);
               return <th key={court.id} data-testid={`court-heading-${court.number}`} scope="col"
+                data-closed-until={closedUntil}
                 className="border-structural border-b px-4 py-3 text-left">
-                <span className="sr-only">{courtName}</span>
+                <span className="sr-only">{closedUntil
+                  ? t("week.courtClosedUntil", { court: courtName, endsOn: dateTimeFormatter(language, { dateStyle: "medium" }).format(parseDate(closedUntil)) }) : courtName}</span>
                 <span className="court-heading-full" aria-hidden="true">{courtName}</span>
                 <span className="court-heading-compact" aria-hidden="true">{court.number}</span>
               </th>;
@@ -518,6 +530,7 @@ export function WeekView({ today, clock = systemClock, canBook = true,
               court={court} slot={slot} date={selectedDate} startsAt={visibleSlotStartsAt}
               allocations={selectedBoundaries} grid={data.grid} locale={language} t={t} shortLabelOf={shortLabelOf}
               book={openBooking} cancel={openCancellation} queue={openWaitlist} past={past} outside={outside}
+              courtClosed={closures.has(court.id)}
               canBook={bookingAllowed} firstVisible={slot === slots[0]}
               selected={drag?.courtId === court.id && dragSpan.includes(slot)}
               beginDrag={beginDrag} extendDrag={extendDrag}
@@ -623,7 +636,7 @@ const DayPlanCell = memo(function DayPlanCell(props: DayPlanCellProps) {
   }, [pressed]);
   return renderCell(props.court, props.slot, props.date, props.startsAt, props.allocations,
     props.grid.slotMinutes, props.grid.timeZone, props.locale, props.t, props.shortLabelOf,
-    () => props.book(props.court.id, props.slot), props.cancel, props.queue, props.past, props.outside,
+    () => props.book(props.court.id, props.slot), props.cancel, props.queue, props.past, props.outside, props.courtClosed,
     props.canBook, props.firstVisible, {
       selected: props.selected || pressed === cell,
       start: (pointerType) => {
@@ -640,11 +653,12 @@ function isOccupied(allocations: AllocationBoundary[], courtId: string, slot: st
     && entry.startsAtMinute <= minute && entry.endsAtMinute > minute);
 }
 
-function remainingFreeSlots(data: WeekData, currentInstant: Date,
+function remainingFreeSlots(data: WeekData, date: string, currentInstant: Date,
   allocations: AllocationBoundary[], slots: GridSlot[]): number {
+  const openCourts = data.courts.filter((court) => !closureOn(data.grid, court.id, date));
   return slots.reduce((count, slot) => {
     if (slot.startsAt < currentInstant.getTime()) return count;
-    return count + data.courts.filter((court) =>
+    return count + openCourts.filter((court) =>
       !isOccupied(allocations, court.id, slot.time)
     ).length;
   }, 0);
@@ -694,6 +708,7 @@ function renderCell(
   queue: (allocation: Allocation) => void,
   isPast: boolean,
   isOutside: boolean,
+  isCourtClosed: boolean,
   canBook: boolean,
   isFirstVisibleSlot: boolean,
   drag: { selected: boolean; start: (pointerType: string) => void; extend: () => void }
@@ -771,6 +786,14 @@ function renderCell(
       <div data-testid="outside-slot" data-date={date} data-court-number={court.number} data-slot={slot}
         data-state="outside" className="day-plan-slot day-plan-free-slot flex w-full items-center justify-center rounded-md px-2 text-sm">
         {t("week.outside")}
+      </div>
+    </td>;
+  }
+  if (isCourtClosed) {
+    return <td key={court.id} className={`${cellClass} day-plan-free-cell p-1`}>
+      <div data-testid="closed-court-slot" data-date={date} data-court-number={court.number} data-slot={slot}
+        data-state="closed" className="day-plan-slot day-plan-free-slot flex w-full items-center justify-center rounded-md px-2 text-sm">
+        {t("week.courtClosed")}
       </div>
     </td>;
   }
