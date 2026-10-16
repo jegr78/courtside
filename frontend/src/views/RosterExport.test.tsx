@@ -9,7 +9,7 @@ import { RosterExport } from "./RosterExport";
 const membershipSystem: ImportSource = {
   id: "source-1", sourceKey: "membership", displayName: "Membership system", separator: ";",
   encoding: "windows-1252", columns: {}, membershipTypes: {}, defaultMembershipTypeId: "type-1",
-  ownedFields: [], removalWarningPercent: 10
+  ownedFields: [], removalWarningPercent: 10, columnMode: "HEADER", positions: [], columnCount: null
 };
 
 function offer(): Promise<{ fileName: string; content: Blob }> {

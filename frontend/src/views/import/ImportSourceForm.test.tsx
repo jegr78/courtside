@@ -20,7 +20,7 @@ const existing: ImportSource = {
   membershipTypes: {},
   defaultMembershipTypeId: "type-1",
   ownedFields: [],
-  removalWarningPercent: 10
+  removalWarningPercent: 10, columnMode: "HEADER", positions: [], columnCount: null
 };
 
 function file(content: string, name = "members.csv") {
@@ -287,6 +287,124 @@ describe("ImportSourceForm", () => {
     expect(screen.getByTestId("source-encoding")).toHaveValue("windows-1252");
     expect([...screen.getByTestId("column-EXTERNAL_ID").querySelectorAll("option")]
       .map((option) => option.getAttribute("value"))).toContain("Straße");
+  });
+});
+
+describe("ImportSourceForm by position", () => {
+  beforeEach(async () => {
+    await i18n.changeLanguage("en");
+  });
+
+  const positional: ImportSource = {
+    ...existing, columns: {}, columnMode: "POSITION", columnCount: 4,
+    positions: [{ position: 1, field: "EXTERNAL_ID" }, { position: 2, field: "FIRST_NAME" }, { position: 3, field: "LAST_NAME" }]
+  };
+
+  it("given a headerless export, when the source is described by position, then numbered columns are shown and the positions are sent", async () => {
+    // given
+    const save = vi.fn().mockResolvedValue(existing);
+    show(undefined, save);
+    await userEvent.click(screen.getByTestId("column-mode-POSITION"));
+
+    // when
+    await userEvent.upload(screen.getByTestId("source-file"), file("4711;Jane;Doe;A\n4712;John;Roe;B\n"));
+    expect(await screen.findByTestId("column-sample")).toBeInTheDocument();
+    await userEvent.type(screen.getByTestId("source-key"), "headerless-system");
+    await userEvent.type(screen.getByTestId("source-name"), "Headerless system");
+    await userEvent.selectOptions(screen.getByTestId("position-LAST_NAME"), "3");
+    await userEvent.selectOptions(screen.getByTestId("position-EXTERNAL_ID"), "1");
+    await userEvent.selectOptions(screen.getByTestId("position-FIRST_NAME"), "2");
+    await userEvent.selectOptions(screen.getByTestId("source-default-type"), "type-1");
+    await userEvent.click(screen.getByTestId("save-source"));
+
+    // then
+    expect(screen.getByTestId("sample-column-4")).toHaveTextContent("4");
+    expect(screen.getByTestId("source-column-count")).toHaveValue(4);
+    expect(screen.queryByTestId("sample-header-row")).not.toBeInTheDocument();
+    const request = save.mock.calls[0][0] as ImportSourceRequest;
+    expect(request).toEqual(expect.objectContaining({
+      columnMode: "POSITION", columnCount: 4,
+      positions: [{ position: 1, field: "EXTERNAL_ID" }, { position: 2, field: "FIRST_NAME" }, { position: 3, field: "LAST_NAME" }]
+    }));
+    expect(request.columns).toBeUndefined();
+  });
+
+  it("given an export whose first row looks like a header, when read by position, then that row is marked", async () => {
+    // given
+    show(undefined, vi.fn());
+    await userEvent.click(screen.getByTestId("column-mode-POSITION"));
+
+    // when
+    await userEvent.upload(screen.getByTestId("source-file"), file("Number;Given;Family\n4711;Jane;Doe\n"));
+
+    // then
+    expect(await screen.findByTestId("sample-header-row")).toBeInTheDocument();
+    expect(screen.getByTestId("sample-row-1")).toHaveAttribute("data-header-like", "true");
+    expect(screen.getByTestId("sample-row-2")).not.toHaveAttribute("data-header-like");
+  });
+
+  it("given a character set the browser cannot read, when read by position, then the column count is asked for by hand", async () => {
+    // given
+    show(undefined, vi.fn());
+    await userEvent.click(screen.getByTestId("column-mode-POSITION"));
+    await userEvent.upload(screen.getByTestId("source-file"),
+      new File([Uint8Array.from([52, 55, 59, 83, 116, 114, 97, 223, 101, 10])], "members.csv", { type: "text/csv" }));
+    await userEvent.clear(screen.getByTestId("source-encoding"));
+
+    // when
+    await userEvent.type(screen.getByTestId("source-encoding"), "IBM930");
+
+    // then
+    expect(await screen.findByTestId("column-count-by-hand")).toBeInTheDocument();
+    expect(screen.queryByTestId("column-sample")).not.toBeInTheDocument();
+    await userEvent.clear(screen.getByTestId("source-column-count"));
+    await userEvent.type(screen.getByTestId("source-column-count"), "6");
+    expect(screen.getByTestId("position-EXTERNAL_ID").querySelectorAll("option")).toHaveLength(7);
+  });
+
+  it("given a source stored by position, when it opens untouched, then its positions show and nothing is unsaved", async () => {
+    // when
+    show(positional, vi.fn());
+
+    // then
+    expect(await screen.findByTestId("position-LAST_NAME")).toHaveValue("3");
+    expect(screen.getByTestId("column-mode-POSITION")).toBeChecked();
+    expect(screen.getByTestId("unsaved-count")).toHaveTextContent("0");
+  });
+
+  it("given a source stored by header, when it is switched to positions, then saving asks first and only the confirmation sends it", async () => {
+    // given
+    const save = vi.fn().mockResolvedValue(existing);
+    show(existing, save);
+    await userEvent.click(screen.getByTestId("column-mode-POSITION"));
+    await userEvent.type(screen.getByTestId("source-column-count"), "3");
+    await userEvent.selectOptions(screen.getByTestId("position-EXTERNAL_ID"), "1");
+    await userEvent.selectOptions(screen.getByTestId("position-FIRST_NAME"), "2");
+    await userEvent.selectOptions(screen.getByTestId("position-LAST_NAME"), "3");
+
+    // when
+    await userEvent.click(screen.getByTestId("save-source"));
+
+    // then
+    expect(screen.getByTestId("column-mode-confirmation")).toBeInTheDocument();
+    expect(save).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByTestId("confirm-column-mode-change"));
+    expect(save).toHaveBeenCalledWith(expect.objectContaining({ columnMode: "POSITION", confirmColumnModeChange: true }));
+  });
+
+  it("given a pending switch, when it is cancelled, then nothing is sent", async () => {
+    // given
+    const save = vi.fn();
+    show(existing, save);
+    await userEvent.click(screen.getByTestId("column-mode-POSITION"));
+    await userEvent.click(screen.getByTestId("save-source"));
+
+    // when
+    await userEvent.click(screen.getByTestId("cancel-column-mode-change"));
+
+    // then
+    expect(screen.queryByTestId("column-mode-confirmation")).not.toBeInTheDocument();
+    expect(save).not.toHaveBeenCalled();
   });
 });
 
