@@ -1,13 +1,13 @@
 import { test, expect } from "@playwright/test";
 import { appendFileSync } from "node:fs";
 import { capture } from "../lib/checks";
-import { openAs } from "../lib/session";
+import { openAs, reauthenticateIfAsked } from "../lib/session";
 import { step } from "../lib/steps";
 import { discovery, disposableRecord, onDesksAndTablet, projectName } from "../lib/journey";
-import { adminPost, adminPut, apiAs } from "../lib/api";
+import { adminPost, adminPut, anonymousApi, apiAs } from "../lib/api";
 import { config, persona, runPath } from "../lib/context";
 import type { Page } from "@playwright/test";
-import { mailAvailable, mailsTo, type Mail } from "../lib/mail";
+import { latestMailTo, mailAvailable, mailsTo, type Mail } from "../lib/mail";
 import { recordCreated } from "../lib/ledger";
 import { precondition } from "../lib/precondition";
 import { ADMIN_LINKS } from "../lib/surfaces.mjs";
@@ -158,5 +158,59 @@ test("given a name that reads like a formula, when the admin downloads both logs
         { firstName: original.firstName, lastName: original.lastName, email: original.email });
       expect.soft(restored.status(), "the disposable person carries their own name again").toBeLessThan(300);
     }
+  }
+});
+
+test("given the club's own wording of the username reminder, when a reminder is asked for, then it arrives in that wording until the admin restores the shipped one", async ({ browser }) => {
+  // given
+  test.skip(projectName() !== "desktop-chrome", "the wording is global, so one profile changes it");
+  precondition(mailAvailable(), "mail.url is not configured, so the reworded reminder is not checkable");
+  const marker = `UAT-wording-${Date.now().toString(36)}`;
+  const page = await openAs(browser, "admin");
+  try {
+    await step("admin", "message wording", async () => {
+      await page.goto("/admin/message-wording");
+      await page.getByTestId("wording-kind").selectOption("ACCOUNT_USERNAME_REMINDER");
+      for (const language of ["de", "en"]) {
+        await page.getByTestId("wording-language").selectOption(language);
+        await page.getByTestId("wording-subject").fill(`${marker} {clubName}`);
+        await page.getByTestId("wording-body").fill(`${marker}\n{firstName}: {username}\n{instanceLink}`);
+        await page.getByTestId("wording-preview").click();
+        await expect(page.getByTestId("wording-preview-body"), "product: the preview fills the wording").toContainText(marker);
+        await expect(page.getByTestId("wording-preview-body"), "product: the preview leaves no placeholder").not.toContainText("{username}");
+        recordCreated({ kind: "template", id: `ACCOUNT_USERNAME_REMINDER/${language}`, by: "admin", project: projectName() });
+        await page.getByTestId("wording-save").click();
+        await reauthenticateIfAsked(page);
+        await expect(page.getByTestId("wording-state"), `product: the ${language} wording is stored`).toHaveAttribute("data-own", "true");
+      }
+      await capture(page, "message-wording");
+    });
+    const email = discovery.emails["memberA"];
+    const since = new Date();
+
+    // when
+    const visitor = await anonymousApi();
+    const asked = await visitor.post("/api/account-recovery/usernames", { email });
+    await visitor.dispose();
+    expect(asked.status(), "product: the username reminder is accepted").toBeLessThan(300);
+
+    // then
+    const mail = await latestMailTo(email, since, new RegExp(marker));
+    expect(mail, "product: the reminder arrives in the club's wording").not.toBeNull();
+    expect(mail!.text.includes(new URL(config.baseUrl).host), "product: the reworded reminder links the instance").toBe(true);
+  } finally {
+    await step("admin", "restore message wording", async () => {
+      await page.goto("/admin/message-wording");
+      await page.getByTestId("wording-kind").selectOption("ACCOUNT_USERNAME_REMINDER");
+      for (const language of ["de", "en"]) {
+        await page.getByTestId("wording-language").selectOption(language);
+        if (await page.getByTestId("wording-reset").isEnabled()) {
+          await page.getByTestId("wording-reset").click();
+          await reauthenticateIfAsked(page);
+        }
+        await expect(page.getByTestId("wording-state"), `product: the shipped ${language} wording applies again`).toHaveAttribute("data-own", "false");
+      }
+    });
+    await page.context().close();
   }
 });

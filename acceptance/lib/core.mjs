@@ -12,7 +12,16 @@ export const removalPath = (entry) => entry.kind === "series"
   ? `/api/booking-series/${entry.id}?scope=WHOLE_SERIES${entry.anchor ? `&fromBookingId=${entry.anchor}` : ""}`
   : entry.kind === "opening-week" ? `/api/admin/opening-hours/schedule/${entry.id}`
     : entry.kind === "opening-period" ? `/api/admin/opening-periods/${entry.id}`
-      : entry.kind === "court-closure" ? `/api/admin/court-closures/${entry.id}` : `/api/bookings/${entry.id}`;
+      : entry.kind === "court-closure" ? `/api/admin/court-closures/${entry.id}`
+        : entry.kind === "template" ? `/api/admin/message-templates/${entry.id}` : `/api/bookings/${entry.id}`;
+
+export function foreignWordings(templates, entries) {
+  const ours = new Set(entries.filter((entry) => entry.kind === "template").map((entry) => entry.id));
+  return templates.flatMap((template) => template.languages
+    .filter((wording) => wording.own)
+    .map((wording) => `${template.kind}/${wording.language}`))
+    .filter((id) => !ours.has(id));
+}
 
 export async function replayEntries(entries, remove) {
   const results = [];

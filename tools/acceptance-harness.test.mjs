@@ -301,7 +301,7 @@ test("given club bookings on the window's weekend, when the weekend journeys are
   assert.deepEqual(conflicts, ["early", "sunday"], "a booking before the latest later opening and every Sunday booking would be displaced");
 });
 
-import { admitted, answers, sweepSlots, weeksToClear, attribute, classify, classifyErrors, occupying, replayEntries } from "../acceptance/lib/core.mjs";
+import { admitted, answers, sweepSlots, weeksToClear, attribute, classify, classifyErrors, foreignWordings, occupying, replayEntries } from "../acceptance/lib/core.mjs";
 import { claimRunDirectory, harnessCommit } from "../acceptance/lib/run-directory.mjs";
 import { findExecutable } from "../acceptance/lib/executable.mjs";
 import { mkdtempSync, writeFileSync, mkdirSync, chmodSync, rmSync } from "node:fs";
@@ -371,6 +371,27 @@ test("given a ledger with a season and a court closure, when replayed, then each
   await replayEntries([{ kind: "opening-period", id: "p-1" }, { kind: "court-closure", id: "c-1" }], async (path) => { paths.push(path); return { status: () => 204 }; });
   // then
   assert.deepEqual(paths, ["/api/admin/opening-periods/p-1", "/api/admin/court-closures/c-1"]);
+});
+
+test("given a ledger with a message wording, when replayed, then that wording is reset", async () => {
+  // given
+  const paths = [];
+  // when
+  await replayEntries([{ kind: "template", id: "ACCOUNT_USERNAME_REMINDER/de" }], async (path) => { paths.push(path); return { status: () => 204 }; });
+  // then
+  assert.deepEqual(paths, ["/api/admin/message-templates/ACCOUNT_USERNAME_REMINDER/de"]);
+});
+
+test("given stored wordings, when the run's own are known, then only the others are named as foreign", () => {
+  // given
+  const templates = [
+    { kind: "ACCOUNT_USERNAME_REMINDER", languages: [{ language: "de", own: { subject: "s", body: "b" } }, { language: "en", own: null }] },
+    { kind: "BOOKING_CONFIRMED", languages: [{ language: "de", own: null }, { language: "en", own: { subject: "s", body: "b" } }] }
+  ];
+  // when
+  const foreign = foreignWordings(templates, [{ kind: "template", id: "ACCOUNT_USERNAME_REMINDER/de" }]);
+  // then
+  assert.deepEqual(foreign, ["BOOKING_CONFIRMED/en"]);
 });
 
 const answer = (status, retryAfter) => ({ status: () => status, headers: () => (retryAfter ? { "retry-after": retryAfter } : {}) });
