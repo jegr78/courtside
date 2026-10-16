@@ -3189,7 +3189,7 @@ components:
     NotificationClosure:
       type: string
       description: Why a displaced booking no longer fits, present on `BOOKING_DISPLACED` entries only.
-      enum: [COURT_OUT_OF_SERVICE, CARD_OUT_OF_SERVICE, DAY_CLOSED, HOURS_NARROWED]
+      enum: [COURT_OUT_OF_SERVICE, CARD_OUT_OF_SERVICE, DAY_CLOSED, HOURS_NARROWED, HOLIDAY, SEASON, COURT_CLOSED]
 
     NotificationLink:
       type: object

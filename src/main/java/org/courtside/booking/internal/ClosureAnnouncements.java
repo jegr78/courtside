@@ -3,7 +3,10 @@ package org.courtside.booking.internal;
 import lombok.RequiredArgsConstructor;
 import org.courtside.card.CardEvent;
 import org.courtside.config.ClubTimeZone;
+import org.courtside.facility.AvailabilityChange;
+import org.courtside.facility.CourtClosure;
 import org.courtside.facility.FacilityEvent;
+import org.courtside.facility.OpeningPeriod;
 import org.courtside.shared.BookingDisplaced;
 import org.courtside.shared.OpeningWindow;
 import org.springframework.context.ApplicationEventPublisher;
@@ -16,6 +19,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 import java.time.Clock;
 import java.time.DayOfWeek;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import java.util.function.BiFunction;
 import java.util.function.Function;
@@ -72,6 +76,35 @@ class ClosureAnnouncements {
                 (period, cursor) -> impact.pageOfOpeningHours(DayOfWeek.of(set.dayOfWeek()),
                         new OpeningWindow(set.opensAt(), set.closesAt()), period, cursor, PAGE_SIZE),
                 BookingDisplaced.Closure.HOURS_NARROWED);
+    }
+
+    @Async("closureAnnouncementExecutor")
+    @TransactionalEventListener
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    void on(AvailabilityChange.PeriodStored stored) {
+        OpeningPeriod period = stored.after();
+        Availability current = impact.currentAvailability();
+        Availability before = stored.before() == null
+                ? current.withoutPeriod(period.id()) : current.withPeriod(stored.before());
+        announce(impact.newlyUnavailable(before, current.withPeriod(period), period.startsOn(), period.endsOn(),
+                clock.instant()), period.kind() == OpeningPeriod.Kind.HOLIDAY
+                ? BookingDisplaced.Closure.HOLIDAY : BookingDisplaced.Closure.SEASON);
+    }
+
+    @Async("closureAnnouncementExecutor")
+    @TransactionalEventListener
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    void on(AvailabilityChange.ClosureStored stored) {
+        CourtClosure closure = stored.after();
+        Availability current = impact.currentAvailability();
+        Availability before = stored.before() == null
+                ? current.withoutClosure(closure.id()) : current.withClosure(stored.before());
+        announce(impact.newlyUnavailable(before, current.withClosure(closure), closure.startsOn(),
+                closure.endsOn(), clock.instant()), BookingDisplaced.Closure.COURT_CLOSED);
+    }
+
+    private void announce(List<ImpactService.AffectedBooking> affected, BookingDisplaced.Closure closure) {
+        affected.forEach(booking -> events.publishEvent(new BookingDisplaced(booking.bookingId(), closure)));
     }
 
     // One instant for every page: a clock read per page lets a booking that starts in between drop
