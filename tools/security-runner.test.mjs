@@ -6,7 +6,10 @@ import { createRequire } from "node:module";
 import { test } from "node:test";
 import { openCandidateCount, zapVersion } from "./security-passive-deployment.mjs";
 import { openApiFuzzVersion } from "./security-openapi-fuzz.mjs";
+import { planAuthorizationRequests } from "./security-authorization.mjs";
+import { shippedLoginAddressMaxFailures } from "./security-environment.mjs";
 import {
+  activeRequestShares, admissionRetryAllowance, openApiFuzzRequestCeiling,
   boundedAssessmentFailureReason,
   authorizeSecurityProfile, buildSecurityPlan, executeSecurityPlan, fingerprintSecurityTarget, recoverSecurityRun,
   redactSecurityText, securityRunContract, securityRunPaths, validateSecurityRedirect,
@@ -46,6 +49,23 @@ const require = createRequire(new URL("../frontend/package.json", import.meta.ur
 const Ajv = require("ajv/dist/2020").default;
 const runContractSchema = JSON.parse(readFileSync(new URL("../security/run-contract.schema.json", import.meta.url)));
 const runManifestSchema = JSON.parse(readFileSync(new URL("../security/run-manifest.schema.json", import.meta.url)));
+
+const shippedApi = require("js-yaml").load(
+  readFileSync(new URL("../src/main/resources/api/openapi.yaml", import.meta.url), "utf8"));
+
+function shippedAuthorizationPlan(plan, api = shippedApi) {
+  return planAuthorizationRequests(api, { attemptsBeforeLimit: shippedLoginAddressMaxFailures(),
+    durationSeconds: plan.budgets.durationSeconds });
+}
+
+function contractWithReadOperations(count) {
+  const grown = structuredClone(shippedApi);
+  for (let index = 0; index < count; index += 1) {
+    grown.paths[`/api/admin/security-share-probe-${index}`] = { get: { operationId: `securityShareProbe${index}`,
+      responses: { 200: { description: "Read." } } } };
+  }
+  return grown;
+}
 
 function manifestValidator() {
   const ajv = new Ajv({ strict: true, strictRequired: false, allErrors: true, formats: false });
@@ -327,12 +347,14 @@ test("given the bounded active suites, when every attack check passes, then thei
   // given
   const root = mkdtempSync(join(tmpdir(), "courtside-security-run-"));
   const plan = activePlan();
+  const planned = shippedAuthorizationPlan(plan).total;
   const limits = {};
 
   // when
   const manifest = await executeSecurityPlan(plan, {
     root,
     verifyTarget: async () => input(),
+    planAuthorizationRequests: async () => planned,
     runAuthorizationAssessment: async (_plan, context) => {
       limits.authorization = context.maxRequests;
       await context.resetLoginAttempts();
@@ -354,7 +376,11 @@ test("given the bounded active suites, when every attack check passes, then thei
   assert.equal(manifest.outcome, "passed");
   assert.equal(manifest.usage.requests, 1200);
   assert.equal(manifest.usage.generatedDataMegabytes, 3);
-  assert.deepEqual(limits, { zap: 6000, fuzz: 2000, loginAttemptsReset: true, authorization: 2000 });
+  assert.equal(limits.loginAttemptsReset, true);
+  assert.ok(limits.authorization >= planned, "the authorization matrix is given at least the requests it plans");
+  assert.ok(limits.zap + limits.fuzz + limits.authorization <= plan.budgets.requests,
+    "the shares never promise more than the profile allows");
+  assert.equal(limits.fuzz, openApiFuzzRequestCeiling);
   assert.deepEqual(manifest.toolResults.at(-1), {
     id: "authorization-matrix", version: "1.0.0", outcome: "passed"
   });
@@ -369,6 +395,7 @@ test("given fuzzing changed domain state, when executing the active plan, then l
   const manifest = await executeSecurityPlan(activePlan(), {
     root,
     verifyTarget: async () => input(),
+    planAuthorizationRequests: async (plan) => shippedAuthorizationPlan(plan).total,
     runAuthenticatedZapAssessment: async () => ({ outcome: "passed", requestCount: 100,
       generatedDataMegabytes: 1 }),
     runOpenApiFuzzAssessment: async () => ({ outcome: "failed", requestCount: 200,
@@ -384,6 +411,43 @@ test("given fuzzing changed domain state, when executing the active plan, then l
   assert.equal(manifest.outcome, "failed");
   assert.match(manifest.reason, /changed protected domain state/);
   assert.equal(manifest.usage.requests, 300);
+});
+
+test("given a contract that grows by forty operations, when the active run is budgeted, then the authorization share grows with it and ZAP gives way", () => {
+  // given
+  const plan = activePlan();
+  const shipped = activeRequestShares(plan.budgets.requests, shippedAuthorizationPlan(plan).total);
+
+  // when
+  const grownPlan = shippedAuthorizationPlan(plan, contractWithReadOperations(40)).total;
+  const grown = activeRequestShares(plan.budgets.requests, grownPlan);
+
+  // then
+  assert.ok(grown.authorization >= grownPlan, "the grown matrix still gets every request it plans");
+  assert.ok(grown.authorization > shipped.authorization, "the share follows the contract, not a fixed number");
+  assert.equal(grown.zap + grown.authorization, shipped.zap + shipped.authorization,
+    "ZAP's share shrinks by exactly what the authorization matrix gains");
+});
+
+test("given a contract the active profile cannot assess, when the run is budgeted, then it is refused before any request with both numbers named", async () => {
+  // given
+  const root = mkdtempSync(join(tmpdir(), "courtside-security-run-"));
+  const plan = activePlan();
+  let zapCalled = false;
+
+  // when
+  const manifest = await executeSecurityPlan(plan, {
+    root,
+    verifyTarget: async () => input(),
+    planAuthorizationRequests: async () => plan.budgets.requests,
+    runAuthenticatedZapAssessment: async () => { zapCalled = true; return { outcome: "passed", requestCount: 1 }; }
+  });
+
+  // then
+  assert.equal(zapCalled, false);
+  assert.equal(manifest.outcome, "incomplete");
+  assert.match(manifest.reason, new RegExp(`${plan.budgets.requests} requests cannot hold the authorization `
+    + `matrix's ${Math.ceil(plan.budgets.requests * (1 + admissionRetryAllowance))}`));
 });
 
 test("given the destructive abuse suite, when recovery and integrity pass, then its evidence governs the outcome", async () => {

@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { test } from "node:test";
-import { compareSecurityToolRuns, comparisonSummary, unacknowledgedFindings,
-  untoleratedBaseFailures } from "./security-tool-comparison.mjs";
+import { compareSecurityToolRuns, comparisonSummary, exhaustedAuthorizationBudget, exhaustedAuthorizationRemark,
+  unacknowledgedFindings, untoleratedBaseFailures } from "./security-tool-comparison.mjs";
 
 const fingerprint = (character) => `sha256:${character.repeat(64)}`;
 const contractPath = new URL("../security/run-contract.json", import.meta.url);
@@ -329,4 +329,105 @@ test("given an option where a value belongs, when the comparator starts, then it
     { encoding: "utf8" });
   assert.equal(failure.status, 1);
   assert.match(failure.stderr, /required arguments are missing/);
+});
+
+function exhaustedRun(root, name, { reason = exhaustedAuthorizationBudget, missing = "authorization-matrix",
+  others = "passed" } = {}) {
+  const run = runFixture(root, name, { outcome: "incomplete", reason,
+    toolResults: tools.filter(({ id }) => id !== missing).map(({ id, version }) => ({ id, version,
+      outcome: id === "target-identity" ? "passed" : others })) });
+  rmSync(join(run.evidence, { "authorization-matrix": "authorization-matrix.json",
+    "openapi-fuzzer": "openapi-fuzz.json" }[missing]));
+  for (const evidenceName of readdirSync(run.evidence)) {
+    writeFileSync(join(run.evidence, evidenceName), JSON.stringify({ outcome: others,
+      candidates: others === "passed" ? [] : [{ fingerprint: fingerprint("7") }] }));
+  }
+  return run;
+}
+
+function passingRun(root, name, matrixOutcome = "passed") {
+  const run = runFixture(root, name, { outcome: matrixOutcome, reason: null,
+    toolResults: tools.map(({ id, version }) => ({ id, version,
+      outcome: id === "authorization-matrix" ? matrixOutcome : "passed" })) });
+  for (const evidenceName of evidenceNames) {
+    const matrix = evidenceName === "authorization-matrix.json";
+    writeFileSync(join(run.evidence, evidenceName), JSON.stringify({ outcome: matrix ? matrixOutcome : "passed",
+      candidates: matrix ? [{ fingerprint: fingerprint("8") }] : [] }));
+  }
+  return run;
+}
+
+function comparePair(root, base, candidate) {
+  return compareSecurityToolRuns({
+    baseRoot: runtimeRoot(root, "base-runtime"), baseManifest: base.manifest, baseEvidence: base.evidence,
+    baseRef: "2".repeat(40), baseContract: contractPath, baseCatalog: catalogPath,
+    candidateRoot: runtimeRoot(root, "candidate-runtime"), candidateManifest: candidate.manifest,
+    candidateEvidence: candidate.evidence, candidateRef: "b".repeat(40),
+    candidateContract: contractPath, candidateCatalog: catalogPath
+  });
+}
+
+test("given a base toolchain that ran out of authorization requests on the candidate's contract, when the candidate's matrix passes, then the matrix is recorded as not comparable and the rest is compared", () => {
+  // given
+  const root = mkdtempSync(join(tmpdir(), "courtside-tool-comparison-"));
+  const base = exhaustedRun(root, "base");
+  const candidate = passingRun(root, "candidate");
+
+  // when
+  const comparison = comparePair(root, base, candidate);
+
+  // then
+  assert.deepEqual(comparison.notComparable, [{ tool: "authorization-matrix", reason: exhaustedAuthorizationRemark }]);
+  assert.deepEqual(comparison.newFindings, [], "a matrix the base never ran contributes no difference");
+  assert.match(comparisonSummary(comparison), /`authorization-matrix`: not comparable: base exhausted its request budget/);
+});
+
+test("given a base run that lost its matrix for any other reason, when comparing, then the comparison refuses it", () => {
+  // given
+  const root = mkdtempSync(join(tmpdir(), "courtside-tool-comparison-"));
+  const base = exhaustedRun(root, "base", { reason: "The authorization suite has no remaining request budget" });
+  const candidate = passingRun(root, "candidate");
+
+  // when / then
+  assert.throws(() => comparePair(root, base, candidate), /both runs must retain every tool result/);
+});
+
+test("given a base run that lost a tool other than the matrix, when its reason names the exhausted budget, then the comparison refuses it", () => {
+  // given
+  const root = mkdtempSync(join(tmpdir(), "courtside-tool-comparison-"));
+  const base = exhaustedRun(root, "base", { missing: "openapi-fuzzer" });
+  const candidate = passingRun(root, "candidate");
+
+  // when / then
+  assert.throws(() => comparePair(root, base, candidate), /both runs must retain every tool result/);
+});
+
+test("given an exhausted base beside another tool that did not pass, when comparing, then the comparison refuses it", () => {
+  // given
+  const root = mkdtempSync(join(tmpdir(), "courtside-tool-comparison-"));
+  const base = exhaustedRun(root, "base", { others: "incomplete" });
+  const candidate = passingRun(root, "candidate");
+
+  // when / then
+  assert.throws(() => comparePair(root, base, candidate), /both runs must retain every tool result/);
+});
+
+test("given a candidate that lost its matrix to the same exhausted budget, when comparing, then the comparison refuses it", () => {
+  // given
+  const root = mkdtempSync(join(tmpdir(), "courtside-tool-comparison-"));
+  const base = passingRun(root, "base");
+  const candidate = exhaustedRun(root, "candidate");
+
+  // when / then
+  assert.throws(() => comparePair(root, base, candidate), /both runs must retain every tool result/);
+});
+
+test("given an exhausted base and a candidate matrix that did not pass, when comparing, then the comparison refuses it", () => {
+  // given
+  const root = mkdtempSync(join(tmpdir(), "courtside-tool-comparison-"));
+  const base = exhaustedRun(root, "base");
+  const candidate = passingRun(root, "candidate", "incomplete");
+
+  // when / then
+  assert.throws(() => comparePair(root, base, candidate), /requires the candidate's matrix to pass/);
 });

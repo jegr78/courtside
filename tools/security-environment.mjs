@@ -1054,11 +1054,12 @@ export function relayableMethods(policy) {
 }
 
 export async function runOpenApiFuzzer(plan, stopFile, limits) {
-  if (limits.maxRequests <= limits.policy.nativeRequestReserve) {
+  if (!Number.isSafeInteger(limits.nativeRequestReserve) || limits.nativeRequestReserve < 1
+      || limits.maxRequests <= limits.nativeRequestReserve) {
     throw new Error("The OpenAPI fuzz request budget cannot reserve native fixture requests");
   }
   const environment = { ...mergeSecurityProcessEnvironment(readSecurityEnvironment(plan.runId)),
-    COURTSIDE_SECURITY_MAX_REQUESTS: String(limits.maxRequests - limits.policy.nativeRequestReserve),
+    COURTSIDE_SECURITY_MAX_REQUESTS: String(limits.maxRequests - limits.nativeRequestReserve),
     COURTSIDE_SECURITY_MAX_CONCURRENCY: "1",
     COURTSIDE_SECURITY_ALLOWED_METHODS: relayableMethods(limits.policy).join(","),
     COURTSIDE_SECURITY_ALLOWED_PATH_PREFIXES: "/api,/manifest.webmanifest",
@@ -1132,7 +1133,7 @@ export async function runOpenApiFuzzer(plan, stopFile, limits) {
     const requestCount = metrics.requests + fixture.requestCount + importResult.requestCount + inputResult.requestCount
       + mutationResult.requestCount;
     if (fixture.requestCount + importResult.requestCount + inputResult.requestCount + mutationResult.requestCount
-        > limits.policy.nativeRequestReserve
+        > limits.nativeRequestReserve
         || requestCount > limits.maxRequests) throw new Error("The OpenAPI fuzz request budget was exceeded");
     return { events, importCases: importResult.cases, inputCases: inputResult.cases,
       mutationCases: mutationResult.cases,
