@@ -138,6 +138,10 @@ VALUES ('7b000000-0000-0000-0000-000000000001', '72000000-0000-0000-0000-0000000
         'BOOKING_CONFIRMED', 'HANDED_OVER', '<upgrade-fixture@example.org>',
         '2025-01-01T00:00:00Z', '2025-01-01T00:00:05Z');
 
+INSERT INTO message_template_override (kind, language, subject, body, changed_at)
+VALUES ('ACCOUNT_USERNAME_REMINDER', 'en', '{clubName}: your username', 'Hello {firstName}, it is {username}.',
+        '2025-01-01T00:00:00Z');
+
 INSERT INTO event_publication
     (id, listener_id, event_type, serialized_event, publication_date, completion_date, status,
      completion_attempts)
