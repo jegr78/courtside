@@ -2736,3 +2736,19 @@ it("given a court closed today, when showing the plan, then its free cells read 
   expect(screen.getAllByTestId("free-slot").some((cell) => cell.dataset.courtNumber === "2")).toBe(false);
   expect(screen.getByTestId("court-heading-2")).toHaveAttribute("data-closed-until", "2026-08-12");
 });
+
+it("given a closed court, when several courts can be chosen, then the closed one cannot be added", async () => {
+  // given
+  vi.spyOn(api, "bookingGrid").mockResolvedValue({ ...openingHoursWith({}), courtClosures: [{
+    id: "aaaaaaaa-0000-0000-0000-000000000005", courtId: courts[1].id, name: "Resurfacing",
+    startsOn: "2026-08-10", endsOn: "2026-08-10"
+  }] });
+  render(<WeekView today={clubInstant("07:00")} canChooseSeveralCourts />);
+
+  // when
+  await userEvent.click(await findFreeSlot(1, "08:00"));
+
+  // then
+  expect(screen.getByTestId(`booking-court-${courts[1].id}`), "a closed court is not offered").toBeDisabled();
+  expect(screen.getByTestId(`booking-court-${courts[0].id}`)).toBeEnabled();
+});

@@ -10,7 +10,7 @@ import { DialogBody } from "../components/DialogBody";
 import { Modal } from "../components/Modal";
 import { bookingTimeSlot, formatBookingPeriod, zonedDateTime } from "../time/clubZone";
 import { leavesBookingHours } from "../time/bookingHours";
-import { hoursOn } from "../time/openingHours";
+import { closureOn, hoursOn } from "../time/openingHours";
 import { PERSON_SEARCH_DEBOUNCE_MS, PERSON_SEARCH_MIN_LENGTH } from "../person-search";
 import { warnAbout } from "../api/failureWarning";
 
@@ -210,11 +210,13 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
         ? <fieldset className="mt-5 grid gap-2" aria-invalid={fieldViolations("courtIds").length > 0} aria-describedby={describedBy("courtIds")}>
           <legend className="font-semibold">{t("booking.courts")}</legend>
           {courts.map((court) => <label key={court.id} className="flex gap-2">
-            <input data-testid={`booking-court-${court.id}`} type="checkbox" checked={courtIds.includes(court.id)} onChange={(event) => {
+            <input data-testid={`booking-court-${court.id}`} type="checkbox" checked={courtIds.includes(court.id)}
+              disabled={!courtIds.includes(court.id) && closureOn(grid, court.id, selection.date) !== undefined} onChange={(event) => {
               setRefusedAsTaken(undefined);
               setCourtIds((current) => event.target.checked ? [...current, court.id] : current.filter((id) => id !== court.id));
             }} />
             {court.name || t("court.number", { number: court.number })}
+            {closureOn(grid, court.id, selection.date) && <span className="text-muted">({t("week.courtClosed")})</span>}
           </label>)}
         </fieldset>
         : <p data-testid="booking-court" className="mt-5 font-semibold">
