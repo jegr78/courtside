@@ -8,6 +8,7 @@ import { AdminStatisticsView } from "./AdminStatisticsView";
 import { AdminImportView } from "./AdminImportView";
 import { AdminMembershipTypesView } from "./AdminMembershipTypesView";
 import { AdminMessagesView } from "./AdminMessagesView";
+import { AdminMessageWordingView } from "./AdminMessageWordingView";
 import { AdminOperationalLogsView } from "./AdminOperationalLogsView";
 import { AdminOverviewView } from "./AdminOverviewView";
 import { AdminPersonView } from "./AdminPersonView";
@@ -39,6 +40,7 @@ export default function AdminRoutes({ configurationChanged, administrator, manag
       <Route path="configuration" element={<AdminConfigurationView configurationChanged={configurationChanged} />} />
       <Route path="deadlines" element={<AdminDeadlinesView configurationChanged={configurationChanged} />} />
       <Route path="rule-sets" element={<AdminRuleSetsView configurationChanged={configurationChanged} />} />
+      <Route path="message-wording" element={<AdminMessageWordingView />} />
       <Route path="facility">
         <Route index element={<Navigate to="/admin/facility/courts" replace />} />
         <Route path="courts" element={<AdminCourtsView />} />

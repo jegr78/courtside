@@ -32,7 +32,8 @@ const groups: Group[] = [
       { to: "/admin/setup", testId: "admin-setup-link", label: "nav.adminSetup" },
       { to: "/admin/configuration", testId: "admin-configuration-link", label: "nav.adminConfiguration" },
       { to: "/admin/deadlines", testId: "admin-deadlines-link", label: "nav.adminDeadlines" },
-      { to: "/admin/rule-sets", testId: "admin-rule-sets-link", label: "nav.adminRuleSets" }
+      { to: "/admin/rule-sets", testId: "admin-rule-sets-link", label: "nav.adminRuleSets" },
+      { to: "/admin/message-wording", testId: "admin-message-wording-link", label: "nav.adminMessageWording" }
     ]
   },
   {
