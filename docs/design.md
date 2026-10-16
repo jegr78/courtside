@@ -579,7 +579,9 @@ names no person, account or booking.
 - A card or membership-type group fewer than three accounts stand behind
   (`UsageReportService.MINIMUM_GROUP_ACCOUNTS`) is never shown on its own. It joins one `other` row
   without card or type, so the totals stay whole and a type one member holds does not expose that
-  member's bookings. When every group is small, the other row is the only one.
+  member's bookings. When every group is small, the other row is the only one. The minimum group
+  keeps a single person from being read off the report by chance; it is not built to withstand an
+  admin, who manages personal data anyway, deliberately comparing different periods.
 - Attendance counts attended bookings, no-shows that still count and lifted ones. A booking with
   nothing recorded counts in none of them.
 - Rule rejections count the booking and cancellation attempts the rules refused in the period, per
