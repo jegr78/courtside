@@ -148,6 +148,12 @@ Statusleiste der installierten App übernimmt die Primärfarbe beim nächsten Ö
   Trainer den Platz nicht buchen, und ihre Serien überspringen diesen Termin. Der Vorstand und eine
   Sperrung gehen vor: Bucht ein Admin den Platz, legt eine Serie darüber oder verschiebt eine dorthin,
   oder sperrt jemand den Platz, endet das Angebot. Das Mitglied sieht das unter *Meine Buchungen*.
+* Unter **Anwesenheit** schaltest du die Erfassung ein. Mitglieder checken dann ab 15 Minuten vor
+  Beginn bis zum Ende ihrer Buchung unter *Meine Buchungen* ein, und in einem begonnenen Termin unter
+  *Termine* hältst du fest, ob die Spieler erschienen sind. Eine Buchung, für die nichts erfasst ist,
+  zählt nie als Nichterscheinen. **Platz freigeben nach** storniert eine Mitgliederbuchung, für die 5
+  bis 120 Minuten nach Beginn niemand eingecheckt hat, und gibt den Platz frei. Leer gelassen gibt
+  Courtside keinen Platz frei. Eine Freigabe zählt nicht als Nichterscheinen.
 
 ![Die Fristen für Einmalpasswörter und Codes und die Erinnerung vor einer Buchung.](screenshots/de/deadlines.png)
 
@@ -263,6 +269,7 @@ fest, ob das Regelwerk sie enthält. Jedes Regelwerk kann diese Regeln höchsten
 | Buchungszeiten | Frühester Beginn und spätestes Ende einer Buchung an jedem Wochentag |
 | Gebuchte Stunden pro Woche | Höchste Zahl von Stunden, die ein Mitglied von Montag bis Sonntag gebucht haben darf |
 | Mindestdauer einer Buchung | Kürzeste Dauer in Minuten |
+| Nichterscheinen | Ab dieser Zahl erfasster Nichterscheinen in den letzten Tagen nimmt Courtside keine Buchung des Mitglieds mehr an |
 
 Öffnungszeiten und Buchungsraster gelten für den ganzen Verein. Sie stehen deshalb außerhalb der
 Regelwerke. Buchungszeiten engen die Öffnungszeiten für eine Mitgliedsart ein, erweitern sie aber
@@ -361,6 +368,12 @@ Administratoren können die E-Mail-Adresse ändern und anschließend neue Zugang
 Änderungsprotokoll hält beide Vorgänge mit Zeitpunkt und ausführendem Konto fest, aber weder die
 Adresse noch das Passwort. Organisatorische Kontrolle, etwa mehrere verantwortliche Personen,
 bleibt Aufgabe des Vereins.
+
+### Nichterscheinen aufheben
+
+Bei einer Person mit Konto zeigt der Abschnitt **Nichterscheinen**, welche erfassten Nichterscheinen
+noch zählen. **Nichterscheinen aufheben** lässt sie erfasst, aber nicht mehr zählen. Damit endet die
+Sperre der Regel *Nichterscheinen*. Ein später erfasstes Nichterscheinen zählt wieder.
 
 ### Konto deaktivieren
 

@@ -140,6 +140,12 @@ Open *Club → Deadlines and reminders*.
   skip that date. The board and a closure go first: when an admin books the court, creates a series
   over it or moves one onto it, or someone closes the court, the offer ends. The member sees this in
   *My bookings*.
+* Under **Attendance** you switch recording on. Members then check in from 15 minutes before the
+  start until the end of their booking in *My bookings*, and in an appointment that has started you
+  record under *Appointments* whether its players came. A booking with nothing recorded never counts
+  as a no-show. **Free the court after** cancels a member booking nobody checked in for 5 to 120
+  minutes after its start and frees the court. Left empty, Courtside frees no court. A freed court
+  does not count as a no-show.
 
 ![Lifetimes for one-time passwords and codes and the reminder before a booking.](../screenshots/en/deadlines.png)
 
@@ -246,6 +252,7 @@ with its state and the membership types it applies to. Choose a rule set there t
 | Booking hours | Earliest start and latest end of a booking on every weekday |
 | Weekly booked hours | Highest number of hours a member may have booked from Monday to Sunday |
 | Minimum booking duration | Shortest duration in minutes |
+| No-shows | From this many recorded no-shows over the last days Courtside takes no booking of the member |
 
 Opening hours and the booking grid apply across the club, so they sit outside rule sets. Booking
 hours narrow the opening hours for one membership type and never widen them. With the facility
@@ -342,6 +349,12 @@ Administrators can change an email address and then request new credentials. The
 both actions with their time and acting account, but it records neither the address nor the
 password. Organisational controls, such as sharing responsibility between several people, remain
 the club's responsibility.
+
+### Lift no-shows
+
+For a person with an account the **No-shows** section lists the recorded no-shows that still count.
+**Lift the no-shows** keeps them recorded but stops them counting, which ends the block of the
+*No-shows* rule. A no-show recorded later counts again.
 
 ### Deactivate an account
 

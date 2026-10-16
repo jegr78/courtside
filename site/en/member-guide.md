@@ -203,6 +203,7 @@ violations at once next to the relevant fields.
 | A booking may only last a certain number of minutes | The selected duration is too long |
 | One booking must run at least a certain number of minutes | The selected duration is too short |
 | You may book at most a certain number of hours a week | With this booking you would have booked more hours from Monday to Sunday than your membership type allows |
+| You did not turn up to a number of bookings in the last days | The club takes no booking until the board lifts the no-shows |
 | You have reached the number of open bookings | You must finish or cancel an open booking first |
 | You must cancel a certain number of minutes before the start | The cancellation deadline has passed |
 | A booking cannot start in the past | The selected start is in the past |
@@ -230,6 +231,13 @@ booking, you learn of it as well. If the club chose a reason, the message names 
 the club.
 
 ![Upcoming bookings with the cancellation button, the past ones folded away below them.](../screenshots/en/my-bookings.png)
+
+### Checking in
+
+If your club records attendance, you check in under *My bookings* with **Check in** from 15 minutes
+before the start until the end of your booking. If the club has set a release time and nobody
+checks in by then, Courtside cancels the booking and frees the court. It then shows as freed among
+your cancelled bookings.
 
 ## Waiting for a taken court
 
