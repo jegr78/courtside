@@ -16,11 +16,11 @@ if (projectOrder !== undefined && projectOrder !== "configured" && projectOrder 
   throw new Error(`Unsupported browser project order: ${projectOrder}`);
 }
 
-// A hung axe test fails with its trace instead of consuming the job; twice the slowest sweep, rounded up.
-const accessibilityTestBound = 5 * 60_000;
+// A hung test fails naming the step it waits for, with its trace, instead of consuming the job; over three times the slowest test.
+const stalledTestBound = 5 * 60_000;
 
 const qualificationProjects = process.env.COURTSIDE_WEBKIT_AXE === "true" ? [
-  { name: "webkit-accessibility", testMatch: /accessibility\.spec\.ts/, timeout: accessibilityTestBound, use: { browserName: "webkit" as const } }
+  { name: "webkit-accessibility", testMatch: /accessibility\.spec\.ts/, use: { browserName: "webkit" as const } }
 ] : [];
 
 // The catalogue's two tiers: whoever does this at the club with a phone is walked on all three
@@ -54,7 +54,7 @@ const configuredProjects = [
   { name: "guides-de", testMatch: /guide-screenshots\.spec\.ts/, snapshotPathTemplate: "{testDir}/../../site/screenshots/de/{arg}{ext}", use: { browserName: "chromium" as const, locale: "de-DE" } },
   { name: "guides-en", testMatch: /guide-screenshots\.spec\.ts/, snapshotPathTemplate: "{testDir}/../../site/screenshots/en/{arg}{ext}", use: { browserName: "chromium" as const, locale: "en-GB" } },
   { name: "chromium", testIgnore: /accessibility\.spec\.ts|responsive-mobile\.spec\.ts|visual-regression\.spec\.ts|guide-screenshots\.spec\.ts|journeys\//, use: { browserName: "chromium" as const } },
-  { name: "chromium-accessibility", testMatch: /accessibility\.spec\.ts/, timeout: accessibilityTestBound, use: { browserName: "chromium" as const } },
+  { name: "chromium-accessibility", testMatch: /accessibility\.spec\.ts/, use: { browserName: "chromium" as const } },
   { name: "webkit-core", testMatch: /supported-browser\.spec\.ts|browser-security-smoke\.spec\.ts/, use: { browserName: "webkit" as const } },
   { name: "webkit-pwa", testMatch: /pwa-browser-compatibility\.spec\.ts|pwa-first-install\.spec\.ts/, use: { browserName: "webkit" as const } },
   // Both engines, because a phone layout breaks per engine: the booking dialog was swallowed by a
@@ -80,7 +80,7 @@ export default defineConfig<JourneyOptions>({
   fullyParallel: false,
   workers: 1,
   shard,
-  timeout: 0,
+  timeout: stalledTestBound,
   expect: { timeout: 0, toHaveScreenshot: { maxDiffPixelRatio: 0.005 } },
   // Pinned so nobody reaches "changed" or "all", under which a missing baseline passes silently.
   // "missing" writes the new baseline for collection and still fails the run that needed it.
