@@ -4,6 +4,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import { api, ApiError, type AuditEntry, type ClubConfig } from "../api/client";
 import i18n from "../i18n";
+import de from "../locales/de";
+import en from "../locales/en";
 import { ClubConfigurationProvider } from "../club/ClubConfigurationProvider";
 import { WithClubConfiguration } from "../test/ClubConfiguration";
 import { expectTableRolesIndependentOfLayout } from "../test/tableRoles";
@@ -434,7 +436,9 @@ describe("AdminAuditView", () => {
     expect(options[0].value, "the first choice leaves the log unfiltered").toBe("");
     expect(options[0]).toHaveTextContent(unfiltered);
     const kinds = options.slice(1);
-    expect(kinds, "every audited kind of change is offered").toHaveLength(66);
+    const bundle = language === "de" ? de : en;
+    expect(kinds.map((option) => option.value).sort(), "every audited kind of change is offered")
+      .toEqual(Object.keys(bundle).filter((key) => key.startsWith("audit.eventType.")).map((key) => key.slice("audit.eventType.".length)).sort());
     expect(kinds.find((option) => option.value === "facility.court.added")).toHaveTextContent(courtAddedLabel);
     expect(kinds.filter((option) => /\w\.\w/.test(option.text)).map((option) => option.text), "no choice shows an identifier").toEqual([]);
     const labels = kinds.map((option) => option.text);
