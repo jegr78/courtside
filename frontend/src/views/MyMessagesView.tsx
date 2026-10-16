@@ -40,6 +40,7 @@ function NotificationEntry({ notification, timeZone, marking, justRead, markRead
   const booking = notification.booking ?? notification.waitlistOffer?.slot;
   const offer = notification.waitlistOffer;
   return <li ref={item} tabIndex={-1} data-testid={`notification-${notification.id}`} data-read={String(read)}
+    data-closure={notification.closure}
     className={`focus-ring border-structural grid gap-1 rounded-xl border p-4 ${read ? "" : "surface-raised border-l-4"}`}>
     <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
       <span className="font-semibold">{t(`messages.kind.${notification.kind}`)}</span>

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  api, type AdminCourt, type CourtClosure, type DayOfWeek, type Impact, type OpeningHours, type OpeningPeriod
+  api, type AdminCourt, type CourtClosure, type CourtClosureImpactRequest, type DayOfWeek, type Impact,
+  type OpeningHours, type OpeningPeriod, type OpeningPeriodImpactRequest
 } from "../../api/client";
 import { useClubConfiguration } from "../../club/registry";
 import { Button } from "../../components/Button";
@@ -20,8 +21,8 @@ type ClosureDraft = { id?: string; courtId: string; name: string; startsOn: stri
 const weekdays: DayOfWeek[] = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"];
 const MAX_NAME = 80;
 const IMPACT_DELAY_MS = 400;
-const askPeriodImpact = (question: string) => api.openingPeriodImpact(JSON.parse(question));
-const askClosureImpact = (question: string) => api.courtClosureImpact(JSON.parse(question));
+const askPeriodImpact = (question: string) => api.openingPeriodImpact(JSON.parse(question) as OpeningPeriodImpactRequest);
+const askClosureImpact = (question: string) => api.courtClosureImpact(JSON.parse(question) as CourtClosureImpactRequest);
 
 const newPeriod = (): PeriodDraft => ({
   kind: "HOLIDAY", name: "", startsOn: "", endsOn: "",
