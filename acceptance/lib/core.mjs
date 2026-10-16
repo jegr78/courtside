@@ -23,6 +23,10 @@ export function foreignWordings(templates, entries) {
     .filter((id) => !ours.has(id));
 }
 
+// The window sweep reads only the lane days, so a booking made further ahead is cancelled by its ledger entry.
+export const bookingsBeyondWindow = (entries, days) =>
+  entries.filter((entry) => entry.kind === "booking" && entry.date && !days.includes(entry.date));
+
 export async function replayEntries(entries, remove) {
   const results = [];
   for (const entry of entries) {

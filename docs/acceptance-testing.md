@@ -41,6 +41,11 @@ created.
 - On the eighth and ninth day after the window, no season, holiday or court closure of the club,
   and weekly hours that open both days. The availability journey adds a holiday on the first and
   closes the first court on the second.
+- On the tenth day after the window, no season, holiday or court closure, weekly hours that open
+  it, and the last court free at opening time. The closure-notice journey runs on
+  `desktop-firefox` only: its disposable member books that court at opening with the second plain
+  member, the admin closes the court that day, and the journey reads the count in the form, the
+  notice in the member's notification centre and the mail in Mailpit, then removes both.
 - Every message on its shipped wording. The admin journey rewords the username reminder in German
   and English, asks for a reminder to the first plain member's address and restores the shipped
   wording; a club wording the run did not store stops the preflight, which names each one.
@@ -150,8 +155,9 @@ recorded in its ledger. A
 booking or week of the club in its way stops the preflight or the journey that needs it and is
 never touched; choose another `window.start` or other `courts`. Each opening week a journey
 schedules is followed the next day by a copy of the hours in force, so the change governs one day.
-The availability journey removes its holiday and court closure itself; the postflight removes any
-the ledger still holds and fails when one of them is left.
+The availability and closure-notice journeys remove their holidays, court closures and bookings
+themselves; the postflight removes any the ledger still holds, a booking beyond the window included,
+and fails when a holiday, season or court closure of the run is left.
 
 The harness starts no log or tunnel process. To attribute server log lines to journey steps, follow
 the instance's logs into the files `logs.app` and `logs.proxy` name for the duration of the run,

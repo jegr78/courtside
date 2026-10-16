@@ -4,7 +4,8 @@ import { writeFileSync } from "node:fs";
 import { apiAs, readRoster } from "../lib/api";
 import { canSignIn } from "../lib/disposable";
 import { allSlots, instantOf, lanePlan } from "../lib/lanes";
-import { availabilityConflicts, weekendConflicts } from "../config/lanes.mjs";
+import { availabilityConflicts, governingHours, weekendConflicts } from "../config/lanes.mjs";
+import { addDays } from "../config/calendar.mjs";
 import { config, disposables, PASSWORD, runPath, type PersonaKey } from "../lib/context";
 import { mailAvailable } from "../lib/mail";
 import { DISPOSABLE_PROFILES, disposableFor, profilesOf, resetQuota } from "../config/disposables.mjs";
@@ -67,6 +68,14 @@ test("when the environment is checked before a run, then every precondition hold
     checks.futureWeeks = weeks.slice(1).map((w) => w.effectiveFrom);
     const grid = await (await admin.get(`/api/public/booking-grid?from=${plan.days[0]}&to=${plan.days.at(-1)}`)).json();
     checks.availabilityConflicts = availabilityConflicts(grid, { ...plan, slots: allSlots() }, courts);
+    const noticeDay = addDays(plan.sunday, 10);
+    const noticeGrid = await (await admin.get(`/api/public/booking-grid?from=${noticeDay}&to=${noticeDay}`)).json() as
+      { openingPeriods: { startsOn: string; endsOn: string }[]; courtClosures: { startsOn: string; endsOn: string }[] };
+    checks.closureNoticeDay = {
+      day: noticeDay,
+      covered: [...noticeGrid.openingPeriods, ...noticeGrid.courtClosures].some((entry) => entry.startsOn <= noticeDay && noticeDay <= entry.endsOn),
+      opens: governingHours(noticeGrid, noticeDay).opensAt !== null
+    };
     const participantCards = await (await admin.get("/api/admin/participant-cards")).json() as { id: string; active: boolean }[];
     checks.partnerMarkerActive = participantCards.some((card) => card.id === PARTNER_MARKER && card.active);
     checks.foreignWordings = foreignWordings(await (await admin.get("/api/admin/message-templates")).json(), readLedger());
@@ -114,6 +123,8 @@ test("when the environment is checked before a run, then every precondition hold
   }
   expect.soft(checks.futureWeeks, "PRECONDITION: no opening week is scheduled after today").toEqual([]);
   expect.soft(checks.availabilityConflicts, "PRECONDITION: no season, holiday or court closure changes a lane or the hours of the window's weekend").toEqual([]);
+  expect.soft(checks.closureNoticeDay, "PRECONDITION: the tenth day after the window has no season, holiday or court closure and the weekly hours open it")
+    .toEqual({ day: (checks.closureNoticeDay as { day: string }).day, covered: false, opens: true });
   expect.soft(checks.partnerMarkerActive, "PRECONDITION: the looking-for-a-partner participant card is active").toBe(true);
   expect.soft(checks.foreignWordings, "PRECONDITION: every message uses the shipped wording, so a run reads mail it can recognise and resets only what it wrote").toEqual([]);
   if (config.personas.restricted) {

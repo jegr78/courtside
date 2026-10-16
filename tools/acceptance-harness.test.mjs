@@ -301,7 +301,7 @@ test("given club bookings on the window's weekend, when the weekend journeys are
   assert.deepEqual(conflicts, ["early", "sunday"], "a booking before the latest later opening and every Sunday booking would be displaced");
 });
 
-import { admitted, answers, sweepSlots, weeksToClear, attribute, classify, classifyErrors, foreignWordings, occupying, replayEntries } from "../acceptance/lib/core.mjs";
+import { admitted, answers, bookingsBeyondWindow, sweepSlots, weeksToClear, attribute, classify, classifyErrors, foreignWordings, occupying, replayEntries } from "../acceptance/lib/core.mjs";
 import { claimRunDirectory, harnessCommit } from "../acceptance/lib/run-directory.mjs";
 import { findExecutable } from "../acceptance/lib/executable.mjs";
 import { mkdtempSync, writeFileSync, mkdirSync, chmodSync, rmSync } from "node:fs";
@@ -371,6 +371,22 @@ test("given a ledger with a season and a court closure, when replayed, then each
   await replayEntries([{ kind: "opening-period", id: "p-1" }, { kind: "court-closure", id: "c-1" }], async (path) => { paths.push(path); return { status: () => 204 }; });
   // then
   assert.deepEqual(paths, ["/api/admin/opening-periods/p-1", "/api/admin/court-closures/c-1"]);
+});
+
+test("given bookings in and beyond the window, when the postflight picks what the window sweep cannot reach, then only dated bookings outside it are chosen", () => {
+  // given
+  const entries = [
+    { kind: "booking", id: "inside", date: "2030-03-11" },
+    { kind: "booking", id: "beyond", date: "2030-03-21" },
+    { kind: "booking", id: "undated" },
+    { kind: "court-closure", id: "closure", date: "2030-03-21" }
+  ];
+
+  // when
+  const chosen = bookingsBeyondWindow(entries, ["2030-03-11", "2030-03-12"]);
+
+  // then
+  assert.deepEqual(chosen.map((entry) => entry.id), ["beyond"], "a booking beyond the window is replayed, the window's own are swept");
 });
 
 test("given a ledger with a message wording, when replayed, then that wording is reset", async () => {
