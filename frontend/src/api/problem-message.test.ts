@@ -127,3 +127,45 @@ it("given a refused upload, when resolving it, then the board reads which format
   expect(message).not.toEqual(i18n.t("error.generic"));
   expect(message).toContain(".csv");
 });
+
+it("given a file whose column count moved, when resolving the refusal, then the board reads both counts", () => {
+  // given
+  const error = new ApiError(400, {
+    type: "urn:courtside:error:import-snapshot-unreadable",
+    title: "Snapshot unreadable",
+    status: 400,
+    violations: [{ code: "import.snapshot.columns.countChanged", params: { expected: 4, found: 3 } }]
+  });
+
+  // when
+  const message = problemMessage(error, i18n.t);
+
+  // then
+  expect(message).toBe(i18n.t("import.snapshot.columns.countChanged", { expected: 4, found: 3 }));
+  expect(message, "both counts reach the board").toMatch(/3.*4/);
+});
+
+it.each([
+  ["import.source.columnMode.changeUnconfirmed", { from: "HEADER", to: "POSITION" }],
+  ["import.source.positions.outOfRange", { position: 5, columnCount: 4 }],
+  ["import.source.positions.incomplete", {}],
+  ["import.source.positions.ambiguous", {}],
+  ["import.source.positions.unexpected", {}],
+  ["import.source.columns.unexpected", {}],
+  ["import.source.columnCount.outOfRange", { maxColumns: 200 }]
+])("given the refused source code %s, when resolving it, then the board reads its own sentence", (code, params) => {
+  // given
+  const error = new ApiError(400, {
+    type: "urn:courtside:error:import-source-invalid",
+    title: "Invalid import source",
+    status: 400,
+    violations: [{ code, params }]
+  });
+
+  // when
+  const message = problemMessage(error, i18n.t);
+
+  // then
+  expect(i18n.exists(code), `${code} has an English text`).toBe(true);
+  expect(message).toBe(i18n.t(code, params));
+});
