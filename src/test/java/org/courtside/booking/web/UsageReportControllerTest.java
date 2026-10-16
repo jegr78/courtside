@@ -69,6 +69,8 @@ class UsageReportControllerTest extends AbstractIntegrationTest {
     private UUID janePerson;
     private UUID jane;
     private UUID john;
+    private UUID richard;
+    private UUID mary;
     private UUID board;
 
     @BeforeEach
@@ -83,38 +85,62 @@ class UsageReportControllerTest extends AbstractIntegrationTest {
         members.assignMembership(johnPerson, youthType, LocalDate.of(2026, 1, 1));
         jane = identity.createEnabledAccount(janePerson, "jane", Set.of(Role.MEMBER));
         john = identity.createEnabledAccount(johnPerson, "john", Set.of(Role.MEMBER));
-        board = identity.createEnabledAccount(identity.createPerson("Mary", "Major", "mary@example.org"), "mary",
+        richard = member("Richard", "Miles", "richard", adultType);
+        mary = member("Mary", "Major", "mary", adultType);
+        board = identity.createEnabledAccount(identity.createPerson("Richard", "Roe", "board@example.org"), "board",
                 Set.of(Role.ADMIN));
     }
 
     @Test
-    void givenBookingsOfTwoCardsAndTwoMembershipTypes_whenReportingTheirDays_thenCapacityIsGroupedByCardAndType()
+    void givenThreeAdultsAndOneYouth_whenReporting_thenTheAdultsHaveTheirRowAndTheYouthJoinsTheOtherRow()
             throws Exception {
         // given
         booking(MEMBER_BOOKING_CARD, jane, 0, 60);
         booking(MEMBER_BOOKING_CARD, jane, 1, 90);
-        booking(MEMBER_BOOKING_CARD, john, 2, 60);
-        booking(TRAINING_CARD, john, 3, 120);
-        booking(COURT_CLOSED_CARD, board, 4, 600);
+        booking(MEMBER_BOOKING_CARD, richard, 2, 60);
+        booking(MEMBER_BOOKING_CARD, mary, 3, 60);
+        booking(MEMBER_BOOKING_CARD, john, 4, 60);
+        booking(TRAINING_CARD, john, 5, 120);
+        booking(COURT_CLOSED_CARD, board, 6, 600);
 
         // when / then
-        mockMvc.perform(get("/api/admin/reports/usage").param("from", "2026-05-01").param("to", "2026-05-10"))
+        mockMvc.perform(get("/api/admin/reports/usage").param("from", "2026-05-01").param("to", "2026-05-15"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.from").value("2026-05-01"))
-                .andExpect(jsonPath("$.to").value("2026-05-10"))
                 .andExpect(jsonPath("$.timeZone").value("Europe/Berlin"))
-                .andExpect(jsonPath("$.capacity.uses.length()").value(3))
-                .andExpect(jsonPath("$.capacity.uses[?(@.cardId == '%s' && @.membershipTypeName == 'Adult')].bookings"
-                        .formatted(MEMBER_BOOKING_CARD)).value(2))
-                .andExpect(jsonPath("$.capacity.uses[?(@.cardId == '%s' && @.membershipTypeName == 'Adult')].bookedMinutes"
-                        .formatted(MEMBER_BOOKING_CARD)).value(150))
-                .andExpect(jsonPath("$.capacity.uses[?(@.cardId == '%s' && @.membershipTypeName == 'Youth')].bookings"
-                        .formatted(MEMBER_BOOKING_CARD)).value(1))
-                .andExpect(jsonPath("$.capacity.uses[?(@.cardId == '%s')].membershipTypeId"
-                        .formatted(TRAINING_CARD)).value(youthType.toString()))
-                .andExpect(jsonPath("$.capacity.uses[?(@.cardId == '%s')].bookedMinutes"
-                        .formatted(TRAINING_CARD)).value(120))
-                .andExpect(jsonPath("$.capacity.uses[*].cardId", hasItemNot(COURT_CLOSED_CARD)));
+                .andExpect(jsonPath("$.capacity.uses.length()").value(2))
+                .andExpect(jsonPath("$.capacity.uses[0].other").value(false))
+                .andExpect(jsonPath("$.capacity.uses[0].cardId").value(MEMBER_BOOKING_CARD.toString()))
+                .andExpect(jsonPath("$.capacity.uses[0].membershipTypeName").value("Adult"))
+                .andExpect(jsonPath("$.capacity.uses[0].bookings").value(4))
+                .andExpect(jsonPath("$.capacity.uses[0].bookedMinutes").value(270))
+                .andExpect(jsonPath("$.capacity.uses[1].other").value(true))
+                .andExpect(jsonPath("$.capacity.uses[1].cardId").doesNotExist())
+                .andExpect(jsonPath("$.capacity.uses[1].membershipTypeName").doesNotExist())
+                .andExpect(jsonPath("$.capacity.uses[1].bookings").value(2))
+                .andExpect(jsonPath("$.capacity.uses[1].bookedMinutes").value(180))
+                .andExpect(jsonPath("$.capacity.uses[*].membershipTypeName", hasItemNot("Youth")));
+    }
+
+    @Test
+    void givenOnlyOneMemberOfAType_whenReporting_thenTheTypeIsNotNamedAndTheTotalsStayWhole() throws Exception {
+        // given
+        booking(MEMBER_BOOKING_CARD, john, 0, 60);
+        booking(MEMBER_BOOKING_CARD, john, 1, 30);
+
+        // when
+        String body = mockMvc.perform(get("/api/admin/reports/usage")
+                        .param("from", "2026-05-01").param("to", "2026-05-10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.capacity.uses.length()").value(1))
+                .andExpect(jsonPath("$.capacity.uses[0].other").value(true))
+                .andExpect(jsonPath("$.capacity.uses[0].bookings").value(2))
+                .andExpect(jsonPath("$.capacity.uses[0].bookedMinutes").value(90))
+                .andReturn().getResponse().getContentAsString();
+
+        // then
+        assertThat(body).as("a type one member holds is not named beside that member's bookings")
+                .doesNotContain("Youth", youthType.toString());
     }
 
     @Test
@@ -137,9 +163,9 @@ class UsageReportControllerTest extends AbstractIntegrationTest {
     void givenCancellationsByTheHolderTheClubAndTheRelease_whenReporting_thenEachIsCountedOnItsOwn() throws Exception {
         // given
         UUID byHolder = booking(MEMBER_BOOKING_CARD, jane, 0, 60);
-        UUID byClubInRain = booking(MEMBER_BOOKING_CARD, jane, 1, 60);
-        UUID byClubWithoutReason = booking(TRAINING_CARD, john, 2, 60);
-        UUID released = booking(MEMBER_BOOKING_CARD, john, 3, 60);
+        UUID byClubInRain = booking(MEMBER_BOOKING_CARD, richard, 1, 60);
+        UUID released = booking(MEMBER_BOOKING_CARD, mary, 2, 60);
+        UUID byClubWithoutReason = booking(TRAINING_CARD, john, 3, 60);
         booking(MEMBER_BOOKING_CARD, john, 4, 60);
         cancel(byHolder, jane, null);
         cancel(byClubInRain, board, CancellationReason.WEATHER);
@@ -160,10 +186,12 @@ class UsageReportControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.cancellations.reasons[0].cancelled").value(1))
                 .andExpect(jsonPath("$.cancellations.reasons[1].reason").doesNotExist())
                 .andExpect(jsonPath("$.cancellations.reasons[1].cancelled").value(1))
-                .andExpect(jsonPath("$.cancellations.cards[?(@.cardId == '%s')].byClub"
-                        .formatted(TRAINING_CARD)).value(1))
-                .andExpect(jsonPath("$.cancellations.cards[?(@.cardId == '%s')].cancelled"
-                        .formatted(MEMBER_BOOKING_CARD)).value(3));
+                .andExpect(jsonPath("$.cancellations.cards.length()").value(2))
+                .andExpect(jsonPath("$.cancellations.cards[0].cardId").value(MEMBER_BOOKING_CARD.toString()))
+                .andExpect(jsonPath("$.cancellations.cards[0].cancelled").value(3))
+                .andExpect(jsonPath("$.cancellations.cards[1].other").value(true))
+                .andExpect(jsonPath("$.cancellations.cards[1].cardId").doesNotExist())
+                .andExpect(jsonPath("$.cancellations.cards[1].byClub").value(1));
     }
 
     @Test
@@ -253,7 +281,7 @@ class UsageReportControllerTest extends AbstractIntegrationTest {
 
         // then
         assertThat(body).as("an aggregate report names nobody")
-                .doesNotContain("Jane", "Doe", "John", "Roe", "jane", "john", "example.org",
+                .doesNotContain("Jane", "Doe", "John", "Roe", "Richard", "Mary", "jane", "john", "example.org",
                         jane.toString(), john.toString(), board.toString(), janePerson.toString(),
                         held.toString(), cancelled.toString());
     }
@@ -285,8 +313,14 @@ class UsageReportControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.to").value("2026-04-30"));
     }
 
-    private static org.hamcrest.Matcher<Iterable<? super String>> hasItemNot(UUID cardId) {
-        return org.hamcrest.Matchers.not(hasItem(cardId.toString()));
+    private static org.hamcrest.Matcher<Iterable<? super String>> hasItemNot(String value) {
+        return org.hamcrest.Matchers.not(hasItem(value));
+    }
+
+    private UUID member(String firstName, String lastName, String username, UUID membershipTypeId) {
+        UUID personId = identity.createPerson(firstName, lastName, username + "@example.org");
+        members.assignMembership(personId, membershipTypeId, LocalDate.of(2026, 1, 1));
+        return identity.createEnabledAccount(personId, username, Set.of(Role.MEMBER));
     }
 
     private UUID booking(UUID cardId, UUID bookedBy, int dayAfterMayFifth, int minutes) {

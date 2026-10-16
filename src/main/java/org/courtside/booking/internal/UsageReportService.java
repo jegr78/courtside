@@ -14,6 +14,7 @@ import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -23,6 +24,8 @@ import java.util.UUID;
 @RequiredArgsConstructor
 @Transactional(readOnly = true, timeoutString = DatabaseDeadlines.REPORT)
 public class UsageReportService {
+
+    static final int MINIMUM_GROUP_ACCOUNTS = 3;
 
     private static final String STARTED = """
             WITH started AS (
@@ -54,9 +57,9 @@ public class UsageReportService {
     }
 
     private List<CapacityUse> capacityUses(Map<String, Object> bounds, long bookableMinutes) {
-        return jdbc.sql(STARTED + """
+        List<Grouped<CapacityUse>> groups = jdbc.sql(STARTED + """
                         SELECT s.card_id, c.label, m.membership_type_id, t.name,
-                               COUNT(DISTINCT s.id) AS bookings,
+                               COUNT(DISTINCT s.id) AS bookings, COUNT(DISTINCT s.booked_by) AS accounts,
                                CAST(FLOOR(SUM(EXTRACT(EPOCH FROM a.ends_at - a.starts_at)) / 60) AS bigint) AS minutes
                         FROM started s
                         JOIN booking_card c ON c.id = s.card_id
@@ -71,19 +74,38 @@ public class UsageReportService {
                         ORDER BY c.label, t.name NULLS LAST
                         """)
                 .params(bounds)
-                .query((rs, row) -> {
-                    long minutes = rs.getLong("minutes");
-                    return new CapacityUse(rs.getObject("card_id", UUID.class), rs.getString("label"),
-                            rs.getObject("membership_type_id", UUID.class), rs.getString("name"),
-                            rs.getLong("bookings"), minutes,
-                            bookableMinutes <= 0 ? null : (double) minutes / bookableMinutes);
-                })
+                .query((rs, row) -> new Grouped<>(rs.getLong("accounts"), new CapacityUse(false,
+                        rs.getObject("card_id", UUID.class), rs.getString("label"),
+                        rs.getObject("membership_type_id", UUID.class), rs.getString("name"),
+                        rs.getLong("bookings"), rs.getLong("minutes"), null)))
                 .list();
+        List<CapacityUse> uses = new ArrayList<>();
+        long otherBookings = 0;
+        long otherMinutes = 0;
+        boolean other = false;
+        for (Grouped<CapacityUse> group : groups) {
+            if (group.accounts() >= MINIMUM_GROUP_ACCOUNTS) {
+                uses.add(group.row().withShare(share(group.row().bookedMinutes(), bookableMinutes)));
+            } else {
+                other = true;
+                otherBookings += group.row().bookings();
+                otherMinutes += group.row().bookedMinutes();
+            }
+        }
+        if (other) {
+            uses.add(new CapacityUse(true, null, null, null, null, otherBookings, otherMinutes,
+                    share(otherMinutes, bookableMinutes)));
+        }
+        return uses;
+    }
+
+    private static Double share(long minutes, long bookableMinutes) {
+        return bookableMinutes <= 0 ? null : (double) minutes / bookableMinutes;
     }
 
     private Cancellations cancellations(Map<String, Object> bounds) {
-        List<CardCancellations> cards = jdbc.sql(STARTED + """
-                        SELECT s.card_id, c.label, COUNT(*) AS cancelled,
+        List<Grouped<CardCancellations>> grouped = jdbc.sql(STARTED + """
+                        SELECT s.card_id, c.label, COUNT(*) AS cancelled, COUNT(DISTINCT s.booked_by) AS accounts,
                                COUNT(*) FILTER (WHERE r.booking_id IS NOT NULL) AS released,
                                COUNT(*) FILTER (WHERE r.booking_id IS NULL AND s.cancelled_by IS NOT NULL
                                                   AND s.cancelled_by = s.booked_by) AS by_holder
@@ -99,10 +121,23 @@ public class UsageReportService {
                     long cancelled = rs.getLong("cancelled");
                     long released = rs.getLong("released");
                     long byHolder = rs.getLong("by_holder");
-                    return new CardCancellations(rs.getObject("card_id", UUID.class), rs.getString("label"),
-                            cancelled, byHolder, cancelled - released - byHolder, released);
+                    return new Grouped<>(rs.getLong("accounts"), new CardCancellations(false,
+                            rs.getObject("card_id", UUID.class), rs.getString("label"),
+                            cancelled, byHolder, cancelled - released - byHolder, released));
                 })
                 .list();
+        List<CardCancellations> cards = new ArrayList<>();
+        CardCancellations other = null;
+        for (Grouped<CardCancellations> group : grouped) {
+            if (group.accounts() >= MINIMUM_GROUP_ACCOUNTS) {
+                cards.add(group.row());
+            } else {
+                other = group.row().joining(other);
+            }
+        }
+        if (other != null) {
+            cards.add(other);
+        }
         List<ReasonCount> reasons = jdbc.sql(STARTED + """
                         SELECT s.cancellation_reason, COUNT(*) AS cancelled
                         FROM started s
@@ -177,8 +212,13 @@ public class UsageReportService {
     public record Capacity(long capacityMinutes, long closedMinutes, List<CapacityUse> uses) {
     }
 
-    public record CapacityUse(UUID cardId, String cardLabel, UUID membershipTypeId, String membershipTypeName,
-                              long bookings, long bookedMinutes, Double share) {
+    public record CapacityUse(boolean other, UUID cardId, String cardLabel, UUID membershipTypeId,
+                              String membershipTypeName, long bookings, long bookedMinutes, Double share) {
+
+        CapacityUse withShare(Double value) {
+            return new CapacityUse(other, cardId, cardLabel, membershipTypeId, membershipTypeName, bookings,
+                    bookedMinutes, value);
+        }
     }
 
     public record Cancellations(long cancelled, long byHolder, long byClub, long released,
@@ -188,8 +228,18 @@ public class UsageReportService {
     public record ReasonCount(CancellationReason reason, long cancelled) {
     }
 
-    public record CardCancellations(UUID cardId, String cardLabel, long cancelled, long byHolder, long byClub,
-                                    long released) {
+    public record CardCancellations(boolean other, UUID cardId, String cardLabel, long cancelled, long byHolder,
+                                    long byClub, long released) {
+
+        CardCancellations joining(CardCancellations sum) {
+            return sum == null
+                    ? new CardCancellations(true, null, null, cancelled, byHolder, byClub, released)
+                    : new CardCancellations(true, null, null, sum.cancelled + cancelled, sum.byHolder + byHolder,
+                    sum.byClub + byClub, sum.released + released);
+        }
+    }
+
+    private record Grouped<T>(long accounts, T row) {
     }
 
     public record Attendance(boolean tracked, long attended, long noShows, long liftedNoShows) {

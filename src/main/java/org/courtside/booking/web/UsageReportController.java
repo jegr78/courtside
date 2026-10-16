@@ -33,7 +33,7 @@ class UsageReportController implements AdminUsageReportsApi {
         UsageReportService.RuleRejections rejections = report.ruleRejections();
         return ResponseEntity.ok(new ApiUsageReport(report.from(), report.to(), report.timeZone(),
                 new ApiCapacityUsage(capacity.capacityMinutes(), capacity.closedMinutes(),
-                        capacity.uses().stream().map(use -> new ApiCapacityUse(use.cardId(), use.cardLabel(),
+                        capacity.uses().stream().map(use -> new ApiCapacityUse(use.other(), use.cardId(), use.cardLabel(),
                                 use.membershipTypeId(), use.membershipTypeName(), use.bookings(),
                                 use.bookedMinutes(), use.share())).toList()),
                 new ApiCancellationUsage(cancellations.cancelled(), cancellations.byHolder(),
@@ -41,7 +41,7 @@ class UsageReportController implements AdminUsageReportsApi {
                         cancellations.reasons().stream().map(reason -> new ApiCancellationReasonCount(reason.cancelled())
                                 .reason(reason.reason() == null ? null
                                         : ApiCancellationReason.fromValue(reason.reason().name()))).toList(),
-                        cancellations.cards().stream().map(card -> new ApiCardCancellations(card.cardId(),
+                        cancellations.cards().stream().map(card -> new ApiCardCancellations(card.other(), card.cardId(),
                                 card.cardLabel(), card.cancelled(), card.byHolder(), card.byClub(),
                                 card.released())).toList()),
                 new ApiAttendanceUsage(attendance.tracked(), attendance.attended(), attendance.noShows(),

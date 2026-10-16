@@ -2665,11 +2665,14 @@ components:
         Confirmed bookings of one card whose holder holds one membership type, counted when that
         membership ran on the day the booking starts; type changes keep no history. A holder without
         a running membership, or a booking without a holder, has no type.
-        `bookedMinutes` sums the court minutes of those bookings, one court at a time.
-      required: [cardId, cardLabel, membershipTypeId, membershipTypeName, bookings, bookedMinutes, share]
+        `bookedMinutes` sums the court minutes of those bookings, one court at a time. A group
+        fewer than three accounts booked is not shown on its own: it joins the one row with
+        `other` set, which has no card and no type, so the totals stay whole and nobody is singled out.
+      required: [other, cardId, cardLabel, membershipTypeId, membershipTypeName, bookings, bookedMinutes, share]
       properties:
-        cardId: { type: string, format: uuid }
-        cardLabel: { type: string }
+        other: { type: boolean }
+        cardId: { type: [string, "null"], format: uuid }
+        cardLabel: { type: [string, "null"] }
         membershipTypeId: { type: [string, "null"], format: uuid }
         membershipTypeName: { type: [string, "null"] }
         bookings: { type: integer, format: int64, minimum: 0 }
@@ -2711,10 +2714,14 @@ components:
 
     CardCancellations:
       type: object
-      required: [cardId, cardLabel, cancelled, byHolder, byClub, released]
+      description: |
+        The cancellations of one card. A card fewer than three accounts held cancelled bookings of
+        joins the one row with `other` set, which has no card.
+      required: [other, cardId, cardLabel, cancelled, byHolder, byClub, released]
       properties:
-        cardId: { type: string, format: uuid }
-        cardLabel: { type: string }
+        other: { type: boolean }
+        cardId: { type: [string, "null"], format: uuid }
+        cardLabel: { type: [string, "null"] }
         cancelled: { type: integer, format: int64, minimum: 0 }
         byHolder: { type: integer, format: int64, minimum: 0 }
         byClub: { type: integer, format: int64, minimum: 0 }
