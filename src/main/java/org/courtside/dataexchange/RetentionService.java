@@ -62,6 +62,7 @@ public class RetentionService {
         if (retainMonths == null || retainMonths < MINIMUM_MONTHS || retainMonths > MAXIMUM_MONTHS) {
             throw new RetentionPeriodInvalidException("A retention period is 1 to 1200 months, not " + retainMonths);
         }
+        rows.discardPreviewsCovering(category);
         rows.setPolicy(category, retainMonths);
         events.publishEvent(new DataExchangeEvent.RetentionPolicySet(category, retainMonths));
         return new RetentionPlan.Policy(category, retainMonths);
@@ -133,6 +134,7 @@ public class RetentionService {
         if (!preview.expiresAt().isAfter(now)) {
             throw new RetentionPreviewExpiredException("Retention preview " + previewId + " has expired");
         }
+        requireTheSamePeriods(preview);
         rows.deletePreview(previewId);
 
         long[] pseudonymised = preview.bookingsEndedBefore() == null ? new long[]{0, 0}
@@ -163,6 +165,21 @@ public class RetentionService {
                         + "removed, {} skipped", runId, run.bookingsPseudonymised(), run.seriesPseudonymised(),
                 run.formerMembersRemoved(), run.accountsRemoved(), run.formerMembersSkipped());
         return run;
+    }
+
+    // A period changed or removed since the preview discards it; this holds that against a change racing the run.
+    private void requireTheSamePeriods(RetentionRows.StoredPreview preview) {
+        Map<RetentionCategory, Integer> configured = rows.lockPolicies();
+        ZoneId zone = clubTimeZone.zoneId();
+        LocalDate previewedOn = preview.createdAt().atZone(zone).toLocalDate();
+        boolean bookingsKept = preview.bookingsEndedBefore() == null || preview.bookingsEndedBefore()
+                .equals(cutoff(configured.get(RetentionCategory.BOOKINGS), previewedOn, zone));
+        Integer memberMonths = configured.get(RetentionCategory.FORMER_MEMBERS);
+        boolean membersKept = preview.membershipsEndedBefore() == null || (memberMonths != null
+                && preview.membershipsEndedBefore().equals(previewedOn.minusMonths(memberMonths)));
+        if (!bookingsKept || !membersKept) {
+            throw new RetentionPreviewNotFoundException("A retention preview applies a period the board has changed since");
+        }
     }
 
     private static @Nullable Instant cutoff(@Nullable Integer months, LocalDate today, ZoneId zone) {

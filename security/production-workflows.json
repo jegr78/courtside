@@ -739,7 +739,7 @@
         "A former member who became ineligible after the preview is skipped and counted.",
         "A former member eligible by date but still an administrator, named in a booking the run keeps or on a waiting list is reported as blocked and never removed.",
         "Expired retention previews are deleted by the preview sweep.",
-        "Removing a period discards every open preview that applies it."
+        "Changing or removing a period discards every open preview that applies it, and a run checks under a lock that the periods it applies are unchanged."
       ],
       "failurePaths": [
         "A preview without any configured category is refused.",
@@ -760,6 +760,7 @@
         "src/test/java/org/courtside/dataexchange/web/RetentionAdminControllerTest.java#givenAMember_whenTheyAskForAnyRetentionOperation_thenEveryOneIsForbidden",
         "src/test/java/org/courtside/dataexchange/ConcurrentRetentionRunTest.java#givenOnePreview_whenTwoBoardsConfirmItAtOnce_thenItRunsOnceAndTheOtherFindsNoPreview",
         "src/test/java/org/courtside/dataexchange/ConcurrentRetentionRunTest.java#givenAMembershipResumedWhileTheRunStarts_whenTheRunReachesThatPerson_thenItWaitsForTheChangeAndSkipsThem",
+        "src/test/java/org/courtside/dataexchange/ConcurrentRetentionRunTest.java#givenABoardLengtheningThePeriodWhileTheRunStarts_whenTheRunReachesThePreview_thenItWaitsAndRunsNothing",
         "src/test/java/org/courtside/dataexchange/web/RetentionAdminControllerTest.java#givenRecordsThatTieAnOldBookingToPeople_whenTheRunApplies_thenNoTableKeepsItBesideAPersonOrAccount",
         "src/test/java/org/courtside/dataexchange/web/RetentionAdminControllerTest.java#givenAPreviewUnderAPeriod_whenThePeriodIsRemoved_thenThePreviewCanNoLongerRun"
       ]

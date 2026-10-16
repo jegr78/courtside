@@ -243,7 +243,7 @@
     "waitlist-sweep": "Deleted by the waitlist sweep once the slot it waited for has ended; removed with the account it belongs to.",
     "partner-sweep": "Deleted when the place is taken or withdrawn, and by the partner sweep once its booking is gone, cancelled or started.",
     "usage-record": "Names nobody and is kept as long as the club keeps its usage history; only a board's retention decision bounds it.",
-    "retention-preview": "Deleted when its run starts, when the board removes a period it applies, and by the preview sweep once it has expired; removed with the account that created it."
+    "retention-preview": "Deleted when its run starts, when the board changes or removes a period it applies, and by the preview sweep once it has expired; removed with the account that created it."
   },
   "inMemoryState": {
     "BookingController": {

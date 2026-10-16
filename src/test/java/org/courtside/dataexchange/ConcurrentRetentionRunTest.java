@@ -122,6 +122,71 @@ class ConcurrentRetentionRunTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenABoardLengtheningThePeriodWhileTheRunStarts_whenTheRunReachesThePreview_thenItWaitsAndRunsNothing()
+            throws Exception {
+        // given
+        UUID admin = board();
+        UUID gone = formerMemberWhoLeftIn2023();
+        retention.setPolicy(RetentionCategory.FORMER_MEMBERS, 24);
+        UUID previewId = retention.preview(admin).previewId();
+        CountDownLatch changed = new CountDownLatch(1);
+
+        // when
+        Object outcome;
+        try (ExecutorService pool = Executors.newSingleThreadExecutor()) {
+            Future<?> lengthening = pool.submit(() -> new TransactionTemplate(transactions).executeWithoutResult(status -> {
+                retention.setPolicy(RetentionCategory.FORMER_MEMBERS, 48);
+                changed.countDown();
+                try {
+                    Thread.sleep(1500);
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                }
+            }));
+            changed.await();
+            try {
+                outcome = retention.run(previewId, admin);
+            } catch (RetentionPreviewNotFoundException refused) {
+                outcome = refused;
+            }
+            lengthening.get();
+        }
+
+        // then
+        assertThat(outcome).as("a preview taken under the shorter period no longer runs")
+                .isInstanceOf(RetentionPreviewNotFoundException.class);
+        assertThat(identity.personExists(gone)).as("the longer period keeps the former member").isTrue();
+    }
+
+    @Test
+    void givenAPeriodChangedBesideTheService_whenThePreviewRuns_thenTheRunRefusesTheOutdatedPreview() {
+        // given
+        UUID admin = board();
+        UUID gone = formerMemberWhoLeftIn2023();
+        retention.setPolicy(RetentionCategory.FORMER_MEMBERS, 24);
+        UUID previewId = retention.preview(admin).previewId();
+        jdbc.sql("UPDATE retention_policy SET retain_months = 48").update();
+
+        // when / then
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> retention.run(previewId, admin))
+                .as("the run checks the period it applies under its own lock")
+                .isInstanceOf(RetentionPreviewNotFoundException.class);
+        assertThat(identity.personExists(gone)).isTrue();
+    }
+
+    private UUID board() {
+        UUID board = identity.createPerson("Richard", "Miles", "richard.miles@example.org");
+        return identity.createAccount(board, "admin", Set.of(Role.ADMIN));
+    }
+
+    private UUID formerMemberWhoLeftIn2023() {
+        UUID person = roster.addPerson("Jane", "Doe", "jane.doe@example.org");
+        roster.assignMembership(person, ACTIVE_TYPE, LocalDate.of(2018, 1, 1));
+        jdbc.sql("UPDATE member SET ended_on = DATE '2023-06-30' WHERE person_id = :id").param("id", person).update();
+        return person;
+    }
+
+    @Test
     void givenAPeriodOutsideOneToTwelveHundredMonths_whenSetThroughTheService_thenItIsRefused() {
         // when / then
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> retention.setPolicy(RetentionCategory.BOOKINGS, 0))

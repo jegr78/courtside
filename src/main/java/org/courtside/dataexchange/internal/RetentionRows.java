@@ -53,6 +53,16 @@ public class RetentionRows {
         return policies;
     }
 
+    /** The configured periods, held against a change until the transaction ends. */
+    public Map<RetentionCategory, Integer> lockPolicies() {
+        Map<RetentionCategory, Integer> policies = new EnumMap<>(RetentionCategory.class);
+        jdbc.sql("SELECT category, retain_months FROM retention_policy ORDER BY category FOR SHARE")
+                .query(rs -> {
+                    policies.put(RetentionCategory.valueOf(rs.getString("category")), rs.getInt("retain_months"));
+                });
+        return policies;
+    }
+
     public void setPolicy(RetentionCategory category, int retainMonths) {
         jdbc.sql("""
                         INSERT INTO retention_policy (category, retain_months) VALUES (:category, :months)
@@ -301,19 +311,20 @@ public class RetentionRows {
                 .update();
     }
 
-    public record StoredPreview(UUID createdBy, Instant expiresAt, @Nullable Instant bookingsEndedBefore,
+    public record StoredPreview(UUID createdBy, Instant createdAt, Instant expiresAt, @Nullable Instant bookingsEndedBefore,
                                 @Nullable LocalDate membershipsEndedBefore, List<UUID> formerMemberIds) {
     }
 
     public Optional<StoredPreview> lockPreview(UUID previewId) {
         return jdbc.sql("""
-                        SELECT created_by, expires_at, bookings_ended_before, memberships_ended_before,
+                        SELECT created_by, created_at, expires_at, bookings_ended_before, memberships_ended_before,
                                former_member_ids
                         FROM retention_preview WHERE id = :id FOR UPDATE
                         """)
                 .param("id", previewId)
                 .query((rs, row) -> new StoredPreview(
                         rs.getObject("created_by", UUID.class),
+                        rs.getObject("created_at", OffsetDateTime.class).toInstant(),
                         rs.getObject("expires_at", OffsetDateTime.class).toInstant(),
                         Optional.ofNullable(rs.getObject("bookings_ended_before", OffsetDateTime.class))
                                 .map(OffsetDateTime::toInstant).orElse(null),
