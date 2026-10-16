@@ -4,8 +4,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { test } from "node:test";
-import { compareSecurityToolRuns, comparisonSummary, exhaustedAuthorizationBudget, exhaustedAuthorizationRemark,
-  unacknowledgedFindings, untoleratedBaseFailures } from "./security-tool-comparison.mjs";
+import { fileURLToPath } from "node:url";
+import { assertExactEvidenceLists, compareSecurityToolRuns, comparisonSummary, exhaustedAuthorizationBudget,
+  exhaustedAuthorizationRemark, unacknowledgedFindings, untoleratedBaseFailures } from "./security-tool-comparison.mjs";
+import { requiredPassiveCheckIds } from "./security-passive-deployment.mjs";
 
 const fingerprint = (character) => `sha256:${character.repeat(64)}`;
 const contractPath = new URL("../security/run-contract.json", import.meta.url);
@@ -430,4 +432,49 @@ test("given an exhausted base and a candidate matrix that did not pass, when com
 
   // when / then
   assert.throws(() => comparePair(root, base, candidate), /requires the candidate's matrix to pass/);
+});
+
+test("given ZAP evidence that lost a role its policy names, when the runs are compared, then the comparison refuses it", () => {
+  // given
+  const root = mkdtempSync(join(tmpdir(), "courtside-tool-comparison-"));
+  const baseRoot = runtimeRoot(root, "base-runtime");
+  const candidateRoot = runtimeRoot(root, "candidate-runtime");
+  const roles = ["MEMBER", "ADMIN"];
+  for (const runtime of [baseRoot, candidateRoot]) {
+    writeFileSync(join(runtime, "security", "zap-authenticated-policy.json"), JSON.stringify({ roles }));
+    writeFileSync(join(runtime, "security", "authenticated-zap-evidence.schema.json"), JSON.stringify({
+      $schema: "https://json-schema.org/draft/2020-12/schema", type: "object",
+      required: ["outcome", "candidates", "roles"], properties: {
+        outcome: { enum: ["passed", "failed", "incomplete"] }, candidates: { type: "array" },
+        roles: { type: "array", minItems: 1 } } }));
+  }
+  const base = runFixture(root, "base");
+  const candidate = runFixture(root, "candidate");
+  const zap = (covered) => JSON.stringify({ outcome: "incomplete", candidates: [{ fingerprint: fingerprint("7") }],
+    roles: covered.map((role) => ({ role, outcome: "passed" })) });
+  writeFileSync(join(base.evidence, "authenticated-zap.json"), zap(roles));
+  writeFileSync(join(candidate.evidence, "authenticated-zap.json"), zap(roles.slice(1)));
+  const compare = () => compareSecurityToolRuns({
+    baseRoot, baseManifest: base.manifest, baseEvidence: base.evidence,
+    baseRef: "2".repeat(40), baseContract: contractPath, baseCatalog: catalogPath,
+    candidateRoot, candidateManifest: candidate.manifest, candidateEvidence: candidate.evidence,
+    candidateRef: "b".repeat(40), candidateContract: contractPath, candidateCatalog: catalogPath
+  });
+
+  // when / then
+  assert.throws(compare, /does not cover exactly the roles its policy names/);
+  writeFileSync(join(candidate.evidence, "authenticated-zap.json"), zap(roles));
+  assert.doesNotThrow(compare);
+});
+
+test("given passive evidence that lost one of its checks, when its lists are read against its runtime, then it is refused", () => {
+  // given
+  const repository = fileURLToPath(new URL("..", import.meta.url));
+  const complete = { checks: requiredPassiveCheckIds.map((id) => ({ id })) };
+  const shortened = { checks: complete.checks.slice(1) };
+
+  // when / then
+  assert.doesNotThrow(() => assertExactEvidenceLists(repository, "passive-deployment", complete));
+  assert.throws(() => assertExactEvidenceLists(repository, "passive-deployment", shortened),
+    /does not cover exactly its required checks/);
 });

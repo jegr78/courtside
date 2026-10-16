@@ -75,6 +75,24 @@ function validateEvidence(root, toolId, evidence) {
   const schema = JSON.parse(readFileSync(join(root, "security", evidenceSchemas[toolId]), "utf8"));
   const validate = ajv.compile(schema);
   if (!validate(evidence)) fail(`${toolId} evidence violates its runtime schema: ${JSON.stringify(validate.errors)}`);
+  assertExactEvidenceLists(root, toolId, evidence);
+}
+
+// The schemas leave list lengths open so they need no upkeep; the exact lists come from the same root.
+export function assertExactEvidenceLists(root, toolId, evidence) {
+  const sorted = (values) => JSON.stringify([...values].toSorted());
+  const zapPolicy = join(root, "security", "zap-authenticated-policy.json");
+  if (toolId === "authenticated-zap" && existsSync(zapPolicy)
+      && sorted(JSON.parse(readFileSync(zapPolicy, "utf8")).roles)
+        !== sorted((evidence.roles ?? []).map(({ role }) => role))) {
+    fail("authenticated-zap evidence does not cover exactly the roles its policy names");
+  }
+  const passiveModule = join(root, "tools", "security-passive-deployment.mjs");
+  if (toolId === "passive-deployment" && existsSync(passiveModule)
+      && sorted(createRequire(import.meta.url)(passiveModule).requiredPassiveCheckIds)
+        !== sorted((evidence.checks ?? []).map(({ id }) => id))) {
+    fail("passive-deployment evidence does not cover exactly its required checks");
+  }
 }
 
 function expectedPlan(contractPath, catalogPath, profile) {
