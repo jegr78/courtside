@@ -104,6 +104,8 @@ tags:
     description: Queueing for a taken slot and taking it when it frees.
   - name: partner-search
     description: Offering the open place of a booking to other members and taking one.
+  - name: attendance
+    description: Checking in for one's own booking where the club records attendance.
   - name: admin-courts
     description: Administering courts.
   - name: admin-opening-hours
@@ -120,6 +122,8 @@ tags:
     description: Administering rule sets and their rules.
   - name: admin-config
     description: Administering the club's own name and branding.
+  - name: admin-attendance
+    description: Recording attendance and no-shows, and lifting no-shows.
   - name: admin-impact
     description: What a configuration change would affect, before it is made.
   - name: admin-import-references
@@ -357,7 +361,7 @@ components:
       type: string
       enum: [OPENING_HOURS, SLOT_GRID, ADVANCE_WINDOW, MAX_OPEN_BOOKINGS, MAX_BOOKING_DURATION,
              CANCELLATION_DEADLINE, NO_COURT_BOOKING, BOOKING_HOURS, WEEKLY_BOOKED_HOURS,
-             MIN_BOOKING_DURATION]
+             MIN_BOOKING_DURATION, NO_SHOW_LIMIT]
 
     CancelScope:
       type: string
@@ -2080,6 +2084,68 @@ components:
         note: { type: [string, "null"] }
         partnerSearch:
           $ref: "#/components/schemas/PartnerSearchState"
+        checkIn:
+          $ref: "#/components/schemas/CheckIn"
+        released:
+          type: boolean
+          description: |
+            True on a cancelled booking the club freed because nobody checked in by its release
+            time. Absent otherwise.
+
+    CheckIn:
+      type: object
+      description: |
+        Present on an upcoming confirmed booking while the club records attendance. The member who
+        booked it checks in from `opensAt` until `closesAt`, the booking's end.
+      required: [opensAt, closesAt, checkedIn]
+      properties:
+        opensAt: { type: string, format: date-time }
+        closesAt: { type: string, format: date-time }
+        checkedIn: { type: boolean }
+
+    AttendanceOutcome:
+      type: string
+      enum: [ATTENDED, NO_SHOW]
+
+    AttendanceRequest:
+      type: object
+      required: [outcome]
+      properties:
+        outcome: { $ref: "#/components/schemas/AttendanceOutcome" }
+
+    AttendancePolicy:
+      type: object
+      required: [enabled]
+      properties:
+        enabled:
+          type: boolean
+          description: |
+            Whether the club records attendance at all. Without it no check-in, no-show, release or
+            no-show limit has any effect.
+        releaseAfterMinutes:
+          type: [integer, "null"]
+          minimum: 5
+          maximum: 120
+          description: |
+            How long after its start a member booking nobody checked in for is cancelled and its
+            court freed. `null` never releases one. It needs `enabled`.
+
+    NoShow:
+      type: object
+      required: [bookingId, startsAt, endsAt]
+      properties:
+        bookingId: { type: string, format: uuid }
+        startsAt: { type: string, format: date-time }
+        endsAt: { type: string, format: date-time }
+
+    NoShowsLifted:
+      type: object
+      required: [lifted]
+      properties:
+        lifted:
+          type: integer
+          minimum: 0
+          description: How many recorded no-shows stopped counting.
 
     PartnerSearchState:
       type: string
@@ -2221,6 +2287,8 @@ components:
             participants:
               type: array
               items: { $ref: "#/components/schemas/ManagedParticipant" }
+            attendance:
+              $ref: "#/components/schemas/AttendanceOutcome"
 
     Allocation:
       type: object
@@ -5061,6 +5129,215 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/my/bookings/{bookingId}/check-in:
+    post:
+      tags: [attendance]
+      operationId: checkIn
+      summary: Check in for one's own booking.
+      description: |
+        Records the booking as attended. It opens 15 minutes before the start and closes at the
+        end. A club that records no attendance answers `409` with
+        `urn:courtside:error:attendance-not-tracked`; outside the window, on a cancelled booking or
+        after a recorded no-show the answer is `409` with `urn:courtside:error:check-in-closed`.
+        Checking in again changes nothing. A booking somebody else holds answers `404` like one
+        that does not exist.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: bookingId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "204":
+          description: Checked in.
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/admin/attendance-policy:
+    get:
+      tags: [admin-attendance]
+      operationId: getAttendancePolicy
+      summary: Whether the club records attendance and when it releases an unattended court.
+      responses:
+        "200":
+          description: The attendance policy.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AttendancePolicy" }
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+    put:
+      tags: [admin-attendance]
+      operationId: changeAttendancePolicy
+      summary: Switch attendance on or off and set the release time.
+      description: |
+        A release time without attendance answers `400` with
+        `urn:courtside:error:attendance-policy-invalid`. Switching attendance off keeps every
+        recorded attendance but lets none of it count.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AttendancePolicy" }
+      responses:
+        "200":
+          description: The stored policy.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AttendancePolicy" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/admin/bookings/{bookingId}/attendance:
+    put:
+      tags: [admin-attendance]
+      operationId: recordAttendance
+      summary: Record that the players of a started booking came, or did not.
+      description: |
+        Replaces what was recorded before, a lifted no-show included. A booking that has not
+        started, one cancelled before its start and one nobody holds answer `409` with
+        `urn:courtside:error:attendance-not-recordable`; a club that records no attendance answers
+        `409` with `urn:courtside:error:attendance-not-tracked`.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: bookingId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AttendanceRequest" }
+      responses:
+        "204":
+          description: Recorded.
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+    delete:
+      tags: [admin-attendance]
+      operationId: clearAttendance
+      summary: Remove a recorded attendance, so the booking counts as unrecorded again.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: bookingId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "204":
+          description: Nothing is recorded for the booking any more.
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/admin/roster/{personId}/no-shows:
+    get:
+      tags: [admin-attendance]
+      operationId: listNoShows
+      summary: The no-shows that still count against a person's account, latest first.
+      description: A person without an account has none.
+      parameters:
+        - name: personId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: The counting no-shows.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/NoShow" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/admin/roster/{personId}/no-shows/lift:
+    post:
+      tags: [admin-attendance]
+      operationId: liftNoShows
+      summary: Stop every recorded no-show of a person from counting, which lifts a no-show limit.
+      description: The no-shows stay recorded; a no-show recorded afterwards counts again.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: personId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: How many no-shows were lifted.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/NoShowsLifted" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "429":
           $ref: "#/components/responses/RateLimited"
 

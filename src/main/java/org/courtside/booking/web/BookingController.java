@@ -16,6 +16,8 @@ import org.courtside.api.ApiPersonalBookingPage;
 import org.courtside.api.ApiPersonalBookingView;
 import org.courtside.api.ApiPublicCourt;
 import org.courtside.api.ApiManagedAppointment;
+import org.courtside.api.ApiAttendanceOutcome;
+import org.courtside.api.ApiCheckIn;
 import org.courtside.api.ApiManagedAppointmentDetail;
 import org.courtside.api.ApiManagedAppointmentPage;
 import org.courtside.api.ApiManagedAppointmentView;
@@ -33,6 +35,8 @@ import org.courtside.booking.partner.PartnerSearchState;
 import org.courtside.booking.PersonalBookingPage;
 import org.courtside.booking.PersonalBookingView;
 import org.courtside.booking.Booking;
+import org.courtside.booking.BookingStatus;
+import org.courtside.booking.attendance.AttendanceService;
 import org.courtside.booking.internal.AllocationVisibilityService;
 import org.courtside.booking.internal.BookingRuleGate;
 import org.courtside.booking.internal.ManagedAppointmentQuery;
@@ -57,6 +61,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -79,6 +84,7 @@ class BookingController implements BookingsApi {
     private final ClubIdentity club;
     private final Clock clock;
     private final PartnerSearchService partnerSearch;
+    private final AttendanceService attendance;
 
     BookingController(BookingService bookings,
                       CardService cards,
@@ -92,7 +98,8 @@ class BookingController implements BookingsApi {
                       FacilityService facility,
                       ClubIdentity club,
                       Clock clock,
-                      PartnerSearchService partnerSearch) {
+                      PartnerSearchService partnerSearch,
+                      AttendanceService attendance) {
         this.bookings = bookings;
         this.cards = cards;
         this.currentUser = currentUser;
@@ -106,6 +113,7 @@ class BookingController implements BookingsApi {
         this.club = club;
         this.clock = clock;
         this.partnerSearch = partnerSearch;
+        this.attendance = attendance;
     }
 
     @Override
@@ -174,6 +182,18 @@ class BookingController implements BookingsApi {
                 account.getId(), PersonalBookingView.valueOf(view.getValue()), cursor, limit);
         Map<UUID, PartnerSearchState> searches = partnerSearch.searchStatesOf(
                 page.bookings().stream().map(Booking::getId).toList());
+        Map<UUID, AttendanceService.CheckIn> checkIns = view == ApiPersonalBookingView.UPCOMING
+                ? attendance.checkInsOf(page.bookings().stream()
+                        .filter(booking -> booking.getStatus() == BookingStatus.CONFIRMED)
+                        .map(booking -> new AttendanceService.TimedBooking(booking.getId(),
+                                booking.getAllocations().getFirst().getStartsAt(),
+                                booking.getAllocations().getFirst().getEndsAt()))
+                        .toList())
+                : Map.of();
+        Set<UUID> released = attendance.releasedAmong(page.bookings().stream()
+                .filter(booking -> booking.getStatus() == BookingStatus.CANCELLED)
+                .map(Booking::getId)
+                .toList());
         List<ApiPersonalBooking> items = page.bookings().stream()
                 .map(booking -> {
                     List<CourtAllocation> allocations = booking.getAllocations();
@@ -190,7 +210,9 @@ class BookingController implements BookingsApi {
                             .seriesId(booking.getSeriesId())
                             .note(booking.getNote())
                             .partnerSearch(searches.containsKey(booking.getId())
-                                    ? ApiPartnerSearchState.fromValue(searches.get(booking.getId()).name()) : null);
+                                    ? ApiPartnerSearchState.fromValue(searches.get(booking.getId()).name()) : null)
+                            .checkIn(toCheckIn(checkIns.get(booking.getId())))
+                            .released(released.contains(booking.getId()) ? Boolean.TRUE : null);
                 })
                 .toList();
         List<ApiPublicCourt> courtLabels = facility.allCourts().stream()
@@ -277,7 +299,15 @@ class BookingController implements BookingsApi {
                 ApiBookingStatus.fromValue(booking.getStatus().name()), participants.size(),
                 account.getId().equals(booking.getBookedBy()), participants)
                 .seriesId(booking.getSeriesId())
-                .note(booking.getNote()));
+                .note(booking.getNote())
+                .attendance(attendance.outcomeOf(booking.getId())
+                        .map(outcome -> ApiAttendanceOutcome.fromValue(outcome.name()))
+                        .orElse(null)));
+    }
+
+    private static ApiCheckIn toCheckIn(AttendanceService.CheckIn checkIn) {
+        return checkIn == null ? null : new ApiCheckIn(WireTypes.toOffsetDateTime(checkIn.opensAt()),
+                WireTypes.toOffsetDateTime(checkIn.closesAt()), checkIn.checkedIn());
     }
 
     private ApiManagedAppointment toManagedAppointment(Booking booking,

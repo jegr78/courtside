@@ -5,6 +5,9 @@ import org.courtside.booking.Booking;
 import org.courtside.booking.BookingRepository;
 import org.courtside.booking.BookingService;
 import org.courtside.booking.BookingStatus;
+import org.courtside.booking.attendance.AttendanceOutcome;
+import org.courtside.booking.attendance.AttendancePolicy;
+import org.courtside.booking.attendance.AttendanceService;
 import org.courtside.booking.internal.BookingReminders;
 import org.courtside.booking.series.BookingSeries;
 import org.courtside.booking.series.BookingSeriesRepository;
@@ -22,6 +25,10 @@ import org.courtside.identity.Role;
 import org.courtside.shared.CancellationReason;
 import org.courtside.shared.TimeSlot;
 
+import org.springframework.jdbc.core.simple.JdbcClient;
+
+import java.sql.Timestamp;
+import java.time.Duration;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -36,6 +43,8 @@ public class BookingTestFixture {
     private final SeriesService seriesService;
     private final WaitlistService waitlist;
     private final PartnerSearchService partnerSearch;
+    private final AttendanceService attendance;
+    private final JdbcClient jdbc;
 
     public UUID createBookingLookingForAPartner(UUID courtId, UUID cardId, TimeSlot slot, UUID bookedBy,
                                                 UUID bookerPersonId) {
@@ -150,6 +159,41 @@ public class BookingTestFixture {
 
     public long countBookings() {
         return bookings.count();
+    }
+
+    public UUID insertBookingThatHasStarted(UUID courtId, UUID cardId, TimeSlot slot, UUID bookedBy) {
+        UUID id = UUID.randomUUID();
+        jdbc.sql("""
+                        INSERT INTO booking (id, card_id, status, booked_by, created_at)
+                        VALUES (:id, :cardId, 'CONFIRMED', :bookedBy, :createdAt)
+                        """)
+                .param("id", id).param("cardId", cardId).param("bookedBy", bookedBy)
+                .param("createdAt", Timestamp.from(slot.start().minus(Duration.ofDays(1))))
+                .update();
+        jdbc.sql("""
+                        INSERT INTO court_allocation (id, booking_id, court_id, starts_at, ends_at, status)
+                        VALUES (:id, :bookingId, :courtId, :startsAt, :endsAt, 'CONFIRMED')
+                        """)
+                .param("id", UUID.randomUUID()).param("bookingId", id).param("courtId", courtId)
+                .param("startsAt", Timestamp.from(slot.start())).param("endsAt", Timestamp.from(slot.end()))
+                .update();
+        return id;
+    }
+
+    public void trackAttendance(Integer releaseAfterMinutes) {
+        attendance.changePolicy(new AttendancePolicy(true, releaseAfterMinutes));
+    }
+
+    public void stopTrackingAttendance() {
+        attendance.changePolicy(new AttendancePolicy(false, null));
+    }
+
+    public void recordNoShow(UUID bookingId, UUID boardAccountId) {
+        attendance.record(bookingId, AttendanceOutcome.NO_SHOW, boardAccountId);
+    }
+
+    public int liftNoShows(UUID personId, UUID boardAccountId) {
+        return attendance.liftNoShows(personId, boardAccountId);
     }
 
     private Booking booking(UUID bookingId) {
