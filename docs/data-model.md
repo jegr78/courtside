@@ -174,6 +174,8 @@ no-show sets `lifted_at` and keeps the row, so the no-show stays visible but sto
 `booking_rule_rejection` feeds the usage report and names nobody: no person, no account and no
 booking. `attempt_id` groups the rules one attempt broke, so the report counts attempts as well as
 rules. A refused attempt writes it in a transaction of its own, because the attempt itself rolls back.
+A refused single booking, booking series and cancellation each write it. Nothing deletes its rows
+yet; how long a club keeps them belongs to the retention controls by record category.
 
 ## People, memberships and accounts
 

@@ -575,7 +575,11 @@ names no person, account or booking.
 - Capacity groups confirmed bookings by card and by the holder's membership type, with their court
   minutes and their share of the open court minutes that were not closed.
 - Cancellations split into those by the holder, by the club and by the release of an unattended
-  booking, and the club's are counted by the reason it gave.
+  booking, and the club's are counted by the reason it gave. They are also grouped by card.
+- A card or membership-type group fewer than three accounts stand behind
+  (`UsageReportService.MINIMUM_GROUP_ACCOUNTS`) is never shown on its own. It joins one `other` row
+  without card or type, so the totals stay whole and a type one member holds does not expose that
+  member's bookings. When every group is small, the other row is the only one.
 - Attendance counts attended bookings, no-shows that still count and lifted ones. A booking with
   nothing recorded counts in none of them.
 - Rule rejections count the booking and cancellation attempts the rules refused in the period, per
