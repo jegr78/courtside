@@ -925,9 +925,10 @@ period is never touched. `BOOKINGS` pseudonymises bookings and series that ended
 booker, canceller, mover, creator, notes, member players and guest names leave the booking, while
 court time, status, card and guest places stay for utilisation and booking counts. `FORMER_MEMBERS`
 removes a person whose membership ended before the cut-off and whose accounts neither signed in nor
-were opened since, with those accounts and everything they hold. A person is reported as blocked
-instead while an account of theirs holds the administrator role, a booking or series the run keeps
-still names them, or they wait for a court.
+were opened since, with those accounts and everything they hold. Removal does not record a
+departure: a member who leaves is deactivated, and only the period the board set after that ending
+erases them. A person is reported as blocked instead while an account of theirs holds the
+administrator role, a booking or series the run keeps still names them, or they wait for a court.
 
 Every run starts as a preview that changes nothing, counts what it would change and lists the
 blocked people with their reason. Only the account that took the preview can run it, with a recent
