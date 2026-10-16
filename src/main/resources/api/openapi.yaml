@@ -8563,8 +8563,8 @@ paths:
 
         Entries come from two places. The administrative surfaces record what a board configures:
         `facility.court.added`, `card.bookingCard.changed`, `config.club.changed`,
-        `rules.ruleSet.changed`, `roster.person.corrected` and `dataexchange.source.described`,
-        each with siblings. The rest is recorded outside those surfaces:
+        `rules.ruleSet.changed`, `roster.person.corrected`, `dataexchange.source.described` and
+        `notification.template.changed`, each with siblings. The rest is recorded outside those surfaces:
         `booking.booking.confirmed` and the four other booking entries, and
         `identity.account.credentialsRequested`, which names the account a credential was issued
         for. Treat `eventType` as an open set — a page may carry a name this description does not
