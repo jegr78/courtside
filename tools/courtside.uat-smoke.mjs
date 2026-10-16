@@ -103,6 +103,26 @@ export async function runUatSmoke({ args = process.argv.slice(2), environment = 
     return run("docker", [...compose, ...args], { environment: smokeEnvironment });
   }
 
+  function appState(container) {
+    const [{ State, RestartCount }] = JSON.parse(run("docker", ["inspect", container]));
+    return { status: State.Status, restarts: RestartCount, startedAt: State.StartedAt };
+  }
+
+  async function stopApp(container) {
+    const describe = ({ status, restarts, startedAt }) => `${status}, ${restarts} restarts, started ${startedAt}`;
+    const before = appState(container);
+    composeRun("stop", "app");
+    for (let poll = 0; ; poll++) {
+      const state = appState(container);
+      if (state.status === "exited") return;
+      if (state.restarts > before.restarts) {
+        throw new Error(`The restart policy started app again after compose stop: ${describe(before)} -> ${describe(state)}`);
+      }
+      if (poll === 60) throw new Error(`app did not exit within 30 s of compose stop: ${describe(before)} -> ${describe(state)}`);
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+  }
+
   function previewBookingSeed() {
     const candidate = uatBookingSeedCandidate(selectedEnvironment);
     if (!candidate) return;
@@ -226,7 +246,7 @@ export async function runUatSmoke({ args = process.argv.slice(2), environment = 
       lifecycle.proof.tlsSource = { commit: offer.commit, version: offer.version,
         bodySha256: createHash("sha256").update(source.body).digest("hex"), certificateSha256: source.certificateSha256 };
     }
-    composeRun("stop", "app");
+    await stopApp(appBefore);
     const redirect = await request({ secure: false, port: instance.httpPort, path: "/login?from=smoke" });
     const headRedirect = await request({
       secure: false, port: instance.httpPort, path: "/courts?from=head", method: "HEAD"
