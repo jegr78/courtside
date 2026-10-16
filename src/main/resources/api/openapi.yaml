@@ -643,6 +643,33 @@ components:
           properties:
             kind: { $ref: "#/components/schemas/OpeningPeriodKind" }
 
+    OpeningPeriodImpactRequest:
+      type: object
+      description: |
+        A season or holiday as it would be stored, without its name, and the stored one it would
+        replace.
+      required: [kind, startsOn, endsOn, days]
+      properties:
+        periodId: { type: [string, "null"], format: uuid }
+        kind: { $ref: "#/components/schemas/OpeningPeriodKind" }
+        startsOn: { type: string, format: date }
+        endsOn: { type: string, format: date }
+        days:
+          type: array
+          minItems: 7
+          maxItems: 7
+          items: { $ref: "#/components/schemas/OpeningHours" }
+
+    CourtClosureImpactRequest:
+      type: object
+      description: A court closure as it would be stored, without its name, and the stored one it would replace.
+      required: [courtId, startsOn, endsOn]
+      properties:
+        closureId: { type: [string, "null"], format: uuid }
+        courtId: { type: string, format: uuid }
+        startsOn: { type: string, format: date }
+        endsOn: { type: string, format: date }
+
     CourtClosure:
       type: object
       required: [id, courtId, name, startsOn, endsOn]
@@ -3189,7 +3216,7 @@ components:
     NotificationClosure:
       type: string
       description: Why a displaced booking no longer fits, present on `BOOKING_DISPLACED` entries only.
-      enum: [COURT_OUT_OF_SERVICE, CARD_OUT_OF_SERVICE, DAY_CLOSED, HOURS_NARROWED]
+      enum: [COURT_OUT_OF_SERVICE, CARD_OUT_OF_SERVICE, DAY_CLOSED, HOURS_NARROWED, HOLIDAY, SEASON, COURT_CLOSED]
 
     NotificationLink:
       type: object
@@ -8411,6 +8438,84 @@ paths:
           $ref: "#/components/responses/Unauthenticated"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/admin/impact/opening-periods:
+    post:
+      tags: [admin-impact]
+      operationId: openingPeriodImpact
+      summary: Which bookings storing this season or holiday would newly put outside the hours.
+      description: |
+        Stores nothing. With `periodId` it answers for a change to that season or holiday, so the
+        bookings its stored version already leaves outside the hours are not counted again, and
+        neither are bookings another entry already closes.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/PageCursor"
+        - $ref: "#/components/parameters/PageLimit"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/OpeningPeriodImpactRequest" }
+      responses:
+        "200":
+          description: The bookings it would newly affect.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Impact" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/admin/impact/court-closures:
+    post:
+      tags: [admin-impact]
+      operationId: courtClosureImpact
+      summary: Which bookings storing this court closure would newly close.
+      description: |
+        Stores nothing. With `closureId` it answers for a change to that closure, so the bookings
+        its stored version already closes are not counted again, and neither are bookings another
+        entry already closes.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/PageCursor"
+        - $ref: "#/components/parameters/PageLimit"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CourtClosureImpactRequest" }
+      responses:
+        "200":
+          description: The bookings it would newly affect.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Impact" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
         "429":
           $ref: "#/components/responses/RateLimited"
 

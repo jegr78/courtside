@@ -13,6 +13,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @RequiredArgsConstructor
 public class FacilityTestFixture {
@@ -52,10 +54,11 @@ public class FacilityTestFixture {
                 week(open)).id();
     }
 
-    /** A holiday on {@code date}, closed without a window. */
+    /** A holiday on {@code date} open within {@code window}, or closed without one. */
     public UUID addHoliday(LocalDate date, OpeningWindow window) {
         return facilityService.createOpeningPeriod(OpeningPeriod.Kind.HOLIDAY, "Holiday", date, date,
-                week(window == null ? Map.of() : Map.of(date.getDayOfWeek(), window))).id();
+                week(window == null ? Map.of() : Arrays.stream(DayOfWeek.values())
+                        .collect(Collectors.toMap(Function.identity(), day -> window)))).id();
     }
 
     public UUID closeCourt(UUID courtId, LocalDate startsOn, LocalDate endsOn) {

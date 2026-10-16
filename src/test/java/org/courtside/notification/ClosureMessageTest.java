@@ -22,10 +22,15 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 import java.time.DayOfWeek;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentCaptor.forClass;
@@ -41,6 +46,9 @@ class ClosureMessageTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_BOOKING_CARD =
             UUID.fromString("11111111-1111-1111-1111-111111111111");
+
+    private static final LocalDate WEDNESDAY = LocalDate.of(2026, 5, 13);
+    private static final OpeningWindow UNTIL_FIVE = new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(17, 0));
 
     private static final Instant SIX_PM = Instant.parse("2026-05-13T16:00:00Z");
     private static final Instant SEVEN_PM = Instant.parse("2026-05-13T17:00:00Z");
@@ -182,6 +190,74 @@ class ClosureMessageTest extends AbstractIntegrationTest {
         verify(sender, never()).send(any(MimeMessage.class));
     }
 
+    @Test
+    void givenABookingOnADay_whenAHolidayClosesTheClubThen_thenEverybodyInItIsToldItIsAHoliday() throws Exception {
+        // when
+        facilityFixture.addHoliday(WEDNESDAY, null);
+
+        // then
+        assertThat(addressesWrittenTo())
+                .containsExactlyInAnyOrder("jane.doe@example.org", "john.roe@example.org");
+        assertThat(closuresInTheNotificationCentre()).containsOnly("HOLIDAY");
+        assertThat(lastBodyTo("jane.doe@example.org"))
+                .contains("Feiertag", "Court 1", "13. Mai 2026", "18:00", "19:00");
+    }
+
+    @Test
+    void givenABookingInTheEvening_whenASeasonClosesEarlier_thenEverybodyInItIsToldItIsASeason() throws Exception {
+        // when
+        facilityFixture.addSeason(WEDNESDAY.minusDays(1), WEDNESDAY.plusDays(30), everyDay(UNTIL_FIVE));
+
+        // then
+        assertThat(addressesWrittenTo()).contains("jane.doe@example.org");
+        assertThat(closuresInTheNotificationCentre()).containsOnly("SEASON");
+        assertThat(lastBodyTo("jane.doe@example.org")).contains("Saison", "13. Mai 2026");
+    }
+
+    @Test
+    void givenABookingOnACourt_whenTheBoardClosesThatCourtOnItsDay_thenEverybodyInItIsToldWithoutTheBoardsNote()
+            throws Exception {
+        // when
+        facility.createCourtClosure(courtId, "Roof leak, contractor booked", WEDNESDAY, WEDNESDAY);
+
+        // then
+        assertThat(addressesWrittenTo())
+                .containsExactlyInAnyOrder("jane.doe@example.org", "john.roe@example.org");
+        assertThat(closuresInTheNotificationCentre()).containsOnly("COURT_CLOSED");
+        assertThat(lastBodyTo("jane.doe@example.org"))
+                .contains("gesperrt", "Court 1", "13. Mai 2026")
+                .doesNotContain("Roof leak");
+    }
+
+    @Test
+    void givenAClosureNextToTheBooking_whenItIsWidenedOverItAndThenFurther_thenEverybodyIsToldOnce() throws Exception {
+        // given
+        var closure = facility.createCourtClosure(courtId, "Resurfacing", WEDNESDAY.plusDays(1), WEDNESDAY.plusDays(2));
+        verify(sender, never()).send(any(MimeMessage.class));
+
+        // when
+        facility.changeCourtClosure(closure.id(), courtId, "Resurfacing", WEDNESDAY, WEDNESDAY.plusDays(2));
+        facility.changeCourtClosure(closure.id(), courtId, "Resurfacing", WEDNESDAY, WEDNESDAY.plusDays(4));
+
+        // then
+        assertThat(addressesWrittenTo())
+                .as("the second widening covers nothing the first had not already told them about")
+                .containsExactlyInAnyOrder("jane.doe@example.org", "john.roe@example.org");
+    }
+
+    @Test
+    void givenABookingWithinTheHours_whenAHolidayKeepsThemOrAnotherCourtIsClosed_thenNobodyIsTold() {
+        // given
+        UUID otherCourt = facilityFixture.createCourt(2, "Court 2");
+
+        // when
+        facilityFixture.addHoliday(WEDNESDAY, new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0)));
+        facility.createCourtClosure(otherCourt, "Nets", WEDNESDAY, WEDNESDAY);
+
+        // then
+        verify(sender, never()).send(any(MimeMessage.class));
+    }
+
     private void book(UUID court) {
         bookings.create(new CreateBookingCommand(List.of(court), MEMBER_BOOKING_CARD,
                 new TimeSlot(SIX_PM, SEVEN_PM), bookerAccountId, bookerPersonId, Set.of(Role.MEMBER),
@@ -202,6 +278,14 @@ class ClosureMessageTest extends AbstractIntegrationTest {
                 .reduce((earlier, later) -> later)
                 .orElseThrow(() -> new AssertionError("Nothing reached " + address))
                 .getContent().toString();
+    }
+
+    private List<String> closuresInTheNotificationCentre() {
+        return jdbc.sql("SELECT parameters ->> 'closure' FROM notification WHERE parameters ->> 'closure' IS NOT NULL").query(String.class).list();
+    }
+
+    private static Map<DayOfWeek, OpeningWindow> everyDay(OpeningWindow window) {
+        return Arrays.stream(DayOfWeek.values()).collect(Collectors.toMap(Function.identity(), day -> window));
     }
 
     private List<String> kindsRecorded() {

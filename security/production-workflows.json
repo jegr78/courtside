@@ -371,6 +371,8 @@
         "removeCourtClosure"
       ],
       "backgroundEntryPoints": [
+        "ClosureAnnouncements#on(AvailabilityChange.ClosureStored)",
+        "ClosureAnnouncements#on(AvailabilityChange.PeriodStored)",
         "ClosureAnnouncements#on(CardEvent.BookingCardAvailabilityChanged)",
         "ClosureAnnouncements#on(FacilityEvent.CourtAvailabilityChanged)",
         "ClosureAnnouncements#on(FacilityEvent.OpeningHoursClosed)",
@@ -383,7 +385,8 @@
       "stateTransitions": [
         "Administrators create and correct configuration records.",
         "Active flags retire and restore resources without deleting history.",
-        "Opening-hour changes schedule a weekly version from today or a later day; earlier days keep the hours they had, and a version not yet in force can be removed."
+        "Opening-hour changes schedule a weekly version from today or a later day; earlier days keep the hours they had, and a version not yet in force can be removed.",
+        "Storing a season, holiday or court closure tells the people in each booking it newly closes, once, and leaves the booking in place."
       ],
       "alternatePaths": [
         "Impact endpoints let the board inspect affected future bookings before a restrictive change.",
@@ -400,7 +403,8 @@
       ],
       "evidence": [
         "src/test/java/org/courtside/config/web/ConfigControllerTest.java#givenAFutureBooking_whenChangingTheTimeZone_thenItIsRejected",
-        "src/test/java/org/courtside/facility/FacilityServiceTest.java#givenAWeekScheduledForNovember_whenReadingBeforeAndAfterIt_thenEachDayKeepsItsOwnHours"
+        "src/test/java/org/courtside/facility/FacilityServiceTest.java#givenAWeekScheduledForNovember_whenReadingBeforeAndAfterIt_thenEachDayKeepsItsOwnHours",
+        "src/test/java/org/courtside/notification/ClosureMessageTest.java#givenAClosureNextToTheBooking_whenItIsWidenedOverItAndThenFurther_thenEverybodyIsToldOnce"
       ]
     },
     {
@@ -598,6 +602,8 @@
         "courtImpact",
         "bookingCardImpact",
         "openingHoursImpact",
+        "openingPeriodImpact",
+        "courtClosureImpact",
         "facilityUtilisation",
         "readStatisticsRange",
         "readUtilisationStatistics",
@@ -641,6 +647,7 @@
       ],
       "evidence": [
         "src/test/java/org/courtside/booking/web/ImpactControllerTest.java#givenACursorFromAnotherCourt_whenRequestingImpact_thenNoPositionedBookingsAreDisclosed",
+        "src/test/java/org/courtside/booking/web/ImpactControllerTest.java#givenAnUnknownClosure_whenAskingWhatChangingItWouldAffect_thenItIsNotFound",
         "src/test/java/org/courtside/booking/web/FacilityUtilisationControllerTest.java#givenTheEndPrecedesTheStart_whenReportingUtilisation_thenThePeriodViolationIsReturned",
         "src/test/java/org/courtside/operations/OperationalLogAdminControllerTest.java#givenAMemberOrMissingCsrf_whenSearching_thenAccessIsRefused",
         "src/test/java/org/courtside/reporting/web/StatisticsControllerTest.java#givenAnEndBeforeTheStart_whenReadingUtilisation_thenThePeriodOrderIsRefused",

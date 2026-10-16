@@ -443,11 +443,13 @@
       "kind": "demanding",
       "entryPoints": [
         "bookingCardImpact",
+        "courtClosureImpact",
         "courtImpact",
-        "openingHoursImpact"
+        "openingHoursImpact",
+        "openingPeriodImpact"
       ],
-      "growthDrivers": "The affected-count query grows with future allocations for the court, booking card or weekday whose configuration may change.",
-      "inputOrDataBound": "Visible identifiers are paged at 100 by the API; the accompanying affected count still spans all matching future allocations.",
+      "growthDrivers": "The affected-count query grows with future allocations for the court, booking card or weekday whose configuration may change; a season, holiday or court closure preview grows with the future allocations starting within its dates.",
+      "inputOrDataBound": "Visible identifiers are paged at 100 by the API; the accompanying affected count still spans all matching future allocations, and a season, holiday or court closure preview reads every future allocation starting within its dates once.",
       "concurrencyOrRateBound": "Admission control runs at most two impact reads at a time per instance and charges 5 tokens of the caller's request budget.",
       "executionModel": "Interactive impact previews synchronously execute one count and one bounded identifier page; announcement pages deliberately omit the count query.",
       "failureBehavior": "Unknown resources and invalid page sizes return typed failures; a query failure produces no configuration mutation because impact operations are read-only.",
@@ -459,6 +461,7 @@
       "evidence": [
         "src/test/java/org/courtside/booking/internal/ImpactServicePageTest.java#givenAnAnnouncementPage_whenReadingIt_thenItOmitsTheInteractiveCountQuery",
         "src/test/java/org/courtside/booking/internal/ImpactServicePageTest.java#givenAnInteractivePreview_whenReadingIt_thenItStillComputesTheAffectedCount",
+        "src/test/java/org/courtside/booking/internal/AvailabilityEntryImpactTest.java#givenAStoredClosureOverTheBooking_whenPreviewingItWidened_thenTheBookingIsNotCountedAgain",
         "src/test/java/org/courtside/shared/web/AdmissionPlanTest.java#whenLoadingTheShippedPlan_thenEveryDemandingClassHasItsDecidedCostAndBulkhead"
       ]
     },
@@ -489,6 +492,8 @@
       "entryPoints": [
         "BookingMailer#on(BookingConfirmed)",
         "CancellationMailer#on(BookingCancelled)",
+        "ClosureAnnouncements#on(AvailabilityChange.ClosureStored)",
+        "ClosureAnnouncements#on(AvailabilityChange.PeriodStored)",
         "ClosureAnnouncements#on(CardEvent.BookingCardAvailabilityChanged)",
         "ClosureAnnouncements#on(FacilityEvent.CourtAvailabilityChanged)",
         "ClosureAnnouncements#on(FacilityEvent.OpeningHoursClosed)",
@@ -509,7 +514,7 @@
         "WaitlistMailer#on(WaitlistOffered)"
       ],
       "growthDrivers": "Mail work fans out with booking participants, reminders, cancellations, series summaries, series changes and displaced future bookings; every fanned-out message is one stored outbox row, and relay latency holds an outbox worker for one handover.",
-      "inputOrDataBound": "A booking has at most twenty participant positions, closure discovery pages by 100, a queued row carries identifiers only and at most the 200 occurrence ids a series can hold, and each SMTP connect and read wait stops after ten seconds.",
+      "inputOrDataBound": "A booking has at most twenty participant positions, closure discovery pages by 100 and a stored season, holiday or court closure reads the future allocations within its dates once, a queued row carries identifiers only and at most the 200 occurrence ids a series can hold, and each SMTP connect and read wait stops after ten seconds.",
       "concurrencyOrRateBound": "Two outbox workers hand messages over, each holding one database connection while it composes and sends; a wake-up beyond one pending pass is discarded because that pass finds its row. Closure announcements use at most two threads and a queue of 100 with caller-run backpressure.",
       "executionModel": "A mail listener runs before commit inside the publishing transaction and only stores a queued message_record row, so the row commits with the change or not at all. The outbox workers claim due rows with FOR UPDATE SKIP LOCKED under a five-minute lease, then lock the row, compose, hand over and record the outcome in one transaction. A scheduled pass every five seconds resumes what a restart or a retry left due. Closure announcements run after commit through the publication registry, and each closure page runs in a new transaction outside the originating mutation.",
       "failureBehavior": "A transport failure reschedules the row after 15 seconds and then gaps three times as long, and fails it on the sixth attempt; a refused recipient, a vanished booking, a cancelled booking other than the one a cancellation or release notice announces, a series with no occurrence left, a reminder past its start or an unreachable recipient settles it at once with its reason. A queue insert that fails rolls the originating change back. No message leaves the outbox without a settled row.",

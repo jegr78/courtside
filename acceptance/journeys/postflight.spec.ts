@@ -8,7 +8,7 @@ import { sweep } from "../lib/sweep";
 import { clearWeekend } from "../lib/weekend";
 import { canSignIn, restoreDisposable } from "../lib/disposable";
 import { config, disposables, PASSWORD, runPath } from "../lib/context";
-import { attendanceErasureSql, deactivationLeftover, foreignWordings, removalPath, waitlistErasureSql, welcomeErasureSql } from "../lib/core.mjs";
+import { attendanceErasureSql, bookingsBeyondWindow, deactivationLeftover, foreignWordings, removalPath, waitlistErasureSql, welcomeErasureSql } from "../lib/core.mjs";
 import { personaUsernames } from "../lib/attendance";
 import { erase } from "../lib/erasure";
 import { leaveWaitlist, MEMBERS, openWaitlistEntries } from "../lib/waitlist";
@@ -22,8 +22,9 @@ test("when the ledger is replayed, then the window holds no booking of this run"
   const ledgerIds = new Set(readLedger().map((e) => e.id));
   const before = Object.fromEntries(await Promise.all(lanePlan().days.map(async (d) => [d, await (await page.request.get(`/api/bookings?date=${d}`)).json()])));
   const open = lanePlan().days.flatMap((d) => [...ids(before[d])].filter((id) => ledgerIds.has(id!)).map((id) => ({ date: d, id })));
-  const outcome = dry ? [] : await replay(page.request, await xsrf(page), readLedger().filter((e) => open.some((o) => o.id === e.id) || e.kind === "series" || e.kind === "opening-week"
-    || e.kind === "opening-period" || e.kind === "court-closure"));
+  const beyond = new Set((bookingsBeyondWindow(readLedger(), lanePlan().days) as { id: string }[]).map((e) => e.id));
+  const outcome = dry ? [] : await replay(page.request, await xsrf(page), readLedger().filter((e) => open.some((o) => o.id === e.id) || beyond.has(e.id)
+    || e.kind === "series" || e.kind === "opening-week" || e.kind === "opening-period" || e.kind === "court-closure"));
   const baseline = JSON.parse(readFileSync(runPath("baseline.json"), "utf8")).days;
   const diff = [];
   for (const date of lanePlan().days) {

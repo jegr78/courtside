@@ -503,7 +503,12 @@ ended is read-only. This is a deliberate exception to correcting whatever a club
 before today keep the hours that governed them, so statistics and the audit trail stay true. A
 board corrects a running entry by ending it yesterday and adding a new one from today.
 Bookings already on a day that a new entry closes stay; the opening-hours rule refuses every booking
-written or moved after it, a closed court with `booking.rule.openingHours.courtClosed`. Utilisation
+written or moved after it, a closed court with `booking.rule.openingHours.courtClosed`. Storing an
+entry tells the people in each future booking it newly leaves outside the hours or on a closed
+court, naming the kind of entry and never its name; a booking the stored version or another entry
+already closed is not announced again, so widening an entry tells nobody twice. The impact preview
+answers the same question for an entry before it is stored, and the availability form shows its
+count while the board edits an entry, saying nothing while the count is zero. Utilisation
 counts open time from the hours that governed each day and does not subtract court closures from
 capacity.
 

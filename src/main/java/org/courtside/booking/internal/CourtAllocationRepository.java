@@ -251,6 +251,16 @@ public interface CourtAllocationRepository extends JpaRepository<CourtAllocation
                                             @Param("closesAt") LocalTime closesAt);
 
     @Query("""
+            SELECT new org.courtside.booking.internal.BookedSlot(a.booking.id, a.courtId, a.startsAt, a.endsAt)
+            FROM CourtAllocation a
+            WHERE a.status = org.courtside.booking.BookingStatus.CONFIRMED
+              AND a.startsAt >= :from
+              AND a.startsAt < :until
+            ORDER BY a.startsAt, a.booking.id, a.courtId
+            """)
+    List<BookedSlot> findConfirmedSlotsStartingBetween(@Param("from") Instant from, @Param("until") Instant until);
+
+    @Query("""
             SELECT a FROM CourtAllocation a
             JOIN FETCH a.booking b
             WHERE b.id IN :bookingIds

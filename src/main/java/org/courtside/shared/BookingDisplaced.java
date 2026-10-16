@@ -15,7 +15,10 @@ public record BookingDisplaced(UUID bookingId, Closure closure) implements Domai
         COURT_OUT_OF_SERVICE,
         CARD_OUT_OF_SERVICE,
         DAY_CLOSED,
-        HOURS_NARROWED
+        HOURS_NARROWED,
+        HOLIDAY,
+        SEASON,
+        COURT_CLOSED
     }
 
     @Override

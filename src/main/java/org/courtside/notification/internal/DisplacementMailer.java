@@ -74,6 +74,9 @@ class DisplacementMailer implements MessageComposer {
             case CARD_OUT_OF_SERVICE -> "card";
             case DAY_CLOSED -> "day";
             case HOURS_NARROWED -> "hours";
+            case HOLIDAY -> "holiday";
+            case SEASON -> "season";
+            case COURT_CLOSED -> "courtClosed";
         };
     }
 }

@@ -12,7 +12,7 @@ public class OpeningWeekIncompleteException extends CodedDomainFailure {
             "opening-week-incomplete", HttpStatus.BAD_REQUEST,
             "The week is incomplete", "A week names every weekday exactly once");
 
-    OpeningWeekIncompleteException() {
+    public OpeningWeekIncompleteException() {
         super("facility.openingHours.weekIncomplete", Map.of());
     }
 

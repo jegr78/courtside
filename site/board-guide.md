@@ -213,6 +213,12 @@ Buchungen, die schon auf einem gesperrten Tag liegen, bleiben bestehen. Neue Buc
 Verschiebungen dorthin lehnt Courtside ab. Im Platzplan steht ein Feiertag mit seinem Namen, ein
 gesperrter Platz zeigt *Gesperrt*.
 
+Trifft ein Eintrag bestehende Buchungen, nennt das Formular ihre Zahl, bevor du speicherst. Beim
+Speichern bekommen Bucher und Mitspieler eine Nachricht in Courtside und per Mail. Sie erfahren den
+Tag, den Platz und ob ein Feiertag, eine Saison oder eine Sperrung der Grund ist, nicht aber den
+Namen, den du dem Eintrag gegeben hast. Wer schon benachrichtigt wurde, hört beim Verlängern
+desselben Eintrags nichts zum zweiten Mal.
+
 ![Weihnachtspause als geschlossener Feiertag und eine Woche Sperrung für einen Platz.](screenshots/de/availability.png)
 
 ## Anlage → Buchungskarten
