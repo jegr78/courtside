@@ -464,8 +464,26 @@ court plan, the opening-hours rule, utilisation statistics and the impact previe
 version in force on the day they evaluate. Members whose bookings a change leaves outside the hours
 are told about the bookings from that day up to the next scheduled version.
 
-Grid changes are refused when active or future bookings, or the opening hours in force today or
-scheduled after it, no longer align. Time-zone changes are refused while a confirmed booking has not
+Seasons and holidays replace the weekly hours for a range of days. Each is a weekly template with a
+first and a last day; a holiday holds the same window, or none, on every weekday. On a given day a
+holiday governs first, then a season, then the version in force. Seasons do not overlap each other
+and holidays do not overlap each other, which an exclusion constraint on `opening_period` enforces;
+a holiday inside a season is the intended case. A court closure takes one court out of the plan for
+whole days while the other courts keep the hours of the day, and closures of one court do not
+overlap, enforced the same way.
+
+These entries are correctable while they lie ahead: an entry starts today or later, and until it
+starts every field can change and it can be removed. Once it has started its first day and its hours
+are fixed and it cannot be removed, but it can be renamed and ended as early as yesterday. An entry
+that has ended is read-only. This is the one exception to correcting whatever a club entered: the
+days before today keep the hours that governed them, so statistics and the audit trail stay true.
+Bookings already on a day that a new entry closes stay; the opening-hours rule refuses every booking
+written or moved after it, a closed court with `booking.rule.openingHours.courtClosed`. Utilisation
+counts open time from the hours that governed each day and does not subtract court closures from
+capacity.
+
+Grid changes are refused when active or future bookings, or the opening hours, seasons and holidays
+in force today or scheduled after it, no longer align. Time-zone changes are refused while a confirmed booking has not
 ended. These writes serialize with booking and opening-hours changes through the club configuration
 row.
 

@@ -15,7 +15,8 @@ Buchen wählst du dort *Anmelden*.
 4. Lies in der Legende, ob ein Zeitraum **Frei**, **Belegt**, **Deine Buchung**,
    **Nicht verfügbar** oder **Vergangen** ist.
 
-An geschlossenen Tagen zeigt Courtside kein Raster. Liegt eine Buchung außerhalb der Öffnungszeiten,
+An geschlossenen Tagen zeigt Courtside kein Raster, an einem Feiertag steht dessen Name darüber.
+Ein gesperrter Platz zeigt in seiner Spalte *Gesperrt*. Liegt eine Buchung außerhalb der Öffnungszeiten,
 etwa weil der Verein sie später geändert hat, bleibt sie im Plan sichtbar. Die übrigen Plätze in
 diesen Zeilen stehen auf *Geschlossen*. Bei fremden Buchungen siehst du entweder die
 Buchungsart oder den neutralen Text *Belegt*. Das stellt der Verein für jede Buchungsart ein. Die
@@ -202,6 +203,7 @@ Verstöße gleichzeitig am jeweiligen Feld an.
 |---|---|
 | An diesem Tag ist die Anlage geschlossen | Für den Tag ist keine Öffnungszeit hinterlegt |
 | Buchungen sind nur zwischen zwei Uhrzeiten möglich | Die Buchung liegt außerhalb der Öffnungszeit |
+| Platz 2 ist bis zu einem Datum gesperrt | Der Verein hat den Platz an diesem Tag gesperrt |
 | Mit deiner Mitgliedsart kannst du nur zwischen zwei Uhrzeiten buchen | Deine Mitgliedsart darf nur einen Teil der Öffnungszeit buchen |
 | Buchungen beginnen im Minutenraster | Der Beginn passt nicht in das Raster des Vereins |
 | Die Dauer muss ein Vielfaches der Rasterlänge sein | Die Dauer passt nicht in das Raster |

@@ -15,7 +15,8 @@ before you can book.
 4. Use the legend to identify **Available**, **Occupied**, **Your booking**, **Unavailable** and
    **Past** periods.
 
-Courtside does not show a grid on days when the club is closed. A booking outside the opening
+Courtside does not show a grid on days when the club is closed; on a holiday its name appears
+above the plan. A closed court reads *Court closed* in its column. A booking outside the opening
 hours, for example after the club changed them, stays visible in the plan. The other courts in its
 rows read *Closed*. Another member's booking displays
 either its booking type or the neutral label *Occupied*. The club chooses this for each booking
@@ -194,6 +195,7 @@ violations at once next to the relevant fields.
 |---|---|
 | The facility is closed on this day | The day has no opening hours |
 | Bookings are only possible between two times | The booking is outside the opening hours |
+| Court 2 is closed until a date | The club has closed the court on that day |
 | Your membership type may book only between two times | Your membership type may book only part of the opening hours |
 | Bookings start on the minute grid | The start does not match the club's grid |
 | The duration must be a multiple of the grid | The duration does not match the grid |
