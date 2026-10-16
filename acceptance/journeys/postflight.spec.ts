@@ -8,7 +8,8 @@ import { sweep } from "../lib/sweep";
 import { clearWeekend } from "../lib/weekend";
 import { canSignIn, restoreDisposable } from "../lib/disposable";
 import { config, disposables, PASSWORD, runPath } from "../lib/context";
-import { deactivationLeftover, foreignWordings, removalPath, waitlistErasureSql, welcomeErasureSql } from "../lib/core.mjs";
+import { attendanceErasureSql, deactivationLeftover, foreignWordings, removalPath, waitlistErasureSql, welcomeErasureSql } from "../lib/core.mjs";
+import { personaUsernames } from "../lib/attendance";
 import { erase } from "../lib/erasure";
 import { leaveWaitlist, MEMBERS, openWaitlistEntries } from "../lib/waitlist";
 
@@ -76,13 +77,15 @@ test("when the run ends, then no reserved slot holds a booking of this run, no w
   }));
   const erasure = erase(welcomeErasureSql(accounts.map((account) => account.personId)), "erase-welcome-accounts.sql");
   const waitlistErasure = erase(waitlistErasureSql(MEMBERS.map((key) => config.personas[key])), "erase-waitlist-entries.sql");
+  const attendanceErasure = erase(attendanceErasureSql(personaUsernames()), "erase-attendance.sql");
   const queued = Object.fromEntries(await Promise.all(MEMBERS.map(async (key) => [key, (await openWaitlistEntries(key, allSlots())).length])));
-  writeFileSync(runPath("postflight.json"), JSON.stringify({ removed, left, foreign, weeks: weeks.removed, foreignWeeks: weeks.foreign, queued, accounts, erasure, waitlistErasure }, null, 2));
+  writeFileSync(runPath("postflight.json"), JSON.stringify({ removed, left, foreign, weeks: weeks.removed, foreignWeeks: weeks.foreign, queued, accounts, erasure, waitlistErasure, attendanceErasure }, null, 2));
   // then
   expect(left, "no reserved slot holds a booking of this run").toEqual([]);
   expect(queued, "no member is left waiting on a waitlist").toEqual({ memberA: 0, memberB: 0, memberC: 0 });
   expect(deactivationLeftover(accounts), "every account this run created is deactivated").toEqual([]);
   if (erasure.attempted) expect(erasure.erased, `every welcome account this run created is erased (exit ${erasure.exit})`).toBe(accounts.length);
   if (waitlistErasure.attempted) expect(waitlistErasure.exit, "the members' closed waitlist entries are erased").toBe(0);
+  if (attendanceErasure.attempted) expect(attendanceErasure.exit, "the personas' recorded attendance and seeded no-shows are erased").toBe(0);
   for (const [index, username] of disposables.entries()) expect(await canSignIn(PASSWORD, username), `disposable ${index + 1} signs in`).toBe(true);
 });

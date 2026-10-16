@@ -845,7 +845,7 @@ test("given an erasure target, when parsed, then host and container are kept, an
   assert.equal(field({ ...valid(), erasure: { ssh: "ops-host", container: "club-db-1", user: "root" } }), "erasure.user");
 });
 
-import { deactivationLeftover, erasureCommand, erasedCount, waitlistErasureSql, welcomeErasureSql } from "../acceptance/lib/core.mjs";
+import { attendanceErasureSql, deactivationLeftover, erasureCommand, erasedCount, noShowLimitOf, NO_SHOW_SEED_NOTE, seededBookingId, startedBookingSql, violationCodes, waitlistErasureSql, welcomeErasureSql } from "../acceptance/lib/core.mjs";
 
 test("given the persons a run recorded, when the erasure is written, then it names exactly them and erases only a deactivated welcome account nothing depends on", () => {
   // given
@@ -877,6 +877,44 @@ test("given the member personas, when the waitlist erasure is written, then it r
   assert.equal(erasedCount("erased 7\n"), 7, "the count line has the shape the postflight reads");
   assert.throws(() => waitlistErasureSql(["x'); DELETE FROM booking; --"]), /not a username/);
   assert.equal(waitlistErasureSql([]), null, "no persona, no statement");
+});
+
+test("given the disposable member, when a started booking is seeded, then it is one confirmed night-time booking of theirs marked as the seed", () => {
+  // when
+  const sql = startedBookingSql("acceptance.disposable-1", 42);
+  // then
+  assert.match(sql, /^BEGIN;[\s\S]*COMMIT;\s*$/, "the seed is one transaction");
+  assert.ok(sql.includes("ua.username IN ('acceptance.disposable-1')"), "the seed belongs to exactly the persona");
+  assert.ok(sql.includes("time '02:00' + interval '42 minutes'"), "the seed lies at night, two days back");
+  assert.ok(sql.includes(`'${NO_SHOW_SEED_NOTE}'`), "the seed carries the note the erasure removes it by");
+  assert.equal(seededBookingId("seeded 3f2b1c4d-0000-4000-8000-000000000001\n"), "3f2b1c4d-0000-4000-8000-000000000001", "the id line has the shape the journey reads");
+  assert.equal(seededBookingId("ERROR"), null);
+  assert.throws(() => startedBookingSql("x'); DELETE FROM booking; --", 0), /not a username/);
+  assert.throws(() => startedBookingSql("acceptance.disposable-1", 171), /not a minute offset/);
+});
+
+test("given the personas, when the attendance erasure is written, then it removes their recorded attendance and only the bookings the run seeded", () => {
+  // when
+  const sql = attendanceErasureSql(["acceptance.member-a", "acceptance.disposable-1"]);
+  // then
+  assert.match(sql, /^BEGIN;[\s\S]*COMMIT;\s*$/, "the erasure is one transaction");
+  assert.ok(sql.includes("ua.username IN ('acceptance.member-a', 'acceptance.disposable-1')"), "the erasure names exactly the personas");
+  assert.match(sql, /DELETE FROM booking_attendance WHERE booking_id IN/);
+  assert.match(sql, /DELETE FROM booking_release WHERE booking_id IN/);
+  assert.ok(sql.includes(`DELETE FROM booking WHERE id IN (SELECT id FROM held) AND note = '${NO_SHOW_SEED_NOTE}'`), "a persona's own booking stays");
+  assert.equal(erasedCount(sql.includes("SELECT 'erased ' || count(*) FROM erased") ? "erased 1" : ""), 1, "the count line has the shape the postflight reads");
+  assert.equal(attendanceErasureSql([]), null, "no persona, no statement");
+  assert.throws(() => attendanceErasureSql(["x'); DELETE FROM booking; --"]), /not a username/);
+});
+
+test("given a rule set, when its no-show limit is read, then only NO_SHOW_LIMIT answers", () => {
+  // when / then
+  assert.deepEqual(noShowLimitOf([{ ruleType: "ADVANCE_WINDOW", params: { maxDays: 7 } }, { ruleType: "NO_SHOW_LIMIT", params: { maxNoShows: 1, windowDays: 30 } }]),
+    { maxNoShows: 1, windowDays: 30 });
+  assert.equal(noShowLimitOf([{ ruleType: "ADVANCE_WINDOW", params: { maxDays: 7 } }]), null);
+  assert.equal(noShowLimitOf(undefined), null);
+  assert.deepEqual(violationCodes({ violations: [{ code: "booking.rule.startsInPast" }] }), ["booking.rule.startsInPast"]);
+  assert.deepEqual(violationCodes({}), []);
 });
 
 test("given an erasure target, when the command is built, then ssh runs psql in the named container and the statement travels on standard input", () => {

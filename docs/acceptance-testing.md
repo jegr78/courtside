@@ -62,6 +62,15 @@ created.
   Without both rules it is reported as not checkable. The preflight refuses a run in which a lane
   persona's category limits the weekly hours or asks for a booking longer than a lane hour, because
   a run books several lanes per persona in one week.
+- For the no-show journey, attendance switched on in the deadlines page and a rule set for the
+  disposable member of desktop-firefox that carries `NO_SHOW_LIMIT` with one no-show, for example
+  over 30 days, and `erasure` configured. The product writes no booking in the past, so the journey
+  seeds one started booking of that member at night two days back over the erasure path, records a
+  no-show through the API, expects the next booking to be refused with
+  `booking.rule.noShowLimit.reached`, lifts the no-show on the person page and expects the refusal
+  gone. The preflight checks all three and refuses the run without them. Preflight and postflight
+  erase the attendance recorded for every persona and the bookings the journey seeded, so a lifted
+  no-show never stays behind and repeated runs never accumulate one.
 - For the welcome, `welcomeAccounts`. The journey creates one account on desktop-chrome to read
   its welcome and deactivates it again. Courtside has no erasure path yet, so with `erasure` the
   postflight removes that account and its person in the database: over `ssh` it runs `psql` in the

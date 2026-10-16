@@ -7,8 +7,9 @@ import { allSlots, instantOf, lanePlan } from "../lib/lanes";
 import { availabilityConflicts, weekendConflicts } from "../config/lanes.mjs";
 import { config, disposables, PASSWORD, runPath, type PersonaKey } from "../lib/context";
 import { mailAvailable } from "../lib/mail";
-import { profilesOf, resetQuota } from "../config/disposables.mjs";
-import { foreignWordings, laneLimitConflicts, leavesBookingHours, occupying, waitlistErasureSql } from "../lib/core.mjs";
+import { DISPOSABLE_PROFILES, disposableFor, profilesOf, resetQuota } from "../config/disposables.mjs";
+import { attendanceErasureSql, foreignWordings, laneLimitConflicts, leavesBookingHours, occupying, waitlistErasureSql } from "../lib/core.mjs";
+import { noShowLimitFor, personaUsernames } from "../lib/attendance";
 import { readLedger } from "../lib/ledger";
 import { erase } from "../lib/erasure";
 import { PARTNER_MARKER } from "../lib/journey";
@@ -29,6 +30,14 @@ test("when the environment is checked before a run, then every precondition hold
     checks.waitlistErasure = checks.version === config.expectedVersion
       ? erase(waitlistErasureSql(MEMBERS.map((key) => config.personas[key])), "erase-waitlist-entries-before.sql")
       : { attempted: false };
+    checks.attendanceErasure = checks.version === config.expectedVersion
+      ? erase(attendanceErasureSql(personaUsernames()), "erase-attendance-before.sql")
+      : { attempted: false };
+    checks.attendanceRecorded = (await (await admin.get("/api/admin/attendance-policy")).json() as { enabled?: boolean }).enabled === true;
+    const noShowWalker = disposableFor(DISPOSABLE_PROFILES[0], disposables);
+    const noShowPerson = (await readRoster(admin)).find((entry) => entry.username === noShowWalker)?.personId;
+    checks.disposableNoShowLimit = noShowPerson ? await noShowLimitFor(admin, noShowPerson) : null;
+    checks.noShowSeedable = config.erasure !== undefined;
     const courts = await (await admin.get("/api/public/courts")).json() as { id: string; number: number }[];
     const days = new Map<string, unknown>();
     for (const slot of allSlots()) if (!days.has(slot.date)) days.set(slot.date, await (await admin.get(`/api/bookings?date=${slot.date}`)).json());
@@ -92,6 +101,11 @@ test("when the environment is checked before a run, then every precondition hold
   expect.soft(checks.occupiedSlots, "PRECONDITION: every reserved slot is free").toEqual([]);
   const waitlistErasure = checks.waitlistErasure as { attempted: boolean; exit?: number };
   if (waitlistErasure.attempted) expect.soft(waitlistErasure.exit, "PRECONDITION: the members' closed waitlist entries are erased").toBe(0);
+  const attendanceErasure = checks.attendanceErasure as { attempted: boolean; exit?: number };
+  if (attendanceErasure.attempted) expect.soft(attendanceErasure.exit, "PRECONDITION: the personas' recorded attendance and seeded no-shows are erased").toBe(0);
+  expect.soft(checks.attendanceRecorded, "PRECONDITION: the club records attendance (Fristen und Erinnerungen, Anwesenheit erfassen)").toBe(true);
+  expect.soft((checks.disposableNoShowLimit as { maxNoShows?: number } | null)?.maxNoShows, "PRECONDITION: the rule set of the disposable member who walks the no-show journey carries NO_SHOW_LIMIT with one no-show").toBe(1);
+  expect.soft(checks.noShowSeedable, "PRECONDITION: an erasure path is configured, which seeds the started booking a no-show needs").toBe(true);
   if (!config.notifyClubBookings) expect.soft(checks.weekendConflicts, "PRECONDITION: no club booking lies before a Saturday later opening or on the window's Sunday").toEqual([]);
   for (const [key, count] of Object.entries(checks.openBookings as Record<string, number>)) expect.soft(count, `PRECONDITION: ${key} has at most 6 open bookings`).toBeLessThanOrEqual(6);
   expect.soft(checks.laneLimitConflicts, "PRECONDITION: no lane persona's category limits the weekly hours or asks for a booking longer than a lane").toEqual([]);

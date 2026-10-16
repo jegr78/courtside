@@ -153,6 +153,62 @@ COMMIT;
 `;
 }
 
+export const NO_SHOW_SEED_NOTE = "acceptance no-show seed";
+const MEMBER_CARD = "11111111-1111-1111-1111-111111111111";
+
+const usernameList = (usernames) => {
+  for (const name of usernames) if (!USERNAME.test(name)) throw new Error(`not a username: ${name}`);
+  return usernames.map((name) => `'${name}'`).join(", ");
+};
+
+// The product writes no booking in the past, so the started booking a no-show needs is seeded at night two days ago.
+export function startedBookingSql(username, minuteOffset) {
+  const names = usernameList([username]);
+  if (!Number.isInteger(minuteOffset) || minuteOffset < 0 || minuteOffset > 170) throw new Error(`not a minute offset: ${minuteOffset}`);
+  return `BEGIN;
+CREATE TEMP TABLE seeded ON COMMIT DROP AS
+  SELECT gen_random_uuid() AS id, ua.id AS account_id,
+         ((current_date - 2)::timestamp + time '02:00' + interval '${minuteOffset} minutes')
+           AT TIME ZONE (SELECT time_zone FROM club_config LIMIT 1) AS starts_at
+  FROM user_account ua WHERE ua.username IN (${names});
+INSERT INTO booking (id, card_id, status, booked_by, note, created_at)
+  SELECT id, '${MEMBER_CARD}', 'CONFIRMED', account_id, '${NO_SHOW_SEED_NOTE}', starts_at - interval '1 day' FROM seeded;
+INSERT INTO court_allocation (id, booking_id, court_id, starts_at, ends_at, status)
+  SELECT gen_random_uuid(), id, (SELECT id FROM court WHERE active ORDER BY number LIMIT 1), starts_at, starts_at + interval '5 minutes', 'CONFIRMED'
+  FROM seeded;
+SELECT 'seeded ' || id FROM seeded;
+COMMIT;
+`;
+}
+
+export function seededBookingId(output) {
+  return /^seeded ([0-9a-f-]{36})$/m.exec(output)?.[1] ?? null;
+}
+
+// Lifting a no-show keeps it recorded, so a run removes what it recorded and the bookings it seeded.
+export function attendanceErasureSql(usernames) {
+  if (usernames.length === 0) return null;
+  const names = usernameList(usernames);
+  return `BEGIN;
+CREATE TEMP TABLE held ON COMMIT DROP AS
+  SELECT b.id FROM booking b JOIN user_account ua ON ua.id = b.booked_by WHERE ua.username IN (${names});
+CREATE TEMP TABLE erased ON COMMIT DROP AS
+  SELECT booking_id FROM booking_attendance WHERE booking_id IN (SELECT id FROM held);
+DELETE FROM booking_attendance WHERE booking_id IN (SELECT booking_id FROM erased);
+DELETE FROM booking_release WHERE booking_id IN (SELECT id FROM held);
+DELETE FROM booking WHERE id IN (SELECT id FROM held) AND note = '${NO_SHOW_SEED_NOTE}';
+SELECT 'erased ' || count(*) FROM erased;
+COMMIT;
+`;
+}
+
+export function noShowLimitOf(rules) {
+  const rule = (rules ?? []).find((candidate) => candidate.ruleType === "NO_SHOW_LIMIT");
+  return rule ? { maxNoShows: rule.params.maxNoShows, windowDays: rule.params.windowDays } : null;
+}
+
+export const violationCodes = (body) => (body?.violations ?? []).map((violation) => violation.code);
+
 // ssh hands the remote shell one string, so the command is quoted here; the container name holds no shell character.
 export function erasureCommand({ ssh, container }) {
   return ["ssh", ["-o", "BatchMode=yes", "--", ssh,
