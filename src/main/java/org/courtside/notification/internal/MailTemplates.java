@@ -8,6 +8,7 @@ import java.util.Arrays;
 import java.util.Locale;
 import java.util.Map;
 import java.util.MissingResourceException;
+import java.util.Optional;
 import java.util.ResourceBundle;
 import java.util.function.Function;
 import java.util.regex.Matcher;
@@ -34,21 +35,30 @@ class MailTemplates {
     private final MessageTemplateOverrides overrides;
 
     String render(String key, Locale locale, Map<String, String> values) {
-        return fill(key, wording(key, locale), values);
+        String shipped = shipped(key, locale);
+        return own(key, locale)
+                .map(wording -> fillOrNull(key, wording, values))
+                .orElseGet(() -> fill(key, shipped, values));
     }
 
     // A club's own wording replaces a message's subject or body; the fragments inside them stay shipped.
-    private String wording(String key, Locale locale) {
-        String language = languageOf(locale);
-        if (SUBJECTS.containsKey(key)) {
-            return overrides.of(SUBJECTS.get(key), language).map(MessageText::subject)
-                    .orElseGet(() -> shipped(key, locale));
+    // A stored wording that would not pass the board's check again never reaches a member.
+    private Optional<String> own(String key, Locale locale) {
+        MessageKind kind = SUBJECTS.containsKey(key) ? SUBJECTS.get(key) : BODIES.get(key);
+        if (kind == null) {
+            return Optional.empty();
         }
-        if (BODIES.containsKey(key)) {
-            return overrides.of(BODIES.get(key), language).map(MessageText::body)
-                    .orElseGet(() -> shipped(key, locale));
+        return overrides.of(kind, languageOf(locale))
+                .filter(text -> MessageTemplateCatalog.check(kind, text).isEmpty())
+                .map(text -> SUBJECTS.containsKey(key) ? text.subject() : text.body());
+    }
+
+    private static String fillOrNull(String key, String template, Map<String, String> values) {
+        try {
+            return fill(key, template, values);
+        } catch (IllegalStateException unfillable) {
+            return null;
         }
-        return shipped(key, locale);
     }
 
     static String languageOf(Locale locale) {

@@ -42,7 +42,7 @@ class PasswordResetCodeMailerTest {
     private final List<OutgoingMail> handedOver = new ArrayList<>();
 
     private final PasswordResetCodeMailer mailer = new PasswordResetCodeMailer(codes, accounts, club,
-            new MailTemplates(mock(MessageTemplateOverrides.class)), outbox);
+            new MailTemplates(mock(MessageTemplateOverrides.class)), new InstanceLinks(""), outbox);
 
     @Test
     void givenAMemberWrittenToInEnglish_whenTheirCodeIsSent_thenTheMessageCarriesItAndItsDeadline() {

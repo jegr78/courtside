@@ -22,6 +22,7 @@ class UsernameReminderMailer implements MessageComposer {
     private final UserAccountRepository accounts;
     private final ClubIdentity club;
     private final MailTemplates templates;
+    private final InstanceLinks links;
     private final MessageOutbox outbox;
 
     @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT, fallbackExecution = true)
@@ -43,7 +44,8 @@ class UsernameReminderMailer implements MessageComposer {
         Map<String, String> values = Map.of(
                 "clubName", club.clubName(),
                 "firstName", account.getPerson().getFirstName(),
-                "username", account.getUsername());
+                "username", account.getUsername(),
+                InstanceLinks.PLACEHOLDER, links.root());
         handOver.accept(new OutgoingMail(account.getPerson().getEmail(),
                 templates.render(key + ".subject", locale, values),
                 templates.render(key + ".body", locale, values)));
