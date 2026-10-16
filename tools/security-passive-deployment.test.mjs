@@ -683,6 +683,17 @@ test("given retained evidence naming no directive, when it is validated, then th
     assert.equal(validate(evidence), true, JSON.stringify(validate.errors));
   });
 
+test("given retained evidence that lost one of its checks, when it is read back, then the exact check list refuses it", () => {
+  // given
+  const evidence = buildPassiveDeploymentEvidence({ targetFingerprint: digest, imageDigest: digest,
+    observations: passingObservations(), requestCount: 1, zapReport: { version: "2.17.0", site: [{ alerts: [] }] } });
+  const shortened = { ...evidence, checks: evidence.checks.slice(1) };
+
+  // when / then
+  assert.doesNotThrow(() => assertPassiveDeploymentEvidence(evidence));
+  assert.throws(() => assertPassiveDeploymentEvidence(shortened), /missing required checks/);
+});
+
 const dispositions = JSON.parse(readFileSync(new URL(
   "../security/passive-alert-dispositions.json", import.meta.url)));
 const acceptances = JSON.parse(readFileSync(new URL(

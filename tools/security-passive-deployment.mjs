@@ -505,6 +505,9 @@ export function assertPassiveDeploymentEvidence(evidence) {
   if (!validateEvidence(evidence)) {
     throw new Error(`The passive assessment evidence is invalid: ${JSON.stringify(validateEvidence.errors)}`);
   }
+  if (JSON.stringify(evidence.checks.map(({ id }) => id).toSorted()) !== JSON.stringify(requiredPassiveCheckIds)) {
+    throw new Error("The passive assessment evidence is missing required checks");
+  }
   const fingerprints = new Set();
   for (const alert of evidence.zap.alerts) {
     if (alert.fingerprint !== passiveAlertFingerprint(alert.pluginId, alert.method, alert.routeTemplate)) {

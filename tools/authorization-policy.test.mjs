@@ -10,6 +10,7 @@ import {
   renderAuthorizationPolicy,
   validateAuthorizationPolicy
 } from "./authorization-policy.mjs";
+import { contractOperationIds } from "./contract-operations.mjs";
 
 const require = createRequire(new URL("../frontend/package.json", import.meta.url));
 const YAML = require("yaml");
@@ -51,7 +52,7 @@ test("given the shipped API and production authorization paths, when reading the
   const result = validate(policy);
 
   // then
-  assert.equal(result.operationCount, 158);
+  assert.equal(result.operationCount, contractOperationIds(api).length);
   assert.equal(result.protectedFieldCount > 0, true);
   assert.equal(result.decisionCount > 0, true);
 });

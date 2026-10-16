@@ -31,6 +31,7 @@ import {
   planAuthorizationRequests,
   runAuthorizationAssessment
 } from "./security-authorization.mjs";
+import { contractOperationIds } from "./contract-operations.mjs";
 
 const require = createRequire(new URL("../frontend/package.json", import.meta.url));
 const yaml = require("js-yaml");
@@ -41,8 +42,7 @@ test("given the OpenAPI contract, when generating authorization cases, then ever
   const matrix = buildOperationAuthorizationMatrix(api);
 
   // then
-  assert.equal(matrix.length, 158);
-  assert.equal(new Set(matrix.map((entry) => entry.operationId)).size, 158);
+  assert.deepEqual(matrix.map((entry) => entry.operationId).toSorted(), contractOperationIds(api));
   assert.deepEqual(Object.keys(matrix[0].expectations).toSorted(), [...authorizationActors].toSorted());
   assert.ok(matrix.every((entry) => Object.keys(entry.expectations).length === authorizationActors.length));
   assert.deepEqual(matrix.find((entry) => entry.operationId === "getBookingEligibility").expectations, {
@@ -883,7 +883,9 @@ test("given admission refusals during identity checks, when executing them, then
     () => ({ method: "GET", path: "/api/admin/roster?limit=1", headers: {} }));
 
   // then
-  assert.equal(checks.length, 9);
+  assert.deepEqual(checks.map(({ actor }) => actor).toSorted(), [
+    ...authorizationActors.filter((actor) => !["ANONYMOUS", "INITIAL_PASSWORD"].includes(actor)),
+    "MANAGER_COMBINATION_1", "MANAGER_COMBINATION_2"].toSorted());
   for (const check of checks) {
     assert.equal(check.outcome, "incomplete", `${check.actor} was refused before its boundary answered`);
     assert.equal(check.observation, "admission-refused");

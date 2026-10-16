@@ -23,13 +23,19 @@ import org.springframework.web.servlet.HandlerMapping;
 import org.springframework.web.servlet.mvc.method.RequestMappingInfo;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 import org.springframework.web.util.ServletRequestPathUtils;
+import org.yaml.snakeyaml.Yaml;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.anonymous;
@@ -43,7 +49,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 class AdminSurfaceTest extends AbstractIntegrationTest {
 
-    private static final int KNOWN_PRIVILEGED_ENDPOINT_COUNT = 103;
+    private static final String API_DOCUMENT = "/api/openapi.yaml";
+
+    private static final Set<String> HTTP_METHODS =
+            Set.of("get", "put", "post", "delete", "patch", "options", "head", "trace");
 
     private static final String CATCH_ALL_UUID = "11111111-1111-1111-1111-111111111111";
 
@@ -168,12 +177,15 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
     void givenAMember_whenCallingEveryAdminEndpoint_thenEveryOneOfThemIsForbidden() {
         // given
         List<MappedEndpoint> endpoints = endpointsMatching(AdminSurfaceTest::isPrivileged);
-        assertThat(endpoints)
-                .as("admin endpoint discovery is expected to match the known count of %d exactly; "
-                        + "a mismatch means discovery broke, an endpoint was added, or an endpoint "
-                        + "was removed — in every case this constant must be updated to match once "
-                        + "the cause is confirmed", KNOWN_PRIVILEGED_ENDPOINT_COUNT)
-                .hasSize(KNOWN_PRIVILEGED_ENDPOINT_COUNT);
+        TreeSet<String> discovered = endpoints.stream()
+                .map(endpoint -> endpoint.method().name() + " " + endpoint.pattern())
+                .collect(Collectors.toCollection(TreeSet::new));
+        assertThat(discovered)
+                .as("admin endpoint discovery must find exactly the privileged operations %s declares;"
+                        + " a difference means discovery broke or an endpoint is served without being in"
+                        + " the contract", API_DOCUMENT)
+                .isNotEmpty()
+                .isEqualTo(contractPrivilegedOperations());
 
         // when
         List<String> misrouted = new ArrayList<>();
@@ -478,6 +490,25 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
                 .filter(Objects::nonNull)
                 .flatMap(condition -> condition.getPatternValues().stream())
                 .toList();
+    }
+
+    @SuppressWarnings("unchecked")
+    private static TreeSet<String> contractPrivilegedOperations() {
+        Map<String, Object> document;
+        try (InputStream in = AdminSurfaceTest.class.getResourceAsStream(API_DOCUMENT)) {
+            assertThat(in).as("the API document must be on the classpath at %s", API_DOCUMENT).isNotNull();
+            document = new Yaml().load(in);
+        } catch (IOException closingFailed) {
+            throw new UncheckedIOException(closingFailed);
+        }
+        TreeSet<String> operations = new TreeSet<>();
+        ((Map<String, Map<String, Object>>) document.get("paths")).forEach((path, item) -> {
+            if (isPrivileged(path)) {
+                item.keySet().stream().filter(HTTP_METHODS::contains)
+                        .forEach(method -> operations.add(method.toUpperCase() + " " + path));
+            }
+        });
+        return operations;
     }
 
     private static boolean isPrivileged(String pattern) {

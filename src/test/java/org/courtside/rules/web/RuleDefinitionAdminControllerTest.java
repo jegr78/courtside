@@ -9,6 +9,7 @@ import org.courtside.shared.OpeningWindow;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.courtside.member.testfixture.MemberTestFixture;
+import org.courtside.rules.RuleType;
 import org.courtside.shared.TimeSlot;
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.BeforeEach;
@@ -28,6 +29,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.Arrays;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -157,7 +159,8 @@ class RuleDefinitionAdminControllerTest extends AbstractIntegrationTest {
         // when / then
         mockMvc.perform(get("/api/admin/rule-types"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(11))
+                .andExpect(jsonPath("$[*].ruleType").value(Matchers.containsInAnyOrder(
+                        Arrays.stream(RuleType.values()).map(Enum::name).toArray())))
                 .andExpect(jsonPath("$[?(@.ruleType == 'NO_SHOW_LIMIT')].parameters[*].name")
                         .value(Matchers.contains("maxNoShows", "windowDays")))
                 .andExpect(jsonPath("$[?(@.ruleType == 'NO_SHOW_LIMIT')].parameters[1].maximum").value(365))

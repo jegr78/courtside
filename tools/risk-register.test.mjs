@@ -18,11 +18,10 @@ test("given the maintained risks, when validating the register, then every risk 
   const result = validateRiskRegister(register, { catalog, exceptions });
 
   // then
-  assert.equal(result.riskCount, 18);
-  assert.deepEqual(result.riskIds, [
-    "AD-1", "AD-2", "BK-1", "BK-2", "BK-3", "BK-4", "ID-1", "ID-2", "ID-3",
-    "MB-1", "MB-2", "OP-1", "OP-2", "OP-3", "OP-4", "UI-1", "UI-2", "UI-3"
-  ]);
+  const maintained = register.areas.flatMap((area) => area.risks.map(({ id }) => id)).toSorted();
+  assert.ok(maintained.length > 0, "the register keeps at least one risk");
+  assert.equal(result.riskCount, maintained.length);
+  assert.deepEqual(result.riskIds.toSorted(), maintained);
 });
 
 test("given malformed governance data, when validating, then the register fails closed", () => {

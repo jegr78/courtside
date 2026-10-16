@@ -18,8 +18,7 @@
     },
     "checks": {
       "type": "array",
-      "minItems": 33,
-      "maxItems": 34,
+      "minItems": 1,
       "items": {
         "type": "object",
         "additionalProperties": false,
