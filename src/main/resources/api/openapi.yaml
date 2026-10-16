@@ -132,6 +132,8 @@ tags:
     description: The changes this instance recorded.
   - name: admin-messages
     description: What became of the messages this instance sent.
+  - name: admin-message-templates
+    description: The club's own wording of the messages it sends.
   - name: admin-operational-logs
     description: Recent bounded diagnostics from the reference deployment.
   - name: admin-subject-access
@@ -185,6 +187,16 @@ components:
       in: query
       required: false
       schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+    MessageTemplateKind:
+      name: kind
+      in: path
+      required: true
+      schema: { $ref: "#/components/schemas/MessageKind" }
+    MessageTemplateLanguage:
+      name: language
+      in: path
+      required: true
+      schema: { $ref: "#/components/schemas/MessageTemplateLanguage" }
     StatisticsFrom:
       name: from
       in: query
@@ -2956,6 +2968,55 @@ components:
              BOOKING_REMINDER, BOOKING_CANCELLED, BOOKING_CANCELLED_BY_CLUB,
              BOOKING_SERIES_CREATED, BOOKING_SERIES_CANCELLED_BY_CLUB, BOOKING_SERIES_MOVED_BY_CLUB,
              WAITLIST_OFFER, BOOKING_PARTNER_FOUND, BOOKING_PLACE_TAKEN]
+
+    MessageTemplateLanguage:
+      type: string
+      description: A language the instance ships message wording in.
+      enum: [de, en]
+
+    MessageTemplateText:
+      type: object
+      required: [subject, body]
+      properties:
+        subject:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: One line. Placeholders are written as `{name}`.
+        body:
+          type: string
+          minLength: 1
+          maxLength: 10000
+          description: Plain text. Placeholders are written as `{name}`.
+
+    MessageTemplateWording:
+      type: object
+      required: [language, shipped]
+      properties:
+        language: { $ref: "#/components/schemas/MessageTemplateLanguage" }
+        shipped: { $ref: "#/components/schemas/MessageTemplateText" }
+        own:
+          oneOf:
+            - $ref: "#/components/schemas/MessageTemplateText"
+            - type: "null"
+          description: The club's wording, or null while the shipped wording applies.
+
+    MessageTemplate:
+      type: object
+      required: [kind, placeholders, requiredPlaceholders, languages]
+      properties:
+        kind: { $ref: "#/components/schemas/MessageKind" }
+        placeholders:
+          type: array
+          description: Every placeholder the message fills, without braces.
+          items: { type: string }
+        requiredPlaceholders:
+          type: array
+          description: The placeholders a club wording of the body must keep.
+          items: { type: string }
+        languages:
+          type: array
+          items: { $ref: "#/components/schemas/MessageTemplateWording" }
 
     MessageChoice:
       type: object
@@ -8344,6 +8405,140 @@ paths:
           $ref: "#/components/responses/Unauthenticated"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/admin/message-templates:
+    get:
+      tags: [admin-message-templates]
+      operationId: listMessageTemplates
+      summary: Every message the instance sends, with its shipped and its club wording.
+      description: |
+        One entry per message kind in the order the instance knows them. Each carries the
+        placeholders its message fills, the ones a club wording must keep, and per supported
+        language the shipped subject and body beside the club's own wording, which is absent where
+        the club keeps the shipped one. Administrators only.
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: The templates.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/MessageTemplate" }
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/admin/message-templates/{kind}/{language}:
+    put:
+      tags: [admin-message-templates]
+      operationId: changeMessageTemplate
+      summary: Store the club's own subject and body of one message in one language.
+      description: |
+        The wording is plain text. It may name only placeholders the message fills, must keep the
+        ones the message exists to deliver, such as the one-time password or the reset code, and
+        keeps a secret out of the subject, which also stays on one line. Anything else, links
+        included, is the club's to word. The wording changes what a message says, never who
+        receives it or whether it is sent.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/MessageTemplateKind"
+        - $ref: "#/components/parameters/MessageTemplateLanguage"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MessageTemplateText" }
+      responses:
+        "204":
+          description: Stored; the next message of this kind in this language uses it.
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "422":
+          description: |
+            The wording names a placeholder the message cannot fill, leaves out one it must keep,
+            puts a secret into the subject or breaks the subject over lines. Each reason is one
+            entry of `violations`, with the placeholder it concerns.
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "429":
+          $ref: "#/components/responses/RateLimited"
+    delete:
+      tags: [admin-message-templates]
+      operationId: resetMessageTemplate
+      summary: Return one message in one language to the shipped wording.
+      description: Resetting a message that already uses the shipped wording changes nothing.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/MessageTemplateKind"
+        - $ref: "#/components/parameters/MessageTemplateLanguage"
+      responses:
+        "204":
+          description: The shipped wording applies.
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/admin/message-templates/{kind}/{language}/preview:
+    post:
+      tags: [admin-message-templates]
+      operationId: previewMessageTemplate
+      summary: Show a wording filled with example values, without storing it.
+      description: |
+        The same check as storing applies, so a preview that answers is a wording that can be
+        stored. The example values are invented and name nobody.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/MessageTemplateKind"
+        - $ref: "#/components/parameters/MessageTemplateLanguage"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MessageTemplateText" }
+      responses:
+        "200":
+          description: The wording as a member would read it.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MessageTemplateText" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "422":
+          description: The wording is refused for the reasons storing it would be.
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
         "429":
           $ref: "#/components/responses/RateLimited"
 

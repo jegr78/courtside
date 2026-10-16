@@ -45,6 +45,7 @@ class ProblemTypeUriTest {
             "urn:courtside:error:audit-cursor-unknown",
             "urn:courtside:error:message-cursor-unknown",
             "urn:courtside:error:message-not-declinable",
+            "urn:courtside:error:message-template-refused",
             "urn:courtside:error:notification-not-found",
             "urn:courtside:error:booking-not-found",
             "urn:courtside:error:cancellation-reason-not-allowed",
