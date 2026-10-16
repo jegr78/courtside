@@ -11,6 +11,7 @@ import org.courtside.booking.internal.RuleRejectionLog;
 import org.courtside.identity.Role;
 import org.courtside.shared.CursorPage;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -27,6 +28,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class BookingService {
@@ -80,7 +82,16 @@ public class BookingService {
         failure.getViolations().forEach(violation -> meters
                 .counter("courtside.bookings.rejected", "rule", violation.code())
                 .increment());
-        rejections.record(failure.getViolations(), command.cardId(), command.bookedByPersonId(), command.bookedBy());
+        countRejection(failure, command.cardId(), command.bookedByPersonId(), command.bookedBy());
+    }
+
+    // Counting a refusal for the usage report must never replace the refusal the caller receives.
+    private void countRejection(BookingRulesViolatedException failure, UUID cardId, UUID personId, UUID accountId) {
+        try {
+            rejections.record(failure.getViolations(), cardId, personId, accountId);
+        } catch (RuntimeException counting) {
+            log.warn("A refused booking attempt could not be counted for the usage report", counting);
+        }
     }
 
     private static void validateIdempotencyKey(String idempotencyKey) {
@@ -124,7 +135,7 @@ public class BookingService {
         try {
             writer.cancel(bookingId, cancelledBy, cancellerRoles, reason);
         } catch (BookingRulesViolatedException failure) {
-            rejections.record(failure.getViolations(), visibleBooking.getCardId(), null, visibleBooking.getBookedBy());
+            countRejection(failure, visibleBooking.getCardId(), null, visibleBooking.getBookedBy());
             throw failure;
         }
     }

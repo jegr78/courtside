@@ -205,6 +205,22 @@ class UsageReportControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenTheRejectionRecordRefusesEveryRow_whenTheRulesRefuseABooking_thenTheMemberStillReceivesTheRefusal() {
+        // given
+        TimeSlot yesterday = new TimeSlot(Instant.parse("2026-05-11T08:00:00Z"), Instant.parse("2026-05-11T09:00:00Z"));
+        jdbc.sql("ALTER TABLE booking_rule_rejection ADD CONSTRAINT refuse_every_row CHECK (false)").update();
+        try {
+            // when / then
+            assertThatThrownBy(() -> bookings.createBookingLookingForAPartner(court, MEMBER_BOOKING_CARD, yesterday,
+                    jane, janePerson))
+                    .as("a count that cannot be written must not replace the refusal")
+                    .isInstanceOf(BookingRulesViolatedException.class);
+        } finally {
+            jdbc.sql("ALTER TABLE booking_rule_rejection DROP CONSTRAINT refuse_every_row").update();
+        }
+    }
+
+    @Test
     void givenARefusalOutsideThePeriod_whenReporting_thenItIsNotCounted() throws Exception {
         // given
         jdbc.sql("""
