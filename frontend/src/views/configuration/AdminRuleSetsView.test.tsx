@@ -181,7 +181,7 @@ describe("AdminRuleSetsView", () => {
     await waitFor(() => expect(screen.getByTestId("rule-ADVANCE_WINDOW-maxDays")).toHaveValue(7));
     expect(screen.getByTestId("rule-ADVANCE_WINDOW-maxDays-range")).toHaveTextContent("Allowed: 1 to 365");
     expect(screen.getByTestId("rule-ADVANCE_WINDOW-maxDays-range-short"), "the visible range stays on the parameter's line")
-      .toHaveTextContent("(1–365)");
+      .toHaveTextContent("(1-365)");
     expect(screen.getByTestId("rule-ADVANCE_WINDOW-maxDays"), "screen readers still hear the full range")
       .toHaveAccessibleDescription("Allowed: 1 to 365");
     expect(screen.getByTestId("rule-ADVANCE_WINDOW-maxDays")).toHaveAccessibleDescription("Allowed: 1 to 365");
