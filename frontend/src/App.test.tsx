@@ -82,8 +82,9 @@ describe("AppRoutes", () => {
       .toEqual(["Platzbelegung"]);
     expect(screen.queryByTestId("public-club-name")).not.toBeInTheDocument();
     expect(screen.getByTestId("guest-guidance")).toHaveTextContent("öffentliche Belegung");
-    expect(screen.getByTestId("guest-sign-in"), "the notice offers the sign-in it asks for")
-      .toHaveAttribute("href", "/login");
+    const signIn = screen.queryByTestId("guest-sign-in");
+    expect(signIn, "the notice offers the sign-in it asks for").toBeInTheDocument();
+    expect(signIn).toHaveAttribute("href", "/login");
   });
 
   it("given a member, when opening the landing page, then guest guidance stays out of the member workflow", async () => {
