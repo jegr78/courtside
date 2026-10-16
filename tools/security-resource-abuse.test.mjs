@@ -723,7 +723,9 @@ test("given the destructive k6 profile, when inspecting it, then every curated a
   assert.match(script, /export function resourceAbuse\(run\) \{[\s\S]*useSetupSession\(run, null\);[\s\S]*failedLogin\(\);/);
   assert.equal(resourceAbusePolicy.stages.at(-1).target, 0);
   assert.equal(resourceAbusePolicy.stages[0].target, 12);
-  assert.equal(resourceAbusePolicy.scenarios.length, 9);
+  const scenarioIds = resourceAbusePolicy.scenarios.map(({ id }) => id);
+  assert.equal(new Set(scenarioIds).size, scenarioIds.length, "every scenario id is unique");
+  assert.deepEqual(scenarioIds.filter((id) => !script.includes(`"${id}`)), [], "every policy scenario is driven by the k6 script");
   assert.equal(resourceAbusePolicy.scenarios.every(({ checks }) => checks.length > 0), true);
   for (const [name, trip] of Object.entries(resourceAbusePolicy.circuitBreakers.tripThresholds)) {
     assert.ok(trip < resourceAbusePolicy.circuitBreakers.safetyLimits[name]);
