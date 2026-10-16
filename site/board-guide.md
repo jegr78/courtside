@@ -299,7 +299,8 @@ Hier gibst du einer Nachricht den Betreff und Text deines Vereins.
 * Die Liste darunter nennt die Platzhalter, die diese Nachricht füllt, etwa `{firstName}` oder
   `{instanceLink}` für die Adresse eures Courtside. Mit *(Pflicht)* markierte Platzhalter muss der
   Text enthalten: Benutzername und Einmalpasswort, Benutzername und Code. Ein Einmalpasswort oder
-  Code darf nicht im Betreff stehen, und der Betreff bleibt einzeilig.
+  Code darf nicht im Betreff stehen und muss im Text für sich stehen, durch Leerzeichen getrennt, damit
+  er nie Teil eines Links wird. Der Betreff bleibt einzeilig.
 * *Vorschau* füllt deinen Entwurf mit Beispielwerten und speichert nichts.
 * *Text speichern* fragt bei Bedarf noch einmal nach deinem Passwort, weil der Text auch Nachrichten
   mit Zugangsdaten betrifft. Die nächste Nachricht dieser Art und Sprache verwendet ihn.

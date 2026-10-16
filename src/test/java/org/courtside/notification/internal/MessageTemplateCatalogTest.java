@@ -100,4 +100,70 @@ class MessageTemplateCatalogTest {
         // then
         assertThat(found).as("a link is the club's to place").isEmpty();
     }
+
+    @Test
+    void givenTheResetCodeInsideALink_whenChecked_thenTheSecretIsKeptOutOfIt() {
+        // given
+        MessageText text = new MessageText("Your code",
+                "Hello {username}, continue at https://evil.example/r?c={resetCode}");
+
+        // when
+        List<MessageTemplateCatalog.Violation> found =
+                MessageTemplateCatalog.check(MessageKind.ACCOUNT_PASSWORD_RESET_CODE, text);
+
+        // then
+        assertThat(found).containsExactly(
+                new MessageTemplateCatalog.Violation("messageTemplate.placeholder.secretInLink", "resetCode"));
+    }
+
+    @Test
+    void givenThePasswordGluedToOtherText_whenChecked_thenItMustStandOnItsOwn() {
+        // given
+        MessageText text = new MessageText("Welcome", "{username}, password=({credential}).");
+
+        // when
+        List<MessageTemplateCatalog.Violation> found =
+                MessageTemplateCatalog.check(MessageKind.CREDENTIALS_NEW_ACCOUNT, text);
+
+        // then
+        assertThat(found).containsExactly(
+                new MessageTemplateCatalog.Violation("messageTemplate.placeholder.secretInLink", "credential"));
+    }
+
+    @Test
+    void givenThePasswordQuotedAtTheEndOfASentence_whenChecked_thenItStands() {
+        // given
+        MessageText text = new MessageText("Welcome", "{username}, your password is \"{credential}\".\nKeep it safe.");
+
+        // when
+        List<MessageTemplateCatalog.Violation> found =
+                MessageTemplateCatalog.check(MessageKind.CREDENTIALS_NEW_ACCOUNT, text);
+
+        // then
+        assertThat(found).isEmpty();
+    }
+
+    @Test
+    void givenAUnicodeLineSeparatorInTheSubject_whenChecked_thenTheSubjectIsRefused() {
+        // given
+        MessageText text = new MessageText("Booked again", "See you on {day}.");
+
+        // when
+        List<MessageTemplateCatalog.Violation> found = MessageTemplateCatalog.check(MessageKind.BOOKING_CONFIRMED, text);
+
+        // then
+        assertThat(found).containsExactly(new MessageTemplateCatalog.Violation("messageTemplate.subject.lineBreak", null));
+    }
+
+    @Test
+    void givenAControlCharacterInTheBody_whenChecked_thenTheTextIsRefused() {
+        // given
+        MessageText text = new MessageText("Booked", "See you\u0000 on {day}.\n\tBring water.");
+
+        // when
+        List<MessageTemplateCatalog.Violation> found = MessageTemplateCatalog.check(MessageKind.BOOKING_CONFIRMED, text);
+
+        // then
+        assertThat(found).containsExactly(new MessageTemplateCatalog.Violation("messageTemplate.text.controlCharacter", null));
+    }
 }

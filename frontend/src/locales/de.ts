@@ -263,6 +263,8 @@ const de = {
   "messageTemplate.placeholder.missing": "Der Text muss {{placeholder}} enthalten, weil die Nachricht genau das zustellt.",
   "messageTemplate.placeholder.secretInSubject": "{{placeholder}} darf nicht im Betreff stehen. Mailprogramme zeigen Betreffs in Listen und Benachrichtigungen.",
   "messageTemplate.subject.lineBreak": "Der Betreff muss in einer Zeile bleiben.",
+  "messageTemplate.placeholder.secretInLink": "{{placeholder}} muss für sich stehen, durch Leerzeichen getrennt, damit es nie Teil eines Links wird.",
+  "messageTemplate.text.controlCharacter": "Der Text enthält ein unsichtbares Steuerzeichen. Entferne es und speichere erneut.",
   "messageTemplate.language.unknown": "Courtside liefert Nachrichten nur auf Deutsch und Englisch.",
   "config.slotMinutes.futureBookingConflict": "Mindestens eine zukünftige Buchung passt nicht in das gewählte {{slotMinutes}}-Minuten-Raster.",
   "config.timeZone.futureBookingConflict": "Die Zeitzone kann nicht geändert werden, solange zukünftige Buchungen vorhanden sind.",

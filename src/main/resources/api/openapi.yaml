@@ -8443,8 +8443,9 @@ paths:
       description: |
         The wording is plain text. It may name only placeholders the message fills, must keep the
         ones the message exists to deliver, such as the one-time password or the reset code, and
-        keeps a secret out of the subject, which also stays on one line. Anything else, links
-        included, is the club's to word. The wording changes what a message says, never who
+        keeps a secret out of the subject, which also stays on one line. A secret stands on its own
+        in the body, apart from quotes and punctuation, so it never becomes part of a link. Control
+        characters are refused. Anything else, links included, is the club's to word. The wording changes what a message says, never who
         receives it or whether it is sent.
 
         This operation requires a full reauthentication within the configured window, capped at
@@ -8475,8 +8476,9 @@ paths:
         "422":
           description: |
             The wording names a placeholder the message cannot fill, leaves out one it must keep,
-            puts a secret into the subject or breaks the subject over lines. Each reason is one
-            entry of `violations`, with the placeholder it concerns.
+            puts a secret into the subject, glues a secret to other text, breaks the subject over
+            lines or holds a control character. Each reason is one entry of `violations`, with the
+            placeholder it concerns.
           content:
             application/problem+json:
               schema: { $ref: "#/components/schemas/Problem" }

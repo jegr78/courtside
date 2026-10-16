@@ -265,6 +265,8 @@ const en: Record<keyof typeof de, string> = {
   "messageTemplate.placeholder.missing": "The text must contain {{placeholder}}, because the message exists to deliver it.",
   "messageTemplate.placeholder.secretInSubject": "{{placeholder}} must not appear in the subject. Mail programs show subjects in lists and notifications.",
   "messageTemplate.subject.lineBreak": "The subject must stay on one line.",
+  "messageTemplate.placeholder.secretInLink": "{{placeholder}} must stand on its own, separated by spaces, so it never becomes part of a link.",
+  "messageTemplate.text.controlCharacter": "The text contains an invisible control character. Remove it and save again.",
   "messageTemplate.language.unknown": "Courtside ships messages in German and English only.",
   "config.slotMinutes.futureBookingConflict": "At least one future booking does not fit the selected {{slotMinutes}}-minute grid.",
   "config.timeZone.futureBookingConflict": "The time zone cannot be changed while future bookings exist.",

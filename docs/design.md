@@ -652,7 +652,9 @@ fragments inside them, such as a closure or a cancellation reason, stay shipped.
 only placeholders the message fills in either language, plus `{instanceLink}`. It must keep the
 placeholders the message exists to deliver: the username and generated credential of the two
 credential messages, the username and code of a reset code, the username of a reminder. A credential
-or reset code may not appear in the subject, and the subject stays on one line. Nothing else is
+or reset code may not appear in the subject, and in the body it stands on its own, apart from quotes
+and punctuation, so a wording cannot make it part of a link. The subject stays on one line and
+neither part holds a control character. Nothing else is
 refused, links included. The wording changes what a message says and never who receives it, whether
 it is sent or whether a member may decline it. Changing or resetting a wording needs a recent
 full-password proof, because it decides what the credential and reset-code mails say, and each

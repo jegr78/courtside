@@ -1,6 +1,7 @@
 package org.courtside.notification.internal;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.courtside.notification.MessageKind;
 import org.springframework.stereotype.Component;
 
@@ -18,6 +19,7 @@ import java.util.stream.Stream;
 
 // Plain text, and the placeholders are named rather than positional: a translator moving a value
 // inside a sentence must not have to count arguments to keep it correct.
+@Slf4j
 @Component
 @RequiredArgsConstructor
 class MailTemplates {
@@ -49,7 +51,14 @@ class MailTemplates {
             return Optional.empty();
         }
         return overrides.of(kind, languageOf(locale))
-                .filter(text -> MessageTemplateCatalog.check(kind, text).isEmpty())
+                .filter(text -> {
+                    boolean acceptable = MessageTemplateCatalog.check(kind, text).isEmpty();
+                    if (!acceptable) {
+                        log.warn("The club's {} wording of {} fails its check, so the shipped one is sent",
+                                languageOf(locale), kind);
+                    }
+                    return acceptable;
+                })
                 .map(text -> SUBJECTS.containsKey(key) ? text.subject() : text.body());
     }
 
@@ -57,6 +66,7 @@ class MailTemplates {
         try {
             return fill(key, template, values);
         } catch (IllegalStateException unfillable) {
+            log.warn("The club's wording of {} cannot be filled, so the shipped one is sent", key);
             return null;
         }
     }

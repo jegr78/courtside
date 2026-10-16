@@ -281,7 +281,8 @@ message your club's own subject and text.
 * The list below names the placeholders this message fills, such as `{firstName}` or
   `{instanceLink}` for the address of your Courtside. Placeholders marked *(required)* must stay in
   the text: the username and one-time password, the username and code. A one-time password or code
-  may not appear in the subject, and the subject stays on one line.
+  may not appear in the subject and stands on its own in the text, separated by spaces, so it never
+  becomes part of a link. The subject stays on one line.
 * *Preview* fills your draft with example values and stores nothing.
 * *Save wording* may ask for your password once more, because the wording also covers messages that
   carry sign-in details. The next message of this kind and language uses it.

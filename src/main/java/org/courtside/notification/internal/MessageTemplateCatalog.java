@@ -10,6 +10,7 @@ import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 final class MessageTemplateCatalog {
 
@@ -23,6 +24,10 @@ final class MessageTemplateCatalog {
 
     // A subject is shown on lock screens and in message lists, so a secret never travels in one.
     private static final Set<String> SECRET = Set.of("credential", "resetCode");
+    private static final Pattern STANDALONE = Pattern.compile("[\"'\u00ab\u00bb\u201a\u201e\u2018\u2019\u201c\u201d()\\[\\].,;:!]*");
+    private static final Pattern LINE_BREAK = Pattern.compile("[\r\n\u0085  ]");
+    private static final Pattern CONTROL = Pattern.compile("\\p{Cc}");
+    private static final Pattern WORD = Pattern.compile("\\S+");
 
     record Violation(String code, String placeholder) {
     }
@@ -53,8 +58,12 @@ final class MessageTemplateCatalog {
 
     static List<Violation> check(MessageKind kind, MessageText text) {
         List<Violation> violations = new ArrayList<>();
-        if (text.subject().contains("\n") || text.subject().contains("\r")) {
+        if (LINE_BREAK.matcher(text.subject()).find()) {
             violations.add(new Violation("messageTemplate.subject.lineBreak", null));
+        }
+        if (CONTROL.matcher(text.subject().replaceAll(LINE_BREAK.pattern(), "")).find()
+                || CONTROL.matcher(text.body().replaceAll("[\n\r\t]", "")).find()) {
+            violations.add(new Violation("messageTemplate.text.controlCharacter", null));
         }
         SortedSet<String> known = placeholders(kind);
         SortedSet<String> named = new TreeSet<>(namedIn(text.subject()));
@@ -65,7 +74,26 @@ final class MessageTemplateCatalog {
                 .forEach(name -> violations.add(new Violation("messageTemplate.placeholder.missing", name)));
         namedIn(text.subject()).stream().filter(SECRET::contains)
                 .forEach(name -> violations.add(new Violation("messageTemplate.placeholder.secretInSubject", name)));
+        gluedSecrets(text.body())
+                .forEach(name -> violations.add(new Violation("messageTemplate.placeholder.secretInLink", name)));
         return violations;
+    }
+
+    // A secret glued to other text could become part of a link that carries it to somebody else.
+    private static SortedSet<String> gluedSecrets(String body) {
+        SortedSet<String> glued = new TreeSet<>();
+        Matcher word = WORD.matcher(body);
+        while (word.find()) {
+            Matcher placeholder = MailTemplates.PLACEHOLDER.matcher(word.group());
+            while (placeholder.find()) {
+                String name = placeholder.group(1);
+                if (SECRET.contains(name)
+                        && !STANDALONE.matcher(word.group().replace(placeholder.group(), "")).matches()) {
+                    glued.add(name);
+                }
+            }
+        }
+        return glued;
     }
 
     static SortedSet<String> namedIn(String template) {
