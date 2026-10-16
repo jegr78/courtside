@@ -118,6 +118,11 @@
       "pages": { "de": "site/board-guide.md", "en": "site/en/board-guide.md" }
     },
     {
+      "name": "availability",
+      "surface": "admin-availability-view",
+      "pages": { "de": "site/board-guide.md", "en": "site/en/board-guide.md" }
+    },
+    {
       "name": "booking-card",
       "surface": "admin-booking-card-view",
       "pages": { "de": "site/board-guide.md", "en": "site/en/board-guide.md" }

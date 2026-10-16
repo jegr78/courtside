@@ -193,6 +193,8 @@ entries stay as they were, so past days keep their hours.
 Bookings already on a closed day stay. Courtside refuses new bookings and moves there. The court
 plan names a holiday, and a closed court reads *Court closed*.
 
+![A winter break as a closed holiday and one court closed for a week.](../screenshots/en/availability.png)
+
 ## Facility → Booking cards
 
 Booking cards distinguish types of court occupancy, such as a member game, training, league match

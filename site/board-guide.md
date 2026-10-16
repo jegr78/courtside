@@ -206,6 +206,8 @@ Buchungen, die schon auf einem gesperrten Tag liegen, bleiben bestehen. Neue Buc
 Verschiebungen dorthin lehnt Courtside ab. Im Platzplan steht ein Feiertag mit seinem Namen, ein
 gesperrter Platz zeigt *Gesperrt*.
 
+![Weihnachtspause als geschlossener Feiertag und eine Woche Sperrung für einen Platz.](screenshots/de/availability.png)
+
 ## Anlage → Buchungskarten
 
 Buchungskarten unterscheiden die Arten einer Platzbelegung, etwa Mitgliederspiel, Training,
