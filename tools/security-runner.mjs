@@ -9,6 +9,8 @@ const repository = join(dirname(fileURLToPath(import.meta.url)), "..");
 export const securityRunContract = Object.freeze(JSON.parse(
   readFileSync(join(repository, "security", "run-contract.json"), "utf8")));
 const profiles = securityRunContract.profiles;
+const authenticatedZapPolicy = JSON.parse(
+  readFileSync(join(repository, "security", "zap-authenticated-policy.json"), "utf8"));
 
 export function authorizeSecurityProfile(profile, runId, authorization) {
   if (!profiles[profile]) throw new Error(`Unknown security profile: ${profile}`);
@@ -132,12 +134,15 @@ export async function executeSecurityPlan(plan, runtime = {}) {
   const runAuthenticatedZapAssessment = runtime.runAuthenticatedZapAssessment ?? missingAuthenticatedZapAssessment;
   const runOpenApiFuzzAssessment = runtime.runOpenApiFuzzAssessment ?? missingOpenApiFuzzAssessment;
   const runResourceAbuseAssessment = runtime.runResourceAbuseAssessment ?? missingResourceAbuseAssessment;
+  const planAuthorizationRequests = runtime.planAuthorizationRequests ?? missingAuthorizationRequestPlan;
   const { attempt, paths } = reserveAttempt(root, plan.runId);
   const startedAt = now();
   const manifest = createManifest(plan, attempt, startedAt);
   writeManifest(paths.manifest, manifest);
   try {
     const adapter = assertSupportedPlan(plan);
+    const shares = adapter === "active-security"
+      ? activeRequestShares(plan.budgets.requests, await planAuthorizationRequests(plan)) : undefined;
     assertRunning(paths, startedAt, now(), plan.budgets);
     const deadline = new Date(startedAt.getTime() + plan.budgets.durationSeconds * 1000);
     assertTargetIdentity(plan, await verifyTarget(plan, { stopFile: paths.stop, deadline }));
@@ -161,20 +166,19 @@ export async function executeSecurityPlan(plan, runtime = {}) {
     } else if (adapter === "active-security") {
       assertRunning(paths, startedAt, now(), plan.budgets);
       const zapEvidence = await runAuthenticatedZapAssessment(plan, { evidenceDirectory: paths.evidence,
-        stopFile: paths.stop, attempt, deadline,
-        maxRequests: Math.min(plan.budgets.requests, authenticatedZapRequestLimit(plan)) });
+        stopFile: paths.stop, attempt, deadline, maxRequests: shares.zap });
       assertRunning(paths, startedAt, now(), plan.budgets);
       manifest.toolResults.push({ id: "authenticated-zap", version: plan.tools[1].version,
         outcome: zapEvidence.outcome });
       const fuzzEvidence = await runOpenApiFuzzAssessment(plan, { evidenceDirectory: paths.evidence,
-        stopFile: paths.stop, attempt, deadline, maxRequests: openApiFuzzRequestLimit(plan) });
+        stopFile: paths.stop, attempt, deadline, maxRequests: shares.fuzz });
       assertRunning(paths, startedAt, now(), plan.budgets);
       manifest.toolResults.push({ id: "openapi-fuzzer", version: plan.tools[2].version,
         outcome: fuzzEvidence.outcome });
       let authorizationEvidence = { outcome: "passed", requestCount: 0 };
       if (fuzzEvidence.outcome !== "failed") {
         authorizationEvidence = await runAuthorizationAssessment(plan, { evidenceDirectory: paths.evidence,
-          stopFile: paths.stop, attempt, deadline, maxRequests: authorizationRequestLimit(plan),
+          stopFile: paths.stop, attempt, deadline, maxRequests: shares.authorization,
           resetLoginAttempts: () => resetLoginAttempts(plan, { stopFile: paths.stop, deadline }) });
         assertRunning(paths, startedAt, now(), plan.budgets);
         manifest.toolResults.push({ id: "authorization-matrix", version: plan.tools[3].version,
@@ -280,20 +284,28 @@ function combinedOutcome(...outcomes) {
   return "passed";
 }
 
-function authenticatedZapRequestLimit(plan) {
-  const reservedForOtherSuites = 4000;
-  if (plan.budgets.requests <= reservedForOtherSuites) {
-    throw new Error("The active request budget cannot reserve authorization coverage");
+// Beyond one admission retry per four requests the run reports incomplete rather than eat ZAP's share.
+export const admissionRetryAllowance = 0.25;
+export const openApiFuzzRequestCeiling = 2000;
+
+/** Splits an active run's requests: the authorization matrix gets its plan, the fuzzer its ceiling, ZAP the rest. */
+export function activeRequestShares(budget, plannedAuthorizationRequests) {
+  if (!Number.isSafeInteger(plannedAuthorizationRequests) || plannedAuthorizationRequests < 1) {
+    throw new Error("The authorization suite has no request plan to budget from");
   }
-  return plan.budgets.requests - reservedForOtherSuites;
+  const authorization = Math.ceil(plannedAuthorizationRequests * (1 + admissionRetryAllowance));
+  const fuzz = openApiFuzzRequestCeiling;
+  const zapFloor = authenticatedZapPolicy.roles.length * (3 + authenticatedZapPolicy.spider.minimumUrlsPerRole);
+  const zap = Math.min(authenticatedZapPolicy.requestLimit, budget - authorization - fuzz);
+  if (zap < zapFloor) {
+    throw new Error(`The active profile's ${budget} requests cannot hold the authorization matrix's `
+      + `${authorization} and the fuzzer's ${fuzz} and still leave authenticated ZAP its ${zapFloor}`);
+  }
+  return { zap, fuzz, authorization };
 }
 
-function openApiFuzzRequestLimit(plan) {
-  return Math.min(2000, plan.budgets.requests - authenticatedZapRequestLimit(plan));
-}
-
-function authorizationRequestLimit(plan) {
-  return plan.budgets.requests - authenticatedZapRequestLimit(plan) - openApiFuzzRequestLimit(plan);
+async function missingAuthorizationRequestPlan() {
+  throw new Error("No authorization request plan is registered");
 }
 
 async function missingOpenApiFuzzAssessment() {

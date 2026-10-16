@@ -738,8 +738,8 @@ async function execute(options) {
   }
   if (options.command === "security-run") {
     const {
-      runPassiveDeploymentAssessment, runAuthorizationAssessment, renderAuthenticatedZapPlan,
-      renderAuthenticatedZapCanaryRetestPlan,
+      runPassiveDeploymentAssessment, runAuthorizationAssessment, planAssessedAuthorizationRequests,
+      renderAuthenticatedZapPlan, renderAuthenticatedZapCanaryRetestPlan,
       runAuthenticatedZapAssessment, prepareOpenApiFuzzFixtures, runOpenApiFuzzAssessment,
       runOpenApiImportCases, runOpenApiInputCases, runOpenApiMutationCases, runResourceAbuseAssessment
     } = await securityAssessments();
@@ -767,6 +767,10 @@ async function execute(options) {
         sharedPassword: securityEnvironment.COURTSIDE_SECURITY_SHARED_PASSWORD,
         maxAddressFailures: shippedLoginAddressMaxFailures()
       }),
+      planAuthorizationRequests: (selectedPlan) => planAssessedAuthorizationRequests({
+        attemptsBeforeLimit: shippedLoginAddressMaxFailures(),
+        durationSeconds: selectedPlan.budgets.durationSeconds
+      }).total,
       resetLoginAttempts: async (selectedPlan, context) => resetSecurityLoginAttempts(selectedPlan.runId,
         context.stopFile, Math.max(1, context.deadline.getTime() - Date.now())),
       runAuthenticatedZapAssessment: async (selectedPlan, context) => runAuthenticatedZapAssessment(selectedPlan, {

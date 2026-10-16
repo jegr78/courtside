@@ -611,6 +611,10 @@ export function planAuthorizationRequests(api, { attemptsBeforeLimit, durationSe
   return { ...phases, total: Object.values(phases).reduce((sum, count) => sum + count, 0) };
 }
 
+export function planAssessedAuthorizationRequests(limits) {
+  return planAuthorizationRequests(yaml.load(readFileSync(apiDocumentPath(), "utf8")), limits);
+}
+
 export async function runAuthorizationAssessment(plan, context) {
   if (plan.profile !== "active" || plan.environment !== "SECURITY"
       || !["CSA-AUTHN-001", "CSA-AUTHZ-001", "CSA-DAST-001"]
