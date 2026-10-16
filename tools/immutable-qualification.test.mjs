@@ -87,6 +87,7 @@ function lifecycleExecute({ collision = false, foreign = false, root = "/example
   const removed = new Set();
   let token;
   let restarted = false;
+  let stopped = false;
   const configDrift = {};
   const reservationId = "1".repeat(64);
   let appId = "2".repeat(64);
@@ -142,7 +143,8 @@ function lifecycleExecute({ collision = false, foreign = false, root = "/example
         .map((id) => ({ Id: id,
         Image: imageDrift && restarted && id === appId ? `sha256:${"f".repeat(64)}` : runtimeImage,
         Name: `/${project}-${id === reservationId ? "reservation" : id === dbId ? "db-1" : id === proxyId ? "proxy-1" : id === collectorId ? "log-collector-1" : "app-1"}`,
-        State: { StartedAt: restarted ? "2026-01-01T00:01:00Z" : "2026-01-01T00:00:00Z",
+        State: { Status: id === appId && stopped ? "exited" : "running",
+          StartedAt: restarted ? "2026-01-01T00:01:00Z" : "2026-01-01T00:00:00Z",
           ...(runtimeIncomplete ? {} : { OOMKilled: false }) }, RestartCount: 0,
         HostConfig: { ReadonlyRootfs: id === reservationId || id === collectorId || id === appId && !hardeningFails,
           CapDrop: id === appId || id === reservationId || id === collectorId ? ["ALL"] : [],
@@ -168,6 +170,7 @@ function lifecycleExecute({ collision = false, foreign = false, root = "/example
         Labels: { "org.courtside.qualification.owner": token, "com.docker.compose.project": project } }]);
     } else if (commandArgs[0] === "compose" && commandArgs.includes("up")) {
       bootstrapPassword = options.env.COURTSIDE_UAT_ADMIN_PASSWORD ?? "";
+      stopped = false;
       if (commandArgs.includes("--force-recreate")) { removed.add(appId); appId = String(appGeneration++).repeat(64); }
       started = true;
       removed.delete(appId);
@@ -177,9 +180,9 @@ function lifecycleExecute({ collision = false, foreign = false, root = "/example
     }
     else if (commandArgs[0] === "compose" && commandArgs.includes("ps")) stdout = appId;
     else if (commandArgs[0] === "compose" && commandArgs.includes("images")) stdout = JSON.stringify([{ ID: image }]);
-    else if (commandArgs[0] === "compose" && commandArgs.includes("restart")) restarted = true;
+    else if (commandArgs[0] === "compose" && commandArgs.includes("restart")) { restarted = true; stopped = false; }
     else if (commandArgs[0] === "compose" && commandArgs.includes("exec")) stdout = commandArgs.includes("cat") ? "example CA" : "1";
-    else if (commandArgs[0] === "compose" && commandArgs.includes("stop")) stdout = "";
+    else if (commandArgs[0] === "compose" && commandArgs.includes("stop")) stopped = true;
     else if (commandArgs[0] === "compose" && commandArgs.includes("logs")) {
       stdout = "Graceful shutdown complete";
       if (configDrift.replaceDuringLogs) { removed.add(appId); appId = "7".repeat(64); }
@@ -229,6 +232,67 @@ test("given original native image Cmd absent and container Cmd null with equal J
     assert.equal(proof.image.Config.User, "10001:10001");
     assert.ok(proof.runtime.length > 0 && proof.runtime.every(item => item.command === null));
     assert.deepEqual(proof.liveResources, []);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+function appStillUpAfterStop(harness, { polls, restarts = 0 }) {
+  let stopped = false;
+  let reported = 0;
+  const execute = (command, commandArgs, options) => {
+    const result = harness.execute(command, commandArgs, options);
+    if (commandArgs[0] === "compose" && commandArgs.includes("stop")) stopped = true;
+    if (commandArgs[0] === "compose" && commandArgs.includes("up")) stopped = false;
+    if (stopped && commandArgs[0] === "inspect" && commandArgs.length === 2 && reported < polls) {
+      const values = JSON.parse(result.stdout);
+      const app = values.find((item) => item.Config?.Labels?.["com.docker.compose.service"] === "app");
+      if (app) {
+        reported += 1;
+        app.State.Status = "running";
+        app.RestartCount = restarts;
+      }
+      return { ...result, stdout: JSON.stringify(values) };
+    }
+    return result;
+  };
+  return { execute, reported: () => reported };
+}
+
+test("given compose stop returns while the app still runs, when it exits on a later poll, then the smoke waits for it and completes", async () => {
+  // given
+  const root = mkdtempSync(join(tmpdir(), "immutable-uat-slow-stop-"));
+  const harness = lifecycleExecute({ root, imageCommandAbsent: true });
+  const slowStop = appStillUpAfterStop(harness, { polls: 2 });
+  const { execute } = slowStop;
+  const { runUatSmoke } = await import("./courtside.uat-smoke.mjs");
+  try {
+    // when
+    const receipt = await runUatSmoke({ args, environment: nativeEnvironment, repository: root, execute,
+      request: smokeRequest(), platform: "linux", architecture: "x64" }).catch(error => {
+      assert.fail([error, ...(error.errors ?? [])].map(failure => failure.message).join("; "));
+    });
+    // then
+    assert.equal(receipt.manifestDigest, image, "a slow stop must delay the smoke, not fail it");
+    assert.equal(slowStop.reported(), 2, "the smoke must keep polling until the app has exited");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("given the restart policy revives the app after compose stop, when the smoke waits for it to exit, then the attempt record names the policy and both states", async () => {
+  // given
+  const root = mkdtempSync(join(tmpdir(), "immutable-uat-revived-"));
+  const harness = lifecycleExecute({ root, imageCommandAbsent: true });
+  const { execute } = appStillUpAfterStop(harness, { polls: Infinity, restarts: 1 });
+  const { runUatSmoke } = await import("./courtside.uat-smoke.mjs");
+  try {
+    // when
+    await assert.rejects(runUatSmoke({ args, environment: nativeEnvironment, repository: root, execute,
+      request: smokeRequest(), platform: "linux", architecture: "x64" }));
+    // then
+    const attempt = JSON.parse(readFileSync(join(root, "build", "immutable-qualification", project, "attempt.json"), "utf8"));
+    assert.match(attempt.failure?.message ?? "", /restart policy started app again after compose stop: running, 0 restarts.* -> running, 1 restarts/,
+      `the record must name the restart policy and both states, got ${JSON.stringify(attempt.failure)}`);
+    const stop = harness.calls.findIndex(({ args: commandArgs }) => commandArgs[0] === "compose" && commandArgs.includes("stop"));
+    assert.ok(stop >= 0 && !harness.calls.slice(stop).some(({ args: commandArgs }) => commandArgs[0] === "compose"
+      && commandArgs.includes("up")), "the smoke must not start a revived app again before reporting it");
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
