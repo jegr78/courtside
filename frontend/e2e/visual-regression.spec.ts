@@ -499,7 +499,8 @@ test("each configuration surface fits the desktop screen without scrolling in ei
   const surfaces = [
     { link: "admin-configuration-link", view: "admin-configuration-view", ready: "logo-url" },
     { link: "admin-deadlines-link", view: "admin-deadlines-view", ready: "booking-reminder-hours" },
-    { link: "admin-rule-sets-link", view: "admin-rule-sets-view", ready: "rule-ADVANCE_WINDOW-maxDays" }
+    { link: "admin-rule-sets-link", view: "admin-rule-sets-view", ready: "rule-ADVANCE_WINDOW-maxDays" },
+    { link: "admin-message-wording-link", view: "admin-message-wording-view", ready: "wording-body" }
   ];
 
   for (const language of ["de", "en"]) {

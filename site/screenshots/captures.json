@@ -138,6 +138,11 @@
       "pages": { "de": "site/board-guide.md", "en": "site/en/board-guide.md" }
     },
     {
+      "name": "message-wording",
+      "surface": "admin-message-wording-view",
+      "pages": { "de": "site/board-guide.md", "en": "site/en/board-guide.md" }
+    },
+    {
       "name": "membership-types",
       "surface": "admin-membership-types-view",
       "pages": { "de": "site/board-guide.md", "en": "site/en/board-guide.md" }

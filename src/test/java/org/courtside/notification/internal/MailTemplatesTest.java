@@ -8,6 +8,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 
 import static java.util.Map.entry;
 import java.util.ResourceBundle;
@@ -18,6 +19,8 @@ import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class MailTemplatesTest {
 
@@ -44,7 +47,40 @@ class MailTemplatesTest {
 
     private static final String ADDRESS_LIKE = "(?i)[a-z][a-z0-9+.-]*://|\\b[\\p{L}0-9-]+\\.\\p{L}{2,}\\b";
 
-    private final MailTemplates templates = new MailTemplates();
+    private final MailTemplates templates = new MailTemplates(mock(MessageTemplateOverrides.class));
+
+    @Test
+    void givenAStoredWordingTheMessageCannotFill_whenRendered_thenTheShippedWordingIsSentInstead() {
+        // given
+        MessageTemplateOverrides overrides = mock(MessageTemplateOverrides.class);
+        when(overrides.of(MessageKind.ACCOUNT_PASSWORD_RESET_CODE, "en"))
+                .thenReturn(Optional.of(new MessageText("Your code", "{username}: {resetCode}\n{instanceLink}")));
+        MailTemplates withUnfillableWording = new MailTemplates(overrides);
+        Map<String, String> withoutLink = new HashMap<>(VALUES);
+        withoutLink.remove("instanceLink");
+
+        // when
+        String body = withUnfillableWording.render("account.passwordResetCode.body", Locale.ENGLISH, withoutLink);
+
+        // then
+        assertThat(body).as("a security message is never lost to a club's wording")
+                .isEqualTo(templates.render("account.passwordResetCode.body", Locale.ENGLISH, withoutLink));
+    }
+
+    @Test
+    void givenAStoredWordingWithoutTheResetCode_whenRendered_thenTheShippedWordingCarriesTheCode() {
+        // given
+        MessageTemplateOverrides overrides = mock(MessageTemplateOverrides.class);
+        when(overrides.of(MessageKind.ACCOUNT_PASSWORD_RESET_CODE, "en"))
+                .thenReturn(Optional.of(new MessageText("Your code", "Hello {firstName}, ask the board.")));
+
+        // when
+        String body = new MailTemplates(overrides).render("account.passwordResetCode.body", Locale.ENGLISH, VALUES);
+
+        // then
+        assertThat(body).as("a wording stored past the check is checked again before it is sent")
+                .contains(VALUES.get("resetCode"));
+    }
 
     @Test
     void whenReadingBothLocales_thenEachDefinesTheSameKeys() {

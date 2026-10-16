@@ -17,7 +17,7 @@ Die Seitenleiste führt oben zur Übersicht und ordnet die Verwaltung darunter i
 
 | Bereich | Inhalt |
 |---|---|
-| **Verein** | Einrichtung, Vereinsprofil, Fristen und Erinnerungen, Buchungsregeln |
+| **Verein** | Einrichtung, Vereinsprofil, Fristen und Erinnerungen, Buchungsregeln, Nachrichtentexte |
 | **Anlage** | Plätze, Öffnungszeiten, Buchungskarten und Platzfüller |
 | **Mitglieder** | Personen, Konten, Mitgliedsarten und Import |
 | **Nachweise** | Statistik, Datenexport, Änderungsprotokoll und Nachrichtenprotokoll |
@@ -288,6 +288,29 @@ du gemeinsam. Wählst du ein anderes Regelwerk, bevor du gespeichert hast, fragt
 weil Name und Regeln zum gewählten Regelwerk gehören.
 
 ![Die Buchungsregeln mit der Übersicht der Regelwerke, erlaubten Bereichen und Verweisen auf globale Einstellungen.](screenshots/de/booking-rules.png)
+
+## Verein → Nachrichtentexte
+
+Öffne *Verein → Nachrichtentexte*. Courtside liefert jede Nachricht auf Deutsch und Englisch aus.
+Hier gibst du einer Nachricht den Betreff und Text deines Vereins.
+
+* Wähle die **Nachricht** und die **Sprache**. Die Seite zeigt, ob der mitgelieferte oder dein
+  eigener Text gilt.
+* Die Liste darunter nennt die Platzhalter, die diese Nachricht füllt, etwa `{firstName}` oder
+  `{instanceLink}` für die Adresse eures Courtside. Mit *(Pflicht)* markierte Platzhalter muss der
+  Text enthalten: Benutzername und Einmalpasswort, Benutzername und Code. Ein Einmalpasswort oder
+  Code darf nicht im Betreff stehen und muss im Text für sich stehen, durch Leerzeichen getrennt, damit
+  er nie Teil eines Links wird. Der Betreff bleibt einzeilig.
+* *Vorschau* füllt deinen Entwurf mit Beispielwerten und speichert nichts.
+* *Text speichern* fragt bei Bedarf noch einmal nach deinem Passwort, weil der Text auch Nachrichten
+  mit Zugangsdaten betrifft. Die nächste Nachricht dieser Art und Sprache verwendet ihn.
+* *Mitgelieferten Text wiederherstellen* löscht deinen Text für diese Sprache.
+
+Der Text ändert nur, was eine Nachricht sagt. Wer sie erhält, ob sie verschickt wird und ob ein
+Mitglied sie abbestellen kann, bleibt gleich. Kann Courtside einen gespeicherten Text beim Versand
+nicht füllen, geht der mitgelieferte Text hinaus. Jede Änderung steht im Änderungsprotokoll.
+
+![Die Nachrichtentexte mit Auswahl von Nachricht und Sprache, Platzhaltern, Betreff und Text.](screenshots/de/message-wording.png)
 
 ## Mitglieder → Mitgliedsarten
 

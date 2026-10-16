@@ -50,7 +50,8 @@ class CredentialMailerTest {
     private final List<OutgoingMail> handedOver = new ArrayList<>();
 
     private final CredentialMailer mailer = new CredentialMailer(credentials, validity, accounts, club,
-            new MailTemplates(), outbox, mock(JdbcClient.class, RETURNS_DEEP_STUBS), Clock.fixed(NOW, ZONE));
+            new MailTemplates(mock(MessageTemplateOverrides.class)), new InstanceLinks(""), outbox,
+            mock(JdbcClient.class, RETURNS_DEEP_STUBS), Clock.fixed(NOW, ZONE));
 
     @Test
     void givenAnAccountWrittenToInEnglish_whenItsCredentialIsSent_thenTheMessageIsInEnglish() {

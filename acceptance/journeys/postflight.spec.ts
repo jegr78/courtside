@@ -2,13 +2,13 @@ import { test, expect } from "@playwright/test";
 import { readFileSync, writeFileSync } from "node:fs";
 import { readLedger, replay } from "../lib/ledger";
 import { openAs, xsrf } from "../lib/session";
-import { adminPut, apiAs } from "../lib/api";
+import { adminDelete, adminPut, apiAs } from "../lib/api";
 import { allSlots, lanePlan } from "../lib/lanes";
 import { sweep } from "../lib/sweep";
 import { clearWeekend } from "../lib/weekend";
 import { canSignIn, restoreDisposable } from "../lib/disposable";
 import { config, disposables, PASSWORD, runPath } from "../lib/context";
-import { deactivationLeftover, waitlistErasureSql, welcomeErasureSql } from "../lib/core.mjs";
+import { deactivationLeftover, foreignWordings, removalPath, waitlistErasureSql, welcomeErasureSql } from "../lib/core.mjs";
 import { erase } from "../lib/erasure";
 import { leaveWaitlist, MEMBERS, openWaitlistEntries } from "../lib/waitlist";
 
@@ -46,6 +46,20 @@ test("when the ledger is replayed, then the window holds no booking of this run"
   if (!dry) expect(diff.flatMap((d) => d.ours), "no booking of this run is left in the window").toEqual([]);
   if (!dry) expect(weeksLeft, "no opening week this run scheduled is left").toEqual([]);
   if (!dry) expect(availabilityLeft, "no holiday, season or court closure this run added is left").toEqual([]);
+});
+
+test("when the run ends, then every message wording this run stored is reset to the shipped one", async () => {
+  // when
+  const admin = await apiAs("admin");
+  const ours = readLedger().filter((entry) => entry.kind === "template");
+  const outcome: { id: string; status: number }[] = [];
+  for (const entry of ours) outcome.push({ id: entry.id, status: (await adminDelete(admin, removalPath(entry))).status() });
+  const templates = await (await admin.get("/api/admin/message-templates")).json();
+  const left = (foreignWordings(templates, []) as string[]).filter((id) => ours.some((entry) => entry.id === id));
+  writeFileSync(runPath("postflight-wording.json"), JSON.stringify({ outcome, left }, null, 2));
+  // then
+  expect(outcome.filter((reset) => reset.status >= 300), "every reset of this run's wording is accepted").toEqual([]);
+  expect(left, "no message keeps a wording this run stored").toEqual([]);
 });
 
 test("when the run ends, then no reserved slot holds a booking of this run, no week is scheduled and the disposable member signs in with the shared password", async () => {

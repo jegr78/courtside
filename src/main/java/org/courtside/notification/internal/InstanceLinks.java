@@ -38,6 +38,11 @@ class InstanceLinks {
         return origin.isEmpty() ? "" : origin + target;
     }
 
+    // A credential message names the instance only where a club's own wording puts it.
+    String root() {
+        return origin.isEmpty() ? "" : origin + "/";
+    }
+
     // The value never reaches the failure, because it may hold credentials.
     private static String originOf(String configured) {
         if (configured == null || configured.isBlank()) {

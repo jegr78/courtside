@@ -8,7 +8,8 @@ import { availabilityConflicts, weekendConflicts } from "../config/lanes.mjs";
 import { config, disposables, PASSWORD, runPath, type PersonaKey } from "../lib/context";
 import { mailAvailable } from "../lib/mail";
 import { profilesOf, resetQuota } from "../config/disposables.mjs";
-import { laneLimitConflicts, leavesBookingHours, occupying, waitlistErasureSql } from "../lib/core.mjs";
+import { foreignWordings, laneLimitConflicts, leavesBookingHours, occupying, waitlistErasureSql } from "../lib/core.mjs";
+import { readLedger } from "../lib/ledger";
 import { erase } from "../lib/erasure";
 import { PARTNER_MARKER } from "../lib/journey";
 import { MEMBERS } from "../lib/waitlist";
@@ -59,6 +60,7 @@ test("when the environment is checked before a run, then every precondition hold
     checks.availabilityConflicts = availabilityConflicts(grid, { ...plan, slots: allSlots() }, courts);
     const participantCards = await (await admin.get("/api/admin/participant-cards")).json() as { id: string; active: boolean }[];
     checks.partnerMarkerActive = participantCards.some((card) => card.id === PARTNER_MARKER && card.active);
+    checks.foreignWordings = foreignWordings(await (await admin.get("/api/admin/message-templates")).json(), readLedger());
     if (config.personas.restricted) {
       const restricted = await apiAs("restricted");
       const { bookingHours } = await (await restricted.get("/api/booking-eligibility")).json() as { bookingHours?: { earliestStart: string; latestEnd: string } | null };
@@ -99,6 +101,7 @@ test("when the environment is checked before a run, then every precondition hold
   expect.soft(checks.futureWeeks, "PRECONDITION: no opening week is scheduled after today").toEqual([]);
   expect.soft(checks.availabilityConflicts, "PRECONDITION: no season, holiday or court closure changes a lane or the hours of the window's weekend").toEqual([]);
   expect.soft(checks.partnerMarkerActive, "PRECONDITION: the looking-for-a-partner participant card is active").toBe(true);
+  expect.soft(checks.foreignWordings, "PRECONDITION: every message uses the shipped wording, so a run reads mail it can recognise and resets only what it wrote").toEqual([]);
   if (config.personas.restricted) {
     expect.soft(checks.restrictedHours, "PRECONDITION: the restricted member's category sets booking hours").toBeTruthy();
     expect.soft(checks.restrictedLanesInside, "PRECONDITION: the earliest lane hour lies outside the restricted member's booking hours").toEqual([]);

@@ -41,6 +41,9 @@ created.
 - On the eighth and ninth day after the window, no season, holiday or court closure of the club,
   and weekly hours that open both days. The availability journey adds a holiday on the first and
   closes the first court on the second.
+- Every message on its shipped wording. The admin journey rewords the username reminder in German
+  and English, asks for a reminder to the first plain member's address and restores the shipped
+  wording; a club wording the run did not store stops the preflight, which names each one.
 - Mail delivered to a catcher, never to members. The journeys change opening hours, and the
   instance tells members about bookings those changes affect.
 - The Mailpit API of that catcher for the journeys that read mail. Without `mail.url` those
@@ -132,7 +135,8 @@ and preflight, the journeys on all ten profiles, the postflight and the report.
 Discovery writes `lanes.json`: the window, and for each profile and journey its day, court and
 hour. Preflight then proves every lane slot free before a journey starts.
 
-The harness cancels only bookings and removes only opening weeks, holidays and court closures it
+The harness cancels only bookings, removes only opening weeks, holidays and court closures and
+resets only message wordings it
 recorded in its ledger. A
 booking or week of the club in its way stops the preflight or the journey that needs it and is
 never touched; choose another `window.start` or other `courts`. Each opening week a journey

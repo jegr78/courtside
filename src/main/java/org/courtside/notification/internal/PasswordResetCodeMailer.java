@@ -28,6 +28,7 @@ class PasswordResetCodeMailer implements MessageComposer {
     private final UserAccountRepository accounts;
     private final ClubIdentity club;
     private final MailTemplates templates;
+    private final InstanceLinks links;
     private final MessageOutbox outbox;
 
     @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT, fallbackExecution = true)
@@ -52,7 +53,8 @@ class PasswordResetCodeMailer implements MessageComposer {
                 "firstName", issued.recipientFirstName(),
                 "username", issued.username(),
                 "resetCode", issued.code(),
-                "expiresAt", expiresAt(issued.expiresAt(), locale));
+                "expiresAt", expiresAt(issued.expiresAt(), locale),
+                InstanceLinks.PLACEHOLDER, links.root());
         handOver.accept(new OutgoingMail(issued.recipientAddress(),
                 templates.render(key + ".subject", locale, values),
                 templates.render(key + ".body", locale, values)));

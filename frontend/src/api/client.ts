@@ -50,6 +50,9 @@ export type MessageEntry = components["schemas"]["MessageEntry"];
 export type MessagePage = components["schemas"]["MessagePage"];
 export type MessageState = components["schemas"]["MessageState"];
 export type MessageKind = components["schemas"]["MessageKind"];
+export type MessageTemplate = components["schemas"]["MessageTemplate"];
+export type MessageTemplateLanguage = components["schemas"]["MessageTemplateLanguage"];
+export type MessageTemplateText = components["schemas"]["MessageTemplateText"];
 export type MessageChoice = components["schemas"]["MessageChoice"];
 export type MessageChannel = components["schemas"]["MessageChannel"];
 export type MessageChannelChoice = components["schemas"]["MessageChannelChoice"];
@@ -638,6 +641,17 @@ export const api = {
         ...(options.personId ? { personId: options.personId } : {})
       })}`
     ),
+  messageTemplates: () => request<MessageTemplate[]>("/api/admin/message-templates"),
+  changeMessageTemplate: (kind: MessageKind, language: MessageTemplateLanguage, text: MessageTemplateText) =>
+    request<void>(`/api/admin/message-templates/${kind}/${language}`, {
+      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(text)
+    }),
+  resetMessageTemplate: (kind: MessageKind, language: MessageTemplateLanguage) =>
+    request<void>(`/api/admin/message-templates/${kind}/${language}`, { method: "DELETE" }),
+  previewMessageTemplate: (kind: MessageKind, language: MessageTemplateLanguage, text: MessageTemplateText) =>
+    request<MessageTemplateText>(`/api/admin/message-templates/${kind}/${language}/preview`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(text)
+    }),
   source: () => request<SourceOffer>("/api/source"),
   courts: () => request<PublicCourt[]>("/api/public/courts"),
   bookingGrid: (range?: { from: string; to: string }) => request<BookingGrid>(

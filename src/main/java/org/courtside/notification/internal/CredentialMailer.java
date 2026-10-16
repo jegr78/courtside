@@ -35,6 +35,7 @@ class CredentialMailer implements MessageComposer {
     private final UserAccountRepository accounts;
     private final ClubIdentity club;
     private final MailTemplates templates;
+    private final InstanceLinks links;
     private final MessageOutbox outbox;
     private final JdbcClient jdbc;
     private final Clock clock;
@@ -88,7 +89,8 @@ class CredentialMailer implements MessageComposer {
                 "firstName", issued.recipientFirstName(),
                 "username", issued.username(),
                 "credential", issued.credential(),
-                "expiresOn", expiresOn(expiresAt, locale));
+                "expiresOn", expiresOn(expiresAt, locale),
+                InstanceLinks.PLACEHOLDER, links.root());
         return new OutgoingMail(issued.recipientAddress(),
                 templates.render(key + ".subject", locale, values),
                 templates.render(key + ".body", locale, values));

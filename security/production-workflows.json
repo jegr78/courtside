@@ -491,6 +491,42 @@
       ]
     },
     {
+      "id": "message-wording",
+      "actors": [
+        "ADMIN"
+      ],
+      "entryPoints": "Message template list, change, preview and reset endpoints.",
+      "operationIds": [
+        "listMessageTemplates",
+        "changeMessageTemplate",
+        "previewMessageTemplate",
+        "resetMessageTemplate"
+      ],
+      "backgroundEntryPoints": [],
+      "stateTransitions": [
+        "An administrator stores the club's own subject and body of one message in one language.",
+        "A reset removes that wording so the shipped wording applies again."
+      ],
+      "alternatePaths": [
+        "A preview fills a wording with example values and stores nothing.",
+        "A stored wording the message cannot fill is skipped and the shipped wording is sent."
+      ],
+      "failurePaths": [
+        "Unknown or missing required placeholders, a secret in the subject or a line break in it are refused with typed violations.",
+        "A change or reset without recent full-password proof is refused and changes nothing."
+      ],
+      "productionPaths": [
+        "src/main/java/org/courtside/notification/internal/MessageTemplateService.java",
+        "src/main/java/org/courtside/notification/internal/MessageTemplateCatalog.java",
+        "src/main/java/org/courtside/notification/internal/MailTemplates.java"
+      ],
+      "evidence": [
+        "src/test/java/org/courtside/notification/web/MessageTemplateAdminControllerTest.java#givenNoRecentProof_whenAWordingIsStoredOrReset_thenBothAreRefusedAndNothingChanges",
+        "src/test/java/org/courtside/notification/web/MessageTemplateAdminControllerTest.java#givenAWordingWithoutTheUsername_whenStored_thenTheRefusalNamesThePlaceholder",
+        "src/test/java/org/courtside/notification/internal/MailTemplatesTest.java#givenAStoredWordingTheMessageCannotFill_whenRendered_thenTheShippedWordingIsSentInstead"
+      ]
+    },
+    {
       "id": "administrative-impact-reporting-and-records",
       "actors": [
         "ADMIN"

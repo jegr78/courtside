@@ -57,6 +57,7 @@ async function adminWrite(admin: Api, write: (path: string, data: unknown) => Pr
 
 export const adminPut = (admin: Api, path: string, data: unknown) => adminWrite(admin, admin.put, path, data);
 export const adminPost = (admin: Api, path: string, data: unknown) => adminWrite(admin, (p, d) => admin.post(p, d), path, data);
+export const adminDelete = (admin: Api, path: string) => adminWrite(admin, (p) => admin.del(p), path, undefined);
 
 export type RosterEntry = { personId: string; username: string | null; roles?: string[]; firstName: string; lastName: string; email: string | null; enabled: boolean; locale?: string | null };
 

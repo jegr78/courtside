@@ -150,6 +150,23 @@ describe("AdminAuditView", () => {
     expect(within(row(entry.id)).getByTestId("audit-subject")).toHaveTextContent("Whole instance");
   });
 
+  it("given a changed message wording, when it is shown, then the change names the message and its language", async () => {
+    // given
+    const entry: AuditEntry = {
+      ...courtAdded, eventType: "notification.template.changed",
+      parameters: { kind: "ACCOUNT_USERNAME_REMINDER", language: "de" }
+    };
+    vi.spyOn(api, "audit").mockResolvedValue({ entries: [entry], nextCursor: null });
+
+    // when
+    show();
+    await screen.findByTestId("audit-row");
+
+    // then
+    expect(within(row(entry.id)).getByTestId("audit-message"))
+      .toHaveTextContent("Wording of \"Username reminder\" (de) changed");
+  });
+
   it("given a booking entry, when it is shown, then the subject cell names its courts and its slot in the club time zone", async () => {
     // given
     const entry: AuditEntry = {
@@ -415,7 +432,7 @@ describe("AdminAuditView", () => {
     expect(options[0].value, "the first choice leaves the log unfiltered").toBe("");
     expect(options[0]).toHaveTextContent(unfiltered);
     const kinds = options.slice(1);
-    expect(kinds, "every audited kind of change is offered").toHaveLength(59);
+    expect(kinds, "every audited kind of change is offered").toHaveLength(61);
     expect(kinds.find((option) => option.value === "facility.court.added")).toHaveTextContent(courtAddedLabel);
     expect(kinds.filter((option) => /\w\.\w/.test(option.text)).map((option) => option.text), "no choice shows an identifier").toEqual([]);
     const labels = kinds.map((option) => option.text);

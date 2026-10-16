@@ -57,7 +57,9 @@ export function auditMessage(entry: AuditEntry, t: TFunction): string {
     : undefined;
   const opensAt = typeof entry.parameters.opensAt === "string" ? shortTime(entry.parameters.opensAt) : undefined;
   const closesAt = typeof entry.parameters.closesAt === "string" ? shortTime(entry.parameters.closesAt) : undefined;
-  const kind = typeof entry.parameters.kind === "string" ? t(`admin.availability.kind.${entry.parameters.kind}`) : undefined;
+  const kind = entry.eventType.startsWith("facility.openingPeriod.") && typeof entry.parameters.kind === "string"
+    ? t(`admin.availability.kind.${entry.parameters.kind}`)
+    : undefined;
   return t(`audit.event.${entry.eventType}`, {
     ...entry.parameters,
     ...(weekday !== undefined ? { weekday } : {}),
