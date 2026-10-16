@@ -72,6 +72,7 @@ public class RetentionService {
         if (category == null) {
             throw new IllegalStateException("Removing a retention period needs its category");
         }
+        rows.discardPreviewsCovering(category);
         if (rows.removePolicy(category)) {
             events.publishEvent(new DataExchangeEvent.RetentionPolicyRemoved(category));
         }

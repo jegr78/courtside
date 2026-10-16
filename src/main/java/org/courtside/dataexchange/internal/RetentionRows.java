@@ -69,6 +69,15 @@ public class RetentionRows {
                 .update() > 0;
     }
 
+    /** Deletes every open preview that applies a cut-off of the category; returns how many. */
+    public int discardPreviewsCovering(RetentionCategory category) {
+        String cutoff = switch (category) {
+            case BOOKINGS -> "bookings_ended_before";
+            case FORMER_MEMBERS -> "memberships_ended_before";
+        };
+        return jdbc.sql("DELETE FROM retention_preview WHERE " + cutoff + " IS NOT NULL").update();
+    }
+
     public long dueBookings(Instant endedBefore) {
         return jdbc.sql("SELECT count(*) FROM (" + DUE_BOOKINGS + ") due")
                 .param("endedBefore", utc(endedBefore))

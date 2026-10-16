@@ -137,6 +137,27 @@ class RetentionAdminControllerTest extends AbstractIntegrationTest {
 
     @Test
     @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAPreviewUnderAPeriod_whenThePeriodIsRemoved_thenThePreviewCanNoLongerRun() throws Exception {
+        // given
+        UUID gone = formerMember("Jane", "Doe", "jane.doe");
+        keep("FORMER_MEMBERS", 24);
+        String preview = mockMvc.perform(post("/api/admin/retention/previews").with(csrf()))
+                .andExpect(jsonPath("$.formerMembers.people").value(1))
+                .andReturn().getResponse().getContentAsString();
+
+        // when
+        mockMvc.perform(delete("/api/admin/retention/policies/FORMER_MEMBERS").with(csrf()))
+                .andExpect(status().isNoContent());
+
+        // then
+        mockMvc.perform(post("/api/admin/retention/previews/{id}/run", previewId(preview)).with(csrf()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:retention-preview-not-found"));
+        assertThat(identity.personExists(gone)).as("a period the board took back removes nobody").isTrue();
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
     void givenAPeriodOfNoMonths_whenSet_thenTheRefusalNamesTheField() throws Exception {
         // when / then
         mockMvc.perform(put("/api/admin/retention/policies/BOOKINGS").with(csrf())

@@ -282,8 +282,8 @@ A category without a `retention_policy` row is never touched, and nothing seeds 
 period is the club's decision. `retention_policy_retain_months_range` accepts 1 to 1200 months.
 `retention_preview_covers_a_category` refuses a preview with no cut-off, and
 `retention_preview_members_need_a_cutoff` refuses former members without the membership cut-off they
-were judged against. A preview row is deleted when its run starts, by the preview sweep once it has
-expired, and with the account that created it.
+were judged against. A preview row is deleted when its run starts, when the board removes a period
+it applies, by the preview sweep once it has expired, and with the account that created it.
 
 A run sets `booking.pseudonymised_at` and `booking_series.pseudonymised_at`.
 `booking_pseudonymised_names_nobody` and `booking_series_pseudonymised_names_nobody` then require
