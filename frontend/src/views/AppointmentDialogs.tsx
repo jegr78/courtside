@@ -134,12 +134,17 @@ export function ManagedAppointmentDialog({ bookingId, locale, timeZone, administ
   const { t } = useTranslation();
   const [detail, setDetail] = useState<ManagedAppointmentDetail>();
   const [tracked, setTracked] = useState(false);
+  const [begun, setBegun] = useState(false);
   const { message: error, report, clear } = useReportedFailure();
 
   useEffect(() => {
     let active = true;
     void api.managedAppointment(bookingId)
-      .then((appointment) => { if (active) setDetail(appointment); })
+      .then((appointment) => {
+        if (!active) return;
+        setDetail(appointment);
+        setBegun(Date.parse(appointment.startsAt) <= Date.now());
+      })
       .catch((failure) => { if (active) report(failure); });
     if (administrator) {
       void api.attendancePolicy()
@@ -159,8 +164,6 @@ export function ManagedAppointmentDialog({ bookingId, locale, timeZone, administ
       report(failure);
     }
   }
-
-  const begun = detail !== undefined && Date.parse(detail.startsAt) <= Date.now();
 
   return <Modal labelledBy="managed-appointment-detail-title" closed={closed}><div className="surface-panel flex w-full max-w-lg flex-col overflow-hidden rounded-2xl border">
     <DialogBody><div className="grid gap-4">
