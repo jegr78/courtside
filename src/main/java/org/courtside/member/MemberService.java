@@ -1,5 +1,6 @@
 package org.courtside.member;
 
+import org.courtside.config.ClubTimeZone;
 import org.courtside.member.internal.MembershipType;
 import org.courtside.member.internal.MembershipTypeInactiveException;
 import org.courtside.member.internal.MembershipTypeNameTakenException;
@@ -13,7 +14,10 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
+import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -35,9 +39,33 @@ public class MemberService {
     private final MembershipTypeRepository membershipTypes;
     private final RuleSetActivationRepository ruleSetActivation;
     private final ApplicationEventPublisher events;
+    private final Clock clock;
+    private final ClubTimeZone clubTimeZone;
 
     public Optional<UUID> membershipTypeIdOf(UUID personId) {
-        return members.findCurrentByPersonId(personId).map(Member::getMembershipTypeId);
+        return members.findValidOn(personId, today()).map(Member::getMembershipTypeId);
+    }
+
+    public Map<UUID, MembershipStanding> standingsOf(List<UUID> personIds) {
+        LocalDate today = today();
+        return members.findByPersonIdIn(personIds).stream()
+                .collect(Collectors.groupingBy(Member::getPersonId)).entrySet().stream()
+                .collect(Collectors.toMap(Map.Entry::getKey, entry -> {
+                    Member member = representativePeriod(entry.getValue(), today);
+                    return new MembershipStanding(member.getMembershipTypeId(), member.isValidOn(today));
+                }));
+    }
+
+    static Member representativePeriod(List<Member> periods, LocalDate today) {
+        return periods.stream().filter(member -> member.isValidOn(today)).findFirst()
+                .or(() -> periods.stream().filter(member -> member.getStartedOn().isAfter(today))
+                        .min(Comparator.comparing(Member::getStartedOn)))
+                .or(() -> periods.stream().max(Comparator.comparing(Member::getStartedOn)))
+                .orElse(null);
+    }
+
+    LocalDate today() {
+        return LocalDate.now(clock.withZone(clubTimeZone.zoneId()));
     }
 
     public List<MemberParticipant> findParticipants(String query, UUID searcherAccountId) {
@@ -45,7 +73,8 @@ public class MemberService {
         if (normalized.isEmpty()) {
             return List.of();
         }
-        return members.findParticipants(escapeLikePattern(normalized), searcherAccountId, PageRequest.of(0, 20));
+        return members.findParticipants(escapeLikePattern(normalized), searcherAccountId, today(),
+                PageRequest.of(0, 20));
     }
 
     private String escapeLikePattern(String value) {
@@ -179,5 +208,8 @@ public class MemberService {
     private boolean isRuleSetInvalid(DataIntegrityViolationException e) {
         return SqlConstraintViolation.matches(
                 e, SqlConstraintViolation.FOREIGN_KEY_VIOLATION, RULE_SET_FOREIGN_KEY);
+    }
+
+    public record MembershipStanding(UUID membershipTypeId, boolean current) {
     }
 }

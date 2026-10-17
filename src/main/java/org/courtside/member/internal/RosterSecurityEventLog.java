@@ -38,6 +38,9 @@ class RosterSecurityEventLog {
             case RosterEvent.AccountLocaleCorrected ignored -> null;
             case RosterEvent.MembershipWritten ignored -> null;
             case RosterEvent.MembershipEnded ignored -> null;
+            case RosterEvent.MembershipPeriodAdded ignored -> null;
+            case RosterEvent.MembershipPeriodCorrected ignored -> null;
+            case RosterEvent.MembershipPeriodRemoved ignored -> null;
         };
         if (action != null) {
             write(action.accountId(), actor, action.action());

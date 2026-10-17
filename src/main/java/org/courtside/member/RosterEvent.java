@@ -129,4 +129,39 @@ public sealed interface RosterEvent extends DomainEventRecord {
         }
 
     }
+
+    record MembershipPeriodAdded(UUID personId, UUID periodId, UUID membershipTypeId, LocalDate startedOn,
+                                 @Nullable LocalDate endedOn) implements RosterEvent {
+
+        static final String TYPE = "roster.membershipPeriod.added";
+
+        @Override
+        public String eventType() {
+            return TYPE;
+        }
+
+    }
+
+    record MembershipPeriodCorrected(UUID personId, UUID periodId, UUID membershipTypeId, LocalDate startedOn,
+                                     @Nullable LocalDate endedOn) implements RosterEvent {
+
+        static final String TYPE = "roster.membershipPeriod.corrected";
+
+        @Override
+        public String eventType() {
+            return TYPE;
+        }
+
+    }
+
+    record MembershipPeriodRemoved(UUID personId, UUID periodId) implements RosterEvent {
+
+        static final String TYPE = "roster.membershipPeriod.removed";
+
+        @Override
+        public String eventType() {
+            return TYPE;
+        }
+
+    }
 }

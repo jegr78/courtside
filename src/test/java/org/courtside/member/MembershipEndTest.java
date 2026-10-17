@@ -10,11 +10,11 @@ import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
 import java.time.LocalDate;
-import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 
 @Import(IdentityTestFixture.class)
 class MembershipEndTest extends AbstractIntegrationTest {
@@ -49,7 +49,7 @@ class MembershipEndTest extends AbstractIntegrationTest {
 
         // then
         assertThat(memberships.membershipTypeIdOf(mary)).isEmpty();
-        assertThat(members.findByPersonId(mary))
+        assertThat(MemberFixtures.latestPeriodOf(members, mary))
                 .as("the record stays, carrying the type they last held and the date it ended")
                 .get()
                 .satisfies(member -> {
@@ -59,33 +59,34 @@ class MembershipEndTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void givenAMembershipDatedToEndInDecember_whenWritingIt_thenTheFutureDateIsRefused() {
+    void givenAMembershipDatedToEndInDecember_whenWritingIt_thenItBindsUntilThen() {
         // given
         UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
         MembershipType type = memberships.createMembershipType("Adults", null, false);
 
-        // when / then
-        assertThatThrownBy(() -> roster.writeMembership(mary, type.getId(),
-                new MembershipPeriod(LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31))))
-                .isInstanceOf(InvalidMembershipPeriodException.class)
-                .extracting("code")
-                .isEqualTo("membershipPeriod.inTheFuture");
-        assertThat(members.findByPersonId(mary)).isEmpty();
+        // when
+        roster.writeMembership(mary, type.getId(),
+                new MembershipPeriod(LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31)));
+
+        // then
+        assertThat(memberships.membershipTypeIdOf(mary)).contains(type.getId());
+        assertThat(MemberFixtures.latestPeriodOf(members, mary)).get()
+                .satisfies(member -> assertThat(member.getEndedOn()).isEqualTo(LocalDate.of(2026, 12, 31)));
     }
 
     @Test
-    void givenAMembershipDatedToBeginNextYear_whenWritingIt_thenTheFutureDateIsRefused() {
+    void givenAMembershipDatedToBeginNextYear_whenWritingIt_thenItGrantsNothingYet() {
         // given
         UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
         MembershipType type = memberships.createMembershipType("Adults", null, false);
 
-        // when / then
-        assertThatThrownBy(() -> roster.writeMembership(mary, type.getId(),
-                new MembershipPeriod(LocalDate.of(2027, 1, 1), null)))
-                .isInstanceOf(InvalidMembershipPeriodException.class)
-                .extracting("code")
-                .isEqualTo("membershipPeriod.inTheFuture");
-        assertThat(members.findByPersonId(mary)).isEmpty();
+        // when
+        roster.writeMembership(mary, type.getId(), new MembershipPeriod(LocalDate.of(2027, 1, 1), null));
+
+        // then
+        assertThat(memberships.membershipTypeIdOf(mary)).isEmpty();
+        assertThat(MemberFixtures.latestPeriodOf(members, mary)).get()
+                .satisfies(member -> assertThat(member.getStartedOn()).isEqualTo(LocalDate.of(2027, 1, 1)));
     }
 
     @Test
@@ -99,7 +100,7 @@ class MembershipEndTest extends AbstractIntegrationTest {
         roster.endMembership(mary);
 
         // then
-        assertThat(members.findByPersonId(mary))
+        assertThat(MemberFixtures.latestPeriodOf(members, mary))
                 .get()
                 .satisfies(member -> {
                     assertThat(member.getStartedOn()).isEqualTo(TODAY);
@@ -154,7 +155,7 @@ class MembershipEndTest extends AbstractIntegrationTest {
 
         // then
         assertThat(entry.membership().startedOn()).isEqualTo(LocalDate.of(2020, 9, 1));
-        assertThat(members.findByPersonId(mary))
+        assertThat(MemberFixtures.latestPeriodOf(members, mary))
                 .get()
                 .satisfies(member ->
                         assertThat(member.getStartedOn()).isEqualTo(LocalDate.of(2020, 9, 1)));
@@ -200,7 +201,7 @@ class MembershipEndTest extends AbstractIntegrationTest {
         roster.endMembership(mary);
 
         // then
-        assertThat(members.findByPersonId(mary))
+        assertThat(MemberFixtures.latestPeriodOf(members, mary))
                 .get()
                 .satisfies(member -> assertThat(member.getEndedOn())
                         .as("a second ending does not move the date to today")
@@ -208,7 +209,7 @@ class MembershipEndTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void givenAMembershipThatEnded_whenTheSameTypeIsWrittenAgain_thenItRunsAgainFromTheNewStart() {
+    void givenAMembershipThatEnded_whenTheSameTypeIsWrittenAgain_thenANewPeriodRunsFromTheNewStart() {
         // given
         UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
         MembershipType type = memberships.createMembershipType("Adults", null, false);
@@ -220,13 +221,12 @@ class MembershipEndTest extends AbstractIntegrationTest {
 
         // then
         assertThat(memberships.membershipTypeIdOf(mary)).contains(type.getId());
-        assertThat(members.findByPersonIdIn(List.of(mary)))
-                .as("a rejoin revives the one record rather than adding a second")
-                .singleElement()
-                .satisfies(member -> {
-                    assertThat(member.getStartedOn()).isEqualTo(LocalDate.of(2026, 1, 1));
-                    assertThat(member.getEndedOn()).isNull();
-                });
+        assertThat(members.findByPersonIdOrderByStartedOnAscIdAsc(mary))
+                .as("a rejoin adds a period and keeps the earlier one")
+                .extracting(Member::getStartedOn, Member::getEndedOn)
+                .containsExactly(
+                        tuple(LocalDate.of(2024, 1, 1), LocalDate.of(2024, 12, 31)),
+                        tuple(LocalDate.of(2026, 1, 1), null));
     }
 
     @Test
@@ -242,7 +242,7 @@ class MembershipEndTest extends AbstractIntegrationTest {
                 new MembershipPeriod(LocalDate.of(2026, 1, 1), LocalDate.of(2026, 4, 30)));
 
         // then
-        assertThat(members.findByPersonId(mary))
+        assertThat(MemberFixtures.latestPeriodOf(members, mary))
                 .get()
                 .satisfies(member ->
                         assertThat(member.getEndedOn()).isEqualTo(LocalDate.of(2026, 4, 30)));
@@ -326,7 +326,7 @@ class MembershipEndTest extends AbstractIntegrationTest {
         roster.endMembership(mary);
 
         // then
-        assertThat(members.findByPersonId(mary))
+        assertThat(MemberFixtures.latestPeriodOf(members, mary))
                 .get()
                 .satisfies(member -> assertThat(member.getEndedOn()).isEqualTo(TODAY));
     }

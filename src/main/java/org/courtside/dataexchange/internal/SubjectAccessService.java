@@ -114,10 +114,9 @@ public class SubjectAccessService {
     }
 
     private List<SubjectAccessRecord.Membership> membershipsOf(UUID personId) {
-        return members.findByPersonId(personId)
+        return members.findByPersonIdOrderByStartedOnAscIdAsc(personId).stream()
                 .map(this::membershipOf)
-                .map(List::of)
-                .orElse(List.of());
+                .toList();
     }
 
     private SubjectAccessRecord.Membership membershipOf(Member member) {

@@ -1,7 +1,6 @@
 package org.courtside.member.testfixture;
 
 import lombok.RequiredArgsConstructor;
-import org.courtside.member.MemberRepository;
 import org.courtside.member.MemberService;
 import org.courtside.member.MembershipPeriod;
 import org.courtside.member.RosterChangeSet;
@@ -23,7 +22,6 @@ public class MemberTestFixture {
 
     private final MemberService memberships;
     private final RosterService roster;
-    private final MemberRepository members;
     private final RosterSyncService sync;
 
     public UUID addPerson(String firstName, String lastName, String email) {
@@ -112,6 +110,8 @@ public class MemberTestFixture {
     }
 
     public Optional<LocalDate> membershipStartedOn(UUID personId) {
-        return members.findCurrentByPersonId(personId).map(member -> member.getStartedOn());
+        return Optional.ofNullable(roster.person(personId).membership())
+                .filter(membership -> membership.endedOn() == null)
+                .map(RosterService.Membership::startedOn);
     }
 }

@@ -108,7 +108,7 @@ public class RosterSyncService {
     private UUID create(RosterChangeSet.NewPerson creation) {
         UUID personId = roster.createPerson(creation.firstName(), creation.lastName(),
                 creation.email()).personId();
-        roster.writeMembership(personId, creation.membershipTypeId(), MembershipPeriod.running());
+        roster.holdMembershipFromToday(personId, creation.membershipTypeId());
         return personId;
     }
 
@@ -122,8 +122,7 @@ public class RosterSyncService {
                     correction.lastName(), correction.email());
         }
         if (correction.membershipTypeId() != null) {
-            roster.writeMembership(correction.personId(), correction.membershipTypeId(),
-                    MembershipPeriod.running());
+            roster.holdMembershipFromToday(correction.personId(), correction.membershipTypeId());
         }
         return names || correction.membershipTypeId() != null;
     }

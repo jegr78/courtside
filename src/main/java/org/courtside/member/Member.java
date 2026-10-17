@@ -43,12 +43,6 @@ public class Member {
         this.membershipTypeId = membershipTypeId;
     }
 
-    public void reviveOn(UUID membershipTypeId, LocalDate startedOn) {
-        this.membershipTypeId = membershipTypeId;
-        this.startedOn = startedOn;
-        this.endedOn = null;
-    }
-
     public void endOn(LocalDate endedOn) {
         this.endedOn = endedOn;
     }
@@ -58,7 +52,11 @@ public class Member {
         this.endedOn = endedOn;
     }
 
-    public boolean isCurrent() {
-        return endedOn == null;
+    public boolean isValidOn(LocalDate day) {
+        return !startedOn.isAfter(day) && (endedOn == null || endedOn.isAfter(day));
+    }
+
+    public boolean hasEndedBy(LocalDate day) {
+        return endedOn != null && !endedOn.isAfter(day);
     }
 }

@@ -14,8 +14,6 @@ import org.courtside.dataexchange.internal.PreviewContent;
 import org.courtside.dataexchange.internal.SnapshotParser;
 import org.courtside.identity.Person;
 import org.courtside.identity.PersonRepository;
-import org.courtside.member.Member;
-import org.courtside.member.MemberRepository;
 import org.courtside.member.MemberService;
 import org.courtside.member.RosterService;
 import org.springframework.stereotype.Service;
@@ -34,7 +32,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -46,7 +43,6 @@ public class PreviewService {
     private final ImportSourceService sources;
     private final ExternalReferenceRepository references;
     private final PersonRepository persons;
-    private final MemberRepository members;
     private final MemberService memberships;
     private final RosterService roster;
     private final ObjectMapper json;
@@ -103,8 +99,7 @@ public class PreviewService {
                 .collect(Collectors.toMap(ExternalReference::getExternalId,
                         ExternalReference::getPersonId));
         List<UUID> linked = List.copyOf(personIdsByExternalId.values());
-        Map<UUID, Member> membershipsByPerson = members.findByPersonIdIn(linked).stream()
-                .collect(Collectors.toMap(Member::getPersonId, Function.identity()));
+        Map<UUID, MemberService.MembershipStanding> membershipsByPerson = memberships.standingsOf(linked);
         Map<UUID, CurrentRoster.RosterPerson> peopleById = persons.findAllById(linked).stream()
                 .collect(Collectors.toMap(Person::getId,
                         person -> toRosterPerson(person, membershipsByPerson.get(person.getId()))));
@@ -152,11 +147,12 @@ public class PreviewService {
                         Collectors.mapping(Person::getId, Collectors.toList())));
     }
 
-    private static CurrentRoster.RosterPerson toRosterPerson(Person person, Member member) {
+    private static CurrentRoster.RosterPerson toRosterPerson(Person person,
+                                                             MemberService.MembershipStanding member) {
         return new CurrentRoster.RosterPerson(person.getId(), person.getFirstName(),
                 person.getLastName(), person.getEmail(),
-                member == null ? null : member.getMembershipTypeId(),
-                member != null && member.isCurrent());
+                member == null ? null : member.membershipTypeId(),
+                member != null && member.current());
     }
 
     // Only the people the change set names: an execution compares those and nothing else, and a
