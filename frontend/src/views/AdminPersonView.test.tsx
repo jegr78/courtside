@@ -446,6 +446,7 @@ describe("AdminPersonView", () => {
     vi.mocked(downloadJson).mockClear();
     await i18n.changeLanguage("en");
     vi.spyOn(api, "membershipTypes").mockResolvedValue([adults, juniors]);
+    vi.spyOn(api, "membershipPeriods").mockResolvedValue([]);
     vi.spyOn(api, "messages").mockResolvedValue({ entries: [], nextCursor: null });
   });
 
@@ -616,6 +617,41 @@ describe("AdminPersonView", () => {
     // then
     expect(api.assignMembership).not.toHaveBeenCalled();
     expect(screen.getByRole("dialog")).toBeInTheDocument();
+  });
+
+  it("given a membership that runs today with an end ahead, when the page is shown, then it can still be ended", async () => {
+    // when
+    showPerson({ ...jane, membershipCurrent: true, membershipEndedOn: "2999-01-01" });
+
+    // then
+    expect(await screen.findByTestId("end-membership"), "an end date ahead leaves the membership running").toBeInTheDocument();
+  });
+
+  it("given a membership that begins later, when the page is shown, then it is not offered as one to end", async () => {
+    // when
+    showPerson({ ...jane, membershipCurrent: false, membershipStartedOn: "2999-01-01", membershipEndedOn: null });
+
+    // then
+    await screen.findByTestId("person-membership");
+    expect(screen.queryByTestId("end-membership"), "nothing runs yet that could end").not.toBeInTheDocument();
+  });
+
+  it("given a period is added, when it is saved, then the membership fields are read again", async () => {
+    // given
+    const scheduled = { id: "period-9", membershipTypeId: "type-2", startedOn: "2999-01-01", endedOn: null };
+    vi.spyOn(api, "addMembershipPeriod").mockResolvedValue(scheduled);
+    vi.spyOn(api, "membershipPeriods").mockResolvedValueOnce([]).mockResolvedValue([scheduled]);
+    showPerson();
+    await screen.findByTestId("membership-periods-none");
+
+    // when
+    await userEvent.click(screen.getByTestId("add-period"));
+    await userEvent.selectOptions(screen.getByTestId("period-type"), "type-2");
+    await userEvent.type(screen.getByTestId("period-started-on"), "2999-01-01");
+    await userEvent.click(screen.getByTestId("save-period"));
+
+    // then
+    await waitFor(() => expect(api.person, "the roster entry is read again after the period changed").toHaveBeenCalledTimes(2));
   });
 
   it("given the end is confirmed, when it is written, then the end date is the one the board chose", async () => {

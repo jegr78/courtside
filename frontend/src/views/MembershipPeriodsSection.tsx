@@ -22,7 +22,7 @@ export function MembershipPeriodsSection({ personId, types, disabled, version, c
   personId: string;
   types: MembershipType[];
   disabled: boolean;
-  version: number;
+  version: string;
   changed: () => void;
 }) {
   const { t } = useTranslation();

@@ -18,7 +18,7 @@ const overlap = new ApiError(409, {
 });
 
 function show(changed = vi.fn()) {
-  render(<MembershipPeriodsSection personId="person-1" types={[adults, juniors]} disabled={false} version={0} changed={changed} />);
+  render(<MembershipPeriodsSection personId="person-1" types={[adults, juniors]} disabled={false} version="0" changed={changed} />);
   return changed;
 }
 
