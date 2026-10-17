@@ -354,11 +354,16 @@ Vorname, Nachname und E-Mail-Adresse kannst du später korrigieren.
 
 ![Die Personenliste mit Suche, Filter und den wichtigsten Kontodaten.](screenshots/de/admin-roster.png)
 
-Nach dem Öffnen einer Person stehen drei Bereiche bereit:
+Nach dem Öffnen einer Person stehen diese Bereiche bereit:
 
 * Unter **Person** bearbeitest du Vorname, Nachname und E-Mail-Adresse.
 * Unter **Mitgliedschaft** bearbeitest du Mitgliedsart, Beginn und Ende. Beende eine
-  Mitgliedschaft, statt sie zu löschen. Das Enddatum bleibt korrigierbar.
+  Mitgliedschaft, statt sie zu löschen. Das Enddatum bleibt korrigierbar. Das Ende ist der erste
+  Tag, an dem die Person nicht mehr Mitglied ist.
+* Unter **Zeiträume der Mitgliedschaft** stehen alle Zeiträume dieser Person, auch ein Wechsel der
+  Mitgliedsart oder ein Wiedereintritt. Ein Zeitraum darf in der Zukunft beginnen und gilt erst ab
+  seinem ersten Tag. Zwei Zeiträume dürfen sich nicht überschneiden. Einen falsch erfassten
+  Zeitraum korrigierst oder entfernst du dort.
 * Unter **Konto** verwaltest du Benutzername, Sprache der Benachrichtigungen, Rollen, Status und
   Zugangsdaten. Für ein Konto ist eine E-Mail-Adresse erforderlich.
 
