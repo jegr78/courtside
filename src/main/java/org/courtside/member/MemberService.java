@@ -77,7 +77,8 @@ public class MemberService {
                 .collect(Collectors.groupingBy(Member::getPersonId)).entrySet().stream()
                 .collect(Collectors.toMap(Map.Entry::getKey, entry -> {
                     Member member = representativePeriod(entry.getValue(), today);
-                    return new MembershipStanding(member.getMembershipTypeId(), member.isValidOn(today));
+                    return new MembershipStanding(member.getMembershipTypeId(), member.isValidOn(today),
+                            member.getStartedOn().isAfter(today));
                 }));
     }
 
@@ -235,6 +236,6 @@ public class MemberService {
                 e, SqlConstraintViolation.FOREIGN_KEY_VIOLATION, RULE_SET_FOREIGN_KEY);
     }
 
-    public record MembershipStanding(UUID membershipTypeId, boolean current) {
+    public record MembershipStanding(UUID membershipTypeId, boolean current, boolean scheduled) {
     }
 }

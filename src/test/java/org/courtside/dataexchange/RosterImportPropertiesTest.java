@@ -187,7 +187,7 @@ class RosterImportPropertiesTest {
             UUID personId = UUID.nameUUIDFromBytes(("person-" + index).getBytes(StandardCharsets.UTF_8));
             personIds.put("M" + index, personId);
             people.put(personId, new CurrentRoster.RosterPerson(personId, "Old" + index, "Roe",
-                    null, ACTIVE_TYPE, true));
+                    null, ACTIVE_TYPE, true, false));
         }
         return new CurrentRoster(personIds, people, Set.of(ACTIVE_TYPE), Map.of(), Set.of(),
                 Set.of(), Map.of());

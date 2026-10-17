@@ -152,7 +152,7 @@ public class PreviewService {
         return new CurrentRoster.RosterPerson(person.getId(), person.getFirstName(),
                 person.getLastName(), person.getEmail(),
                 member == null ? null : member.membershipTypeId(),
-                member != null && member.current());
+                member != null && member.current(), member != null && member.scheduled());
     }
 
     // Only the people the change set names: an execution compares those and nothing else, and a
