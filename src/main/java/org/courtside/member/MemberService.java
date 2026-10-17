@@ -25,6 +25,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -44,6 +45,23 @@ public class MemberService {
 
     public Optional<UUID> membershipTypeIdOf(UUID personId) {
         return members.findValidOn(personId, today()).map(Member::getMembershipTypeId);
+    }
+
+    public Optional<UUID> membershipTypeIdFor(UUID personId, LocalDate day) {
+        if (day == null) {
+            throw new IllegalStateException("A membership type is read for a day");
+        }
+        return membershipTypesOf(personId).apply(day);
+    }
+
+    public Function<LocalDate, Optional<UUID>> membershipTypesOf(UUID personId) {
+        LocalDate today = today();
+        List<Member> periods = members.findByPersonIdOrderByStartedOnAscIdAsc(personId);
+        if (periods.stream().noneMatch(member -> member.isValidOn(today))) {
+            return day -> Optional.empty();
+        }
+        return day -> periods.stream().filter(member -> member.isValidOn(day)).findFirst()
+                .map(Member::getMembershipTypeId);
     }
 
     public Map<UUID, MembershipStanding> standingsOf(List<UUID> personIds) {
