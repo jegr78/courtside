@@ -126,10 +126,10 @@ it("given an administrator, when the operator health is read, then the overview 
   const overview = {
     checkedAt: "2026-10-17T08:00:00Z",
     version: { state: "OK", version: "0.4.0", revision: null, builtAt: null },
-    migrations: { state: "OK", pending: 0, currentVersion: "63", expectedVersion: "63" },
-    mail: { state: "UNAVAILABLE", reason: "NOT_YET_OBSERVED" },
-    publicOrigin: { state: "OK", origin: "https://courts.example.org" },
-    backup: { state: "UNAVAILABLE", reason: "NOT_CONFIGURED" }
+    migrations: { state: "OK", reason: null, pending: 0, currentVersion: "63", expectedVersion: "63", location: null },
+    mail: { state: "UNAVAILABLE", reason: "NOT_YET_OBSERVED", lastHandedOverAt: null, location: null },
+    publicOrigin: { state: "OK", reason: null, origin: "https://courts.example.org" },
+    backup: { state: "UNAVAILABLE", reason: "NOT_CONFIGURED", completedAt: null, ageSeconds: null, location: null }
   };
   server.use(http.get("/api/admin/operator-health", () => HttpResponse.json(overview)));
 

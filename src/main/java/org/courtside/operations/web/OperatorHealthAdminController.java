@@ -29,26 +29,18 @@ class OperatorHealthAdminController implements AdminOperatorHealthApi {
         OperatorHealth read = health.read();
         return ResponseEntity.ok(new ApiOperatorHealth(
                 WireTypes.toOffsetDateTime(read.checkedAt()),
-                new ApiOperatorVersionCheck(ApiOperatorCheckState.OK, read.version().version())
-                        .revision(read.version().revision())
-                        .builtAt(WireTypes.toOffsetDateTime(read.version().builtAt())),
-                new ApiOperatorMigrationCheck(state(read.migrations().state()), read.migrations().pending())
-                        .reason(reason(read.migrations().reason()))
-                        .currentVersion(read.migrations().currentVersion())
-                        .expectedVersion(read.migrations().expectedVersion())
-                        .location(read.migrations().location()),
-                new ApiOperatorMailCheck(state(read.mail().state()))
-                        .reason(reason(read.mail().reason()))
-                        .lastHandedOverAt(WireTypes.toOffsetDateTime(read.mail().lastHandedOverAt()))
-                        .location(read.mail().location()),
-                new ApiOperatorPublicOriginCheck(state(read.publicOrigin().state()))
-                        .reason(reason(read.publicOrigin().reason()))
-                        .origin(read.publicOrigin().origin()),
-                new ApiOperatorBackupCheck(state(read.backup().state()))
-                        .reason(reason(read.backup().reason()))
-                        .completedAt(WireTypes.toOffsetDateTime(read.backup().completedAt()))
-                        .ageSeconds(read.backup().ageSeconds())
-                        .location(read.backup().location())));
+                new ApiOperatorVersionCheck(ApiOperatorCheckState.OK, read.version().version(),
+                        read.version().revision(), WireTypes.toOffsetDateTime(read.version().builtAt())),
+                new ApiOperatorMigrationCheck(state(read.migrations().state()), reason(read.migrations().reason()),
+                        read.migrations().currentVersion(), read.migrations().expectedVersion(),
+                        read.migrations().pending(), read.migrations().location()),
+                new ApiOperatorMailCheck(state(read.mail().state()), reason(read.mail().reason()),
+                        WireTypes.toOffsetDateTime(read.mail().lastHandedOverAt()), read.mail().location()),
+                new ApiOperatorPublicOriginCheck(state(read.publicOrigin().state()),
+                        reason(read.publicOrigin().reason()), read.publicOrigin().origin()),
+                new ApiOperatorBackupCheck(state(read.backup().state()), reason(read.backup().reason()),
+                        WireTypes.toOffsetDateTime(read.backup().completedAt()), read.backup().ageSeconds(),
+                        read.backup().location())));
     }
 
     private static ApiOperatorCheckState state(CheckState state) {

@@ -473,10 +473,10 @@ test("stable administration surfaces match their reviewed baselines", async ({ p
 const operatorHealthSample = {
   checkedAt: "2026-10-17T08:00:00Z",
   version: { state: "OK", version: "0.4.0", revision: "4f2c9e1", builtAt: "2026-10-16T20:00:00Z" },
-  migrations: { state: "OK", pending: 0, currentVersion: "63", expectedVersion: "63" },
+  migrations: { state: "OK", reason: null, pending: 0, currentVersion: "63", expectedVersion: "63", location: null },
   mail: { state: "FAILING", reason: "HANDOVER_FAILING", lastHandedOverAt: "2026-10-17T07:00:00Z", location: "relay.example.org:587" },
-  publicOrigin: { state: "OK", origin: "https://courts.example.org" },
-  backup: { state: "UNAVAILABLE", reason: "NOT_CONFIGURED" }
+  publicOrigin: { state: "OK", reason: null, origin: "https://courts.example.org" },
+  backup: { state: "UNAVAILABLE", reason: "NOT_CONFIGURED", completedAt: null, ageSeconds: null, location: null }
 };
 
 async function signIn(page: Page, username: string): Promise<void> {

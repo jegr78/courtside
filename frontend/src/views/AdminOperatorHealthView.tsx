@@ -20,7 +20,7 @@ const symbols: Record<OperatorCheckState, string> = { OK: "✓", FAILING: "✕",
 
 interface Reading {
   state: OperatorCheckState;
-  reason?: OperatorCheckReason;
+  reason: OperatorCheckReason | null;
   detail: Record<string, string | number>;
 }
 
@@ -65,7 +65,7 @@ export function AdminOperatorHealthView() {
     switch (check) {
       case "version": {
         const { state, version, revision, builtAt } = overview.version;
-        return { state, detail: { version, revision: revision ?? t("operatorHealth.version.noRevision"), builtAt: time(builtAt) || t("operatorHealth.version.noBuildTime") } };
+        return { state, reason: null, detail: { version, revision: revision ?? t("operatorHealth.version.noRevision"), builtAt: time(builtAt) || t("operatorHealth.version.noBuildTime") } };
       }
       case "migrations": {
         const { state, reason, currentVersion, pending: count, location } = overview.migrations;

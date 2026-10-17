@@ -31,6 +31,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -103,7 +104,14 @@ class OperatorHealthAdminControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.publicOrigin.state").value("OK"))
                 .andExpect(jsonPath("$.publicOrigin.origin").value("https://courts.example.org"))
                 .andExpect(jsonPath("$.backup.state").value("OK"))
-                .andExpect(jsonPath("$.backup.ageSeconds").value(greaterThanOrEqualTo(7_200)));
+                .andExpect(jsonPath("$.backup.ageSeconds").value(greaterThanOrEqualTo(7_200)))
+                .andExpect(jsonPath("$.migrations.reason").value(nullValue()))
+                .andExpect(jsonPath("$.migrations.location").value(nullValue()))
+                .andExpect(jsonPath("$.mail.reason").value(nullValue()))
+                .andExpect(jsonPath("$.mail.location").value(nullValue()))
+                .andExpect(jsonPath("$.publicOrigin.reason").value(nullValue()))
+                .andExpect(jsonPath("$.backup.reason").value(nullValue()))
+                .andExpect(jsonPath("$.backup.location").value(nullValue()));
     }
 
     @Test
@@ -118,7 +126,9 @@ class OperatorHealthAdminControllerTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.backup.state").value("UNAVAILABLE"))
                 .andExpect(jsonPath("$.backup.reason").value("NOT_RECORDED"))
-                .andExpect(jsonPath("$.backup.ageSeconds").doesNotExist())
+                .andExpect(jsonPath("$.backup.ageSeconds").value(nullValue()))
+                .andExpect(jsonPath("$.backup.completedAt").value(nullValue()))
+                .andExpect(jsonPath("$.backup.location").value(nullValue()))
                 .andExpect(jsonPath("$.mail.state").value("FAILING"))
                 .andExpect(jsonPath("$.mail.reason").value("HANDOVER_FAILING"))
                 .andExpect(jsonPath("$.mail.location").value("localhost:2525"));

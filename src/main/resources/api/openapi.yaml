@@ -3603,7 +3603,7 @@ components:
 
     OperatorVersionCheck:
       type: object
-      required: [state, version]
+      required: [state, version, revision, builtAt]
       properties:
         state: { $ref: "#/components/schemas/OperatorCheckState" }
         version:
@@ -3617,11 +3617,14 @@ components:
 
     OperatorMigrationCheck:
       type: object
-      required: [state, pending]
+      required: [state, reason, currentVersion, expectedVersion, pending, location]
       properties:
         state: { $ref: "#/components/schemas/OperatorCheckState" }
         reason:
-          $ref: "#/components/schemas/OperatorCheckReason"
+          oneOf:
+            - $ref: "#/components/schemas/OperatorCheckReason"
+            - type: "null"
+          description: "`null` when the check is `OK`."
         currentVersion:
           type: [string, "null"]
           description: The newest migration the database records as applied.
@@ -3638,11 +3641,14 @@ components:
 
     OperatorMailCheck:
       type: object
-      required: [state]
+      required: [state, reason, lastHandedOverAt, location]
       properties:
         state: { $ref: "#/components/schemas/OperatorCheckState" }
         reason:
-          $ref: "#/components/schemas/OperatorCheckReason"
+          oneOf:
+            - $ref: "#/components/schemas/OperatorCheckReason"
+            - type: "null"
+          description: "`null` when the check is `OK`."
         lastHandedOverAt:
           type: [string, "null"]
           format: date-time
@@ -3653,22 +3659,28 @@ components:
 
     OperatorPublicOriginCheck:
       type: object
-      required: [state]
+      required: [state, reason, origin]
       properties:
         state: { $ref: "#/components/schemas/OperatorCheckState" }
         reason:
-          $ref: "#/components/schemas/OperatorCheckReason"
+          oneOf:
+            - $ref: "#/components/schemas/OperatorCheckReason"
+            - type: "null"
+          description: "`null` when the check is `OK`."
         origin:
           type: [string, "null"]
           description: The configured public address messages link to.
 
     OperatorBackupCheck:
       type: object
-      required: [state]
+      required: [state, reason, completedAt, ageSeconds, location]
       properties:
         state: { $ref: "#/components/schemas/OperatorCheckState" }
         reason:
-          $ref: "#/components/schemas/OperatorCheckReason"
+          oneOf:
+            - $ref: "#/components/schemas/OperatorCheckReason"
+            - type: "null"
+          description: "`null` when the check is `OK`."
         completedAt:
           type: [string, "null"]
           format: date-time
