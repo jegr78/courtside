@@ -672,6 +672,27 @@ describe("AdminPersonView", () => {
     });
   });
 
+  it("given a period scheduled to follow, when the membership is ended, then the period list is read again without it", async () => {
+    // given
+    const running = { id: "period-1", membershipTypeId: "type-1", startedOn: "2026-01-01", endedOn: "2026-12-01", state: "RUNNING" as const };
+    const scheduled = { id: "period-2", membershipTypeId: "type-2", startedOn: "2026-12-01", endedOn: null, state: "SCHEDULED" as const };
+    vi.spyOn(api, "membershipPeriods").mockResolvedValueOnce([running, scheduled])
+      .mockResolvedValue([{ ...running, endedOn: "2026-03-31" }]);
+    vi.spyOn(api, "assignMembership").mockResolvedValue({ ...jane, membershipEndedOn: "2026-03-31" });
+    showPerson({ ...jane, membershipEndedOn: "2026-12-01" });
+    await screen.findByTestId("membership-period-period-2");
+
+    // when
+    await userEvent.click(screen.getByTestId("end-membership"));
+    await userEvent.clear(screen.getByTestId("end-membership-date"));
+    await userEvent.type(screen.getByTestId("end-membership-date"), "2026-03-31");
+    await userEvent.click(screen.getByTestId("confirm-end-membership"));
+
+    // then
+    await waitFor(() => expect(screen.queryByTestId("membership-period-period-2"),
+      "the period the server withdrew with the end is no longer listed").not.toBeInTheDocument());
+  });
+
   it("given an unsaved membership type, when the membership is ended, then only the end is written and the type stays in the bar", async () => {
     // given
     const assigning = vi.spyOn(api, "assignMembership").mockResolvedValue({ ...jane, membershipEndedOn: "2026-03-31" });
