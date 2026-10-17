@@ -6,6 +6,7 @@ import org.courtside.api.ApiAccountRequest;
 import org.courtside.api.ApiActiveRequest;
 import org.courtside.api.ApiCredentialState;
 import org.courtside.api.ApiMembershipPeriod;
+import org.courtside.api.ApiMembershipPeriodState;
 import org.courtside.api.ApiMembershipPeriodRequest;
 import org.courtside.api.ApiMembershipRequest;
 import org.courtside.api.ApiPersonRequest;
@@ -192,7 +193,8 @@ class RosterAdminController implements AdminRosterApi {
     }
 
     private static ApiMembershipPeriod toPeriodResponse(MembershipPeriodService.Period period) {
-        return new ApiMembershipPeriod(period.id(), period.membershipTypeId(), period.startedOn(), period.endedOn());
+        return new ApiMembershipPeriod(period.id(), period.membershipTypeId(), period.startedOn(), period.endedOn(),
+                ApiMembershipPeriodState.fromValue(period.state().name()));
     }
 
     private static Set<Role> roles(Collection<ApiRole> requested) {
@@ -225,6 +227,8 @@ class RosterAdminController implements AdminRosterApi {
                 .locale(entry.locale())
                 .credentialState(credentialState(entry))
                 .membershipTypeId(membershipTypeId(entry))
+                .membershipState(entry.membership() == null ? null
+                        : ApiMembershipPeriodState.fromValue(entry.membership().state().name()))
                 .membershipStartedOn(membershipDate(entry, RosterService.Membership::startedOn))
                 .membershipEndedOn(membershipDate(entry, RosterService.Membership::endedOn));
     }

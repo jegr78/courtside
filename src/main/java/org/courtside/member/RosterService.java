@@ -557,7 +557,7 @@ public class RosterService {
                                 Instant now, Integer addressSharedBy) {
         Membership membership = member == null ? null : new Membership(
                 member.getMembershipTypeId(), member.getStartedOn(), member.getEndedOn(),
-                member.isValidOn(LocalDate.ofInstant(now, clubTimeZone.zoneId())));
+                member.stateOn(LocalDate.ofInstant(now, clubTimeZone.zoneId())));
         if (account == null) {
             return new RosterEntry(person.getId(), person.getFirstName(), person.getLastName(),
                     person.getEmail(), addressSharedBy, null, null, null, null, false,
@@ -630,7 +630,11 @@ public class RosterService {
         }
     }
 
-    public record Membership(UUID typeId, LocalDate startedOn, LocalDate endedOn, boolean current) {
+    public record Membership(UUID typeId, LocalDate startedOn, LocalDate endedOn, MembershipPeriodState state) {
+
+        public boolean current() {
+            return state == MembershipPeriodState.RUNNING;
+        }
     }
 
     public enum SortField {

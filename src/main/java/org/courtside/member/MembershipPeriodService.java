@@ -37,7 +37,9 @@ public class MembershipPeriodService {
         if (!persons.existsById(id)) {
             throw new PersonNotFoundException("No person with id " + id);
         }
-        return members.findByPersonIdOrderByStartedOnAscIdAsc(id).stream().map(Period::of).toList();
+        LocalDate today = memberships.today();
+        return members.findByPersonIdOrderByStartedOnAscIdAsc(id).stream()
+                .map(member -> Period.of(member, today)).toList();
     }
 
     @Transactional
@@ -52,7 +54,7 @@ public class MembershipPeriodService {
         revokeSessionsOf(id);
         events.publishEvent(new RosterEvent.MembershipPeriodAdded(
                 id, created.getId(), typeId, created.getStartedOn(), created.getEndedOn()));
-        return Period.of(created);
+        return Period.of(created, memberships.today());
     }
 
     @Transactional
@@ -70,7 +72,7 @@ public class MembershipPeriodService {
         revokeSessionsOf(id);
         events.publishEvent(new RosterEvent.MembershipPeriodCorrected(
                 id, existing.getId(), typeId, existing.getStartedOn(), existing.getEndedOn()));
-        return Period.of(existing);
+        return Period.of(existing, memberships.today());
     }
 
     @Transactional
@@ -128,11 +130,12 @@ public class MembershipPeriodService {
         return period;
     }
 
-    public record Period(UUID id, UUID membershipTypeId, LocalDate startedOn, LocalDate endedOn) {
+    public record Period(UUID id, UUID membershipTypeId, LocalDate startedOn, LocalDate endedOn,
+                         MembershipPeriodState state) {
 
-        static Period of(Member member) {
+        static Period of(Member member, LocalDate today) {
             return new Period(member.getId(), member.getMembershipTypeId(),
-                    member.getStartedOn(), member.getEndedOn());
+                    member.getStartedOn(), member.getEndedOn(), member.stateOn(today));
         }
     }
 }

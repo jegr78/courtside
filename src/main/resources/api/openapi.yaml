@@ -1194,9 +1194,16 @@ components:
             The first day the period no longer holds; omitted or `null`, it runs without an end. It
             must lie after `startedOn`, or the period would cover no day.
 
+    MembershipPeriodState:
+      type: string
+      enum: [RUNNING, SCHEDULED, ENDED]
+      description: |
+        Where a period stands on the club's today, in the club's time zone: `RUNNING` holds today,
+        `SCHEDULED` begins later, `ENDED` no longer holds.
+
     MembershipPeriod:
       type: object
-      required: [id, membershipTypeId, startedOn, endedOn]
+      required: [id, membershipTypeId, startedOn, endedOn, state]
       properties:
         id: { type: string, format: uuid }
         membershipTypeId: { type: string, format: uuid }
@@ -1205,6 +1212,7 @@ components:
           type: [string, "null"]
           format: date
           description: The first day the period no longer holds, `null` while it runs without an end.
+        state: { $ref: "#/components/schemas/MembershipPeriodState" }
 
     MembershipType:
       type: object
@@ -1914,6 +1922,11 @@ components:
             The type of one period of the person's membership: the period valid today, else the
             next one scheduled, else the latest that ended. `GET
             /api/admin/roster/{personId}/membership-periods` lists every period.
+        membershipState:
+          oneOf:
+            - $ref: "#/components/schemas/MembershipPeriodState"
+            - type: "null"
+          description: Where that period stands on the club's today, `null` when the person holds none.
         membershipStartedOn:
           type: [string, "null"]
           format: date

@@ -57,6 +57,13 @@ public class Member {
         return !startedOn.isAfter(day) && (endedOn == null || endedOn.isAfter(day));
     }
 
+    public MembershipPeriodState stateOn(LocalDate day) {
+        if (startedOn.isAfter(day)) {
+            return MembershipPeriodState.SCHEDULED;
+        }
+        return isValidOn(day) ? MembershipPeriodState.RUNNING : MembershipPeriodState.ENDED;
+    }
+
     public boolean hasEndedBy(LocalDate day) {
         return endedOn != null && !endedOn.isAfter(day);
     }

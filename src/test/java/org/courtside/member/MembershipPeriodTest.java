@@ -151,7 +151,8 @@ class MembershipPeriodTest extends AbstractIntegrationTest {
 
         // then
         assertThat(periods.periodsOf(mary)).singleElement().isEqualTo(new MembershipPeriodService.Period(
-                periodId, adults.getId(), LocalDate.of(2026, 2, 1), LocalDate.of(2026, 9, 30)));
+                periodId, adults.getId(), LocalDate.of(2026, 2, 1), LocalDate.of(2026, 9, 30),
+                MembershipPeriodState.RUNNING));
     }
 
     @Test
