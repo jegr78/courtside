@@ -947,6 +947,20 @@
         "lifecycle": "import-record"
       }
     },
+    "import_column_position": {
+      "canonical_field": {
+        "level": "operational",
+        "lifecycle": "import-record"
+      },
+      "position": {
+        "level": "operational",
+        "lifecycle": "import-record"
+      },
+      "source_id": {
+        "level": "operational",
+        "lifecycle": "import-record"
+      }
+    },
     "import_external_reference": {
       "external_id": {
         "level": "personal",
@@ -1104,6 +1118,14 @@
       }
     },
     "import_source": {
+      "column_count": {
+        "level": "operational",
+        "lifecycle": "import-record"
+      },
+      "column_mode": {
+        "level": "operational",
+        "lifecycle": "import-record"
+      },
       "created_at": {
         "level": "operational",
         "lifecycle": "import-record"

@@ -64,6 +64,20 @@ test("when the run ends, then every message wording this run stored is reset to 
   expect(left, "no message keeps a wording this run stored").toEqual([]);
 });
 
+test("when the run ends, then no import source this run described is left", async () => {
+  // when
+  const admin = await apiAs("admin");
+  const ours = readLedger().filter((entry) => entry.kind === "import-source");
+  const outcome: { id: string; status: number }[] = [];
+  for (const entry of ours) outcome.push({ id: entry.id, status: (await adminDelete(admin, removalPath(entry))).status() });
+  const sources = await (await admin.get("/api/admin/import/sources")).json() as { id: string }[];
+  const left = sources.map((source) => source.id).filter((id) => ours.some((entry) => entry.id === id));
+  writeFileSync(runPath("postflight-import.json"), JSON.stringify({ outcome, left }, null, 2));
+  // then
+  expect(outcome.filter((removal) => removal.status >= 300 && removal.status !== 404), "every removal of this run's import source is accepted").toEqual([]);
+  expect(left, "no import source of this run is left").toEqual([]);
+});
+
 test("when the run ends, then no reserved slot holds a booking of this run, no week is scheduled and the disposable member signs in with the shared password", async () => {
   const admin = await apiAs("admin");
   // when

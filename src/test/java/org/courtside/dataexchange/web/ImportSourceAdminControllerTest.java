@@ -39,6 +39,16 @@ class ImportSourceAdminControllerTest extends AbstractIntegrationTest {
              "removalWarningPercent":10}
             """.formatted(ACTIVE_TYPE, ACTIVE_TYPE);
 
+    private static final String POSITIONAL = """
+            {"sourceKey":"roster-system","displayName":"Membership system","separator":";",
+             "encoding":"UTF-8","columnMode":"POSITION",
+             "positions":[{"position":3,"field":"LAST_NAME"},{"position":1,"field":"EXTERNAL_ID"},
+                          {"position":2,"field":"FIRST_NAME"}],
+             "columnCount":4,
+             "defaultMembershipTypeId":"%s",
+             "removalWarningPercent":10}
+            """.formatted(ACTIVE_TYPE);
+
     @Autowired
     private WebApplicationContext context;
 
@@ -141,6 +151,55 @@ class ImportSourceAdminControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:import-source-invalid"))
                 .andExpect(jsonPath("$.violations[0].code")
                         .value("import.source.columns.incomplete"));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAHeaderlessExport_whenASourceIsDescribedByPosition_thenItReadsBackByPosition() throws Exception {
+        // when / then
+        mockMvc.perform(create(POSITIONAL))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.columnMode").value("POSITION"))
+                .andExpect(jsonPath("$.columnCount").value(4))
+                .andExpect(jsonPath("$.columns.length()").value(0))
+                .andExpect(jsonPath("$.positions[0].position").value(1))
+                .andExpect(jsonPath("$.positions[0].field").value("EXTERNAL_ID"))
+                .andExpect(jsonPath("$.positions[2].field").value("LAST_NAME"));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAHeaderSource_whenItIsSwitchedToPositionsWithoutConfirmation_thenTheSwitchIsRefusedByName()
+            throws Exception {
+        // given
+        String id = JsonPath.read(mockMvc.perform(create(COMPLETE))
+                .andReturn().getResponse().getContentAsString(), "$.id");
+
+        // when / then
+        mockMvc.perform(put("/api/admin/import/sources/{id}", id)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(POSITIONAL)
+                        .with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:import-source-invalid"))
+                .andExpect(jsonPath("$.violations[0].code").value("import.source.columnMode.changeUnconfirmed"));
+        mockMvc.perform(get("/api/admin/import/sources/{id}", id))
+                .andExpect(jsonPath("$.columnMode").value("HEADER"));
+        mockMvc.perform(put("/api/admin/import/sources/{id}", id)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(POSITIONAL.replace("\"columnCount\":4", "\"columnCount\":4,\"confirmColumnModeChange\":true"))
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.columnMode").value("POSITION"));
+    }
+
+    @Test
+    @WithMockUser(username = "member", roles = "MEMBER")
+    void givenAMemberSession_whenDescribingASourceByPosition_thenItIsDenied() throws Exception {
+        // when / then
+        mockMvc.perform(create(POSITIONAL))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:access-denied"));
     }
 
     @Test

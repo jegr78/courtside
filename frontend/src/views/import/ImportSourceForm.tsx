@@ -1,7 +1,8 @@
 import { useEffect, useId, useState, type ChangeEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { api, type CanonicalField, type ImportSource, type ImportSourceRequest, type MembershipType } from "../../api/client";
-import { EncodingUnreadableHereError, NotUtf8Error, readCsvColumn, readCsvHeader, suggestSeparator } from "../../import/read-csv";
+import { EncodingUnreadableHereError, NotUtf8Error, looksLikeHeader, readCsvColumn, readCsvHeader, readCsvRows, suggestSeparator } from "../../import/read-csv";
+import { Button } from "../../components/Button";
 import { TextField } from "../../components/TextField";
 import { differs } from "../../unsaved/differs";
 import { importSourceMark } from "./importSourceMark";
@@ -16,6 +17,23 @@ const KEY_LENGTH = 40;
 const NAME_LENGTH = 80;
 
 type Mapping = Partial<Record<CanonicalField, string>>;
+type ColumnMode = "HEADER" | "POSITION";
+type Positions = Partial<Record<CanonicalField, string>>;
+
+function positionsOf(source: ImportSource | undefined): Positions {
+  const positions: Positions = {};
+  (source?.positions ?? []).forEach(({ position, field }) => { positions[field] = String(position); });
+  return positions;
+}
+
+const countOf = (source: ImportSource | undefined) =>
+  typeof source?.columnCount === "number" ? String(source.columnCount) : "";
+
+function positionList(positions: Positions) {
+  return FIELDS.filter((field) => positions[field])
+    .map((field) => ({ position: Number(positions[field]), field }))
+    .sort((left, right) => left.position - right.position);
+}
 
 function mappingOf(source: ImportSource | undefined): Mapping {
   const mapping: Mapping = {};
@@ -33,12 +51,20 @@ function described(source: ImportSource | undefined) {
     displayName: source?.displayName ?? "",
     separator: source?.separator ?? ",",
     encoding: source?.encoding ?? "UTF-8",
-    columns: source?.columns ?? {},
+    ...layoutOf(source?.columnMode ?? "HEADER", source?.columns ?? {}, positionsOf(source),
+      countOf(source)),
     membershipTypes: source?.membershipTypes ?? {},
     defaultMembershipTypeId: source?.defaultMembershipTypeId ?? "",
     ownedFields: OWNABLE.filter((field) => (source?.ownedFields ?? []).includes(field)),
     removalWarningPercent: source?.removalWarningPercent ?? 10
   };
+}
+
+// Only the side of the layout the mode reads is sent, because the server refuses the other one.
+function layoutOf(mode: ColumnMode, columns: Record<string, CanonicalField>, positions: Positions, columnCount: string) {
+  return mode === "POSITION"
+    ? { columnMode: mode, positions: positionList(positions), columnCount: Number(columnCount) }
+    : { columnMode: mode, columns };
 }
 
 // A category left unassigned is absent from the request, so it has to be absent from the
@@ -83,6 +109,11 @@ export function ImportSourceForm({ source, types, disabled, save }: {
   const [encodings, setEncodings] = useState<string[]>([]);
   const [unreadableHere, setUnreadableHere] = useState(false);
   const [asksEncoding, setAsksEncoding] = useState(false);
+  const [mode, setMode] = useState<ColumnMode>(source?.columnMode ?? "HEADER");
+  const [positions, setPositions] = useState<Positions>(positionsOf(source));
+  const [columnCount, setColumnCount] = useState(countOf(source));
+  const [sample, setSample] = useState<string[][]>([]);
+  const [confirmingMode, setConfirmingMode] = useState(false);
 
   // A type that went inactive after it was chosen stays on its own list and says so: withholding it
   // would clear the club's own choice the next time anybody saves this form.
@@ -130,6 +161,9 @@ export function ImportSourceForm({ source, types, disabled, save }: {
     if (!file) return;
     try {
       setHeaders(await readCsvHeader(file, chosenEncoding, chosenSeparator));
+      const rows = await readCsvRows(file, chosenEncoding, chosenSeparator);
+      setSample(rows);
+      setColumnCount((current) => current || (rows[0] ? String(rows[0].length) : ""));
       if (categoryColumn) {
         setReadValues(await readCsvColumn(file, categoryColumn, chosenEncoding, chosenSeparator));
       }
@@ -143,6 +177,7 @@ export function ImportSourceForm({ source, types, disabled, save }: {
     setUnreadableHere(true);
     setHeaders([]);
     setReadValues([]);
+    setSample([]);
   }
 
   async function mapField(field: CanonicalField, column: string) {
@@ -157,7 +192,7 @@ export function ImportSourceForm({ source, types, disabled, save }: {
       displayName,
       separator,
       encoding,
-      columns: columnsOf(mapping),
+      ...layoutOf(mode, columnsOf(mapping), positions, columnCount),
       membershipTypes: assigned(categories),
       defaultMembershipTypeId: defaultType,
       // In the canonical order rather than the order they were ticked, so a field taken back and
@@ -167,8 +202,18 @@ export function ImportSourceForm({ source, types, disabled, save }: {
     };
   }
 
+  // A stored source read the other way changes what every column of the next snapshot means.
   function submit() {
+    if (source && mode !== confirmed.columnMode) {
+      setConfirmingMode(true);
+      return;
+    }
     void save(requested());
+  }
+
+  function confirmModeChange() {
+    setConfirmingMode(false);
+    void save({ ...requested(), confirmColumnModeChange: true });
   }
 
   function discard() {
@@ -181,6 +226,10 @@ export function ImportSourceForm({ source, types, disabled, save }: {
     setThreshold(String(confirmed.removalWarningPercent));
     setSeparator(confirmed.separator);
     setEncoding(confirmed.encoding);
+    setMode(confirmed.columnMode);
+    setPositions(positionsOf(source));
+    setColumnCount(countOf(source));
+    setConfirmingMode(false);
   }
 
   const mark = importSourceMark(source);
@@ -214,7 +263,17 @@ export function ImportSourceForm({ source, types, disabled, save }: {
       {unreadableHere && <p data-testid="source-encoding-unreadable">{t("admin.import.encodingUnreadableHere")}</p>}
     </div>
 
-    <div className="grid gap-3">
+    <fieldset className="grid gap-2">
+      <legend className="font-semibold">{t("admin.import.columnMode")}</legend>
+      {(["HEADER", "POSITION"] as ColumnMode[]).map((option) => <label key={option} className="flex items-center gap-2">
+        <input data-testid={`column-mode-${option}`} type="radio" name={`${group}-mode`} disabled={disabled}
+               checked={mode === option} onChange={() => setMode(option)} />
+        {t(`admin.import.columnMode${option}`)}
+      </label>)}
+      <p className="text-sm">{t(`admin.import.columnModeHint${mode}`)}</p>
+    </fieldset>
+
+    {mode === "HEADER" ? <div className="grid gap-3">
       <h3 className="text-lg font-semibold">{t("admin.import.columns")}</h3>
       {FIELDS.map((field) => <div key={field} className="grid gap-1">
         <label className="font-semibold" htmlFor={`${group}-column-${field}`}>{t(`admin.import.field.${field}`)}</label>
@@ -227,7 +286,32 @@ export function ImportSourceForm({ source, types, disabled, save }: {
       {unmapped.length > 0 && <p data-testid="unmapped-columns" className="text-sm">
         {t("admin.import.unmapped", { columns: unmapped.join(", ") })}
       </p>}
-    </div>
+    </div> : <div className="grid gap-3">
+      <h3 className="text-lg font-semibold">{t("admin.import.positions")}</h3>
+      {sample.length > 0 && <div className="overflow-x-auto">
+        {looksLikeHeader(sample) && <p data-testid="sample-header-row" className="font-semibold">{t("admin.import.sampleHeaderRow")}</p>}
+        <table data-testid="column-sample" className="min-w-full text-sm">
+          <thead><tr>{Array.from({ length: Math.max(...sample.map((row) => row.length)) }, (_, index) =>
+            <th key={index} data-testid={`sample-column-${index + 1}`} scope="col" className="border px-2 py-1">{index + 1}</th>)}</tr></thead>
+          <tbody>{sample.map((row, rowIndex) => <tr key={rowIndex} data-testid={`sample-row-${rowIndex + 1}`}
+              data-header-like={rowIndex === 0 && looksLikeHeader(sample) ? "true" : undefined}>
+            {row.map((cell, cellIndex) => <td key={cellIndex} className="border px-2 py-1">{cell}</td>)}
+          </tr>)}</tbody>
+        </table>
+      </div>}
+      {unreadableHere && <p data-testid="column-count-by-hand" className="text-sm">{t("admin.import.columnCountByHand")}</p>}
+      <TextField data-testid="source-column-count" disabled={disabled} type="number" min={1} max={200}
+                 label={t("admin.import.columnCount")} value={columnCount} onChange={(event) => setColumnCount(event.target.value)} />
+      {FIELDS.map((field) => <div key={field} className="grid gap-1">
+        <label className="font-semibold" htmlFor={`${group}-position-${field}`}>{t(`admin.import.field.${field}`)}</label>
+        <select data-testid={`position-${field}`} id={`${group}-position-${field}`} className="rounded-md border p-2" disabled={disabled}
+                value={positions[field] ?? ""} onChange={(event) => setPositions({ ...positions, [field]: event.target.value })}>
+          <option value="">{t("admin.import.noColumn")}</option>
+          {Array.from({ length: Number(columnCount) || 0 }, (_, index) => String(index + 1)).map((position) =>
+            <option key={position} value={position}>{t("admin.import.columnNumber", { position })}</option>)}
+        </select>
+      </div>)}
+    </div>}
 
     {categoryColumn && knownValues.length > 0 && <div className="grid gap-3">
       <h3 className="text-lg font-semibold">{t("admin.import.categories")}</h3>
@@ -260,6 +344,17 @@ export function ImportSourceForm({ source, types, disabled, save }: {
     </fieldset>
 
     <TextField data-testid="source-threshold" disabled={disabled} type="number" min={0} max={100} label={t("admin.import.removalWarning")} value={threshold} onChange={(event) => setThreshold(event.target.value)} />
+
+    {confirmingMode && <div data-testid="column-mode-confirmation" role="alertdialog" aria-labelledby={`${group}-mode-change`} className="grid gap-3 rounded-xl border p-4">
+      <h3 id={`${group}-mode-change`} className="text-lg font-semibold">{t("admin.import.columnModeChangeTitle")}</h3>
+      <p>{t(`admin.import.columnModeChange${mode}`)}</p>
+      <div className="flex flex-wrap gap-3">
+        <Button variant="primary" type="button" data-testid="confirm-column-mode-change" disabled={disabled} onClick={confirmModeChange}>
+          {t("admin.import.columnModeChangeConfirm")}</Button>
+        <Button variant="secondary" type="button" data-testid="cancel-column-mode-change" onClick={() => setConfirmingMode(false)}>
+          {t("admin.import.columnModeChangeCancel")}</Button>
+      </div>
+    </div>}
 
     <SaveBar id={mark} subject={source?.displayName ?? t("admin.import.newSource")} saveTestId="save-source"
              unsaved={unsaved} pending={disabled} save={submit} discard={discard} />

@@ -483,6 +483,7 @@
       ],
       "stateTransitions": [
         "An import source defines the external identifier and field mapping.",
+        "An import source reads its files by header or, for an export without a header row, by stored column position and column count; switching between the two needs explicit confirmation.",
         "An uploaded snapshot creates a preview bound to its reviewer.",
         "Executing a current preview creates or corrects people, memberships and optional accounts, then records one run.",
         "Missing source members lose the member role or receive the mapped membership state."
@@ -492,18 +493,22 @@
         "A removal threshold requires explicit confirmation before execution."
       ],
       "failurePaths": [
+        "A file read by position whose first row has a different column count is refused before a preview exists.",
         "Malformed rows stay row failures in the preview.",
         "Expired, superseded, stale or differently owned previews refuse transactionally.",
         "Concurrent execution for one source serializes and cannot duplicate people."
       ],
       "productionPaths": [
+        "src/main/java/org/courtside/dataexchange/ImportSourceService.java",
         "src/main/java/org/courtside/dataexchange/PreviewService.java",
         "src/main/java/org/courtside/dataexchange/ExecutionService.java",
         "src/main/java/org/courtside/member/RosterSyncService.java"
       ],
       "evidence": [
         "src/test/java/org/courtside/dataexchange/ExecutionServiceTest.java#givenAReviewedPreview_whenItIsExecuted_thenEveryRecordExistsAndIsLinked",
-        "src/test/java/org/courtside/dataexchange/ExecutionServiceTest.java#givenAPreviewThatWouldEndAMembership_whenSomebodyItTouchesChangedSince_thenItIsRefused"
+        "src/test/java/org/courtside/dataexchange/ExecutionServiceTest.java#givenAPreviewThatWouldEndAMembership_whenSomebodyItTouchesChangedSince_thenItIsRefused",
+        "src/test/java/org/courtside/dataexchange/PositionalImportSourceTest.java#givenAPositionalSource_whenATruncatedExportIsUploaded_thenItIsRefusedAndNoPreviewIsStored",
+        "src/test/java/org/courtside/dataexchange/PositionalImportSourceTest.java#givenAHeaderSource_whenItIsSwitchedToPositionsWithoutConfirmation_thenNothingChanges"
       ]
     },
     {

@@ -19,7 +19,7 @@ const rosterSystem: ImportSource = {
   membershipTypes: {},
   defaultMembershipTypeId: "type-1",
   ownedFields: [],
-  removalWarningPercent: 10
+  removalWarningPercent: 10, columnMode: "HEADER", positions: [], columnCount: null
 };
 
 const snapshot: ImportPreview = {

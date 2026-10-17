@@ -258,8 +258,9 @@ again when a message is composed, so a row that no longer passes falls back to t
 
 | Table | Holds | References |
 |---|---|---|
-| `import_source` | A described file format: separator, encoding, default membership type, the removal threshold that triggers a warning | `membership_type` |
-| `import_column_mapping` | Which column header carries which canonical field | `import_source` |
+| `import_source` | A described file format: separator, encoding, whether columns are found by header or by position and, by position, how many a file has, default membership type, the removal threshold that triggers a warning | `membership_type` |
+| `import_column_mapping` | Which column header carries which canonical field, for a source read by header | `import_source` |
+| `import_column_position` | Which numbered column carries which canonical field, for a source read by position | `import_source` |
 | `import_type_mapping` | Which value in the file means which membership type | `import_source`, `membership_type` |
 | `import_owned_field` | Which fields the file owns, and may therefore overwrite | `import_source` |
 | `import_external_reference` | The link between a number in the file and a person here | `import_source`, `person` |

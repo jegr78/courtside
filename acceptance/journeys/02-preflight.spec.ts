@@ -9,7 +9,7 @@ import { addDays } from "../config/calendar.mjs";
 import { config, disposables, PASSWORD, runPath, type PersonaKey } from "../lib/context";
 import { mailAvailable } from "../lib/mail";
 import { DISPOSABLE_PROFILES, disposableFor, profilesOf, resetQuota } from "../config/disposables.mjs";
-import { attendanceErasureSql, foreignWordings, laneLimitConflicts, leavesBookingHours, occupying, waitlistErasureSql } from "../lib/core.mjs";
+import { attendanceErasureSql, foreignImportSources, foreignWordings, laneLimitConflicts, leavesBookingHours, occupying, waitlistErasureSql } from "../lib/core.mjs";
 import { noShowLimitFor, personaUsernames } from "../lib/attendance";
 import { readLedger } from "../lib/ledger";
 import { erase } from "../lib/erasure";
@@ -79,6 +79,8 @@ test("when the environment is checked before a run, then every precondition hold
     const participantCards = await (await admin.get("/api/admin/participant-cards")).json() as { id: string; active: boolean }[];
     checks.partnerMarkerActive = participantCards.some((card) => card.id === PARTNER_MARKER && card.active);
     checks.foreignWordings = foreignWordings(await (await admin.get("/api/admin/message-templates")).json(), readLedger());
+    checks.foreignImportSources = foreignImportSources(await (await admin.get("/api/admin/import/sources")).json(), readLedger());
+    checks.activeMembershipType = ((await (await admin.get("/api/admin/membership-types")).json()) as { active: boolean }[]).some((type) => type.active);
     if (config.personas.restricted) {
       const restricted = await apiAs("restricted");
       const { bookingHours } = await (await restricted.get("/api/booking-eligibility")).json() as { bookingHours?: { earliestStart: string; latestEnd: string } | null };
@@ -126,6 +128,8 @@ test("when the environment is checked before a run, then every precondition hold
   expect.soft(checks.closureNoticeDay, "PRECONDITION: the tenth day after the window has no season, holiday or court closure and the weekly hours open it")
     .toEqual({ day: (checks.closureNoticeDay as { day: string }).day, covered: false, opens: true });
   expect.soft(checks.partnerMarkerActive, "PRECONDITION: the looking-for-a-partner participant card is active").toBe(true);
+  expect.soft(checks.foreignImportSources, "PRECONDITION: no acceptance import source of an earlier run is left, so this run removes only the one it describes").toEqual([]);
+  expect.soft(checks.activeMembershipType, "PRECONDITION: the club has an active membership type the acceptance import source can default to").toBe(true);
   expect.soft(checks.foreignWordings, "PRECONDITION: every message uses the shipped wording, so a run reads mail it can recognise and resets only what it wrote").toEqual([]);
   if (config.personas.restricted) {
     expect.soft(checks.restrictedHours, "PRECONDITION: the restricted member's category sets booking hours").toBeTruthy();

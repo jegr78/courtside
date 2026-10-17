@@ -153,6 +153,23 @@ describe("ImportPreviewPanel", () => {
     expect(error, "an untranslated code is not presented as a generic failure").not.toHaveTextContent("That did not work.");
   });
 
+  it.each([
+    ["import.snapshot.row.columnsMissing", "fewer"],
+    ["import.snapshot.row.columnsUnexpected", "more"]
+  ])("given a positional row with the wrong width (%s), when the preview is read, then it names both counts", async (code, comparison) => {
+    // given
+    show({ ...preview, rowErrors: [{ rowNumber: 4, code, params: { expected: 4, found: 3 } }] });
+
+    // when
+    await userEvent.click(screen.getByTestId("row-errors-heading"));
+
+    // then
+    const error = screen.getByTestId("row-error-4");
+    expect(error).toHaveTextContent(i18n.t(code, { expected: 4, found: 3 }));
+    expect(error, "the sentence says which way the row is off").toHaveTextContent(comparison);
+    expect(error).not.toHaveTextContent(code);
+  });
+
   it("given a change touching somebody the club holds, when it is read, then it names them", async () => {
     // given
     show(preview);

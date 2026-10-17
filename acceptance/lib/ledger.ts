@@ -3,7 +3,7 @@ import { removalPath, replayEntries } from "./core.mjs";
 import { appendFileSync, existsSync, readFileSync } from "node:fs";
 import type { APIRequestContext } from "@playwright/test";
 
-export type Entry = { kind: "booking" | "series" | "opening-week" | "opening-period" | "court-closure" | "account" | "template"; id: string; by?: string; project?: string; anchor?: string; date?: string };
+export type Entry = { kind: "booking" | "series" | "opening-week" | "opening-period" | "court-closure" | "account" | "template" | "import-source"; id: string; by?: string; project?: string; anchor?: string; date?: string };
 const FILE = runPath("ledger.jsonl");
 
 export function recordCreated(entry: Entry) { appendFileSync(FILE, JSON.stringify({ ...entry, at: new Date().toISOString() }) + "\n"); }
