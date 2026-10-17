@@ -263,7 +263,7 @@ variables with other names:
 The three `COURTSIDE_DB_*_PASSWORD_FILE` variables keep their names but not their meaning: in `.env`
 they name a file on the host, in the container the path it is mounted at. The
 [environment variables](guides/operations.md#environment-variables) table describes each variable from the
-`.env` side, except `COURTSIDE_BACKUP_EVIDENCE_FILE`, `COURTSIDE_DB_IDENTITY_MODE`, `COURTSIDE_MAIL_FROM`, `COURTSIDE_MAIL_USERNAME`,
+`.env` side, except `COURTSIDE_DB_IDENTITY_MODE`, `COURTSIDE_MAIL_FROM`, `COURTSIDE_MAIL_USERNAME`,
 `COURTSIDE_OPERATIONAL_LOG_PATH` and `COURTSIDE_PASSWORD_BREACH_ENDPOINT`, which this page describes.
 
 | Variable | Default |

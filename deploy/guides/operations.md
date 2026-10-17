@@ -1161,6 +1161,7 @@ default.
 | `COURTSIDE_APP_TLS_KEY` | *unset* | Path **inside the container** to the private key belonging to that certificate. `compose.app-tls.yaml` sets it to `/etc/courtside/tls/app/server.key`; set it yourself only when running the image without that overlay. |
 | `COURTSIDE_APP_TLS_MATERIAL` | `/srv/courtside/tls/app` | Host directory holding `server.crt` and `server.key`, the certificate the application serves to the proxy and the key belonging to it. Read by `compose.app-tls.yaml` only. |
 | `COURTSIDE_APP_TLS_AUTHORITY` | `/srv/courtside/tls/app-authority/authority.pem` | Host path to the certificate authority that issued it. Mounted as that single file into both the application and the proxy. |
+| `COURTSIDE_BACKUP_EVIDENCE_FILE` | *unset* | Path **inside the container** to the JSON file the backup job writes after each successful backup, such as `{"completedAt":"2026-10-17T02:00:00Z"}`. The operator health overview and `courtside.backup.age` read the backup age from it. Unset or missing, the backup counts as unavailable. The reference Compose files pass it on but do not mount the file; [Tell the instance when the last backup finished](#tell-the-instance-when-the-last-backup-finished) shows the mount. |
 | `COURTSIDE_BOOTSTRAP_ADMIN_USERNAME` | *required on an empty account table* | Username of the first local administrator. |
 | `COURTSIDE_BOOTSTRAP_ADMIN_PASSWORD` | *required on an empty account table* | One-time password, at least 12 characters. |
 | `COURTSIDE_BOOTSTRAP_ADMIN_DISPLAY_NAME` | *required on an empty account table* | First and last name of the first administrator. |
@@ -1432,6 +1433,41 @@ It then removes the isolated target, including after an interrupted or failed ch
 proves the unit; restoring a live installation remains an explicit replacement of the complete
 installation state, never an in-place database rollback. Keep installed releases for as long as
 their recovery units must remain verifiable.
+
+### Tell the instance when the last backup finished
+
+The operator health overview under **Records** and the `courtside.backup.age` metric report the age
+of the newest backup only when the backup job leaves evidence of it. Courtside cannot see the host,
+so without that evidence the overview shows the backup as unavailable, never as healthy.
+
+After each successful backup, the job writes a small JSON file with the completion time in UTC and
+replaces the old one atomically:
+
+```sh
+evidence=/srv/courtside/backup-evidence/last-backup.json
+/srv/courtside/current/courtside backup --retain 7 \
+  && printf '{"completedAt":"%s"}\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$evidence.tmp" \
+  && mv "$evidence.tmp" "$evidence"
+```
+
+The file may hold at most 4 KiB and must be readable by UID 10001. The application reads it on every
+request to the overview and on every metric collection. Set `COURTSIDE_BACKUP_EVIDENCE_FILE` in
+`.env` to the path inside the container. The reference Compose files do not mount the directory yet,
+so add the mount in a `compose.override.yaml`:
+
+```yaml
+services:
+  app:
+    volumes:
+      - /srv/courtside/backup-evidence:/run/courtside/backup-evidence:ro
+```
+
+```sh
+COURTSIDE_BACKUP_EVIDENCE_FILE=/run/courtside/backup-evidence/last-backup.json
+```
+
+A missing file reads as "no backup recorded", an unreadable one or a time in the future as failing.
+Courtside sets no maximum age. Alert on `courtside.backup.age` with the limit your club accepts.
 
 ## Adoption and secret rotation
 
