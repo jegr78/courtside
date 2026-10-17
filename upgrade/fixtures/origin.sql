@@ -201,6 +201,13 @@ VALUES ('7e000000-0000-0000-0000-000000000003', '7d000000-0000-0000-0000-0000000
         '7e000000-0000-0000-0000-000000000002', 'UPDATE_ONLY', repeat('e', 64), 0, 1, 0, 0, 0, 0, false,
         '2025-01-01T00:20:00Z', '72000000-0000-0000-0000-000000000001', 0);
 
+INSERT INTO retention_policy (category, retain_months) VALUES ('BOOKINGS', 24);
+
+INSERT INTO retention_preview
+    (id, created_by, created_at, expires_at, bookings_ended_before, memberships_ended_before, former_member_ids)
+VALUES ('7f000000-0000-0000-0000-000000000001', '72000000-0000-0000-0000-000000000001', '2025-01-01T00:00:00Z',
+        '2025-01-01T00:30:00Z', '2023-01-01T00:00:00Z', NULL, '{}');
+
 UPDATE club_config
 SET club_name = 'Example Tennis Club', primary_color = '#123456', accent_color = '#ABCDEF',
     default_locale = 'en', slot_minutes = 15, time_zone = 'Europe/London';

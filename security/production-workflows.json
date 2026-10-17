@@ -714,6 +714,56 @@
         "src/test/java/org/courtside/dataexchange/web/LogExportAdminControllerTest.java#givenAnExport_whenItIsAnswered_thenTheLogRecordsItForTheWholeInstanceAndLeavesItOutOfTheFile",
         "src/test/java/org/courtside/dataexchange/web/LogExportAdminControllerTest.java#givenAMember_whenTheyAskForEitherLog_thenTheyAreRefusedAndNothingIsRecorded"
       ]
+    },
+    {
+      "id": "personal-data-retention",
+      "actors": [
+        "ADMIN"
+      ],
+      "entryPoints": "Retention policy list, set and remove, retention preview and retention run endpoints.",
+      "operationIds": [
+        "listRetentionPolicies",
+        "setRetentionPolicy",
+        "removeRetentionPolicy",
+        "previewRetention",
+        "runRetention"
+      ],
+      "backgroundEntryPoints": [],
+      "stateTransitions": [
+        "An administrator sets or removes how many months one record category is kept; no record changes.",
+        "A preview stores the cut-offs it judged against and the former members it would remove, for one account and a limited time.",
+        "A run pseudonymises bookings and series that ended before the cut-off and removes eligible former members with their accounts, then records counts only.",
+        "For the bookings and series it pseudonymised, a run clears actor and person or account fields from their change log entries and deletes their notification entries, queued messages and unfinished event publications."
+      ],
+      "alternatePaths": [
+        "A former member who became ineligible after the preview is skipped and counted.",
+        "A former member eligible by date but still an administrator, named in a booking the run keeps or on a waiting list is reported as blocked and never removed.",
+        "Expired retention previews are deleted by the preview sweep.",
+        "Changing or removing a period discards every open preview that applies it, and a run checks under a lock that the periods it applies are unchanged."
+      ],
+      "failurePaths": [
+        "A preview without any configured category is refused.",
+        "A run without recent full-password proof, of another account's preview, of an expired preview or of a preview already run is refused and changes nothing.",
+        "A period outside one to 1200 months is refused."
+      ],
+      "productionPaths": [
+        "src/main/java/org/courtside/dataexchange/web/RetentionAdminController.java",
+        "src/main/java/org/courtside/dataexchange/RetentionService.java",
+        "src/main/java/org/courtside/dataexchange/internal/RetentionRows.java"
+      ],
+      "evidence": [
+        "src/test/java/org/courtside/dataexchange/web/RetentionAdminControllerTest.java#givenAnOldAndARecentBooking_whenTheReviewedRunApplies_thenOnlyTheOldOneStopsNamingAnybody",
+        "src/test/java/org/courtside/dataexchange/web/RetentionAdminControllerTest.java#givenFormerMembers_whenPreviewed_thenTheRemovableAreCountedAndTheOthersBlockedWithTheirReason",
+        "src/test/java/org/courtside/dataexchange/web/RetentionAdminControllerTest.java#givenARemovableFormerMember_whenTheRunApplies_thenThePersonAndTheirAccountLeaveAndTheLogKeepsCountsOnly",
+        "src/test/java/org/courtside/dataexchange/web/RetentionAdminControllerTest.java#givenNoRecentProof_whenARunIsAsked_thenItIsRefusedAndThePreviewStillWaits",
+        "src/test/java/org/courtside/dataexchange/web/RetentionAdminControllerTest.java#givenAPreviewOfAnotherAccount_whenRun_thenItIsRefusedAndNobodyIsRemoved",
+        "src/test/java/org/courtside/dataexchange/web/RetentionAdminControllerTest.java#givenAMember_whenTheyAskForAnyRetentionOperation_thenEveryOneIsForbidden",
+        "src/test/java/org/courtside/dataexchange/ConcurrentRetentionRunTest.java#givenOnePreview_whenTwoBoardsConfirmItAtOnce_thenItRunsOnceAndTheOtherFindsNoPreview",
+        "src/test/java/org/courtside/dataexchange/ConcurrentRetentionRunTest.java#givenAMembershipResumedWhileTheRunStarts_whenTheRunReachesThatPerson_thenItWaitsForTheChangeAndSkipsThem",
+        "src/test/java/org/courtside/dataexchange/ConcurrentRetentionRunTest.java#givenABoardLengtheningThePeriodWhileTheRunStarts_whenTheRunReachesThePreview_thenItWaitsAndRunsNothing",
+        "src/test/java/org/courtside/dataexchange/web/RetentionAdminControllerTest.java#givenRecordsThatTieAnOldBookingToPeople_whenTheRunApplies_thenNoTableKeepsItBesideAPersonOrAccount",
+        "src/test/java/org/courtside/dataexchange/web/RetentionAdminControllerTest.java#givenAPreviewUnderAPeriod_whenThePeriodIsRemoved_thenThePreviewCanNoLongerRun"
+      ]
     }
   ]
 }

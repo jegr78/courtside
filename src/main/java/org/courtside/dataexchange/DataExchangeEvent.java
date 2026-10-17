@@ -112,6 +112,54 @@ public sealed interface DataExchangeEvent extends DomainEventRecord {
         }
     }
 
+    record RetentionPolicySet(RetentionCategory category, int retainMonths) implements DataExchangeEvent {
+
+        static final String TYPE = "dataexchange.retention.policySet";
+
+        @Override
+        public String eventType() {
+            return TYPE;
+        }
+
+        @Override
+        public UUID subjectId() {
+            return category.subjectId();
+        }
+    }
+
+    record RetentionPolicyRemoved(RetentionCategory category) implements DataExchangeEvent {
+
+        static final String TYPE = "dataexchange.retention.policyRemoved";
+
+        @Override
+        public String eventType() {
+            return TYPE;
+        }
+
+        @Override
+        public UUID subjectId() {
+            return category.subjectId();
+        }
+    }
+
+    // Counts only: an entry that listed whom a run removed would keep what the run erased.
+    record RetentionRun(UUID runId, long bookingsPseudonymised, long seriesPseudonymised,
+                        long formerMembersRemoved, long accountsRemoved, long formerMembersSkipped)
+            implements DataExchangeEvent {
+
+        static final String TYPE = "dataexchange.retention.run";
+
+        @Override
+        public String eventType() {
+            return TYPE;
+        }
+
+        @Override
+        public UUID subjectId() {
+            return runId;
+        }
+    }
+
     // A whole log leaves the instance, so the entry concerns no single subject.
     record LogExported(String log, @Nullable LocalDate from, @Nullable LocalDate to) implements DataExchangeEvent {
 

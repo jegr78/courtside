@@ -86,6 +86,11 @@ export type AccountRequest = components["schemas"]["AccountRequest"];
 export type SubjectAccessExport = components["schemas"]["SubjectAccessExport"];
 export type FacilityUtilisation = components["schemas"]["FacilityUtilisation"];
 export type UsageReport = components["schemas"]["UsageReport"];
+export type RetentionCategory = components["schemas"]["RetentionCategory"];
+export type RetentionPolicy = components["schemas"]["RetentionPolicy"];
+export type RetentionPreview = components["schemas"]["RetentionPreview"];
+export type RetentionBlockReason = components["schemas"]["RetentionBlockReason"];
+export type RetentionRun = components["schemas"]["RetentionRun"];
 export type CourtUtilisation = components["schemas"]["CourtUtilisation"];
 export type StatisticsPeriodQuery = { from: string; to: string };
 export type StatisticsRange = components["schemas"]["StatisticsRange"];
@@ -636,6 +641,16 @@ export const api = {
     }
   ),
   importRuns: (sourceId: string) => request<ImportRun[]>(`/api/admin/import/sources/${sourceId}/runs`),
+  retentionPolicies: () => request<RetentionPolicy[]>("/api/admin/retention/policies"),
+  setRetentionPolicy: (category: RetentionCategory, retainMonths: number) => request<RetentionPolicy>(
+    `/api/admin/retention/policies/${category}`, {
+      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ retainMonths })
+    }),
+  removeRetentionPolicy: (category: RetentionCategory) => request<void>(
+    `/api/admin/retention/policies/${category}`, { method: "DELETE" }),
+  previewRetention: () => request<RetentionPreview>("/api/admin/retention/previews", { method: "POST" }),
+  runRetention: (previewId: string) => request<RetentionRun>(
+    `/api/admin/retention/previews/${encodeURIComponent(previewId)}/run`, { method: "POST" }),
   audit: (cursor?: string, limit = 50, subjectId?: string) => request<AuditPage>(
     `/api/admin/audit?${new URLSearchParams({
       limit: String(limit),

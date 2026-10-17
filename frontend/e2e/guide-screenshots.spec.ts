@@ -129,6 +129,7 @@ const drivers: Record<string, (page: Page, visualDate: string) => Promise<void>>
   "admin-navigation": async (page) => {
     await page.getByTestId("administration-link").click();
     await expectAdministrationOverview(page);
+    await showTheWholeNavigation(page);
   },
   // The bar appears only once something is unsaved, so a renamed court brings it on screen.
   "save-bar": async (page) => {
@@ -259,6 +260,16 @@ const drivers: Record<string, (page: Page, visualDate: string) => Promise<void>>
     await page.getByTestId("admin-operator-health-link").click();
     await expect(page.getByTestId("operator-check-mail"), "the example, not the live instance, is drawn").toHaveAttribute("data-state", "FAILING");
     await expect(page.getByTestId("operator-health-refresh")).toBeEnabled();
+  },
+  "retention": async (page) => {
+    await page.getByTestId("admin-retention-link").click();
+    for (const [category, months] of [["BOOKINGS", "24"], ["FORMER_MEMBERS", "12"]]) {
+      await page.getByTestId(`retention-months-${category}`).fill(months);
+      await page.getByTestId(`retention-save-${category}`).click();
+      await expect(page.getByTestId(`retention-state-${category}`)).toHaveAttribute("data-configured", "true");
+    }
+    await expect(page.getByTestId("retention-preview")).toBeEnabled();
+    await expect(page.getByTestId("retention-success")).toBeVisible();
   }
 };
 
@@ -422,6 +433,16 @@ test("the overview a board reads the instance's own health from is captured", as
   await capture(page, "operator-health", journeyService.visualDate);
 });
 
+test("the periods a board keeps personal records for are captured", async ({ page, journeyService }, info) => {
+  // given
+  await prepare(page, localeOf(info));
+  await signIn(page, "configuration-admin", "court-plan-view");
+  await page.getByTestId("administration-link").click();
+
+  // when / then
+  await capture(page, "retention", journeyService.visualDate);
+});
+
 async function prepare(page: Page, locale: string): Promise<void> {
   await page.goto("/");
   await selectPreference(page, "#locale-preference", locale);
@@ -431,10 +452,22 @@ async function prepare(page: Page, locale: string): Promise<void> {
 async function capture(page: Page, name: string, visualDate: string): Promise<void> {
   const declared = catalogue.captures.find((entry) => entry.name === name);
   if (declared === undefined) throw new Error(`No catalogue entry for ${name}`);
+  const size = page.viewportSize();
   await drivers[name](page, visualDate);
   const surface = page.getByTestId(declared.surface);
   await surface.page().evaluate(() => document.fonts.ready);
   await expect(surface).toHaveScreenshot(`${name}.png`, { animations: "disabled", caret: "hide" });
+  if (size !== null) await page.setViewportSize(size);
+}
+
+// A guide shows every destination, so the window grows by what the navigation's own frame would scroll.
+async function showTheWholeNavigation(page: Page): Promise<void> {
+  const frame = page.getByTestId("admin-navigation-frame");
+  const hidden = () => frame.evaluate((element) => element.scrollHeight - element.clientHeight);
+  const size = page.viewportSize();
+  const overflow = await hidden();
+  if (size !== null && overflow > 0) await page.setViewportSize({ width: size.width, height: size.height + overflow });
+  await expect.poll(hidden, { message: "every destination is in the picture", timeout: 10_000 }).toBe(0);
 }
 
 // A one-time password leads to the page that replaces it and nowhere else, so what the sign-in

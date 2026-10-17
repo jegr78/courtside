@@ -6,6 +6,7 @@ import { AdminConfigurationView } from "./AdminConfigurationView";
 import { AdminExportView } from "./AdminExportView";
 import { AdminStatisticsView } from "./AdminStatisticsView";
 import { AdminUsageView } from "./AdminUsageView";
+import { AdminRetentionView } from "./AdminRetentionView";
 import { AdminImportView } from "./AdminImportView";
 import { AdminMembershipTypesView } from "./AdminMembershipTypesView";
 import { AdminMessagesView } from "./AdminMessagesView";
@@ -57,6 +58,7 @@ export default function AdminRoutes({ configurationChanged, administrator, manag
       <Route path="membership-types" element={<AdminMembershipTypesView />} />
       <Route path="import" element={<AdminImportView />} />
       <Route path="export" element={<AdminExportView />} />
+      <Route path="retention" element={<AdminRetentionView />} />
       <Route path="utilisation" element={<AdminStatisticsView />} />
       <Route path="usage" element={<AdminUsageView />} />
       <Route path="audit" element={<AdminAuditView />} />

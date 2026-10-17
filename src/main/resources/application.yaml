@@ -134,6 +134,7 @@ courtside:
       statistics-reads: { cost: 5, concurrency: 2 }
       bulk-export: { cost: 20, concurrency: 2 }
       roster-import: { cost: 20, concurrency: 1 }
+      retention-run: { cost: 20, concurrency: 1 }
       operational-log-search: { cost: 10, concurrency: 1 }
       logo-normalization: { cost: 10, concurrency: 1 }
       global-session-revocation: { cost: 5, concurrency: 1 }
@@ -146,6 +147,8 @@ courtside:
   import:
     preview-retention: ${COURTSIDE_IMPORT_PREVIEW_RETENTION:7d}
     sweep-interval: ${COURTSIDE_IMPORT_SWEEP_INTERVAL:1h}
+  retention:
+    preview-lifetime: 30m
   warm-up:
     enabled: ${COURTSIDE_WARM_UP_ENABLED:true}
     rounds: ${COURTSIDE_WARM_UP_ROUNDS:200}

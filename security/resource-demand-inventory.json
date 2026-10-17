@@ -121,6 +121,7 @@
         "listOwnSessions",
         "listOwnWaitlistEntries",
         "listPersonalBookings",
+        "listRetentionPolicies",
         "listRuleTypes",
         "listRules",
         "listSupportedEncodings",
@@ -138,6 +139,7 @@
         "removeMembership",
         "removeOpeningPeriod",
         "removeOwnParticipation",
+        "removeRetentionPolicy",
         "removeRule",
         "removeScheduledOpeningHours",
         "resetMessageTemplate",
@@ -146,6 +148,7 @@
         "setCourtActive",
         "setMembershipTypeActive",
         "setParticipantCardActive",
+        "setRetentionPolicy",
         "setRule",
         "setRuleSetActive",
         "setWeeklyOpeningHours",
@@ -226,6 +229,31 @@
       "evidence": [
         "src/test/java/org/courtside/dataexchange/ExecutionServiceTest.java#givenAnExecutedSnapshot_whenTheIdenticalFileIsUploadedAndExecutedAgain_thenNothingChanges",
         "src/test/java/org/courtside/dataexchange/ExecutionServiceTest.java#givenAnOlderPreviewOfTheSameSource_whenANewerOneIsExecuted_thenTheOlderCannotRun",
+        "src/test/java/org/courtside/shared/web/AdmissionPlanTest.java#whenLoadingTheShippedPlan_thenEveryDemandingClassHasItsDecidedCostAndBulkhead"
+      ]
+    },
+    {
+      "id": "retention-run",
+      "kind": "demanding",
+      "entryPoints": [
+        "previewRetention",
+        "runRetention"
+      ],
+      "growthDrivers": "A preview and a run read every booking that has not been pseudonymised, every former member and the bookings, series and waiting-list rows that still name them; a run rewrites the bookings that ended before the cut-off and removes the eligible former members one by one.",
+      "inputOrDataBound": "Neither request carries data. The work is bounded by the club's own bookings and roster; a run reaches only the cut-offs and former members its stored preview fixed.",
+      "concurrencyOrRateBound": "Admission control runs one retention operation at a time per instance and charges 20 tokens of the caller's request budget; a run locks its preview row, so two confirmations of one preview run it once.",
+      "executionModel": "Preview and run are synchronous transactions. A run locks the bookings it pseudonymises and each former member before re-checking and removing them.",
+      "failureBehavior": "A refused, expired, foreign or already used preview fails before anything changes; a failure inside a run rolls the whole run back.",
+      "consumerTimeoutBehavior": "The application rolls this request's transaction back after 120 seconds and cancels any statement after 15 seconds. The reference proxy adds no response deadline. Disconnect is not a rollback promise, so a used-up preview makes a later retry observable and safe.",
+      "productionPaths": [
+        "src/main/java/org/courtside/dataexchange/RetentionService.java",
+        "src/main/java/org/courtside/dataexchange/internal/RetentionRows.java",
+        "src/main/resources/application.yaml",
+        "src/main/java/org/courtside/shared/web/AdmissionControl.java"
+      ],
+      "evidence": [
+        "src/test/java/org/courtside/dataexchange/ConcurrentRetentionRunTest.java#givenOnePreview_whenTwoBoardsConfirmItAtOnce_thenItRunsOnceAndTheOtherFindsNoPreview",
+        "src/test/java/org/courtside/dataexchange/web/RetentionAdminControllerTest.java#givenAnExpiredPreview_whenRun_thenItIsRefusedAsExpiredAndNobodyIsRemoved",
         "src/test/java/org/courtside/shared/web/AdmissionPlanTest.java#whenLoadingTheShippedPlan_thenEveryDemandingClassHasItsDecidedCostAndBulkhead"
       ]
     },

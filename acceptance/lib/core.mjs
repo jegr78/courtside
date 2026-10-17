@@ -32,6 +32,27 @@ export function foreignWordings(templates, entries) {
     .filter((id) => !ours.has(id));
 }
 
+export const RETENTION_CATEGORIES = ["BOOKINGS", "FORMER_MEMBERS"];
+export const RETENTION_BLOCK_REASONS = ["ADMINISTRATOR", "NAMED_IN_BOOKINGS", "ON_A_WAITING_LIST"];
+
+// The first entry of a category holds the period from before the run, however often a run changed it since.
+export function retentionRestorations(entries) {
+  const first = new Map();
+  for (const entry of entries) {
+    if (entry.kind !== "retention-policy" || first.has(entry.id)) continue;
+    if (!RETENTION_CATEGORIES.includes(entry.id)) throw new Error(`unknown retention category ${entry.id}`);
+    first.set(entry.id, entry.before ?? null);
+  }
+  return [...first].map(([category, before]) => before === null
+    ? { category, before, method: "DELETE", path: `/api/admin/retention/policies/${category}` }
+    : { category, before, method: "PUT", path: `/api/admin/retention/policies/${category}`, body: { retainMonths: before } });
+}
+
+// A period the board did not set is answered without months; the run sets one that differs from it.
+export const periodsOf = (policies) => Object.fromEntries(RETENTION_CATEGORIES.map((category) =>
+  [category, policies.find((policy) => policy.category === category)?.retainMonths ?? null]));
+export const differentPeriod = (before) => before === 1 ? 2 : 1;
+
 // The window sweep reads only the lane days, so a booking made further ahead is cancelled by its ledger entry.
 export const bookingsBeyondWindow = (entries, days) =>
   entries.filter((entry) => entry.kind === "booking" && entry.date && !days.includes(entry.date));

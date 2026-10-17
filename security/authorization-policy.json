@@ -2,9 +2,9 @@
   "schemaVersion": 1,
   "reviewedAt": "2026-10-16",
   "purpose": "This is the normative authorization policy for the shipped Courtside API. OpenAPI defines the transport shape; this policy defines who may perform each operation, which resource attributes narrow that permission, and which protected fields each projection may read or write.",
-  "openApiFieldInventorySha256": "f071211366a4792eec7acdfd4490b34e186a6eec0d0ad12cf0695bc277ba9b9a",
-  "protectedFieldInventorySha256": "10670996757e5300500a16ba654826a53bce0e5e37a70e067e29ef4cf58656d6",
-  "productionAuthorizationSha256": "2324585663775de7570ad53384868c354c480982464ae33b4937982815fb2049",
+  "openApiFieldInventorySha256": "85a7b8a5a3059f4d0d03e18b36905bc4f56593416598af9ef11bbe95d4f12bfe",
+  "protectedFieldInventorySha256": "c59928b469725ddc7eaf3f30dce4526afb7b92a4bc8e328e541d62576f25a033",
+  "productionAuthorizationSha256": "148b900e5ac2619d240f08d3883844fc6daa59f31d0513c576fe2eb2a1c7bc38",
   "ordinaryFields": [
     "Problem.detail",
     "Problem.fieldErrors",
@@ -1754,6 +1754,16 @@
     "listReservedSlots:response:Violation.code",
     "listReservedSlots:response:Violation.params",
     "listReservedSlots:response:Violation.params.*",
+    "listRetentionPolicies:response:$response.header.Retry-After",
+    "listRetentionPolicies:response:FieldError.code",
+    "listRetentionPolicies:response:FieldError.field",
+    "listRetentionPolicies:response:FieldError.params",
+    "listRetentionPolicies:response:FieldError.params.*",
+    "listRetentionPolicies:response:RetentionPolicy.category",
+    "listRetentionPolicies:response:RetentionPolicy.retainMonths",
+    "listRetentionPolicies:response:Violation.code",
+    "listRetentionPolicies:response:Violation.params",
+    "listRetentionPolicies:response:Violation.params.*",
     "listRuleSets:response:$response.header.Retry-After",
     "listRuleSets:response:FieldError.code",
     "listRuleSets:response:FieldError.field",
@@ -1905,6 +1915,25 @@
     "previewMessageTemplate:response:Violation.code",
     "previewMessageTemplate:response:Violation.params",
     "previewMessageTemplate:response:Violation.params.*",
+    "previewRetention:response:$response.header.Retry-After",
+    "previewRetention:response:FieldError.code",
+    "previewRetention:response:FieldError.field",
+    "previewRetention:response:FieldError.params",
+    "previewRetention:response:FieldError.params.*",
+    "previewRetention:response:RetentionBookingsPreview.bookings",
+    "previewRetention:response:RetentionBookingsPreview.endedBefore",
+    "previewRetention:response:RetentionBookingsPreview.series",
+    "previewRetention:response:RetentionFormerMembersPreview.accounts",
+    "previewRetention:response:RetentionFormerMembersPreview.membershipEndedBefore",
+    "previewRetention:response:RetentionFormerMembersPreview.people",
+    "previewRetention:response:RetentionPreview.blocked",
+    "previewRetention:response:RetentionPreview.bookings",
+    "previewRetention:response:RetentionPreview.expiresAt",
+    "previewRetention:response:RetentionPreview.formerMembers",
+    "previewRetention:response:RetentionPreview.previewId",
+    "previewRetention:response:Violation.code",
+    "previewRetention:response:Violation.params",
+    "previewRetention:response:Violation.params.*",
     "previewSeries:request:SeriesRuleRequest.cardId",
     "previewSeries:request:SeriesRuleRequest.courtIds",
     "previewSeries:request:SeriesRuleRequest.durationMinutes",
@@ -2336,6 +2365,15 @@
     "removeOwnParticipation:response:Violation.code",
     "removeOwnParticipation:response:Violation.params",
     "removeOwnParticipation:response:Violation.params.*",
+    "removeRetentionPolicy:parameter:$parameter.path.category",
+    "removeRetentionPolicy:response:$response.header.Retry-After",
+    "removeRetentionPolicy:response:FieldError.code",
+    "removeRetentionPolicy:response:FieldError.field",
+    "removeRetentionPolicy:response:FieldError.params",
+    "removeRetentionPolicy:response:FieldError.params.*",
+    "removeRetentionPolicy:response:Violation.code",
+    "removeRetentionPolicy:response:Violation.params",
+    "removeRetentionPolicy:response:Violation.params.*",
     "removeRule:parameter:$parameter.path.id",
     "removeRule:parameter:$parameter.path.ruleType",
     "removeRule:response:$response.header.Retry-After",
@@ -2392,6 +2430,21 @@
     "resetMessageTemplate:response:Violation.code",
     "resetMessageTemplate:response:Violation.params",
     "resetMessageTemplate:response:Violation.params.*",
+    "runRetention:parameter:$parameter.path.id",
+    "runRetention:response:$response.header.Retry-After",
+    "runRetention:response:FieldError.code",
+    "runRetention:response:FieldError.field",
+    "runRetention:response:FieldError.params",
+    "runRetention:response:FieldError.params.*",
+    "runRetention:response:RetentionRun.accountsRemoved",
+    "runRetention:response:RetentionRun.bookingsPseudonymised",
+    "runRetention:response:RetentionRun.formerMembersRemoved",
+    "runRetention:response:RetentionRun.formerMembersSkipped",
+    "runRetention:response:RetentionRun.runId",
+    "runRetention:response:RetentionRun.seriesPseudonymised",
+    "runRetention:response:Violation.code",
+    "runRetention:response:Violation.params",
+    "runRetention:response:Violation.params.*",
     "searchAuditLog:request:AuditSearchRequest.cursor",
     "searchAuditLog:request:AuditSearchRequest.eventType",
     "searchAuditLog:request:AuditSearchRequest.from",
@@ -2549,6 +2602,19 @@
     "setParticipantCardActive:response:Violation.code",
     "setParticipantCardActive:response:Violation.params",
     "setParticipantCardActive:response:Violation.params.*",
+    "setRetentionPolicy:parameter:$parameter.path.category",
+    "setRetentionPolicy:request:RetentionPeriod.retainMonths",
+    "setRetentionPolicy:response:$response.header.Accept",
+    "setRetentionPolicy:response:$response.header.Retry-After",
+    "setRetentionPolicy:response:FieldError.code",
+    "setRetentionPolicy:response:FieldError.field",
+    "setRetentionPolicy:response:FieldError.params",
+    "setRetentionPolicy:response:FieldError.params.*",
+    "setRetentionPolicy:response:RetentionPolicy.category",
+    "setRetentionPolicy:response:RetentionPolicy.retainMonths",
+    "setRetentionPolicy:response:Violation.code",
+    "setRetentionPolicy:response:Violation.params",
+    "setRetentionPolicy:response:Violation.params.*",
     "setRule:parameter:$parameter.path.id",
     "setRule:parameter:$parameter.path.ruleType",
     "setRule:request:SetRuleRequest.params",
@@ -3422,6 +3488,10 @@
         "exportAuditLog",
         "exportMessageLog",
         "exportPersonData",
+        "listRetentionPolicies",
+        "setRetentionPolicy",
+        "removeRetentionPolicy",
+        "previewRetention",
         "getAttendancePolicy",
         "changeAttendancePolicy",
         "recordAttendance",
@@ -3519,6 +3589,22 @@
       ]
     },
     {
+      "id": "retention-run",
+      "description": "Running a retention preview requires ADMIN, recent authentication and ownership of a current, unexpired preview.",
+      "operationIds": [
+        "runRetention"
+      ],
+      "actors": [
+        "ADMIN"
+      ],
+      "decisions": [
+        "administrator-gate",
+        "recent-authentication",
+        "retention-preview-owner",
+        "administrative-projection"
+      ]
+    },
+    {
       "id": "message-wording",
       "description": "Changing or resetting the wording of a message requires ADMIN and recent authentication, because the wording includes what credential and reset-code mails say.",
       "operationIds": [
@@ -3610,7 +3696,8 @@
       "productionPaths": [
         "src/main/java/org/courtside/identity/internal/SecurityConfiguration.java#filterChain",
         "src/main/java/org/courtside/booking/web/AttendanceAdminController.java#recordAttendance",
-        "src/main/java/org/courtside/booking/web/AttendanceAdminController.java#liftNoShows"
+        "src/main/java/org/courtside/booking/web/AttendanceAdminController.java#liftNoShows",
+        "src/main/java/org/courtside/dataexchange/web/RetentionAdminController.java#previewRetention"
       ],
       "positiveTests": [
         "src/test/java/org/courtside/identity/AdminAuthorizationTest.java#givenAnAdmin_whenCallingAnAdminEndpoint_thenItIsServed"
@@ -3930,13 +4017,16 @@
         "src/main/java/org/courtside/member/web/RosterAdminController.java#endAllSessions",
         "src/main/java/org/courtside/dataexchange/web/ImportExecutionAdminController.java#executeImportPreview",
         "src/main/java/org/courtside/notification/web/MessageTemplateAdminController.java#changeMessageTemplate",
-        "src/main/java/org/courtside/notification/web/MessageTemplateAdminController.java#resetMessageTemplate"
+        "src/main/java/org/courtside/notification/web/MessageTemplateAdminController.java#resetMessageTemplate",
+        "src/main/java/org/courtside/dataexchange/web/RetentionAdminController.java#runRetention"
       ],
       "positiveTests": [
-        "src/test/java/org/courtside/identity/AdminRecentAuthenticationTest.java#givenAnotherAccountsSessions_whenAdminProofIsRefreshed_thenOnlyTheTargetEnds"
+        "src/test/java/org/courtside/identity/AdminRecentAuthenticationTest.java#givenAnotherAccountsSessions_whenAdminProofIsRefreshed_thenOnlyTheTargetEnds",
+        "src/test/java/org/courtside/dataexchange/web/RetentionAdminControllerTest.java#givenARemovableFormerMember_whenTheRunApplies_thenThePersonAndTheirAccountLeaveAndTheLogKeepsCountsOnly"
       ],
       "negativeTests": [
-        "src/test/java/org/courtside/identity/AdminRecentAuthenticationTest.java#givenNoRecentProof_whenAnAdminPerformsSensitiveChanges_thenEveryChangeIsRefused"
+        "src/test/java/org/courtside/identity/AdminRecentAuthenticationTest.java#givenNoRecentProof_whenAnAdminPerformsSensitiveChanges_thenEveryChangeIsRefused",
+        "src/test/java/org/courtside/dataexchange/web/RetentionAdminControllerTest.java#givenNoRecentProof_whenARunIsAsked_thenItIsRefusedAndThePreviewStillWaits"
       ]
     },
     {
@@ -3983,6 +4073,32 @@
       ],
       "negativeTests": [
         "src/test/java/org/courtside/dataexchange/ExecutionServiceTest.java#givenAnotherAdministratorTookThePreview_whenExecutingIt_thenOnlyItsReviewerCanProceed"
+      ]
+    },
+    {
+      "id": "retention-preview-owner",
+      "title": "Retention preview ownership and state",
+      "rule": "Only the administrator who created a retention preview may run it, once, before it expires and while the periods it applies are unchanged.",
+      "attributes": [
+        "preview-reviewer",
+        "preview-current",
+        "preview-expiry"
+      ],
+      "productionPaths": [
+        "src/main/java/org/courtside/dataexchange/RetentionService.java#run",
+        "src/main/java/org/courtside/dataexchange/RetentionService.java#requireTheSamePeriods",
+        "src/main/java/org/courtside/dataexchange/RetentionService.java#setPolicy",
+        "src/main/java/org/courtside/dataexchange/RetentionService.java#removePolicy"
+      ],
+      "positiveTests": [
+        "src/test/java/org/courtside/dataexchange/web/RetentionAdminControllerTest.java#givenARemovableFormerMember_whenTheRunApplies_thenThePersonAndTheirAccountLeaveAndTheLogKeepsCountsOnly"
+      ],
+      "negativeTests": [
+        "src/test/java/org/courtside/dataexchange/web/RetentionAdminControllerTest.java#givenAPreviewOfAnotherAccount_whenRun_thenItIsRefusedAndNobodyIsRemoved",
+        "src/test/java/org/courtside/dataexchange/web/RetentionAdminControllerTest.java#givenAnExpiredPreview_whenRun_thenItIsRefusedAsExpiredAndNobodyIsRemoved",
+        "src/test/java/org/courtside/dataexchange/web/RetentionAdminControllerTest.java#givenARunPreview_whenRunAgain_thenTheSecondRequestFindsNoPreview",
+        "src/test/java/org/courtside/dataexchange/web/RetentionAdminControllerTest.java#givenAPreviewUnderAPeriod_whenThePeriodIsRemoved_thenThePreviewCanNoLongerRun",
+        "src/test/java/org/courtside/dataexchange/ConcurrentRetentionRunTest.java#givenABoardLengtheningThePeriodWhileTheRunStarts_whenTheRunReachesThePreview_thenItWaitsAndRunsNothing"
       ]
     },
     {
@@ -5101,6 +5217,29 @@
       ],
       "operationIds": [
         "listNoShows"
+      ],
+      "actors": [
+        "ADMIN"
+      ],
+      "attributes": [
+        "administrator",
+        "target-person"
+      ],
+      "decisions": [
+        "administrator-gate",
+        "administrative-projection"
+      ]
+    },
+    {
+      "id": "retention-blocked-read",
+      "access": "read",
+      "description": "Which former members a retention run cannot remove yet, and why, is visible only to ADMIN in the preview that judged them.",
+      "fields": [
+        "RetentionBlockedRecord.personId",
+        "RetentionBlockedRecord.reason"
+      ],
+      "operationIds": [
+        "previewRetention"
       ],
       "actors": [
         "ADMIN"
