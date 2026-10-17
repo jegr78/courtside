@@ -61,15 +61,33 @@ export function buildSnapshot({ resolved, direct, sha, ref, runId, correlator, r
   };
 }
 
-export async function submitSnapshot(snapshot, repository, token, send = fetch) {
-  const response = await send(`https://api.github.com/repos/${repository}/dependency-graph/snapshots`, {
-    method: "POST",
-    headers: { Accept: "application/vnd.github+json", Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json", "X-GitHub-Api-Version": "2022-11-28" },
-    body: JSON.stringify(snapshot)
-  });
-  if (response.status !== 201) throw new Error(`GitHub API returned ${response.status}`);
-  return response;
+const transient = (status) => status === 429 || status >= 500;
+const pause = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
+
+export async function submitSnapshot(snapshot, repository, token, send = fetch,
+  { attempts = 4, backoff = 5000, wait = pause } = {}) {
+  for (let attempt = 1; ; attempt += 1) {
+    let response;
+    try {
+      response = await send(`https://api.github.com/repos/${repository}/dependency-graph/snapshots`, {
+        method: "POST",
+        headers: { Accept: "application/vnd.github+json", Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json", "X-GitHub-Api-Version": "2022-11-28" },
+        body: JSON.stringify(snapshot)
+      });
+    } catch (error) {
+      if (attempt >= attempts) throw error;
+      process.stderr.write(`attempt ${attempt} failed: ${error.message}\n`);
+      await wait(backoff * 2 ** (attempt - 1));
+      continue;
+    }
+    if (response.status === 201) return response;
+    if (!transient(response.status) || attempt >= attempts) {
+      throw new Error(`GitHub API returned ${response.status}`);
+    }
+    process.stderr.write(`attempt ${attempt} returned ${response.status}\n`);
+    await wait(backoff * 2 ** (attempt - 1));
+  }
 }
 
 async function main(args) {

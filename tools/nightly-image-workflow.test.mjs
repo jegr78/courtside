@@ -193,6 +193,29 @@ test("given the runtime base image, when the Courtside image is assembled, then 
   assert.match(dockerfile, /rm -f \/usr\/bin\/pebble/);
 });
 
+test("given a transient Sigstore failure, when images are attested and signed, then each step gets a second attempt", () => {
+  // given
+  const steps = workflow.jobs.publish.steps;
+  const attesting = steps.filter((step) => /^actions\/attest(-build-provenance|-sbom)?@/.test(step.uses ?? ""));
+  const first = attesting.filter((step) => step.id);
+
+  // when / then
+  assert.equal(first.length, 6, "every image carries provenance, SBOM and source attestations");
+  for (const step of first) {
+    const retry = `steps.${step.id}.outcome == 'failure'`;
+    const at = steps.indexOf(step);
+    assert.equal(step["continue-on-error"], true, `${step.id} may fail once`);
+    assert.equal(steps[at + 1].if, retry, `${step.id} waits before its second attempt`);
+    assert.match(steps[at + 1].run, /^sleep \d+$/);
+    assert.equal(steps[at + 2].uses, step.uses, `${step.id} is attempted again with the same action`);
+    assert.equal(steps[at + 2].if, retry);
+    assert.equal(steps[at + 2]["continue-on-error"], undefined, `a second failure of ${step.id} fails the job`);
+    assert.deepEqual(steps[at + 2].with, step.with);
+  }
+  assert.equal(attesting.length, 12);
+  assert.match(source, /cosign sign --yes "\$image" \|\| \{ sleep \d+; cosign sign --yes "\$image"; \}/);
+});
+
 test("given qualified main images, when they are published, then verified evidence precedes their nightly tags", () => {
   // given
   const publish = source.slice(source.indexOf("\n  publish:\n"), source.indexOf("\n  retention:\n"));
@@ -207,8 +230,7 @@ test("given qualified main images, when they are published, then verified eviden
   assert.match(publish, /actions\/attest@[0-9a-f]{40}/);
   assert.match(publish, /verificationRunId/);
   assert.match(publish, /\.commit == \$commit and \.verificationRunId == \$runId/);
-  assert.match(publish, /cosign sign --yes "\$IMAGE"/);
-  assert.match(publish, /cosign sign --yes "\$BOOKING_SEED_IMAGE"/);
+  assert.match(publish, /for image in "\$IMAGE" "\$BOOKING_SEED_IMAGE"; do/);
   assert.match(publish, /courtside-booking-seed-nightly\.spdx\.json/);
   assert.match(publish,
     /subject-digest: \$\{\{ needs\.image\.outputs\.booking-seed-digest \}\}/);
