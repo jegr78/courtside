@@ -235,7 +235,8 @@ public final class ChangeSetResolver {
         List<ResolvedChangeSet.PersonChange> endings = new ArrayList<>();
         roster.personIdsByExternalId().forEach((externalId, personId) -> {
             CurrentRoster.RosterPerson person = roster.peopleById().get(personId);
-            if (!present.contains(externalId) && person != null && person.membershipCurrent()) {
+            if (!present.contains(externalId) && person != null
+                    && (person.membershipCurrent() || person.membershipScheduled())) {
                 endings.add(new ResolvedChangeSet.PersonChange(
                         ResolvedChangeSet.ChangeKind.END_MEMBERSHIP, 0, externalId, personId,
                         Map.of(), null, ResolvedChangeSet.AccountOutcome.NOT_ASKED));
@@ -246,7 +247,7 @@ public final class ChangeSetResolver {
 
     private static ResolvedChangeSet.RemovalCounts removalsOf(int removed, CurrentRoster roster) {
         int linked = (int) roster.peopleById().values().stream()
-                .filter(CurrentRoster.RosterPerson::membershipCurrent)
+                .filter(person -> person.membershipCurrent() || person.membershipScheduled())
                 .count();
         return new ResolvedChangeSet.RemovalCounts(removed, linked,
                 linked == 0 ? 0 : (int) Math.ceil(removed * 100.0 / linked));
