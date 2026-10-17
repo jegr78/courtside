@@ -1146,8 +1146,13 @@ components:
       description: |
         Writes one period of the person's membership: the period valid today, else the next one
         scheduled, else the latest that ended. When that one has ended and the request starts on or
-        after its end, or names no start, a new period is added instead, so a rejoin keeps the
-        history. `/api/admin/roster/{personId}/membership-periods` addresses each period by id.
+        after its end, names no start, or leaves the person a member after today, a new period is
+        added instead, from today unless the request starts later, so a rejoin keeps the gap. A
+        new type for a period that began before today and keeps its start ends that period today
+        and opens the new type from today. A write that ends the period or moves its end earlier
+        withdraws the periods starting on or after the new end and after today, each recorded in
+        the audit log. `/api/admin/roster/{personId}/membership-periods` addresses each period by
+        id.
       required: [membershipTypeId]
       properties:
         membershipTypeId:
@@ -7423,9 +7428,10 @@ paths:
       operationId: assignMembership
       summary: Give a person a membership, move them to another type, or correct its dates.
       description: |
-        Writes one period of the person's membership, as `MembershipRequest` describes: a board
-        that picked the wrong type moves them to the right one with the same request, and a
-        person who rejoins gains a new period beside the one that ended.
+        Writes one period of the person's membership, as `MembershipRequest` describes: a type
+        change opens the new type from today and keeps the old one as its own period, and a
+        person who rejoins gains a new period beside the one that ended. A type picked by mistake
+        is corrected on the period itself.
 
         The type has to be one the club still offers whenever the write leaves somebody a member of
         a type they did not already hold. A deactivated type is refused there, which is what its
