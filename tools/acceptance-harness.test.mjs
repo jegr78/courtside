@@ -1091,7 +1091,7 @@ test("given the policies the instance lists, when read as periods, then an unset
 
 test("given the retention journey, when its source is read, then it lets no run reach the instance and never presses the run button", () => {
   // given
-  const source = readFileSync(new URL("../acceptance/journeys/56-retention.spec.ts", import.meta.url), "utf8");
+  const source = readFileSync(new URL("../acceptance/journeys/57-retention.spec.ts", import.meta.url), "utf8");
   // then
   assert.match(source, /page\.route\("\*\*\/api\/admin\/retention\/previews\/\*\/run", async \(route\) => \{ runsAsked\+\+; await route\.abort\(\); \}\)/,
     "the journey aborts every run the page asks for");
