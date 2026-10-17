@@ -280,7 +280,7 @@ services:
 
   schemathesis:
     profiles: [assessment]
-    image: schemathesis/schemathesis:v4.30.1@sha256:30ef2766eb58dabfd26f9785d2e29e366a3ab69c2a40e34a8e56dbef5ce525f6
+    image: schemathesis/schemathesis:v4.31.0@sha256:58a4ffa68cd690a04eb70fd2d1c790acd54cd73986c777ec2556c901b6b707e4
     pull_policy: never
     entrypoint: ["tail", "-f", "/dev/null"]
     read_only: true

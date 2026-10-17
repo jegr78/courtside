@@ -213,10 +213,15 @@ point it at that source.
 Set, it must be an absolute `https://` address without path, query or credentials, or the
 application refuses to start.
 
+`COURTSIDE_BACKUP_EVIDENCE_FILE` names a JSON file such as `{"completedAt": "2026-10-17T02:00:00Z"}`
+that the operator's backup job rewrites after each successful backup. The operator health overview
+reports the backup's age from it. Unset or missing, the overview reports the backup as unavailable.
+
 These inputs are paths to files the container reads, so mount each one readable by UID 10001:
 
 - `COURTSIDE_APP_TLS_CERTIFICATE`
 - `COURTSIDE_APP_TLS_KEY`
+- `COURTSIDE_BACKUP_EVIDENCE_FILE`
 - `COURTSIDE_DB_MIGRATION_PASSWORD_FILE`
 - `COURTSIDE_DB_OWNER_PASSWORD_FILE`
 - `COURTSIDE_DB_RUNTIME_PASSWORD_FILE`
@@ -270,6 +275,7 @@ they name a file on the host, in the container the path it is mounted at. The
 | `COURTSIDE_APP_TLS_CERTIFICATE` | unset |
 | `COURTSIDE_APP_TLS_KEY` | unset |
 | `COURTSIDE_APP_TLS_MODE` | `plaintext` |
+| `COURTSIDE_BACKUP_EVIDENCE_FILE` | unset |
 | `COURTSIDE_BOOTSTRAP_ADMIN_DISPLAY_NAME` | unset |
 | `COURTSIDE_BOOTSTRAP_ADMIN_PASSWORD` | unset |
 | `COURTSIDE_BOOTSTRAP_ADMIN_USERNAME` | unset |

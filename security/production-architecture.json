@@ -124,6 +124,7 @@
       "compose:app:COURTSIDE_APP_TLS_CERTIFICATE",
       "compose:app:COURTSIDE_APP_TLS_KEY",
       "compose:app:COURTSIDE_APP_TLS_MODE",
+      "compose:app:COURTSIDE_BACKUP_EVIDENCE_FILE",
       "compose:app:COURTSIDE_BOOTSTRAP_ADMIN_DISPLAY_NAME",
       "compose:app:COURTSIDE_BOOTSTRAP_ADMIN_PASSWORD",
       "compose:app:COURTSIDE_BOOTSTRAP_ADMIN_USERNAME",
