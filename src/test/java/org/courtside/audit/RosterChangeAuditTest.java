@@ -107,7 +107,9 @@ class RosterChangeAuditTest extends AbstractIntegrationTest {
                         "roster.membership.ended");
         assertThat(audit.latestPayload(personId, "roster.membership.written"))
                 .containsEntry("membershipTypeId", membershipTypeId.toString())
-                .containsEntry("startedOn", "2026-01-01");
+                .containsEntry("startedOn", "2026-01-01")
+                .as("the entry names the period it wrote")
+                .hasEntrySatisfying("periodId", periodId -> assertThat(periodId).isNotNull());
     }
 
     @Test

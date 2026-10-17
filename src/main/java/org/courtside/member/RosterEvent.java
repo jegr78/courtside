@@ -107,7 +107,7 @@ public sealed interface RosterEvent extends DomainEventRecord {
 
     }
 
-    record MembershipWritten(UUID personId, UUID membershipTypeId, @Nullable LocalDate startedOn,
+    record MembershipWritten(UUID personId, UUID periodId, UUID membershipTypeId, LocalDate startedOn,
                              @Nullable LocalDate endedOn) implements RosterEvent {
 
         static final String TYPE = "roster.membership.written";
