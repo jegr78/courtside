@@ -11,6 +11,7 @@ import { AdminMembershipTypesView } from "./AdminMembershipTypesView";
 import { AdminMessagesView } from "./AdminMessagesView";
 import { AdminMessageWordingView } from "./AdminMessageWordingView";
 import { AdminOperationalLogsView } from "./AdminOperationalLogsView";
+import { AdminOperatorHealthView } from "./AdminOperatorHealthView";
 import { AdminOverviewView } from "./AdminOverviewView";
 import { AdminPersonView } from "./AdminPersonView";
 import { AdminRosterView } from "./AdminRosterView";
@@ -61,6 +62,7 @@ export default function AdminRoutes({ configurationChanged, administrator, manag
       <Route path="audit" element={<AdminAuditView />} />
       <Route path="messages" element={<AdminMessagesView />} />
       <Route path="operational-logs" element={<AdminOperationalLogsView />} />
+      <Route path="operator-health" element={<AdminOperatorHealthView />} />
       </>}
       <Route path="*" element={<Navigate to={administrator ? "/" : "/admin/appointments"} replace />} />
     </Route>

@@ -121,6 +121,25 @@ it("when an administrator ends sessions, then the target and global routes stay 
   expect(calls).toEqual(["person:person-1", "global"]);
 });
 
+it("given an administrator, when the operator health is read, then the overview answers as the server sent it", async () => {
+  // given
+  const overview = {
+    checkedAt: "2026-10-17T08:00:00Z",
+    version: { state: "OK", version: "0.4.0", revision: null, builtAt: null },
+    migrations: { state: "OK", pending: 0, currentVersion: "63", expectedVersion: "63" },
+    mail: { state: "UNAVAILABLE", reason: "NOT_YET_OBSERVED" },
+    publicOrigin: { state: "OK", origin: "https://courts.example.org" },
+    backup: { state: "UNAVAILABLE", reason: "NOT_CONFIGURED" }
+  };
+  server.use(http.get("/api/admin/operator-health", () => HttpResponse.json(overview)));
+
+  // when
+  const result = await api.operatorHealth();
+
+  // then
+  expect(result).toEqual(overview);
+});
+
 it("given private operational-log filters, when searching, then they stay in the protected request body", async () => {
   // given
   document.cookie = "XSRF-TOKEN=test-token";
