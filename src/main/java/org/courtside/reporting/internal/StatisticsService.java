@@ -93,7 +93,7 @@ public class StatisticsService {
         limitStatementTime();
         return new MemberReport(period, timeZone(), memberFigures(period),
                 previous(period, this::memberFigures),
-                memberships.runningByType(period.to()),
+                memberships.runningByType(upToToday(period.to())),
                 accounts.figuresAsOf(period.to()));
     }
 
@@ -106,10 +106,16 @@ public class StatisticsService {
     }
 
     private MemberFigures memberFigures(StatisticsPeriod period) {
-        MembershipStatistics.MembershipFigures membership = memberships.figures(period.from(), period.to());
-        long active = bookings.activeMembers(period.from(), period.to());
+        LocalDate to = upToToday(period.to());
+        MembershipStatistics.MembershipFigures membership = memberships.figures(period.from(), to);
+        long active = bookings.activeMembers(period.from(), to);
         return new MemberFigures(membership.running(), membership.joins(), membership.leavings(), active,
                 membership.running() == 0 ? null : (double) active / membership.running());
+    }
+
+    private LocalDate upToToday(LocalDate day) {
+        LocalDate today = LocalDate.ofInstant(clock.instant(), clubTimeZone.zoneId());
+        return day.isAfter(today) ? today : day;
     }
 
     private void limitStatementTime() {

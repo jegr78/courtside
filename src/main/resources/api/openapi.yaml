@@ -9482,8 +9482,9 @@ paths:
       summary: How many members the club had at the end of a period, and how many of them played.
       description: |
         A membership runs on a day when it started on or before that day and has no end date or
-        ends after it. Members are counted by the membership type of the period running on the
-        period's last day. An active member holds a running membership on the period's last
+        ends after it. A period reaching past today is read up to today, so a scheduled start or end
+        does not count before its day. Members are counted by the membership type of the period
+        running on the period's last day. An active member holds a running membership on the period's last
         day and, in a confirmed booking starting in the period, booked it or was recorded as a
         participant. Guests and participant cards are never members.
 

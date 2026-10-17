@@ -567,7 +567,8 @@ period between them. Each read runs its statements under a 30-second statement t
   An active member holds a running membership on the period's last day and, in a confirmed booking
   starting in the period, booked it or was recorded as a participant. Members are grouped by the
   type of the period running on that day. A period that directly follows another period of the same
-  person, such as a type change, is neither a join nor a leaving.
+  person, such as a type change, is neither a join nor a leaving. A period reaching past today is
+  read up to today, so a scheduled start or end does not count before its day.
 - Account figures describe the enabled accounts as they are now; a disabled account counts in none
   of them. Only the latest sign-in is stored, so for
   a past period the 30- and 90-day windows count the accounts whose latest sign-in falls inside
