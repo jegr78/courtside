@@ -162,7 +162,8 @@ class OperatorHealthAdminControllerTest extends AbstractIntegrationTest {
         assertThat(unrecorded).as("a missing backup record must never read as a fresh backup").isNaN();
         assertThat(backupAge.value()).isGreaterThanOrEqualTo(3_600);
         assertThat(backupAge.getId().getTags()).as("the backup age carries no labels").isEmpty();
-        assertThat(pending.value()).isGreaterThanOrEqualTo(0);
+        assertThat(pending.value()).as("pending publications are counted, not unreadable").isNotNaN()
+                .isGreaterThanOrEqualTo(0);
         assertThat(pending.getId().getTags()).as("pending publications carry no labels").isEmpty();
     }
 

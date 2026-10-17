@@ -953,6 +953,10 @@ contain placeholders rather than values and include trace identifiers when sampl
 `courtside.login.failures` counts refused sign-ins labelled only by the catalogued reason. None of
 them carries an account, a person or an address. Without a backup record the age reads `NaN`.
 
+The reference deployment is a supported starting point, not a managed service. Courtside validates
+configuration it owns and supplies lifecycle tools. The operator owns the machine, external
+services, credentials, backups and availability.
+
 ### Operator health overview
 
 `GET /api/admin/operator-health` answers administrators only and reads what the instance can prove
@@ -973,10 +977,6 @@ Each check is `OK`, `FAILING` with the place that fails, or `UNAVAILABLE` with t
 evidence is missing. A check without evidence never reads as healthy. The overview sets no
 thresholds: whether a backup is too old is the operator's decision, made in whatever alerting reads
 the metric.
-
-The reference deployment is a supported starting point, not a managed service. Courtside validates
-configuration it owns and supplies lifecycle tools. The operator owns the machine, external
-services, credentials, backups and availability.
 
 ### Start sequence
 
