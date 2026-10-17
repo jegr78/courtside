@@ -511,7 +511,7 @@ async function stableScreenshot(surface: Locator, name: string, mask?: Locator):
   });
 }
 
-test("each configuration surface and the operator health overview fit the desktop screen without scrolling in either language", async ({ page }) => {
+test("each configuration surface fits the desktop screen without scrolling in either language", async ({ page }) => {
   // given
   await signIn(page, "configuration-admin");
   const surfaces = [
@@ -553,6 +553,35 @@ test("each configuration surface and the operator health overview fit the deskto
     }
     await page.getByTestId("court-plan-link").click();
   }
+});
+
+test("given a desktop window shorter than the navigation, when an administrative page is shown, then the navigation scrolls within the window", async ({ page }) => {
+  // given
+  await signIn(page, "configuration-admin");
+  await page.setViewportSize({ width: 1440, height: 640 });
+  await page.getByTestId("administration-link").click();
+
+  // when
+  await page.getByTestId("admin-configuration-link").click();
+  await expect(page.getByTestId("logo-url")).toBeEnabled();
+  const measured = await page.evaluate(() => {
+    const frame = document.querySelector("[data-testid='admin-navigation-frame']")!;
+    const shell = document.querySelector("[data-testid='admin-shell']")!;
+    return {
+      scrolls: frame.scrollHeight > frame.clientHeight,
+      end: frame.getBoundingClientRect().bottom + window.scrollY
+        + document.documentElement.scrollHeight - (shell.getBoundingClientRect().bottom + window.scrollY),
+      viewport: window.innerHeight
+    };
+  });
+
+  // then
+  expect(measured.scrolls, "the navigation keeps its destinations in its own scroll area").toBe(true);
+  expect(measured.end, `the navigation alone would end the page within the window: ${JSON.stringify(measured)}`)
+    .toBeLessThanOrEqual(measured.viewport);
+  const last = page.getByTestId("admin-navigation").getByRole("link").last();
+  await last.scrollIntoViewIfNeeded();
+  await expect(last).toBeInViewport();
 });
 
 async function expectToFit(page: Page, name: string, view: string): Promise<void> {
