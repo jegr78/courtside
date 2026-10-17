@@ -1,5 +1,6 @@
 package org.courtside.notification.internal;
 
+import org.courtside.notification.InstanceOrigin;
 import org.courtside.notification.MessageKind;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -7,11 +8,12 @@ import org.springframework.stereotype.Component;
 import java.net.IDN;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 @Component
-class InstanceLinks {
+class InstanceLinks implements InstanceOrigin {
 
     static final String PLACEHOLDER = "instanceLink";
     private static final Pattern AUTHORITY = Pattern.compile("(\\[[0-9A-Fa-f:.]+]|[^:@\\[\\]]+)(?::([0-9]{1,5}))?");
@@ -20,6 +22,11 @@ class InstanceLinks {
 
     InstanceLinks(@Value("${courtside.public-url:}") String configured) {
         this.origin = originOf(configured);
+    }
+
+    @Override
+    public Optional<String> origin() {
+        return origin.isEmpty() ? Optional.empty() : Optional.of(origin);
     }
 
     String of(QueuedMessage message) {

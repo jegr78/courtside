@@ -43,6 +43,7 @@ describe("AdminNavigation", () => {
     expect(within(records).getByTestId("admin-audit-link")).toBeInTheDocument();
     expect(within(records).getByTestId("admin-messages-link")).toBeInTheDocument();
     expect(within(records).getByTestId("admin-operational-logs-link")).toBeInTheDocument();
+    expect(within(records).getByTestId("admin-operator-health-link")).toHaveAttribute("href", "/admin/operator-health");
     expect(screen.getByTestId("admin-appointments-link")).toHaveAttribute("href", "/admin/appointments");
   });
 
@@ -276,7 +277,7 @@ describe("AdminNavigation", () => {
     resizeTo(375);
     render(<MemoryRouter initialEntries={["/admin/setup"]}><AdminNavigation /><button type="button" data-testid="beyond">beyond</button></MemoryRouter>);
     await userEvent.click(screen.getByTestId("admin-menu"));
-    screen.getByTestId("admin-operational-logs-link").focus();
+    screen.getByTestId("admin-operator-health-link").focus();
 
     // when
     await userEvent.tab();

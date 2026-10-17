@@ -1,5 +1,7 @@
 package org.courtside.identity.internal;
 
+import io.micrometer.core.instrument.Meter;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.courtside.identity.UserAccountRepository;
 import org.courtside.shared.SecurityEventLog;
 import org.junit.jupiter.api.Test;
@@ -19,9 +21,12 @@ import org.springframework.security.authentication.event.AuthenticationFailureCr
 import org.springframework.security.authentication.event.AuthenticationFailureDisabledEvent;
 import org.springframework.security.authentication.event.AuthenticationFailureLockedEvent;
 
+import java.util.Locale;
 import java.util.stream.Stream;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -37,9 +42,34 @@ class SignInFailureLogUnitTest {
         UserAccountRepository accounts = mock(UserAccountRepository.class);
         SecurityEventLog securityEvents = mock(SecurityEventLog.class);
 
-        new SignInFailureLog(accounts, securityEvents).on(refusal);
+        new SignInFailureLog(accounts, securityEvents, new SimpleMeterRegistry()).on(refusal);
 
         verify(securityEvents).authenticationFailed(null, reason);
+    }
+
+    @ParameterizedTest
+    @MethodSource("failureEvents")
+    void givenAnyAuthenticationFailure_whenObserved_thenOnlyItsReasonLabelsTheCounter(
+            AbstractAuthenticationFailureEvent refusal,
+            SecurityEventLog.AuthenticationFailure reason) {
+        // given
+        SimpleMeterRegistry meters = new SimpleMeterRegistry();
+
+        // when
+        new SignInFailureLog(mock(UserAccountRepository.class), mock(SecurityEventLog.class), meters).on(refusal);
+
+        // then
+        assertThat(meters.getMeters()).as("one failure counter labelled only by the catalogued reason")
+                .singleElement()
+                .satisfies(meter -> {
+                    assertThat(meter.getId().getName()).isEqualTo("courtside.login.failures");
+                    assertThat(meter.getId().getType()).isEqualTo(Meter.Type.COUNTER);
+                    assertThat(meter.getId().getTags()).extracting("key", "value")
+                            .containsExactly(tuple("reason",
+                                    reason.name().toLowerCase(Locale.ROOT)));
+                });
+        assertThat(meters.counter("courtside.login.failures", "reason", reason.name().toLowerCase(Locale.ROOT))
+                .count()).isEqualTo(1.0);
     }
 
     @Test
@@ -51,7 +81,7 @@ class SignInFailureLogUnitTest {
                 .thenThrow(new DataAccessResourceFailureException("no connection"));
 
         // when / then
-        assertThatCode(() -> new SignInFailureLog(accounts, securityEvents)
+        assertThatCode(() -> new SignInFailureLog(accounts, securityEvents, new SimpleMeterRegistry())
                 .on(refusalFor("doe.jane")))
                 .doesNotThrowAnyException();
         verify(securityEvents).authenticationFailed(

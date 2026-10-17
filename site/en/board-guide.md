@@ -481,7 +481,7 @@ roles again.
 
 ## Records
 
-The **Records** area has six views.
+The **Records** area has seven views.
 
 * **Statistics** opens on the last full month. At the top you choose another period: 7 days, 1, 3,
   6 or 12 months up to today, everything since the first booking, the previous calendar year or two
@@ -530,6 +530,14 @@ The **Records** area has six views.
   about unavailable, expired or incomplete evidence are part of the result. The view is not a
   durable log archive and cannot inspect arbitrary server containers. The source is not
   authenticated: a local process on the server can imitate one of the fixed source names.
+* **Operator health** shows what the instance can prove about itself: version, database schema,
+  mail handover, public address and latest backup. Each check is *Healthy*, *Failing* with the place
+  that fails, or *Not evidenced*. Not evidenced does not mean healthy. It means Courtside holds no
+  evidence. The latest backup stays not evidenced until the operator records its time. The view
+  checks when it opens and when you press **Check again**. It raises no alarm on its own. A warning
+  about a backup that is too old belongs in the operator's own monitoring.
+
+![Operator health with healthy checks, a failing one naming its mail server and a backup without evidence.](../screenshots/en/operator-health.png)
 
 ![Statistics with the period choice and the utilisation key figures with their change.](../screenshots/en/utilisation.png)
 

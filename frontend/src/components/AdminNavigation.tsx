@@ -64,7 +64,8 @@ const groups: Group[] = [
       { to: "/admin/export", testId: "admin-export-link", label: "nav.adminExport" },
       { to: "/admin/audit", testId: "admin-audit-link", label: "nav.adminAudit" },
       { to: "/admin/messages", testId: "admin-messages-link", label: "nav.adminMessages" },
-      { to: "/admin/operational-logs", testId: "admin-operational-logs-link", label: "nav.adminOperationalLogs" }
+      { to: "/admin/operational-logs", testId: "admin-operational-logs-link", label: "nav.adminOperationalLogs" },
+      { to: "/admin/operator-health", testId: "admin-operator-health-link", label: "nav.adminOperatorHealth" }
     ]
   }
 ];
@@ -135,7 +136,7 @@ export function AdminNavigation({ administrator = true }: { administrator?: bool
       </span>
       <span data-testid="admin-menu-indicator" aria-hidden="true" className="shrink-0 transition-transform group-open:rotate-180">▾</span>
     </summary>
-    <nav aria-label={t("nav.administration")} className="surface-panel absolute inset-x-0 top-full z-20 mt-2 grid max-h-[70vh] gap-5 overflow-y-auto lg:gap-4 rounded-xl border p-4 shadow-xl lg:static lg:mt-0 lg:max-h-none lg:overflow-visible lg:rounded-none lg:border-0 lg:bg-transparent lg:p-0 lg:shadow-none">
+    <nav aria-label={t("nav.administration")} className="surface-panel absolute inset-x-0 top-full z-20 mt-2 grid max-h-[70vh] gap-5 overflow-y-auto lg:gap-3 rounded-xl border p-4 shadow-xl lg:static lg:mt-0 lg:max-h-none lg:overflow-visible lg:rounded-none lg:border-0 lg:bg-transparent lg:p-0 lg:shadow-none">
       <Link data-testid="court-plan-link" to="/" className="focus-ring rounded-lg font-semibold underline-offset-4">
         {t("nav.courts")}
       </Link>

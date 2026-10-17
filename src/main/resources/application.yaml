@@ -54,6 +54,8 @@ server:
 courtside:
   source-url: ${COURTSIDE_SOURCE_URL:@project.url@}
   public-url: ${COURTSIDE_PUBLIC_URL:}
+  operations:
+    backup-evidence-file: ${COURTSIDE_BACKUP_EVIDENCE_FILE:}
   environment: ${COURTSIDE_ENVIRONMENT:PRODUCTION}
   database:
     lock-timeout: ${COURTSIDE_DB_LOCK_TIMEOUT:5s}

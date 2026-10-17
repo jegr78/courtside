@@ -18,7 +18,7 @@ const adminDestinations = [
   "admin-configuration-link", "admin-deadlines-link", "admin-rule-sets-link", "admin-courts-link", "admin-opening-hours-link",
   "admin-booking-cards-link", "admin-slot-fillers-link", "admin-roster-link",
   "admin-membership-types-link", "admin-import-link", "admin-audit-link",
-  "admin-messages-link", "admin-operational-logs-link"
+  "admin-messages-link", "admin-operational-logs-link", "admin-operator-health-link"
 ];
 
 function show(session: SessionStatus, at = "/") {

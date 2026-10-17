@@ -504,7 +504,7 @@ aktivieren und Mitgliedsrollen neu vergeben.
 
 ## Nachweise
 
-Unter **Nachweise** findest du sechs Ansichten.
+Unter **Nachweise** findest du sieben Ansichten.
 
 * **Statistik** zeigt beim Öffnen den letzten vollen Monat. Oben wählst du einen anderen Zeitraum:
   7 Tage, 1, 3, 6 oder 12 Monate bis heute, alles seit der ersten Buchung, das letzte Kalenderjahr
@@ -559,6 +559,15 @@ Unter **Nachweise** findest du sechs Ansichten.
   Hinweise über fehlende, entfernte oder unvollständige Daten gehören zum Ergebnis. Die Ansicht ist
   kein dauerhaftes Logarchiv und zeigt keine beliebigen Container des Servers. Die Quelle ist nicht
   authentifiziert: Ein lokaler Prozess auf dem Server kann einen der festen Quellnamen nachahmen.
+* **Betriebsübersicht** zeigt, was die Instanz über sich selbst nachweisen kann: Version,
+  Datenbankschema, Mailversand, öffentliche Adresse und letzte Sicherung. Jeder Punkt ist
+  *In Ordnung*, *Gestört* mit dem Ort der Störung oder *Nicht belegt*. Nicht belegt heißt nicht in
+  Ordnung. Courtside hat für diesen Punkt keinen Nachweis. Die letzte Sicherung bleibt nicht belegt,
+  bis der Betrieb ihren Zeitpunkt einträgt. Die Ansicht prüft beim Öffnen und wenn du **Neu
+  prüfen** drückst. Sie meldet nichts von selbst. Eine Warnung bei einer zu alten Sicherung
+  richtet der Betrieb in seinem eigenen Monitoring ein.
+
+![Die Betriebsübersicht mit einem Punkt in Ordnung, einem gestörten mit seinem Mailserver und einer nicht belegten Sicherung.](screenshots/de/operator-health.png)
 
 ![Die Statistik mit Zeitraumwahl, Kennzahlen zur Auslastung und ihrer Veränderung.](screenshots/de/utilisation.png)
 

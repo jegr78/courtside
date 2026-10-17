@@ -459,7 +459,25 @@ test("stable administration surfaces match their reviewed baselines", async ({ p
 
   // then
   await stableScreenshot(page.getByTestId("admin-messages-view"), "admin-messages.png");
+
+  // when — one check in each state, because the journey world never fails a check of its own
+  await page.context().route("**/api/admin/operator-health", (route) => route.fulfill({ json: operatorHealthSample }));
+  await page.goto("/admin/operator-health");
+  await expect(page.getByTestId("operator-check-mail"), "the sample, not the live instance, is drawn").toHaveAttribute("data-state", "FAILING");
+
+  // then
+  await stableScreenshot(page.getByTestId("admin-operator-health-view"), "admin-operator-health.png");
+  await page.context().unroute("**/api/admin/operator-health");
 });
+
+const operatorHealthSample = {
+  checkedAt: "2026-10-17T08:00:00Z",
+  version: { state: "OK", version: "0.4.0", revision: "4f2c9e1", builtAt: "2026-10-16T20:00:00Z" },
+  migrations: { state: "OK", reason: null, pending: 0, currentVersion: "63", expectedVersion: "63", location: null },
+  mail: { state: "FAILING", reason: "HANDOVER_FAILING", lastHandedOverAt: "2026-10-17T07:00:00Z", location: "relay.example.org:587" },
+  publicOrigin: { state: "OK", reason: null, origin: "https://courts.example.org" },
+  backup: { state: "UNAVAILABLE", reason: "NOT_CONFIGURED", completedAt: null, ageSeconds: null, location: null }
+};
 
 async function signIn(page: Page, username: string): Promise<void> {
   await page.goto("/login");
@@ -493,14 +511,15 @@ async function stableScreenshot(surface: Locator, name: string, mask?: Locator):
   });
 }
 
-test("each configuration surface fits the desktop screen without scrolling in either language", async ({ page }) => {
+test("each configuration surface and the operator health overview fit the desktop screen without scrolling in either language", async ({ page }) => {
   // given
   await signIn(page, "configuration-admin");
   const surfaces = [
     { link: "admin-configuration-link", view: "admin-configuration-view", ready: "logo-url" },
     { link: "admin-deadlines-link", view: "admin-deadlines-view", ready: "booking-reminder-hours" },
     { link: "admin-rule-sets-link", view: "admin-rule-sets-view", ready: "rule-ADVANCE_WINDOW-maxDays" },
-    { link: "admin-message-wording-link", view: "admin-message-wording-view", ready: "wording-body" }
+    { link: "admin-message-wording-link", view: "admin-message-wording-view", ready: "wording-body" },
+    { link: "admin-operator-health-link", view: "admin-operator-health-view", ready: "operator-check-backup" }
   ];
 
   for (const language of ["de", "en"]) {
