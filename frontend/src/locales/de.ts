@@ -1140,6 +1140,7 @@ const de = {
   "request.uploadTooLarge": "Die hochgeladene Datei überschreitet die erlaubte Größe.",
   "request.missingPart": "In der Anfrage fehlt der erforderliche Teil {{part}}.",
   "membershipPeriod.endsBeforeItBegan": "Eine Mitgliedschaft muss an oder nach ihrem Beginn enden.",
+  "membershipPeriod.startRequired": "Ein Zeitraum der Mitgliedschaft braucht den Tag, an dem er beginnt.",
   "membershipPeriod.overlaps": "An jedem Tag gilt höchstens ein Zeitraum der Mitgliedschaft.",
   "membershipType.inactive": "Diese Mitgliedsart wird nicht mehr angeboten und kann nicht zugewiesen werden.",
   "membershipType.ruleSet.inactive": "Das ausgewählte Regelwerk ist nicht aktiv.",

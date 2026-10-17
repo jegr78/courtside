@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -98,8 +99,7 @@ public class MembershipPeriodService {
         } catch (DataIntegrityViolationException e) {
             if (SqlConstraintViolation.matches(e, SqlConstraintViolation.EXCLUSION_VIOLATION,
                     DISJOINT_PERIODS_CONSTRAINT)) {
-                throw new MembershipPeriodsOverlapException(
-                        "Membership period " + member.getId() + " overlaps another of person " + member.getPersonId());
+                throw new MembershipPeriodsOverlapException("membershipPeriod.overlaps", Map.of());
             }
             throw e;
         }

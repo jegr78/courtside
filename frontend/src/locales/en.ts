@@ -1142,6 +1142,7 @@ const en: Record<keyof typeof de, string> = {
   "request.uploadTooLarge": "The uploaded file exceeds the size limit.",
   "request.missingPart": "The request is missing the required {{part}} part.",
   "membershipPeriod.endsBeforeItBegan": "A membership must end on or after the day it began.",
+  "membershipPeriod.startRequired": "A membership period needs the day it begins.",
   "membershipPeriod.overlaps": "At most one period of a membership holds on any given day.",
   "membershipType.inactive": "This membership type is no longer offered and cannot be assigned.",
   "membershipType.ruleSet.inactive": "The selected rule set is not active.",
