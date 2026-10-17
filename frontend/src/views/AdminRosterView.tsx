@@ -12,6 +12,7 @@ import { noticeColours } from "../components/noticeTones";
 import { TextField } from "../components/TextField";
 import { formString } from "../forms/formString";
 import { useUnsavedForm } from "../unsaved/useUnsavedForm";
+import { formatDate } from "../time/clubZone";
 
 const NAME_LENGTH = 60;
 const EMAIL_LENGTH = 120;
@@ -87,12 +88,14 @@ function AccountMark({ entry, t }: { entry: RosterEntry; t: Translate }) {
   </span>;
 }
 
-// membershipTypeId stays set once a membership has ended, naming the type last held, so a column
-// reading it alone would show everybody who ever left as a current member.
 function membershipLabel(entry: RosterEntry, names: Map<string, string>, t: Translate): string {
   if (!entry.membershipTypeId) return "—";
-  if (entry.membershipEndedOn) return t("admin.roster.membershipEnded", { date: entry.membershipEndedOn });
-  return names.get(entry.membershipTypeId) ?? entry.membershipTypeId;
+  const name = names.get(entry.membershipTypeId) ?? entry.membershipTypeId;
+  if (entry.membershipCurrent) return name;
+  if (entry.membershipStartedOn && entry.membershipStartedOn > formatDate(new Date())) {
+    return t("admin.roster.membershipScheduled", { name, date: entry.membershipStartedOn });
+  }
+  return t("admin.roster.membershipEnded", { date: entry.membershipEndedOn ?? "" });
 }
 
 function roleLabel(entry: RosterEntry, t: Translate): string {

@@ -16,14 +16,14 @@ vi.mock("../downloads/downloadJson", () => ({ downloadJson: vi.fn() }));
 
 const jane: RosterEntry = {
   personId: "person-1", firstName: "Jane", lastName: "Doe", email: "jane.doe@example.org",
-  accountId: "account-1", username: "doe.jane", locale: "de", enabled: true, roles: ["MEMBER"],
+  accountId: "account-1", username: "doe.jane", locale: "de", enabled: true, membershipCurrent: true, roles: ["MEMBER"],
   credentialState: "CREDENTIAL_ISSUED", addressSharedBy: 1,
   membershipTypeId: "type-1", membershipStartedOn: "2026-01-01", membershipEndedOn: null
 };
 
 const withoutAccount: RosterEntry = {
   personId: "person-1", firstName: "John", lastName: "Roe", email: "john.roe@example.org",
-  accountId: null, username: null, enabled: false, roles: []
+  accountId: null, username: null, enabled: false, membershipCurrent: false, roles: []
 };
 
 const club: ClubConfig = {

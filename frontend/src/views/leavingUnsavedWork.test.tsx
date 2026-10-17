@@ -28,7 +28,7 @@ const config: AdminClubConfig = {
 const adults: MembershipType = { id: "type-1", name: "Adults", ruleSetId: "rule-set", active: true, grantsAccount: false };
 const jane: RosterEntry = {
   personId: "person-1", firstName: "Jane", lastName: "Doe", email: "jane.doe@example.org",
-  accountId: "account-1", username: "doe.jane", locale: "en", enabled: true, roles: ["MEMBER"],
+  accountId: "account-1", username: "doe.jane", locale: "en", enabled: true, membershipCurrent: true, roles: ["MEMBER"],
   credentialState: "CREDENTIAL_ISSUED", addressSharedBy: 1,
   membershipTypeId: "type-1", membershipStartedOn: "2026-01-01", membershipEndedOn: null
 };

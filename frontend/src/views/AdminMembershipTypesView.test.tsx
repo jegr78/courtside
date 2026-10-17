@@ -16,7 +16,7 @@ const summer: RuleSet = { id: "rules-1", name: "Summer rules", active: true };
 
 const holder = (personId: string): RosterEntry => ({
   personId, firstName: "Jane", lastName: "Doe", email: "jane.doe@example.org",
-  accountId: null, username: null, enabled: false, roles: []
+  accountId: null, username: null, enabled: false, membershipCurrent: false, roles: []
 });
 
 function card(id: string): HTMLElement {

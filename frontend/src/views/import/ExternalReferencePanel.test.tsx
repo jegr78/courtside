@@ -9,12 +9,12 @@ import { ExternalReferencePanel } from "./ExternalReferencePanel";
 
 const jane: RosterEntry = {
   personId: "person-1", firstName: "Jane", lastName: "Doe", email: "jane.doe@example.org",
-  accountId: null, username: null, enabled: false, roles: []
+  accountId: null, username: null, enabled: false, membershipCurrent: false, roles: []
 };
 
 const mary: RosterEntry = {
   personId: "person-2", firstName: "Mary", lastName: "Major", email: "mary.major@example.org",
-  accountId: null, username: null, enabled: false, roles: []
+  accountId: null, username: null, enabled: false, membershipCurrent: false, roles: []
 };
 
 const linked: ExternalReference = {
