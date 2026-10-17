@@ -1,6 +1,7 @@
 package org.courtside.member;
 
 import org.courtside.config.ClubTimeZone;
+import org.courtside.config.RuleSetForPeopleWithoutAMembershipType;
 import org.courtside.member.internal.MembershipType;
 import org.courtside.member.internal.MembershipTypeInactiveException;
 import org.courtside.member.internal.MembershipTypeNameTakenException;
@@ -42,6 +43,7 @@ public class MemberService {
     private final ApplicationEventPublisher events;
     private final Clock clock;
     private final ClubTimeZone clubTimeZone;
+    private final RuleSetForPeopleWithoutAMembershipType withoutAMembershipType;
 
     public Optional<UUID> membershipTypeIdOf(UUID personId) {
         return members.findValidOn(personId, today()).map(Member::getMembershipTypeId);
@@ -62,9 +64,11 @@ public class MemberService {
         if (current.isEmpty()) {
             return day -> Optional.empty();
         }
+        // Past the end, the rules a club bound for people without a type apply; without any, today's type keeps binding.
+        Optional<UUID> uncovered = withoutAMembershipType.ruleSetId().isPresent() ? Optional.empty() : current;
         return day -> periods.stream().filter(member -> member.isValidOn(day)).findFirst()
                 .map(Member::getMembershipTypeId)
-                .or(() -> current);
+                .or(() -> uncovered);
     }
 
     public Map<UUID, MembershipStanding> standingsOf(List<UUID> personIds) {

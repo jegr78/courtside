@@ -98,6 +98,20 @@ class MembershipOnTheSlotDayTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenAMembershipEndingBeforeTheSlot_whenBookingIt_thenTheRulesForPeopleWithoutATypeMeasureIt() {
+        // given
+        club.bindPeopleWithoutAMembershipTypeTo(rules.ruleSetBarringCourtBookings("No membership"));
+
+        // when
+        BookingRulesViolatedException refusal = catchThrowableOfType(BookingRulesViolatedException.class,
+                () -> bookings.create(bookingOn(CHANGE.plusDays(1))));
+
+        // then
+        assertThat(refusal).as("nobody books as a member for a day their membership no longer covers").isNotNull();
+        assertThat(refusal.getViolations()).extracting(RuleViolation::code).contains("booking.rule.noCourtBooking");
+    }
+
+    @Test
     void givenOnlyAPeriodThatBeginsNextMonth_whenBookingASlotInsideIt_thenItGrantsNothingYet() {
         // given
         UUID john = identity.createPerson("John", "Roe", "john.roe@example.org");
