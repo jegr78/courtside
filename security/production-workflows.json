@@ -605,7 +605,7 @@
       "actors": [
         "ADMIN"
       ],
-      "entryPoints": "Impact, utilisation, usage, statistics, message-history, audit-log and bounded operational-log endpoints.",
+      "entryPoints": "Impact, utilisation, usage, statistics, message-history, audit-log, bounded operational-log and operator-health endpoints.",
       "operationIds": [
         "courtImpact",
         "bookingCardImpact",
@@ -622,7 +622,8 @@
         "readMessageLog",
         "readAuditLog",
         "searchAuditLog",
-        "searchOperationalLogs"
+        "searchOperationalLogs",
+        "readOperatorHealth"
       ],
       "backgroundEntryPoints": [
         "DomainEventWriter#record(DomainEventRecord)"
@@ -635,12 +636,14 @@
         "Reports use the club time zone; utilisation and usage reports stop at 366 days, statistics accept periods of at most 36,525 days in the years 0001 to 9999.",
         "Message and audit records expose privacy-safe event metadata to the permitted board role.",
         "Operational records come only from the fixed application, database and proxy sources and are redacted before bounded storage.",
-        "The usage report counts capacity by card and membership type, cancellations, attendance and refused attempts without naming a person, an account or a booking."
+        "The usage report counts capacity by card and membership type, cancellations, attendance and refused attempts without naming a person, an account or a booking.",
+        "Operator health reads version, migration history, mail handover evidence, the public origin and the operator's backup record without changing any of them."
       ],
       "failurePaths": [
         "Unknown subjects, cross-scope cursors and invalid report periods refuse without disclosing another set.",
         "Unavailable delivery evidence remains explicit rather than appearing successful.",
-        "A stopped collector, dropped input, rotation and an incomplete scan remain explicit rather than appearing as an empty complete log."
+        "A stopped collector, dropped input, rotation and an incomplete scan remain explicit rather than appearing as an empty complete log.",
+        "Operator health reports a check without evidence as unavailable and a failing check with the place that fails, never as healthy."
       ],
       "productionPaths": [
         "src/main/java/org/courtside/booking/internal/ImpactService.java",
@@ -654,7 +657,11 @@
         "src/main/java/org/courtside/audit/internal/AuditService.java",
         "src/main/java/org/courtside/notification/internal/MessageLogService.java",
         "src/main/java/org/courtside/operations/internal/OperationalLogService.java",
-        "src/main/java/org/courtside/operations/internal/OperationalLogCollector.java"
+        "src/main/java/org/courtside/operations/internal/OperationalLogCollector.java",
+        "src/main/java/org/courtside/operations/internal/OperatorHealthService.java",
+        "src/main/java/org/courtside/operations/internal/BackupEvidence.java",
+        "src/main/java/org/courtside/operations/internal/FlywayMigrationLedger.java",
+        "src/main/java/org/courtside/notification/internal/MailHandoverRecords.java"
       ],
       "evidence": [
         "src/test/java/org/courtside/booking/web/ImpactControllerTest.java#givenACursorFromAnotherCourt_whenRequestingImpact_thenNoPositionedBookingsAreDisclosed",
@@ -664,7 +671,9 @@
         "src/test/java/org/courtside/reporting/web/StatisticsControllerTest.java#givenAnEndBeforeTheStart_whenReadingUtilisation_thenThePeriodOrderIsRefused",
         "src/test/java/org/courtside/reporting/web/StatisticsControllerTest.java#givenMembersWhoPlayedLeftOrOnlyCancelled_whenReadingLastMonth_thenOnlyRunningPlayersAreActive",
         "src/test/java/org/courtside/booking/web/UsageReportControllerTest.java#givenBookingsOfNamedMembers_whenReporting_thenNoPersonAccountOrBookingIsNamed",
-        "src/test/java/org/courtside/booking/web/UsageReportControllerTest.java#givenAMember_whenReadingTheUsageReport_thenItIsForbidden"
+        "src/test/java/org/courtside/booking/web/UsageReportControllerTest.java#givenAMember_whenReadingTheUsageReport_thenItIsForbidden",
+        "src/test/java/org/courtside/operations/web/OperatorHealthAdminControllerTest.java#givenAMember_whenReading_thenAccessIsDenied",
+        "src/test/java/org/courtside/operations/web/OperatorHealthAdminControllerTest.java#givenNoBackupRecordAndAFailingRelay_whenAnAdministratorReads_thenTheBackupIsUnavailableAndMailFails"
       ]
     },
     {

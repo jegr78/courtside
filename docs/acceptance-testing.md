@@ -84,6 +84,12 @@ created.
   Cancellations are only checked for their shape, because no journey keeps a cancellation in the
   window for certain. The admin page walk follows the navigation the product renders, so a new
   administration page is walked without a change to the harness.
+- The operator health journey needs nothing new and changes nothing, so it has no postflight. On
+  the desktop browsers the admin opens the overview and expects version, migrations and mail to
+  show one of the three states, version and migrations as ok. The backup is judged from the
+  overview's own API answer: without configured evidence it must never read ok, and with evidence
+  an ok reading has to carry an age that follows from its completion time. A UAT that starts
+  recording backups therefore needs no change to the harness.
 - For the welcome, `welcomeAccounts`. The journey creates one account on desktop-chrome to read
   its welcome and deactivates it again. Courtside has no erasure path yet, so with `erasure` the
   postflight removes that account and its person in the database: over `ssh` it runs `psql` in the

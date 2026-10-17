@@ -1,5 +1,6 @@
 package org.courtside.identity.internal;
 
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.courtside.identity.UserAccountRepository;
@@ -12,6 +13,7 @@ import org.springframework.security.authentication.event.AuthenticationFailureDi
 import org.springframework.security.authentication.event.AuthenticationFailureLockedEvent;
 import org.springframework.stereotype.Component;
 
+import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -22,11 +24,14 @@ class SignInFailureLog {
 
     private final UserAccountRepository accounts;
     private final SecurityEventLog securityEvents;
+    private final MeterRegistry meters;
 
     @EventListener
     void on(AbstractAuthenticationFailureEvent event) {
         // Observing a refusal must not turn it into a different answer than the one it earned.
-        securityEvents.authenticationFailed(accountOf(event).orElse(null), reasonOf(event));
+        SecurityEventLog.AuthenticationFailure reason = reasonOf(event);
+        securityEvents.authenticationFailed(accountOf(event).orElse(null), reason);
+        meters.counter("courtside.login.failures", "reason", reason.name().toLowerCase(Locale.ROOT)).increment();
     }
 
     private Optional<UUID> accountOf(AbstractAuthenticationFailureEvent event) {

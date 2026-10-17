@@ -9,34 +9,29 @@ const eslint = readFileSync(new URL("../frontend/eslint.config.js", import.meta.
 const setup = readFileSync(new URL("../frontend/e2e/global-setup.ts", import.meta.url), "utf8");
 const snapshots = new URL("../frontend/e2e/visual-regression.spec.ts-snapshots/", import.meta.url);
 
+// The capture names come from the spec that takes them, so a surface added there needs no second list here.
+function capturedBaselines(spec) {
+  const single = [...spec.matchAll(/"([a-z0-9-]+\.png)"/g)].map(([, name]) => name);
+  const themed = [...spec.matchAll(/baseline\("([a-z0-9-]+)"\)/g)].flatMap(([, surface]) => [`${surface}.png`, `${surface}-light.png`]);
+  return [...new Set([...single, ...themed])].sort();
+}
+
 test("given stable product views, when qualifying the UI, then reviewed pixel baselines cover every principal surface", () => {
-  const principalSurfaces = [
-    "court-plan", "booking-dialog", "booking-validation", "personal-bookings",
-    "my-messages", "series-preview", "primary-navigation", "admin-navigation", "admin-menu-folded",
-    "admin-overview", "admin-setup", "admin-configuration", "admin-deadlines", "admin-deadlines-unsaved", "admin-rule-sets", "admin-courts", "admin-opening-hours", "admin-booking-cards",
-    "admin-booking-card",
-    "admin-slot-fillers", "admin-roster", "admin-membership-types",
-    "admin-import", "admin-export", "admin-utilisation", "admin-audit", "admin-messages",
-    "phone-public-court-plan", "phone-personal-bookings"
-  ];
-  const phoneSurfacesInBothThemes = [
-    "phone-court-plan", "phone-landscape-court-plan", "phone-landscape-booking-dialog",
-    "phone-landscape-move-dialog", "phone-landscape-cancel-dialog", "phone-message-log",
-    "phone-day-strip", "phone-court-plan-day-strip", "phone-landscape-day-strip", "phone-german-heading",
-    "phone-court-plan-now-line", "phone-operational-log"
-  ];
-  for (const surface of principalSurfaces) {
-    assert.match(visual, new RegExp(`\\"${surface}\\.png\\"`));
-  }
-  for (const surface of phoneSurfacesInBothThemes) {
-    assert.match(visual, new RegExp(`baseline\\("${surface}"\\)`), `${surface} is captured in both themes`);
+  // given
+  assert.match(visual, /const baseline = \(surface: string\) => theme === "dark" \? `\$\{surface\}\.png` : `\$\{surface\}-light\.png`;/,
+    "a themed capture still names its dark baseline after the surface and its light one with -light");
+  for (const surface of ["court-plan", "booking-dialog", "admin-navigation", "admin-overview", "phone-court-plan"]) {
+    assert.match(visual, new RegExp(`(?:"${surface}\\.png"|baseline\\("${surface}"\\))`), `${surface} is still captured`);
   }
   assert.equal(existsSync(snapshots), true);
-  const reviewed = readdirSync(snapshots).filter((file) => file.endsWith(".png"));
-  assert.deepEqual(reviewed.sort(), [
-    ...principalSurfaces.map((surface) => `${surface}.png`),
-    ...phoneSurfacesInBothThemes.flatMap((surface) => [`${surface}.png`, `${surface}-light.png`])
-  ].sort());
+
+  // when
+  const captured = capturedBaselines(visual);
+  const reviewed = readdirSync(snapshots).filter((file) => file.endsWith(".png")).sort();
+
+  // then
+  assert.deepEqual(captured.filter((name) => !reviewed.includes(name)), [], "every captured surface has a reviewed baseline");
+  assert.deepEqual(reviewed.filter((name) => !captured.includes(name)), [], "no baseline is left without the capture that drew it");
   assert.deepEqual(reviewed.filter((file) => /-(darwin|linux)\.png$/.test(file)), []);
 });
 

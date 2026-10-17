@@ -51,4 +51,21 @@ test("given a board preparing its annual meeting, when they read how busy the co
     // then
     await expect(page.getByTestId("admin-messages-view")).toBeVisible();
     await expect(page.getByTestId("message-row").or(page.getByTestId("messages-empty")).first()).toBeVisible();
+
+    // when — and whether the instance itself is in order
+    await reachAdministration(page, "admin-operator-health-link");
+
+    // then — an instance nobody recorded a backup for says so instead of passing it
+    await expect(page.getByTestId("admin-operator-health-view")).toBeVisible();
+    await expect(page.getByTestId("operator-check-version")).toHaveAttribute("data-state", "OK");
+    await expect(page.getByTestId("operator-check-migrations")).toHaveAttribute("data-state", "OK");
+    await expect(page.getByTestId("operator-check-backup")).toHaveAttribute("data-state", "UNAVAILABLE");
+    await expect(page.getByTestId("operator-check-backup-not-healthy")).toBeVisible();
+
+    // when — they ask again
+    await activate(page.getByTestId("operator-health-refresh"));
+
+    // then
+    await expect(page.getByTestId("operator-health-refresh")).toBeEnabled();
+    await expect(page.getByTestId("operator-health-checked-at")).toBeVisible();
   });

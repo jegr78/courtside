@@ -140,6 +140,7 @@ class AuditedOperationCoverageTest {
             "MessageTemplateService#reset",
             "MessageTemplateService#templates",
             "OperationalLogService#search",
+            "OperatorHealthService#read",
             "PreviewService#create",
             "PreviewService#read",
             "RosterExportService#roster",
