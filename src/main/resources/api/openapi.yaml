@@ -1147,7 +1147,8 @@ components:
         Writes one period of the person's membership: the period valid today, else the next one
         scheduled, else the latest that ended. When that one has ended and the request starts on or
         after its end, names no start, or leaves the person a member after today, a new period is
-        added instead, from today unless the request starts later, so a rejoin keeps the gap. A
+        added instead, from the requested start when it lies on or after the old end and from today
+        otherwise, so a rejoin keeps the gap. A
         new type for a period that began before today and keeps its start ends that period today
         and opens the new type from today. A write that ends the period or moves its end earlier
         withdraws the periods starting on or after the new end and after today, each recorded in
