@@ -307,17 +307,24 @@ export const barsCourtBooking = (rules) => (rules ?? []).some((rule) => rule.rul
 const samePeriod = (a, b) => a.membershipTypeId === b.membershipTypeId && a.startedOn === b.startedOn && (a.endedOn ?? null) === (b.endedOn ?? null);
 const periodBody = (period) => ({ membershipTypeId: period.membershipTypeId, startedOn: period.startedOn, endedOn: period.endedOn ?? null });
 
-// Removals come first, so a period put back never overlaps one the run left.
+const endOf = (period) => period.endedOn ?? "9999-12-31";
+const shrinks = (from, to) => to.startedOn >= from.startedOn && endOf(to) <= endOf(from);
+
+// Removals, then periods giving up days, then the rest, so no write overlaps a period not yet put back.
 export function periodRestorations(personId, before, now) {
   const path = `/api/admin/roster/${personId}/membership-periods`;
   const removals = now.filter((period) => !before.some((kept) => kept.id === period.id))
     .map((period) => ({ method: "DELETE", path: `${path}/${period.id}` }));
-  const writes = before.flatMap((period) => {
+  const corrections = before.flatMap((period) => {
     const current = now.find((candidate) => candidate.id === period.id);
-    if (!current) return [{ method: "POST", path, body: periodBody(period) }];
-    return samePeriod(current, period) ? [] : [{ method: "PUT", path: `${path}/${period.id}`, body: periodBody(period) }];
+    return current && !samePeriod(current, period) ? [{ current, period }] : [];
   });
-  return [...removals, ...writes];
+  const puts = [...corrections.filter(({ current, period }) => shrinks(current, period)),
+    ...corrections.filter(({ current, period }) => !shrinks(current, period))]
+    .map(({ period }) => ({ method: "PUT", path: `${path}/${period.id}`, body: periodBody(period) }));
+  const posts = before.filter((period) => !now.some((candidate) => candidate.id === period.id))
+    .map((period) => ({ method: "POST", path, body: periodBody(period) }));
+  return [...removals, ...puts, ...posts];
 }
 
 export function periodSnapshots(entries) {
@@ -328,14 +335,17 @@ export function periodSnapshots(entries) {
   return [...first].map(([personId, periods]) => ({ personId, periods }));
 }
 
-export const comparablePeriods = (periods) => periods.map(({ id, membershipTypeId, startedOn, endedOn }) => ({ id, membershipTypeId, startedOn, endedOn: endedOn ?? null }));
+// A period put back by POST carries a new id, so only the content is compared.
+export const comparablePeriods = (periods) => periods
+  .map(({ membershipTypeId, startedOn, endedOn }) => ({ membershipTypeId, startedOn, endedOn: endedOn ?? null }))
+  .sort((a, b) => a.startedOn.localeCompare(b.startedOn) || endOf(a).localeCompare(endOf(b)));
 
 // The journey moves the running period's start and books on lastDay, so the period has to hold until after it.
 export function membershipPeriodProblems(periods, lastDay) {
   const running = periods.filter((period) => period.state === "RUNNING");
   const scheduled = periods.filter((period) => period.state === "SCHEDULED");
   const problems = [];
-  if (scheduled.length) problems.push(`holds a period scheduled from ${scheduled.map((period) => period.startedOn).join(", ")}, as an interrupted run of the membership period journey leaves it; correct it on the person page`);
+  if (scheduled.length) problems.push(`holds a period scheduled from ${scheduled.map((period) => period.startedOn).join(", ")}, as an interrupted run of the membership period journey leaves it; correct it on the person page to a start on or before today, which unblocks the member`);
   if (running.length === 0) problems.push("holds no membership period running today");
   for (const period of running) {
     if (period.endedOn && period.endedOn <= lastDay) problems.push(`holds a running period that ends on ${period.endedOn}, not after ${lastDay}`);
