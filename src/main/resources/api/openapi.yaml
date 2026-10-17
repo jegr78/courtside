@@ -2874,7 +2874,8 @@ components:
       type: object
       description: |
         Confirmed bookings of one card whose holder holds one membership type, counted when that
-        membership ran on the day the booking starts; type changes keep no history. A holder without
+        membership ran on the day the booking starts, so a type change counts each booking under the
+        type held on its day. A holder without
         a running membership, or a booking without a holder, has no type.
         `bookedMinutes` sums the court minutes of those bookings, one court at a time. A group
         fewer than three accounts booked is not shown on its own: it joins the one row with
@@ -3227,12 +3228,12 @@ components:
           type: integer
           format: int64
           minimum: 0
-          description: Memberships that started in the period.
+          description: Memberships that started in the period, without a period of the same person that directly precedes them.
         leavings:
           type: integer
           format: int64
           minimum: 0
-          description: Memberships that ended in the period.
+          description: Memberships that ended in the period, without a period of the same person that directly follows them.
         activeMembers: { type: integer, format: int64, minimum: 0 }
         activeShare:
           type: [number, "null"]
@@ -9481,8 +9482,8 @@ paths:
       summary: How many members the club had at the end of a period, and how many of them played.
       description: |
         A membership runs on a day when it started on or before that day and has no end date or
-        ends after it. Members are counted by the membership type they hold now, because type
-        changes keep no history. An active member holds a running membership on the period's last
+        ends after it. Members are counted by the membership type of the period running on the
+        period's last day. An active member holds a running membership on the period's last
         day and, in a confirmed booking starting in the period, booked it or was recorded as a
         participant. Guests and participant cards are never members.
 
