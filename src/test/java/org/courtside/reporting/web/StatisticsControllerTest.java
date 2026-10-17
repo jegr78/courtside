@@ -507,6 +507,26 @@ class StatisticsControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenAPeriodThatHasNotBegun_whenReadingMembers_thenItShowsTodaysMembersWithoutMovement() throws Exception {
+        // given
+        UUID adult = members.createMembershipType("Adult");
+        UUID jane = members.addPerson("Jane", "Doe", "jane.doe@example.org");
+        UUID john = members.addPerson("John", "Roe", "john.roe@example.org");
+        members.addMembershipPeriod(jane, adult, LocalDate.of(2020, 1, 1), null);
+        members.addMembershipPeriod(john, adult, LocalDate.of(2026, 6, 1), null);
+
+        // when / then
+        mockMvc.perform(get("/api/admin/statistics/members")
+                        .param("from", "2026-06-01").param("to", "2026-06-01"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.figures.members").value(1))
+                .andExpect(jsonPath("$.figures.joins").value(0))
+                .andExpect(jsonPath("$.figures.leavings").value(0))
+                .andExpect(jsonPath("$.figures.activeMembers").value(0))
+                .andExpect(jsonPath("$.membershipTypes[?(@.membershipTypeId == '" + adult + "')].members").value(1));
+    }
+
+    @Test
     void givenMessagesAroundThePeriod_whenReadingMessages_thenEachKindCountsItsStatesInside() throws Exception {
         // given
         UUID person = members.addPerson("Jane", "Doe", "jane.doe@example.org");
