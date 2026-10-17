@@ -57,11 +57,14 @@ public class MemberService {
     public Function<LocalDate, Optional<UUID>> membershipTypesOf(UUID personId) {
         LocalDate today = today();
         List<Member> periods = members.findByPersonIdOrderByStartedOnAscIdAsc(personId);
-        if (periods.stream().noneMatch(member -> member.isValidOn(today))) {
+        Optional<UUID> current = periods.stream().filter(member -> member.isValidOn(today)).findFirst()
+                .map(Member::getMembershipTypeId);
+        if (current.isEmpty()) {
             return day -> Optional.empty();
         }
         return day -> periods.stream().filter(member -> member.isValidOn(day)).findFirst()
-                .map(Member::getMembershipTypeId);
+                .map(Member::getMembershipTypeId)
+                .or(() -> current);
     }
 
     public Map<UUID, MembershipStanding> standingsOf(List<UUID> personIds) {

@@ -98,20 +98,6 @@ class MembershipOnTheSlotDayTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void givenAMembershipEndingBeforeTheSlot_whenBookingIt_thenTheRulesForPeopleWithoutATypeMeasureIt() {
-        // given
-        club.bindPeopleWithoutAMembershipTypeTo(rules.ruleSetBarringCourtBookings("No membership"));
-
-        // when
-        BookingRulesViolatedException refusal = catchThrowableOfType(BookingRulesViolatedException.class,
-                () -> bookings.create(bookingOn(CHANGE.plusDays(1))));
-
-        // then
-        assertThat(refusal).as("nobody books as a member for a day their membership no longer covers").isNotNull();
-        assertThat(refusal.getViolations()).extracting(RuleViolation::code).contains("booking.rule.noCourtBooking");
-    }
-
-    @Test
     void givenOnlyAPeriodThatBeginsNextMonth_whenBookingASlotInsideIt_thenItGrantsNothingYet() {
         // given
         UUID john = identity.createPerson("John", "Roe", "john.roe@example.org");
@@ -129,6 +115,48 @@ class MembershipOnTheSlotDayTest extends AbstractIntegrationTest {
         // then
         assertThat(refusal).as("a period that has not begun grants no booking, whatever day it is for").isNotNull();
         assertThat(refusal.getViolations()).extracting(RuleViolation::code).contains("booking.rule.noCourtBooking");
+    }
+
+    @Test
+    void givenAMembershipEndingBeforeTheSlotAndNoRulesForPeopleWithoutAType_whenBookingIt_thenTheCurrentTypeStillMeasuresIt() {
+        // given
+        UUID john = identity.createPerson("John", "Roe", "john.roe@example.org");
+        UUID johnAccount = identity.createEnabledAccount(john, "roe.john", Set.of(Role.MEMBER));
+        members.addMembershipPeriod(john, barred("Passive"), TODAY.minusYears(1), CHANGE);
+
+        // when
+        BookingRulesViolatedException refusal = catchThrowableOfType(BookingRulesViolatedException.class,
+                () -> bookings.create(bookingFor(john, johnAccount, CHANGE.plusDays(1))));
+
+        // then
+        assertThat(refusal).as("a slot past the end of today's period never escapes today's rules").isNotNull();
+        assertThat(refusal.getViolations()).extracting(RuleViolation::code).contains("booking.rule.noCourtBooking");
+    }
+
+    @Test
+    void givenAMembershipEndingBeforeTheSlotAndNoRulesForPeopleWithoutAType_whenCancellingLate_thenTheCurrentDeadlineHolds() {
+        // given
+        UUID john = identity.createPerson("John", "Roe", "john.roe@example.org");
+        UUID johnAccount = identity.createEnabledAccount(john, "roe.john", Set.of(Role.MEMBER));
+        UUID strict = rules.activeRuleSet("Strict cancellation");
+        rules.setCancellationDeadline(strict, 525600);
+        members.addMembershipPeriod(john, members.membershipTypeMeasuredBy("Strict", strict), TODAY.minusYears(1), CHANGE);
+        UUID bookingId = bookings.create(bookingFor(john, johnAccount, CHANGE.plusDays(1)));
+
+        // when
+        BookingRulesViolatedException refusal = catchThrowableOfType(BookingRulesViolatedException.class,
+                () -> bookings.cancel(bookingId, johnAccount, Set.of(Role.MEMBER)));
+
+        // then
+        assertThat(refusal).as("the deadline of today's type binds a slot past the end of its period").isNotNull();
+        assertThat(refusal.getViolations()).extracting(RuleViolation::code)
+                .contains("booking.rule.cancellationDeadline.exceeded");
+    }
+
+    private CreateBookingCommand bookingFor(UUID person, UUID account, LocalDate day) {
+        Instant start = day.atTime(16, 0).toInstant(java.time.ZoneOffset.UTC);
+        return new CreateBookingCommand(List.of(court), card, new TimeSlot(start, start.plusSeconds(3600)),
+                account, person, Set.of(Role.MEMBER), null, List.of(), null);
     }
 
     private UUID barred(String name) {
