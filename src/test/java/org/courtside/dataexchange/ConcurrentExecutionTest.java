@@ -71,10 +71,10 @@ class ConcurrentExecutionTest extends AbstractIntegrationTest {
     @BeforeEach
     void setUp() {
         source = sources.create("roster-system", "Membership system", ",", "UTF-8",
-                Map.of("Member number", CanonicalField.EXTERNAL_ID,
+                ColumnLayout.headers(Map.of("Member number", CanonicalField.EXTERNAL_ID,
                         "First name", CanonicalField.FIRST_NAME,
                         "Last name", CanonicalField.LAST_NAME,
-                        "Email", CanonicalField.EMAIL),
+                        "Email", CanonicalField.EMAIL)),
                 Map.of(), ACTIVE_TYPE, Set.of(CanonicalField.FIRST_NAME), 10).sourceId();
         UUID admin = identity.createPerson("Richard", "Miles", "richard.miles@example.org");
         actor = identity.createAccount(admin, "admin", Set.of(Role.ADMIN));

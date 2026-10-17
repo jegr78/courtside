@@ -69,9 +69,9 @@ class ImportAuditTest extends AbstractIntegrationTest {
 
         // when
         sources.change(source, "member-system", "Member system", ";", "ISO-8859-1",
-                Map.of("No", CanonicalField.EXTERNAL_ID, "Given", CanonicalField.FIRST_NAME,
-                        "Family", CanonicalField.LAST_NAME),
-                Map.of("Adults", OTHER_TYPE), OTHER_TYPE, Set.of(CanonicalField.FIRST_NAME), 25);
+                ColumnLayout.headers(Map.of("No", CanonicalField.EXTERNAL_ID, "Given", CanonicalField.FIRST_NAME,
+                        "Family", CanonicalField.LAST_NAME)),
+                Map.of("Adults", OTHER_TYPE), OTHER_TYPE, Set.of(CanonicalField.FIRST_NAME), 25, false);
 
         // then
         assertThat(audit.latestPayload(source, DataExchangeEvent.SourceChanged.TYPE))
@@ -173,13 +173,13 @@ class ImportAuditTest extends AbstractIntegrationTest {
     }
 
     private UUID source(String sourceKey) {
-        return sources.create(sourceKey, "Membership system", ",", "UTF-8", columns(),
+        return sources.create(sourceKey, "Membership system", ",", "UTF-8", ColumnLayout.headers(columns()),
                 Map.of(), ACTIVE_TYPE, Set.of(), 10).sourceId();
     }
 
     private void change(UUID sourceId, String sourceKey, int removalWarningPercent) {
-        sources.change(sourceId, sourceKey, "Membership system", ",", "UTF-8", columns(),
-                Map.of(), ACTIVE_TYPE, Set.of(), removalWarningPercent);
+        sources.change(sourceId, sourceKey, "Membership system", ",", "UTF-8", ColumnLayout.headers(columns()),
+                Map.of(), ACTIVE_TYPE, Set.of(), removalWarningPercent, false);
     }
 
     private static Map<String, CanonicalField> columns() {

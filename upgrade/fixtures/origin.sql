@@ -161,9 +161,16 @@ VALUES ('7c000000-0000-0000-0000-000000000001', 'upgrade-fixture-listener', 'upg
 
 INSERT INTO import_source
     (id, source_key, display_name, separator, encoding, default_membership_type_id,
-     removal_warning_percent, created_at)
+     removal_warning_percent, created_at, column_mode, column_count)
 VALUES ('7d000000-0000-0000-0000-000000000001', 'upgrade-roster', 'Upgrade roster', ';', 'UTF-8',
-        'cccccccc-0000-0000-0000-000000000001', 10, '2025-01-01T00:00:00Z');
+        'cccccccc-0000-0000-0000-000000000001', 10, '2025-01-01T00:00:00Z', 'HEADER', NULL),
+       ('7d000000-0000-0000-0000-000000000004', 'upgrade-headerless', 'Upgrade headerless roster', ';',
+        'UTF-8', 'cccccccc-0000-0000-0000-000000000001', 10, '2025-01-01T00:00:00Z', 'POSITION', 4);
+
+INSERT INTO import_column_position (source_id, position, canonical_field) VALUES
+    ('7d000000-0000-0000-0000-000000000004', 1, 'EXTERNAL_ID'),
+    ('7d000000-0000-0000-0000-000000000004', 2, 'FIRST_NAME'),
+    ('7d000000-0000-0000-0000-000000000004', 3, 'LAST_NAME');
 
 INSERT INTO import_column_mapping (source_id, column_header, canonical_field) VALUES
     ('7d000000-0000-0000-0000-000000000001', 'Number', 'EXTERNAL_ID'),

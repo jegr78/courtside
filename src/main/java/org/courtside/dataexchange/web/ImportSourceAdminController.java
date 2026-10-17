@@ -3,9 +3,13 @@ package org.courtside.dataexchange.web;
 import lombok.RequiredArgsConstructor;
 import org.courtside.api.AdminImportApi;
 import org.courtside.api.ApiCanonicalField;
+import org.courtside.api.ApiImportColumnMode;
+import org.courtside.api.ApiImportColumnPosition;
 import org.courtside.api.ApiImportSource;
 import org.courtside.api.ApiImportSourceRequest;
 import org.courtside.dataexchange.CanonicalField;
+import org.courtside.dataexchange.ColumnLayout;
+import org.courtside.dataexchange.ColumnMode;
 import org.courtside.dataexchange.ImportSourceService;
 import org.courtside.dataexchange.SupportedEncodings;
 import org.courtside.dataexchange.SourceConfiguration;
@@ -16,6 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.net.URI;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -42,7 +47,7 @@ class ImportSourceAdminController implements AdminImportApi {
     public ResponseEntity<ApiImportSource> createImportSource(ApiImportSourceRequest request) {
         SourceConfiguration created = sources.create(request.getSourceKey(),
                 request.getDisplayName(), request.getSeparator(), request.getEncoding(),
-                columns(request), request.getMembershipTypes(),
+                layout(request), request.getMembershipTypes(),
                 request.getDefaultMembershipTypeId(), ownedFields(request),
                 request.getRemovalWarningPercent());
         return ResponseEntity
@@ -60,9 +65,10 @@ class ImportSourceAdminController implements AdminImportApi {
                                                               ApiImportSourceRequest request) {
         return ResponseEntity.ok(toResponse(sources.change(id, request.getSourceKey(),
                 request.getDisplayName(), request.getSeparator(), request.getEncoding(),
-                columns(request), request.getMembershipTypes(),
+                layout(request), request.getMembershipTypes(),
                 request.getDefaultMembershipTypeId(), ownedFields(request),
-                request.getRemovalWarningPercent())));
+                request.getRemovalWarningPercent(),
+                Boolean.TRUE.equals(request.getConfirmColumnModeChange()))));
     }
 
     @Override
@@ -71,10 +77,18 @@ class ImportSourceAdminController implements AdminImportApi {
         return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
     }
 
-    private static Map<String, CanonicalField> columns(ApiImportSourceRequest request) {
+    private static ColumnLayout layout(ApiImportSourceRequest request) {
         Map<String, CanonicalField> columns = new LinkedHashMap<>();
-        request.getColumns().forEach((header, field) -> columns.put(header, field(field)));
-        return columns;
+        if (request.getColumns() != null) {
+            request.getColumns().forEach((header, field) -> columns.put(header, field(field)));
+        }
+        Map<Integer, CanonicalField> positions = new LinkedHashMap<>();
+        if (request.getPositions() != null) {
+            request.getPositions().forEach(position -> positions.put(position.getPosition(), field(position.getField())));
+        }
+        ColumnMode mode = request.getColumnMode() == null ? ColumnMode.HEADER
+                : ColumnMode.valueOf(request.getColumnMode().getValue());
+        return new ColumnLayout(mode, columns, positions, request.getColumnCount());
     }
 
     private static Set<CanonicalField> ownedFields(ApiImportSourceRequest request) {
@@ -94,9 +108,15 @@ class ImportSourceAdminController implements AdminImportApi {
         Set<ApiCanonicalField> owned = new LinkedHashSet<>();
         configuration.ownedFields().stream().sorted()
                 .forEach(field -> owned.add(ApiCanonicalField.fromValue(field.name())));
+        List<ApiImportColumnPosition> positions = configuration.positions().entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .map(entry -> new ApiImportColumnPosition(entry.getKey(),
+                        ApiCanonicalField.fromValue(entry.getValue().name())))
+                .toList();
         return new ApiImportSource(configuration.sourceId(), configuration.sourceKey(),
                 configuration.displayName(), String.valueOf(configuration.separator()),
-                configuration.encoding(), columns, configuration.membershipTypes(),
+                configuration.encoding(), ApiImportColumnMode.fromValue(configuration.columnMode().name()),
+                columns, positions, configuration.columnCount(), configuration.membershipTypes(),
                 configuration.defaultMembershipTypeId(), owned,
                 configuration.removalWarningPercent());
     }

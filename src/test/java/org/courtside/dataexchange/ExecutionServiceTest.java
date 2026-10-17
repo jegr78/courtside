@@ -79,10 +79,10 @@ class ExecutionServiceTest extends AbstractIntegrationTest {
     @BeforeEach
     void setUp() {
         source = sources.create("roster-system", "Membership system", ",", "UTF-8",
-                Map.of("Member number", CanonicalField.EXTERNAL_ID,
+                ColumnLayout.headers(Map.of("Member number", CanonicalField.EXTERNAL_ID,
                         "First name", CanonicalField.FIRST_NAME,
                         "Last name", CanonicalField.LAST_NAME,
-                        "Email", CanonicalField.EMAIL),
+                        "Email", CanonicalField.EMAIL)),
                 Map.of(), ACTIVE_TYPE, Set.of(CanonicalField.FIRST_NAME, CanonicalField.LAST_NAME,
                         CanonicalField.EMAIL), 10).sourceId();
         UUID admin = identity.createPerson("Richard", "Miles", "richard.miles@example.org");
@@ -243,11 +243,11 @@ class ExecutionServiceTest extends AbstractIntegrationTest {
     void givenAMembershipTypeDeactivatedAfterThePreview_whenExecuting_thenNothingIsWrittenAtAll() {
         // given
         UUID typed = sources.create("club-registry", "The other system", ",", "UTF-8",
-                Map.of("Member number", CanonicalField.EXTERNAL_ID,
+                ColumnLayout.headers(Map.of("Member number", CanonicalField.EXTERNAL_ID,
                         "First name", CanonicalField.FIRST_NAME,
                         "Last name", CanonicalField.LAST_NAME,
                         "Email", CanonicalField.EMAIL,
-                        "Category", CanonicalField.MEMBERSHIP_TYPE),
+                        "Category", CanonicalField.MEMBERSHIP_TYPE)),
                 Map.of("A", ACTIVE_TYPE), ACTIVE_TYPE, Set.of(CanonicalField.MEMBERSHIP_TYPE), 10).sourceId();
         UUID previewId = previews.create(typed, SnapshotMode.FULL_SNAPSHOT, "UTF-8",
                 new SnapshotUpload("roster.csv", "text/csv", """
@@ -504,10 +504,10 @@ class ExecutionServiceTest extends AbstractIntegrationTest {
 
     private UUID sourceWithDefaultType(UUID membershipTypeId) {
         return sources.create("contributing-system", "Contributing members", ",", "UTF-8",
-                Map.of("Member number", CanonicalField.EXTERNAL_ID,
+                ColumnLayout.headers(Map.of("Member number", CanonicalField.EXTERNAL_ID,
                         "First name", CanonicalField.FIRST_NAME,
                         "Last name", CanonicalField.LAST_NAME,
-                        "Email", CanonicalField.EMAIL),
+                        "Email", CanonicalField.EMAIL)),
                 Map.of(), membershipTypeId, Set.of(CanonicalField.FIRST_NAME,
                         CanonicalField.LAST_NAME, CanonicalField.EMAIL), 10).sourceId();
     }

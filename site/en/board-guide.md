@@ -436,6 +436,17 @@ recovery codes there.
 
 The example file used for mapping stays in the browser and is not uploaded.
 
+If your export has no header row, choose *By position*. Courtside then shows the first rows of the
+example file in numbered columns, and you give each field a column number. The form takes the
+number of columns from the example file. If the browser cannot show the character set, you enter
+it yourself. If the first row looks like a header, the form says so, because read by position it
+would be imported as a member.
+
+Courtside refuses a file with a different number of columns before it reads a single row. That
+way no value lands in the wrong field when the club software adds or drops a column. If you switch
+a saved source to the other way of reading, the form asks before it saves. The next file is then
+read the new way.
+
 ![The import source with file format, column mapping and fields owned by the source.](../screenshots/en/import-source.png)
 
 ### 2. Review the file

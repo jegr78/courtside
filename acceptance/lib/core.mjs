@@ -13,7 +13,16 @@ export const removalPath = (entry) => entry.kind === "series"
   : entry.kind === "opening-week" ? `/api/admin/opening-hours/schedule/${entry.id}`
     : entry.kind === "opening-period" ? `/api/admin/opening-periods/${entry.id}`
       : entry.kind === "court-closure" ? `/api/admin/court-closures/${entry.id}`
-        : entry.kind === "template" ? `/api/admin/message-templates/${entry.id}` : `/api/bookings/${entry.id}`;
+        : entry.kind === "template" ? `/api/admin/message-templates/${entry.id}`
+          : entry.kind === "import-source" ? `/api/admin/import/sources/${entry.id}` : `/api/bookings/${entry.id}`;
+
+export const IMPORT_SOURCE_PREFIX = "acceptance-headerless-";
+
+export function foreignImportSources(sources, entries) {
+  const ours = new Set(entries.filter((entry) => entry.kind === "import-source").map((entry) => entry.id));
+  return sources.filter((source) => source.sourceKey.startsWith(IMPORT_SOURCE_PREFIX) && !ours.has(source.id))
+    .map((source) => source.sourceKey);
+}
 
 export function foreignWordings(templates, entries) {
   const ours = new Set(entries.filter((entry) => entry.kind === "template").map((entry) => entry.id));

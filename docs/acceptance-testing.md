@@ -92,6 +92,14 @@ created.
   created, and who hold no booking, membership, participation, queue or import reference. A person
   whose account creation failed therefore leaves nothing behind either. Without `erasure` the run
   writes the statement to `erase-welcome-accounts.sql` and the person stays on the roster.
+- For the headerless import journey, an active membership type and no import source whose key
+  starts with `acceptance-headerless-`. On desktop-chrome the admin describes a source of its own
+  by column position from a generated headerless file, previews that file and then a copy with one
+  column fewer. The first preview has to read every row as a new member, the second has to be
+  refused with `import.snapshot.columns.countChanged` and both counts. No preview is ever executed,
+  so the roster stays untouched. The journey removes the source, which takes its previews with it,
+  and the postflight removes it again from the ledger after an aborted run. The preflight names
+  every leftover source from an earlier run, because the run deletes only the one it recorded.
 
 The member journeys also walk what members hear. The contention journey queues the refused member
 on the waitlist, cancels the holder's booking and takes the offer from the notification centre;
