@@ -528,7 +528,7 @@ public class RosterService {
         List<Person> people = persons.findAllById(personIds);
         Map<String, Integer> sharing = addressSharing(people);
         return people.stream()
-                .map(person -> toEntry(person, accountsByPerson.get(person.getId()),
+                .map(person -> this.toEntry(person, accountsByPerson.get(person.getId()),
                         membershipsByPerson.get(person.getId()), now,
                         sharing.get(person.getEmail())))
                 .toList();
@@ -552,10 +552,11 @@ public class RosterService {
         return counts;
     }
 
-    private static RosterEntry toEntry(Person person, UserAccount account, Member member,
-                                       Instant now, Integer addressSharedBy) {
+    private RosterEntry toEntry(Person person, UserAccount account, Member member,
+                                Instant now, Integer addressSharedBy) {
         Membership membership = member == null ? null : new Membership(
-                member.getMembershipTypeId(), member.getStartedOn(), member.getEndedOn());
+                member.getMembershipTypeId(), member.getStartedOn(), member.getEndedOn(),
+                member.isValidOn(LocalDate.ofInstant(now, clubTimeZone.zoneId())));
         if (account == null) {
             return new RosterEntry(person.getId(), person.getFirstName(), person.getLastName(),
                     person.getEmail(), addressSharedBy, null, null, null, null, false,
@@ -628,7 +629,7 @@ public class RosterService {
         }
     }
 
-    public record Membership(UUID typeId, LocalDate startedOn, LocalDate endedOn) {
+    public record Membership(UUID typeId, LocalDate startedOn, LocalDate endedOn, boolean current) {
     }
 
     public enum SortField {
