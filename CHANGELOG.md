@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.3.0 (2026-10-17)
+
+### Features
+
+* export the audit log and the message log from the administration UI ([#1547](https://github.com/jegr78/courtside/issues/1547)) ([ea091dc](https://github.com/jegr78/courtside/commit/ea091dcbcfdb3e4a7b5d8635ad2423796b0d289a))
+* give operators a health overview and bounded metrics for their instance ([#1562](https://github.com/jegr78/courtside/issues/1562)) ([8a90b80](https://github.com/jegr78/courtside/commit/8a90b80765c7eb4bcc2572b6051de5b603cabd8c))
+* import a membership export without a header row by column position ([#1559](https://github.com/jegr78/courtside/issues/1559)) ([0d78f00](https://github.com/jegr78/courtside/commit/0d78f0072714d328d63e94cf5f7c7150833e9ddf))
+* let a board word the messages the club sends ([#1548](https://github.com/jegr78/courtside/issues/1548)) ([6aaf6d3](https://github.com/jegr78/courtside/commit/6aaf6d37b4658444f4e2c7ca78d2ea85b6c7c1ca))
+* limit the hours a member books per week and set a minimum booking duration ([#1542](https://github.com/jegr78/courtside/issues/1542)) ([b77f186](https://github.com/jegr78/courtside/commit/b77f1863632a3a7797760f51ed6c77582598a121))
+* model seasons, holidays and court-specific availability ([#1546](https://github.com/jegr78/courtside/issues/1546)) ([5db9628](https://github.com/jegr78/courtside/commit/5db96285053fa17196ca91cc0ba85ea017dfd73b))
+* record attendance, free unattended courts and limit no-shows ([#1549](https://github.com/jegr78/courtside/issues/1549)) ([0ec5b99](https://github.com/jegr78/courtside/commit/0ec5b99178e275d6270eaa36ef7cf5729c1190f0))
+* report capacity, cancellations, no-shows and refused bookings to the board ([#1553](https://github.com/jegr78/courtside/issues/1553)) ([d9efd51](https://github.com/jegr78/courtside/commit/d9efd514bc7a86db65b4b82272865429685ed55d))
+* retain personal records by category with a reviewed run and publish the club privacy kit ([#1560](https://github.com/jegr78/courtside/issues/1560)) ([4b893ec](https://github.com/jegr78/courtside/commit/4b893ec4504d0062eaa22051f2c672708cd6494d))
+* tell members when a new holiday or court closure falls on their booking ([#1550](https://github.com/jegr78/courtside/issues/1550)) ([4db05cd](https://github.com/jegr78/courtside/commit/4db05cd3b06dad46d76cbdb5321d8712bb5becb0))
+
+### Bug fixes
+
+* **frontend:** give every dialog its own surface ([#1565](https://github.com/jegr78/courtside/issues/1565)) ([59c8f4d](https://github.com/jegr78/courtside/commit/59c8f4dcff1cb2384ac876fbf6abdd474d5a1d67))
+* **frontend:** keep the administration navigation within the desktop window ([#1563](https://github.com/jegr78/courtside/issues/1563)) ([e0bbc89](https://github.com/jegr78/courtside/commit/e0bbc893f6e80c0dde1c4388640a7559bb09d033))
+* **security:** derive the active assessment's request budgets from the API instead of fixed shares ([#1551](https://github.com/jegr78/courtside/issues/1551)) ([bca79f6](https://github.com/jegr78/courtside/commit/bca79f6d450ce96945438088b54b55d9e8fdf25b))
+* wait for the stopped app to exit before the smoke goes on ([8571d0b](https://github.com/jegr78/courtside/commit/8571d0bb853f5304587a8a09af48517a08eccec3))
+* wait for the stopped app to exit before the UAT smoke goes on ([#1543](https://github.com/jegr78/courtside/issues/1543)) ([8571d0b](https://github.com/jegr78/courtside/commit/8571d0bb853f5304587a8a09af48517a08eccec3))
+* **web:** replace the redundant court plan intro heading with a sign-in notice ([#1545](https://github.com/jegr78/courtside/issues/1545)) ([b21b692](https://github.com/jegr78/courtside/commit/b21b6925a2f7f01c9f86d3e2083edf04d96e23fb))
+
+### Build and dependencies
+
+* **deps-dev:** bump org.codehaus.mojo:versions-maven-plugin ([0e7d569](https://github.com/jegr78/courtside/commit/0e7d56917a80ffcfdcd3337041bdb9e1ee669cb7))
+* **deps-dev:** bump org.codehaus.mojo:versions-maven-plugin from 2.22.0 to 2.23.0 ([#1555](https://github.com/jegr78/courtside/issues/1555)) ([0e7d569](https://github.com/jegr78/courtside/commit/0e7d56917a80ffcfdcd3337041bdb9e1ee669cb7))
+* **deps:** bump actions/setup-java from 6.0.1 to 6.1.0 ([#1558](https://github.com/jegr78/courtside/issues/1558)) ([a38b015](https://github.com/jegr78/courtside/commit/a38b0153e1958643c382317d40fa6dcfa88157f3))
+* **deps:** update the frontend dependencies, Playwright 1.64 and the deployment images ([#1561](https://github.com/jegr78/courtside/issues/1561)) ([5f8fad4](https://github.com/jegr78/courtside/commit/5f8fad450f4e3cf916529dc6c4ae580d6aee5870))
+* open the 0.3.0 candidate line on main ([#1540](https://github.com/jegr78/courtside/issues/1540)) ([56de1b0](https://github.com/jegr78/courtside/commit/56de1b0f00a69115be8efce02c9900d100b1a996))
+
 ## 0.2.0 (2026-10-15)
 
 ### Features
