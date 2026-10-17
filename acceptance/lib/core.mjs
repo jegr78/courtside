@@ -254,3 +254,26 @@ export function personaIdentities(roster, usernames, emails) {
     ...emails.filter((email) => typeof email === "string" && email.length > 0)
   ])];
 }
+
+const BACKUP_UNAVAILABLE = new Set(["NOT_CONFIGURED", "NOT_RECORDED"]);
+const BACKUP_FAILING = new Set(["UNREADABLE", "RECORDED_IN_THE_FUTURE"]);
+
+// Read from the overview's own answer, so a UAT that later records real backups needs no change here.
+export function backupReadingProblems(backup, checkedAt) {
+  if (backup.state === "OK") {
+    if (backup.reason) return [`an ok backup names the reason ${backup.reason}`];
+    if (!backup.completedAt || !Number.isInteger(backup.ageSeconds) || backup.ageSeconds < 0) {
+      return ["an ok backup carries no completion time and age"];
+    }
+    const elapsed = (Date.parse(checkedAt) - Date.parse(backup.completedAt)) / 1000;
+    if (elapsed < 0) return [`the backup completed at ${backup.completedAt}, after the check at ${checkedAt}`];
+    if (Math.abs(elapsed - backup.ageSeconds) > 1) return [`an age of ${backup.ageSeconds} s does not follow from ${backup.completedAt} and ${checkedAt}`];
+    return [];
+  }
+  const problems = [];
+  if (backup.ageSeconds !== undefined && backup.ageSeconds !== null) problems.push("a backup that is not ok carries an age");
+  if (BACKUP_UNAVAILABLE.has(backup.reason) && backup.state !== "UNAVAILABLE") problems.push(`${backup.reason} reads ${backup.state}, not UNAVAILABLE`);
+  else if (BACKUP_FAILING.has(backup.reason) && backup.state !== "FAILING") problems.push(`${backup.reason} reads ${backup.state}, not FAILING`);
+  else if (!BACKUP_UNAVAILABLE.has(backup.reason) && !BACKUP_FAILING.has(backup.reason)) problems.push(`a backup that is not ok names no known reason: ${backup.reason}`);
+  return problems;
+}

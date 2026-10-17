@@ -1019,3 +1019,38 @@ test("given the roster and persona addresses, when identities are drawn, then on
   // then
   assert.deepEqual(identities, ["Jane Doe", "jane@example.org"], "a member outside the run and a missing address name nobody");
 });
+
+import { backupReadingProblems } from "../acceptance/lib/core.mjs";
+
+test("given an instance without backup evidence, when the overview reads it, then only an unavailable backup is accepted", () => {
+  // given
+  const checkedAt = "2026-10-17T08:00:00.400Z";
+  // when / then
+  assert.deepEqual(backupReadingProblems({ state: "UNAVAILABLE", reason: "NOT_CONFIGURED" }, checkedAt), [],
+    "an instance nobody configured a record for says so");
+  assert.deepEqual(backupReadingProblems({ state: "UNAVAILABLE", reason: "NOT_RECORDED" }, checkedAt), [],
+    "a configured file nobody wrote yet is not evidence either");
+  assert.ok(backupReadingProblems({ state: "OK", reason: "NOT_CONFIGURED" }, checkedAt).length > 0,
+    "missing evidence read as ok is refused");
+  assert.ok(backupReadingProblems({ state: "FAILING", reason: "NOT_CONFIGURED" }, checkedAt).length > 0,
+    "missing evidence is unavailable, not failing");
+});
+
+test("given an instance with backup evidence, when the overview reads it, then the age has to follow from the completion time", () => {
+  // given
+  const checkedAt = "2026-10-17T08:00:00.400Z";
+  const completedAt = "2026-10-17T02:00:00Z";
+  // when / then
+  assert.deepEqual(backupReadingProblems({ state: "OK", completedAt, ageSeconds: 21_600 }, checkedAt), [],
+    "six hours between completion and check is six hours of age");
+  assert.ok(backupReadingProblems({ state: "OK", completedAt, ageSeconds: 3_600 }, checkedAt).length > 0,
+    "an age that contradicts the completion time is refused");
+  assert.ok(backupReadingProblems({ state: "OK", completedAt: "2026-10-17T09:00:00Z", ageSeconds: 0 }, checkedAt).length > 0,
+    "a completion after the check is not plausible");
+  assert.ok(backupReadingProblems({ state: "OK" }, checkedAt).length > 0,
+    "an ok backup without completion time and age is refused");
+  assert.deepEqual(backupReadingProblems({ state: "FAILING", reason: "UNREADABLE", location: "/run/evidence.json" }, checkedAt), [],
+    "an unreadable record fails and names the file");
+  assert.ok(backupReadingProblems({ state: "UNAVAILABLE", reason: "UNREADABLE" }, checkedAt).length > 0,
+    "an unreadable record is a failure, not missing evidence");
+});
