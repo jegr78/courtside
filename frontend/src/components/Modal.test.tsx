@@ -129,3 +129,29 @@ it("given the focus on a panel between two controls, when tabbing either way, th
   // then
   expect(screen.getByTestId("before"), "Shift+Tab continues before the panel rather than at the last control").toHaveFocus();
 });
+
+it("given plain content, when the dialog opens, then the dialog is a panel of its own with a scrolling body", () => {
+  // when
+  render(<Modal labelledBy="heading" closed={vi.fn()}>
+    <h2 id="heading">Booking</h2>
+    <button type="button">Book now</button>
+  </Modal>);
+
+  // then
+  const dialog = screen.getByRole("dialog");
+  expect(dialog, "the dialog draws its own surface instead of the dimmed page").toHaveClass("surface-panel");
+  expect(dialog.querySelector("[data-testid='dialog-body']"), "plain content scrolls inside the panel").toContainElement(screen.getByRole("button"));
+});
+
+it("given content composed of its own sections, when the dialog opens, then the panel holds it without a second body", () => {
+  // when
+  render(<Modal labelledBy="heading" closed={vi.fn()} composed testId="booking">
+    <h2 id="heading">Booking</h2>
+  </Modal>);
+
+  // then
+  const dialog = screen.getByRole("dialog");
+  expect(dialog, "the panel carries the caller's test ID").toBe(screen.getByTestId("booking"));
+  expect(dialog, "a composed dialog still draws its own surface").toHaveClass("surface-panel");
+  expect(dialog.querySelector("[data-testid='dialog-body']"), "a composed dialog brings its own body").toBeNull();
+});

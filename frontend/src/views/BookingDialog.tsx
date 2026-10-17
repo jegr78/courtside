@@ -172,8 +172,8 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
     + participantCardIds.filter(Boolean).length;
   const requiredPlayers = requiredFor(bookingCards.find((card) => card.id === cardId), chosenPlayers);
 
-  return <Modal labelledBy="booking-heading" closed={closed}>
-    <form data-testid="booking-dialog" onSubmit={(event) => void submit(event)} className="surface-panel flex w-full max-w-xl flex-col overflow-hidden rounded-2xl border shadow-2xl">
+  return <Modal labelledBy="booking-heading" closed={closed} width="xl" composed testId="booking-dialog">
+    <form onSubmit={(event) => void submit(event)} className="flex min-h-0 flex-col">
       <DialogBody>
       <h2 id="booking-heading" className="text-xl font-bold">{t(waitlist ? "waitlist.title" : "booking.title")}</h2>
       <p data-testid="booking-period" aria-live="polite" className="mt-2 font-semibold">{formatBookingPeriod(period.startsAt, period.endsAt, i18n.language, grid.timeZone)}</p>

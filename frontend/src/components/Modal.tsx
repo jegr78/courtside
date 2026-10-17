@@ -1,6 +1,16 @@
 import { type KeyboardEvent, type ReactNode, useEffect, useRef } from "react";
+import { DialogBody } from "./DialogBody";
 
-export function Modal({ labelledBy, closed, children }: { labelledBy: string; closed: () => void; children: ReactNode }) {
+const widths = { md: "max-w-md", lg: "max-w-lg", xl: "max-w-xl" } as const;
+
+export function Modal({ labelledBy, closed, width = "md", composed = false, testId, children }: {
+  labelledBy: string;
+  closed: () => void;
+  width?: keyof typeof widths;
+  composed?: boolean;
+  testId?: string;
+  children: ReactNode;
+}) {
   const dialog = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -35,8 +45,9 @@ export function Modal({ labelledBy, closed, children }: { labelledBy: string; cl
     className="fixed inset-0 z-20 flex items-center justify-center bg-(--cs-overlay) p-4"
     onMouseDown={(event) => { if (event.target === event.currentTarget) closed(); }}
   >
-    <div ref={dialog} role="dialog" aria-modal="true" aria-labelledby={labelledBy} onKeyDown={handleKeyDown} className="flex max-h-full w-full flex-col items-center">
-      {children}
+    <div ref={dialog} role="dialog" aria-modal="true" aria-labelledby={labelledBy} onKeyDown={handleKeyDown} data-testid={testId}
+         className={`surface-panel flex max-h-full w-full ${widths[width]} flex-col overflow-hidden rounded-2xl border shadow-2xl`}>
+      {composed ? children : <DialogBody>{children}</DialogBody>}
     </div>
   </div>;
 }

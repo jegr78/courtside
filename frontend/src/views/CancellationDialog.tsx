@@ -11,15 +11,13 @@ export function CancellationDialog({ allocation, locale, timeZone, closed, cance
   const { t } = useTranslation();
   const [error, setError] = useState<string>();
   return <Modal labelledBy="cancel-heading" closed={closed}>
-    <div className="surface-panel w-full max-w-md rounded-2xl border p-6 shadow-2xl">
-      <h2 id="cancel-heading" className="text-xl font-bold">{t("booking.cancelTitle")}</h2>
-      <p className="mt-3">{t("booking.cancelQuestion", { label: allocation.cardLabel })}</p>
-      <p data-testid="cancellation-period" className="mt-2 font-semibold">{formatBookingPeriod(allocation.startsAt, allocation.endsAt, locale, timeZone)}</p>
-      {error && <Alert>{error}</Alert>}
-      <div className="mt-6 flex justify-end gap-3">
-        <Button variant="secondary" type="button" onClick={closed}>{t("booking.close")}</Button>
-        <Button variant="destructive-confirm" type="button" data-testid="confirm-cancellation" onClick={() => void api.cancelBooking(allocation.bookingId).then(cancelled).catch((failure: unknown) => setError(problemMessage(failure, t)))}>{t("booking.cancelConfirm")}</Button>
-      </div>
+    <h2 id="cancel-heading" className="text-xl font-bold">{t("booking.cancelTitle")}</h2>
+    <p className="mt-3">{t("booking.cancelQuestion", { label: allocation.cardLabel })}</p>
+    <p data-testid="cancellation-period" className="mt-2 font-semibold">{formatBookingPeriod(allocation.startsAt, allocation.endsAt, locale, timeZone)}</p>
+    {error && <Alert>{error}</Alert>}
+    <div className="mt-6 flex justify-end gap-3">
+      <Button variant="secondary" type="button" onClick={closed}>{t("booking.close")}</Button>
+      <Button variant="destructive-confirm" type="button" data-testid="confirm-cancellation" onClick={() => void api.cancelBooking(allocation.bookingId).then(cancelled).catch((failure: unknown) => setError(problemMessage(failure, t)))}>{t("booking.cancelConfirm")}</Button>
     </div>
   </Modal>;
 }
