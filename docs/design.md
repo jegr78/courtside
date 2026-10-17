@@ -920,6 +920,27 @@ The audit log stores identifiers, event types, actors and non-personal change de
 not copy names, addresses, credentials or free text. Erasing the referenced person removes the link
 without rewriting the append-only event.
 
+A board keeps two categories of record for a number of months it chooses, and a category without a
+period is never touched. `BOOKINGS` pseudonymises bookings and series that ended before the cut-off:
+booker, canceller, mover, creator, notes, member players and guest names leave the booking, while
+court time, status, card and guest places stay for utilisation and booking counts. `FORMER_MEMBERS`
+removes a person whose membership ended before the cut-off and whose accounts neither signed in nor
+were opened since, with those accounts and everything they hold. Removal does not record a
+departure: a member who leaves is deactivated, and only the period the board set after that ending
+erases them. A person is reported as blocked instead while an account of theirs holds the
+administrator role, a booking or series the run keeps still names them, or they wait for a court.
+
+Every run starts as a preview that changes nothing, counts what it would change and lists the
+blocked people with their reason. Only the account that took the preview can run it, with a recent
+full-password proof, once, before it expires and while the periods it applies are unchanged. A run
+re-checks each former member under a lock and skips one who became ineligible. Pseudonymising a
+booking also reaches the records that would tie it back to a person: its change log entries lose
+their actor and the person and account fields of their payload but keep type, time and subject, and
+its notification entries and queued messages are deleted. Removing a person leaves their entries
+untouched, as described above. The change log records periods and run counts, never whom a run
+removed. Courtside ships no period and gives no legal advice: the club chooses the period its own
+lawful basis allows.
+
 Session rows are deleted after inactivity or absolute expiry. Import previews retain their resolved
 change set only for the configured period and never store the uploaded file. Message records,
 notification-centre entries and message choices leave with their account.

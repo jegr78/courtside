@@ -426,6 +426,13 @@ test("stable administration surfaces match their reviewed baselines", async ({ p
   await stableScreenshot(page.getByTestId("admin-export-view"), "admin-export.png");
 
   // when
+  await page.goto("/admin/retention");
+  await expect(page.getByTestId("retention-state-BOOKINGS")).toBeVisible();
+
+  // then
+  await stableScreenshot(page.getByTestId("admin-retention-view"), "admin-retention.png");
+
+  // when
   await page.goto("/admin/utilisation");
   await expect(page.getByTestId("utilisation-row-1")).toBeVisible();
   await expect(page.getByTestId("statistics-confirmed")).toBeVisible();
@@ -519,7 +526,8 @@ test("each configuration surface fits the desktop screen without scrolling in ei
     { link: "admin-deadlines-link", view: "admin-deadlines-view", ready: "booking-reminder-hours" },
     { link: "admin-rule-sets-link", view: "admin-rule-sets-view", ready: "rule-ADVANCE_WINDOW-maxDays" },
     { link: "admin-message-wording-link", view: "admin-message-wording-view", ready: "wording-body" },
-    { link: "admin-operator-health-link", view: "admin-operator-health-view", ready: "operator-check-backup" }
+    { link: "admin-operator-health-link", view: "admin-operator-health-view", ready: "operator-check-backup" },
+    { link: "admin-retention-link", view: "admin-retention-view", ready: "retention-months-BOOKINGS" }
   ];
 
   for (const language of ["de", "en"]) {

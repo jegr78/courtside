@@ -271,6 +271,35 @@ A run points at the preview it executed and `import_run_one_per_preview` allows 
 preview a board has read cannot be applied twice. Both carry the file hash, so a run that executed
 a different file than the one previewed is visible after the fact.
 
+## Keeping personal records
+
+| Table | Holds | References |
+|---|---|---|
+| `retention_policy` | For one record category, how many months the club keeps it after it ended | None |
+| `retention_preview` | What a reviewed retention run will apply: the cut-off of each category and the former members it would remove | `user_account` |
+
+A category without a `retention_policy` row is never touched, and nothing seeds one, because the
+period is the club's decision. `retention_policy_retain_months_range` accepts 1 to 1200 months.
+`retention_preview_covers_a_category` refuses a preview with no cut-off, and
+`retention_preview_members_need_a_cutoff` refuses former members without the membership cut-off they
+were judged against. A preview row is deleted when its run starts, when the board changes or removes
+a period it applies, by the preview sweep once it has expired, and with the account that created it.
+
+A run sets `booking.pseudonymised_at` and `booking_series.pseudonymised_at`.
+`booking_pseudonymised_names_nobody` and `booking_series_pseudonymised_names_nobody` then require
+the booker, the canceller, the mover, the creator and the notes to be empty.
+`booking_move_actor_complete` still allows a mover only beside a move time, and
+`booking_move_actor_kept_until_pseudonymised` lets a move time outlive its mover only on a
+pseudonymised booking. The run also deletes the `MEMBER` rows of `booking_participant`, empties
+`guest_name` on its `GUEST` rows and clears who recorded or lifted an attendance, so court time,
+status, card and the number of guest places stay countable. For the bookings and series it
+pseudonymised, the run clears `actor_account_id` and every payload field ending in `personId` or
+`accountId` from the `domain_event` entries that name them, while their type, time and subject stay;
+it deletes the `notification` rows and queued `message_record` rows that carry their ids, and the
+unfinished `event_publication` rows that mention them. Removing a former member deletes their
+`person`, `member`, `import_external_reference` and `user_account` rows, and the account takes its
+own rows with it. `domain_event` keeps its entries, which then name an identifier nobody holds.
+
 ## What the instance records
 
 | Table | Holds | References |

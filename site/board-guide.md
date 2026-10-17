@@ -20,7 +20,7 @@ Die Seitenleiste führt oben zur Übersicht und ordnet die Verwaltung darunter i
 | **Verein** | Einrichtung, Vereinsprofil, Fristen und Erinnerungen, Buchungsregeln, Nachrichtentexte |
 | **Anlage** | Plätze, Öffnungszeiten, Buchungskarten und Platzfüller |
 | **Mitglieder** | Personen, Konten, Mitgliedsarten und Import |
-| **Nachweise** | Statistik, Nutzung, Datenexport, Änderungsprotokoll und Nachrichtenprotokoll |
+| **Nachweise** | Statistik, Nutzung, Datenexport, Aufbewahrung, Änderungsprotokoll und Nachrichtenprotokoll |
 
 Über dieselbe Leiste kehrst du zum Platzplan zurück.
 
@@ -504,7 +504,7 @@ aktivieren und Mitgliedsrollen neu vergeben.
 
 ## Nachweise
 
-Unter **Nachweise** findest du sieben Ansichten.
+Unter **Nachweise** findest du acht Ansichten. Die *Aufbewahrung* beschreibt der nächste Abschnitt.
 
 * **Statistik** zeigt beim Öffnen den letzten vollen Monat. Oben wählst du einen anderen Zeitraum:
   7 Tage, 1, 3, 6 oder 12 Monate bis heute, alles seit der ersten Buchung, das letzte Kalenderjahr
@@ -571,11 +571,53 @@ Unter **Nachweise** findest du sieben Ansichten.
 
 ![Die Statistik mit Zeitraumwahl, Kennzahlen zur Auslastung und ihrer Veränderung.](screenshots/de/utilisation.png)
 
+## Nachweise → Aufbewahrung
+
+Hier legt der Verein fest, wie lange er personenbezogene Daten nach ihrem Ende aufbewahrt. Courtside
+gibt keine Frist vor. Eine Kategorie ohne Frist bleibt unberührt, ganz gleich, wie alt ihre Daten
+sind. Welche Frist rechtmäßig ist, entscheidet der Verein als Verantwortlicher. Das
+[Datenschutz-Kit](privacy-kit.md) hilft beim Dokumentieren dieser Entscheidung, ersetzt aber keine
+Rechtsberatung.
+
+Es gibt zwei Kategorien, jede mit einer Frist in Monaten von 1 bis 1200:
+
+* **Buchungen** pseudonymisiert Buchungen und Serien, die vor der Frist endeten. Bucher, stornierende
+  und verschiebende Konten, Notizen, mitspielende Mitglieder und die Namen von Gästen verschwinden.
+  Karte, Plätze, Zeiten, Status und die Zahl der Gastplätze bleiben, deshalb rechnen Auslastung,
+  Nutzung und Buchungszahlen weiter mit diesen Buchungen.
+* **Ehemalige Mitglieder** entfernt eine Person, deren Mitgliedschaft vor der Frist endete und deren
+  Konten sich seither nicht angemeldet haben und nicht neu angelegt wurden. Mit ihr verschwinden
+  ihre Konten und alles, was an ihnen hängt.
+
+Lies vor dem Setzen einer Buchungsfrist, was dir danach fehlt: Für pseudonymisierte Zeiträume zählt
+die Statistik keine aktiven Mitglieder mehr, und die Nutzung kann die Kapazität dieser Zeit keiner
+Mitgliedsart mehr zuordnen. Eine Austrittsmeldung erledigt nicht die
+Aufbewahrung: Wer geht, wird mit *Mitgliedschaft beenden* ausgetragen, und erst die Frist entfernt
+die Person später.
+
+Ein Lauf beginnt immer mit *Vorschau erstellen*. Die Vorschau ändert nichts. Sie zählt, wie viele
+Buchungen, Serien, ehemalige Mitglieder und Konten ein Lauf jetzt erfassen würde, und nennt die
+Personen, die er noch nicht erreicht, mit dem Grund:
+
+* Ein Konto der Person hat die Rolle *Administrator*.
+* Eine Buchung oder Serie, die bleibt, nennt die Person noch.
+* Die Person wartet auf einen Platz.
+
+Über *Person öffnen* erreichst du die Person und kannst den Grund beheben. Erst wenn du im Formular
+bestätigst, dass der Lauf nicht rückgängig zu machen ist, startet *Endgültig ausführen* genau diese
+Vorschau. Fehlt eine frische Passwortbestätigung, fragt Courtside dein Passwort ab. Eine Vorschau
+gilt 30 Minuten, nur das Konto, das sie erstellt hat, kann sie ausführen, und sie läuft höchstens
+einmal. Wer sich seit der Vorschau wieder angemeldet hat, wird übersprungen und gezählt. Das
+Änderungsprotokoll hält die gesetzten Fristen und die Zahlen eines Laufs fest, nie die Namen.
+
+![Die Aufbewahrung mit je einer Frist für Buchungen und für ehemalige Mitglieder.](screenshots/de/retention.png)
+
 ## Zwei Regeln, die überall gelten
 
 Courtside bewahrt fachliche Historie auf. Deaktiviere Plätze, Buchungskarten und Konten oder lege
 Regelwerke und Mitgliedsarten still. Beende Mitgliedschaften. Lösche diese Daten
-nicht, wenn die Vergangenheit weiterhin nachvollziehbar bleiben soll.
+nicht, wenn die Vergangenheit weiterhin nachvollziehbar bleiben soll. Personenbezogene Daten nach
+Ablauf einer Frist entfernt allein die *Aufbewahrung*.
 
 Eingabefehler bleiben korrigierbar. Ändere Namen, Benutzernamen und Datumsangaben in der
 jeweiligen Verwaltung. Dafür ist kein direkter Datenbankzugriff nötig.

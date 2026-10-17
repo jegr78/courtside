@@ -12,6 +12,8 @@ import { attendanceErasureSql, bookingsBeyondWindow, deactivationLeftover, forei
 import { personaUsernames } from "../lib/attendance";
 import { erase } from "../lib/erasure";
 import { leaveWaitlist, MEMBERS, openWaitlistEntries } from "../lib/waitlist";
+import { readPeriods, restorePeriods } from "../lib/retention";
+import { retentionRestorations } from "../lib/core.mjs";
 
 const ids = (day: unknown) => new Set((day as { bookingId?: string; id?: string }[]).map((a) => a.bookingId ?? a.id));
 
@@ -103,4 +105,18 @@ test("when the run ends, then no reserved slot holds a booking of this run, no w
   if (waitlistErasure.attempted) expect(waitlistErasure.exit, "the members' closed waitlist entries are erased").toBe(0);
   if (attendanceErasure.attempted) expect(attendanceErasure.exit, "the personas' recorded attendance and seeded no-shows are erased").toBe(0);
   for (const [index, username] of disposables.entries()) expect(await canSignIn(PASSWORD, username), `disposable ${index + 1} signs in`).toBe(true);
+});
+
+test("when the run ends, then every retention period this run changed is back to what it was before", async () => {
+  // when
+  const admin = await apiAs("admin");
+  const expected = retentionRestorations(readLedger()) as { category: string; before: number | null }[];
+  const outcome = await restorePeriods(admin);
+  const periods: Record<string, number | null> = expected.length ? await readPeriods(admin) : {};
+  writeFileSync(runPath("postflight-retention.json"), JSON.stringify({ outcome, periods }, null, 2));
+  // then
+  expect(outcome.filter((restore) => restore.status >= 300), "every period this run changed is put back").toEqual([]);
+  for (const { category, before } of expected) {
+    expect(periods[category], `${category} holds the period it had before the run`).toBe(before);
+  }
 });
