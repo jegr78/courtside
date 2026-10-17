@@ -217,14 +217,18 @@ internal events.
 ### People, memberships and accounts
 
 `Person`, `Member` and `UserAccount` are separate concepts. A person is the identity and contact
-record. A member links one person to one current membership type and records its start and optional
-end. An account grants sign-in access and roles. A person may have no account.
+record. A member row is one dated period of a person's membership: its type, its first day and an
+optional end, the first day it no longer holds. A person may hold several periods, which never
+overlap. An account grants sign-in access and roles. A person may have no account.
 
 Email is optional for a person and mandatory before that person receives an account. It is not
 unique because several people may use one family mailbox. Username is unique within an instance.
 
-A membership with an end date is inactive. The row remains with its last type and dates. The
-current model does not schedule membership changes and refuses future start or end dates.
+A period holds on a day when it began on or before it and has no end or ends after it. Start and
+end may lie in the future, so a board can schedule a departure or a type change; a period that has
+not begun grants nothing yet. A rejoin adds a period and keeps the earlier ones, an import type
+change ends the running period on the run day and opens one of the new type, and ending a
+membership also removes the periods scheduled to begin later.
 
 Every value entered through an administrative surface can be corrected there. Identifiers are not
 editable descriptions. Deactivation represents records that should no longer be used. Erasure
@@ -290,9 +294,12 @@ violation instead of stopping at the first.
 | `MIN_BOOKING_DURATION` | One booking lasts at least this long |
 | `NO_SHOW_LIMIT` | The member has fewer than this many counting no-shows in the last days |
 
-Membership-scoped rules come from the current membership type. A club may configure a fallback for
-people without current membership. Without it, no membership-scoped rule applies. Facility rules
-still apply.
+Membership-scoped rules come from a membership type, and only for a person who holds a period
+today. A booking, move, series occurrence or cancellation is measured against the type of the
+period covering the slot's club-local day. Where no period covers that day, the rule set the club
+bound for people without a membership type applies, and without one the type held today. A person
+who holds no period today is measured by that fallback, and without one by no membership-scoped
+rule. Facility rules still apply.
 
 Entitlement rules are administratively overridable. Opening hours and grid alignment describe the
 calendar and are not. `NO_COURT_BOOKING`, `MAX_BOOKING_DURATION`, `MIN_BOOKING_DURATION`,
@@ -924,7 +931,7 @@ A board keeps two categories of record for a number of months it chooses, and a 
 period is never touched. `BOOKINGS` pseudonymises bookings and series that ended before the cut-off:
 booker, canceller, mover, creator, notes, member players and guest names leave the booking, while
 court time, status, card and guest places stay for utilisation and booking counts. `FORMER_MEMBERS`
-removes a person whose membership ended before the cut-off and whose accounts neither signed in nor
+removes a person all of whose periods ended, the latest before the cut-off, and whose accounts neither signed in nor
 were opened since, with those accounts and everything they hold. Removal does not record a
 departure: a member who leaves is deactivated, and only the period the board set after that ending
 erases them. A person is reported as blocked instead while an account of theirs holds the
