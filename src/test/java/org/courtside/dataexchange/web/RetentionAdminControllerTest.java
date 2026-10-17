@@ -299,6 +299,29 @@ class RetentionAdminControllerTest extends AbstractIntegrationTest {
 
     @Test
     @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAnOldEndedPeriodBesideARunningOrScheduledOne_whenPreviewed_thenOnlyTheTrueFormerMemberCounts()
+            throws Exception {
+        // given
+        UUID gone = formerMember("Jane", "Doe", "jane.doe");
+        UUID rejoined = formerMember("John", "Roe", "john.roe");
+        roster.addMembershipPeriod(rejoined, ACTIVE_TYPE, LocalDate.of(2025, 1, 1), null);
+        UUID returning = formerMember("Mary", "Major", "mary.major");
+        roster.addMembershipPeriod(returning, ACTIVE_TYPE, LocalDate.of(2026, 9, 1), LocalDate.of(2027, 9, 1));
+        UUID twice = formerMember("Richard", "Roe", "richard.roe");
+        roster.addMembershipPeriod(twice, ACTIVE_TYPE, LocalDate.of(2010, 1, 1), LocalDate.of(2012, 1, 1));
+        keep("FORMER_MEMBERS", 24);
+
+        // when / then
+        mockMvc.perform(post("/api/admin/retention/previews").with(csrf()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.formerMembers.people").value(2))
+                .andExpect(jsonPath("$.formerMembers.accounts").value(2))
+                .andExpect(jsonPath("$.blocked.length()").value(0));
+        assertThat(identity.personExists(gone)).isTrue();
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
     void givenARemovableFormerMember_whenTheRunApplies_thenThePersonAndTheirAccountLeaveAndTheLogKeepsCountsOnly()
             throws Exception {
         // given

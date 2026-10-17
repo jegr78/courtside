@@ -71,7 +71,7 @@ class UatBookingSeeder {
         LocalDate first = today.minusWeeks(8).with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
         LocalDate last = today.plusWeeks(12).with(TemporalAdjusters.nextOrSame(DayOfWeek.SUNDAY));
         List<UUID> courts = activeCourts();
-        List<MemberIdentity> members = currentMembers();
+        List<MemberIdentity> members = currentMembers(today);
         List<SeedBooking> plan = new ArrayList<>();
         List<SeriesPlan> series = new ArrayList<>();
         Set<String> unavailable = new LinkedHashSet<>();
@@ -128,7 +128,7 @@ class UatBookingSeeder {
                                   UUID cardId, LocalDate first, LocalDate last,
                                   int intervalWeeks, LocalTime time, Duration duration,
                                   List<UUID> activeCourts, int maximumCourts, ZoneId zone) {
-        Account booker = permittedAccount(cardId, false);
+        Account booker = permittedAccount(cardId, false, null);
         UUID seriesId = stableId("series-" + key);
         String note = label + " " + marker("series-" + key);
         Optional<ExistingSeries> existing = existingSeries(seriesId, note);
@@ -155,7 +155,7 @@ class UatBookingSeeder {
 
     private void addClosures(List<SeedBooking> plan, Set<String> unavailable, LocalDate first,
                              LocalDate last, List<UUID> courts, ZoneId zone) {
-        Account booker = permittedAccount(CLOSURE_CARD, false);
+        Account booker = permittedAccount(CLOSURE_CARD, false, null);
         if (booker == null || !noPlayerCardAvailable(CLOSURE_CARD) || courts.isEmpty()) {
             unavailable.add("court closures");
             return;
@@ -172,7 +172,7 @@ class UatBookingSeeder {
     private void addMemberBookings(List<SeedBooking> plan, Set<String> unavailable, LocalDate first,
                                    LocalDate last, List<UUID> courts, List<MemberIdentity> members,
                                    ZoneId zone) {
-        Account booker = permittedAccount(MEMBER_CARD, true);
+        Account booker = permittedAccount(MEMBER_CARD, true, LocalDate.now(clock.withZone(zone)));
         BookingCardCapabilities card = bookingCard(MEMBER_CARD);
         if (booker == null || courts.isEmpty() || members.size() < 4) {
             unavailable.add("member bookings (four current members and an enabled member account required)");
@@ -231,9 +231,10 @@ class UatBookingSeeder {
                 label + " " + marker(key), seriesId, startsAt, startsAt.plus(duration), courts, participants);
     }
 
-    private Account permittedAccount(UUID cardId, boolean currentMemberRequired) {
+    private Account permittedAccount(UUID cardId, boolean currentMemberRequired, LocalDate today) {
         String membership = currentMemberRequired
-                ? "JOIN member m ON m.person_id = ua.person_id AND m.ended_on IS NULL\n"
+                ? "JOIN member m ON m.person_id = ua.person_id AND m.started_on <= :today\n"
+                        + "AND (m.ended_on IS NULL OR m.ended_on > :today)\n"
                 : "LEFT JOIN member m ON false\n";
         return jdbc.sql("""
                 SELECT ua.id, ua.person_id
@@ -251,17 +252,17 @@ class UatBookingSeeder {
                                     AND allowed.booking_card_id = :cardId))
                 ORDER BY ua.id
                 LIMIT 1
-                """).param("cardId", cardId).query((rs, row) ->
+                """).param("cardId", cardId).param("today", today).query((rs, row) ->
                 new Account(rs.getObject(1, UUID.class), rs.getObject(2, UUID.class))).optional().orElse(null);
     }
 
-    private List<MemberIdentity> currentMembers() {
+    private List<MemberIdentity> currentMembers(LocalDate today) {
         return jdbc.sql("""
                 SELECT DISTINCT m.person_id
                 FROM member m
-                WHERE m.ended_on IS NULL
+                WHERE m.started_on <= :today AND (m.ended_on IS NULL OR m.ended_on > :today)
                 ORDER BY m.person_id
-                """).query(UUID.class).list().stream().map(MemberIdentity::new).toList();
+                """).param("today", today).query(UUID.class).list().stream().map(MemberIdentity::new).toList();
     }
 
     private List<MemberIdentity> rotateOwnerFirst(List<MemberIdentity> members, UUID owner) {

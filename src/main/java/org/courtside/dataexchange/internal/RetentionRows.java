@@ -198,9 +198,10 @@ public class RetentionRows {
     public List<UUID> formerMembers(LocalDate membershipEndedBefore, Instant activeSince) {
         return jdbc.sql("""
                         SELECT p.id FROM person p JOIN member m ON m.person_id = p.id
-                        WHERE m.ended_on IS NOT NULL AND m.ended_on < :endedBefore
-                          AND NOT EXISTS (SELECT 1 FROM user_account u WHERE u.person_id = p.id
+                        WHERE NOT EXISTS (SELECT 1 FROM user_account u WHERE u.person_id = p.id
                                           AND (u.created_at >= :activeSince OR u.last_login_at >= :activeSince))
+                        GROUP BY p.id
+                        HAVING bool_and(m.ended_on IS NOT NULL) AND max(m.ended_on) < :endedBefore
                         ORDER BY p.id
                         """)
                 .param("endedBefore", membershipEndedBefore)
