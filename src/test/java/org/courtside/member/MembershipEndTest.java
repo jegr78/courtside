@@ -387,6 +387,56 @@ class MembershipEndTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenATypeTheClubRetired_whenAddingAPeriodThatEndedOnIt_thenThePastIsRecorded() {
+        // given
+        UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
+        MembershipType retired = memberships.createMembershipType("Youth", null, false);
+        memberships.setMembershipTypeActive(retired.getId(), false);
+
+        // when
+        periods.add(mary, retired.getId(), new MembershipPeriod(LocalDate.of(2019, 1, 1), LocalDate.of(2020, 1, 1)));
+
+        // then
+        assertThat(periods.periodsOf(mary))
+                .as("a period that is over does not make anybody a member of the retired type")
+                .extracting(MembershipPeriodService.Period::membershipTypeId)
+                .containsExactly(retired.getId());
+    }
+
+    @Test
+    void givenATypeTheClubRetired_whenAddingAPeriodRunningOnIt_thenItIsRefused() {
+        // given
+        UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
+        MembershipType retired = memberships.createMembershipType("Youth", null, false);
+        memberships.setMembershipTypeActive(retired.getId(), false);
+
+        // when / then
+        assertThatThrownBy(() -> periods.add(mary, retired.getId(), new MembershipPeriod(LocalDate.of(2026, 1, 1), null)))
+                .isInstanceOf(MembershipTypeInactiveException.class);
+        assertThat(periods.periodsOf(mary)).isEmpty();
+    }
+
+    @Test
+    void givenAPastPeriod_whenCorrectingItOntoATypeTheClubRetired_thenTheCorrectionHolds() {
+        // given
+        UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
+        MembershipType adults = memberships.createMembershipType("Adults", null, false);
+        MembershipType retired = memberships.createMembershipType("Youth", null, false);
+        UUID past = periods.add(mary, adults.getId(),
+                new MembershipPeriod(LocalDate.of(2019, 1, 1), LocalDate.of(2020, 1, 1))).id();
+        memberships.setMembershipTypeActive(retired.getId(), false);
+
+        // when
+        periods.correct(mary, past, retired.getId(),
+                new MembershipPeriod(LocalDate.of(2019, 1, 1), LocalDate.of(2020, 1, 1)));
+
+        // then
+        assertThat(periods.periodsOf(mary))
+                .extracting(MembershipPeriodService.Period::membershipTypeId)
+                .containsExactly(retired.getId());
+    }
+
+    @Test
     void givenARunningMembership_whenTheTypeChanges_thenTheOldTypeEndsTodayAndTheNewOneRunsFromToday() {
         // given
         UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
