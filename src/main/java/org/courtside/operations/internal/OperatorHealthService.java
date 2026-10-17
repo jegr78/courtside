@@ -1,9 +1,9 @@
 package org.courtside.operations.internal;
 
 import lombok.extern.slf4j.Slf4j;
+import org.courtside.notification.InstanceOrigin;
 import org.courtside.notification.MailHandover;
 import org.jspecify.annotations.Nullable;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.info.BuildProperties;
 import org.springframework.boot.info.GitProperties;
 import org.springframework.stereotype.Service;
@@ -21,20 +21,20 @@ public class OperatorHealthService {
     private final MailHandover mail;
     private final BackupEvidence backup;
     private final Clock clock;
-    private final String publicUrl;
+    private final InstanceOrigin instance;
 
     OperatorHealthService(BuildProperties build,
                           // Absent when the build had no repository to read.
                           @Nullable GitProperties git,
                           MigrationLedger migrations, MailHandover mail, BackupEvidence backup, Clock clock,
-                          @Value("${courtside.public-url:}") String publicUrl) {
+                          InstanceOrigin instance) {
         this.build = build;
         this.git = git;
         this.migrations = migrations;
         this.mail = mail;
         this.backup = backup;
         this.clock = clock;
-        this.publicUrl = publicUrl == null ? "" : publicUrl.strip();
+        this.instance = instance;
     }
 
     public OperatorHealth read() {
@@ -91,10 +91,9 @@ public class OperatorHealthService {
     }
 
     private OperatorHealth.PublicOrigin publicOrigin() {
-        if (publicUrl.isEmpty()) {
-            return new OperatorHealth.PublicOrigin(CheckState.UNAVAILABLE, CheckReason.NOT_CONFIGURED, null);
-        }
-        return new OperatorHealth.PublicOrigin(CheckState.OK, null,
-                publicUrl.endsWith("/") ? publicUrl.substring(0, publicUrl.length() - 1) : publicUrl);
+        return instance.origin()
+                .map(origin -> new OperatorHealth.PublicOrigin(CheckState.OK, null, origin))
+                .orElseGet(() -> new OperatorHealth.PublicOrigin(CheckState.UNAVAILABLE, CheckReason.NOT_CONFIGURED,
+                        null));
     }
 }

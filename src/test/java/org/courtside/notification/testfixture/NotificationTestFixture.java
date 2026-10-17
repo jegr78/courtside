@@ -132,6 +132,26 @@ public class NotificationTestFixture {
         record(accountId, kind, "REFUSED", messageId, at, reason, statusCode);
     }
 
+    public void recordFailed(UUID accountId, MessageKind kind, String messageId, Instant at) {
+        record(accountId, kind, "FAILED", messageId, at, "MailSendException", null);
+    }
+
+    public void queueRetry(UUID accountId, MessageKind kind, String messageId, Instant queuedAt, Instant due) {
+        jdbc.sql("""
+                        INSERT INTO message_record
+                            (id, account_id, kind, state, message_id, queued_at, attempts, retries,
+                             next_attempt_at)
+                        VALUES (:id, :accountId, :kind, 'QUEUED', :messageId, :at, 1, 1, :due)
+                        """)
+                .param("id", UUID.randomUUID())
+                .param("accountId", accountId)
+                .param("kind", kind.name())
+                .param("messageId", messageId)
+                .param("at", java.sql.Timestamp.from(queuedAt))
+                .param("due", java.sql.Timestamp.from(due))
+                .update();
+    }
+
     private void record(UUID accountId, MessageKind kind, String state, String messageId,
                         Instant at, String reason, String statusCode) {
         jdbc.sql("""

@@ -35,7 +35,8 @@ class OperatorHealthServiceTest {
         git.setProperty("commit.id", "a".repeat(40));
         return new OperatorHealthService(new BuildProperties(build), new GitProperties(git),
                 this::migrationLedger, () -> mail, new BackupEvidence(backupFile),
-                Clock.fixed(NOW, ZoneOffset.UTC), publicUrl);
+                Clock.fixed(NOW, ZoneOffset.UTC),
+                () -> publicUrl.isEmpty() ? Optional.empty() : Optional.of(publicUrl));
     }
 
     private MigrationLedger.Snapshot migrationLedger() {
