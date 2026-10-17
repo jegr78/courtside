@@ -47,7 +47,7 @@ public class MembershipPeriodService {
         UUID id = requiredPersonId(personId);
         MembershipPeriod requested = requiredPeriod(period).requireStart();
         requireLockedPerson(id);
-        UUID typeId = memberships.requireAssignableMembershipType(membershipTypeId).getId();
+        UUID typeId = typeIdFor(membershipTypeId, requested, false);
         Member created = new Member(id, typeId, requested.startedOn());
         created.endOn(requested.endedOn());
         saveOrRejectOverlap(members, created);
@@ -63,9 +63,7 @@ public class MembershipPeriodService {
         MembershipPeriod requested = requiredPeriod(period).requireStart();
         requireLockedPerson(id);
         Member existing = requirePeriod(id, periodId);
-        UUID typeId = existing.getMembershipTypeId().equals(membershipTypeId)
-                ? memberships.requireMembershipType(membershipTypeId).getId()
-                : memberships.requireAssignableMembershipType(membershipTypeId).getId();
+        UUID typeId = typeIdFor(membershipTypeId, requested, existing.getMembershipTypeId().equals(membershipTypeId));
         existing.assignTo(typeId);
         existing.correctPeriod(requested.startedOn(), requested.endedOn());
         saveOrRejectOverlap(members, existing);
@@ -84,6 +82,14 @@ public class MembershipPeriodService {
         members.flush();
         revokeSessionsOf(id);
         events.publishEvent(new RosterEvent.MembershipPeriodRemoved(id, existing.getId()));
+    }
+
+    private UUID typeIdFor(UUID membershipTypeId, MembershipPeriod requested, boolean keepsItsType) {
+        LocalDate today = memberships.today();
+        boolean leavesAMember = requested.endedOn() == null || requested.endedOn().isAfter(today);
+        return leavesAMember && !keepsItsType
+                ? memberships.requireAssignableMembershipType(membershipTypeId).getId()
+                : memberships.requireMembershipType(membershipTypeId).getId();
     }
 
     private Member requirePeriod(UUID personId, UUID periodId) {
