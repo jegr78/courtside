@@ -467,6 +467,26 @@ class StatisticsControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenAMemberWhoMovedToAnotherTypeMidMonth_whenReadingThatMonth_thenTheMoveIsNeitherAJoinNorALeaving()
+            throws Exception {
+        // given
+        UUID adult = members.createMembershipType("Adult");
+        UUID youth = members.createMembershipType("Youth");
+        UUID jane = members.addPerson("Jane", "Doe", "jane.doe@example.org");
+        members.addMembershipPeriod(jane, youth, LocalDate.of(2020, 1, 1), LocalDate.of(2026, 4, 15));
+        members.addMembershipPeriod(jane, adult, LocalDate.of(2026, 4, 15), null);
+
+        // when / then
+        mockMvc.perform(get("/api/admin/statistics/members"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.figures.members").value(1))
+                .andExpect(jsonPath("$.figures.joins").value(0))
+                .andExpect(jsonPath("$.figures.leavings").value(0))
+                .andExpect(jsonPath("$.membershipTypes[?(@.membershipTypeId == '" + adult + "')].members").value(1))
+                .andExpect(jsonPath("$.membershipTypes[?(@.membershipTypeId == '" + youth + "')].members").value(0));
+    }
+
+    @Test
     void givenMessagesAroundThePeriod_whenReadingMessages_thenEachKindCountsItsStatesInside() throws Exception {
         // given
         UUID person = members.addPerson("Jane", "Doe", "jane.doe@example.org");

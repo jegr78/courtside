@@ -348,6 +348,25 @@ class RosterListTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenAPeriodThatBeginsTomorrow_whenSearchingCurrentMembers_thenThePersonIsNotOneYetButTheEntryNamesIt() {
+        // given
+        UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
+        java.time.LocalDate tomorrow = java.time.LocalDate.now(clock).plusDays(1);
+        members.save(new Member(jane, MEMBERSHIP_TYPE_ID, tomorrow));
+
+        // when
+        RosterService.RosterPage current = roster.search(
+                null, MEMBERSHIP_TYPE_ID, true, null, Set.of(), null, null, null, 50);
+        RosterService.RosterPage everybody = roster.search(
+                null, null, false, null, Set.of(), null, null, null, 50);
+
+        // then
+        assertThat(current.items()).extracting(RosterService.RosterEntry::personId).doesNotContain(jane);
+        assertThat(everybody.items()).filteredOn(entry -> entry.personId().equals(jane)).singleElement()
+                .satisfies(entry -> assertThat(entry.membership().startedOn()).isEqualTo(tomorrow));
+    }
+
+    @Test
     void givenIdsThatContradictTheNameOrder_whenFollowingTheCursor_thenTheNextPageContinuesByName() {
         // given
         UUID jane = identity.createPersonWithLeadingIdDigitIn(

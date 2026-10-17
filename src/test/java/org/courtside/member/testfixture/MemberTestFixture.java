@@ -3,6 +3,7 @@ package org.courtside.member.testfixture;
 import lombok.RequiredArgsConstructor;
 import org.courtside.member.MemberService;
 import org.courtside.member.MembershipPeriod;
+import org.courtside.member.MembershipPeriodService;
 import org.courtside.member.RosterChangeSet;
 import org.courtside.member.RosterService;
 import org.courtside.member.RosterSyncService;
@@ -23,6 +24,7 @@ public class MemberTestFixture {
     private final MemberService memberships;
     private final RosterService roster;
     private final RosterSyncService sync;
+    private final MembershipPeriodService periods;
 
     public UUID addPerson(String firstName, String lastName, String email) {
         return roster.createPerson(firstName, lastName, email).personId();
@@ -95,6 +97,10 @@ public class MemberTestFixture {
 
     public void assignMembership(UUID personId, UUID membershipTypeId, LocalDate startedOn) {
         roster.writeMembership(personId, membershipTypeId, new MembershipPeriod(startedOn, null));
+    }
+
+    public UUID addMembershipPeriod(UUID personId, UUID membershipTypeId, LocalDate startedOn, LocalDate endedOn) {
+        return periods.add(personId, membershipTypeId, new MembershipPeriod(startedOn, endedOn)).id();
     }
 
     public void assignMembership(UUID personId, UUID membershipTypeId) {

@@ -1,6 +1,7 @@
 package org.courtside.member.internal;
 
 import lombok.RequiredArgsConstructor;
+import org.courtside.config.ClubTimeZone;
 import org.courtside.identity.CredentialState;
 import org.courtside.identity.Role;
 import org.courtside.member.RosterService;
@@ -8,6 +9,7 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.List;
@@ -20,6 +22,7 @@ import java.util.UUID;
 public class RosterListQuery {
 
     private final JdbcClient jdbc;
+    private final ClubTimeZone clubTimeZone;
 
     public List<UUID> findIds(String nameFragment, UUID membershipTypeId, boolean currentMembersOnly, Role role,
                               Set<CredentialState> credentialStates, Instant now,
@@ -57,11 +60,12 @@ public class RosterListQuery {
                 .params(parameters).query(Long.class).single();
     }
 
-    private static String criteria(String nameFragment, UUID membershipTypeId, boolean currentMembersOnly, Role role,
+    private String criteria(String nameFragment, UUID membershipTypeId, boolean currentMembersOnly, Role role,
                                    Set<CredentialState> credentialStates, Instant now,
                                    Map<String, Object> parameters) {
         parameters.put("nameFragment", nameFragment);
         parameters.put("now", now.atOffset(ZoneOffset.UTC));
+        parameters.put("today", LocalDate.ofInstant(now, clubTimeZone.zoneId()));
         StringBuilder criteria = new StringBuilder("""
                 WHERE lower(concat(p.first_name, ' ', p.last_name))
                       LIKE concat('%', :nameFragment, '%') ESCAPE '!'
@@ -71,7 +75,8 @@ public class RosterListQuery {
                     AND EXISTS (SELECT 1 FROM member filtered_member
                                 WHERE filtered_member.person_id = p.id
                                   AND filtered_member.membership_type_id = :membershipTypeId
-                                  AND filtered_member.ended_on IS NULL)
+                                  AND filtered_member.started_on <= :today
+                                  AND (filtered_member.ended_on IS NULL OR filtered_member.ended_on > :today))
                     """);
             parameters.put("membershipTypeId", membershipTypeId);
         }
@@ -79,7 +84,8 @@ public class RosterListQuery {
             criteria.append("""
                     AND EXISTS (SELECT 1 FROM member current_member
                                 WHERE current_member.person_id = p.id
-                                  AND current_member.ended_on IS NULL)
+                                  AND current_member.started_on <= :today
+                                  AND (current_member.ended_on IS NULL OR current_member.ended_on > :today))
                     """);
         }
         if (role != null) {
@@ -130,6 +136,11 @@ public class RosterListQuery {
                         FROM member held
                         JOIN membership_type type ON type.id = held.membership_type_id
                         WHERE held.person_id = p.id
+                        ORDER BY (held.started_on <= :today
+                                  AND (held.ended_on IS NULL OR held.ended_on > :today)) DESC,
+                                 held.started_on > :today DESC,
+                                 CASE WHEN held.started_on > :today THEN held.started_on END,
+                                 held.started_on DESC
                         LIMIT 1
                     ) membership ON TRUE
                     LEFT JOIN LATERAL (

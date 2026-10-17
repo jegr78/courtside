@@ -23,9 +23,15 @@ class MembershipStatisticsService implements MembershipStatistics {
         return jdbc.sql("""
                         SELECT COUNT(*) FILTER (WHERE started_on <= :to
                                                   AND (ended_on IS NULL OR ended_on > :to)) AS running,
-                               COUNT(*) FILTER (WHERE started_on BETWEEN :from AND :to) AS joins,
-                               COUNT(*) FILTER (WHERE ended_on BETWEEN :from AND :to) AS leavings
-                        FROM member
+                               COUNT(*) FILTER (WHERE started_on BETWEEN :from AND :to
+                                                  AND NOT EXISTS (SELECT 1 FROM member earlier
+                                                                  WHERE earlier.person_id = m.person_id
+                                                                    AND earlier.ended_on = m.started_on)) AS joins,
+                               COUNT(*) FILTER (WHERE ended_on BETWEEN :from AND :to
+                                                  AND NOT EXISTS (SELECT 1 FROM member later
+                                                                  WHERE later.person_id = m.person_id
+                                                                    AND later.started_on = m.ended_on)) AS leavings
+                        FROM member m
                         """)
                 .param("from", from)
                 .param("to", to)
