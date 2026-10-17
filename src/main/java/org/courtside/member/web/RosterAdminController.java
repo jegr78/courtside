@@ -167,21 +167,21 @@ class RosterAdminController implements AdminRosterApi {
     @Override
     public ResponseEntity<List<ApiMembershipPeriod>> listMembershipPeriods(UUID personId) {
         return ResponseEntity.ok(periods.periodsOf(personId).stream()
-                .map(RosterAdminController::toResponse)
+                .map(RosterAdminController::toPeriodResponse)
                 .toList());
     }
 
     @Override
     public ResponseEntity<ApiMembershipPeriod> addMembershipPeriod(UUID personId,
                                                                    ApiMembershipPeriodRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(toResponse(periods.add(personId,
+        return ResponseEntity.status(HttpStatus.CREATED).body(toPeriodResponse(periods.add(personId,
                 request.getMembershipTypeId(), new MembershipPeriod(request.getStartedOn(), request.getEndedOn()))));
     }
 
     @Override
     public ResponseEntity<ApiMembershipPeriod> correctMembershipPeriod(UUID personId, UUID periodId,
                                                                        ApiMembershipPeriodRequest request) {
-        return ResponseEntity.ok(toResponse(periods.correct(personId, periodId, request.getMembershipTypeId(),
+        return ResponseEntity.ok(toPeriodResponse(periods.correct(personId, periodId, request.getMembershipTypeId(),
                 new MembershipPeriod(request.getStartedOn(), request.getEndedOn()))));
     }
 
@@ -191,7 +191,7 @@ class RosterAdminController implements AdminRosterApi {
         return ResponseEntity.noContent().build();
     }
 
-    private static ApiMembershipPeriod toResponse(MembershipPeriodService.Period period) {
+    private static ApiMembershipPeriod toPeriodResponse(MembershipPeriodService.Period period) {
         return new ApiMembershipPeriod(period.id(), period.membershipTypeId(), period.startedOn(), period.endedOn());
     }
 
