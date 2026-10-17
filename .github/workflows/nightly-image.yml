@@ -468,7 +468,7 @@ jobs:
     needs: [select, image, qualify]
     if: needs.select.outputs.build == 'true' && needs.select.outputs.publish == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     permissions:
       attestations: write
       contents: read

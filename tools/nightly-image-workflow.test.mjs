@@ -212,7 +212,7 @@ test("given a transient Sigstore failure, when images are attested and signed, t
     assert.equal(steps[at + 2]["continue-on-error"], undefined, `a second failure of ${step.id} fails the job`);
     assert.deepEqual(steps[at + 2].with, step.with);
   }
-  assert.equal(attesting.length, 12);
+  assert.equal(attesting.length, 2 * first.length, "each attestation has exactly one second attempt");
   assert.match(source, /cosign sign --yes "\$image" \|\| \{ sleep \d+; cosign sign --yes "\$image"; \}/);
 });
 
