@@ -131,6 +131,7 @@
         "readImportPreview",
         "readImportSource",
         "readMessageLog",
+        "readOperatorHealth",
         "readPerson",
         "recordAttendance",
         "removeCourtClosure",

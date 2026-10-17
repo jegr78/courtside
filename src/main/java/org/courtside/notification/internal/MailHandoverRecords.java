@@ -9,7 +9,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.OffsetDateTime;
-import java.util.Objects;
 import java.util.Optional;
 
 @Component
@@ -32,11 +31,9 @@ class MailHandoverRecords implements MailHandover {
     }
 
     private Optional<Instant> latestSettled(MessageState state) {
-        return jdbc.sql("SELECT max(settled_at) FROM message_record WHERE state = :state")
+        return jdbc.sql("SELECT settled_at FROM message_record WHERE state = :state ORDER BY queued_seq DESC LIMIT 1")
                 .param("state", state.name())
-                .query(OffsetDateTime.class).list().stream()
-                .filter(Objects::nonNull)
-                .findFirst()
+                .query(OffsetDateTime.class).optional()
                 .map(OffsetDateTime::toInstant);
     }
 }
