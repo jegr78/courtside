@@ -486,6 +486,31 @@ const operatorHealthSample = {
   backup: { state: "UNAVAILABLE", reason: "NOT_CONFIGURED", completedAt: null, ageSeconds: null, location: null }
 };
 
+test("given the dark theme, when a confirmation dialog opens over the person administration, then its surface hides the page behind it", async ({ page }) => {
+  // given
+  await signIn(page, "configuration-admin");
+  await page.goto("/admin/roster");
+  await page.getByTestId("roster-search").fill("Jane");
+  await page.getByTestId("roster-search-submit").click();
+  await page.locator('[data-testid^="person-link-"]').first().click();
+
+  // when
+  await page.getByTestId("end-membership").click();
+
+  // then
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toBeVisible();
+  const alpha = await dialog.evaluate((element) => {
+    const probe = document.createElement("canvas").getContext("2d")!;
+    probe.fillStyle = getComputedStyle(element).backgroundColor;
+    probe.fillRect(0, 0, 1, 1);
+    return probe.getImageData(0, 0, 1, 1).data[3];
+  });
+  expect(alpha, "the dialog paints an opaque surface instead of letting the dimmed page show through").toBe(255);
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+});
+
 async function signIn(page: Page, username: string): Promise<void> {
   await page.goto("/login");
   await page.getByTestId("username").fill(username);
