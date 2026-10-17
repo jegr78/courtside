@@ -140,6 +140,8 @@ tags:
     description: The club's own wording of the messages it sends.
   - name: admin-operational-logs
     description: Recent bounded diagnostics from the reference deployment.
+  - name: admin-operator-health
+    description: Which application-controlled checks pass and which operator evidence is missing.
   - name: admin-subject-access
     description: Answering what this instance holds about one named person.
   - name: admin-statistics
@@ -3572,6 +3574,112 @@ components:
           maxLength: 256
           pattern: "^[A-Fa-f0-9]{32}$"
           description: A W3C trace identifier. Values outside that closed shape are not retained.
+
+    OperatorCheckState:
+      type: string
+      enum: [OK, FAILING, UNAVAILABLE]
+      description: |
+        `OK` passed. `FAILING` names where the failing dependency sits in `location`. `UNAVAILABLE`
+        means the instance holds no evidence either way and is never a healthy result.
+
+    OperatorCheckReason:
+      type: string
+      enum: [NOT_CONFIGURED, NOT_RECORDED, UNREADABLE, NOT_YET_OBSERVED, PENDING_MIGRATIONS,
+             FAILED_MIGRATION, HANDOVER_FAILING, LAST_MESSAGE_FAILED, RECORDED_IN_THE_FUTURE]
+      description: Why a check is not `OK`, as a code the client translates.
+
+    OperatorHealth:
+      type: object
+      required: [checkedAt, version, migrations, mail, publicOrigin, backup]
+      properties:
+        checkedAt:
+          type: string
+          format: date-time
+        version: { $ref: "#/components/schemas/OperatorVersionCheck" }
+        migrations: { $ref: "#/components/schemas/OperatorMigrationCheck" }
+        mail: { $ref: "#/components/schemas/OperatorMailCheck" }
+        publicOrigin: { $ref: "#/components/schemas/OperatorPublicOriginCheck" }
+        backup: { $ref: "#/components/schemas/OperatorBackupCheck" }
+
+    OperatorVersionCheck:
+      type: object
+      required: [state, version]
+      properties:
+        state: { $ref: "#/components/schemas/OperatorCheckState" }
+        version:
+          type: string
+        revision:
+          type: [string, "null"]
+          description: The source revision, or `null` when the build had no repository to read.
+        builtAt:
+          type: [string, "null"]
+          format: date-time
+
+    OperatorMigrationCheck:
+      type: object
+      required: [state, pending]
+      properties:
+        state: { $ref: "#/components/schemas/OperatorCheckState" }
+        reason:
+          $ref: "#/components/schemas/OperatorCheckReason"
+        currentVersion:
+          type: [string, "null"]
+          description: The newest migration the database records as applied.
+        expectedVersion:
+          type: [string, "null"]
+          description: The newest migration this application ships.
+        pending:
+          type: integer
+          minimum: 0
+          description: Migrations this application ships that the database has not applied.
+        location:
+          type: [string, "null"]
+          description: The migration version that failed or is the first still pending.
+
+    OperatorMailCheck:
+      type: object
+      required: [state]
+      properties:
+        state: { $ref: "#/components/schemas/OperatorCheckState" }
+        reason:
+          $ref: "#/components/schemas/OperatorCheckReason"
+        lastHandedOverAt:
+          type: [string, "null"]
+          format: date-time
+          description: When the relay last accepted a message.
+        location:
+          type: [string, "null"]
+          description: The configured relay as host and port, named when handover fails.
+
+    OperatorPublicOriginCheck:
+      type: object
+      required: [state]
+      properties:
+        state: { $ref: "#/components/schemas/OperatorCheckState" }
+        reason:
+          $ref: "#/components/schemas/OperatorCheckReason"
+        origin:
+          type: [string, "null"]
+          description: The configured public address messages link to.
+
+    OperatorBackupCheck:
+      type: object
+      required: [state]
+      properties:
+        state: { $ref: "#/components/schemas/OperatorCheckState" }
+        reason:
+          $ref: "#/components/schemas/OperatorCheckReason"
+        completedAt:
+          type: [string, "null"]
+          format: date-time
+          description: When the latest backup the operator recorded completed.
+        ageSeconds:
+          type: [integer, "null"]
+          format: int64
+          minimum: 0
+        location:
+          type: [string, "null"]
+          description: The configured evidence file, named when it cannot be read.
 
     OperationalLogSearchRequest:
       type: object
@@ -9311,6 +9419,28 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "415":
           $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/admin/operator-health:
+    get:
+      tags: [admin-operator-health]
+      operationId: readOperatorHealth
+      summary: The running version, migration state, mail handover, public origin and backup evidence.
+      description: |
+        Every check reads evidence the instance already holds and changes nothing. A check without
+        evidence answers `UNAVAILABLE`, never `OK`: Courtside reports a backup only when the
+        operator records one, and does not promise that backups, monitoring or alerts exist.
+      responses:
+        "200":
+          description: The current result of every check.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OperatorHealth" }
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "429":
           $ref: "#/components/responses/RateLimited"
 
