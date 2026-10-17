@@ -1054,3 +1054,47 @@ test("given an instance with backup evidence, when the overview reads it, then t
   assert.ok(backupReadingProblems({ state: "UNAVAILABLE", reason: "UNREADABLE" }, checkedAt).length > 0,
     "an unreadable record is a failure, not missing evidence");
 });
+
+import { differentPeriod, periodsOf, retentionRestorations } from "../acceptance/lib/core.mjs";
+
+test("given a run that changed both retention periods twice, when restored, then each category gets the period its first entry recorded", () => {
+  // given
+  const entries = [
+    { kind: "retention-policy", id: "BOOKINGS", before: 24 },
+    { kind: "booking", id: "b-1" },
+    { kind: "retention-policy", id: "FORMER_MEMBERS", before: null },
+    { kind: "retention-policy", id: "BOOKINGS", before: 1 },
+    { kind: "retention-policy", id: "FORMER_MEMBERS", before: 1 }
+  ];
+  // when
+  const restorations = retentionRestorations(entries);
+  // then
+  assert.deepEqual(restorations, [
+    { category: "BOOKINGS", before: 24, method: "PUT", path: "/api/admin/retention/policies/BOOKINGS", body: { retainMonths: 24 } },
+    { category: "FORMER_MEMBERS", before: null, method: "DELETE", path: "/api/admin/retention/policies/FORMER_MEMBERS" }
+  ], "a period the club never set is removed again, a set one is written back");
+});
+
+test("given a ledger entry for an unknown retention category, when restored, then the restoration refuses it by name", () => {
+  // when / then
+  assert.throws(() => retentionRestorations([{ kind: "retention-policy", id: "MESSAGES", before: 3 }]), /MESSAGES/);
+});
+
+test("given the policies the instance lists, when read as periods, then an unset category is null and the run picks a period that differs", () => {
+  // when
+  const periods = periodsOf([{ category: "BOOKINGS", retainMonths: 1 }, { category: "FORMER_MEMBERS", retainMonths: null }]);
+  // then
+  assert.deepEqual(periods, { BOOKINGS: 1, FORMER_MEMBERS: null });
+  assert.notEqual(differentPeriod(periods.BOOKINGS), periods.BOOKINGS, "a set period is changed to another");
+  assert.notEqual(differentPeriod(periods.FORMER_MEMBERS), periods.FORMER_MEMBERS, "an unset period becomes a set one");
+});
+
+test("given the retention journey, when its source is read, then it lets no run reach the instance and never presses the run button", () => {
+  // given
+  const source = readFileSync(new URL("../acceptance/journeys/56-retention.spec.ts", import.meta.url), "utf8");
+  // then
+  assert.match(source, /page\.route\("\*\*\/api\/admin\/retention\/previews\/\*\/run", async \(route\) => \{ runsAsked\+\+; await route\.abort\(\); \}\)/,
+    "the journey aborts every run the page asks for");
+  assert.doesNotMatch(source, /getByTestId\("retention-(run|acknowledge)"\)\.(click|check|tap)/, "the journey never confirms a run");
+  assert.doesNotMatch(source, /previews\/\$\{preview\.previewId\}\/run/, "the journey never runs the preview it took");
+});

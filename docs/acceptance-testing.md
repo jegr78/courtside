@@ -90,6 +90,15 @@ created.
   overview's own API answer: without configured evidence it must never read ok, and with evidence
   an ok reading has to carry an age that follows from its completion time. A UAT that starts
   recording backups therefore needs no change to the harness.
+- The retention journey needs an instance that answers the retention periods to the administrator;
+  the preflight checks it. On desktop-chrome the admin records the period of both categories in
+  the ledger, sets each to another number of months on the retention page, takes a preview and
+  reads its counts and the blocked people with their reason. Former members on the instance may
+  make the preview count and block somebody, so the journey checks the shape and never a number.
+  It never confirms a run: the page's run request is aborted, the acknowledgement stays unticked
+  and the run button disabled, and only a preview id nobody created is sent to the run endpoint to
+  read its typed refusal. The journey puts both periods back in the same test, and the postflight
+  does so again from the ledger after an interrupted run, so the club keeps the periods it had.
 - For the welcome, `welcomeAccounts`. The journey creates one account on desktop-chrome to read
   its welcome and deactivates it again. Courtside has no erasure path yet, so with `erasure` the
   postflight removes that account and its person in the database: over `ssh` it runs `psql` in the
@@ -172,14 +181,13 @@ Discovery writes `lanes.json`: the window, and for each profile and journey its 
 hour. Preflight then proves every lane slot free before a journey starts.
 
 The harness cancels only bookings, removes only opening weeks, holidays and court closures and
-resets only message wordings it
-recorded in its ledger. A
-booking or week of the club in its way stops the preflight or the journey that needs it and is
-never touched; choose another `window.start` or other `courts`. Each opening week a journey
-schedules is followed the next day by a copy of the hours in force, so the change governs one day.
-The availability and closure-notice journeys remove their holidays, court closures and bookings
-themselves; the postflight removes any the ledger still holds, a booking beyond the window included,
-and fails when a holiday, season or court closure of the run is left.
+resets only message wordings and retention periods it recorded in its ledger. A booking or week of
+the club in its way stops the preflight or the journey that needs it and is never touched; choose
+another `window.start` or other `courts`. Each opening week a journey schedules is followed the next
+day by a copy of the hours in force, so the change governs one day. The availability and
+closure-notice journeys remove their holidays, court closures and bookings themselves; the
+postflight removes any the ledger still holds, a booking beyond the window included, and fails when
+a holiday, season or court closure of the run is left.
 
 The harness starts no log or tunnel process. To attribute server log lines to journey steps, follow
 the instance's logs into the files `logs.app` and `logs.proxy` name for the duration of the run,

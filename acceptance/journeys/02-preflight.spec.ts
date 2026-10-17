@@ -9,7 +9,7 @@ import { addDays } from "../config/calendar.mjs";
 import { config, disposables, PASSWORD, runPath, type PersonaKey } from "../lib/context";
 import { mailAvailable } from "../lib/mail";
 import { DISPOSABLE_PROFILES, disposableFor, profilesOf, resetQuota } from "../config/disposables.mjs";
-import { attendanceErasureSql, foreignImportSources, foreignWordings, laneLimitConflicts, leavesBookingHours, occupying, waitlistErasureSql } from "../lib/core.mjs";
+import { attendanceErasureSql, foreignImportSources, foreignWordings, periodsOf, laneLimitConflicts, leavesBookingHours, occupying, waitlistErasureSql } from "../lib/core.mjs";
 import { noShowLimitFor, personaUsernames } from "../lib/attendance";
 import { readLedger } from "../lib/ledger";
 import { erase } from "../lib/erasure";
@@ -78,6 +78,8 @@ test("when the environment is checked before a run, then every precondition hold
     };
     const participantCards = await (await admin.get("/api/admin/participant-cards")).json() as { id: string; active: boolean }[];
     checks.partnerMarkerActive = participantCards.some((card) => card.id === PARTNER_MARKER && card.active);
+    const periods = await admin.get("/api/admin/retention/policies");
+    checks.retentionPeriods = { status: periods.status(), periods: periods.ok() ? periodsOf(await periods.json()) : null };
     checks.foreignWordings = foreignWordings(await (await admin.get("/api/admin/message-templates")).json(), readLedger());
     checks.foreignImportSources = foreignImportSources(await (await admin.get("/api/admin/import/sources")).json(), readLedger());
     checks.activeMembershipType = ((await (await admin.get("/api/admin/membership-types")).json()) as { active: boolean }[]).some((type) => type.active);
@@ -130,6 +132,7 @@ test("when the environment is checked before a run, then every precondition hold
   expect.soft(checks.partnerMarkerActive, "PRECONDITION: the looking-for-a-partner participant card is active").toBe(true);
   expect.soft(checks.foreignImportSources, "PRECONDITION: no acceptance import source of an earlier run is left, so this run removes only the one it describes").toEqual([]);
   expect.soft(checks.activeMembershipType, "PRECONDITION: the club has an active membership type the acceptance import source can default to").toBe(true);
+  expect.soft((checks.retentionPeriods as { status: number }).status, "PRECONDITION: the admin reads the retention periods, which the retention journey sets and puts back").toBe(200);
   expect.soft(checks.foreignWordings, "PRECONDITION: every message uses the shipped wording, so a run reads mail it can recognise and resets only what it wrote").toEqual([]);
   if (config.personas.restricted) {
     expect.soft(checks.restrictedHours, "PRECONDITION: the restricted member's category sets booking hours").toBeTruthy();
