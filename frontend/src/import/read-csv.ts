@@ -27,6 +27,23 @@ export async function readCsvColumn(file: File, header: string, encoding = "UTF-
   return [...new Set(values)];
 }
 
+// The first rows only, for a board to see which numbered column holds what; nothing leaves the browser.
+export async function readCsvRows(file: File, encoding = "UTF-8", separator?: string, limit = 5): Promise<string[][]> {
+  const head = await file.slice(0, HEADER_BYTES).arrayBuffer();
+  const text = decode(wholeLines(new Uint8Array(head)), encoding);
+  return splitRecords(text, separator ?? separatorOf(text), limit + 1)
+    .filter((row) => row.some((cell) => cell.length > 0))
+    .slice(0, limit);
+}
+
+// A header names its columns, so no cell of it holds a digit while the rows below it do.
+export function looksLikeHeader(rows: string[][]): boolean {
+  const [first, ...rest] = rows;
+  if (!first || rest.length === 0) return false;
+  const hasDigit = (cell: string) => /\d/.test(cell);
+  return !first.some(hasDigit) && rest.some((row) => row.some(hasDigit));
+}
+
 function separatorOf(text: string): string {
   let widest = SEPARATORS[0];
   let columns = 0;

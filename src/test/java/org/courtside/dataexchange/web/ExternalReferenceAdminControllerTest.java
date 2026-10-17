@@ -1,5 +1,6 @@
 package org.courtside.dataexchange.web;
 
+import org.courtside.dataexchange.ColumnLayout;
 import com.jayway.jsonpath.JsonPath;
 import org.courtside.AbstractIntegrationTest;
 import org.courtside.identity.PersonRepository;
@@ -58,10 +59,10 @@ class ExternalReferenceAdminControllerTest extends AbstractIntegrationTest {
     void setUp() {
         mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
         source = sources.create("roster-system", "Membership system", ",", "UTF-8",
-                Map.of("Member number", CanonicalField.EXTERNAL_ID,
+                ColumnLayout.headers(Map.of("Member number", CanonicalField.EXTERNAL_ID,
                         "First name", CanonicalField.FIRST_NAME,
                         "Last name", CanonicalField.LAST_NAME,
-                        "Email", CanonicalField.EMAIL),
+                        "Email", CanonicalField.EMAIL)),
                 Map.of(), ACTIVE_TYPE, Set.of(), 10).sourceId();
     }
 
@@ -240,10 +241,10 @@ class ExternalReferenceAdminControllerTest extends AbstractIntegrationTest {
         // given
         String reference = referenceIdOf(link("4711", person("Jane", "Doe")));
         UUID other = sources.create("second-system", "Second system", ",", "UTF-8",
-                Map.of("Member number", CanonicalField.EXTERNAL_ID,
+                ColumnLayout.headers(Map.of("Member number", CanonicalField.EXTERNAL_ID,
                         "First name", CanonicalField.FIRST_NAME,
                         "Last name", CanonicalField.LAST_NAME,
-                        "Email", CanonicalField.EMAIL),
+                        "Email", CanonicalField.EMAIL)),
                 Map.of(), ACTIVE_TYPE, Set.of(), 10).sourceId();
 
         // when / then

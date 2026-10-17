@@ -1,5 +1,37 @@
 import { describe, expect, it } from "vitest";
-import { EncodingUnreadableHereError, NotUtf8Error, readCsvColumn, readCsvHeader } from "./read-csv";
+import { EncodingUnreadableHereError, NotUtf8Error, looksLikeHeader, readCsvColumn, readCsvHeader, readCsvRows } from "./read-csv";
+
+describe("readCsvRows", () => {
+  it("given a headerless export, when reading its first rows, then only that many rows arrive with every cell", async () => {
+    // given
+    const rows = Array.from({ length: 8 }, (_, index) => `${4701 + index};Jane;Doe`).join("\n");
+
+    // when
+    const read = await readCsvRows(csv(`${rows}\n`), "UTF-8", ";", 5);
+
+    // then
+    expect(read).toHaveLength(5);
+    expect(read[0]).toEqual(["4701", "Jane", "Doe"]);
+  });
+
+  it("given blank lines between rows, when reading the first rows, then the blank lines are not rows", async () => {
+    expect(await readCsvRows(csv("4711;Jane\n\n4712;John\n"), "UTF-8", ";")).toEqual([["4711", "Jane"], ["4712", "John"]]);
+  });
+});
+
+describe("looksLikeHeader", () => {
+  it("given a first row of names over rows of numbers, when checked, then it looks like a header", () => {
+    expect(looksLikeHeader([["Number", "First name"], ["4711", "Jane"]])).toBe(true);
+  });
+
+  it("given a first row that is already a member, when checked, then it does not look like a header", () => {
+    expect(looksLikeHeader([["4711", "Jane"], ["4712", "John"]])).toBe(false);
+  });
+
+  it("given a single row, when checked, then nothing can be said about it", () => {
+    expect(looksLikeHeader([["Number", "First name"]])).toBe(false);
+  });
+});
 
 const csv = (content: string) => new File([content], "roster.csv", { type: "text/csv" });
 const legacy = (content: string) =>

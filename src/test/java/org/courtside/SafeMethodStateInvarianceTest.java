@@ -1,5 +1,6 @@
 package org.courtside;
 
+import org.courtside.dataexchange.ColumnLayout;
 import org.courtside.booking.testfixture.BookingTestFixture;
 import org.courtside.dataexchange.CanonicalField;
 import org.courtside.dataexchange.ExecutionService;
@@ -251,10 +252,10 @@ class SafeMethodStateInvarianceTest extends AbstractIntegrationTest {
 
         String membershipTypeId = seededId("SELECT id FROM membership_type ORDER BY name");
         UUID sourceId = importSources.create("roster-system", "Membership system", ",", "UTF-8",
-                Map.of("Member number", CanonicalField.EXTERNAL_ID,
+                ColumnLayout.headers(Map.of("Member number", CanonicalField.EXTERNAL_ID,
                         "First name", CanonicalField.FIRST_NAME,
                         "Last name", CanonicalField.LAST_NAME,
-                        "Email", CanonicalField.EMAIL),
+                        "Email", CanonicalField.EMAIL)),
                 Map.of(), UUID.fromString(membershipTypeId),
                 Set.of(CanonicalField.FIRST_NAME, CanonicalField.LAST_NAME), 10).sourceId();
         UUID previewId = previews.create(sourceId, SnapshotMode.FULL_SNAPSHOT, "UTF-8",

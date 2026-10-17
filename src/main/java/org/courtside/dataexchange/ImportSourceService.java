@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.lang.reflect.RecordComponent;
 import java.time.Clock;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -38,6 +39,7 @@ public class ImportSourceService {
     private static final int MAX_DISPLAY_NAME_LENGTH = 80;
     private static final int MAX_ENTRY_LENGTH = 120;
     private static final int MAX_MEMBERSHIP_TYPE_MAPPINGS = 200;
+    private static final int MAX_COLUMNS = 200;
 
     // Read off the record rather than listed, so a field added to the configuration is reported the
     // day it is added. The log names which part moved and never what it moved to.
@@ -76,17 +78,16 @@ public class ImportSourceService {
 
     @Transactional
     public SourceConfiguration create(String sourceKey, String displayName, String separator,
-                                      String encoding, Map<String, CanonicalField> columns,
+                                      String encoding, ColumnLayout layout,
                                       Map<String, UUID> membershipTypes,
                                       UUID defaultMembershipTypeId,
                                       Set<CanonicalField> ownedFields, int removalWarningPercent) {
-        Map<String, CanonicalField> storedColumns = strippedColumns(columns);
+        ColumnLayout storedLayout = usableLayout(layout);
         Map<String, UUID> storedTypes = strippedMembershipTypes(membershipTypes);
-        requireUsable(storedColumns, storedTypes, defaultMembershipTypeId, ownedFields,
-                removalWarningPercent);
+        requireUsable(storedTypes, defaultMembershipTypeId, ownedFields, removalWarningPercent);
         ImportSource source = new ImportSource(clock.instant());
         source.changeTo(requiredKey(sourceKey), requiredDisplayName(displayName),
-                requiredSeparator(separator), requiredEncoding(encoding), storedColumns, storedTypes,
+                requiredSeparator(separator), requiredEncoding(encoding), storedLayout, storedTypes,
                 defaultMembershipTypeId, ownedFields, removalWarningPercent);
         SourceConfiguration described = toConfiguration(saveOrRejectTakenKey(source));
         events.publishEvent(
@@ -96,19 +97,19 @@ public class ImportSourceService {
 
     @Transactional
     public SourceConfiguration change(UUID sourceId, String sourceKey, String displayName,
-                                      String separator, String encoding,
-                                      Map<String, CanonicalField> columns,
+                                      String separator, String encoding, ColumnLayout layout,
                                       Map<String, UUID> membershipTypes,
                                       UUID defaultMembershipTypeId,
-                                      Set<CanonicalField> ownedFields, int removalWarningPercent) {
-        Map<String, CanonicalField> storedColumns = strippedColumns(columns);
+                                      Set<CanonicalField> ownedFields, int removalWarningPercent,
+                                      boolean columnModeChangeConfirmed) {
+        ColumnLayout storedLayout = usableLayout(layout);
         Map<String, UUID> storedTypes = strippedMembershipTypes(membershipTypes);
-        requireUsable(storedColumns, storedTypes, defaultMembershipTypeId, ownedFields,
-                removalWarningPercent);
+        requireUsable(storedTypes, defaultMembershipTypeId, ownedFields, removalWarningPercent);
         ImportSource source = require(sourceId);
         SourceConfiguration before = toConfiguration(source);
+        requireConfirmedModeChange(before.columnMode(), storedLayout.mode(), columnModeChangeConfirmed);
         source.changeTo(requiredKey(sourceKey), requiredDisplayName(displayName),
-                requiredSeparator(separator), requiredEncoding(encoding), storedColumns, storedTypes,
+                requiredSeparator(separator), requiredEncoding(encoding), storedLayout, storedTypes,
                 defaultMembershipTypeId, ownedFields, removalWarningPercent);
         SourceConfiguration after = toConfiguration(saveOrRejectTakenKey(source));
         List<String> changedFields = differingFields(before, after);
@@ -150,15 +151,61 @@ public class ImportSourceService {
         }
     }
 
-    private void requireUsable(Map<String, CanonicalField> columns,
-                               Map<String, UUID> membershipTypes, UUID defaultMembershipTypeId,
+    private void requireUsable(Map<String, UUID> membershipTypes, UUID defaultMembershipTypeId,
                                Set<CanonicalField> ownedFields, int removalWarningPercent) {
-        requireCompleteColumns(columns);
-        requireUnambiguousColumns(columns);
         requireOwnableFields(ownedFields);
         requireKnownMembershipTypes(membershipTypes);
         requireKnownDefaultMembershipType(defaultMembershipTypeId);
         requirePercentage(removalWarningPercent);
+    }
+
+    private static ColumnLayout usableLayout(ColumnLayout layout) {
+        ColumnLayout given = layout == null ? ColumnLayout.headers(Map.of()) : layout;
+        if (given.mode() == ColumnMode.HEADER) {
+            if (!given.positions().isEmpty() || given.columnCount() != null) {
+                throw new ImportSourceInvalidException("import.source.positions.unexpected",
+                        Map.of("field", "positions"));
+            }
+            Map<String, CanonicalField> headers = strippedColumns(given.headers());
+            requireCompleteColumns(headers);
+            requireUnambiguousColumns(headers);
+            return ColumnLayout.headers(headers);
+        }
+        if (!given.headers().isEmpty()) {
+            throw new ImportSourceInvalidException("import.source.columns.unexpected",
+                    Map.of("field", "columns"));
+        }
+        int columnCount = requiredColumnCount(given.columnCount());
+        requirePositionsWithin(given.positions(), columnCount);
+        requireCompleteFields(given.positions().values(), "positions", "import.source.positions.incomplete");
+        requireUnambiguousFields(given.positions().values(), "positions", "import.source.positions.ambiguous");
+        return ColumnLayout.positions(Map.copyOf(given.positions()), columnCount);
+    }
+
+    private static int requiredColumnCount(Integer columnCount) {
+        if (columnCount == null || columnCount < 1 || columnCount > MAX_COLUMNS) {
+            throw new ImportSourceInvalidException("import.source.columnCount.outOfRange",
+                    Map.of("field", "columnCount", "maxColumns", MAX_COLUMNS));
+        }
+        return columnCount;
+    }
+
+    private static void requirePositionsWithin(Map<Integer, CanonicalField> positions, int columnCount) {
+        positions.forEach((position, field) -> {
+            if (position == null || field == null || position < 1 || position > columnCount) {
+                throw new ImportSourceInvalidException("import.source.positions.outOfRange",
+                        Map.of("field", "positions", "position", position == null ? 0 : position,
+                                "columnCount", columnCount));
+            }
+        });
+    }
+
+    // Switching how a file is read changes what every column of the next snapshot means.
+    private static void requireConfirmedModeChange(ColumnMode stored, ColumnMode requested, boolean confirmed) {
+        if (stored != requested && !confirmed) {
+            throw new ImportSourceInvalidException("import.source.columnMode.changeUnconfirmed",
+                    Map.of("field", "columnMode", "from", stored.name(), "to", requested.name()));
+        }
     }
 
     private void requireKnownDefaultMembershipType(UUID defaultMembershipTypeId) {
@@ -169,22 +216,30 @@ public class ImportSourceService {
     }
 
     private static void requireCompleteColumns(Map<String, CanonicalField> columns) {
-        Set<CanonicalField> missing = EnumSet.copyOf(REQUIRED_COLUMNS);
-        missing.removeAll(requiredColumns(columns).values());
-        if (!missing.isEmpty()) {
-            throw new ImportSourceInvalidException("import.source.columns.incomplete",
-                    Map.of("field", "columns", "missing", missing.stream().map(Enum::name).sorted().toList()));
-        }
+        requireCompleteFields(requiredColumns(columns).values(), "columns", "import.source.columns.incomplete");
     }
 
     private static void requireUnambiguousColumns(Map<String, CanonicalField> columns) {
+        requireUnambiguousFields(columns.values(), "columns", "import.source.columns.ambiguous");
+    }
+
+    private static void requireCompleteFields(Collection<CanonicalField> fields, String field, String code) {
+        Set<CanonicalField> missing = EnumSet.copyOf(REQUIRED_COLUMNS);
+        missing.removeAll(fields);
+        if (!missing.isEmpty()) {
+            throw new ImportSourceInvalidException(code,
+                    Map.of("field", field, "missing", missing.stream().map(Enum::name).sorted().toList()));
+        }
+    }
+
+    private static void requireUnambiguousFields(Collection<CanonicalField> fields, String field, String code) {
         Set<CanonicalField> seen = EnumSet.noneOf(CanonicalField.class);
-        columns.values().stream()
-                .filter(field -> !seen.add(field))
+        fields.stream()
+                .filter(candidate -> !seen.add(candidate))
                 .findFirst()
                 .ifPresent(duplicate -> {
-                    throw new ImportSourceInvalidException("import.source.columns.ambiguous",
-                            Map.of("field", "columns", "canonicalField", duplicate.name()));
+                    throw new ImportSourceInvalidException(code,
+                            Map.of("field", field, "canonicalField", duplicate.name()));
                 });
     }
 
@@ -336,7 +391,8 @@ public class ImportSourceService {
     private static SourceConfiguration toConfiguration(ImportSource source) {
         return new SourceConfiguration(source.getId(), source.getSourceKey(),
                 source.getDisplayName(), source.getSeparator().charAt(0), source.getEncoding(),
-                Map.copyOf(source.getColumns()),
+                source.getColumnMode(), Map.copyOf(source.getColumns()),
+                Map.copyOf(source.getPositions()), source.getColumnCount(),
                 Map.copyOf(source.getMembershipTypes()), source.getDefaultMembershipTypeId(),
                 new HashSet<>(source.getOwnedFields()), source.getRemovalWarningPercent());
     }

@@ -301,7 +301,7 @@ test("given club bookings on the window's weekend, when the weekend journeys are
   assert.deepEqual(conflicts, ["early", "sunday"], "a booking before the latest later opening and every Sunday booking would be displaced");
 });
 
-import { admitted, answers, bookingsBeyondWindow, sweepSlots, weeksToClear, attribute, classify, classifyErrors, foreignWordings, occupying, replayEntries } from "../acceptance/lib/core.mjs";
+import { admitted, answers, bookingsBeyondWindow, sweepSlots, weeksToClear, attribute, classify, classifyErrors, foreignImportSources, foreignWordings, IMPORT_SOURCE_PREFIX, occupying, replayEntries } from "../acceptance/lib/core.mjs";
 import { claimRunDirectory, harnessCommit } from "../acceptance/lib/run-directory.mjs";
 import { findExecutable } from "../acceptance/lib/executable.mjs";
 import { mkdtempSync, writeFileSync, mkdirSync, chmodSync, rmSync } from "node:fs";
@@ -396,6 +396,28 @@ test("given a ledger with a message wording, when replayed, then that wording is
   await replayEntries([{ kind: "template", id: "ACCOUNT_USERNAME_REMINDER/de" }], async (path) => { paths.push(path); return { status: () => 204 }; });
   // then
   assert.deepEqual(paths, ["/api/admin/message-templates/ACCOUNT_USERNAME_REMINDER/de"]);
+});
+
+test("given a ledger with an import source, when replayed, then that source is removed", async () => {
+  // given
+  const paths = [];
+  // when
+  await replayEntries([{ kind: "import-source", id: "s-1" }], async (path) => { paths.push(path); return { status: () => 204 }; });
+  // then
+  assert.deepEqual(paths, ["/api/admin/import/sources/s-1"]);
+});
+
+test("given import sources, when the run's own are known, then only an acceptance source of another run is named as foreign", () => {
+  // given
+  const sources = [
+    { id: "ours", sourceKey: `${IMPORT_SOURCE_PREFIX}a1` },
+    { id: "earlier", sourceKey: `${IMPORT_SOURCE_PREFIX}b2` },
+    { id: "club", sourceKey: "club-registry" }
+  ];
+  // when
+  const foreign = foreignImportSources(sources, [{ kind: "import-source", id: "ours" }]);
+  // then
+  assert.deepEqual(foreign, [`${IMPORT_SOURCE_PREFIX}b2`], "the club's own source is never touched or named");
 });
 
 test("given stored wordings, when the run's own are known, then only the others are named as foreign", () => {
