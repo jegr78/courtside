@@ -253,7 +253,23 @@ const drivers: Record<string, (page: Page, visualDate: string) => Promise<void>>
     await expect(page.getByTestId("statistics-members-total")).toBeVisible();
     await expect(page.getByTestId("statistics-messages").getByRole("status")).toHaveCount(0);
     await expect(page.getByTestId("statistics-choice-1m")).toBeEnabled();
+  },
+  "operator-health": async (page) => {
+    await page.context().route("**/api/admin/operator-health", (route) => route.fulfill({ json: operatorHealthExample }));
+    await page.getByTestId("admin-operator-health-link").click();
+    await expect(page.getByTestId("operator-check-mail"), "the example, not the live instance, is drawn").toHaveAttribute("data-state", "FAILING");
+    await expect(page.getByTestId("operator-health-refresh")).toBeEnabled();
   }
+};
+
+// One check in each state, because the journey instance never fails a check of its own.
+const operatorHealthExample = {
+  checkedAt: "2026-10-17T08:00:00Z",
+  version: { state: "OK", version: "0.4.0", revision: "4f2c9e1", builtAt: "2026-10-16T20:00:00Z" },
+  migrations: { state: "OK", pending: 0, currentVersion: "63", expectedVersion: "63" },
+  mail: { state: "FAILING", reason: "HANDOVER_FAILING", lastHandedOverAt: "2026-10-17T07:00:00Z", location: "relay.example.org:587" },
+  publicOrigin: { state: "OK", origin: "https://courts.example.org" },
+  backup: { state: "UNAVAILABLE", reason: "NOT_CONFIGURED" }
 };
 
 test("the court plan every visitor sees is captured", async ({ page, journeyService }, info) => {
@@ -394,6 +410,16 @@ test("the record a board reads its own club from is captured", async ({ page, jo
 
   // when / then
   await capture(page, "utilisation", journeyService.visualDate);
+});
+
+test("the overview a board reads the instance's own health from is captured", async ({ page, journeyService }, info) => {
+  // given
+  await prepare(page, localeOf(info));
+  await signIn(page, "configuration-admin", "court-plan-view");
+  await page.getByTestId("administration-link").click();
+
+  // when / then
+  await capture(page, "operator-health", journeyService.visualDate);
 });
 
 async function prepare(page: Page, locale: string): Promise<void> {

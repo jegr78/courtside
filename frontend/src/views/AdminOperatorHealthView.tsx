@@ -87,36 +87,40 @@ export function AdminOperatorHealthView() {
   }
 
   const problem = error ?? clubError;
-  return <section data-testid="admin-operator-health-view" className="surface-panel grid gap-6 rounded-2xl border p-6 shadow-[0_20px_50px_var(--cs-shadow)] sm:p-8">
+  return <section data-testid="admin-operator-health-view" className="surface-panel grid gap-5 rounded-2xl border p-6 shadow-[0_20px_50px_var(--cs-shadow)] sm:p-8">
     <div className="grid gap-2">
-      <h1 className="text-3xl font-bold">{t("operatorHealth.title")}</h1>
-      <p className="text-muted max-w-3xl">{t("operatorHealth.introduction")}</p>
-    </div>
-    <Alert tone="info" testId="operator-health-unavailable-meaning">{t("operatorHealth.unavailableMeaning")}</Alert>
-    <div className="flex flex-wrap items-center gap-4">
-      <Button variant="secondary" data-testid="operator-health-refresh" type="button" disabled={pending} onClick={retry}>{t("operatorHealth.refresh")}</Button>
-      {health && club && <p data-testid="operator-health-checked-at" className="text-muted">{t("operatorHealth.checkedAt", { time: time(health.checkedAt) })}</p>}
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <h1 className="text-3xl font-bold">{t("operatorHealth.title")}</h1>
+        <div className="flex flex-wrap items-center gap-3">
+          {health && club && <p data-testid="operator-health-checked-at" className="text-muted text-sm">{t("operatorHealth.checkedAt", { time: time(health.checkedAt) })}</p>}
+          <Button variant="secondary" data-testid="operator-health-refresh" type="button" disabled={pending} onClick={retry}>{t("operatorHealth.refresh")}</Button>
+        </div>
+      </div>
+      <p className="text-muted">
+        {t("operatorHealth.introduction")}{" "}
+        <strong data-testid="operator-health-unavailable-meaning" className="font-semibold">{t("operatorHealth.unavailableMeaning")}</strong>
+      </p>
     </div>
     {!health || !club
       ? (problem ? <LoadFailure message={problem} retry={() => { setError(undefined); loadClub(); retry(); }} /> : <p role="status">{t("status.loading")}</p>)
       : <>
         {problem && <Alert testId="operator-health-problem">{problem}</Alert>}
-        <ul className="grid gap-3" aria-label={t("operatorHealth.title")}>
+        <ul className="grid gap-2" aria-label={t("operatorHealth.title")}>
           {checks.map((check) => {
             const { state, reason, detail } = reading(health, check);
             const detailKey = state === "OK" ? `operatorHealth.${check}.ok` : `operatorHealth.${check}.${reason ?? "unknown"}`;
-            return <li key={check} data-testid={`operator-check-${check}`} data-state={state} className={`grid gap-2 rounded-xl border-2 p-4 sm:grid-cols-[minmax(0,14rem)_minmax(0,1fr)] sm:items-start ${state === "UNAVAILABLE" ? "border-dashed" : ""} ${noticeColours(tones[state])}`}>
-              <div className="grid gap-1">
+            return <li key={check} data-testid={`operator-check-${check}`} data-state={state} className={`grid gap-1 rounded-xl border-2 px-4 py-3 ${state === "UNAVAILABLE" ? "border-dashed" : ""} ${noticeColours(tones[state])}`}>
+              <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
                 <h2 className="text-lg font-semibold">{t(`operatorHealth.check.${check}`)}</h2>
                 <p data-testid={`operator-check-${check}-state`} className="flex items-center gap-2 font-semibold">
                   <span aria-hidden="true" className="inline-grid size-6 place-items-center rounded-full border-2 border-current text-sm leading-none">{symbols[state]}</span>
                   {t(`operatorHealth.state.${state}`)}
                 </p>
               </div>
-              <div className="grid min-w-0 gap-1">
-                <p data-testid={`operator-check-${check}-detail`} className="[overflow-wrap:anywhere]">{t(detailKey, detail)}</p>
-                {state === "UNAVAILABLE" && <p data-testid={`operator-check-${check}-not-healthy`} className="text-sm">{t("operatorHealth.unavailableHint")}</p>}
-              </div>
+              <p className="min-w-0 [overflow-wrap:anywhere]">
+                <span data-testid={`operator-check-${check}-detail`}>{t(detailKey, detail)}</span>
+                {state === "UNAVAILABLE" && <>{" "}<strong data-testid={`operator-check-${check}-not-healthy`} className="font-semibold">{t("operatorHealth.unavailableHint")}</strong></>}
+              </p>
             </li>;
           })}
         </ul>

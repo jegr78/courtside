@@ -163,6 +163,11 @@
       "pages": { "de": "site/board-guide.md", "en": "site/en/board-guide.md" }
     },
     {
+      "name": "operator-health",
+      "surface": "admin-operator-health-view",
+      "pages": { "de": "site/board-guide.md", "en": "site/en/board-guide.md" }
+    },
+    {
       "name": "person-membership",
       "surface": "person-membership",
       "pages": { "de": "site/board-guide.md", "en": "site/en/board-guide.md" }
