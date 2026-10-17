@@ -66,6 +66,41 @@ test("given anything but a created snapshot, when GitHub answers, then the submi
   assert.equal((await submitSnapshot(snapshot, "example/courtside", "token", answering(201))).status, 201);
 });
 
+test("given a transient GitHub failure, when the snapshot is submitted, then it is sent again until it is created", async () => {
+  // given
+  const statuses = [502, 429, 201];
+  const calls = [];
+  const send = async () => { calls.push(1); return { status: statuses.shift() }; };
+  const waits = [];
+
+  // when
+  const response = await submitSnapshot({ version: 0 }, "example/courtside", "token", send,
+    { wait: async (milliseconds) => waits.push(milliseconds) });
+
+  // then
+  assert.equal(response.status, 201);
+  assert.equal(calls.length, 3, "two transient answers are followed by a third attempt");
+  assert.deepEqual(waits, [5000, 10000], "the pause doubles between attempts");
+});
+
+test("given a refused or persistently failing submission, when it is submitted, then it fails without spinning", async () => {
+  // given
+  const counting = (status) => { const send = async () => { send.calls += 1; return { status }; }; send.calls = 0; return send; };
+  const refused = counting(403);
+  const failing = counting(503);
+  const unreachable = async () => { unreachable.calls += 1; throw new Error("fetch failed"); };
+  unreachable.calls = 0;
+  const options = { wait: async () => {} };
+
+  // when / then
+  await assert.rejects(() => submitSnapshot({}, "example/courtside", "token", refused, options), /returned 403/);
+  assert.equal(refused.calls, 1, "a client error is not retried");
+  await assert.rejects(() => submitSnapshot({}, "example/courtside", "token", failing, options), /returned 503/);
+  assert.equal(failing.calls, 4, "a server error stops after the last attempt");
+  await assert.rejects(() => submitSnapshot({}, "example/courtside", "token", unreachable, options), /fetch failed/);
+  assert.equal(unreachable.calls, 4, "a network error stops after the last attempt");
+});
+
 test("given the dependency Maven resolved transitively, when the snapshot is built, then it is reported as indirect", () => {
   // when
   const resolved = snapshotOf().manifests["pom.xml"].resolved;
