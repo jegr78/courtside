@@ -12,7 +12,6 @@ import { noticeColours } from "../components/noticeTones";
 import { TextField } from "../components/TextField";
 import { formString } from "../forms/formString";
 import { useUnsavedForm } from "../unsaved/useUnsavedForm";
-import { formatDate } from "../time/clubZone";
 
 const NAME_LENGTH = 60;
 const EMAIL_LENGTH = 120;
@@ -92,7 +91,7 @@ function membershipLabel(entry: RosterEntry, names: Map<string, string>, t: Tran
   if (!entry.membershipTypeId) return "—";
   const name = names.get(entry.membershipTypeId) ?? entry.membershipTypeId;
   if (entry.membershipCurrent) return name;
-  if (entry.membershipStartedOn && entry.membershipStartedOn > formatDate(new Date())) {
+  if (entry.membershipState === "SCHEDULED" && entry.membershipStartedOn) {
     return t("admin.roster.membershipScheduled", { name, date: entry.membershipStartedOn });
   }
   return t("admin.roster.membershipEnded", { date: entry.membershipEndedOn ?? "" });

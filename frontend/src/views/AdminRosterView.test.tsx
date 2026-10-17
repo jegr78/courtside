@@ -24,7 +24,7 @@ const withoutAccount: RosterEntry = {
 const departed: RosterEntry = {
   personId: "person-3", firstName: "Mary", lastName: "Major", email: "mary.major@example.org",
   accountId: "account-3", username: "major.mary", enabled: true, membershipCurrent: false, roles: ["MEMBER"],
-  membershipTypeId: "type-1", membershipStartedOn: "2025-01-01", membershipEndedOn: "2026-03-31"
+  membershipTypeId: "type-1", membershipState: "ENDED", membershipStartedOn: "2025-01-01", membershipEndedOn: "2026-03-31"
 };
 
 const trainer: RosterEntry = {
@@ -240,9 +240,9 @@ describe("AdminRosterView", () => {
     expect(ended).toHaveTextContent("2026-03-31");
   });
 
-  it("given a membership that begins later, when the list is read, then it shows its type with the day it begins and not as current", async () => {
+  it("given a membership the server reports as beginning later, when the list is read, then it shows its type with the day it begins whatever the browser's calendar says", async () => {
     // given
-    const scheduled: RosterEntry = { ...departed, personId: "person-6", membershipCurrent: false, membershipStartedOn: "2999-01-01", membershipEndedOn: null };
+    const scheduled: RosterEntry = { ...departed, personId: "person-6", membershipCurrent: false, membershipState: "SCHEDULED", membershipStartedOn: "2000-01-01", membershipEndedOn: null };
     vi.spyOn(api, "roster").mockResolvedValue({ entries: [scheduled], nextCursor: null, matching: 1 });
 
     // when
@@ -251,7 +251,7 @@ describe("AdminRosterView", () => {
     // then
     const label = await screen.findByTestId("roster-membership-person-6");
     expect(label, "a scheduled period names the type it will carry").toHaveTextContent("Adults");
-    expect(label, "and the day it begins").toHaveTextContent("2999-01-01");
+    expect(label, "and the day it begins").toHaveTextContent("2000-01-01");
     expect(label.textContent, "it is not shown as a plain current type").not.toBe("Adults");
   });
 

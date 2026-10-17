@@ -8,9 +8,9 @@ import { MembershipPeriodsSection } from "./MembershipPeriodsSection";
 const adults: MembershipType = { id: "type-1", name: "Adults", ruleSetId: null, active: true, grantsAccount: false };
 const juniors: MembershipType = { id: "type-2", name: "Juniors", ruleSetId: null, active: true, grantsAccount: false };
 
-const ended: MembershipPeriod = { id: "period-1", membershipTypeId: "type-2", startedOn: "2020-01-01", endedOn: "2021-01-01" };
-const running: MembershipPeriod = { id: "period-2", membershipTypeId: "type-1", startedOn: "2021-01-01", endedOn: null };
-const scheduled: MembershipPeriod = { id: "period-3", membershipTypeId: "type-2", startedOn: "2999-01-01", endedOn: null };
+const ended: MembershipPeriod = { id: "period-1", membershipTypeId: "type-2", startedOn: "2020-01-01", endedOn: "2021-01-01", state: "ENDED" };
+const running: MembershipPeriod = { id: "period-2", membershipTypeId: "type-1", startedOn: "2021-01-01", endedOn: null, state: "RUNNING" };
+const scheduled: MembershipPeriod = { id: "period-3", membershipTypeId: "type-2", startedOn: "2999-01-01", endedOn: null, state: "SCHEDULED" };
 
 const overlap = new ApiError(409, {
   type: "urn:courtside:error:membership-periods-overlap", title: "Membership periods overlap", status: 409,
@@ -48,18 +48,21 @@ describe("MembershipPeriodsSection", () => {
     expect(screen.getByTestId("membership-period-period-3")).toHaveTextContent("2999-01-01");
   });
 
-  it("given a period whose end has arrived, when the section is shown, then it is ended on that day", async () => {
+  it("given dates the browser's calendar would read otherwise, when the section is shown, then the state the server gives on the club's day stands", async () => {
     // given
-    const today = new Date();
-    const day = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
-    vi.spyOn(api, "membershipPeriods").mockResolvedValue([{ ...running, endedOn: day }]);
+    vi.spyOn(api, "membershipPeriods").mockResolvedValue([
+      { ...running, endedOn: "2999-01-01", state: "ENDED" },
+      { ...scheduled, id: "period-4", startedOn: "2000-01-01", endedOn: "2000-06-01", state: "SCHEDULED" },
+    ]);
 
     // when
     show();
 
     // then
-    expect(await screen.findByTestId("membership-period-state-period-2"), "the end is the first day without the membership")
+    expect(await screen.findByTestId("membership-period-state-period-2"), "a period ended on the club's day is ended")
       .toHaveAttribute("data-state", "ended");
+    expect(screen.getByTestId("membership-period-state-period-4"), "a period not yet begun on the club's day is scheduled")
+      .toHaveAttribute("data-state", "scheduled");
   });
 
   it("given a person without periods, when a period beginning in the future is added, then it is sent whole and the list is read again", async () => {

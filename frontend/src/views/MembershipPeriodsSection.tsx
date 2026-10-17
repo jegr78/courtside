@@ -6,17 +6,14 @@ import { Button } from "../components/Button";
 import { Modal } from "../components/Modal";
 import { TextField } from "../components/TextField";
 import { useReportedFailure } from "../failures/useReportedFailure";
-import { formatDate } from "../time/clubZone";
 
 type PeriodState = "running" | "scheduled" | "ended";
 
 type Editing = { period?: MembershipPeriod };
 
-function stateOf(period: MembershipPeriod, today: string): PeriodState {
-  if (period.startedOn > today) return "scheduled";
-  if (period.endedOn !== null && period.endedOn <= today) return "ended";
-  return "running";
-}
+const STATES: Record<MembershipPeriod["state"], PeriodState> = {
+  RUNNING: "running", SCHEDULED: "scheduled", ENDED: "ended",
+};
 
 export function MembershipPeriodsSection({ personId, types, disabled, version, changed }: {
   personId: string;
@@ -32,7 +29,6 @@ export function MembershipPeriodsSection({ personId, types, disabled, version, c
   const [removing, setRemoving] = useState<MembershipPeriod>();
   const [pending, setPending] = useState(false);
   const names = new Map(types.map((type) => [type.id, type.name]));
-  const today = formatDate(new Date());
 
   useEffect(() => {
     let active = true;
@@ -80,7 +76,7 @@ export function MembershipPeriodsSection({ personId, types, disabled, version, c
       ? <p data-testid="membership-periods-none" className="text-muted">{t("admin.person.periodsNone")}</p>
       : <ul data-testid="membership-periods-list" className="grid gap-2">
         {periods.map((period) => {
-          const state = stateOf(period, today);
+          const state = STATES[period.state];
           return <li key={period.id} data-testid={`membership-period-${period.id}`} className="flex flex-wrap items-center gap-3 rounded-lg border p-3">
             <span className="min-w-0 grow break-words">
               <span className="font-semibold">{names.get(period.membershipTypeId) ?? period.membershipTypeId}</span>

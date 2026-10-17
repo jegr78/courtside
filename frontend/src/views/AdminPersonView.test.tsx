@@ -638,7 +638,7 @@ describe("AdminPersonView", () => {
 
   it("given a period is added, when it is saved, then the membership fields are read again", async () => {
     // given
-    const scheduled = { id: "period-9", membershipTypeId: "type-2", startedOn: "2999-01-01", endedOn: null };
+    const scheduled = { id: "period-9", membershipTypeId: "type-2", startedOn: "2999-01-01", endedOn: null, state: "SCHEDULED" as const };
     vi.spyOn(api, "addMembershipPeriod").mockResolvedValue(scheduled);
     vi.spyOn(api, "membershipPeriods").mockResolvedValueOnce([]).mockResolvedValue([scheduled]);
     showPerson();
