@@ -948,6 +948,31 @@ evidence and never presents this lossy recent view as a durable audit log.
 Current domain metrics cover created bookings, rule rejections, booking conflicts, failed password
 rehashes and message outcomes. Spring metrics cover HTTP, JVM and connection pools. Slow-query logs
 contain placeholders rather than values and include trace identifiers when sampled.
+`courtside.events.pending` counts event publications between modules that have not completed,
+`courtside.backup.age` gives the seconds since the backup the operator recorded, and
+`courtside.login.failures` counts refused sign-ins labelled only by the catalogued reason. None of
+them carries an account, a person or an address. Without a backup record the age reads `NaN`.
+
+### Operator health overview
+
+`GET /api/admin/operator-health` answers administrators only and reads what the instance can prove
+about itself without changing it:
+
+- the version and, when the build had a repository, its commit and build time;
+- the migration state, read from the history the migration process wrote. Pending or failed
+  migrations fail and name the first such version;
+- mail handover, from the outbox. A queued message waiting for another attempt, or a newest failure
+  later than the newest handover, fails and names the relay. Before any message has settled the
+  check is unavailable;
+- the public origin, exactly as messages link to it, or unavailable when none is configured;
+- the backup age, from a JSON file `{"completedAt": "<instant>"}` that the operator's backup job
+  writes and `COURTSIDE_BACKUP_EVIDENCE_FILE` names. Unset or missing, the check is unavailable. An
+  unreadable record or one dated in the future fails and names the file.
+
+Each check is `OK`, `FAILING` with the place that fails, or `UNAVAILABLE` with the reason the
+evidence is missing. A check without evidence never reads as healthy. The overview sets no
+thresholds: whether a backup is too old is the operator's decision, made in whatever alerting reads
+the metric.
 
 The reference deployment is a supported starting point, not a managed service. Courtside validates
 configuration it owns and supplies lifecycle tools. The operator owns the machine, external
