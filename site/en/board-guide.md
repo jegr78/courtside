@@ -545,7 +545,7 @@ The **Records** area has eight views. The next section describes *Retention*.
 
 Here the club decides how long it keeps personal records after they end. Courtside sets no period.
 A category without a period stays untouched, however old its records are. Which period is lawful
-is the club's decision as the controller. The [privacy kit](privacy-kit) helps to document that
+is the club's decision as the controller. The [privacy kit](privacy-kit.md) helps to document that
 decision but is no legal advice.
 
 There are two categories, each with a period in months from 1 to 1200:

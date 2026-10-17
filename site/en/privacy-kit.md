@@ -17,7 +17,7 @@ the texts with your board and, when in doubt, with a qualified adviser before yo
 2. Copy the templates into a document of your own. Replace everything in square brackets with your
    club's details, for example `[Name of the club]`.
 3. Decide the periods and enter them in the administration under *Records → Retention*. The
-   [board handbook](board-guide#records-retention) explains how. A category without a period stays
+   [board handbook](board-guide.md#records-retention) explains how. A category without a period stays
    untouched, and Courtside deletes nothing there on its own.
 4. Add what your club does outside Courtside: hosting, backups, mail delivery and who can reach the
    server.

@@ -576,7 +576,7 @@ Unter **Nachweise** findest du acht Ansichten. Die *Aufbewahrung* beschreibt der
 Hier legt der Verein fest, wie lange er personenbezogene Daten nach ihrem Ende aufbewahrt. Courtside
 gibt keine Frist vor. Eine Kategorie ohne Frist bleibt unberührt, ganz gleich, wie alt ihre Daten
 sind. Welche Frist rechtmäßig ist, entscheidet der Verein als Verantwortlicher. Das
-[Datenschutz-Kit](privacy-kit) hilft beim Dokumentieren dieser Entscheidung, ersetzt aber keine
+[Datenschutz-Kit](privacy-kit.md) hilft beim Dokumentieren dieser Entscheidung, ersetzt aber keine
 Rechtsberatung.
 
 Es gibt zwei Kategorien, jede mit einer Frist in Monaten von 1 bis 1200:

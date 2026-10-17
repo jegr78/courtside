@@ -18,7 +18,7 @@ fachkundigen Stelle, bevor du sie verwendest.
 2. Kopiere die Vorlagen in ein eigenes Dokument. Alles in eckigen Klammern ersetzt du durch die
    Angaben deines Vereins, zum Beispiel `[Name des Vereins]`.
 3. Lege die Fristen fest und trage sie in der Verwaltung unter *Nachweise → Aufbewahrung* ein. Wie
-   das geht, steht im [Handbuch für Vorstände](board-guide#nachweise-aufbewahrung). Eine Kategorie
+   das geht, steht im [Handbuch für Vorstände](board-guide.md#nachweise-aufbewahrung). Eine Kategorie
    ohne Frist bleibt unberührt, Courtside löscht dort nichts von selbst.
 4. Ergänze, was dein Verein außerhalb von Courtside tut: Hosting, Backups, Mailversand und wer
    Zugang zum Server hat.
