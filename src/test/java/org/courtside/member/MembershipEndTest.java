@@ -211,6 +211,72 @@ class MembershipEndTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void whenAPeriodEndsOnTheDayItBegins_thenItCannotBeBuiltAtAll() {
+        // when / then
+        assertThatThrownBy(() ->
+                new MembershipPeriod(LocalDate.of(2026, 5, 1), LocalDate.of(2026, 5, 1)))
+                .isInstanceOf(InvalidMembershipPeriodException.class)
+                .extracting("code")
+                .as("the end is the first day without the membership, so this period would cover no day")
+                .isEqualTo("membershipPeriod.coversNoDay");
+    }
+
+    @Test
+    void givenNoMembership_whenTheRosterWritesOneEndingToday_thenItIsRefusedAndNothingIsStored() {
+        // given
+        UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
+        MembershipType type = memberships.createMembershipType("Adults", null, false);
+
+        // when / then
+        assertThatThrownBy(() -> roster.writeMembership(mary, type.getId(), new MembershipPeriod(null, TODAY)))
+                .isInstanceOf(InvalidMembershipPeriodException.class)
+                .extracting("code")
+                .as("a start that defaults to today and an end of today cover no day")
+                .isEqualTo("membershipPeriod.coversNoDay");
+        assertThat(MemberFixtures.latestPeriodOf(members, mary)).isEmpty();
+    }
+
+    @Test
+    void givenAMembershipThatBeganToday_whenTheRosterCorrectsItsEndToToday_thenTheCorrectionIsRefused() {
+        // given
+        UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
+        MembershipType type = memberships.createMembershipType("Adults", null, false);
+        roster.writeMembership(mary, type.getId(), MembershipPeriod.running());
+
+        // when / then
+        assertThatThrownBy(() -> roster.writeMembership(mary, type.getId(), new MembershipPeriod(null, TODAY)))
+                .isInstanceOf(InvalidMembershipPeriodException.class)
+                .extracting("code")
+                .isEqualTo("membershipPeriod.coversNoDay");
+        assertThat(memberships.membershipTypeIdOf(mary)).as("the running period stays as it was")
+                .contains(type.getId());
+    }
+
+    @Test
+    void givenALegacyPeriodThatEndedOnTheDayItBegan_whenReadingAndAddingPeriods_thenItHoldsOnNoDayAndBlocksNothing() {
+        // given
+        UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
+        MembershipType type = memberships.createMembershipType("Adults", null, false);
+        jdbc.sql("""
+                        INSERT INTO member (id, person_id, membership_type_id, started_on, ended_on)
+                        VALUES (:id, :personId, :typeId, :day, :day)
+                        """)
+                .param("id", UUID.randomUUID())
+                .param("personId", mary)
+                .param("typeId", type.getId())
+                .param("day", TODAY)
+                .update();
+
+        // when
+        periods.add(mary, type.getId(), new MembershipPeriod(TODAY, null));
+
+        // then
+        assertThat(periods.periodsOf(mary)).as("both rows are listed").hasSize(2);
+        assertThat(memberships.membershipTypeIdOf(mary)).contains(type.getId());
+        assertThat(roster.person(mary).membership().current()).isTrue();
+    }
+
+    @Test
     void givenAWriteThatBypassesThePeriodType_whenItInvertsTheDates_thenTheDatabaseRefusesIt() {
         // given
         UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");

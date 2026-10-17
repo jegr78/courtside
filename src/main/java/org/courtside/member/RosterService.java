@@ -278,8 +278,9 @@ public class RosterService {
         UUID typeId;
         if (startsAnotherPeriod(target, requested, today)) {
             typeId = typeIdFor(null, membershipTypeId, requested, today);
-            Member created = new Member(id, typeId, startOr(requested, today));
-            created.endOn(requested.endedOn());
+            MembershipPeriod resolved = new MembershipPeriod(startOr(requested, today), requested.endedOn());
+            Member created = new Member(id, typeId, resolved.startedOn());
+            created.endOn(resolved.endedOn());
             MembershipPeriodService.saveOrRejectOverlap(members, created);
             changesValidity = created.isValidOn(today);
         } else {

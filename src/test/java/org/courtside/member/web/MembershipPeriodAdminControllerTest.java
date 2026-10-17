@@ -153,6 +153,24 @@ class MembershipPeriodAdminControllerTest extends AbstractIntegrationTest {
 
     @Test
     @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAPeriod_whenCorrectingItToEndOnItsFirstDay_thenTheEmptyPeriodIsRefused() throws Exception {
+        // given
+        String body = add(period(ACTIVE, "2026-01-01", null)).andReturn().getResponse().getContentAsString();
+        String periodId = JsonPath.read(body, "$.id");
+
+        // when / then
+        mockMvc.perform(put(periods() + "/" + periodId).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content(period(ACTIVE, "2026-03-01", "2026-03-01")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:invalid-membership-period"))
+                .andExpect(jsonPath("$.detail").value("The membership period is not usable"))
+                .andExpect(jsonPath("$.violations[0].code").value("membershipPeriod.coversNoDay"));
+        mockMvc.perform(get(periods()))
+                .andExpect(jsonPath("$[0].startedOn").value("2026-01-01"));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
     void whenAddingAPeriodWithoutAStart_thenTheFieldIsNamed() throws Exception {
         // when / then
         add("{\"membershipTypeId\":\"" + ACTIVE + "\"}")

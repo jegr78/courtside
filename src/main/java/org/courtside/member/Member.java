@@ -48,8 +48,9 @@ public class Member {
     }
 
     public void correctPeriod(LocalDate startedOn, LocalDate endedOn) {
-        this.startedOn = startedOn;
-        this.endedOn = endedOn;
+        MembershipPeriod corrected = new MembershipPeriod(startedOn, endedOn);
+        this.startedOn = corrected.startedOn();
+        this.endedOn = corrected.endedOn();
     }
 
     public boolean isValidOn(LocalDate day) {

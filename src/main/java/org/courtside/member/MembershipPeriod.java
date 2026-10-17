@@ -7,7 +7,11 @@ public record MembershipPeriod(LocalDate startedOn, LocalDate endedOn) {
     public MembershipPeriod {
         if (startedOn != null && endedOn != null && endedOn.isBefore(startedOn)) {
             throw new InvalidMembershipPeriodException("membershipPeriod.endsBeforeItBegan",
-                    "A membership ends on or after the day it began");
+                    "A membership ends after the day it began");
+        }
+        if (startedOn != null && startedOn.equals(endedOn)) {
+            throw new InvalidMembershipPeriodException("membershipPeriod.coversNoDay",
+                    "A membership period ending on its first day covers no day");
         }
     }
 

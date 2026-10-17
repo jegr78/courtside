@@ -200,7 +200,10 @@ and the sign-in path answers such a row exactly as it answers a wrong password.
 period no longer holds, so a period covers `[started_on, ended_on)`. Both may lie in the future.
 The exclusion `member_periods_disjoint` keeps the periods of one person from overlapping; a period
 ending on the day the next begins does not overlap it. Ended periods stay, so a club can still see
-who held what and until when.
+who held what and until when. The application refuses a new or corrected period whose end equals its
+start, because it would cover no day. The CHECK still allows `ended_on = started_on`: rows written
+before periods existed carry it for a membership ended on the day it began, and ending a membership
+that began today records it too. Such a row holds on no day and the exclusion ignores it.
 
 `security_epoch` invalidates every session an account holds; `version` is the optimistic lock;
 `credentials_expire_at` bounds an issued one-time credential. `last_login_at` is the instant of the

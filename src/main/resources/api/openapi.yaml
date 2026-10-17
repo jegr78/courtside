@@ -1170,7 +1170,7 @@ components:
           format: date
           description: |
             The first day the period no longer holds. Omitted, it runs without an end. It may lie in
-            the future and may not precede `startedOn`. A period that would overlap another of the
+            the future and must lie after `startedOn`. A period that would overlap another of the
             same person is answered `409` with `urn:courtside:error:membership-periods-overlap`.
 
     MembershipPeriodRequest:
@@ -1192,7 +1192,7 @@ components:
           format: date
           description: |
             The first day the period no longer holds; omitted or `null`, it runs without an end. It
-            may not precede `startedOn`.
+            must lie after `startedOn`, or the period would cover no day.
 
     MembershipPeriod:
       type: object

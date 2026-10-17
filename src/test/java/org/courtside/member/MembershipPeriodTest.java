@@ -212,4 +212,18 @@ class MembershipPeriodTest extends AbstractIntegrationTest {
                 .extracting("code")
                 .isEqualTo("membershipPeriod.startRequired");
     }
+
+    @Test
+    void whenAddingAPeriodThatEndsOnItsFirstDay_thenItIsRefused() {
+        // given
+        UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
+        MembershipType adults = memberships.createMembershipType("Adults", null, false);
+
+        // when / then
+        assertThatThrownBy(() -> periods.add(mary, adults.getId(), new MembershipPeriod(TODAY, TODAY)))
+                .isInstanceOf(InvalidMembershipPeriodException.class)
+                .extracting("code")
+                .isEqualTo("membershipPeriod.coversNoDay");
+        assertThat(periods.periodsOf(mary)).isEmpty();
+    }
 }
