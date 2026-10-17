@@ -2,9 +2,9 @@
   "schemaVersion": 1,
   "reviewedAt": "2026-10-16",
   "purpose": "This is the normative authorization policy for the shipped Courtside API. OpenAPI defines the transport shape; this policy defines who may perform each operation, which resource attributes narrow that permission, and which protected fields each projection may read or write.",
-  "openApiFieldInventorySha256": "85a7b8a5a3059f4d0d03e18b36905bc4f56593416598af9ef11bbe95d4f12bfe",
-  "protectedFieldInventorySha256": "c59928b469725ddc7eaf3f30dce4526afb7b92a4bc8e328e541d62576f25a033",
-  "productionAuthorizationSha256": "148b900e5ac2619d240f08d3883844fc6daa59f31d0513c576fe2eb2a1c7bc38",
+  "openApiFieldInventorySha256": "23a043a6f83dcdc3fc8b84927efb230a9ec45e019b5dd2f631daa6cf7722c34f",
+  "protectedFieldInventorySha256": "e3a4e4f8c4bb24a799fca7b78ca1832d9afa76cb20a897a4f3b25432ec8a6136",
+  "productionAuthorizationSha256": "c3aa6c52c70cab65f93816b26a5aabb2d60b57c666dec8e87fcc1d701ddf518d",
   "ordinaryFields": [
     "Problem.detail",
     "Problem.fieldErrors",
@@ -35,6 +35,19 @@
     "acceptWaitlistOffer:response:Violation.code",
     "acceptWaitlistOffer:response:Violation.params",
     "acceptWaitlistOffer:response:Violation.params.*",
+    "addMembershipPeriod:parameter:$parameter.path.personId",
+    "addMembershipPeriod:request:MembershipPeriodRequest.endedOn",
+    "addMembershipPeriod:request:MembershipPeriodRequest.membershipTypeId",
+    "addMembershipPeriod:request:MembershipPeriodRequest.startedOn",
+    "addMembershipPeriod:response:$response.header.Accept",
+    "addMembershipPeriod:response:$response.header.Retry-After",
+    "addMembershipPeriod:response:FieldError.code",
+    "addMembershipPeriod:response:FieldError.field",
+    "addMembershipPeriod:response:FieldError.params",
+    "addMembershipPeriod:response:FieldError.params.*",
+    "addMembershipPeriod:response:Violation.code",
+    "addMembershipPeriod:response:Violation.params",
+    "addMembershipPeriod:response:Violation.params.*",
     "assignMembership:parameter:$parameter.path.personId",
     "assignMembership:request:MembershipRequest.endedOn",
     "assignMembership:request:MembershipRequest.membershipTypeId",
@@ -444,6 +457,20 @@
     "clearAttendance:response:Violation.code",
     "clearAttendance:response:Violation.params",
     "clearAttendance:response:Violation.params.*",
+    "correctMembershipPeriod:parameter:$parameter.path.periodId",
+    "correctMembershipPeriod:parameter:$parameter.path.personId",
+    "correctMembershipPeriod:request:MembershipPeriodRequest.endedOn",
+    "correctMembershipPeriod:request:MembershipPeriodRequest.membershipTypeId",
+    "correctMembershipPeriod:request:MembershipPeriodRequest.startedOn",
+    "correctMembershipPeriod:response:$response.header.Accept",
+    "correctMembershipPeriod:response:$response.header.Retry-After",
+    "correctMembershipPeriod:response:FieldError.code",
+    "correctMembershipPeriod:response:FieldError.field",
+    "correctMembershipPeriod:response:FieldError.params",
+    "correctMembershipPeriod:response:FieldError.params.*",
+    "correctMembershipPeriod:response:Violation.code",
+    "correctMembershipPeriod:response:Violation.params",
+    "correctMembershipPeriod:response:Violation.params.*",
     "courtClosureImpact:parameter:$parameter.query.cursor",
     "courtClosureImpact:parameter:$parameter.query.limit",
     "courtClosureImpact:request:CourtClosureImpactRequest.closureId",
@@ -1488,6 +1515,15 @@
     "listManagedAppointments:response:Violation.code",
     "listManagedAppointments:response:Violation.params",
     "listManagedAppointments:response:Violation.params.*",
+    "listMembershipPeriods:parameter:$parameter.path.personId",
+    "listMembershipPeriods:response:$response.header.Retry-After",
+    "listMembershipPeriods:response:FieldError.code",
+    "listMembershipPeriods:response:FieldError.field",
+    "listMembershipPeriods:response:FieldError.params",
+    "listMembershipPeriods:response:FieldError.params.*",
+    "listMembershipPeriods:response:Violation.code",
+    "listMembershipPeriods:response:Violation.params",
+    "listMembershipPeriods:response:Violation.params.*",
     "listMembershipTypes:response:$response.header.Retry-After",
     "listMembershipTypes:response:FieldError.code",
     "listMembershipTypes:response:FieldError.field",
@@ -2347,6 +2383,16 @@
     "removeMembership:response:Violation.code",
     "removeMembership:response:Violation.params",
     "removeMembership:response:Violation.params.*",
+    "removeMembershipPeriod:parameter:$parameter.path.periodId",
+    "removeMembershipPeriod:parameter:$parameter.path.personId",
+    "removeMembershipPeriod:response:$response.header.Retry-After",
+    "removeMembershipPeriod:response:FieldError.code",
+    "removeMembershipPeriod:response:FieldError.field",
+    "removeMembershipPeriod:response:FieldError.params",
+    "removeMembershipPeriod:response:FieldError.params.*",
+    "removeMembershipPeriod:response:Violation.code",
+    "removeMembershipPeriod:response:Violation.params",
+    "removeMembershipPeriod:response:Violation.params.*",
     "removeOpeningPeriod:parameter:$parameter.path.periodId",
     "removeOpeningPeriod:response:$response.header.Retry-After",
     "removeOpeningPeriod:response:FieldError.code",
@@ -3498,7 +3544,11 @@
         "clearAttendance",
         "listNoShows",
         "liftNoShows",
-        "readOperatorHealth"
+        "readOperatorHealth",
+        "listMembershipPeriods",
+        "addMembershipPeriod",
+        "correctMembershipPeriod",
+        "removeMembershipPeriod"
       ],
       "actors": [
         "ADMIN"
@@ -4669,7 +4719,9 @@
         "RosterEntry.membershipTypeId",
         "RosterEntry.membershipStartedOn",
         "RosterEntry.membershipEndedOn",
-        "RosterEntry.roles"
+        "RosterEntry.roles",
+        "RosterEntry.membershipCurrent",
+        "RosterEntry.membershipState"
       ],
       "operationIds": [
         "searchRoster",
@@ -4695,6 +4747,34 @@
         "administrator-gate",
         "administrative-projection",
         "credential-write-only"
+      ]
+    },
+    {
+      "id": "membership-period-read",
+      "access": "read",
+      "description": "Every period of a person's membership, with its type and dates, is confined to administrative roster responses.",
+      "fields": [
+        "MembershipPeriod.id",
+        "MembershipPeriod.membershipTypeId",
+        "MembershipPeriod.startedOn",
+        "MembershipPeriod.endedOn",
+        "MembershipPeriod.state"
+      ],
+      "operationIds": [
+        "listMembershipPeriods",
+        "addMembershipPeriod",
+        "correctMembershipPeriod"
+      ],
+      "actors": [
+        "ADMIN"
+      ],
+      "attributes": [
+        "administrator",
+        "target-person"
+      ],
+      "decisions": [
+        "administrator-gate",
+        "administrative-projection"
       ]
     },
     {
