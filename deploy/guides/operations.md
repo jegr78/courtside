@@ -1282,6 +1282,114 @@ Docker logging drivers send the application, database and proxy output over host
 restricted collector. This path never blocks a request and does not assert that the collector
 accepted a datagram. External retention and alerts remain the operator's responsibility.
 
+## Watch the instance from your own monitoring
+
+Courtside needs no monitoring stack. The **Records → Operator health** page answers a board's
+question on demand. Alerts at three in the morning need something that keeps asking, and that is a
+system you run. Courtside pushes its metrics over OTLP once `COURTSIDE_OTLP_ENABLED` is `true`. It
+offers no scrape endpoint, keeps no metric history and sends no alert. Storage, retention and alert
+routing stay with you.
+
+Three metrics answer the questions the overview answers:
+
+| Metric | Type | Labels | Meaning |
+|---|---|---|---|
+| `courtside.backup.age` | gauge, seconds | none | Time since the completion your backup job recorded in `COURTSIDE_BACKUP_EVIDENCE_FILE`. `NaN` while no record exists. |
+| `courtside.events.pending` | gauge | none | Event publications between modules that have not completed. A value that keeps growing means work the instance accepted is not finishing. `NaN` when the database cannot be read. |
+| `courtside.login.failures` | counter | `reason` | Refused sign-ins. `reason` is one of `bad_credentials`, `disabled`, `locked`, `credentials_expired` or `other`. |
+
+No metric carries an account, a username, a person or an address, and no label takes a value from a
+request. A backend that names metrics the Prometheus way usually shows them as
+`courtside_backup_age_seconds`, `courtside_events_pending` and `courtside_login_failures_total`.
+Check the names in your own backend, because the translation is the collector's.
+
+### An OpenTelemetry Collector in front of Prometheus
+
+The collector receives OTLP from the application and offers the values to Prometheus. Run it on the
+same container network and keep its ports off the public interface:
+
+```yaml
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+exporters:
+  prometheus:
+    endpoint: 127.0.0.1:8889
+service:
+  pipelines:
+    metrics:
+      receivers: [otlp]
+      exporters: [prometheus]
+```
+
+Point Courtside at it in `.env`:
+
+```sh
+COURTSIDE_OTLP_ENABLED=true
+COURTSIDE_OTLP_METRICS_ENDPOINT=http://otel-collector:4318/v1/metrics
+COURTSIDE_OTLP_TRACES_ENDPOINT=http://otel-collector:4318/v1/traces
+```
+
+The same switch exports traces, so give the collector a traces pipeline as well or point the traces
+endpoint at a backend that accepts them. A collector that forwards to a hosted backend instead uses
+that backend's OTLP exporter in place of `prometheus`.
+
+### Prometheus alert rules
+
+Courtside sets no limits. These rules use example values, so set your own:
+
+```yaml
+groups:
+  - name: courtside
+    rules:
+      - alert: CourtsideBackupTooOld
+        expr: courtside_backup_age_seconds > 2 * 86400
+        for: 15m
+        annotations:
+          summary: The latest recorded backup is older than two days.
+      - alert: CourtsideBackupNotRecorded
+        # NaN is the only value that differs from itself.
+        expr: courtside_backup_age_seconds != courtside_backup_age_seconds
+        for: 1h
+        annotations:
+          summary: Courtside holds no backup record at all.
+      - alert: CourtsideMetricsMissing
+        expr: absent(courtside_backup_age_seconds)
+        for: 15m
+        annotations:
+          summary: The instance stopped sending metrics.
+      - alert: CourtsidePublicationsStuck
+        expr: min_over_time(courtside_events_pending[30m]) > 0
+        annotations:
+          summary: Event publications have stayed incomplete for half an hour.
+      - alert: CourtsideSignInFailuresHigh
+        expr: sum(rate(courtside_login_failures_total[10m])) * 600 > 50
+        annotations:
+          summary: More than 50 refused sign-ins in ten minutes.
+```
+
+### Grafana
+
+With Prometheus as a data source, a Grafana-managed alert rule takes the same expressions. Query
+`courtside_backup_age_seconds / 3600`, reduce it with *Last* and alert when it is above your limit in
+hours. Set *Alert state if no data or all values are null* to *Alerting*, so a silent instance does
+not count as a healthy one. A stat panel on the same query and a time series of
+`sum by (reason) (rate(courtside_login_failures_total[5m]))` cover the dashboard side.
+
+### Spring Boot Admin
+
+Spring Boot Admin can be attached, but Courtside never needs it. It reads actuator endpoints over
+HTTP, and the image exposes only `health`. Showing more means widening
+`MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE`, which the container contract leaves outside its
+guarantees. Endpoints such as `env`, `loggers` or `heapdump` reveal configuration and memory
+contents or change the running instance, so they must never reach the reverse proxy. Registering
+needs either the Spring Boot Admin client library, which the image does not carry, or a discovery
+service the reference deployment does not run. What it would add over the overview and the
+metrics above is a second user interface with its own accounts to protect. If you run it anyway,
+keep it on the container network and expose only `health` and `metrics` to it.
+
 ## Inspect recent operational logs in the administration
 
 The **Records → Operational log** page gives an administrator recent diagnostics without shell
