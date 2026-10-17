@@ -7607,7 +7607,8 @@ paths:
       summary: Correct a period of a person's membership, its type and both its dates.
       description: |
         The request writes the period whole. The corrected period may not overlap another of the
-        same person.
+        same person. The person's account sessions end, because the rules their bookings are measured
+        against may change.
       security:
         - sessionCookie: []
           csrfToken: []
@@ -7661,7 +7662,8 @@ paths:
       summary: Remove a period recorded by mistake.
       description: |
         The period is deleted, not ended: use it for a period that never happened. A membership
-        that did happen and has stopped is ended instead, so its record stays.
+        that did happen and has stopped is ended instead, so its record stays. The person's account
+        sessions end, because the rules their bookings are measured against may change.
       security:
         - sessionCookie: []
           csrfToken: []

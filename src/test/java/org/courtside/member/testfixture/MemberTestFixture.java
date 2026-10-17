@@ -117,7 +117,7 @@ public class MemberTestFixture {
 
     public Optional<LocalDate> membershipStartedOn(UUID personId) {
         return Optional.ofNullable(roster.person(personId).membership())
-                .filter(membership -> membership.endedOn() == null)
+                .filter(RosterService.Membership::current)
                 .map(RosterService.Membership::startedOn);
     }
 }

@@ -26,8 +26,4 @@ public record MembershipPeriod(LocalDate startedOn, LocalDate endedOn) {
         }
         return this;
     }
-
-    public boolean isCurrent() {
-        return endedOn == null;
-    }
 }
