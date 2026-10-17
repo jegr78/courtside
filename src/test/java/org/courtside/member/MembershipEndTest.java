@@ -387,7 +387,7 @@ class MembershipEndTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void givenARunningMembership_whenTheTypeChanges_thenTheDateItBeganStands() {
+    void givenARunningMembership_whenTheTypeChanges_thenTheOldTypeEndsTodayAndTheNewOneRunsFromToday() {
         // given
         UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
         MembershipType first = memberships.createMembershipType("Junior", null, false);
@@ -395,14 +395,100 @@ class MembershipEndTest extends AbstractIntegrationTest {
         roster.writeMembership(mary, first.getId(), new MembershipPeriod(LocalDate.of(2020, 9, 1), null));
 
         // when
-        RosterService.RosterEntry entry =
-                roster.writeMembership(mary, second.getId(), MembershipPeriod.running());
+        RosterService.RosterEntry entry = roster.writeMembership(mary, second.getId(),
+                new MembershipPeriod(LocalDate.of(2020, 9, 1), null));
 
         // then
         assertThat(entry.membership().typeId()).isEqualTo(second.getId());
-        assertThat(entry.membership().startedOn())
-                .as("changing the type continues the membership; it does not start a new one")
-                .isEqualTo(LocalDate.of(2020, 9, 1));
+        assertThat(members.findByPersonIdOrderByStartedOnAscIdAsc(mary))
+                .as("a type change keeps the years held on the old type as their own period")
+                .extracting(Member::getMembershipTypeId, Member::getStartedOn, Member::getEndedOn)
+                .containsExactly(
+                        tuple(first.getId(), LocalDate.of(2020, 9, 1), TODAY),
+                        tuple(second.getId(), TODAY, null));
+    }
+
+    @Test
+    void givenAMembershipThatBeganToday_whenTheTypeChanges_thenThePeriodIsRetypedInPlace() {
+        // given
+        UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
+        MembershipType first = memberships.createMembershipType("Junior", null, false);
+        MembershipType second = memberships.createMembershipType("Adults", null, false);
+        roster.writeMembership(mary, first.getId(), new MembershipPeriod(TODAY, null));
+
+        // when
+        roster.writeMembership(mary, second.getId(), new MembershipPeriod(TODAY, null));
+
+        // then
+        assertThat(members.findByPersonIdOrderByStartedOnAscIdAsc(mary))
+                .as("a period that began today holds no day on the old type worth keeping")
+                .extracting(Member::getMembershipTypeId, Member::getStartedOn, Member::getEndedOn)
+                .containsExactly(tuple(second.getId(), TODAY, null));
+    }
+
+    @Test
+    void givenAMembershipThatEnded_whenTheFormReopensIt_thenANewPeriodRunsFromTodayAndTheGapStays() {
+        // given
+        UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
+        MembershipType type = memberships.createMembershipType("Adults", null, false);
+        roster.writeMembership(mary, type.getId(),
+                new MembershipPeriod(LocalDate.of(2020, 1, 1), LocalDate.of(2024, 1, 1)));
+
+        // when
+        roster.writeMembership(mary, type.getId(), new MembershipPeriod(LocalDate.of(2020, 1, 1), null));
+
+        // then
+        assertThat(memberships.membershipTypeIdOf(mary)).contains(type.getId());
+        assertThat(members.findByPersonIdOrderByStartedOnAscIdAsc(mary))
+                .as("taking somebody back keeps the years they were away")
+                .extracting(Member::getStartedOn, Member::getEndedOn)
+                .containsExactly(
+                        tuple(LocalDate.of(2020, 1, 1), LocalDate.of(2024, 1, 1)),
+                        tuple(TODAY, null));
+    }
+
+    @Test
+    void givenARunningPeriodAndOneScheduledAhead_whenTheFormEndsTheMembership_thenTheScheduledOneIsWithdrawn() {
+        // given
+        UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
+        MembershipType adults = memberships.createMembershipType("Adults", null, false);
+        MembershipType passive = memberships.createMembershipType("Passive", null, false);
+        periods.add(mary, adults.getId(), new MembershipPeriod(LocalDate.of(2025, 1, 1), LocalDate.of(2026, 12, 1)));
+        periods.add(mary, passive.getId(), new MembershipPeriod(LocalDate.of(2026, 12, 1), null));
+
+        // when
+        roster.writeMembership(mary, adults.getId(), new MembershipPeriod(LocalDate.of(2025, 1, 1), TODAY));
+
+        // then
+        assertThat(periods.periodsOf(mary))
+                .as("ending through the form withdraws the period scheduled to follow, as ending does")
+                .extracting(MembershipPeriodService.Period::startedOn, MembershipPeriodService.Period::endedOn)
+                .containsExactly(tuple(LocalDate.of(2025, 1, 1), TODAY));
+        assertThat(jdbc.sql("SELECT count(*) FROM domain_event WHERE subject_id = :id AND event_type = :type")
+                .param("id", mary).param("type", "roster.membershipPeriod.removed").query(Long.class).single())
+                .as("the withdrawn period is recorded in the audit log")
+                .isEqualTo(1);
+    }
+
+    @Test
+    void givenARunningPeriodWithAGapBeforeAScheduledOne_whenTheFormMovesItsEndLater_thenTheScheduledOneStays() {
+        // given
+        UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
+        MembershipType type = memberships.createMembershipType("Adults", null, false);
+        periods.add(mary, type.getId(), new MembershipPeriod(LocalDate.of(2025, 1, 1), LocalDate.of(2026, 8, 1)));
+        periods.add(mary, type.getId(), new MembershipPeriod(LocalDate.of(2026, 12, 1), null));
+
+        // when
+        roster.writeMembership(mary, type.getId(),
+                new MembershipPeriod(LocalDate.of(2025, 1, 1), LocalDate.of(2026, 9, 1)));
+
+        // then
+        assertThat(periods.periodsOf(mary))
+                .as("a later end shortens nothing, so nothing scheduled is withdrawn")
+                .extracting(MembershipPeriodService.Period::startedOn, MembershipPeriodService.Period::endedOn)
+                .containsExactly(
+                        tuple(LocalDate.of(2025, 1, 1), LocalDate.of(2026, 9, 1)),
+                        tuple(LocalDate.of(2026, 12, 1), null));
     }
 
     @Test
