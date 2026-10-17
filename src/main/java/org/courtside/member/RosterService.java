@@ -337,12 +337,23 @@ public class RosterService {
         UUID id = requiredPersonId(personId);
         requireLockedPerson(id);
         LocalDate today = today();
-        members.findValidOn(id, today).ifPresent(member -> {
+        boolean ended = members.findValidOn(id, today).map(member -> {
             member.endOn(today);
-            members.flush();
-            revokeSessionsOf(id);
+            return true;
+        }).orElse(false);
+        List<Member> scheduled = members.findByPersonIdOrderByStartedOnAscIdAsc(id).stream()
+                .filter(member -> member.getStartedOn().isAfter(today))
+                .toList();
+        members.deleteAll(scheduled);
+        members.flush();
+        if (!ended && scheduled.isEmpty()) {
+            return;
+        }
+        revokeSessionsOf(id);
+        scheduled.forEach(member -> events.publishEvent(new RosterEvent.MembershipPeriodRemoved(id, member.getId())));
+        if (ended) {
             events.publishEvent(new RosterEvent.MembershipEnded(id));
-        });
+        }
     }
 
     private void requireASuccessorAdministrator(UserAccount account) {

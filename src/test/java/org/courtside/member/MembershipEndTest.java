@@ -34,6 +34,9 @@ class MembershipEndTest extends AbstractIntegrationTest {
     private RosterService roster;
 
     @Autowired
+    private MembershipPeriodService periods;
+
+    @Autowired
     private JdbcClient jdbc;
 
     @Test
@@ -87,6 +90,42 @@ class MembershipEndTest extends AbstractIntegrationTest {
         assertThat(memberships.membershipTypeIdOf(mary)).isEmpty();
         assertThat(MemberFixtures.latestPeriodOf(members, mary)).get()
                 .satisfies(member -> assertThat(member.getStartedOn()).isEqualTo(LocalDate.of(2027, 1, 1)));
+    }
+
+    @Test
+    void givenARunningPeriodAndOneScheduledAhead_whenTheRosterEndsTheMembership_thenNeitherHoldsAnyLonger() {
+        // given
+        UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
+        MembershipType type = memberships.createMembershipType("Adults", null, false);
+        periods.add(mary, type.getId(), new MembershipPeriod(LocalDate.of(2026, 1, 1), LocalDate.of(2026, 7, 1)));
+        periods.add(mary, type.getId(), new MembershipPeriod(LocalDate.of(2026, 7, 1), null));
+
+        // when
+        roster.endMembership(mary);
+
+        // then
+        assertThat(periods.periodsOf(mary))
+                .as("ending a membership also withdraws the period scheduled to follow it")
+                .extracting(MembershipPeriodService.Period::startedOn, MembershipPeriodService.Period::endedOn)
+                .containsExactly(tuple(LocalDate.of(2026, 1, 1), TODAY));
+        assertThat(jdbc.sql("SELECT count(*) FROM domain_event WHERE subject_id = :id AND event_type = :type")
+                .param("id", mary).param("type", "roster.membershipPeriod.removed").query(Long.class).single())
+                .as("the withdrawn period is recorded in the audit log")
+                .isEqualTo(1);
+    }
+
+    @Test
+    void givenOnlyAPeriodScheduledAhead_whenTheRosterEndsTheMembership_thenItIsWithdrawn() {
+        // given
+        UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
+        MembershipType type = memberships.createMembershipType("Adults", null, false);
+        periods.add(mary, type.getId(), new MembershipPeriod(LocalDate.of(2026, 9, 1), null));
+
+        // when
+        roster.endMembership(mary);
+
+        // then
+        assertThat(periods.periodsOf(mary)).isEmpty();
     }
 
     @Test

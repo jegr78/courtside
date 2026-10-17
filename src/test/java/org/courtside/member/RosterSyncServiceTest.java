@@ -203,6 +203,24 @@ class RosterSyncServiceTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenAPeriodTheBoardScheduledAhead_whenTheSnapshotNoLongerListsThePerson_thenTheDepartureWithdrawsIt() {
+        // given
+        UUID john = identity.createPerson("John", "Roe", "john.roe@example.org");
+        periods.add(john, STANDARD_MEMBERSHIP, new MembershipPeriod(LocalDate.of(2025, 1, 1), LocalDate.of(2026, 7, 1)));
+        UUID juniors = memberships.createMembershipType("Juniors", null, false).getId();
+        periods.add(john, juniors, new MembershipPeriod(LocalDate.of(2026, 7, 1), null));
+
+        // when
+        sync.apply(new RosterChangeSet(List.of(), List.of(), List.of(john)));
+
+        // then
+        assertThat(periods.periodsOf(john))
+                .extracting(MembershipPeriodService.Period::membershipTypeId,
+                        MembershipPeriodService.Period::startedOn, MembershipPeriodService.Period::endedOn)
+                .containsExactly(tuple(STANDARD_MEMBERSHIP, LocalDate.of(2025, 1, 1), TODAY));
+    }
+
+    @Test
     void givenAPersonThisInstanceDoesNotHold_whenApplying_thenTheirRecordIsCreatedWithNoAccount() {
         // when
         RosterSyncOutcome outcome = sync.apply(new RosterChangeSet(
