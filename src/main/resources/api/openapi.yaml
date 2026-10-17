@@ -1696,14 +1696,14 @@ components:
 
     RetentionPolicy:
       type: object
-      required: [category]
+      required: [category, retainMonths]
       properties:
         category: { $ref: "#/components/schemas/RetentionCategory" }
         retainMonths:
-          type: integer
+          type: [integer, "null"]
           minimum: 1
           maximum: 1200
-          description: Months a record is kept after it ended; absent when the category is not configured.
+          description: Months a record is kept after it ended; null when the category is not configured.
 
     RetentionPeriod:
       type: object
@@ -1716,12 +1716,20 @@ components:
 
     RetentionPreview:
       type: object
-      required: [previewId, expiresAt, blocked]
+      required: [previewId, expiresAt, bookings, formerMembers, blocked]
       properties:
         previewId: { type: string, format: uuid }
         expiresAt: { type: string, format: date-time }
-        bookings: { $ref: "#/components/schemas/RetentionBookingsPreview" }
-        formerMembers: { $ref: "#/components/schemas/RetentionFormerMembersPreview" }
+        bookings:
+          description: What the run would pseudonymise; null when bookings have no period.
+          oneOf:
+            - $ref: "#/components/schemas/RetentionBookingsPreview"
+            - type: "null"
+        formerMembers:
+          description: Whom the run would remove; null when former members have no period.
+          oneOf:
+            - $ref: "#/components/schemas/RetentionFormerMembersPreview"
+            - type: "null"
         blocked:
           type: array
           description: Former members eligible by date whom a run cannot remove yet, with the reason.
@@ -8032,7 +8040,7 @@ paths:
       summary: How long the club keeps each category of personal record.
       description: |
         One entry per record category the instance can apply retention to, in a fixed order. A
-        category without `retainMonths` is not configured, and nothing in it is ever changed.
+        category whose `retainMonths` is null is not configured, and nothing in it is ever changed.
         Courtside prescribes no period: the club chooses what its own lawful basis allows.
         Administrators only.
       security:

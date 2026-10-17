@@ -11,8 +11,7 @@ const MARY = "00000000-0000-0000-0000-000000000103";
 const RICHARD = "00000000-0000-0000-0000-000000000106";
 const PREVIEW = "6a000000-0000-0000-0000-000000000001";
 
-// The instance writes an unset period as null rather than leaving it out.
-const unset = [{ category: "BOOKINGS", retainMonths: null }, { category: "FORMER_MEMBERS" }] as unknown as RetentionPolicy[];
+const unset: RetentionPolicy[] = [{ category: "BOOKINGS", retainMonths: null }, { category: "FORMER_MEMBERS", retainMonths: null }];
 const configured: RetentionPolicy[] = [{ category: "BOOKINGS", retainMonths: 24 }, { category: "FORMER_MEMBERS", retainMonths: 12 }];
 
 const preview: RetentionPreview = {
@@ -67,7 +66,7 @@ describe("AdminRetentionView", () => {
   it("given a board that types a period, when it is saved, then the instance stores those months and the page shows them", async () => {
     // given
     const reads = vi.spyOn(api, "retentionPolicies").mockResolvedValueOnce(unset)
-      .mockResolvedValueOnce([{ category: "BOOKINGS", retainMonths: 24 }, { category: "FORMER_MEMBERS" }]);
+      .mockResolvedValueOnce([{ category: "BOOKINGS", retainMonths: 24 }, { category: "FORMER_MEMBERS", retainMonths: null }]);
     const setting = vi.spyOn(api, "setRetentionPolicy").mockResolvedValue({ category: "BOOKINGS", retainMonths: 24 });
     show();
     await userEvent.type(await screen.findByTestId("retention-months-BOOKINGS"), "24");
@@ -103,7 +102,7 @@ describe("AdminRetentionView", () => {
     // given
     await previewed();
     const removing = vi.spyOn(api, "removeRetentionPolicy").mockResolvedValue(undefined);
-    vi.spyOn(api, "retentionPolicies").mockResolvedValue([{ category: "BOOKINGS", retainMonths: 24 }, { category: "FORMER_MEMBERS" }]);
+    vi.spyOn(api, "retentionPolicies").mockResolvedValue([{ category: "BOOKINGS", retainMonths: 24 }, { category: "FORMER_MEMBERS", retainMonths: null }]);
 
     // when
     await userEvent.click(screen.getByTestId("retention-remove-FORMER_MEMBERS"));

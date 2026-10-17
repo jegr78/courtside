@@ -122,7 +122,7 @@ class RetentionAdminControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$[0].category").value("BOOKINGS"))
                 .andExpect(jsonPath("$[0].retainMonths").value(12))
                 .andExpect(jsonPath("$[1].category").value("FORMER_MEMBERS"))
-                .andExpect(jsonPath("$[1].retainMonths").doesNotExist());
+                .andExpect(jsonPath("$[1]", org.hamcrest.Matchers.hasEntry("retainMonths", null)));
 
         // when
         mockMvc.perform(delete("/api/admin/retention/policies/BOOKINGS").with(csrf()))
@@ -194,7 +194,7 @@ class RetentionAdminControllerTest extends AbstractIntegrationTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.bookings.bookings").value(2))
                 .andExpect(jsonPath("$.bookings.endedBefore").value("2025-05-11T22:00:00Z"))
-                .andExpect(jsonPath("$.formerMembers").doesNotExist())
+                .andExpect(jsonPath("$", org.hamcrest.Matchers.hasEntry("formerMembers", null)))
                 .andReturn().getResponse().getContentAsString();
         mockMvc.perform(post("/api/admin/retention/previews/{id}/run", previewId(preview)).with(csrf()))
                 .andExpect(status().isOk())

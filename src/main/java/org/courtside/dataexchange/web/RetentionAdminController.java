@@ -52,20 +52,17 @@ class RetentionAdminController implements AdminRetentionApi {
     @Override
     public ResponseEntity<ApiRetentionPreview> previewRetention() {
         RetentionPlan.Preview preview = retention.preview(currentUser.requireAccount().getId());
+        RetentionPlan.Bookings bookings = preview.bookings();
+        RetentionPlan.FormerMembers formerMembers = preview.formerMembers();
         ApiRetentionPreview response = new ApiRetentionPreview(preview.previewId(),
                 WireTypes.toOffsetDateTime(preview.expiresAt()),
+                bookings == null ? null : new ApiRetentionBookingsPreview(
+                        WireTypes.toOffsetDateTime(bookings.endedBefore()),
+                        Math.toIntExact(bookings.bookings()), Math.toIntExact(bookings.series())),
+                formerMembers == null ? null : new ApiRetentionFormerMembersPreview(formerMembers.membershipEndedBefore(),
+                        Math.toIntExact(formerMembers.people()), Math.toIntExact(formerMembers.accounts())),
                 preview.blocked().stream().map(blocked -> new ApiRetentionBlockedRecord(blocked.personId(),
                         ApiRetentionBlockReason.fromValue(blocked.reason().name()))).toList());
-        if (preview.bookings() != null) {
-            response.bookings(new ApiRetentionBookingsPreview(
-                    WireTypes.toOffsetDateTime(preview.bookings().endedBefore()),
-                    Math.toIntExact(preview.bookings().bookings()), Math.toIntExact(preview.bookings().series())));
-        }
-        if (preview.formerMembers() != null) {
-            response.formerMembers(new ApiRetentionFormerMembersPreview(preview.formerMembers().membershipEndedBefore(),
-                    Math.toIntExact(preview.formerMembers().people()),
-                    Math.toIntExact(preview.formerMembers().accounts())));
-        }
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
@@ -83,7 +80,6 @@ class RetentionAdminController implements AdminRetentionApi {
     }
 
     private static ApiRetentionPolicy toResponse(RetentionPlan.Policy policy) {
-        return new ApiRetentionPolicy(ApiRetentionCategory.fromValue(policy.category().name()))
-                .retainMonths(policy.retainMonths());
+        return new ApiRetentionPolicy(ApiRetentionCategory.fromValue(policy.category().name()), policy.retainMonths());
     }
 }
