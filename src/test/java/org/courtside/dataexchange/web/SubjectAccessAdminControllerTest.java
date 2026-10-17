@@ -125,6 +125,26 @@ class SubjectAccessAdminControllerTest extends AbstractIntegrationTest {
 
     @Test
     @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAPersonWithAPastAndAScheduledPeriod_whenABoardAsks_thenEveryPeriodIsAnswered() throws Exception {
+        // given
+        UUID personId = roster.addPerson("Jane", "Doe", "jane.doe@example.org");
+        UUID youth = roster.createMembershipType("Youth");
+        UUID adult = roster.createMembershipType("Adult");
+        roster.addMembershipPeriod(personId, youth, LocalDate.of(2018, 1, 1), LocalDate.of(2026, 1, 1));
+        roster.addMembershipPeriod(personId, adult, LocalDate.of(2026, 7, 1), null);
+
+        // when / then
+        mockMvc.perform(export(personId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.memberships.length()").value(2))
+                .andExpect(jsonPath("$.memberships[0].membershipType").value("Youth"))
+                .andExpect(jsonPath("$.memberships[0].endedOn").value("2026-01-01"))
+                .andExpect(jsonPath("$.memberships[1].membershipType").value("Adult"))
+                .andExpect(jsonPath("$.memberships[1].startedOn").value("2026-07-01"));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
     void givenAPersonTheInstanceHoldsEverythingAbout_whenABoardAsks_thenEachOfThoseThingsIsAnswered()
             throws Exception {
         // given
