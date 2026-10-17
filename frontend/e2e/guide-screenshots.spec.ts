@@ -129,6 +129,7 @@ const drivers: Record<string, (page: Page, visualDate: string) => Promise<void>>
   "admin-navigation": async (page) => {
     await page.getByTestId("administration-link").click();
     await expectAdministrationOverview(page);
+    await showTheWholeNavigation(page);
   },
   // The bar appears only once something is unsaved, so a renamed court brings it on screen.
   "save-bar": async (page) => {
@@ -451,10 +452,22 @@ async function prepare(page: Page, locale: string): Promise<void> {
 async function capture(page: Page, name: string, visualDate: string): Promise<void> {
   const declared = catalogue.captures.find((entry) => entry.name === name);
   if (declared === undefined) throw new Error(`No catalogue entry for ${name}`);
+  const size = page.viewportSize();
   await drivers[name](page, visualDate);
   const surface = page.getByTestId(declared.surface);
   await surface.page().evaluate(() => document.fonts.ready);
   await expect(surface).toHaveScreenshot(`${name}.png`, { animations: "disabled", caret: "hide" });
+  if (size !== null) await page.setViewportSize(size);
+}
+
+// A guide shows every destination, so the window grows by what the navigation's own frame would scroll.
+async function showTheWholeNavigation(page: Page): Promise<void> {
+  const frame = page.getByTestId("admin-navigation-frame");
+  const hidden = () => frame.evaluate((element) => element.scrollHeight - element.clientHeight);
+  const size = page.viewportSize();
+  const overflow = await hidden();
+  if (size !== null && overflow > 0) await page.setViewportSize({ width: size.width, height: size.height + overflow });
+  await expect.poll(hidden, { message: "every destination is in the picture", timeout: 10_000 }).toBe(0);
 }
 
 // A one-time password leads to the page that replaces it and nowhere else, so what the sign-in
