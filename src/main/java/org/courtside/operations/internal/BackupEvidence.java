@@ -6,9 +6,12 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
@@ -48,10 +51,18 @@ class BackupEvidence {
     }
 
     private static Instant completedAt(Path file) throws IOException {
-        if (Files.size(file) > MAX_BYTES) {
+        // Opening a pipe or a device would block the overview and every metric collection.
+        if (!Files.readAttributes(file, BasicFileAttributes.class).isRegularFile()) {
+            throw new IOException("The backup evidence is not a regular file");
+        }
+        byte[] content;
+        try (InputStream input = Files.newInputStream(file)) {
+            content = input.readNBytes(MAX_BYTES + 1);
+        }
+        if (content.length > MAX_BYTES) {
             throw new IOException("The backup evidence is larger than " + MAX_BYTES + " bytes");
         }
-        JsonNode value = JSON.readTree(Files.readString(file)).get("completedAt");
+        JsonNode value = JSON.readTree(new String(content, StandardCharsets.UTF_8)).get("completedAt");
         if (value == null || !value.isString()) {
             throw new IOException("The backup evidence names no completedAt");
         }

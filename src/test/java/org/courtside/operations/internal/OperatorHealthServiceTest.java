@@ -1,7 +1,10 @@
 package org.courtside.operations.internal;
 
 import org.courtside.notification.MailHandover;
+import org.courtside.TestCertificate;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.springframework.boot.info.BuildProperties;
 import org.springframework.boot.info.GitProperties;
 
@@ -11,6 +14,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.Properties;
 
@@ -208,6 +212,74 @@ class OperatorHealthServiceTest {
         assertThat(result.state()).isEqualTo(CheckState.FAILING);
         assertThat(result.reason()).isEqualTo(CheckReason.UNREADABLE);
         assertThat(result.location()).isEqualTo(file.toString());
+    }
+
+    @Test
+    void givenADirectoryAsEvidence_whenReadingTheOverview_thenTheBackupFailsNamingIt() throws Exception {
+        // given
+        Path directory = Files.createTempDirectory("backup-evidence");
+        backupFile = directory.toString();
+
+        // when
+        OperatorHealth.Backup result = service().read().backup();
+
+        // then
+        assertThat(result.state()).isEqualTo(CheckState.FAILING);
+        assertThat(result.reason()).isEqualTo(CheckReason.UNREADABLE);
+        assertThat(result.location()).isEqualTo(directory.toString());
+    }
+
+    @Test
+    @Timeout(value = 10, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
+    void givenAPipeWithoutWriterAsEvidence_whenReadingTheOverview_thenTheBackupFailsInsteadOfWaiting() throws Exception {
+        // given
+        Assumptions.assumeFalse(System.getProperty("os.name").toLowerCase(Locale.ROOT).contains("win"),
+                "named pipes are a POSIX file type");
+        Path pipe = Files.createTempDirectory("backup-evidence").resolve("last-backup.json");
+        Process created = new ProcessBuilder(TestCertificate.executable("mkfifo").toString(), pipe.toString()).start();
+        assertThat(created.waitFor()).as("mkfifo created the pipe").isZero();
+        backupFile = pipe.toString();
+
+        // when
+        OperatorHealth.Backup result = service().read().backup();
+
+        // then
+        assertThat(result.state()).as("a pipe nobody writes must not block the overview or the gauge")
+                .isEqualTo(CheckState.FAILING);
+        assertThat(result.reason()).isEqualTo(CheckReason.UNREADABLE);
+        assertThat(result.location()).isEqualTo(pipe.toString());
+    }
+
+    @Test
+    void givenAnEvidenceFileOneByteTooLarge_whenReadingTheOverview_thenTheBackupFails() throws Exception {
+        // given
+        Path file = Files.createTempFile("backup", ".json");
+        String evidence = "{\"completedAt\":\"2026-10-17T03:00:00Z\"}";
+        Files.writeString(file, evidence + " ".repeat(BackupEvidence.MAX_BYTES + 1 - evidence.length()));
+        backupFile = file.toString();
+
+        // when
+        OperatorHealth.Backup result = service().read().backup();
+
+        // then
+        assertThat(result.state()).as("the read stops at the bound").isEqualTo(CheckState.FAILING);
+        assertThat(result.reason()).isEqualTo(CheckReason.UNREADABLE);
+    }
+
+    @Test
+    void givenASymbolicLinkToAnEvidenceFile_whenReadingTheOverview_thenTheBackupIsRead() throws Exception {
+        // given
+        Path file = Files.createTempFile("backup", ".json");
+        Files.writeString(file, "{\"completedAt\":\"2026-10-17T03:00:00Z\"}");
+        Path link = Files.createTempDirectory("backup-evidence").resolve("last-backup.json");
+        Files.createSymbolicLink(link, file);
+        backupFile = link.toString();
+
+        // when
+        OperatorHealth.Backup result = service().read().backup();
+
+        // then
+        assertThat(result.state()).as("a link to a regular file is the operator's to choose").isEqualTo(CheckState.OK);
     }
 
     @Test

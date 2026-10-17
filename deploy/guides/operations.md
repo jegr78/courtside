@@ -1306,7 +1306,8 @@ Check the names in your own backend, because the translation is the collector's.
 ### An OpenTelemetry Collector in front of Prometheus
 
 The collector receives OTLP from the application and offers the values to Prometheus. Run it on the
-same container network and keep its ports off the public interface:
+same container network and keep its ports off the public interface. When the collector runs in
+Compose, give its service no `ports:` entry, so it is reachable on the internal network only:
 
 ```yaml
 receivers:
@@ -1558,7 +1559,8 @@ evidence=/srv/courtside/backup-evidence/last-backup.json
   && mv "$evidence.tmp" "$evidence"
 ```
 
-The file may hold at most 4 KiB and must be readable by UID 10001. The application reads it on every
+The file must be a regular file or a link to one, may hold at most 4 KiB and must be readable by UID
+10001. A pipe or a device reads as failing. The application reads it on every
 request to the overview and on every metric collection. Set `COURTSIDE_BACKUP_EVIDENCE_FILE` in
 `.env` to the path inside the container. The reference Compose files do not mount the directory yet,
 so add the mount in a `compose.override.yaml`:
