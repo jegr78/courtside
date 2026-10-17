@@ -1349,17 +1349,13 @@ groups:
         for: 15m
         annotations:
           summary: The latest recorded backup is older than two days.
-      - alert: CourtsideBackupNotRecorded
-        # NaN is the only value that differs from itself.
-        expr: courtside_backup_age_seconds != courtside_backup_age_seconds
+      - alert: CourtsideBackupNotEvidenced
+        expr: >
+          (courtside_backup_age_seconds != courtside_backup_age_seconds)
+          or absent(courtside_backup_age_seconds)
         for: 1h
         annotations:
-          summary: Courtside holds no backup record at all.
-      - alert: CourtsideMetricsMissing
-        expr: absent(courtside_backup_age_seconds)
-        for: 15m
-        annotations:
-          summary: The instance stopped sending metrics.
+          summary: No usable backup age arrives from Courtside.
       - alert: CourtsidePublicationsStuck
         expr: min_over_time(courtside_events_pending[30m]) > 0
         annotations:
@@ -1369,6 +1365,10 @@ groups:
         annotations:
           summary: More than 50 refused sign-ins in ten minutes.
 ```
+
+`CourtsideBackupNotEvidenced` fires alike when the series never existed, when its samples stop
+arriving and when a value arrives as `NaN`, the only value unequal to itself, so it does not depend
+on whether your collector carries `NaN` through unchanged.
 
 ### Grafana
 
