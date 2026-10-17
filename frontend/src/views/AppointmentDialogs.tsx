@@ -41,7 +41,7 @@ export function CancelDialog({ booking, seriesBookings, hasMoreBookings, timeZon
   const affected = scope === "THIS" ? [booking] : scope === "WHOLE_SERIES"
     ? seriesBookings
     : seriesBookings.filter((candidate) => new Date(candidate.startsAt) >= new Date(booking.startsAt));
-  return <Modal labelledBy="cancel-personal-title" closed={closed}><div className="surface-panel flex w-full max-w-lg flex-col overflow-hidden rounded-2xl border">
+  return <Modal labelledBy="cancel-personal-title" closed={closed} width="lg" composed>
     <DialogBody><div className="grid gap-4">
     <h2 id="cancel-personal-title" className="text-xl font-bold">{t("booking.cancelTitle")}</h2>
     {booking.seriesId && <ScopeFields scope={scope} changed={setScope} t={t} />}
@@ -52,7 +52,7 @@ export function CancelDialog({ booking, seriesBookings, hasMoreBookings, timeZon
     </div></DialogBody>
     {error && <div className="shrink-0 px-6 pt-3"><Alert>{error}</Alert></div>}
     <div className="surface-panel border-structural flex shrink-0 gap-2 border-t px-6 py-4"><Button variant="destructive-confirm" data-testid="confirm-cancellation" onClick={() => void submit()}>{t("booking.cancelConfirm")}</Button><Button variant="secondary" onClick={closed}>{t("booking.close")}</Button></div>
-  </div></Modal>;
+  </Modal>;
 }
 
 export function MoveDialog({ booking, courts, timeZone, maxBookingMinutes, closed, completed }: { booking: Appointment; courts: PublicCourt[]; timeZone: string; maxBookingMinutes?: number; closed: () => void; completed: () => Promise<void> }) {
@@ -88,7 +88,7 @@ export function MoveDialog({ booking, courts, timeZone, maxBookingMinutes, close
     try { await api.moveSeries(booking.seriesId!, request); await completed(); }
     catch (failure) { report(failure); }
   }
-  return <Modal labelledBy="move-personal-title" closed={closed}><div ref={dialog} data-testid="move-dialog" className="surface-panel flex w-full max-w-lg flex-col overflow-hidden rounded-2xl border">
+  return <Modal labelledBy="move-personal-title" closed={closed} width="lg" composed testId="move-dialog"><div ref={dialog} className="flex min-h-0 flex-col">
     <DialogBody><div className="grid gap-4">
     <h2 id="move-personal-title" className="text-xl font-bold">{t("myBookings.moveTitle")}</h2>
     <ScopeFields scope={scope} changed={(value) => { setScope(value); setPreview(undefined); }} t={t} />
@@ -165,7 +165,7 @@ export function ManagedAppointmentDialog({ bookingId, locale, timeZone, administ
     }
   }
 
-  return <Modal labelledBy="managed-appointment-detail-title" closed={closed}><div className="surface-panel flex w-full max-w-lg flex-col overflow-hidden rounded-2xl border">
+  return <Modal labelledBy="managed-appointment-detail-title" closed={closed} width="lg" composed>
     <DialogBody><div className="grid gap-4">
     <h2 id="managed-appointment-detail-title" className="text-xl font-bold">{t("managedAppointments.detailTitle")}</h2>
     {error && <Alert>{error}</Alert>}
@@ -182,7 +182,7 @@ export function ManagedAppointmentDialog({ bookingId, locale, timeZone, administ
     </>}
     </div></DialogBody>
     <div className="surface-panel border-structural flex shrink-0 gap-2 border-t px-6 py-4"><Button variant="secondary" data-testid="close-managed-appointment" onClick={closed}>{t("booking.close")}</Button></div>
-  </div></Modal>;
+  </Modal>;
 }
 
 function MoveReasons({ move, courtNames, t }: { move: MovePreview["moves"][number]; courtNames: Map<string, string>; t: Translate }) {
