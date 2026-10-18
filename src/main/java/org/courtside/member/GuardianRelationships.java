@@ -10,6 +10,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -19,23 +20,23 @@ import java.util.UUID;
 @Component
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-public class GuardianRelationships {
+class GuardianRelationships {
 
     private final GuardianRelationshipRepository relationships;
     private final UserAccountRepository accounts;
 
-    public boolean mayActFor(UUID guardianPersonId, UUID dependantPersonId, GuardianGrant grant, LocalDate day) {
+    boolean mayActFor(UUID guardianPersonId, UUID dependantPersonId, GuardianGrant grant, LocalDate day) {
         requireAll(guardianPersonId, dependantPersonId, grant, day);
         return grantsFor(guardianPersonId, dependantPersonId, day).map(granted -> granted.contains(grant))
                 .orElse(false);
     }
 
     /** The actions granted on the day, or empty when no relationship between the two holds then. */
-    public Optional<Set<GuardianGrant>> grantsFor(UUID guardianPersonId, UUID dependantPersonId, LocalDate day) {
+    Optional<Set<GuardianGrant>> grantsFor(UUID guardianPersonId, UUID dependantPersonId, LocalDate day) {
         if (guardianPersonId == null || dependantPersonId == null || day == null) {
             throw new IllegalStateException("A guardian question names both people and the day");
         }
-        if (!canSignIn(guardianPersonId) || accounts.findByPersonId(dependantPersonId).isEmpty()) {
+        if (!canSignIn(guardianPersonId) || accountOf(dependantPersonId).isEmpty()) {
             return Optional.empty();
         }
         return relationships.findByGuardianPersonIdAndDependantPersonId(guardianPersonId, dependantPersonId)
@@ -45,7 +46,7 @@ public class GuardianRelationships {
                 .map(relationship -> Set.copyOf(relationship.getGrants()));
     }
 
-    public List<UUID> dependantsOf(UUID guardianPersonId, GuardianGrant grant, LocalDate day) {
+    List<UUID> dependantsOf(UUID guardianPersonId, GuardianGrant grant, LocalDate day) {
         requireAll(guardianPersonId, guardianPersonId, grant, day);
         if (!canSignIn(guardianPersonId)) {
             return List.of();
@@ -54,12 +55,19 @@ public class GuardianRelationships {
                 .filter(relationship -> grants(relationship, grant, day))
                 .map(GuardianRelationship::getDependantPersonId)
                 .distinct()
-                .filter(dependant -> accounts.findByPersonId(dependant).isPresent())
+                .filter(dependant -> accountOf(dependant).isPresent())
                 .toList();
     }
 
+    /** The account a person acts through: an enabled one first, the same one on every call. */
+    Optional<UserAccount> accountOf(UUID personId) {
+        return accounts.findByPersonIdIn(List.of(personId)).stream()
+                .min(Comparator.comparing((UserAccount account) -> !account.isEnabled())
+                        .thenComparing(UserAccount::getId));
+    }
+
     private boolean canSignIn(UUID personId) {
-        return accounts.findByPersonId(personId).map(UserAccount::isEnabled).orElse(false);
+        return accountOf(personId).map(UserAccount::isEnabled).orElse(false);
     }
 
     private static boolean grants(GuardianRelationship relationship, GuardianGrant grant, LocalDate day) {

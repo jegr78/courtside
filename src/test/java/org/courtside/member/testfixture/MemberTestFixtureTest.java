@@ -86,15 +86,14 @@ class MemberTestFixtureTest extends AbstractIntegrationTest {
         UUID john = members.addPerson("John", "Roe", "john.roe@example.org");
         members.giveAccount(jane, "jane.doe", Set.of(Role.MEMBER));
         members.giveAccount(john, "john.roe", Set.of(Role.MEMBER));
-        LocalDate today = LocalDate.of(2026, 5, 12);
 
         // when
         UUID relationship = members.linkGuardian(jane, john, Set.of(GuardianGrant.BOOK));
 
         // then
-        assertThat(members.mayActFor(jane, john, GuardianGrant.BOOK, today)).isTrue();
+        assertThat(members.runningGrants(jane, john)).containsExactly(GuardianGrant.BOOK);
         assertThat(members.guardianshipCount(john)).isEqualTo(1);
         members.endGuardianship(john, relationship);
-        assertThat(members.mayActFor(jane, john, GuardianGrant.BOOK, today)).isFalse();
+        assertThat(members.runningGrants(jane, john)).isEmpty();
     }
 }

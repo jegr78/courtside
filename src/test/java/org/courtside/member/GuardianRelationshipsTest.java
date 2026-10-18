@@ -117,6 +117,23 @@ class GuardianRelationshipsTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenBothPeopleHoldingADormantAccountBesideACurrentOne_whenAsking_thenTheCurrentAccountsCount() {
+        // given
+        identity.createAccount(jane, "jane.doe.dormant", Set.of(Role.MEMBER));
+        identity.createAccount(john, "john.roe.dormant", Set.of(Role.MEMBER));
+        guardianships.create(jane, jane, john, Set.of(GuardianGrant.BOOK), null);
+
+        // when / then
+        assertThat(relationships.mayActFor(jane, john, GuardianGrant.BOOK, TODAY))
+                .as("a dormant account beside an enabled one does not hide the guardian").isTrue();
+        assertThat(relationships.accountOf(john)).as("the dependant acts through the enabled account")
+                .hasValueSatisfying(account -> assertThat(account.getId()).isEqualTo(johnAccount));
+        identity.disableAccount(janeAccount);
+        assertThat(relationships.mayActFor(jane, john, GuardianGrant.BOOK, TODAY))
+                .as("only disabled accounts left").isFalse();
+    }
+
+    @Test
     void givenADependantWhoseAccountIsDisabled_whenTheGuardianAsks_thenTheGuardianMayStillAct() {
         // given
         guardianships.create(jane, jane, john, Set.of(GuardianGrant.ACCOUNT_TASKS), null);

@@ -217,6 +217,7 @@ class GuardianshipAdminControllerTest extends AbstractIntegrationTest {
     void givenUnusableRequests_whenCreating_thenEachIsRefusedWithItsOwnCode() throws Exception {
         // given
         UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
+        identity.createAccount(jane, "jane.doe.dormant", Set.of(Role.MEMBER));
 
         // when / then
         refused(create(jane, request(jane, jane, "[\"BOOK\"]", null)), "guardianship.self");

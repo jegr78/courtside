@@ -70,7 +70,8 @@ public class GuardianshipService {
         }
         Set<GuardianGrant> granted = requiredGrants(grants);
         Map<UUID, Person> people = lockPeople(guardian, dependant);
-        if (accounts.findByPersonIdIn(List.of(guardian, dependant)).size() < 2) {
+        if (accounts.findByPersonIdIn(List.of(guardian, dependant)).stream()
+                .map(account -> account.getPerson().getId()).distinct().count() < 2) {
             throw new InvalidGuardianRelationshipException("guardianship.accountRequired");
         }
         LocalDate today = memberships.today();

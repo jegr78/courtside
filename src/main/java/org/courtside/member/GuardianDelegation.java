@@ -6,7 +6,6 @@ import org.courtside.identity.CurrentUser;
 import org.courtside.identity.DependantMessageAccess;
 import org.courtside.identity.Role;
 import org.courtside.identity.UserAccount;
-import org.courtside.identity.UserAccountRepository;
 import org.courtside.member.internal.DependantAccountDisabledException;
 import org.courtside.member.internal.DependantNotFoundException;
 import org.courtside.member.internal.GuardianActionNotGrantedException;
@@ -28,7 +27,6 @@ public class GuardianDelegation implements DependantMessageAccess {
 
     private final CurrentUser currentUser;
     private final GuardianRelationships relationships;
-    private final UserAccountRepository accounts;
     private final SecurityEventLog securityEvents;
     private final ClubTimeZone clubTimeZone;
     private final Clock clock;
@@ -60,7 +58,7 @@ public class GuardianDelegation implements DependantMessageAccess {
             securityEvents.authorizationDenied(guardian.getId());
             throw new GuardianActionNotGrantedException(grant);
         }
-        UserAccount dependant = accounts.findByPersonId(dependantPersonId)
+        UserAccount dependant = relationships.accountOf(dependantPersonId)
                 .orElseThrow(() -> new IllegalStateException("A granted relationship lost its dependant's account"));
         return new Delegation(guardian, dependant);
     }
