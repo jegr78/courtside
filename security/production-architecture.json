@@ -53,6 +53,7 @@
       "deploy/mail-check.sh",
       "deploy/mail-reload.sh",
       "src/main/java/org/courtside/booking/web/BookingController.java",
+      "src/main/java/org/courtside/booking/web/DependantBookingController.java",
       "src/main/java/org/courtside/booking/web/SeriesController.java",
       "src/main/java/org/courtside/booking/web/WaitlistController.java",
       "src/main/java/org/courtside/card/web/CardAdminController.java",
