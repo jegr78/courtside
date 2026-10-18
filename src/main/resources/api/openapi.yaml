@@ -5717,7 +5717,9 @@ paths:
         `urn:courtside:error:account-address-missing`, and too many requests for the account
         `429` with `urn:courtside:error:credential-issue-rate-limited`. The refusals for an unknown
         dependant and an action not granted are those of `listDependantBookings`, with
-        `ACCOUNT_TASKS` as the action.
+        `ACCOUNT_TASKS` as the action. A dependant whose account holds the administrator role is
+        refused the same way with the code `guardianship.administratorCredentials`, whatever the
+        relationship grants.
 
         This operation requires a full reauthentication within the configured window, capped at
         five minutes. Missing or stale proof is answered `403` with

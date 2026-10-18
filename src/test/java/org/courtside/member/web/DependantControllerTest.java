@@ -149,6 +149,22 @@ class DependantControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenAnAdministratorDependant_whenTheGuardianAsksForCredentials_thenNothingIsIssued() throws Exception {
+        // given
+        UUID richard = identity.createPerson("Richard", "Miles", "richard.miles@example.org");
+        identity.createEnabledAccount(richard, "miles.richard", Set.of(Role.MEMBER, Role.ADMIN));
+        members.linkGuardian(jane, richard, Set.of(GuardianGrant.ACCOUNT_TASKS));
+
+        // when / then
+        mockMvc.perform(post("/api/my/dependants/{personId}/credentials", richard).with(as("doe.jane")).with(csrf()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:guardian-action-not-granted"))
+                .andExpect(jsonPath("$.violations[0].code").value("guardianship.administratorCredentials"))
+                .andExpect(jsonPath("$.violations[0].params.action").value("ACCOUNT_TASKS"));
+        assertThat(audit.eventsAbout(richard, CREDENTIALS_REQUESTED)).isEmpty();
+    }
+
+    @Test
     void givenAStaleSignIn_whenTheGuardianAsksForCredentials_thenAFreshProofIsRequiredAndNothingIsIssued()
             throws Exception {
         // given

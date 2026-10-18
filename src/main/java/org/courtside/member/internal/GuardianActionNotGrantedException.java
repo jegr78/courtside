@@ -14,7 +14,11 @@ public class GuardianActionNotGrantedException extends CodedDomainFailure {
             "Action not granted", "Your relationship with this dependant does not grant this action");
 
     public GuardianActionNotGrantedException(GuardianGrant grant) {
-        super("guardianship.actionNotGranted", Map.of("action", grant.name()));
+        this("guardianship.actionNotGranted", grant);
+    }
+
+    public GuardianActionNotGrantedException(String code, GuardianGrant grant) {
+        super(code, Map.of("action", grant.name()));
     }
 
     @Override

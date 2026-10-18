@@ -7,9 +7,12 @@ import org.courtside.identity.CurrentUser;
 import org.courtside.identity.Person;
 import org.courtside.identity.PersonRepository;
 import org.courtside.identity.RecentAuthentication;
+import org.courtside.identity.Role;
 import org.courtside.identity.UserAccount;
+import org.courtside.member.internal.GuardianActionNotGrantedException;
 import org.courtside.member.internal.GuardianRelationship;
 import org.courtside.member.internal.GuardianRelationshipRepository;
+import org.courtside.shared.SecurityEventLog;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,6 +39,7 @@ public class DependantService {
     private final PersonRepository people;
     private final AccountCredentials credentials;
     private final RecentAuthentication recentAuthentication;
+    private final SecurityEventLog securityEvents;
     private final ApplicationEventPublisher events;
     private final ClubTimeZone clubTimeZone;
     private final Clock clock;
@@ -73,7 +77,13 @@ public class DependantService {
 
     @Transactional
     public void requestCredentials(UUID dependantPersonId) {
-        UserAccount dependant = delegation.require(dependantPersonId, GuardianGrant.ACCOUNT_TASKS).dependant();
+        GuardianDelegation.Delegation granted = delegation.require(dependantPersonId, GuardianGrant.ACCOUNT_TASKS);
+        UserAccount dependant = granted.dependant();
+        if (dependant.getRoles().contains(Role.ADMIN)) {
+            securityEvents.authorizationDenied(granted.guardian().getId());
+            throw new GuardianActionNotGrantedException("guardianship.administratorCredentials",
+                    GuardianGrant.ACCOUNT_TASKS);
+        }
         recentAuthentication.requireRecent();
         credentials.issueTo(dependant.getId());
         events.publishEvent(new RosterEvent.AccountCredentialsRequested(dependantPersonId, dependant.getId()));
