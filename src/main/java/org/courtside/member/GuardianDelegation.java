@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.util.EnumSet;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -47,20 +48,19 @@ public class GuardianDelegation implements DependantMessageAccess {
             throw new IllegalStateException("A delegated action names the dependant and the action");
         }
         UserAccount guardian = currentUser.requireAccount();
-        Set<GuardianGrant> granted = guardian.getPerson() == null ? null
-                : relationships.grantsFor(guardian.getPerson().getId(), dependantPersonId, today()).orElse(null);
-        if (granted == null) {
-            securityEvents.authorizationDenied(guardian.getId());
-            throw new DependantNotFoundException(
-                    "Account %s acts for no person %s".formatted(guardian.getId(), dependantPersonId));
+        Optional<Set<GuardianGrant>> granted = guardian.getPerson() == null ? Optional.empty()
+                : relationships.grantsFor(guardian.getPerson().getId(), dependantPersonId, today());
+        if (granted.map(grants -> grants.contains(grant)).orElse(false)) {
+            UserAccount dependant = relationships.accountOf(dependantPersonId).orElseThrow(
+                    () -> new IllegalStateException("A granted relationship lost its dependant's account"));
+            return new Delegation(guardian, dependant);
         }
-        if (!granted.contains(grant)) {
-            securityEvents.authorizationDenied(guardian.getId());
+        securityEvents.authorizationDenied(guardian.getId());
+        if (granted.isPresent()) {
             throw new GuardianActionNotGrantedException(grant);
         }
-        UserAccount dependant = relationships.accountOf(dependantPersonId)
-                .orElseThrow(() -> new IllegalStateException("A granted relationship lost its dependant's account"));
-        return new Delegation(guardian, dependant);
+        throw new DependantNotFoundException(
+                "Account %s acts for no person %s".formatted(guardian.getId(), dependantPersonId));
     }
 
     public Delegation requireBookable(UUID dependantPersonId, GuardianGrant grant) {

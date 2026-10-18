@@ -41,11 +41,11 @@ public class DependantBookings {
         boolean held = bookingId != null && repository.findById(bookingId)
                 .map(booking -> holder.equals(booking.getBookedBy()))
                 .orElse(false);
-        if (!held) {
-            securityEvents.authorizationDenied(granted.guardian().getId());
-            throw new BookingNotFoundException(
-                    "Person %s holds no booking %s".formatted(dependantPersonId, bookingId));
+        if (held) {
+            bookings.cancel(bookingId, holder, granted.dependantRoles(), null);
+            return;
         }
-        bookings.cancel(bookingId, holder, granted.dependantRoles(), null);
+        securityEvents.authorizationDenied(granted.guardian().getId());
+        throw new BookingNotFoundException("Person %s holds no booking %s".formatted(dependantPersonId, bookingId));
     }
 }
