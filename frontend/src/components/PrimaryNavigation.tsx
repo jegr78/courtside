@@ -3,22 +3,26 @@ import { Link, useLocation } from "react-router-dom";
 import { type SessionStatus } from "../api/client";
 import { useUnreadNotifications } from "../navigation/unreadNotifications";
 import { reachesAdministration } from "../navigation/administrationAccess";
+import { useHasDependants } from "../navigation/dependants";
 
 interface Destination {
   to: string;
   testId: string;
   label: string;
   compactLabel: string;
-  icon: "courts" | "bookings" | "messages" | "administration";
-  visible: (session: SessionStatus) => boolean;
+  icon: "courts" | "bookings" | "messages" | "dependants" | "administration";
+  visible: (session: SessionStatus, hasDependants: boolean) => boolean;
 }
 
 const destinations: Destination[] = [
   { to: "/", testId: "court-plan-link", label: "nav.courts", compactLabel: "nav.courtsCompact", icon: "courts", visible: () => true },
   { to: "/my-bookings", testId: "my-bookings-link", label: "nav.myBookings", compactLabel: "nav.myBookingsCompact", icon: "bookings", visible: (session) => session.authenticated },
   { to: "/my-messages", testId: "my-messages-link", label: "nav.myMessages", compactLabel: "nav.myMessagesCompact", icon: "messages", visible: (session) => session.authenticated },
+  { to: "/my-dependants", testId: "my-dependants-link", label: "nav.myDependants", compactLabel: "nav.myDependantsCompact", icon: "dependants", visible: (session, hasDependants) => session.authenticated && hasDependants },
   { to: "/admin", testId: "administration-link", label: "nav.administration", compactLabel: "nav.administrationCompact", icon: "administration", visible: reachesAdministration }
 ];
+
+const MOST_DESTINATIONS = 4;
 
 function isCurrent(destination: Destination, pathname: string): boolean {
   if (destination.to === "/") return pathname === "/" || pathname === "/courts";
@@ -34,6 +38,7 @@ function DestinationIcon({ destination }: { destination: Destination }) {
     courts: <><path d="M4 5h16v14H4z" /><path d="M8 3v4M16 3v4M4 9h16" /></>,
     bookings: <><path d="M5 4h14v16H5z" /><path d="M8 2v4M16 2v4M5 8h14M8 13l2 2 4-4" /></>,
     messages: <><path d="M4 5h16v14H4z" /><path d="m4 7 8 6 8-6" /></>,
+    dependants: <><circle cx="9" cy="7" r="3" /><circle cx="17" cy="10" r="2" /><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M14 20c0-2 1.3-4 3-4s3 2 3 4" /></>,
     administration: <><path d="M4 6h16M4 12h16M4 18h16" /><circle cx="8" cy="6" r="2" /><circle cx="16" cy="12" r="2" /><circle cx="10" cy="18" r="2" /></>
   }[destination.icon];
   return <svg
@@ -52,7 +57,10 @@ function DestinationIcon({ destination }: { destination: Destination }) {
 export function PrimaryNavigation({ session }: { session: SessionStatus }) {
   const { t } = useTranslation();
   const { pathname } = useLocation();
-  const open = destinations.filter((destination) => destination.visible(session));
+  const hasDependants = useHasDependants(session.authenticated, pathname);
+  const offered = destinations.filter((destination) => destination.visible(session, hasDependants));
+  // A thumb reaches four places on a phone; the bookings page links the dependants when the bar is full.
+  const open = offered.length > MOST_DESTINATIONS ? offered.filter((destination) => destination.icon !== "dependants") : offered;
   const unread = useUnreadNotifications(session.authenticated, pathname);
   const counted = (destination: Destination) => destination.icon === "messages" && unread > 0;
 

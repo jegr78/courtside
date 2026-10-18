@@ -25,9 +25,9 @@ function summaryOf(notification: Notification, t: Translate) {
     : t(`notifications.summary.${notification.kind}`);
 }
 
-function NotificationEntry({ notification, timeZone, marking, justRead, markRead, t, language }: {
-  notification: Notification; timeZone: string; marking: boolean; justRead: boolean;
-  markRead: (id: string, quietly?: boolean) => void; t: Translate; language: string;
+export function NotificationEntry({ notification, timeZone, marking = false, justRead = false, markRead, t, language }: {
+  notification: Notification; timeZone: string; marking?: boolean; justRead?: boolean;
+  markRead?: (id: string, quietly?: boolean) => void; t: Translate; language: string;
 }) {
   const summaryId = useId();
   const item = useRef<HTMLLIElement>(null);
@@ -36,7 +36,7 @@ function NotificationEntry({ notification, timeZone, marking, justRead, markRead
     if (justRead) item.current?.focus();
   }, [justRead]);
   const read = Boolean(notification.readAt);
-  const route = routes[notification.link.target];
+  const route = markRead && routes[notification.link.target];
   const booking = notification.booking ?? notification.waitlistOffer?.slot;
   const offer = notification.waitlistOffer;
   return <li ref={item} tabIndex={-1} data-testid={`notification-${notification.id}`} data-read={String(read)}
@@ -72,7 +72,7 @@ function NotificationEntry({ notification, timeZone, marking, justRead, markRead
         onClick={() => { if (!read) markRead(notification.id, true); }}>
         {t(`notifications.open.${notification.link.target}`)}
       </Link>}
-      {!read && <Button variant="secondary" data-testid="notification-mark-read" aria-describedby={summaryId}
+      {!read && markRead && <Button variant="secondary" data-testid="notification-mark-read" aria-describedby={summaryId}
         className="min-h-11 px-3" aria-disabled={marking || undefined}
         onClick={() => { if (!marking) markRead(notification.id); }}>
         {t("notifications.markRead")}

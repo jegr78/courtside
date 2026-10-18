@@ -34,6 +34,7 @@ class SpaConfiguration {
             "/initial-password",
             "/my-bookings",
             "/my-messages",
+            "/my-dependants",
             "/account/security",
             "/admin",
             "/admin/appointments",

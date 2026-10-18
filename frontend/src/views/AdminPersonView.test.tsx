@@ -238,9 +238,9 @@ describe("AdminPersonView", () => {
     await userEvent.click(screen.getByTestId("confirm-end-guardianship"));
 
     // when
-    const dialog = await screen.findByRole("dialog", { name: "Confirm your identity" });
+    const submit = await screen.findByTestId("admin-reauthentication-submit");
     await userEvent.type(input("admin-reauthentication-password"), "admin-password");
-    await userEvent.click(within(dialog).getByTestId("admin-reauthentication-submit"));
+    await userEvent.click(submit);
 
     // then
     await waitFor(() => expect(end).toHaveBeenCalledTimes(2));

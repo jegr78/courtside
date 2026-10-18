@@ -1,6 +1,6 @@
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ApiError, api, type Allocation, type BookingGrid, type BookingHours, type Problem, type PublicBookingCard, type PublicCourt, type PublicParticipantCard, type PublicParticipantMember } from "../api/client";
+import { ApiError, api, type Allocation, type BookingGrid, type BookingHours, type Dependant, type Problem, type PublicBookingCard, type PublicCourt, type PublicParticipantCard, type PublicParticipantMember } from "../api/client";
 import { idempotencyKey } from "../api/idempotency";
 import { failureReference, problemText, violationMessage } from "../api/problem-message";
 import { useReportedFailure } from "../failures/useReportedFailure";
@@ -61,6 +61,8 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
   const [requestKey, setRequestKey] = useState(() => idempotencyKey());
   const [showsMore, setShowsMore] = useState(false);
   const [refusedAsTaken, setRefusedAsTaken] = useState<{ refreshFailed: boolean }>();
+  const [bookable, setBookable] = useState<Dependant[]>([]);
+  const [bookFor, setBookFor] = useState("");
 
   useEffect(() => {
     void Promise.all([api.bookingCards(), api.participantCards()]).then(([cards, participants]) => {
@@ -69,6 +71,15 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
       setCardId(cards[0]?.id ?? "");
     }).catch((failure: unknown) => report(failure));
   }, [report]);
+
+  useEffect(() => {
+    if (waitlist) return;
+    let active = true;
+    void api.dependants()
+      .then((dependants) => { if (active) setBookable(dependants.filter((dependant) => dependant.grants.includes("BOOK"))); })
+      .catch((failure: unknown) => warnAbout("Dependants unavailable", failure));
+    return () => { active = false; };
+  }, [waitlist]);
 
   useEffect(() => {
     const query = memberQuery.trim();
@@ -108,14 +119,8 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
           courtId: selection.courtId, cardId, startsAt, endsAt, note: note.trim() || undefined, participants
         });
       } else {
-        await api.createBooking({
-          courtIds,
-          cardId,
-          startsAt,
-          endsAt,
-          note: note.trim() || undefined,
-          participants
-        }, requestKey);
+        const booking = { courtIds, cardId, startsAt, endsAt, note: note.trim() || undefined, participants };
+        await (bookFor ? api.createDependantBooking(bookFor, booking, requestKey) : api.createBooking(booking, requestKey));
       }
       await created();
     } catch (failure) {
@@ -179,6 +184,16 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
       <p data-testid="booking-period" aria-live="polite" className="mt-2 font-semibold">{formatBookingPeriod(period.startsAt, period.endsAt, i18n.language, grid.timeZone)}</p>
       <FieldViolations id="booking-startsAt-errors" violations={fieldViolations("startsAt")} />
       {waitlist && <p data-testid="waitlist-explanation" className="text-muted mt-2 text-sm">{t("waitlist.explanation")}</p>}
+      {!waitlist && bookable.length > 0 && <>
+        <label className="mt-5 grid gap-2 font-medium">{t("booking.bookFor")}
+          <select data-testid="booking-for" aria-describedby="booking-for-hint" value={bookFor} onChange={(event) => setBookFor(event.target.value)}
+                  className="form-control rounded-lg border px-3 py-3">
+            <option value="">{t("booking.bookForSelf")}</option>
+            {bookable.map((dependant) => <option key={dependant.personId} value={dependant.personId}>{`${dependant.firstName} ${dependant.lastName}`}</option>)}
+          </select>
+        </label>
+        <p id="booking-for-hint" className="text-muted mt-1 text-sm">{t("booking.bookForHint")}</p>
+      </>}
       {!slotTaken && !waitlist && <>
       <label className="mt-5 grid gap-2 font-medium">{t("booking.duration")}
         <select data-testid="booking-duration" aria-describedby={durationDescription} value={refusedAsTaken ? "" : selectedDuration} onChange={(event) => {

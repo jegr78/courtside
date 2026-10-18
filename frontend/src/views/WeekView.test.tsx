@@ -74,6 +74,8 @@ beforeEach(async () => {
   vi.spyOn(api, "participantMembers").mockResolvedValue([]);
   vi.spyOn(api, "bookingEligibility").mockResolvedValue({ violations: [] });
   vi.spyOn(api, "createBooking").mockResolvedValue({ id: "77777777-7777-7777-7777-777777777777" });
+  vi.spyOn(api, "createDependantBooking").mockResolvedValue({ id: "77777777-7777-7777-7777-777777777778" });
+  vi.spyOn(api, "dependants").mockResolvedValue([]);
   vi.spyOn(api, "cancelBooking").mockResolvedValue(undefined);
   vi.spyOn(api, "reservedSlots").mockResolvedValue([]);
   vi.spyOn(api, "joinWaitlist").mockResolvedValue({ id: "88888888-8888-8888-8888-888888888888" });
@@ -672,6 +674,40 @@ it("given a refresh failed, when a later refresh succeeds, then its failure noti
 
   // then
   await waitFor(() => expect(notice, "a plan that refreshed again no longer claims it failed").not.toBeInTheDocument());
+});
+
+it("given a member who acts for nobody, when the booking dialog opens, then it offers nobody to book for", async () => {
+  // given
+  render(<WeekView today={clubInstant("07:00")} />);
+
+  // when
+  await userEvent.click(await findFreeSlot(1, "08:00"));
+
+  // then
+  await waitFor(() => expect(api.dependants).toHaveBeenCalled());
+  expect(screen.queryByTestId("booking-for")).toBeNull();
+});
+
+it("given a guardian allowed to book for one dependant and only to view another, when they book for the first, then the booking goes to that dependant", async () => {
+  // given
+  vi.mocked(api.dependants).mockResolvedValue([
+    { personId: "person-2", firstName: "John", lastName: "Roe", grants: ["BOOK"], endedOn: null },
+    { personId: "person-3", firstName: "Mary", lastName: "Major", grants: ["VIEW_BOOKINGS"], endedOn: null }
+  ]);
+  render(<WeekView today={clubInstant("07:00")} />);
+  await userEvent.click(await findFreeSlot(1, "08:00"));
+  const bookFor = await screen.findByTestId("booking-for");
+  expect([...within(bookFor).getAllByRole("option")].map((option) => option.getAttribute("value")),
+    "only a dependant the guardian may book for is offered").toEqual(["", "person-2"]);
+
+  // when
+  await userEvent.selectOptions(bookFor, "person-2");
+  await userEvent.click(screen.getByTestId("booking-submit"));
+
+  // then
+  await waitFor(() => expect(api.createDependantBooking).toHaveBeenCalledWith("person-2",
+    expect.objectContaining({ courtIds: [courts[0].id] }), expect.any(String)));
+  expect(api.createBooking, "the guardian's own booking path is not used").not.toHaveBeenCalled();
 });
 
 it("given a booking conflict, when submission fails, then the affected day is refreshed", async () => {
