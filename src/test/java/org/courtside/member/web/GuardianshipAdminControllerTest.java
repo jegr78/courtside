@@ -224,6 +224,7 @@ class GuardianshipAdminControllerTest extends AbstractIntegrationTest {
         refused(create(jane, request(jane, mary, "[\"BOOK\"]", null)), "guardianship.accountRequired");
         refused(create(mary, request(mary, john, "[\"BOOK\"]", null)), "guardianship.accountRequired");
         refused(create(jane, request(jane, john, "[\"BOOK\"]", "2026-05-11")), "guardianship.endsBeforeItBegan");
+        refused(create(jane, request(jane, john, "[\"BOOK\"]", "2026-05-12")), "guardianship.coversNoDay");
         mockMvc.perform(get(guardianships(jane))).andExpect(jsonPath("$.length()").value(0));
     }
 
@@ -251,6 +252,9 @@ class GuardianshipAdminControllerTest extends AbstractIntegrationTest {
         // when / then
         refused(change(jane, id, "{\"grants\":[\"BOOK\"],\"endedOn\":\"2026-05-01\"}"),
                 "guardianship.endsBeforeItBegan");
+        refused(change(jane, id, "{\"grants\":[\"BOOK\"],\"endedOn\":\"2026-05-12\"}"),
+                "guardianship.coversNoDay");
+        end(jane, id).andExpect(status().isOk()).andExpect(jsonPath("$.endedOn").value("2026-05-12"));
     }
 
     @Test

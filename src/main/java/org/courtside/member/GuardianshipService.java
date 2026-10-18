@@ -74,7 +74,7 @@ public class GuardianshipService {
             throw new InvalidGuardianRelationshipException("guardianship.accountRequired");
         }
         LocalDate today = memberships.today();
-        requireEndNotBefore(today, endedOn);
+        requireEndAfter(today, endedOn);
         GuardianRelationship created = new GuardianRelationship(guardian, dependant, today, granted, endedOn);
         requireNotReversed(created, today);
         saveOrRejectOverlap(created);
@@ -90,7 +90,7 @@ public class GuardianshipService {
         Locked locked = lockedRelationship(personId, relationshipId);
         GuardianRelationship existing = locked.relationship();
         Map<UUID, Person> people = locked.people();
-        requireEndNotBefore(existing.getStartedOn(), endedOn);
+        requireEndAfter(existing.getStartedOn(), endedOn);
         existing.change(granted, endedOn);
         LocalDate today = memberships.today();
         requireNotReversed(existing, today);
@@ -173,9 +173,12 @@ public class GuardianshipService {
         }
     }
 
-    private static void requireEndNotBefore(LocalDate start, @Nullable LocalDate endedOn) {
+    private static void requireEndAfter(LocalDate start, @Nullable LocalDate endedOn) {
         if (endedOn != null && endedOn.isBefore(start)) {
             throw new InvalidGuardianRelationshipException("guardianship.endsBeforeItBegan");
+        }
+        if (start.equals(endedOn)) {
+            throw new InvalidGuardianRelationshipException("guardianship.coversNoDay");
         }
     }
 

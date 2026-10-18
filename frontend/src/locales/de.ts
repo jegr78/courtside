@@ -1211,6 +1211,7 @@ const de = {
   "guardianship.self": "Niemand kann sich selbst vertreten.",
   "guardianship.grantsRequired": "Wähle mindestens eine Aktion, die die vertretende Person ausführen darf.",
   "guardianship.endsBeforeItBegan": "Das Ende einer Beziehung kann nicht vor ihrem Beginn liegen.",
+  "guardianship.coversNoDay": "Das Ende ist der erste Tag ohne Vertretung und muss deshalb nach dem Beginn liegen.",
   "guardianship.reversed": "Die vertretene Person vertritt bereits diese Person, beide können sich nicht gegenseitig vertreten.",
   "guardianship.overlaps": "Diese Person vertritt die andere an diesen Tagen bereits.",
   "guardianship.accountRequired": "Die vertretende und die vertretene Person brauchen beide ein Konto.",

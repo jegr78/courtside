@@ -8176,7 +8176,8 @@ paths:
             The request is malformed, or the relationship is not usable
             (`urn:courtside:error:invalid-guardian-relationship`): the person in the path takes no
             part in it, a person would be their own guardian, no action is granted, the end lies
-            before today, or the dependant already acts for the guardian.
+            before today or on today so that it would hold no day, or the dependant already acts
+            for the guardian.
           content:
             application/problem+json:
               schema: { $ref: "#/components/schemas/Problem" }
@@ -8234,7 +8235,8 @@ paths:
           description: |
             The request is malformed, or the change is not usable
             (`urn:courtside:error:invalid-guardian-relationship`): no action is granted, the end
-            lies before the start, or reopening it would make two people each other's guardians.
+            lies before the start or on it, or reopening it would make two people each other's
+            guardians. Ending a relationship on its first day is what the end operation does.
           content:
             application/problem+json:
               schema: { $ref: "#/components/schemas/Problem" }

@@ -1213,6 +1213,7 @@ const en: Record<keyof typeof de, string> = {
   "guardianship.self": "A person cannot be their own guardian.",
   "guardianship.grantsRequired": "Choose at least one action the guardian may take.",
   "guardianship.endsBeforeItBegan": "The end of a relationship cannot lie before its start.",
+  "guardianship.coversNoDay": "The end is the first day the relationship no longer holds, so it must lie after the start.",
   "guardianship.reversed": "The dependant already acts for this guardian, so the two cannot be each other's guardians.",
   "guardianship.overlaps": "This guardian already holds a relationship to this dependant on these days.",
   "guardianship.accountRequired": "Both the guardian and the dependant need an account.",
