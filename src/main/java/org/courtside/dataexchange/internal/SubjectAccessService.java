@@ -76,7 +76,8 @@ public class SubjectAccessService {
                         .sorted(ACCOUNT_PRECEDENCE)
                         .map(held -> accountOf(held, now))
                         .toList(),
-                membershipsOf(personId), guardianshipsOf(personId), made, recordedInSomebodyElses(personId, made),
+                membershipsOf(personId), guardianshipsOf(personId), made,
+                eachAccount(accountIds, bookings::actedForOthersBy), recordedInSomebodyElses(personId, made),
                 eachAccount(accountIds, bookings::seriesCreatedBy),
                 eachAccount(accountIds, bookings::waitlistOf),
                 bookings.namedInWaitlists(personId),

@@ -4044,6 +4044,21 @@ components:
           type: array
           items: { $ref: "#/components/schemas/SubjectAccessReservation" }
 
+    SubjectAccessActedForBooking:
+      type: object
+      required: [bookingId, holderPersonId, createdAt, status, reservations]
+      description: |
+        A booking this person made as guardian for somebody else, who holds it. The holder is
+        named by id only, since their name is not this person's data.
+      properties:
+        bookingId: { type: string, format: uuid }
+        holderPersonId: { type: string, format: uuid }
+        createdAt: { type: string, format: date-time }
+        status: { $ref: "#/components/schemas/BookingStatus" }
+        reservations:
+          type: array
+          items: { $ref: "#/components/schemas/SubjectAccessReservation" }
+
     SubjectAccessWaitlistEntry:
       type: object
       required: [entryId, courtId, startsAt, endsAt, state, joinedAt]
@@ -4234,7 +4249,7 @@ components:
     SubjectAccessExport:
       type: object
       required: [producedAt, personId, firstName, lastName, accounts, memberships, guardianships,
-                 bookingsMade, bookingsRecordedIn, bookingSeries, messages, declinedMessages,
+                 bookingsMade, bookingsActedFor, bookingsRecordedIn, bookingSeries, messages, declinedMessages,
                  notifications, declinedChannels, externalReferences, changesAsSubject, changesAsActor,
                  waitlistEntries, waitlistsNamedIn]
       description: |
@@ -4265,6 +4280,9 @@ components:
         bookingsMade:
           type: array
           items: { $ref: "#/components/schemas/SubjectAccessBooking" }
+        bookingsActedFor:
+          type: array
+          items: { $ref: "#/components/schemas/SubjectAccessActedForBooking" }
         bookingsRecordedIn:
           type: array
           items: { $ref: "#/components/schemas/SubjectAccessParticipation" }

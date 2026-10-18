@@ -22,6 +22,7 @@ import org.courtside.api.ApiSubjectAccessMembership;
 import org.courtside.api.ApiSubjectAccessMessage;
 import org.courtside.api.ApiNotificationClosure;
 import org.courtside.api.ApiSubjectAccessNotification;
+import org.courtside.api.ApiSubjectAccessActedForBooking;
 import org.courtside.api.ApiSubjectAccessParticipation;
 import org.courtside.api.ApiSubjectAccessNamedInWaitlist;
 import org.courtside.api.ApiSubjectAccessWaitlistEntry;
@@ -62,6 +63,7 @@ class SubjectAccessAdminController implements AdminSubjectAccessApi {
                 answer.memberships().stream().map(SubjectAccessAdminController::toMembership).toList(),
                 answer.guardianships().stream().map(SubjectAccessAdminController::toGuardianship).toList(),
                 answer.bookingsMade().stream().map(SubjectAccessAdminController::toBooking).toList(),
+                answer.bookingsActedFor().stream().map(SubjectAccessAdminController::toActedFor).toList(),
                 answer.bookingsRecordedIn().stream()
                         .map(SubjectAccessAdminController::toParticipation).toList(),
                 answer.bookingSeries().stream().map(SubjectAccessAdminController::toSeries).toList(),
@@ -178,6 +180,13 @@ class SubjectAccessAdminController implements AdminSubjectAccessApi {
                         : ApiCancellationReason.fromValue(booking.cancellationReason().name()))
                 .note(booking.note())
                 .partnerSearchPublishedAt(WireTypes.toOffsetDateTime(booking.partnerSearchPublishedAt()));
+    }
+
+    private static ApiSubjectAccessActedForBooking toActedFor(PersonBookingHistory.ActedFor booking) {
+        return new ApiSubjectAccessActedForBooking(booking.bookingId(), booking.holderPersonId(),
+                WireTypes.toOffsetDateTime(booking.createdAt()),
+                ApiBookingStatus.fromValue(booking.status().name()),
+                toReservations(booking.reservations()));
     }
 
     private static ApiSubjectAccessParticipation toParticipation(PersonBookingHistory.Recorded booking) {

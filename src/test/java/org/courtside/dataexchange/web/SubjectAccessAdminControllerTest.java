@@ -153,6 +153,36 @@ class SubjectAccessAdminControllerTest extends AbstractIntegrationTest {
 
     @Test
     @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAGuardianWhoBookedForTheirDependant_whenABoardAsks_thenTheBookingIsAnsweredWithTheHolderByIdOnly()
+            throws Exception {
+        // given
+        UUID personId = roster.addPerson("Jane", "Doe", "jane.doe@example.org");
+        UUID child = roster.addPerson("John", "Roe", "john.roe@example.org");
+        roster.giveAccount(personId, "jane.doe", Set.of(Role.MEMBER));
+        roster.giveAccount(child, "john.roe", Set.of(Role.MEMBER));
+        UUID bookingId = bookings.createBookingForDependant(courtId, MEMBER_BOOKING_CARD,
+                new TimeSlot(SIX_PM, SEVEN_PM), identity.accountIdOf(child), child, identity.accountIdOf(personId));
+
+        // when / then
+        String body = mockMvc.perform(export(personId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.bookingsMade", hasSize(0)))
+                .andExpect(jsonPath("$.bookingsActedFor.length()").value(1))
+                .andExpect(jsonPath("$.bookingsActedFor[0].bookingId").value(bookingId.toString()))
+                .andExpect(jsonPath("$.bookingsActedFor[0].holderPersonId").value(child.toString()))
+                .andExpect(jsonPath("$.bookingsActedFor[0].status").value("CONFIRMED"))
+                .andExpect(jsonPath("$.bookingsActedFor[0].reservations[0].courtId").value(courtId.toString()))
+                .andExpect(jsonPath("$.bookingsActedFor[0].reservations[0].startsAt").value("2026-05-13T16:00:00Z"))
+                .andReturn().getResponse().getContentAsString();
+        assertThat(body).as("the dependant's name is theirs, not the guardian's").doesNotContain("Roe");
+        mockMvc.perform(export(child))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.bookingsMade[0].bookingId").value(bookingId.toString()))
+                .andExpect(jsonPath("$.bookingsActedFor", hasSize(0)));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
     void givenAPersonWithAPastAndAScheduledPeriod_whenABoardAsks_thenEveryPeriodIsAnswered() throws Exception {
         // given
         UUID personId = roster.addPerson("Jane", "Doe", "jane.doe@example.org");

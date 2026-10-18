@@ -19,6 +19,7 @@ public record SubjectAccessRecord(Instant producedAt, UUID personId, String firs
                                   List<Membership> memberships,
                                   List<Guardianship> guardianships,
                                   List<PersonBookingHistory.Made> bookingsMade,
+                                  List<PersonBookingHistory.ActedFor> bookingsActedFor,
                                   List<PersonBookingHistory.Recorded> bookingsRecordedIn,
                                   List<PersonBookingHistory.Series> bookingSeries,
                                   List<PersonBookingHistory.Waiting> waitlistEntries,
