@@ -1,10 +1,9 @@
 package org.courtside.booking;
 
 import lombok.RequiredArgsConstructor;
-import org.courtside.booking.internal.BookingNotFoundException;
+import org.courtside.booking.internal.DependantBookingNotHeldException;
 import org.courtside.member.GuardianDelegation;
 import org.courtside.member.GuardianGrant;
-import org.courtside.shared.SecurityEventLog;
 import org.courtside.shared.TimeSlot;
 import org.springframework.stereotype.Service;
 
@@ -19,7 +18,6 @@ public class DependantBookings {
     private final GuardianDelegation delegation;
     private final BookingService bookings;
     private final BookingRepository repository;
-    private final SecurityEventLog securityEvents;
 
     public PersonalBookingPage bookingsOf(UUID dependantPersonId, PersonalBookingView view, UUID cursor, int limit) {
         GuardianDelegation.Delegation granted = delegation.require(dependantPersonId, GuardianGrant.VIEW_BOOKINGS);
@@ -45,7 +43,7 @@ public class DependantBookings {
             bookings.cancel(bookingId, holder, granted.dependantRoles(), null);
             return;
         }
-        securityEvents.authorizationDenied(granted.guardian().getId());
-        throw new BookingNotFoundException("Person %s holds no booking %s".formatted(dependantPersonId, bookingId));
+        throw new DependantBookingNotHeldException(
+                "Person %s holds no booking %s".formatted(dependantPersonId, bookingId));
     }
 }
