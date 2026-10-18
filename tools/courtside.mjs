@@ -741,7 +741,8 @@ async function execute(options) {
       runPassiveDeploymentAssessment, runAuthorizationAssessment, planAssessedAuthorizationRequests,
       renderAuthenticatedZapPlan, renderAuthenticatedZapCanaryRetestPlan,
       runAuthenticatedZapAssessment, prepareOpenApiFuzzFixtures, runOpenApiFuzzAssessment,
-      runOpenApiImportCases, runOpenApiInputCases, runOpenApiMutationCases, runResourceAbuseAssessment
+      runOpenApiImportCases, runOpenApiInputCases, runOpenApiMutationCases, runResourceAbuseAssessment,
+      openApiFuzzRequestPlan
     } = await securityAssessments();
     const plan = securityAssessmentPlan(options, false);
     const ca = readSecurityProxyCa(options.runId);
@@ -771,6 +772,7 @@ async function execute(options) {
         attemptsBeforeLimit: shippedLoginAddressMaxFailures(),
         durationSeconds: selectedPlan.budgets.durationSeconds
       }).total,
+      planOpenApiFuzzRequests: () => openApiFuzzRequestPlan().total,
       resetLoginAttempts: async (selectedPlan, context) => resetSecurityLoginAttempts(selectedPlan.runId,
         context.stopFile, Math.max(1, context.deadline.getTime() - Date.now())),
       runAuthenticatedZapAssessment: async (selectedPlan, context) => runAuthenticatedZapAssessment(selectedPlan, {
