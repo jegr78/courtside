@@ -227,6 +227,39 @@ class DependantBookingControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenTwoGuardiansOfOneDependant_whenBothBookWithTheSameKey_thenEachGetsTheirOwnBooking() throws Exception {
+        // given
+        UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
+        identity.createEnabledAccount(mary, "major.mary", Set.of(Role.MEMBER));
+        members.linkGuardian(jane, john, Set.of(GuardianGrant.BOOK));
+        members.linkGuardian(mary, john, Set.of(GuardianGrant.BOOK));
+        UUID janes = idOf(book(as("doe.jane"), john, "family-key", "18:00", "19:00")
+                .andExpect(status().isCreated()));
+
+        // when
+        UUID marys = idOf(book(as("major.mary"), john, "family-key", "19:00", "20:00")
+                .andExpect(status().isCreated()));
+
+        // then
+        assertThat(marys).as("one guardian's key never answers for another's").isNotEqualTo(janes);
+        assertThat(bookings.findById(marys).orElseThrow().getActedBy()).isNotEqualTo(janeAccount);
+    }
+
+    @Test
+    void givenARelationshipThatDoesNotGrantViewing_whenTheGuardianListsTheDependantsBookings_thenItIsRefusedByName()
+            throws Exception {
+        // given
+        members.linkGuardian(jane, john, Set.of(GuardianGrant.BOOK, GuardianGrant.CANCEL_BOOKINGS));
+
+        // when / then
+        mockMvc.perform(get("/api/my/dependants/{personId}/bookings", john).with(as("doe.jane")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.type").value(NOT_GRANTED))
+                .andExpect(jsonPath("$.violations[0].code").value("guardianship.actionNotGranted"))
+                .andExpect(jsonPath("$.violations[0].params.action").value("VIEW_BOOKINGS"));
+    }
+
+    @Test
     void givenAGuardianGrantedToView_whenListingTheDependantsBookings_thenTheyAreTheDependantsOnly() throws Exception {
         // given
         members.linkGuardian(jane, john, Set.of(GuardianGrant.BOOK, GuardianGrant.VIEW_BOOKINGS));
@@ -259,6 +292,23 @@ class DependantBookingControllerTest extends AbstractIntegrationTest {
         assertThat(audit.eventsAbout(id, "booking.booking.cancelled"))
                 .extracting(AuditTestFixture.RecordedEvent::actorAccountId)
                 .as("the change log names the guardian").containsExactly(janeAccount);
+    }
+
+    @Test
+    void givenARelationshipThatDoesNotGrantCancelling_whenTheGuardianCancels_thenItIsRefusedByNameAndStands()
+            throws Exception {
+        // given
+        members.linkGuardian(jane, john, Set.of(GuardianGrant.BOOK, GuardianGrant.VIEW_BOOKINGS));
+        UUID id = idOf(book(as("roe.john"), null, "johns-own", "18:00", "19:00").andExpect(status().isCreated()));
+
+        // when / then
+        mockMvc.perform(delete("/api/my/dependants/{personId}/bookings/{bookingId}", john, id)
+                        .with(as("doe.jane")).with(csrf()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.type").value(NOT_GRANTED))
+                .andExpect(jsonPath("$.violations[0].code").value("guardianship.actionNotGranted"))
+                .andExpect(jsonPath("$.violations[0].params.action").value("CANCEL_BOOKINGS"));
+        assertThat(bookings.findById(id).orElseThrow().getStatus()).isEqualTo(BookingStatus.CONFIRMED);
     }
 
     @Test
