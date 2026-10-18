@@ -92,6 +92,11 @@
       "class": "identifier"
     },
     {
+      "name": "relationshipId",
+      "in": "path",
+      "class": "identifier"
+    },
+    {
       "name": "ruleType",
       "in": "path",
       "class": "neutral"
