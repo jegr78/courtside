@@ -11,7 +11,6 @@ import org.courtside.identity.Role;
 import org.courtside.identity.UserAccount;
 import org.courtside.member.internal.GuardianActionNotGrantedException;
 import org.courtside.member.internal.GuardianRelationship;
-import org.courtside.shared.SecurityEventLog;
 import org.jspecify.annotations.Nullable;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -38,7 +37,6 @@ public class DependantService {
     private final PersonRepository people;
     private final AccountCredentials credentials;
     private final RecentAuthentication recentAuthentication;
-    private final SecurityEventLog securityEvents;
     private final ApplicationEventPublisher events;
     private final ClubTimeZone clubTimeZone;
     private final Clock clock;
@@ -75,7 +73,6 @@ public class DependantService {
         GuardianDelegation.Delegation granted = delegation.require(dependantPersonId, GuardianGrant.ACCOUNT_TASKS);
         UserAccount dependant = granted.dependant();
         if (dependant.getRoles().contains(Role.ADMIN)) {
-            securityEvents.authorizationDenied(granted.guardian().getId());
             throw new GuardianActionNotGrantedException("guardianship.administratorCredentials",
                     GuardianGrant.ACCOUNT_TASKS);
         }

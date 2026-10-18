@@ -21,6 +21,11 @@ public abstract class DomainFailure extends RuntimeException implements ErrorRes
 
     public abstract ProblemType problemType();
 
+    /** Whether answering this failure refuses the caller an authorization, which the security log records. */
+    public boolean refusesAuthorization() {
+        return false;
+    }
+
     @Override
     public HttpStatusCode getStatusCode() {
         return problemType().status();

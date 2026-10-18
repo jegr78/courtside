@@ -9,7 +9,6 @@ import org.courtside.identity.UserAccount;
 import org.courtside.member.internal.DependantAccountDisabledException;
 import org.courtside.member.internal.DependantNotFoundException;
 import org.courtside.member.internal.GuardianActionNotGrantedException;
-import org.courtside.shared.SecurityEventLog;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,7 +27,6 @@ public class GuardianDelegation implements DependantMessageAccess {
 
     private final CurrentUser currentUser;
     private final GuardianRelationships relationships;
-    private final SecurityEventLog securityEvents;
     private final ClubTimeZone clubTimeZone;
     private final Clock clock;
 
@@ -55,7 +53,6 @@ public class GuardianDelegation implements DependantMessageAccess {
                     () -> new IllegalStateException("A granted relationship lost its dependant's account"));
             return new Delegation(guardian, dependant);
         }
-        securityEvents.authorizationDenied(guardian.getId());
         if (granted.isPresent()) {
             throw new GuardianActionNotGrantedException(grant);
         }

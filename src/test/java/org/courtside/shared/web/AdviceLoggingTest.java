@@ -113,7 +113,7 @@ class AdviceLoggingTest {
         DomainFailure failure = new ConflictFailure("card.label.taken", Map.of("field", "cardLabel"));
 
         // when
-        new DomainFailureHandler(mock(ProblemTraceReference.class)).handleDomainFailure(failure);
+        new DomainFailureHandler(mock(ProblemTraceReference.class), mock(SecurityEventLog.class)).handleDomainFailure(failure);
 
         // then
         assertThat(domainAppender.list).singleElement().satisfies(event -> {
@@ -135,7 +135,7 @@ class AdviceLoggingTest {
                 Map.of("externalIds", List.of(memberNumber)));
 
         // when
-        new DomainFailureHandler(mock(ProblemTraceReference.class)).handleDomainFailure(failure);
+        new DomainFailureHandler(mock(ProblemTraceReference.class), mock(SecurityEventLog.class)).handleDomainFailure(failure);
 
         // then
         assertThat(domainAppender.list).singleElement().satisfies(event -> {
@@ -158,7 +158,7 @@ class AdviceLoggingTest {
         DomainFailure failure = new NotFoundFailure("Card label %s is already taken".formatted(rejectedLabel));
 
         // when
-        new DomainFailureHandler(mock(ProblemTraceReference.class)).handleDomainFailure(failure);
+        new DomainFailureHandler(mock(ProblemTraceReference.class), mock(SecurityEventLog.class)).handleDomainFailure(failure);
 
         // then
         assertThat(domainAppender.list).singleElement().satisfies(event -> {
@@ -181,7 +181,7 @@ class AdviceLoggingTest {
 
         // when
         try {
-            new DomainFailureHandler(mock(ProblemTraceReference.class)).handleDomainFailure(failure);
+            new DomainFailureHandler(mock(ProblemTraceReference.class), mock(SecurityEventLog.class)).handleDomainFailure(failure);
         } finally {
             SecurityContextHolder.clearContext();
         }
@@ -222,7 +222,7 @@ class AdviceLoggingTest {
                 new DataIntegrityViolationException(DUPLICATE_USERNAME));
 
         // when
-        new DomainFailureHandler(mock(ProblemTraceReference.class)).handleDomainFailure(failure);
+        new DomainFailureHandler(mock(ProblemTraceReference.class), mock(SecurityEventLog.class)).handleDomainFailure(failure);
 
         // then
         assertThat(domainAppender.list).singleElement().satisfies(event -> {

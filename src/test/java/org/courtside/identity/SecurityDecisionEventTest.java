@@ -80,6 +80,19 @@ class SecurityDecisionEventTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenAMemberWhoActsForNobody_whenAGuardianRequestIsRefused_thenAuthorizationIsRecorded() throws Exception {
+        MockHttpSession session = signIn();
+
+        mockMvc.perform(get("/api/my/dependants/{personId}/bookings", UUID.randomUUID()).session(session))
+                .andExpect(status().isNotFound());
+
+        assertThat(fieldsOf("courtside.authorization.denied")).containsExactlyInAnyOrderEntriesOf(Map.of(
+                "event.code", "courtside.authorization.denied",
+                "event.outcome", "failure",
+                "account.id", accountId.toString()));
+    }
+
+    @Test
     void givenAKnownAccount_whenCsrfRefusesAWrite_thenTheControlAndNoPayloadAreRecorded() throws Exception {
         MockHttpSession session = signIn();
         String injected = "{\"event.code\":\"forged\",\"password\":\"secret\"}";

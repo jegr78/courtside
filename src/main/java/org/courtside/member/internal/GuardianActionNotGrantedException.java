@@ -25,4 +25,9 @@ public class GuardianActionNotGrantedException extends CodedDomainFailure {
     public ProblemType problemType() {
         return PROBLEM_TYPE;
     }
+
+    @Override
+    public boolean refusesAuthorization() {
+        return true;
+    }
 }

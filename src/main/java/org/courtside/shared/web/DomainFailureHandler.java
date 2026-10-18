@@ -3,6 +3,7 @@ package org.courtside.shared.web;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.courtside.shared.DomainFailure;
+import org.courtside.shared.SecurityEventLog;
 import org.courtside.shared.SecurityEventPrincipal;
 import org.slf4j.spi.LoggingEventBuilder;
 import org.springframework.core.Ordered;
@@ -20,12 +21,16 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 class DomainFailureHandler {
 
     private final ProblemTraceReference traceReference;
+    private final SecurityEventLog securityEvents;
 
     @ExceptionHandler(DomainFailure.class)
     ResponseEntity<ProblemDetail> handleDomainFailure(DomainFailure failure) {
         ProblemDetail body = failure.getBody();
         traceReference.addTo(body);
         logAnswered(failure, body);
+        if (failure.refusesAuthorization()) {
+            securityEvents.authorizationDeniedForCurrentAccount();
+        }
         return ResponseEntity.status(failure.getStatusCode())
                 .headers(failure.getHeaders())
                 .body(body);

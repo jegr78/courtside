@@ -18,4 +18,9 @@ public class DependantNotFoundException extends DomainFailure {
     public ProblemType problemType() {
         return PROBLEM_TYPE;
     }
+
+    @Override
+    public boolean refusesAuthorization() {
+        return true;
+    }
 }

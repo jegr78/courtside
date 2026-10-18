@@ -6,7 +6,6 @@ import org.courtside.identity.Person;
 import org.courtside.identity.UserAccount;
 import org.courtside.member.internal.DependantNotFoundException;
 import org.courtside.member.internal.GuardianActionNotGrantedException;
-import org.courtside.shared.SecurityEventLog;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -22,8 +21,6 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class GuardianDelegationTest {
@@ -32,11 +29,10 @@ class GuardianDelegationTest {
 
     private final CurrentUser currentUser = mock(CurrentUser.class);
     private final GuardianRelationships relationships = mock(GuardianRelationships.class);
-    private final SecurityEventLog securityEvents = mock(SecurityEventLog.class);
     private final ClubTimeZone clubTimeZone = () -> ZoneId.of("UTC");
     private final Clock clock = Clock.fixed(Instant.parse("2026-05-12T10:00:00Z"), ZoneOffset.UTC);
     private final GuardianDelegation delegation =
-            new GuardianDelegation(currentUser, relationships, securityEvents, clubTimeZone, clock);
+            new GuardianDelegation(currentUser, relationships, clubTimeZone, clock);
 
     private final UUID guardianAccountId = UUID.randomUUID();
     private final UUID guardianPersonId = UUID.randomUUID();
@@ -53,30 +49,30 @@ class GuardianDelegationTest {
     }
 
     @Test
-    void givenNoRelationship_whenTheGuardianActs_thenTheRefusalIsRecorded() {
+    void givenNoRelationship_whenTheGuardianActs_thenTheRefusalIsMarkedAsAnAuthorizationRefusal() {
         // given
         when(relationships.grantsFor(guardianPersonId, dependantPersonId, TODAY)).thenReturn(Optional.empty());
 
         // when / then
         assertThatThrownBy(() -> delegation.require(dependantPersonId, GuardianGrant.BOOK))
-                .isInstanceOf(DependantNotFoundException.class);
-        verify(securityEvents).authorizationDenied(guardianAccountId);
+                .isInstanceOfSatisfying(DependantNotFoundException.class,
+                        refusal -> assertThat(refusal.refusesAuthorization()).isTrue());
     }
 
     @Test
-    void givenARelationshipWithoutTheGrant_whenTheGuardianActs_thenTheRefusalIsRecorded() {
+    void givenARelationshipWithoutTheGrant_whenTheGuardianActs_thenTheRefusalIsMarkedAsAnAuthorizationRefusal() {
         // given
         when(relationships.grantsFor(guardianPersonId, dependantPersonId, TODAY))
                 .thenReturn(Optional.of(Set.of(GuardianGrant.VIEW_BOOKINGS)));
 
         // when / then
         assertThatThrownBy(() -> delegation.require(dependantPersonId, GuardianGrant.BOOK))
-                .isInstanceOf(GuardianActionNotGrantedException.class);
-        verify(securityEvents).authorizationDenied(guardianAccountId);
+                .isInstanceOfSatisfying(GuardianActionNotGrantedException.class,
+                        refusal -> assertThat(refusal.refusesAuthorization()).isTrue());
     }
 
     @Test
-    void givenTheGrant_whenTheGuardianActs_thenTheDependantsAccountIsReturnedAndNothingIsRecorded() {
+    void givenTheGrant_whenTheGuardianActs_thenTheDependantsAccountIsReturned() {
         // given
         UserAccount dependant = mock(UserAccount.class);
         when(relationships.grantsFor(guardianPersonId, dependantPersonId, TODAY))
@@ -88,6 +84,5 @@ class GuardianDelegationTest {
 
         // then
         assertThat(granted.dependant()).isSameAs(dependant);
-        verify(securityEvents, never()).authorizationDenied(guardianAccountId);
     }
 }
