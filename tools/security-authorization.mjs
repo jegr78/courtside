@@ -22,7 +22,7 @@ const managerCombinationCount = 2;
 const mutationBoundaries = Object.freeze(["csrf", "cors", "host", "forwarded-host"]);
 const signInRequests = 2;
 const objectProbeRequests = 10;
-const actorUsernames = Object.freeze({
+export const actorUsernames = Object.freeze({
   MEMBER: "security.member.1",
   TRAINER: "security.trainer.1",
   SPORT_DIRECTOR: "security.sport.director.1",

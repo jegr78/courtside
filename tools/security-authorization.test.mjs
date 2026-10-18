@@ -9,6 +9,7 @@ import { test } from "node:test";
 import {
   executeAuthorizationProbe,
   rosterListingProbe,
+  actorUsernames,
   authorizationActors,
   buildOperationAuthorizationMatrix,
   buildOperationProbe,
@@ -32,10 +33,24 @@ import {
   runAuthorizationAssessment
 } from "./security-authorization.mjs";
 import { contractOperationIds } from "./contract-operations.mjs";
+import { authenticatedZapPolicy } from "./security-authenticated-zap.mjs";
 
 const require = createRequire(new URL("../frontend/package.json", import.meta.url));
 const yaml = require("js-yaml");
 const api = yaml.load(readFileSync(new URL("../src/main/resources/api/openapi.yaml", import.meta.url), "utf8"));
+
+test("given the contract's roles, when the security actors are listed, then each role is an actor with an account and a ZAP session", () => {
+  // given
+  const contractRoles = api.components.schemas.Role.enum.toSorted();
+
+  // then
+  assert.deepEqual(authorizationActors.filter((actor) => !["ANONYMOUS", "INITIAL_PASSWORD"].includes(actor)).toSorted(),
+    contractRoles, "the authorization matrix probes every role the contract defines");
+  assert.deepEqual(Object.keys(actorUsernames).toSorted(),
+    authorizationActors.filter((actor) => actor !== "ANONYMOUS").toSorted(), "every signed-in actor has an account");
+  assert.deepEqual(authenticatedZapPolicy.roles.toSorted(), contractRoles,
+    "authenticated ZAP scans with a session for every role the contract defines");
+});
 
 test("given the OpenAPI contract, when generating authorization cases, then every operation covers every actor", () => {
   // when
