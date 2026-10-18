@@ -13,15 +13,27 @@ export type Api = {
   dispose: () => Promise<void>;
 };
 
+// Half the account refill of a default instance, so the harness never spends the budget a persona's page needs.
+const REQUEST_INTERVAL_MS = 100;
+let nextRequestAt = 0;
+
+async function paced<T>(send: () => Promise<T>): Promise<T> {
+  const now = Date.now();
+  const wait = Math.max(0, nextRequestAt - now);
+  nextRequestAt = Math.max(now, nextRequestAt) + REQUEST_INTERVAL_MS;
+  if (wait > 0) await new Promise((done) => setTimeout(done, wait));
+  return send();
+}
+
 async function wrap(context: APIRequestContext): Promise<Api> {
-  await context.get("/api/session");
+  await paced(() => context.get("/api/session"));
   const headers = async () => ({ "X-XSRF-TOKEN": (await context.storageState()).cookies.find((c) => c.name.endsWith("XSRF-TOKEN"))?.value ?? "" });
   return {
-    get: (path) => admitted(() => context.get(path)),
-    del: (path) => admitted(async () => context.delete(path, { headers: await headers() })),
-    put: async (path, data) => context.put(path, { data, headers: await headers() }),
-    post: async (path, data, extra = {}) => context.post(path, { data, headers: { ...(await headers()), ...extra } }),
-    postForm: (path, form) => admitted(async () => context.post(path, { form, headers: await headers() })),
+    get: (path) => admitted(() => paced(() => context.get(path))),
+    del: (path) => admitted(async () => paced(async () => context.delete(path, { headers: await headers() }))),
+    put: async (path, data) => paced(async () => context.put(path, { data, headers: await headers() })),
+    post: async (path, data, extra = {}) => paced(async () => context.post(path, { data, headers: { ...(await headers()), ...extra } })),
+    postForm: (path, form) => admitted(async () => paced(async () => context.post(path, { form, headers: await headers() }))),
     dispose: () => context.dispose()
   };
 }
