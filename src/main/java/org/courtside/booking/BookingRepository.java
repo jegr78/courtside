@@ -301,6 +301,7 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
     @EntityGraph(attributePaths = "allocations")
     List<Booking> findByBookedByOrderByCreatedAtAscIdAsc(UUID bookedBy);
 
+    @EntityGraph(attributePaths = "allocations")
     List<Booking> findByActedByOrderByCreatedAtAscIdAsc(UUID actedBy);
 
     @EntityGraph(attributePaths = "allocations")
