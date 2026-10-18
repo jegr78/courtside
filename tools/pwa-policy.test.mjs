@@ -15,6 +15,21 @@ const viteConfiguration = readFileSync(join(repository, "frontend/vite.config.ts
 const eslintConfiguration = readFileSync(join(repository, "frontend/eslint.config.js"), "utf8");
 const typescriptConfiguration = readFileSync(join(repository, "frontend/tsconfig.app.json"), "utf8");
 const frontendPackage = JSON.parse(readFileSync(join(repository, "frontend/package.json"), "utf8"));
+const REVIEWED_PASSWORD_FIELDS = [
+  "frontend/src/views/AccountRecoveryView.tsx#recovery-new-password",
+  "frontend/src/views/AccountSecurityView.tsx#confirm-password",
+  "frontend/src/views/AccountSecurityView.tsx#current-password",
+  "frontend/src/views/AccountSecurityView.tsx#new-password",
+  "frontend/src/views/AccountSecurityView.tsx#reauthentication-password",
+  "frontend/src/views/AdminMessageWordingView.tsx#admin-reauthentication-password",
+  "frontend/src/views/AdminPersonView.tsx#admin-reauthentication-password",
+  "frontend/src/views/AdminRetentionView.tsx#retention-reauthentication-password",
+  "frontend/src/views/DependantsView.tsx#dependant-reauthentication-password",
+  "frontend/src/views/InitialPasswordView.tsx#confirm-password",
+  "frontend/src/views/InitialPasswordView.tsx#new-password",
+  "frontend/src/views/LoginView.tsx#password",
+  "frontend/src/views/import/ImportExecutionPanel.tsx#import-reauthentication-password"
+];
 const pom = readFileSync(join(repository, "pom.xml"), "utf8");
 const buildWorkflow = readFileSync(join(repository, ".github/workflows/build.yml"), "utf8");
 const stability = readFileSync(join(repository, ".github/workflows/test-stability.yml"), "utf8");
@@ -128,7 +143,7 @@ test("given shipped password inputs, when enforcing browser credential handling,
     jsxPasswordFields(path, source));
 
   // when / then
-  assert.equal(passwordFields.length, 12,
+  assert.deepEqual(passwordFields.map((field) => `${field.path}#${field.id}`).sort(), REVIEWED_PASSWORD_FIELDS,
     "Every added or removed password field needs an explicit credential-handling review");
   for (const field of passwordFields) {
     assert.equal(field.type, "password", `${field.path}:${field.line} exposes a password as ${field.type}`);
@@ -173,6 +188,7 @@ function jsxPasswordFields(path, source) {
         fields.push({
           path: path.slice(repository.length + 1),
           line: file.getLineAndCharacterOfPosition(node.getStart(file)).line + 1,
+          id,
           type,
           autoComplete: jsxAttribute(node, "autoComplete"),
           onPaste: node.attributes.properties.some((attribute) =>
