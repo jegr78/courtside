@@ -79,7 +79,7 @@ public class RosterService {
         // runs the other way, and inverting it here would be the cycle ModularityTests rejects.
         List<UUID> holders = membershipTypeId == null
                 ? List.of()
-                : members.findCurrentHolderIds(membershipTypeId);
+                : members.findHolderIdsOn(membershipTypeId, today());
         if (membershipTypeId != null && holders.isEmpty()) {
             return new CursorPage.Result<>(List.of(), null);
         }
@@ -270,27 +270,133 @@ public class RosterService {
     public RosterEntry writeMembership(UUID personId, UUID membershipTypeId,
                                        MembershipPeriod period) {
         UUID id = requiredPersonId(personId);
-        MembershipPeriod requested = requiredPeriod(period).requireNotInTheFuture(today());
+        MembershipPeriod requested = requiredPeriod(period);
         requireLockedPerson(id);
-        Member existing = members.findByPersonId(id).orElse(null);
-        UUID typeId = assignableTypeIdFor(existing, membershipTypeId, requested);
-        if (applyMembership(id, existing, typeId, requested)) {
+        LocalDate today = today();
+        List<Member> periods = members.findByPersonIdOrderByStartedOnAscIdAsc(id);
+        Member target = MemberService.representativePeriod(periods, today);
+        Member written;
+        boolean changesValidity;
+        LocalDate previousEnd = null;
+        boolean shortens = false;
+        if (startsAnotherPeriod(target, requested, today)) {
+            UUID typeId = typeIdFor(null, membershipTypeId, requested, today);
+            LocalDate start = startOr(requested, today);
+            if (target != null && start.isBefore(target.getEndedOn())) {
+                start = today;
+            }
+            written = new Member(id, typeId, new MembershipPeriod(start, requested.endedOn()).startedOn());
+            written.endOn(requested.endedOn());
+            MembershipPeriodService.saveOrRejectOverlap(members, written);
+            changesValidity = written.isValidOn(today);
+        } else if (movesTypeFromToday(target, membershipTypeId, requested, today)) {
+            UUID typeId = typeIdFor(target, membershipTypeId, requested, today);
+            previousEnd = target.getEndedOn();
+            shortens = true;
+            target.endOn(today);
+            members.flush();
+            events.publishEvent(new RosterEvent.MembershipPeriodCorrected(id, target.getId(),
+                    target.getMembershipTypeId(), target.getStartedOn(), target.getEndedOn()));
+            written = new Member(id, typeId, new MembershipPeriod(today, requested.endedOn()).startedOn());
+            written.endOn(requested.endedOn());
+            MembershipPeriodService.saveOrRejectOverlap(members, written);
+            changesValidity = true;
+        } else {
+            UUID typeId = typeIdFor(target, membershipTypeId, requested, today);
+            boolean wasValid = target.isValidOn(today);
+            boolean typeChanged = !target.getMembershipTypeId().equals(typeId);
+            previousEnd = target.getEndedOn();
+            shortens = true;
+            target.assignTo(typeId);
+            target.correctPeriod(startOr(requested, target.getStartedOn()), requested.endedOn());
+            MembershipPeriodService.saveOrRejectOverlap(members, target);
+            written = target;
+            changesValidity = typeChanged || wasValid != target.isValidOn(today);
+        }
+        List<Member> withdrawn = shortens && endsEarlier(written.getEndedOn(), previousEnd)
+                ? withdrawPeriodsAfter(written, periods, today)
+                : List.of();
+        if (changesValidity || !withdrawn.isEmpty()) {
             revokeSessionsOf(id);
         }
-        events.publishEvent(new RosterEvent.MembershipWritten(
-                id, typeId, requested.startedOn(), requested.endedOn()));
+        withdrawn.forEach(member -> events.publishEvent(new RosterEvent.MembershipPeriodRemoved(id, member.getId())));
+        events.publishEvent(new RosterEvent.MembershipWritten(id, written.getId(),
+                written.getMembershipTypeId(), written.getStartedOn(), written.getEndedOn()));
         return load(List.of(id)).getFirst();
+    }
+
+    private static boolean endsEarlier(LocalDate end, LocalDate previousEnd) {
+        return end != null && (previousEnd == null || end.isBefore(previousEnd));
+    }
+
+    private List<Member> withdrawPeriodsAfter(Member written, List<Member> periods, LocalDate today) {
+        LocalDate end = written.getEndedOn();
+        List<Member> following = periods.stream()
+                .filter(member -> !member.getId().equals(written.getId()))
+                .filter(member -> member.getStartedOn().isAfter(today) && !member.getStartedOn().isBefore(end))
+                .toList();
+        members.deleteAll(following);
+        members.flush();
+        return following;
+    }
+
+    @Transactional
+    public void holdMembershipFromToday(UUID personId, UUID membershipTypeId) {
+        UUID id = requiredPersonId(personId);
+        requireLockedPerson(id);
+        LocalDate today = today();
+        List<Member> periods = members.findByPersonIdOrderByStartedOnAscIdAsc(id);
+        Member valid = periods.stream().filter(member -> member.isValidOn(today)).findFirst().orElse(null);
+        if (valid != null && valid.getMembershipTypeId().equals(membershipTypeId)) {
+            return;
+        }
+        UUID typeId = memberships.requireAssignableMembershipType(membershipTypeId).getId();
+        Member written;
+        if (valid != null && valid.getStartedOn().equals(today)) {
+            valid.assignTo(typeId);
+            written = valid;
+        } else if (valid != null) {
+            LocalDate scheduledEnd = valid.getEndedOn();
+            valid.endOn(today);
+            members.flush();
+            events.publishEvent(new RosterEvent.MembershipPeriodCorrected(id, valid.getId(),
+                    valid.getMembershipTypeId(), valid.getStartedOn(), valid.getEndedOn()));
+            written = new Member(id, typeId, today);
+            written.endOn(scheduledEnd);
+        } else {
+            written = new Member(id, typeId, today);
+            periods.stream().map(Member::getStartedOn).filter(start -> start.isAfter(today))
+                    .min(Comparator.naturalOrder())
+                    .ifPresent(written::endOn);
+        }
+        MembershipPeriodService.saveOrRejectOverlap(members, written);
+        revokeSessionsOf(id);
+        events.publishEvent(new RosterEvent.MembershipWritten(
+                id, written.getId(), typeId, written.getStartedOn(), written.getEndedOn()));
     }
 
     @Transactional
     public void endMembership(UUID personId) {
         UUID id = requiredPersonId(personId);
         requireLockedPerson(id);
-        members.findCurrentByPersonId(id).ifPresent(member -> {
-            member.endOn(today());
-            revokeSessionsOf(id);
+        LocalDate today = today();
+        boolean ended = members.findValidOn(id, today).map(member -> {
+            member.endOn(today);
+            return true;
+        }).orElse(false);
+        List<Member> scheduled = members.findByPersonIdOrderByStartedOnAscIdAsc(id).stream()
+                .filter(member -> member.getStartedOn().isAfter(today))
+                .toList();
+        members.deleteAll(scheduled);
+        members.flush();
+        if (!ended && scheduled.isEmpty()) {
+            return;
+        }
+        revokeSessionsOf(id);
+        scheduled.forEach(member -> events.publishEvent(new RosterEvent.MembershipPeriodRemoved(id, member.getId())));
+        if (ended) {
             events.publishEvent(new RosterEvent.MembershipEnded(id));
-        });
+        }
     }
 
     private void requireASuccessorAdministrator(UserAccount account) {
@@ -305,41 +411,33 @@ public class RosterService {
         }
     }
 
-    private UUID assignableTypeIdFor(Member existing, UUID requested, MembershipPeriod period) {
-        if (makesSomebodyAMemberOfANewType(existing, requested, period)) {
+    private UUID typeIdFor(Member existing, UUID requested, MembershipPeriod period, LocalDate today) {
+        boolean leavesAMember = period.endedOn() == null || period.endedOn().isAfter(today);
+        boolean newType = existing == null || !existing.isValidOn(today)
+                || !existing.getMembershipTypeId().equals(requested);
+        if (leavesAMember && newType) {
             return memberships.requireAssignableMembershipType(requested).getId();
         }
         return memberships.requireMembershipType(requested).getId();
     }
 
-    private static boolean makesSomebodyAMemberOfANewType(Member existing, UUID requested,
-                                                          MembershipPeriod period) {
-        return period.isCurrent()
-                && (existing == null
-                || !existing.isCurrent()
-                || !existing.getMembershipTypeId().equals(requested));
+    private static boolean startsAnotherPeriod(Member target, MembershipPeriod requested, LocalDate today) {
+        return target == null || target.hasEndedBy(today)
+                && (requested.startedOn() == null || !requested.startedOn().isBefore(target.getEndedOn())
+                || reopens(target, requested, today));
     }
 
-    private boolean applyMembership(UUID personId, Member existing, UUID typeId,
-                                   MembershipPeriod period) {
-        LocalDate endedOn = period.endedOn();
-        if (existing == null) {
-            Member created = new Member(personId, typeId, startOr(period, today()));
-            created.endOn(endedOn);
-            members.saveAndFlush(created);
-            return period.isCurrent();
-        }
-        boolean wasCurrent = existing.isCurrent();
-        boolean typeChanged = !existing.getMembershipTypeId().equals(typeId);
-        if (wasCurrent) {
-            existing.assignTo(typeId);
-            existing.correctPeriod(startOr(period, existing.getStartedOn()), endedOn);
-        } else {
-            existing.reviveOn(typeId, startOr(period, today()));
-            existing.endOn(endedOn);
-        }
-        members.flush();
-        return typeChanged || wasCurrent != period.isCurrent();
+    private static boolean reopens(Member target, MembershipPeriod requested, LocalDate today) {
+        return target != null && target.hasEndedBy(today)
+                && (requested.endedOn() == null || requested.endedOn().isAfter(today));
+    }
+
+    private static boolean movesTypeFromToday(Member target, UUID membershipTypeId, MembershipPeriod requested,
+                                              LocalDate today) {
+        return target.isValidOn(today)
+                && target.getStartedOn().isBefore(today)
+                && !target.getMembershipTypeId().equals(membershipTypeId)
+                && (requested.startedOn() == null || requested.startedOn().equals(target.getStartedOn()));
     }
 
     private static LocalDate startOr(MembershipPeriod period, LocalDate fallback) {
@@ -479,12 +577,15 @@ public class RosterService {
         Map<UUID, UserAccount> accountsByPerson = accounts.findByPersonIdIn(personIds).stream()
                 .collect(Collectors.toMap(account -> account.getPerson().getId(), account -> account,
                         RosterService::preferredAccount));
+        LocalDate today = LocalDate.ofInstant(now, clubTimeZone.zoneId());
         Map<UUID, Member> membershipsByPerson = members.findByPersonIdIn(personIds).stream()
-                .collect(Collectors.toMap(Member::getPersonId, member -> member));
+                .collect(Collectors.groupingBy(Member::getPersonId)).entrySet().stream()
+                .collect(Collectors.toMap(Map.Entry::getKey,
+                        entry -> MemberService.representativePeriod(entry.getValue(), today)));
         List<Person> people = persons.findAllById(personIds);
         Map<String, Integer> sharing = addressSharing(people);
         return people.stream()
-                .map(person -> toEntry(person, accountsByPerson.get(person.getId()),
+                .map(person -> this.toEntry(person, accountsByPerson.get(person.getId()),
                         membershipsByPerson.get(person.getId()), now,
                         sharing.get(person.getEmail())))
                 .toList();
@@ -508,10 +609,11 @@ public class RosterService {
         return counts;
     }
 
-    private static RosterEntry toEntry(Person person, UserAccount account, Member member,
-                                       Instant now, Integer addressSharedBy) {
+    private RosterEntry toEntry(Person person, UserAccount account, Member member,
+                                Instant now, Integer addressSharedBy) {
         Membership membership = member == null ? null : new Membership(
-                member.getMembershipTypeId(), member.getStartedOn(), member.getEndedOn());
+                member.getMembershipTypeId(), member.getStartedOn(), member.getEndedOn(),
+                member.stateOn(LocalDate.ofInstant(now, clubTimeZone.zoneId())));
         if (account == null) {
             return new RosterEntry(person.getId(), person.getFirstName(), person.getLastName(),
                     person.getEmail(), addressSharedBy, null, null, null, null, false,
@@ -584,7 +686,11 @@ public class RosterService {
         }
     }
 
-    public record Membership(UUID typeId, LocalDate startedOn, LocalDate endedOn) {
+    public record Membership(UUID typeId, LocalDate startedOn, LocalDate endedOn, MembershipPeriodState state) {
+
+        public boolean current() {
+            return state == MembershipPeriodState.RUNNING;
+        }
     }
 
     public enum SortField {

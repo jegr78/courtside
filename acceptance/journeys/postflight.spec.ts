@@ -13,7 +13,8 @@ import { personaUsernames } from "../lib/attendance";
 import { erase } from "../lib/erasure";
 import { leaveWaitlist, MEMBERS, openWaitlistEntries } from "../lib/waitlist";
 import { readPeriods, restorePeriods } from "../lib/retention";
-import { retentionRestorations } from "../lib/core.mjs";
+import { comparablePeriods, periodSnapshots, retentionRestorations } from "../lib/core.mjs";
+import { readMembershipPeriods, restoreMembershipPeriods, type MembershipPeriod } from "../lib/membership";
 
 const ids = (day: unknown) => new Set((day as { bookingId?: string; id?: string }[]).map((a) => a.bookingId ?? a.id));
 
@@ -118,5 +119,19 @@ test("when the run ends, then every retention period this run changed is back to
   expect(outcome.filter((restore) => restore.status >= 300), "every period this run changed is put back").toEqual([]);
   for (const { category, before } of expected) {
     expect(periods[category], `${category} holds the period it had before the run`).toBe(before);
+  }
+});
+
+test("when the run ends, then every membership period this run changed is back to what it was before", async () => {
+  // when
+  const admin = await apiAs("admin");
+  const snapshots = periodSnapshots(readLedger()) as { personId: string; periods: MembershipPeriod[] }[];
+  const outcome = await restoreMembershipPeriods(admin);
+  const periods = Object.fromEntries(await Promise.all(snapshots.map(async ({ personId }) => [personId, comparablePeriods(await readMembershipPeriods(admin, personId))])));
+  writeFileSync(runPath("postflight-membership-periods.json"), JSON.stringify({ outcome, periods }, null, 2));
+  // then
+  expect(outcome.filter((restore) => restore.status >= 300), "every period this run changed is put back").toEqual([]);
+  for (const { personId, periods: before } of snapshots) {
+    expect(periods[personId], `${personId} holds the periods it had before the run`).toEqual(comparablePeriods(before));
   }
 });

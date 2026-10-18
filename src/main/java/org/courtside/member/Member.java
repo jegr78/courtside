@@ -43,22 +43,28 @@ public class Member {
         this.membershipTypeId = membershipTypeId;
     }
 
-    public void reviveOn(UUID membershipTypeId, LocalDate startedOn) {
-        this.membershipTypeId = membershipTypeId;
-        this.startedOn = startedOn;
-        this.endedOn = null;
-    }
-
     public void endOn(LocalDate endedOn) {
         this.endedOn = endedOn;
     }
 
     public void correctPeriod(LocalDate startedOn, LocalDate endedOn) {
-        this.startedOn = startedOn;
-        this.endedOn = endedOn;
+        MembershipPeriod corrected = new MembershipPeriod(startedOn, endedOn);
+        this.startedOn = corrected.startedOn();
+        this.endedOn = corrected.endedOn();
     }
 
-    public boolean isCurrent() {
-        return endedOn == null;
+    public boolean isValidOn(LocalDate day) {
+        return !startedOn.isAfter(day) && (endedOn == null || endedOn.isAfter(day));
+    }
+
+    public MembershipPeriodState stateOn(LocalDate day) {
+        if (startedOn.isAfter(day)) {
+            return MembershipPeriodState.SCHEDULED;
+        }
+        return isValidOn(day) ? MembershipPeriodState.RUNNING : MembershipPeriodState.ENDED;
+    }
+
+    public boolean hasEndedBy(LocalDate day) {
+        return endedOn != null && !endedOn.isAfter(day);
     }
 }

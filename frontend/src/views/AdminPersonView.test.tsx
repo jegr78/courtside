@@ -16,14 +16,14 @@ vi.mock("../downloads/downloadJson", () => ({ downloadJson: vi.fn() }));
 
 const jane: RosterEntry = {
   personId: "person-1", firstName: "Jane", lastName: "Doe", email: "jane.doe@example.org",
-  accountId: "account-1", username: "doe.jane", locale: "de", enabled: true, roles: ["MEMBER"],
+  accountId: "account-1", username: "doe.jane", locale: "de", enabled: true, membershipCurrent: true, roles: ["MEMBER"],
   credentialState: "CREDENTIAL_ISSUED", addressSharedBy: 1,
   membershipTypeId: "type-1", membershipStartedOn: "2026-01-01", membershipEndedOn: null
 };
 
 const withoutAccount: RosterEntry = {
   personId: "person-1", firstName: "John", lastName: "Roe", email: "john.roe@example.org",
-  accountId: null, username: null, enabled: false, roles: []
+  accountId: null, username: null, enabled: false, membershipCurrent: false, roles: []
 };
 
 const club: ClubConfig = {
@@ -446,6 +446,7 @@ describe("AdminPersonView", () => {
     vi.mocked(downloadJson).mockClear();
     await i18n.changeLanguage("en");
     vi.spyOn(api, "membershipTypes").mockResolvedValue([adults, juniors]);
+    vi.spyOn(api, "membershipPeriods").mockResolvedValue([]);
     vi.spyOn(api, "messages").mockResolvedValue({ entries: [], nextCursor: null });
   });
 
@@ -618,6 +619,41 @@ describe("AdminPersonView", () => {
     expect(screen.getByRole("dialog")).toBeInTheDocument();
   });
 
+  it("given a membership that runs today with an end ahead, when the page is shown, then it can still be ended", async () => {
+    // when
+    showPerson({ ...jane, membershipCurrent: true, membershipEndedOn: "2999-01-01" });
+
+    // then
+    expect(await screen.findByTestId("end-membership"), "an end date ahead leaves the membership running").toBeInTheDocument();
+  });
+
+  it("given a membership that begins later, when the page is shown, then it is not offered as one to end", async () => {
+    // when
+    showPerson({ ...jane, membershipCurrent: false, membershipStartedOn: "2999-01-01", membershipEndedOn: null });
+
+    // then
+    await screen.findByTestId("person-membership");
+    expect(screen.queryByTestId("end-membership"), "nothing runs yet that could end").not.toBeInTheDocument();
+  });
+
+  it("given a period is added, when it is saved, then the membership fields are read again", async () => {
+    // given
+    const scheduled = { id: "period-9", membershipTypeId: "type-2", startedOn: "2999-01-01", endedOn: null, state: "SCHEDULED" as const };
+    vi.spyOn(api, "addMembershipPeriod").mockResolvedValue(scheduled);
+    vi.spyOn(api, "membershipPeriods").mockResolvedValueOnce([]).mockResolvedValue([scheduled]);
+    showPerson();
+    await screen.findByTestId("membership-periods-none");
+
+    // when
+    await userEvent.click(screen.getByTestId("add-period"));
+    await userEvent.selectOptions(screen.getByTestId("period-type"), "type-2");
+    await userEvent.type(screen.getByTestId("period-started-on"), "2999-01-01");
+    await userEvent.click(screen.getByTestId("save-period"));
+
+    // then
+    await waitFor(() => expect(api.person, "the roster entry is read again after the period changed").toHaveBeenCalledTimes(2));
+  });
+
   it("given the end is confirmed, when it is written, then the end date is the one the board chose", async () => {
     // given
     vi.spyOn(api, "assignMembership").mockResolvedValue({ ...jane, membershipEndedOn: "2026-03-31" });
@@ -634,6 +670,27 @@ describe("AdminPersonView", () => {
     expect(api.assignMembership).toHaveBeenCalledWith("person-1", {
       membershipTypeId: "type-1", startedOn: "2026-01-01", endedOn: "2026-03-31"
     });
+  });
+
+  it("given a period scheduled to follow, when the membership is ended, then the period list is read again without it", async () => {
+    // given
+    const running = { id: "period-1", membershipTypeId: "type-1", startedOn: "2026-01-01", endedOn: "2026-12-01", state: "RUNNING" as const };
+    const scheduled = { id: "period-2", membershipTypeId: "type-2", startedOn: "2026-12-01", endedOn: null, state: "SCHEDULED" as const };
+    vi.spyOn(api, "membershipPeriods").mockResolvedValueOnce([running, scheduled])
+      .mockResolvedValue([{ ...running, endedOn: "2026-03-31" }]);
+    vi.spyOn(api, "assignMembership").mockResolvedValue({ ...jane, membershipEndedOn: "2026-03-31" });
+    showPerson({ ...jane, membershipEndedOn: "2026-12-01" });
+    await screen.findByTestId("membership-period-period-2");
+
+    // when
+    await userEvent.click(screen.getByTestId("end-membership"));
+    await userEvent.clear(screen.getByTestId("end-membership-date"));
+    await userEvent.type(screen.getByTestId("end-membership-date"), "2026-03-31");
+    await userEvent.click(screen.getByTestId("confirm-end-membership"));
+
+    // then
+    await waitFor(() => expect(screen.queryByTestId("membership-period-period-2"),
+      "the period the server withdrew with the end is no longer listed").not.toBeInTheDocument());
   });
 
   it("given an unsaved membership type, when the membership is ended, then only the end is written and the type stays in the bar", async () => {

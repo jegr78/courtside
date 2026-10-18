@@ -36,6 +36,21 @@ class MemberTestFixtureTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenAPeriodRunningTodayWithAnEndAhead_whenReadingItsStart_thenTheStartIsObservable() {
+        // given
+        UUID personId = identity.createPerson("Jane", "Doe");
+        UUID membershipTypeId = members.createMembershipType("Adults");
+
+        // when
+        members.addMembershipPeriod(personId, membershipTypeId, LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 1));
+
+        // then
+        assertThat(members.membershipStartedOn(personId))
+                .as("a running period reads as running even when its end is already set")
+                .contains(LocalDate.of(2026, 1, 1));
+    }
+
+    @Test
     void givenAnActiveMembershipType_whenDeactivatingIt_thenItsStateIsObservableByIdentifier() {
         // given
         UUID membershipTypeId = members.createMembershipType("Passive");

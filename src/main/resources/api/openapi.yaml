@@ -1144,9 +1144,16 @@ components:
     MembershipRequest:
       type: object
       description: |
-        A person holds at most one membership, so the type named here replaces the one they hold
-        rather than adding a second. The request writes that one membership whole: its type and
-        both its dates.
+        Writes one period of the person's membership: the period valid today, else the next one
+        scheduled, else the latest that ended. When that one has ended and the request starts on or
+        after its end, names no start, or leaves the person a member after today, a new period is
+        added instead, from the requested start when it lies on or after the old end and from today
+        otherwise, so a rejoin keeps the gap. A
+        new type for a period that began before today and keeps its start ends that period today
+        and opens the new type from today. A write that ends the period or moves its end earlier
+        withdraws the periods starting on or after the new end and after today, each recorded in
+        the audit log. `/api/admin/roster/{personId}/membership-periods` addresses each period by
+        id.
       required: [membershipTypeId]
       properties:
         membershipTypeId:
@@ -1154,32 +1161,64 @@ components:
           format: uuid
           description: |
             A membership type the club still offers; `GET /api/admin/membership-types` lists them
-            with their `active` flag. The club has to still offer it only when it differs from the
-            type the person already holds — correcting the dates of a membership on a type retired
-            since is not an assignment and is not refused, because a departure recorded on the
-            wrong day would otherwise be permanent.
+            with their `active` flag. The club has to still offer it only when the write leaves the
+            person a member of a type they did not already hold, so correcting the dates of a
+            period on a type retired since is not refused.
         startedOn:
           type: [string, "null"]
           format: date
           description: |
-            The date the membership began. Omitted, it is today for a membership that is being
-            created or revived, and leaves a running one where it is — changing somebody's type
-            continues their membership rather than starting a new one.
+            The first day of the period. Omitted, it is today for a period being added and leaves
+            the start of an existing one where it is. It may lie in the future: such a period grants
+            nothing until it begins.
         endedOn:
           type: [string, "null"]
           format: date
           description: |
-            Present, it writes a membership that has ended: the record and the type stay, the
-            person stops being a member. Omitted, the membership runs. It may not precede
-            `startedOn`.
+            The first day the period no longer holds. Omitted, it runs without an end. It may lie in
+            the future and must lie after `startedOn`. A period that would overlap another of the
+            same person is answered `409` with `urn:courtside:error:membership-periods-overlap`.
 
-            **Neither date may lie in the future.** The roster records a membership that has
-            begun, not one scheduled to begin: whether somebody is a member is decided by whether
-            an end date is set and never by comparing a date with today, so a start date next
-            month would make them a member now and an end date in December would stop their
-            membership today. A future date is answered `400` with
-            `urn:courtside:error:invalid-membership-period`. Scheduling a membership ahead is a
-            feature this surface does not have rather than one it half has.
+    MembershipPeriodRequest:
+      type: object
+      required: [membershipTypeId, startedOn]
+      properties:
+        membershipTypeId:
+          type: string
+          format: uuid
+          description: |
+            A type the club still offers when the write gives the person a type the period did not
+            already carry; keeping a retired type while correcting the dates is not refused.
+        startedOn:
+          type: string
+          format: date
+          description: The first day of the period. It may lie in the future.
+        endedOn:
+          type: [string, "null"]
+          format: date
+          description: |
+            The first day the period no longer holds; omitted or `null`, it runs without an end. It
+            must lie after `startedOn`, or the period would cover no day.
+
+    MembershipPeriodState:
+      type: string
+      enum: [RUNNING, SCHEDULED, ENDED]
+      description: |
+        Where a period stands on the club's today, in the club's time zone: `RUNNING` holds today,
+        `SCHEDULED` begins later, `ENDED` no longer holds.
+
+    MembershipPeriod:
+      type: object
+      required: [id, membershipTypeId, startedOn, endedOn, state]
+      properties:
+        id: { type: string, format: uuid }
+        membershipTypeId: { type: string, format: uuid }
+        startedOn: { type: string, format: date }
+        endedOn:
+          type: [string, "null"]
+          format: date
+          description: The first day the period no longer holds, `null` while it runs without an end.
+        state: { $ref: "#/components/schemas/MembershipPeriodState" }
 
     MembershipType:
       type: object
@@ -1832,7 +1871,7 @@ components:
 
     RosterEntry:
       type: object
-      required: [personId, firstName, lastName, email, enabled, roles]
+      required: [personId, firstName, lastName, email, enabled, membershipCurrent, roles]
       properties:
         personId: { type: string, format: uuid }
         firstName: { type: string }
@@ -1876,24 +1915,34 @@ components:
           description: |
             The account's state, not the person's. A person without an account is never enabled and
             is not thereby disabled — read it together with `accountId`.
+        membershipCurrent:
+          type: boolean
+          description: |
+            Whether the person holds a membership on the club's today. It is the field to read for
+            "is this person a member": the period the other membership fields describe may have
+            ended or may not have begun yet.
         membershipTypeId:
           type: [string, "null"]
           format: uuid
           description: |
-            The type of the membership the person holds, or — when `membershipEndedOn` is present —
-            the type they last held. Read it together with `membershipEndedOn` and never on its
-            own: a person whose membership has ended still has a type here and is not a member.
+            The type of one period of the person's membership: the period valid today, else the
+            next one scheduled, else the latest that ended. `GET
+            /api/admin/roster/{personId}/membership-periods` lists every period.
+        membershipState:
+          oneOf:
+            - $ref: "#/components/schemas/MembershipPeriodState"
+            - type: "null"
+          description: Where that period stands on the club's today, `null` when the person holds none.
         membershipStartedOn:
           type: [string, "null"]
           format: date
-          description: The date the membership began, absent when the person holds none.
+          description: The first day of that period, absent when the person holds none.
         membershipEndedOn:
           type: [string, "null"]
           format: date
           description: |
-            Present only for a membership that has ended, naming the date it did. A person whose
-            entry carries it is **not** currently a member: no membership-scoped booking rule is
-            measured against them and they are not offered as a co-player.
+            The first day that period no longer holds, absent while it runs without an end. It may
+            lie in the future: a membership that ends in December still holds until then.
         roles:
           type: array
           description: |
@@ -2831,7 +2880,8 @@ components:
       type: object
       description: |
         Confirmed bookings of one card whose holder holds one membership type, counted when that
-        membership ran on the day the booking starts; type changes keep no history. A holder without
+        membership ran on the day the booking starts, so a type change counts each booking under the
+        type held on its day. A holder without
         a running membership, or a booking without a holder, has no type.
         `bookedMinutes` sums the court minutes of those bookings, one court at a time. A group
         fewer than three accounts booked is not shown on its own: it joins the one row with
@@ -3184,12 +3234,12 @@ components:
           type: integer
           format: int64
           minimum: 0
-          description: Memberships that started in the period.
+          description: Memberships that started in the period, without a period of the same person that directly precedes them.
         leavings:
           type: integer
           format: int64
           minimum: 0
-          description: Memberships that ended in the period.
+          description: Memberships that ended in the period, without a period of the same person that directly follows them.
         activeMembers: { type: integer, format: int64, minimum: 0 }
         activeShare:
           type: [number, "null"]
@@ -7379,30 +7429,20 @@ paths:
       operationId: assignMembership
       summary: Give a person a membership, move them to another type, or correct its dates.
       description: |
-        A person holds at most one membership, so this writes the one they already have rather
-        than adding a second: a board that picked the wrong type moves them to the right one with
-        the same request, and writing the type they already hold changes nothing.
+        Writes one period of the person's membership, as `MembershipRequest` describes: a type
+        change opens the new type from today and keeps the old one as its own period, and a
+        person who rejoins gains a new period beside the one that ended. A type picked by mistake
+        is corrected on the period itself.
 
-        A membership that has ended is revived by this request rather than duplicated — somebody
-        rejoining is the same person on the same record, beginning again on the `startedOn` given.
-        The type they held before is then overwritten and is no longer readable: this surface keeps
-        one membership per person, not a history of them.
-
-        The type has to be one the club still offers **whenever the write leaves somebody a member
-        of a type they were not already a member of** — a first assignment, a move to another type,
-        and a revival, because taking somebody back is an assignment however dormant their record
-        was. A deactivated type is refused there, which is what its `active` flag is for.
-
-        Everything that does not make somebody a member is left alone: the memberships already on a
-        type are untouched, a type deactivated afterwards leaves the people holding it exactly
-        where they are, correcting the dates of such a membership stays possible, and ending one
-        is never refused for the type it is on.
+        The type has to be one the club still offers whenever the write leaves somebody a member of
+        a type they did not already hold. A deactivated type is refused there, which is what its
+        `active` flag is for. Everything that does not make somebody a member is left alone:
+        correcting the dates of a period on a retired type stays possible, and ending one is never
+        refused for the type it is on.
 
         A membership decides which rules the person's bookings are measured against, so a write
-        that changes the type, ends the membership or revives it ends their account's sessions and
-        they sign in again. A write that only moves `startedOn` while the membership keeps running
-        changes nothing a session carries and leaves it standing. A person without an account has
-        none to end.
+        that changes the type or whether they are a member today ends their account's sessions and
+        they sign in again. A person without an account has none to end.
 
         The response is the roster entry.
       security:
@@ -7451,20 +7491,15 @@ paths:
       operationId: removeMembership
       summary: End a person's membership today.
       description: |
-        The person, their account, their bookings **and the membership record** stay; what goes is
-        the membership itself, and with it the rules that were measured against its type. The
-        record keeps the type they held and gains today's date in the club's time zone as the date
-        it ended, so a club can still see who was a member of what and until when. Nothing is
-        deleted here.
+        The person, their account, their bookings and the record of their past periods stay. The
+        period valid today ends today in the club's time zone, so it no longer holds from today on,
+        and every period scheduled to begin after today is removed, each removal recorded in the
+        audit log. Nothing else is deleted.
 
-        This is exactly `PUT` with the type unchanged and `endedOn` set to today — a shortcut for
-        the one date that needs no choosing, kept because it reads as what it does. Use `PUT`
-        instead to end a membership on a different date, or to correct a date recorded wrongly.
-        The browser uses `PUT` throughout: a board records a departure after the fact far more
-        often than on the day, and only `PUT` can correct the date afterwards.
-
-        Ending a membership the person does not currently hold is the state the request asks for
-        and answers the same way, and it leaves an already recorded end date where it is.
+        Use `PUT` to end a membership on another date, or the periods under
+        `/api/admin/roster/{personId}/membership-periods` to correct a date recorded wrongly.
+        Ending a membership the person does not hold is the state the request asks for and answers
+        the same way.
 
         Their account's sessions end, for the reason the assignment gives.
       security:
@@ -7486,6 +7521,184 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/admin/roster/{personId}/membership-periods:
+    get:
+      tags: [admin-roster]
+      operationId: listMembershipPeriods
+      summary: Every period of a person's membership, oldest first.
+      description: |
+        The periods never overlap. One of them may be valid today, earlier ones have ended and
+        later ones are scheduled; a period scheduled ahead grants nothing until its first day.
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: personId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: The periods, ascending by their first day.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/MembershipPeriod" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+    post:
+      tags: [admin-roster]
+      operationId: addMembershipPeriod
+      summary: Add a period to a person's membership, also one that begins or ends in the future.
+      description: |
+        The period may not overlap another of the same person; one ending on the day the next
+        begins does not. The person's account sessions end, because the rules their bookings are
+        measured against may change.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: personId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MembershipPeriodRequest" }
+      responses:
+        "201":
+          description: Added.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MembershipPeriod" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          description: No such person, or no such membership type.
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "409":
+          description: |
+            The period overlaps another (`urn:courtside:error:membership-periods-overlap`), or the
+            type is no longer offered (`urn:courtside:error:membership-type-inactive`).
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/admin/roster/{personId}/membership-periods/{periodId}:
+    put:
+      tags: [admin-roster]
+      operationId: correctMembershipPeriod
+      summary: Correct a period of a person's membership, its type and both its dates.
+      description: |
+        The request writes the period whole. The corrected period may not overlap another of the
+        same person. The person's account sessions end, because the rules their bookings are measured
+        against may change.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: personId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: periodId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MembershipPeriodRequest" }
+      responses:
+        "200":
+          description: Corrected.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MembershipPeriod" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          description: |
+            No such person, no such membership type, or no such period of this person
+            (`urn:courtside:error:membership-period-not-found`).
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "409":
+          description: |
+            The period overlaps another (`urn:courtside:error:membership-periods-overlap`), or the
+            new type is no longer offered (`urn:courtside:error:membership-type-inactive`).
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+    delete:
+      tags: [admin-roster]
+      operationId: removeMembershipPeriod
+      summary: Remove a period recorded by mistake.
+      description: |
+        The period is deleted, not ended: use it for a period that never happened. A membership
+        that did happen and has stopped is ended instead, so its record stays. The person's account
+        sessions end, because the rules their bookings are measured against may change.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: personId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: periodId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "204":
+          description: Removed.
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          description: |
+            No such person, or no such period of this person
+            (`urn:courtside:error:membership-period-not-found`).
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
         "429":
           $ref: "#/components/responses/RateLimited"
 
@@ -9278,8 +9491,9 @@ paths:
       summary: How many members the club had at the end of a period, and how many of them played.
       description: |
         A membership runs on a day when it started on or before that day and has no end date or
-        ends after it. Members are counted by the membership type they hold now, because type
-        changes keep no history. An active member holds a running membership on the period's last
+        ends after it. A period reaching past today is read up to today, so a scheduled start or end
+        does not count before its day. Members are counted by the membership type of the period
+        running on the period's last day. An active member holds a running membership on the period's last
         day and, in a confirmed booking starting in the period, booked it or was recorded as a
         participant. Guests and participant cards are never members.
 

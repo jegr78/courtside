@@ -184,7 +184,7 @@ yet; how long a club keeps them belongs to the retention controls by record cate
 | Table | Holds | References |
 |---|---|---|
 | `person` | A human being: name and email | None |
-| `member` | A membership: its type and the dates it ran | `person`, `membership_type` |
+| `member` | One period of a person's membership: its type, its first day and the day it no longer holds | `person`, `membership_type` |
 | `membership_type` | A kind of membership, the rule set it is measured against, and whether it opens an account on import | `rule_set` |
 | `user_account` | Credentials and sign-in state for a person | `person` |
 | `user_account_role` | One row per role the account holds | `user_account` |
@@ -196,10 +196,14 @@ name that arrived through a roster import. `user_account.username` is unique; `p
 **`user_account.password_hash` is nullable.** It is null until the instance has issued a credential,
 and the sign-in path answers such a row exactly as it answers a wrong password.
 
-**`member` is one dated row per person.** `started_on` is required, `ended_on` marks a membership
-that ended, and the row survives so a club can still see who held what and until when. Neither date
-may lie in the future: nothing compares them with today, so a future date would be a fact no reader
-honours.
+**`member` holds one row per period.** `started_on` is required and `ended_on` is the first day the
+period no longer holds, so a period covers `[started_on, ended_on)`. Both may lie in the future.
+The exclusion `member_periods_disjoint` keeps the periods of one person from overlapping; a period
+ending on the day the next begins does not overlap it. Ended periods stay, so a club can still see
+who held what and until when. The application refuses a new or corrected period whose end equals its
+start, because it would cover no day. The CHECK still allows `ended_on = started_on`: rows written
+before periods existed carry it for a membership ended on the day it began, and ending a membership
+that began today records it too. Such a row holds on no day and the exclusion ignores it.
 
 `security_epoch` invalidates every session an account holds; `version` is the optimistic lock;
 `credentials_expire_at` bounds an issued one-time credential. `last_login_at` is the instant of the

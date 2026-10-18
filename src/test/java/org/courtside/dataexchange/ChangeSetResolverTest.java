@@ -283,12 +283,34 @@ class ChangeSetResolverTest {
     }
 
     @Test
+    void givenAPersonWhoseOnlyMembershipIsScheduled_whenTheyAreAbsentFromAFullSnapshot_thenTheyDepart() {
+        // given
+        CsvSnapshot snapshot = snapshotOf();
+        CurrentRoster roster = new CurrentRoster(Map.of("4711", JANE),
+                Map.of(JANE, new CurrentRoster.RosterPerson(JANE, "Jane", "Doe",
+                        "jane.doe@example.org", ACTIVE_TYPE, false, true)),
+                Set.of(ACTIVE_TYPE), Map.of(), Set.of(), Set.of(), Map.of());
+
+        // when
+        ResolvedChangeSet resolved = resolve(snapshot, SnapshotMode.FULL_SNAPSHOT, roster);
+
+        // then
+        assertThat(resolved.changes())
+                .as("a membership scheduled to begin is withdrawn like a running one")
+                .singleElement()
+                .satisfies(change -> {
+                    assertThat(change.kind()).isEqualTo(ResolvedChangeSet.ChangeKind.END_MEMBERSHIP);
+                    assertThat(change.personId()).isEqualTo(JANE);
+                });
+    }
+
+    @Test
     void givenAMemberWhoseMembershipAlreadyEnded_whenTheyAreAbsentAgain_thenNothingEndsTwice() {
         // given
         CsvSnapshot snapshot = snapshotOf();
         CurrentRoster roster = new CurrentRoster(Map.of("4711", JANE),
                 Map.of(JANE, new CurrentRoster.RosterPerson(JANE, "Jane", "Doe",
-                        "jane.doe@example.org", ACTIVE_TYPE, false)),
+                        "jane.doe@example.org", ACTIVE_TYPE, false, false)),
                 Set.of(ACTIVE_TYPE), Map.of(), Set.of(), Set.of(), Map.of());
 
         // when
@@ -463,7 +485,7 @@ class ChangeSetResolverTest {
         UUID personId = JANE;
         CurrentRoster roster = new CurrentRoster(Map.of("4711", personId),
                 Map.of(personId, new CurrentRoster.RosterPerson(personId, "Jane", "Doe",
-                        "jane.doe@example.org", ACTIVE_TYPE, false)),
+                        "jane.doe@example.org", ACTIVE_TYPE, false, false)),
                 Set.of(ACTIVE_TYPE), Map.of(), Set.of(ACTIVE_TYPE), Set.of(), Map.of());
 
         // when — an account is a membership's benefit, and this run gives them no membership
@@ -552,7 +574,7 @@ class ChangeSetResolverTest {
                                                        boolean holdsAnAccount) {
         return new CurrentRoster(Map.of(externalId, personId),
                 Map.of(personId, new CurrentRoster.RosterPerson(personId, firstName, lastName,
-                        "jane.doe@example.org", ACTIVE_TYPE, true)),
+                        "jane.doe@example.org", ACTIVE_TYPE, true, false)),
                 Set.of(ACTIVE_TYPE), Map.of(), Set.of(ACTIVE_TYPE),
                 holdsAnAccount ? Set.of(personId) : Set.of(), Map.of());
     }
@@ -590,7 +612,7 @@ class ChangeSetResolverTest {
     private static CurrentRoster rosterHoldingType(UUID membershipTypeId) {
         return new CurrentRoster(Map.of("4711", JANE),
                 Map.of(JANE, new CurrentRoster.RosterPerson(JANE, "Jane", "Doe",
-                        "jane.doe@example.org", membershipTypeId, true)),
+                        "jane.doe@example.org", membershipTypeId, true, false)),
                 Set.of(ACTIVE_TYPE, RETIRED_TYPE), Map.of(), Set.of(), Set.of(), Map.of());
     }
 
@@ -607,14 +629,14 @@ class ChangeSetResolverTest {
 
     private static CurrentRoster.RosterPerson person(UUID personId, String firstName, String lastName) {
         return new CurrentRoster.RosterPerson(personId, firstName, lastName,
-                firstName.toLowerCase(java.util.Locale.ROOT) + "@example.org", ACTIVE_TYPE, true);
+                firstName.toLowerCase(java.util.Locale.ROOT) + "@example.org", ACTIVE_TYPE, true, false);
     }
 
     private static CurrentRoster rosterHolding(UUID personId, String externalId, String firstName,
                                                String lastName) {
         return new CurrentRoster(Map.of(externalId, personId),
                 Map.of(personId, new CurrentRoster.RosterPerson(personId, firstName, lastName,
-                        "jane.doe@example.org", ACTIVE_TYPE, true)),
+                        "jane.doe@example.org", ACTIVE_TYPE, true, false)),
                 Set.of(ACTIVE_TYPE), Map.of(), Set.of(), Set.of(), Map.of());
     }
 }

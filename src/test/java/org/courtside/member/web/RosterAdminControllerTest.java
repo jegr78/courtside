@@ -34,6 +34,7 @@ import java.util.stream.Stream;
 import static org.courtside.member.MemberFixtures.MEMBER_SINCE;
 import static org.courtside.member.MemberFixtures.memberSince;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.assertj.core.api.InstanceOfAssertFactories.MAP;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -1308,7 +1309,7 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
 
     @Test
     @WithMockUser(username = "admin", roles = "ADMIN")
-    void givenAPersonOnTheWrongType_whenAnotherIsAssigned_thenTheyHoldOnlyTheNewOne()
+    void givenAPersonOnOneType_whenAnotherIsAssigned_thenTheOldTypeEndsTodayAndTheNewOneRunsFromToday()
             throws Exception {
         // given
         UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
@@ -1323,10 +1324,12 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.membershipTypeId").value(OTHER_MEMBERSHIP_TYPE_ID.toString()));
 
         // then
-        assertThat(members.findByPersonIdIn(List.of(mary)))
-                .singleElement()
-                .satisfies(member -> assertThat(member.getMembershipTypeId())
-                        .isEqualTo(OTHER_MEMBERSHIP_TYPE_ID));
+        assertThat(members.findByPersonIdOrderByStartedOnAscIdAsc(mary))
+                .as("the type held until today stays as its own period")
+                .extracting(Member::getMembershipTypeId, Member::getStartedOn, Member::getEndedOn)
+                .containsExactly(
+                        tuple(MEMBERSHIP_TYPE_ID, MEMBER_SINCE, LocalDate.of(2026, 5, 12)),
+                        tuple(OTHER_MEMBERSHIP_TYPE_ID, LocalDate.of(2026, 5, 12), null));
     }
 
     @Test

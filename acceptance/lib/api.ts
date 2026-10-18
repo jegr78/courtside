@@ -42,6 +42,12 @@ export function apiAs(key: PersonaKey): Promise<Api> {
   return signedIn.get(key)!;
 }
 
+// A membership write ends the member's sessions, so the next request signs in again.
+export function apiAsAgain(key: PersonaKey): Promise<Api> {
+  signedIn.delete(key);
+  return apiAs(key);
+}
+
 export async function anonymousApi(): Promise<Api> {
   return wrap(await request.newContext({ baseURL: BASE }));
 }

@@ -7,6 +7,7 @@ import org.courtside.booking.CourtAllocation;
 import org.courtside.booking.BookingStatus;
 import org.courtside.identity.Role;
 import org.courtside.identity.UserAccountRepository;
+import org.courtside.config.ClubTimeZone;
 import org.courtside.member.MemberService;
 import org.courtside.rules.BookingDurationLimit;
 import org.courtside.rules.BookingHoursLimit;
@@ -21,12 +22,14 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
 
 @Component
 @RequiredArgsConstructor
@@ -40,6 +43,7 @@ public class BookingRuleGate {
     private final CancellationDeadline cancellationDeadline;
     private final MemberService members;
     private final UserAccountRepository accounts;
+    private final ClubTimeZone clubTimeZone;
 
     public List<RuleViolation> violationsFor(BookingRuleCheck check) {
         RuleContext context = contextOf(check);
@@ -56,7 +60,7 @@ public class BookingRuleGate {
         if (checks.stream().anyMatch(check -> restrictionsApplyTo(check) != restrictionsApply)) {
             throw new IllegalStateException("A rule evaluation batch must use one restriction mode");
         }
-        Map<UUID, Optional<UUID>> membershipTypes = new HashMap<>();
+        Map<UUID, Function<LocalDate, Optional<UUID>>> membershipTypes = new HashMap<>();
         List<RuleContext> contexts = checks.stream()
                 .map(check -> contextOf(check, membershipTypes))
                 .toList();
@@ -71,7 +75,7 @@ public class BookingRuleGate {
         if (checks.isEmpty()) {
             return List.of();
         }
-        Map<UUID, Optional<UUID>> membershipTypes = new HashMap<>();
+        Map<UUID, Function<LocalDate, Optional<UUID>>> membershipTypes = new HashMap<>();
         List<RuleContext> contexts = checks.stream()
                 .map(check -> contextOf(check, membershipTypes))
                 .toList();
@@ -139,7 +143,7 @@ public class BookingRuleGate {
                 .min(Instant::compareTo)
                 .orElseThrow(() -> new IllegalStateException("A confirmed booking must occupy a court"));
         cancellationDeadline.violationFor(
-                        membershipTypeOf(personBehind(booking.getBookedBy())), startsAt, cancelledAt)
+                        membershipTypeOn(personBehind(booking.getBookedBy()), startsAt), startsAt, cancelledAt)
                 .ifPresent(violation -> requireEmpty(List.of(violation)));
     }
 
@@ -152,17 +156,26 @@ public class BookingRuleGate {
         return personId == null ? null : members.membershipTypeIdOf(personId).orElse(null);
     }
 
-    private RuleContext contextOf(BookingRuleCheck check) {
-        return new RuleContext(check.courtIds().getFirst(), check.cardId(), check.slot(),
-                check.bookedBy(), membershipTypeOf(check.bookedByPersonId()), check.movedBookingIds(),
-                check.courtIds());
+    private UUID membershipTypeOn(UUID personId, Instant startsAt) {
+        return personId == null ? null : members.membershipTypeIdFor(personId, dayOf(startsAt)).orElse(null);
     }
 
-    private RuleContext contextOf(BookingRuleCheck check, Map<UUID, Optional<UUID>> membershipTypes) {
+    private LocalDate dayOf(Instant instant) {
+        return LocalDate.ofInstant(instant, clubTimeZone.zoneId());
+    }
+
+    private RuleContext contextOf(BookingRuleCheck check) {
+        return new RuleContext(check.courtIds().getFirst(), check.cardId(), check.slot(),
+                check.bookedBy(), membershipTypeOn(check.bookedByPersonId(), check.slot().start()),
+                check.movedBookingIds(), check.courtIds());
+    }
+
+    private RuleContext contextOf(BookingRuleCheck check,
+                                  Map<UUID, Function<LocalDate, Optional<UUID>>> membershipTypes) {
         UUID membershipTypeId = check.bookedByPersonId() == null
                 ? null
-                : membershipTypes.computeIfAbsent(
-                        check.bookedByPersonId(), members::membershipTypeIdOf).orElse(null);
+                : membershipTypes.computeIfAbsent(check.bookedByPersonId(), members::membershipTypesOf)
+                        .apply(dayOf(check.slot().start())).orElse(null);
         return new RuleContext(check.courtIds().getFirst(), check.cardId(), check.slot(),
                 check.bookedBy(), membershipTypeId, check.movedBookingIds(), check.courtIds());
     }

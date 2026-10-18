@@ -21,12 +21,14 @@ import org.springframework.context.annotation.Import;
 
 import java.time.DayOfWeek;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.courtside.member.MemberFixtures.memberSince;
 
@@ -35,6 +37,7 @@ class RosterSyncServiceTest extends AbstractIntegrationTest {
 
     private static final UUID STANDARD_MEMBERSHIP =
             UUID.fromString("cccccccc-0000-0000-0000-000000000001");
+    private static final LocalDate TODAY = LocalDate.of(2026, 5, 12);
     private static final Instant SIX_PM = Instant.parse("2026-05-13T16:00:00Z");
     private static final Instant SEVEN_PM = Instant.parse("2026-05-13T17:00:00Z");
 
@@ -55,6 +58,12 @@ class RosterSyncServiceTest extends AbstractIntegrationTest {
 
     @Autowired
     private CardService cards;
+
+    @Autowired
+    private MemberService memberships;
+
+    @Autowired
+    private MembershipPeriodService periods;
 
     @Autowired
     private FacilityTestFixture facilityFixture;
@@ -149,7 +158,66 @@ class RosterSyncServiceTest extends AbstractIntegrationTest {
 
         // then
         assertThat(accounts.findById(account.getId()).orElseThrow().isEnabled()).isFalse();
-        assertThat(members.findCurrentByPersonId(john)).isPresent();
+        assertThat(members.findValidOn(john, TODAY)).isPresent();
+    }
+
+    @Test
+    void givenARunningMembership_whenTheSnapshotListsAnotherType_thenTheOldPeriodEndsTodayAndANewOneBegins() {
+        // given
+        UUID john = identity.createPerson("John", "Roe", "john.roe@example.org");
+        UUID juniors = memberships.createMembershipType("Juniors", null, false).getId();
+        periods.add(john, juniors, new MembershipPeriod(LocalDate.of(2025, 1, 1), null));
+
+        // when
+        sync.apply(new RosterChangeSet(List.of(), List.of(new RosterChangeSet.PersonCorrection(
+                john, "4711", null, null, null, STANDARD_MEMBERSHIP, false)), List.of()));
+
+        // then
+        assertThat(periods.periodsOf(john))
+                .as("a type change from the import keeps the history of the earlier type")
+                .extracting(MembershipPeriodService.Period::membershipTypeId,
+                        MembershipPeriodService.Period::startedOn, MembershipPeriodService.Period::endedOn)
+                .containsExactly(
+                        tuple(juniors, LocalDate.of(2025, 1, 1), TODAY),
+                        tuple(STANDARD_MEMBERSHIP, TODAY, null));
+    }
+
+    @Test
+    void givenAPeriodTheBoardScheduledAhead_whenTheSnapshotListsThePersonToday_thenTheImportedPeriodRunsUntilIt() {
+        // given
+        UUID john = identity.createPerson("John", "Roe", "john.roe@example.org");
+        UUID juniors = memberships.createMembershipType("Juniors", null, false).getId();
+        periods.add(john, juniors, new MembershipPeriod(LocalDate.of(2026, 7, 1), null));
+
+        // when
+        sync.apply(new RosterChangeSet(List.of(), List.of(new RosterChangeSet.PersonCorrection(
+                john, "4711", null, null, null, STANDARD_MEMBERSHIP, false)), List.of()));
+
+        // then
+        assertThat(periods.periodsOf(john))
+                .extracting(MembershipPeriodService.Period::membershipTypeId,
+                        MembershipPeriodService.Period::startedOn, MembershipPeriodService.Period::endedOn)
+                .containsExactly(
+                        tuple(STANDARD_MEMBERSHIP, TODAY, LocalDate.of(2026, 7, 1)),
+                        tuple(juniors, LocalDate.of(2026, 7, 1), null));
+    }
+
+    @Test
+    void givenAPeriodTheBoardScheduledAhead_whenTheSnapshotNoLongerListsThePerson_thenTheDepartureWithdrawsIt() {
+        // given
+        UUID john = identity.createPerson("John", "Roe", "john.roe@example.org");
+        periods.add(john, STANDARD_MEMBERSHIP, new MembershipPeriod(LocalDate.of(2025, 1, 1), LocalDate.of(2026, 7, 1)));
+        UUID juniors = memberships.createMembershipType("Juniors", null, false).getId();
+        periods.add(john, juniors, new MembershipPeriod(LocalDate.of(2026, 7, 1), null));
+
+        // when
+        sync.apply(new RosterChangeSet(List.of(), List.of(), List.of(john)));
+
+        // then
+        assertThat(periods.periodsOf(john))
+                .extracting(MembershipPeriodService.Period::membershipTypeId,
+                        MembershipPeriodService.Period::startedOn, MembershipPeriodService.Period::endedOn)
+                .containsExactly(tuple(STANDARD_MEMBERSHIP, LocalDate.of(2025, 1, 1), TODAY));
     }
 
     @Test
@@ -164,7 +232,7 @@ class RosterSyncServiceTest extends AbstractIntegrationTest {
         UUID created = outcome.createdPersonIdsByExternalId().get("4711");
         assertThat(created).isNotNull();
         assertThat(persons.findById(created).orElseThrow().getLastName()).isEqualTo("Doe");
-        assertThat(members.findCurrentByPersonId(created)).isPresent();
+        assertThat(members.findValidOn(created, TODAY)).isPresent();
         assertThat(accounts.findByPersonIdIn(List.of(created))).isEmpty();
     }
 
@@ -270,7 +338,7 @@ class RosterSyncServiceTest extends AbstractIntegrationTest {
         assertThat(second.accountsDisabled()).isZero();
         assertThat(second.rolesRemoved()).isZero();
         assertThat(accounts.findById(accountId).orElseThrow().isEnabled()).isFalse();
-        assertThat(members.findByPersonId(jane).orElseThrow().getEndedOn()).isNotNull();
+        assertThat(MemberFixtures.latestPeriodOf(members, jane).orElseThrow().getEndedOn()).isNotNull();
     }
 
     private static RosterChangeSet endingsFor(UUID personId) {

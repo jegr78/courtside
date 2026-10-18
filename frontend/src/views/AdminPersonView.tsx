@@ -20,6 +20,7 @@ import { differs } from "../unsaved/differs";
 import { SaveBar } from "../unsaved/SaveBar";
 import { saveInTurn, StepFailed, type SaveStep } from "../unsaved/saveInTurn";
 import { useUnsavedForm } from "../unsaved/useUnsavedForm";
+import { MembershipPeriodsSection } from "./MembershipPeriodsSection";
 
 const roles: Role[] = [
   "MEMBER", "TRAINER", "SPORT_DIRECTOR", "YOUTH_DIRECTOR", "GROUNDSKEEPER", "TREASURER", "ADMIN"
@@ -52,6 +53,10 @@ function storedMembership(entry: RosterEntry): Membership {
     startedOn: entry.membershipStartedOn ?? "",
     endedOn: entry.membershipEndedOn ?? ""
   };
+}
+
+function membershipVersion(entry: RosterEntry): string {
+  return [entry.membershipCurrent, entry.membershipTypeId, entry.membershipStartedOn, entry.membershipEndedOn].join("|");
 }
 
 function isRecentAuth(failure: unknown): boolean {
@@ -314,6 +319,13 @@ export function AdminPersonView() {
             return ended;
           }}
         />
+        <MembershipPeriodsSection
+          personId={personId}
+          types={types}
+          disabled={pending}
+          version={membershipVersion(entry)}
+          changed={() => void api.person(personId).then(setEntry).catch(reportError)}
+        />
         {entry.accountId
           ? <AccountSection
             entry={entry}
@@ -376,7 +388,7 @@ function MembershipSection({ entry, types, disabled, membership, changed, end }:
   const { t } = useTranslation();
   const [ending, setEnding] = useState(false);
   const [chosenEnd, setChosenEnd] = useState(entry.membershipEndedOn ?? "");
-  const running = Boolean(entry.membershipTypeId) && !entry.membershipEndedOn;
+  const running = entry.membershipCurrent;
 
   async function endMembership() {
     if (await end(chosenEnd)) setEnding(false);
@@ -393,8 +405,9 @@ function MembershipSection({ entry, types, disabled, membership, changed, end }:
         </select>
       </label>
       <TextField data-testid="membership-started-on" disabled={disabled} type="date" label={t("admin.person.startedOn")} value={membership.startedOn} onChange={(event) => changed({ ...membership, startedOn: event.target.value })} />
-      <TextField data-testid="membership-ended-on" disabled={disabled} type="date" label={t("admin.person.endedOn")} value={membership.endedOn} onChange={(event) => changed({ ...membership, endedOn: event.target.value })} />
+      <TextField data-testid="membership-ended-on" disabled={disabled} type="date" label={t("admin.person.endedOn")} value={membership.endedOn} aria-describedby="membership-ended-on-hint" onChange={(event) => changed({ ...membership, endedOn: event.target.value })} />
     </div>
+    <p id="membership-ended-on-hint" className="text-muted text-sm">{t("admin.person.endedOnHint")}</p>
     {running && <Button variant="destructive" data-testid="end-membership" disabled={disabled} className="justify-self-start" type="button" onClick={() => setEnding(true)}>{t("admin.person.endMembership")}</Button>}
     {ending && <Modal labelledBy="end-membership-title" closed={() => setEnding(false)}>
       <div className="grid gap-4">

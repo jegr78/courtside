@@ -82,7 +82,7 @@ class SecurityAssessmentDataSeederTest {
         ArgumentCaptor<Member> member = ArgumentCaptor.forClass(Member.class);
         verify(members, times(SecurityAssessmentDataSeeder.ROLE_ACCOUNT_COUNT
                 + SecurityAssessmentDataset.managerCombinationAccounts())).save(member.capture());
-        assertThat(member.getAllValues()).anySatisfy(value -> assertThat(value.isCurrent()).isFalse());
+        assertThat(member.getAllValues()).anySatisfy(value -> assertThat(value.getEndedOn()).isNotNull());
         verify(bookings, times(SecurityAssessmentDataset.standaloneBookings())).save(any());
         verify(bookings, times(SecurityAssessmentDataset.seriesOccurrences())).saveAndFlush(any());
         verify(jdbc, times(2 + SecurityAssessmentDataset.seriesOccurrences()))

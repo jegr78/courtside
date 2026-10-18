@@ -43,7 +43,7 @@ const currentMember: RosterEntry = {
   accountId: null,
   username: null,
   enabled: false,
-  roles: [],
+  membershipCurrent: true, roles: [],
   membershipTypeId: "type-1",
   membershipStartedOn: "2026-01-01",
   membershipEndedOn: null
@@ -117,7 +117,7 @@ describe("AdminSetupView", () => {
       { id: "type-1", name: "Adults", ruleSetId: null, active: false, grantsAccount: false }
     ]);
     vi.spyOn(api, "roster").mockResolvedValue({
-      entries: [{ ...currentMember, membershipEndedOn: "2026-08-31" }],
+      entries: [{ ...currentMember, membershipCurrent: false, membershipEndedOn: "2026-08-31" }],
       nextCursor: null, matching: 0
     });
     vi.spyOn(api, "importSources").mockResolvedValue([{

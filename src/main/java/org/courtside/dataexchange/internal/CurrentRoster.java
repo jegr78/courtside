@@ -24,6 +24,7 @@ public record CurrentRoster(Map<String, UUID> personIdsByExternalId,
     }
 
     public record RosterPerson(UUID personId, String firstName, String lastName, String email,
-                               UUID membershipTypeId, boolean membershipCurrent) {
+                               UUID membershipTypeId, boolean membershipCurrent,
+                               boolean membershipScheduled) {
     }
 }

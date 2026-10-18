@@ -27,7 +27,7 @@ const configured: AdminClubConfig = {
 const currentMember: RosterEntry = {
   personId: "11111111-1111-1111-1111-111111111111", firstName: "Jane", lastName: "Doe",
   email: "jane.doe@example.org", accountId: "22222222-2222-2222-2222-222222222222", username: "jane.doe",
-  enabled: true, roles: ["MEMBER"], membershipTypeId: "type-1", membershipStartedOn: "2026-01-01",
+  enabled: true, membershipCurrent: true, roles: ["MEMBER"], membershipTypeId: "type-1", membershipStartedOn: "2026-01-01",
   membershipEndedOn: null, credentialState: "CREDENTIAL_ISSUED"
 };
 

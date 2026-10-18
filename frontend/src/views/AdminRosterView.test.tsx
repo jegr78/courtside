@@ -11,31 +11,31 @@ import { AdminRosterView } from "./AdminRosterView";
 
 const withAccount: RosterEntry = {
   personId: "person-1", firstName: "Jane", lastName: "Doe", email: "jane.doe@example.org",
-  accountId: "account-1", username: "doe.jane", enabled: true, roles: ["MEMBER"],
+  accountId: "account-1", username: "doe.jane", enabled: true, membershipCurrent: true, roles: ["MEMBER"],
   credentialState: "PASSWORD_CHOSEN",
   membershipTypeId: "type-1", membershipStartedOn: "2026-01-01", membershipEndedOn: null
 };
 
 const withoutAccount: RosterEntry = {
   personId: "person-2", firstName: "John", lastName: "Roe", email: "john.roe@example.org",
-  accountId: null, username: null, enabled: false, roles: []
+  accountId: null, username: null, enabled: false, membershipCurrent: false, roles: []
 };
 
 const departed: RosterEntry = {
   personId: "person-3", firstName: "Mary", lastName: "Major", email: "mary.major@example.org",
-  accountId: "account-3", username: "major.mary", enabled: true, roles: ["MEMBER"],
-  membershipTypeId: "type-1", membershipStartedOn: "2025-01-01", membershipEndedOn: "2026-03-31"
+  accountId: "account-3", username: "major.mary", enabled: true, membershipCurrent: false, roles: ["MEMBER"],
+  membershipTypeId: "type-1", membershipState: "ENDED", membershipStartedOn: "2025-01-01", membershipEndedOn: "2026-03-31"
 };
 
 const trainer: RosterEntry = {
   personId: "person-4", firstName: "Tara", lastName: "Trainer", email: "tara@example.org",
-  accountId: "account-4", username: "trainer.tara", enabled: true, roles: ["MEMBER", "TRAINER"],
+  accountId: "account-4", username: "trainer.tara", enabled: true, membershipCurrent: false, roles: ["MEMBER", "TRAINER"],
   credentialState: "AWAITING_CREDENTIAL"
 };
 
 const blocked: RosterEntry = {
   personId: "person-5", firstName: "Richard", lastName: "Miles", email: "richard.miles@example.org",
-  accountId: "account-5", username: "miles.richard", enabled: false, roles: ["MEMBER"],
+  accountId: "account-5", username: "miles.richard", enabled: false, membershipCurrent: false, roles: ["MEMBER"],
   credentialState: "CREDENTIAL_EXPIRED"
 };
 
@@ -240,6 +240,34 @@ describe("AdminRosterView", () => {
     expect(ended).toHaveTextContent("2026-03-31");
   });
 
+  it("given a membership the server reports as beginning later, when the list is read, then it shows its type with the day it begins whatever the browser's calendar says", async () => {
+    // given
+    const scheduled: RosterEntry = { ...departed, personId: "person-6", membershipCurrent: false, membershipState: "SCHEDULED", membershipStartedOn: "2000-01-01", membershipEndedOn: null };
+    vi.spyOn(api, "roster").mockResolvedValue({ entries: [scheduled], nextCursor: null, matching: 1 });
+
+    // when
+    render(<MemoryRouter><UnsavedChangesProvider><AdminRosterView /></UnsavedChangesProvider></MemoryRouter>);
+
+    // then
+    const label = await screen.findByTestId("roster-membership-person-6");
+    expect(label, "a scheduled period names the type it will carry").toHaveTextContent("Adults");
+    expect(label, "and the day it begins").toHaveTextContent("2000-01-01");
+    expect(label.textContent, "it is not shown as a plain current type").not.toBe("Adults");
+  });
+
+  it("given a current membership with an end ahead, when the list is read, then it shows the type as current", async () => {
+    // given
+    const ending: RosterEntry = { ...withAccount, membershipCurrent: true, membershipEndedOn: "2999-01-01" };
+    vi.spyOn(api, "roster").mockResolvedValue({ entries: [ending], nextCursor: null, matching: 1 });
+
+    // when
+    render(<MemoryRouter><UnsavedChangesProvider><AdminRosterView /></UnsavedChangesProvider></MemoryRouter>);
+
+    // then
+    expect(await screen.findByTestId("roster-membership-person-1"), "an end date ahead does not end the membership today")
+      .toHaveTextContent("Adults");
+  });
+
   it("given a membership type is chosen, when filtering, then the list asks the server for that type", async () => {
     // given
     render(<MemoryRouter><UnsavedChangesProvider><AdminRosterView /></UnsavedChangesProvider></MemoryRouter>);
@@ -340,7 +368,7 @@ describe("AdminRosterView", () => {
     // given
     const created: RosterEntry = {
       personId: "person-9", firstName: "Mary", lastName: "Major", email: "mary.major@example.org",
-      accountId: null, username: null, enabled: false, roles: []
+      accountId: null, username: null, enabled: false, membershipCurrent: false, roles: []
     };
     vi.spyOn(api, "createPerson").mockResolvedValue(created);
     render(<MemoryRouter initialEntries={["/admin/roster"]}><UnsavedChangesProvider>
@@ -381,7 +409,7 @@ describe("AdminRosterView", () => {
     // given
     vi.spyOn(api, "createPerson").mockResolvedValue({
       personId: "person-9", firstName: "Mary", lastName: "Major", email: null,
-      accountId: null, username: null, enabled: false, roles: []
+      accountId: null, username: null, enabled: false, membershipCurrent: false, roles: []
     });
     render(<RouterProvider router={rosterRouter()} />);
     await screen.findByTestId("roster-row-person-1");
@@ -417,7 +445,7 @@ describe("AdminRosterView", () => {
     // given
     const created: RosterEntry = {
       personId: "person-9", firstName: "Mary", lastName: "Major", email: null,
-      accountId: null, username: null, enabled: false, roles: []
+      accountId: null, username: null, enabled: false, membershipCurrent: false, roles: []
     };
     vi.spyOn(api, "createPerson").mockResolvedValue(created);
     render(<MemoryRouter initialEntries={["/admin/roster"]}><UnsavedChangesProvider>

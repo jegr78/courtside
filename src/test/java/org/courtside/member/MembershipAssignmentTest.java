@@ -94,7 +94,7 @@ class MembershipAssignmentTest extends AbstractIntegrationTest {
         // when / then
         assertThatThrownBy(() -> roster.writeMembership(richard, type.getId(), MembershipPeriod.running()))
                 .isInstanceOf(MembershipTypeInactiveException.class);
-        assertThat(members.findByPersonId(richard)).isEmpty();
+        assertThat(MemberFixtures.latestPeriodOf(members, richard)).isEmpty();
     }
 
     @Test
@@ -167,7 +167,7 @@ class MembershipAssignmentTest extends AbstractIntegrationTest {
         assertThatThrownBy(() -> roster.writeMembership(mary, absent, MembershipPeriod.running()))
                 .isInstanceOf(MembershipTypeNotFoundException.class)
                 .hasMessageContaining(absent.toString());
-        assertThat(members.findByPersonId(mary)).isEmpty();
+        assertThat(MemberFixtures.latestPeriodOf(members, mary)).isEmpty();
     }
 
     @Test
@@ -178,7 +178,7 @@ class MembershipAssignmentTest extends AbstractIntegrationTest {
         // when / then
         assertThatThrownBy(() -> roster.writeMembership(mary, null, MembershipPeriod.running()))
                 .isInstanceOf(IllegalStateException.class);
-        assertThat(members.findByPersonId(mary)).isEmpty();
+        assertThat(MemberFixtures.latestPeriodOf(members, mary)).isEmpty();
     }
 
     @Test
@@ -196,7 +196,7 @@ class MembershipAssignmentTest extends AbstractIntegrationTest {
         assertThat(persons.findById(mary))
                 .as("only the membership goes; the person stays")
                 .isPresent();
-        assertThat(members.findByPersonId(mary))
+        assertThat(MemberFixtures.latestPeriodOf(members, mary))
                 .as("and so does the record of what they held")
                 .isPresent();
     }

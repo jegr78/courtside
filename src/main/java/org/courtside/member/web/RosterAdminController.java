@@ -5,6 +5,9 @@ import org.courtside.api.AdminRosterApi;
 import org.courtside.api.ApiAccountRequest;
 import org.courtside.api.ApiActiveRequest;
 import org.courtside.api.ApiCredentialState;
+import org.courtside.api.ApiMembershipPeriod;
+import org.courtside.api.ApiMembershipPeriodState;
+import org.courtside.api.ApiMembershipPeriodRequest;
 import org.courtside.api.ApiMembershipRequest;
 import org.courtside.api.ApiPersonRequest;
 import org.courtside.api.ApiRole;
@@ -22,6 +25,7 @@ import org.courtside.identity.RecentAuthentication;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import org.courtside.member.MembershipPeriod;
+import org.courtside.member.MembershipPeriodService;
 import org.courtside.member.RosterService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -41,6 +45,7 @@ import java.util.function.Function;
 class RosterAdminController implements AdminRosterApi {
 
     private final RosterService roster;
+    private final MembershipPeriodService periods;
     private final GlobalSessionAdministration globalSessions;
     private final HttpServletRequest servletRequest;
     private final RecentAuthentication recentAuthentication;
@@ -160,6 +165,38 @@ class RosterAdminController implements AdminRosterApi {
         return ResponseEntity.noContent().build();
     }
 
+    @Override
+    public ResponseEntity<List<ApiMembershipPeriod>> listMembershipPeriods(UUID personId) {
+        return ResponseEntity.ok(periods.periodsOf(personId).stream()
+                .map(RosterAdminController::toPeriodResponse)
+                .toList());
+    }
+
+    @Override
+    public ResponseEntity<ApiMembershipPeriod> addMembershipPeriod(UUID personId,
+                                                                   ApiMembershipPeriodRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(toPeriodResponse(periods.add(personId,
+                request.getMembershipTypeId(), new MembershipPeriod(request.getStartedOn(), request.getEndedOn()))));
+    }
+
+    @Override
+    public ResponseEntity<ApiMembershipPeriod> correctMembershipPeriod(UUID personId, UUID periodId,
+                                                                       ApiMembershipPeriodRequest request) {
+        return ResponseEntity.ok(toPeriodResponse(periods.correct(personId, periodId, request.getMembershipTypeId(),
+                new MembershipPeriod(request.getStartedOn(), request.getEndedOn()))));
+    }
+
+    @Override
+    public ResponseEntity<Void> removeMembershipPeriod(UUID personId, UUID periodId) {
+        periods.remove(personId, periodId);
+        return ResponseEntity.noContent().build();
+    }
+
+    private static ApiMembershipPeriod toPeriodResponse(MembershipPeriodService.Period period) {
+        return new ApiMembershipPeriod(period.id(), period.membershipTypeId(), period.startedOn(), period.endedOn(),
+                ApiMembershipPeriodState.fromValue(period.state().name()));
+    }
+
     private static Set<Role> roles(Collection<ApiRole> requested) {
         Set<Role> result = EnumSet.noneOf(Role.class);
         if (requested == null) {
@@ -182,13 +219,16 @@ class RosterAdminController implements AdminRosterApi {
 
     private static ApiRosterEntry toResponse(RosterService.RosterEntry entry) {
         return new ApiRosterEntry(entry.personId(), entry.firstName(), entry.lastName(),
-                address(entry.email()), entry.enabled(), roleNames(entry.roles()))
+                address(entry.email()), entry.enabled(),
+                entry.membership() != null && entry.membership().current(), roleNames(entry.roles()))
                 .addressSharedBy(entry.addressSharedBy())
                 .accountId(entry.accountId())
                 .username(entry.username())
                 .locale(entry.locale())
                 .credentialState(credentialState(entry))
                 .membershipTypeId(membershipTypeId(entry))
+                .membershipState(entry.membership() == null ? null
+                        : ApiMembershipPeriodState.fromValue(entry.membership().state().name()))
                 .membershipStartedOn(membershipDate(entry, RosterService.Membership::startedOn))
                 .membershipEndedOn(membershipDate(entry, RosterService.Membership::endedOn));
     }

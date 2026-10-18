@@ -333,11 +333,14 @@ name and email address later.
 
 ![The people list with search, filters and the main account details.](../screenshots/en/admin-roster.png)
 
-After opening a person, you can edit three areas:
+After opening a person, you can edit these areas:
 
 * **Person** contains first name, last name and email address.
 * **Membership** contains type, start and end. End a membership instead of deleting it. You can
-  correct the end date later.
+  correct the end date later. The end is the first day the person is no longer a member.
+* **Membership periods** lists every period of this person, including a change of type or a
+  return. A period may begin in the future and holds from its first day only. Two periods may not
+  overlap. Correct or remove a period recorded by mistake there.
 * **Account** contains username, the language used for notifications, roles, state and credentials.
   An account requires an email address.
 

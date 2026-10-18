@@ -1098,3 +1098,106 @@ test("given the retention journey, when its source is read, then it lets no run 
   assert.doesNotMatch(source, /getByTestId\("retention-(run|acknowledge)"\)\.(click|check|tap)/, "the journey never confirms a run");
   assert.doesNotMatch(source, /previews\/\$\{preview\.previewId\}\/run/, "the journey never runs the preview it took");
 });
+
+import { barsCourtBooking, comparablePeriods, holdsMembership, membershipPeriodProblems, periodRestorations, periodSnapshots } from "../acceptance/lib/core.mjs";
+
+const period = (id, startedOn, endedOn, state, membershipTypeId = "type-a") => ({ id, membershipTypeId, startedOn, endedOn, state });
+
+test("given a period the run moved and one it added, when restored, then the added one is removed first and the moved one written back whole", () => {
+  // given
+  const before = [period("p-1", "2020-01-01", null, "RUNNING")];
+  const now = [period("p-1", "2026-10-18", null, "SCHEDULED"), period("p-2", "2026-10-19", "2026-11-01", "SCHEDULED")];
+  // when
+  const restorations = periodRestorations("person-1", before, now);
+  // then
+  assert.deepEqual(restorations, [
+    { method: "DELETE", path: "/api/admin/roster/person-1/membership-periods/p-2" },
+    { method: "PUT", path: "/api/admin/roster/person-1/membership-periods/p-1", body: { membershipTypeId: "type-a", startedOn: "2020-01-01", endedOn: null } }
+  ], "a removal precedes the write so the restored period overlaps nothing");
+});
+
+test("given periods as they were, when restored, then nothing is written, and a period the run removed is added again", () => {
+  // given
+  const before = [period("p-1", "2020-01-01", "2021-01-01", "ENDED"), period("p-2", "2021-01-01", null, "RUNNING")];
+  // when
+  const unchanged = periodRestorations("person-1", before, [...before].reverse());
+  const removed = periodRestorations("person-1", before, [before[1]]);
+  // then
+  assert.deepEqual(unchanged, [], "an unchanged period is not written");
+  assert.deepEqual(removed, [{ method: "POST", path: "/api/admin/roster/person-1/membership-periods", body: { membershipTypeId: "type-a", startedOn: "2020-01-01", endedOn: "2021-01-01" } }]);
+});
+
+test("given two ledger entries for one person, when snapshots are read, then the first entry wins", () => {
+  // given
+  const entries = [
+    { kind: "membership-period", id: "person-1", periods: [period("p-1", "2020-01-01", null, "RUNNING")] },
+    { kind: "booking", id: "b-1" },
+    { kind: "membership-period", id: "person-1", periods: [period("p-1", "2026-10-18", null, "SCHEDULED")] }
+  ];
+  // when
+  const snapshots = periodSnapshots(entries);
+  // then
+  assert.deepEqual(snapshots, [{ personId: "person-1", periods: [period("p-1", "2020-01-01", null, "RUNNING")] }]);
+  assert.deepEqual(comparablePeriods(snapshots[0].periods), [{ membershipTypeId: "type-a", startedOn: "2020-01-01", endedOn: null }],
+    "the comparison ignores the state, which follows from the club's day");
+});
+
+test("given a period put back under a new id, when compared with the snapshot, then it counts as restored", () => {
+  // given
+  const before = [period("p-2", "2021-01-01", null, "RUNNING"), period("p-1", "2020-01-01", "2021-01-01", "ENDED")];
+  const now = [period("p-1", "2020-01-01", "2021-01-01", "ENDED"), period("p-9", "2021-01-01", null, "RUNNING")];
+  // then
+  assert.deepEqual(comparablePeriods(now), comparablePeriods(before),
+    "a period removed during the run comes back by POST with a new id, and only its content is compared");
+});
+
+test("given one period to shrink and its neighbour to grow into the room, when restored, then the shrinking write comes first", () => {
+  // given
+  const before = [period("p-1", "2020-01-01", "2024-01-01", "ENDED"), period("p-2", "2024-01-01", null, "RUNNING")];
+  const now = [period("p-1", "2020-01-01", "2025-01-01", "ENDED"), period("p-2", "2025-01-01", null, "RUNNING")];
+  // when
+  const restorations = periodRestorations("person-1", before, now);
+  // then
+  assert.deepEqual(restorations.map((write) => write.path.split("/").pop()), ["p-1", "p-2"],
+    "the period giving up days is written before the one taking them, so no write overlaps another");
+  const reversed = periodRestorations("person-1", [...before].reverse(), [...now].reverse());
+  assert.deepEqual(reversed.map((write) => write.path.split("/").pop()), ["p-1", "p-2"], "the order follows the change, not the listing");
+});
+
+test("given the walker's periods, when checked before a run, then a scheduled period, none running and one ending too early are named", () => {
+  // when
+  const fine = membershipPeriodProblems([period("p-1", "2020-01-01", "2021-01-01", "ENDED"), period("p-2", "2021-01-01", null, "RUNNING")], "2026-11-02");
+  const interrupted = membershipPeriodProblems([period("p-1", "2026-10-18", null, "SCHEDULED")], "2026-11-02");
+  const ending = membershipPeriodProblems([period("p-1", "2020-01-01", "2026-11-02", "RUNNING")], "2026-11-02");
+  // then
+  assert.deepEqual(fine, []);
+  assert.equal(interrupted.length, 2, "a scheduled period and the missing running one are both named");
+  assert.match(interrupted[0], /2026-10-18.*interrupted run/);
+  assert.match(interrupted[0], /start on or before today/, "the message says how the walker is unblocked");
+  assert.match(interrupted[1], /no membership period running today/);
+  assert.deepEqual(ending, ["holds a running period that ends on 2026-11-02, not after 2026-11-02"], "the period has to hold on the booking day");
+});
+
+test("given a roster entry with and without the membership flag, when read, then the flag wins and an older instance falls back to the end date", () => {
+  // then
+  assert.equal(holdsMembership({ membershipTypeId: "type-a", membershipEndedOn: "2026-12-01", membershipCurrent: true }), true, "an end ahead still holds");
+  assert.equal(holdsMembership({ membershipTypeId: "type-a", membershipEndedOn: null, membershipCurrent: false }), false, "a scheduled period holds nothing yet");
+  assert.equal(holdsMembership({ membershipTypeId: "type-a", membershipEndedOn: null }), true);
+  assert.equal(holdsMembership({ membershipTypeId: "type-a", membershipEndedOn: "2020-01-01" }), false);
+  assert.equal(holdsMembership({ membershipTypeId: null }), false);
+});
+
+test("given a rule set's rules, when read, then only NO_COURT_BOOKING bars booking", () => {
+  // then
+  assert.equal(barsCourtBooking([{ ruleType: "ADVANCE_WINDOW", params: { maxDays: 7 } }, { ruleType: "NO_COURT_BOOKING", params: {} }]), true);
+  assert.equal(barsCourtBooking([{ ruleType: "ADVANCE_WINDOW", params: { maxDays: 7 } }]), false);
+  assert.equal(barsCourtBooking(undefined), false);
+});
+
+test("given the membership period journey, when its source is read, then it puts the periods back in a finally block", () => {
+  // given
+  const source = readFileSync(new URL("../acceptance/journeys/58-membership-periods.spec.ts", import.meta.url), "utf8");
+  // then
+  assert.match(source, /recordCreated\(\{ kind: "membership-period"/, "the periods are recorded before anything changes");
+  assert.match(source, /finally \{[\s\S]*restoreMembershipPeriods\(admin\)/, "the periods are put back however the journey ends");
+});

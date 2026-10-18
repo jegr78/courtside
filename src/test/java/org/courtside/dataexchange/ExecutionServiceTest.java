@@ -176,7 +176,7 @@ class ExecutionServiceTest extends AbstractIntegrationTest {
         // when / then
         assertThatThrownBy(() -> executions.execute(previewId, false, actor))
                 .isInstanceOf(RemovalsNeedConfirmationException.class);
-        assertThat(members.findAll()).allSatisfy(member -> assertThat(member.isCurrent()).isTrue());
+        assertThat(members.findAll()).allSatisfy(member -> assertThat(member.getEndedOn()).isNull());
     }
 
     @Test
@@ -195,7 +195,8 @@ class ExecutionServiceTest extends AbstractIntegrationTest {
         assertThat(outcome.membershipsEnded()).isEqualTo(1);
         assertThat(outcome.removalsConfirmed()).isTrue();
         UUID john = personIdsOf(source).get("4712");
-        assertThat(members.findCurrentByPersonId(john)).isEmpty();
+        assertThat(members.findByPersonIdOrderByStartedOnAscIdAsc(john)).singleElement()
+                .satisfies(member -> assertThat(member.getEndedOn()).isNotNull());
     }
 
     @Test

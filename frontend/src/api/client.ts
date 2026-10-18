@@ -66,6 +66,8 @@ export type NotificationPage = components["schemas"]["NotificationPage"];
 export type AccountSession = components["schemas"]["AccountSession"];
 export type PersonRequest = components["schemas"]["PersonRequest"];
 export type MembershipRequest = components["schemas"]["MembershipRequest"];
+export type MembershipPeriod = components["schemas"]["MembershipPeriod"];
+export type MembershipPeriodRequest = components["schemas"]["MembershipPeriodRequest"];
 export type MembershipType = components["schemas"]["MembershipType"];
 export type MembershipTypeRequest = components["schemas"]["MembershipTypeRequest"];
 export type ImportSource = components["schemas"]["ImportSource"];
@@ -552,6 +554,22 @@ export const api = {
   ),
   endMembership: (personId: string) => request<void>(
     `/api/admin/roster/${personId}/membership`, { method: "DELETE" }
+  ),
+  membershipPeriods: (personId: string) => request<MembershipPeriod[]>(
+    `/api/admin/roster/${personId}/membership-periods`
+  ),
+  addMembershipPeriod: (personId: string, period: MembershipPeriodRequest) => request<MembershipPeriod>(
+    `/api/admin/roster/${personId}/membership-periods`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(period)
+    }
+  ),
+  correctMembershipPeriod: (personId: string, periodId: string, period: MembershipPeriodRequest) => request<MembershipPeriod>(
+    `/api/admin/roster/${personId}/membership-periods/${periodId}`, {
+      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(period)
+    }
+  ),
+  removeMembershipPeriod: (personId: string, periodId: string) => request<void>(
+    `/api/admin/roster/${personId}/membership-periods/${periodId}`, { method: "DELETE" }
   ),
   membershipTypes: () => request<MembershipType[]>("/api/admin/membership-types"),
   membershipType: (id: string) => request<MembershipType>(`/api/admin/membership-types/${id}`),

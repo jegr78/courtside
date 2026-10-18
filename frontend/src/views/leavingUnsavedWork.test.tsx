@@ -28,7 +28,7 @@ const config: AdminClubConfig = {
 const adults: MembershipType = { id: "type-1", name: "Adults", ruleSetId: "rule-set", active: true, grantsAccount: false };
 const jane: RosterEntry = {
   personId: "person-1", firstName: "Jane", lastName: "Doe", email: "jane.doe@example.org",
-  accountId: "account-1", username: "doe.jane", locale: "en", enabled: true, roles: ["MEMBER"],
+  accountId: "account-1", username: "doe.jane", locale: "en", enabled: true, membershipCurrent: true, roles: ["MEMBER"],
   credentialState: "CREDENTIAL_ISSUED", addressSharedBy: 1,
   membershipTypeId: "type-1", membershipStartedOn: "2026-01-01", membershipEndedOn: null
 };
@@ -112,6 +112,7 @@ describe("leaving an administrative page with unsaved work", () => {
     ]);
     vi.spyOn(api, "rules").mockResolvedValue([{ ruleType: "ADVANCE_WINDOW", params: { maxDays: 7 } }]);
     vi.spyOn(api, "membershipTypes").mockResolvedValue([adults]);
+    vi.spyOn(api, "membershipPeriods").mockResolvedValue([]);
     vi.spyOn(api, "roster").mockResolvedValue({ entries: [], nextCursor: null, matching: 0 });
     vi.spyOn(api, "adminOpeningSchedule").mockResolvedValue([{ id: "week-1", effectiveFrom: null, days: [{ dayOfWeek: "MONDAY", opensAt: "08:00:00", closesAt: "22:00:00" }] }]);
     vi.spyOn(api, "adminCourts").mockResolvedValue([{ id: "court-1", number: 1, name: "Centre Court", active: true }]);

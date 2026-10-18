@@ -87,12 +87,14 @@ function AccountMark({ entry, t }: { entry: RosterEntry; t: Translate }) {
   </span>;
 }
 
-// membershipTypeId stays set once a membership has ended, naming the type last held, so a column
-// reading it alone would show everybody who ever left as a current member.
 function membershipLabel(entry: RosterEntry, names: Map<string, string>, t: Translate): string {
   if (!entry.membershipTypeId) return "—";
-  if (entry.membershipEndedOn) return t("admin.roster.membershipEnded", { date: entry.membershipEndedOn });
-  return names.get(entry.membershipTypeId) ?? entry.membershipTypeId;
+  const name = names.get(entry.membershipTypeId) ?? entry.membershipTypeId;
+  if (entry.membershipCurrent) return name;
+  if (entry.membershipState === "SCHEDULED" && entry.membershipStartedOn) {
+    return t("admin.roster.membershipScheduled", { name, date: entry.membershipStartedOn });
+  }
+  return t("admin.roster.membershipEnded", { date: entry.membershipEndedOn ?? "" });
 }
 
 function roleLabel(entry: RosterEntry, t: Translate): string {

@@ -430,13 +430,18 @@
         "endAllSessions",
         "setAccountActive",
         "assignMembership",
-        "removeMembership"
+        "removeMembership",
+        "listMembershipPeriods",
+        "addMembershipPeriod",
+        "correctMembershipPeriod",
+        "removeMembershipPeriod"
       ],
       "backgroundEntryPoints": [
         "RosterSecurityEventLog#record(RosterEvent)"
       ],
       "stateTransitions": [
         "A person may gain or lose a current membership.",
+        "A membership period may be added, corrected or removed, also one that begins or ends in the future.",
         "An account may be created, corrected, enabled, disabled or assigned a new credential.",
         "Role and username changes revoke stale authority.",
         "Session termination removes one account's or every account's sessions."
@@ -447,14 +452,17 @@
       ],
       "failurePaths": [
         "The last enabled administrator cannot remove its own continuity.",
+        "A membership period that would overlap another of the same person is refused.",
         "Duplicate usernames, stale writes, invalid roles and missing recent proof refuse without partial security changes."
       ],
       "productionPaths": [
         "src/main/java/org/courtside/member/RosterService.java",
+        "src/main/java/org/courtside/member/MembershipPeriodService.java",
         "src/main/java/org/courtside/identity/internal/AccountSessionService.java"
       ],
       "evidence": [
-        "src/test/java/org/courtside/identity/SecurityDecisionEventTest.java#givenTheOnlyAdminWouldRemoveItsRole_whenContinuityRefusesIt_thenTheGuardIsRecorded"
+        "src/test/java/org/courtside/identity/SecurityDecisionEventTest.java#givenTheOnlyAdminWouldRemoveItsRole_whenContinuityRefusesIt_thenTheGuardIsRecorded",
+        "src/test/java/org/courtside/member/MembershipPeriodConcurrencyTest.java#givenTwoBoardMembersAddingOverlappingPeriodsAtOnce_whenBothAreInFlight_thenTheSecondWaitsAndIsRefused"
       ]
     },
     {
