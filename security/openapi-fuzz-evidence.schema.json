@@ -22,8 +22,8 @@
         "pathTemplate": { "type": "string", "pattern": "^/", "maxLength": 200 }
       }
     } },
-    "inputCases": { "type": "array", "minItems": 11, "items": { "$ref": "#/$defs/inputCase" } },
-    "importCases": { "type": "array", "minItems": 4, "items": { "$ref": "#/$defs/importCase" } },
+    "inputCases": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/inputCase" } },
+    "importCases": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/importCase" } },
     "mutationCases": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/mutationCase" } },
     "stateBefore": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
     "stateAfter": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },

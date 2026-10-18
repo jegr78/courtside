@@ -10,6 +10,8 @@ import { redactSecurityText } from "./security-runner.mjs";
 const require = createRequire(new URL("../frontend/package.json", import.meta.url));
 const evidenceSchema = JSON.parse(readFileSync(new URL(
   "../security/passive-deployment-evidence.schema.json", import.meta.url)));
+const safeRequestBudget = JSON.parse(readFileSync(new URL(
+  "../security/run-contract.json", import.meta.url))).profiles.safe.requests;
 const alertDispositions = JSON.parse(readFileSync(new URL(
   "../security/passive-alert-dispositions.json", import.meta.url))).dispositions;
 const alertAcceptances = new Map(JSON.parse(readFileSync(new URL(
@@ -333,7 +335,7 @@ export function buildPassiveDeploymentEvidence({
   targetFingerprint, imageDigest, observations, zapReport, requestCount,
   today = new Date().toISOString().slice(0, 10)
 }) {
-  if (!Number.isInteger(requestCount) || requestCount < 1 || requestCount > 1000) {
+  if (!Number.isInteger(requestCount) || requestCount < 1 || requestCount > safeRequestBudget) {
     throw new Error("The passive assessment request budget was exceeded");
   }
   const checks = observations.map(({ id, layer, passed, outcome, observation }) => ({

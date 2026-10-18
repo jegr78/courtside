@@ -62,6 +62,16 @@ export function openApiNativeRequestReserve(contract = api, policy = openApiFuzz
     + (securityImportCases().length + policy.inputClasses.length + mutationCases) * (nativeRetries + 1);
 }
 
+/** The requests the fuzz share must hold: an estimate of the cases the scanner generates per operation mode, plus the native reserve. */
+export function openApiFuzzRequestPlan(contract = api, policy = openApiFuzzPolicy) {
+  const generated = buildOpenApiFuzzInventory(contract, policy).filter(({ modes }) => modes.includes("positive"));
+  const operationModes = generated.reduce((count, { modes }) => count + modes.length, 0);
+  const perOperationMode = policy.maxExamples * policy.phases.length + policy.unexpectedMethods.length;
+  const scanner = operationModes * perOperationMode;
+  const nativeReserve = openApiNativeRequestReserve(contract, policy);
+  return { operationModes, perOperationMode, scanner, nativeReserve, total: scanner + nativeReserve };
+}
+
 export function openApiFuzzPolicyDigest(policy = openApiFuzzPolicy) {
   return `sha256:${createHash("sha256").update(JSON.stringify(policy)).digest("hex")}`;
 }
@@ -528,9 +538,8 @@ export function validateOpenApiFuzzEvidence(evidence, inventory = buildOpenApiFu
     .map(candidateEvidenceIdentity).toSorted()) !== JSON.stringify(expectedEvidence.get(candidate.fingerprint)))) {
     throw new Error("OpenAPI fuzz lifecycle candidate evidence is incomplete");
   }
-  const expectedImportCases = ["invalid-utf8", "duplicate-columns", "oversized-cell", "conflicting-reference"];
   if (JSON.stringify(evidence.importCases.map(({ id }) => id).toSorted())
-      !== JSON.stringify(expectedImportCases.toSorted())) {
+      !== JSON.stringify(securityImportCases().map(({ id }) => id).toSorted())) {
     throw new Error("OpenAPI fuzz evidence omits a curated import case");
   }
   if (JSON.stringify(evidence.inputCases.map(({ id }) => id).toSorted())

@@ -129,8 +129,9 @@ test("given journey data is restored while the application stays live, when the 
   assert.doesNotMatch(loginAttemptCleanup, /@Scheduled/);
   assert.doesNotMatch(passwordResetMailLimit, /@Scheduled/);
   assert.doesNotMatch(passwordResetTokenService, /@Scheduled/);
-  assert.match(identityCleanupSchedule, /@Profile\("!journey"\)/);
-  assert.equal(identityCleanupSchedule.match(/@Scheduled/g)?.length, 4);
+  assert.match(identityCleanupSchedule, /@Profile\("!journey"\)\s+(?:@\w+(?:\([^)]*\))?\s+)*class /,
+    "the profile covers every scheduled method of the class");
+  assert.match(identityCleanupSchedule, /@Scheduled/);
   assert.doesNotMatch(sessionCleanupCadence, /@Profile/);
   assert.doesNotMatch(setup, /COURTSIDE_SESSION_CLEANUP_CRON: "-"/);
   assert.match(setup, /Scheduled preview expiry ran in the shared journey world/);

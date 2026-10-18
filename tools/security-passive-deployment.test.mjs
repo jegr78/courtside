@@ -17,6 +17,8 @@ const require = createRequire(new URL("../frontend/package.json", import.meta.ur
 const Ajv = require("ajv/dist/2020").default;
 const schema = JSON.parse(readFileSync(new URL(
   "../security/passive-deployment-evidence.schema.json", import.meta.url)));
+const safeRequests = JSON.parse(readFileSync(new URL(
+  "../security/run-contract.json", import.meta.url), "utf8")).profiles.safe.requests;
 const digest = `sha256:${"a".repeat(64)}`;
 const observationById = {
   "backup-exposure": "route-group-not-exposed", "body-limit": "proxy-body-limit-enforced",
@@ -1308,8 +1310,10 @@ test("given a request count above the safe budget, when building evidence, then 
   // when / then
   assert.throws(() => buildPassiveDeploymentEvidence({
     targetFingerprint: digest, imageDigest: digest, observations: [],
-    zapReport: { version: "2.17.0", site: [{ alerts: [] }] }, requestCount: 1001
+    zapReport: { version: "2.17.0", site: [{ alerts: [] }] }, requestCount: safeRequests + 1
   }), /request budget/);
+  assert.equal(schema.properties.requestCount.maximum, safeRequests,
+    "the evidence schema bounds the request count by the safe profile's budget");
 });
 
 test("given missing or duplicate checks, when building evidence, then the run fails closed", () => {

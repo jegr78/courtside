@@ -5,11 +5,11 @@ import { join } from "node:path";
 import { createRequire } from "node:module";
 import { test } from "node:test";
 import { openCandidateCount, zapVersion } from "./security-passive-deployment.mjs";
-import { openApiFuzzVersion } from "./security-openapi-fuzz.mjs";
+import { openApiFuzzRequestPlan, openApiFuzzVersion } from "./security-openapi-fuzz.mjs";
 import { planAuthorizationRequests } from "./security-authorization.mjs";
 import { shippedLoginAddressMaxFailures } from "./security-environment.mjs";
 import {
-  activeRequestShares, admissionRetryAllowance, openApiFuzzRequestCeiling,
+  activeRequestShares, admissionRetryAllowance,
   boundedAssessmentFailureReason,
   authorizeSecurityProfile, buildSecurityPlan, executeSecurityPlan, fingerprintSecurityTarget, recoverSecurityRun,
   redactSecurityText, securityRunContract, securityRunPaths, validateSecurityRedirect,
@@ -355,6 +355,7 @@ test("given the bounded active suites, when every attack check passes, then thei
     root,
     verifyTarget: async () => input(),
     planAuthorizationRequests: async () => planned,
+    planOpenApiFuzzRequests: async () => openApiFuzzRequestPlan(shippedApi).total,
     runAuthorizationAssessment: async (_plan, context) => {
       limits.authorization = context.maxRequests;
       await context.resetLoginAttempts();
@@ -380,7 +381,7 @@ test("given the bounded active suites, when every attack check passes, then thei
   assert.ok(limits.authorization >= planned, "the authorization matrix is given at least the requests it plans");
   assert.ok(limits.zap + limits.fuzz + limits.authorization <= plan.budgets.requests,
     "the shares never promise more than the profile allows");
-  assert.equal(limits.fuzz, openApiFuzzRequestCeiling);
+  assert.equal(limits.fuzz, openApiFuzzRequestPlan(shippedApi).total, "the fuzzer is given the requests its inventory plans");
   assert.deepEqual(manifest.toolResults.at(-1), {
     id: "authorization-matrix", version: "1.0.0", outcome: "passed"
   });
@@ -396,6 +397,7 @@ test("given fuzzing changed domain state, when executing the active plan, then l
     root,
     verifyTarget: async () => input(),
     planAuthorizationRequests: async (plan) => shippedAuthorizationPlan(plan).total,
+    planOpenApiFuzzRequests: async () => openApiFuzzRequestPlan(shippedApi).total,
     runAuthenticatedZapAssessment: async () => ({ outcome: "passed", requestCount: 100,
       generatedDataMegabytes: 1 }),
     runOpenApiFuzzAssessment: async () => ({ outcome: "failed", requestCount: 200,
@@ -416,17 +418,45 @@ test("given fuzzing changed domain state, when executing the active plan, then l
 test("given a contract that grows by forty operations, when the active run is budgeted, then the authorization share grows with it and ZAP gives way", () => {
   // given
   const plan = activePlan();
-  const shipped = activeRequestShares(plan.budgets.requests, shippedAuthorizationPlan(plan).total);
+  const fuzz = openApiFuzzRequestPlan(shippedApi).total;
+  const shipped = activeRequestShares(plan.budgets.requests, shippedAuthorizationPlan(plan).total, fuzz);
 
   // when
   const grownPlan = shippedAuthorizationPlan(plan, contractWithReadOperations(40)).total;
-  const grown = activeRequestShares(plan.budgets.requests, grownPlan);
+  const grown = activeRequestShares(plan.budgets.requests, grownPlan, fuzz);
 
   // then
   assert.ok(grown.authorization >= grownPlan, "the grown matrix still gets every request it plans");
   assert.ok(grown.authorization > shipped.authorization, "the share follows the contract, not a fixed number");
   assert.equal(grown.zap + grown.authorization, shipped.zap + shipped.authorization,
     "ZAP's share shrinks by exactly what the authorization matrix gains");
+});
+
+test("given a contract that grows by forty read operations, when the fuzz share is planned, then it grows with the inventory", () => {
+  // given
+  const shipped = openApiFuzzRequestPlan(shippedApi);
+
+  // when
+  const grown = openApiFuzzRequestPlan(contractWithReadOperations(40));
+
+  // then
+  assert.equal(grown.operationModes, shipped.operationModes + 40, "every added read operation is fuzzed once");
+  assert.equal(grown.total - shipped.total, 40 * shipped.perOperationMode,
+    "the share follows the inventory, not a fixed number");
+  assert.equal(shipped.total, shipped.scanner + shipped.nativeReserve, "the native fixture requests are held as well");
+});
+
+test("given a missing request plan, when the active run is budgeted, then it is refused by the suite that has none", () => {
+  // given
+  const budget = activePlan().budgets.requests;
+  const authorization = shippedAuthorizationPlan(activePlan()).total;
+  const fuzz = openApiFuzzRequestPlan(shippedApi).total;
+
+  // when / then
+  for (const missing of [undefined, 0, 1.5]) {
+    assert.throws(() => activeRequestShares(budget, missing, fuzz), /authorization suite has no request plan/);
+    assert.throws(() => activeRequestShares(budget, authorization, missing), /OpenAPI fuzzer has no request plan/);
+  }
 });
 
 test("given a contract the active profile cannot assess, when the run is budgeted, then it is refused before any request with both numbers named", async () => {
@@ -440,6 +470,7 @@ test("given a contract the active profile cannot assess, when the run is budgete
     root,
     verifyTarget: async () => input(),
     planAuthorizationRequests: async () => plan.budgets.requests,
+    planOpenApiFuzzRequests: async () => openApiFuzzRequestPlan(shippedApi).total,
     runAuthenticatedZapAssessment: async () => { zapCalled = true; return { outcome: "passed", requestCount: 1 }; }
   });
 

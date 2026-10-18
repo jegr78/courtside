@@ -132,7 +132,8 @@ test("given isolated role sessions and a canary-only scan, when assessing, then 
 
   // then
   assert.equal(evidence.outcome, "passed");
-  assert.equal(evidence.requestCount, 91);
+  assert.equal(evidence.requestCount, 70 + authenticatedZapPolicy.roles.length * 3,
+    "the scanner's requests plus three sign-in requests per role");
   assert.deepEqual(evidence.candidates, []);
   assert.equal(evidence.lifecycleProof.state, "retest-passed");
   assert.deepEqual(evidence.lifecycleProof.transitions.map(({ state }) => state),
