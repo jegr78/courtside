@@ -142,6 +142,22 @@ class DependantBookingControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenADependantWhoIsAnAdministrator_whenTheGuardianBooksForThem_thenTheOverrideStaysTheDependantsOwn()
+            throws Exception {
+        // given
+        UUID richard = identity.createPerson("Richard", "Miles", "richard.miles@example.org");
+        identity.createEnabledAccount(richard, "miles.richard", Set.of(Role.ADMIN));
+        UUID barred = members.membershipTypeMeasuredBy("Barred", rules.ruleSetBarringCourtBookings("No courts"));
+        members.assignMembership(richard, barred, LocalDate.of(2026, 1, 1));
+        members.linkGuardian(jane, richard, Set.of(GuardianGrant.BOOK));
+
+        // when / then
+        book(as("doe.jane"), richard, "for-the-board", "18:00", "19:00")
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.violations[0].code").value("booking.rule.noCourtBooking"));
+    }
+
+    @Test
     void givenARelationshipThatDoesNotGrantBooking_whenTheGuardianBooks_thenTheActionIsRefusedByName()
             throws Exception {
         // given
