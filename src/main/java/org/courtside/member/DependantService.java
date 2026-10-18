@@ -11,8 +11,8 @@ import org.courtside.identity.Role;
 import org.courtside.identity.UserAccount;
 import org.courtside.member.internal.GuardianActionNotGrantedException;
 import org.courtside.member.internal.GuardianRelationship;
-import org.courtside.member.internal.GuardianRelationshipRepository;
 import org.courtside.shared.SecurityEventLog;
+import org.jspecify.annotations.Nullable;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,7 +34,6 @@ public class DependantService {
 
     private final CurrentUser currentUser;
     private final GuardianRelationships relationships;
-    private final GuardianRelationshipRepository relationshipRows;
     private final GuardianDelegation delegation;
     private final PersonRepository people;
     private final AccountCredentials credentials;
@@ -45,7 +44,7 @@ public class DependantService {
     private final Clock clock;
 
     public record Dependant(UUID personId, String firstName, String lastName, Set<GuardianGrant> grants,
-                            LocalDate endedOn) {
+                            @Nullable LocalDate endedOn) {
     }
 
     @Transactional(readOnly = true)
@@ -56,11 +55,7 @@ public class DependantService {
         }
         UUID guardianPersonId = guardian.getPerson().getId();
         LocalDate today = LocalDate.ofInstant(clock.instant(), clubTimeZone.zoneId());
-        List<GuardianRelationship> running = relationshipRows.findByGuardianPersonId(guardianPersonId).stream()
-                .filter(relationship -> relationship.isValidOn(today))
-                .filter(relationship -> relationships.grantsFor(guardianPersonId,
-                        relationship.getDependantPersonId(), today).isPresent())
-                .toList();
+        List<GuardianRelationship> running = relationships.runningFor(guardianPersonId, today);
         Map<UUID, Person> named = people.findAllById(running.stream()
                         .map(GuardianRelationship::getDependantPersonId).toList()).stream()
                 .collect(Collectors.toMap(Person::getId, Function.identity()));

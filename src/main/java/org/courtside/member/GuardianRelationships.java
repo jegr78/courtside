@@ -5,7 +5,6 @@ import org.courtside.identity.UserAccount;
 import org.courtside.identity.UserAccountRepository;
 import org.courtside.member.internal.GuardianRelationship;
 import org.courtside.member.internal.GuardianRelationshipRepository;
-import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,6 +14,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /** Answers what a guardian may do for a dependant on a day; both must hold an account, the guardian's enabled. */
 @Component
@@ -24,12 +24,6 @@ class GuardianRelationships {
 
     private final GuardianRelationshipRepository relationships;
     private final UserAccountRepository accounts;
-
-    boolean mayActFor(UUID guardianPersonId, UUID dependantPersonId, GuardianGrant grant, LocalDate day) {
-        requireAll(guardianPersonId, dependantPersonId, grant, day);
-        return grantsFor(guardianPersonId, dependantPersonId, day).map(granted -> granted.contains(grant))
-                .orElse(false);
-    }
 
     /** The actions granted on the day, or empty when no relationship between the two holds then. */
     Optional<Set<GuardianGrant>> grantsFor(UUID guardianPersonId, UUID dependantPersonId, LocalDate day) {
@@ -46,16 +40,23 @@ class GuardianRelationships {
                 .map(relationship -> Set.copyOf(relationship.getGrants()));
     }
 
-    List<UUID> dependantsOf(UUID guardianPersonId, GuardianGrant grant, LocalDate day) {
-        requireAll(guardianPersonId, guardianPersonId, grant, day);
+    /** The relationships holding on the day through which the guardian may act, each with a dependant account. */
+    List<GuardianRelationship> runningFor(UUID guardianPersonId, LocalDate day) {
+        if (guardianPersonId == null || day == null) {
+            throw new IllegalStateException("A guardian question names the guardian and the day");
+        }
         if (!canSignIn(guardianPersonId)) {
             return List.of();
         }
-        return relationships.findByGuardianPersonId(guardianPersonId).stream()
-                .filter(relationship -> grants(relationship, grant, day))
-                .map(GuardianRelationship::getDependantPersonId)
-                .distinct()
-                .filter(dependant -> accountOf(dependant).isPresent())
+        List<GuardianRelationship> running = relationships.findByGuardianPersonId(guardianPersonId).stream()
+                .filter(relationship -> relationship.isValidOn(day))
+                .toList();
+        Set<UUID> withAccount = accounts.findByPersonIdIn(running.stream()
+                        .map(GuardianRelationship::getDependantPersonId).toList()).stream()
+                .map(account -> account.getPerson().getId())
+                .collect(Collectors.toSet());
+        return running.stream()
+                .filter(relationship -> withAccount.contains(relationship.getDependantPersonId()))
                 .toList();
     }
 
@@ -68,16 +69,5 @@ class GuardianRelationships {
 
     private boolean canSignIn(UUID personId) {
         return accountOf(personId).map(UserAccount::isEnabled).orElse(false);
-    }
-
-    private static boolean grants(GuardianRelationship relationship, GuardianGrant grant, LocalDate day) {
-        return relationship.isValidOn(day) && relationship.getGrants().contains(grant);
-    }
-
-    private static void requireAll(@Nullable UUID guardian, @Nullable UUID dependant, @Nullable GuardianGrant grant,
-                                   @Nullable LocalDate day) {
-        if (guardian == null || dependant == null || grant == null || day == null) {
-            throw new IllegalStateException("A guardian question names both people, the action and the day");
-        }
     }
 }

@@ -3,6 +3,7 @@ package org.courtside.member;
 import org.courtside.AbstractIntegrationTest;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
+import org.courtside.member.internal.GuardianRelationship;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -10,6 +11,7 @@ import org.springframework.context.annotation.Import;
 
 import java.time.LocalDate;
 import java.util.EnumSet;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
@@ -48,13 +50,13 @@ class GuardianRelationshipsTest extends AbstractIntegrationTest {
         guardianships.create(jane, jane, john, EnumSet.of(GuardianGrant.VIEW_BOOKINGS, GuardianGrant.BOOK), null);
 
         // when / then
-        assertThat(relationships.mayActFor(jane, john, GuardianGrant.BOOK, TODAY)).isTrue();
-        assertThat(relationships.mayActFor(jane, john, GuardianGrant.CANCEL_BOOKINGS, TODAY))
+        assertThat(mayActFor(jane, john, GuardianGrant.BOOK, TODAY)).isTrue();
+        assertThat(mayActFor(jane, john, GuardianGrant.CANCEL_BOOKINGS, TODAY))
                 .as("an action the relationship does not grant").isFalse();
-        assertThat(relationships.mayActFor(john, jane, GuardianGrant.BOOK, TODAY))
+        assertThat(mayActFor(john, jane, GuardianGrant.BOOK, TODAY))
                 .as("the dependant may not act for the guardian").isFalse();
-        assertThat(relationships.dependantsOf(jane, GuardianGrant.VIEW_BOOKINGS, TODAY)).containsExactly(john);
-        assertThat(relationships.dependantsOf(jane, GuardianGrant.READ_MESSAGES, TODAY)).isEmpty();
+        assertThat(dependantsOf(jane, GuardianGrant.VIEW_BOOKINGS)).containsExactly(john);
+        assertThat(dependantsOf(jane, GuardianGrant.READ_MESSAGES)).isEmpty();
     }
 
     @Test
@@ -63,10 +65,10 @@ class GuardianRelationshipsTest extends AbstractIntegrationTest {
         guardianships.create(john, jane, john, Set.of(GuardianGrant.BOOK), LocalDate.of(2026, 6, 1));
 
         // when / then
-        assertThat(relationships.mayActFor(jane, john, GuardianGrant.BOOK, LocalDate.of(2026, 5, 31))).isTrue();
-        assertThat(relationships.mayActFor(jane, john, GuardianGrant.BOOK, LocalDate.of(2026, 6, 1)))
+        assertThat(mayActFor(jane, john, GuardianGrant.BOOK, LocalDate.of(2026, 5, 31))).isTrue();
+        assertThat(mayActFor(jane, john, GuardianGrant.BOOK, LocalDate.of(2026, 6, 1)))
                 .as("the end is the first day without the relationship").isFalse();
-        assertThat(relationships.mayActFor(jane, john, GuardianGrant.BOOK, TODAY.minusDays(1)))
+        assertThat(mayActFor(jane, john, GuardianGrant.BOOK, TODAY.minusDays(1)))
                 .as("the relationship began today").isFalse();
     }
 
@@ -79,8 +81,8 @@ class GuardianRelationshipsTest extends AbstractIntegrationTest {
         guardianships.end(jane, id);
 
         // then
-        assertThat(relationships.mayActFor(jane, john, GuardianGrant.BOOK, TODAY)).isFalse();
-        assertThat(relationships.dependantsOf(jane, GuardianGrant.BOOK, TODAY)).isEmpty();
+        assertThat(mayActFor(jane, john, GuardianGrant.BOOK, TODAY)).isFalse();
+        assertThat(dependantsOf(jane, GuardianGrant.BOOK)).isEmpty();
     }
 
     @Test
@@ -92,8 +94,8 @@ class GuardianRelationshipsTest extends AbstractIntegrationTest {
         identity.disableAccount(janeAccount);
 
         // then
-        assertThat(relationships.mayActFor(jane, john, GuardianGrant.BOOK, TODAY)).isFalse();
-        assertThat(relationships.dependantsOf(jane, GuardianGrant.BOOK, TODAY)).isEmpty();
+        assertThat(mayActFor(jane, john, GuardianGrant.BOOK, TODAY)).isFalse();
+        assertThat(dependantsOf(jane, GuardianGrant.BOOK)).isEmpty();
     }
 
     @Test
@@ -109,10 +111,10 @@ class GuardianRelationshipsTest extends AbstractIntegrationTest {
         identity.removeAccount(maryAccount);
 
         // then
-        assertThat(relationships.mayActFor(jane, john, GuardianGrant.BOOK, TODAY))
+        assertThat(mayActFor(jane, john, GuardianGrant.BOOK, TODAY))
                 .as("a dependant without an account").isFalse();
-        assertThat(relationships.dependantsOf(jane, GuardianGrant.BOOK, TODAY)).isEmpty();
-        assertThat(relationships.mayActFor(mary, john, GuardianGrant.BOOK, TODAY))
+        assertThat(dependantsOf(jane, GuardianGrant.BOOK)).isEmpty();
+        assertThat(mayActFor(mary, john, GuardianGrant.BOOK, TODAY))
                 .as("a guardian without an account").isFalse();
     }
 
@@ -124,12 +126,12 @@ class GuardianRelationshipsTest extends AbstractIntegrationTest {
         guardianships.create(jane, jane, john, Set.of(GuardianGrant.BOOK), null);
 
         // when / then
-        assertThat(relationships.mayActFor(jane, john, GuardianGrant.BOOK, TODAY))
+        assertThat(mayActFor(jane, john, GuardianGrant.BOOK, TODAY))
                 .as("a dormant account beside an enabled one does not hide the guardian").isTrue();
         assertThat(relationships.accountOf(john)).as("the dependant acts through the enabled account")
                 .hasValueSatisfying(account -> assertThat(account.getId()).isEqualTo(johnAccount));
         identity.disableAccount(janeAccount);
-        assertThat(relationships.mayActFor(jane, john, GuardianGrant.BOOK, TODAY))
+        assertThat(mayActFor(jane, john, GuardianGrant.BOOK, TODAY))
                 .as("only disabled accounts left").isFalse();
     }
 
@@ -142,7 +144,19 @@ class GuardianRelationshipsTest extends AbstractIntegrationTest {
         identity.disableAccount(johnAccount);
 
         // then
-        assertThat(relationships.mayActFor(jane, john, GuardianGrant.ACCOUNT_TASKS, TODAY))
+        assertThat(mayActFor(jane, john, GuardianGrant.ACCOUNT_TASKS, TODAY))
                 .as("the dependant still holds an account").isTrue();
+    }
+
+    private boolean mayActFor(UUID guardian, UUID dependant, GuardianGrant grant, LocalDate day) {
+        return relationships.grantsFor(guardian, dependant, day).map(granted -> granted.contains(grant))
+                .orElse(false);
+    }
+
+    private List<UUID> dependantsOf(UUID guardian, GuardianGrant grant) {
+        return relationships.runningFor(guardian, TODAY).stream()
+                .filter(relationship -> relationship.getGrants().contains(grant))
+                .map(GuardianRelationship::getDependantPersonId)
+                .toList();
     }
 }
