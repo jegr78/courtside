@@ -1,7 +1,6 @@
 # Changelog
 
-## [0.3.0-rc.1](https://github.com/jegr78/courtside/compare/v0.2.0...v0.3.0-rc.1) (2026-10-18)
-
+## 0.3.0 (2026-10-18)
 
 ### Features
 
@@ -18,7 +17,6 @@
 * retain personal records by category with a reviewed run and publish the club privacy kit ([#1560](https://github.com/jegr78/courtside/issues/1560)) ([4b893ec](https://github.com/jegr78/courtside/commit/4b893ec4504d0062eaa22051f2c672708cd6494d))
 * tell members when a new holiday or court closure falls on their booking ([#1550](https://github.com/jegr78/courtside/issues/1550)) ([4db05cd](https://github.com/jegr78/courtside/commit/4db05cd3b06dad46d76cbdb5321d8712bb5becb0))
 
-
 ### Bug fixes
 
 * **frontend:** give every dialog its own surface ([#1565](https://github.com/jegr78/courtside/issues/1565)) ([59c8f4d](https://github.com/jegr78/courtside/commit/59c8f4dcff1cb2384ac876fbf6abdd474d5a1d67))
@@ -27,7 +25,6 @@
 * wait for the stopped app to exit before the smoke goes on ([8571d0b](https://github.com/jegr78/courtside/commit/8571d0bb853f5304587a8a09af48517a08eccec3))
 * wait for the stopped app to exit before the UAT smoke goes on ([#1543](https://github.com/jegr78/courtside/issues/1543)) ([8571d0b](https://github.com/jegr78/courtside/commit/8571d0bb853f5304587a8a09af48517a08eccec3))
 * **web:** replace the redundant court plan intro heading with a sign-in notice ([#1545](https://github.com/jegr78/courtside/issues/1545)) ([b21b692](https://github.com/jegr78/courtside/commit/b21b6925a2f7f01c9f86d3e2083edf04d96e23fb))
-
 
 ### Build and dependencies
 
