@@ -130,6 +130,11 @@ public class MemberTestFixture {
         return guardianships.create(guardianPersonId, guardianPersonId, dependantPersonId, grants, null).id();
     }
 
+    public UUID linkGuardianUntil(UUID guardianPersonId, UUID dependantPersonId, Set<GuardianGrant> grants,
+                                  LocalDate endedOn) {
+        return guardianships.create(guardianPersonId, guardianPersonId, dependantPersonId, grants, endedOn).id();
+    }
+
     public void endGuardianship(UUID personId, UUID relationshipId) {
         guardianships.end(personId, relationshipId);
     }
