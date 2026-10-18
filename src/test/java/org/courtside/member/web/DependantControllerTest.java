@@ -89,6 +89,7 @@ class DependantControllerTest extends AbstractIntegrationTest {
     void givenRelationshipsOfSeveralKinds_whenAGuardianListsDependants_thenOnlyTheirRunningOnesShowByName()
             throws Exception {
         // given
+        members.endGuardianship(jane, members.linkGuardian(jane, john, Set.of(GuardianGrant.CANCEL_BOOKINGS)));
         members.linkGuardian(jane, john, Set.of(GuardianGrant.VIEW_BOOKINGS, GuardianGrant.BOOK));
         UUID ended = members.linkGuardian(jane, mary, Set.of(GuardianGrant.BOOK));
         members.endGuardianship(jane, ended);
