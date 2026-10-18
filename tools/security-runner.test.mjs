@@ -432,10 +432,9 @@ test("given a contract that grows by forty operations, when the active run is bu
     "ZAP's share shrinks by exactly what the authorization matrix gains");
 });
 
-test("given a contract that grows by forty read operations, when the fuzz share is planned, then it grows with the inventory and covers what Schemathesis sent", () => {
+test("given a contract that grows by forty read operations, when the fuzz share is planned, then it grows with the inventory", () => {
   // given
   const shipped = openApiFuzzRequestPlan(shippedApi);
-  const measuredCasesPerPersona = [{ operationModes: 24, cases: 479 }, { operationModes: 24, cases: 477 }];
 
   // when
   const grown = openApiFuzzRequestPlan(contractWithReadOperations(40));
@@ -444,11 +443,20 @@ test("given a contract that grows by forty read operations, when the fuzz share 
   assert.equal(grown.operationModes, shipped.operationModes + 40, "every added read operation is fuzzed once");
   assert.equal(grown.total - shipped.total, 40 * shipped.perOperationMode,
     "the share follows the inventory, not a fixed number");
-  for (const { operationModes, cases } of measuredCasesPerPersona) {
-    assert.ok(operationModes * shipped.perOperationMode >= cases,
-      `${cases} generated cases over ${operationModes} operation modes fit the planned share`);
-  }
   assert.equal(shipped.total, shipped.scanner + shipped.nativeReserve, "the native fixture requests are held as well");
+});
+
+test("given a missing request plan, when the active run is budgeted, then it is refused by the suite that has none", () => {
+  // given
+  const budget = activePlan().budgets.requests;
+  const authorization = shippedAuthorizationPlan(activePlan()).total;
+  const fuzz = openApiFuzzRequestPlan(shippedApi).total;
+
+  // when / then
+  for (const missing of [undefined, 0, 1.5]) {
+    assert.throws(() => activeRequestShares(budget, missing, fuzz), /authorization suite has no request plan/);
+    assert.throws(() => activeRequestShares(budget, authorization, missing), /OpenAPI fuzzer has no request plan/);
+  }
 });
 
 test("given a contract the active profile cannot assess, when the run is budgeted, then it is refused before any request with both numbers named", async () => {

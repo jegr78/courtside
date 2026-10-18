@@ -62,7 +62,7 @@ export function openApiNativeRequestReserve(contract = api, policy = openApiFuzz
     + (securityImportCases().length + policy.inputClasses.length + mutationCases) * (nativeRetries + 1);
 }
 
-/** The requests the fuzz share must hold: every generated operation and mode at the policy's case ceiling, plus the native reserve. */
+/** The requests the fuzz share must hold: an estimate of the cases the scanner generates per operation mode, plus the native reserve. */
 export function openApiFuzzRequestPlan(contract = api, policy = openApiFuzzPolicy) {
   const generated = buildOpenApiFuzzInventory(contract, policy).filter(({ modes }) => modes.includes("positive"));
   const operationModes = generated.reduce((count, { modes }) => count + modes.length, 0);
