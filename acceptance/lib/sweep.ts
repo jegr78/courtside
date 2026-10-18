@@ -20,10 +20,13 @@ const ownBookings = () => new Set(readLedger().flatMap((entry) => entry.kind ===
 
 export async function sweep(admin: Api, slots: Slot[]) {
   const courts = await (await admin.get("/api/public/courts")).json() as { id: string; number: number }[];
+  // One read per day: a read per slot spends the admin's request budget the next page then finds exhausted.
+  const days = new Map<string, Promise<Allocation[]>>();
+  const day = (date: string) => days.get(date) ?? days.set(date, admin.get(`/api/bookings?date=${date}`).then((answer) => answer.json())).get(date)!;
   return sweepSlots({
     slots, ours: ownBookings(),
-    read: async (slot: Slot) => occupying(await (await admin.get(`/api/bookings?date=${slot.date}`)).json(),
+    read: async (slot: Slot) => occupying(await day(slot.date),
       courts.find((c) => c.number === slot.court)!.id, instantOf(slot, "start"), instantOf(slot, "end")),
-    cancel: (id: string) => cancelAny(admin, id)
+    cancel: (id: string) => { days.clear(); return cancelAny(admin, id); }
   }) as Promise<{ removed: { journey: string; id: string; status: number }[]; left: { journey: string; id: string }[]; foreign: { journey: string; id: string }[] }>;
 }

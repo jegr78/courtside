@@ -100,7 +100,8 @@ test("given a day beyond the lanes, when the admin adds a holiday and closes a c
       await page.goto("/");
       await gotoDayBeyondWindow(page, holiday);
       await expect(page.getByTestId("day-holiday-notice"), "product: the plan names the holiday").toContainText("Acceptance holiday");
-      await expect(page.getByTestId("day-closed"), "product: the holiday closes the day").toBeVisible();
+      // A booking already on the day keeps its grid, and the plan then says the day is closed above it.
+      await expect(page.locator('[data-testid="day-closed"], [data-testid="day-closed-notice"]').first(), "product: the holiday closes the day").toBeVisible();
       await gotoDayBeyondWindow(page, closed);
       await expect(page.locator(`[data-testid="closed-court-slot"][data-date="${closed}"][data-court-number="${court.number}"]`).first(),
         "product: the closed court reads as closed").toBeVisible();
