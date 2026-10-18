@@ -47,6 +47,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class DependantBookingControllerTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_BOOKING_CARD = UUID.fromString("11111111-1111-1111-1111-111111111111");
+    private static final UUID TRAINING_CARD = UUID.fromString("22222222-2222-2222-2222-222222222222");
     private static final UUID DEFAULT_RULE_SET = UUID.fromString("aaaaaaaa-0000-0000-0000-000000000001");
     private static final UUID DEFAULT_MEMBERSHIP_TYPE = UUID.fromString("cccccccc-0000-0000-0000-000000000001");
     private static final String NOT_GRANTED = "urn:courtside:error:guardian-action-not-granted";
@@ -256,6 +257,51 @@ class DependantBookingControllerTest extends AbstractIntegrationTest {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:booking-not-found"));
         assertThat(bookings.findById(janes).orElseThrow().getStatus()).isEqualTo(BookingStatus.CONFIRMED);
+    }
+
+    @Test
+    void givenADependantWhoManagesTrainings_whenTheGuardianCancelsSomebodyElsesTraining_thenTheRoleLendsNothing()
+            throws Exception {
+        // given
+        UUID trainer = identity.createPerson("Richard", "Roe", "richard.roe@example.org");
+        identity.createEnabledAccount(trainer, "roe.richard", Set.of(Role.TRAINER));
+        UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
+        identity.createEnabledAccount(mary, "major.mary", Set.of(Role.TRAINER));
+        members.linkGuardian(jane, trainer, Set.of(GuardianGrant.CANCEL_BOOKINGS));
+        UUID marys = idOf(mockMvc.perform(post("/api/bookings")
+                        .header("Idempotency-Key", "marys-training")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "courtIds": ["%s"],
+                                  "cardId": "%s",
+                                  "startsAt": "2026-05-12T18:00:00+02:00",
+                                  "endsAt": "2026-05-12T19:00:00+02:00"
+                                }
+                                """.formatted(courtId, TRAINING_CARD))
+                        .with(as("major.mary"))
+                        .with(csrf()))
+                .andExpect(status().isCreated()));
+
+        // when / then
+        mockMvc.perform(delete("/api/my/dependants/{personId}/bookings/{bookingId}", trainer, marys)
+                        .with(as("doe.jane")).with(csrf()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:booking-not-found"));
+        assertThat(bookings.findById(marys).orElseThrow().getStatus()).isEqualTo(BookingStatus.CONFIRMED);
+    }
+
+    @Test
+    void givenADisabledGuardianAccount_whenItsSessionActsForTheDependant_thenItIsSignedOutBeforeAnythingIsRead()
+            throws Exception {
+        // given
+        members.linkGuardian(jane, john, Set.of(GuardianGrant.VIEW_BOOKINGS));
+        RequestPostProcessor stillSignedIn = as("doe.jane");
+        identity.disableAccount(janeAccount);
+
+        // when / then
+        mockMvc.perform(get("/api/my/dependants/{personId}/bookings", john).with(stillSignedIn))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
