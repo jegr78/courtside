@@ -113,7 +113,7 @@ class DependantBookingControllerTest extends AbstractIntegrationTest {
         // then
         UUID id = idOf(created);
         assertThat(created.andReturn().getResponse().getHeader("Location"))
-                .as("the guardian can act on the resource the answer names")
+                .as("the answer names the dependant booking path")
                 .isEqualTo("/api/my/dependants/" + john + "/bookings/" + id);
         Booking booking = bookings.findWithAllocationsById(id).orElseThrow();
         assertThat(booking.getBookedBy()).as("the dependant's account holds the booking").isEqualTo(johnAccount);

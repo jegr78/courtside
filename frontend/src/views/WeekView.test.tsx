@@ -738,7 +738,7 @@ it("given dependant refreshes overlap, when an older answer arrives last, then t
 
   // then
   expect(screen.getByRole("dialog")).toBeInTheDocument();
-  expect(screen.queryByTestId("booking-for"), "an ended relationship is not offered again by a late answer").toBeNull();
+  expect(screen.queryByTestId("booking-for"), "a late older answer does not replace the latest list").toBeNull();
 });
 
 it("given a guardian barred from courts who may book for a dependant, when they pick a free slot, then the dialog books for the dependant only", async () => {
