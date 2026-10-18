@@ -51,7 +51,8 @@ class DependantBookingController implements DependantBookingsApi {
         UUID id = dependantBookings.bookFor(personId, List.copyOf(request.getCourtIds()), request.getCardId(),
                 new TimeSlot(WireTypes.toInstant(request.getStartsAt()), WireTypes.toInstant(request.getEndsAt())),
                 request.getNote(), participants, idempotencyKey);
-        return ResponseEntity.created(URI.create("/api/bookings/" + id)).body(new ApiBookingCreated(id));
+        return ResponseEntity.created(URI.create("/api/my/dependants/" + personId + "/bookings/" + id))
+                .body(new ApiBookingCreated(id));
     }
 
     @Override

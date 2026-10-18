@@ -107,10 +107,14 @@ class DependantBookingControllerTest extends AbstractIntegrationTest {
         members.linkGuardian(jane, john, Set.of(GuardianGrant.BOOK));
 
         // when
-        UUID id = idOf(book(as("doe.jane"), john, "guardian-key", "18:00", "19:00")
-                .andExpect(status().isCreated()));
+        ResultActions created = book(as("doe.jane"), john, "guardian-key", "18:00", "19:00")
+                .andExpect(status().isCreated());
 
         // then
+        UUID id = idOf(created);
+        assertThat(created.andReturn().getResponse().getHeader("Location"))
+                .as("the guardian can act on the resource the answer names")
+                .isEqualTo("/api/my/dependants/" + john + "/bookings/" + id);
         Booking booking = bookings.findWithAllocationsById(id).orElseThrow();
         assertThat(booking.getBookedBy()).as("the dependant's account holds the booking").isEqualTo(johnAccount);
         assertThat(booking.getActedBy()).as("the guardian is recorded as the one who acted").isEqualTo(janeAccount);
