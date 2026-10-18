@@ -3,7 +3,7 @@ import { type Page } from "@playwright/test";
 import { test, expect } from "../lib/fixtures";
 import { restoreDisposable } from "../lib/disposable";
 import { randomBytes, randomInt, randomUUID } from "node:crypto";
-import { adminPut, apiAs } from "../lib/api";
+import { adminPut, apiAs, apiAsAgain } from "../lib/api";
 import { runSql } from "../lib/erasure";
 import { recordCreated } from "../lib/ledger";
 import { precondition } from "../lib/precondition";
@@ -192,7 +192,7 @@ test("given the disposable member, when the language is switched in the preferen
 
 // A booking three days back is refused for its start whatever else holds, so it probes the rules without writing one.
 async function probeRefusals(): Promise<string[]> {
-  const api = await apiAs("disposable");
+  const api = await apiAsAgain("disposable");
   const courts = await (await api.get("/api/public/courts")).json() as { id: string }[];
   const card = discovery.cards.find((candidate: { active: boolean; allowedRoles: string[] }) => candidate.active && candidate.allowedRoles.length === 0);
   const start = new Date(Math.floor(Date.now() / 3_600_000) * 3_600_000 - 3 * 86_400_000);
@@ -202,6 +202,7 @@ async function probeRefusals(): Promise<string[]> {
   }, { "Idempotency-Key": randomUUID() });
   const body = await answer.json().catch(() => ({}));
   if (answer.ok() && body.id) recordCreated({ kind: "booking", id: body.id, by: "disposable", project: projectName() });
+  expect(answer.status(), `product: the probe in the past is refused by the rules (${JSON.stringify(body)})`).toBe(422);
   return violationCodes(body);
 }
 

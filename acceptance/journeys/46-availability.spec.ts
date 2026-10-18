@@ -38,6 +38,16 @@ async function refusedCodes(api: Api, courtId: string, date: string, opensAt: st
   return (body.violations ?? []).map((violation: { code: string }) => violation.code);
 }
 
+// A booking keeps the day's grid, so the closed day reads as closed only on a day nobody has booked.
+async function firstEmptyPair(admin: Api, from: string): Promise<string | undefined> {
+  const empty = async (date: string) => ((await (await admin.get(`/api/bookings?date=${date}`)).json()) as unknown[]).length === 0;
+  for (let offset = 0; offset < 14; offset++) {
+    const day = addDays(from, offset);
+    if (await empty(day) && await empty(addDays(day, 1))) return day;
+  }
+  return undefined;
+}
+
 async function saveEntry(page: Page, form: "opening-period" | "court-closure", path: string): Promise<string> {
   const saved = page.waitForResponse(answers("POST", path));
   await page.getByTestId(`save-${form}`).click();
@@ -58,9 +68,10 @@ async function removeEntry(page: Page, form: "opening-period" | "court-closure",
 
 test("given a day beyond the lanes, when the admin adds a holiday and closes a court the day after, then the plan shows both, bookings there are refused and removing both opens the days again", async ({ browser }) => {
   // given
-  const holiday = addDays(lanePlan().sunday, 8);
-  const closed = addDays(holiday, 1);
   const admin = await apiAs("admin");
+  const holiday = await firstEmptyPair(admin, addDays(lanePlan().sunday, 8));
+  precondition(holiday, "two consecutive days beyond the lanes hold no booking");
+  const closed = addDays(holiday, 1);
   const member = await apiAs("memberA");
   const grid = await (await admin.get(`/api/public/booking-grid?from=${holiday}&to=${closed}`)).json() as Grid;
   const courts = await (await admin.get("/api/public/courts")).json() as { id: string; number: number }[];
