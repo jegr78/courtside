@@ -312,5 +312,11 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
 
     boolean existsByIdAndSeriesId(UUID id, UUID seriesId);
 
-    Optional<Booking> findByBookedByAndIdempotencyKey(UUID bookedBy, String idempotencyKey);
+    @Query("""
+            SELECT b FROM Booking b
+            WHERE b.bookedBy = :bookedBy AND b.idempotencyKey = :idempotencyKey
+              AND (b.actedBy = :actedBy OR (CAST(:actedBy AS uuid) IS NULL AND b.actedBy IS NULL))
+            """)
+    Optional<Booking> findIdempotentRequest(@Param("bookedBy") UUID bookedBy, @Param("actedBy") UUID actedBy,
+                                            @Param("idempotencyKey") String idempotencyKey);
 }

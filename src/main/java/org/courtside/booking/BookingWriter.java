@@ -130,6 +130,7 @@ class BookingWriter implements SeriesOccurrenceCancellation, BookingDrafts, Unat
         slots.forEach(booking::addParticipant);
         booking.joinSeries(command.seriesId());
         booking.identifyRequest(idempotencyKey, requestFingerprint);
+        booking.actedOnBehalfBy(command.actedBy());
 
         try {
             bookings.saveAndFlush(booking);
@@ -166,7 +167,7 @@ class BookingWriter implements SeriesOccurrenceCancellation, BookingDrafts, Unat
             return;
         }
         if (idempotencyKey != null
-                && bookings.findByBookedByAndIdempotencyKey(command.bookedBy(), idempotencyKey).isPresent()) {
+                && bookings.findIdempotentRequest(command.bookedBy(), command.actedBy(), idempotencyKey).isPresent()) {
             throw new IdempotencyKeyRaceException(null);
         }
         throw courtUnavailable(null);

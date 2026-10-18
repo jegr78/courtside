@@ -127,8 +127,8 @@ public class RetentionRows {
                         + DUE_BOOKINGS + ")")
                 .param("endedBefore", before).update();
         long bookings = jdbc.sql("""
-                        UPDATE booking SET booked_by = NULL, cancelled_by = NULL, moved_by = NULL, note = NULL,
-                                           pseudonymised_at = :now
+                        UPDATE booking SET booked_by = NULL, cancelled_by = NULL, moved_by = NULL, acted_by = NULL,
+                                           note = NULL, pseudonymised_at = :now
                         WHERE id IN (%s)
                         """.formatted(DUE_BOOKINGS))
                 .param("endedBefore", before)
@@ -233,7 +233,7 @@ public class RetentionRows {
                                (EXISTS (SELECT 1 FROM booking_participant bp JOIN booking b ON b.id = bp.booking_id
                                         WHERE bp.person_id = p.id AND %1$s)
                                 OR EXISTS (SELECT 1 FROM booking b JOIN user_account u
-                                             ON u.id IN (b.booked_by, b.cancelled_by, b.moved_by)
+                                             ON u.id IN (b.booked_by, b.cancelled_by, b.moved_by, b.acted_by)
                                            WHERE u.person_id = p.id AND %1$s)
                                 OR EXISTS (SELECT 1 FROM booking_series s JOIN user_account u ON u.id = s.created_by
                                            WHERE u.person_id = p.id

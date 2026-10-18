@@ -52,13 +52,14 @@ INSERT INTO booking_series_court (booking_series_id, court_id, position)
 VALUES ('76000000-0000-0000-0000-000000000001', '70000000-0000-0000-0000-000000000001', 0);
 
 INSERT INTO booking
-    (id, card_id, status, booked_by, note, created_at, series_id, idempotency_key, request_fingerprint)
+    (id, card_id, status, booked_by, acted_by, note, created_at, series_id, idempotency_key, request_fingerprint)
 VALUES
     ('77000000-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111',
-     'CONFIRMED', '72000000-0000-0000-0000-000000000001', 'Synthetic upgrade booking',
+     'CONFIRMED', '72000000-0000-0000-0000-000000000001',
+     (SELECT id FROM user_account WHERE username = 'admin'), 'Synthetic upgrade booking',
      '2025-01-01T00:00:00Z', NULL, 'upgrade-fixture-booking', repeat('a', 64)),
     ('77000000-0000-0000-0000-000000000002', '22222222-2222-2222-2222-222222222222',
-     'CONFIRMED', '72000000-0000-0000-0000-000000000001', 'Synthetic series occurrence',
+     'CONFIRMED', '72000000-0000-0000-0000-000000000001', NULL, 'Synthetic series occurrence',
      '2025-01-01T00:00:00Z', '76000000-0000-0000-0000-000000000001', NULL, NULL);
 
 INSERT INTO court_allocation (id, booking_id, court_id, starts_at, ends_at, status) VALUES

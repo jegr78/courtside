@@ -11,6 +11,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 /** Answers what a guardian may do for a dependant on a day; both must hold an account, the guardian's enabled. */
@@ -24,9 +26,23 @@ public class GuardianRelationships {
 
     public boolean mayActFor(UUID guardianPersonId, UUID dependantPersonId, GuardianGrant grant, LocalDate day) {
         requireAll(guardianPersonId, dependantPersonId, grant, day);
-        return canSignIn(guardianPersonId) && accounts.findByPersonId(dependantPersonId).isPresent()
-                && relationships.findByGuardianPersonIdAndDependantPersonId(guardianPersonId, dependantPersonId)
-                .stream().anyMatch(relationship -> grants(relationship, grant, day));
+        return grantsFor(guardianPersonId, dependantPersonId, day).map(granted -> granted.contains(grant))
+                .orElse(false);
+    }
+
+    /** The actions granted on the day, or empty when no relationship between the two holds then. */
+    public Optional<Set<GuardianGrant>> grantsFor(UUID guardianPersonId, UUID dependantPersonId, LocalDate day) {
+        if (guardianPersonId == null || dependantPersonId == null || day == null) {
+            throw new IllegalStateException("A guardian question names both people and the day");
+        }
+        if (!canSignIn(guardianPersonId) || accounts.findByPersonId(dependantPersonId).isEmpty()) {
+            return Optional.empty();
+        }
+        return relationships.findByGuardianPersonIdAndDependantPersonId(guardianPersonId, dependantPersonId)
+                .stream()
+                .filter(relationship -> relationship.isValidOn(day))
+                .findFirst()
+                .map(relationship -> Set.copyOf(relationship.getGrants()));
     }
 
     public List<UUID> dependantsOf(UUID guardianPersonId, GuardianGrant grant, LocalDate day) {

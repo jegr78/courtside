@@ -447,6 +447,10 @@
       }
     },
     "booking": {
+      "acted_by": {
+        "level": "pseudonymous",
+        "lifecycle": "booking-pseudonymisation"
+      },
       "booked_by": {
         "level": "pseudonymous",
         "lifecycle": "booking-pseudonymisation"

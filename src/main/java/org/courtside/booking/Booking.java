@@ -48,6 +48,9 @@ public class Booking implements Persistable<UUID> {
     @Column(name = "booked_by")
     private UUID bookedBy;
 
+    @Column(name = "acted_by")
+    private UUID actedBy;
+
     private String note;
 
     @Column(name = "created_at", nullable = false)
@@ -95,6 +98,10 @@ public class Booking implements Persistable<UUID> {
         this.note = note;
         this.status = BookingStatus.CONFIRMED;
         this.createdAt = createdAt;
+    }
+
+    public void actedOnBehalfBy(UUID guardianAccountId) {
+        this.actedBy = guardianAccountId;
     }
 
     public void allocate(UUID courtId, TimeSlot slot) {
