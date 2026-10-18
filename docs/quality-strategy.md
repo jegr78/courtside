@@ -433,7 +433,7 @@ New material gaps are added here or linked to an existing authoritative issue be
 
 ## Flake policy
 
-A flaky test is a product-quality defect. The first attempt remains visible and a retry is recorded separately; retries never convert a failed required check into clean evidence. Quarantine requires a linked issue, owner, affected risk IDs, containment, expiry and a replacement signal. P0 tests are not quarantined. Periodic order variation and repeated concurrency runs measure flake rate; the target is below 0.5% first-attempt failures per gate and zero unexplained failures in release qualification.
+A flaky test is a product-quality defect. The first attempt remains visible and a retry is recorded separately; retries never convert a failed required check into clean evidence. Quarantine requires a linked issue, owner, affected risk IDs, containment, expiry and a replacement signal. P0 tests are not quarantined. Periodic order variation and repeated concurrency runs measure flake rate; the target is below 0.5% first-attempt failures per gate and zero unexplained failures in release qualification. A publishing call to an external service, such as the dependency snapshot upload or a Sigstore attestation, is not a test: it is attempted again after a failure, and each failed attempt stays in the log.
 
 Pull-request feedback has a p95 target of 15 minutes for normal change profiles. CI timing records keep the first attempt separate from reruns and report run duration, time to first failure and runner minutes. A sample with fewer than twenty first attempts is explicitly insufficient for a reliability or duration conclusion.
 
