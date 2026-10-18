@@ -27,7 +27,9 @@ export interface WaitlistSelection {
 }
 
 export function BookingDialog({ selection, grid, courts, allocations, canChooseSeveralCourts,
-  maxBookingMinutes, minBookingMinutes, maxWeeklyBookedHours, bookingHours, closed, created, conflicted, waitlist }: {
+  maxBookingMinutes: ownMaxBookingMinutes, minBookingMinutes: ownMinBookingMinutes,
+  maxWeeklyBookedHours: ownMaxWeeklyBookedHours, bookingHours: ownBookingHours,
+  dependants = [], selfBookable = true, closed, created, conflicted, waitlist }: {
   selection: BookingSelection;
   grid: BookingGrid;
   courts: PublicCourt[];
@@ -37,6 +39,8 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
   minBookingMinutes?: number;
   maxWeeklyBookedHours?: number;
   bookingHours?: BookingHours;
+  dependants?: Dependant[];
+  selfBookable?: boolean;
   closed: () => void;
   created: () => Promise<void>;
   conflicted: () => Promise<void>;
@@ -61,8 +65,12 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
   const [requestKey, setRequestKey] = useState(() => idempotencyKey());
   const [showsMore, setShowsMore] = useState(false);
   const [refusedAsTaken, setRefusedAsTaken] = useState<{ refreshFailed: boolean }>();
-  const [bookable, setBookable] = useState<Dependant[]>([]);
-  const [bookFor, setBookFor] = useState("");
+  const [bookFor, setBookFor] = useState(() => selfBookable ? "" : dependants[0]?.personId ?? "");
+  const ownLimits = !bookFor;
+  const maxBookingMinutes = ownLimits ? ownMaxBookingMinutes : undefined;
+  const minBookingMinutes = ownLimits ? ownMinBookingMinutes : undefined;
+  const maxWeeklyBookedHours = ownLimits ? ownMaxWeeklyBookedHours : undefined;
+  const bookingHours = ownLimits ? ownBookingHours : undefined;
 
   useEffect(() => {
     void Promise.all([api.bookingCards(), api.participantCards()]).then(([cards, participants]) => {
@@ -71,15 +79,6 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
       setCardId(cards[0]?.id ?? "");
     }).catch((failure: unknown) => report(failure));
   }, [report]);
-
-  useEffect(() => {
-    if (waitlist) return;
-    let active = true;
-    void api.dependants()
-      .then((dependants) => { if (active) setBookable(dependants.filter((dependant) => dependant.grants.includes("BOOK"))); })
-      .catch((failure: unknown) => warnAbout("Dependants unavailable", failure));
-    return () => { active = false; };
-  }, [waitlist]);
 
   useEffect(() => {
     const query = memberQuery.trim();
@@ -184,12 +183,14 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
       <p data-testid="booking-period" aria-live="polite" className="mt-2 font-semibold">{formatBookingPeriod(period.startsAt, period.endsAt, i18n.language, grid.timeZone)}</p>
       <FieldViolations id="booking-startsAt-errors" violations={fieldViolations("startsAt")} />
       {waitlist && <p data-testid="waitlist-explanation" className="text-muted mt-2 text-sm">{t("waitlist.explanation")}</p>}
-      {!waitlist && bookable.length > 0 && <>
+      {!waitlist && dependants.length > 0 && <>
         <label className="mt-5 grid gap-2 font-medium">{t("booking.bookFor")}
-          <select data-testid="booking-for" aria-describedby="booking-for-hint" value={bookFor} onChange={(event) => setBookFor(event.target.value)}
-                  className="form-control rounded-lg border px-3 py-3">
-            <option value="">{t("booking.bookForSelf")}</option>
-            {bookable.map((dependant) => <option key={dependant.personId} value={dependant.personId}>{`${dependant.firstName} ${dependant.lastName}`}</option>)}
+          <select data-testid="booking-for" aria-describedby="booking-for-hint" value={bookFor} onChange={(event) => {
+            setBookFor(event.target.value);
+            setRequestKey(idempotencyKey());
+          }} className="form-control rounded-lg border px-3 py-3">
+            {selfBookable && <option value="">{t("booking.bookForSelf")}</option>}
+            {dependants.map((dependant) => <option key={dependant.personId} value={dependant.personId}>{`${dependant.firstName} ${dependant.lastName}`}</option>)}
           </select>
         </label>
         <p id="booking-for-hint" className="text-muted mt-1 text-sm">{t("booking.bookForHint")}</p>

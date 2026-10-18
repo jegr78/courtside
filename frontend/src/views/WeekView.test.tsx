@@ -710,6 +710,67 @@ it("given a guardian allowed to book for one dependant and only to view another,
   expect(api.createBooking, "the guardian's own booking path is not used").not.toHaveBeenCalled();
 });
 
+it("given a guardian barred from courts who may book for a dependant, when they pick a free slot, then the dialog books for the dependant only", async () => {
+  // given
+  vi.mocked(api.bookingEligibility).mockResolvedValue({ violations: [{ code: "booking.rule.noCourtBooking", params: {} }] });
+  vi.mocked(api.dependants).mockResolvedValue([
+    { personId: "person-2", firstName: "John", lastName: "Roe", grants: ["BOOK"], endedOn: null }
+  ]);
+  render(<WeekView today={clubInstant("07:00")} />);
+
+  // when
+  await userEvent.click(await findFreeSlot(1, "08:00"));
+
+  // then
+  const bookFor = await screen.findByTestId("booking-for");
+  expect([...within(bookFor).getAllByRole("option")].map((option) => option.getAttribute("value")),
+    "the guardian who may not book is not offered").toEqual(["person-2"]);
+  await userEvent.click(screen.getByTestId("booking-submit"));
+  await waitFor(() => expect(api.createDependantBooking).toHaveBeenCalledWith("person-2",
+    expect.objectContaining({ courtIds: [courts[0].id] }), expect.any(String)));
+  expect(api.createBooking).not.toHaveBeenCalled();
+});
+
+it("given a guardian bound to an hour, when they book for a dependant, then the guardian's bound no longer shortens the choice", async () => {
+  // given
+  vi.mocked(api.bookingEligibility).mockResolvedValue({ violations: [], maxBookingMinutes: 60 });
+  vi.mocked(api.dependants).mockResolvedValue([
+    { personId: "person-2", firstName: "John", lastName: "Roe", grants: ["BOOK"], endedOn: null }
+  ]);
+  render(<WeekView today={clubInstant("07:00")} />);
+  await userEvent.click(await findFreeSlot(2, "08:00"));
+  expect(await screen.findByTestId("booking-duration")).not.toContainHTML('value="90"');
+
+  // when
+  await userEvent.selectOptions(screen.getByTestId("booking-for"), "person-2");
+
+  // then
+  expect(screen.getByTestId("booking-duration"), "the dependant's rules decide on the server").toContainHTML('value="90"');
+  expect(screen.queryByTestId("booking-duration-bound")).toBeNull();
+});
+
+it("given a request whose outcome is unknown, when the guardian switches whom they book for, then the next request carries a new key", async () => {
+  // given
+  vi.mocked(api.dependants).mockResolvedValue([
+    { personId: "person-2", firstName: "John", lastName: "Roe", grants: ["BOOK"], endedOn: null }
+  ]);
+  vi.mocked(api.createBooking).mockRejectedValueOnce(new Error("no network"));
+  render(<WeekView today={clubInstant("07:00")} />);
+  await userEvent.click(await findFreeSlot(1, "08:00"));
+  await userEvent.click(await screen.findByTestId("booking-submit"));
+  await waitFor(() => expect(api.createBooking).toHaveBeenCalled());
+
+  // when
+  await userEvent.selectOptions(screen.getByTestId("booking-for"), "person-2");
+  await userEvent.click(screen.getByTestId("booking-submit"));
+
+  // then
+  await waitFor(() => expect(api.createDependantBooking).toHaveBeenCalled());
+  const ownKey = vi.mocked(api.createBooking).mock.calls[0][1];
+  const dependantKey = vi.mocked(api.createDependantBooking).mock.calls[0][2];
+  expect(dependantKey, "a key the own path may already have used never reaches the dependant's path").not.toBe(ownKey);
+});
+
 it("given a booking conflict, when submission fails, then the affected day is refreshed", async () => {
   // given
   vi.mocked(api.createBooking).mockRejectedValue(new ApiError(409, {
