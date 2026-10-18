@@ -20,6 +20,7 @@ import { differs } from "../unsaved/differs";
 import { SaveBar } from "../unsaved/SaveBar";
 import { saveInTurn, StepFailed, type SaveStep } from "../unsaved/saveInTurn";
 import { useUnsavedForm } from "../unsaved/useUnsavedForm";
+import { GuardianshipsSection } from "./GuardianshipsSection";
 import { MembershipPeriodsSection } from "./MembershipPeriodsSection";
 
 const roles: Role[] = [
@@ -347,6 +348,10 @@ export function AdminPersonView() {
             create={(request) => mutate(() => api.createAccount(personId, request))}
           />}
         {entry.accountId && <NoShowsSection personId={personId} timeZone={club.timeZone} />}
+        {entry.accountId && <GuardianshipsSection entry={entry} disabled={pending} stepUp={(run) => {
+          setReauthenticationFailure(undefined);
+          setRetry({ run });
+        }} />}
         <section className="grid gap-3 rounded-xl border p-4">
           <h2 className="text-2xl font-bold">{t("admin.person.subjectAccess")}</h2>
           <p className="text-muted text-sm">{t("admin.person.subjectAccessExplain")}</p>
