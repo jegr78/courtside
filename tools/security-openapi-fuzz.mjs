@@ -528,9 +528,8 @@ export function validateOpenApiFuzzEvidence(evidence, inventory = buildOpenApiFu
     .map(candidateEvidenceIdentity).toSorted()) !== JSON.stringify(expectedEvidence.get(candidate.fingerprint)))) {
     throw new Error("OpenAPI fuzz lifecycle candidate evidence is incomplete");
   }
-  const expectedImportCases = ["invalid-utf8", "duplicate-columns", "oversized-cell", "conflicting-reference"];
   if (JSON.stringify(evidence.importCases.map(({ id }) => id).toSorted())
-      !== JSON.stringify(expectedImportCases.toSorted())) {
+      !== JSON.stringify(securityImportCases().map(({ id }) => id).toSorted())) {
     throw new Error("OpenAPI fuzz evidence omits a curated import case");
   }
   if (JSON.stringify(evidence.inputCases.map(({ id }) => id).toSorted())

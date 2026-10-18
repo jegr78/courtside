@@ -611,6 +611,15 @@ test("given a mutation probe that was not answered as documented, when the run i
   withoutCandidate.candidates = withoutCandidate.candidates
     .filter(({ ruleId }) => ruleId !== "mutation-case-incomplete");
   assert.throws(() => validateOpenApiFuzzEvidence(withoutCandidate), /omits a lifecycle candidate/);
+
+  const withoutImportCase = structuredClone(evidence);
+  withoutImportCase.importCases = withoutImportCase.importCases.filter(({ id }) => id !== "conflicting-reference");
+  assert.throws(() => validateOpenApiFuzzEvidence(withoutImportCase), /omits a curated import case/);
+
+  const withoutInputClass = structuredClone(evidence);
+  const lastInputClass = withoutInputClass.inputCases.at(-1).id;
+  withoutInputClass.inputCases = withoutInputClass.inputCases.filter(({ id }) => id !== lastInputClass);
+  assert.throws(() => validateOpenApiFuzzEvidence(withoutInputClass), /omits a required input class/);
 });
 
 // An operation with no body, no path parameter and no required header leaves the probe nothing to
