@@ -1171,6 +1171,7 @@ const en: Record<keyof typeof de, string> = {
   "guardianship.reversed": "The dependant already acts for this guardian, so the two cannot be each other's guardians.",
   "guardianship.overlaps": "This guardian already holds a relationship to this dependant on these days.",
   "guardianship.accountRequired": "Both the guardian and the dependant need an account.",
+  "guardianship.actionNotGranted": "Your relationship with this person does not allow this.",
   "membershipType.inactive": "This membership type is no longer offered and cannot be assigned.",
   "membershipType.ruleSet.inactive": "The selected rule set is not active.",
   "membershipType.ruleSet.unresolvable": "The selected rule set no longer exists.",

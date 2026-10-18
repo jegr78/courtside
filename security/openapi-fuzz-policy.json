@@ -56,7 +56,8 @@
     "requestUsernameReminder": "account-recovery mail limits",
     "changeInitialPassword": "credential-proof limits",
     "changeOwnPassword": "credential-proof limits",
-    "requestAccountCredentials": "credential issue limits"
+    "requestAccountCredentials": "credential issue limits",
+    "requestDependantCredentials": "credential issue limits"
   },
   "positiveMutationRationale": "Valid mutations are covered by packaged journeys and the authorization matrix; generated mutation traffic is restricted to rejected inputs so state preservation remains attributable."
 }

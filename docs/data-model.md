@@ -30,6 +30,11 @@ API's own contract is what refuses an empty list of courts. A club that wants a 
 occupancy, a tournament, a school session, inserts a `booking_card` row; it does not deploy
 anything.
 
+A booking a guardian makes for a dependant is held by the dependant's account in `booked_by`;
+`acted_by`, null otherwise, names the guardian's account. An `idempotency_key` is unique per holder
+and per account that acted, so a guardian's key never meets one the dependant or another guardian
+used. Pseudonymising a booking clears `acted_by` with `booked_by`.
+
 A cancelled booking may carry a `cancellation_reason`, one of five codes chosen by whoever cancelled
 somebody else's booking. It is never free text, so it names nobody. CHECK constraints accept only
 the known codes and only on a cancelled booking.

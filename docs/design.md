@@ -241,6 +241,16 @@ change or clear at any time; there is no birth date, so the board ends it when t
 age. A guardian holds one relationship to a dependant on any day, and two people cannot be each
 other's guardians at once.
 
+A guardian acts for a dependant from their own session, and every action reads the relationship
+afresh, so ending it takes effect at once. A booking a guardian makes is held by the dependant's
+account with the dependant in the first place, and every rule, quota, card and deadline is measured
+against the dependant and the dependant's roles; neither the guardian's roles nor the dependant's
+administrator override apply. The guardian is recorded on the booking and in the change log as the
+one who acted. A guardian cancels only bookings the dependant holds, in the dependant's name and
+under the dependant's deadline. Reading a dependant's messages marks nothing read. Somebody acted
+for without a relationship holding today is answered as no dependant, and an action the
+relationship does not grant is refused by name.
+
 Every value entered through an administrative surface can be corrected there. Identifiers are not
 editable descriptions. Deactivation represents records that should no longer be used. Erasure
 follows the data-protection lifecycle rather than an ordinary edit.

@@ -1169,6 +1169,7 @@ const de = {
   "guardianship.reversed": "Die vertretene Person vertritt bereits diese Person, beide können sich nicht gegenseitig vertreten.",
   "guardianship.overlaps": "Diese Person vertritt die andere an diesen Tagen bereits.",
   "guardianship.accountRequired": "Die vertretende und die vertretene Person brauchen beide ein Konto.",
+  "guardianship.actionNotGranted": "Deine Beziehung zu dieser Person erlaubt das nicht.",
   "membershipType.inactive": "Diese Mitgliedsart wird nicht mehr angeboten und kann nicht zugewiesen werden.",
   "membershipType.ruleSet.inactive": "Das ausgewählte Regelwerk ist nicht aktiv.",
   "membershipType.ruleSet.unresolvable": "Das ausgewählte Regelwerk existiert nicht mehr.",

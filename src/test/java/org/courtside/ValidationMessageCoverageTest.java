@@ -31,6 +31,7 @@ class ValidationMessageCoverageTest {
             List.of("ParticipantsInvalidException", "InvalidOpeningWindowException",
                     "InvalidMembershipPeriodException", "MembershipPeriodsOverlapException",
                     "InvalidGuardianRelationshipException", "GuardianRelationshipOverlapException",
+                    "GuardianActionNotGrantedException",
                     "RuleParameterInvalidException", "MembershipTypeRuleSetInvalidException",
                     "MembershipTypeRuleSetInactiveException", "MembershipTypeInactiveException",
                     "NoMembershipTypeRuleSetInactiveException", "NoMembershipTypeRuleSetInvalidException",
