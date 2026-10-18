@@ -12,10 +12,13 @@ import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 import java.time.Clock;
+import java.time.Duration;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
@@ -261,6 +264,32 @@ class GuardianshipAdminControllerTest extends AbstractIntegrationTest {
         change(jane, unknown.toString(), "{\"grants\":[\"BOOK\"]}").andExpect(status().isForbidden());
         end(jane, unknown.toString()).andExpect(status().isForbidden());
         mockMvc.perform(delete(guardianships(jane) + "/" + unknown).with(csrf())).andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAStaleSignIn_whenTheBoardWritesARelationship_thenEveryWriteAsksForAFreshProof() throws Exception {
+        // given
+        String id = idOf(create(jane, request(jane, john, "[\"BOOK\"]", null)));
+        long stale = clock.instant().minus(Duration.ofHours(2)).toEpochMilli();
+
+        // when / then
+        for (MockHttpServletRequestBuilder write : List.of(
+                post(guardianships(john)).contentType(MediaType.APPLICATION_JSON)
+                        .content(request(john, jane, "[\"BOOK\"]", null)),
+                put(guardianships(jane) + "/" + id).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"grants\":[\"BOOK\",\"CANCEL_BOOKINGS\"]}"),
+                post(guardianships(jane) + "/" + id + "/end"),
+                delete(guardianships(jane) + "/" + id))) {
+            mockMvc.perform(write.with(csrf()).sessionAttr("courtside.authenticated-at", stale))
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.type").value("urn:courtside:error:recent-authentication-required"))
+                    .andExpect(jsonPath("$.violations[0].code").value("identity.reauthentication.required"));
+        }
+        mockMvc.perform(get(guardianships(jane)))
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].grants", containsInAnyOrder("BOOK")))
+                .andExpect(jsonPath("$[0].state").value("RUNNING"));
     }
 
     private void refused(ResultActions result, String code) throws Exception {

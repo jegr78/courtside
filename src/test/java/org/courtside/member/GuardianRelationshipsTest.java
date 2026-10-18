@@ -1,0 +1,131 @@
+package org.courtside.member;
+
+import org.courtside.AbstractIntegrationTest;
+import org.courtside.identity.Role;
+import org.courtside.identity.testfixture.IdentityTestFixture;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
+
+import java.time.LocalDate;
+import java.util.EnumSet;
+import java.util.Set;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+@Import(IdentityTestFixture.class)
+class GuardianRelationshipsTest extends AbstractIntegrationTest {
+
+    private static final LocalDate TODAY = LocalDate.of(2026, 5, 12);
+
+    @Autowired
+    private IdentityTestFixture identity;
+
+    @Autowired
+    private GuardianshipService guardianships;
+
+    @Autowired
+    private GuardianRelationships relationships;
+
+    private UUID jane;
+    private UUID john;
+    private UUID janeAccount;
+    private UUID johnAccount;
+
+    @BeforeEach
+    void setUp() {
+        jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
+        john = identity.createPerson("John", "Roe", "john.roe@example.org");
+        janeAccount = identity.createEnabledAccount(jane, "jane.doe", Set.of(Role.MEMBER));
+        johnAccount = identity.createEnabledAccount(john, "john.roe", Set.of(Role.MEMBER));
+    }
+
+    @Test
+    void givenARunningRelationship_whenAskingForAGrantedAction_thenTheGuardianMayActOnlyForThatOne() {
+        // given
+        guardianships.create(jane, jane, john, EnumSet.of(GuardianGrant.VIEW_BOOKINGS, GuardianGrant.BOOK), null);
+
+        // when / then
+        assertThat(relationships.mayActFor(jane, john, GuardianGrant.BOOK, TODAY)).isTrue();
+        assertThat(relationships.mayActFor(jane, john, GuardianGrant.CANCEL_BOOKINGS, TODAY))
+                .as("an action the relationship does not grant").isFalse();
+        assertThat(relationships.mayActFor(john, jane, GuardianGrant.BOOK, TODAY))
+                .as("the dependant may not act for the guardian").isFalse();
+        assertThat(relationships.dependantsOf(jane, GuardianGrant.VIEW_BOOKINGS, TODAY)).containsExactly(john);
+        assertThat(relationships.dependantsOf(jane, GuardianGrant.READ_MESSAGES, TODAY)).isEmpty();
+    }
+
+    @Test
+    void givenAnEndInTheFuture_whenAskingAcrossIt_thenTheRelationshipGrantsUntilTheDayBeforeTheEnd() {
+        // given
+        guardianships.create(john, jane, john, Set.of(GuardianGrant.BOOK), LocalDate.of(2026, 6, 1));
+
+        // when / then
+        assertThat(relationships.mayActFor(jane, john, GuardianGrant.BOOK, LocalDate.of(2026, 5, 31))).isTrue();
+        assertThat(relationships.mayActFor(jane, john, GuardianGrant.BOOK, LocalDate.of(2026, 6, 1)))
+                .as("the end is the first day without the relationship").isFalse();
+        assertThat(relationships.mayActFor(jane, john, GuardianGrant.BOOK, TODAY.minusDays(1)))
+                .as("the relationship began today").isFalse();
+    }
+
+    @Test
+    void givenADependantReachingAdulthood_whenTheBoardEndsTheRelationshipToday_thenNothingIsGrantedToday() {
+        // given
+        UUID id = guardianships.create(jane, jane, john, Set.of(GuardianGrant.BOOK), null).id();
+
+        // when
+        guardianships.end(jane, id);
+
+        // then
+        assertThat(relationships.mayActFor(jane, john, GuardianGrant.BOOK, TODAY)).isFalse();
+        assertThat(relationships.dependantsOf(jane, GuardianGrant.BOOK, TODAY)).isEmpty();
+    }
+
+    @Test
+    void givenAGuardianWhoseAccountIsDisabled_whenAskingForAnyAction_thenNothingIsGranted() {
+        // given
+        guardianships.create(jane, jane, john, Set.of(GuardianGrant.BOOK), null);
+
+        // when
+        identity.disableAccount(janeAccount);
+
+        // then
+        assertThat(relationships.mayActFor(jane, john, GuardianGrant.BOOK, TODAY)).isFalse();
+        assertThat(relationships.dependantsOf(jane, GuardianGrant.BOOK, TODAY)).isEmpty();
+    }
+
+    @Test
+    void givenAGuardianOrDependantWhoseAccountWasRemoved_whenAskingForAnyAction_thenNothingIsGranted() {
+        // given
+        UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
+        UUID maryAccount = identity.createEnabledAccount(mary, "mary.major", Set.of(Role.MEMBER));
+        guardianships.create(jane, jane, john, Set.of(GuardianGrant.BOOK), null);
+        guardianships.create(mary, mary, john, Set.of(GuardianGrant.BOOK), null);
+
+        // when
+        identity.removeAccount(johnAccount);
+        identity.removeAccount(maryAccount);
+
+        // then
+        assertThat(relationships.mayActFor(jane, john, GuardianGrant.BOOK, TODAY))
+                .as("a dependant without an account").isFalse();
+        assertThat(relationships.dependantsOf(jane, GuardianGrant.BOOK, TODAY)).isEmpty();
+        assertThat(relationships.mayActFor(mary, john, GuardianGrant.BOOK, TODAY))
+                .as("a guardian without an account").isFalse();
+    }
+
+    @Test
+    void givenADependantWhoseAccountIsDisabled_whenTheGuardianAsks_thenTheGuardianMayStillAct() {
+        // given
+        guardianships.create(jane, jane, john, Set.of(GuardianGrant.ACCOUNT_TASKS), null);
+
+        // when
+        identity.disableAccount(johnAccount);
+
+        // then
+        assertThat(relationships.mayActFor(jane, john, GuardianGrant.ACCOUNT_TASKS, TODAY))
+                .as("the dependant still holds an account").isTrue();
+    }
+}

@@ -21,6 +21,7 @@ import java.time.LocalDate;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
@@ -179,7 +180,7 @@ public class GuardianshipService {
     }
 
     private static Set<GuardianGrant> requiredGrants(@Nullable Set<GuardianGrant> grants) {
-        if (grants == null || grants.isEmpty() || grants.contains(null)) {
+        if (grants == null || grants.isEmpty() || grants.stream().anyMatch(Objects::isNull)) {
             throw new InvalidGuardianRelationshipException("guardianship.grantsRequired");
         }
         return EnumSet.copyOf(grants);

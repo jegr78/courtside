@@ -213,6 +213,7 @@ class RosterAdminController implements AdminRosterApi {
     @Override
     public ResponseEntity<ApiGuardianRelationship> createGuardianRelationship(
             UUID personId, ApiGuardianRelationshipRequest request) {
+        recentAuthentication.requireRecent();
         return ResponseEntity.status(HttpStatus.CREATED).body(toGuardianshipResponse(guardianships.create(personId,
                 request.getGuardianPersonId(), request.getDependantPersonId(), grantsOf(request.getGrants()),
                 request.getEndedOn())));
@@ -221,17 +222,20 @@ class RosterAdminController implements AdminRosterApi {
     @Override
     public ResponseEntity<ApiGuardianRelationship> changeGuardianRelationship(
             UUID personId, UUID relationshipId, ApiGuardianRelationshipChange request) {
+        recentAuthentication.requireRecent();
         return ResponseEntity.ok(toGuardianshipResponse(guardianships.change(personId, relationshipId,
                 grantsOf(request.getGrants()), request.getEndedOn())));
     }
 
     @Override
     public ResponseEntity<ApiGuardianRelationship> endGuardianRelationship(UUID personId, UUID relationshipId) {
+        recentAuthentication.requireRecent();
         return ResponseEntity.ok(toGuardianshipResponse(guardianships.end(personId, relationshipId)));
     }
 
     @Override
     public ResponseEntity<Void> removeGuardianRelationship(UUID personId, UUID relationshipId) {
+        recentAuthentication.requireRecent();
         guardianships.remove(personId, relationshipId);
         return ResponseEntity.noContent().build();
     }
