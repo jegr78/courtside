@@ -120,6 +120,12 @@ class ProblemTypeUriTest {
             "urn:courtside:error:weekly-opening-hours-rejected",
             "urn:courtside:error:availability-rejected",
             "urn:courtside:error:availability-entry-not-found",
+            "urn:courtside:error:dependant-account-disabled",
+            "urn:courtside:error:dependant-not-found",
+            "urn:courtside:error:guardian-action-not-granted",
+            "urn:courtside:error:guardian-relationship-not-found",
+            "urn:courtside:error:guardian-relationship-overlap",
+            "urn:courtside:error:invalid-guardian-relationship",
             "urn:courtside:error:membership-period-not-found",
             "urn:courtside:error:membership-periods-overlap",
             "urn:courtside:error:membership-type-inactive",
@@ -187,11 +193,13 @@ class ProblemTypeUriTest {
                 .allMatch(type -> ALLOWED.matcher(type).matches());
     }
 
+    // Distinct: a refusal may answer with the type of the failure it imitates.
     @Test
     void whenReadingEveryDomainFailuresProblemType_thenTheSlugSetMatchesKnownSlugsExactly()
             throws Exception {
         // when / then
-        assertThat(failureSlugs()).containsExactlyInAnyOrderElementsOf(KNOWN_FAILURE_SLUGS);
+        assertThat(failureSlugs().stream().distinct().toList())
+                .containsExactlyInAnyOrderElementsOf(KNOWN_FAILURE_SLUGS);
     }
 
     // Distinct: two places may answer with the same type, and a client reads the type, not the place.

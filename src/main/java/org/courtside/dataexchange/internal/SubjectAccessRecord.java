@@ -5,6 +5,7 @@ import org.courtside.booking.PersonBookingHistory;
 import org.courtside.notification.PersonMessageHistory;
 import org.courtside.identity.CredentialState;
 import org.courtside.identity.Role;
+import org.courtside.member.GuardianGrant;
 import org.jspecify.annotations.Nullable;
 
 import java.time.Instant;
@@ -16,7 +17,9 @@ import java.util.UUID;
 public record SubjectAccessRecord(Instant producedAt, UUID personId, String firstName,
                                   String lastName, @Nullable String email, List<Account> accounts,
                                   List<Membership> memberships,
+                                  List<Guardianship> guardianships,
                                   List<PersonBookingHistory.Made> bookingsMade,
+                                  List<PersonBookingHistory.ActedFor> bookingsActedFor,
                                   List<PersonBookingHistory.Recorded> bookingsRecordedIn,
                                   List<PersonBookingHistory.Series> bookingSeries,
                                   List<PersonBookingHistory.Waiting> waitlistEntries,
@@ -37,6 +40,10 @@ public record SubjectAccessRecord(Instant producedAt, UUID personId, String firs
 
     public record Membership(UUID membershipTypeId, @Nullable String membershipType,
                              @Nullable LocalDate startedOn, @Nullable LocalDate endedOn) {
+    }
+
+    public record Guardianship(UUID relationshipId, boolean guardian, UUID otherPersonId,
+                               Set<GuardianGrant> grants, LocalDate startedOn, @Nullable LocalDate endedOn) {
     }
 
     public record Reference(UUID sourceId, String externalId, Instant linkedAt) {

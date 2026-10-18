@@ -23,7 +23,7 @@ class BookingLookupPreparation implements SmartInitializingSingleton {
         transaction.setReadOnly(true);
         transaction.executeWithoutResult(status -> {
             var account = new UUID(0, 0);
-            bookings.findByBookedByAndIdempotencyKey(account, "startup-preparation");
+            bookings.findIdempotentRequest(account, null, "startup-preparation");
             bookings.countOpenBookings(account, Instant.EPOCH);
         });
     }

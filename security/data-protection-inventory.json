@@ -92,6 +92,11 @@
       "class": "identifier"
     },
     {
+      "name": "relationshipId",
+      "in": "path",
+      "class": "identifier"
+    },
+    {
       "name": "ruleType",
       "in": "path",
       "class": "neutral"
@@ -286,6 +291,21 @@
       "holds": "The people this instance currently holds, keyed by person id, as an import compares against them.",
       "bounded": "The import run that reads it."
     },
+    "DependantBookingController": {
+      "level": "personal",
+      "holds": "The participant specifications of one booking a guardian makes for a dependant, each able to name a guest.",
+      "bounded": "The request that built it."
+    },
+    "DependantBookings": {
+      "level": "personal",
+      "holds": "The participant specifications of one booking a guardian makes for a dependant, each able to name a guest.",
+      "bounded": "The request that built it."
+    },
+    "DependantService": {
+      "level": "personal",
+      "holds": "The names of the dependants one guardian acts for, assembled to answer that guardian.",
+      "bounded": "The request that built it."
+    },
     "ExecutionService": {
       "level": "personal",
       "holds": "The people an import run would create, each carrying the names and address the file gave.",
@@ -442,6 +462,10 @@
       }
     },
     "booking": {
+      "acted_by": {
+        "level": "pseudonymous",
+        "lifecycle": "booking-pseudonymisation"
+      },
       "booked_by": {
         "level": "pseudonymous",
         "lifecycle": "booking-pseudonymisation"
@@ -945,6 +969,38 @@
       "status": {
         "level": "operational",
         "lifecycle": "publication-registry"
+      }
+    },
+    "guardian_relationship": {
+      "dependant_person_id": {
+        "level": "pseudonymous",
+        "lifecycle": "roster-record"
+      },
+      "ended_on": {
+        "level": "operational",
+        "lifecycle": "roster-record"
+      },
+      "guardian_person_id": {
+        "level": "pseudonymous",
+        "lifecycle": "roster-record"
+      },
+      "id": {
+        "level": "pseudonymous",
+        "lifecycle": "roster-record"
+      },
+      "started_on": {
+        "level": "operational",
+        "lifecycle": "roster-record"
+      }
+    },
+    "guardian_relationship_action": {
+      "action": {
+        "level": "operational",
+        "lifecycle": "roster-record"
+      },
+      "guardian_relationship_id": {
+        "level": "pseudonymous",
+        "lifecycle": "roster-record"
       }
     },
     "import_column_mapping": {

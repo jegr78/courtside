@@ -156,7 +156,7 @@ public class SecurityConfiguration {
                                 new AuthorizationDecision(performanceTelemetryEnabled))
                         .requestMatchers("/api/openapi.yaml", "/api/source").permitAll()
                         .requestMatchers("/", "/courts", "/login", "/initial-password", "/my-bookings",
-                                "/my-messages", "/account/security", "/account-recovery",
+                                "/my-messages", "/my-dependants", "/account/security", "/account-recovery",
                                 "/admin", "/admin/appointments", "/admin/setup",
                                 "/admin/configuration", "/admin/deadlines", "/admin/rule-sets", "/admin/message-wording",
                                 "/admin/facility",

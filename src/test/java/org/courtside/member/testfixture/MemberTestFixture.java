@@ -1,6 +1,9 @@
 package org.courtside.member.testfixture;
 
 import lombok.RequiredArgsConstructor;
+import org.courtside.member.GuardianGrant;
+import org.courtside.member.GuardianRelationshipState;
+import org.courtside.member.GuardianshipService;
 import org.courtside.member.MemberService;
 import org.courtside.member.MembershipPeriod;
 import org.courtside.member.MembershipPeriodService;
@@ -15,6 +18,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @RequiredArgsConstructor
 public class MemberTestFixture {
@@ -25,6 +29,7 @@ public class MemberTestFixture {
     private final RosterService roster;
     private final RosterSyncService sync;
     private final MembershipPeriodService periods;
+    private final GuardianshipService guardianships;
 
     public UUID addPerson(String firstName, String lastName, String email) {
         return roster.createPerson(firstName, lastName, email).personId();
@@ -119,5 +124,30 @@ public class MemberTestFixture {
         return Optional.ofNullable(roster.person(personId).membership())
                 .filter(RosterService.Membership::current)
                 .map(RosterService.Membership::startedOn);
+    }
+
+    public UUID linkGuardian(UUID guardianPersonId, UUID dependantPersonId, Set<GuardianGrant> grants) {
+        return guardianships.create(guardianPersonId, guardianPersonId, dependantPersonId, grants, null).id();
+    }
+
+    public UUID linkGuardianUntil(UUID guardianPersonId, UUID dependantPersonId, Set<GuardianGrant> grants,
+                                  LocalDate endedOn) {
+        return guardianships.create(guardianPersonId, guardianPersonId, dependantPersonId, grants, endedOn).id();
+    }
+
+    public void endGuardianship(UUID personId, UUID relationshipId) {
+        guardianships.end(personId, relationshipId);
+    }
+
+    public int guardianshipCount(UUID personId) {
+        return guardianships.guardianshipsOf(personId).size();
+    }
+
+    public Set<GuardianGrant> runningGrants(UUID guardianPersonId, UUID dependantPersonId) {
+        return guardianships.guardianshipsOf(dependantPersonId).stream()
+                .filter(guardianship -> guardianship.guardian().personId().equals(guardianPersonId))
+                .filter(guardianship -> guardianship.state() == GuardianRelationshipState.RUNNING)
+                .flatMap(guardianship -> guardianship.grants().stream())
+                .collect(Collectors.toSet());
     }
 }

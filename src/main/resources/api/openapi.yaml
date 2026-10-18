@@ -192,6 +192,12 @@ components:
         endpoint whose cursor needs prose of its own declares that cursor inline instead of sharing
         this one, so not every paging endpoint refers to it.
       schema: { type: string, format: uuid }
+    DependantPersonId:
+      name: personId
+      in: path
+      required: true
+      description: The dependant the caller acts for as a guardian.
+      schema: { type: string, format: uuid }
     PageLimit:
       name: limit
       in: query
@@ -1219,6 +1225,108 @@ components:
           format: date
           description: The first day the period no longer holds, `null` while it runs without an end.
         state: { $ref: "#/components/schemas/MembershipPeriodState" }
+
+    GuardianGrant:
+      type: string
+      enum: [VIEW_BOOKINGS, BOOK, CANCEL_BOOKINGS, READ_MESSAGES, ACCOUNT_TASKS]
+      description: |
+        One action a guardian may take for a dependant: read the dependant's bookings, book for
+        them, cancel their bookings, read their messages, or account tasks such as requesting new
+        credentials for the dependant's account. A guardian may take no action the relationship
+        does not grant.
+
+    GuardianRelationshipState:
+      type: string
+      enum: [RUNNING, ENDED]
+      description: |
+        Where a relationship stands on the club's today: `RUNNING` grants its actions today,
+        `ENDED` grants nothing.
+
+    Dependant:
+      type: object
+      required: [personId, firstName, lastName, grants, endedOn]
+      properties:
+        personId: { type: string, format: uuid }
+        firstName: { type: string }
+        lastName: { type: string }
+        grants:
+          type: array
+          uniqueItems: true
+          items: { $ref: "#/components/schemas/GuardianGrant" }
+        endedOn:
+          type: [string, "null"]
+          format: date
+          description: The first day the relationship no longer holds, `null` while it runs without an end.
+
+    GuardianParty:
+      type: object
+      required: [personId, firstName, lastName]
+      properties:
+        personId: { type: string, format: uuid }
+        firstName: { type: string }
+        lastName: { type: string }
+
+    GuardianRelationship:
+      type: object
+      required: [id, guardian, dependant, grants, startedOn, endedOn, state]
+      properties:
+        id: { type: string, format: uuid }
+        guardian: { $ref: "#/components/schemas/GuardianParty" }
+        dependant: { $ref: "#/components/schemas/GuardianParty" }
+        grants:
+          type: array
+          uniqueItems: true
+          items: { $ref: "#/components/schemas/GuardianGrant" }
+        startedOn:
+          type: string
+          format: date
+          description: The day the board created the relationship.
+        endedOn:
+          type: [string, "null"]
+          format: date
+          description: The first day the relationship no longer holds, `null` while it runs without an end.
+        state: { $ref: "#/components/schemas/GuardianRelationshipState" }
+
+    GuardianRelationshipRequest:
+      type: object
+      required: [guardianPersonId, dependantPersonId, grants]
+      properties:
+        guardianPersonId:
+          type: string
+          format: uuid
+          description: The person who acts. Either this or `dependantPersonId` is the person in the path.
+        dependantPersonId:
+          type: string
+          format: uuid
+          description: The person acted for. A person cannot be their own guardian.
+        grants:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items: { $ref: "#/components/schemas/GuardianGrant" }
+        endedOn:
+          type: [string, "null"]
+          format: date
+          description: |
+            The first day the relationship no longer holds; omitted or `null`, it lasts until the
+            board ends it. It may be any day from today on.
+
+    GuardianRelationshipChange:
+      type: object
+      required: [grants]
+      properties:
+        grants:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items: { $ref: "#/components/schemas/GuardianGrant" }
+        endedOn:
+          type: [string, "null"]
+          format: date
+          description: |
+            The first day the relationship no longer holds; omitted or `null`, it lasts until the
+            board ends it. It may be any day from the relationship's start on, also one already
+            passed.
 
     MembershipType:
       type: object
@@ -3936,6 +4044,21 @@ components:
           type: array
           items: { $ref: "#/components/schemas/SubjectAccessReservation" }
 
+    SubjectAccessActedForBooking:
+      type: object
+      required: [bookingId, holderPersonId, createdAt, status, reservations]
+      description: |
+        A booking this person made as guardian for somebody else, who holds it. The holder is
+        named by id only, since their name is not this person's data.
+      properties:
+        bookingId: { type: string, format: uuid }
+        holderPersonId: { type: string, format: uuid }
+        createdAt: { type: string, format: date-time }
+        status: { $ref: "#/components/schemas/BookingStatus" }
+        reservations:
+          type: array
+          items: { $ref: "#/components/schemas/SubjectAccessReservation" }
+
     SubjectAccessWaitlistEntry:
       type: object
       required: [entryId, courtId, startsAt, endsAt, state, joinedAt]
@@ -3971,6 +4094,26 @@ components:
           type: [string, "null"]
           format: date
           description: The date the membership ended, absent while it runs.
+
+    SubjectAccessGuardianship:
+      type: object
+      required: [relationshipId, role, otherPersonId, grants, startedOn, endedOn]
+      properties:
+        relationshipId: { type: string, format: uuid }
+        role:
+          type: string
+          enum: [GUARDIAN, DEPENDANT]
+          description: Whether this person acts for the other or is acted for.
+        otherPersonId: { type: string, format: uuid }
+        grants:
+          type: array
+          uniqueItems: true
+          items: { $ref: "#/components/schemas/GuardianGrant" }
+        startedOn: { type: string, format: date }
+        endedOn:
+          type: [string, "null"]
+          format: date
+          description: The first day the relationship no longer holds, `null` while it runs without an end.
 
     SubjectAccessAccount:
       type: object
@@ -4105,9 +4248,9 @@ components:
 
     SubjectAccessExport:
       type: object
-      required: [producedAt, personId, firstName, lastName, accounts, memberships, bookingsMade,
-                 bookingsRecordedIn, bookingSeries, messages, declinedMessages, notifications,
-                 declinedChannels, externalReferences, changesAsSubject, changesAsActor,
+      required: [producedAt, personId, firstName, lastName, accounts, memberships, guardianships,
+                 bookingsMade, bookingsActedFor, bookingsRecordedIn, bookingSeries, messages, declinedMessages,
+                 notifications, declinedChannels, externalReferences, changesAsSubject, changesAsActor,
                  waitlistEntries, waitlistsNamedIn]
       description: |
         Everything this instance holds about one person, and nothing it holds about anybody else.
@@ -4128,9 +4271,18 @@ components:
         memberships:
           type: array
           items: { $ref: "#/components/schemas/SubjectAccessMembership" }
+        guardianships:
+          type: array
+          description: |
+            Every guardian relationship the person takes part in, as guardian or as dependant. The
+            other person is named by id only, since their name is not this person's data.
+          items: { $ref: "#/components/schemas/SubjectAccessGuardianship" }
         bookingsMade:
           type: array
           items: { $ref: "#/components/schemas/SubjectAccessBooking" }
+        bookingsActedFor:
+          type: array
+          items: { $ref: "#/components/schemas/SubjectAccessActedForBooking" }
         bookingsRecordedIn:
           type: array
           items: { $ref: "#/components/schemas/SubjectAccessParticipation" }
@@ -5332,6 +5484,264 @@ paths:
           $ref: "#/components/responses/Invalid"
         "401":
           $ref: "#/components/responses/Unauthenticated"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/my/dependants:
+    get:
+      tags: [dependants]
+      operationId: listDependants
+      summary: The people the signed-in account acts for as a guardian today.
+      description: |
+        Every dependant whose relationship with the signed-in account holds on the club's today,
+        with the actions it grants and the day it ends. A relationship that has ended, a dependant
+        without an account and a guardian whose own account is disabled list nothing. Names are
+        all this shows of a dependant; the relationship grants no other personal data.
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: The dependants, by last and first name.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Dependant" }
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/my/dependants/{personId}/bookings:
+    get:
+      tags: [dependant-bookings]
+      operationId: listDependantBookings
+      summary: A dependant's bookings, for a guardian granted to view them.
+      description: |
+        The bookings the dependant's account holds, in the views and shape of
+        `listPersonalBookings`, those a guardian made for the dependant included.
+
+        Somebody the caller acts for on no relationship holding today, an ended one included, is
+        answered `404` with `urn:courtside:error:dependant-not-found`. A relationship that does not
+        grant `VIEW_BOOKINGS` is answered `403` with `urn:courtside:error:guardian-action-not-granted`
+        and the code `guardianship.actionNotGranted` naming the action.
+      parameters:
+        - $ref: "#/components/parameters/DependantPersonId"
+        - name: view
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/PersonalBookingView"
+            default: UPCOMING
+        - name: cursor
+          in: query
+          required: false
+          description: The opaque `nextCursor` of the preceding page; one the dependant's bookings do not contain ends the list.
+          schema: { type: string, format: uuid }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: The dependant's bookings in the requested view.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PersonalBookingPage" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+    post:
+      tags: [dependant-bookings]
+      operationId: createDependantBooking
+      summary: Book for a dependant, for a guardian granted to book.
+      description: |
+        The booking is held by the dependant's account and the dependant takes the first player
+        place, as if they had booked themself. Every rule, quota, card and booking window is
+        measured against the dependant and their roles; the guardian's own roles, an administrator's
+        included, override nothing here. The guardian is recorded as the one who acted.
+
+        The idempotency key is scoped to the guardian acting for this dependant, so it never meets a
+        key the dependant or another guardian used.
+
+        A disabled dependant account is answered `409` with
+        `urn:courtside:error:dependant-account-disabled`. The refusals for an unknown dependant and
+        an action not granted are those of `listDependantBookings`.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/DependantPersonId"
+        - name: Idempotency-Key
+          in: header
+          required: true
+          description: An opaque key unique to this booking attempt for the guardian acting for this dependant.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 128
+            pattern: '^[\x21-\x7E]+$'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateBookingRequest" }
+      responses:
+        "201":
+          description: Booked for the dependant.
+          headers:
+            Location: { $ref: "#/components/headers/Location" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BookingCreated" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: A court was taken in the meantime, the idempotency key belongs to another request, or the dependant's account is disabled.
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "422":
+          description: One or more booking rules refused it for the dependant.
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/my/dependants/{personId}/bookings/{bookingId}:
+    delete:
+      tags: [dependant-bookings]
+      operationId: cancelDependantBooking
+      summary: Cancel a dependant's booking, for a guardian granted to cancel.
+      description: |
+        Only a booking the dependant's account holds, and in the dependant's name: the dependant's
+        cancellation deadline applies and no reason may be given, as when the holder cancels. A
+        booking the dependant does not hold is answered `404` with
+        `urn:courtside:error:booking-not-found`. The refusals for an unknown dependant and an
+        action not granted are those of `listDependantBookings`.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/DependantPersonId"
+        - name: bookingId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "204":
+          description: Cancelled.
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          description: The dependant's cancellation deadline has passed.
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/my/dependants/{personId}/notifications:
+    get:
+      tags: [dependant-notifications]
+      operationId: listDependantNotifications
+      summary: A dependant's notification centre, for a guardian granted to read their messages.
+      description: |
+        The entries of `listOwnNotifications` as the dependant's account holds them, newest first.
+        Reading here marks nothing read: what the dependant has not read stays unread for them.
+        The refusals for an unknown dependant and an action not granted are those of
+        `listDependantBookings`, with `READ_MESSAGES` as the action.
+      parameters:
+        - $ref: "#/components/parameters/DependantPersonId"
+        - name: cursor
+          in: query
+          required: false
+          description: The opaque `nextCursor` of the preceding page; one the dependant's notifications do not contain ends the list.
+          schema: { type: string, format: uuid }
+        - $ref: "#/components/parameters/PageLimit"
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: The dependant's notifications.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/NotificationPage" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/my/dependants/{personId}/credentials:
+    post:
+      tags: [dependants]
+      operationId: requestDependantCredentials
+      summary: Have the instance send a dependant's account new credentials, for a guardian granted account tasks.
+      description: |
+        The same issue as the board's `requestAccountCredentials`, under the same limits: the
+        credential goes to the dependant's address, appears in no response, and whatever was issued
+        before stops working. The change log records the guardian as the one who asked.
+
+        A deactivated dependant account is answered `409` with
+        `urn:courtside:error:account-deactivated`, one whose person has no address with
+        `urn:courtside:error:account-address-missing`, and too many requests for the account
+        `429` with `urn:courtside:error:credential-issue-rate-limited`. The refusals for an unknown
+        dependant and an action not granted are those of `listDependantBookings`, with
+        `ACCOUNT_TASKS` as the action. A dependant whose account holds the administrator role is
+        refused the same way with the code `guardianship.administratorCredentials`, whatever the
+        relationship grants.
+
+        This operation requires a full reauthentication within the configured window, capped at
+        five minutes. Missing or stale proof is answered `403` with
+        `urn:courtside:error:recent-authentication-required` and changes nothing.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/DependantPersonId"
+      responses:
+        "204":
+          description: Requested.
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
         "429":
           $ref: "#/components/responses/RateLimited"
 
@@ -7696,6 +8106,239 @@ paths:
           description: |
             No such person, or no such period of this person
             (`urn:courtside:error:membership-period-not-found`).
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/admin/roster/{personId}/guardianships:
+    get:
+      tags: [admin-roster]
+      operationId: listGuardianRelationships
+      summary: Every guardian relationship a person takes part in, as guardian or as dependant.
+      description: |
+        Oldest first. A relationship grants its actions only while it runs; an ended one stays
+        listed so the board can see who could act for whom.
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: personId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: The relationships, ascending by their first day.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/GuardianRelationship" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+    post:
+      tags: [admin-roster]
+      operationId: createGuardianRelationship
+      summary: Let one person act for another with the granted actions, from today.
+      description: |
+        The relationship starts today and grants exactly the listed actions. It gives the guardian
+        no club role and does not change either person's account. A guardian holds one relationship
+        to a dependant on any day, and two people cannot be each other's guardians at once. The
+        change is recorded in the audit log.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: personId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/GuardianRelationshipRequest" }
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/GuardianRelationship" }
+        "400":
+          description: |
+            The request is malformed, or the relationship is not usable
+            (`urn:courtside:error:invalid-guardian-relationship`): the person in the path takes no
+            part in it, a person would be their own guardian, no action is granted, the end lies
+            before today or on today so that it would hold no day, or the dependant already acts
+            for the guardian.
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: |
+            The guardian already holds a relationship to this dependant on a day the new one would
+            cover (`urn:courtside:error:guardian-relationship-overlap`).
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/admin/roster/{personId}/guardianships/{relationshipId}:
+    put:
+      tags: [admin-roster]
+      operationId: changeGuardianRelationship
+      summary: Change the granted actions and the end of a relationship.
+      description: |
+        The request writes both whole. Setting an end today or earlier stops the relationship from
+        that day; clearing it lets the relationship run until the board ends it. The change is
+        recorded in the audit log.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: personId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: relationshipId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/GuardianRelationshipChange" }
+      responses:
+        "200":
+          description: Changed.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/GuardianRelationship" }
+        "400":
+          description: |
+            The request is malformed, or the change is not usable
+            (`urn:courtside:error:invalid-guardian-relationship`): no action is granted, the end
+            lies before the start or on it, or reopening it would make two people each other's
+            guardians. Ending a relationship on its first day is what the end operation does.
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          description: |
+            No such person, or no such relationship of this person
+            (`urn:courtside:error:guardian-relationship-not-found`).
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "409":
+          description: |
+            The reopened relationship would overlap another of the same two people
+            (`urn:courtside:error:guardian-relationship-overlap`).
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+    delete:
+      tags: [admin-roster]
+      operationId: removeGuardianRelationship
+      summary: Remove a relationship recorded by mistake.
+      description: |
+        The relationship is deleted, not ended: use it for one that should never have existed. One
+        that did hold and has stopped is ended instead, so its record stays. The removal is
+        recorded in the audit log.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: personId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: relationshipId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "204":
+          description: Removed.
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          description: |
+            No such relationship of this person
+            (`urn:courtside:error:guardian-relationship-not-found`).
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/admin/roster/{personId}/guardianships/{relationshipId}/end:
+    post:
+      tags: [admin-roster]
+      operationId: endGuardianRelationship
+      summary: End a relationship today.
+      description: |
+        From today the guardian may take none of its actions. A relationship that has already ended
+        keeps its end. The change is recorded in the audit log.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: personId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: relationshipId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Ended.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/GuardianRelationship" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          description: |
+            No such relationship of this person
+            (`urn:courtside:error:guardian-relationship-not-found`).
           content:
             application/problem+json:
               schema: { $ref: "#/components/schemas/Problem" }

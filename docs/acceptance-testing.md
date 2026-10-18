@@ -110,6 +110,18 @@ created.
   period back in the same test and the postflight does so again from the ledger. A scheduled
   period in the preflight is what an interrupted run whose postflight also failed leaves; the
   preflight names it, and the board corrects its start on the person page.
+- The guardian journey needs nothing beyond the membership period journey, after which it books the
+  same court at the same hour, and no relationship between `memberA` and the first disposable
+  member. On desktop-chrome the admin lets `memberA` act for that member on the person page with
+  every action except account tasks. `memberA` books for the member through the booking dialog's
+  choice of whom to book for, with `memberB` as partner, and the journey expects the booking among
+  the member's own bookings and not among `memberA`'s. `memberA` reads the member's booking
+  confirmation, which stays unread for the member, and cancels the booking. A request for new
+  credentials is refused with `guardian-action-not-granted` naming the action, and once the admin
+  ends the relationship today the member's bookings answer `dependant-not-found`. The journey
+  removes the relationship in the same test and the postflight removes every relationship the
+  ledger holds. A relationship between the two that an earlier run left stops the journey; the
+  board removes it on the person page.
 - For the welcome, `welcomeAccounts`. The journey creates one account on desktop-chrome to read
   its welcome and deactivates it again. Courtside has no erasure path yet, so with `erasure` the
   postflight removes that account and its person in the database: over `ssh` it runs `psql` in the

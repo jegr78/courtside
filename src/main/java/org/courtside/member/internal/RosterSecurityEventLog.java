@@ -41,6 +41,10 @@ class RosterSecurityEventLog {
             case RosterEvent.MembershipPeriodAdded ignored -> null;
             case RosterEvent.MembershipPeriodCorrected ignored -> null;
             case RosterEvent.MembershipPeriodRemoved ignored -> null;
+            case RosterEvent.GuardianshipCreated ignored -> null;
+            case RosterEvent.GuardianshipChanged ignored -> null;
+            case RosterEvent.GuardianshipEnded ignored -> null;
+            case RosterEvent.GuardianshipRemoved ignored -> null;
         };
         if (action != null) {
             write(action.accountId(), actor, action.action());

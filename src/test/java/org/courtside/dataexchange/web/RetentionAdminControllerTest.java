@@ -6,6 +6,7 @@ import org.courtside.booking.testfixture.BookingTestFixture;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
+import org.courtside.member.GuardianGrant;
 import org.courtside.member.testfixture.MemberTestFixture;
 import org.courtside.notification.MessageKind;
 import org.courtside.notification.testfixture.NotificationTestFixture;
@@ -270,6 +271,50 @@ class RetentionAdminControllerTest extends AbstractIntegrationTest {
 
     @Test
     @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenABookingAGuardianMadeForADependant_whenTheRunApplies_thenTheOldOneForgetsTheGuardianToo()
+            throws Exception {
+        // given
+        UUID janePerson = roster.addPerson("Jane", "Doe", "jane.doe@example.org");
+        roster.giveAccount(janePerson, "jane.doe", Set.of(Role.MEMBER));
+        UUID jane = identity.accountIdOf(janePerson);
+        UUID old = bookings.createBookingWithGuest(courtId, MEMBER_BOOKING_CARD, TOMORROW_SIX_PM, admin, adminPerson,
+                Set.of(Role.MEMBER), null, "Mary Major");
+        actedBy(old, jane);
+        shiftBack(old, 500);
+        keep("BOOKINGS", 12);
+        String preview = mockMvc.perform(post("/api/admin/retention/previews").with(csrf()))
+                .andReturn().getResponse().getContentAsString();
+
+        // when
+        mockMvc.perform(post("/api/admin/retention/previews/{id}/run", previewId(preview)).with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.bookingsPseudonymised").value(1));
+
+        // then
+        assertThat(jdbc.sql("SELECT acted_by FROM booking WHERE id = :id").param("id", old)
+                .query(UUID.class).optional()).as("the guardian who acted is no longer named").isEmpty();
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAFormerMemberWhoActedAsGuardianOnAKeptBooking_whenPreviewed_thenTheyAreBlockedAsNamedInBookings()
+            throws Exception {
+        // given
+        UUID guardian = formerMember("Jane", "Doe", "jane.doe");
+        UUID kept = bookings.createBookingWithGuest(courtId, MEMBER_BOOKING_CARD, TOMORROW_SIX_PM, admin, adminPerson,
+                Set.of(Role.MEMBER), null, "Mary Major");
+        actedBy(kept, identity.accountIdOf(guardian));
+        keep("FORMER_MEMBERS", 24);
+
+        // when / then
+        mockMvc.perform(post("/api/admin/retention/previews").with(csrf()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.blocked[?(@.personId == '" + guardian + "')].reason")
+                        .value("NAMED_IN_BOOKINGS"));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
     void givenFormerMembers_whenPreviewed_thenTheRemovableAreCountedAndTheOthersBlockedWithTheirReason()
             throws Exception {
         // given
@@ -346,6 +391,30 @@ class RetentionAdminControllerTest extends AbstractIntegrationTest {
         assertThat(payload).as("the change log counts what the run did and names nobody it removed")
                 .contains("\"formerMembersRemoved\": 1").doesNotContain(gone.toString())
                 .doesNotContain(account.toString()).doesNotContain("Doe");
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAFormerMemberWhoActsForADependant_whenTheRunApplies_thenTheRelationshipLeavesWithThem()
+            throws Exception {
+        // given
+        UUID gone = formerMember("Jane", "Doe", "jane.doe");
+        UUID dependant = roster.addPerson("John", "Roe", "john.roe@example.org");
+        roster.giveAccount(dependant, "john.roe", Set.of(Role.MEMBER));
+        roster.linkGuardian(gone, dependant, Set.of(GuardianGrant.BOOK));
+        keep("FORMER_MEMBERS", 24);
+        String preview = mockMvc.perform(post("/api/admin/retention/previews").with(csrf()))
+                .andReturn().getResponse().getContentAsString();
+
+        // when
+        mockMvc.perform(post("/api/admin/retention/previews/{id}/run", previewId(preview)).with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.formerMembersRemoved").value(1));
+
+        // then
+        assertThat(identity.personExists(gone)).isFalse();
+        assertThat(roster.guardianshipCount(dependant)).as("the dependant keeps no relationship to nobody")
+                .isZero();
     }
 
     @Test
@@ -515,6 +584,11 @@ class RetentionAdminControllerTest extends AbstractIntegrationTest {
         mockMvc.perform(put("/api/admin/retention/policies/{category}", category).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON).content("{\"retainMonths\": " + months + "}"))
                 .andExpect(status().isOk());
+    }
+
+    private void actedBy(UUID bookingId, UUID guardianAccountId) {
+        jdbc.sql("UPDATE booking SET acted_by = :guardian WHERE id = :id")
+                .param("guardian", guardianAccountId).param("id", bookingId).update();
     }
 
     private void shiftBack(UUID bookingId, int days) {

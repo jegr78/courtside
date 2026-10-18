@@ -15,6 +15,7 @@ import { leaveWaitlist, MEMBERS, openWaitlistEntries } from "../lib/waitlist";
 import { readPeriods, restorePeriods } from "../lib/retention";
 import { comparablePeriods, periodSnapshots, retentionRestorations } from "../lib/core.mjs";
 import { readMembershipPeriods, restoreMembershipPeriods, type MembershipPeriod } from "../lib/membership";
+import { readGuardianships, removeGuardianships } from "../lib/guardianship";
 
 const ids = (day: unknown) => new Set((day as { bookingId?: string; id?: string }[]).map((a) => a.bookingId ?? a.id));
 
@@ -134,4 +135,17 @@ test("when the run ends, then every membership period this run changed is back t
   for (const { personId, periods: before } of snapshots) {
     expect(periods[personId], `${personId} holds the periods it had before the run`).toEqual(comparablePeriods(before));
   }
+});
+
+test("when the run ends, then no guardian relationship this run created is left", async () => {
+  // when
+  const admin = await apiAs("admin");
+  const ours = readLedger().filter((entry) => entry.kind === "guardianship");
+  const outcome = await removeGuardianships(admin);
+  const left = (await Promise.all([...new Set(ours.map((entry) => entry.personId!))].map((personId) => readGuardianships(admin, personId))))
+    .flat().map((relationship) => relationship.id).filter((id) => ours.some((entry) => entry.id === id));
+  writeFileSync(runPath("postflight-guardianships.json"), JSON.stringify({ outcome, left }, null, 2));
+  // then
+  expect(outcome.filter((removal) => removal.status >= 300 && removal.status !== 404), "every removal of this run's relationship is accepted").toEqual([]);
+  expect(left, "no relationship of this run is left").toEqual([]);
 });

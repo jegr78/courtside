@@ -73,7 +73,10 @@
         "listOwnMessageChannels",
         "chooseOwnMessageChannels",
         "listOwnNotifications",
-        "markOwnNotificationRead"
+        "markOwnNotificationRead",
+        "listDependants",
+        "listDependantNotifications",
+        "requestDependantCredentials"
       ],
       "backgroundEntryPoints": [
         "AgedSessionSweep#deleteSessionsPastTheirLifetime",
@@ -92,28 +95,35 @@
         "Password or security changes revoke earlier authority.",
         "Logout and session termination delete or invalidate sessions.",
         "Locale and message choices update account preferences.",
-        "An unauthenticated recovery request by username issues a one-time credential and ends the account's sessions; one by address issues nothing."
+        "An unauthenticated recovery request by username issues a one-time credential and ends the account's sessions; one by address issues nothing.",
+        "A guardian granted account tasks has new credentials issued to a dependant's account under the account's issuing limit."
       ],
       "alternatePaths": [
         "Initial credentials require a permanent password before ordinary use.",
         "The current session can be ended without a second proof while other sessions require recent authentication.",
-        "A shared address holds several accounts, so the address path reminds each of its own name rather than issuing a credential per account."
+        "A shared address holds several accounts, so the address path reminds each of its own name rather than issuing a credential per account.",
+        "A guardian granted it reads a dependant's notification centre without marking anything read."
       ],
       "failurePaths": [
         "Unknown, disabled and wrong-credential logins remain indistinguishable.",
         "Expired proof, CSRF failure, rate limits and invalid password policy refuse without partial account mutation.",
-        "Recovery answers 202 for a subject that exists and one that does not, and swallows the per-account issuing limit so no refusal distinguishes them; the caller's own window answers 429."
+        "Recovery answers 202 for a subject that exists and one that does not, and swallows the per-account issuing limit so no refusal distinguishes them; the caller's own window answers 429.",
+        "A guardian without the grant, without a running relationship or without recent proof is refused before any credential is issued."
       ],
       "productionPaths": [
         "src/main/java/org/courtside/identity/internal/AccountController.java",
         "src/main/java/org/courtside/identity/internal/AccountRecoveryController.java",
         "src/main/java/org/courtside/identity/internal/SecurityConfiguration.java",
-        "src/main/java/org/courtside/notification/web/MessageChoiceController.java"
+        "src/main/java/org/courtside/notification/web/MessageChoiceController.java",
+        "src/main/java/org/courtside/member/DependantService.java",
+        "src/main/java/org/courtside/notification/internal/OwnNotifications.java"
       ],
       "evidence": [
         "src/test/java/org/courtside/identity/LoginTest.java#givenFiveDifferentReasonsToRefuse_whenSigningIn_thenTheAnswersCannotBeToldApart",
         "src/test/java/org/courtside/identity/SignOutTest.java#givenASignedInAccount_whenItSignsOut_thenTheSessionIsGone",
-        "src/test/java/org/courtside/identity/AccountRecoveryTest.java#givenANameNobodyHolds_whenItIsAsked_thenTheAnswerCannotBeToldFromTheOne"
+        "src/test/java/org/courtside/identity/AccountRecoveryTest.java#givenANameNobodyHolds_whenItIsAsked_thenTheAnswerCannotBeToldFromTheOne",
+        "src/test/java/org/courtside/member/web/DependantControllerTest.java#givenAStaleSignIn_whenTheGuardianAsksForCredentials_thenAFreshProofIsRequiredAndNothingIsIssued",
+        "src/test/java/org/courtside/notification/web/DependantNotificationControllerTest.java#givenAGuardianGrantedToReadMessages_whenReadingTheDependantsCentre_thenItIsTheirsAndStaysUnread"
       ]
     },
     {
@@ -204,7 +214,10 @@
         "publishPartnerInvitation",
         "withdrawPartnerInvitation",
         "listOpenPlaces",
-        "acceptPartnerInvitation"
+        "acceptPartnerInvitation",
+        "listDependantBookings",
+        "createDependantBooking",
+        "cancelDependantBooking"
       ],
       "backgroundEntryPoints": [
         "BookingMailer#on(BookingConfirmed)",
@@ -232,7 +245,8 @@
         "Series creation, move and cancellation change all selected occurrences transactionally.",
         "Joining a waitlist stores one open entry per slot and account; a freed slot is offered to the first eligible entry in the transaction that freed it, and acceptance turns the reservation into a confirmed booking.",
         "A holder publishes or withdraws a partner invitation for an own booking; an eligible member who accepts it joins the booking as a participant under the booking row lock.",
-        "A booking or cancellation the rules refuse is counted with its rule codes, card and the holder's membership type, in a transaction of its own."
+        "A booking or cancellation the rules refuse is counted with its rule codes, card and the holder's membership type, in a transaction of its own.",
+        "A guardian granted it books or cancels in a dependant's name: the dependant's account holds the booking, the dependant's rules, roles and deadline decide, and the guardian is recorded as the one who acted."
       ],
       "alternatePaths": [
         "Booking-card roles and ADMIN authority select which appointments a caller may create or manage.",
@@ -246,7 +260,8 @@
         "Unauthorized access is concealed as absence where existence would disclose another person's booking.",
         "Concurrency and stale series state roll back rather than leave a partial calendar.",
         "A reserved court refuses every other account's booking, and another account's waitlist entry answers as absent.",
-        "Another account's booking answers as absent to publish and withdraw, and an invitation the caller may not take answers as absent to acceptance."
+        "Another account's booking answers as absent to publish and withdraw, and an invitation the caller may not take answers as absent to acceptance.",
+        "A guardian acting for nobody they hold a running relationship to is refused as for no dependant; an action the relationship does not grant, a disabled dependant account and a booking the dependant does not hold refuse without writing."
       ],
       "productionPaths": [
         "src/main/java/org/courtside/booking/BookingService.java",
@@ -260,7 +275,9 @@
         "src/main/java/org/courtside/booking/web/WaitlistController.java",
         "src/main/java/org/courtside/booking/partner/PartnerSearchService.java",
         "src/main/java/org/courtside/booking/partner/PartnerSearchSweep.java",
-        "src/main/java/org/courtside/booking/web/PartnerSearchController.java"
+        "src/main/java/org/courtside/booking/web/PartnerSearchController.java",
+        "src/main/java/org/courtside/booking/DependantBookings.java",
+        "src/main/java/org/courtside/member/GuardianDelegation.java"
       ],
       "evidence": [
         "src/test/java/org/courtside/booking/BookingServiceTest.java#givenAnExistingBooking_whenCreatingAnOverlappingOne_thenCourtUnavailableIsThrown",
@@ -268,7 +285,10 @@
         "src/test/java/org/courtside/booking/web/BookingValidationPreparationTest.java#givenFailedMvcBindingValidation_whenTheWebServerStarts_thenStartupFailsAndTheClassLoaderIsRestored",
         "src/test/java/org/courtside/booking/ParticipationServiceTest.java#givenAMemberNamedInSomebodyElsesBooking_whenTheyWithdraw_thenTheBookingKeepsEverythingElse",
         "src/test/java/org/courtside/shared/internal/StartupWarmUpIntegrationTest.java#givenAClubWithACourt_whenTheWarmUpRuns_thenEveryStepRunsAndNoTableChanges",
-        "src/test/java/org/courtside/booking/web/UsageReportControllerTest.java#givenABookingTheRulesRefuse_whenReportingThatDay_thenTheRefusalIsCountedByItsCodeAndType"
+        "src/test/java/org/courtside/booking/web/UsageReportControllerTest.java#givenABookingTheRulesRefuse_whenReportingThatDay_thenTheRefusalIsCountedByItsCodeAndType",
+        "src/test/java/org/courtside/booking/web/DependantBookingControllerTest.java#givenAnAdministratorGuardian_whenBookingForADependantBarredFromCourts_thenTheDependantsRulesRefuseIt",
+        "src/test/java/org/courtside/booking/web/DependantBookingControllerTest.java#givenADependantWhoManagesTrainings_whenTheGuardianCancelsSomebodyElsesTraining_thenTheRoleLendsNothing",
+        "src/test/java/org/courtside/booking/web/DependantBookingControllerTest.java#givenTheDependantUsedAKey_whenTheGuardianBooksWithTheSameKey_thenTheKeysNeverMeet"
       ]
     },
     {
@@ -434,7 +454,12 @@
         "listMembershipPeriods",
         "addMembershipPeriod",
         "correctMembershipPeriod",
-        "removeMembershipPeriod"
+        "removeMembershipPeriod",
+        "listGuardianRelationships",
+        "createGuardianRelationship",
+        "changeGuardianRelationship",
+        "endGuardianRelationship",
+        "removeGuardianRelationship"
       ],
       "backgroundEntryPoints": [
         "RosterSecurityEventLog#record(RosterEvent)"
@@ -442,6 +467,7 @@
       "stateTransitions": [
         "A person may gain or lose a current membership.",
         "A membership period may be added, corrected or removed, also one that begins or ends in the future.",
+        "A guardian relationship may be created, changed, ended or removed; it grants only the actions the board chose and no club role.",
         "An account may be created, corrected, enabled, disabled or assigned a new credential.",
         "Role and username changes revoke stale authority.",
         "Session termination removes one account's or every account's sessions."
@@ -453,16 +479,20 @@
       "failurePaths": [
         "The last enabled administrator cannot remove its own continuity.",
         "A membership period that would overlap another of the same person is refused.",
+        "A guardian relationship that would overlap another of the same two people, make two people each other's guardians, or link a person without an account is refused.",
         "Duplicate usernames, stale writes, invalid roles and missing recent proof refuse without partial security changes."
       ],
       "productionPaths": [
         "src/main/java/org/courtside/member/RosterService.java",
         "src/main/java/org/courtside/member/MembershipPeriodService.java",
+        "src/main/java/org/courtside/member/GuardianshipService.java",
         "src/main/java/org/courtside/identity/internal/AccountSessionService.java"
       ],
       "evidence": [
         "src/test/java/org/courtside/identity/SecurityDecisionEventTest.java#givenTheOnlyAdminWouldRemoveItsRole_whenContinuityRefusesIt_thenTheGuardIsRecorded",
-        "src/test/java/org/courtside/member/MembershipPeriodConcurrencyTest.java#givenTwoBoardMembersAddingOverlappingPeriodsAtOnce_whenBothAreInFlight_thenTheSecondWaitsAndIsRefused"
+        "src/test/java/org/courtside/member/MembershipPeriodConcurrencyTest.java#givenTwoBoardMembersAddingOverlappingPeriodsAtOnce_whenBothAreInFlight_thenTheSecondWaitsAndIsRefused",
+        "src/test/java/org/courtside/member/web/GuardianshipAdminControllerTest.java#givenARunningRelationship_whenTheSamePairIsLinkedAgain_thenTheOverlapIsRefused",
+        "src/test/java/org/courtside/member/web/GuardianshipAdminControllerTest.java#givenAStaleSignIn_whenTheBoardWritesARelationship_thenEveryWriteAsksForAFreshProof"
       ]
     },
     {

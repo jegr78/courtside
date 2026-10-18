@@ -14,7 +14,8 @@ export const removalPath = (entry) => entry.kind === "series"
     : entry.kind === "opening-period" ? `/api/admin/opening-periods/${entry.id}`
       : entry.kind === "court-closure" ? `/api/admin/court-closures/${entry.id}`
         : entry.kind === "template" ? `/api/admin/message-templates/${entry.id}`
-          : entry.kind === "import-source" ? `/api/admin/import/sources/${entry.id}` : `/api/bookings/${entry.id}`;
+          : entry.kind === "import-source" ? `/api/admin/import/sources/${entry.id}`
+            : entry.kind === "guardianship" ? `/api/admin/roster/${entry.personId}/guardianships/${entry.id}` : `/api/bookings/${entry.id}`;
 
 export const IMPORT_SOURCE_PREFIX = "acceptance-headerless-";
 
@@ -352,3 +353,12 @@ export function membershipPeriodProblems(periods, lastDay) {
   }
   return problems;
 }
+
+// Either direction counts: the instance refuses a pair that already runs the other way round.
+export const relationshipsBetween = (relationships, one, other) => relationships
+  .filter((relationship) => relationship.state === "RUNNING")
+  .filter(({ guardian, dependant }) => (guardian.personId === one && dependant.personId === other) || (guardian.personId === other && dependant.personId === one))
+  .map((relationship) => relationship.id);
+
+export const confirmationsOf = (items, startsAt) => items
+  .filter((item) => item.kind === "BOOKING_CONFIRMED" && item.booking && Date.parse(item.booking.startsAt) === startsAt.getTime());

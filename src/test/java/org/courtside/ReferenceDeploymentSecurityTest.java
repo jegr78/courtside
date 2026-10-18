@@ -388,7 +388,7 @@ public class ReferenceDeploymentSecurityTest {
                         "@unknownMethod {", "method QUERY", "path /api/*", "method @unknownMethod PATCH",
                         "import {$COURTSIDE_INGRESS_MODE:publicIngress}"),
                 "plaintext-site", List.of("@browserNavigation {", "host {$COURTSIDE_DOMAIN}", "method GET HEAD",
-                        "path / /courts /login /initial-password /account-recovery /my-bookings /my-messages /account/security /admin /admin/* /index.html /assets/* /font-licenses.txt /icon.svg /manifest.webmanifest /sw.js /workbox-*.js",
+                        "path / /courts /login /initial-password /account-recovery /my-bookings /my-messages /my-dependants /account/security /admin /admin/* /index.html /assets/* /font-licenses.txt /icon.svg /manifest.webmanifest /sw.js /workbox-*.js",
                         "handle @browserNavigation {", "header {", "Cache-Control \"no-store\"",
                         "Content-Security-Policy \"base-uri 'none'; frame-ancestors 'none'\"", "-Server", "-Via",
                         "redir https://{$COURTSIDE_DOMAIN}{uri} permanent", "handle {", "header {",

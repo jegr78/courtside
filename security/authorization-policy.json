@@ -2,9 +2,9 @@
   "schemaVersion": 1,
   "reviewedAt": "2026-10-16",
   "purpose": "This is the normative authorization policy for the shipped Courtside API. OpenAPI defines the transport shape; this policy defines who may perform each operation, which resource attributes narrow that permission, and which protected fields each projection may read or write.",
-  "openApiFieldInventorySha256": "23a043a6f83dcdc3fc8b84927efb230a9ec45e019b5dd2f631daa6cf7722c34f",
-  "protectedFieldInventorySha256": "e3a4e4f8c4bb24a799fca7b78ca1832d9afa76cb20a897a4f3b25432ec8a6136",
-  "productionAuthorizationSha256": "c3aa6c52c70cab65f93816b26a5aabb2d60b57c666dec8e87fcc1d701ddf518d",
+  "openApiFieldInventorySha256": "bd484404a04854d30da3c4f7c8d9ffa650a53b6d18c8b67de773b36272738199",
+  "protectedFieldInventorySha256": "986f4786b6d260347b8e21f3a8b68ca4a04580a75cd23738a6a0252da159ed5f",
+  "productionAuthorizationSha256": "b6653d608e2115947a8e9298b65684031cacf3735bae16dd098d54b38c7b647f",
   "ordinaryFields": [
     "Problem.detail",
     "Problem.fieldErrors",
@@ -90,6 +90,16 @@
     "cancelBooking:response:Violation.code",
     "cancelBooking:response:Violation.params",
     "cancelBooking:response:Violation.params.*",
+    "cancelDependantBooking:parameter:$parameter.path.bookingId",
+    "cancelDependantBooking:parameter:$parameter.path.personId",
+    "cancelDependantBooking:response:$response.header.Retry-After",
+    "cancelDependantBooking:response:FieldError.code",
+    "cancelDependantBooking:response:FieldError.field",
+    "cancelDependantBooking:response:FieldError.params",
+    "cancelDependantBooking:response:FieldError.params.*",
+    "cancelDependantBooking:response:Violation.code",
+    "cancelDependantBooking:response:Violation.params",
+    "cancelDependantBooking:response:Violation.params.*",
     "cancelSeries:parameter:$parameter.path.id",
     "cancelSeries:parameter:$parameter.query.fromBookingId",
     "cancelSeries:parameter:$parameter.query.reason",
@@ -249,6 +259,19 @@
     "changeCourtClosure:response:Violation.code",
     "changeCourtClosure:response:Violation.params",
     "changeCourtClosure:response:Violation.params.*",
+    "changeGuardianRelationship:parameter:$parameter.path.personId",
+    "changeGuardianRelationship:parameter:$parameter.path.relationshipId",
+    "changeGuardianRelationship:request:GuardianRelationshipChange.endedOn",
+    "changeGuardianRelationship:request:GuardianRelationshipChange.grants",
+    "changeGuardianRelationship:response:$response.header.Accept",
+    "changeGuardianRelationship:response:$response.header.Retry-After",
+    "changeGuardianRelationship:response:FieldError.code",
+    "changeGuardianRelationship:response:FieldError.field",
+    "changeGuardianRelationship:response:FieldError.params",
+    "changeGuardianRelationship:response:FieldError.params.*",
+    "changeGuardianRelationship:response:Violation.code",
+    "changeGuardianRelationship:response:Violation.params",
+    "changeGuardianRelationship:response:Violation.params.*",
     "changeImportSource:parameter:$parameter.path.id",
     "changeImportSource:request:ImportColumnPosition.field",
     "changeImportSource:request:ImportColumnPosition.position",
@@ -602,6 +625,37 @@
     "createCourtClosure:response:Violation.code",
     "createCourtClosure:response:Violation.params",
     "createCourtClosure:response:Violation.params.*",
+    "createDependantBooking:parameter:$parameter.header.Idempotency-Key",
+    "createDependantBooking:parameter:$parameter.path.personId",
+    "createDependantBooking:request:CreateBookingRequest.cardId",
+    "createDependantBooking:request:CreateBookingRequest.courtIds",
+    "createDependantBooking:request:CreateBookingRequest.endsAt",
+    "createDependantBooking:request:CreateBookingRequest.startsAt",
+    "createDependantBooking:response:$response.header.Accept",
+    "createDependantBooking:response:$response.header.Location",
+    "createDependantBooking:response:$response.header.Retry-After",
+    "createDependantBooking:response:BookingCreated.id",
+    "createDependantBooking:response:FieldError.code",
+    "createDependantBooking:response:FieldError.field",
+    "createDependantBooking:response:FieldError.params",
+    "createDependantBooking:response:FieldError.params.*",
+    "createDependantBooking:response:Violation.code",
+    "createDependantBooking:response:Violation.params",
+    "createDependantBooking:response:Violation.params.*",
+    "createGuardianRelationship:parameter:$parameter.path.personId",
+    "createGuardianRelationship:request:GuardianRelationshipRequest.dependantPersonId",
+    "createGuardianRelationship:request:GuardianRelationshipRequest.endedOn",
+    "createGuardianRelationship:request:GuardianRelationshipRequest.grants",
+    "createGuardianRelationship:request:GuardianRelationshipRequest.guardianPersonId",
+    "createGuardianRelationship:response:$response.header.Accept",
+    "createGuardianRelationship:response:$response.header.Retry-After",
+    "createGuardianRelationship:response:FieldError.code",
+    "createGuardianRelationship:response:FieldError.field",
+    "createGuardianRelationship:response:FieldError.params",
+    "createGuardianRelationship:response:FieldError.params.*",
+    "createGuardianRelationship:response:Violation.code",
+    "createGuardianRelationship:response:Violation.params",
+    "createGuardianRelationship:response:Violation.params.*",
     "createImportPreview:parameter:$parameter.path.sourceId",
     "createImportPreview:request:$request.encoding",
     "createImportPreview:request:$request.file",
@@ -848,6 +902,16 @@
     "endAllSessions:response:Violation.code",
     "endAllSessions:response:Violation.params",
     "endAllSessions:response:Violation.params.*",
+    "endGuardianRelationship:parameter:$parameter.path.personId",
+    "endGuardianRelationship:parameter:$parameter.path.relationshipId",
+    "endGuardianRelationship:response:$response.header.Retry-After",
+    "endGuardianRelationship:response:FieldError.code",
+    "endGuardianRelationship:response:FieldError.field",
+    "endGuardianRelationship:response:FieldError.params",
+    "endGuardianRelationship:response:FieldError.params.*",
+    "endGuardianRelationship:response:Violation.code",
+    "endGuardianRelationship:response:Violation.params",
+    "endGuardianRelationship:response:Violation.params.*",
     "endOwnSession:parameter:$parameter.path.sessionHandle",
     "endOwnSession:response:$response.header.Retry-After",
     "endOwnSession:response:FieldError.code",
@@ -1425,6 +1489,83 @@
     "listCourtsForAdmin:response:Violation.code",
     "listCourtsForAdmin:response:Violation.params",
     "listCourtsForAdmin:response:Violation.params.*",
+    "listDependantBookings:parameter:$parameter.path.personId",
+    "listDependantBookings:parameter:$parameter.query.cursor",
+    "listDependantBookings:parameter:$parameter.query.limit",
+    "listDependantBookings:parameter:$parameter.query.view",
+    "listDependantBookings:response:$response.header.Retry-After",
+    "listDependantBookings:response:CheckIn.checkedIn",
+    "listDependantBookings:response:CheckIn.closesAt",
+    "listDependantBookings:response:CheckIn.opensAt",
+    "listDependantBookings:response:FieldError.code",
+    "listDependantBookings:response:FieldError.field",
+    "listDependantBookings:response:FieldError.params",
+    "listDependantBookings:response:FieldError.params.*",
+    "listDependantBookings:response:PersonalBooking.cardColor",
+    "listDependantBookings:response:PersonalBooking.cardLabel",
+    "listDependantBookings:response:PersonalBooking.checkIn",
+    "listDependantBookings:response:PersonalBooking.courtIds",
+    "listDependantBookings:response:PersonalBooking.endsAt",
+    "listDependantBookings:response:PersonalBooking.partnerSearch",
+    "listDependantBookings:response:PersonalBooking.released",
+    "listDependantBookings:response:PersonalBooking.startsAt",
+    "listDependantBookings:response:PersonalBooking.status",
+    "listDependantBookings:response:PersonalBookingPage.clubName",
+    "listDependantBookings:response:PersonalBookingPage.courts",
+    "listDependantBookings:response:PersonalBookingPage.items",
+    "listDependantBookings:response:PersonalBookingPage.nextCursor",
+    "listDependantBookings:response:PersonalBookingPage.refreshedAt",
+    "listDependantBookings:response:PersonalBookingPage.timeZone",
+    "listDependantBookings:response:PublicCourt.id",
+    "listDependantBookings:response:PublicCourt.name",
+    "listDependantBookings:response:PublicCourt.number",
+    "listDependantBookings:response:Violation.code",
+    "listDependantBookings:response:Violation.params",
+    "listDependantBookings:response:Violation.params.*",
+    "listDependantNotifications:parameter:$parameter.path.personId",
+    "listDependantNotifications:parameter:$parameter.query.cursor",
+    "listDependantNotifications:parameter:$parameter.query.limit",
+    "listDependantNotifications:response:$response.header.Retry-After",
+    "listDependantNotifications:response:FieldError.code",
+    "listDependantNotifications:response:FieldError.field",
+    "listDependantNotifications:response:FieldError.params",
+    "listDependantNotifications:response:FieldError.params.*",
+    "listDependantNotifications:response:Notification.booking",
+    "listDependantNotifications:response:Notification.cancellationReason",
+    "listDependantNotifications:response:Notification.closure",
+    "listDependantNotifications:response:Notification.createdAt",
+    "listDependantNotifications:response:Notification.id",
+    "listDependantNotifications:response:Notification.kind",
+    "listDependantNotifications:response:Notification.link",
+    "listDependantNotifications:response:Notification.readAt",
+    "listDependantNotifications:response:Notification.waitlistOffer",
+    "listDependantNotifications:response:NotificationBooking.cancelled",
+    "listDependantNotifications:response:NotificationBooking.cardLabel",
+    "listDependantNotifications:response:NotificationBooking.courts",
+    "listDependantNotifications:response:NotificationBooking.endsAt",
+    "listDependantNotifications:response:NotificationBooking.startsAt",
+    "listDependantNotifications:response:NotificationCourt.name",
+    "listDependantNotifications:response:NotificationCourt.number",
+    "listDependantNotifications:response:NotificationLink.bookingId",
+    "listDependantNotifications:response:NotificationLink.target",
+    "listDependantNotifications:response:NotificationLink.waitlistEntryId",
+    "listDependantNotifications:response:NotificationPage.items",
+    "listDependantNotifications:response:NotificationPage.nextCursor",
+    "listDependantNotifications:response:NotificationPage.unread",
+    "listDependantNotifications:response:NotificationWaitlistOffer.expiresAt",
+    "listDependantNotifications:response:NotificationWaitlistOffer.open",
+    "listDependantNotifications:response:NotificationWaitlistOffer.slot",
+    "listDependantNotifications:response:Violation.code",
+    "listDependantNotifications:response:Violation.params",
+    "listDependantNotifications:response:Violation.params.*",
+    "listDependants:response:$response.header.Retry-After",
+    "listDependants:response:FieldError.code",
+    "listDependants:response:FieldError.field",
+    "listDependants:response:FieldError.params",
+    "listDependants:response:FieldError.params.*",
+    "listDependants:response:Violation.code",
+    "listDependants:response:Violation.params",
+    "listDependants:response:Violation.params.*",
     "listExternalReferences:parameter:$parameter.path.sourceId",
     "listExternalReferences:parameter:$parameter.query.cursor",
     "listExternalReferences:parameter:$parameter.query.limit",
@@ -1441,6 +1582,15 @@
     "listExternalReferences:response:Violation.code",
     "listExternalReferences:response:Violation.params",
     "listExternalReferences:response:Violation.params.*",
+    "listGuardianRelationships:parameter:$parameter.path.personId",
+    "listGuardianRelationships:response:$response.header.Retry-After",
+    "listGuardianRelationships:response:FieldError.code",
+    "listGuardianRelationships:response:FieldError.field",
+    "listGuardianRelationships:response:FieldError.params",
+    "listGuardianRelationships:response:FieldError.params.*",
+    "listGuardianRelationships:response:Violation.code",
+    "listGuardianRelationships:response:Violation.params",
+    "listGuardianRelationships:response:Violation.params.*",
     "listImportRuns:parameter:$parameter.path.sourceId",
     "listImportRuns:response:$response.header.Retry-After",
     "listImportRuns:response:FieldError.code",
@@ -2374,6 +2524,16 @@
     "removeCourtClosure:response:Violation.code",
     "removeCourtClosure:response:Violation.params",
     "removeCourtClosure:response:Violation.params.*",
+    "removeGuardianRelationship:parameter:$parameter.path.personId",
+    "removeGuardianRelationship:parameter:$parameter.path.relationshipId",
+    "removeGuardianRelationship:response:$response.header.Retry-After",
+    "removeGuardianRelationship:response:FieldError.code",
+    "removeGuardianRelationship:response:FieldError.field",
+    "removeGuardianRelationship:response:FieldError.params",
+    "removeGuardianRelationship:response:FieldError.params.*",
+    "removeGuardianRelationship:response:Violation.code",
+    "removeGuardianRelationship:response:Violation.params",
+    "removeGuardianRelationship:response:Violation.params.*",
     "removeMembership:parameter:$parameter.path.personId",
     "removeMembership:response:$response.header.Retry-After",
     "removeMembership:response:FieldError.code",
@@ -2448,6 +2608,15 @@
     "requestAccountCredentials:response:Violation.code",
     "requestAccountCredentials:response:Violation.params",
     "requestAccountCredentials:response:Violation.params.*",
+    "requestDependantCredentials:parameter:$parameter.path.personId",
+    "requestDependantCredentials:response:$response.header.Retry-After",
+    "requestDependantCredentials:response:FieldError.code",
+    "requestDependantCredentials:response:FieldError.field",
+    "requestDependantCredentials:response:FieldError.params",
+    "requestDependantCredentials:response:FieldError.params.*",
+    "requestDependantCredentials:response:Violation.code",
+    "requestDependantCredentials:response:Violation.params",
+    "requestDependantCredentials:response:Violation.params.*",
     "requestPasswordReset:response:$response.header.Accept",
     "requestPasswordReset:response:$response.header.Retry-After",
     "requestPasswordReset:response:FieldError.code",
@@ -2882,10 +3051,6 @@
       "description": "Whether the booking card must hide its identity from viewers other than the booking owner."
     },
     {
-      "id": "participant-card-active",
-      "description": "Whether a participant card remains active and may be offered for a new booking."
-    },
-    {
       "id": "booking-owner",
       "description": "Whether the current account created the selected booking."
     },
@@ -2914,12 +3079,20 @@
       "description": "Whether the latest full password proof is no older than five minutes."
     },
     {
+      "id": "guardian-relationship",
+      "description": "Whether a relationship holding on the club's today lets the authenticated account act for the named dependant, and which actions it grants."
+    },
+    {
       "id": "managing-role",
       "description": "Whether a current account role occurs in the booking card manager list."
     },
     {
       "id": "occurrence-scope",
       "description": "The whole-series, following-occurrences or single-occurrence scope requested."
+    },
+    {
+      "id": "participant-card-active",
+      "description": "Whether a participant card remains active and may be offered for a new booking."
     },
     {
       "id": "participant-person",
@@ -3354,6 +3527,51 @@
       ]
     },
     {
+      "id": "guardian-account-tasks",
+      "description": "A permanent account granted account tasks for a dependant has new credentials issued to the dependant's account after a recent full-password proof.",
+      "operationIds": [
+        "requestDependantCredentials"
+      ],
+      "actors": [
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN"
+      ],
+      "decisions": [
+        "permanent-account-gate",
+        "guardian-delegation",
+        "recent-authentication"
+      ]
+    },
+    {
+      "id": "guardian-acting-for-dependant",
+      "description": "A permanent account lists the dependants it acts for today, and for each one reads its bookings, books in its name, cancels the bookings it holds and reads its notification centre, each only where the relationship grants that action.",
+      "operationIds": [
+        "listDependants",
+        "listDependantBookings",
+        "createDependantBooking",
+        "cancelDependantBooking",
+        "listDependantNotifications"
+      ],
+      "actors": [
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN"
+      ],
+      "decisions": [
+        "permanent-account-gate",
+        "guardian-delegation"
+      ]
+    },
+    {
       "id": "own-waitlist",
       "description": "A permanent account joins, reads, leaves and accepts only its own waitlist entries; joining and accepting pass the booking-card and rule checks of a booking.",
       "operationIds": [
@@ -3548,7 +3766,8 @@
         "listMembershipPeriods",
         "addMembershipPeriod",
         "correctMembershipPeriod",
-        "removeMembershipPeriod"
+        "removeMembershipPeriod",
+        "listGuardianRelationships"
       ],
       "actors": [
         "ADMIN"
@@ -3575,12 +3794,16 @@
     },
     {
       "id": "recent-account-administration",
-      "description": "Creating or correcting account security and terminating one account's sessions requires ADMIN and a recent full-password proof.",
+      "description": "Creating or correcting account security, terminating one account's sessions and creating, changing, ending or removing a guardian relationship requires ADMIN and a recent full-password proof.",
       "operationIds": [
         "createAccount",
         "changeAccountUsername",
         "requestAccountCredentials",
-        "endAccountSessions"
+        "endAccountSessions",
+        "createGuardianRelationship",
+        "changeGuardianRelationship",
+        "endGuardianRelationship",
+        "removeGuardianRelationship"
       ],
       "actors": [
         "ADMIN"
@@ -3901,6 +4124,49 @@
       ]
     },
     {
+      "id": "guardian-delegation",
+      "title": "Guardian delegation",
+      "rule": "Every guardian action reads, at its point of use, the relationship between the authenticated account's person and the named dependant on the club's today. Without one holding, or while the guardian's account is disabled or the dependant holds no account, the dependant answers as not found; an action the relationship does not grant is refused by name. A booking is held by the dependant's account and measured against the dependant and the dependant's roles without the administrator override; cancellation reaches only a booking the dependant holds, in the dependant's name. Reading messages marks nothing read.",
+      "attributes": [
+        "current-account",
+        "guardian-relationship",
+        "booking-owner",
+        "account-enabled"
+      ],
+      "productionPaths": [
+        "src/main/java/org/courtside/member/GuardianDelegation.java#require",
+        "src/main/java/org/courtside/member/GuardianDelegation.java#requireBookable",
+        "src/main/java/org/courtside/member/GuardianDelegation.java#requireReadableAccount",
+        "src/main/java/org/courtside/member/GuardianRelationships.java#grantsFor",
+        "src/main/java/org/courtside/member/GuardianRelationships.java#runningFor",
+        "src/main/java/org/courtside/member/DependantService.java#dependantsOfCurrentAccount",
+        "src/main/java/org/courtside/member/DependantService.java#requestCredentials",
+        "src/main/java/org/courtside/booking/DependantBookings.java#bookingsOf",
+        "src/main/java/org/courtside/booking/DependantBookings.java#bookFor",
+        "src/main/java/org/courtside/booking/DependantBookings.java#cancelFor",
+        "src/main/java/org/courtside/notification/internal/OwnNotifications.java#dependantPage",
+        "src/main/java/org/courtside/member/GuardianDelegation.java#dependantRoles",
+        "src/main/java/org/courtside/shared/web/DomainFailureHandler.java#handleDomainFailure",
+        "src/main/java/org/courtside/member/internal/DependantNotFoundException.java#refusesAuthorization",
+        "src/main/java/org/courtside/member/internal/GuardianActionNotGrantedException.java#refusesAuthorization",
+        "src/main/java/org/courtside/booking/internal/DependantBookingNotHeldException.java#refusesAuthorization"
+      ],
+      "positiveTests": [
+        "src/test/java/org/courtside/booking/web/DependantBookingControllerTest.java#givenAGuardianGrantedToBook_whenBookingForTheDependant_thenTheDependantHoldsItAndTheGuardianActed",
+        "src/test/java/org/courtside/booking/web/DependantBookingControllerTest.java#givenAGuardianGrantedToCancel_whenCancellingTheDependantsBooking_thenItIsCancelledInTheDependantsName",
+        "src/test/java/org/courtside/notification/web/DependantNotificationControllerTest.java#givenAGuardianGrantedToReadMessages_whenReadingTheDependantsCentre_thenItIsTheirsAndStaysUnread",
+        "src/test/java/org/courtside/member/web/DependantControllerTest.java#givenAGuardianGrantedAccountTasks_whenAskingForTheDependantsCredentials_thenTheyAreIssuedOnTheGuardiansWord"
+      ],
+      "negativeTests": [
+        "src/test/java/org/courtside/booking/web/DependantBookingControllerTest.java#givenARelationshipThatDoesNotGrantBooking_whenTheGuardianBooks_thenTheActionIsRefusedByName",
+        "src/test/java/org/courtside/booking/web/DependantBookingControllerTest.java#givenNoRelationshipHoldingToday_whenSomebodyActsForThePerson_thenThePersonIsNoDependantOfTheirs",
+        "src/test/java/org/courtside/booking/web/DependantBookingControllerTest.java#givenAnAdministratorGuardian_whenBookingForADependantBarredFromCourts_thenTheDependantsRulesRefuseIt",
+        "src/test/java/org/courtside/booking/web/DependantBookingControllerTest.java#givenADependantWhoManagesTrainings_whenTheGuardianCancelsSomebodyElsesTraining_thenTheRoleLendsNothing",
+        "src/test/java/org/courtside/notification/web/DependantNotificationControllerTest.java#givenARelationshipThatDoesNotGrantReading_whenTheGuardianReads_thenTheActionIsRefusedByName",
+        "src/test/java/org/courtside/member/web/DependantControllerTest.java#givenARelationshipWithoutAccountTasks_whenTheGuardianAsksForCredentials_thenNothingIsIssued"
+      ]
+    },
+    {
       "id": "waitlist-ownership",
       "title": "Waitlist entry ownership",
       "rule": "The current account selects which waitlist entries are read, left and accepted; another account's entry answers as not found, no response names another waiting account or a position, and a reserved court refuses every other account's booking unless an admin books it or it is closed, which withdraws the offer.",
@@ -4048,7 +4314,7 @@
     {
       "id": "recent-authentication",
       "title": "Recent full-password proof",
-      "rule": "Sensitive account administration, another browser's session termination, import execution and changes to message wording require a successful full-password proof no older than five minutes.",
+      "rule": "Sensitive account administration, guardian relationships, a guardian's credential request for a dependant, another browser's session termination, import execution and changes to message wording require a successful full-password proof no older than five minutes.",
       "attributes": [
         "authenticated-at",
         "current-session",
@@ -4068,7 +4334,12 @@
         "src/main/java/org/courtside/dataexchange/web/ImportExecutionAdminController.java#executeImportPreview",
         "src/main/java/org/courtside/notification/web/MessageTemplateAdminController.java#changeMessageTemplate",
         "src/main/java/org/courtside/notification/web/MessageTemplateAdminController.java#resetMessageTemplate",
-        "src/main/java/org/courtside/dataexchange/web/RetentionAdminController.java#runRetention"
+        "src/main/java/org/courtside/dataexchange/web/RetentionAdminController.java#runRetention",
+        "src/main/java/org/courtside/member/web/RosterAdminController.java#createGuardianRelationship",
+        "src/main/java/org/courtside/member/web/RosterAdminController.java#changeGuardianRelationship",
+        "src/main/java/org/courtside/member/web/RosterAdminController.java#endGuardianRelationship",
+        "src/main/java/org/courtside/member/web/RosterAdminController.java#removeGuardianRelationship",
+        "src/main/java/org/courtside/member/DependantService.java#requestCredentials"
       ],
       "positiveTests": [
         "src/test/java/org/courtside/identity/AdminRecentAuthenticationTest.java#givenAnotherAccountsSessions_whenAdminProofIsRefreshed_thenOnlyTheTargetEnds",
@@ -4076,7 +4347,9 @@
       ],
       "negativeTests": [
         "src/test/java/org/courtside/identity/AdminRecentAuthenticationTest.java#givenNoRecentProof_whenAnAdminPerformsSensitiveChanges_thenEveryChangeIsRefused",
-        "src/test/java/org/courtside/dataexchange/web/RetentionAdminControllerTest.java#givenNoRecentProof_whenARunIsAsked_thenItIsRefusedAndThePreviewStillWaits"
+        "src/test/java/org/courtside/dataexchange/web/RetentionAdminControllerTest.java#givenNoRecentProof_whenARunIsAsked_thenItIsRefusedAndThePreviewStillWaits",
+        "src/test/java/org/courtside/member/web/GuardianshipAdminControllerTest.java#givenAStaleSignIn_whenTheBoardWritesARelationship_thenEveryWriteAsksForAFreshProof",
+        "src/test/java/org/courtside/member/web/DependantControllerTest.java#givenAStaleSignIn_whenTheGuardianAsksForCredentials_thenAFreshProofIsRequiredAndNothingIsIssued"
       ]
     },
     {
@@ -4512,7 +4785,8 @@
         "PersonalBooking.note"
       ],
       "operationIds": [
-        "listPersonalBookings"
+        "listPersonalBookings",
+        "listDependantBookings"
       ],
       "actors": [
         "MEMBER",
@@ -4528,7 +4802,40 @@
         "current-account"
       ],
       "decisions": [
-        "booking-ownership"
+        "booking-ownership",
+        "guardian-delegation"
+      ]
+    },
+    {
+      "id": "dependant-read",
+      "access": "read",
+      "description": "A guardian reads only the names, granted actions and end of the relationships that hold for them today, and no other personal data of a dependant.",
+      "fields": [
+        "Dependant.personId",
+        "Dependant.firstName",
+        "Dependant.lastName",
+        "Dependant.grants",
+        "Dependant.endedOn"
+      ],
+      "operationIds": [
+        "listDependants"
+      ],
+      "actors": [
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN"
+      ],
+      "attributes": [
+        "current-account",
+        "guardian-relationship"
+      ],
+      "decisions": [
+        "permanent-account-gate",
+        "guardian-delegation"
       ]
     },
     {
@@ -4778,6 +5085,37 @@
       ]
     },
     {
+      "id": "guardian-relationship-read",
+      "access": "read",
+      "description": "Who may act for whom, with both names, the granted actions and the dates, is confined to administrative roster responses.",
+      "fields": [
+        "GuardianRelationship.id",
+        "GuardianRelationship.guardian",
+        "GuardianRelationship.dependant",
+        "GuardianRelationship.grants",
+        "GuardianRelationship.startedOn",
+        "GuardianRelationship.endedOn",
+        "GuardianRelationship.state"
+      ],
+      "operationIds": [
+        "listGuardianRelationships",
+        "createGuardianRelationship",
+        "changeGuardianRelationship",
+        "endGuardianRelationship"
+      ],
+      "actors": [
+        "ADMIN"
+      ],
+      "attributes": [
+        "administrator",
+        "target-person"
+      ],
+      "decisions": [
+        "administrator-gate",
+        "administrative-projection"
+      ]
+    },
+    {
       "id": "administrative-config-read-write",
       "access": "read",
       "description": "Credential lifetimes and the no-membership rule assignment are visible only in the administrative configuration projection.",
@@ -4839,7 +5177,8 @@
         "CreateBookingRequest.participants"
       ],
       "operationIds": [
-        "createBooking"
+        "createBooking",
+        "createDependantBooking"
       ],
       "actors": [
         "MEMBER",
@@ -4858,7 +5197,8 @@
       ],
       "decisions": [
         "permanent-account-gate",
-        "booking-card-eligibility"
+        "booking-card-eligibility",
+        "guardian-delegation"
       ]
     },
     {
@@ -5001,7 +5341,9 @@
         "SubjectAccessExport.changesAsSubject",
         "SubjectAccessExport.changesAsActor",
         "SubjectAccessExport.waitlistEntries",
-        "SubjectAccessExport.waitlistsNamedIn"
+        "SubjectAccessExport.waitlistsNamedIn",
+        "SubjectAccessExport.guardianships",
+        "SubjectAccessExport.bookingsActedFor"
       ],
       "operationIds": [
         "exportPersonData"

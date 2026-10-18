@@ -16,10 +16,13 @@ import org.courtside.api.ApiSubjectAccessDeclinedChannel;
 import org.courtside.api.ApiSubjectAccessDeclinedMessage;
 import org.courtside.api.ApiSubjectAccessExport;
 import org.courtside.api.ApiSubjectAccessExternalReference;
+import org.courtside.api.ApiGuardianGrant;
+import org.courtside.api.ApiSubjectAccessGuardianship;
 import org.courtside.api.ApiSubjectAccessMembership;
 import org.courtside.api.ApiSubjectAccessMessage;
 import org.courtside.api.ApiNotificationClosure;
 import org.courtside.api.ApiSubjectAccessNotification;
+import org.courtside.api.ApiSubjectAccessActedForBooking;
 import org.courtside.api.ApiSubjectAccessParticipation;
 import org.courtside.api.ApiSubjectAccessNamedInWaitlist;
 import org.courtside.api.ApiSubjectAccessWaitlistEntry;
@@ -37,8 +40,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.DayOfWeek;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @RestController
 @RequiredArgsConstructor
@@ -56,7 +61,9 @@ class SubjectAccessAdminController implements AdminSubjectAccessApi {
                 answer.personId(), answer.firstName(), answer.lastName(),
                 answer.accounts().stream().map(SubjectAccessAdminController::toAccount).toList(),
                 answer.memberships().stream().map(SubjectAccessAdminController::toMembership).toList(),
+                answer.guardianships().stream().map(SubjectAccessAdminController::toGuardianship).toList(),
                 answer.bookingsMade().stream().map(SubjectAccessAdminController::toBooking).toList(),
+                answer.bookingsActedFor().stream().map(SubjectAccessAdminController::toActedFor).toList(),
                 answer.bookingsRecordedIn().stream()
                         .map(SubjectAccessAdminController::toParticipation).toList(),
                 answer.bookingSeries().stream().map(SubjectAccessAdminController::toSeries).toList(),
@@ -146,6 +153,17 @@ class SubjectAccessAdminController implements AdminSubjectAccessApi {
                 .lastLoginAt(WireTypes.toOffsetDateTime(account.lastLoginAt()));
     }
 
+    private static ApiSubjectAccessGuardianship toGuardianship(SubjectAccessRecord.Guardianship guardianship) {
+        return new ApiSubjectAccessGuardianship(guardianship.relationshipId(),
+                guardianship.guardian() ? ApiSubjectAccessGuardianship.RoleEnum.GUARDIAN
+                        : ApiSubjectAccessGuardianship.RoleEnum.DEPENDANT,
+                guardianship.otherPersonId(),
+                guardianship.grants().stream().sorted()
+                        .map(grant -> ApiGuardianGrant.fromValue(grant.name()))
+                        .collect(Collectors.toCollection(LinkedHashSet::new)),
+                guardianship.startedOn(), guardianship.endedOn());
+    }
+
     private static ApiSubjectAccessMembership toMembership(SubjectAccessRecord.Membership membership) {
         return new ApiSubjectAccessMembership(membership.membershipTypeId(), membership.membershipType())
                 .startedOn(membership.startedOn())
@@ -162,6 +180,13 @@ class SubjectAccessAdminController implements AdminSubjectAccessApi {
                         : ApiCancellationReason.fromValue(booking.cancellationReason().name()))
                 .note(booking.note())
                 .partnerSearchPublishedAt(WireTypes.toOffsetDateTime(booking.partnerSearchPublishedAt()));
+    }
+
+    private static ApiSubjectAccessActedForBooking toActedFor(PersonBookingHistory.ActedFor booking) {
+        return new ApiSubjectAccessActedForBooking(booking.bookingId(), booking.holderPersonId(),
+                WireTypes.toOffsetDateTime(booking.createdAt()),
+                ApiBookingStatus.fromValue(booking.status().name()),
+                toReservations(booking.reservations()));
     }
 
     private static ApiSubjectAccessParticipation toParticipation(PersonBookingHistory.Recorded booking) {

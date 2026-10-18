@@ -4,6 +4,7 @@ import org.courtside.AbstractIntegrationTest;
 import org.courtside.audit.testfixture.AuditTestFixture;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
+import org.courtside.member.GuardianGrant;
 import org.courtside.member.testfixture.MemberTestFixture;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -177,5 +178,26 @@ class RosterChangeAuditTest extends AbstractIntegrationTest {
                         "roster.membership.ended", "roster.account.availabilityChanged");
         assertThat(audit.latestPayload(personId, "roster.account.availabilityChanged"))
                 .containsEntry("enabled", false);
+    }
+
+    @Test
+    void givenABoardLinksAndEndsAGuardian_whenTheChangesAreCommitted_thenTheDependantsAuditLogHoldsBoth() {
+        // given
+        UUID guardian = roster.addPerson("Jane", "Doe", "jane.doe@example.org");
+        UUID dependant = roster.addPerson("John", "Roe", "john.roe@example.org");
+        roster.giveAccount(guardian, "jane.doe", Set.of(Role.MEMBER));
+        roster.giveAccount(dependant, "john.roe", Set.of(Role.MEMBER));
+
+        // when
+        UUID relationship = roster.linkGuardian(guardian, dependant, Set.of(GuardianGrant.BOOK));
+        roster.endGuardianship(dependant, relationship);
+
+        // then
+        assertThat(audit.latestPayload(dependant, "roster.guardianship.created"))
+                .containsEntry("relationshipId", relationship.toString())
+                .containsEntry("guardianPersonId", guardian.toString())
+                .containsEntry("grants", List.of("BOOK"));
+        assertThat(audit.latestPayload(dependant, "roster.guardianship.ended"))
+                .containsEntry("endedOn", "2026-05-12");
     }
 }

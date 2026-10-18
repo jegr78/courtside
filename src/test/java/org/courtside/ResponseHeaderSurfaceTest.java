@@ -65,6 +65,8 @@ class ResponseHeaderSurfaceTest extends AbstractIntegrationTest {
     private static final Map<String, String> REVIEWED_SOURCES = Map.of(
             "org/courtside/booking/web/BookingController.java Location",
             "an identifier this application generated",
+            "org/courtside/booking/web/DependantBookingController.java Location",
+            "a dependant the guardian was granted and an identifier this application generated",
             "org/courtside/booking/web/SeriesController.java Location",
             "an identifier this application generated",
             "org/courtside/booking/web/WaitlistController.java Location",

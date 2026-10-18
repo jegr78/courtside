@@ -25,6 +25,7 @@ import { InitialPasswordView } from "./views/InitialPasswordView";
 import { LoginView } from "./views/LoginView";
 import { MyBookingsPage } from "./views/MyBookingsPage";
 import { MyMessagesView } from "./views/MyMessagesView";
+import { DependantsView } from "./views/DependantsView";
 import { AccountSecurityView } from "./views/AccountSecurityView";
 import { warnAbout } from "./api/failureWarning";
 
@@ -76,6 +77,9 @@ export function AppRoutes({ session, refreshSession, passwordChanged, initialPas
       : signInFirst} />
     <Route path="/my-messages" element={session.authenticated
       ? <MyMessagesView />
+      : signInFirst} />
+    <Route path="/my-dependants" element={session.authenticated
+      ? <DependantsView />
       : signInFirst} />
     <Route path="/account/security" element={session.authenticated
       ? <AccountSecurityView passwordChanged={() => initialPasswordChanged?.()}

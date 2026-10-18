@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { allocationLabel } from "../booking/allocationLabel";
 import { shortLabels } from "../booking/shortLabels";
 import {
-  api, type Allocation, type BookingCardLegendEntry, type BookingEligibility, type BookingGrid, type PublicCourt,
+  api, type Allocation, type BookingCardLegendEntry, type BookingEligibility, type BookingGrid, type Dependant, type PublicCourt,
   type ReservedSlot
 } from "../api/client";
 import { warnAbout } from "../api/failureWarning";
@@ -99,6 +99,7 @@ export function WeekView({ today, clock = systemClock, canBook = true,
   const [loadAttempt, retryLoad] = useRetry();
   const [success, setSuccess] = useState<string>();
   const [eligibility, setEligibility] = useState<BookingEligibility>();
+  const [bookableDependants, setBookableDependants] = useState<Dependant[]>([]);
   const { message: eligibilityError, report: reportEligibility, clear: clearEligibility } = useReportedFailure();
   const [bookingSelection, setBookingSelection] = useState<BookingSelection>();
   const [waitlistSelection, setWaitlistSelection] = useState<{ selection: BookingSelection; period: WaitlistSelection }>();
@@ -110,6 +111,7 @@ export function WeekView({ today, clock = systemClock, canBook = true,
   const dayNavigationRef = useRef<HTMLElement>(null);
   const dayListRef = useRef<HTMLDivElement>(null);
   const eligibilityRequest = useRef(0);
+  const dependantsRequest = useRef(0);
   const shownDate = useRef<string>(undefined);
   const scrolledToNowOn = useRef<string>(undefined);
   const memberMoved = useRef(false);
@@ -150,6 +152,7 @@ export function WeekView({ today, clock = systemClock, canBook = true,
   useEffect(() => {
     if (!canBook || offline) {
       setEligibility(undefined);
+      setBookableDependants([]);
       clearEligibility();
       return;
     }
@@ -157,6 +160,14 @@ export function WeekView({ today, clock = systemClock, canBook = true,
     setEligibility(undefined);
     clearEligibility();
     const refresh = () => {
+      const dependantsAsked = ++dependantsRequest.current;
+      void api.dependants()
+        .then((dependants) => {
+          if (active && dependantsAsked === dependantsRequest.current) {
+            setBookableDependants(dependants.filter((dependant) => dependant.grants.includes("BOOK")));
+          }
+        })
+        .catch((failure: unknown) => warnAbout("Dependants unavailable", failure));
       const request = ++eligibilityRequest.current;
       void api.bookingEligibility().then((current) => {
         if (active && request === eligibilityRequest.current) {
@@ -180,9 +191,12 @@ export function WeekView({ today, clock = systemClock, canBook = true,
     };
   }, [canBook, clearEligibility, offline, reportEligibility]);
 
+  const selfBookable = eligibility?.violations.length === 0;
+  const bookingAllowed = canBook && (selfBookable || (eligibility !== undefined && bookableDependants.length > 0));
   useEffect(() => {
-    if (eligibilityError || eligibility?.violations.length) setBookingSelection(undefined);
-  }, [eligibility, eligibilityError]);
+    if (!bookingAllowed) setBookingSelection(undefined);
+  }, [bookingAllowed]);
+  const ownLimits = selfBookable ? eligibility : undefined;
 
   const grid = data?.grid;
   const loadedDays = data?.days;
@@ -275,14 +289,14 @@ export function WeekView({ today, clock = systemClock, canBook = true,
     for (let index = from; step > 0 ? index <= to : index >= to; index += step) {
       if (!isBookable(courtId, slots[index])) break;
       if (data && exceedsTheBound((span.length + 1) * data.grid.slotMinutes)) break;
-      if (data && eligibility?.bookingHours && leavesBookingHours(slots[index], data.grid.slotMinutes, eligibility.bookingHours)) break;
+      if (data && ownLimits?.bookingHours && leavesBookingHours(slots[index], data.grid.slotMinutes, ownLimits.bookingHours)) break;
       span.push(slots[index]);
     }
     return step > 0 ? span : span.reverse();
   }
 
   function exceedsTheBound(minutes: number): boolean {
-    const bound = eligibility?.maxBookingMinutes;
+    const bound = ownLimits?.maxBookingMinutes;
     return bound !== undefined && bound !== null && minutes > bound;
   }
 
@@ -313,7 +327,6 @@ export function WeekView({ today, clock = systemClock, canBook = true,
 
   const slotHeight = data ? Math.max(32, data.grid.slotMinutes * 4 / 3) : 40;
   const currentSlot = currentTime && (slots.find((slot) => slot >= currentTime) ?? slots.at(-1));
-  const bookingAllowed = canBook && eligibility?.violations.length === 0;
 
   function selectDate(value: string | undefined) {
     if (!value || !data) return;
@@ -575,10 +588,12 @@ export function WeekView({ today, clock = systemClock, canBook = true,
       courts={data.courts}
       allocations={data.allocations.get(bookingSelection.date) ?? []}
       canChooseSeveralCourts={canChooseSeveralCourts}
-      maxBookingMinutes={eligibility?.maxBookingMinutes ?? undefined}
-      minBookingMinutes={eligibility?.minBookingMinutes ?? undefined}
-      maxWeeklyBookedHours={eligibility?.maxWeeklyBookedHours ?? undefined}
-      bookingHours={eligibility?.bookingHours ?? undefined}
+      maxBookingMinutes={ownLimits?.maxBookingMinutes ?? undefined}
+      minBookingMinutes={ownLimits?.minBookingMinutes ?? undefined}
+      maxWeeklyBookedHours={ownLimits?.maxWeeklyBookedHours ?? undefined}
+      bookingHours={ownLimits?.bookingHours ?? undefined}
+      dependants={bookableDependants}
+      selfBookable={selfBookable}
       closed={() => setBookingSelection(undefined)}
       created={async () => {
         setBookingSelection(undefined);

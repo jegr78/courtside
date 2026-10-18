@@ -1201,3 +1201,39 @@ test("given the membership period journey, when its source is read, then it puts
   assert.match(source, /recordCreated\(\{ kind: "membership-period"/, "the periods are recorded before anything changes");
   assert.match(source, /finally \{[\s\S]*restoreMembershipPeriods\(admin\)/, "the periods are put back however the journey ends");
 });
+
+import { confirmationsOf, relationshipsBetween, removalPath } from "../acceptance/lib/core.mjs";
+
+test("given a guardian relationship in the ledger, when it is removed, then the path names the person it was recorded on", () => {
+  // when / then
+  assert.equal(removalPath({ kind: "guardianship", id: "rel-1", personId: "person-1" }), "/api/admin/roster/person-1/guardianships/rel-1");
+});
+
+test("given relationships of a person, when the pair is looked for, then a running one in either direction counts and an ended or foreign one does not", () => {
+  // given
+  const relationship = (id, guardian, dependant, state = "RUNNING") => ({ id, guardian: { personId: guardian }, dependant: { personId: dependant }, state });
+  const relationships = [relationship("a", "g", "d"), relationship("b", "d", "g"), relationship("c", "g", "d", "ENDED"), relationship("e", "g", "x")];
+  // when / then
+  assert.deepEqual(relationshipsBetween(relationships, "g", "d"), ["a", "b"]);
+});
+
+test("given notifications, when the confirmation of a slot is looked for, then only a confirmation of that start counts", () => {
+  // given
+  const startsAt = new Date(Date.UTC(2030, 2, 11, 8));
+  const items = [
+    { id: "1", kind: "BOOKING_CONFIRMED", booking: { startsAt: startsAt.toISOString() } },
+    { id: "2", kind: "BOOKING_CANCELLED", booking: { startsAt: startsAt.toISOString() } },
+    { id: "3", kind: "BOOKING_CONFIRMED", booking: { startsAt: new Date(startsAt.getTime() + 3_600_000).toISOString() } },
+    { id: "4", kind: "BOOKING_CONFIRMED" }
+  ];
+  // when / then
+  assert.deepEqual(confirmationsOf(items, startsAt).map((item) => item.id), ["1"]);
+});
+
+test("given the guardian journey, when its source is read, then it records the relationship and removes it in a finally block", () => {
+  // given
+  const source = readFileSync(new URL("../acceptance/journeys/59-guardian.spec.ts", import.meta.url), "utf8");
+  // then
+  assert.match(source, /recordCreated\(\{ kind: "guardianship"/, "the relationship is recorded as soon as it exists");
+  assert.match(source, /finally \{[\s\S]*removeGuardianships\(admin\)/, "the relationship is removed however the journey ends");
+});

@@ -77,6 +77,29 @@ public class BookingHistoryService implements PersonBookingHistory {
                 .toList();
     }
 
+    @Override
+    public List<ActedFor> actedForOthersBy(UUID accountId) {
+        requireIdentifier(accountId, "account");
+        List<Booking> acted = bookings.findByActedByOrderByCreatedAtAscIdAsc(accountId);
+        Map<UUID, UUID> holders = personsOf(acted.stream().map(Booking::getBookedBy).distinct().toList());
+        return acted.stream()
+                .map(booking -> new ActedFor(booking.getId(), holders.get(booking.getBookedBy()),
+                        booking.getCreatedAt(), booking.getStatus(), reservationsOf(booking)))
+                .toList();
+    }
+
+    private Map<UUID, UUID> personsOf(List<UUID> accountIds) {
+        if (accountIds.isEmpty()) {
+            return Map.of();
+        }
+        return jdbc.sql("SELECT id, person_id FROM user_account WHERE id IN (:ids)")
+                .param("ids", accountIds)
+                .query((row, number) -> Map.entry(row.getObject("id", UUID.class),
+                        row.getObject("person_id", UUID.class)))
+                .list().stream()
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+    }
+
     private Map<UUID, Instant> partnerSearchPublications(List<UUID> bookingIds) {
         if (bookingIds.isEmpty()) {
             return Map.of();

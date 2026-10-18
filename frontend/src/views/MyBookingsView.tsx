@@ -272,9 +272,9 @@ function ParticipationSection({ participations, courtNames, locale, timeZone, wi
 
 type Translate = ReturnType<typeof useTranslation>["t"];
 
-function BookingSection({ testId, title, titleHidden = false, empty, bookings, courtNames, locale, timeZone, actionable = false, action, searchPartner, checkIn, reference, t }: {
+export function BookingSection({ testId, title, titleHidden = false, empty, bookings, courtNames, locale, timeZone, actionable = false, movable = true, action, searchPartner, checkIn, reference, t }: {
   testId: string; title?: string; titleHidden?: boolean; empty: string; bookings: PersonalBooking[]; courtNames: Map<string, string>;
-  locale: string; timeZone: string; actionable?: boolean; action: (value: { kind: "cancel" | "move"; booking: PersonalBooking }) => void;
+  locale: string; timeZone: string; actionable?: boolean; movable?: boolean; action: (value: { kind: "cancel" | "move"; booking: PersonalBooking }) => void;
   searchPartner?: (booking: PersonalBooking, publish: boolean) => Promise<void>; checkIn?: (booking: PersonalBooking) => Promise<void>;
   reference?: Date; t: Translate;
 }) {
@@ -303,7 +303,7 @@ function BookingSection({ testId, title, titleHidden = false, empty, bookings, c
               {checkIn && reference && booking.checkIn && !booking.checkIn.checkedIn && checkInOpen(booking.checkIn, reference)
                 && <Button variant="primary" aria-label={bookingActionName("myBookings.checkInAccessible", booking, courtNames, locale, timeZone, t)} data-testid="check-in" data-booking-id={booking.id} className="px-3 py-2" onClick={() => void checkIn(booking)}>{t("myBookings.checkIn")}</Button>}
               <Button variant="destructive" aria-label={bookingActionName("myBookings.cancelAccessible", booking, courtNames, locale, timeZone, t)} data-testid="personal-cancel" data-booking-id={booking.id} className="px-3 py-2" onClick={() => action({ kind: "cancel", booking })}>{t("myBookings.cancel")}</Button>
-              {booking.seriesId && <Button variant="secondary" aria-label={bookingActionName("myBookings.moveAccessible", booking, courtNames, locale, timeZone, t)} data-testid="move-booking" data-booking-id={booking.id} className="px-3 py-2" onClick={() => action({ kind: "move", booking })}>{t("myBookings.move")}</Button>}
+              {movable && booking.seriesId && <Button variant="secondary" aria-label={bookingActionName("myBookings.moveAccessible", booking, courtNames, locale, timeZone, t)} data-testid="move-booking" data-booking-id={booking.id} className="px-3 py-2" onClick={() => action({ kind: "move", booking })}>{t("myBookings.move")}</Button>}
               {searchPartner && booking.partnerSearch && <Button variant="secondary"
                 aria-label={bookingActionName(booking.partnerSearch === "AVAILABLE" ? "myBookings.searchPartnerAccessible" : "myBookings.stopPartnerSearchAccessible", booking, courtNames, locale, timeZone, t)}
                 data-testid={booking.partnerSearch === "AVAILABLE" ? "publish-open-place" : "withdraw-open-place"} data-booking-id={booking.id}

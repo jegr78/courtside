@@ -11,6 +11,7 @@ import org.courtside.dataexchange.SnapshotUpload;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
+import org.courtside.member.GuardianGrant;
 import org.courtside.member.testfixture.MemberTestFixture;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.shared.TimeSlot;
@@ -141,6 +142,9 @@ class SafeMethodStateInvarianceTest extends AbstractIntegrationTest {
             entry("/api/bookings", read("date=" + TODAY)),
             entry("/api/booking-eligibility", read()),
             entry("/api/my/bookings", read()),
+            entry("/api/my/dependants", read()),
+            entry("/api/my/dependants/{personId}/bookings", read("dependantPersonId", "")),
+            entry("/api/my/dependants/{personId}/notifications", read("dependantPersonId", "")),
             entry("/api/my/participations", read()),
             entry("/api/my/waitlist", read()),
             entry("/api/partner-invitations", read()),
@@ -157,6 +161,7 @@ class SafeMethodStateInvarianceTest extends AbstractIntegrationTest {
             entry("/api/admin/membership-types/{id}", read("membershipTypeId", "")),
             entry("/api/admin/roster/{personId}", read("personId", "")),
             entry("/api/admin/roster/{personId}/membership-periods", read("personId", "")),
+            entry("/api/admin/roster/{personId}/guardianships", read("personId", "")),
             entry("/api/admin/roster/{personId}/no-shows", read("personId", "")),
             entry("/api/admin/import/encodings", read()),
             entry("/api/admin/import/sources", read()),
@@ -276,6 +281,7 @@ class SafeMethodStateInvarianceTest extends AbstractIntegrationTest {
 
         identifiers.put("courtId", courtId.toString());
         identifiers.put("personId", personId.toString());
+        identifiers.put("dependantPersonId", aDependantOf(personId).toString());
         identifiers.put("bookingId", bookingId.toString());
         identifiers.put("bookingCardId", bookingCardId);
         identifiers.put("participantCardId", seededId("SELECT id FROM participant_card ORDER BY label"));
@@ -284,6 +290,13 @@ class SafeMethodStateInvarianceTest extends AbstractIntegrationTest {
         identifiers.put("importSourceId", sourceId.toString());
         identifiers.put("importPreviewId", reviewedPreviewId.toString());
         identifiers.put("weekday", BOOKED_FROM.atZone(ZoneOffset.UTC).getDayOfWeek().name());
+    }
+
+    private UUID aDependantOf(UUID guardianPersonId) {
+        UUID dependant = identity.createPerson("Mary", "Major", "mary.major@example.org");
+        identity.createEnabledAccount(dependant, "major.mary", Set.of(Role.MEMBER));
+        members.linkGuardian(guardianPersonId, dependant, Set.of(GuardianGrant.values()));
+        return dependant;
     }
 
     private int sessionsOfAnotherPrincipal() {

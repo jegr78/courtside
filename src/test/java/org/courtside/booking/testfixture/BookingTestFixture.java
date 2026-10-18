@@ -54,6 +54,13 @@ public class BookingTestFixture {
                 Set.of(Role.MEMBER), null, List.of(ParticipantSpec.card(ParticipantCard.LOOKING_FOR_A_PARTNER)), null));
     }
 
+    public UUID createBookingForDependant(UUID courtId, UUID cardId, TimeSlot slot, UUID dependantAccountId,
+                                          UUID dependantPersonId, UUID guardianAccountId) {
+        return bookingService.create(new CreateBookingCommand(List.of(courtId), cardId, slot, dependantAccountId,
+                dependantPersonId, Set.of(Role.MEMBER), null,
+                List.of(ParticipantSpec.card(ParticipantCard.LOOKING_FOR_A_PARTNER)), null, guardianAccountId));
+    }
+
     public UUID publishOpenPlace(UUID bookingId, UUID holderAccountId) {
         return partnerSearch.publish(bookingId, holderAccountId);
     }

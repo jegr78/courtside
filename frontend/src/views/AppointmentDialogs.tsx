@@ -25,15 +25,17 @@ function ScopeFields({ scope, changed, t }: { scope: CancelScope; changed: (scop
   </fieldset>;
 }
 
-export function CancelDialog({ booking, seriesBookings, hasMoreBookings, timeZone, closed, completed }: { booking: Appointment; seriesBookings: Appointment[]; hasMoreBookings: boolean; timeZone: string; closed: () => void; completed: () => Promise<void> }) {
+export function CancelDialog({ booking, seriesBookings, hasMoreBookings, timeZone, closed, completed, cancelOne }: { booking: Appointment; seriesBookings: Appointment[]; hasMoreBookings: boolean; timeZone: string; closed: () => void; completed: () => Promise<void>; cancelOne?: () => Promise<void> }) {
   const { t, i18n } = useTranslation();
   const [scope, setScope] = useState<CancelScope>("THIS");
   const [reason, setReason] = useState<CancellationReason>();
   const { message: error, report } = useReportedFailure();
-  const foreign = "ownBooking" in booking && !booking.ownBooking;
+  const foreign = !cancelOne && "ownBooking" in booking && !booking.ownBooking;
+  const series = !cancelOne && booking.seriesId;
   async function submit() {
     try {
-      if (booking.seriesId) await api.cancelSeries(booking.seriesId, booking.id, scope, reason);
+      if (cancelOne) await cancelOne();
+      else if (booking.seriesId) await api.cancelSeries(booking.seriesId, booking.id, scope, reason);
       else await api.cancelBooking(booking.id, reason);
       await completed();
     } catch (failure) { report(failure); }
@@ -44,7 +46,7 @@ export function CancelDialog({ booking, seriesBookings, hasMoreBookings, timeZon
   return <Modal labelledBy="cancel-personal-title" closed={closed} width="lg" composed>
     <DialogBody><div className="grid gap-4">
     <h2 id="cancel-personal-title" className="text-xl font-bold">{t("booking.cancelTitle")}</h2>
-    {booking.seriesId && <ScopeFields scope={scope} changed={setScope} t={t} />}
+    {series && <ScopeFields scope={scope} changed={setScope} t={t} />}
     <p className="font-semibold">{t("myBookings.affected", { count: affected.length })}</p>
     <ul className="list-disc pl-5">{affected.map((candidate) => <li key={candidate.id}>{formatBookingPeriod(candidate.startsAt, candidate.endsAt, i18n.language, timeZone)}</li>)}</ul>
     {hasMoreBookings && scope !== "THIS" && <p data-testid="incomplete-series-warning">{t("myBookings.affectedIncomplete")}</p>}

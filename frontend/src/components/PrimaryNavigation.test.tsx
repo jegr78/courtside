@@ -1,7 +1,7 @@
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { render, screen, waitFor } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
-import { type SessionStatus } from "../api/client";
+import { api, type Dependant, type SessionStatus } from "../api/client";
 import { PrimaryNavigation } from "./PrimaryNavigation";
 
 const anonymous: SessionStatus = { authenticated: false, roles: [], passwordChangeRequired: false };
@@ -145,5 +145,58 @@ describe("PrimaryNavigation", () => {
     show(anonymous, "/login");
     expect(screen.getByTestId("court-plan-link")).toBeInTheDocument();
     expect(screen.queryByTestId("sign-in-link")).not.toBeInTheDocument();
+  });
+  describe("dependants", () => {
+    const john: Dependant = { personId: "person-2", firstName: "John", lastName: "Roe", grants: ["VIEW_BOOKINGS"], endedOn: null };
+
+    it("given a member who acts for nobody, when rendered, then no dependants destination is offered", async () => {
+      // given
+      const read = vi.spyOn(api, "dependants").mockResolvedValue([]);
+
+      // when
+      show(member);
+
+      // then
+      await waitFor(() => expect(read).toHaveBeenCalled());
+      expect(screen.queryByTestId("my-dependants-link")).not.toBeInTheDocument();
+    });
+
+    it("given a member who acts for somebody, when rendered, then the dependants are a destination of their own", async () => {
+      // given
+      vi.spyOn(api, "dependants").mockResolvedValue([john]);
+
+      // when
+      show(member);
+
+      // then
+      const link = await screen.findByTestId("my-dependants-link");
+      expect(link).toHaveAttribute("href", "/my-dependants");
+      expect(link).toHaveAccessibleName("nav.myDependants");
+      expect(screen.getByTestId("my-dependants-compact-label")).toHaveTextContent("nav.myDependantsCompact");
+    });
+
+    it("given an anonymous visitor, when rendered, then nobody is asked about dependants", () => {
+      // given
+      const read = vi.spyOn(api, "dependants").mockResolvedValue([john]);
+
+      // when
+      show(anonymous);
+
+      // then
+      expect(read).not.toHaveBeenCalled();
+    });
+
+    it("given an administrator who acts for somebody, when rendered on a phone, then the bar still holds at most four destinations", async () => {
+      // given
+      const read = vi.spyOn(api, "dependants").mockResolvedValue([john]);
+
+      // when
+      show(administrator);
+
+      // then
+      await waitFor(() => expect(read).toHaveBeenCalled());
+      expect(screen.getByTestId("primary-navigation-bar").querySelectorAll("a").length).toBeLessThanOrEqual(4);
+      expect(screen.getByTestId("administration-link")).toBeInTheDocument();
+    });
   });
 });

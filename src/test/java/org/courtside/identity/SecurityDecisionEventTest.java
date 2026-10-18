@@ -4,11 +4,14 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import org.courtside.AbstractIntegrationTest;
+import org.courtside.member.GuardianGrant;
+import org.courtside.member.testfixture.MemberTestFixture;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -17,6 +20,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -31,6 +35,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+@Import(MemberTestFixture.class)
 class SecurityDecisionEventTest extends AbstractIntegrationTest {
 
     private static final String USERNAME = "doe.jane";
@@ -44,15 +49,19 @@ class SecurityDecisionEventTest extends AbstractIntegrationTest {
     private UserAccountRepository accounts;
     @Autowired
     private PasswordEncoder passwordEncoder;
+    @Autowired
+    private MemberTestFixture members;
 
     private final ListAppender<ILoggingEvent> recorded = new ListAppender<>();
     private MockMvc mockMvc;
     private UUID accountId;
+    private UUID personId;
 
     @BeforeEach
     void setUp() throws Exception {
         mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
         Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
+        personId = jane.getId();
         accountId = accounts.save(enabled(new UserAccount(
                 jane, USERNAME, passwordEncoder.encode(PASSWORD), Set.of(Role.MEMBER), "de"))).getId();
         recorded.start();
@@ -77,6 +86,41 @@ class SecurityDecisionEventTest extends AbstractIntegrationTest {
                 "event.outcome", "failure",
                 "account.id", accountId.toString()));
         assertRequestCorrelation("courtside.authorization.denied");
+    }
+
+    @Test
+    void givenAMemberWhoActsForNobody_whenAGuardianRequestIsRefused_thenAuthorizationIsRecordedOnce() throws Exception {
+        MockHttpSession session = signIn();
+
+        mockMvc.perform(get("/api/my/dependants/{personId}/bookings", UUID.randomUUID()).session(session))
+                .andExpect(status().isNotFound());
+
+        assertSingleDenial();
+    }
+
+    @Test
+    void givenAGuardianWithoutTheGrant_whenAGuardianRequestIsRefused_thenAuthorizationIsRecordedOnce() throws Exception {
+        UUID john = dependantWithAccount("John", "Roe", Set.of(Role.MEMBER));
+        members.linkGuardian(personId, john, Set.of(GuardianGrant.BOOK));
+        MockHttpSession session = signIn();
+
+        mockMvc.perform(get("/api/my/dependants/{personId}/bookings", john).session(session))
+                .andExpect(status().isForbidden());
+
+        assertSingleDenial();
+    }
+
+    @Test
+    void givenAnAdministratorDependant_whenAGuardianAsksForCredentials_thenAuthorizationIsRecordedOnce()
+            throws Exception {
+        UUID richard = dependantWithAccount("Richard", "Miles", Set.of(Role.MEMBER, Role.ADMIN));
+        members.linkGuardian(personId, richard, Set.of(GuardianGrant.ACCOUNT_TASKS));
+        MockHttpSession session = signIn();
+
+        mockMvc.perform(post("/api/my/dependants/{personId}/credentials", richard).session(session).with(csrf()))
+                .andExpect(status().isForbidden());
+
+        assertSingleDenial();
     }
 
     @Test
@@ -278,6 +322,25 @@ class SecurityDecisionEventTest extends AbstractIntegrationTest {
                 .andReturn().getRequest().getSession(false);
         recorded.list.clear();
         return session;
+    }
+
+    private UUID dependantWithAccount(String firstName, String lastName, Set<Role> roles) {
+        String username = (lastName + "." + firstName).toLowerCase();
+        UUID dependant = members.addPerson(firstName, lastName, username + "@example.org");
+        members.giveAccount(dependant, username, roles);
+        return dependant;
+    }
+
+    private void assertSingleDenial() {
+        List<Map<String, Object>> denials = recorded.list.stream()
+                .map(SecurityDecisionEventTest::fields)
+                .filter(fields -> "courtside.authorization.denied".equals(fields.get("event.code")))
+                .toList();
+        assertThat(denials).as("one refusal is recorded once").containsExactly(Map.of(
+                "event.code", "courtside.authorization.denied",
+                "event.outcome", "failure",
+                "account.id", accountId.toString()));
+        assertRequestCorrelation("courtside.authorization.denied");
     }
 
     private Map<String, Object> fieldsOf(String code) {

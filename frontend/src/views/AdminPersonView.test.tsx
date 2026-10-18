@@ -2,7 +2,7 @@ import { act, cleanup, render, screen, waitFor, within } from "@testing-library/
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createMemoryRouter, MemoryRouter, Route, RouterProvider, Routes } from "react-router-dom";
-import { api, ApiError, type ClubConfig, type MembershipType, type MessageEntry, type RosterEntry } from "../api/client";
+import { api, ApiError, type ClubConfig, type GuardianRelationship, type MembershipType, type MessageEntry, type RosterEntry } from "../api/client";
 import i18n from "../i18n";
 import { downloadJson } from "../downloads/downloadJson";
 import { UnsavedCount } from "../test/UnsavedCount";
@@ -216,6 +216,44 @@ describe("AdminPersonView", () => {
     expect(person, "the step that already succeeded is not repeated").toHaveBeenCalledOnce();
     expect(await screen.findByTestId("admin-save-success")).toBeInTheDocument();
     await waitFor(() => expect(screen.getByTestId("unsaved-count")).toHaveTextContent("0"));
+  });
+
+  it("given a guardianship write that needs a fresh sign-in, when the administrator proves it, then the write is sent again and the section shows it", async () => {
+    // given
+    const relationship: GuardianRelationship = {
+      id: "relationship-1", guardian: { personId: "person-2", firstName: "Mary", lastName: "Major" },
+      dependant: { personId: "person-1", firstName: "Jane", lastName: "Doe" }, grants: ["BOOK"],
+      startedOn: "2026-10-01", endedOn: null, state: "RUNNING"
+    };
+    vi.spyOn(api, "guardianRelationships").mockResolvedValue([relationship]);
+    const end = vi.spyOn(api, "endGuardianRelationship")
+      .mockRejectedValueOnce(new ApiError(403, {
+        type: "urn:courtside:error:recent-authentication-required",
+        title: "Recent authentication required", status: 403
+      }))
+      .mockResolvedValue({ ...relationship, state: "ENDED" });
+    vi.spyOn(api, "reauthenticate").mockResolvedValue(undefined);
+    showPerson();
+    await userEvent.click(await screen.findByTestId("end-guardianship-relationship-1"));
+    await userEvent.click(screen.getByTestId("confirm-end-guardianship"));
+
+    // when
+    const submit = await screen.findByTestId("admin-reauthentication-submit");
+    await userEvent.type(input("admin-reauthentication-password"), "admin-password");
+    await userEvent.click(submit);
+
+    // then
+    await waitFor(() => expect(end).toHaveBeenCalledTimes(2));
+    expect(await screen.findByTestId("guardianship-success")).toHaveTextContent("The guardianship was ended.");
+  });
+
+  it("given a person without an account, when the page is shown, then no guardianship can be recorded for them", async () => {
+    // when
+    showPerson(withoutAccount);
+
+    // then
+    await screen.findByTestId("new-account-username");
+    expect(screen.queryByTestId("person-guardianships")).toBeNull();
   });
 
   it("given only a role is ticked on the account form, when it is read, then it holds work", async () => {
@@ -447,6 +485,7 @@ describe("AdminPersonView", () => {
     await i18n.changeLanguage("en");
     vi.spyOn(api, "membershipTypes").mockResolvedValue([adults, juniors]);
     vi.spyOn(api, "membershipPeriods").mockResolvedValue([]);
+    vi.spyOn(api, "guardianRelationships").mockResolvedValue([]);
     vi.spyOn(api, "messages").mockResolvedValue({ entries: [], nextCursor: null });
   });
 

@@ -40,7 +40,7 @@ class NotificationController implements AccountNotificationsApi {
         return ResponseEntity.noContent().build();
     }
 
-    private static ApiNotification toResponse(OwnNotifications.Entry entry) {
+    static ApiNotification toResponse(OwnNotifications.Entry entry) {
         ApiNotificationLink link = new ApiNotificationLink(ApiNotificationLink.TargetEnum.fromValue(entry.target().name()))
                 .bookingId(entry.linkedBookingId())
                 .waitlistEntryId(entry.linkedWaitlistEntryId());

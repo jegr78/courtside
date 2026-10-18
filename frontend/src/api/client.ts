@@ -69,6 +69,11 @@ export type MembershipRequest = components["schemas"]["MembershipRequest"];
 export type MembershipPeriod = components["schemas"]["MembershipPeriod"];
 export type MembershipPeriodRequest = components["schemas"]["MembershipPeriodRequest"];
 export type MembershipType = components["schemas"]["MembershipType"];
+export type GuardianGrant = components["schemas"]["GuardianGrant"];
+export type GuardianRelationship = components["schemas"]["GuardianRelationship"];
+export type GuardianRelationshipRequest = components["schemas"]["GuardianRelationshipRequest"];
+export type GuardianRelationshipChange = components["schemas"]["GuardianRelationshipChange"];
+export type Dependant = components["schemas"]["Dependant"];
 export type MembershipTypeRequest = components["schemas"]["MembershipTypeRequest"];
 export type ImportSource = components["schemas"]["ImportSource"];
 export type ImportSourceRequest = components["schemas"]["ImportSourceRequest"];
@@ -571,6 +576,25 @@ export const api = {
   removeMembershipPeriod: (personId: string, periodId: string) => request<void>(
     `/api/admin/roster/${personId}/membership-periods/${periodId}`, { method: "DELETE" }
   ),
+  guardianRelationships: (personId: string) => request<GuardianRelationship[]>(
+    `/api/admin/roster/${personId}/guardianships`
+  ),
+  createGuardianRelationship: (personId: string, relationship: GuardianRelationshipRequest) => request<GuardianRelationship>(
+    `/api/admin/roster/${personId}/guardianships`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(relationship)
+    }
+  ),
+  changeGuardianRelationship: (personId: string, relationshipId: string, change: GuardianRelationshipChange) => request<GuardianRelationship>(
+    `/api/admin/roster/${personId}/guardianships/${relationshipId}`, {
+      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(change)
+    }
+  ),
+  removeGuardianRelationship: (personId: string, relationshipId: string) => request<void>(
+    `/api/admin/roster/${personId}/guardianships/${relationshipId}`, { method: "DELETE" }
+  ),
+  endGuardianRelationship: (personId: string, relationshipId: string) => request<GuardianRelationship>(
+    `/api/admin/roster/${personId}/guardianships/${relationshipId}/end`, { method: "POST" }
+  ),
   membershipTypes: () => request<MembershipType[]>("/api/admin/membership-types"),
   membershipType: (id: string) => request<MembershipType>(`/api/admin/membership-types/${id}`),
   createMembershipType: (type: MembershipTypeRequest) => request<MembershipType>("/api/admin/membership-types", {
@@ -742,6 +766,29 @@ export const api = {
   ),
   withdrawParticipation: (bookingId: string) => request<void>(
     `/api/my/participations/${bookingId}`, { method: "DELETE" }
+  ),
+  dependants: () => request<Dependant[]>("/api/my/dependants"),
+  dependantBookings: (personId: string, options: { view?: PersonalBookingView; cursor?: string; limit?: number } = {}) =>
+    request<PersonalBookingPage>(`/api/my/dependants/${personId}/bookings?${new URLSearchParams({
+      limit: String(options.limit ?? 50),
+      ...(options.view ? { view: options.view } : {}),
+      ...(options.cursor ? { cursor: options.cursor } : {})
+    })}`),
+  createDependantBooking: (personId: string, booking: CreateBookingRequest, idempotencyKey: string) => request<BookingCreated>(
+    `/api/my/dependants/${personId}/bookings`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Idempotency-Key": idempotencyKey },
+      body: JSON.stringify(booking)
+    }
+  ),
+  cancelDependantBooking: (personId: string, bookingId: string) => request<void>(
+    `/api/my/dependants/${personId}/bookings/${bookingId}`, { method: "DELETE" }
+  ),
+  dependantNotifications: (personId: string, cursor?: string, limit = 50) => request<NotificationPage>(
+    `/api/my/dependants/${personId}/notifications?${new URLSearchParams({ limit: String(limit), ...(cursor ? { cursor } : {}) })}`
+  ),
+  requestDependantCredentials: (personId: string) => request<void>(
+    `/api/my/dependants/${personId}/credentials`, { method: "POST" }
   ),
   reservedSlots: (date: string) => request<ReservedSlot[]>(
     `/api/reserved-slots?${new URLSearchParams({ date })}`

@@ -74,7 +74,7 @@ public class BookingService {
     }
 
     private UUID createIdempotently(CreateBookingCommand command, String idempotencyKey, String fingerprint) {
-        return existingBooking(command.bookedBy(), idempotencyKey, fingerprint)
+        return existingBooking(command, idempotencyKey, fingerprint)
                 .orElseGet(() -> createNew(command, idempotencyKey, fingerprint));
     }
 
@@ -108,14 +108,14 @@ public class BookingService {
         try {
             return writer.write(command, idempotencyKey, fingerprint);
         } catch (IdempotencyKeyRaceException race) {
-            return existingBooking(command.bookedBy(), idempotencyKey, fingerprint)
+            return existingBooking(command, idempotencyKey, fingerprint)
                     .orElseThrow(() -> new IllegalStateException(
                             "An idempotency conflict has no persisted booking", race));
         }
     }
 
-    private Optional<UUID> existingBooking(UUID bookedBy, String idempotencyKey, String fingerprint) {
-        return bookings.findByBookedByAndIdempotencyKey(bookedBy, idempotencyKey)
+    private Optional<UUID> existingBooking(CreateBookingCommand command, String idempotencyKey, String fingerprint) {
+        return bookings.findIdempotentRequest(command.bookedBy(), command.actedBy(), idempotencyKey)
                 .map(booking -> {
                     if (!fingerprint.equals(booking.getRequestFingerprint())) {
                         throw new IdempotencyKeyReusedException();

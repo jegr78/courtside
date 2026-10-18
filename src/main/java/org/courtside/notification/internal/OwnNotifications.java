@@ -2,6 +2,7 @@ package org.courtside.notification.internal;
 
 import lombok.RequiredArgsConstructor;
 import org.courtside.identity.CurrentUser;
+import org.courtside.identity.DependantMessageAccess;
 import org.courtside.identity.UserAccount;
 import org.courtside.notification.MessageKind;
 import org.courtside.shared.BookingAnnouncement;
@@ -35,19 +36,29 @@ public class OwnNotifications {
     };
 
     private final CurrentUser currentUser;
+    private final DependantMessageAccess dependants;
     private final JdbcClient jdbc;
     private final BookingAnnouncer bookings;
     private final WaitlistAnnouncer waitlist;
     private final ObjectMapper json;
     private final Clock clock;
 
-    // A cursor that is not one of this account's entries matches no sequence, so it reads as the end.
     @Transactional(readOnly = true)
     public Page page(UUID cursor, int limit) {
+        return pageOf(currentUser.requireAccount(), cursor, limit);
+    }
+
+    // Read only: a guardian reading leaves the dependant's unread entries unread.
+    @Transactional(readOnly = true)
+    public Page dependantPage(UUID dependantPersonId, UUID cursor, int limit) {
+        return pageOf(dependants.requireReadableAccount(dependantPersonId), cursor, limit);
+    }
+
+    // A cursor that is not one of this account's entries matches no sequence, so it reads as the end.
+    private Page pageOf(UserAccount account, UUID cursor, int limit) {
         if (limit < 1 || limit > MAX_PAGE_SIZE) {
             throw new IllegalStateException("Notification page size must be between 1 and " + MAX_PAGE_SIZE);
         }
-        UserAccount account = currentUser.requireAccount();
         List<Stored> stored = jdbc.sql("""
                         SELECT id, kind, parameters::text AS parameters, created_at, read_at
                         FROM notification

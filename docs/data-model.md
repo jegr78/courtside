@@ -30,6 +30,11 @@ API's own contract is what refuses an empty list of courts. A club that wants a 
 occupancy, a tournament, a school session, inserts a `booking_card` row; it does not deploy
 anything.
 
+A booking a guardian makes for a dependant is held by the dependant's account in `booked_by`;
+`acted_by`, null otherwise, names the guardian's account. An `idempotency_key` is unique per holder
+and per account that acted, so a guardian's key never meets one the dependant or another guardian
+used. Pseudonymising a booking clears `acted_by` with `booked_by`.
+
 A cancelled booking may carry a `cancellation_reason`, one of five codes chosen by whoever cancelled
 somebody else's booking. It is never free text, so it names nobody. CHECK constraints accept only
 the known codes and only on a cancelled booking.
@@ -188,6 +193,8 @@ yet; how long a club keeps them belongs to the retention controls by record cate
 | `membership_type` | A kind of membership, the rule set it is measured against, and whether it opens an account on import | `rule_set` |
 | `user_account` | Credentials and sign-in state for a person | `person` |
 | `user_account_role` | One row per role the account holds | `user_account` |
+| `guardian_relationship` | One person allowed to act for another: who acts, for whom, from which day and until which | `person` twice |
+| `guardian_relationship_action` | One row per action a relationship grants | `guardian_relationship` |
 | `password_reset_token` | The one outstanding reset code an account has: its hash, the address it was mailed to, the epoch it was issued under and when it expires | `user_account` |
 
 **`person` and `user_account` are separate** because not every person has an account, a child, a
@@ -204,6 +211,16 @@ who held what and until when. The application refuses a new or corrected period 
 start, because it would cover no day. The CHECK still allows `ended_on = started_on`: rows written
 before periods existed carry it for a membership ended on the day it began, and ending a membership
 that began today records it too. Such a row holds on no day and the exclusion ignores it.
+
+**`guardian_relationship` lets one person act for another.** The board creates it; `started_on` is
+the day it did, and `ended_on`, nullable, is the first day it no longer holds. The exclusion
+`guardian_relationships_disjoint` keeps a guardian from holding two relationships to the same
+dependant on one day, and a CHECK refuses a person as their own guardian. The actions it grants
+live in `guardian_relationship_action`, one of `VIEW_BOOKINGS`, `BOOK`, `CANCEL_BOOKINGS`,
+`READ_MESSAGES` and `ACCOUNT_TASKS` per row; a relationship without one is refused before it is
+written. Both people need an account when it is created, and it grants nothing while the guardian's
+account is disabled or either account is gone. No birth date is stored: the board ends the
+relationship when the dependant comes of age. Removing a former member removes their relationships.
 
 `security_epoch` invalidates every session an account holds; `version` is the optimistic lock;
 `credentials_expire_at` bounds an issued one-time credential. `last_login_at` is the instant of the

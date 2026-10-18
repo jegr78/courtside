@@ -23,9 +23,16 @@ SELECT '72000000-0000-0000-0000-000000000001', '71000000-0000-0000-0000-00000000
        'upgrade-member', password_hash, 'en', true, '2025-01-01T00:00:00Z', false
 FROM user_account WHERE username = 'admin';
 
+INSERT INTO user_account
+    (id, person_id, username, password_hash, locale, enabled, created_at, password_change_required)
+SELECT '72000000-0000-0000-0000-000000000002', '71000000-0000-0000-0000-000000000002',
+       'upgrade-guardian', password_hash, 'en', true, '2025-01-01T00:00:00Z', false
+FROM user_account WHERE username = 'admin';
+
 INSERT INTO user_account_role (user_account_id, role) VALUES
     ('72000000-0000-0000-0000-000000000001', 'MEMBER'),
-    ('72000000-0000-0000-0000-000000000001', 'TRAINER');
+    ('72000000-0000-0000-0000-000000000001', 'TRAINER'),
+    ('72000000-0000-0000-0000-000000000002', 'MEMBER');
 
 INSERT INTO member (id, person_id, membership_type_id, started_on) VALUES
     ('73000000-0000-0000-0000-000000000001', '71000000-0000-0000-0000-000000000001',
@@ -52,13 +59,14 @@ INSERT INTO booking_series_court (booking_series_id, court_id, position)
 VALUES ('76000000-0000-0000-0000-000000000001', '70000000-0000-0000-0000-000000000001', 0);
 
 INSERT INTO booking
-    (id, card_id, status, booked_by, note, created_at, series_id, idempotency_key, request_fingerprint)
+    (id, card_id, status, booked_by, acted_by, note, created_at, series_id, idempotency_key, request_fingerprint)
 VALUES
     ('77000000-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111',
-     'CONFIRMED', '72000000-0000-0000-0000-000000000001', 'Synthetic upgrade booking',
+     'CONFIRMED', '72000000-0000-0000-0000-000000000001',
+     '72000000-0000-0000-0000-000000000002', 'Synthetic upgrade booking',
      '2025-01-01T00:00:00Z', NULL, 'upgrade-fixture-booking', repeat('a', 64)),
     ('77000000-0000-0000-0000-000000000002', '22222222-2222-2222-2222-222222222222',
-     'CONFIRMED', '72000000-0000-0000-0000-000000000001', 'Synthetic series occurrence',
+     'CONFIRMED', '72000000-0000-0000-0000-000000000001', NULL, 'Synthetic series occurrence',
      '2025-01-01T00:00:00Z', '76000000-0000-0000-0000-000000000001', NULL, NULL);
 
 INSERT INTO court_allocation (id, booking_id, court_id, starts_at, ends_at, status) VALUES
@@ -207,6 +215,13 @@ INSERT INTO retention_preview
     (id, created_by, created_at, expires_at, bookings_ended_before, memberships_ended_before, former_member_ids)
 VALUES ('7f000000-0000-0000-0000-000000000001', '72000000-0000-0000-0000-000000000001', '2025-01-01T00:00:00Z',
         '2025-01-01T00:30:00Z', '2023-01-01T00:00:00Z', NULL, '{}');
+
+INSERT INTO guardian_relationship (id, guardian_person_id, dependant_person_id, started_on)
+VALUES ('7f100000-0000-0000-0000-000000000001', '71000000-0000-0000-0000-000000000002',
+        '71000000-0000-0000-0000-000000000001', '2025-01-01');
+
+INSERT INTO guardian_relationship_action (guardian_relationship_id, action)
+VALUES ('7f100000-0000-0000-0000-000000000001', 'VIEW_BOOKINGS');
 
 UPDATE club_config
 SET club_name = 'Example Tennis Club', primary_color = '#123456', accent_color = '#ABCDEF',

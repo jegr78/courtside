@@ -47,11 +47,22 @@ public interface PersonBookingHistory {
                    Instant offerExpiresAt, String note) {
     }
 
+    // Made as a guardian for a dependant, who holds it and is named by person id only.
+    record ActedFor(UUID bookingId, UUID holderPersonId, Instant createdAt, BookingStatus status,
+                    List<Reservation> reservations) {
+
+        public ActedFor {
+            reservations = List.copyOf(reservations);
+        }
+    }
+
     // An entry somebody else made naming this person as a player, without who made it.
     record NamedInWaitlist(UUID entryId, UUID courtId, Instant startsAt, Instant endsAt) {
     }
 
     List<Made> madeBy(UUID accountId);
+
+    List<ActedFor> actedForOthersBy(UUID accountId);
 
     List<Waiting> waitlistOf(UUID accountId);
 

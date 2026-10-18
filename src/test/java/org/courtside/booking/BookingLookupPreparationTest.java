@@ -45,7 +45,7 @@ class BookingLookupPreparationTest extends AbstractIntegrationTest {
         doAnswer(invocation -> {
             readOnlyModes.add(jdbc.sql("SELECT current_setting('transaction_read_only')").query(String.class).single());
             return query.answer(invocation);
-        }).when(bookings).findByBookedByAndIdempotencyKey(any(UUID.class), anyString());
+        }).when(bookings).findIdempotentRequest(any(UUID.class), any(), anyString());
         doAnswer(invocation -> {
             readOnlyModes.add(jdbc.sql("SELECT current_setting('transaction_read_only')").query(String.class).single());
             return query.answer(invocation);
@@ -55,7 +55,7 @@ class BookingLookupPreparationTest extends AbstractIntegrationTest {
             context.refresh();
 
             // then
-            verify(bookings, times(1)).findByBookedByAndIdempotencyKey(any(UUID.class), anyString());
+            verify(bookings, times(1)).findIdempotentRequest(any(UUID.class), any(), anyString());
             verify(bookings, times(1)).countOpenBookings(any(UUID.class), any(Instant.class));
             assertThat(readOnlyModes).containsExactly("on", "on");
             assertThat(bookings.count()).isEqualTo(before);
@@ -81,7 +81,7 @@ class BookingLookupPreparationTest extends AbstractIntegrationTest {
         // given
         long before = bookings.count();
         doAnswer(invocation -> jdbc.sql("SELECT 1 / 0").query(Integer.class).single())
-                .when(bookings).findByBookedByAndIdempotencyKey(any(UUID.class), anyString());
+                .when(bookings).findIdempotentRequest(any(UUID.class), any(), anyString());
         try (var context = preparationContext()) {
             // when / then
             assertThatThrownBy(context::refresh).rootCause().hasMessageContaining("division by zero");
