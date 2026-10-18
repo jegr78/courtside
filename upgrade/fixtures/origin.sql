@@ -23,9 +23,16 @@ SELECT '72000000-0000-0000-0000-000000000001', '71000000-0000-0000-0000-00000000
        'upgrade-member', password_hash, 'en', true, '2025-01-01T00:00:00Z', false
 FROM user_account WHERE username = 'admin';
 
+INSERT INTO user_account
+    (id, person_id, username, password_hash, locale, enabled, created_at, password_change_required)
+SELECT '72000000-0000-0000-0000-000000000002', '71000000-0000-0000-0000-000000000002',
+       'upgrade-guardian', password_hash, 'en', true, '2025-01-01T00:00:00Z', false
+FROM user_account WHERE username = 'admin';
+
 INSERT INTO user_account_role (user_account_id, role) VALUES
     ('72000000-0000-0000-0000-000000000001', 'MEMBER'),
-    ('72000000-0000-0000-0000-000000000001', 'TRAINER');
+    ('72000000-0000-0000-0000-000000000001', 'TRAINER'),
+    ('72000000-0000-0000-0000-000000000002', 'MEMBER');
 
 INSERT INTO member (id, person_id, membership_type_id, started_on) VALUES
     ('73000000-0000-0000-0000-000000000001', '71000000-0000-0000-0000-000000000001',
@@ -56,7 +63,7 @@ INSERT INTO booking
 VALUES
     ('77000000-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111',
      'CONFIRMED', '72000000-0000-0000-0000-000000000001',
-     (SELECT id FROM user_account WHERE username = 'admin'), 'Synthetic upgrade booking',
+     '72000000-0000-0000-0000-000000000002', 'Synthetic upgrade booking',
      '2025-01-01T00:00:00Z', NULL, 'upgrade-fixture-booking', repeat('a', 64)),
     ('77000000-0000-0000-0000-000000000002', '22222222-2222-2222-2222-222222222222',
      'CONFIRMED', '72000000-0000-0000-0000-000000000001', NULL, 'Synthetic series occurrence',
