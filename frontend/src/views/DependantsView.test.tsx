@@ -170,6 +170,22 @@ describe("DependantsView", () => {
     expect(await screen.findByTestId("dependants-none")).toBeInTheDocument();
   });
 
+  it("given the relationship ended after the first page, when more bookings are read, then the page says so and lists nobody", async () => {
+    // given
+    vi.spyOn(api, "dependants").mockResolvedValueOnce([john(["VIEW_BOOKINGS"])]).mockResolvedValue([]);
+    vi.mocked(api.dependantBookings)
+      .mockResolvedValueOnce({ items: [lesson], nextCursor: lesson.id })
+      .mockRejectedValue(refused("dependant-not-found", 404));
+    show();
+
+    // when
+    await userEvent.click(await screen.findByTestId("dependant-load-more-bookings"));
+
+    // then
+    expect(await screen.findByTestId("dependants-refusal")).toHaveTextContent("You do not or no longer act for this person.");
+    expect(await screen.findByTestId("dependants-none")).toBeInTheDocument();
+  });
+
   it("given two dependants, when the other one is chosen, then the page shows that one's bookings", async () => {
     // given
     vi.spyOn(api, "dependants").mockResolvedValue([john(["VIEW_BOOKINGS"]), mary]);

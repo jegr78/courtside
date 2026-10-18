@@ -51,10 +51,18 @@ export function GuardianshipsSection({ entry, disabled, stepUp }: {
       done();
       setSuccess(t(message));
     };
+    const retried = async () => {
+      try {
+        await completed();
+      } catch (failure) {
+        if (failure instanceof ApiError && failure.problem?.type === RECENT_AUTH) throw failure;
+        report(failure);
+      }
+    };
     try {
       await completed();
     } catch (failure) {
-      if (failure instanceof ApiError && failure.problem?.type === RECENT_AUTH) stepUp(completed);
+      if (failure instanceof ApiError && failure.problem?.type === RECENT_AUTH) stepUp(retried);
       else report(failure);
     } finally {
       setPending(false);

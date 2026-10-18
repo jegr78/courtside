@@ -170,6 +170,27 @@ describe("GuardianshipsSection", () => {
     expect(await screen.findByTestId("guardianship-relationship-1")).toBeInTheDocument();
   });
 
+  it("given a fresh proof, when the retried write is refused for another reason, then the open form says why", async () => {
+    // given
+    vi.spyOn(api, "guardianRelationships").mockResolvedValue([]);
+    vi.spyOn(api, "roster").mockResolvedValue({ entries: [john], matching: 1 });
+    vi.spyOn(api, "createGuardianRelationship")
+      .mockRejectedValueOnce(refused("recent-authentication-required", 403))
+      .mockRejectedValueOnce(refused("guardian-relationship-overlap", 409, "guardianship.overlaps"));
+    const stepUp = show();
+    await screen.findByTestId("guardianships-none");
+    await chooseJohnAsDependant();
+    await userEvent.click(screen.getByTestId("save-guardianship"));
+    const retry = stepUp.mock.calls[0][0] as () => Promise<void>;
+
+    // when
+    await retry();
+
+    // then
+    expect(within(await screen.findByRole("dialog")).getByRole("alert"))
+      .toHaveTextContent("This guardian already holds a relationship to this dependant on these days.");
+  });
+
   it("given a running relationship, when the board changes it, then the chosen actions and a cleared end go to that relationship", async () => {
     // given
     vi.spyOn(api, "guardianRelationships").mockResolvedValue([{ ...actingForJohn, endedOn: "2030-01-01" }]);

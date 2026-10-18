@@ -134,7 +134,8 @@ function DependantBookings({ dependant, cancels, refused, acted }: {
       setBookings((current) => [...(current ?? []), ...page.items]);
       setNextCursor(page.nextCursor ?? undefined);
     } catch (failure) {
-      report(failure);
+      if (relationshipChanged(failure)) await refused(failure);
+      else report(failure);
     }
   }
 
