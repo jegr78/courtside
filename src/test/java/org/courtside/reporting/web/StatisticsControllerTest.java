@@ -507,13 +507,17 @@ class StatisticsControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void givenAPeriodThatHasNotBegun_whenReadingMembers_thenItShowsTodaysMembersWithoutMovement() throws Exception {
+    void givenAPeriodThatHasNotBegun_whenReadingMembers_thenTodaysMembersCountWithTheirBookedGames() throws Exception {
         // given
         UUID adult = members.createMembershipType("Adult");
         UUID jane = members.addPerson("Jane", "Doe", "jane.doe@example.org");
         UUID john = members.addPerson("John", "Roe", "john.roe@example.org");
         members.addMembershipPeriod(jane, adult, LocalDate.of(2020, 1, 1), null);
         members.addMembershipPeriod(john, adult, LocalDate.of(2026, 6, 1), null);
+        UUID court = facility.createCourt(1, "Centre");
+        UUID janeAccount = identity.createEnabledAccount(jane, "jane.doe", Set.of(Role.MEMBER));
+        allocate(booking(MEMBER_CARD, "CONFIRMED", null, janeAccount), court,
+                "2026-06-01T08:00:00Z", "2026-06-01T09:00:00Z", "CONFIRMED");
 
         // when / then
         mockMvc.perform(get("/api/admin/statistics/members")
@@ -522,7 +526,7 @@ class StatisticsControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.figures.members").value(1))
                 .andExpect(jsonPath("$.figures.joins").value(0))
                 .andExpect(jsonPath("$.figures.leavings").value(0))
-                .andExpect(jsonPath("$.figures.activeMembers").value(0))
+                .andExpect(jsonPath("$.figures.activeMembers").value(1))
                 .andExpect(jsonPath("$.membershipTypes[?(@.membershipTypeId == '" + adult + "')].members").value(1));
     }
 

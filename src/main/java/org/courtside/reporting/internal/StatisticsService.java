@@ -107,12 +107,10 @@ public class StatisticsService {
 
     private MemberFigures memberFigures(StatisticsPeriod period) {
         LocalDate to = upToToday(period.to());
-        if (to.isBefore(period.from())) {
-            long running = memberships.figures(to, to).running();
-            return new MemberFigures(running, 0, 0, 0, running == 0 ? null : 0.0);
-        }
-        MembershipStatistics.MembershipFigures membership = memberships.figures(period.from(), to);
-        long active = bookings.activeMembers(period.from(), to);
+        MembershipStatistics.MembershipFigures membership = to.isBefore(period.from())
+                ? new MembershipStatistics.MembershipFigures(memberships.figures(to, to).running(), 0, 0)
+                : memberships.figures(period.from(), to);
+        long active = bookings.activeMembers(period.from(), period.to());
         return new MemberFigures(membership.running(), membership.joins(), membership.leavings(), active,
                 membership.running() == 0 ? null : (double) active / membership.running());
     }
