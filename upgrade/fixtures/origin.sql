@@ -208,6 +208,13 @@ INSERT INTO retention_preview
 VALUES ('7f000000-0000-0000-0000-000000000001', '72000000-0000-0000-0000-000000000001', '2025-01-01T00:00:00Z',
         '2025-01-01T00:30:00Z', '2023-01-01T00:00:00Z', NULL, '{}');
 
+INSERT INTO guardian_relationship (id, guardian_person_id, dependant_person_id, started_on)
+VALUES ('7f100000-0000-0000-0000-000000000001', '71000000-0000-0000-0000-000000000002',
+        '71000000-0000-0000-0000-000000000001', '2025-01-01');
+
+INSERT INTO guardian_relationship_action (guardian_relationship_id, action)
+VALUES ('7f100000-0000-0000-0000-000000000001', 'VIEW_BOOKINGS');
+
 UPDATE club_config
 SET club_name = 'Example Tennis Club', primary_color = '#123456', accent_color = '#ABCDEF',
     default_locale = 'en', slot_minutes = 15, time_zone = 'Europe/London';

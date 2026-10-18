@@ -5,6 +5,12 @@ import org.courtside.api.AdminRosterApi;
 import org.courtside.api.ApiAccountRequest;
 import org.courtside.api.ApiActiveRequest;
 import org.courtside.api.ApiCredentialState;
+import org.courtside.api.ApiGuardianGrant;
+import org.courtside.api.ApiGuardianParty;
+import org.courtside.api.ApiGuardianRelationship;
+import org.courtside.api.ApiGuardianRelationshipChange;
+import org.courtside.api.ApiGuardianRelationshipRequest;
+import org.courtside.api.ApiGuardianRelationshipState;
 import org.courtside.api.ApiMembershipPeriod;
 import org.courtside.api.ApiMembershipPeriodState;
 import org.courtside.api.ApiMembershipPeriodRequest;
@@ -25,6 +31,8 @@ import org.courtside.identity.RecentAuthentication;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import org.courtside.member.MembershipPeriod;
+import org.courtside.member.GuardianGrant;
+import org.courtside.member.GuardianshipService;
 import org.courtside.member.MembershipPeriodService;
 import org.courtside.member.RosterService;
 import org.springframework.http.HttpStatus;
@@ -35,10 +43,12 @@ import java.net.URI;
 import java.time.LocalDate;
 import java.util.Collection;
 import java.util.EnumSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @RestController
 @RequiredArgsConstructor
@@ -46,6 +56,7 @@ class RosterAdminController implements AdminRosterApi {
 
     private final RosterService roster;
     private final MembershipPeriodService periods;
+    private final GuardianshipService guardianships;
     private final GlobalSessionAdministration globalSessions;
     private final HttpServletRequest servletRequest;
     private final RecentAuthentication recentAuthentication;
@@ -190,6 +201,59 @@ class RosterAdminController implements AdminRosterApi {
     public ResponseEntity<Void> removeMembershipPeriod(UUID personId, UUID periodId) {
         periods.remove(personId, periodId);
         return ResponseEntity.noContent().build();
+    }
+
+    @Override
+    public ResponseEntity<List<ApiGuardianRelationship>> listGuardianRelationships(UUID personId) {
+        return ResponseEntity.ok(guardianships.guardianshipsOf(personId).stream()
+                .map(RosterAdminController::toGuardianshipResponse)
+                .toList());
+    }
+
+    @Override
+    public ResponseEntity<ApiGuardianRelationship> createGuardianRelationship(
+            UUID personId, ApiGuardianRelationshipRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(toGuardianshipResponse(guardianships.create(personId,
+                request.getGuardianPersonId(), request.getDependantPersonId(), grantsOf(request.getGrants()),
+                request.getEndedOn())));
+    }
+
+    @Override
+    public ResponseEntity<ApiGuardianRelationship> changeGuardianRelationship(
+            UUID personId, UUID relationshipId, ApiGuardianRelationshipChange request) {
+        return ResponseEntity.ok(toGuardianshipResponse(guardianships.change(personId, relationshipId,
+                grantsOf(request.getGrants()), request.getEndedOn())));
+    }
+
+    @Override
+    public ResponseEntity<ApiGuardianRelationship> endGuardianRelationship(UUID personId, UUID relationshipId) {
+        return ResponseEntity.ok(toGuardianshipResponse(guardianships.end(personId, relationshipId)));
+    }
+
+    @Override
+    public ResponseEntity<Void> removeGuardianRelationship(UUID personId, UUID relationshipId) {
+        guardianships.remove(personId, relationshipId);
+        return ResponseEntity.noContent().build();
+    }
+
+    private static Set<GuardianGrant> grantsOf(Set<ApiGuardianGrant> grants) {
+        return grants == null ? Set.of() : grants.stream()
+                .map(grant -> GuardianGrant.valueOf(grant.getValue()))
+                .collect(Collectors.toSet());
+    }
+
+    private static ApiGuardianRelationship toGuardianshipResponse(GuardianshipService.Guardianship guardianship) {
+        return new ApiGuardianRelationship(guardianship.id(), toParty(guardianship.guardian()),
+                toParty(guardianship.dependant()),
+                guardianship.grants().stream().sorted()
+                        .map(grant -> ApiGuardianGrant.fromValue(grant.name()))
+                        .collect(Collectors.toCollection(LinkedHashSet::new)),
+                guardianship.startedOn(), guardianship.endedOn(),
+                ApiGuardianRelationshipState.fromValue(guardianship.state().name()));
+    }
+
+    private static ApiGuardianParty toParty(GuardianshipService.Party party) {
+        return new ApiGuardianParty(party.personId(), party.firstName(), party.lastName());
     }
 
     private static ApiMembershipPeriod toPeriodResponse(MembershipPeriodService.Period period) {

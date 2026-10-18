@@ -1220,6 +1220,92 @@ components:
           description: The first day the period no longer holds, `null` while it runs without an end.
         state: { $ref: "#/components/schemas/MembershipPeriodState" }
 
+    GuardianGrant:
+      type: string
+      enum: [VIEW_BOOKINGS, BOOK, CANCEL_BOOKINGS, READ_MESSAGES, ACCOUNT_TASKS]
+      description: |
+        One action a guardian may take for a dependant: read the dependant's bookings, book for
+        them, cancel their bookings, read their messages, or account tasks such as requesting new
+        credentials for the dependant's account. A guardian may take no action the relationship
+        does not grant.
+
+    GuardianRelationshipState:
+      type: string
+      enum: [RUNNING, ENDED]
+      description: |
+        Where a relationship stands on the club's today: `RUNNING` grants its actions today,
+        `ENDED` grants nothing.
+
+    GuardianParty:
+      type: object
+      required: [personId, firstName, lastName]
+      properties:
+        personId: { type: string, format: uuid }
+        firstName: { type: string }
+        lastName: { type: string }
+
+    GuardianRelationship:
+      type: object
+      required: [id, guardian, dependant, grants, startedOn, endedOn, state]
+      properties:
+        id: { type: string, format: uuid }
+        guardian: { $ref: "#/components/schemas/GuardianParty" }
+        dependant: { $ref: "#/components/schemas/GuardianParty" }
+        grants:
+          type: array
+          uniqueItems: true
+          items: { $ref: "#/components/schemas/GuardianGrant" }
+        startedOn:
+          type: string
+          format: date
+          description: The day the board created the relationship.
+        endedOn:
+          type: [string, "null"]
+          format: date
+          description: The first day the relationship no longer holds, `null` while it runs without an end.
+        state: { $ref: "#/components/schemas/GuardianRelationshipState" }
+
+    GuardianRelationshipRequest:
+      type: object
+      required: [guardianPersonId, dependantPersonId, grants]
+      properties:
+        guardianPersonId:
+          type: string
+          format: uuid
+          description: The person who acts. Either this or `dependantPersonId` is the person in the path.
+        dependantPersonId:
+          type: string
+          format: uuid
+          description: The person acted for. A person cannot be their own guardian.
+        grants:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items: { $ref: "#/components/schemas/GuardianGrant" }
+        endedOn:
+          type: [string, "null"]
+          format: date
+          description: |
+            The first day the relationship no longer holds; omitted or `null`, it lasts until the
+            board ends it. It may be any day from today on.
+
+    GuardianRelationshipChange:
+      type: object
+      required: [grants]
+      properties:
+        grants:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items: { $ref: "#/components/schemas/GuardianGrant" }
+        endedOn:
+          type: [string, "null"]
+          format: date
+          description: |
+            The first day the relationship no longer holds; omitted or `null`, it lasts until the
+            board ends it. It may be any day from the relationship's start on, also one already
+            passed.
+
     MembershipType:
       type: object
       required: [id, name, active, grantsAccount]
@@ -7696,6 +7782,237 @@ paths:
           description: |
             No such person, or no such period of this person
             (`urn:courtside:error:membership-period-not-found`).
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/admin/roster/{personId}/guardianships:
+    get:
+      tags: [admin-roster]
+      operationId: listGuardianRelationships
+      summary: Every guardian relationship a person takes part in, as guardian or as dependant.
+      description: |
+        Oldest first. A relationship grants its actions only while it runs; an ended one stays
+        listed so the board can see who could act for whom.
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: personId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: The relationships, ascending by their first day.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/GuardianRelationship" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+    post:
+      tags: [admin-roster]
+      operationId: createGuardianRelationship
+      summary: Let one person act for another with the granted actions, from today.
+      description: |
+        The relationship starts today and grants exactly the listed actions. It gives the guardian
+        no club role and does not change either person's account. A guardian holds one relationship
+        to a dependant on any day, and two people cannot be each other's guardians at once. The
+        change is recorded in the audit log.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: personId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/GuardianRelationshipRequest" }
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/GuardianRelationship" }
+        "400":
+          description: |
+            The request is malformed, or the relationship is not usable
+            (`urn:courtside:error:invalid-guardian-relationship`): the person in the path takes no
+            part in it, a person would be their own guardian, no action is granted, the end lies
+            before today, or the dependant already acts for the guardian.
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: |
+            The guardian already holds a relationship to this dependant on a day the new one would
+            cover (`urn:courtside:error:guardian-relationship-overlap`).
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/admin/roster/{personId}/guardianships/{relationshipId}:
+    put:
+      tags: [admin-roster]
+      operationId: changeGuardianRelationship
+      summary: Change the granted actions and the end of a relationship.
+      description: |
+        The request writes both whole. Setting an end today or earlier stops the relationship from
+        that day; clearing it lets the relationship run until the board ends it. The change is
+        recorded in the audit log.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: personId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: relationshipId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/GuardianRelationshipChange" }
+      responses:
+        "200":
+          description: Changed.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/GuardianRelationship" }
+        "400":
+          description: |
+            The request is malformed, or the change is not usable
+            (`urn:courtside:error:invalid-guardian-relationship`): no action is granted, the end
+            lies before the start, or reopening it would make two people each other's guardians.
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          description: |
+            No such person, or no such relationship of this person
+            (`urn:courtside:error:guardian-relationship-not-found`).
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "409":
+          description: |
+            The reopened relationship would overlap another of the same two people
+            (`urn:courtside:error:guardian-relationship-overlap`).
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+    delete:
+      tags: [admin-roster]
+      operationId: removeGuardianRelationship
+      summary: Remove a relationship recorded by mistake.
+      description: |
+        The relationship is deleted, not ended: use it for one that should never have existed. One
+        that did hold and has stopped is ended instead, so its record stays. The removal is
+        recorded in the audit log.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: personId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: relationshipId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "204":
+          description: Removed.
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          description: |
+            No such relationship of this person
+            (`urn:courtside:error:guardian-relationship-not-found`).
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/admin/roster/{personId}/guardianships/{relationshipId}/end:
+    post:
+      tags: [admin-roster]
+      operationId: endGuardianRelationship
+      summary: End a relationship today.
+      description: |
+        From today the guardian may take none of its actions. A relationship that has already ended
+        keeps its end. The change is recorded in the audit log.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: personId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: relationshipId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Ended.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/GuardianRelationship" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          description: |
+            No such relationship of this person
+            (`urn:courtside:error:guardian-relationship-not-found`).
           content:
             application/problem+json:
               schema: { $ref: "#/components/schemas/Problem" }

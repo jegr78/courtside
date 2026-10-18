@@ -164,4 +164,52 @@ public sealed interface RosterEvent extends DomainEventRecord {
         }
 
     }
+
+    record GuardianshipCreated(UUID personId, UUID relationshipId, UUID guardianPersonId,
+                               Set<GuardianGrant> grants, LocalDate startedOn,
+                               @Nullable LocalDate endedOn) implements RosterEvent {
+
+        static final String TYPE = "roster.guardianship.created";
+
+        @Override
+        public String eventType() {
+            return TYPE;
+        }
+
+    }
+
+    record GuardianshipChanged(UUID personId, UUID relationshipId, UUID guardianPersonId,
+                               Set<GuardianGrant> grants, @Nullable LocalDate endedOn) implements RosterEvent {
+
+        static final String TYPE = "roster.guardianship.changed";
+
+        @Override
+        public String eventType() {
+            return TYPE;
+        }
+
+    }
+
+    record GuardianshipEnded(UUID personId, UUID relationshipId, UUID guardianPersonId,
+                             LocalDate endedOn) implements RosterEvent {
+
+        static final String TYPE = "roster.guardianship.ended";
+
+        @Override
+        public String eventType() {
+            return TYPE;
+        }
+
+    }
+
+    record GuardianshipRemoved(UUID personId, UUID relationshipId, UUID guardianPersonId) implements RosterEvent {
+
+        static final String TYPE = "roster.guardianship.removed";
+
+        @Override
+        public String eventType() {
+            return TYPE;
+        }
+
+    }
 }
