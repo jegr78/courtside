@@ -287,6 +287,8 @@ public class RetentionRows {
         }
         long accounts = jdbc.sql("DELETE FROM user_account WHERE person_id = :id").param("id", personId).update();
         jdbc.sql("DELETE FROM import_external_reference WHERE person_id = :id").param("id", personId).update();
+        jdbc.sql("DELETE FROM guardian_relationship WHERE guardian_person_id = :id OR dependant_person_id = :id")
+                .param("id", personId).update();
         jdbc.sql("DELETE FROM member WHERE person_id = :id").param("id", personId).update();
         jdbc.sql("DELETE FROM person WHERE id = :id").param("id", personId).update();
         return Optional.of(accounts);

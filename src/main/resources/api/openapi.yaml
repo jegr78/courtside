@@ -4058,6 +4058,26 @@ components:
           format: date
           description: The date the membership ended, absent while it runs.
 
+    SubjectAccessGuardianship:
+      type: object
+      required: [relationshipId, role, otherPersonId, grants, startedOn, endedOn]
+      properties:
+        relationshipId: { type: string, format: uuid }
+        role:
+          type: string
+          enum: [GUARDIAN, DEPENDANT]
+          description: Whether this person acts for the other or is acted for.
+        otherPersonId: { type: string, format: uuid }
+        grants:
+          type: array
+          uniqueItems: true
+          items: { $ref: "#/components/schemas/GuardianGrant" }
+        startedOn: { type: string, format: date }
+        endedOn:
+          type: [string, "null"]
+          format: date
+          description: The first day the relationship no longer holds, `null` while it runs without an end.
+
     SubjectAccessAccount:
       type: object
       required: [accountId, username, locale, enabled, createdAt, credentialState, roles]
@@ -4191,9 +4211,9 @@ components:
 
     SubjectAccessExport:
       type: object
-      required: [producedAt, personId, firstName, lastName, accounts, memberships, bookingsMade,
-                 bookingsRecordedIn, bookingSeries, messages, declinedMessages, notifications,
-                 declinedChannels, externalReferences, changesAsSubject, changesAsActor,
+      required: [producedAt, personId, firstName, lastName, accounts, memberships, guardianships,
+                 bookingsMade, bookingsRecordedIn, bookingSeries, messages, declinedMessages,
+                 notifications, declinedChannels, externalReferences, changesAsSubject, changesAsActor,
                  waitlistEntries, waitlistsNamedIn]
       description: |
         Everything this instance holds about one person, and nothing it holds about anybody else.
@@ -4214,6 +4234,12 @@ components:
         memberships:
           type: array
           items: { $ref: "#/components/schemas/SubjectAccessMembership" }
+        guardianships:
+          type: array
+          description: |
+            Every guardian relationship the person takes part in, as guardian or as dependant. The
+            other person is named by id only, since their name is not this person's data.
+          items: { $ref: "#/components/schemas/SubjectAccessGuardianship" }
         bookingsMade:
           type: array
           items: { $ref: "#/components/schemas/SubjectAccessBooking" }

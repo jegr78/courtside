@@ -947,6 +947,38 @@
         "lifecycle": "publication-registry"
       }
     },
+    "guardian_relationship": {
+      "dependant_person_id": {
+        "level": "pseudonymous",
+        "lifecycle": "roster-record"
+      },
+      "ended_on": {
+        "level": "operational",
+        "lifecycle": "roster-record"
+      },
+      "guardian_person_id": {
+        "level": "pseudonymous",
+        "lifecycle": "roster-record"
+      },
+      "id": {
+        "level": "pseudonymous",
+        "lifecycle": "roster-record"
+      },
+      "started_on": {
+        "level": "operational",
+        "lifecycle": "roster-record"
+      }
+    },
+    "guardian_relationship_action": {
+      "action": {
+        "level": "operational",
+        "lifecycle": "roster-record"
+      },
+      "guardian_relationship_id": {
+        "level": "pseudonymous",
+        "lifecycle": "roster-record"
+      }
+    },
     "import_column_mapping": {
       "canonical_field": {
         "level": "operational",

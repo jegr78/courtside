@@ -1,12 +1,15 @@
 package org.courtside.member.testfixture;
 
 import org.courtside.AbstractIntegrationTest;
+import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
+import org.courtside.member.GuardianGrant;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 
 import java.time.LocalDate;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -74,5 +77,24 @@ class MemberTestFixtureTest extends AbstractIntegrationTest {
 
         // then
         assertThat(members.membershipTypeIdOf(personId)).isEmpty();
+    }
+
+    @Test
+    void givenTwoPeopleWithAccounts_whenLinkingThem_thenTheGrantIsObservableUntilTheRelationshipEnds() {
+        // given
+        UUID jane = members.addPerson("Jane", "Doe", "jane.doe@example.org");
+        UUID john = members.addPerson("John", "Roe", "john.roe@example.org");
+        members.giveAccount(jane, "jane.doe", Set.of(Role.MEMBER));
+        members.giveAccount(john, "john.roe", Set.of(Role.MEMBER));
+        LocalDate today = LocalDate.of(2026, 5, 12);
+
+        // when
+        UUID relationship = members.linkGuardian(jane, john, Set.of(GuardianGrant.BOOK));
+
+        // then
+        assertThat(members.mayActFor(jane, john, GuardianGrant.BOOK, today)).isTrue();
+        assertThat(members.guardianshipCount(john)).isEqualTo(1);
+        members.endGuardianship(john, relationship);
+        assertThat(members.mayActFor(jane, john, GuardianGrant.BOOK, today)).isFalse();
     }
 }

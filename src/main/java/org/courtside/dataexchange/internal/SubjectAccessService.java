@@ -12,6 +12,7 @@ import org.courtside.identity.UserAccount;
 import org.courtside.identity.UserAccountRepository;
 import org.courtside.member.Member;
 import org.courtside.member.MemberRepository;
+import org.courtside.member.GuardianshipService;
 import org.courtside.member.MemberService;
 import org.courtside.notification.PersonMessageHistory;
 import org.springframework.context.ApplicationEventPublisher;
@@ -43,6 +44,7 @@ public class SubjectAccessService {
     private final UserAccountRepository accounts;
     private final MemberRepository members;
     private final MemberService membershipTypes;
+    private final GuardianshipService guardianships;
     private final ExternalReferenceRepository references;
     private final PersonBookingHistory bookings;
     private final PersonAuditTrail auditTrail;
@@ -74,7 +76,7 @@ public class SubjectAccessService {
                         .sorted(ACCOUNT_PRECEDENCE)
                         .map(held -> accountOf(held, now))
                         .toList(),
-                membershipsOf(personId), made, recordedInSomebodyElses(personId, made),
+                membershipsOf(personId), guardianshipsOf(personId), made, recordedInSomebodyElses(personId, made),
                 eachAccount(accountIds, bookings::seriesCreatedBy),
                 eachAccount(accountIds, bookings::waitlistOf),
                 bookings.namedInWaitlists(personId),
@@ -111,6 +113,17 @@ public class SubjectAccessService {
                 account.getLocale(), account.isEnabled(), account.getCreatedAt(),
                 account.isPasswordChangeRequired(), account.getCredentialsExpireAt(),
                 account.getLastLoginAt(), account.credentialState(now), account.getRoles());
+    }
+
+    private List<SubjectAccessRecord.Guardianship> guardianshipsOf(UUID personId) {
+        return guardianships.guardianshipsOf(personId).stream()
+                .map(held -> {
+                    boolean guardian = held.guardian().personId().equals(personId);
+                    return new SubjectAccessRecord.Guardianship(held.id(), guardian,
+                            guardian ? held.dependant().personId() : held.guardian().personId(),
+                            held.grants(), held.startedOn(), held.endedOn());
+                })
+                .toList();
     }
 
     private List<SubjectAccessRecord.Membership> membershipsOf(UUID personId) {

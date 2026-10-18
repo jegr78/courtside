@@ -6,6 +6,7 @@ import org.courtside.booking.testfixture.BookingTestFixture;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
+import org.courtside.member.GuardianGrant;
 import org.courtside.member.testfixture.MemberTestFixture;
 import org.courtside.notification.MessageKind;
 import org.courtside.notification.testfixture.NotificationTestFixture;
@@ -346,6 +347,30 @@ class RetentionAdminControllerTest extends AbstractIntegrationTest {
         assertThat(payload).as("the change log counts what the run did and names nobody it removed")
                 .contains("\"formerMembersRemoved\": 1").doesNotContain(gone.toString())
                 .doesNotContain(account.toString()).doesNotContain("Doe");
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAFormerMemberWhoActsForADependant_whenTheRunApplies_thenTheRelationshipLeavesWithThem()
+            throws Exception {
+        // given
+        UUID gone = formerMember("Jane", "Doe", "jane.doe");
+        UUID dependant = roster.addPerson("John", "Roe", "john.roe@example.org");
+        roster.giveAccount(dependant, "john.roe", Set.of(Role.MEMBER));
+        roster.linkGuardian(gone, dependant, Set.of(GuardianGrant.BOOK));
+        keep("FORMER_MEMBERS", 24);
+        String preview = mockMvc.perform(post("/api/admin/retention/previews").with(csrf()))
+                .andReturn().getResponse().getContentAsString();
+
+        // when
+        mockMvc.perform(post("/api/admin/retention/previews/{id}/run", previewId(preview)).with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.formerMembersRemoved").value(1));
+
+        // then
+        assertThat(identity.personExists(gone)).isFalse();
+        assertThat(roster.guardianshipCount(dependant)).as("the dependant keeps no relationship to nobody")
+                .isZero();
     }
 
     @Test

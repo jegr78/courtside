@@ -30,6 +30,7 @@ class ValidationMessageCoverageTest {
     private static final List<String> CODE_CARRYING_EXCEPTION_SIMPLE_NAMES =
             List.of("ParticipantsInvalidException", "InvalidOpeningWindowException",
                     "InvalidMembershipPeriodException", "MembershipPeriodsOverlapException",
+                    "InvalidGuardianRelationshipException", "GuardianRelationshipOverlapException",
                     "RuleParameterInvalidException", "MembershipTypeRuleSetInvalidException",
                     "MembershipTypeRuleSetInactiveException", "MembershipTypeInactiveException",
                     "NoMembershipTypeRuleSetInactiveException", "NoMembershipTypeRuleSetInvalidException",

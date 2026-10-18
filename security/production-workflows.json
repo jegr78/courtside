@@ -434,7 +434,12 @@
         "listMembershipPeriods",
         "addMembershipPeriod",
         "correctMembershipPeriod",
-        "removeMembershipPeriod"
+        "removeMembershipPeriod",
+        "listGuardianRelationships",
+        "createGuardianRelationship",
+        "changeGuardianRelationship",
+        "endGuardianRelationship",
+        "removeGuardianRelationship"
       ],
       "backgroundEntryPoints": [
         "RosterSecurityEventLog#record(RosterEvent)"
@@ -442,6 +447,7 @@
       "stateTransitions": [
         "A person may gain or lose a current membership.",
         "A membership period may be added, corrected or removed, also one that begins or ends in the future.",
+        "A guardian relationship may be created, changed, ended or removed; it grants only the actions the board chose and no club role.",
         "An account may be created, corrected, enabled, disabled or assigned a new credential.",
         "Role and username changes revoke stale authority.",
         "Session termination removes one account's or every account's sessions."
@@ -453,16 +459,20 @@
       "failurePaths": [
         "The last enabled administrator cannot remove its own continuity.",
         "A membership period that would overlap another of the same person is refused.",
+        "A guardian relationship that would overlap another of the same two people, make two people each other's guardians, or link a person without an account is refused.",
         "Duplicate usernames, stale writes, invalid roles and missing recent proof refuse without partial security changes."
       ],
       "productionPaths": [
         "src/main/java/org/courtside/member/RosterService.java",
         "src/main/java/org/courtside/member/MembershipPeriodService.java",
+        "src/main/java/org/courtside/member/GuardianshipService.java",
         "src/main/java/org/courtside/identity/internal/AccountSessionService.java"
       ],
       "evidence": [
         "src/test/java/org/courtside/identity/SecurityDecisionEventTest.java#givenTheOnlyAdminWouldRemoveItsRole_whenContinuityRefusesIt_thenTheGuardIsRecorded",
-        "src/test/java/org/courtside/member/MembershipPeriodConcurrencyTest.java#givenTwoBoardMembersAddingOverlappingPeriodsAtOnce_whenBothAreInFlight_thenTheSecondWaitsAndIsRefused"
+        "src/test/java/org/courtside/member/MembershipPeriodConcurrencyTest.java#givenTwoBoardMembersAddingOverlappingPeriodsAtOnce_whenBothAreInFlight_thenTheSecondWaitsAndIsRefused",
+        "src/test/java/org/courtside/member/web/GuardianshipAdminControllerTest.java#givenARunningRelationship_whenTheSamePairIsLinkedAgain_thenTheOverlapIsRefused",
+        "src/test/java/org/courtside/member/web/GuardianshipAdminControllerTest.java#givenAStaleSignIn_whenTheBoardWritesARelationship_thenEveryWriteAsksForAFreshProof"
       ]
     },
     {

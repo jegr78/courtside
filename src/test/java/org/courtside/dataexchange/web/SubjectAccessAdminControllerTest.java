@@ -11,6 +11,7 @@ import org.courtside.dataexchange.ImportSourceService;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
+import org.courtside.member.GuardianGrant;
 import org.courtside.member.testfixture.MemberTestFixture;
 import org.courtside.shared.CancellationReason;
 import org.courtside.shared.OpeningWindow;
@@ -121,6 +122,33 @@ class SubjectAccessAdminControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.bookingsMade[0].partnerSearchPublishedAt").value("2026-05-12T10:00:00Z"))
                 .andExpect(jsonPath("$.notifications[?(@.kind == 'WAITLIST_OFFER')].waitlistEntryId")
                         .value(entryId.toString()));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAPersonActingForOneAndActedForByAnother_whenABoardAsks_thenBothRelationshipsAreAnsweredByIdOnly()
+            throws Exception {
+        // given
+        UUID personId = roster.addPerson("Jane", "Doe", "jane.doe@example.org");
+        UUID child = roster.addPerson("John", "Roe", "john.roe@example.org");
+        UUID parent = roster.addPerson("Mary", "Major", "mary.major@example.org");
+        roster.giveAccount(personId, "jane.doe", Set.of(Role.MEMBER));
+        roster.giveAccount(child, "john.roe", Set.of(Role.MEMBER));
+        roster.giveAccount(parent, "mary.major", Set.of(Role.MEMBER));
+        roster.linkGuardian(personId, child, Set.of(GuardianGrant.BOOK, GuardianGrant.VIEW_BOOKINGS));
+        roster.linkGuardian(parent, personId, Set.of(GuardianGrant.READ_MESSAGES));
+
+        // when / then
+        String body = mockMvc.perform(export(personId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.guardianships.length()").value(2))
+                .andExpect(jsonPath("$.guardianships[?(@.role == 'GUARDIAN')].otherPersonId").value(child.toString()))
+                .andExpect(jsonPath("$.guardianships[?(@.role == 'DEPENDANT')].otherPersonId")
+                        .value(parent.toString()))
+                .andExpect(jsonPath("$.guardianships[?(@.role == 'DEPENDANT')].grants[0]").value("READ_MESSAGES"))
+                .andReturn().getResponse().getContentAsString();
+        assertThat(body).as("the other people's names are theirs, not this person's")
+                .doesNotContain("Roe").doesNotContain("Major");
     }
 
     @Test
