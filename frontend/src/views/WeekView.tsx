@@ -111,6 +111,7 @@ export function WeekView({ today, clock = systemClock, canBook = true,
   const dayNavigationRef = useRef<HTMLElement>(null);
   const dayListRef = useRef<HTMLDivElement>(null);
   const eligibilityRequest = useRef(0);
+  const dependantsRequest = useRef(0);
   const shownDate = useRef<string>(undefined);
   const scrolledToNowOn = useRef<string>(undefined);
   const memberMoved = useRef(false);
@@ -159,8 +160,13 @@ export function WeekView({ today, clock = systemClock, canBook = true,
     setEligibility(undefined);
     clearEligibility();
     const refresh = () => {
+      const dependantsAsked = ++dependantsRequest.current;
       void api.dependants()
-        .then((dependants) => { if (active) setBookableDependants(dependants.filter((dependant) => dependant.grants.includes("BOOK"))); })
+        .then((dependants) => {
+          if (active && dependantsAsked === dependantsRequest.current) {
+            setBookableDependants(dependants.filter((dependant) => dependant.grants.includes("BOOK")));
+          }
+        })
         .catch((failure: unknown) => warnAbout("Dependants unavailable", failure));
       const request = ++eligibilityRequest.current;
       void api.bookingEligibility().then((current) => {

@@ -710,6 +710,37 @@ it("given a guardian allowed to book for one dependant and only to view another,
   expect(api.createBooking, "the guardian's own booking path is not used").not.toHaveBeenCalled();
 });
 
+it("given dependant refreshes overlap, when an older answer arrives last, then the latest list remains", async () => {
+  // given
+  const older = deferred<Awaited<ReturnType<typeof api.dependants>>>();
+  const latest = deferred<Awaited<ReturnType<typeof api.dependants>>>();
+  vi.mocked(api.dependants)
+    .mockResolvedValueOnce([])
+    .mockImplementationOnce(() => older.promise)
+    .mockImplementationOnce(() => latest.promise);
+  render(<WeekView today={clubInstant("12:00")} />);
+  const slot = await findFreeSlot(1, "12:30");
+  await waitFor(() => expect(slot).toHaveRole("button"));
+  await userEvent.click(slot);
+  expect(screen.getByRole("dialog")).toBeInTheDocument();
+  window.dispatchEvent(new Event("focus"));
+  window.dispatchEvent(new Event("focus"));
+
+  // when
+  await act(async () => {
+    latest.resolve([]);
+    await latest.promise;
+  });
+  await act(async () => {
+    older.resolve([{ personId: "person-2", firstName: "John", lastName: "Roe", grants: ["BOOK"], endedOn: null }]);
+    await older.promise;
+  });
+
+  // then
+  expect(screen.getByRole("dialog")).toBeInTheDocument();
+  expect(screen.queryByTestId("booking-for"), "an ended relationship is not offered again by a late answer").toBeNull();
+});
+
 it("given a guardian barred from courts who may book for a dependant, when they pick a free slot, then the dialog books for the dependant only", async () => {
   // given
   vi.mocked(api.bookingEligibility).mockResolvedValue({ violations: [{ code: "booking.rule.noCourtBooking", params: {} }] });
