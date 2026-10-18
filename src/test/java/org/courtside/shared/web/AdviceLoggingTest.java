@@ -45,6 +45,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
 import static org.assertj.core.api.InstanceOfAssertFactories.STRING;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 
 class AdviceLoggingTest {
 
@@ -108,12 +110,36 @@ class AdviceLoggingTest {
     }
 
     @Test
+    void givenAFailureThatRefusesAnAuthorization_whenItIsAnswered_thenTheDenialIsRecorded() {
+        // given
+        SecurityEventLog securityEvents = mock(SecurityEventLog.class);
+
+        // when
+        handler(securityEvents).handleDomainFailure(new RefusalFailure("refused"));
+
+        // then
+        verify(securityEvents).authorizationDeniedForCurrentAccount();
+    }
+
+    @Test
+    void givenAnOrdinaryFailure_whenItIsAnswered_thenNoDenialIsRecorded() {
+        // given
+        SecurityEventLog securityEvents = mock(SecurityEventLog.class);
+
+        // when
+        handler(securityEvents).handleDomainFailure(new NotFoundFailure("missing"));
+
+        // then
+        verify(securityEvents, never()).authorizationDeniedForCurrentAccount();
+    }
+
+    @Test
     void givenACodedDomainFailure_whenItIsAnswered_thenItsStatusTypeAndViolationAreLoggedAtInfo() {
         // given
         DomainFailure failure = new ConflictFailure("card.label.taken", Map.of("field", "cardLabel"));
 
         // when
-        new DomainFailureHandler(mock(ProblemTraceReference.class), mock(SecurityEventLog.class)).handleDomainFailure(failure);
+        handler(mock(SecurityEventLog.class)).handleDomainFailure(failure);
 
         // then
         assertThat(domainAppender.list).singleElement().satisfies(event -> {
@@ -135,7 +161,7 @@ class AdviceLoggingTest {
                 Map.of("externalIds", List.of(memberNumber)));
 
         // when
-        new DomainFailureHandler(mock(ProblemTraceReference.class), mock(SecurityEventLog.class)).handleDomainFailure(failure);
+        handler(mock(SecurityEventLog.class)).handleDomainFailure(failure);
 
         // then
         assertThat(domainAppender.list).singleElement().satisfies(event -> {
@@ -158,7 +184,7 @@ class AdviceLoggingTest {
         DomainFailure failure = new NotFoundFailure("Card label %s is already taken".formatted(rejectedLabel));
 
         // when
-        new DomainFailureHandler(mock(ProblemTraceReference.class), mock(SecurityEventLog.class)).handleDomainFailure(failure);
+        handler(mock(SecurityEventLog.class)).handleDomainFailure(failure);
 
         // then
         assertThat(domainAppender.list).singleElement().satisfies(event -> {
@@ -181,7 +207,7 @@ class AdviceLoggingTest {
 
         // when
         try {
-            new DomainFailureHandler(mock(ProblemTraceReference.class), mock(SecurityEventLog.class)).handleDomainFailure(failure);
+            handler(mock(SecurityEventLog.class)).handleDomainFailure(failure);
         } finally {
             SecurityContextHolder.clearContext();
         }
@@ -222,7 +248,7 @@ class AdviceLoggingTest {
                 new DataIntegrityViolationException(DUPLICATE_USERNAME));
 
         // when
-        new DomainFailureHandler(mock(ProblemTraceReference.class), mock(SecurityEventLog.class)).handleDomainFailure(failure);
+        handler(mock(SecurityEventLog.class)).handleDomainFailure(failure);
 
         // then
         assertThat(domainAppender.list).singleElement().satisfies(event -> {
@@ -498,6 +524,26 @@ class AdviceLoggingTest {
 
     private static Logger securityLogger() {
         return (Logger) LoggerFactory.getLogger("org.courtside.security.events");
+    }
+
+    private static DomainFailureHandler handler(SecurityEventLog securityEvents) {
+        return new DomainFailureHandler(mock(ProblemTraceReference.class), securityEvents);
+    }
+
+    private static final class RefusalFailure extends DomainFailure {
+        RefusalFailure(String message) {
+            super(message);
+        }
+
+        @Override
+        public ProblemType problemType() {
+            return NOT_FOUND;
+        }
+
+        @Override
+        public boolean refusesAuthorization() {
+            return true;
+        }
     }
 
     private static final class NotFoundFailure extends DomainFailure {
