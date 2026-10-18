@@ -4,7 +4,7 @@
   "purpose": "This is the normative authorization policy for the shipped Courtside API. OpenAPI defines the transport shape; this policy defines who may perform each operation, which resource attributes narrow that permission, and which protected fields each projection may read or write.",
   "openApiFieldInventorySha256": "bd484404a04854d30da3c4f7c8d9ffa650a53b6d18c8b67de773b36272738199",
   "protectedFieldInventorySha256": "986f4786b6d260347b8e21f3a8b68ca4a04580a75cd23738a6a0252da159ed5f",
-  "productionAuthorizationSha256": "904cc39fabf4652bd5aef1a9b9935dfa244c5d6c3c04566f71ba5af067136939",
+  "productionAuthorizationSha256": "fdbb84b8d5d04d9955b92e5beaccc32a2feeb0a11c43761b49b2f9f701404832",
   "ordinaryFields": [
     "Problem.detail",
     "Problem.fieldErrors",
@@ -4138,7 +4138,7 @@
         "src/main/java/org/courtside/member/GuardianDelegation.java#requireBookable",
         "src/main/java/org/courtside/member/GuardianDelegation.java#requireReadableAccount",
         "src/main/java/org/courtside/member/GuardianRelationships.java#grantsFor",
-        "src/main/java/org/courtside/member/GuardianRelationships.java#mayActFor",
+        "src/main/java/org/courtside/member/GuardianRelationships.java#runningFor",
         "src/main/java/org/courtside/member/DependantService.java#dependantsOfCurrentAccount",
         "src/main/java/org/courtside/member/DependantService.java#requestCredentials",
         "src/main/java/org/courtside/booking/DependantBookings.java#bookingsOf",
