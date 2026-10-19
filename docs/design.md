@@ -386,7 +386,7 @@ The day plan is the primary member view. Courts share the available width and la
 scroll horizontally. Headings and the time axis stay visible. Occupancies span their duration.
 
 Mouse users may drag over adjacent free cells. Touch and pen input keep scrolling and use the
-duration control. The current day marks the current time and offers a return action. A date control
+duration control. The booking dialog mentions the drag only on a device with a fine pointer. The current day marks the current time and offers a return action. A date control
 opens another day directly.
 
 The public grid shows occupancy, the booking-card label where appropriate and participant count. It

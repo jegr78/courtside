@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
 
-// Dragging across slots in the plan follows a mouse only, so a device with any fine pointer can do it.
+// No media query names a mouse, so any fine pointer stands in for the one that can drag across slots.
 const finePointer = window.matchMedia("(any-pointer: fine)");
 
 function subscribe(changed: () => void) {
