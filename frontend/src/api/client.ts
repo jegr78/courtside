@@ -132,6 +132,7 @@ export type Participation = components["schemas"]["Participation"];
 export type ParticipationPage = components["schemas"]["ParticipationPage"];
 export type ManagedAppointment = components["schemas"]["ManagedAppointment"];
 export type ManagedAppointmentPage = components["schemas"]["ManagedAppointmentPage"];
+export type ManagedSeriesFacts = components["schemas"]["ManagedSeriesFacts"];
 export type ManagedAppointmentDetail = components["schemas"]["ManagedAppointmentDetail"];
 export type AttendanceOutcome = components["schemas"]["AttendanceOutcome"];
 export type AttendancePolicy = components["schemas"]["AttendancePolicy"];

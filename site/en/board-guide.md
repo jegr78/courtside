@@ -30,9 +30,10 @@ The same sidebar returns you to the court plan.
 
 *Club appointments* initially shows at most 20 upcoming appointments, nearest first. Switch to
 *History* for past and cancelled appointments. You can filter by court or booking type and load
-further matches page by page. Loaded occurrences of one series start grouped and collapsed.
-*Details* remains directly available; *Cancel* sits under *Actions*. Create a new series at the top
-of the page.
+further matches page by page. Loaded occurrences of one series start grouped and collapsed. A
+series heading names its first and last date and counts all of its appointments, past and cancelled
+ones included, however many are loaded. *Details* remains directly available; *Cancel* sits under
+*Actions*. Create a new series at the top of the page.
 
 When you cancel somebody else's appointment, you may choose a reason: court condition, weather, club
 event, maintenance work or another reason. The member who booked and the players are told it. There

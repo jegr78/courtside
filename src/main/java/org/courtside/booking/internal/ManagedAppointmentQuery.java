@@ -15,9 +15,12 @@ import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
+import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor
@@ -37,7 +40,7 @@ public class ManagedAppointmentQuery {
         validatePageLimit(limit);
         Set<Role> managementRoles = BookingCard.managementRoles(roles);
         if (!roles.contains(Role.ADMIN) && managementRoles.isEmpty()) {
-            return new Page(List.of(), null);
+            return new Page(List.of(), List.of(), null);
         }
         List<UUID> ids = switch (view) {
             case UPCOMING -> bookings.findUpcomingManagedBookingIds(
@@ -48,7 +51,14 @@ public class ManagedAppointmentQuery {
                     cursor, PageRequest.of(0, Math.addExact(limit, 1)));
         };
         CursorPage.Result<Booking> page = CursorPage.of(ids, limit, bookings::findAllByIdIn, Booking::getId);
-        return new Page(page.items(), page.nextCursor());
+        Set<UUID> seriesIds = page.items().stream().map(Booking::getSeriesId).filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        List<SeriesFacts> series = seriesIds.isEmpty() ? List.of() : bookings.findManagedSeriesFacts(
+                        seriesIds, managementRoles, roles.contains(Role.ADMIN), clock.instant()).stream()
+                .map(row -> new SeriesFacts((UUID) row[0], (Instant) row[1], (Instant) row[2],
+                        (Long) row[3], (Long) row[4], (Long) row[5]))
+                .toList();
+        return new Page(page.items(), series, page.nextCursor());
     }
 
     private static void validatePageLimit(int limit) {
@@ -80,10 +90,11 @@ public class ManagedAppointmentQuery {
         return new Participant(participant.getKind().name(), displayName);
     }
 
-    public record Page(List<Booking> bookings, UUID nextCursor) {
+    public record Page(List<Booking> bookings, List<SeriesFacts> series, UUID nextCursor) {
 
         public Page {
             bookings = List.copyOf(bookings);
+            series = List.copyOf(series);
         }
     }
 

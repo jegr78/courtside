@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  api, type BookingGrid, type ManagedAppointment, type ManagedAppointmentView,
+  api, type BookingGrid, type ManagedAppointment, type ManagedAppointmentView, type ManagedSeriesFacts,
   type PublicBookingCard, type PublicCourt
 } from "../api/client";
 import { Button } from "../components/Button";
@@ -25,6 +25,7 @@ export function AdminManagedAppointmentsView({ managesAppointments, createsSerie
   const [courtId, setCourtId] = useState("");
   const [cardId, setCardId] = useState("");
   const [appointments, setAppointments] = useState<ManagedAppointment[]>([]);
+  const [seriesFacts, setSeriesFacts] = useState<Map<string, ManagedSeriesFacts>>(new Map());
   const [nextCursor, setNextCursor] = useState<string>();
   const [courts, setCourts] = useState<PublicCourt[]>([]);
   const [cards, setCards] = useState<PublicBookingCard[]>([]);
@@ -54,6 +55,7 @@ export function AdminManagedAppointmentsView({ managesAppointments, createsSerie
       });
       if (version !== loadVersion.current) return;
       setAppointments(page.items);
+      setSeriesFacts(new Map(page.series.map((facts) => [facts.seriesId, facts])));
       setNextCursor(page.nextCursor ?? undefined);
       clear();
     } catch (failure) {
@@ -99,6 +101,7 @@ export function AdminManagedAppointmentsView({ managesAppointments, createsSerie
       });
       if (version !== loadVersion.current) return;
       setAppointments((current) => [...current, ...page.items]);
+      setSeriesFacts((current) => new Map([...current, ...page.series.map((facts) => [facts.seriesId, facts] as const)]));
       setNextCursor(page.nextCursor ?? undefined);
       clear();
     } catch (failure) {
@@ -172,7 +175,7 @@ export function AdminManagedAppointmentsView({ managesAppointments, createsSerie
         {groups.map((group) => group.series
           ? <details key={group.key} data-testid={`managed-series-${group.key}`} className="surface-raised rounded-lg border">
             <summary data-testid="managed-series-summary" className="focus-ring cursor-pointer px-3 py-4 font-semibold">
-              {seriesHeading(group.items, courtNames, i18n.language, timeZone, t)}
+              {seriesHeading(group.items, seriesFacts.get(group.key), courtNames, i18n.language, timeZone, t)}
             </summary>
             <ul className="divide-y border-t pl-4 sm:pl-8">{group.items.map((appointment) => <AppointmentRow key={appointment.id}
               appointment={appointment} courtNames={courtNames} locale={i18n.language} timeZone={timeZone}
@@ -279,19 +282,26 @@ function groupAppointments(appointments: ManagedAppointment[]) {
   return groups;
 }
 
-function seriesHeading(items: ManagedAppointment[], courtNames: Map<string, string>, locale: string,
-  timeZone: string | undefined, t: Translate) {
+function seriesHeading(items: ManagedAppointment[], facts: ManagedSeriesFacts | undefined, courtNames: Map<string, string>,
+  locale: string, timeZone: string | undefined, t: Translate) {
   const [first] = items;
   const courts = first.courtIds.map((id) => courtNames.get(id) ?? t("myBookings.unknownCourt")).join(", ");
-  const count = t("managedAppointments.loadedCount", { count: items.length });
-  if (!timeZone) return [first.cardLabel, courts, count].join(" · ");
+  const counts = facts && seriesCounts(facts, t);
+  if (!timeZone) return [first.cardLabel, courts, counts].filter(Boolean).join(" · ");
   const weekday = dateTimeFormatter(locale, { weekday: "short", timeZone });
   const weekdays = [...new Set(sortedByWeekday(items, timeZone).map((item) => weekday.format(new Date(item.startsAt))))].join(", ");
-  const starts = items.map((item) => new Date(item.startsAt).getTime());
   const date = dateTimeFormatter(locale, { dateStyle: "medium", timeZone });
-  const dates = date.formatRange(Math.min(...starts), Math.max(...starts));
+  const dates = facts && date.formatRange(new Date(facts.firstStartsAt), new Date(facts.lastStartsAt));
   return [first.cardLabel, `${weekdays} ${formatBookingTimeRange(first.startsAt, first.endsAt, locale, timeZone)}`,
-    courts, dates, count].join(" · ");
+    courts, dates, counts].filter(Boolean).join(" · ");
+}
+
+function seriesCounts(facts: ManagedSeriesFacts, t: Translate) {
+  return [
+    t("managedAppointments.seriesOccurrences", { count: facts.occurrences }),
+    facts.past > 0 && t("managedAppointments.seriesPast", { count: facts.past }),
+    facts.cancelled > 0 && t("managedAppointments.seriesCancelled", { count: facts.cancelled })
+  ].filter(Boolean).join(", ");
 }
 
 function sortedByWeekday(items: ManagedAppointment[], timeZone: string) {
