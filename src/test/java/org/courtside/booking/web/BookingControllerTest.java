@@ -22,6 +22,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.courtside.shared.CancellationReason;
@@ -404,6 +405,108 @@ class BookingControllerTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].cardLabel").value(labelOf(MEMBER_BOOKING_CARD)));
+    }
+
+    @Test
+    @WithMockUser(username = "doe.jane", roles = "MEMBER")
+    void givenBookingsOnTwoDaysOfAWeek_whenReadingTheWeek_thenEachIsListedOnce() throws Exception {
+        // given
+        mockMvc.perform(bookingPost()
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(bookingJson("2026-05-12T18:00:00+02:00", "2026-05-12T19:00:00+02:00"))
+                        .with(csrf()))
+                .andExpect(status().isCreated());
+        mockMvc.perform(bookingPost()
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(bookingJson("2026-05-14T18:00:00+02:00", "2026-05-14T19:00:00+02:00"))
+                        .with(csrf()))
+                .andExpect(status().isCreated());
+
+        // when / then
+        mockMvc.perform(get("/api/bookings").param("from", "2026-05-11").param("to", "2026-05-17"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[*].startsAt", Matchers.containsInAnyOrder(
+                        "2026-05-12T16:00:00Z", "2026-05-14T16:00:00Z")));
+    }
+
+    @Test
+    void givenAnotherMembersBooking_whenReadingTheWeek_thenOwnershipAndParticipantsAreHidden() throws Exception {
+        // given
+        UUID participantId = accounts.findByUsername("major.mary").orElseThrow().getPerson().getId();
+        mockMvc.perform(bookingPost()
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(bookingJson(courtId, MEMBER_BOOKING_CARD,
+                                "{ \"personId\": \"%s\" }".formatted(participantId)))
+                        .with(user("doe.jane").roles("MEMBER"))
+                        .with(csrf()))
+                .andExpect(status().isCreated());
+
+        // when / then
+        mockMvc.perform(get("/api/bookings").param("from", "2026-05-11").param("to", "2026-05-17")
+                        .with(user("major.mary").roles("MEMBER")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].ownBooking").value(false))
+                .andExpect(jsonPath("$[0].cardLabel").value("?"))
+                .andExpect(jsonPath("$[0].cardColor").value("#999999"))
+                .andExpect(jsonPath("$[0].participantLastNames").doesNotExist())
+                .andExpect(jsonPath("$[0].bookedByName").doesNotExist());
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "2026-05-11, 2026-05-18, bookings.range.tooLong",
+            "2026-05-17, 2026-05-11, bookings.range.reversed",
+            "2026-05-11, , bookings.range.incomplete",
+            ", 2026-05-17, bookings.range.incomplete"
+    })
+    void givenARangeTheWeekCannotHold_whenReadingIt_thenItIsRefusedByName(
+            String from, String to, String refusal) throws Exception {
+        // given
+        var read = get("/api/bookings");
+        if (from != null) read = read.param("from", from);
+        if (to != null) read = read.param("to", to);
+
+        // when / then
+        mockMvc.perform(read)
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:day-range-invalid"))
+                .andExpect(jsonPath("$.violations[0].code").value(refusal));
+    }
+
+    @Test
+    void givenADayAndARange_whenReadingThem_thenTheReadIsRefusedByName() throws Exception {
+        // when / then
+        mockMvc.perform(get("/api/bookings").param("date", "2026-05-12")
+                        .param("from", "2026-05-11").param("to", "2026-05-17"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:day-range-invalid"))
+                .andExpect(jsonPath("$.violations[0].code").value("bookings.range.dayAndRange"));
+    }
+
+    @Test
+    void givenNeitherADayNorARange_whenReadingBookings_thenTheReadIsRefusedByName() throws Exception {
+        // when / then
+        mockMvc.perform(get("/api/bookings"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:day-range-invalid"))
+                .andExpect(jsonPath("$.violations[0].code").value("bookings.range.incomplete"));
+    }
+
+    @Test
+    void givenAnEmptyWeek_whenLoadingThePublicGrid_thenItsQueryBudgetIsTheDaysBudget() throws Exception {
+        // given
+        queries.reset();
+
+        // when
+        mockMvc.perform(get("/api/bookings").param("from", "2026-05-11").param("to", "2026-05-17"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isEmpty());
+        SqlStatementCounter.Snapshot snapshot = queries.snapshot();
+
+        // then
+        assertThat(snapshot.total()).as(snapshot.toString()).isLessThanOrEqualTo(11);
+        assertThat(snapshot.category("other")).as(snapshot.toString()).isLessThanOrEqualTo(1);
     }
 
     @Test
