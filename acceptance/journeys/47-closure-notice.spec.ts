@@ -37,7 +37,7 @@ test("given a disposable member's booking ten days after the lanes, when the adm
   const admin = await apiAs("admin");
   const member = await apiAs("disposable");
   const grid = await (await admin.get(`/api/public/booking-grid?from=${day}&to=${day}`)).json() as Grid;
-  const courts = await (await admin.get("/api/public/courts")).json() as { id: string; number: number }[];
+  const courts = await (await admin.get("/api/public/courts")).json() as { id: string; number: number; name?: string }[];
   const court = courts[courts.length - 1];
   const { opensAt } = governingHours(grid, day);
   precondition(!covers(grid.openingPeriods, day) && !covers(grid.courtClosures, day),
@@ -105,7 +105,8 @@ test("given a disposable member's booking ten days after the lanes, when the adm
       expect(mail!.text, "product: the mail names the booking's start").toContain(opensAt!.slice(0, 5));
       expect(mail!.text, "product: the mail names the booking's year").toContain(day.slice(0, 4));
       expect(mail!.text, "product: the mail names the day of the month").toMatch(new RegExp(`\\b${Number(day.slice(8))}\\b`));
-      expect(mail!.text, "product: the mail names the court").toMatch(new RegExp(`\\b${court.number}\\b`));
+      if (court.name) expect(mail!.text, "product: the mail names the court by its club name").toContain(court.name);
+      else expect(mail!.text, "product: the mail names the court by its number").toMatch(new RegExp(`\\b${court.number}\\b`));
       expect(mail!.text, "product: the mail keeps the admin's note to the board").not.toContain(NOTE);
     });
   } finally {
