@@ -624,9 +624,17 @@ input[type="time"] {
     scroll-snap-align: start;
   }
 
-  .week-day-option {
-    flex: 0 0 7rem;
+  .week-day-option,
+  .week-step {
+    flex: 0 0 calc((100% - (var(--week-day-count, 2) - 1) * 0.5rem) / var(--week-day-count, 2));
+    min-width: 0;
     scroll-snap-align: start;
+  }
+
+  .week-step {
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
   }
 
   .day-plan {
