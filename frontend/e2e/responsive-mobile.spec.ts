@@ -615,10 +615,11 @@ test.describe("without a service worker, so the page's own requests can be answe
     // given
     const longName = "Acceptance card with a name a club entered that is longer than the screen";
     await signIn(page, "doe.jane");
+    await expect(page.getByTestId("mobile-week-navigation")).toBeVisible();
     for (const path of ["booking-cards", "participant-cards"]) {
       const cards = await page.evaluate((url) => fetch(url).then((answer) => answer.json()), `/api/public/${path}`) as { label: string }[];
       await page.route(`**/api/public/${path}`, (route) => route.fulfill({ json: cards.map((card, index) =>
-        index === 0 ? { ...card, label: longName } : card) }));
+        ({ ...card, label: `${longName} ${index + 1}` })) }));
     }
     await selectJourneyDate(page, journeyService.visualDate);
 
@@ -630,7 +631,7 @@ test.describe("without a service worker, so the page's own requests can be answe
     await expect(dialog).toBeVisible();
     for (const choice of ["booking-card", "participant-card"]) {
       const select = dialog.getByTestId(choice);
-      await expect(select.locator("option", { hasText: longName }), `${choice} offers the long name`).toHaveCount(1);
+      await expect(select.locator("option", { hasText: longName }).first(), `${choice} offers a long name`).toBeAttached();
       const fits = await select.evaluate((element) => element.getBoundingClientRect().right
         <= element.closest('[data-testid="booking-dialog"]')!.getBoundingClientRect().right + 1);
       expect(fits, `${choice} stays inside the dialog`).toBe(true);
@@ -755,13 +756,13 @@ test("given a phone, when the member moves through the week, then the day strip 
   const navigation = page.getByTestId("mobile-week-navigation");
   const dayList = navigation.getByTestId("mobile-week-days");
   await expect(navigation).toBeVisible();
-  const partialItems = () => dayList.evaluate((list) => {
+  const shownItems = () => dayList.evaluate((list) => {
     const bounds = list.getBoundingClientRect();
     return [...list.children].map((item) => ({ id: item.getAttribute("data-testid"), box: item.getBoundingClientRect() }))
       .filter(({ box }) => box.right > bounds.left + 1 && box.left < bounds.right - 1)
-      .filter(({ box }) => box.left < bounds.left - 1 || box.right > bounds.right + 1)
-      .map(({ id }) => id);
+      .map(({ id, box }) => ({ id, whole: box.left >= bounds.left - 1 && box.right <= bounds.right + 1 }));
   });
+  const partialItems = async () => (await shownItems()).filter(({ whole }) => !whole).map(({ id }) => id);
 
   // then
   await expect.poll(partialItems, { message: "the loaded strip starts and ends on whole items" }).toEqual([]);
@@ -782,8 +783,8 @@ test("given a phone, when the member moves through the week, then the day strip 
   await dayList.evaluate((list) => { list.scrollLeft = list.scrollWidth; });
 
   // then
-  await expect(navigation.getByTestId("mobile-week-next"), "the end of the strip shows the next week whole")
-    .toBeInViewport({ ratio: 1 });
+  await expect.poll(shownItems, { message: "the end of the strip shows the next week whole and nothing cut" })
+    .toContainEqual({ id: "mobile-week-next", whole: true });
   expect(await partialItems(), "the strip's end is an item boundary").toEqual([]);
 });
 
