@@ -90,7 +90,19 @@ beforeEach(async () => {
     showGenericOccupancy: true,
     participantCount: 2
   }] : []));
+  vi.spyOn(api, "allocationsBetween").mockImplementation(async (from, to) =>
+    (await Promise.all(datesFrom(from, to).map((date) => vi.mocked(api.allocations).getMockImplementation()!(date)))).flat());
+  vi.spyOn(api, "reservedSlotsBetween").mockImplementation(async (from, to) =>
+    (await Promise.all(datesFrom(from, to).map((date) => vi.mocked(api.reservedSlots).getMockImplementation()!(date)))).flat());
 });
+
+function datesFrom(from: string, to: string): string[] {
+  const dates: string[] = [];
+  for (let day = new Date(`${from}T00:00:00Z`); day <= new Date(`${to}T00:00:00Z`); day = new Date(day.getTime() + 86_400_000)) {
+    dates.push(day.toISOString().slice(0, 10));
+  }
+  return dates;
+}
 
 afterEach(() => {
   vi.useRealTimers();
@@ -115,9 +127,12 @@ it("given the current week, when it loads, then every day and active court is av
   const title = await screen.findByTestId("occupancy-heading");
   expect(title).toHaveRole("heading");
   expect(title).toHaveTextContent("Court occupancy");
-  expect(api.allocations).toHaveBeenCalledTimes(7);
-  expect(api.allocations).toHaveBeenCalledWith("2026-08-10");
-  expect(api.allocations).toHaveBeenCalledWith("2026-08-16");
+  expect(api.allocationsBetween, "a week costs one bookings read").toHaveBeenCalledTimes(1);
+  expect(api.allocationsBetween).toHaveBeenCalledWith("2026-08-10", "2026-08-16");
+  expect(api.reservedSlotsBetween, "a week costs one reserved-slots read").toHaveBeenCalledTimes(1);
+  expect(api.reservedSlotsBetween).toHaveBeenCalledWith("2026-08-10", "2026-08-16");
+  expect(api.allocations, "no day of the week is read on its own").not.toHaveBeenCalled();
+  expect(api.reservedSlots, "no day of the week is read on its own").not.toHaveBeenCalled();
   expect(screen.getByTestId("court-heading-1")).toHaveTextContent("Centre Court");
   expect(screen.getByTestId("court-heading-2")).toHaveTextContent("Court 2");
   expect(screen.getByTestId("court-heading-1")).toHaveRole("columnheader");
@@ -206,8 +221,7 @@ it("given the current week, when opening the next week, then its seven days are 
   await userEvent.click(screen.getByTestId("week-next"));
 
   // then
-  await waitFor(() => expect(api.allocations).toHaveBeenCalledWith("2026-08-17"));
-  expect(api.allocations).toHaveBeenCalledWith("2026-08-23");
+  await waitFor(() => expect(api.allocationsBetween).toHaveBeenCalledWith("2026-08-17", "2026-08-23"));
   expect(screen.getByTestId("week-grid")).toHaveAttribute("data-week-offset", "1");
   expect(screen.getByTestId("day-selector-2026-08-17")).toBeInTheDocument();
   expect(screen.getByTestId("week-previous")).toBeInTheDocument();
@@ -474,7 +488,7 @@ it("given a week before daylight saving starts, when choosing the next week, the
   await userEvent.click(screen.getByTestId("week-next"));
 
   // then
-  await waitFor(() => expect(api.allocations).toHaveBeenCalledWith("2026-03-30"));
+  await waitFor(() => expect(api.allocationsBetween).toHaveBeenCalledWith("2026-03-30", "2026-04-05"));
   expect(screen.getByTestId("day-selector-2026-03-30")).toHaveAttribute("aria-pressed", "true");
 });
 
@@ -2147,7 +2161,7 @@ it("given the wide layout, when a date in another week is chosen there, then tha
   fireEvent.change(screen.getByTestId("week-date"), { target: { value: "2026-08-26" } });
 
   // then
-  await waitFor(() => expect(api.allocations).toHaveBeenCalledWith("2026-08-26"));
+  await waitFor(() => expect(api.allocationsBetween).toHaveBeenCalledWith("2026-08-24", "2026-08-30"));
   expect(screen.getByTestId("week-date")).toHaveValue("2026-08-26");
   expect(screen.getByTestId("day-selector-2026-08-26")).toHaveAttribute("aria-pressed", "true");
 });
@@ -2774,7 +2788,7 @@ it("given the week loads, when the bookings are still on their way, then the res
   render(<WeekView today={clubInstant("12:00")} />);
 
   // then
-  await waitFor(() => expect(api.reservedSlots, "reservations do not wait for the bookings").toHaveBeenCalledTimes(7));
+  await waitFor(() => expect(api.reservedSlotsBetween, "reservations do not wait for the bookings").toHaveBeenCalledTimes(1));
 });
 
 it("given a court reserved for somebody else, when the plan is shown, then it reads as reserved and names nobody", async () => {

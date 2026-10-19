@@ -736,6 +736,9 @@ export const api = {
   allocations: (date: string) => request<Allocation[]>(
     `/api/bookings?${new URLSearchParams({ date })}`
   ),
+  allocationsBetween: (from: string, to: string) => request<Allocation[]>(
+    `/api/bookings?${new URLSearchParams({ from, to })}`
+  ),
   bookingCards: () => request<PublicBookingCard[]>("/api/public/booking-cards"),
   bookingCardLegend: () => request<BookingCardLegendEntry[]>("/api/public/booking-card-legend"),
   participantCards: () => request<PublicParticipantCard[]>("/api/public/participant-cards"),
@@ -792,6 +795,9 @@ export const api = {
   ),
   reservedSlots: (date: string) => request<ReservedSlot[]>(
     `/api/reserved-slots?${new URLSearchParams({ date })}`
+  ),
+  reservedSlotsBetween: (from: string, to: string) => request<ReservedSlot[]>(
+    `/api/reserved-slots?${new URLSearchParams({ from, to })}`
   ),
   openPlaces: () => request<OpenPlace[]>("/api/partner-invitations"),
   acceptOpenPlace: (invitationId: string) => request<void>(

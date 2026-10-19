@@ -130,16 +130,18 @@ export function WeekView({ today, clock = systemClock, canBook = true,
         const clubToday = dateInTimeZone(referenceInstant, grid.timeZone);
         const weekStart = addDays(startOfWeek(clubToday), weekOffset * 7);
         const days = weekDays(weekStart);
-        const [dailyAllocations, dailyReservations] = await Promise.all([
-          Promise.all(days.map(async (day) => [formatDate(day), await api.allocations(formatDate(day))] as const)),
-          Promise.all(days.map(async (day) => [formatDate(day), await reservationsOn(formatDate(day))] as const))
+        const dates = days.map(formatDate);
+        const [weekAllocations, weekReservations] = await Promise.all([
+          api.allocationsBetween(dates[0], dates[dates.length - 1]),
+          reservationsBetween(dates[0], dates[dates.length - 1])
         ]);
         if (active) {
           setSelectedDate((current) => current && days.some((day) => formatDate(day) === current)
             ? current
             : weekOffset === 0 ? formatDate(clubToday) : formatDate(weekStart));
           setData({ grid, courts, bookingCards: currentBookingCards, days,
-            allocations: new Map(dailyAllocations), reservations: new Map(dailyReservations) });
+            allocations: byDay(dates, weekAllocations, grid.timeZone),
+            reservations: byDay(dates, weekReservations, grid.timeZone) });
         }
       }).catch((failure: unknown) => {
       if (active) {
@@ -937,6 +939,26 @@ function formatDayLong(date: Date, language: string, timeZone: string): string {
 function formatWeekRange(days: Date[], language: string, timeZone: string): string {
   const formatter = dateTimeFormatter(language, { year: "numeric", month: "short", day: "numeric", timeZone });
   return `${formatter.format(days[0])} – ${formatter.format(days[6])}`;
+}
+
+async function reservationsBetween(from: string, to: string): Promise<PlanAllocation[]> {
+  try {
+    return (await api.reservedSlotsBetween(from, to)).map(reservedAllocation);
+  } catch (failure) {
+    warnAbout("Reserved slots unavailable", failure);
+    return [];
+  }
+}
+
+// An entry belongs to every club day it overlaps, as it did when each day was read on its own.
+function byDay<T extends { startsAt: string; endsAt: string }>(dates: string[], entries: T[], timeZone: string): Map<string, T[]> {
+  const days = new Map(dates.map((date) => [date, [] as T[]]));
+  for (const entry of entries) {
+    const first = dateInTimeZoneValue(new Date(entry.startsAt), timeZone)!;
+    const last = dateInTimeZoneValue(new Date(Date.parse(entry.endsAt) - 1), timeZone)!;
+    for (const date of dates) if (first <= date && date <= last) days.get(date)!.push(entry);
+  }
+  return days;
 }
 
 async function reservationsOn(date: string): Promise<PlanAllocation[]> {
