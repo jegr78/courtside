@@ -32,6 +32,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -487,6 +488,54 @@ class SeriesControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.NotNull"));
     }
 
+    @Test
+    void givenASeriesLongerThanOnePage_whenItsManagerListsAppointments_thenThePageCarriesTheWholeSeriesFacts()
+            throws Exception {
+        // given
+        String created = mockMvc.perform(post("/api/booking-series")
+                        .with(user("trainer.john").roles("TRAINER"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(fourTuesdaysJson())
+                        .with(csrf()))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        UUID seriesId = UUID.fromString(JsonPath.read(created, "$.seriesId"));
+        List<String> bookingIds = JsonPath.read(created, "$.bookingIds");
+        mockMvc.perform(delete("/api/bookings/{id}", bookingIds.getLast())
+                        .with(user("trainer.john").roles("TRAINER"))
+                        .with(csrf()))
+                .andExpect(status().isNoContent());
+        jdbc.sql("""
+                UPDATE court_allocation SET starts_at = starts_at - interval '336 hours', ends_at = ends_at - interval '336 hours'
+                WHERE booking_id = :bookingId
+                """).param("bookingId", UUID.fromString(bookingIds.getFirst())).update();
+
+        // when / then
+        mockMvc.perform(get("/api/managed/bookings").param("limit", "1")
+                        .with(user("trainer.john").roles("TRAINER")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(1))
+                .andExpect(jsonPath("$.series.length()").value(1))
+                .andExpect(jsonPath("$.series[0].seriesId").value(seriesId.toString()))
+                .andExpect(jsonPath("$.series[0].occurrences").value(4))
+                .andExpect(jsonPath("$.series[0].cancelled").value(1))
+                .andExpect(jsonPath("$.series[0].past").value(1))
+                .andExpect(jsonPath("$.series[0].firstStartsAt").value("2026-03-24T16:00:00Z"))
+                .andExpect(jsonPath("$.series[0].lastStartsAt").value("2026-04-28T16:00:00Z"));
+    }
+
+    @Test
+    void givenASeries_whenAMemberWhoManagesNoCardListsAppointments_thenNoSeriesFactsAreAnswered() throws Exception {
+        // given
+        createSeriesAs("trainer.john");
+
+        // when / then
+        mockMvc.perform(get("/api/managed/bookings").with(user("doe.jane").roles("MEMBER")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items").isEmpty())
+                .andExpect(jsonPath("$.series").isEmpty());
+    }
+
     private String createSeriesAs(String username) throws Exception {
         return mockMvc.perform(post("/api/booking-series")
                         .with(user(username).roles("TRAINER"))
@@ -551,6 +600,27 @@ class SeriesControllerTest extends AbstractIntegrationTest {
                   "confirmedStarts": [
                     "2026-04-07T18:00:00+02:00",
                     "2026-04-14T18:00:00+02:00"
+                  ]
+                }
+                """.formatted(courtId);
+    }
+
+    private String fourTuesdaysJson() {
+        return """
+                {
+                  "courtIds": ["%s"],
+                  "cardId": "22222222-2222-2222-2222-222222222222",
+                  "startsOn": "2026-04-07",
+                  "startTime": "18:00:00",
+                  "durationMinutes": 120,
+                  "intervalWeeks": 1,
+                  "weekdays": ["TUESDAY"],
+                  "occurrenceCount": 4,
+                  "confirmedStarts": [
+                    "2026-04-07T18:00:00+02:00",
+                    "2026-04-14T18:00:00+02:00",
+                    "2026-04-21T18:00:00+02:00",
+                    "2026-04-28T18:00:00+02:00"
                   ]
                 }
                 """.formatted(courtId);

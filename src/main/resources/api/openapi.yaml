@@ -2611,14 +2611,42 @@ components:
 
     ManagedAppointmentPage:
       type: object
-      required: [items]
+      required: [items, series]
       properties:
         items:
           type: array
           items: { $ref: "#/components/schemas/ManagedAppointment" }
+        series:
+          type: array
+          description: |
+            The whole of every series an item on this page belongs to, counted over all its occurrences
+            the caller manages rather than the ones this page holds.
+          items: { $ref: "#/components/schemas/ManagedSeriesFacts" }
         nextCursor:
           type: [string, "null"]
           format: uuid
+
+    ManagedSeriesFacts:
+      type: object
+      required: [seriesId, firstStartsAt, lastStartsAt, occurrences, cancelled, past]
+      properties:
+        seriesId: { type: string, format: uuid }
+        firstStartsAt: { type: string, format: date-time }
+        lastStartsAt: { type: string, format: date-time }
+        occurrences:
+          type: integer
+          format: int32
+          minimum: 1
+        cancelled:
+          type: integer
+          format: int32
+          minimum: 0
+          description: Occurrences that were cancelled.
+        past:
+          type: integer
+          format: int32
+          minimum: 0
+          description: Occurrences not cancelled that have already started.
 
     ManagedParticipantKind:
       type: string

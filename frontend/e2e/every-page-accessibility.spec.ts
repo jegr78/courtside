@@ -42,7 +42,11 @@ const appointment = (index: number, seriesId: string | null) => ({
 
 // Single appointments between and after two series, the list shape that repeated a landmark.
 const managedAppointmentsPage = {
-  items: [appointment(1, "series-a"), appointment(2, null), appointment(3, "series-b"), appointment(4, null)]
+  items: [appointment(1, "series-a"), appointment(2, null), appointment(3, "series-b"), appointment(4, null)],
+  series: [[1, "series-a"], [3, "series-b"]].map(([index, seriesId]) => ({
+    seriesId, firstStartsAt: `2030-03-1${index}T16:00:00Z`, lastStartsAt: `2030-03-1${index}T16:00:00Z`,
+    occurrences: 1, cancelled: 0, past: 0
+  }))
 };
 
 async function standInsForEmptyTables(page: import("@playwright/test").Page) {

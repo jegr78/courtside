@@ -19,6 +19,7 @@ import org.courtside.api.ApiManagedAppointmentPage;
 import org.courtside.api.ApiManagedAppointmentView;
 import org.courtside.api.ApiManagedParticipant;
 import org.courtside.api.ApiManagedParticipantKind;
+import org.courtside.api.ApiManagedSeriesFacts;
 import org.courtside.api.BookingsApi;
 import org.courtside.booking.BookingService;
 import org.courtside.booking.CourtAllocation;
@@ -217,7 +218,14 @@ class BookingController implements BookingsApi {
                 .map(booking -> toManagedAppointment(booking, cardsById,
                         participantCounts.getOrDefault(booking.getId(), 0L), account.getId()))
                 .toList();
-        return ResponseEntity.ok(new ApiManagedAppointmentPage(items).nextCursor(page.nextCursor()));
+        List<ApiManagedSeriesFacts> series = page.series().stream()
+                .map(facts -> new ApiManagedSeriesFacts(facts.seriesId(),
+                        WireTypes.toOffsetDateTime(facts.firstStartsAt()),
+                        WireTypes.toOffsetDateTime(facts.lastStartsAt()),
+                        Math.toIntExact(facts.occurrences()), Math.toIntExact(facts.cancelled()),
+                        Math.toIntExact(facts.past())))
+                .toList();
+        return ResponseEntity.ok(new ApiManagedAppointmentPage(items, series).nextCursor(page.nextCursor()));
     }
 
     @Override

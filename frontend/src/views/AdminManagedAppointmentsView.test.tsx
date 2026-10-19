@@ -2,7 +2,7 @@ import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
-import { api, type ManagedAppointment } from "../api/client";
+import { api, type ManagedAppointment, type ManagedAppointmentPage, type ManagedSeriesFacts } from "../api/client";
 import i18n from "../i18n";
 import { AdminManagedAppointmentsView } from "./AdminManagedAppointmentsView";
 
@@ -15,12 +15,16 @@ const second: ManagedAppointment = {
   ...first, id: "22222222-2222-2222-2222-222222222222", startsAt: "2026-10-08T16:00:00Z",
   endsAt: "2026-10-08T17:00:00Z"
 };
+const seriesFacts: ManagedSeriesFacts[] = [
+  { seriesId: "series-1", firstStartsAt: "2026-09-17T16:00:00Z", lastStartsAt: "2026-12-17T17:00:00Z", occurrences: 14, cancelled: 1, past: 2 },
+  { seriesId: "series-2", firstStartsAt: "2026-10-05T18:00:00Z", lastStartsAt: "2026-10-05T18:00:00Z", occurrences: 1, cancelled: 0, past: 0 }
+];
 
 describe("AdminManagedAppointmentsView", () => {
   beforeEach(async () => {
     vi.restoreAllMocks();
     await i18n.changeLanguage("en");
-    vi.spyOn(api, "managedAppointments").mockResolvedValue({ items: [first, second] });
+    vi.spyOn(api, "managedAppointments").mockResolvedValue({ series: seriesFacts, items: [first, second] });
     vi.spyOn(api, "courts").mockResolvedValue([{ id: "court-1", number: 1, name: "Centre Court" }]);
     vi.spyOn(api, "bookingCards").mockResolvedValue([{
       id: "card-training", label: "Training", color: "#34584a", allowedPlayerCounts: [8], guestAllowed: false
@@ -44,7 +48,7 @@ describe("AdminManagedAppointmentsView", () => {
 
   it("given an account that manages appointments but may create no series, when nothing is scheduled, then the empty list does not point at a series form", async () => {
     // given
-    vi.mocked(api.managedAppointments).mockResolvedValue({ items: [] });
+    vi.mocked(api.managedAppointments).mockResolvedValue({ series: seriesFacts, items: [] });
 
     // when
     show({ managesAppointments: true, createsSeries: false });
@@ -103,7 +107,7 @@ describe("AdminManagedAppointmentsView", () => {
       view: "UPCOMING", courtId: undefined, cardId: undefined, limit: 20
     });
     expect(series).not.toHaveAttribute("open");
-    expect(within(series).getByTestId("managed-series-summary")).toHaveTextContent(/^Training · .* · 2 loaded appointments$/);
+    expect(within(series).getByTestId("managed-series-summary")).toHaveTextContent(/^Training · .* · Sep 17 – Dec 17, 2026 · 14 appointments, 2 past, 1 cancelled$/);
     expect(screen.getByTestId("new-series"), "creating work starts above the list").toBeInTheDocument();
   });
 
@@ -113,7 +117,7 @@ describe("AdminManagedAppointmentsView", () => {
       ...first, id: "33333333-3333-3333-3333-333333333333", seriesId: "series-2", courtIds: ["court-2"],
       startsAt: "2026-10-05T18:00:00Z", endsAt: "2026-10-05T19:00:00Z"
     };
-    vi.mocked(api.managedAppointments).mockResolvedValue({ items: [first, monday, second] });
+    vi.mocked(api.managedAppointments).mockResolvedValue({ series: seriesFacts, items: [first, monday, second] });
     vi.mocked(api.courts).mockResolvedValue([
       { id: "court-1", number: 1, name: "Centre Court" }, { id: "court-2", number: 2, name: "Court 2" }
     ]);
@@ -125,8 +129,9 @@ describe("AdminManagedAppointmentsView", () => {
     const thursdays = within(await screen.findByTestId("managed-series-series-1")).getByTestId("managed-series-summary");
     const mondays = within(screen.getByTestId("managed-series-series-2")).getByTestId("managed-series-summary");
     await waitFor(() => expect(thursdays).toHaveTextContent(/^Training · Thu 6:00\s?PM – 7:00\s?PM · Centre Court/));
-    expect(thursdays, "the loaded dates bound the series").toHaveTextContent(/Oct 1 – 8, 2026 · 2 loaded appointments$/);
-    expect(mondays).toHaveTextContent(/^Training · Mon 8:00\s?PM – 9:00\s?PM · Court 2 · Oct 5, 2026 · one loaded appointment$/);
+    expect(thursdays, "the server's facts describe the whole series, not the loaded rows")
+      .toHaveTextContent(/Sep 17 – Dec 17, 2026 · 14 appointments, 2 past, 1 cancelled$/);
+    expect(mondays).toHaveTextContent(/^Training · Mon 8:00\s?PM – 9:00\s?PM · Court 2 · Oct 5, 2026 · one appointment$/);
   });
 
   it("given a series on two weekdays, when the list loads, then its heading names both weekdays from Monday on", async () => {
@@ -134,7 +139,7 @@ describe("AdminManagedAppointmentsView", () => {
     const monday: ManagedAppointment = {
       ...first, id: "66666666-6666-6666-6666-666666666666", startsAt: "2026-10-05T16:00:00Z", endsAt: "2026-10-05T17:00:00Z"
     };
-    vi.mocked(api.managedAppointments).mockResolvedValue({ items: [first, monday] });
+    vi.mocked(api.managedAppointments).mockResolvedValue({ series: seriesFacts, items: [first, monday] });
 
     // when
     show();
@@ -150,7 +155,7 @@ describe("AdminManagedAppointmentsView", () => {
       ...first, id: "44444444-4444-4444-4444-444444444444", seriesId: null, startsAt: "2026-10-02T16:00:00Z", endsAt: "2026-10-02T17:00:00Z"
     };
     const other: ManagedAppointment = { ...second, id: "55555555-5555-5555-5555-555555555555", seriesId: "series-2" };
-    vi.mocked(api.managedAppointments).mockResolvedValue({ items: [first, single, other] });
+    vi.mocked(api.managedAppointments).mockResolvedValue({ series: seriesFacts, items: [first, single, other] });
 
     // when
     show();
@@ -173,7 +178,7 @@ describe("AdminManagedAppointmentsView", () => {
     const after: ManagedAppointment = {
       ...first, id: "66666666-6666-6666-6666-666666666666", seriesId: null, startsAt: "2026-10-09T16:00:00Z", endsAt: "2026-10-09T17:00:00Z"
     };
-    vi.mocked(api.managedAppointments).mockResolvedValue({ items: [first, between, other, after] });
+    vi.mocked(api.managedAppointments).mockResolvedValue({ series: seriesFacts, items: [first, between, other, after] });
 
     // when
     show();
@@ -317,12 +322,31 @@ describe("AdminManagedAppointmentsView", () => {
     expect(body, "the close button stays outside the scrolling body").not.toContainElement(screen.getByTestId("close-managed-appointment"));
   });
 
+  it("given a further page starts another series, when it loads, then that series is headed by its own server facts", async () => {
+    // given
+    const other: ManagedAppointment = { ...second, id: "55555555-5555-5555-5555-555555555555", seriesId: "series-2" };
+    vi.mocked(api.managedAppointments).mockImplementation((options) => Promise.resolve(options?.cursor
+      ? { items: [other], series: [{ ...seriesFacts[1], occurrences: 6, cancelled: 2 }] }
+      : { items: [first], series: [seriesFacts[0]], nextCursor: first.id }));
+    show();
+    await screen.findByTestId("managed-series-series-1");
+
+    // when
+    await userEvent.click(screen.getByTestId("managed-load-more"));
+
+    // then
+    const added = within(await screen.findByTestId("managed-series-series-2")).getByTestId("managed-series-summary");
+    expect(added, "the later page carries the facts of the series it starts").toHaveTextContent(/· 6 appointments, 2 cancelled$/);
+    expect(within(screen.getByTestId("managed-series-series-1")).getByTestId("managed-series-summary"),
+      "the first page's series keeps its facts").toHaveTextContent(/· 14 appointments, 2 past, 1 cancelled$/);
+  });
+
   it("given another upcoming page is in flight, when history opens, then the stale page is discarded", async () => {
     // given
-    let resolveMore!: (page: { items: ManagedAppointment[] }) => void;
+    let resolveMore!: (page: ManagedAppointmentPage) => void;
     vi.mocked(api.managedAppointments).mockImplementation((options) => {
       if (options?.cursor) return new Promise((resolve) => { resolveMore = resolve; });
-      return Promise.resolve(options?.view === "HISTORY" ? { items: [] } : { items: [first], nextCursor: first.id });
+      return Promise.resolve(options?.view === "HISTORY" ? { series: seriesFacts, items: [] } : { series: seriesFacts, items: [first], nextCursor: first.id });
     });
     show();
     await screen.findByTestId("managed-load-more");
@@ -334,7 +358,7 @@ describe("AdminManagedAppointmentsView", () => {
       view: "HISTORY", courtId: undefined, cardId: undefined, limit: 20
     }));
     await act(() => {
-      resolveMore({ items: [second] });
+      resolveMore({ series: seriesFacts, items: [second] });
       return Promise.resolve();
     });
 
@@ -347,7 +371,7 @@ describe("AdminManagedAppointmentsView", () => {
     let rejectMore!: (failure: Error) => void;
     vi.mocked(api.managedAppointments).mockImplementation((options) => {
       if (options?.cursor) return new Promise((_, reject) => { rejectMore = reject; });
-      return Promise.resolve({ items: [first], nextCursor: first.id });
+      return Promise.resolve({ series: seriesFacts, items: [first], nextCursor: first.id });
     });
     show();
     await screen.findByTestId("managed-load-more");
@@ -372,7 +396,7 @@ describe("AdminManagedAppointmentsView", () => {
     // given
     const cancel = vi.spyOn(api, "cancelSeries").mockResolvedValue(undefined);
     vi.mocked(api.managedAppointments).mockResolvedValue({
-      items: [{ ...first, ownBooking: false }, { ...second, ownBooking: false }]
+      series: seriesFacts, items: [{ ...first, ownBooking: false }, { ...second, ownBooking: false }]
     });
     show();
     await userEvent.click(within(await screen.findByTestId("managed-series-series-1")).getByTestId("managed-series-summary"));
@@ -390,7 +414,7 @@ describe("AdminManagedAppointmentsView", () => {
     // given
     const cancel = vi.spyOn(api, "cancelBooking").mockResolvedValue(undefined);
     const single = { ...first, id: "33333333-3333-3333-3333-333333333333", seriesId: null, ownBooking: false };
-    vi.mocked(api.managedAppointments).mockResolvedValue({ items: [single] });
+    vi.mocked(api.managedAppointments).mockResolvedValue({ series: seriesFacts, items: [single] });
     show();
     await userEvent.click(within(await screen.findByTestId(`booking-${single.id}`)).getByTestId("managed-cancel"));
 
@@ -423,7 +447,7 @@ describe("AdminManagedAppointmentsView", () => {
     let reads = 0;
     vi.mocked(api.managedAppointments).mockImplementation(() => {
       reads += 1;
-      return reads <= 2 ? Promise.resolve({ items: [first, second] }) : new Promise(() => undefined);
+      return reads <= 2 ? Promise.resolve({ series: seriesFacts, items: [first, second] }) : new Promise(() => undefined);
     });
     show();
     await userEvent.click(within(await screen.findByTestId("managed-series-series-1")).getByTestId("managed-series-summary"));
@@ -474,7 +498,7 @@ describe("AdminManagedAppointmentsView", () => {
     let reads = 0;
     vi.mocked(api.managedAppointments).mockImplementation(() => {
       reads += 1;
-      return reads <= 2 ? Promise.resolve({ items: [first, second] }) : new Promise(() => undefined);
+      return reads <= 2 ? Promise.resolve({ series: seriesFacts, items: [first, second] }) : new Promise(() => undefined);
     });
     show();
     await userEvent.click(within(await screen.findByTestId("managed-series-series-1")).getByTestId("managed-series-summary"));
@@ -501,7 +525,7 @@ describe("AdminManagedAppointmentsView", () => {
     // given
     vi.mocked(api.managedAppointments).mockImplementation((options) => options?.courtId
       ? new Promise(() => undefined)
-      : Promise.resolve({ items: [first], nextCursor: first.id }));
+      : Promise.resolve({ series: seriesFacts, items: [first], nextCursor: first.id }));
     show();
     await screen.findByTestId("managed-load-more");
 
@@ -517,14 +541,14 @@ describe("AdminManagedAppointmentsView", () => {
 
   it("given the first page is loading, when the active view is chosen again, then that load still completes", async () => {
     // given
-    let resolveInitial!: (page: { items: ManagedAppointment[] }) => void;
+    let resolveInitial!: (page: ManagedAppointmentPage) => void;
     vi.mocked(api.managedAppointments).mockReturnValue(new Promise((resolve) => { resolveInitial = resolve; }));
     show();
 
     // when
     await userEvent.click(screen.getByTestId("managed-view-UPCOMING"));
     await act(() => {
-      resolveInitial({ items: [first] });
+      resolveInitial({ series: seriesFacts, items: [first] });
       return Promise.resolve();
     });
 

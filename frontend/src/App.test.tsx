@@ -446,7 +446,7 @@ describe("AppRoutes", () => {
 
   it("given a trainer, when club appointments open, then the workspace is available without other administration pages", async () => {
     // given
-    vi.spyOn(api, "managedAppointments").mockResolvedValue({ items: [] });
+    vi.spyOn(api, "managedAppointments").mockResolvedValue({ items: [], series: [] });
     vi.spyOn(api, "courts").mockResolvedValue([]);
     vi.spyOn(api, "bookingCards").mockResolvedValue([]);
     vi.spyOn(api, "bookingGrid").mockResolvedValue({ timeZone: "Europe/Berlin", slotMinutes: 30, openingWeeks: [], openingPeriods: [], courtClosures: [], openingHours: [] });
@@ -479,7 +479,7 @@ describe("AppRoutes", () => {
 
   it("given a treasurer a card names as managing role, when opening club appointments, then the list is served without the series form", async () => {
     // given
-    vi.spyOn(api, "managedAppointments").mockResolvedValue({ items: [] });
+    vi.spyOn(api, "managedAppointments").mockResolvedValue({ items: [], series: [] });
     vi.spyOn(api, "courts").mockResolvedValue([]);
     vi.spyOn(api, "bookingCards").mockResolvedValue([]);
     vi.spyOn(api, "bookingGrid").mockResolvedValue({ timeZone: "Europe/Berlin", slotMinutes: 30, openingWeeks: [], openingPeriods: [], courtClosures: [], openingHours: [] });

@@ -31,8 +31,10 @@ Die Seitenleiste führt oben zur Übersicht und ordnet die Verwaltung darunter i
 Unter *Vereinstermine* stehen zunächst höchstens 20 anstehende Termine, der nächste zuerst. Mit
 *Verlauf* wechselst du zu vergangenen und stornierten Terminen. Filtere bei Bedarf nach Platz oder
 Buchungsart und lade weitere Treffer seitenweise nach. Geladene Termine derselben Serie sind
-eingeklappt zusammengefasst. *Details* bleibt direkt erreichbar; *Stornieren* liegt unter
-*Aktionen*. Neue Serien legst du am Anfang der Seite an.
+eingeklappt zusammengefasst. Der Kopf einer Serie nennt ihren ersten und letzten Termin und zählt
+alle ihre Termine, auch die vergangenen und abgesagten, unabhängig davon, wie viele geladen sind.
+*Details* bleibt direkt erreichbar; *Stornieren* liegt unter *Aktionen*. Neue Serien legst du am
+Anfang der Seite an.
 
 Stornierst du den Termin einer anderen Person, kannst du einen Grund wählen: Zustand des Platzes,
 Wetter, Veranstaltung des Vereins, Wartungsarbeiten oder ein anderer Grund. Die Person, die gebucht
