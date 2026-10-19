@@ -253,7 +253,7 @@ export function AdminRosterView() {
               {t("admin.roster.filter")}
               <select
                 data-testid="roster-filter"
-                className="form-control rounded-lg border px-3 py-3"
+                className="form-control w-full min-w-0 rounded-lg border px-3 py-3"
                 disabled={pending}
                 value={criteria.membershipTypeId ?? ""}
                 onChange={(event) => void read({ ...criteria, membershipTypeId: event.target.value || undefined })}

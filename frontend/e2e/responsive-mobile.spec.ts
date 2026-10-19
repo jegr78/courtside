@@ -557,10 +557,18 @@ test("member and administration surfaces remain usable on a touch viewport", asy
   await expectNoHorizontalOverflow(page);
 
   // when
+  await page.route("**/api/admin/rule-sets", async (route) => {
+    const sets = await (await route.fetch()).json() as { name: string }[];
+    await route.fulfill({ json: sets.map((set, index) => index === 0
+      ? { ...set, name: "Acceptance without a membership type and a rule set name longer than the screen" } : set) });
+  });
   await page.goto("/admin/membership-types");
 
   // then
   await expect(page.getByTestId("create-membership-type")).toBeVisible();
+  expect(await page.getByTestId("new-membership-type-rule-set").evaluate((select) =>
+    [...(select as HTMLSelectElement).options].some((option) => option.text.endsWith("longer than the screen"))),
+  "the rule set offered is the long one the layout must absorb").toBe(true);
   const typeRow = page.getByTestId("membership-type-cccccccc-0000-0000-0000-000000000001");
   expect(await typeRow.evaluate((element) => getComputedStyle(element).display)).toBe("grid");
   await expect(typeRow.getByTestId("membership-type-label-name")).toBeVisible();

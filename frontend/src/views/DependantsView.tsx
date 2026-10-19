@@ -63,7 +63,7 @@ export function DependantsView() {
       : <>
         {dependants.length > 1 && <label className="grid max-w-md gap-2 font-medium">
           {t("dependants.choose")}
-          <select data-testid="dependant-choice" className="form-control rounded-lg border px-3 py-3" value={chosen}
+          <select data-testid="dependant-choice" className="form-control w-full min-w-0 rounded-lg border px-3 py-3" value={chosen}
                   onChange={(event) => { setRefusal(undefined); setChosen(event.target.value); }}>
             {dependants.map((candidate) => <option key={candidate.personId} value={candidate.personId}>{nameOf(candidate)}</option>)}
           </select>

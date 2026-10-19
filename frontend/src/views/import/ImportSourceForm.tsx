@@ -277,7 +277,7 @@ export function ImportSourceForm({ source, types, disabled, save }: {
       <h3 className="text-lg font-semibold">{t("admin.import.columns")}</h3>
       {FIELDS.map((field) => <div key={field} className="grid gap-1">
         <label className="font-semibold" htmlFor={`${group}-column-${field}`}>{t(`admin.import.field.${field}`)}</label>
-        <select data-testid={`column-${field}`} id={`${group}-column-${field}`} className="rounded-md border p-2" disabled={disabled} value={mapping[field] ?? ""} onChange={(event) => void mapField(field, event.target.value)}>
+        <select data-testid={`column-${field}`} id={`${group}-column-${field}`} className="w-full min-w-0 rounded-md border p-2" disabled={disabled} value={mapping[field] ?? ""} onChange={(event) => void mapField(field, event.target.value)}>
           <option value="">{t("admin.import.noColumn")}</option>
           {[...new Set([...headers, mapping[field] ?? ""])].filter(Boolean).map((header) =>
             <option key={header} value={header}>{header}</option>)}
@@ -317,7 +317,7 @@ export function ImportSourceForm({ source, types, disabled, save }: {
       <h3 className="text-lg font-semibold">{t("admin.import.categories")}</h3>
       {knownValues.map((value) => <div key={value} className="grid gap-1">
         <label className="font-semibold" htmlFor={`${group}-category-${value}`}>{value}</label>
-        <select data-testid={`category-${value}`} id={`${group}-category-${value}`} className="rounded-md border p-2" disabled={disabled} value={categories[value] ?? ""} onChange={(event) => setCategories({ ...categories, [value]: event.target.value })}>
+        <select data-testid={`category-${value}`} id={`${group}-category-${value}`} className="w-full min-w-0 rounded-md border p-2" disabled={disabled} value={categories[value] ?? ""} onChange={(event) => setCategories({ ...categories, [value]: event.target.value })}>
           <option value="">{t("admin.import.noType")}</option>
           {typeOptions(categories[value] ?? "")}
         </select>
@@ -326,7 +326,7 @@ export function ImportSourceForm({ source, types, disabled, save }: {
 
     <div className="grid gap-1">
       <label className="font-semibold" htmlFor={`${group}-default-type`}>{t("admin.import.defaultType")}</label>
-      <select data-testid="source-default-type" id={`${group}-default-type`} className="rounded-md border p-2" disabled={disabled} value={defaultType} onChange={(event) => setDefaultType(event.target.value)}>
+      <select data-testid="source-default-type" id={`${group}-default-type`} className="w-full min-w-0 rounded-md border p-2" disabled={disabled} value={defaultType} onChange={(event) => setDefaultType(event.target.value)}>
         <option value="">{t("admin.import.noType")}</option>
         {typeOptions(defaultType)}
       </select>
