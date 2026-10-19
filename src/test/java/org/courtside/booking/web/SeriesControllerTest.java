@@ -501,14 +501,14 @@ class SeriesControllerTest extends AbstractIntegrationTest {
                 .andReturn().getResponse().getContentAsString();
         UUID seriesId = UUID.fromString(JsonPath.read(created, "$.seriesId"));
         List<String> bookingIds = JsonPath.read(created, "$.bookingIds");
-        mockMvc.perform(delete("/api/bookings/{id}", bookingIds.getLast())
+        mockMvc.perform(delete("/api/bookings/{id}", bookingIds.getFirst())
                         .with(user("trainer.john").roles("TRAINER"))
                         .with(csrf()))
                 .andExpect(status().isNoContent());
         jdbc.sql("""
                 UPDATE court_allocation SET starts_at = starts_at - interval '336 hours', ends_at = ends_at - interval '336 hours'
-                WHERE booking_id = :bookingId
-                """).param("bookingId", UUID.fromString(bookingIds.getFirst())).update();
+                WHERE booking_id IN (:bookingIds)
+                """).param("bookingIds", bookingIds.subList(0, 2).stream().map(UUID::fromString).toList()).update();
 
         // when / then
         mockMvc.perform(get("/api/managed/bookings").param("limit", "1")
