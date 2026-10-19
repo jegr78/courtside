@@ -50,7 +50,7 @@ function rawGroups(metrics) {
     for (const t of row.truncated) add(`trunc ${t.selector}`, "hint", "truncation", `Text cut off: ${t.selector}`, row);
     for (const t of row.smallTargets) add(`small ${t}`, "hint", "touch target", `Touch target under 44 px: ${t}`, row);
     for (const h of row.httpErrors) add(`http ${h.status} ${h.url.replace(/^https?:\/\/[^/]+/, "").split("?")[0]}`, "hint", "http", `HTTP ${h.status} ${h.url.replace(/^https?:\/\/[^/]+/, "").split("?")[0]}`, row);
-    if (row.settled === false) add(`unsettled ${row.label}`, "hint", "capture", `Loading status still shown at capture: ${row.label}`, row);
+    if (row.settled === false) add(`unsettled ${row.label}`, "major", "harness gap", `Captured while still loading, so the page is unchecked: ${row.label}`, row);
   }
   return [...groups.values()].sort((a, b) => ORDER[a.severity] - ORDER[b.severity]);
 }
