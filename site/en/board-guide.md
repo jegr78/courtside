@@ -187,8 +187,9 @@ The link below *Weeks* leads to entries that govern a range of days.
 
 - A **season** replaces the weekly hours from its first to its last day, with hours of its own
   for every weekday. Seasons do not overlap.
-- A **holiday** governs before seasons and weekly hours. It is closed all day or has one window
-  of its own. A holiday may lie inside a season; two holidays do not overlap.
+- A **holiday** governs before seasons and weekly hours. It has one window of its own or is
+  closed all day. A new holiday starts with the weekly hours of its first day; it closes only when
+  you tick *Closed*. A holiday may lie inside a season; two holidays do not overlap.
 - A **court closure** takes one court out of the plan for whole days, such as a renovation. The
   other courts stay open. Two closures of the same court do not overlap.
 
