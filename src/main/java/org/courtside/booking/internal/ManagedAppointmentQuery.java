@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
+import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -53,7 +54,10 @@ public class ManagedAppointmentQuery {
         Set<UUID> seriesIds = page.items().stream().map(Booking::getSeriesId).filter(Objects::nonNull)
                 .collect(Collectors.toSet());
         List<SeriesFacts> series = seriesIds.isEmpty() ? List.of() : bookings.findManagedSeriesFacts(
-                seriesIds, managementRoles, roles.contains(Role.ADMIN), clock.instant());
+                        seriesIds, managementRoles, roles.contains(Role.ADMIN), clock.instant()).stream()
+                .map(row -> new SeriesFacts((UUID) row[0], (Instant) row[1], (Instant) row[2],
+                        (Long) row[3], (Long) row[4], (Long) row[5]))
+                .toList();
         return new Page(page.items(), series, page.nextCursor());
     }
 

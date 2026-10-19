@@ -296,12 +296,11 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
                                     Pageable pageable);
 
     @Query("""
-            SELECT new org.courtside.booking.internal.SeriesFacts(b.seriesId, min(a.startsAt), max(a.startsAt),
-                       count(DISTINCT b.id),
-                       count(DISTINCT CASE WHEN b.status = org.courtside.booking.BookingStatus.CANCELLED
-                                           THEN b.id END),
-                       count(DISTINCT CASE WHEN b.status <> org.courtside.booking.BookingStatus.CANCELLED
-                                                AND a.startsAt < :now THEN b.id END))
+            SELECT b.seriesId, min(a.startsAt), max(a.startsAt), count(DISTINCT b.id),
+                   count(DISTINCT CASE WHEN b.status = org.courtside.booking.BookingStatus.CANCELLED
+                                       THEN b.id END),
+                   count(DISTINCT CASE WHEN b.status <> org.courtside.booking.BookingStatus.CANCELLED
+                                            AND a.startsAt < :now THEN b.id END)
             FROM Booking b JOIN b.allocations a
             WHERE b.seriesId IN :seriesIds
               AND (:administrator = true OR EXISTS (
@@ -310,7 +309,7 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
               ))
             GROUP BY b.seriesId
             """)
-    List<org.courtside.booking.internal.SeriesFacts> findManagedSeriesFacts(
+    List<Object[]> findManagedSeriesFacts(
             @Param("seriesIds") Collection<UUID> seriesIds,
             @Param("roles") Set<Role> roles,
             @Param("administrator") boolean administrator,
