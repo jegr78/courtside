@@ -963,9 +963,10 @@ test("a booking on a day the club has since closed stays in the phone plan", asy
     openingHours: week.map((dayOfWeek) => ({ dayOfWeek, opensAt: null, closesAt: null }))
   } }));
   await page.route("**/api/bookings?*", async (route) => {
-    const date = new URL(route.request().url()).searchParams.get("date");
-    await route.fulfill({ json: [{
-      bookingId: "33333333-3333-3333-3333-333333333333",
+    const query = new URL(route.request().url()).searchParams;
+    const dates = query.has("date") ? [query.get("date")!] : daysFrom(query.get("from")!, query.get("to")!);
+    await route.fulfill({ json: dates.map((date) => ({
+      bookingId: `33333333-3333-3333-3333-${date.replaceAll("-", "").padStart(12, "0")}`,
       courtId: "dddddddd-0000-0000-0000-000000000001",
       startsAt: `${date}T18:00:00+02:00`,
       endsAt: `${date}T19:00:00+02:00`,
@@ -974,7 +975,7 @@ test("a booking on a day the club has since closed stays in the phone plan", asy
       ownBooking: false,
       showGenericOccupancy: true,
       participantCount: 2
-    }] });
+    })) });
   });
 
   // when
@@ -988,6 +989,14 @@ test("a booking on a day the club has since closed stays in the phone plan", asy
   await expect(page.getByTestId("free-slot"), "a closed day offers nothing to book").toHaveCount(0);
   await expectNoHorizontalOverflow(page);
 });
+
+function daysFrom(from: string, to: string): string[] {
+  const days: string[] = [];
+  for (let day = new Date(`${from}T00:00:00Z`); day <= new Date(`${to}T00:00:00Z`); day = new Date(day.getTime() + 86_400_000)) {
+    days.push(day.toISOString().slice(0, 10));
+  }
+  return days;
+}
 
 async function expectInsideViewport(locator: import("@playwright/test").Locator, name: string) {
   const width = await locator.page().evaluate(() => document.documentElement.clientWidth);
