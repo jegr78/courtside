@@ -1424,7 +1424,7 @@ const en: Record<keyof typeof de, string> = {
   "environment.performance": "Performance test environment",
   "environment.loading": "Build and environment are being identified",
   "environment.unavailable": "Build and environment could not be identified",
-  "build.unavailable": "Version unavailable",
+  "build.appVersion": "v{{version}} · app",
   "build.about": "About Courtside",
   "build.version": "Version",
   "build.commit": "Commit",

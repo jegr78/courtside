@@ -1422,7 +1422,7 @@ const de = {
   "environment.performance": "Performance-Testumgebung",
   "environment.loading": "Build und Umgebung werden ermittelt",
   "environment.unavailable": "Build und Umgebung konnten nicht ermittelt werden",
-  "build.unavailable": "Version nicht verfügbar",
+  "build.appVersion": "v{{version}} · App",
   "build.about": "Über Courtside",
   "build.version": "Version",
   "build.commit": "Commit",
