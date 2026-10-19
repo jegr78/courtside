@@ -65,7 +65,7 @@ export async function capture(page: Page, label: string, opts: { expectedStatuse
     await page.screenshot({ path: `${base}-full.png`, fullPage: true });
     trace(label, "full shot");
     const stillQuiet = await page.locator(LOADING_NOTICE).count() === 0;
-    if (stillQuiet || attempt === 3) { settled = settled && stillQuiet; break; }
+    if (stillQuiet || !settled || attempt === 3) { settled = settled && stillQuiet; break; }
     settled = await settle(page);
   }
   const measured = await measure(page, profile.locale ?? "de");
