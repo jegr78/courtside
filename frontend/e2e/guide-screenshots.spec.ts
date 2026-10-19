@@ -188,6 +188,7 @@ const drivers: Record<string, (page: Page, visualDate: string) => Promise<void>>
     await page.getByTestId("opening-period-name").fill("Winter break");
     await page.getByTestId("opening-period-starts-on").fill("2026-12-24");
     await page.getByTestId("opening-period-ends-on").fill("2026-12-26");
+    await page.getByTestId("opening-period-closed-MONDAY").check();
     await page.getByTestId("save-opening-period").click();
     await expect(page.getByTestId("opening-periods")).toBeVisible();
     await page.getByTestId("court-closure-court").selectOption({ index: 1 });

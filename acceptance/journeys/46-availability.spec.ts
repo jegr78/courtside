@@ -12,7 +12,7 @@ import { step } from "../lib/steps";
 import { discovery, projectName } from "../lib/journey";
 import { recordCreated } from "../lib/ledger";
 import { precondition } from "../lib/precondition";
-import { answers } from "../lib/core.mjs";
+import { answers, occupying } from "../lib/core.mjs";
 
 type Entry = { id: string; startsOn: string; endsOn: string; courtId?: string };
 type Grid = { openingPeriods: Entry[]; courtClosures: Entry[]; openingWeeks: unknown[] };
@@ -31,6 +31,7 @@ async function refusedCodes(api: Api, courtId: string, date: string, opensAt: st
     participants: [{ personId: discovery.personIds["memberB"] }]
   }, { "Idempotency-Key": randomUUID() });
   const body = await refused.json().catch(() => ({}));
+  expect([201, 422], `product: the booking is decided by the rules (${JSON.stringify(body)})`).toContain(refused.status());
   if (refused.ok() && body.id) {
     recordCreated({ kind: "booking", id: body.id, by: "memberA", project: projectName() });
     await api.del(`/api/bookings/${body.id}`);
@@ -84,7 +85,10 @@ test("given a day beyond the lanes, when the admin adds a holiday and closes a c
       await page.getByTestId("opening-period-name").fill("Acceptance holiday");
       await page.getByTestId("opening-period-starts-on").fill(holiday);
       await page.getByTestId("opening-period-ends-on").fill(holiday);
-      await expect(page.getByTestId("opening-period-closed-MONDAY")).toBeChecked();
+      await expect(page.getByTestId("opening-period-closed-MONDAY"), "product: a new holiday is not closed by default").not.toBeChecked();
+      await expect(page.getByTestId("opening-period-opens-MONDAY"), "product: a new holiday starts with its day's weekly hours")
+        .toHaveValue(governingHours(grid, holiday).opensAt!.slice(0, 5));
+      await page.getByTestId("opening-period-closed-MONDAY").check();
       created.push({ form: "opening-period", path: "/api/admin/opening-periods",
         id: await saveEntry(page, "opening-period", "/api/admin/opening-periods") });
       await page.getByTestId("court-closure-court").selectOption(court.id);
@@ -132,6 +136,55 @@ test("given a day beyond the lanes, when the admin adds a holiday and closes a c
     });
   } finally {
     for (const entry of created) await admin.del(`${entry.path}/${entry.id}`);
+    await page.context().close();
+  }
+});
+
+test("given a day beyond the lanes, when the admin gives it a holiday window that opens later, then the server refuses a booking before the window and accepts one inside it", async ({ browser }) => {
+  // given
+  const holiday = addDays(lanePlan().sunday, 11);
+  const admin = await apiAs("admin");
+  const member = await apiAs("memberA");
+  const grid = await (await admin.get(`/api/public/booking-grid?from=${holiday}&to=${holiday}`)).json() as Grid;
+  const regular = governingHours(grid, holiday);
+  precondition(!covers(grid.openingPeriods, holiday), `no season or holiday of the club covers ${holiday}`);
+  precondition(regular.opensAt !== null && regular.closesAt !== null, `the weekly hours open ${holiday}`);
+  const regularOpening = regular.opensAt!.slice(0, 5);
+  const windowOpening = `${String(Number(regularOpening.slice(0, 2)) + 2).padStart(2, "0")}${regularOpening.slice(2)}`;
+  precondition(windowOpening < regular.closesAt!.slice(0, 5), `the weekly hours of ${holiday} last beyond ${windowOpening}`);
+  const courts = await (await admin.get("/api/public/courts")).json() as { id: string; number: number }[];
+  const startsAt = zonedInstant(holiday, windowOpening, lanePlan().timeZone);
+  const day = await (await admin.get(`/api/bookings?date=${holiday}`)).json();
+  const court = courts.find((candidate) => occupying(day, candidate.id, startsAt, new Date(startsAt.getTime() + 60 * 60_000)).length === 0);
+  precondition(court, `a court is free at ${windowOpening} on ${holiday}`);
+  const page = await openAs(browser, "admin");
+  let created: string | undefined;
+  try {
+    // when
+    await step("admin", "add holiday window", async () => {
+      await page.goto("/admin/facility/opening-hours/exceptions");
+      await expect(page.getByTestId("opening-period-form")).toBeVisible();
+      await page.getByTestId("opening-period-name").fill("Acceptance late opening");
+      await page.getByTestId("opening-period-starts-on").fill(holiday);
+      await page.getByTestId("opening-period-ends-on").fill(holiday);
+      await page.getByTestId("opening-period-opens-MONDAY").fill(windowOpening);
+      created = await saveEntry(page, "opening-period", "/api/admin/opening-periods");
+    });
+    // then
+    await step("memberA", "booking before the window refused, inside accepted", async () => {
+      expect(await refusedCodes(member, court.id, holiday, regularOpening), "product: the server refuses a booking before the holiday window")
+        .toContain("booking.rule.openingHours.outside");
+      expect(await refusedCodes(member, court.id, holiday, windowOpening), "product: the server accepts a booking inside the holiday window")
+        .toEqual([]);
+    });
+    // when
+    await step("admin", "remove holiday window", async () => {
+      await page.goto("/admin/facility/opening-hours/exceptions");
+      await removeEntry(page, "opening-period", "/api/admin/opening-periods", created!);
+      created = undefined;
+    });
+  } finally {
+    if (created) await admin.del(`/api/admin/opening-periods/${created}`);
     await page.context().close();
   }
 });

@@ -199,9 +199,10 @@ Der Link unter *Wochen* führt zu Einträgen, die für eine Zeitspanne gelten.
 
 - Eine **Saison** ersetzt vom ersten bis zum letzten Tag die Wochenzeiten, mit eigenen Zeiten je
   Wochentag. Saisons überschneiden sich nicht.
-- Ein **Feiertag** gilt vor Saison und Wochenzeiten. Er ist ganz geschlossen oder hat ein
-  eigenes Zeitfenster. Ein Feiertag darf in einer Saison liegen, zwei Feiertage überschneiden sich
-  nicht.
+- Ein **Feiertag** gilt vor Saison und Wochenzeiten. Er hat ein eigenes Zeitfenster oder ist
+  ganz geschlossen. Ein neuer Feiertag übernimmt die Wochenzeiten seines ersten Tages, geschlossen
+  ist er erst, wenn du *Geschlossen* ankreuzt. Ein Feiertag darf in einer Saison liegen, zwei
+  Feiertage überschneiden sich nicht.
 - Eine **Platzsperrung** nimmt einen Platz für ganze Tage aus dem Plan, etwa für eine Sanierung.
   Die anderen Plätze bleiben offen. Zwei Sperrungen desselben Platzes überschneiden sich nicht.
 
