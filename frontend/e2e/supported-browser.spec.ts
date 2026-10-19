@@ -53,7 +53,7 @@ async function signIn(page: import("@playwright/test").Page, username: string) {
   const csrfName = secure ? "__Host-XSRF-TOKEN" : "XSRF-TOKEN";
   await page.getByTestId("username").fill(username);
   await page.getByTestId("password").fill("temporary-password");
-  const allocationResponses = allocationResponseWaiter(page, 7);
+  const allocationResponses = allocationResponseWaiter(page, 1);
   const sessionResponse = page.waitForResponse((response) =>
     response.url().endsWith("/api/session") && response.request().method() === "POST");
   const csrfResponse = page.waitForResponse(async (response) =>
@@ -91,7 +91,7 @@ function allocationResponseWaiter(page: import("@playwright/test").Page, count: 
     };
     const onResponse = (response: import("@playwright/test").Response) => {
       const url = new URL(response.url());
-      if (response.request().method() !== "GET" || url.pathname !== "/api/bookings" || !url.searchParams.has("date")) return;
+      if (response.request().method() !== "GET" || url.pathname !== "/api/bookings" || !url.searchParams.has("from")) return;
       if (!response.ok()) {
         finish(() => reject(new Error(`Allocation request failed with status ${response.status()}`)));
         return;
