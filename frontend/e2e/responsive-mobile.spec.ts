@@ -610,6 +610,33 @@ test.describe("without a service worker, so the page's own requests can be answe
     "the rule set offered is the long one the layout must absorb").toBe(true);
     await expectNoHorizontalOverflow(page);
   });
+
+  test("given card names longer than the screen, when a member opens the booking dialog on a phone, then both card choices stay inside it", async ({ page, journeyService }) => {
+    // given
+    const longName = "Acceptance card with a name a club entered that is longer than the screen";
+    await signIn(page, "doe.jane");
+    for (const path of ["booking-cards", "participant-cards"]) {
+      const cards = await page.evaluate((url) => fetch(url).then((answer) => answer.json()), `/api/public/${path}`) as { label: string }[];
+      await page.route(`**/api/public/${path}`, (route) => route.fulfill({ json: cards.map((card, index) =>
+        index === 0 ? { ...card, label: longName } : card) }));
+    }
+    await selectJourneyDate(page, journeyService.visualDate);
+
+    // when
+    await page.locator('[data-testid="free-slot"][data-state="free"]').first().click();
+
+    // then
+    const dialog = page.getByTestId("booking-dialog");
+    await expect(dialog).toBeVisible();
+    for (const choice of ["booking-card", "participant-card"]) {
+      const select = dialog.getByTestId(choice);
+      await expect(select.locator("option", { hasText: longName }), `${choice} offers the long name`).toHaveCount(1);
+      const fits = await select.evaluate((element) => element.getBoundingClientRect().right
+        <= element.closest('[data-testid="booking-dialog"]')!.getBoundingClientRect().right + 1);
+      expect(fits, `${choice} stays inside the dialog`).toBe(true);
+    }
+    await expectNoHorizontalOverflow(page);
+  });
 });
 
 test("the initial-password form remains usable on a touch viewport", async ({ page }) => {
@@ -720,6 +747,44 @@ test("the phone reaches the whole week before the first bookable row", async ({ 
   const restoredFromOtherWeek = navigation.getByTestId(currentDayId!);
   await expect(restoredFromOtherWeek).toHaveAttribute("aria-pressed", "true");
   await expect(restoredFromOtherWeek).toBeInViewport();
+});
+
+test("given a phone, when the member moves through the week, then the day strip never rests on a partial item", async ({ page }) => {
+  // given
+  await signIn(page, "doe.jane");
+  const navigation = page.getByTestId("mobile-week-navigation");
+  const dayList = navigation.getByTestId("mobile-week-days");
+  await expect(navigation).toBeVisible();
+  const partialItems = () => dayList.evaluate((list) => {
+    const bounds = list.getBoundingClientRect();
+    return [...list.children].map((item) => ({ id: item.getAttribute("data-testid"), box: item.getBoundingClientRect() }))
+      .filter(({ box }) => box.right > bounds.left + 1 && box.left < bounds.right - 1)
+      .filter(({ box }) => box.left < bounds.left - 1 || box.right > bounds.right + 1)
+      .map(({ id }) => id);
+  });
+
+  // then
+  await expect.poll(partialItems, { message: "the loaded strip starts and ends on whole items" }).toEqual([]);
+
+  // when
+  await navigation.locator('[data-testid^="day-selector-"]').last().click();
+
+  // then
+  await expect.poll(partialItems, { message: "the last day leaves no sliver of the day before it" }).toEqual([]);
+
+  // when
+  await navigation.locator('[data-testid^="day-selector-"]').first().click();
+
+  // then
+  await expect.poll(partialItems, { message: "the first day leaves no sliver of the day after it" }).toEqual([]);
+
+  // when
+  await dayList.evaluate((list) => { list.scrollLeft = list.scrollWidth; });
+
+  // then
+  await expect(navigation.getByTestId("mobile-week-next"), "the end of the strip shows the next week whole")
+    .toBeInViewport({ ratio: 1 });
+  expect(await partialItems(), "the strip's end is an item boundary").toEqual([]);
 });
 
 test("the court plan describes its served cards, remaining room, and elapsed rows", async ({ page }) => {

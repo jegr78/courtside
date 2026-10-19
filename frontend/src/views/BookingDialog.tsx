@@ -241,7 +241,7 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
           {courtName(courts, selection.courtId, t)}</p>}
       <FieldViolations id="booking-courtIds-errors" violations={fieldViolations("courtIds")} />
       <label data-testid="booking-kind" className="mt-4 grid gap-2 font-medium">{t("booking.card")}
-        <select data-testid="booking-card" value={cardId} onChange={(event) => setCardId(event.target.value)} required aria-invalid={fieldViolations("cardId").length > 0} aria-describedby={describedBy("cardId")} className="form-control rounded-lg border px-3 py-3">
+        <select data-testid="booking-card" value={cardId} onChange={(event) => setCardId(event.target.value)} required aria-invalid={fieldViolations("cardId").length > 0} aria-describedby={describedBy("cardId")} className="form-control w-full min-w-0 rounded-lg border px-3 py-3">
           {bookingCards.map((card) => <option key={card.id} value={card.id}>{card.label}</option>)}
         </select>
       </label>
@@ -281,7 +281,7 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
         <legend className="font-semibold">{t("booking.participantCards")}</legend>
         {participantCardIds.map((participantCardId, index) => <label key={index} className="grid gap-2 font-medium">
           {index === 0 ? t("booking.participantCard") : t("booking.participantCardNumber", { number: index + 1 })}
-          <select data-testid="participant-card" value={participantCardId} onChange={(event) => setParticipantCardIds((current) => current.map((id, currentIndex) => currentIndex === index ? event.target.value : id))} className="form-control rounded-lg border px-3 py-3">
+          <select data-testid="participant-card" value={participantCardId} onChange={(event) => setParticipantCardIds((current) => current.map((id, currentIndex) => currentIndex === index ? event.target.value : id))} className="form-control w-full min-w-0 rounded-lg border px-3 py-3">
             <option value="">{t("booking.none")}</option>
             {participantCards.map((card) => <option key={card.id} value={card.id}>{card.label}</option>)}
           </select>
