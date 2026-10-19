@@ -18,6 +18,15 @@ const running: OpeningPeriod = {
   id: "period-running", kind: "SEASON", name: "Long season", startsOn: "2000-01-01", endsOn: "2099-12-31",
   days: weekdays.map((dayOfWeek) => ({ dayOfWeek, opensAt: "09:00:00", closesAt: "20:00:00" }))
 };
+const weekInForce = {
+  id: "week-now", effectiveFrom: null,
+  days: weekdays.map((dayOfWeek) => dayOfWeek === "SUNDAY" ? { dayOfWeek, opensAt: null, closesAt: null }
+    : { dayOfWeek, opensAt: "08:00:00", closesAt: "22:00:00" })
+};
+const weekFromJuly = {
+  id: "week-july", effectiveFrom: "2099-07-01",
+  days: weekdays.map((dayOfWeek) => ({ dayOfWeek, opensAt: dayOfWeek === "TUESDAY" ? "10:00:00" : "08:00:00", closesAt: "21:00:00" }))
+};
 const ended: OpeningPeriod = { ...future, id: "period-ended", startsOn: "2000-01-01", endsOn: "2000-01-02" };
 const courts = [
   { id: "court-1", number: 1, name: "Centre Court", active: true },
@@ -42,6 +51,7 @@ describe("AdminAvailabilityView", () => {
       { id: "closure-1", courtId: "court-2", name: "Resurfacing", startsOn: "2099-06-01", endsOn: "2099-06-30" }
     ]);
     vi.spyOn(api, "adminCourts").mockResolvedValue(courts);
+    vi.spyOn(api, "adminOpeningSchedule").mockResolvedValue([weekInForce, weekFromJuly]);
     vi.spyOn(api, "openingPeriodImpact").mockResolvedValue(noImpact);
     vi.spyOn(api, "courtClosureImpact").mockResolvedValue(noImpact);
   });
@@ -60,7 +70,7 @@ describe("AdminAvailabilityView", () => {
     expect(screen.getByTestId("court-closure-closure-1")).toHaveTextContent("Court 2: Resurfacing");
   });
 
-  it("given a new closed holiday, when it is saved, then every weekday is sent closed and the list reloads", async () => {
+  it("given a new holiday ticked closed, when it is saved, then every weekday is sent closed and the list reloads", async () => {
     // given
     const create = vi.spyOn(api, "createAdminOpeningPeriod").mockResolvedValue(future);
     show();
@@ -68,6 +78,7 @@ describe("AdminAvailabilityView", () => {
     fireEvent.change(screen.getByTestId("opening-period-name"), { target: { value: "Founding day" } });
     fireEvent.change(screen.getByTestId("opening-period-starts-on"), { target: { value: "2099-07-07" } });
     fireEvent.change(screen.getByTestId("opening-period-ends-on"), { target: { value: "2099-07-07" } });
+    await userEvent.click(screen.getByTestId("opening-period-closed-MONDAY"));
 
     // when
     await userEvent.click(screen.getByTestId("save-opening-period"));
@@ -88,7 +99,6 @@ describe("AdminAvailabilityView", () => {
     fireEvent.change(screen.getByTestId("opening-period-name"), { target: { value: "Short day" } });
     fireEvent.change(screen.getByTestId("opening-period-starts-on"), { target: { value: "2099-12-24" } });
     fireEvent.change(screen.getByTestId("opening-period-ends-on"), { target: { value: "2099-12-24" } });
-    await userEvent.click(screen.getByTestId("opening-period-closed-MONDAY"));
     fireEvent.change(screen.getByTestId("opening-period-opens-MONDAY"), { target: { value: "10:00" } });
     fireEvent.change(screen.getByTestId("opening-period-closes-MONDAY"), { target: { value: "14:00" } });
 
@@ -99,6 +109,52 @@ describe("AdminAvailabilityView", () => {
     await waitFor(() => expect(create).toHaveBeenCalledWith(expect.objectContaining({
       days: weekdays.map((dayOfWeek) => ({ dayOfWeek, opensAt: "10:00", closesAt: "14:00" }))
     })));
+  });
+
+  it("given a new holiday on a day the regular week opens, when it is saved untouched, then it keeps that day's regular window", async () => {
+    // given
+    const create = vi.spyOn(api, "createAdminOpeningPeriod").mockResolvedValue(future);
+    show();
+    await screen.findByTestId("opening-period-form");
+    fireEvent.change(screen.getByTestId("opening-period-name"), { target: { value: "Founding day" } });
+    fireEvent.change(screen.getByTestId("opening-period-starts-on"), { target: { value: "2099-07-07" } });
+    fireEvent.change(screen.getByTestId("opening-period-ends-on"), { target: { value: "2099-07-07" } });
+
+    // when
+    await userEvent.click(screen.getByTestId("save-opening-period"));
+
+    // then
+    expect(screen.getByTestId("opening-period-closed-MONDAY"), "a holiday closes only when the board says so").not.toBeChecked();
+    await waitFor(() => expect(create).toHaveBeenCalledWith(expect.objectContaining({
+      days: weekdays.map((dayOfWeek) => ({ dayOfWeek, opensAt: "10:00", closesAt: "21:00" }))
+    })));
+  });
+
+  it("given a new holiday on a day the regular week keeps closed, when its first day is entered, then the form starts closed", async () => {
+    // given
+    show();
+    await screen.findByTestId("opening-period-form");
+
+    // when
+    fireEvent.change(screen.getByTestId("opening-period-starts-on"), { target: { value: "2026-05-17" } });
+
+    // then
+    expect(screen.getByTestId("opening-period-closed-MONDAY"), "the Sunday of the week in force is closed").toBeChecked();
+  });
+
+  it("given a holiday window the board changed, when its first day moves, then the board's window stays", async () => {
+    // given
+    show();
+    await screen.findByTestId("opening-period-form");
+    fireEvent.change(screen.getByTestId("opening-period-starts-on"), { target: { value: "2099-07-07" } });
+    fireEvent.change(screen.getByTestId("opening-period-closes-MONDAY"), { target: { value: "13:00" } });
+
+    // when
+    fireEvent.change(screen.getByTestId("opening-period-starts-on"), { target: { value: "2099-07-08" } });
+
+    // then
+    expect(screen.getByTestId("opening-period-opens-MONDAY")).toHaveValue("10:00");
+    expect(screen.getByTestId("opening-period-closes-MONDAY"), "an edited window is the board's, not the week's").toHaveValue("13:00");
   });
 
   it("given a form without its days, when it is saved, then nothing is sent and the board is told what is missing", async () => {
@@ -179,6 +235,7 @@ describe("AdminAvailabilityView", () => {
     // when
     fireEvent.change(screen.getByTestId("opening-period-starts-on"), { target: { value: "2099-07-07" } });
     fireEvent.change(screen.getByTestId("opening-period-ends-on"), { target: { value: "2099-07-07" } });
+    await userEvent.click(screen.getByTestId("opening-period-closed-MONDAY"));
 
     // then
     expect(await screen.findByTestId("opening-period-affected")).toHaveTextContent("affects 2 existing bookings");

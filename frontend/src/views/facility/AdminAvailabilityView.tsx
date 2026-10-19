@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import {
   api, type AdminCourt, type CourtClosure, type CourtClosureImpactRequest, type DayOfWeek, type Impact,
-  type OpeningHours, type OpeningPeriod, type OpeningPeriodImpactRequest
+  type OpeningHours, type OpeningPeriod, type OpeningPeriodImpactRequest, type OpeningWeek
 } from "../../api/client";
 import { useClubConfiguration } from "../../club/registry";
 import { Button } from "../../components/Button";
@@ -24,9 +24,8 @@ const IMPACT_DELAY_MS = 400;
 const askPeriodImpact = (question: string) => api.openingPeriodImpact(JSON.parse(question) as OpeningPeriodImpactRequest);
 const askClosureImpact = (question: string) => api.courtClosureImpact(JSON.parse(question) as CourtClosureImpactRequest);
 
-const newPeriod = (): PeriodDraft => ({
-  kind: "HOLIDAY", name: "", startsOn: "", endsOn: "",
-  days: weekdays.map((dayOfWeek) => ({ dayOfWeek, opensAt: "", closesAt: "", closed: true }))
+const newPeriod = (schedule: OpeningWeek[] = []): PeriodDraft => ({
+  kind: "HOLIDAY", name: "", startsOn: "", endsOn: "", days: holidayWindow(regularDays(schedule, ""), "")
 });
 const newClosure = (courtId = ""): ClosureDraft => ({ courtId, name: "", startsOn: "", endsOn: "" });
 
@@ -36,24 +35,27 @@ export function AdminAvailabilityView() {
   const [periods, setPeriods] = useState<OpeningPeriod[]>();
   const [closures, setClosures] = useState<CourtClosure[]>();
   const [courts, setCourts] = useState<AdminCourt[]>();
+  const [schedule, setSchedule] = useState<OpeningWeek[]>();
   const [period, setPeriod] = useState<PeriodDraft>(newPeriod);
   const [closure, setClosure] = useState<ClosureDraft>(newClosure);
   const { error, success, pending, reportError, refuse, save } = useSaving();
   const today = useMemo(() => dateInTimeZoneValue(new Date(), club?.timeZone), [club?.timeZone]);
 
   useEffect(() => {
-    void Promise.all([api.adminOpeningPeriods(), api.adminCourtClosures(), api.adminCourts()])
-      .then(([loadedPeriods, loadedClosures, loadedCourts]) => {
+    void Promise.all([api.adminOpeningPeriods(), api.adminCourtClosures(), api.adminCourts(), api.adminOpeningSchedule()])
+      .then(([loadedPeriods, loadedClosures, loadedCourts, loadedSchedule]) => {
         setPeriods(loadedPeriods);
         setClosures(loadedClosures);
         setCourts(loadedCourts);
+        setSchedule(loadedSchedule);
+        setPeriod((current) => current.id ? current : newPeriod(loadedSchedule));
       })
       .catch(reportError);
   }, [reportError]);
 
   const editedPeriod = periods?.find((entry) => entry.id === period.id);
   const editedClosure = closures?.find((entry) => entry.id === closure.id);
-  useUnsavedMark("opening-period", differs(period, editedPeriod ? toDraft(editedPeriod) : newPeriod()));
+  useUnsavedMark("opening-period", differs(period, editedPeriod ? toDraft(editedPeriod) : newPeriod(schedule)));
   useUnsavedMark("court-closure", differs(closure, editedClosure ? { ...editedClosure } : newClosure()));
   const periodQuestion = period.startsOn && period.endsOn && period.endsOn >= period.startsOn
     && period.days.every((day) => day.closed || (day.opensAt && day.closesAt))
@@ -79,7 +81,7 @@ export function AdminAvailabilityView() {
       if (period.id) await api.changeAdminOpeningPeriod(period.id, body);
       else await api.createAdminOpeningPeriod(body);
       setPeriods(await api.adminOpeningPeriods());
-      setPeriod(newPeriod());
+      setPeriod(newPeriod(schedule));
     });
   }
 
@@ -101,7 +103,7 @@ export function AdminAvailabilityView() {
     void save(`opening-period-${entry.id}`, async () => {
       await api.removeAdminOpeningPeriod(entry.id);
       setPeriods(await api.adminOpeningPeriods());
-      if (period.id === entry.id) setPeriod(newPeriod());
+      if (period.id === entry.id) setPeriod(newPeriod(schedule));
     });
   }
 
@@ -113,7 +115,7 @@ export function AdminAvailabilityView() {
     });
   }
 
-  const loaded = periods && closures && courts && today;
+  const loaded = periods && closures && courts && schedule && today;
   return <FacilityPage testId="admin-availability-view" title={t("admin.availability.title")}
                        error={error ?? clubError} success={success}>
     {loaded && <div className="grid gap-6 lg:grid-cols-2">
@@ -128,10 +130,10 @@ export function AdminAvailabilityView() {
           today={today} disabled={pending.size > 0}
           edit={(id) => setPeriod(toDraft(periods.find((entry) => entry.id === id)!))}
           remove={(id) => removePeriod(periods.find((entry) => entry.id === id)!)} />
-        <PeriodForm draft={period} today={today} started={!!editedPeriod && editedPeriod.startsOn < today}
+        <PeriodForm draft={period} schedule={schedule} today={today} started={!!editedPeriod && editedPeriod.startsOn < today}
                     affected={periodAffected}
                     disabled={pending.has("opening-period")} changed={setPeriod}
-                    submit={(event) => void savePeriod(event)} cancel={() => setPeriod(newPeriod())} />
+                    submit={(event) => void savePeriod(event)} cancel={() => setPeriod(newPeriod(schedule))} />
       </section>
       <section aria-labelledby="court-closures-heading" className="grid content-start gap-4">
         <h2 id="court-closures-heading" className="text-2xl font-bold">{t("admin.availability.closures")}</h2>
@@ -179,8 +181,8 @@ function EntryList({ testId, empty, entries, today, disabled, edit, remove }: {
   </ul>;
 }
 
-function PeriodForm({ draft, today, started, affected, disabled, changed, submit, cancel }: {
-  draft: PeriodDraft; today: string; started: boolean; affected: number; disabled: boolean;
+function PeriodForm({ draft, schedule, today, started, affected, disabled, changed, submit, cancel }: {
+  draft: PeriodDraft; schedule: OpeningWeek[]; today: string; started: boolean; affected: number; disabled: boolean;
   changed: (draft: PeriodDraft) => void; submit: (event: FormEvent<HTMLFormElement>) => void; cancel: () => void;
 }) {
   const { t } = useTranslation();
@@ -195,7 +197,7 @@ function PeriodForm({ draft, today, started, affected, disabled, changed, submit
     <label className="grid gap-2 font-medium">{t("admin.availability.kindLabel")}
       <select data-testid="opening-period-kind" className="form-control rounded-lg border px-3 py-3" value={draft.kind}
               disabled={disabled || started}
-              onChange={(event) => changed(holidayHours({ ...draft, kind: event.target.value as Kind }))}>
+              onChange={(event) => changed(withKind(draft, event.target.value as Kind, schedule))}>
         <option value="HOLIDAY">{t("admin.availability.kind.HOLIDAY")}</option>
         <option value="SEASON">{t("admin.availability.kind.SEASON")}</option>
       </select>
@@ -205,7 +207,7 @@ function PeriodForm({ draft, today, started, affected, disabled, changed, submit
     <div className="grid gap-3 sm:grid-cols-2">
       <TextField data-testid="opening-period-starts-on" type="date" min={today} label={t("admin.availability.startsOn")}
                  disabled={disabled || started} value={draft.startsOn}
-                 onChange={(event) => changed({ ...draft, startsOn: event.target.value })} />
+                 onChange={(event) => changed(withStart(draft, event.target.value, schedule))} />
       <TextField data-testid="opening-period-ends-on" type="date" min={draft.startsOn || today}
                  label={t("admin.availability.endsOn")} disabled={disabled} value={draft.endsOn}
                  onChange={(event) => changed({ ...draft, endsOn: event.target.value })} />
@@ -306,10 +308,41 @@ function courtLabel(courts: AdminCourt[], courtId: string, t: ReturnType<typeof 
   return court.name ? `${t("court.number", { number: court.number })}, ${court.name}` : t("court.number", { number: court.number });
 }
 
-// A holiday holds one window for every weekday, so switching to it keeps Monday's for all.
-function holidayHours(draft: PeriodDraft): PeriodDraft {
-  if (draft.kind !== "HOLIDAY") return draft;
-  return { ...draft, days: draft.days.map((day) => ({ ...draft.days[0], dayOfWeek: day.dayOfWeek })) };
+// The week that governs a day is the last one taking effect on or before it; without a day, the one in force.
+function regularDays(schedule: OpeningWeek[], date: string): Hours[] {
+  const week = (date ? schedule.filter((entry) => !entry.effectiveFrom || entry.effectiveFrom <= date).at(-1) : undefined) ?? schedule[0];
+  return weekdays.map((dayOfWeek) => {
+    const hours = week?.days.find((day) => day.dayOfWeek === dayOfWeek);
+    return hours?.opensAt && hours.closesAt
+      ? { dayOfWeek, opensAt: shortTime(hours.opensAt), closesAt: shortTime(hours.closesAt), closed: false }
+      : { dayOfWeek, opensAt: "", closesAt: "", closed: true };
+  });
+}
+
+// A holiday holds one window for every weekday: the regular hours of its first day, Monday's until it has one.
+function holidayWindow(days: Hours[], startsOn: string): Hours[] {
+  const first = startsOn ? weekdays[(new Date(`${startsOn}T12:00:00Z`).getUTCDay() + 6) % 7] : "MONDAY";
+  const source = days.find((day) => day.dayOfWeek === first)!;
+  return days.map((day) => ({ ...source, dayOfWeek: day.dayOfWeek }));
+}
+
+function regularFor(kind: Kind, schedule: OpeningWeek[], startsOn: string): Hours[] {
+  const days = regularDays(schedule, startsOn);
+  return kind === "HOLIDAY" ? holidayWindow(days, startsOn) : days;
+}
+
+// The hours follow the regular week only while the board has not changed them.
+function untouched(draft: PeriodDraft, schedule: OpeningWeek[]): boolean {
+  return !draft.id && !differs(draft.days, regularFor(draft.kind, schedule, draft.startsOn));
+}
+
+function withStart(draft: PeriodDraft, startsOn: string, schedule: OpeningWeek[]): PeriodDraft {
+  return untouched(draft, schedule) ? { ...draft, startsOn, days: regularFor(draft.kind, schedule, startsOn) } : { ...draft, startsOn };
+}
+
+function withKind(draft: PeriodDraft, kind: Kind, schedule: OpeningWeek[]): PeriodDraft {
+  if (untouched(draft, schedule)) return { ...draft, kind, days: regularFor(kind, schedule, draft.startsOn) };
+  return kind === "HOLIDAY" ? { ...draft, kind, days: holidayWindow(draft.days, draft.startsOn) } : { ...draft, kind };
 }
 
 function toDraft(period: OpeningPeriod): PeriodDraft {
