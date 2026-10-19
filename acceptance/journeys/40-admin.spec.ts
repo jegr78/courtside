@@ -39,12 +39,11 @@ test("when the admin visits every administration page, then each renders", async
           appendFileSync(runPath("observations.jsonl"), JSON.stringify({ project: test.info().project.name, test: link, note: "menu link did not navigate, page opened by URL (see M2)" }) + "\n");
           await page.goto(href);
         }
-        const settled = await expect.poll(async () => {
+        const arrived = await expect.poll(async () => {
           const heading = (await page.locator("main h1, main h2").first().textContent().catch(() => "")) ?? "";
-          const loading = await page.locator('p[role="status"]').count();
-          return loading === 0 && heading !== "" && heading !== previousHeading;
+          return heading !== "" && heading !== previousHeading;
         }, { timeout: 15_000 }).toBe(true).then(() => true, () => false);
-        if (!settled) appendFileSync(runPath("observations.jsonl"), JSON.stringify({ project: test.info().project.name, test: link, note: "page heading unchanged or loading status still shown 15 s after navigation" }) + "\n");
+        if (!arrived) appendFileSync(runPath("observations.jsonl"), JSON.stringify({ project: test.info().project.name, test: link, note: "page heading unchanged 15 s after navigation" }) + "\n");
         previousHeading = (await page.locator("main h1, main h2").first().textContent().catch(() => "")) ?? "";
         await page.waitForLoadState("networkidle", { timeout: 3_000 }).catch(() => undefined);
         await capture(page, link.replace(/^admin-|-link$/g, ""));

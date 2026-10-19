@@ -27,6 +27,22 @@ export function watch(page: Page) {
   });
 }
 
+export const LOADING_NOTICE = 'p[role="status"]:not([data-testid]), p[aria-live]:not([data-testid])';
+
+const QUIET_MS = 1_000;
+
+// A page's own read can put its loading notice back after the first render, so one absent check proves nothing.
+export async function settle(page: Page, timeout = 15_000): Promise<boolean> {
+  const deadline = Date.now() + timeout;
+  let quietSince = Date.now();
+  while (Date.now() < deadline) {
+    if (await page.locator(LOADING_NOTICE).count() > 0) quietSince = Date.now();
+    else if (Date.now() - quietSince >= QUIET_MS) return true;
+    await page.waitForTimeout(100);
+  }
+  return false;
+}
+
 const trace = (label: string, phase: string) => { if (process.env.DEBUG_CAPTURE) console.log(`${new Date().toISOString()} capture ${label}: ${phase}`); };
 
 export async function capture(page: Page, label: string, opts: { expectedStatuses?: number[] } = {}) {
@@ -34,7 +50,7 @@ export async function capture(page: Page, label: string, opts: { expectedStatuse
   trace(label, "start");
   const profile = info.project.metadata as { locale: "de" | "en"; phone: boolean };
   const idle = await page.waitForLoadState("networkidle", { timeout: 3_000 }).then(() => true, () => false);
-  const settled = await page.locator('p[role="status"]:not([data-testid])').first().waitFor({ state: "detached", timeout: 10_000 }).then(() => true, () => false);
+  let settled = await settle(page);
   await page.evaluate(() => document.fonts?.ready).catch(() => undefined);
   const persona = personaOf.get(page) ?? "visitor";
   const directory = runPath(`shots/${info.project.name}/${persona}/${slug(info.title)}`);
@@ -43,10 +59,15 @@ export async function capture(page: Page, label: string, opts: { expectedStatuse
   counters.set(directory, count);
   const base = `${directory}/${String(count).padStart(2, "0")}-${label}`;
   trace(label, "idle done");
-  await page.screenshot({ path: `${base}.png` });
-  trace(label, "viewport shot");
-  await page.screenshot({ path: `${base}-full.png`, fullPage: true });
-  trace(label, "full shot");
+  for (let attempt = 1; ; attempt++) {
+    await page.screenshot({ path: `${base}.png` });
+    trace(label, "viewport shot");
+    await page.screenshot({ path: `${base}-full.png`, fullPage: true });
+    trace(label, "full shot");
+    const stillQuiet = await page.locator(LOADING_NOTICE).count() === 0;
+    if (stillQuiet || !settled || attempt === 3) { settled = settled && stillQuiet; break; }
+    settled = await settle(page);
+  }
   const measured = await measure(page, profile.locale ?? "de");
   trace(label, "measured");
   const axe = (await new AxeBuilder({ page }).analyze()).violations
