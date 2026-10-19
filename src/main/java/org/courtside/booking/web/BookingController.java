@@ -269,11 +269,10 @@ class BookingController implements BookingsApi {
     }
 
     @Override
-    public ResponseEntity<List<ApiAllocation>> listAllocations(LocalDate date) {
+    public ResponseEntity<List<ApiAllocation>> listAllocations(LocalDate date, LocalDate from, LocalDate to) {
         ZoneId zone = timeZone.zoneId();
-        List<CourtAllocation> allocations = bookings.allocationsBetween(
-                date.atStartOfDay(zone).toInstant(),
-                date.plusDays(1).atStartOfDay(zone).toInstant());
+        DayRange days = DayRange.of(date, from, to);
+        List<CourtAllocation> allocations = bookings.allocationsBetween(days.start(zone), days.end(zone));
 
         Map<UUID, BookingCard> cardsById = cards.allCards().stream()
                 .collect(Collectors.toMap(BookingCard::getId, card -> card));

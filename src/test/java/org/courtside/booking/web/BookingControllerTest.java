@@ -455,10 +455,10 @@ class BookingControllerTest extends AbstractIntegrationTest {
 
     @ParameterizedTest
     @CsvSource({
-            "2026-05-11, 2026-05-18, bookings.range.tooLong",
-            "2026-05-17, 2026-05-11, bookings.range.reversed",
-            "2026-05-11, , bookings.range.incomplete",
-            ", 2026-05-17, bookings.range.incomplete"
+            "2026-05-11, 2026-05-18, booking.dayRange.tooLong",
+            "2026-05-17, 2026-05-11, booking.dayRange.reversed",
+            "2026-05-11, , booking.dayRange.incomplete",
+            ", 2026-05-17, booking.dayRange.incomplete"
     })
     void givenARangeTheWeekCannotHold_whenReadingIt_thenItIsRefusedByName(
             String from, String to, String refusal) throws Exception {
@@ -481,7 +481,7 @@ class BookingControllerTest extends AbstractIntegrationTest {
                         .param("from", "2026-05-11").param("to", "2026-05-17"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:day-range-invalid"))
-                .andExpect(jsonPath("$.violations[0].code").value("bookings.range.dayAndRange"));
+                .andExpect(jsonPath("$.violations[0].code").value("booking.dayRange.dayAndRange"));
     }
 
     @Test
@@ -490,7 +490,7 @@ class BookingControllerTest extends AbstractIntegrationTest {
         mockMvc.perform(get("/api/bookings"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:day-range-invalid"))
-                .andExpect(jsonPath("$.violations[0].code").value("bookings.range.incomplete"));
+                .andExpect(jsonPath("$.violations[0].code").value("booking.dayRange.incomplete"));
     }
 
     @Test

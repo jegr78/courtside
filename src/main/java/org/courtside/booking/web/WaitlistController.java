@@ -90,11 +90,11 @@ class WaitlistController implements WaitlistApi {
     }
 
     @Override
-    public ResponseEntity<List<ApiReservedSlot>> listReservedSlots(LocalDate date) {
+    public ResponseEntity<List<ApiReservedSlot>> listReservedSlots(LocalDate date, LocalDate from, LocalDate to) {
         ZoneId zone = timeZone.zoneId();
+        DayRange days = DayRange.of(date, from, to);
         UUID viewer = currentUser.accountReadyForUse().map(UserAccount::getId).orElse(null);
-        return ResponseEntity.ok(waitlist.reservationsBetween(date.atStartOfDay(zone).toInstant(),
-                        date.plusDays(1).atStartOfDay(zone).toInstant(), viewer).stream()
+        return ResponseEntity.ok(waitlist.reservationsBetween(days.start(zone), days.end(zone), viewer).stream()
                 .map(reservation -> new ApiReservedSlot(reservation.courtId(),
                         WireTypes.toOffsetDateTime(reservation.slot().start()),
                         WireTypes.toOffsetDateTime(reservation.slot().end()))

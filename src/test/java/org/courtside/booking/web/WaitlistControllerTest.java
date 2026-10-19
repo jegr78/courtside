@@ -340,7 +340,7 @@ class WaitlistControllerTest extends AbstractIntegrationTest {
         mockMvc.perform(get("/api/reserved-slots").param("from", "2026-05-11").param("to", "2026-05-18"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:day-range-invalid"))
-                .andExpect(jsonPath("$.violations[0].code").value("bookings.range.tooLong"))
+                .andExpect(jsonPath("$.violations[0].code").value("booking.dayRange.tooLong"))
                 .andExpect(jsonPath("$.violations[0].params.maxDays").value(7));
     }
 
