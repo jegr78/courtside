@@ -37,6 +37,7 @@ export function MyBookingsView({ now, offline = false }: {
   const [participationsNextCursor, setParticipationsNextCursor] = useState<string>();
   const [loadingMore, setLoadingMore] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loaded, setLoaded] = useState(false);
   const { message: error, report, clear } = useReportedFailure();
   const { message: loadError, report: reportLoad, clear: clearLoad } = useReportedFailure();
   const [success, setSuccess] = useState<string>();
@@ -77,6 +78,7 @@ export function MyBookingsView({ now, offline = false }: {
       reportLoad(failure);
     } finally {
       setLoading(false);
+      setLoaded(true);
     }
   }, [clearLoad, offline, reportLoad]);
 
@@ -195,7 +197,7 @@ export function MyBookingsView({ now, offline = false }: {
     {loadError && <LoadFailure message={loadError} retry={() => { clearLoad(); void load(); }} />}
     {error && <Alert>{error}</Alert>}
     {success && <SuccessFeedback>{success}</SuccessFeedback>}
-    {loading && !grid ? <p aria-live="polite">{t("status.loading")}</p> : grid && <div className="mt-4 grid gap-6">
+    {loading && !loaded ? <p aria-live="polite">{t("status.loading")}</p> : grid && <div className="mt-4 grid gap-6">
       <BookingSection testId="upcoming-bookings" title={t("myBookings.upcoming")} titleHidden empty={t("myBookings.noUpcoming")} bookings={sections.upcoming} courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone} actionable={!offline && !loading} busy={loading} action={chooseAction} searchPartner={searchPartner} checkIn={checkIn} reference={reference} t={t} />
       {!offline && nextCursor && <Button variant="secondary" data-testid="load-more-bookings" className="justify-self-start" disabled={loadingMore} onClick={() => void loadMore()}>{t("myBookings.loadMore")}</Button>}
       {cancelled.length > 0 && <details data-testid="cancelled-bookings">

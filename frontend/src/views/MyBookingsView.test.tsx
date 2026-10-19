@@ -1046,3 +1046,19 @@ it("given a cancellation, when the list reloads, then the other bookings stay sh
   expect(screen.getByTestId(`booking-${otherId}`), "the other booking stays while the list reloads").toBeVisible();
   expect(screen.getByTestId("upcoming-bookings"), "the list says it is updating").toHaveAttribute("aria-busy", "true");
 });
+
+it("given the first load is half answered, when the page renders, then it shows the loading state and no list without actions", async () => {
+  // given
+  vi.mocked(api.personalBookings).mockImplementation((options) => options?.view
+    ? new Promise(() => undefined)
+    : Promise.resolve({ items: [{ id: upcomingId, courtIds: ["33333333-3333-3333-3333-333333333333"],
+      startsAt: "2026-08-12T16:00:00Z", endsAt: "2026-08-12T17:00:00Z", cardLabel: "Member booking",
+      cardColor: "#176b55", status: "CONFIRMED" as const }], timeZone: "Europe/Berlin" }));
+
+  // when
+  render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} />);
+
+  // then
+  await waitFor(() => expect(api.personalBookings).toHaveBeenCalledWith({ view: "CANCELLED" }));
+  expect(screen.queryByTestId("upcoming-bookings"), "a list before the first load completes would offer no actions").not.toBeInTheDocument();
+});
