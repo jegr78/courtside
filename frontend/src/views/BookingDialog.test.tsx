@@ -57,12 +57,14 @@ it("given a mouse is plugged in, when the dialog is open, then the drag hint app
   withFinePointer(false);
   show();
   await screen.findByTestId("booking-duration");
+  await act(() => new Promise((settled) => setTimeout(settled, 50)));
+  expect(screen.queryByTestId("booking-duration-hint")).not.toBeInTheDocument();
 
   // when
   act(() => withFinePointer(true));
 
   // then
-  expect(await screen.findByTestId("booking-duration-hint")).toBeInTheDocument();
+  expect(screen.getByTestId("booking-duration-hint"), "the dialog follows the pointer change itself").toBeInTheDocument();
 });
 
 it("given the German copy, when the duration is bounded, then it speaks of the club as Verein", () => {
