@@ -596,7 +596,6 @@ function dayStrip(width: number) {
   const items = ["mobile-week-previous", ...["10", "11", "12", "13", "14", "15", "16"].map((day) => `day-selector-2026-08-${day}`), "mobile-week-next"];
   const list = () => screen.getByTestId("mobile-week-days");
   let scrolled = 0;
-  const originalScrollLeft = Object.getOwnPropertyDescriptor(Element.prototype, "scrollLeft");
   Object.defineProperty(HTMLElement.prototype, "scrollLeft", {
     configurable: true,
     get(this: HTMLElement) { return this.dataset.testid === "mobile-week-days" ? scrolled : 0; },
@@ -614,10 +613,7 @@ function dayStrip(width: number) {
     const index = items.indexOf(id);
     return index < 0 ? new DOMRect() : new DOMRect(index * STRIP_PITCH - scrolled, 0, STRIP_PITCH - 8, 60);
   });
-  onTestFinished(() => {
-    if (originalScrollLeft) Object.defineProperty(Element.prototype, "scrollLeft", originalScrollLeft);
-    Reflect.deleteProperty(HTMLElement.prototype, "scrollLeft");
-  });
+  onTestFinished(() => { Reflect.deleteProperty(HTMLElement.prototype, "scrollLeft"); });
   return () => list().scrollLeft;
 }
 
