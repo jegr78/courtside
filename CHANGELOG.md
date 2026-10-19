@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.3.0-rc.2](https://github.com/jegr78/courtside/compare/v0.3.0-rc.1...v0.3.0-rc.2) (2026-10-19)
+
+
+### Bug fixes
+
+* **frontend:** keep My bookings listed while it reloads after a cancellation ([#1587](https://github.com/jegr78/courtside/issues/1587)) ([de51894](https://github.com/jegr78/courtside/commit/de51894001b6889ce985b24980be2d1bed9de59c))
+* **frontend:** keep My bookings listed while the list reloads after a cancellation ([de51894](https://github.com/jegr78/courtside/commit/de51894001b6889ce985b24980be2d1bed9de59c))
+* **frontend:** rest the court plan's day strip on whole items on phones ([#1591](https://github.com/jegr78/courtside/issues/1591)) ([c695279](https://github.com/jegr78/courtside/commit/c69527929e1adee0299f9badd3a5c7aee02d6aa8))
+* **frontend:** show My bookings only once its first load has answered ([#1590](https://github.com/jegr78/courtside/issues/1590)) ([a14b086](https://github.com/jegr78/courtside/commit/a14b086f41cf9f9a255a0644a7bbf6fa674dfa59))
+* **frontend:** show the app's own version in the footer when the server cannot answer ([#1588](https://github.com/jegr78/courtside/issues/1588)) ([ffcfcf8](https://github.com/jegr78/courtside/commit/ffcfcf8b91d032bfe940a2e246b00c04f631f623))
+* **frontend:** show the drag hint only with a fine pointer and align the club and messages wording ([#1586](https://github.com/jegr78/courtside/issues/1586)) ([ea4a561](https://github.com/jegr78/courtside/commit/ea4a56169276a369baa5746e9f53345d137c058a))
+* head a managed series with its own facts, not the loaded rows ([#1589](https://github.com/jegr78/courtside/issues/1589)) ([0598793](https://github.com/jegr78/courtside/commit/05987937016050fd90b7869e3efb4b95439cd385))
+* keep selects that list club-entered names inside a phone screen ([#1585](https://github.com/jegr78/courtside/issues/1585)) ([b5d6d68](https://github.com/jegr78/courtside/commit/b5d6d680836acc28c65b15b19d5ac256d696e61c))
+* read the court plan's week in one request per kind instead of one per day ([#1584](https://github.com/jegr78/courtside/issues/1584)) ([8b9cae4](https://github.com/jegr78/courtside/commit/8b9cae4b8de4092296a3370720e41ba5e6f016c8))
+* start a new holiday with the regular hours of its first day instead of closed ([#1576](https://github.com/jegr78/courtside/issues/1576)) ([868b311](https://github.com/jegr78/courtside/commit/868b311550780f8da0d1f24cd67f4ef511449383))
+
 ## 0.3.0 (2026-10-18)
 
 ### Features
