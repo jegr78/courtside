@@ -391,7 +391,9 @@ opens another day directly.
 
 The public grid shows occupancy, the booking-card label where appropriate and participant count. It
 does not publish participant names. Owners see their details. Administrators and configured managing
-roles use a separate managed-booking view.
+roles use a separate managed-booking view. The plan reads a week's occupancy and its reserved slots
+with one request each; such a read covers one day or at most seven, so a week costs the caller's
+request budget the same however many days it shows.
 
 The session reports whether an active card names one of the account's roles other than MEMBER as
 managing role, the same filter the managed-booking view applies, and whether an active card that
