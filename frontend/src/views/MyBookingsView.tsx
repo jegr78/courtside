@@ -195,8 +195,8 @@ export function MyBookingsView({ now, offline = false }: {
     {loadError && <LoadFailure message={loadError} retry={() => { clearLoad(); void load(); }} />}
     {error && <Alert>{error}</Alert>}
     {success && <SuccessFeedback>{success}</SuccessFeedback>}
-    {loading ? <p aria-live="polite">{t("status.loading")}</p> : grid && <div className="mt-4 grid gap-6">
-      <BookingSection testId="upcoming-bookings" title={t("myBookings.upcoming")} titleHidden empty={t("myBookings.noUpcoming")} bookings={sections.upcoming} courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone} actionable={!offline} action={chooseAction} searchPartner={searchPartner} checkIn={checkIn} reference={reference} t={t} />
+    {loading && !grid ? <p aria-live="polite">{t("status.loading")}</p> : grid && <div className="mt-4 grid gap-6">
+      <BookingSection testId="upcoming-bookings" title={t("myBookings.upcoming")} titleHidden empty={t("myBookings.noUpcoming")} bookings={sections.upcoming} courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone} actionable={!offline && !loading} busy={loading} action={chooseAction} searchPartner={searchPartner} checkIn={checkIn} reference={reference} t={t} />
       {!offline && nextCursor && <Button variant="secondary" data-testid="load-more-bookings" className="justify-self-start" disabled={loadingMore} onClick={() => void loadMore()}>{t("myBookings.loadMore")}</Button>}
       {cancelled.length > 0 && <details data-testid="cancelled-bookings">
         <summary data-testid="cancelled-bookings-summary" className="cursor-pointer font-semibold">{t(cancelledNextCursor ? "myBookings.cancelledCountMore" : "myBookings.cancelledCount", { count: cancelled.length })}</summary>
@@ -272,14 +272,14 @@ function ParticipationSection({ participations, courtNames, locale, timeZone, wi
 
 type Translate = ReturnType<typeof useTranslation>["t"];
 
-export function BookingSection({ testId, title, titleHidden = false, empty, bookings, courtNames, locale, timeZone, actionable = false, movable = true, action, searchPartner, checkIn, reference, t }: {
+export function BookingSection({ testId, title, titleHidden = false, empty, bookings, courtNames, locale, timeZone, actionable = false, movable = true, busy = false, action, searchPartner, checkIn, reference, t }: {
   testId: string; title?: string; titleHidden?: boolean; empty: string; bookings: PersonalBooking[]; courtNames: Map<string, string>;
-  locale: string; timeZone: string; actionable?: boolean; movable?: boolean; action: (value: { kind: "cancel" | "move"; booking: PersonalBooking }) => void;
+  locale: string; timeZone: string; actionable?: boolean; movable?: boolean; busy?: boolean; action: (value: { kind: "cancel" | "move"; booking: PersonalBooking }) => void;
   searchPartner?: (booking: PersonalBooking, publish: boolean) => Promise<void>; checkIn?: (booking: PersonalBooking) => Promise<void>;
   reference?: Date; t: Translate;
 }) {
   const groups = groupBookings(bookings);
-  return <section data-testid={testId}>
+  return <section data-testid={testId} aria-busy={busy || undefined}>
     {title && <h2 className={titleHidden ? "sr-only" : "text-xl font-semibold"}>{title}</h2>}
     {groups.length === 0 ? <p className={titleHidden ? "text-muted" : "text-muted mt-3"}>{empty}</p> : <div className={`grid gap-3 sm:gap-4 ${titleHidden ? "" : "mt-3"}`}>{groups.map((group) =>
       <article key={group.key} className="border-structural rounded-xl border p-3 sm:p-4">
