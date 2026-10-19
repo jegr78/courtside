@@ -590,77 +590,86 @@ it("given a slot that starts in ten seconds, when it starts, then it is no longe
   expect(freeSlot(1, "12:30")).toBeDisabled();
 });
 
-function dayStripGeometry(rects: Record<string, { left: number; right: number }>) {
+const STRIP_PITCH = 111;
+
+function dayStrip(width: number) {
+  const items = ["mobile-week-previous", ...["10", "11", "12", "13", "14", "15", "16"].map((day) => `day-selector-2026-08-${day}`), "mobile-week-next"];
+  const list = () => screen.getByTestId("mobile-week-days");
+  let scrolled = 0;
+  const originalScrollLeft = Object.getOwnPropertyDescriptor(Element.prototype, "scrollLeft");
+  Object.defineProperty(HTMLElement.prototype, "scrollLeft", {
+    configurable: true,
+    get(this: HTMLElement) { return this.dataset.testid === "mobile-week-days" ? scrolled : 0; },
+    set(this: HTMLElement, value: number) { if (this.dataset.testid === "mobile-week-days") scrolled = value; }
+  });
+  vi.spyOn(HTMLElement.prototype, "scrollWidth", "get").mockImplementation(function (this: HTMLElement) {
+    return this.dataset.testid === "mobile-week-days" ? items.length * STRIP_PITCH - 8 : 0;
+  });
+  vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockImplementation(function (this: HTMLElement) {
+    return this.dataset.testid === "mobile-week-days" ? width : 0;
+  });
   vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
-    const rect = rects[this.dataset.testid ?? ""];
-    return rect ? new DOMRect(rect.left, 0, rect.right - rect.left, 60) : new DOMRect();
+    const id = this.dataset.testid ?? "";
+    if (id === "mobile-week-days") return new DOMRect(0, 0, width, 60);
+    const index = items.indexOf(id);
+    return index < 0 ? new DOMRect() : new DOMRect(index * STRIP_PITCH - scrolled, 0, STRIP_PITCH - 8, 60);
   });
-  const scrollIntoView = vi.fn();
-  const originalScroll = Object.getOwnPropertyDescriptor(Element.prototype, "scrollIntoView");
-  Object.defineProperty(Element.prototype, "scrollIntoView", { value: scrollIntoView, configurable: true, writable: true });
   onTestFinished(() => {
-    if (originalScroll) Object.defineProperty(Element.prototype, "scrollIntoView", originalScroll);
-    else Reflect.deleteProperty(Element.prototype, "scrollIntoView");
+    if (originalScrollLeft) Object.defineProperty(Element.prototype, "scrollLeft", originalScrollLeft);
+    Reflect.deleteProperty(HTMLElement.prototype, "scrollLeft");
   });
-  return (target: Element) => scrollIntoView.mock.calls.filter((_, index) => scrollIntoView.mock.instances[index] === target);
+  return () => list().scrollLeft;
 }
 
-it("given today's card reaches past the day strip's edge, when the plan loads, then the strip aligns that card to its start", async () => {
+it("given today's card fully inside the day strip, when the plan loads, then the strip keeps its item-aligned start", async () => {
   // given
-  const scrollsOf = dayStripGeometry({
-    "mobile-week-days": { left: 41, right: 255 },
-    "day-selector-2026-08-10": { left: 161, right: 273 }
-  });
+  const scrollOf = dayStrip(214);
 
   // when
   render(<WeekView today={clubInstant("12:00")} />);
   await screen.findByTestId("week-grid");
 
   // then
-  await waitFor(() => expect(scrollsOf(screen.getByTestId("day-selector-2026-08-10")),
-    "a card cut by the strip's edge is aligned to its own snap point").toEqual([[{ block: "nearest", inline: "start" }]]));
+  expect(scrollOf(), "a strip already starting at an item keeps its position").toBe(0);
 });
 
-it("given a day card cut by the day strip's edge, when the member selects it, then the strip aligns that card to its start", async () => {
+it("given the last day reaches past the day strip's edge, when the member selects it, then the strip starts at the item before it", async () => {
   // given
-  const scrollsOf = dayStripGeometry({
-    "mobile-week-days": { left: 41, right: 255 },
-    "day-selector-2026-08-10": { left: 89, right: 201 },
-    "day-selector-2026-08-11": { left: 209, right: 321 }
-  });
+  const scrollOf = dayStrip(214);
   render(<WeekView today={clubInstant("12:00")} />);
   await screen.findByTestId("week-grid");
-  const cutDay = screen.getByTestId("day-selector-2026-08-11");
 
   // when
-  await userEvent.click(cutDay);
+  await userEvent.click(screen.getByTestId("day-selector-2026-08-16"));
 
   // then
-  await waitFor(() => expect(scrollsOf(cutDay), "the chosen card is aligned to its own snap point")
-    .toEqual([[{ block: "nearest", inline: "start" }]]));
-  expect(scrollsOf(screen.getByTestId("day-selector-2026-08-10")), "a card already inside the strip stays where it is")
-    .toEqual([[{ block: "nearest", inline: "nearest" }]]);
+  await waitFor(() => expect(scrollOf(), "Saturday and Sunday fill the strip without a sliver")
+    .toBe(6 * STRIP_PITCH));
+});
+
+it("given the member swiped the strip to rest between two items, when they select a day cut at its start, then the strip starts at that day", async () => {
+  // given
+  const scrollOf = dayStrip(214);
+  render(<WeekView today={clubInstant("12:00")} />);
+  await screen.findByTestId("week-grid");
+  screen.getByTestId("mobile-week-days").scrollLeft = 400;
+
+  // when
+  await userEvent.click(screen.getByTestId("day-selector-2026-08-12"));
+
+  // then
+  await waitFor(() => expect(scrollOf(), "the cut day is aligned to the strip's start").toBe(3 * STRIP_PITCH));
 });
 
 it("given the plan is open, when the refresh interval elapses and focus returns, then the selected day is refreshed", async () => {
   // given
   vi.useFakeTimers({ shouldAdvanceTime: true });
-  const scrollIntoView = vi.fn();
-  const originalScroll = Object.getOwnPropertyDescriptor(Element.prototype, "scrollIntoView");
-  Object.defineProperty(Element.prototype, "scrollIntoView", { value: scrollIntoView, configurable: true, writable: true });
-  onTestFinished(() => {
-    if (originalScroll) Object.defineProperty(Element.prototype, "scrollIntoView", originalScroll);
-    else Reflect.deleteProperty(Element.prototype, "scrollIntoView");
-  });
+  const scrollOf = dayStrip(214);
   render(<WeekView today={clubInstant("12:00")} />);
   await screen.findByTestId("week-grid");
   await act(async () => {});
   vi.mocked(api.allocations).mockClear();
-  const activeDay = screen.getByTestId("day-selector-2026-08-10");
-  await waitFor(() => expect(scrollIntoView.mock.instances.filter((target) => target === activeDay)).toHaveLength(1));
-  expect(scrollIntoView.mock.calls[scrollIntoView.mock.instances.indexOf(activeDay)])
-    .toEqual([{ block: "nearest", inline: "nearest" }]);
-  scrollIntoView.mockClear();
+  screen.getByTestId("mobile-week-days").scrollLeft = 340;
 
   // when
   await vi.advanceTimersByTimeAsync(60_000);
@@ -670,7 +679,7 @@ it("given the plan is open, when the refresh interval elapses and focus returns,
   await waitFor(() => expect(api.allocations).toHaveBeenCalledTimes(2));
   expect(api.allocations).toHaveBeenNthCalledWith(1, "2026-08-10");
   expect(api.allocations).toHaveBeenNthCalledWith(2, "2026-08-10");
-  expect(scrollIntoView.mock.instances.filter((target) => target === activeDay)).toHaveLength(0);
+  expect(scrollOf(), "a refresh leaves the member's own scroll position alone").toBe(340);
 });
 
 it("given a refresh failed, when a later refresh succeeds, then its failure notice is gone", async () => {

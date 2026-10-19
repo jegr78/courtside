@@ -419,15 +419,24 @@ export function WeekView({ today, clock = systemClock, canBook = true,
     return () => observer.disconnect();
   }, [hasCourts]);
 
-  useLayoutEffect(() => {
-    const activeDay = selectedDate
-      ? dayListRef.current?.querySelector(`[data-testid="day-selector-${selectedDate}"]`)
-      : undefined;
-    if (activeDay instanceof HTMLElement && typeof activeDay.scrollIntoView === "function") {
-      // Start snapping pulls a nearest-aligned card back by one, so a cut card aligns to its own start.
-      activeDay.scrollIntoView({ block: "nearest", inline: isCutBy(activeDay, dayListRef.current) ? "start" : "nearest" });
-    }
-  }, [renderedWeekStart, selectedDate]);
+  const alignSelectedDay = useCallback(() => {
+    const list = dayListRef.current;
+    const activeDay = selectedDate ? list?.querySelector(`[data-testid="day-selector-${selectedDate}"]`) : undefined;
+    if (list && activeDay instanceof HTMLElement) alignToItem(list, activeDay);
+  }, [selectedDate]);
+
+  useLayoutEffect(alignSelectedDay, [renderedWeekStart, alignSelectedDay]);
+
+  useEffect(() => {
+    const list = dayListRef.current;
+    if (!list || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(() => {
+      list.style.setProperty("--week-day-count", String(itemsThatFit(list)));
+      alignSelectedDay();
+    });
+    observer.observe(list);
+    return () => observer.disconnect();
+  }, [hasCourts, alignSelectedDay]);
 
   return <section ref={sectionRef} aria-labelledby="occupancy-heading">
     <div className="flex flex-wrap items-center justify-between gap-3">
@@ -450,8 +459,8 @@ export function WeekView({ today, clock = systemClock, canBook = true,
       aria-label={t("week.chooseDate")}>
       <div ref={dayListRef} data-testid="mobile-week-days" className="week-day-list">
         <Button variant="secondary" type="button" data-testid="mobile-week-previous"
-          className="mobile-week-control shrink-0 px-3" onClick={() => setWeekOffset((offset) => offset - 1)}
-          aria-label={t("week.previous")}>‹</Button>
+          className="mobile-week-control week-step px-3" onClick={() => setWeekOffset((offset) => offset - 1)}
+          aria-label={t("week.previous")}><span aria-hidden="true">‹</span> <span className="text-xs">{t("week.previous")}</span></Button>
         {days.map((day) => {
           const date = formatDate(day);
           const count = remainingCounts.get(date) ?? 0;
@@ -472,8 +481,8 @@ export function WeekView({ today, clock = systemClock, canBook = true,
           </button>;
         })}
         <Button variant="secondary" type="button" data-testid="mobile-week-next"
-          className="mobile-week-control shrink-0 px-3" onClick={() => setWeekOffset((offset) => offset + 1)}
-          aria-label={t("week.next")}>›</Button>
+          className="mobile-week-control week-step px-3" onClick={() => setWeekOffset((offset) => offset + 1)}
+          aria-label={t("week.next")}><span className="text-xs">{t("week.next")}</span> <span aria-hidden="true">›</span></Button>
       </div>
       <Button variant="secondary" type="button" data-testid="mobile-current-time" className="mobile-week-control shrink-0"
         onClick={() => isToday
@@ -855,11 +864,29 @@ function currentLineOffset(currentTime: string, slots: string[], slotMinutes: nu
   return (row + into / slotMinutes) * slotHeight;
 }
 
-function isCutBy(day: HTMLElement, list: HTMLElement | null): boolean {
-  if (!list) return false;
-  const card = day.getBoundingClientRect();
-  const visible = list.getBoundingClientRect();
-  return card.left < visible.left || card.right > visible.right;
+const DAY_STRIP_ITEM_MIN_REM = 6;
+
+function itemsThatFit(list: HTMLElement): number {
+  const style = window.getComputedStyle(list);
+  const gap = parseFloat(style.columnGap) || 0;
+  const minimum = DAY_STRIP_ITEM_MIN_REM * parseFloat(window.getComputedStyle(document.documentElement).fontSize);
+  return Math.max(1, Math.floor((list.clientWidth + gap) / (minimum + gap)));
+}
+
+// Every item shares one width, so resting on an item's start leaves no partial item at either edge.
+function alignToItem(list: HTMLElement, item: HTMLElement) {
+  const origin = list.getBoundingClientRect().left - list.scrollLeft;
+  const itemBounds = item.getBoundingClientRect();
+  const lowest = itemBounds.right - origin - list.clientWidth;
+  const highest = itemBounds.left - origin;
+  const starts = [...list.children]
+    .map((child) => child.getBoundingClientRect().left - origin)
+    .filter((start) => start >= lowest - 1 && start <= highest + 1);
+  if (starts.length === 0) return;
+  const target = starts.reduce((closest, start) =>
+    Math.abs(start - list.scrollLeft) < Math.abs(closest - list.scrollLeft) ? start : closest);
+  const reachable = Math.min(Math.max(0, target), list.scrollWidth - list.clientWidth);
+  if (Math.abs(reachable - list.scrollLeft) > 1) list.scrollLeft = reachable;
 }
 
 function scrollToSlot(plan: HTMLDivElement | null, slot?: string) {
