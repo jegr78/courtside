@@ -13,6 +13,7 @@ import { leavesBookingHours } from "../time/bookingHours";
 import { closureOn, hoursOn } from "../time/openingHours";
 import { PERSON_SEARCH_DEBOUNCE_MS, PERSON_SEARCH_MIN_LENGTH } from "../person-search";
 import { warnAbout } from "../api/failureWarning";
+import { useFinePointer } from "../booking/finePointer";
 
 export interface BookingSelection {
   date: string;
@@ -47,6 +48,7 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
   waitlist?: WaitlistSelection;
 }) {
   const { t, i18n } = useTranslation();
+  const canDrag = useFinePointer();
   const [bookingCards, setBookingCards] = useState<PublicBookingCard[]>([]);
   const [participantCards, setParticipantCards] = useState<PublicParticipantCard[]>([]);
   const [courtIds, setCourtIds] = useState([selection.courtId]);
@@ -164,7 +166,7 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
   const showsMinimum = !waitlist && Boolean(minBookingMinutes) && !minimumLeavesNoPeriod;
   const showsWeekly = !waitlist && Boolean(maxWeeklyBookedHours);
   const durationDescription = [showsBound && "booking-duration-bound", showsMinimum && "booking-minimum-bound",
-    hours && !outsideHours && "booking-hours-bound", showsWeekly && "booking-weekly-bound", "booking-duration-hint"]
+    hours && !outsideHours && "booking-hours-bound", showsWeekly && "booking-weekly-bound", canDrag && "booking-duration-hint"]
     .filter(Boolean).join(" ");
   const slotTaken = refusedAsTaken !== undefined && (freeDurations.length === 0 || refusedAsTaken.refreshFailed);
   const selectedDuration = durations.includes(durationMinutes) || refusedAsTaken
@@ -217,7 +219,7 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
       {showsWeekly && <p id="booking-weekly-bound" data-testid="booking-weekly-bound" className="text-muted mt-2 text-sm">
         {t("booking.weeklyBound", { hours: maxWeeklyBookedHours })}
       </p>}
-      <p id="booking-duration-hint" data-testid="booking-duration-hint" className="text-muted mt-1 text-sm">{t("booking.durationHint")}</p>
+      {canDrag && <p id="booking-duration-hint" data-testid="booking-duration-hint" className="text-muted mt-1 text-sm">{t("booking.durationHint")}</p>}
       </>}
       {boundLeavesNoPeriod && <Alert tone="warning" testId="booking-no-duration">{t("booking.boundBelowSlotGrid")}</Alert>}
       {minimumLeavesNoPeriod && !boundLeavesNoPeriod && <Alert tone="warning" testId="booking-below-minimum">{t("booking.minimumBeyondFreeTime")}</Alert>}

@@ -968,7 +968,7 @@ const en: Record<keyof typeof de, string> = {
   "booking.minimumBound": "A booking runs at least {{duration}}.",
   "booking.weeklyBound": "Your membership type books at most {{hours}} h a week, counted Monday to Sunday.",
   "booking.minimumBeyondFreeTime": "The rule set asks for a longer booking than the free time from here allows, so no duration is on offer.",
-  "booking.durationHint": "In the court plan only a mouse can drag across several slots. Otherwise, choose the length here.",
+  "booking.durationHint": "In the court plan you can drag across several slots with a mouse. Otherwise, choose the length here.",
   "booking.chooseDuration": "Choose a length",
   "booking.durationMinutes": "{{count}} minutes",
   "booking.boundBelowSlotGrid": "The rule set permits a shorter booking than one cell of the time grid, so no duration is on offer.",
