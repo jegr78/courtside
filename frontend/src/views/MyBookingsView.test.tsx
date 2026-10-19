@@ -1018,3 +1018,31 @@ it("given a booking looking for a partner, when its holder offers the place, the
   expect(within(screen.getByTestId(`booking-${single}`)).getByTestId("partner-search-published"))
     .toHaveTextContent("Other members can take the open place.");
 });
+
+it("given a cancellation, when the list reloads, then the other bookings stay shown until it answers", async () => {
+  // given
+  const otherId = "55555555-5555-5555-5555-555555555555";
+  const booking = (id: string, startsAt: string, endsAt: string) => ({
+    id, courtIds: ["33333333-3333-3333-3333-333333333333"], startsAt, endsAt,
+    cardLabel: "Member booking", cardColor: "#176b55", status: "CONFIRMED" as const
+  });
+  let reloading = false;
+  vi.mocked(api.personalBookings).mockImplementation((options) => {
+    if (reloading && !options?.view) return new Promise(() => undefined);
+    return Promise.resolve(options?.view ? { items: [] } : { items: [
+      booking(upcomingId, "2026-08-12T16:00:00Z", "2026-08-12T17:00:00Z"),
+      booking(otherId, "2026-08-14T16:00:00Z", "2026-08-14T17:00:00Z")
+    ] });
+  });
+  vi.spyOn(api, "cancelBooking").mockImplementation(() => { reloading = true; return Promise.resolve(); });
+  render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} />);
+  await userEvent.click(within(await screen.findByTestId(`booking-${upcomingId}`)).getByTestId("personal-cancel"));
+
+  // when
+  await userEvent.click(screen.getByTestId("confirm-cancellation"));
+
+  // then
+  await waitFor(() => expect(api.cancelBooking).toHaveBeenCalledWith(upcomingId, undefined));
+  expect(screen.getByTestId(`booking-${otherId}`), "the other booking stays while the list reloads").toBeVisible();
+  expect(screen.getByTestId("upcoming-bookings"), "the list says it is updating").toHaveAttribute("aria-busy", "true");
+});
