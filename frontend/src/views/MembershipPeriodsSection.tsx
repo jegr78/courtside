@@ -142,7 +142,7 @@ function PeriodForm({ period, types, pending, error, save, closed }: {
       {error && <Alert>{error}</Alert>}
       <label className="grid gap-2 font-medium">
         {t("admin.person.membershipType")}
-        <select data-testid="period-type" required className="form-control rounded-lg border px-3 py-3" value={membershipTypeId}
+        <select data-testid="period-type" required className="form-control w-full min-w-0 rounded-lg border px-3 py-3" value={membershipTypeId}
                 onChange={(event) => setMembershipTypeId(event.target.value)}>
           <option value="">{t("admin.person.chooseMembershipType")}</option>
           {offered.map((type) => <option key={type.id} value={type.id}>{type.name}</option>)}

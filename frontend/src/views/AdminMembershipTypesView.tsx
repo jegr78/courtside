@@ -185,7 +185,7 @@ export function AdminMembershipTypesView() {
             <TextField data-testid="new-membership-type-name" disabled={pending} name="name" maxLength={NAME_LENGTH} label={t("admin.membershipTypes.name")} />
             <label className="grid gap-2 font-medium">
               {t("admin.membershipTypes.ruleSet")}
-              <select data-testid="new-membership-type-rule-set" disabled={pending} name="ruleSetId" className="form-control rounded-lg border px-3 py-3" defaultValue="">
+              <select data-testid="new-membership-type-rule-set" disabled={pending} name="ruleSetId" className="form-control w-full min-w-0 rounded-lg border px-3 py-3" defaultValue="">
                 <option value="">{t("admin.membershipTypes.noRuleSet")}</option>
                 {ruleSets.map((set) => <option key={set.id} value={set.id}>{set.name}</option>)}
               </select>

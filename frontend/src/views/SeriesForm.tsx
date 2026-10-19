@@ -150,7 +150,7 @@ export function SeriesForm({ timeZone, courts, created, reportError }: {
 
     <div className="grid gap-2">
       <label className="font-semibold" htmlFor="series-courts">{t("series.courts")}</label>
-      <select data-testid="series-courts" id="series-courts" multiple size={Math.min(courts.length, 5)} className="form-control rounded-lg border p-2" disabled={pending} value={draft.courtIds} onChange={(event) => change({ courtIds: [...event.target.selectedOptions].map((option) => option.value) })}>
+      <select data-testid="series-courts" id="series-courts" multiple size={Math.min(courts.length, 5)} className="form-control w-full min-w-0 rounded-lg border p-2" disabled={pending} value={draft.courtIds} onChange={(event) => change({ courtIds: [...event.target.selectedOptions].map((option) => option.value) })}>
         {courts.map((court) => <option key={court.id} value={court.id}>{court.name ?? t("court.number", { number: court.number })}</option>)}
       </select>
       <p className="text-muted text-sm">{t("series.courtsHint")}</p>
@@ -158,7 +158,7 @@ export function SeriesForm({ timeZone, courts, created, reportError }: {
 
     <div className="grid gap-2">
       <label className="font-semibold" htmlFor="series-card">{t("series.card")}</label>
-      <select data-testid="series-card" id="series-card" className="form-control rounded-lg border p-2" disabled={pending} value={draft.cardId} onChange={(event) => change({ cardId: event.target.value })}>
+      <select data-testid="series-card" id="series-card" className="form-control w-full min-w-0 rounded-lg border p-2" disabled={pending} value={draft.cardId} onChange={(event) => change({ cardId: event.target.value })}>
         <option value="">{t("series.chooseCard")}</option>
         {cards.map((card) => <option key={card.id} value={card.id}>{card.label}</option>)}
       </select>

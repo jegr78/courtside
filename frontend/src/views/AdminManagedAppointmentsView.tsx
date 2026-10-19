@@ -148,13 +148,13 @@ export function AdminManagedAppointmentsView({ managesAppointments, createsSerie
 
     <div className="mt-4 grid gap-3 sm:grid-cols-2">
       <label className="grid gap-1 font-semibold">{t("managedAppointments.filterCourt")}
-        <select data-testid="managed-court-filter" className="form-control rounded-lg border p-2" value={courtId} onChange={(event) => { loadVersion.current += 1; setCourtId(event.target.value); }}>
+        <select data-testid="managed-court-filter" className="form-control w-full min-w-0 rounded-lg border p-2" value={courtId} onChange={(event) => { loadVersion.current += 1; setCourtId(event.target.value); }}>
           <option value="">{t("managedAppointments.allCourts")}</option>
           {courts.map((court) => <option key={court.id} value={court.id}>{courtNames.get(court.id)}</option>)}
         </select>
       </label>
       <label className="grid gap-1 font-semibold">{t("managedAppointments.filterCard")}
-        <select data-testid="managed-card-filter" className="form-control rounded-lg border p-2" value={cardId} onChange={(event) => { loadVersion.current += 1; setCardId(event.target.value); }}>
+        <select data-testid="managed-card-filter" className="form-control w-full min-w-0 rounded-lg border p-2" value={cardId} onChange={(event) => { loadVersion.current += 1; setCardId(event.target.value); }}>
           <option value="">{t("managedAppointments.allCards")}</option>
           {cards.map((card) => <option key={card.id} value={card.id}>{card.label}</option>)}
         </select>

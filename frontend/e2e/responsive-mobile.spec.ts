@@ -589,6 +589,29 @@ test("member and administration surfaces remain usable on a touch viewport", asy
   await expectNoHorizontalOverflow(page);
 });
 
+test.describe("without a service worker, so the page's own requests can be answered here", () => {
+  test.use({ serviceWorkers: "block" });
+
+  test("given a rule set named longer than the screen, when the board opens membership types on a phone, then the page stays inside the screen", async ({ page }) => {
+    // given
+    await signIn(page, "configuration-admin");
+    await expect(page.getByTestId("administration-link")).toBeVisible();
+    const sets = await page.evaluate(() => fetch("/api/admin/rule-sets").then((answer) => answer.json())) as { name: string }[];
+    await page.route("**/api/admin/rule-sets", (route) => route.fulfill({ json: sets.map((set, index) => index === 0
+      ? { ...set, name: "Acceptance without a membership type and a rule set name longer than the screen" } : set) }));
+
+    // when
+    await page.goto("/admin/membership-types");
+
+    // then
+    await expect(page.getByTestId("create-membership-type")).toBeVisible();
+    expect(await page.getByTestId("new-membership-type-rule-set").evaluate((select) =>
+      [...(select as HTMLSelectElement).options].some((option) => option.text.endsWith("longer than the screen"))),
+    "the rule set offered is the long one the layout must absorb").toBe(true);
+    await expectNoHorizontalOverflow(page);
+  });
+});
+
 test("the initial-password form remains usable on a touch viewport", async ({ page }) => {
   // given
   await page.goto("/login");
