@@ -485,11 +485,11 @@ class ProblemTypeWireTest extends AbstractIntegrationTest {
     @Test
     void givenAnEmptyRequiredParameter_whenRequesting_thenItIsStillReportedMissing() throws Exception {
         // given / when
-        ResultActions result = mockMvc.perform(get("/api/bookings?date="));
+        ResultActions result = mockMvc.perform(get("/api/public/config/icon?size="));
 
         // then
         assertProblem(result, HttpStatus.BAD_REQUEST, "urn:courtside:error:missing-parameter");
-        result.andExpect(jsonPath("$.violations[0].params.parameter").value("date"));
+        result.andExpect(jsonPath("$.violations[0].params.parameter").value("size"));
     }
 
     @Test
@@ -501,12 +501,12 @@ class ProblemTypeWireTest extends AbstractIntegrationTest {
     @Test
     void givenAMissingRequiredParameter_whenRequesting_thenTheResponseNamesItInParams() throws Exception {
         // given / when
-        ResultActions result = mockMvc.perform(get("/api/bookings"));
+        ResultActions result = mockMvc.perform(get("/api/public/config/icon"));
 
         // then
         assertProblem(result, HttpStatus.BAD_REQUEST, "urn:courtside:error:missing-parameter");
         result.andExpect(jsonPath("$.violations[0].code").value("request.missingParameter"))
-                .andExpect(jsonPath("$.violations[0].params.parameter").value("date"));
+                .andExpect(jsonPath("$.violations[0].params.parameter").value("size"));
     }
 
     @Test

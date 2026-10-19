@@ -539,12 +539,14 @@ test("given path query and body parameters, when creating a harmless probe, then
   // when
   const booking = buildOperationProbe(matrix.find((entry) => entry.operationId === "cancelBooking"));
   const allocations = buildOperationProbe(matrix.find((entry) => entry.operationId === "listAllocations"));
+  const icon = buildOperationProbe(matrix.find((entry) => entry.operationId === "getAppIcon"));
   const create = buildOperationProbe(matrix.find((entry) => entry.operationId === "createBooking"));
   const upload = buildOperationProbe(matrix.find((entry) => entry.operationId === "createImportPreview"));
 
   // then
   assert.equal(booking.path, "/api/bookings/00000000-0000-0000-0000-000000000000");
-  assert.equal(allocations.path, "/api/bookings?date=2026-01-15");
+  assert.equal(allocations.path, "/api/bookings", "an optional query parameter stays out of the probe");
+  assert.equal(icon.path, "/api/public/config/icon?size=180");
   assert.equal(create.headers["content-type"], "application/json");
   assert.equal(create.headers["idempotency-key"], "security-authorization-probe");
   assert.equal(create.body, "{}");

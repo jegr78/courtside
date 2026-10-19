@@ -5297,15 +5297,24 @@ paths:
     get:
       tags: [bookings]
       operationId: listAllocations
-      summary: The occupancy grid for one day.
+      summary: The occupancy grid for one day or one week.
       security: []
       description: |
-        A day, not a range: the grid a member reads is one day wide, and the instance's own time
-        zone decides where that day begins. A range would let a caller ask for a year.
+        Either `date` for one day or `from` and `to` for at most seven days, both inclusive. The
+        instance's own time zone decides where a day begins. The bound keeps a caller from asking
+        for a year; the court plan reads its week at once instead of one request per day.
       parameters:
         - name: date
           in: query
-          required: true
+          required: false
+          schema: { type: string, format: date }
+        - name: from
+          in: query
+          required: false
+          schema: { type: string, format: date }
+        - name: to
+          in: query
+          required: false
           schema: { type: string, format: date }
       responses:
         "200":
@@ -6316,16 +6325,25 @@ paths:
     get:
       tags: [waitlist]
       operationId: listReservedSlots
-      summary: The courts held for a waiting member on one day.
+      summary: The courts held for a waiting member on one day or one week.
       security: []
       description: |
         A freed slot reserved for the member whose turn it is stays unavailable to everybody else
         until the offer is taken, declined or passed on. Nobody is named; only the holder sees
-        `ownEntryId`, so the court plan can lead them to the offer.
+        `ownEntryId`, so the court plan can lead them to the offer. Either `date` for one day or
+        `from` and `to` for at most seven days, both inclusive.
       parameters:
         - name: date
           in: query
-          required: true
+          required: false
+          schema: { type: string, format: date }
+        - name: from
+          in: query
+          required: false
+          schema: { type: string, format: date }
+        - name: to
+          in: query
+          required: false
           schema: { type: string, format: date }
       responses:
         "200":

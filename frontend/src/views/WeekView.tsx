@@ -2,6 +2,7 @@ import { type CSSProperties, memo, useCallback, useEffect, useLayoutEffect, useM
 import { useTranslation } from "react-i18next";
 import { allocationLabel } from "../booking/allocationLabel";
 import { shortLabels } from "../booking/shortLabels";
+import { byDay } from "../booking/byDay";
 import {
   api, type Allocation, type BookingCardLegendEntry, type BookingEligibility, type BookingGrid, type Dependant, type PublicCourt,
   type ReservedSlot
@@ -130,16 +131,18 @@ export function WeekView({ today, clock = systemClock, canBook = true,
         const clubToday = dateInTimeZone(referenceInstant, grid.timeZone);
         const weekStart = addDays(startOfWeek(clubToday), weekOffset * 7);
         const days = weekDays(weekStart);
-        const [dailyAllocations, dailyReservations] = await Promise.all([
-          Promise.all(days.map(async (day) => [formatDate(day), await api.allocations(formatDate(day))] as const)),
-          Promise.all(days.map(async (day) => [formatDate(day), await reservationsOn(formatDate(day))] as const))
+        const dates = days.map(formatDate);
+        const [weekAllocations, weekReservations] = await Promise.all([
+          api.allocationsBetween(dates[0], dates[dates.length - 1]),
+          reservationsBetween(dates[0], dates[dates.length - 1])
         ]);
         if (active) {
           setSelectedDate((current) => current && days.some((day) => formatDate(day) === current)
             ? current
             : weekOffset === 0 ? formatDate(clubToday) : formatDate(weekStart));
           setData({ grid, courts, bookingCards: currentBookingCards, days,
-            allocations: new Map(dailyAllocations), reservations: new Map(dailyReservations) });
+            allocations: byDay(dates, weekAllocations, grid.timeZone),
+            reservations: byDay(dates, weekReservations, grid.timeZone) });
         }
       }).catch((failure: unknown) => {
       if (active) {
@@ -937,6 +940,15 @@ function formatDayLong(date: Date, language: string, timeZone: string): string {
 function formatWeekRange(days: Date[], language: string, timeZone: string): string {
   const formatter = dateTimeFormatter(language, { year: "numeric", month: "short", day: "numeric", timeZone });
   return `${formatter.format(days[0])} – ${formatter.format(days[6])}`;
+}
+
+async function reservationsBetween(from: string, to: string): Promise<PlanAllocation[]> {
+  try {
+    return (await api.reservedSlotsBetween(from, to)).map(reservedAllocation);
+  } catch (failure) {
+    warnAbout("Reserved slots unavailable", failure);
+    return [];
+  }
 }
 
 async function reservationsOn(date: string): Promise<PlanAllocation[]> {

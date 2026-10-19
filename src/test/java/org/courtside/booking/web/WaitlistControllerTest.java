@@ -320,6 +320,30 @@ class WaitlistControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$[0].ownEntryId").value(entry.toString()));
     }
 
+    @Test
+    void givenAnOffer_whenAVisitorReadsTheWeek_thenTheSlotIsHeldWithoutAName() throws Exception {
+        // given
+        offered();
+
+        // when / then
+        mockMvc.perform(get("/api/reserved-slots").param("from", "2026-05-11").param("to", "2026-05-17"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].courtId").value(court.toString()))
+                .andExpect(jsonPath("$[0].ownEntryId").value(nullValue()))
+                .andExpect(jsonPath("$[0].accountId").doesNotExist());
+    }
+
+    @Test
+    void givenARangeLongerThanAWeek_whenReadingTheReservedSlots_thenItIsRefusedByName() throws Exception {
+        // when / then
+        mockMvc.perform(get("/api/reserved-slots").param("from", "2026-05-11").param("to", "2026-05-18"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:day-range-invalid"))
+                .andExpect(jsonPath("$.violations[0].code").value("booking.dayRange.tooLong"))
+                .andExpect(jsonPath("$.violations[0].params.maxDays").value(7));
+    }
+
     private UUID offered() {
         UUID booking = book(holder);
         UUID entry = joinAs(waiting);
