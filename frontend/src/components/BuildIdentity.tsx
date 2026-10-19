@@ -69,7 +69,7 @@ export function BuildIdentity({ source }: BuildIdentityProps) {
       className="px-3 py-2"
       disabled={!source}
       onClick={() => source && setOpen(true)}
-    >{shortIdentity(source) ?? t("build.unavailable")}</Button>
+    >{shortIdentity(source) ?? t("build.appVersion", { version: __COURTSIDE_APP_VERSION__ })}</Button>
     {isOpen && source && <dialog
       ref={dialog}
       aria-labelledby="build-dialog-title"

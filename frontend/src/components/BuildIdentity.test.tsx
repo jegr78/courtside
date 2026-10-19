@@ -25,6 +25,16 @@ describe("BuildIdentity", () => {
     expect(screen.getByTestId("build-identity")).toHaveTextContent("v1.4.0 · 9f1c0e3");
   });
 
+  it("given no answer from the server, when rendered, then the footer names the version the app was built as", () => {
+    // given / when
+    render(<BuildIdentity />);
+
+    // then
+    expect(screen.getByTestId("build-identity"), "the app's own version stands in for the server's")
+      .toHaveTextContent(`v${__COURTSIDE_APP_VERSION__} · app`);
+    expect(screen.getByTestId("build-identity")).toBeDisabled();
+  });
+
   it("given a UAT build, when rendered, then the environment is persistently identified", () => {
     // given / when
     render(<EnvironmentMarker source={{ ...source, environment: "UAT" }} />);
@@ -129,13 +139,5 @@ describe("BuildIdentity", () => {
     // then
     await waitFor(() => expect(screen.getByTestId("copy-build-identity")).toHaveTextContent("Copied"));
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-  });
-
-  it("given unavailable metadata, when rendered, then a localized fallback remains visible", () => {
-    // given / when
-    render(<BuildIdentity />);
-
-    // then
-    expect(screen.getByTestId("build-identity")).toHaveTextContent("Version unavailable");
   });
 });

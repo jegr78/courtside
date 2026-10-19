@@ -2,8 +2,12 @@ import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 import { defineConfig } from "vitest/config";
+import packageJson from "./package.json" with { type: "json" };
 
 export default defineConfig({
+  define: {
+    __COURTSIDE_APP_VERSION__: JSON.stringify(packageJson.version)
+  },
   build: {
     minify: "oxc",
     sourcemap: false
