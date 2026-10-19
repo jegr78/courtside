@@ -2,6 +2,7 @@ import { type CSSProperties, memo, useCallback, useEffect, useLayoutEffect, useM
 import { useTranslation } from "react-i18next";
 import { allocationLabel } from "../booking/allocationLabel";
 import { shortLabels } from "../booking/shortLabels";
+import { byDay } from "../booking/byDay";
 import {
   api, type Allocation, type BookingCardLegendEntry, type BookingEligibility, type BookingGrid, type Dependant, type PublicCourt,
   type ReservedSlot
@@ -948,17 +949,6 @@ async function reservationsBetween(from: string, to: string): Promise<PlanAlloca
     warnAbout("Reserved slots unavailable", failure);
     return [];
   }
-}
-
-// An entry belongs to every club day it overlaps, as it did when each day was read on its own.
-function byDay<T extends { startsAt: string; endsAt: string }>(dates: string[], entries: T[], timeZone: string): Map<string, T[]> {
-  const days = new Map(dates.map((date) => [date, [] as T[]]));
-  for (const entry of entries) {
-    const first = dateInTimeZoneValue(new Date(entry.startsAt), timeZone)!;
-    const last = dateInTimeZoneValue(new Date(Date.parse(entry.endsAt) - 1), timeZone)!;
-    for (const date of dates) if (first <= date && date <= last) days.get(date)!.push(entry);
-  }
-  return days;
 }
 
 async function reservationsOn(date: string): Promise<PlanAllocation[]> {
