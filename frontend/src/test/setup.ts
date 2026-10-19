@@ -1,6 +1,7 @@
 import "@testing-library/jest-dom/vitest";
 import { cleanup } from "@testing-library/react";
 import { afterEach, vi } from "vitest";
+import { anyFinePointerQuery, withFinePointer } from "./pointer";
 
 // Tests switch languages synchronously, so every bundle the browser fetches on demand is there already.
 vi.mock("../i18n", async (importOriginal) => {
@@ -10,14 +11,15 @@ vi.mock("../i18n", async (importOriginal) => {
   return loaded;
 });
 
-// jsdom implements no media queries at all. This answers a width query from the window and refuses
-// every other kind, because a stub that guesses would report a match nobody asked about.
+// jsdom implements no media queries at all. This answers a width query from the window and a pointer
+// query from the test, and refuses every other kind, because a stub that guesses would report a match nobody asked about.
 const widthQueries = new Set<EventTarget>();
 
 window.addEventListener("resize", () =>
   widthQueries.forEach((query) => query.dispatchEvent(new Event("change"))));
 
 window.matchMedia = (media: string) => {
+  if (media === "(any-pointer: fine)") return anyFinePointerQuery(media);
   const width = /^\(width >= (\d+)px\)$/.exec(media);
   if (!width) throw new Error(`The test setup answers width queries only, not "${media}"`);
   const query = new EventTarget() as MediaQueryList;
@@ -36,4 +38,7 @@ HTMLDialogElement.prototype.close = function close() {
   this.dispatchEvent(new Event("close"));
 };
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  withFinePointer(true);
+});

@@ -28,6 +28,11 @@ const BOUNDARIES = {
     classification: "chooses between the host-bound and the unprefixed cookie name",
     test: "src/api/client.test.ts#given an HTTPS host-bound CSRF cookie and a legacy collision, when logging out, then only the host-bound token is used"
   },
+  "src/booking/finePointer.ts matchMedia": {
+    value: "whether the device reports a fine pointer",
+    classification: "decides whether the booking dialog mentions dragging across slots, and never which durations it offers",
+    test: "src/views/BookingDialog.test.tsx#given only touch, when the dialog opens, then it says nothing about dragging"
+  },
   "src/components/AdminNavigation.tsx matchMedia": {
     value: "the width the browser reports",
     classification: "decides whether the destinations start folded, and never which ones exist",
