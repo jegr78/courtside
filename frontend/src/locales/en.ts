@@ -1385,6 +1385,8 @@ const en: Record<keyof typeof de, string> = {
   "error.type.operational-log-range-invalid": "The start must come before the end.",
   "error.type.parameter-type-mismatch": "The page sent a request Courtside cannot process. Reload the page and try again.",
   "error.type.participants-invalid": "These participants are not allowed for this booking.",
+  "error.type.participation-booking-cancelled": "This booking is cancelled, so there is nothing to withdraw from. Reload the page.",
+  "participation.bookingCancelled": "This booking is cancelled, so there is nothing to withdraw from.",
   "error.type.participation-not-found": "You are no longer recorded in this booking. Reload the page.",
   "error.type.password-breach-check-unavailable": "The password cannot be checked right now. Try again later.",
   "error.type.password-reuses-credential": "The new password must not match the current one.",

@@ -166,6 +166,28 @@ class ParticipationControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:participation-not-found"));
     }
 
+    @Test
+    void givenABookingItsHolderCancelled_whenANamedMemberWithdraws_thenItIsRefusedAndTheyStayRecorded()
+            throws Exception {
+        // given
+        String bookingId = bookNaming(maryPersonId, "doe.jane");
+        mockMvc.perform(delete("/api/bookings/" + bookingId)
+                        .with(user("doe.jane").roles("MEMBER")).with(csrf()))
+                .andExpect(status().isNoContent());
+
+        // when
+        mockMvc.perform(delete("/api/my/participations/" + bookingId)
+                        .with(user("major.mary").roles("MEMBER")).with(csrf()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:participation-booking-cancelled"))
+                .andExpect(jsonPath("$.violations[0].code").value("participation.bookingCancelled"));
+
+        // then
+        mockMvc.perform(get("/api/my/participations").with(user("major.mary").roles("MEMBER")))
+                .andExpect(jsonPath("$.items[0].id").value(bookingId))
+                .andExpect(jsonPath("$.items[0].status").value("CANCELLED"));
+    }
+
     private String bookNaming(UUID namedPersonId, String bookerUsername) throws Exception {
         String response = mockMvc.perform(post("/api/bookings")
                         .header("Idempotency-Key", UUID.randomUUID().toString())

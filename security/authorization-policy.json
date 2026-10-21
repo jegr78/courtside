@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
-  "reviewedAt": "2026-10-16",
+  "reviewedAt": "2026-10-21",
   "purpose": "This is the normative authorization policy for the shipped Courtside API. OpenAPI defines the transport shape; this policy defines who may perform each operation, which resource attributes narrow that permission, and which protected fields each projection may read or write.",
-  "openApiFieldInventorySha256": "6273c89301f68f76b014f85d9513fa1c14faef3cfcba95c53ab1cadca39722c1",
+  "openApiFieldInventorySha256": "b69dc26062b4e902a0f97d0600fd7ebc143b89b1b29d175bbd4c20a2468728ef",
   "protectedFieldInventorySha256": "986f4786b6d260347b8e21f3a8b68ca4a04580a75cd23738a6a0252da159ed5f",
-  "productionAuthorizationSha256": "6a1f34f88df82665a3d7ea38cd31d00dedfe8b49f3190808f49ae94abf1d8df2",
+  "productionAuthorizationSha256": "0e1da6868ef095ed3d105825f43e5814d3b42e4c31b1cabed6b2e34b21bbfb52",
   "ordinaryFields": [
     "Problem.detail",
     "Problem.fieldErrors",
@@ -4097,7 +4097,7 @@
     {
       "id": "booking-ownership",
       "title": "Booking and participation ownership",
-      "rule": "Personal queries derive identity from the current account; cancellation requires the booking owner or ADMIN, check-in requires the booking owner and withdrawal removes only the current person's participation. A notification describes and links a booking only to its owner or a current participant. The start-up warm-up also acts here as an in-process caller without an account or request input, and it rolls back every write it makes.",
+      "rule": "Personal queries derive identity from the current account; cancellation requires the booking owner or ADMIN, check-in requires the booking owner and withdrawal removes only the current person's participation, from a booking that is not cancelled; a person the booking never named is answered as not found before its status is read. A notification describes and links a booking only to its owner or a current participant. The start-up warm-up also acts here as an in-process caller without an account or request input, and it rolls back every write it makes.",
       "attributes": [
         "current-account",
         "booking-owner",
@@ -4131,7 +4131,8 @@
       "negativeTests": [
         "src/test/java/org/courtside/booking/web/BookingControllerTest.java#givenAForeignBooking_whenAMemberCancelsIt_thenItIsNotFoundAndItStaysConfirmed",
         "src/test/java/org/courtside/notification/web/NotificationControllerTest.java#givenAPlayerWhoLeftTheBooking_whenTheyReadTheCentre_thenTheEntryNoLongerDescribesOrLinksIt",
-        "src/test/java/org/courtside/booking/attendance/AttendanceTest.java#givenSomebodyElsesBooking_whenAMemberChecksIn_thenItIsAnsweredLikeABookingThatDoesNotExist"
+        "src/test/java/org/courtside/booking/attendance/AttendanceTest.java#givenSomebodyElsesBooking_whenAMemberChecksIn_thenItIsAnsweredLikeABookingThatDoesNotExist",
+        "src/test/java/org/courtside/booking/ParticipationServiceTest.java#givenACancelledBooking_whenSomebodyItNeverNamedWithdraws_thenItIsNotFoundRatherThanCancelled"
       ]
     },
     {

@@ -171,7 +171,8 @@ sich selbst wieder austragen.
 andere Mitglieder mit deinem Namen angelegt haben.
 
 Mit *Austragen* entfernst du dich aus der Buchung. Die Buchung bleibt bestehen. Courtside
-benachrichtigt die Person, die sie angelegt hat.
+benachrichtigt die Person, die sie angelegt hat. Eine stornierte Buchung bleibt als storniert
+stehen und bietet kein Austragen an.
 
 ![Die als Mitspieler eingetragenen Buchungen mit der Schaltfläche zum Austragen.](screenshots/de/participations.png)
 

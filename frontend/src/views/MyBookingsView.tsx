@@ -262,10 +262,10 @@ function ParticipationSection({ participations, courtNames, locale, timeZone, wi
               <span>{participation.courtIds.map((id) => courtNames.get(id) ?? t("myBookings.unknownCourt")).join(", ")}</span>
             </span>
             <span data-testid="booking-card-label" className="text-muted text-sm">{participation.cardLabel}</span>
-            {participation.status === "CANCELLED" && <span>{t("myBookings.cancelled")}</span>}
-            <div className="pt-1">
-              <Button variant="destructive" data-testid="withdraw-participation" data-booking-id={participation.id} className="px-3 py-2" disabled={leaving === participation.id} onClick={() => void withdraw(participation.id)}>{t("participations.withdraw")}</Button>
-            </div>
+            {participation.status === "CANCELLED" ? <span>{t("myBookings.cancelled")}</span>
+              : <div className="pt-1">
+                <Button variant="destructive" data-testid="withdraw-participation" data-booking-id={participation.id} className="px-3 py-2" disabled={leaving === participation.id} onClick={() => void withdraw(participation.id)}>{t("participations.withdraw")}</Button>
+              </div>}
           </li>)}</ul>}
     </div>
     {nextCursor && <Button variant="secondary" data-testid="load-more-participations" className="mt-6" disabled={loadingMore} onClick={() => void loadMore()}>{t("participations.loadMore")}</Button>}
