@@ -38,13 +38,15 @@ export function violationMessage(code: string, params: Record<string, unknown>, 
   return import.meta.env.DEV ? `${unknown} [${code}]` : unknown;
 }
 
-// A refusal this client explains is the user's to correct, so support has nothing to look up.
+// A refusal this client explains is the user's to correct, unless it says the page itself sent it wrongly.
 function isCorrectableRefusal(failure: unknown, t: TFunction): boolean {
   if (!(failure instanceof ApiError) || !failure.problem || failure.status >= 500) return false;
   const coded = firstCodedFailure(failure.problem);
   if (coded) return t(coded.code, { defaultValue: MISSING }) !== MISSING;
   const slug = problemSlug(failure.problem);
-  return slug !== undefined && t(`error.type.${slug}`, { defaultValue: MISSING }) !== MISSING;
+  if (slug === undefined) return false;
+  const message = t(`error.type.${slug}`, { defaultValue: MISSING });
+  return message !== MISSING && message !== t("error.pageDefect");
 }
 
 function problemSlug(problem: Problem): string | undefined {
