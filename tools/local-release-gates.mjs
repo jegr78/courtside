@@ -5,7 +5,8 @@ import { createServer } from "node:net";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { checkoutRepository } from "./courtside.mjs";
-import { emptyOriginNotice, gitHistory, modifiedUpgradeInputs, nightlyUpgradeOrigins }
+import { emptyOriginNotice, gitHistory, modifiedUpgradeInputs, nightlyUpgradeOrigins,
+  registryTags }
   from "./courtside.upgrade-smoke.mjs";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
@@ -202,14 +203,7 @@ function forgetPreviousCandidate() {
 
 async function upgradeOrigins(repository, commit) {
   const name = repository.toLowerCase();
-  const tokenResponse = await fetch(`https://ghcr.io/token?scope=repository:${name}:pull`);
-  if (!tokenResponse.ok) throw new Error(`GHCR refused an anonymous pull token: ${tokenResponse.status}`);
-  const { token } = await tokenResponse.json();
-  const tagsResponse = await fetch(`https://ghcr.io/v2/${name}/tags/list?n=10000`,
-    { headers: { Authorization: `Bearer ${token}` } });
-  if (!tagsResponse.ok) throw new Error(`GHCR refused the tag list: ${tagsResponse.status}`);
-  const { tags } = await tagsResponse.json();
-  return nightlyUpgradeOrigins(name, tags ?? [], gitHistory(commit, root));
+  return nightlyUpgradeOrigins(name, await registryTags(name), gitHistory(commit, root));
 }
 
 async function context(gate) {
