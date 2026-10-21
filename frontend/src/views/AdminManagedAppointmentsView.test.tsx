@@ -441,6 +441,61 @@ describe("AdminManagedAppointmentsView", () => {
     await waitFor(() => expect(cancel).toHaveBeenCalledWith("series-1", first.id, "THIS", undefined));
   });
 
+  it("given a series whose every occurrence is loaded while another page remains, when the whole series is to be cancelled, then no unloaded occurrence is announced", async () => {
+    // given
+    const upcoming: ManagedAppointment = { ...first, startsAt: "2099-10-01T16:00:00Z", endsAt: "2099-10-01T17:00:00Z" };
+    vi.mocked(api.managedAppointments).mockResolvedValue({
+      items: [upcoming], nextCursor: upcoming.id,
+      series: [{ ...seriesFacts[0], occurrences: 2, cancelled: 1, past: 0 }]
+    });
+    show();
+    await userEvent.click(within(await screen.findByTestId("managed-series-series-1")).getByTestId("managed-series-summary"));
+    await userEvent.click(within(screen.getByTestId(`booking-${upcoming.id}`)).getByTestId("managed-cancel"));
+
+    // when
+    await userEvent.click(screen.getByTestId("scope-WHOLE_SERIES"));
+
+    // then
+    expect(screen.queryByTestId("incomplete-series-warning"), "the series' facts show none of it is left unloaded").not.toBeInTheDocument();
+  });
+
+  it("given a series with occurrences beyond the loaded rows, when the whole series is to be cancelled, then the unloaded occurrences are announced", async () => {
+    // given
+    const upcoming: ManagedAppointment = { ...first, startsAt: "2099-10-01T16:00:00Z", endsAt: "2099-10-01T17:00:00Z" };
+    vi.mocked(api.managedAppointments).mockResolvedValue({
+      items: [upcoming], nextCursor: upcoming.id,
+      series: [{ ...seriesFacts[0], occurrences: 4, cancelled: 1, past: 1 }]
+    });
+    show();
+    await userEvent.click(within(await screen.findByTestId("managed-series-series-1")).getByTestId("managed-series-summary"));
+    await userEvent.click(within(screen.getByTestId(`booking-${upcoming.id}`)).getByTestId("managed-cancel"));
+
+    // when
+    await userEvent.click(screen.getByTestId("scope-WHOLE_SERIES"));
+
+    // then
+    expect(screen.getByTestId("incomplete-series-warning"), "one upcoming occurrence of the series is not loaded")
+      .toHaveTextContent(i18n.t("myBookings.affectedIncomplete"));
+  });
+
+  it.each([
+    ["THIS", "Move appointment"],
+    ["THIS_AND_FOLLOWING", "Move this and following appointments"],
+    ["WHOLE_SERIES", "Move series"]
+  ] as const)("given a series occurrence, when the move scope is %s, then the dialog is titled for what moves", async (scope, title) => {
+    // given
+    show();
+    await userEvent.click(within(await screen.findByTestId("managed-series-series-1")).getByTestId("managed-series-summary"));
+    await userEvent.click(within(screen.getByTestId(`booking-${first.id}`)).getByTestId("move-booking"));
+
+    // when
+    await userEvent.click(within(screen.getByTestId("move-dialog")).getByTestId(`scope-${scope}`));
+
+    // then
+    expect(within(screen.getByTestId("move-dialog")).getByRole("heading", { level: 2 }), "the title names the chosen scope").toHaveTextContent(title);
+    expect(screen.getByRole("dialog", { name: title }), "the dialog's accessible name follows the title").toBeInTheDocument();
+  });
+
   it("given a confirmed cancellation, when the next action starts, then the earlier confirmation leaves", async () => {
     // given
     vi.spyOn(api, "cancelSeries").mockResolvedValue(undefined);

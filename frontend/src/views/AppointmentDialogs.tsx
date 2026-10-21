@@ -25,7 +25,7 @@ function ScopeFields({ scope, changed, t }: { scope: CancelScope; changed: (scop
   </fieldset>;
 }
 
-export function CancelDialog({ booking, seriesBookings, hasMoreBookings, timeZone, closed, completed, cancelOne }: { booking: Appointment; seriesBookings: Appointment[]; hasMoreBookings: boolean; timeZone: string; closed: () => void; completed: () => Promise<void>; cancelOne?: () => Promise<void> }) {
+export function CancelDialog({ booking, seriesBookings, incompleteSeries, timeZone, closed, completed, cancelOne }: { booking: Appointment; seriesBookings: Appointment[]; incompleteSeries: boolean; timeZone: string; closed: () => void; completed: () => Promise<void>; cancelOne?: () => Promise<void> }) {
   const { t, i18n } = useTranslation();
   const [scope, setScope] = useState<CancelScope>("THIS");
   const [reason, setReason] = useState<CancellationReason>();
@@ -49,7 +49,7 @@ export function CancelDialog({ booking, seriesBookings, hasMoreBookings, timeZon
     {series && <ScopeFields scope={scope} changed={setScope} t={t} />}
     <p className="font-semibold">{t("myBookings.affected", { count: affected.length })}</p>
     <ul className="list-disc pl-5">{affected.map((candidate) => <li key={candidate.id}>{formatBookingPeriod(candidate.startsAt, candidate.endsAt, i18n.language, timeZone)}</li>)}</ul>
-    {hasMoreBookings && scope !== "THIS" && <p data-testid="incomplete-series-warning">{t("myBookings.affectedIncomplete")}</p>}
+    {incompleteSeries && scope !== "THIS" && <p data-testid="incomplete-series-warning">{t("myBookings.affectedIncomplete")}</p>}
     {foreign && <CancellationReasonField reason={reason} changed={setReason} />}
     </div></DialogBody>
     {error && <div className="shrink-0 px-6 pt-3"><Alert>{error}</Alert></div>}
@@ -92,7 +92,7 @@ export function MoveDialog({ booking, courts, timeZone, maxBookingMinutes, close
   }
   return <Modal labelledBy="move-personal-title" closed={closed} width="lg" composed testId="move-dialog"><div ref={dialog} className="flex min-h-0 flex-col">
     <DialogBody><div className="grid gap-4">
-    <h2 id="move-personal-title" className="text-xl font-bold">{t("myBookings.moveTitle")}</h2>
+    <h2 id="move-personal-title" className="text-xl font-bold">{t(`myBookings.moveTitle.${scope}`)}</h2>
     <ScopeFields scope={scope} changed={(value) => { setScope(value); setPreview(undefined); }} t={t} />
     <label className="grid gap-1 font-semibold">{t("myBookings.newStartTime")}<DateTimeInput data-testid="move-start-time" type="time" emptyHint={t("myBookings.startUnchanged")} value={startTime} onChange={(event) => { setStartTime(event.target.value); setPreview(undefined); }} className="form-control rounded border px-3 py-2" /></label>
     <label className="grid gap-1 font-semibold">{t("myBookings.newDuration")}<input data-testid="move-duration" type="number" min="1" max={maxBookingMinutes} value={duration} onChange={(event) => { setDuration(event.target.value); setPreview(undefined); }} className="form-control rounded border p-2" /></label>
