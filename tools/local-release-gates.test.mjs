@@ -18,7 +18,7 @@ test("given the local candidate image, when the restore gate is planned, then it
 
 test("given retained nightlies, when the upgrade gate is planned, then every resolved origin runs once", () => {
   // given
-  const context = { image, repository: "jegr78/courtside",
+  const context = { image, repository: "jegr78/courtside", commit: "c0ffee1",
     origins: [{ ref: "b194064", image: "ghcr.io/jegr78/courtside:nightly-20261003-b194064" }] };
 
   // when
@@ -31,6 +31,8 @@ test("given retained nightlies, when the upgrade gate is planned, then every res
   assert.equal(plans[0].environment.COURTSIDE_UPGRADE_ORIGIN, "b194064");
   assert.equal(plans[0].environment.COURTSIDE_UPGRADE_ORIGIN_IMAGE, "ghcr.io/jegr78/courtside:nightly-20261003-b194064");
   assert.equal(plans[0].environment.GITHUB_REPOSITORY, "jegr78/courtside");
+  assert.equal(plans[0].environment.COURTSIDE_UPGRADE_CANDIDATE_COMMIT, "c0ffee1",
+    "a fallback origin is judged against the recorded candidate, not whatever the checkout moved to");
 });
 
 test("given no upgrade origin, when the upgrade gate is planned, then it fails instead of passing empty", () => {

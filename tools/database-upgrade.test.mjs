@@ -517,6 +517,33 @@ test("given a nightly the registry still lists but refuses, when the upgrade pul
     /connection reset/, "the same choice again means the registry has not deleted it, so the pull error stands");
   });
 
+test("given a fallback nightly that fails and is chosen again, when the upgrade pulls its origin, then the error "
+  + "names that nightly", async () => {
+    // given
+    const evicted = "ghcr.io/example/courtside:nightly-20261020-931bc00";
+    const refused = "ghcr.io/example/courtside:nightly-20261021-931bc00";
+    const pull = (image) => { throw new Error(image === evicted ? "manifest unknown" : `${image} refused`); };
+    const history = { committedAt: () => 0, unchangedSince: () => true };
+
+    // when / then
+    await assert.rejects(pullOrigin({ ref: "931bc00", image: evicted },
+      { pull, listTags: async () => ["nightly-20261021-931bc00"], history, repository: "example/courtside" }),
+    { message: `${refused} refused` }, "the run reports the image that refused it, not the one retention deleted");
+  });
+
+test("given the upgrade runner, when it falls back to another nightly, then it judges it against the candidate "
+  + "commit and names the run by the origin it tested", () => {
+  // when / then
+  assert.match(upgradeRunner, /history: gitHistory\(candidateCommit\)/);
+  assert.doesNotMatch(upgradeRunner, /gitHistory\("HEAD"\)/, "the checkout may have moved on since the gate resolved");
+  assert.match(gatesWorkflow, /COURTSIDE_UPGRADE_CANDIDATE_COMMIT: \$\{\{ inputs\.source-commit \}\}/);
+  assert.match(upgradeRunner, /const suffix = runSuffix\(pulled\.ref\)/,
+    "the build directory and compose project carry the tested origin");
+  assert.match(gatesWorkflow, /id: upgrade\n/);
+  assert.match(gatesWorkflow, /name: \$\{\{ inputs\.run-label \}\}-database-upgrade-\$\{\{ steps\.upgrade\.outputs\.origin \|\| matrix\.origin\.ref \}\}/,
+    "the artifact is named by the origin the step tested");
+});
+
 test("given a published release origin, when its pull fails, then the error stands without a new choice",
   async () => {
     // given
