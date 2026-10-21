@@ -252,7 +252,7 @@ Courtside checks the same rules as for a booking. Each court and time has its ow
 joins first is offered the court first.
 
 When the court frees, Courtside reserves it for the first member on the waitlist. Your offer appears
-in *Notifications* and in *My bookings*, and by email only if you chose email. The reservation lasts
+in *Messages* and in *My bookings*, and by email only if you chose email. The reservation lasts
 as long as the club has set, at most until the time starts. Select *Book* to turn it into your
 booking with the players you named. If you decline or the time runs out, the court goes to the next
 member. If you may no longer book the court or your mail server refuses the message with the offer,
@@ -289,17 +289,17 @@ Keep these rules in mind:
 A later configuration change may affect your booking. Examples include a deactivated court, a
 retired booking type or shorter opening hours.
 
-Courtside tells you the reason under *Notifications*, and by email if you chose email. This does
+Courtside tells you the reason under *Messages*, and by email if you chose email. This does
 not cancel the booking automatically. The club
 decides how to handle it.
 
-## Notifications
+## Messages
 
-*Notifications* lists every message Courtside sent you, newest first. Each entry shows when it
+*Messages* lists every message Courtside sent you, newest first. Each entry shows when it
 arrived, what it concerns and whether you have read it. New entries are marked *New*. The link
 below an entry opens the booking it concerns or your account security. Select *Mark as read* or
 follow the link to mark an entry read. You see only messages addressed to you, even without an
-email address. The number beside *Notifications* in the menu counts the unread entries.
+email address. The number beside *Messages* in the menu counts the unread entries.
 
 Below the list you choose what you receive. You can disable:
 
@@ -337,7 +337,7 @@ differ from this rule.
 
 Save your choices. They apply to future messages only.
 
-![Notifications with your messages and your choices.](../screenshots/en/notification-choices.png)
+![Messages with your entries and your choices.](../screenshots/en/notification-choices.png)
 
 ## Your account
 

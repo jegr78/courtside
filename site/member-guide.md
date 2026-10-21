@@ -261,7 +261,7 @@ Courtside prüft dabei dieselben Regeln wie bei einer Buchung. Für jeden Platz 
 eine eigene Warteliste. Wer sich zuerst einträgt, kommt zuerst dran.
 
 Wird der Platz frei, reserviert Courtside ihn für das erste Mitglied auf der Warteliste. Dein Angebot
-steht unter *Benachrichtigungen* und unter *Meine Buchungen*, per E-Mail nur, wenn du E-Mail gewählt
+steht unter *Nachrichten* und unter *Meine Buchungen*, per E-Mail nur, wenn du E-Mail gewählt
 hast. Die Reservierung gilt so lange, wie der Verein es eingestellt hat, höchstens bis zum Beginn der
 Zeit. Wählst du *Buchen*, wird daraus deine Buchung mit den eingetragenen Mitspielern. Lehnst du ab
 oder läuft die Zeit ab, geht der Platz an das nächste Mitglied. Darfst du den Platz inzwischen nicht
@@ -302,17 +302,17 @@ Beachte dabei:
 Eine spätere Änderung kann deine Buchung betreffen. Beispiele sind ein deaktivierter Platz, eine
 stillgelegte Buchungsart oder verkürzte Öffnungszeiten.
 
-Courtside nennt dir den Grund unter *Benachrichtigungen* und per E-Mail, wenn du E-Mail gewählt
+Courtside nennt dir den Grund unter *Nachrichten* und per E-Mail, wenn du E-Mail gewählt
 hast. Die Buchung wird dadurch nicht automatisch storniert. Der Verein entscheidet, wie er mit ihr umgeht.
 
-## Benachrichtigungen
+## Nachrichten
 
-Unter *Benachrichtigungen* stehen alle Nachrichten, die Courtside dir geschickt hat, die neueste
+Unter *Nachrichten* stehen alle Nachrichten, die Courtside dir geschickt hat, die neueste
 zuerst. Jeder Eintrag zeigt, wann er kam, worum es geht und ob du ihn schon gelesen hast. Neue
 Einträge sind mit *Neu* markiert. Über den Link darunter kommst du zur betroffenen Buchung oder zu
 deiner Kontosicherheit. Mit *Als gelesen markieren* oder dem Link markierst du einen Eintrag als
 gelesen. Hier siehst du nur Nachrichten an dich, auch ohne E-Mail-Adresse. Wie viele Einträge
-ungelesen sind, zeigt die Zahl neben *Benachrichtigungen* im Menü.
+ungelesen sind, zeigt die Zahl neben *Nachrichten* im Menü.
 
 Darunter wählst du, was du bekommst. Du kannst diese Nachrichten abwählen:
 
@@ -350,7 +350,7 @@ kennst. Eigene Texte deines Vereins können von dieser Regel abweichen.
 
 Speichere die Auswahl. Die Einstellung gilt nur für künftige Nachrichten.
 
-![Die Benachrichtigungen mit deinen Nachrichten und deiner Auswahl.](screenshots/de/notification-choices.png)
+![Nachrichten mit deinen Einträgen und deiner Auswahl.](screenshots/de/notification-choices.png)
 
 ## Dein Konto
 
