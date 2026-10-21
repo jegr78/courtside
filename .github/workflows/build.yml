@@ -439,16 +439,8 @@ jobs:
             .mvn/maven.config
             .mvn/wrapper/maven-wrapper.properties
           cache-read-only: ${{ strategy.job-index != 0 }}
-      - name: Resolve the plugins of every profile for the Maven cache
-        if: strategy.job-index == 0 && steps.java.outputs.cache-hit != 'true'
-        run: |
-          profiles=$(./mvnw -B --no-transfer-progress help:all-profiles \
-            | sed -n 's/^ *Profile Id: \([^ ]*\) .*/\1/p' | sort -u)
-          test -n "$profiles"
-          ./mvnw -B --no-transfer-progress dependency:resolve-plugins
-          for profile in $profiles; do
-            ./mvnw -B --no-transfer-progress dependency:resolve-plugins -P"$profile"
-          done
+      - if: strategy.job-index == 0 && steps.java.outputs.cache-hit != 'true'
+        uses: ./.github/actions/maven-plugins
       - uses: ./.github/actions/tool-dependencies
       - name: Select the backend shard
         env:

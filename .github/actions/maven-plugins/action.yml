@@ -1,0 +1,16 @@
+name: Resolve every Maven plugin
+description: Resolves the plugins of the default build and of every profile Maven lists, so a saved Maven cache holds all of them.
+
+runs:
+  using: composite
+  steps:
+    - name: Resolve the plugins of every profile for the Maven cache
+      shell: bash
+      run: |
+        profiles=$(./mvnw -B --no-transfer-progress help:all-profiles \
+          | sed -n 's/^ *Profile Id: \([^ ]*\) .*/\1/p' | sort -u)
+        test -n "$profiles"
+        ./mvnw -B --no-transfer-progress dependency:resolve-plugins
+        for profile in $profiles; do
+          ./mvnw -B --no-transfer-progress dependency:resolve-plugins -P"$profile"
+        done

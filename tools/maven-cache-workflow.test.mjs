@@ -16,7 +16,7 @@ function mavenCacheUsers() {
   });
 }
 
-test("given every job that restores the Maven cache, when the jobs run, then all share one key and only the full backend shard saves it", () => {
+test("given every job that restores the Maven cache, when the jobs run, then all share one key and one job saves each kind of commit", () => {
   // given
   const users = mavenCacheUsers();
 
@@ -28,26 +28,51 @@ test("given every job that restores the Maven cache, when the jobs run, then all
   assert.ok(users.length > 1, "the workflows restore the Maven cache");
   assert.deepEqual([...keys], ["pom.xml\n.mvn/maven.config\n.mvn/wrapper/maven-wrapper.properties\n"],
     "every job keys the cache on the pom and the Maven wrapper with its configuration");
-  assert.deepEqual(writers.map(({ file, job, step }) => `${file} ${job} ${step.with["cache-read-only"]}`),
-    ["build.yml backend ${{ strategy.job-index != 0 }}"],
-    "only the backend shard that runs every test and integration test saves the cache");
+  assert.deepEqual(writers.map(({ file, job, step }) => `${file} ${job} ${step.with["cache-read-only"]}`), [
+    "build.yml backend ${{ strategy.job-index != 0 }}",
+    "release-candidate.yml release-build ${{ needs.select.outputs.branch == 'main' }}"
+  ], "the full backend shard saves a main commit's cache and the release build a release branch commit's, whose pom "
+    + "no main build keys");
 });
 
-test("given the job that saves the Maven cache, when it builds, then it first resolves the plugins of every profile Maven lists", () => {
+const pluginResolution = "./.github/actions/maven-plugins";
+
+// `a != b` for `a == b` and back, so a writer's save condition reads from its read-only flag.
+function negated(expression) {
+  return expression.replace(/ (!=|==) /, (_, operator) => operator === "!=" ? " == " : " != ");
+}
+
+test("given each job that saves the Maven cache, when it misses, then it resolves every plugin before its first build",
+  () => {
+    // given
+    const writers = mavenCacheUsers().filter(({ step }) => String(step.with["cache-read-only"]) !== "true");
+
+    for (const { file, job, definition, index, step } of writers) {
+      // when
+      const steps = definition.steps;
+      const resolution = steps.findIndex((candidate) => candidate.uses === pluginResolution);
+      const build = steps.findIndex((candidate) => /\.\/mvnw/.test(candidate.run ?? ""));
+      const saving = negated(step.with["cache-read-only"].replace(/^\$\{\{ (.+?) \}\}$/, "$1"));
+
+      // then
+      assert.ok(resolution > index && resolution < build,
+        `${file} ${job} resolves the plugins after the cache is restored and before Maven first builds`);
+      assert.equal(steps[resolution].if, `${saving} && steps.${step.id}.outputs.cache-hit != 'true'`,
+        `${file} ${job} resolves exactly when it saves a missed key`);
+    }
+  });
+
+test("given the plugin resolution, when it runs, then it resolves the plugins of every profile Maven lists", () => {
   // given
-  const [writer] = mavenCacheUsers().filter(({ step }) => String(step.with["cache-read-only"]) !== "true");
-  const steps = writer.definition.steps;
+  const action = yaml.load(readFileSync(new URL("../.github/actions/maven-plugins/action.yml", import.meta.url), "utf8"));
 
   // when
-  const resolution = steps.findIndex((step) => /dependency:resolve-plugins/.test(step.run ?? ""));
-  const build = steps.findIndex((step) => step.name === "Verify backend");
+  const [resolve] = action.runs.steps;
 
   // then
-  assert.ok(resolution > writer.index && resolution < build,
-    "the plugins are resolved after the cache is restored and before the build can fail");
-  assert.match(steps[resolution].run, /help:all-profiles/, "the profiles come from Maven, not from a list in the workflow");
-  assert.doesNotMatch(steps[resolution].run, /-q\b[^\n]*help:all-profiles/, "a quiet Maven prints no profile");
-  assert.match(steps[resolution].run, /test -n "\$profiles"/, "an empty profile list fails instead of caching less");
-  assert.match(steps[resolution].run, /dependency:resolve-plugins[\s\S]*-P"\$profile"/,
-    "each listed profile has its plugins resolved");
+  assert.match(resolve.run, /help:all-profiles/, "the profiles come from Maven, not from a list in the workflow");
+  assert.doesNotMatch(resolve.run, /-q\b[^\n]*help:all-profiles/, "a quiet Maven prints no profile");
+  assert.match(resolve.run, /test -n "\$profiles"/, "an empty profile list fails instead of caching less");
+  assert.match(resolve.run, /dependency:resolve-plugins\n/, "the default build has its plugins resolved");
+  assert.match(resolve.run, /dependency:resolve-plugins[\s\S]*-P"\$profile"/, "each listed profile has its plugins resolved");
 });

@@ -78,6 +78,13 @@
       "validators": []
     },
     {
+      "path": ".github/actions/maven-plugins/action.yml",
+      "profiles": [
+        "full"
+      ],
+      "validators": []
+    },
+    {
       "path": ".github/actions/tool-dependencies/action.yml",
       "profiles": [
         "full"
