@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
-const RELEASE_HEADING = /^##\s+(?:\[)?(\d+\.\d+\.\d+(?:-[0-9A-Za-z]+(?:\.[0-9A-Za-z]+)*)?)(?:\])?(?:\([^\n]*\))?(?:\s+\([^)]+\))?\s*$/gm;
+const RELEASE_HEADING = /^##\s+(?:\[)?(\d+\.\d+\.\d+(?:-[0-9A-Za-z]+(?:\.[0-9A-Za-z]+)*)?)(?:\])?(?:\([^\n]*\))?(?:\s+\([^)]+\))?[ \t]*$/gm;
 const SECTION_HEADING = /^###\s+(.+?)\s*$/gm;
 const SECTION_ORDER = new Map([
   ["Notable changes", 0],
