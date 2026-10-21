@@ -41,6 +41,11 @@ jobs:
           java-version: '25'
           distribution: temurin
           cache: maven
+          cache-dependency-path: |
+            pom.xml
+            .mvn/maven.config
+            .mvn/wrapper/maven-wrapper.properties
+          cache-read-only: true
       - name: Install assessment tool dependencies
         run: >
           ./mvnw -B
