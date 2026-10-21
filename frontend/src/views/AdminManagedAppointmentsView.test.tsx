@@ -461,9 +461,10 @@ describe("AdminManagedAppointmentsView", () => {
 
   it("given a series with occurrences beyond the loaded rows, when the whole series is to be cancelled, then the unloaded occurrences are announced", async () => {
     // given
-    const upcoming: ManagedAppointment = { ...first, startsAt: "2099-10-01T16:00:00Z", endsAt: "2099-10-01T17:00:00Z" };
+    const running: ManagedAppointment = { ...first, startsAt: "2000-10-01T16:00:00Z", endsAt: "2099-10-01T17:00:00Z" };
+    const upcoming: ManagedAppointment = { ...second, startsAt: "2099-10-08T16:00:00Z", endsAt: "2099-10-08T17:00:00Z" };
     vi.mocked(api.managedAppointments).mockResolvedValue({
-      items: [upcoming], nextCursor: upcoming.id,
+      items: [running, upcoming], nextCursor: upcoming.id,
       series: [{ ...seriesFacts[0], occurrences: 4, cancelled: 1, past: 1 }]
     });
     show();
@@ -474,7 +475,7 @@ describe("AdminManagedAppointmentsView", () => {
     await userEvent.click(screen.getByTestId("scope-WHOLE_SERIES"));
 
     // then
-    expect(screen.getByTestId("incomplete-series-warning"), "one upcoming occurrence of the series is not loaded")
+    expect(screen.queryByTestId("incomplete-series-warning"), "one upcoming occurrence is unloaded while the started one counts as past")
       .toHaveTextContent(i18n.t("myBookings.affectedIncomplete"));
   });
 
