@@ -193,6 +193,72 @@ test("given the dark theme, when a member switches to light, then every control 
 });
 
 for (const viewport of [undefined, { width: 320, height: 568 }]) {
+  test(`given a phone ${viewport ? `${viewport.width} px wide` : "of the project's size"}, when the booking form is scrolled to its end, then its title stays whole inside the dialog`, async ({ page, journeyService }) => {
+    // given
+    if (viewport) await page.setViewportSize(viewport);
+    await signIn(page, "doe.jane");
+    await selectJourneyDate(page, journeyService.visualDate);
+    await page.locator('[data-testid="free-slot"][data-court-number="2"][data-slot="12:00"]:visible').tap();
+    const dialog = page.getByTestId("booking-dialog");
+    await page.getByTestId("booking-more-summary").tap();
+
+    // when
+    await dialog.getByTestId("dialog-body").evaluate((body) => body.scrollTo(0, body.scrollHeight));
+
+    // then
+    await expect.poll(async () => {
+      const title = await dialog.getByRole("heading", { level: 2 }).boundingBox();
+      const frame = await dialog.boundingBox();
+      return title !== null && frame !== null && title.y >= frame.y && title.y + title.height <= frame.y + frame.height;
+    }, { message: "the dialog title stays whole inside the dialog while its form scrolls", timeout: 10_000 }).toBe(true);
+    await expect(dialog.getByRole("heading", { level: 2 }), "the title stays on screen").toBeInViewport({ ratio: 1 });
+  });
+}
+
+test("given a phone 320 px wide with text at 150 percent, when another day is chosen, then its first row starts below the plan's pinned header", async ({ page, journeyService }) => {
+  // given
+  await signIn(page, "doe.jane");
+  await page.setViewportSize({ width: 320, height: 568 });
+  await page.evaluate(() => { document.documentElement.style.fontSize = "150%"; });
+
+  // when
+  await selectJourneyDate(page, journeyService.visualDate);
+
+  // then
+  const firstRow = page.locator('[data-testid^="slot-row-"]').first();
+  await expect.poll(async () => {
+    const row = await firstRow.boundingBox();
+    const header = await page.getByTestId("court-heading-1").boundingBox();
+    return row !== null && header !== null && row.y >= header.y + header.height - 1;
+  }, { message: "the first row starts below the pinned court header", timeout: 10_000 }).toBe(true);
+});
+
+test("given a phone, when the member books the first row of the day, then the new booking shows below the plan's pinned header", async ({ page, journeyService }) => {
+  // given
+  await signIn(page, "doe.jane");
+  await selectJourneyDate(page, journeyService.visualDate);
+  const firstRow = page.locator('[data-testid^="slot-row-"]').first();
+  const slot = firstRow.locator('[data-testid="free-slot"][data-state="free"]:visible').first();
+  const time = await firstRow.getAttribute("data-testid");
+  await slot.tap();
+  await page.getByTestId("member-search").fill("Mary");
+  await page.getByTestId("member-match").tap();
+
+  // when
+  await page.getByTestId("booking-submit").tap();
+
+  // then
+  const booked = page.locator(`[data-testid="${time}"] [data-testid="own-allocation"]`);
+  await expect(booked, "the first row now holds the member's booking").toBeVisible({ timeout: 10_000 });
+  await expect.poll(async () => {
+    const booking = await booked.boundingBox();
+    const header = await page.getByTestId("court-heading-1").boundingBox();
+    return booking !== null && header !== null && booking.y >= header.y + header.height - 1;
+  }, { message: "the booking starts below the pinned court header", timeout: 10_000 }).toBe(true);
+  await expect(booked, "the booking is on screen").toBeInViewport({ ratio: 1 });
+});
+
+for (const viewport of [undefined, { width: 320, height: 568 }]) {
   test(`given a phone ${viewport ? `${viewport.width} px wide` : "of the project's size"}, when a booking is refused, then the reason and its reference are on screen inside the alert`, async ({ page, journeyService }) => {
     // given
     if (viewport) await page.setViewportSize(viewport);

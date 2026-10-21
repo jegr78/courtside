@@ -45,6 +45,13 @@ export async function settle(page: Page, timeout = 15_000): Promise<boolean> {
 
 const trace = (label: string, phase: string) => { if (process.env.DEBUG_CAPTURE) console.log(`${new Date().toISOString()} capture ${label}: ${phase}`); };
 
+// Mobile Chromium resizes the viewport for a full-page shot and leaves the page scrolled elsewhere.
+export async function fullPageShot(page: Page, path: string) {
+  const [x, y] = await page.evaluate(() => [window.scrollX, window.scrollY]);
+  await page.screenshot({ path, fullPage: true });
+  await page.evaluate(([left, top]) => window.scrollTo(left, top), [x, y]);
+}
+
 export async function capture(page: Page, label: string, opts: { expectedStatuses?: number[] } = {}) {
   const info = test.info();
   trace(label, "start");
@@ -62,7 +69,7 @@ export async function capture(page: Page, label: string, opts: { expectedStatuse
   for (let attempt = 1; ; attempt++) {
     await page.screenshot({ path: `${base}.png` });
     trace(label, "viewport shot");
-    await page.screenshot({ path: `${base}-full.png`, fullPage: true });
+    await fullPageShot(page, `${base}-full.png`);
     trace(label, "full shot");
     const stillQuiet = await page.locator(LOADING_NOTICE).count() === 0;
     if (stillQuiet || !settled || attempt === 3) { settled = settled && stillQuiet; break; }

@@ -640,7 +640,7 @@ input[type="time"] {
   .day-plan {
     max-height: none;
     overflow: visible;
-    scroll-margin-top: 7rem;
+    scroll-margin-top: var(--week-navigation-height, 7rem);
   }
 
   .day-plan-table.day-plan-many-courts {
