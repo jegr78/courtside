@@ -429,6 +429,15 @@ it("given a listed participation, when the member withdraws, then it is sent and
   expect(screen.getByRole("status")).toHaveTextContent("Participation withdrawn.");
 });
 
+it("given a participation its holder cancelled, when it is listed, then it reads as cancelled and offers no withdrawal", async () => {
+  vi.spyOn(api, "participations").mockResolvedValue({ items: [{ ...participation(participationId), status: "CANCELLED" }] });
+
+  render(<MyBookingsView now={new Date("2026-08-12T12:00:00Z")} />);
+
+  expect(await screen.findByTestId(`participation-${participationId}`)).toHaveTextContent(i18n.t("myBookings.cancelled"));
+  expect(screen.queryByTestId("withdraw-participation"), "a cancelled booking has nothing to withdraw from").not.toBeInTheDocument();
+});
+
 it("given the bookings cannot be read, when the member tries again, then they appear without a reload", async () => {
   // given
   vi.mocked(api.personalBookings).mockRejectedValueOnce(new Error("offline for a moment"));

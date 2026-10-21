@@ -47,9 +47,15 @@ public class ParticipationService {
         Booking booking = bookings.findWithParticipantsById(bookingId)
                 .filter(found -> !accountId.equals(found.getBookedBy()))
                 .orElseThrow(() -> notRecorded(bookingId));
-        if (!booking.withdrawParticipant(personId)) {
+        boolean recorded = booking.getParticipants().stream()
+                .anyMatch(participant -> personId.equals(participant.getPersonId()));
+        if (!recorded) {
             throw notRecorded(bookingId);
         }
+        if (booking.getStatus() == BookingStatus.CANCELLED) {
+            throw new ParticipationBookingCancelledException();
+        }
+        booking.withdrawParticipant(personId);
         bookings.saveAndFlush(booking);
         events.publishEvent(new ParticipantWithdrew(bookingId, personId));
         log.info("Member {} withdrew from booking {}", personId, bookingId);

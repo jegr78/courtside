@@ -5835,7 +5835,8 @@ paths:
         rebooking.
 
         A booking this member is not recorded in answers `404`, which is also the answer to a
-        second attempt.
+        second attempt. A cancelled booking keeps its participants as they were and answers
+        `409` with `urn:courtside:error:participation-booking-cancelled`.
       security:
         - sessionCookie: []
           csrfToken: []
@@ -5855,6 +5856,8 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
         "429":
           $ref: "#/components/responses/RateLimited"
 

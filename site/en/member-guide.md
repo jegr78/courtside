@@ -166,7 +166,7 @@ Open *My bookings* and go to **Recorded as a co-player**. This section lists boo
 members created with your name.
 
 Select *Withdraw* to remove yourself. The booking remains in place. Courtside notifies the person
-who created it.
+who created it. A cancelled booking stays listed as cancelled and offers no withdrawal.
 
 ![Bookings where you are recorded as a co-player, with the withdrawal button.](../screenshots/en/participations.png)
 

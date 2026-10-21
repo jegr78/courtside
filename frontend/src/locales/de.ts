@@ -1383,6 +1383,8 @@ const de = {
   "error.type.operational-log-range-invalid": "Der Beginn muss vor dem Ende liegen.",
   "error.type.parameter-type-mismatch": "Die Seite hat eine Anfrage gesendet, die Courtside nicht verarbeiten kann. Lade die Seite neu und versuche es erneut.",
   "error.type.participants-invalid": "Diese Teilnehmenden sind für die Buchung nicht zulässig.",
+  "error.type.participation-booking-cancelled": "Diese Buchung ist storniert, du musst dich nicht mehr austragen. Lade die Seite neu.",
+  "participation.bookingCancelled": "Diese Buchung ist storniert, du musst dich nicht mehr austragen.",
   "error.type.participation-not-found": "Du bist in dieser Buchung nicht mehr eingetragen. Lade die Seite neu.",
   "error.type.password-breach-check-unavailable": "Das Passwort kann gerade nicht geprüft werden. Versuche es später erneut.",
   "error.type.password-reuses-credential": "Das neue Passwort darf nicht dem bisherigen entsprechen.",

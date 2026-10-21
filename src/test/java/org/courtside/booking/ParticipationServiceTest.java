@@ -143,6 +143,25 @@ class ParticipationServiceTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenACancelledBooking_whenSomebodyItNeverNamedWithdraws_thenItIsNotFoundRatherThanCancelled() {
+        // given
+        UUID bookingId = bookingByJaneNaming(namedPersonId);
+        bookingService.cancel(bookingId, bookerAccountId, Set.of(Role.MEMBER));
+        UUID strangerPersonId = identityFixture.createPerson("Mary", "Major", "mary@example.org");
+
+        // when / then
+        assertThatThrownBy(() -> participations.withdraw(bookingId, strangerPersonId, UUID.randomUUID()))
+                .as("a member the booking never named learns nothing about its status")
+                .isInstanceOf(ParticipationNotFoundException.class);
+        assertThatThrownBy(() -> participations.withdraw(bookingId, namedPersonId, namedAccountId))
+                .isInstanceOf(ParticipationBookingCancelledException.class);
+        assertThat(bookings.findWithParticipantsById(bookingId).orElseThrow().getParticipants())
+                .extracting(BookingParticipant::getPersonId)
+                .as("a refused withdrawal leaves the cancelled booking's record as it was")
+                .contains(namedPersonId);
+    }
+
+    @Test
     void givenTheirOwnBooking_whenTheBookerWithdrawsFromIt_thenItIsRefused() {
         // given
         UUID bookingId = bookingByJaneNaming(namedPersonId);

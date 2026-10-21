@@ -135,6 +135,7 @@ class ProblemTypeUriTest {
             "urn:courtside:error:club-logo-not-found",
             "urn:courtside:error:app-icon-unsupported",
             "urn:courtside:error:participants-invalid",
+            "urn:courtside:error:participation-booking-cancelled",
             "urn:courtside:error:participation-not-found",
             "urn:courtside:error:person-account-exists",
             "urn:courtside:error:person-not-found",
