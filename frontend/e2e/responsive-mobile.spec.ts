@@ -83,14 +83,14 @@ test("administrator and member destinations fit the narrow phone bar", async ({ 
   await signIn(page, "configuration-admin");
 
   // then
-  await expectPrimaryNavigationFits(page, ["Platzplan", "Meine Buchungen", "Benachrichtigungen", "Verwaltung"]);
+  await expectPrimaryNavigationFits(page, ["Platzplan", "Meine Buchungen", "Nachrichten", "Verwaltung"]);
 
   // when
   await page.evaluate(() => window.localStorage.setItem("courtside.locale", "en-GB"));
   await page.reload();
 
   // then
-  await expectPrimaryNavigationFits(page, ["Court plan", "My bookings", "Notifications", "Administration"]);
+  await expectPrimaryNavigationFits(page, ["Court plan", "My bookings", "Messages", "Administration"]);
 
   // when
   await page.context().clearCookies();
@@ -98,14 +98,14 @@ test("administrator and member destinations fit the narrow phone bar", async ({ 
   await signIn(page, "doe.jane");
 
   // then
-  await expectPrimaryNavigationFits(page, ["Platzplan", "Meine Buchungen", "Benachrichtigungen"]);
+  await expectPrimaryNavigationFits(page, ["Platzplan", "Meine Buchungen", "Nachrichten"]);
 
   // when
   await page.evaluate(() => window.localStorage.setItem("courtside.locale", "en-GB"));
   await page.reload();
 
   // then
-  await expectPrimaryNavigationFits(page, ["Court plan", "My bookings", "Notifications"]);
+  await expectPrimaryNavigationFits(page, ["Court plan", "My bookings", "Messages"]);
 });
 
 async function boundsWithinOverlay(page: Page, testId: string) {
@@ -1381,12 +1381,12 @@ test("given a German word longer than a 320 px line, when a heading wraps it, th
   await page.setViewportSize({ width: 320, height: 640 });
   await page.goto("/login");
   await page.evaluate(() => window.localStorage.setItem("courtside.locale", "de-DE"));
-  await become(page, "doe.jane");
+  await become(page, "configuration-admin");
 
   // when
-  await page.goto("/my-messages");
+  await page.goto("/admin/messages");
   const heading = page.getByRole("heading", { level: 1 });
-  await expect(heading).toHaveText("Benachrichtigungen", { timeout: 10_000 });
+  await expect(heading).toHaveText("Nachrichtenprotokoll", { timeout: 10_000 });
   const secondLineStart = await heading.evaluate((element) => {
     const range = document.createRange();
     range.selectNodeContents(element.firstChild!);
@@ -1411,7 +1411,7 @@ test("given a German word longer than a 320 px line, when a heading wraps it, th
   // then
   await expect(page.locator("html"), "the browser hyphenates by the document language").toHaveAttribute("lang", "de");
   expect(secondLineStart.lines, "the word does not fit one 320 px line").toBe(2);
-  expect([2, 6, 10, 12, 15], "the word breaks at a syllable of Be-nach-rich-ti-gun-gen, not at an arbitrary letter")
+  expect([4, 8, 11, 14, 16], "the word breaks at a syllable of Nach-rich-ten-pro-to-koll, not at an arbitrary letter")
     .toContain(secondLineStart.offset);
   expect(drawn.equals(restored), "the heading draws the same twice, so a difference below is the hyphen").toBe(true);
   expect(drawn.equals(redrawn), "the first line ends with a hyphen the browser drew").toBe(false);

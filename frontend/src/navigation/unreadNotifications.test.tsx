@@ -29,7 +29,7 @@ describe("unread notifications in the primary navigation", () => {
 
     // then
     expect(await screen.findByTestId("my-messages-unread")).toHaveTextContent("3");
-    expect(screen.getByTestId("my-messages-link")).toHaveAccessibleName("Notifications, 3 unread");
+    expect(screen.getByTestId("my-messages-link")).toHaveAccessibleName("Messages, 3 unread");
     expect(api.ownNotifications).toHaveBeenCalledWith(undefined, 1);
   });
 
@@ -43,7 +43,7 @@ describe("unread notifications in the primary navigation", () => {
 
     // then
     expect(await screen.findByTestId("my-messages-unread")).toHaveTextContent("1");
-    expect(screen.getByTestId("my-messages-link")).toHaveAccessibleName("Benachrichtigungen, 1 ungelesen");
+    expect(screen.getByTestId("my-messages-link")).toHaveAccessibleName("Nachrichten, 1 ungelesen");
   });
 
   it("given nothing unread, when a member's navigation renders, then no badge is shown and the name carries no count", async () => {
@@ -56,7 +56,7 @@ describe("unread notifications in the primary navigation", () => {
     // then
     await waitFor(() => expect(api.ownNotifications).toHaveBeenCalled());
     expect(screen.queryByTestId("my-messages-unread")).not.toBeInTheDocument();
-    expect(screen.getByTestId("my-messages-link")).toHaveAccessibleName("Notifications");
+    expect(screen.getByTestId("my-messages-link")).toHaveAccessibleName("Messages");
   });
 
   it("given the count on screen, when the member moves to another page, then the count is read again", async () => {
@@ -88,7 +88,7 @@ describe("unread notifications in the primary navigation", () => {
 
     // then
     await waitFor(() => expect(screen.queryByTestId("my-messages-unread")).not.toBeInTheDocument());
-    expect(screen.getByTestId("my-messages-link")).toHaveAccessibleName("Notifications");
+    expect(screen.getByTestId("my-messages-link")).toHaveAccessibleName("Messages");
   });
 
   it("given the count cannot be read, when the navigation renders, then it shows no badge and stays usable", async () => {
@@ -102,7 +102,7 @@ describe("unread notifications in the primary navigation", () => {
     // then
     await waitFor(() => expect(warning).toHaveBeenCalled());
     expect(screen.queryByTestId("my-messages-unread")).not.toBeInTheDocument();
-    expect(screen.getByTestId("my-messages-link")).toHaveAccessibleName("Notifications");
+    expect(screen.getByTestId("my-messages-link")).toHaveAccessibleName("Messages");
   });
 
   it("given a count on screen, when the member signs out and another signs in, then the old count never shows for the new account", async () => {
