@@ -61,11 +61,11 @@ export function BookingsExport({ onFailure }: Props) {
       <div className="grid gap-3 sm:grid-cols-4">
         <TextField data-testid="bookings-export-from" name="from" type="date" required label={t("admin.export.from")} />
         <TextField data-testid="bookings-export-to" name="to" type="date" required label={t("admin.export.to")} />
-        <label className="grid gap-2 font-medium">
+        <label className="grid min-w-0 gap-2 font-medium">
           {t("admin.export.separator")}
           <select
             data-testid="bookings-export-separator"
-            className="form-control rounded-lg border px-3 py-3"
+            className="form-control w-full min-w-0 rounded-lg border px-3 py-3"
             value={separator}
             onChange={(event) => setSeparator(event.target.value)}
           >
@@ -73,11 +73,11 @@ export function BookingsExport({ onFailure }: Props) {
               <option key={character} value={character}>{t(`admin.export.separator.${character}`)}</option>)}
           </select>
         </label>
-        <label className="grid gap-2 font-medium">
+        <label className="grid min-w-0 gap-2 font-medium">
           {t("admin.export.encoding")}
           <select
             data-testid="bookings-export-encoding"
-            className="form-control rounded-lg border px-3 py-3"
+            className="form-control w-full min-w-0 rounded-lg border px-3 py-3"
             value={encoding}
             onChange={(event) => setEncoding(event.target.value)}
           >

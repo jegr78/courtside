@@ -638,6 +638,36 @@ test.describe("without a service worker, so the page's own requests can be answe
     }
     await expectNoHorizontalOverflow(page);
   });
+
+  for (const width of [390, 820]) {
+    test(`given a ${width} px wide window and a long import source name, when the data export is read, then every field ends inside its section`, async ({ page }) => {
+      // given
+      await page.setViewportSize({ width, height: 1180 });
+      await signIn(page, "configuration-admin");
+      await expect(page.getByTestId("administration-link")).toBeVisible();
+      const sources = await page.evaluate(() => fetch("/api/admin/import/sources").then((answer) => answer.json())) as { id: string; displayName: string }[];
+      const longName = "Acceptance member list exported by the previous club software with a name longer than the screen";
+      const named = sources.length > 0 ? sources.map((source) => ({ ...source, displayName: longName }))
+        : [{ id: "90000000-0000-0000-0000-000000000077", displayName: longName, separator: ",", encoding: "UTF-8" }];
+      await page.route("**/api/admin/import/sources", (route) => route.fulfill({ json: named }));
+
+      // when
+      await page.goto("/admin/export");
+      await expect(page.getByTestId("roster-export-source").locator("option", { hasText: longName }), "the source offered is the long one the layout must absorb").toBeAttached();
+
+      // then
+      const escaping = await page.locator('section[data-testid$="export"]').evaluateAll((sections) => sections.flatMap((section) => {
+        const bounds = section.getBoundingClientRect();
+        const inner = bounds.right - parseFloat(getComputedStyle(section).paddingRight) - parseFloat(getComputedStyle(section).borderRightWidth);
+        return [...section.querySelectorAll("select, input")]
+          .filter((field) => field.getBoundingClientRect().right > inner + 0.5)
+          .map((field) => `${field.getAttribute("data-testid")} ends at ${Math.round(field.getBoundingClientRect().right)} past ${Math.round(inner)}`);
+      }));
+      await expect(page.locator('section[data-testid$="export"]'), "the roster, bookings and both log exports are measured").toHaveCount(4);
+      expect(escaping, "every export field ends inside its section").toEqual([]);
+      await expectNoHorizontalOverflow(page);
+    });
+  }
 });
 
 test("the initial-password form remains usable on a touch viewport", async ({ page }) => {
@@ -1126,6 +1156,35 @@ for (const width of [820, 1024]) {
     const name = await page.getByTestId("new-court-name").boundingBox();
     expect(number!.y, "the two fields share a row at this width").toBeCloseTo(name!.y, 0);
     expect(number!.x + number!.width, "the number input stays inside its column").toBeLessThanOrEqual(name!.x);
+  });
+}
+
+for (const [width, locale] of [[390, "de-DE"], [390, "en-GB"], [1280, "de-DE"], [1280, "en-GB"]] as const) {
+  test(`given a ${width} px wide window in ${locale}, when a slot filler without a count is listed, then its count field shows the whole placeholder`, async ({ page }) => {
+    // given
+    await page.setViewportSize({ width, height: 900 });
+    await signIn(page, "configuration-admin");
+    await expect(page.getByTestId("administration-link")).toBeVisible();
+    await page.evaluate((chosen) => window.localStorage.setItem("courtside.locale", chosen), locale);
+
+    // when
+    await page.goto("/admin/facility/slot-fillers");
+    const count = page.getByTestId("edit-participant-card-capacity-66666666-6666-6666-6666-666666666666");
+    await expect(count).toBeVisible();
+    await expect(page.locator("html")).toHaveAttribute("lang", locale.slice(0, 2));
+    await page.evaluate(() => document.fonts.ready);
+
+    // then
+    const room = await count.evaluate((field) => {
+      const input = field as HTMLInputElement;
+      const style = getComputedStyle(input);
+      const context = document.createElement("canvas").getContext("2d")!;
+      context.font = style.font;
+      const content = input.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+      return { placeholder: input.placeholder, text: Math.ceil(context.measureText(input.placeholder).width), content: Math.floor(content) };
+    });
+    expect(room.placeholder, "the empty count shows a placeholder").not.toBe("");
+    expect(room.text + 24, `"${room.placeholder}" and a spin control fit the field (${JSON.stringify(room)})`).toBeLessThanOrEqual(room.content);
   });
 }
 

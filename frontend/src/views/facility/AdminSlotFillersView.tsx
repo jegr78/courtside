@@ -147,10 +147,14 @@ function ParticipantCardRow({ card, entry, refused, disabled, entered, toggle }:
     </td>
     <td className={cell}>
       <span aria-hidden="true" data-testid="participant-card-label-owned" className={label}>{t("admin.facility.owned")}</span>
-      <input data-testid={`edit-participant-card-capacity-${card.id}`} className={`${field} w-28`} type="number" min={1} max={99}
-             aria-label={t("admin.facility.editParticipantCardCapacity")} aria-invalid={(refused && !validCapacity(entry)) || undefined}
-             placeholder={t("admin.facility.unlimited")}
-             disabled={disabled} value={entry.capacity} onChange={(event) => entered({ capacity: event.target.value })} />
+      {/* The hidden copy of the placeholder sizes the field, with room left for the spin control. */}
+      <span className="inline-grid min-w-0 max-w-full justify-self-start">
+        <span aria-hidden="true" className="invisible col-start-1 row-start-1 overflow-hidden whitespace-pre border px-3 py-2 pr-12">{t("admin.facility.unlimited")}</span>
+        <input data-testid={`edit-participant-card-capacity-${card.id}`} className={`${field} col-start-1 row-start-1 w-full min-w-0`} type="number" min={1} max={99}
+               aria-label={t("admin.facility.editParticipantCardCapacity")} aria-invalid={(refused && !validCapacity(entry)) || undefined}
+               placeholder={t("admin.facility.unlimited")}
+               disabled={disabled} value={entry.capacity} onChange={(event) => entered({ capacity: event.target.value })} />
+      </span>
     </td>
     <td className={cell}>
       <span aria-hidden="true" data-testid="participant-card-label-status" className={label}>{t("admin.facility.columnStatus")}</span>

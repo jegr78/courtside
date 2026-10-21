@@ -63,11 +63,11 @@ export function RosterExport({ query, membershipTypeId, disabled, onFailure }: P
     <h2 className="text-2xl font-bold">{t("admin.roster.export")}</h2>
     <p className="text-muted text-sm">{t("admin.roster.exportExplain")}</p>
     <div className="grid gap-3 sm:grid-cols-3">
-      <label className="grid gap-2 font-medium">
+      <label className="grid min-w-0 gap-2 font-medium">
         {t("admin.roster.exportSeparator")}
         <select
           data-testid="roster-export-separator"
-          className="form-control rounded-lg border px-3 py-3"
+          className="form-control w-full min-w-0 rounded-lg border px-3 py-3"
           value={separator}
           onChange={(event) => setSeparator(event.target.value)}
         >
@@ -75,22 +75,22 @@ export function RosterExport({ query, membershipTypeId, disabled, onFailure }: P
             <option key={character} value={character}>{t(`admin.roster.separator.${character}`)}</option>)}
         </select>
       </label>
-      <label className="grid gap-2 font-medium">
+      <label className="grid min-w-0 gap-2 font-medium">
         {t("admin.roster.exportEncoding")}
         <select
           data-testid="roster-export-encoding"
-          className="form-control rounded-lg border px-3 py-3"
+          className="form-control w-full min-w-0 rounded-lg border px-3 py-3"
           value={encoding}
           onChange={(event) => setEncoding(event.target.value)}
         >
           {encodings.map((name) => <option key={name} value={name}>{name}</option>)}
         </select>
       </label>
-      {sources.length > 0 && <label className="grid gap-2 font-medium">
+      {sources.length > 0 && <label className="grid min-w-0 gap-2 font-medium">
         {t("admin.roster.exportSource")}
         <select
           data-testid="roster-export-source"
-          className="form-control rounded-lg border px-3 py-3"
+          className="form-control w-full min-w-0 rounded-lg border px-3 py-3"
           value={sourceId}
           onChange={(event) => setSourceId(event.target.value)}
         >

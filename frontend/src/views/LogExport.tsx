@@ -64,11 +64,11 @@ export function LogExport({ log, onFailure }: Props) {
       <div className="grid gap-3 sm:grid-cols-4">
         <TextField data-testid={`${id}-from`} name="from" type="date" label={t("admin.export.log.from")} />
         <TextField data-testid={`${id}-to`} name="to" type="date" label={t("admin.export.log.to")} />
-        <label className="grid gap-2 font-medium">
+        <label className="grid min-w-0 gap-2 font-medium">
           {t("admin.export.separator")}
           <select
             data-testid={`${id}-separator`}
-            className="form-control rounded-lg border px-3 py-3"
+            className="form-control w-full min-w-0 rounded-lg border px-3 py-3"
             value={separator}
             onChange={(event) => setSeparator(event.target.value)}
           >
@@ -76,11 +76,11 @@ export function LogExport({ log, onFailure }: Props) {
               <option key={character} value={character}>{t(`admin.export.separator.${character}`)}</option>)}
           </select>
         </label>
-        <label className="grid gap-2 font-medium">
+        <label className="grid min-w-0 gap-2 font-medium">
           {t("admin.export.encoding")}
           <select
             data-testid={`${id}-encoding`}
-            className="form-control rounded-lg border px-3 py-3"
+            className="form-control w-full min-w-0 rounded-lg border px-3 py-3"
             value={encoding}
             onChange={(event) => setEncoding(event.target.value)}
           >
