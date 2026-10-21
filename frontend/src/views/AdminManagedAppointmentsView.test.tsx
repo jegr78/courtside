@@ -1,6 +1,6 @@
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import { api, type ManagedAppointment, type ManagedAppointmentPage, type ManagedSeriesFacts } from "../api/client";
 import i18n from "../i18n";
@@ -457,6 +457,30 @@ describe("AdminManagedAppointmentsView", () => {
 
     // then
     expect(screen.queryByTestId("incomplete-series-warning"), "the series' facts show none of it is left unloaded").not.toBeInTheDocument();
+  });
+
+  it("given a loaded occurrence that starts after the page loaded, when the whole series is to be cancelled, then no unloaded occurrence is announced", async () => {
+    // given
+    vi.useFakeTimers({ toFake: ["Date"] });
+    onTestFinished(() => { vi.useRealTimers(); });
+    vi.setSystemTime(new Date("2026-10-01T15:00:00Z"));
+    const soon: ManagedAppointment = { ...first, startsAt: "2026-10-01T16:00:00Z", endsAt: "2026-10-01T17:00:00Z" };
+    const later: ManagedAppointment = { ...second, startsAt: "2026-10-08T16:00:00Z", endsAt: "2026-10-08T17:00:00Z" };
+    vi.mocked(api.managedAppointments).mockResolvedValue({
+      items: [soon, later], nextCursor: later.id,
+      series: [{ ...seriesFacts[0], occurrences: 2, cancelled: 0, past: 0 }]
+    });
+    show();
+    await userEvent.click(within(await screen.findByTestId("managed-series-series-1")).getByTestId("managed-series-summary"));
+    vi.setSystemTime(new Date("2026-10-01T16:30:00Z"));
+    await userEvent.click(within(screen.getByTestId(`booking-${later.id}`)).getByTestId("managed-cancel"));
+
+    // when
+    await userEvent.click(screen.getByTestId("scope-WHOLE_SERIES"));
+
+    // then
+    expect(screen.queryByTestId("incomplete-series-warning"),
+      "the occurrence the server counted as upcoming is loaded, so nothing of the series is left unloaded").not.toBeInTheDocument();
   });
 
   it("given a series with occurrences beyond the loaded rows, when the whole series is to be cancelled, then the unloaded occurrences are announced", async () => {
