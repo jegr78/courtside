@@ -255,3 +255,53 @@ test("given this repository's changelog on a release branch, when release-please
   assert.match(notes, /\* correct the sentence about courts\n$/, "the release body drops the commit link and ends at 0.1.0");
   assert.doesNotMatch(notes, /^## 0\.1\.0/m);
 });
+
+test("given a normalized release line, when two further candidates are folded in, then one blank line stays under its heading", () => {
+  // given
+  const candidate = (version, entry) => `## [${version}](https://example.test/compare) (2026-10-21)
+
+
+### Bug fixes
+
+* ${entry}
+
+`;
+  const line = `# Changelog
+
+## 0.3.0 (2026-10-18)
+
+### Bug fixes
+
+* first fix
+
+## 0.2.0 (2026-10-10)
+
+### Features
+
+* earlier feature
+`;
+
+  // when
+  const second = normalizePrereleaseChangelog(line.replace("## 0.3.0 (", `${candidate("0.3.0-rc.2", "second fix")}## 0.3.0 (`));
+  const third = normalizePrereleaseChangelog(second.replace("## 0.3.0 (", `${candidate("0.3.0-rc.3", "third fix")}## 0.3.0 (`));
+
+  // then
+  assert.equal(third, `# Changelog
+
+## 0.3.0 (2026-10-18)
+
+### Bug fixes
+
+* third fix
+
+* second fix
+
+* first fix
+
+## 0.2.0 (2026-10-10)
+
+### Features
+
+* earlier feature
+`, "each candidate keeps the heading, its single blank line and the line below untouched");
+});
