@@ -16,6 +16,7 @@ import {
   lineReleaseOrigins,
   nextReleaseOrigins,
   nightlyUpgradeOrigins,
+  pullOrigin,
   previousReleaseTag,
   releaseUpgradeOrigins,
   selectUpgradeOrigins,
@@ -439,6 +440,93 @@ test("given more dated nightlies than retention keeps, when an upgrade origin is
     assert.equal(origin.ref, order.at(-retainedNightlyCount),
       "retention deletes every dated nightly older than the newest it keeps, so the oldest of those is the "
       + "earliest origin that survives the run");
+  });
+
+test("given a commit rebuilt under a newer date, when an upgrade origin is chosen, then it is the fresh "
+  + "publication retention keeps rather than the stale one", () => {
+    // given
+    const tags = ["nightly", "nightly-20261020-931bc00", "nightly-20261021-33fd183", "nightly-20261021-50ffed7",
+      "nightly-20261021-84aaa28", "nightly-20261021-8e3acde", "nightly-20261021-931bc00", "nightly-20261021-bd8267a",
+      "nightly-20261021-d139c0a"];
+    const order = ["931bc00", "bd8267a", "d139c0a", "84aaa28", "33fd183", "50ffed7", "8e3acde"];
+    const history = { committedAt: (ref) => order.indexOf(ref), unchangedSince: () => true };
+
+    // when
+    const [origin] = nightlyUpgradeOrigins("example/courtside", tags, history);
+
+    // then
+    assert.deepEqual(origin, { ref: "931bc00", image: "ghcr.io/example/courtside:nightly-20261021-931bc00" },
+      "retention keeps the seven latest publications, and 20261020-931bc00 is the eighth");
+  });
+
+test("given the night rebuilt the oldest commit, when an upgrade origin is chosen, then the tags are ranked by "
+  + "publication date as retention ranks them", () => {
+    // given
+    const tags = ["nightly-20261007-0000000", "nightly-20261008-1111111", "nightly-20261008-2222222",
+      "nightly-20261008-3333333", "nightly-20261008-4444444", "nightly-20261008-5555555", "nightly-20261008-6666666",
+      "nightly-20261009-0000000"];
+    const history = { committedAt: (ref) => Number(ref[0]), unchangedSince: () => true };
+
+    // when
+    const [origin] = nightlyUpgradeOrigins("example/courtside", tags, history);
+
+    // then
+    assert.deepEqual(origin, { ref: "1111111", image: "ghcr.io/example/courtside:nightly-20261008-1111111" },
+      "the rebuild is the latest publication, so 20261007-0000000 is the stale tag outside the seven");
+  });
+
+test("given the planned nightly deleted before its pull, when the upgrade pulls its origin, then it chooses "
+  + "again from the tags retention left", async () => {
+    // given
+    const evicted = "ghcr.io/example/courtside:nightly-20261020-931bc00";
+    const left = ["nightly-20261021-33fd183", "nightly-20261021-931bc00", "nightly-20261021-bd8267a"];
+    const order = ["931bc00", "bd8267a", "33fd183"];
+    const pulled = [];
+    const pull = (image) => {
+      pulled.push(image);
+      if (image === evicted) throw new Error("manifest unknown");
+    };
+    const history = { committedAt: (ref) => order.indexOf(ref), unchangedSince: () => true };
+
+    // when
+    const origin = await pullOrigin({ ref: "931bc00", image: evicted },
+      { pull, listTags: async () => left, history, repository: "example/courtside" });
+
+    // then
+    assert.deepEqual(origin, { ref: "931bc00", image: "ghcr.io/example/courtside:nightly-20261021-931bc00" },
+      "the run upgrades from what the registry holds at the pull, not from what it held at resolution");
+    assert.deepEqual(pulled, [evicted, origin.image]);
+  });
+
+test("given a nightly the registry still lists but refuses, when the upgrade pulls its origin, then it fails "
+  + "instead of looping", async () => {
+    // given
+    const image = "ghcr.io/example/courtside:nightly-20261021-931bc00";
+    const pull = () => { throw new Error("connection reset"); };
+    const history = { committedAt: () => 0, unchangedSince: () => true };
+    let listings = 0;
+    const listTags = async () => {
+      listings += 1;
+      if (listings > 1) throw new Error("the registry was asked again for the same answer");
+      return ["nightly-20261021-931bc00"];
+    };
+
+    // when / then
+    await assert.rejects(pullOrigin({ ref: "931bc00", image },
+      { pull, listTags, history, repository: "example/courtside" }),
+    /connection reset/, "the same choice again means the registry has not deleted it, so the pull error stands");
+  });
+
+test("given a published release origin, when its pull fails, then the error stands without a new choice",
+  async () => {
+    // given
+    const pull = () => { throw new Error("manifest unknown"); };
+    const listTags = async () => { throw new Error("a release origin is never chosen again"); };
+
+    // when / then
+    await assert.rejects(pullOrigin({ ref: "v0.2.0", image: "ghcr.io/example/courtside:0.2.0" },
+      { pull, listTags, history: {}, repository: "example/courtside" }), /manifest unknown/,
+    "the release a club runs is the origin, so another one would prove a different upgrade");
   });
 
 test("given a retained nightly whose commit this checkout lacks, when an upgrade origin is chosen, then it still "

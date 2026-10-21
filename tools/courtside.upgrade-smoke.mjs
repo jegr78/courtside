@@ -122,15 +122,51 @@ export function releaseUpgradeOrigins(repository, tags) {
 }
 
 export function nightlyUpgradeOrigins(repository, tags, history) {
-  // Retention deletes any dated nightly older than the newest it keeps, possibly while this run pulls it.
+  // Retention keeps the latest publications by date, so a rebuilt commit's older tag is the stale one.
   const origin = tags
-    .filter((tag) => /^nightly-\d{8}-[0-9a-f]{7,40}$/.test(tag))
-    .map((tag) => ({ ref: tag.split("-").at(-1), image: `ghcr.io/${repository}:${tag}` }))
-    .sort((left, right) => history.committedAt(right.ref) - history.committedAt(left.ref))
+    .map((tag) => /^nightly-(\d{8})-([0-9a-f]{7,40})$/.exec(tag))
+    .filter((match) => match !== null)
+    .map(([tag, date, ref]) => ({ date, ref, image: `ghcr.io/${repository}:${tag}` }))
+    .sort((left, right) => right.date.localeCompare(left.date)
+      || history.committedAt(right.ref) - history.committedAt(left.ref))
     .slice(0, retainedNightlyCount)
     .filter((candidate) => history.unchangedSince(candidate.ref))
     .at(-1);
-  return origin ? [origin] : [];
+  return origin ? [{ ref: origin.ref, image: origin.image }] : [];
+}
+
+export async function registryTags(repository) {
+  const name = repository.toLowerCase();
+  const tokenResponse = await fetch(`https://ghcr.io/token?scope=repository:${name}:pull`);
+  if (!tokenResponse.ok) throw new Error(`GHCR refused an anonymous pull token: ${tokenResponse.status}`);
+  const { token } = await tokenResponse.json();
+  const tagsResponse = await fetch(`https://ghcr.io/v2/${name}/tags/list?n=10000`,
+    { headers: { Authorization: `Bearer ${token}` } });
+  if (!tagsResponse.ok) throw new Error(`GHCR refused the tag list: ${tagsResponse.status}`);
+  return (await tagsResponse.json()).tags ?? [];
+}
+
+export async function pullOrigin(planned, { pull, listTags, history, repository }) {
+  const nightly = /:nightly-\d{8}-[0-9a-f]{7,40}$/;
+  let failed = planned;
+  try {
+    pull(planned.image);
+    return planned;
+  } catch (error) {
+    if (!nightly.test(planned.image)) throw error;
+    // Retention may have deleted the planned nightly since the origins were resolved, so choose again now.
+    for (;;) {
+      const [next] = nightlyUpgradeOrigins(repository, await listTags(repository), history);
+      if (!next) throw new Error(`${failed.image} is gone and no retained nightly qualifies as an origin any more`);
+      if (next.image === failed.image) throw error;
+      try {
+        pull(next.image);
+        return next;
+      } catch {
+        failed = next;
+      }
+    }
+  }
 }
 
 // Flyway refuses a database whose applied migration changed, which a correction before the first release may do.
@@ -384,16 +420,23 @@ async function executeUpgrade() {
   const build = join(root, "build", "database-upgrade", suffix, runId);
   const password = newBootstrapPassword();
   mkdirSync(build, { recursive: true });
-  const fixture = fromOrigin(origin, originFixture, join(build, "fixture.sql"));
-  const verification = fromOrigin(origin, originVerification, join(build, "origin-verify.sql"));
-  const baseEnvironment = { COURTSIDE_UPGRADE_ADMIN_PASSWORD: password };
   const repository = process.env.GITHUB_REPOSITORY;
   if (!repository) throw new Error("GITHUB_REPOSITORY is required for a published upgrade origin");
-  const originTag = process.env.COURTSIDE_UPGRADE_ORIGIN_IMAGE;
-  if (!originTag) throw new Error("COURTSIDE_UPGRADE_ORIGIN_IMAGE is required for an upgrade origin");
-  run("docker", ["pull", originTag], { inherit: true });
-  const digests = JSON.parse(run("docker", ["image", "inspect", "--format", "{{json .RepoDigests}}", originTag]).stdout);
-  const originImage = selectRepositoryDigest(repository, origin, digests);
+  const plannedImage = process.env.COURTSIDE_UPGRADE_ORIGIN_IMAGE;
+  if (!plannedImage) throw new Error("COURTSIDE_UPGRADE_ORIGIN_IMAGE is required for an upgrade origin");
+  const pulled = await pullOrigin({ ref: origin, image: plannedImage }, {
+    pull: (image) => run("docker", ["pull", image], { inherit: true }),
+    listTags: registryTags,
+    history: gitHistory("HEAD"),
+    repository
+  });
+  if (pulled.ref !== origin) console.log(`Upgrading from ${pulled.image}, because ${plannedImage} is gone`);
+  const fixture = fromOrigin(pulled.ref, originFixture, join(build, "fixture.sql"));
+  const verification = fromOrigin(pulled.ref, originVerification, join(build, "origin-verify.sql"));
+  const baseEnvironment = { COURTSIDE_UPGRADE_ADMIN_PASSWORD: password };
+  const digests = JSON.parse(run("docker", ["image", "inspect", "--format", "{{json .RepoDigests}}",
+    pulled.image]).stdout);
+  const originImage = selectRepositoryDigest(repository, pulled.ref, digests);
   writeFileSync(join(build, "origin-image.txt"), `${originImage}\n`);
   const originEnvironment = { ...baseEnvironment, COURTSIDE_UPGRADE_IMAGE: originImage };
   const candidateEnvironment = { ...baseEnvironment, COURTSIDE_UPGRADE_IMAGE: candidate };

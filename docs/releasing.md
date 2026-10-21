@@ -51,7 +51,7 @@ archive records the head branch as its ref, so a fork branch whose name uses cha
 `.`, `_`, `/` and `-` fails `gates-image` instead of running the gates.
 From that workflow the pull request runs `archive-reproducibility`, `mail`, `active-security`,
 `restore` and `upgrade`, the last from the earliest retained nightly whose migrations it still
-carries. A pull request that adds or changes a migration, or changes `upgrade/verify.sql`, also upgrades from every
+carries. If retention deleted that nightly before the pull, `upgrade` chooses again from the tags left. A pull request that adds or changes a migration, or changes `upgrade/verify.sql`, also upgrades from every
 published origin the next release will support, so a migration that cannot run over a published
 database fails its own pull request rather than the next release. The jobs that run the image load it and refer to it by image ID; `mail` and
 `archive-reproducibility` only bind the archive and read the pinned name it records.
