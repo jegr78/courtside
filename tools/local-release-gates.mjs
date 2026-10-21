@@ -52,6 +52,7 @@ export function gatePlans(gate, context) {
         arguments: ["tools/courtside.upgrade-smoke.mjs", "--confirm", "courtside-upgrade"],
         environment: {
           COURTSIDE_UPGRADE_CANDIDATE_IMAGE: context.image,
+          COURTSIDE_UPGRADE_CANDIDATE_COMMIT: context.commit,
           COURTSIDE_UPGRADE_ORIGIN: origin.ref,
           COURTSIDE_UPGRADE_ORIGIN_IMAGE: origin.image,
           GITHUB_REPOSITORY: context.repository

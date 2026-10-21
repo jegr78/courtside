@@ -494,14 +494,16 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Prove the database upgrade path
+        id: upgrade
         env:
           COURTSIDE_UPGRADE_CANDIDATE_IMAGE: ${{ steps.image.outputs.reference }}
+          COURTSIDE_UPGRADE_CANDIDATE_COMMIT: ${{ inputs.source-commit }}
         run: node tools/courtside.upgrade-smoke.mjs --confirm courtside-upgrade
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
-          name: ${{ inputs.run-label }}-database-upgrade-${{ matrix.origin.ref }}
+          name: ${{ inputs.run-label }}-database-upgrade-${{ steps.upgrade.outputs.origin || matrix.origin.ref }}
           path: build/database-upgrade
           retention-days: 14
           if-no-files-found: error

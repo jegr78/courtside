@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -154,16 +154,18 @@ export async function pullOrigin(planned, { pull, listTags, history, repository 
     return planned;
   } catch (error) {
     if (!nightly.test(planned.image)) throw error;
+    let failure = error;
     // Retention may have deleted the planned nightly since the origins were resolved, so choose again now.
     for (;;) {
       const [next] = nightlyUpgradeOrigins(repository, await listTags(repository), history);
       if (!next) throw new Error(`${failed.image} is gone and no retained nightly qualifies as an origin any more`);
-      if (next.image === failed.image) throw error;
+      if (next.image === failed.image) throw failure;
       try {
         pull(next.image);
         return next;
-      } catch {
+      } catch (nextFailure) {
         failed = next;
+        failure = nextFailure;
       }
     }
   }
@@ -405,32 +407,45 @@ function fromOrigin(origin, path, destination) {
   return content.stdout;
 }
 
+function runSuffix(origin) {
+  return origin.replaceAll(/[^a-zA-Z0-9]/g, "-").toLowerCase();
+}
+
 async function executeUpgrade() {
   const args = process.argv.slice(2);
   if (args.join(" ") !== "--confirm courtside-upgrade") {
     throw new Error("Upgrade testing is destructive; pass --confirm courtside-upgrade");
   }
   const candidate = process.env.COURTSIDE_UPGRADE_CANDIDATE_IMAGE;
-  const origin = process.env.COURTSIDE_UPGRADE_ORIGIN;
-  if (!candidate || !origin) throw new Error("Candidate image and upgrade origin are required");
+  const candidateCommit = process.env.COURTSIDE_UPGRADE_CANDIDATE_COMMIT;
+  const planned = process.env.COURTSIDE_UPGRADE_ORIGIN;
+  if (!candidate || !candidateCommit || !planned) {
+    throw new Error("Candidate image, candidate commit and upgrade origin are required");
+  }
+  const repository = process.env.GITHUB_REPOSITORY;
+  if (!repository) throw new Error("GITHUB_REPOSITORY is required for a published upgrade origin");
+  const plannedImage = process.env.COURTSIDE_UPGRADE_ORIGIN_IMAGE;
+  if (!plannedImage) throw new Error("COURTSIDE_UPGRADE_ORIGIN_IMAGE is required for an upgrade origin");
+  const pulled = await pullOrigin({ ref: planned, image: plannedImage }, {
+    pull: (image) => run("docker", ["pull", image], { inherit: true }),
+    listTags: registryTags,
+    history: gitHistory(candidateCommit),
+    repository
+  });
+  const origin = pulled.ref;
+  if (pulled.image !== plannedImage) {
+    const notice = `Upgrading from ${pulled.image}, because ${plannedImage} is gone`;
+    console.log(notice);
+    if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${notice}\n`);
+  }
+  if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `origin=${origin}\n`);
 
-  const suffix = origin.replaceAll(/[^a-zA-Z0-9]/g, "-").toLowerCase();
+  const suffix = runSuffix(pulled.ref);
   const runId = `${process.pid}-${randomBytes(4).toString("hex")}`;
   const project = `courtside-upgrade-${suffix}-${runId}`;
   const build = join(root, "build", "database-upgrade", suffix, runId);
   const password = newBootstrapPassword();
   mkdirSync(build, { recursive: true });
-  const repository = process.env.GITHUB_REPOSITORY;
-  if (!repository) throw new Error("GITHUB_REPOSITORY is required for a published upgrade origin");
-  const plannedImage = process.env.COURTSIDE_UPGRADE_ORIGIN_IMAGE;
-  if (!plannedImage) throw new Error("COURTSIDE_UPGRADE_ORIGIN_IMAGE is required for an upgrade origin");
-  const pulled = await pullOrigin({ ref: origin, image: plannedImage }, {
-    pull: (image) => run("docker", ["pull", image], { inherit: true }),
-    listTags: registryTags,
-    history: gitHistory("HEAD"),
-    repository
-  });
-  if (pulled.ref !== origin) console.log(`Upgrading from ${pulled.image}, because ${plannedImage} is gone`);
   const fixture = fromOrigin(pulled.ref, originFixture, join(build, "fixture.sql"));
   const verification = fromOrigin(pulled.ref, originVerification, join(build, "origin-verify.sql"));
   const baseEnvironment = { COURTSIDE_UPGRADE_ADMIN_PASSWORD: password };
@@ -477,7 +492,7 @@ async function executeUpgrade() {
     assert.notEqual(overlap.status, 0, "court overlap constraint accepted conflicting data");
     const logs = compose(project, candidateEnvironment, ["logs", "--no-color"]);
     writeFileSync(join(build, "migration-logs.txt"), `${logs.stdout}${logs.stderr}`);
-    writeFileSync(join(build, "result.json"), `${JSON.stringify({ origin, candidate, version, status: "passed" }, null, 2)}\n`);
+    writeFileSync(join(build, "result.json"), `${JSON.stringify({ origin, plannedOrigin: planned, candidate, version, status: "passed" }, null, 2)}\n`);
   } catch (error) {
     const logs = compose(project, candidateEnvironment, ["logs", "--no-color"], { allowFailure: true });
     writeFileSync(join(build, "container-logs.txt"), `${logs.stdout}${logs.stderr}`);
