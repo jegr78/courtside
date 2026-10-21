@@ -465,3 +465,12 @@ test("given a release pull request whose open line is already folded, when norma
     + `### Documentation\n\n${MESSAGES_AREA_TITLE}\n\n${olderLine}`, "the open line is cleaned and nothing else");
   assert.equal(normalizePrereleaseChangelog(normalized), normalized, "a second run changes nothing");
 });
+
+test("given a patch release pull request, when normalization runs, then Release Please's section stays as it wrote it", () => {
+  // given
+  const changelog = fromTheLine("0.1.0").replace("## 0.1.0 (", `${GENERATED_PATCH}\n### Documentation\n\n`
+    + "* explain the courts ([ccccccc](https://github.com/jegr78/courtside/commit/cccccccccccccccccccccccccccccccccccccccc))\n\n## 0.1.0 (");
+
+  // when / then
+  assert.equal(normalizePrereleaseChangelog(changelog), changelog, "only a line this normalizer wrote is cleaned");
+});
