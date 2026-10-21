@@ -492,7 +492,8 @@ test("given the dark theme, when a confirmation dialog opens over the person adm
   await page.goto("/admin/roster");
   await page.getByTestId("roster-search").fill("Jane");
   await page.getByTestId("roster-search-submit").click();
-  await page.locator('[data-testid^="person-link-"]').first().click();
+  // The unfiltered roster opens on the bootstrap administrator, who has no membership to end.
+  await page.getByTestId("person-link-00000000-0000-0000-0000-000000000101").click();
 
   // when
   await page.getByTestId("end-membership").click();
