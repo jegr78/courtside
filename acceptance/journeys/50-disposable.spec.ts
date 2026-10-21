@@ -8,7 +8,7 @@ import { runSql } from "../lib/erasure";
 import { recordCreated } from "../lib/ledger";
 import { precondition } from "../lib/precondition";
 import { noShowLimitFor } from "../lib/attendance";
-import { seededBookingId, startedBookingSql, violationCodes } from "../lib/core.mjs";
+import { answers, seededBookingId, startedBookingSql, violationCodes } from "../lib/core.mjs";
 import { capture } from "../lib/checks";
 import { latestMailTo } from "../lib/mail";
 import { PASSWORD, persona } from "../lib/context";
@@ -99,6 +99,7 @@ test("given a forgotten password, when a reset code is mailed and redeemed, then
     await page.getByTestId("recovery-username").fill(username());
     await page.getByTestId("recovery-password-submit").click();
     await expect(page.getByTestId("recovery-sent")).toBeVisible();
+    const requested = await page.getByTestId("recovery-sent").innerText();
     await capture(page, "recovery-sent");
     const mail = await latestMailTo(disposableRecord(username()).email, since);
     // then
@@ -109,8 +110,13 @@ test("given a forgotten password, when a reset code is mailed and redeemed, then
     // when
     await page.getByTestId("recovery-code").fill(code!);
     await page.getByTestId("recovery-new-password").fill(interim);
+    const redemption = page.waitForResponse(answers("POST", "/api/account-recovery/password/redemption"));
     await page.getByTestId("recovery-redeem-submit").click();
-    await expect(page.getByTestId("recovery-sent").or(page.getByTestId("login-view"))).toBeVisible();
+    expect((await redemption).status(), "product: the reset code is redeemed").toBe(204);
+    await expect(page.getByTestId("recovery-sent"), "product: the redemption confirms itself, not the earlier request")
+      .not.toHaveText(requested);
+    await expect(page.getByTestId("recovery-sent")).toBeVisible();
+    await page.getByTestId("recovery-sent").scrollIntoViewIfNeeded();
     await capture(page, "recovery-redeemed");
     // then
     const second = await signsInWith(browser, interim);
@@ -132,9 +138,12 @@ test("given a forgotten username, when a reminder is asked for by email, then it
     await page.getByTestId("sign-in-link").click();
     await page.getByTestId("forgotten-credentials-link").click();
     await page.getByTestId("recovery-email").fill(disposableRecord(username()).email);
+    const reminder = page.waitForResponse(answers("POST", "/api/account-recovery/usernames"));
     await page.getByTestId("recovery-usernames-submit").click();
     // then
+    expect((await reminder).status(), "product: the username reminder is accepted").toBe(202);
     await expect(page.getByTestId("recovery-sent")).toBeVisible();
+    await page.getByTestId("recovery-sent").scrollIntoViewIfNeeded();
     await capture(page, "username-reminder-sent");
     const mail = await latestMailTo(disposableRecord(username()).email, since);
     expect(mail, "product: the username reminder reached Mailpit").not.toBeNull();
