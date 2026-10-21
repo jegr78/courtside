@@ -6,12 +6,18 @@ const languages = [
   { bundle: de as Record<string, string>, area: "Nachrichten", notice: "Benachrichtigung", pointers: {
     "myMessages.channelsReason": "neben Nachrichten im Menü",
     "waitlist.explanation": "unter Nachrichten",
-    "guardianGrant.READ_MESSAGES": "Nachrichten"
+    "guardianGrant.READ_MESSAGES": "Nachrichten",
+    "notifications.title": "Deine Nachrichten",
+    "notifications.loadMore": "Ältere Nachrichten",
+    "dependants.loadMoreMessages": "Weitere Nachrichten"
   } },
   { bundle: en as Record<string, string>, area: "Messages", notice: "notification", pointers: {
     "myMessages.channelsReason": "beside Messages in the menu",
     "waitlist.explanation": "in Messages",
-    "guardianGrant.READ_MESSAGES": "messages"
+    "guardianGrant.READ_MESSAGES": "messages",
+    "notifications.title": "Your messages",
+    "notifications.loadMore": "older messages",
+    "dependants.loadMoreMessages": "more messages"
   } }
 ];
 

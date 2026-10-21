@@ -286,15 +286,15 @@ for (const theme of ["dark", "light"] as const) {
       await capture(strip, baseline("phone-day-strip"));
     });
 
-    test("given German at 320 px, when My messages opens, then its hyphenated heading matches its reviewed baseline", async ({ page }) => {
+    test("given German at 320 px, when the message log opens, then its hyphenated heading matches its reviewed baseline", async ({ page }) => {
       // given
       await page.addInitScript(() => window.localStorage.setItem("courtside.locale", "de-DE"));
       await page.setViewportSize({ width: 320, height: 640 });
-      await signIn(page, "doe.jane");
+      await signIn(page, "configuration-admin");
 
       // when
-      await page.goto("/my-messages");
-      await expect(page.getByTestId("my-messages-view")).toBeVisible({ timeout: 10_000 });
+      await page.goto("/admin/messages");
+      await expect(page.getByTestId("admin-messages-view")).toBeVisible({ timeout: 10_000 });
       await expect(page.locator("html")).toHaveAttribute("lang", "de", { timeout: 10_000 });
 
       // then
