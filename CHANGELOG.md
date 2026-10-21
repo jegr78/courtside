@@ -31,11 +31,8 @@
 * **frontend:** show a correctable refusal without a support reference ([#1615](https://github.com/jegr78/courtside/issues/1615)) ([7f53bd8](https://github.com/jegr78/courtside/commit/7f53bd8abd42d3643b55c78dae267b56b576f2ba))
 * **frontend:** show each account recovery answer under the form that was sent ([#1626](https://github.com/jegr78/courtside/issues/1626)) ([c4e757e](https://github.com/jegr78/courtside/commit/c4e757efa328e3b2b1a16f6b7f3c1a038508de70)), closes [#1616](https://github.com/jegr78/courtside/issues/1616)
 * keep a request timer for every route the application serves ([#1605](https://github.com/jegr78/courtside/issues/1605)) ([d139c0a](https://github.com/jegr78/courtside/commit/d139c0ab9afd2d42dad353658235768512513cae))
-* name the messages area in the guide indexes and pin only the pointer phrase in mails ([372eeeb](https://github.com/jegr78/courtside/commit/372eeebf0cc093ff0d7108b1e04114aec7c9e473)), closes [#1632](https://github.com/jegr78/courtside/issues/1632)
 * word the appointment dialogs for what they actually affect ([#1608](https://github.com/jegr78/courtside/issues/1608)) ([33fd183](https://github.com/jegr78/courtside/commit/33fd1838f5cbfd4ec431f18e8e836a2da9c22280))
-
 * **frontend:** keep My bookings listed while it reloads after a cancellation ([#1587](https://github.com/jegr78/courtside/issues/1587)) ([de51894](https://github.com/jegr78/courtside/commit/de51894001b6889ce985b24980be2d1bed9de59c))
-* **frontend:** keep My bookings listed while the list reloads after a cancellation ([de51894](https://github.com/jegr78/courtside/commit/de51894001b6889ce985b24980be2d1bed9de59c))
 * **frontend:** rest the court plan's day strip on whole items on phones ([#1591](https://github.com/jegr78/courtside/issues/1591)) ([c695279](https://github.com/jegr78/courtside/commit/c69527929e1adee0299f9badd3a5c7aee02d6aa8))
 * **frontend:** show My bookings only once its first load has answered ([#1590](https://github.com/jegr78/courtside/issues/1590)) ([a14b086](https://github.com/jegr78/courtside/commit/a14b086f41cf9f9a255a0644a7bbf6fa674dfa59))
 * **frontend:** show the app's own version in the footer when the server cannot answer ([#1588](https://github.com/jegr78/courtside/issues/1588)) ([ffcfcf8](https://github.com/jegr78/courtside/commit/ffcfcf8b91d032bfe940a2e246b00c04f631f623))
@@ -44,11 +41,9 @@
 * keep selects that list club-entered names inside a phone screen ([#1585](https://github.com/jegr78/courtside/issues/1585)) ([b5d6d68](https://github.com/jegr78/courtside/commit/b5d6d680836acc28c65b15b19d5ac256d696e61c))
 * read the court plan's week in one request per kind instead of one per day ([#1584](https://github.com/jegr78/courtside/issues/1584)) ([8b9cae4](https://github.com/jegr78/courtside/commit/8b9cae4b8de4092296a3370720e41ba5e6f016c8))
 * start a new holiday with the regular hours of its first day instead of closed ([#1576](https://github.com/jegr78/courtside/issues/1576)) ([868b311](https://github.com/jegr78/courtside/commit/868b311550780f8da0d1f24cd67f4ef511449383))
-
 * **frontend:** give every dialog its own surface ([#1565](https://github.com/jegr78/courtside/issues/1565)) ([59c8f4d](https://github.com/jegr78/courtside/commit/59c8f4dcff1cb2384ac876fbf6abdd474d5a1d67))
 * **frontend:** keep the administration navigation within the desktop window ([#1563](https://github.com/jegr78/courtside/issues/1563)) ([e0bbc89](https://github.com/jegr78/courtside/commit/e0bbc893f6e80c0dde1c4388640a7559bb09d033))
 * **security:** derive the active assessment's request budgets from the API instead of fixed shares ([#1551](https://github.com/jegr78/courtside/issues/1551)) ([bca79f6](https://github.com/jegr78/courtside/commit/bca79f6d450ce96945438088b54b55d9e8fdf25b))
-* wait for the stopped app to exit before the smoke goes on ([8571d0b](https://github.com/jegr78/courtside/commit/8571d0bb853f5304587a8a09af48517a08eccec3))
 * wait for the stopped app to exit before the UAT smoke goes on ([#1543](https://github.com/jegr78/courtside/issues/1543)) ([8571d0b](https://github.com/jegr78/courtside/commit/8571d0bb853f5304587a8a09af48517a08eccec3))
 * **web:** replace the redundant court plan intro heading with a sign-in notice ([#1545](https://github.com/jegr78/courtside/issues/1545)) ([b21b692](https://github.com/jegr78/courtside/commit/b21b6925a2f7f01c9f86d3e2083edf04d96e23fb))
 
@@ -58,7 +53,6 @@
 
 ### Build and dependencies
 
-* **deps-dev:** bump org.codehaus.mojo:versions-maven-plugin ([0e7d569](https://github.com/jegr78/courtside/commit/0e7d56917a80ffcfdcd3337041bdb9e1ee669cb7))
 * **deps-dev:** bump org.codehaus.mojo:versions-maven-plugin from 2.22.0 to 2.23.0 ([#1555](https://github.com/jegr78/courtside/issues/1555)) ([0e7d569](https://github.com/jegr78/courtside/commit/0e7d56917a80ffcfdcd3337041bdb9e1ee669cb7))
 * **deps:** bump actions/setup-java from 6.0.1 to 6.1.0 ([#1558](https://github.com/jegr78/courtside/issues/1558)) ([a38b015](https://github.com/jegr78/courtside/commit/a38b0153e1958643c382317d40fa6dcfa88157f3))
 * **deps:** update the frontend dependencies, Playwright 1.64 and the deployment images ([#1561](https://github.com/jegr78/courtside/issues/1561)) ([5f8fad4](https://github.com/jegr78/courtside/commit/5f8fad450f4e3cf916529dc6c4ae580d6aee5870))
