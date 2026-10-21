@@ -149,7 +149,7 @@ function DependantBookings({ dependant, cancels, refused, acted }: {
       action={({ booking }) => { setSuccess(undefined); setCancelling(booking); }} t={t} />}
     {nextCursor && <Button variant="secondary" data-testid="dependant-load-more-bookings" className="justify-self-start"
       onClick={() => void loadMore()}>{t("dependants.loadMoreBookings")}</Button>}
-    {cancelling && club && <CancelDialog booking={cancelling} seriesBookings={[]} hasMoreBookings={false} timeZone={club.timeZone}
+    {cancelling && club && <CancelDialog booking={cancelling} seriesBookings={[]} incompleteSeries={false} timeZone={club.timeZone}
       closed={() => setCancelling(undefined)}
       cancelOne={async () => {
         try {

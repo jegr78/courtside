@@ -194,7 +194,7 @@ export function AdminManagedAppointmentsView({ managesAppointments, createsSerie
       administrator={administrator} closed={() => setDetail(undefined)} />}
     {grid && cancelling && <CancelDialog booking={cancelling}
       seriesBookings={appointments.filter((appointment) => appointment.seriesId === cancelling.seriesId && appointment.status === "CONFIRMED")}
-      hasMoreBookings={nextCursor !== undefined} timeZone={grid.timeZone} closed={() => setCancelling(undefined)}
+      incompleteSeries={hasUnloadedOccurrences(cancelling, appointments, seriesFacts, nextCursor !== undefined)} timeZone={grid.timeZone} closed={() => setCancelling(undefined)}
       completed={async () => { setCancelling(undefined); await load(); setSuccess(t("booking.cancelledSuccess")); }} />}
     {grid && courtsReady && moving && <MoveDialog booking={moving} courts={courts} timeZone={grid.timeZone}
       maxBookingMinutes={maxBookingMinutes} closed={() => setMoving(undefined)}
@@ -294,6 +294,16 @@ function seriesHeading(items: ManagedAppointment[], facts: ManagedSeriesFacts | 
   const dates = facts && date.formatRange(new Date(facts.firstStartsAt), new Date(facts.lastStartsAt));
   return [first.cardLabel, `${weekdays} ${formatBookingTimeRange(first.startsAt, first.endsAt, locale, timeZone)}`,
     courts, dates, counts].filter(Boolean).join(" · ");
+}
+
+function hasUnloadedOccurrences(appointment: ManagedAppointment, appointments: ManagedAppointment[],
+  seriesFacts: Map<string, ManagedSeriesFacts>, morePages: boolean) {
+  const facts = appointment.seriesId ? seriesFacts.get(appointment.seriesId) : undefined;
+  if (!facts) return morePages;
+  const now = Date.now();
+  const loaded = appointments.filter((candidate) => candidate.seriesId === facts.seriesId && candidate.status === "CONFIRMED"
+    && new Date(candidate.startsAt).getTime() > now).length;
+  return loaded < facts.occurrences - facts.cancelled - facts.past;
 }
 
 function seriesCounts(facts: ManagedSeriesFacts, t: Translate) {
