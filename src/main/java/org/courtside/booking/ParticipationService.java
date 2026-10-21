@@ -1,5 +1,6 @@
 package org.courtside.booking;
 
+import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.courtside.shared.CursorPage;
@@ -22,6 +23,7 @@ public class ParticipationService {
 
     private final BookingRepository bookings;
     private final ApplicationEventPublisher events;
+    private final EntityManager entityManager;
 
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public ParticipationPage participations(UUID personId, UUID accountId, UUID cursor, int limit) {
@@ -44,6 +46,8 @@ public class ParticipationService {
             throw new ParticipationNotFoundException(
                     "An account with no person of its own is recorded in no booking");
         }
+        bookings.lockById(bookingId).orElseThrow(() -> notRecorded(bookingId));
+        entityManager.clear();
         Booking booking = bookings.findWithParticipantsById(bookingId)
                 .filter(found -> !accountId.equals(found.getBookedBy()))
                 .orElseThrow(() -> notRecorded(bookingId));
