@@ -51,7 +51,7 @@ test("given a generated candidate section, when it is normalized, then one cumul
   assert.doesNotMatch(normalized, /0\.1\.0-rc\.2/);
   assert.match(normalized, /### Features\n\n\* complete first-release history/);
   assert.match(normalized,
-    /### Bug fixes\n\n\* preserve cumulative release-line history\n\n\* earlier fix/);
+    /### Bug fixes\n\n\* preserve cumulative release-line history\n\* earlier fix/);
   assert.match(normalized, /### Documentation\n\n\* show every guide section/);
   assert.match(normalized, /### Missing from the generated entries\n\n\* manually recovered security fix/);
   assert.match(normalized, /## 0\.0\.1\n\n\* older release/);
@@ -85,7 +85,7 @@ test("given the first public release, when release-please emits breaking notes, 
   assert.doesNotMatch(normalized, /BREAKING CHANGES/);
   assert.match(normalized, /### Notable changes\n\n\* changed an unreleased contract/);
   assert.match(normalized,
-    /### Features\n\n\* describe the same change for first-time users\n\n\* existing feature/);
+    /### Features\n\n\* describe the same change for first-time users\n\* existing feature/);
 });
 
 test("given an already cumulative changelog, when normalization repeats, then it is unchanged", () => {
@@ -293,9 +293,7 @@ test("given a normalized release line, when two further candidates are folded in
 ### Bug fixes
 
 * third fix
-
 * second fix
-
 * first fix
 
 ## 0.2.0 (2026-10-10)
@@ -304,4 +302,149 @@ test("given a normalized release line, when two further candidates are folded in
 
 * earlier feature
 `, "each candidate keeps the heading, its single blank line and the line below untouched");
+});
+
+const REPO = "https://github.com/jegr78/courtside";
+const MESSAGES_AREA_TITLE = `* name the messages area in the guide indexes and pin only the pointer phrase in mails ([#1642](${REPO}/issues/1642)) `
+  + `([372eeeb](${REPO}/commit/372eeebf0cc093ff0d7108b1e04114aec7c9e473))`;
+const MESSAGES_AREA_BODY = `* name the messages area in the guide indexes and pin only the pointer phrase in mails `
+  + `([372eeeb](${REPO}/commit/372eeebf0cc093ff0d7108b1e04114aec7c9e473)), closes [#1632](${REPO}/issues/1632)`;
+const MY_BOOKINGS_TITLE = `* **frontend:** keep My bookings listed while it reloads after a cancellation ([#1587](${REPO}/issues/1587)) `
+  + `([de51894](${REPO}/commit/de51894001b6889ce985b24980be2d1bed9de59c))`;
+const MY_BOOKINGS_BODY = `* **frontend:** keep My bookings listed while the list reloads after a cancellation `
+  + `([de51894](${REPO}/commit/de51894001b6889ce985b24980be2d1bed9de59c))`;
+const LOCK_FIX = `* **booking:** withdraw from a booking only under its row lock ([#1638](${REPO}/issues/1638)) `
+  + `([0b4c2b4](${REPO}/commit/0b4c2b4aff21e3c0661cfcdcbbae644518e4d3e7)), closes [#1630](${REPO}/issues/1630)`;
+const DAY_STRIP_FIX = `* **frontend:** rest the court plan's day strip on whole items on phones ([#1591](${REPO}/issues/1591)) `
+  + `([c695279](${REPO}/commit/c69527929e1adee0299f9badd3a5c7aee02d6aa8))`;
+
+function rc3Candidate(cumulativeBugFixes) {
+  return `# Changelog
+
+## [0.3.0-rc.3](${REPO}/compare/v0.3.0-rc.2...v0.3.0-rc.3) (2026-10-22)
+
+
+### Bug fixes
+
+${LOCK_FIX}
+${MESSAGES_AREA_BODY}
+
+
+### Documentation
+
+${MESSAGES_AREA_TITLE}
+
+## 0.3.0 (2026-10-18)
+
+### Bug fixes
+
+${cumulativeBugFixes}
+
+## 0.2.0 (2026-10-12)
+
+### Features
+
+* earlier line
+`;
+}
+
+test("given a squash commit whose body repeats a conventional header, when the candidate is folded, then the commit "
+  + "keeps only the entry that names its pull request", () => {
+  // given — #1642 was titled docs: and its body began with the branch's fix: commit.
+  const changelog = rc3Candidate(DAY_STRIP_FIX);
+
+  // when
+  const normalized = normalizePrereleaseChangelog(changelog);
+
+  // then
+  assert.equal(normalized.split("372eeebf0cc093ff0d7108b1e04114aec7c9e473").length - 1, 1, "one entry per commit");
+  assert.match(normalized, /### Documentation\n\n\* name the messages area .*\(\[#1642\]/);
+  assert.doesNotMatch(normalized, /closes \[#1632\]/, "the body's entry is the one dropped");
+});
+
+test("given duplicates already in the cumulative line, when the next candidate is folded, then they collapse to the "
+  + "entry that names its pull request", () => {
+  // given — de51894 (#1587) reached 0.3.0 twice in rc.2.
+  const changelog = rc3Candidate(`${MY_BOOKINGS_TITLE}\n${MY_BOOKINGS_BODY}\n${DAY_STRIP_FIX}`);
+
+  // when
+  const normalized = normalizePrereleaseChangelog(changelog);
+
+  // then
+  assert.equal(normalized.split("de51894001b6889ce985b24980be2d1bed9de59c").length - 1, 1, "one entry per commit");
+  assert.match(normalized, /keep My bookings listed while it reloads after a cancellation \(\[#1587\]/);
+});
+
+test("given a candidate and the cumulative line with entries in one section, when folded, then the section is one list", () => {
+  // given
+  const changelog = rc3Candidate(`${MY_BOOKINGS_TITLE}\n\n${DAY_STRIP_FIX}`);
+
+  // when
+  const normalized = normalizePrereleaseChangelog(changelog);
+
+  // then
+  const bugFixes = /### Bug fixes\n\n([\s\S]*?)\n\n###/.exec(normalized)?.[1];
+  assert.deepEqual(bugFixes?.split("\n"), [LOCK_FIX, MY_BOOKINGS_TITLE, DAY_STRIP_FIX], "no blank line splits the list");
+  assert.equal(normalizePrereleaseChangelog(normalized), normalized, "a second run changes nothing");
+});
+
+test("given a section whose only entry repeats a commit listed elsewhere, when folded, then its heading goes too", () => {
+  // given
+  const changelog = `# Changelog
+
+## [0.3.0-rc.3](${REPO}/compare/v0.3.0-rc.2...v0.3.0-rc.3) (2026-10-22)
+
+
+### Bug fixes
+
+${MESSAGES_AREA_BODY}
+
+
+### Documentation
+
+${MESSAGES_AREA_TITLE}
+
+## 0.3.0 (2026-10-18)
+
+### Features
+
+* earlier feature
+`;
+
+  // when
+  const normalized = normalizePrereleaseChangelog(changelog);
+
+  // then
+  assert.doesNotMatch(normalized, /### Bug fixes/, "an empty section is left out");
+  assert.match(normalized, /### Documentation\n\n\* name the messages area/);
+});
+
+test("given the same entry twice, when folded, then it is listed once", () => {
+  // given
+  const changelog = rc3Candidate(`${DAY_STRIP_FIX}\n${DAY_STRIP_FIX}`);
+
+  // when
+  const normalized = normalizePrereleaseChangelog(changelog);
+
+  // then
+  assert.equal(normalized.split("c69527929e1adee0299f9badd3a5c7aee02d6aa8").length - 1, 1, "one entry per commit");
+});
+
+test("given this repository's changelog, when the next candidate is folded into the open line, then every commit is "
+  + "listed once and each section is one list", () => {
+  // given
+  const changelog = readFileSync(new URL("../CHANGELOG.md", import.meta.url), "utf8");
+  const line = /^## (\d+\.\d+\.\d+) \(/m.exec(changelog)[1];
+  const generated = changelog.replace(`## ${line} (`,
+    `## [${line}-rc.99](${REPO}/compare) (2026-10-22)\n\n\n### Bug fixes\n\n${LOCK_FIX}\n\n\n## ${line} (`);
+
+  // when
+  const normalized = normalizePrereleaseChangelog(generated);
+
+  // then
+  const start = normalized.indexOf(`## ${line} (`);
+  const body = normalized.slice(start, normalized.indexOf("\n## ", start + 1));
+  const commits = [...body.matchAll(/\/commit\/([0-9a-f]{40})\)\)/g)].map((match) => match[1]);
+  assert.deepEqual(commits.filter((commit, index) => commits.indexOf(commit) !== index), [], "no commit is listed twice");
+  assert.doesNotMatch(body, /^\* .*\n\n\* /m, "no blank line splits a section's list");
 });
