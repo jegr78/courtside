@@ -161,7 +161,7 @@ test("given maven downloads fail transiently, when any wrapper command runs, the
     ["count", "3"],
     ["interval", "15000"],
     ["intervalMax", "120000"],
-    ["serviceUnavailable", "429,503"]
+    ["serviceUnavailable", "429,502,503,504"]
   ]);
 
   // when / then
