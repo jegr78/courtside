@@ -479,6 +479,46 @@ describe("AdminManagedAppointmentsView", () => {
       .toHaveTextContent(i18n.t("myBookings.affectedIncomplete"));
   });
 
+  it.each(["THIS_AND_FOLLOWING", "WHOLE_SERIES"] as const)("given a loaded occurrence that has started, when %s is to be cancelled from it, then only the upcoming occurrence is listed", async (scope) => {
+    // given
+    const running: ManagedAppointment = { ...first, startsAt: "2000-10-01T16:00:00Z", endsAt: "2099-10-01T17:00:00Z" };
+    const upcoming: ManagedAppointment = { ...second, startsAt: "2099-10-08T16:00:00Z", endsAt: "2099-10-08T17:00:00Z" };
+    vi.mocked(api.managedAppointments).mockResolvedValue({
+      items: [running, upcoming], nextCursor: undefined,
+      series: [{ ...seriesFacts[0], occurrences: 2, cancelled: 0, past: 1 }]
+    });
+    show();
+    await userEvent.click(within(await screen.findByTestId("managed-series-series-1")).getByTestId("managed-series-summary"));
+    await userEvent.click(within(screen.getByTestId(`booking-${running.id}`)).getByTestId("managed-cancel"));
+
+    // when
+    await userEvent.click(screen.getByTestId(`scope-${scope}`));
+
+    // then
+    expect(screen.getByTestId("affected-count"), "a started occurrence is not cancelled by the series scopes")
+      .toHaveTextContent(i18n.t("myBookings.affected", { count: 1 }));
+    expect(within(screen.getByTestId("affected-occurrences")).getAllByRole("listitem"), "only the upcoming occurrence is named").toHaveLength(1);
+  });
+
+  it("given a loaded occurrence that has started, when only it is to be cancelled, then it is listed", async () => {
+    // given
+    const running: ManagedAppointment = { ...first, startsAt: "2000-10-01T16:00:00Z", endsAt: "2099-10-01T17:00:00Z" };
+    const upcoming: ManagedAppointment = { ...second, startsAt: "2099-10-08T16:00:00Z", endsAt: "2099-10-08T17:00:00Z" };
+    vi.mocked(api.managedAppointments).mockResolvedValue({
+      items: [running, upcoming], nextCursor: undefined,
+      series: [{ ...seriesFacts[0], occurrences: 2, cancelled: 0, past: 1 }]
+    });
+    show();
+    await userEvent.click(within(await screen.findByTestId("managed-series-series-1")).getByTestId("managed-series-summary"));
+
+    // when
+    await userEvent.click(within(screen.getByTestId(`booking-${running.id}`)).getByTestId("managed-cancel"));
+
+    // then
+    expect(screen.getByTestId("affected-count"), "the single scope cancels the chosen occurrence even while it runs")
+      .toHaveTextContent(i18n.t("myBookings.affected", { count: 1 }));
+  });
+
   it.each([
     ["THIS", "Move appointment"],
     ["THIS_AND_FOLLOWING", "Move this and following appointments"],

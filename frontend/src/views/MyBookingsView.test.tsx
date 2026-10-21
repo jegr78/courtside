@@ -274,6 +274,31 @@ it("given more bookings exist, when previewing a series cancellation, then the i
   expect(screen.getByTestId("incomplete-series-warning")).toHaveTextContent("Additional series occurrences that have not been loaded may also be affected.");
 });
 
+it("given a series occurrence that has started, when the whole series is to be cancelled, then only the upcoming occurrence is listed", async () => {
+  // given
+  const runningId = "55555555-5555-5555-5555-555555555555";
+  vi.mocked(api.personalBookings).mockResolvedValueOnce({
+    items: [{
+      id: runningId, seriesId, courtIds: ["33333333-3333-3333-3333-333333333333"],
+      startsAt: "2026-08-11T11:30:00Z", endsAt: "2026-08-11T13:00:00Z",
+      cardLabel: "Member booking", cardColor: "#176b55", status: "CONFIRMED"
+    }, {
+      id: upcomingId, seriesId, courtIds: ["33333333-3333-3333-3333-333333333333"],
+      startsAt: "2026-08-12T16:00:00Z", endsAt: "2026-08-12T17:00:00Z",
+      cardLabel: "Member booking", cardColor: "#176b55", status: "CONFIRMED"
+    }]
+  });
+  render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} />);
+  await userEvent.click(within(await screen.findByTestId(`booking-${upcomingId}`)).getByTestId("personal-cancel"));
+
+  // when
+  await userEvent.click(screen.getByTestId("scope-WHOLE_SERIES"));
+
+  // then
+  expect(screen.getByTestId("affected-count"), "the occurrence running at the view's time is not cancelled with the series")
+    .toHaveTextContent("1 occurrence is affected:");
+});
+
 it("given the browser and club use different zones, when loaded, then booking times use the club zone", async () => {
   // given
   vi.mocked(api.bookingGrid).mockResolvedValue({
