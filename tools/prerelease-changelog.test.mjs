@@ -429,3 +429,22 @@ test("given the same entry twice, when folded, then it is listed once", () => {
   // then
   assert.equal(normalized.split("c69527929e1adee0299f9badd3a5c7aee02d6aa8").length - 1, 1, "one entry per commit");
 });
+
+test("given this repository's changelog, when the next candidate is folded into the open line, then every commit is "
+  + "listed once and each section is one list", () => {
+  // given
+  const changelog = readFileSync(new URL("../CHANGELOG.md", import.meta.url), "utf8");
+  const line = /^## (\d+\.\d+\.\d+) \(/m.exec(changelog)[1];
+  const generated = changelog.replace(`## ${line} (`,
+    `## [${line}-rc.99](${REPO}/compare) (2026-10-22)\n\n\n### Bug fixes\n\n${LOCK_FIX}\n\n\n## ${line} (`);
+
+  // when
+  const normalized = normalizePrereleaseChangelog(generated);
+
+  // then
+  const start = normalized.indexOf(`## ${line} (`);
+  const body = normalized.slice(start, normalized.indexOf("\n## ", start + 1));
+  const commits = [...body.matchAll(/\/commit\/([0-9a-f]{40})\)\)/g)].map((match) => match[1]);
+  assert.deepEqual(commits.filter((commit, index) => commits.indexOf(commit) !== index), [], "no commit is listed twice");
+  assert.doesNotMatch(body, /^\* .*\n\n\* /m, "no blank line splits a section's list");
+});
