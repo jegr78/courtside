@@ -142,7 +142,9 @@ jobs:
           queries: security-extended
           config-file: ./.github/codeql/codeql-config.yml
 
-      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+      # A release branch commit keys its own pom, which no main build saves.
+      - id: java
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           java-version: '25'
           distribution: 'temurin'
@@ -151,7 +153,10 @@ jobs:
             pom.xml
             .mvn/maven.config
             .mvn/wrapper/maven-wrapper.properties
-          cache-read-only: true
+          cache-read-only: ${{ needs.select.outputs.branch == 'main' }}
+
+      - if: needs.select.outputs.branch != 'main' && steps.java.outputs.cache-hit != 'true'
+        uses: ./.github/actions/maven-plugins
 
       - name: Package the selected commit
         run: ./mvnw -B package -DskipTests
