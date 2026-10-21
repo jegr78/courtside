@@ -183,6 +183,11 @@ jobs:
           java-version: '25'
           distribution: temurin
           cache: maven
+          cache-dependency-path: |
+            pom.xml
+            .mvn/maven.config
+            .mvn/wrapper/maven-wrapper.properties
+          cache-read-only: true
 
       - name: Package the selected revision
         run: ./mvnw -B package -DskipTests

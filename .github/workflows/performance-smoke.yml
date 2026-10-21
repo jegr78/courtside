@@ -25,6 +25,11 @@ jobs:
           java-version: '25'
           distribution: 'temurin'
           cache: maven
+          cache-dependency-path: |
+            pom.xml
+            .mvn/maven.config
+            .mvn/wrapper/maven-wrapper.properties
+          cache-read-only: true
       - uses: ./.github/actions/tool-dependencies
       - name: Start disposable performance environment
         run: node tools/courtside.mjs perf --skip-verify --no-credential-output

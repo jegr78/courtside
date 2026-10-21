@@ -21,6 +21,11 @@ jobs:
           java-version: '25'
           distribution: temurin
           cache: maven
+          cache-dependency-path: |
+            pom.xml
+            .mvn/maven.config
+            .mvn/wrapper/maven-wrapper.properties
+          cache-read-only: true
       - name: Mutate critical decisions
         run: ./mvnw -B -Pmutation test-compile org.pitest:pitest-maven:mutationCoverage
       - name: Upload mutation evidence
