@@ -84,6 +84,7 @@ test("the phone court plan and personal bookings match their reviewed baselines"
   await selectJourneyDate(page, journeyService.visualDate);
 
   // then
+  await atPageTop(page);
   await phoneScreenshot(page.getByTestId("court-plan-view"), "phone-public-court-plan.png");
 
   // when
@@ -117,6 +118,7 @@ for (const theme of ["dark", "light"] as const) {
       await expect(page.getByTestId("own-allocation").first()).toBeVisible({ timeout: 10_000 });
 
       // then
+      await atPageTop(page);
       await capture(page.getByTestId("court-plan-view"), baseline("phone-court-plan"));
       await capture(page.getByTestId("mobile-week-navigation"), baseline("phone-court-plan-day-strip"));
     });
@@ -158,6 +160,7 @@ for (const theme of ["dark", "light"] as const) {
       await expect(page.getByTestId("own-allocation").first()).toBeVisible({ timeout: 10_000 });
 
       // then
+      await atPageTop(page);
       await capture(page.getByTestId("court-plan-view"), baseline("phone-landscape-court-plan"));
       await capture(page.getByTestId("mobile-week-navigation"), baseline("phone-landscape-day-strip"));
 
@@ -527,6 +530,12 @@ async function selectVisualDate(page: Page, date: string): Promise<void> {
     await page.getByTestId("week-next").click();
   }
   await day.click();
+}
+
+// The plan's day strip and head stick at the top, so any scroll past them moves them in the capture.
+async function atPageTop(page: Page): Promise<void> {
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await expect.poll(() => page.evaluate(() => window.scrollY), "the page is at its top, where nothing in the plan sticks").toBe(0);
 }
 
 // The bar is fixed to the viewport, so a stitched capture would draw it wherever scrolling left it.
