@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import { ApiError, api } from "../api/client";
 import i18n from "../i18n";
 import { AccountRecoveryView } from "./AccountRecoveryView";
@@ -69,6 +69,47 @@ describe("AccountRecoveryView", () => {
     expect(reset).not.toHaveBeenCalled();
     expect(await screen.findByTestId("recovery-sent"))
       .toHaveTextContent("If any accounts belong to that address, a message is on its way.");
+  });
+
+  it("given the username reminder, when it answers, then its confirmation follows its own button", async () => {
+    // given
+    vi.spyOn(api, "requestUsernameReminder").mockResolvedValue(undefined);
+    const scrolled = vi.fn();
+    const original = Object.getOwnPropertyDescriptor(Element.prototype, "scrollIntoView");
+    Object.defineProperty(Element.prototype, "scrollIntoView", { configurable: true, writable: true, value: scrolled });
+    onTestFinished(() => {
+      if (original) Object.defineProperty(Element.prototype, "scrollIntoView", original);
+      else Reflect.deleteProperty(Element.prototype, "scrollIntoView");
+    });
+    show();
+
+    // when
+    await userEvent.type(screen.getByTestId("recovery-email"), "roe@example.org");
+    await userEvent.click(screen.getByTestId("recovery-usernames-submit"));
+
+    // then
+    const sent = await screen.findByTestId("recovery-sent");
+    expect(screen.getByTestId("recovery-usernames-submit").compareDocumentPosition(sent)
+      & Node.DOCUMENT_POSITION_FOLLOWING, "the answer sits where the member pressed the button").toBeTruthy();
+    expect(screen.getByTestId("recovery-usernames-submit").closest("form"), "the answer belongs to the form that was sent")
+      .toContainElement(sent);
+    expect(scrolled, "the answer is brought into view").toHaveBeenCalledWith({ block: "nearest" });
+  });
+
+  it("given a code that is refused, when the redemption answers, then the refusal sits in the redemption form", async () => {
+    // given
+    vi.spyOn(api, "redeemPasswordReset").mockRejectedValue(new ApiError(400, {
+      type: "urn:courtside:error:password-reset-code-invalid", title: "Invalid code", status: 400 }));
+    show();
+
+    // when
+    await userEvent.type(screen.getByTestId("recovery-code"), "ABCD-EFGH");
+    await userEvent.type(screen.getByTestId("recovery-new-password"), "the-one-they-picked-alone");
+    await userEvent.click(screen.getByTestId("recovery-redeem-submit"));
+
+    // then
+    expect(screen.getByTestId("recovery-redeem-submit").closest("form"), "the refusal belongs to the form that was sent")
+      .toContainElement(await screen.findByRole("alert"));
   });
 
   it("given a request that was sent, when the next one is refused, then the page no longer says it was sent", async () => {

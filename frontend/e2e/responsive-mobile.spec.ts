@@ -753,6 +753,32 @@ test("the initial-password form remains usable on a touch viewport", async ({ pa
   await expect(page.getByTestId("password-submit")).toBeVisible();
 });
 
+test("given the account recovery page on a phone, when the lowest form is sent, then its confirmation is on screen", async ({ page }) => {
+  // given
+  await page.goto("/account-recovery");
+  await page.getByTestId("recovery-email").fill("jane.doe@example.org");
+
+  // when
+  await page.getByTestId("recovery-usernames-submit").tap();
+
+  // then
+  await expect(page.getByTestId("recovery-sent"), "the member sees the answer without scrolling").toBeInViewport({ ratio: 1 });
+});
+
+test("given the account recovery page on a phone, when a code is refused, then the refusal is on screen", async ({ page }) => {
+  // given
+  await page.goto("/account-recovery");
+  await page.getByTestId("recovery-code").fill("ABCD-EFGH");
+  await page.getByTestId("recovery-new-password").fill("the-one-they-picked-alone");
+
+  // when
+  await page.getByTestId("recovery-redeem-submit").tap();
+
+  // then
+  await expect(page.getByTestId("account-recovery-view").getByRole("alert"), "the member sees the refusal without scrolling")
+    .toBeInViewport({ ratio: 1 });
+});
+
 test("a free slot fills its cell and remains large enough to tap", async ({ page, journeyService }) => {
   // given
   await page.setViewportSize({ width: 390, height: 844 });
