@@ -117,3 +117,27 @@ test("given a change to the site, when the profile is classified, then the docum
     assert.deepEqual(contract.localTaskDefinitions["site-build"].arguments,
       ["--prefix", "site", "run", "build"]);
   });
+
+function messagesAreaHeading(guide) {
+  const sections = guide.split(/^(?=## )/m);
+  const section = sections.find((candidate) => candidate.includes("notification-choices.png"));
+  assert.ok(section, "the member guide shows the messages area's screenshot under one of its sections");
+  return section.match(/^## (.+)$/m)[1].trim();
+}
+
+test("given the member guide's messages area, when the site index describes the guide, then it names the area by that heading",
+  () => {
+    for (const language of ["site/", "site/en/"]) {
+      // given
+      const area = messagesAreaHeading(repositoryFile(`${language}member-guide.md`));
+      const index = repositoryFile(`${language}index.md`);
+
+      // when
+      const description = index.split(/^- /m).find((item) => item.includes("(member-guide.md)"));
+
+      // then
+      assert.ok(description, `${language}index.md links the member guide`);
+      assert.match(description, new RegExp(`\\b${area}\\b`),
+        `${language}index.md must name the messages area "${area}" as the member guide does`);
+    }
+  });

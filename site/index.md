@@ -34,7 +34,7 @@ und entscheidet, welche Regeln für seine Mitglieder gelten.
 ## Anleitungen
 
 - Im [Handbuch für Mitglieder](member-guide.md) erfährst du, wie du dich anmeldest, einen Platz
-  buchst, Mitspieler und Gäste einträgst und Benachrichtigungen einstellst.
+  buchst, Mitspieler und Gäste einträgst und unter Nachrichten wählst, was du bekommst.
 - Das [Handbuch für Vorstände](board-guide.md) erklärt die Einrichtung und Verwaltung von Plätzen,
   Buchungsarten, Regeln, Mitgliedern, Konten und Importen.
 

@@ -34,7 +34,7 @@ which rules apply to its members.
 ## Guides
 
 - The [member handbook](member-guide.md) explains how to sign in, book a court, record other players
-  and guests, and configure notifications.
+  and guests, and choose in Messages what you receive.
 - The [board handbook](board-guide.md) covers setup and administration of courts, booking types,
   rules, members, accounts and imports.
 
