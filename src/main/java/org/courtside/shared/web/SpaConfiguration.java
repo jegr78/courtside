@@ -26,7 +26,7 @@ class SpaConfiguration {
     // Ahead of Boot's welcome page, which would otherwise answer "/" with a forward.
     private static final int SHELL_ORDER = 1;
 
-    private static final List<String> SHELL_ROUTES = List.of(
+    static final List<String> SHELL_ROUTES = List.of(
             "/",
             "/courts",
             "/account-recovery",
