@@ -29,6 +29,49 @@ function sectionsOf(body, context) {
   return sections;
 }
 
+function entriesOf(body) {
+  if (!body.startsWith("* ")) {
+    return undefined;
+  }
+  return body.split(/\n(?=\* )/).map((entry) => entry.trimEnd());
+}
+
+function commitOf(entry) {
+  return /\/commit\/([0-9a-f]{7,40})\)\)/.exec(entry)?.[1];
+}
+
+// A squash body that repeats a conventional header becomes a second entry for the same commit.
+function namesPullRequest(entry) {
+  return /\(\[#\d+\]\([^)\s]+\)\) \(\[[0-9a-f]{7,40}\]\(/.test(entry);
+}
+
+function withOneEntryPerCommit(sections) {
+  const listed = sections.map((section) => ({ section, entries: entriesOf(section.body) }));
+  const kept = new Map();
+  for (const entry of listed.flatMap(({ entries }) => entries ?? [])) {
+    const commit = commitOf(entry);
+    if (commit && (!kept.has(commit) || (namesPullRequest(entry) && !namesPullRequest(kept.get(commit))))) {
+      kept.set(commit, entry);
+    }
+  }
+  return listed
+    .map(({ section, entries }) => {
+      if (!entries) {
+        return section;
+      }
+      const body = entries.filter((entry) => {
+        const commit = commitOf(entry);
+        if (!commit || kept.get(commit) !== entry) {
+          return !commit;
+        }
+        kept.delete(commit);
+        return true;
+      }).join("\n");
+      return { ...section, body };
+    })
+    .filter((section) => section.body);
+}
+
 function mergeSections(candidateBody, cumulativeBody, releaseLine) {
   const candidate = sectionsOf(candidateBody, "generated candidate history")
     .map((section) => releaseLine === "0.1.0" && /BREAKING CHANGES/i.test(section.name)
@@ -40,13 +83,13 @@ function mergeSections(candidateBody, cumulativeBody, releaseLine) {
   for (const section of candidate) {
     const existing = merged.get(section.name);
     if (existing) {
-      existing.body = [section.body, existing.body].filter(Boolean).join("\n\n");
+      existing.body = [section.body, existing.body].filter(Boolean).join("\n");
     } else {
       merged.set(section.name, { ...section, order: cumulative.length + section.order });
     }
   }
 
-  return [...merged.values()]
+  return withOneEntryPerCommit([...merged.values()])
     .sort((left, right) => {
       const leftPriority = SECTION_ORDER.get(left.name) ?? SECTION_ORDER.size + left.order;
       const rightPriority = SECTION_ORDER.get(right.name) ?? SECTION_ORDER.size + right.order;
