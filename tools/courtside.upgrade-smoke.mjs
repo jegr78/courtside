@@ -135,7 +135,6 @@ export function nightlyUpgradeOrigins(repository, tags, history) {
   return origin ? [{ ref: origin.ref, image: origin.image }] : [];
 }
 
-// Flyway refuses a database whose applied migration changed, which a correction before the first release may do.
 export async function registryTags(repository) {
   const name = repository.toLowerCase();
   const tokenResponse = await fetch(`https://ghcr.io/token?scope=repository:${name}:pull`);
@@ -170,6 +169,7 @@ export async function pullOrigin(planned, { pull, listTags, history, repository 
   }
 }
 
+// Flyway refuses a database whose applied migration changed, which a correction before the first release may do.
 export function gitHistory(candidate, cwd = root) {
   return {
     committedAt: (ref) => {
