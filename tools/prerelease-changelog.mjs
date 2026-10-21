@@ -29,6 +29,49 @@ function sectionsOf(body, context) {
   return sections;
 }
 
+function entriesOf(body) {
+  if (!body.startsWith("* ")) {
+    return undefined;
+  }
+  return body.split(/\n(?=\* )/).map((entry) => entry.trimEnd());
+}
+
+function commitOf(entry) {
+  return /\/commit\/([0-9a-f]{7,40})\)\)/.exec(entry)?.[1];
+}
+
+// A squash body that repeats a conventional header becomes a second entry for the same commit.
+function namesPullRequest(entry) {
+  return /\(\[#\d+\]\([^)\s]+\)\) \(\[[0-9a-f]{7,40}\]\(/.test(entry);
+}
+
+function withOneEntryPerCommit(sections) {
+  const listed = sections.map((section) => ({ section, entries: entriesOf(section.body) }));
+  const kept = new Map();
+  for (const entry of listed.flatMap(({ entries }) => entries ?? [])) {
+    const commit = commitOf(entry);
+    if (commit && (!kept.has(commit) || (namesPullRequest(entry) && !namesPullRequest(kept.get(commit))))) {
+      kept.set(commit, entry);
+    }
+  }
+  return listed
+    .map(({ section, entries }) => {
+      if (!entries) {
+        return section;
+      }
+      const body = entries.filter((entry) => {
+        const commit = commitOf(entry);
+        if (!commit || kept.get(commit) !== entry) {
+          return !commit;
+        }
+        kept.delete(commit);
+        return true;
+      }).join("\n");
+      return { ...section, body };
+    })
+    .filter((section) => section.body);
+}
+
 function mergeSections(candidateBody, cumulativeBody, releaseLine) {
   const candidate = sectionsOf(candidateBody, "generated candidate history")
     .map((section) => releaseLine === "0.1.0" && /BREAKING CHANGES/i.test(section.name)
@@ -40,13 +83,17 @@ function mergeSections(candidateBody, cumulativeBody, releaseLine) {
   for (const section of candidate) {
     const existing = merged.get(section.name);
     if (existing) {
-      existing.body = [section.body, existing.body].filter(Boolean).join("\n\n");
+      existing.body = [section.body, existing.body].filter(Boolean).join("\n");
     } else {
       merged.set(section.name, { ...section, order: cumulative.length + section.order });
     }
   }
 
-  return [...merged.values()]
+  return renderSections([...merged.values()]);
+}
+
+function renderSections(sections) {
+  return withOneEntryPerCommit(sections)
     .sort((left, right) => {
       const leftPriority = SECTION_ORDER.get(left.name) ?? SECTION_ORDER.size + left.order;
       const rightPriority = SECTION_ORDER.get(right.name) ?? SECTION_ORDER.size + right.order;
@@ -64,6 +111,19 @@ function lineHeading(line, date) {
   return date ? `## ${line} (${date})` : `## ${line}`;
 }
 
+// A line this normalizer wrote has no compare link; Release Please may leave it as an older normalizer wrote it.
+function withCleanNewestLine(changelog, newest, followingRelease) {
+  const start = newest.index + newest[0].length;
+  const end = followingRelease?.index ?? changelog.length;
+  const body = changelog.slice(start, end).trim();
+  const cleaned = renderSections(sectionsOf(body, "cumulative release history"));
+  if (cleaned === body) {
+    return changelog;
+  }
+  const suffix = followingRelease ? `\n\n${changelog.slice(end)}` : "\n";
+  return `${changelog.slice(0, start)}\n\n${cleaned}${suffix}`;
+}
+
 export function normalizePrereleaseChangelog(changelog) {
   const headings = [...changelog.matchAll(RELEASE_HEADING)];
   const newest = headings[0];
@@ -74,7 +134,7 @@ export function normalizePrereleaseChangelog(changelog) {
   const candidates = headings.filter((heading) => heading[1].includes("-"));
   const graduation = newest[1] === releaseLine && headings[1]?.[1] === releaseLine;
   if (candidates.length === 0 && !graduation) {
-    return changelog;
+    return newest[0].includes("[") ? changelog : withCleanNewestLine(changelog, newest, headings[1]);
   }
   if (candidates.length > 1 || (candidates.length === 1 && candidates[0] !== newest)) {
     throw new Error("changelog must contain exactly one generated candidate as its newest release");

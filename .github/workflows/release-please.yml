@@ -59,10 +59,28 @@ jobs:
           manifest-file: .release-please-manifest.json
           skip-github-release: true
 
-      - name: Validate the release pull request branch
-        if: steps.release.outputs.prs_created == 'true'
+      # A push that changes no release note leaves the open pull request as an older normalizer wrote it.
+      - id: release_pr
+        name: Find the release pull request
         env:
-          RELEASE_PR_BRANCH: ${{ fromJSON(steps.release.outputs.pr || '{}').headBranchName }}
+          CREATED: ${{ steps.release.outputs.prs_created }}
+          CREATED_BRANCH: ${{ fromJSON(steps.release.outputs.pr || '{}').headBranchName }}
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+          TARGET: ${{ github.ref_name }}
+        run: |
+          if [ "$CREATED" = true ]; then
+            branch="$CREATED_BRANCH"
+          else
+            branch=$(gh pr list --repo "$GITHUB_REPOSITORY" --state open --base "$TARGET" \
+              --head "release-please--branches--$TARGET" --label "autorelease: pending" \
+              --json headRefName --jq 'if length == 1 then .[0].headRefName else "" end')
+          fi
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+
+      - name: Validate the release pull request branch
+        if: steps.release_pr.outputs.branch != ''
+        env:
+          RELEASE_PR_BRANCH: ${{ steps.release_pr.outputs.branch }}
         run: |
           git check-ref-format --branch "$RELEASE_PR_BRANCH"
           case "$RELEASE_PR_BRANCH" in
@@ -71,7 +89,7 @@ jobs:
           esac
 
       - name: Check out the trusted normalizer
-        if: steps.release.outputs.prs_created == 'true'
+        if: steps.release_pr.outputs.branch != ''
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ github.sha }}
@@ -81,23 +99,23 @@ jobs:
 
       # Fold Release Please's candidate delta into the cumulative heading before review.
       - name: Check out the release pull request
-        if: steps.release.outputs.prs_created == 'true'
+        if: steps.release_pr.outputs.branch != ''
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: ${{ fromJSON(steps.release.outputs.pr || '{}').headBranchName }}
+          ref: ${{ steps.release_pr.outputs.branch }}
           token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
           path: release-pr
           fetch-depth: 0
           persist-credentials: false
 
       - name: Preserve the cumulative release-line changelog
-        if: steps.release.outputs.prs_created == 'true'
+        if: steps.release_pr.outputs.branch != ''
         run: node trusted-source/tools/prerelease-changelog.mjs --changelog release-pr/CHANGELOG.md
 
       - name: Commit the normalized changelog
-        if: steps.release.outputs.prs_created == 'true'
+        if: steps.release_pr.outputs.branch != ''
         env:
-          RELEASE_PR_BRANCH: ${{ fromJSON(steps.release.outputs.pr || '{}').headBranchName }}
+          RELEASE_PR_BRANCH: ${{ steps.release_pr.outputs.branch }}
           RELEASE_PLEASE_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
         working-directory: release-pr
         run: |
