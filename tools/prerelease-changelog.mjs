@@ -89,7 +89,11 @@ function mergeSections(candidateBody, cumulativeBody, releaseLine) {
     }
   }
 
-  return withOneEntryPerCommit([...merged.values()])
+  return renderSections([...merged.values()]);
+}
+
+function renderSections(sections) {
+  return withOneEntryPerCommit(sections)
     .sort((left, right) => {
       const leftPriority = SECTION_ORDER.get(left.name) ?? SECTION_ORDER.size + left.order;
       const rightPriority = SECTION_ORDER.get(right.name) ?? SECTION_ORDER.size + right.order;
@@ -107,6 +111,19 @@ function lineHeading(line, date) {
   return date ? `## ${line} (${date})` : `## ${line}`;
 }
 
+// A line this normalizer wrote has no compare link; Release Please may leave it as an older normalizer wrote it.
+function withCleanNewestLine(changelog, newest, followingRelease) {
+  const start = newest.index + newest[0].length;
+  const end = followingRelease?.index ?? changelog.length;
+  const body = changelog.slice(start, end).trim();
+  const cleaned = renderSections(sectionsOf(body, "cumulative release history"));
+  if (cleaned === body) {
+    return changelog;
+  }
+  const suffix = followingRelease ? `\n\n${changelog.slice(end)}` : "\n";
+  return `${changelog.slice(0, start)}\n\n${cleaned}${suffix}`;
+}
+
 export function normalizePrereleaseChangelog(changelog) {
   const headings = [...changelog.matchAll(RELEASE_HEADING)];
   const newest = headings[0];
@@ -117,7 +134,7 @@ export function normalizePrereleaseChangelog(changelog) {
   const candidates = headings.filter((heading) => heading[1].includes("-"));
   const graduation = newest[1] === releaseLine && headings[1]?.[1] === releaseLine;
   if (candidates.length === 0 && !graduation) {
-    return changelog;
+    return newest[0].includes("[") ? changelog : withCleanNewestLine(changelog, newest, headings[1]);
   }
   if (candidates.length > 1 || (candidates.length === 1 && candidates[0] !== newest)) {
     throw new Error("changelog must contain exactly one generated candidate as its newest release");

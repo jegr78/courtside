@@ -239,7 +239,7 @@ const GENERATED_PATCH = `## [0.1.1](https://github.com/jegr78/courtside/compare/
 test("given this repository's changelog on a release branch, when release-please prepends a patch, then the patch keeps "
   + "its own section and its notes can be cut", () => {
   // given
-  const changelog = readFileSync(new URL("../CHANGELOG.md", import.meta.url), "utf8");
+  const changelog = fromTheLine("0.1.0");
   const generated = changelog.replace("## 0.1.0 (", `${GENERATED_PATCH}## 0.1.0 (`);
   const second = generated.replace("## [0.1.1](", `${GENERATED_PATCH.replaceAll("0.1.1", "0.1.2")
     .replace("v0.1.0...v0.1.2", "v0.1.1...v0.1.2")}## [0.1.1](`);
@@ -447,4 +447,30 @@ test("given this repository's changelog, when the next candidate is folded into 
   const commits = [...body.matchAll(/\/commit\/([0-9a-f]{40})\)\)/g)].map((match) => match[1]);
   assert.deepEqual(commits.filter((commit, index) => commits.indexOf(commit) !== index), [], "no commit is listed twice");
   assert.doesNotMatch(body, /^\* .*\n\n\* /m, "no blank line splits a section's list");
+});
+
+test("given a release pull request whose open line is already folded, when normalization runs again, then its "
+  + "duplicates collapse, each section is one list and older lines stay as they are", () => {
+  // given — #1607 kept the entries of the normalizer before #1644, because a hidden commit left it unchanged.
+  const olderLine = `## 0.2.0 (2026-10-15)\n\n### Bug fixes\n\n${DAY_STRIP_FIX}\n\n${DAY_STRIP_FIX}\n`;
+  const changelog = `# Changelog\n\n## 0.3.0 (2026-10-18)\n\n### Bug fixes\n\n${LOCK_FIX}\n${MESSAGES_AREA_BODY}\n\n`
+    + `${MY_BOOKINGS_TITLE}\n${MY_BOOKINGS_BODY}\n\n### Documentation\n\n${MESSAGES_AREA_TITLE}\n\n${olderLine}`;
+
+  // when
+  const normalized = normalizePrereleaseChangelog(changelog);
+
+  // then
+  assert.equal(normalized,
+    `# Changelog\n\n## 0.3.0 (2026-10-18)\n\n### Bug fixes\n\n${LOCK_FIX}\n${MY_BOOKINGS_TITLE}\n\n`
+    + `### Documentation\n\n${MESSAGES_AREA_TITLE}\n\n${olderLine}`, "the open line is cleaned and nothing else");
+  assert.equal(normalizePrereleaseChangelog(normalized), normalized, "a second run changes nothing");
+});
+
+test("given a patch release pull request, when normalization runs, then Release Please's section stays as it wrote it", () => {
+  // given
+  const changelog = fromTheLine("0.1.0").replace("## 0.1.0 (", `${GENERATED_PATCH}\n### Documentation\n\n`
+    + "* explain the courts ([ccccccc](https://github.com/jegr78/courtside/commit/cccccccccccccccccccccccccccccccccccccccc))\n\n## 0.1.0 (");
+
+  // when / then
+  assert.equal(normalizePrereleaseChangelog(changelog), changelog, "only a line this normalizer wrote is cleaned");
 });
