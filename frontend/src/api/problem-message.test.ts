@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import i18n from "../i18n";
+import de from "../locales/de";
+import en from "../locales/en";
 import { ApiError } from "./client";
 import { problemMessage, violationMessage } from "./problem-message";
 
@@ -133,6 +135,35 @@ it("given a coded rule violation with a trace, when resolving it, then only the 
 
   // then
   expect(message, "a violation the member can act on carries no reference").not.toContain("0123456789abcdef0123456789abcdef");
+});
+
+const pageDefectTypes = (bundle: Record<string, string>) => Object.entries(bundle)
+  .filter(([key, message]) => key.startsWith("error.type.") && message === "$t(error.pageDefect)")
+  .map(([key]) => key.slice("error.type.".length)).sort();
+
+it("given both bundles, when the page-defect family is read, then each language marks the same types and the request-shape refusals are among them", () => {
+  // when
+  const inDe = pageDefectTypes(de);
+  const inEn = pageDefectTypes(en);
+
+  // then
+  expect(inDe, "both languages mark the same types as page defects").toEqual(inEn);
+  expect(inEn, "a request the page built wrongly is a page defect").toEqual(expect.arrayContaining(
+    ["malformed-request-body", "parameter-type-mismatch", "method-not-supported", "unsupported-media-type",
+      "idempotency-key-reused", "request-rejected", "access-denied"]));
+});
+
+it.each(pageDefectTypes(en))("given a %s refusal with a trace, when resolving it, then support can still be quoted the reference", (slug) => {
+  // given
+  const error = new ApiError(400, { type: `urn:courtside:error:${slug}`, title: "Refused", status: 400,
+    traceId: "0123456789abcdef0123456789abcdef", spanId: "0123456789abcdef" });
+
+  // when
+  const message = problemMessage(error, i18n.t);
+
+  // then
+  expect(message, "a page defect names what the page did").toContain(i18n.t("error.pageDefect"));
+  expect(message, "a page defect keeps its reference").toContain("0123456789abcdef0123456789abcdef/0123456789abcdef");
 });
 
 it("given a refusal of a type this client does not know, when it carries a trace, then support can still be quoted the reference", () => {
