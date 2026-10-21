@@ -110,6 +110,55 @@ it("given a problem with a trace reference, when resolving it, then the member c
   expect(message).toContain(`${traceId}/${spanId}`);
 });
 
+it("given a refusal the user can correct, when it carries a trace, then the reason stands without a support reference", () => {
+  // given
+  const error = new ApiError(409, { type: "urn:courtside:error:membership-periods-overlap", title: "Conflict", status: 409,
+    traceId: "0123456789abcdef0123456789abcdef", spanId: "0123456789abcdef" });
+
+  // when
+  const message = problemMessage(error, i18n.t);
+
+  // then
+  expect(message, "an expected refusal reads like its reason alone").toBe(i18n.t("error.type.membership-periods-overlap"));
+});
+
+it("given a coded rule violation with a trace, when resolving it, then only the violation is shown", () => {
+  // given
+  const error = new ApiError(422, { type: "urn:courtside:error:booking-rules-violated", title: "Unprocessable", status: 422,
+    traceId: "0123456789abcdef0123456789abcdef",
+    violations: [{ code: "booking.rule.advanceWindow.exceeded", params: { days: 14 } }] });
+
+  // when
+  const message = problemMessage(error, i18n.t);
+
+  // then
+  expect(message, "a violation the member can act on carries no reference").not.toContain("0123456789abcdef0123456789abcdef");
+});
+
+it("given a refusal of a type this client does not know, when it carries a trace, then support can still be quoted the reference", () => {
+  // given
+  const error = new ApiError(409, { type: "urn:courtside:error:not-in-this-client", title: "Conflict", status: 409,
+    traceId: "0123456789abcdef0123456789abcdef" });
+
+  // when
+  const message = problemMessage(error, i18n.t);
+
+  // then
+  expect(message, "an unexplained refusal keeps its reference").toContain("0123456789abcdef0123456789abcdef");
+});
+
+it("given a violation code this client does not carry, when it carries a trace, then support can still be quoted the reference", () => {
+  // given
+  const error = new ApiError(422, { type: "urn:courtside:error:booking-rules-violated", title: "Unprocessable", status: 422,
+    traceId: "0123456789abcdef0123456789abcdef", violations: [{ code: "booking.rule.introducedLater", params: {} }] });
+
+  // when
+  const message = problemMessage(error, i18n.t);
+
+  // then
+  expect(message, "an untranslated violation keeps its reference").toContain("0123456789abcdef0123456789abcdef");
+});
+
 it("given a refused upload, when resolving it, then the board reads which formats are read rather than the generic message", async () => {
   // given
   await i18n.changeLanguage("de");
