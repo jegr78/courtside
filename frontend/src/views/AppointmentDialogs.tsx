@@ -25,7 +25,7 @@ function ScopeFields({ scope, changed, t }: { scope: CancelScope; changed: (scop
   </fieldset>;
 }
 
-export function CancelDialog({ booking, seriesBookings, incompleteSeries, timeZone, closed, completed, cancelOne }: { booking: Appointment; seriesBookings: Appointment[]; incompleteSeries: boolean; timeZone: string; closed: () => void; completed: () => Promise<void>; cancelOne?: () => Promise<void> }) {
+export function CancelDialog({ booking, seriesBookings, incompleteSeries, timeZone, now = new Date(), closed, completed, cancelOne }: { booking: Appointment; seriesBookings: Appointment[]; incompleteSeries: boolean; timeZone: string; now?: Date; closed: () => void; completed: () => Promise<void>; cancelOne?: () => Promise<void> }) {
   const { t, i18n } = useTranslation();
   const [scope, setScope] = useState<CancelScope>("THIS");
   const [reason, setReason] = useState<CancellationReason>();
@@ -40,15 +40,17 @@ export function CancelDialog({ booking, seriesBookings, incompleteSeries, timeZo
       await completed();
     } catch (failure) { report(failure); }
   }
+  // The series scopes skip an occurrence that has started, as the server does.
+  const upcoming = seriesBookings.filter((candidate) => new Date(candidate.startsAt) > now);
   const affected = scope === "THIS" ? [booking] : scope === "WHOLE_SERIES"
-    ? seriesBookings
-    : seriesBookings.filter((candidate) => new Date(candidate.startsAt) >= new Date(booking.startsAt));
+    ? upcoming
+    : upcoming.filter((candidate) => new Date(candidate.startsAt) >= new Date(booking.startsAt));
   return <Modal labelledBy="cancel-personal-title" closed={closed} width="lg" composed>
     <DialogBody><div className="grid gap-4">
     <h2 id="cancel-personal-title" className="text-xl font-bold">{t("booking.cancelTitle")}</h2>
     {series && <ScopeFields scope={scope} changed={setScope} t={t} />}
-    <p className="font-semibold">{t("myBookings.affected", { count: affected.length })}</p>
-    <ul className="list-disc pl-5">{affected.map((candidate) => <li key={candidate.id}>{formatBookingPeriod(candidate.startsAt, candidate.endsAt, i18n.language, timeZone)}</li>)}</ul>
+    <p data-testid="affected-count" className="font-semibold">{t("myBookings.affected", { count: affected.length })}</p>
+    <ul data-testid="affected-occurrences" className="list-disc pl-5">{affected.map((candidate) => <li key={candidate.id}>{formatBookingPeriod(candidate.startsAt, candidate.endsAt, i18n.language, timeZone)}</li>)}</ul>
     {incompleteSeries && scope !== "THIS" && <p data-testid="incomplete-series-warning">{t("myBookings.affectedIncomplete")}</p>}
     {foreign && <CancellationReasonField reason={reason} changed={setReason} />}
     </div></DialogBody>
