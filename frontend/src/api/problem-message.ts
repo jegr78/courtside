@@ -10,7 +10,8 @@ export function isUnauthenticated(failure: unknown): boolean {
 }
 
 export function problemMessage(failure: unknown, t: TFunction): string {
-  return withReference(failure, problemText(failure, t), t);
+  const message = problemText(failure, t);
+  return isCorrectableRefusal(failure, t) ? message : withReference(failure, message, t);
 }
 
 export function problemText(failure: unknown, t: TFunction): string {
@@ -37,10 +38,23 @@ export function violationMessage(code: string, params: Record<string, unknown>, 
   return import.meta.env.DEV ? `${unknown} [${code}]` : unknown;
 }
 
+// A refusal this client explains is the user's to correct, so support has nothing to look up.
+function isCorrectableRefusal(failure: unknown, t: TFunction): boolean {
+  if (!(failure instanceof ApiError) || !failure.problem || failure.status >= 500) return false;
+  const coded = firstCodedFailure(failure.problem);
+  if (coded) return t(coded.code, { defaultValue: MISSING }) !== MISSING;
+  const slug = problemSlug(failure.problem);
+  return slug !== undefined && t(`error.type.${slug}`, { defaultValue: MISSING }) !== MISSING;
+}
+
+function problemSlug(problem: Problem): string | undefined {
+  return problem.type?.startsWith(TYPE_PREFIX) ? problem.type.slice(TYPE_PREFIX.length) : undefined;
+}
+
 function translatedProblem(problem: Problem, t: TFunction): string {
   const coded = firstCodedFailure(problem);
   if (coded) return violationMessage(coded.code, coded.params, t);
-  const slug = problem.type?.startsWith(TYPE_PREFIX) ? problem.type.slice(TYPE_PREFIX.length) : undefined;
+  const slug = problemSlug(problem);
   const message = slug ? t(`error.type.${slug}`, { defaultValue: MISSING }) : MISSING;
   return message === MISSING ? t("error.generic") : message;
 }
