@@ -180,8 +180,9 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
 
   return <Modal labelledBy="booking-heading" closed={closed} width="xl" composed testId="booking-dialog">
     <form onSubmit={(event) => void submit(event)} className="flex min-h-0 flex-col">
-      <DialogBody>
-      <h2 id="booking-heading" className="text-xl font-bold">{t(waitlist ? "waitlist.title" : "booking.title")}</h2>
+      {/* Outside the scrolling form, so the title stays while the member fills the fields below. */}
+      <h2 id="booking-heading" className="shrink-0 px-6 pt-6 text-xl font-bold">{t(waitlist ? "waitlist.title" : "booking.title")}</h2>
+      <DialogBody padding="px-6 pb-6">
       <p data-testid="booking-period" aria-live="polite" className="mt-2 font-semibold">{formatBookingPeriod(period.startsAt, period.endsAt, i18n.language, grid.timeZone)}</p>
       <FieldViolations id="booking-startsAt-errors" violations={fieldViolations("startsAt")} />
       {waitlist && <p data-testid="waitlist-explanation" className="text-muted mt-2 text-sm">{t("waitlist.explanation")}</p>}

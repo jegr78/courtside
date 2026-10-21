@@ -1,6 +1,6 @@
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 
-export function DialogBody({ children }: { children: ReactNode }) {
+export function DialogBody({ children, padding = "p-6" }: { children: ReactNode; padding?: string }) {
   const body = useRef<HTMLDivElement>(null);
   const content = useRef<HTMLDivElement>(null);
   const [continues, setContinues] = useState(false);
@@ -19,7 +19,7 @@ export function DialogBody({ children }: { children: ReactNode }) {
   }, [measure]);
 
   return <div className="relative flex min-h-0 flex-col">
-    <div ref={body} data-testid="dialog-body" onScroll={measure} className="dialog-body min-h-0 overflow-y-auto p-6">
+    <div ref={body} data-testid="dialog-body" onScroll={measure} className={`dialog-body min-h-0 overflow-y-auto ${padding}`}>
       <div ref={content}>{children}</div>
     </div>
     {continues && <div data-testid="dialog-continues" aria-hidden="true" className="dialog-continues">
