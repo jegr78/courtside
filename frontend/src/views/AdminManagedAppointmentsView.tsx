@@ -25,7 +25,7 @@ export function AdminManagedAppointmentsView({ managesAppointments, createsSerie
   const [courtId, setCourtId] = useState("");
   const [cardId, setCardId] = useState("");
   const [appointments, setAppointments] = useState<ManagedAppointment[]>([]);
-  const [seriesFacts, setSeriesFacts] = useState<Map<string, ManagedSeriesFacts>>(new Map());
+  const [seriesFacts, setSeriesFacts] = useState<Map<string, CountedSeriesFacts>>(new Map());
   const [nextCursor, setNextCursor] = useState<string>();
   const [courts, setCourts] = useState<PublicCourt[]>([]);
   const [cards, setCards] = useState<PublicBookingCard[]>([]);
@@ -55,7 +55,7 @@ export function AdminManagedAppointmentsView({ managesAppointments, createsSerie
       });
       if (version !== loadVersion.current) return;
       setAppointments(page.items);
-      setSeriesFacts(new Map(page.series.map((facts) => [facts.seriesId, facts])));
+      setSeriesFacts(new Map(counted(page.series)));
       setNextCursor(page.nextCursor ?? undefined);
       clear();
     } catch (failure) {
@@ -101,7 +101,7 @@ export function AdminManagedAppointmentsView({ managesAppointments, createsSerie
       });
       if (version !== loadVersion.current) return;
       setAppointments((current) => [...current, ...page.items]);
-      setSeriesFacts((current) => new Map([...current, ...page.series.map((facts) => [facts.seriesId, facts] as const)]));
+      setSeriesFacts((current) => new Map([...current, ...counted(page.series)]));
       setNextCursor(page.nextCursor ?? undefined);
       clear();
     } catch (failure) {
@@ -296,13 +296,20 @@ function seriesHeading(items: ManagedAppointment[], facts: ManagedSeriesFacts | 
     courts, dates, counts].filter(Boolean).join(" · ");
 }
 
+// The server counts an occurrence as past when the page arrives, so the loaded ones are judged at that instant too.
+type CountedSeriesFacts = ManagedSeriesFacts & { countedAt: number };
+
+function counted(series: ManagedSeriesFacts[]): [string, CountedSeriesFacts][] {
+  const countedAt = Date.now();
+  return series.map((facts) => [facts.seriesId, { ...facts, countedAt }]);
+}
+
 function hasUnloadedOccurrences(appointment: ManagedAppointment, appointments: ManagedAppointment[],
-  seriesFacts: Map<string, ManagedSeriesFacts>, morePages: boolean) {
+  seriesFacts: Map<string, CountedSeriesFacts>, morePages: boolean) {
   const facts = appointment.seriesId ? seriesFacts.get(appointment.seriesId) : undefined;
   if (!facts) return morePages;
-  const now = Date.now();
   const loaded = appointments.filter((candidate) => candidate.seriesId === facts.seriesId && candidate.status === "CONFIRMED"
-    && new Date(candidate.startsAt).getTime() > now).length;
+    && new Date(candidate.startsAt).getTime() > facts.countedAt).length;
   return loaded < facts.occurrences - facts.cancelled - facts.past;
 }
 
