@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.3.0-rc.3](https://github.com/jegr78/courtside/compare/v0.3.0-rc.2...v0.3.0-rc.3) (2026-10-21)
+
+
+### Bug fixes
+
+* **booking:** refuse a withdrawal from a cancelled booking ([#1606](https://github.com/jegr78/courtside/issues/1606)) ([bd8267a](https://github.com/jegr78/courtside/commit/bd8267a49fe91f9b83f5ccf85b8e07b9f758adaf)), closes [#1595](https://github.com/jegr78/courtside/issues/1595)
+* **booking:** withdraw from a booking only under its row lock ([#1638](https://github.com/jegr78/courtside/issues/1638)) ([0b4c2b4](https://github.com/jegr78/courtside/commit/0b4c2b4aff21e3c0661cfcdcbbae644518e4d3e7)), closes [#1630](https://github.com/jegr78/courtside/issues/1630)
+* call the messages area Nachrichten and Messages wherever it is named ([#1611](https://github.com/jegr78/courtside/issues/1611)) ([8e3acde](https://github.com/jegr78/courtside/commit/8e3acde55b150cf6f127d3e387431d1ccf3c3382))
+* choose the nightly upgrade origin again when retention deleted it before the pull ([#1621](https://github.com/jegr78/courtside/issues/1621)) ([f662bfa](https://github.com/jegr78/courtside/commit/f662bfa1bf42945191f457c8168d7408285b6455))
+* **frontend:** judge which occurrences a cancellation reaches when the dialog opens ([#1641](https://github.com/jegr78/courtside/issues/1641)) ([b9f5530](https://github.com/jegr78/courtside/commit/b9f5530e1dba08fa86b87c70ecdee526a01c4549)), closes [#1631](https://github.com/jegr78/courtside/issues/1631)
+* **frontend:** keep export selects inside their section and show the whole filler count placeholder ([#1609](https://github.com/jegr78/courtside/issues/1609)) ([84aaa28](https://github.com/jegr78/courtside/commit/84aaa288ba1d82bb5ece6a9f113a73a82949478e))
+* **frontend:** keep the booking title and the plan's first row clear on phones ([#1612](https://github.com/jegr78/courtside/issues/1612)) ([50ffed7](https://github.com/jegr78/courtside/commit/50ffed70a45ef273267fbca19bf33cc6a9947385))
+* **frontend:** keep the support reference on refusals that report a page defect ([#1640](https://github.com/jegr78/courtside/issues/1640)) ([9a0497a](https://github.com/jegr78/courtside/commit/9a0497a60c839ea0eeceaa70852e361193461ef0)), closes [#1629](https://github.com/jegr78/courtside/issues/1629)
+* **frontend:** list only occurrences the series cancellation reaches ([#1618](https://github.com/jegr78/courtside/issues/1618)) ([3e4dff9](https://github.com/jegr78/courtside/commit/3e4dff9c23ee6d88d8fb158720f0cfbfd73cc15f)), closes [#1610](https://github.com/jegr78/courtside/issues/1610)
+* **frontend:** show a correctable refusal without a support reference ([#1615](https://github.com/jegr78/courtside/issues/1615)) ([7f53bd8](https://github.com/jegr78/courtside/commit/7f53bd8abd42d3643b55c78dae267b56b576f2ba))
+* **frontend:** show each account recovery answer under the form that was sent ([#1626](https://github.com/jegr78/courtside/issues/1626)) ([c4e757e](https://github.com/jegr78/courtside/commit/c4e757efa328e3b2b1a16f6b7f3c1a038508de70)), closes [#1616](https://github.com/jegr78/courtside/issues/1616)
+* keep a request timer for every route the application serves ([#1605](https://github.com/jegr78/courtside/issues/1605)) ([d139c0a](https://github.com/jegr78/courtside/commit/d139c0ab9afd2d42dad353658235768512513cae))
+* name the messages area in the guide indexes and pin only the pointer phrase in mails ([372eeeb](https://github.com/jegr78/courtside/commit/372eeebf0cc093ff0d7108b1e04114aec7c9e473)), closes [#1632](https://github.com/jegr78/courtside/issues/1632)
+* word the appointment dialogs for what they actually affect ([#1608](https://github.com/jegr78/courtside/issues/1608)) ([33fd183](https://github.com/jegr78/courtside/commit/33fd1838f5cbfd4ec431f18e8e836a2da9c22280))
+
+
+### Documentation
+
+* name the messages area in the guide indexes and pin only the pointer phrase in mails ([#1642](https://github.com/jegr78/courtside/issues/1642)) ([372eeeb](https://github.com/jegr78/courtside/commit/372eeebf0cc093ff0d7108b1e04114aec7c9e473))
+
 ## 0.3.0 (2026-10-18)
 
 
