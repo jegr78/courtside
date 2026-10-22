@@ -460,6 +460,9 @@ An upload first creates a preview and does not change any person. The preview sh
 row count, checksum, changes, skipped rows, possible duplicates, shared email addresses and planned
 accounts.
 
+If Courtside refuses the file, the reason appears right below the button. A preview of the
+previous file then disappears, so nobody takes it for the result of the new one.
+
 Courtside does not store the file itself. It keeps the calculated changes, including names,
 addresses and member numbers, until the preview expires.
 

@@ -486,6 +486,9 @@ Der Upload erzeugt zuerst eine Vorschau. Noch ändert sich keine Person. Die Vor
 Dateiname, Zeilenzahl, Prüfsumme, Änderungen, übersprungene Zeilen, mögliche Dubletten, gemeinsam
 verwendete E-Mail-Adressen und geplante Konten.
 
+Lehnt Courtside die Datei ab, steht der Grund direkt unter dem Knopf. Eine Vorschau der vorigen
+Datei verschwindet dann, damit niemand sie für das Ergebnis der neuen hält.
+
 Die Datei selbst wird nicht gespeichert. Die ermittelte Änderungsmenge mit Namen, Adressen und
 Mitgliedsnummern bleibt bis zum Ende ihrer Aufbewahrungsfrist in der Instanz.
 

@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { api, type ImportPreview } from "../../api/client";
+import { api, ApiError, type ImportPreview, type ImportSource } from "../../api/client";
 import i18n from "../../i18n";
 import { ImportPreviewPanel } from "./ImportPreviewPanel";
 
@@ -28,10 +28,11 @@ const preview: ImportPreview = {
   expiresAt: "2026-08-22T10:00:00Z"
 };
 
-function show(current: ImportPreview | undefined, previewed = vi.fn(), sourceEncoding = "UTF-8") {
+function show(current: ImportPreview | undefined, previewed = vi.fn(), sourceEncoding = "UTF-8", columnMode: ImportSource["columnMode"] = "HEADER") {
   render(<ImportPreviewPanel
     sourceId="source-1"
     sourceEncoding={sourceEncoding}
+    columnMode={columnMode}
     preview={current}
     disabled={false}
     previewed={previewed}
@@ -269,5 +270,37 @@ describe("ImportPreviewPanel", () => {
 
     // then
     expect(screen.getByTestId("preview-ignored-columns")).toHaveTextContent("IBAN");
+  });
+
+  it("given a refused file, when another file is chosen, then the refusal no longer stands beside it", async () => {
+    // given
+    vi.spyOn(api, "createImportPreview").mockRejectedValue(new ApiError(400, {
+      type: "urn:courtside:error:import-snapshot-unreadable", title: "Bad Request", status: 400,
+      violations: [{ code: "import.snapshot.columns.countChanged", params: { expected: 4, found: 3 } }]
+    }));
+    show(undefined);
+    await userEvent.upload(screen.getByTestId("snapshot-file"), new File(["1;Jane;Doe\n"], "short.csv", { type: "text/csv" }));
+    await userEvent.click(screen.getByTestId("upload-snapshot"));
+    await screen.findByTestId("snapshot-refusal");
+
+    // when
+    await userEvent.upload(screen.getByTestId("snapshot-file"), new File(["1;Jane;Doe;active\n"], "full.csv", { type: "text/csv" }));
+
+    // then
+    expect(screen.queryByTestId("snapshot-refusal"), "the refusal belongs to the file that was refused").not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["de", "Nicht zugeordnet und beim Import übersprungen: Spalte 4, Spalte 6"],
+    ["en", "Not mapped and skipped on import: Column 4, Column 6"]
+  ])("given a source read by position, when the preview names unmapped columns in %s, then each is named as a column", async (language, expected) => {
+    // given
+    await i18n.changeLanguage(language);
+
+    // when
+    show({ ...preview, ignoredColumns: ["4", "6"] }, vi.fn(), "UTF-8", "POSITION");
+
+    // then
+    expect(screen.getByTestId("preview-ignored-columns")).toHaveTextContent(expected);
   });
 });

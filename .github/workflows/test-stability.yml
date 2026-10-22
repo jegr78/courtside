@@ -81,6 +81,7 @@ jobs:
           ./mvnw -B package -DskipTests
           cd frontend
           npm ci --ignore-scripts
+      - uses: ./.github/actions/browser-images
       - name: Prove browser isolation under varied project order
         timeout-minutes: 27
         working-directory: frontend
@@ -154,6 +155,7 @@ jobs:
           ./mvnw -B package -DskipTests
           cd frontend
           npm ci --ignore-scripts
+      - uses: ./.github/actions/browser-images
       - name: Qualify the periodic Firefox project and repeat the phone layout
         working-directory: frontend
         env:

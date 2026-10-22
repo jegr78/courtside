@@ -163,3 +163,41 @@ test("a member number the file does not yet carry is linked by hand rather than 
     await expect(page.getByTestId("duplicate-9001")).toBeVisible();
     await expect(page.getByTestId("duplicate-9003")).toHaveCount(0);
   });
+
+test("a member list that lost a column is refused at its upload, and the earlier preview can no longer be run",
+  async ({ page }) => {
+    // given a source read by position and a readable preview of its export
+    const rows = ["9001;Jane;Doe;active", "9002;John;Roe;active", "9003;Mary;Major;active"];
+    const headerless = (name: string, lines: string[]) => ({ name, mimeType: "text/csv", buffer: Buffer.from(lines.join("\n") + "\n", "utf8") });
+    await signInAsAdministrator(page);
+    await page.getByTestId("admin-import-link").click();
+    await page.getByTestId("new-source").click();
+    await page.getByTestId("column-mode-POSITION").check();
+    await page.getByTestId("source-file").setInputFiles(headerless("members-headerless.csv", rows));
+    await expect(page.getByTestId("source-column-count")).toHaveValue("4");
+    await page.getByTestId("source-key").fill("headerless-registry");
+    await page.getByTestId("source-name").fill("Headerless registry");
+    await page.getByTestId("position-EXTERNAL_ID").selectOption("1");
+    await page.getByTestId("position-FIRST_NAME").selectOption("2");
+    await page.getByTestId("position-LAST_NAME").selectOption("3");
+    await page.getByTestId("source-default-type").selectOption({ index: 1 });
+    await page.getByTestId("save-source").click();
+    await expect(page.getByTestId("no-references")).toBeVisible();
+    await page.getByTestId("snapshot-file").setInputFiles(headerless("members-headerless.csv", rows));
+    await page.getByTestId("upload-snapshot").click();
+    await expect(page.getByTestId("execute-preview")).toBeEnabled();
+
+    // when the next export arrives one column short
+    await page.getByTestId("snapshot-file").setInputFiles(headerless("members-truncated.csv", rows.map((row) => row.split(";").slice(0, 3).join(";"))));
+    const refused = page.waitForResponse((response) =>
+      response.url().includes("/previews") && response.request().method() === "POST");
+    await page.getByTestId("upload-snapshot").click();
+    expect((await refused).status()).toBe(400);
+
+    // then the board reads the refusal where it pressed the button, and nothing of the earlier file can be run
+    const refusal = page.getByTestId("import-part-preview").getByRole("alert");
+    await expect(refusal, "the refusal stands in the snapshot section").toContainText("3");
+    await expect(refusal, "the refusal is where the board is looking").toBeInViewport();
+    await expect(page.getByTestId("preview-identity"), "the earlier preview is gone").toHaveCount(0);
+    await expect(page.getByTestId("execute-preview"), "no earlier preview can be run").toHaveCount(0);
+  });

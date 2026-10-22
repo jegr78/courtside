@@ -590,6 +590,7 @@ jobs:
         with:
           name: application-candidate-${{ github.run_id }}
           path: .
+      - uses: ./.github/actions/browser-images
       - name: Verify visual baselines first
         working-directory: frontend
         env:
@@ -645,6 +646,7 @@ jobs:
         with:
           name: application-candidate-${{ github.run_id }}
           path: .
+      - uses: ./.github/actions/browser-images
       - name: Run the functional browser shard
         working-directory: frontend
         env:
