@@ -74,7 +74,7 @@ class SharedExceptionHandler {
     @ExceptionHandler({PessimisticLockException.class, PessimisticLockingFailureException.class})
     ProblemDetail handleUnavailableDatabaseLock(Exception exception) {
         ProblemDetail problem = unavailableDatabaseLock();
-        logAnswered(problem);
+        logAnswered(problem, exception);
         return problem;
     }
 
@@ -85,14 +85,14 @@ class SharedExceptionHandler {
         problem.setType(URI.create("urn:courtside:error:statement-timeout"));
         problem.setTitle("Statement timed out");
         problem.setProperty("retryable", false);
-        logAnswered(problem);
+        logAnswered(problem, exception);
         return problem;
     }
 
     @ExceptionHandler(TransactionTimedOutException.class)
     ProblemDetail handleTransactionTimeout(TransactionTimedOutException exception) {
         ProblemDetail problem = transactionTimeout();
-        logAnswered(problem);
+        logAnswered(problem, exception);
         return problem;
     }
 
@@ -104,13 +104,12 @@ class SharedExceptionHandler {
             if (cause instanceof org.hibernate.TransactionException
                     && String.valueOf(cause.getMessage()).contains("timeout expired")) {
                 ProblemDetail problem = transactionTimeout();
-                logAnswered(problem);
+                logAnswered(problem, exception);
                 return problem;
             }
         }
         ProblemDetail problem = ContainerErrorController.problemFor(HttpStatus.INTERNAL_SERVER_ERROR);
-        traceReference.addTo(problem);
-        log.warn("Answering {} for {}", HttpStatus.INTERNAL_SERVER_ERROR, problem.getType(), exception);
+        logAnswered(problem, exception);
         return problem;
     }
 
@@ -127,12 +126,11 @@ class SharedExceptionHandler {
     ProblemDetail handleUncategorizedDatabaseFailure(UncategorizedSQLException exception) {
         if ("55P03".equals(exception.getSQLException().getSQLState())) {
             ProblemDetail problem = unavailableDatabaseLock();
-            logAnswered(problem);
+            logAnswered(problem, exception);
             return problem;
         }
         ProblemDetail problem = ContainerErrorController.problemFor(HttpStatus.INTERNAL_SERVER_ERROR);
-        traceReference.addTo(problem);
-        log.warn("Answering {} for {}", HttpStatus.INTERNAL_SERVER_ERROR, problem.getType(), exception);
+        logAnswered(problem, exception);
         return problem;
     }
 
@@ -154,7 +152,7 @@ class SharedExceptionHandler {
                 HttpStatus.BAD_REQUEST, "The request conflicts with a database constraint");
         problem.setType(URI.create("urn:courtside:error:constraint-violation"));
         problem.setTitle("Constraint violation");
-        logAnswered(problem);
+        logAnswered(problem, exception);
         return problem;
     }
 
@@ -167,7 +165,7 @@ class SharedExceptionHandler {
         problem.setProperty("violations", List.of(Map.of(
                 "code", "request.concurrentModification",
                 "params", Map.of())));
-        logAnswered(problem);
+        logAnswered(problem, exception);
         return problem;
     }
 
@@ -226,7 +224,7 @@ class SharedExceptionHandler {
                     HttpStatus.BAD_REQUEST, "The request body could not be parsed");
             problem.setType(URI.create("urn:courtside:error:malformed-request-body"));
             problem.setTitle("Malformed request body");
-            logAnswered(problem);
+            logAnswered(problem, exception);
             return problem;
         }
 
@@ -289,7 +287,7 @@ class SharedExceptionHandler {
                 HttpStatus.METHOD_NOT_ALLOWED, "This HTTP method is not supported for this resource");
         problem.setType(URI.create("urn:courtside:error:method-not-supported"));
         problem.setTitle("Method not allowed");
-        logAnswered(problem);
+        logAnswered(problem, exception);
         return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED)
                 .headers(exception.getHeaders())
                 .body(problem);
@@ -301,7 +299,7 @@ class SharedExceptionHandler {
                 HttpStatus.NOT_FOUND, "No resource exists at this address");
         problem.setType(URI.create("urn:courtside:error:unmapped-path"));
         problem.setTitle("Unmapped path");
-        logAnswered(problem);
+        logAnswered(problem, exception);
         return problem;
     }
 
@@ -319,7 +317,7 @@ class SharedExceptionHandler {
             refusedByValidation();
         }
         ProblemDetail problem = ContainerErrorController.problemFor(status);
-        logAnswered(problem);
+        logAnswered(problem, exception);
         return ResponseEntity.status(status).body(problem);
     }
 
@@ -333,7 +331,7 @@ class SharedExceptionHandler {
         problem.setProperty("violations", List.of(Map.of(
                 "code", "request.missingPart",
                 "params", Map.of("part", exception.getRequestPartName()))));
-        logAnswered(problem);
+        logAnswered(problem, exception);
         return problem;
     }
 
@@ -347,7 +345,7 @@ class SharedExceptionHandler {
         problem.setProperty("violations", List.of(Map.of(
                 "code", "request.uploadTooLarge",
                 "params", Map.of("maxBytes", exception.getMaxUploadSize()))));
-        logAnswered(problem);
+        logAnswered(problem, exception);
         return problem;
     }
 
@@ -355,8 +353,7 @@ class SharedExceptionHandler {
     ProblemDetail handleUnparseableMultipart(MultipartException exception) {
         if (Multipart.failedOnTheServer(exception)) {
             ProblemDetail problem = ContainerErrorController.problemFor(HttpStatus.INTERNAL_SERVER_ERROR);
-            traceReference.addTo(problem);
-            log.warn("Answering {} for {}", HttpStatus.INTERNAL_SERVER_ERROR, problem.getType(), exception);
+            logAnswered(problem, exception);
             return problem;
         }
         refusedByValidation();
@@ -364,7 +361,7 @@ class SharedExceptionHandler {
                 HttpStatus.BAD_REQUEST, "The request body could not be parsed");
         problem.setType(URI.create("urn:courtside:error:malformed-request-body"));
         problem.setTitle("Malformed request body");
-        logAnswered(problem);
+        logAnswered(problem, exception);
         return problem;
     }
 
@@ -376,7 +373,7 @@ class SharedExceptionHandler {
                 HttpStatus.UNSUPPORTED_MEDIA_TYPE, "This endpoint does not accept the request's content type");
         problem.setType(URI.create("urn:courtside:error:unsupported-media-type"));
         problem.setTitle("Unsupported media type");
-        logAnswered(problem);
+        logAnswered(problem, exception);
         return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
                 .headers(exception.getHeaders())
                 .body(problem);
@@ -388,7 +385,7 @@ class SharedExceptionHandler {
                 HttpStatus.NOT_ACCEPTABLE, "This endpoint cannot produce a representation the request accepts");
         problem.setType(URI.create("urn:courtside:error:not-acceptable"));
         problem.setTitle("Not acceptable");
-        logAnswered(problem);
+        logAnswered(problem, exception);
         return problem;
     }
 
@@ -485,11 +482,15 @@ class SharedExceptionHandler {
     }
 
     // Never the exception: its message embeds the rejected value, a password on some endpoints.
-    private void logAnswered(ProblemDetail problem) {
+    // A 5xx is an incident, so its line carries the exception; a refusal's would only repeat the request.
+    private void logAnswered(ProblemDetail problem, Exception exception) {
         traceReference.addTo(problem);
         HttpStatusCode status = HttpStatusCode.valueOf(problem.getStatus());
-        Level level = status.is5xxServerError() ? Level.WARN
-                : status.value() == HttpStatus.CONFLICT.value() ? Level.INFO : Level.DEBUG;
+        if (status.is5xxServerError()) {
+            log.warn("Answering {} for {}", status, problem.getType(), exception);
+            return;
+        }
+        Level level = status.value() == HttpStatus.CONFLICT.value() ? Level.INFO : Level.DEBUG;
         log.atLevel(level).log("Answering {} for {}", status, problem.getType());
     }
 
