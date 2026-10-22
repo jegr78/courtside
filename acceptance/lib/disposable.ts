@@ -9,7 +9,7 @@ const own = () => persona("disposable").username;
 export async function canSignIn(password: string, username = own()): Promise<boolean> {
   const api = await anonymousApi();
   try {
-    const response = await api.postForm("/api/session", { username, password });
+    const response = await api.credential("/api/session", { form: { username, password } });
     if (!response.ok()) return false;
     return (await (await api.get("/api/session")).json()).authenticated === true;
   } finally { await api.dispose(); }
@@ -24,7 +24,7 @@ async function resetToShared(username: string) {
     const mail = await latestMailTo(disposableRecord(username).email, since);
     const code = mail && /^Code:\s*(\S+)\s*$/m.exec(mail.text)?.[1];
     precondition(code, "reset code reached Mailpit (the instance limits reset codes per account and hour)");
-    const redeemed = await api.post("/api/account-recovery/password/redemption", { code, password: PASSWORD });
+    const redeemed = await api.credential("/api/account-recovery/password/redemption", { json: { code, password: PASSWORD } });
     precondition(redeemed.ok(), `reset code redemption answered ${redeemed.status()}`);
   } finally { await api.dispose(); }
 }

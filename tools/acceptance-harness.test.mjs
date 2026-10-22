@@ -1376,3 +1376,39 @@ test("given an aria snapshot with a typed and a masked password box, when checke
     assert.deepEqual(leaksIn(run, SECRET), []);
   } finally { rmSync(run, { recursive: true, force: true }); }
 });
+
+import { applySetCookies, cookieHeader } from "../acceptance/lib/cookie-jar.mjs";
+
+test("given a jar and an answer's Set-Cookie lines, when applied, then new cookies are kept, replaced ones updated and expired ones removed", () => {
+  // given
+  const url = new URL("https://club.example.org/api/session");
+  const jar = [
+    { name: "XSRF-TOKEN", value: "old", domain: "club.example.org", path: "/", expires: -1, httpOnly: false, secure: true, sameSite: "Lax" },
+    { name: "__Host-SESSION", value: "anonymous", domain: "club.example.org", path: "/", expires: -1, httpOnly: true, secure: true, sameSite: "Lax" }
+  ];
+  // when
+  const next = applySetCookies(jar, [
+    "__Host-SESSION=signed-in; Path=/; Secure; HttpOnly; SameSite=Lax",
+    "XSRF-TOKEN=; Path=/; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT",
+    "LANG=de; Path=/api; Max-Age=3600; SameSite=Strict"
+  ], url, 1_000);
+  // then
+  assert.deepEqual(next.map(({ name, value, path, httpOnly, secure, sameSite }) => ({ name, value, path, httpOnly, secure, sameSite })), [
+    { name: "__Host-SESSION", value: "signed-in", path: "/", httpOnly: true, secure: true, sameSite: "Lax" },
+    { name: "LANG", value: "de", path: "/api", httpOnly: false, secure: false, sameSite: "Strict" }
+  ], "the session is replaced, the cleared token removed and the new cookie added");
+  assert.equal(next.find((cookie) => cookie.name === "LANG").expires, 1_000 + 3600, "Max-Age becomes an absolute expiry");
+});
+
+test("given a jar, when the cookie header for a request is built, then only cookies of its host, path and scheme are sent", () => {
+  // given
+  const jar = [
+    { name: "a", value: "1", domain: "club.example.org", path: "/", expires: -1, httpOnly: true, secure: true, sameSite: "Lax" },
+    { name: "b", value: "2", domain: "club.example.org", path: "/admin", expires: -1, httpOnly: false, secure: false, sameSite: "Lax" },
+    { name: "c", value: "3", domain: "other.example.org", path: "/", expires: -1, httpOnly: false, secure: false, sameSite: "Lax" },
+    { name: "d", value: "4", domain: "club.example.org", path: "/", expires: 10, httpOnly: false, secure: false, sameSite: "Lax" }
+  ];
+  // when / then
+  assert.equal(cookieHeader(jar, new URL("https://club.example.org/api/session"), 100), "a=1", "a foreign host, another path and an expired cookie stay home");
+  assert.equal(cookieHeader(jar, new URL("http://club.example.org/admin/x"), 5), "b=2; d=4", "a secure cookie never goes over plain http");
+});
