@@ -10,10 +10,14 @@ import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.core.io.Resource;
 import org.springframework.http.CacheControl;
 import org.springframework.http.MediaType;
+import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 import org.springframework.web.servlet.handler.SimpleUrlHandlerMapping;
 import org.springframework.web.servlet.resource.ResourceHttpRequestHandler;
 
 import java.io.IOException;
+import java.time.Duration;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -68,6 +72,20 @@ class SpaConfiguration {
         Map<String, Object> routes = new LinkedHashMap<>();
         SHELL_ROUTES.forEach(route -> routes.put(route, shell));
         return new SimpleUrlHandlerMapping(routes, SHELL_ORDER);
+    }
+
+    // Every file the build writes below assets/ carries a content hash, so a changed file is a new URL.
+    @Bean
+    WebMvcConfigurer contentHashedAssets(WebProperties web) {
+        return new WebMvcConfigurer() {
+            @Override
+            public void addResourceHandlers(ResourceHandlerRegistry registry) {
+                registry.addResourceHandler("/assets/**")
+                        .addResourceLocations(Arrays.stream(web.getResources().getStaticLocations())
+                                .map(location -> location + "assets/").toArray(String[]::new))
+                        .setCacheControl(CacheControl.maxAge(Duration.ofDays(365)).cachePublic().immutable());
+            }
+        };
     }
 
     @Bean

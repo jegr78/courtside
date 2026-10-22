@@ -9,19 +9,19 @@
     },
     {
       "id": "application-script",
-      "pattern": "^assets/[A-Za-z0-9._-]+\\.js$",
+      "pattern": "^assets/[A-Za-z0-9._-]+-[A-Za-z0-9_-]{8}\\.js$",
       "class": "script",
       "purpose": "The bundled member surface, the chunks it loads on demand for administration and further languages, and the helper that registers the service worker."
     },
     {
       "id": "application-stylesheet",
-      "pattern": "^assets/[A-Za-z0-9._-]+\\.css$",
+      "pattern": "^assets/[A-Za-z0-9._-]+-[A-Za-z0-9_-]{8}\\.css$",
       "class": "stylesheet",
       "purpose": "The bundled styles, including the font faces the shell declares."
     },
     {
       "id": "web-font",
-      "pattern": "^assets/[A-Za-z0-9._-]+\\.woff2$",
+      "pattern": "^assets/[A-Za-z0-9._-]+-[A-Za-z0-9_-]{8}\\.woff2$",
       "class": "font",
       "purpose": "The typefaces the instance serves itself so that no browser reaches a font host."
     },

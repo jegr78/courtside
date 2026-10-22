@@ -318,7 +318,8 @@ test("an expired session cannot turn a supported browser back into an authentica
     "UPDATE spring_session SET last_access_time = 0, max_inactive_interval = 1, expiry_time = 1");
   const sessionResponse = page.waitForResponse((response) =>
     response.url().endsWith("/api/session") && response.request().method() === "GET");
-  const expiryResponse = page.waitForResponse(async (response) =>
+  // A page the service worker controls never sees Set-Cookie, so the clearing answer is read where the worker's fetches are reported too.
+  const expiryResponse = page.context().waitForEvent("response", async (response) =>
     (await cookieFacts(response)).some((cookie) => cookie.name === sessionName
       && cookie.isEmpty && cookie.maxAge === "0"));
 

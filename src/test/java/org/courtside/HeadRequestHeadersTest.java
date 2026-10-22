@@ -86,7 +86,7 @@ class HeadRequestHeadersTest extends AbstractIntegrationTest {
 
         // when / then
         assertThat(files).as("the inventoried build files").contains("/index.html", "/icon.svg");
-        assertThat(files).allSatisfy(file -> answersHeadLikeGet(file, true));
+        assertThat(files).allSatisfy(file -> answersHeadLikeGet(file, !file.startsWith("/assets/")));
     }
 
     @Test
