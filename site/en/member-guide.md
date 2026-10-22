@@ -279,7 +279,8 @@ Keep these rules in mind:
   *Whole series*.
 * Before a move, Courtside shows the affected bookings and any conflicts.
 * A series contains no player list. It appears as occupied time in the court plan.
-* Once the series exists, you receive one summary of it instead of a confirmation per date.
+* Once the series exists, the form closes and one summary above the list replaces a confirmation
+  per date. It also names the skipped dates.
 * If the club cancels or moves dates of your series, you receive one message covering all of them.
 
 ![The series form with courts, booking type, period and weekdays.](../screenshots/en/series-form.png)
