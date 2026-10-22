@@ -1316,13 +1316,11 @@ test("given a run with leaking artefacts, when secured, then it passes once noth
   } finally { rmSync(run, { recursive: true, force: true }); }
 });
 
-test("given the runner, when its phases are read, then every Playwright phase is followed by securing the run directory", () => {
+test("given the runner, when its phases are read, then the matrix only masks and the postflight and report fail on a leak", () => {
   // given
   const source = readFileSync(new URL("../acceptance/run.mjs", import.meta.url), "utf8");
   // then
-  const runs = source.match(/(?<!function )playwright\(run, [^)]*\)/g) ?? [];
-  const secured = source.match(/(?<!function )playwright\(run, [^)]*\)[^\n]*\n\s*secureRun\(run, config\.password\)/g) ?? [];
-  assert.ok(runs.length >= 2, "the runner starts the matrix and the postflight");
-  assert.equal(secured.length, runs.length, "the run directory is secured right after each Playwright phase");
+  assert.match(source, /exit = playwright\(run, projects\);\n\s*redactRun\(run, config\.password\);/, "the matrix masks its artefacts and still lets the postflight clean up");
+  assert.match(source, /exit = playwright\(run, \["postflight"\]\) \|\| exit;\n\s*secureRun\(run, config\.password\);/, "the postflight fails the run on a leak");
   assert.match(source, /phase === "report"\) \{\n\s*secureRun\(run, config\.password\)/, "the report phase secures a run before it reads it");
 });

@@ -196,6 +196,11 @@ A run writes into its own directory under `build/acceptance/` and refuses a dire
 holds results. It waits until the load average is below `loadLimit`, then runs setup, discovery
 and preflight, the journeys on all ten profiles, the postflight and the report.
 
+Playwright writes typed text into a failed test's `error-context.md` and `trace.zip`. After the
+journeys the runner masks every password the harness typed in the run directory, trace entries
+included. After the postflight and before the report it fails the run if any text file or trace
+entry still holds the shared password, or if a trace cannot be read.
+
 - `--phase matrix` runs only the journeys; `--project <profile>` narrows them.
 - `--phase postflight --run <dir>` cleans up after an interrupted run.
 - `--phase report --run <dir>` renders the report again, for example after the review.
