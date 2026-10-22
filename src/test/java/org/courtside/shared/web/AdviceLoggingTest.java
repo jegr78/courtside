@@ -21,10 +21,12 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.UncategorizedSQLException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.http.converter.HttpMessageNotWritableException;
 import org.springframework.mock.http.MockHttpInputMessage;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.ServletRequestBindingException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
@@ -298,6 +300,64 @@ class AdviceLoggingTest {
                     .contains("500 INTERNAL_SERVER_ERROR", "urn:courtside:error:internal-error")
                     .doesNotContain("database unavailable");
             assertThat(causeChainOf(event)).contains("database unavailable");
+        });
+    }
+
+    @Test
+    void givenAFrameworkFailureThatIsNoRejection_whenItIsAnswered_thenTheWarnLineCarriesItsCause() {
+        // given
+        HttpMessageNotWritableException failure = new HttpMessageNotWritableException(
+                "could not write", new IOException("broken pipe"));
+
+        // when
+        new SharedExceptionHandler(mock(ProblemTraceReference.class), mock(SecurityEventLog.class))
+                .handleFrameworkRejection(failure);
+
+        // then
+        assertThat(sharedAppender.list).singleElement().satisfies(event -> {
+            assertThat(event.getLevel()).isEqualTo(Level.WARN);
+            assertThat(event.getFormattedMessage())
+                    .contains("500 INTERNAL_SERVER_ERROR", "urn:courtside:error:internal-error");
+            assertThat(causeChainOf(event))
+                    .as("a 500 without its exception leaves the operator nothing to find the cause by")
+                    .contains("could not write", "broken pipe");
+        });
+    }
+
+    @Test
+    void givenAStatementTimeout_whenItIsAnswered_thenTheWarnLineCarriesItsCause() {
+        // given
+        org.springframework.dao.QueryTimeoutException failure =
+                new org.springframework.dao.QueryTimeoutException("statement canceled");
+
+        // when
+        new SharedExceptionHandler(mock(ProblemTraceReference.class), mock(SecurityEventLog.class))
+                .handleStatementTimeout(failure);
+
+        // then
+        assertThat(sharedAppender.list).singleElement().satisfies(event -> {
+            assertThat(event.getLevel()).isEqualTo(Level.WARN);
+            assertThat(causeChainOf(event))
+                    .as("every 5xx is an incident and logs the exception that caused it")
+                    .contains("statement canceled");
+        });
+    }
+
+    @Test
+    void givenAFrameworkRejectionOfTheRequest_whenItIsAnswered_thenTheLineCarriesNoException() {
+        // given
+        ServletRequestBindingException rejection = new ServletRequestBindingException("missing header");
+
+        // when
+        new SharedExceptionHandler(mock(ProblemTraceReference.class), mock(SecurityEventLog.class))
+                .handleFrameworkRejection(rejection);
+
+        // then
+        assertThat(sharedAppender.list).singleElement().satisfies(event -> {
+            assertThat(event.getFormattedMessage()).contains("400 BAD_REQUEST");
+            assertThat(event.getThrowableProxy())
+                    .as("a refused request is an expected outcome and logs no stack trace")
+                    .isNull();
         });
     }
 
