@@ -155,3 +155,37 @@ it("given content composed of its own sections, when the dialog opens, then the 
   expect(dialog, "a composed dialog still draws its own surface").toHaveClass("surface-panel");
   expect(dialog.querySelector("[data-testid='dialog-body']"), "a composed dialog brings its own body").toBeNull();
 });
+
+it("given a dialog opened from inside another, when Escape is pressed, then only the inner one closes", async () => {
+  // given
+  const outerClosed = vi.fn();
+  const innerClosed = vi.fn();
+  render(<Modal labelledBy="outer" closed={outerClosed}>
+    <h2 id="outer">Form</h2>
+    <Modal labelledBy="inner" closed={innerClosed}>
+      <h2 id="inner">Confirm</h2>
+      <input data-testid="inner-field" />
+    </Modal>
+  </Modal>);
+  screen.getByTestId("inner-field").focus();
+
+  // when
+  await userEvent.keyboard("{Escape}");
+
+  // then
+  expect(innerClosed, "the inner dialog closes").toHaveBeenCalledTimes(1);
+  expect(outerClosed, "the outer dialog stays open").not.toHaveBeenCalled();
+});
+
+it("given a dialog open, when a second one opens, then both lie on the body in opening order", () => {
+  // given / when
+  render(<>
+    <Modal labelledBy="first" closed={vi.fn()} testId="first"><h2 id="first">First</h2></Modal>
+    <Modal labelledBy="second" closed={vi.fn()} testId="second"><h2 id="second">Second</h2></Modal>
+  </>);
+
+  // then
+  const overlays = Array.from(document.body.children).filter((child) => child.getAttribute("data-testid") === "modal-overlay");
+  expect(overlays.map((overlay) => overlay.querySelector("[role=dialog]")?.getAttribute("data-testid")),
+    "each dialog lies directly on the body in opening order").toEqual(["first", "second"]);
+});
