@@ -2,7 +2,6 @@
 
 ## 0.3.0 (2026-10-18)
 
-
 ### Features
 
 * export the audit log and the message log from the administration UI ([#1547](https://github.com/jegr78/courtside/issues/1547)) ([ea091dc](https://github.com/jegr78/courtside/commit/ea091dcbcfdb3e4a7b5d8635ad2423796b0d289a))
@@ -20,8 +19,20 @@
 
 ### Bug fixes
 
+* **booking:** refuse a withdrawal from a cancelled booking ([#1606](https://github.com/jegr78/courtside/issues/1606)) ([bd8267a](https://github.com/jegr78/courtside/commit/bd8267a49fe91f9b83f5ccf85b8e07b9f758adaf)), closes [#1595](https://github.com/jegr78/courtside/issues/1595)
+* **booking:** withdraw from a booking only under its row lock ([#1638](https://github.com/jegr78/courtside/issues/1638)) ([0b4c2b4](https://github.com/jegr78/courtside/commit/0b4c2b4aff21e3c0661cfcdcbbae644518e4d3e7)), closes [#1630](https://github.com/jegr78/courtside/issues/1630)
+* call the messages area Nachrichten and Messages wherever it is named ([#1611](https://github.com/jegr78/courtside/issues/1611)) ([8e3acde](https://github.com/jegr78/courtside/commit/8e3acde55b150cf6f127d3e387431d1ccf3c3382))
+* choose the nightly upgrade origin again when retention deleted it before the pull ([#1621](https://github.com/jegr78/courtside/issues/1621)) ([f662bfa](https://github.com/jegr78/courtside/commit/f662bfa1bf42945191f457c8168d7408285b6455))
+* **frontend:** judge which occurrences a cancellation reaches when the dialog opens ([#1641](https://github.com/jegr78/courtside/issues/1641)) ([b9f5530](https://github.com/jegr78/courtside/commit/b9f5530e1dba08fa86b87c70ecdee526a01c4549)), closes [#1631](https://github.com/jegr78/courtside/issues/1631)
+* **frontend:** keep export selects inside their section and show the whole filler count placeholder ([#1609](https://github.com/jegr78/courtside/issues/1609)) ([84aaa28](https://github.com/jegr78/courtside/commit/84aaa288ba1d82bb5ece6a9f113a73a82949478e))
+* **frontend:** keep the booking title and the plan's first row clear on phones ([#1612](https://github.com/jegr78/courtside/issues/1612)) ([50ffed7](https://github.com/jegr78/courtside/commit/50ffed70a45ef273267fbca19bf33cc6a9947385))
+* **frontend:** keep the support reference on refusals that report a page defect ([#1640](https://github.com/jegr78/courtside/issues/1640)) ([9a0497a](https://github.com/jegr78/courtside/commit/9a0497a60c839ea0eeceaa70852e361193461ef0)), closes [#1629](https://github.com/jegr78/courtside/issues/1629)
+* **frontend:** list only occurrences the series cancellation reaches ([#1618](https://github.com/jegr78/courtside/issues/1618)) ([3e4dff9](https://github.com/jegr78/courtside/commit/3e4dff9c23ee6d88d8fb158720f0cfbfd73cc15f)), closes [#1610](https://github.com/jegr78/courtside/issues/1610)
+* **frontend:** show a correctable refusal without a support reference ([#1615](https://github.com/jegr78/courtside/issues/1615)) ([7f53bd8](https://github.com/jegr78/courtside/commit/7f53bd8abd42d3643b55c78dae267b56b576f2ba))
+* **frontend:** show each account recovery answer under the form that was sent ([#1626](https://github.com/jegr78/courtside/issues/1626)) ([c4e757e](https://github.com/jegr78/courtside/commit/c4e757efa328e3b2b1a16f6b7f3c1a038508de70)), closes [#1616](https://github.com/jegr78/courtside/issues/1616)
+* keep a request timer for every route the application serves ([#1605](https://github.com/jegr78/courtside/issues/1605)) ([d139c0a](https://github.com/jegr78/courtside/commit/d139c0ab9afd2d42dad353658235768512513cae))
+* word the appointment dialogs for what they actually affect ([#1608](https://github.com/jegr78/courtside/issues/1608)) ([33fd183](https://github.com/jegr78/courtside/commit/33fd1838f5cbfd4ec431f18e8e836a2da9c22280))
 * **frontend:** keep My bookings listed while it reloads after a cancellation ([#1587](https://github.com/jegr78/courtside/issues/1587)) ([de51894](https://github.com/jegr78/courtside/commit/de51894001b6889ce985b24980be2d1bed9de59c))
-* **frontend:** keep My bookings listed while the list reloads after a cancellation ([de51894](https://github.com/jegr78/courtside/commit/de51894001b6889ce985b24980be2d1bed9de59c))
 * **frontend:** rest the court plan's day strip on whole items on phones ([#1591](https://github.com/jegr78/courtside/issues/1591)) ([c695279](https://github.com/jegr78/courtside/commit/c69527929e1adee0299f9badd3a5c7aee02d6aa8))
 * **frontend:** show My bookings only once its first load has answered ([#1590](https://github.com/jegr78/courtside/issues/1590)) ([a14b086](https://github.com/jegr78/courtside/commit/a14b086f41cf9f9a255a0644a7bbf6fa674dfa59))
 * **frontend:** show the app's own version in the footer when the server cannot answer ([#1588](https://github.com/jegr78/courtside/issues/1588)) ([ffcfcf8](https://github.com/jegr78/courtside/commit/ffcfcf8b91d032bfe940a2e246b00c04f631f623))
@@ -30,17 +41,18 @@
 * keep selects that list club-entered names inside a phone screen ([#1585](https://github.com/jegr78/courtside/issues/1585)) ([b5d6d68](https://github.com/jegr78/courtside/commit/b5d6d680836acc28c65b15b19d5ac256d696e61c))
 * read the court plan's week in one request per kind instead of one per day ([#1584](https://github.com/jegr78/courtside/issues/1584)) ([8b9cae4](https://github.com/jegr78/courtside/commit/8b9cae4b8de4092296a3370720e41ba5e6f016c8))
 * start a new holiday with the regular hours of its first day instead of closed ([#1576](https://github.com/jegr78/courtside/issues/1576)) ([868b311](https://github.com/jegr78/courtside/commit/868b311550780f8da0d1f24cd67f4ef511449383))
-
 * **frontend:** give every dialog its own surface ([#1565](https://github.com/jegr78/courtside/issues/1565)) ([59c8f4d](https://github.com/jegr78/courtside/commit/59c8f4dcff1cb2384ac876fbf6abdd474d5a1d67))
 * **frontend:** keep the administration navigation within the desktop window ([#1563](https://github.com/jegr78/courtside/issues/1563)) ([e0bbc89](https://github.com/jegr78/courtside/commit/e0bbc893f6e80c0dde1c4388640a7559bb09d033))
 * **security:** derive the active assessment's request budgets from the API instead of fixed shares ([#1551](https://github.com/jegr78/courtside/issues/1551)) ([bca79f6](https://github.com/jegr78/courtside/commit/bca79f6d450ce96945438088b54b55d9e8fdf25b))
-* wait for the stopped app to exit before the smoke goes on ([8571d0b](https://github.com/jegr78/courtside/commit/8571d0bb853f5304587a8a09af48517a08eccec3))
 * wait for the stopped app to exit before the UAT smoke goes on ([#1543](https://github.com/jegr78/courtside/issues/1543)) ([8571d0b](https://github.com/jegr78/courtside/commit/8571d0bb853f5304587a8a09af48517a08eccec3))
 * **web:** replace the redundant court plan intro heading with a sign-in notice ([#1545](https://github.com/jegr78/courtside/issues/1545)) ([b21b692](https://github.com/jegr78/courtside/commit/b21b6925a2f7f01c9f86d3e2083edf04d96e23fb))
 
+### Documentation
+
+* name the messages area in the guide indexes and pin only the pointer phrase in mails ([#1642](https://github.com/jegr78/courtside/issues/1642)) ([372eeeb](https://github.com/jegr78/courtside/commit/372eeebf0cc093ff0d7108b1e04114aec7c9e473))
+
 ### Build and dependencies
 
-* **deps-dev:** bump org.codehaus.mojo:versions-maven-plugin ([0e7d569](https://github.com/jegr78/courtside/commit/0e7d56917a80ffcfdcd3337041bdb9e1ee669cb7))
 * **deps-dev:** bump org.codehaus.mojo:versions-maven-plugin from 2.22.0 to 2.23.0 ([#1555](https://github.com/jegr78/courtside/issues/1555)) ([0e7d569](https://github.com/jegr78/courtside/commit/0e7d56917a80ffcfdcd3337041bdb9e1ee669cb7))
 * **deps:** bump actions/setup-java from 6.0.1 to 6.1.0 ([#1558](https://github.com/jegr78/courtside/issues/1558)) ([a38b015](https://github.com/jegr78/courtside/commit/a38b0153e1958643c382317d40fa6dcfa88157f3))
 * **deps:** update the frontend dependencies, Playwright 1.64 and the deployment images ([#1561](https://github.com/jegr78/courtside/issues/1561)) ([5f8fad4](https://github.com/jegr78/courtside/commit/5f8fad450f4e3cf916529dc6c4ae580d6aee5870))
