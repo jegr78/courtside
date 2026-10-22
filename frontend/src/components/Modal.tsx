@@ -1,4 +1,5 @@
 import { type KeyboardEvent, type ReactNode, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { DialogBody } from "./DialogBody";
 
 const widths = { md: "max-w-md", lg: "max-w-lg", xl: "max-w-xl" } as const;
@@ -27,6 +28,7 @@ export function Modal({ labelledBy, closed, width = "md", composed = false, test
   function handleKeyDown(event: KeyboardEvent) {
     if (event.key === "Escape") {
       event.preventDefault();
+      event.stopPropagation();
       closed();
       return;
     }
@@ -39,7 +41,8 @@ export function Modal({ labelledBy, closed, width = "md", composed = false, test
     focusOnward(focusable, document.activeElement as HTMLElement, event.shiftKey ? -1 : 1);
   }
 
-  return <div
+  // The body hosts every modal in the order it opened, so a later one always lies above an earlier one.
+  return createPortal(<div
     role="presentation"
     data-testid="modal-overlay"
     className="fixed inset-0 z-20 flex items-center justify-center bg-(--cs-overlay) p-4"
@@ -49,7 +52,7 @@ export function Modal({ labelledBy, closed, width = "md", composed = false, test
          className={`surface-panel flex max-h-full w-full ${widths[width]} flex-col overflow-hidden rounded-2xl border shadow-2xl`}>
       {composed ? children : <DialogBody>{children}</DialogBody>}
     </div>
-  </div>;
+  </div>, document.body);
 }
 
 function reachableControls(dialog: HTMLElement | null): HTMLElement[] {
