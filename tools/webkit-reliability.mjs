@@ -355,8 +355,8 @@ export function compareIsolationVariants(records) {
 }
 
 function readPinnedBrowserImage() {
-  const setup = readFileSync(resolve(frontend, "e2e", "global-setup.ts"), "utf8");
-  const image = /mcr\.microsoft\.com\/playwright:v[^"\s]+@sha256:[0-9a-f]{64}/.exec(setup)?.[0];
+  const images = readFileSync(resolve(frontend, "e2e", "container-images.ts"), "utf8");
+  const image = /mcr\.microsoft\.com\/playwright:v[^"\s]+@sha256:[0-9a-f]{64}/.exec(images)?.[0];
   if (image === undefined) throw new Error("The pinned Playwright browser image could not be read");
   return image;
 }

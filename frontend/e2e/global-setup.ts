@@ -36,6 +36,7 @@ import {
 } from "./resource-timeline";
 import { ResourceSampling } from "./resource-sampling";
 import { browserLanguage } from "./browser-language";
+import { deployedMailSinkImage, deployedPostgresImage, deployedProxyImage, PINNED_BROWSER_IMAGE } from "./container-images";
 import {
   browserContainerLabels,
   ObservableGenericContainer,
@@ -63,8 +64,6 @@ function publishedLanguages(): string[] {
   });
 }
 
-const PINNED_BROWSER_IMAGE =
-  "mcr.microsoft.com/playwright:v1.64.0-noble@sha256:06a9939e57531807f8d5fd76ce44b53165ffb7d7501d87ab10e285c20b1e971f";
 // The name the certificate is issued for, so browsers reach the proxy the way a member reaches a club.
 const CLUB_HOST = "courtside.test";
 const ATTACKER_HOST = "attacker.test";
@@ -73,29 +72,6 @@ export const PROXY_BOUNDARY_HOST = "proxy-boundary.test";
 // A cadence a journey never reaches, rather than "-": that switches the cleanup off, and
 // an instance is built to refuse to start when it is off.
 const JOURNEY_SESSION_CLEANUP_CRON = "0 0 0 29 2 *";
-
-// Qualifying against something a club does not run proves nothing about what it does, so every
-// reference here is read from the deployment rather than repeated beside it.
-function deployedImage(composeFile: string, pattern: RegExp, what: string): string {
-  const compose = resolve(`../deploy/${composeFile}`);
-  const found = pattern.exec(readFileSync(compose, "utf8"));
-  if (!found) throw new Error(`${compose} names no ${what} image pinned by digest`);
-  return found[0];
-}
-
-function deployedPostgresImage(): string {
-  return deployedImage("compose.yaml", /postgres(?::[\w.-]+)?@sha256:[a-f0-9]{64}/, "PostgreSQL");
-}
-
-// The relay a journey reads is the one the deployment's mail smoke test already runs against.
-function deployedMailSinkImage(): string {
-  return deployedImage("compose.mail-smoke.yaml",
-    /axllent\/mailpit(?::[\w.-]+)?@sha256:[a-f0-9]{64}/, "Mailpit");
-}
-
-function deployedProxyImage(): string {
-  return deployedImage("compose.caddy.yaml", /caddy(?::[\w.-]+)?@sha256:[a-f0-9]{64}/, "Caddy");
-}
 
 // Courtside requires STARTTLS of every relay, and Mailpit offers it only when it holds a certificate.
 // It names every host Docker may report, so the journey does not lean on the trust exception.

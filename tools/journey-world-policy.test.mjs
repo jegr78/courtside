@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const setup = readFileSync(new URL("../frontend/e2e/global-setup.ts", import.meta.url), "utf8");
+const images = readFileSync(new URL("../frontend/e2e/container-images.ts", import.meta.url), "utf8");
 const frontendPackage = JSON.parse(readFileSync(new URL("../frontend/package.json", import.meta.url), "utf8"));
 const fixtures = readFileSync(new URL("../frontend/e2e/fixtures.ts", import.meta.url), "utf8");
 const playwright = readFileSync(new URL("../frontend/playwright.config.ts", import.meta.url), "utf8");
@@ -100,7 +101,7 @@ test("given Playwright starts browsers in a container, when its package changes,
   const packageRelease = frontendPackage.devDependencies["@playwright/test"];
 
   // when
-  const imageRelease = /mcr\.microsoft\.com\/playwright:v(?<release>\d+\.\d+\.\d+)-/.exec(setup)?.groups?.release;
+  const imageRelease = /mcr\.microsoft\.com\/playwright:v(?<release>\d+\.\d+\.\d+)-/.exec(images)?.groups?.release;
 
   // then
   assert.equal(imageRelease, packageRelease);

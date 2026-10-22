@@ -1,0 +1,12 @@
+name: Browser setup images
+description: Pulls every image the browser setup starts, retrying a failed registry request within the job's budget.
+
+runs:
+  using: composite
+  steps:
+    - name: Pull the browser setup images
+      shell: bash
+      working-directory: frontend
+      run: |
+        images="$(node e2e/container-images.ts)"
+        node ../tools/pull-images.mjs "$images"

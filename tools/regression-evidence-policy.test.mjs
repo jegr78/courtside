@@ -7,6 +7,7 @@ const fixtures = readFileSync(new URL("../frontend/e2e/fixtures.ts", import.meta
 const playwright = readFileSync(new URL("../frontend/playwright.config.ts", import.meta.url), "utf8");
 const eslint = readFileSync(new URL("../frontend/eslint.config.js", import.meta.url), "utf8");
 const setup = readFileSync(new URL("../frontend/e2e/global-setup.ts", import.meta.url), "utf8");
+const images = readFileSync(new URL("../frontend/e2e/container-images.ts", import.meta.url), "utf8");
 const snapshots = new URL("../frontend/e2e/visual-regression.spec.ts-snapshots/", import.meta.url);
 
 // The capture names come from the spec that takes them, so a surface added there needs no second list here.
@@ -43,7 +44,7 @@ test("given visual baselines, when running them on different hosts, then their p
   // taken once at startup rather than translated in front of the camera.
   assert.match(fixtures, /journeyService\.reset\(start, clubLanguage\(info\.project\.use\.locale\)\)/);
   assert.match(playwright, /name: "visual"/);
-  assert.match(setup, /mcr\.microsoft\.com\/playwright:[^"]*@sha256:/);
+  assert.match(images, /mcr\.microsoft\.com\/playwright:[^"]*@sha256:/);
   // Browsers reach the application through the same reverse proxy a club runs, read from the
   // deployment so that a literal here could not name a build the club does not run.
   assert.match(setup, /new GenericContainer\(deployedProxyImage\(\)\)/);
