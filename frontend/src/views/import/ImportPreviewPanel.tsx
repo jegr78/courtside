@@ -1,9 +1,11 @@
 import { useState, type ChangeEvent, type ReactNode } from "react";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
-import { api, type ImportPersonChange, type ImportPreview, type SnapshotMode } from "../../api/client";
+import { api, type ImportPersonChange, type ImportPreview, type ImportSource, type SnapshotMode } from "../../api/client";
 import { NotUtf8Error, readCsvHeader } from "../../import/read-csv";
+import { Alert } from "../../components/Alert";
 import { Button } from "../../components/Button";
+import { useReportedFailure } from "../../failures/useReportedFailure";
 import { isExpired } from "./previewState";
 import { violationMessage } from "../../api/problem-message";
 
@@ -18,12 +20,18 @@ function changed(change: ImportPersonChange, t: TFunction): string {
     .map(([field, value]) => `${t(`admin.import.field.${field}`)}: ${value}`).join(", ");
 }
 
-export function ImportPreviewPanel({ sourceId, sourceEncoding, preview, disabled, previewed, reportError }: {
+function unmappedColumns(preview: ImportPreview, columnMode: ImportSource["columnMode"], t: TFunction): string {
+  return preview.ignoredColumns
+    .map((column) => columnMode === "POSITION" ? t("admin.import.columnNumber", { position: column }) : column).join(", ");
+}
+
+export function ImportPreviewPanel({ sourceId, sourceEncoding, columnMode, preview, disabled, previewed, reportError }: {
   sourceId: string;
   sourceEncoding: string;
+  columnMode: ImportSource["columnMode"];
   preview: ImportPreview | undefined;
   disabled: boolean;
-  previewed: (preview: ImportPreview) => void;
+  previewed: (preview: ImportPreview | undefined) => void;
   reportError: (failure: unknown) => void;
 }) {
   const { t } = useTranslation();
@@ -33,6 +41,7 @@ export function ImportPreviewPanel({ sourceId, sourceEncoding, preview, disabled
   const [encodings, setEncodings] = useState<string[]>([]);
   const [asksEncoding, setAsksEncoding] = useState(false);
   const [pending, setPending] = useState(false);
+  const refusal = useReportedFailure();
 
   // The source answers for every upload; only a file that deviates from it carries its own answer.
   const encoding = override ?? sourceEncoding;
@@ -41,6 +50,7 @@ export function ImportPreviewPanel({ sourceId, sourceEncoding, preview, disabled
   async function chooseFile(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     setChosen(file);
+    refusal.clear();
     setOverride(undefined);
     setAsksEncoding(false);
     if (!file) return;
@@ -57,9 +67,13 @@ export function ImportPreviewPanel({ sourceId, sourceEncoding, preview, disabled
     if (pending || !chosen) return;
     setPending(true);
     try {
-      previewed(await api.createImportPreview(sourceId, chosen, mode, encoding));
+      const read = await api.createImportPreview(sourceId, chosen, mode, encoding);
+      refusal.clear();
+      previewed(read);
     } catch (failure) {
-      reportError(failure);
+      // A preview of an earlier file must not stand under this file's refusal as if it were its result.
+      previewed(undefined);
+      refusal.report(failure);
     } finally {
       setPending(false);
     }
@@ -96,6 +110,8 @@ export function ImportPreviewPanel({ sourceId, sourceEncoding, preview, disabled
       {t("admin.import.upload")}
     </Button>
 
+    {refusal.message && <Alert testId="snapshot-refusal">{refusal.message}</Alert>}
+
     {preview && <div className="grid gap-3 border-t pt-4">
       <p data-testid="preview-identity">
         {t("admin.import.previewIdentity", {
@@ -114,7 +130,7 @@ export function ImportPreviewPanel({ sourceId, sourceEncoding, preview, disabled
       </p>}
       <p data-testid="preview-accounts">{t("admin.import.accounts", { count: accountsOpenedBy(preview) })}</p>
       {preview.ignoredColumns.length > 0 && <p data-testid="preview-ignored-columns">
-        {t("admin.import.unmapped", { columns: preview.ignoredColumns.join(", ") })}
+        {t("admin.import.unmapped", { columns: unmappedColumns(preview, columnMode, t) })}
       </p>}
 
       <Section testId="changes" heading={t("admin.import.changes", { shown: preview.changes.length })}>

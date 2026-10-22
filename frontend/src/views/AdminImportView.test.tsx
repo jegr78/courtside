@@ -2,7 +2,7 @@ import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
-import { api, type ImportPreview, type ImportSource, type MembershipType } from "../api/client";
+import { api, ApiError, type ImportPreview, type ImportSource, type MembershipType } from "../api/client";
 import i18n from "../i18n";
 import { ClubConfigurationProvider } from "../club/ClubConfigurationProvider";
 import { WithClubConfiguration } from "../test/ClubConfiguration";
@@ -250,6 +250,76 @@ describe("AdminImportView", () => {
     // then
     expect(await screen.findByTestId("import-step-execution")).toHaveAttribute("aria-current", "step");
     expect(screen.getByTestId("import-step-preview")).toBeEnabled();
+  });
+
+  it("given a read snapshot, when a later file is refused, then the refusal stands at the upload and the earlier preview cannot be run", async () => {
+    // given
+    vi.spyOn(api, "importSources").mockResolvedValue([rosterSystem]);
+    vi.spyOn(api, "createImportPreview")
+      .mockResolvedValueOnce({ ...snapshot, rowCount: 3 })
+      .mockRejectedValueOnce(new ApiError(400, {
+        type: "urn:courtside:error:import-snapshot-unreadable", title: "Bad Request", status: 400,
+        violations: [{ code: "import.snapshot.columns.countChanged", params: { expected: 4, found: 3 } }]
+      }));
+    show();
+    await userEvent.click(await screen.findByTestId("source-choice-source-1"));
+    await readSnapshot();
+    await screen.findByTestId("execute-preview");
+
+    // when
+    await readSnapshot();
+
+    // then
+    const refusal = await screen.findByRole("alert");
+    expect(screen.getByTestId("import-part-preview"), "the refusal is shown at the upload that caused it").toContainElement(refusal);
+    expect(refusal).toHaveTextContent("3");
+    expect(screen.queryByTestId("preview-identity"), "the earlier preview is gone").not.toBeInTheDocument();
+    expect(screen.queryByTestId("execute-preview"), "no earlier preview can be run").not.toBeInTheDocument();
+    expect(screen.getByTestId("import-step-preview")).toHaveAttribute("aria-current", "step");
+  });
+
+  it("given a source just saved, when its first file is refused, then the saved notice makes way for the refusal", async () => {
+    // given
+    vi.spyOn(api, "importSources").mockResolvedValue([rosterSystem]);
+    vi.spyOn(api, "changeImportSource").mockResolvedValue(rosterSystem);
+    vi.spyOn(api, "createImportPreview").mockRejectedValue(new ApiError(400, {
+      type: "urn:courtside:error:import-snapshot-unreadable", title: "Bad Request", status: 400,
+      violations: [{ code: "import.snapshot.columns.countChanged", params: { expected: 4, found: 3 } }]
+    }));
+    show();
+    await userEvent.click(await screen.findByTestId("source-choice-source-1"));
+    await userEvent.type(await screen.findByTestId("source-name"), " 2");
+    await userEvent.click(screen.getByTestId("save-source"));
+    await screen.findByRole("status");
+
+    // when
+    await readSnapshot();
+
+    // then
+    await screen.findByRole("alert");
+    expect(screen.queryByRole("status"), "a notice of an earlier success does not stand beside the refusal").not.toBeInTheDocument();
+  });
+
+  it("given a refused file, when a readable one is uploaded, then the refusal makes way for its preview", async () => {
+    // given
+    vi.spyOn(api, "importSources").mockResolvedValue([rosterSystem]);
+    vi.spyOn(api, "createImportPreview")
+      .mockRejectedValueOnce(new ApiError(400, {
+        type: "urn:courtside:error:import-snapshot-unreadable", title: "Bad Request", status: 400,
+        violations: [{ code: "import.snapshot.columns.countChanged", params: { expected: 4, found: 3 } }]
+      }))
+      .mockResolvedValueOnce(snapshot);
+    show();
+    await userEvent.click(await screen.findByTestId("source-choice-source-1"));
+    await readSnapshot();
+    await screen.findByRole("alert");
+
+    // when
+    await readSnapshot();
+
+    // then
+    expect(await screen.findByTestId("preview-identity")).toBeInTheDocument();
+    expect(screen.queryByRole("alert"), "the refusal belongs to the earlier file").not.toBeInTheDocument();
   });
 
   it("given a snapshot the server has superseded, when it comes back, then the import stands on reading one again", async () => {

@@ -170,9 +170,13 @@ export function AdminImportView() {
         key={`preview-${chosen.id}`}
         sourceId={chosen.id}
         sourceEncoding={chosen.encoding}
+        columnMode={chosen.columnMode}
         preview={preview}
         disabled={pending}
-        previewed={setPreview}
+        previewed={(next) => {
+          setSuccess(undefined);
+          setPreview(next);
+        }}
         reportError={reportError}
       />
     </div>}
