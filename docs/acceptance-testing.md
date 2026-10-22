@@ -225,7 +225,9 @@ a holiday, season or court closure of the run is left.
 The harness starts no log or tunnel process. To attribute server log lines to journey steps, follow
 the instance's logs into the files `logs.app` and `logs.proxy` name for the duration of the run,
 for example with `docker logs -f --timestamps --since <start> <container> >> <file>` on the host
-that runs the instance.
+that runs the instance. The report reads only lines that start with the timestamp `--timestamps`
+writes. It names a file without such lines as not read, among the harness gaps, instead of counting
+it. The level of an ECS JSON line comes from its `log.level`.
 
 Contact sheets and report images need ImageMagick on `PATH`; without it the run skips the sheets
 and the report embeds the original screenshots.

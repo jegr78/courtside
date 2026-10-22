@@ -16,6 +16,16 @@ const esc = (value) => String(value ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&a
 const json = (path, fallback) => existsSync(path) ? JSON.parse(readFileSync(path, "utf8")) : fallback;
 const jsonl = (path) => existsSync(path) ? readFileSync(path, "utf8").trim().split("\n").filter(Boolean).map((line) => JSON.parse(line)) : [];
 
+export function serverLogSummary(logs, sources) {
+  if (!sources.length) return { counted: "No log files were configured.", files: [], unread: [] };
+  const unread = sources.filter((source) => source.state !== "read").map((source) => source.name);
+  const files = sources.map((source) => source.state === "missing" ? `${source.name}: file missing, not read`
+    : source.state === "unread" ? `${source.name}: ${source.lines} lines without the timestamp docker logs --timestamps writes, not read`
+    : `${source.name}: ${source.lines} lines, ${source.inWindow} in the run window`);
+  const counted = `${logs.length} WARN or ERROR lines${unread.length ? " in the files read" : ""}, ${logs.filter((line) => line.steps.length === 0).length} not attributed to a step.`;
+  return { counted, files, unread };
+}
+
 export function coverageOf(results) {
   const rows = new Map();
   const cells = { passed: 0, failed: 0, skipped: 0 };
@@ -83,8 +93,8 @@ function card(run, finding, images) {
 </article>`;
 }
 
-const listOf = (findings, assessment) => findings.filter((finding) => finding.review?.assessment === assessment)
-  .map((finding) => `<li><code>${esc(finding.key)}</code> ${esc(finding.title)}: ${esc(finding.review.reason)}</li>`).join("") || "<li>None.</li>";
+const listOf = (findings, assessment, more = []) => [...findings.filter((finding) => finding.review?.assessment === assessment)
+  .map((finding) => `<li><code>${esc(finding.key)}</code> ${esc(finding.title)}: ${esc(finding.review.reason)}</li>`), ...more].join("") || "<li>None.</li>";
 
 export function renderReport(run, config, { harnessCommit }) {
   const metrics = jsonl(join(run, "metrics.jsonl"));
@@ -94,6 +104,7 @@ export function renderReport(run, config, { harnessCommit }) {
   const lanes = json(join(run, "lanes.json"), { timeZone: "UTC", days: [] });
   const discovery = json(join(run, "discovery.json"), { lastNames: {} });
   const logs = json(join(run, "log-attribution.json"), []);
+  const serverLogs = serverLogSummary(logs, json(join(run, "log-sources.json"), []));
   const postflight = json(join(run, "postflight.json"), null);
   const cleanup = json(join(run, "cleanup.json"), null);
   const surfaces = [...new Map(jsonl(join(run, "role-surfaces.jsonl")).map((row) => [row.key, row])).values()];
@@ -183,8 +194,9 @@ ${coverage.rows.map((row) => `<tr><td>${esc(row.flow)}</td>${projects.map((p) =>
 <section><h2>Administration surfaces per role</h2><ul>${surfaces.map((s) => `<li><b>${esc(s.key)}</b>: ${s.links.map((l) => esc(l.replace(/^admin-|-link$/g, ""))).join(", ") || "club appointments only"}</li>`).join("") || "<li>None recorded.</li>"}</ul></section>
 <section><h2>Not checked</h2><ul>${notChecked.map((line) => `<li>${esc(line)}</li>`).join("")}</ul></section>
 <section><h2>Rejected suspicions</h2><ul>${listOf(reviewed.findings, "capture-artefact")}</ul></section>
-<section><h2>Harness gaps</h2><ul>${listOf(reviewed.findings, "harness-gap")}${observations.map((o) => `<li>${esc(o.project)}: ${esc(o.note)}</li>`).join("")}</ul></section>
-<section><h2>Server logs</h2><p>${logs.length} WARN or ERROR lines, ${logs.filter((line) => line.steps.length === 0).length} not attributed to a step${Object.keys(config.logs).length ? "" : "; no log files were configured"}.</p></section>
+<section><h2>Harness gaps</h2><ul>${listOf(reviewed.findings, "harness-gap", [...observations.map((o) => `<li>${esc(o.project)}: ${esc(o.note)}</li>`),
+  ...serverLogs.unread.map((name) => `<li>The server log ${esc(name)} was not read.</li>`)])}</ul></section>
+<section><h2>Server logs</h2><p>${esc(serverLogs.counted)}</p>${serverLogs.files.length ? `<ul>${serverLogs.files.map((line) => `<li>${esc(line)}</li>`).join("")}</ul>` : ""}</section>
 <section><h2>Cleanup</h2><p>${postflight ? `Bookings of this run left in reserved slots: ${postflight.left.length}; club bookings in reserved slots, left untouched: ${(postflight.foreign ?? []).length}; weeks of this run removed: ${postflight.weeks.length}; club weeks left untouched: ${(postflight.foreignWeeks ?? []).length}.` : "Postflight did not run."} ${(preflight.weekendConflicts ?? []).length ? `Club bookings the weekend journeys notified their bookers about: ${preflight.weekendConflicts.length}.` : ""} ${cleanup ? `Bookings of this run left in the window: ${cleanup.diff.flatMap((d) => d.ours ?? []).length}.` : ""}</p></section>
 <section><h2>Raw page checks</h2><details><summary>${metrics.length} captures, unfiltered</summary><div class="scroll"><table><thead><tr><th>Grade</th><th>Kind</th><th>Check</th><th>Count</th><th>Profiles</th></tr></thead><tbody>
 ${rawGroups(metrics).map((g) => `<tr><td>${SEVERITY[g.severity]}</td><td>${esc(g.kind)}</td><td>${esc(g.title)}</td><td>${g.n}</td><td>${[...g.projects].map(esc).join(", ")}</td></tr>`).join("")}
