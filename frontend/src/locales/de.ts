@@ -640,7 +640,6 @@ const de = {
   "series.create_one": "Einen Termin anlegen",
   "series.create_other": "{{count}} Termine anlegen",
   "series.created": "Angelegte Termine: {{created}}",
-  "series.createdSuccess": "Terminserie angelegt.",
   "series.skipped": "Nicht angelegt: {{skipped}}",
   "series.courtTaken": "Der Platz ist zu dieser Zeit schon belegt.",
   "admin.impact.ask": "Betroffene Buchungen anzeigen",

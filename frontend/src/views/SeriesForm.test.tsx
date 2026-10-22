@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api, type PublicCourt, type SeriesPreview } from "../api/client";
 import i18n from "../i18n";
-import { SeriesForm } from "./SeriesForm";
+import { SeriesCreatedNotice, SeriesForm } from "./SeriesForm";
 
 const courts: PublicCourt[] = [
   { id: "court-1", number: 1, name: "Centre Court" },
@@ -227,21 +227,30 @@ describe("SeriesForm", () => {
     expect(await screen.findByTestId("series-truncated")).toHaveTextContent("2026-12-31");
   });
 
-  it("given occurrences a conflict kept out, when the series is created, then each skipped date is named", async () => {
+  it("given occurrences a conflict kept out, when the series is created, then the caller receives each skipped date and the duration to name them", async () => {
     // given
+    const answer = { seriesId: "series-1", bookingIds: ["booking-1"], skipped: ["2026-09-14T16:00:00Z"] };
     vi.spyOn(api, "previewSeries").mockResolvedValue(preview);
-    vi.spyOn(api, "createSeries").mockResolvedValue({
-      seriesId: "series-1", bookingIds: ["booking-1"], skipped: ["2026-09-14T16:00:00Z"]
-    });
-    show();
+    vi.spyOn(api, "createSeries").mockResolvedValue(answer);
+    const created = show();
     await describeRule();
     await userEvent.click(screen.getByTestId("preview-series"));
 
     // when
     await userEvent.click(await screen.findByTestId("confirm-series"));
 
+    // then
+    await waitFor(() => expect(created).toHaveBeenCalledWith(answer, 60));
+    expect(screen.queryByTestId("series-form"), "the form closes once the series exists").not.toBeInTheDocument();
+  });
+
+  it("given a series with a skipped date, when its notice is shown, then each skipped date is named", () => {
+    // when
+    const { container } = render(<SeriesCreatedNotice result={{ seriesId: "series-1", bookingIds: ["booking-1"], skipped: ["2026-09-14T16:00:00Z"] }}
+      durationMinutes={60} timeZone="Europe/Berlin" />);
+
     // then — one blocked date does not undo the rest, and the caller has to see which one it was
-    expect(await screen.findByTestId("series-created")).toHaveRole("status");
+    expect(container).toHaveTextContent(i18n.t("series.created", { created: 1 }));
     expect(screen.getByTestId("series-skipped")).toHaveTextContent("14");
   });
 

@@ -5,7 +5,6 @@ import {
   type PublicCourt, type SeriesCreated, type SeriesPreview, type SeriesRuleRequest
 } from "../api/client";
 import { Button } from "../components/Button";
-import { SuccessFeedback } from "../components/SuccessFeedback";
 import { TextField } from "../components/TextField";
 import { formatBookingPeriod } from "../time/clubZone";
 import { violationMessage } from "../api/problem-message";
@@ -64,7 +63,7 @@ function chosenOf(preview: SeriesPreview): string[] {
 export function SeriesForm({ timeZone, courts, created, reportError }: {
   timeZone: string;
   courts: PublicCourt[];
-  created: () => Promise<void>;
+  created: (result: SeriesCreated, durationMinutes: number) => Promise<void>;
   reportError: (failure: unknown) => void;
 }) {
   const { t, i18n } = useTranslation();
@@ -74,7 +73,6 @@ export function SeriesForm({ timeZone, courts, created, reportError }: {
   const [draft, setDraft] = useState<Draft>(EMPTY);
   const [preview, setPreview] = useState<SeriesPreview>();
   const [chosen, setChosen] = useState<string[]>([]);
-  const [result, setResult] = useState<SeriesCreated>();
   const [pending, setPending] = useState(false);
   const opener = useRef<HTMLButtonElement>(null);
   const restoresFocus = useRef(false);
@@ -101,7 +99,6 @@ export function SeriesForm({ timeZone, courts, created, reportError }: {
     setDraft((current) => ({ ...current, ...patch }));
     setPreview(undefined);
     setChosen([]);
-    setResult(undefined);
   }
 
   async function readPreview() {
@@ -110,7 +107,6 @@ export function SeriesForm({ timeZone, courts, created, reportError }: {
       const answer = await api.previewSeries(ruleOf(draft));
       setPreview(answer);
       setChosen(chosenOf(answer));
-      setResult(undefined);
     } catch (failure) {
       reportError(failure);
     } finally {
@@ -122,10 +118,14 @@ export function SeriesForm({ timeZone, courts, created, reportError }: {
     setPending(true);
     try {
       const body: CreateSeriesRequest = { ...ruleOf(draft), confirmedStarts: chosen };
-      setResult(await api.createSeries(body));
+      const answer = await api.createSeries(body);
+      const durationMinutes = draft.durationMinutes;
+      restoresFocus.current = true;
+      setOpen(false);
+      setDraft(EMPTY);
       setPreview(undefined);
       setChosen([]);
-      await created();
+      await created(answer, durationMinutes);
     } catch (failure) {
       reportError(failure);
     } finally {
@@ -198,7 +198,7 @@ export function SeriesForm({ timeZone, courts, created, reportError }: {
       <Button variant="secondary" data-testid="preview-series" disabled={pending || !isComplete(draft)} type="button" onClick={() => void readPreview()}>
         {t("series.preview")}
       </Button>
-      <Button variant="secondary" data-testid="cancel-series" type="button" onClick={() => { restoresFocus.current = true; setOpen(false); setDraft(EMPTY); setPreview(undefined); setChosen([]); setResult(undefined); }}>
+      <Button variant="secondary" data-testid="cancel-series" type="button" onClick={() => { restoresFocus.current = true; setOpen(false); setDraft(EMPTY); setPreview(undefined); setChosen([]); }}>
         {t("admin.cancel")}
       </Button>
     </div>
@@ -222,18 +222,27 @@ export function SeriesForm({ timeZone, courts, created, reportError }: {
       </Button>
     </div>}
 
-    {result && <SuccessFeedback testId="series-created"><div className="grid gap-1">
-      <p>{t("series.created", { created: result.bookingIds.length })}</p>
-      {result.skipped.length > 0 && <div data-testid="series-skipped">
-        <p>{t("series.skipped", { skipped: result.skipped.length })}</p>
-        <ul className="grid gap-1">
-          {result.skipped.map((start) => <li key={start} data-testid={`series-skipped-${start}`}>
-            {formatBookingPeriod(start, new Date(Date.parse(start) + draft.durationMinutes * 60_000).toISOString(), i18n.language, timeZone)}
-          </li>)}
-        </ul>
-      </div>}
-    </div></SuccessFeedback>}
   </section>;
+}
+
+
+export function SeriesCreatedNotice({ result, durationMinutes, timeZone }: {
+  result: SeriesCreated;
+  durationMinutes: number;
+  timeZone: string;
+}) {
+  const { t, i18n } = useTranslation();
+  return <div className="grid gap-1">
+    <p>{t("series.created", { created: result.bookingIds.length })}</p>
+    {result.skipped.length > 0 && <div data-testid="series-skipped">
+      <p>{t("series.skipped", { skipped: result.skipped.length })}</p>
+      <ul className="grid gap-1">
+        {result.skipped.map((start) => <li key={start} data-testid={`series-skipped-${start}`}>
+          {formatBookingPeriod(start, new Date(Date.parse(start) + durationMinutes * 60_000).toISOString(), i18n.language, timeZone)}
+        </li>)}
+      </ul>
+    </div>}
+  </div>;
 }
 
 function blockedBy(occurrence: Occurrence, t: (key: string, params?: Record<string, unknown>) => string): string {

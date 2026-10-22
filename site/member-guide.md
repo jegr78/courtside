@@ -291,7 +291,8 @@ Beachte dabei:
   oder *Ganze Serie* wählen.
 * Vor einer Verschiebung zeigt Courtside die betroffenen Termine und mögliche Konflikte.
 * Serien enthalten keine Spielerlisten. Im Platzplan erscheinen sie als belegte Zeit.
-* Nach dem Anlegen bekommst du eine Zusammenfassung der Serie statt einer Bestätigung pro Termin.
+* Nach dem Anlegen schließt sich das Formular, und über der Liste steht eine Zusammenfassung der Serie
+  statt einer Bestätigung pro Termin. Sie nennt auch die übersprungenen Termine.
 * Storniert oder verlegt der Verein Termine deiner Serie, bekommst du eine Nachricht über alle
   betroffenen Termine.
 

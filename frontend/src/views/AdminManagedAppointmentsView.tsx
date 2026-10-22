@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   api, type BookingGrid, type ManagedAppointment, type ManagedAppointmentView, type ManagedSeriesFacts,
@@ -11,7 +11,7 @@ import { useReportedFailure } from "../failures/useReportedFailure";
 import { dateInTimeZone, formatBookingPeriod, formatBookingTimeRange } from "../time/clubZone";
 import { dateTimeFormatter } from "../time/dateTimeFormatter";
 import { CancelDialog, ManagedAppointmentDialog, MoveDialog } from "./AppointmentDialogs";
-import { SeriesForm } from "./SeriesForm";
+import { SeriesCreatedNotice, SeriesForm } from "./SeriesForm";
 
 const PAGE_SIZE = 20;
 
@@ -37,7 +37,7 @@ export function AdminManagedAppointmentsView({ managesAppointments, createsSerie
   const [cancelling, setCancelling] = useState<ManagedAppointment>();
   const [moving, setMoving] = useState<ManagedAppointment>();
   const [maxBookingMinutes, setMaxBookingMinutes] = useState<number>();
-  const [success, setSuccess] = useState<string>();
+  const [success, setSuccess] = useState<{ testId: string; body: ReactNode }>();
   const [openActionsId, setOpenActionsId] = useState<string>();
   const loadVersion = useRef(0);
   const { message: error, report, clear } = useReportedFailure();
@@ -133,7 +133,11 @@ export function AdminManagedAppointmentsView({ managesAppointments, createsSerie
         {t(managesAppointments ? "managedAppointments.description" : "managedAppointments.seriesOnlyDescription")}</p>
     </div>
     {createsSeries && grid && courtsReady && <SeriesForm timeZone={grid.timeZone} courts={courts}
-      created={async () => { setSuccess(undefined); await load(); setSuccess(t("series.createdSuccess")); }}
+      created={async (result, durationMinutes) => {
+        setSuccess(undefined);
+        await load();
+        setSuccess({ testId: "series-created", body: <SeriesCreatedNotice result={result} durationMinutes={durationMinutes} timeZone={grid.timeZone} /> });
+      }}
       reportError={(failure) => { setSuccess(undefined); report(failure); }} />}
 
     {managesAppointments && <>
@@ -167,7 +171,7 @@ export function AdminManagedAppointmentsView({ managesAppointments, createsSerie
 
     {error && <div className="mt-4"><LoadFailure message={error} retry={() => { clear(); void load(); }} /></div>}
     {referenceError && <div className="mt-4"><LoadFailure message={referenceError} retry={() => { clearReference(); void loadReferenceData(); }} /></div>}
-    {success && <div className="mt-4"><SuccessFeedback testId="managed-success">{success}</SuccessFeedback></div>}
+    {success && <div className="mt-4"><SuccessFeedback testId={success.testId}>{success.body}</SuccessFeedback></div>}
     {managesAppointments && (loading ? <p className="mt-6" role="status">{t("status.loading")}</p>
       : groups.length === 0 ? <p data-testid="managed-empty" className="text-muted mt-6">
         {t(createsSeries ? "managedAppointments.empty" : "managedAppointments.emptyWithoutSeries")}</p>
@@ -195,10 +199,10 @@ export function AdminManagedAppointmentsView({ managesAppointments, createsSerie
     {grid && cancelling && <CancelDialog booking={cancelling}
       seriesBookings={appointments.filter((appointment) => appointment.seriesId === cancelling.seriesId && appointment.status === "CONFIRMED")}
       incompleteSeries={hasUnloadedOccurrences(cancelling, appointments, seriesFacts, nextCursor !== undefined)} timeZone={grid.timeZone} closed={() => setCancelling(undefined)}
-      completed={async () => { setCancelling(undefined); await load(); setSuccess(t("booking.cancelledSuccess")); }} />}
+      completed={async () => { setCancelling(undefined); await load(); setSuccess({ testId: "managed-success", body: t("booking.cancelledSuccess") }); }} />}
     {grid && courtsReady && moving && <MoveDialog booking={moving} courts={courts} timeZone={grid.timeZone}
       maxBookingMinutes={maxBookingMinutes} closed={() => setMoving(undefined)}
-      completed={async () => { setMoving(undefined); await load(); setSuccess(t("booking.moved")); }} />}
+      completed={async () => { setMoving(undefined); await load(); setSuccess({ testId: "managed-success", body: t("booking.moved") }); }} />}
   </section>;
 }
 

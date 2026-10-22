@@ -88,6 +88,8 @@ test("an officer creates a weekly series and finds its appointments in the manag
   // then — the appointments are in the list the officer manages, without a reload
   expect(bookingIds).toHaveLength(3);
   await expect(page.getByTestId("series-created")).toBeVisible();
+  await expect(page.getByTestId("series-form"), "the form closes once the series exists").toHaveCount(0);
+  await expect(page.getByTestId("new-series"), "focus returns to where the form was opened").toBeFocused();
   const series = page.locator('[data-testid^="managed-series-"]')
     .filter({ has: page.getByTestId(`booking-${bookingIds[0]}`) });
   await series.getByTestId("managed-series-summary").click();
