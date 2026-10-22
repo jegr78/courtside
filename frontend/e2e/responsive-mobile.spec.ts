@@ -215,6 +215,78 @@ for (const viewport of [undefined, { width: 320, height: 568 }]) {
   });
 }
 
+const phoneSizes = [undefined, { width: 320, height: 568 }, { width: 734, height: 343 }];
+const sizeName = (viewport?: { width: number; height: number }) => viewport ? `${viewport.width}x${viewport.height}` : "of the project's size";
+
+async function openBookingWithPartner(page: Page, visualDate: string, viewport?: { width: number; height: number }) {
+  if (viewport) await page.setViewportSize(viewport);
+  await signIn(page, "doe.jane");
+  await selectJourneyDate(page, visualDate);
+  await page.locator('[data-testid="free-slot"][data-court-number="2"][data-slot="12:00"]:visible').tap();
+  const dialog = page.getByTestId("booking-dialog");
+  await dialog.getByTestId("member-search").fill("Mary");
+  await dialog.getByTestId("member-match").tap();
+  return dialog;
+}
+
+for (const viewport of phoneSizes) {
+  test(`given a phone ${sizeName(viewport)}, when the booking form scrolls, then a divider and a gap keep its content apart from the title and the slot stays named`, async ({ page, journeyService }) => {
+    // given
+    const dialog = await openBookingWithPartner(page, journeyService.visualDate, viewport);
+    const body = dialog.getByTestId("dialog-body");
+
+    // when
+    await body.evaluate((element) => element.scrollTo(0, element.scrollHeight));
+
+    // then
+    const header = dialog.getByTestId("dialog-header");
+    const divider = await header.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return { width: parseFloat(style.borderBottomWidth), style: style.borderBottomStyle };
+    });
+    expect(divider, "a solid line closes the pinned header").toEqual({ width: expect.any(Number), style: "solid" });
+    expect(divider.width, "the line under the header is drawn").toBeGreaterThanOrEqual(1);
+    const titleBox = (await dialog.getByRole("heading", { level: 2 }).boundingBox())!;
+    const bodyBox = (await body.boundingBox())!;
+    const bodyPadding = await body.evaluate((element) => parseFloat(getComputedStyle(element).paddingTop));
+    expect(bodyBox.y - (titleBox.y + titleBox.height), "space separates the title from the scrolling area").toBeGreaterThanOrEqual(8);
+    expect(bodyPadding, "scrolled content stops short of the divider").toBeGreaterThanOrEqual(8);
+    await expect(header.getByTestId("booking-period"), "the slot is named in the pinned header").toBeVisible();
+    await expect(dialog.getByTestId("booking-period"), "the slot stays on screen while the form scrolls").toBeInViewport({ ratio: 1 });
+  });
+
+  test(`given a phone ${sizeName(viewport)}, when a partner is chosen, then the form shows the partner together with the field above it`, async ({ page, journeyService }) => {
+    // given
+    const dialog = await openBookingWithPartner(page, journeyService.visualDate, viewport);
+    const partner = dialog.getByTestId("selected-member");
+
+    // when
+    await partner.evaluate((element) => element.scrollIntoView({ block: "end" }));
+
+    // then
+    const body = (await dialog.getByTestId("dialog-body").boundingBox())!;
+    const search = (await dialog.getByTestId("member-search").boundingBox())!;
+    const row = (await partner.boundingBox())!;
+    expect(search.y, "the search field is inside the scrolling area").toBeGreaterThanOrEqual(body.y - 1);
+    expect(row.y + row.height, "the partner row is inside the scrolling area").toBeLessThanOrEqual(body.y + body.height + 1);
+  });
+
+  test(`given a phone ${sizeName(viewport)}, when a partner is chosen, then the remove control is short and the partner's name stays on one line`, async ({ page, journeyService }) => {
+    // when
+    const dialog = await openBookingWithPartner(page, journeyService.visualDate, viewport);
+
+    // then
+    const partner = dialog.getByTestId("selected-member");
+    const name = (await partner.getByTestId("selected-member-name").textContent())!.trim();
+    const remove = partner.getByTestId("remove-member");
+    expect((await remove.textContent())!, "the visible label leaves the name to the row").not.toContain(name);
+    await expect(remove, "the control still names the partner it removes").toHaveAccessibleName(new RegExp(name));
+    const lines = await partner.getByTestId("selected-member-name").evaluate((element) =>
+      element.getBoundingClientRect().height / parseFloat(getComputedStyle(element).lineHeight));
+    expect(lines, "the name is not broken across lines").toBeLessThan(1.5);
+  });
+}
+
 test("given a phone 320 px wide with text at 150 percent, when another day is chosen, then its first row starts below the plan's pinned header", async ({ page, journeyService }) => {
   // given
   await signIn(page, "doe.jane");

@@ -1,6 +1,6 @@
-import { act, render, screen } from "@testing-library/react";
-import { beforeEach, expect, it, vi } from "vitest";
-import { api } from "../api/client";
+import { act, fireEvent, render, screen } from "@testing-library/react";
+import { beforeEach, expect, it, onTestFinished, vi } from "vitest";
+import { ApiError, api } from "../api/client";
 import i18n from "../i18n";
 import { withFinePointer } from "../test/pointer";
 import { BookingDialog } from "./BookingDialog";
@@ -73,4 +73,28 @@ it("given the German copy, when the duration is bounded, then it speaks of the c
 
   // then
   expect(bound).toMatch(/^Der Verein /);
+});
+
+it("given a booking the club refuses, when the refusal arrives, then the duration comes back into view beside it", async () => {
+  // given
+  vi.spyOn(api, "bookingCards").mockResolvedValue([{
+    id: "55555555-5555-5555-5555-555555555555", label: "Member booking", color: "#b85c38", allowedPlayerCounts: [1, 2, 4], guestAllowed: true
+  }]);
+  vi.spyOn(api, "createBooking").mockRejectedValue(new ApiError(409, {
+    type: "urn:courtside:error:court-unavailable", title: "Court unavailable", status: 409
+  }));
+  const scrolled = vi.fn();
+  Object.defineProperty(HTMLElement.prototype, "scrollIntoView", { configurable: true, value: scrolled });
+  onTestFinished(() => { delete (HTMLElement.prototype as { scrollIntoView?: unknown }).scrollIntoView; });
+  show();
+  const duration = await screen.findByTestId("booking-duration");
+  await act(() => new Promise((settled) => setTimeout(settled, 50)));
+
+  // when
+  fireEvent.click(screen.getByTestId("booking-submit"));
+
+  // then
+  await screen.findByTestId("booking-refusal");
+  expect(scrolled.mock.contexts, "the duration is the element brought into view").toContain(duration);
+  expect(scrolled).toHaveBeenCalledWith({ block: "nearest" });
 });

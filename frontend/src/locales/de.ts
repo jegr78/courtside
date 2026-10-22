@@ -979,6 +979,7 @@ const de = {
   "booking.members": "Mitglieder",
   "booking.addMember": "{{name}} hinzufügen",
   "booking.removeMember": "{{name}} entfernen",
+  "booking.removeMemberShort": "Entfernen",
   "booking.guest": "Name des Gastes",
   "booking.guests": "Gäste",
   "booking.guestNumber": "Name des Gastes {{number}}",

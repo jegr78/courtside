@@ -735,6 +735,26 @@ input[type="time"] {
   scroll-padding-block-end: 3rem;
 }
 
+/* A landscape phone leaves little height between a pinned header and footer, so both shrink to give the form room. */
+@media (max-height: 30rem) {
+  .modal-overlay {
+    padding: 0.5rem;
+  }
+
+  .dialog-header {
+    padding-top: 0.75rem;
+    padding-bottom: 0.5rem;
+  }
+
+  .dialog-header h2 {
+    font-size: 1.125rem;
+  }
+
+  .dialog-footer {
+    padding-block: 0.5rem;
+  }
+}
+
 .dialog-continues {
   position: absolute;
   inset-inline: 0;
