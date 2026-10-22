@@ -513,14 +513,14 @@ test("given log files with and without the docker timestamp, when the run window
   const files = { app: "app.log", proxy: "proxy.log", gone: "gone.log" };
   const contents = {
     "app.log": '{"@timestamp":"2030-03-11T10:00:07Z","log":{"level":"WARN"},"message":"Security event"}\n{"log":{"level":"INFO"}}\n',
-    "proxy.log": "2030-03-11T09:59:00Z before\n2030-03-11T10:00:05.5Z [warn] inside\n2030-03-11T11:00:00Z after\n"
+    "proxy.log": "2030-03-11T09:59:00Z before\n2030-03-11T10:00:05.5Z [warn] inside\n2030-03-11T10:00:06 [warn] local time without a zone\n2030-03-11T11:00:00Z after\n"
   };
   // when
   const window = logWindow(files, "2030-03-11T10:00:00Z", "2030-03-11T10:30:00Z", (path) => contents[path] ?? null);
   // then
   assert.deepEqual(window.sources, [
     { name: "app", state: "unread", lines: 2, inWindow: 0 },
-    { name: "proxy", state: "read", lines: 3, inWindow: 1 },
+    { name: "proxy", state: "read", lines: 4, inWindow: 1 },
     { name: "gone", state: "missing", lines: 0, inWindow: 0 }
   ]);
   assert.deepEqual(window.lines, ["2030-03-11T10:00:05.5Z [warn] inside"], "only stamped lines inside the window are attributed");
