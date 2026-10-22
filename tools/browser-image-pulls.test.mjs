@@ -124,7 +124,7 @@ test("given the budget is spent, when the next attempt is due, then the pull fai
   await assert.rejects(pullImages(["caddy:2"], {
     pull: () => { calls++; clock += PULL_BUDGET_SECONDS * 1000; return { pulled: false, reason: "stopped by SIGTERM" }; },
     sleep: async () => {}, now: () => clock, log: () => {}
-  }), /Pulling caddy:2 exceeded the 420 s budget/);
+  }), new RegExp(`Pulling caddy:2 exceeded the ${PULL_BUDGET_SECONDS} s budget`));
   assert.equal(calls, 1);
 });
 
