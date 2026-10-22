@@ -2,14 +2,16 @@ import { request, type APIRequestContext, type APIResponse } from "@playwright/t
 import { config, PASSWORD, persona, type PersonaKey } from "./context";
 import { precondition } from "./precondition";
 import { admitted } from "./core.mjs";
+import { applySetCookies, cookieHeader } from "./cookie-jar.mjs";
 
 export const BASE = config.baseUrl;
+export type Answer = { ok: () => boolean; status: () => number; headers: () => Record<string, string> };
 export type Api = {
   get: (path: string) => Promise<APIResponse>;
   del: (path: string) => Promise<APIResponse>;
   put: (path: string, data: unknown) => Promise<APIResponse>;
   post: (path: string, data: unknown, extra?: Record<string, string>) => Promise<APIResponse>;
-  postForm: (path: string, form: Record<string, string>) => Promise<APIResponse>;
+  credential: (path: string, payload: { form: Record<string, string> } | { json: unknown }) => Promise<Answer>;
   dispose: () => Promise<void>;
 };
 
@@ -25,7 +27,25 @@ async function paced<T>(send: () => Promise<T>): Promise<T> {
   return send();
 }
 
-async function wrap(context: APIRequestContext): Promise<Api> {
+// Playwright traces every request of an APIRequestContext with its body, so a password travels through Node's own fetch.
+async function sendCredential(context: APIRequestContext, base: string, path: string, payload: { form: Record<string, string> } | { json: unknown }) {
+  const url = new URL(path, base);
+  const { cookies } = await context.storageState();
+  const form = "form" in payload;
+  const response = await fetch(url, {
+    method: "POST",
+    redirect: "manual",
+    headers: { cookie: cookieHeader(cookies, url), "X-XSRF-TOKEN": cookies.find((c) => c.name.endsWith("XSRF-TOKEN"))?.value ?? "",
+      "content-type": form ? "application/x-www-form-urlencoded" : "application/json" },
+    body: form ? new URLSearchParams(payload.form) : JSON.stringify(payload.json)
+  });
+  await response.arrayBuffer();
+  const answer: Answer = { ok: () => response.ok, status: () => response.status, headers: () => Object.fromEntries(response.headers) };
+  return { answer, cookies: applySetCookies(cookies, response.headers.getSetCookie(), url) };
+}
+
+async function wrap(first: APIRequestContext, base = BASE): Promise<Api> {
+  let context = first;
   await paced(() => context.get("/api/session"));
   const headers = async () => ({ "X-XSRF-TOKEN": (await context.storageState()).cookies.find((c) => c.name.endsWith("XSRF-TOKEN"))?.value ?? "" });
   return {
@@ -33,7 +53,13 @@ async function wrap(context: APIRequestContext): Promise<Api> {
     del: (path) => admitted(async () => paced(async () => context.delete(path, { headers: await headers() }))),
     put: async (path, data) => paced(async () => context.put(path, { data, headers: await headers() })),
     post: async (path, data, extra = {}) => paced(async () => context.post(path, { data, headers: { ...(await headers()), ...extra } })),
-    postForm: (path, form) => admitted(async () => paced(async () => context.post(path, { form, headers: await headers() }))),
+    credential: (path, payload) => admitted(async () => paced(async () => {
+      const { answer, cookies } = await sendCredential(context, base, path, payload);
+      const next = await request.newContext({ baseURL: base, storageState: { cookies, origins: [] } });
+      await context.dispose();
+      context = next;
+      return answer;
+    })),
     dispose: () => context.dispose()
   };
 }
@@ -42,7 +68,7 @@ const signedIn = new Map<PersonaKey, Promise<Api>>();
 
 async function signIn(key: PersonaKey): Promise<Api> {
   const api = await wrap(await request.newContext({ baseURL: BASE }));
-  const login = await api.postForm("/api/session", { username: persona(key).username, password: PASSWORD });
+  const login = await api.credential("/api/session", { form: { username: persona(key).username, password: PASSWORD } });
   precondition(login.ok(), `API sign-in for ${key} answered ${login.status()}`);
   precondition((await (await api.get("/api/session")).json()).authenticated === true, `API session for ${key} is authenticated`);
   return { ...api, dispose: async () => undefined };
@@ -60,15 +86,15 @@ export function apiAsAgain(key: PersonaKey): Promise<Api> {
   return apiAs(key);
 }
 
-export async function anonymousApi(): Promise<Api> {
-  return wrap(await request.newContext({ baseURL: BASE }));
+export async function anonymousApi(base = BASE): Promise<Api> {
+  return wrap(await request.newContext({ baseURL: base }), base);
 }
 
 // Reauthenticates only when the write asks for it, so a healthy account costs no credential check.
 async function adminWrite(admin: Api, write: (path: string, data: unknown) => Promise<APIResponse>, path: string, data: unknown): Promise<APIResponse> {
   const first = await write(path, data);
   if (first.status() !== 401 && first.status() !== 403) return first;
-  const reauthenticated = await admin.post("/api/session/reauthentication", { password: PASSWORD });
+  const reauthenticated = await admin.credential("/api/session/reauthentication", { json: { password: PASSWORD } });
   precondition(reauthenticated.ok(), `admin reauthentication answered ${reauthenticated.status()}`);
   return write(path, data);
 }

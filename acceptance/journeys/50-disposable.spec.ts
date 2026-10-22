@@ -11,6 +11,7 @@ import { noShowLimitFor } from "../lib/attendance";
 import { answers, seededBookingId, startedBookingSql, violationCodes } from "../lib/core.mjs";
 import { capture } from "../lib/checks";
 import { latestMailTo } from "../lib/mail";
+import { fillSecret } from "../lib/secret-fill";
 import { PASSWORD, persona } from "../lib/context";
 import { openAs, reauthenticateIfAsked, signInByForm } from "../lib/session";
 import { step } from "../lib/steps";
@@ -35,9 +36,9 @@ async function changePassword(page: Page, from: string, to: string) {
   await page.getByTestId("preferences-menu").click();
   await page.getByTestId("account-security-link").click();
   await expect(page.getByTestId("account-security-view")).toBeVisible();
-  await page.getByTestId("current-password").fill(from);
-  await page.getByTestId("new-password").fill(to);
-  await page.getByTestId("confirm-password").fill(to);
+  await fillSecret(page.getByTestId("current-password"), from);
+  await fillSecret(page.getByTestId("new-password"), to);
+  await fillSecret(page.getByTestId("confirm-password"), to);
   await page.getByTestId("password-submit").click();
   await expect(page.getByTestId("login-view").or(page.getByTestId("sign-in-link")), "product: the password change signs the member out").toBeVisible();
 }
@@ -109,7 +110,7 @@ test("given a forgotten password, when a reset code is mailed and redeemed, then
     expect(code, "product: the mail carries a code line").toBeTruthy();
     // when
     await page.getByTestId("recovery-code").fill(code!);
-    await page.getByTestId("recovery-new-password").fill(interim);
+    await fillSecret(page.getByTestId("recovery-new-password"), interim);
     const redemption = page.waitForResponse(answers("POST", "/api/account-recovery/password/redemption"));
     await page.getByTestId("recovery-redeem-submit").click();
     expect((await redemption).status(), "product: the reset code is redeemed").toBe(204);

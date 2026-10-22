@@ -1237,3 +1237,275 @@ test("given the guardian journey, when its source is read, then it records the r
   assert.match(source, /recordCreated\(\{ kind: "guardianship"/, "the relationship is recorded as soon as it exists");
   assert.match(source, /finally \{[\s\S]*removeGuardianships\(admin\)/, "the relationship is removed however the journey ends");
 });
+
+import { leaksIn, readZip, redactRun, secureRun, writeZip } from "../acceptance/lib/redaction.mjs";
+
+const SECRET = "Sh4red!pass&\"word<9>";
+const INTERIM = "acceptance-temporary-0123456789abcdef01";
+
+function leakyRun() {
+  const run = mkdtempSync(join(tmpdir(), "acceptance-redaction-"));
+  const failure = join(run, "test-results", "59-guardian-desktop-chrome");
+  mkdirSync(failure, { recursive: true });
+  writeFileSync(join(failure, "error-context.md"),
+    `- textbox "Passwort" [active] [ref=f1e68]: ${SECRET}\n- textbox "Neues Passwort" [ref=f1e70]: typed-elsewhere\n- textbox "Vorname" [ref=f1e78]: Deniz\n`);
+  writeFileSync(join(run, "results.json"), JSON.stringify({ error: `filled ${SECRET} then ${INTERIM}` }));
+  writeFileSync(join(failure, "test-failed-1.png"), Buffer.from([0x89, 0x50, 0x4e, 0x47, 1, 2, 3]));
+  writeFileSync(join(failure, "trace.zip"), writeZip([
+    { name: "trace.trace", data: Buffer.from(`{"method":"fill","params":{"value":${JSON.stringify(SECRET)}}}\n`) },
+    { name: "resources/page@1.html", data: Buffer.from(`<input value="${SECRET.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}">`) },
+    { name: "resources/shot.jpeg", data: Buffer.from([0xff, 0xd8, 9, 9]) }
+  ]));
+  return { run, failure };
+}
+
+test("given a run whose failure artefacts hold the password, when the leaks are listed, then each file and trace entry is named without the password", () => {
+  // given
+  const { run } = leakyRun();
+  try {
+    // when
+    const leaks = leaksIn(run, SECRET);
+    // then
+    assert.deepEqual(leaks.sort(), [
+      "results.json",
+      "test-results/59-guardian-desktop-chrome/error-context.md",
+      "test-results/59-guardian-desktop-chrome/trace.zip!resources/page@1.html",
+      "test-results/59-guardian-desktop-chrome/trace.zip!trace.trace"
+    ], "every artefact that carries the password, raw, JSON-escaped or HTML-escaped, is named");
+    assert.ok(leaks.every((leak) => !leak.includes(SECRET)), "the listing never repeats the password");
+  } finally { rmSync(run, { recursive: true, force: true }); }
+});
+
+test("given a run whose failure artefacts hold passwords, when redacted, then no artefact holds one and the rest is unchanged", () => {
+  // given
+  const { run, failure } = leakyRun();
+  try {
+    // when
+    redactRun(run, SECRET);
+    // then
+    const context = readFileSync(join(failure, "error-context.md"), "utf8");
+    assert.equal(context, `- textbox "Passwort" [active] [ref=f1e68]: <redacted>\n- textbox "Neues Passwort" [ref=f1e70]: <redacted>\n- textbox "Vorname" [ref=f1e78]: Deniz\n`,
+      "a password textbox keeps its line without its value, whatever was typed, and other fields stay");
+    assert.ok(!readFileSync(join(run, "results.json"), "utf8").includes(INTERIM), "an interim password is redacted too");
+    assert.deepEqual([...readFileSync(join(failure, "test-failed-1.png"))], [0x89, 0x50, 0x4e, 0x47, 1, 2, 3], "an image is left alone");
+    const entries = readZip(readFileSync(join(failure, "trace.zip")));
+    assert.deepEqual(entries.map((entry) => entry.name), ["trace.trace", "resources/page@1.html", "resources/shot.jpeg"], "the trace keeps every entry in order");
+    assert.match(entries[0].data.toString(), /"value":"<redacted>"/, "the fill action no longer carries the password");
+    assert.deepEqual([...entries[2].data], [0xff, 0xd8, 9, 9], "a trace image is left alone");
+    assert.deepEqual(leaksIn(run, SECRET), [], "nothing in the run directory holds the password");
+  } finally { rmSync(run, { recursive: true, force: true }); }
+});
+
+test("given a trace the harness cannot read, when the run is secured, then it fails and names the file", () => {
+  // given
+  const { run, failure } = leakyRun();
+  writeFileSync(join(failure, "trace.zip"), Buffer.from("not a zip"));
+  try {
+    // when / then
+    assert.throws(() => secureRun(run, SECRET), /trace\.zip/, "an artefact that cannot be checked fails the run instead of passing unseen");
+  } finally { rmSync(run, { recursive: true, force: true }); }
+});
+
+test("given a run with leaking artefacts, when secured, then it passes once nothing holds the password", () => {
+  // given
+  const { run } = leakyRun();
+  try {
+    // when / then
+    assert.doesNotThrow(() => secureRun(run, SECRET));
+    assert.deepEqual(leaksIn(run, SECRET), []);
+  } finally { rmSync(run, { recursive: true, force: true }); }
+});
+
+test("given the runner, when its phases are read, then the matrix only masks and the postflight and report fail on a leak", () => {
+  // given
+  const source = readFileSync(new URL("../acceptance/run.mjs", import.meta.url), "utf8");
+  // then
+  assert.match(source, /exit = playwright\(run, projects\);\n\s*redactRun\(run, config\.password\);/, "the matrix masks its artefacts and still lets the postflight clean up");
+  assert.match(source, /exit = playwright\(run, \["postflight"\]\) \|\| exit;\n\s*secureRun\(run, config\.password\);/, "the postflight fails the run on a leak");
+  assert.match(source, /phase === "report"\) \{\n\s*secureRun\(run, config\.password\)/, "the report phase secures a run before it reads it");
+});
+
+const encodedForms = (secret) => {
+  const body = `username=jane.doe&password=${secret}`;
+  return {
+    "form-urlencoded": new URLSearchParams({ username: "jane.doe", password: secret }).toString(),
+    "JSON unicode escapes": `{"password":"${[...secret].map((c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, "0")}`).join("")}"}`,
+    "base64 of a form body": Buffer.from(body).toString("base64"),
+    "base64url of a form body": Buffer.from(`x${body}`).toString("base64url"),
+    "base64 of the bare secret": Buffer.from(`ab${secret}`).toString("base64")
+  };
+};
+
+for (const [form, text] of Object.entries(encodedForms(SECRET))) {
+  test(`given the password as ${form} in a trace resource, when the run is secured, then nothing holds it afterwards`, () => {
+    // given
+    const run = mkdtempSync(join(tmpdir(), "acceptance-redaction-"));
+    writeFileSync(join(run, "trace.zip"), writeZip([{ name: "resources/body.dat", data: Buffer.from(text) }]));
+    try {
+      // when
+      const before = leaksIn(run, SECRET);
+      secureRun(run, SECRET);
+      // then
+      assert.deepEqual(before, ["trace.zip!resources/body.dat"], `the check finds the password as ${form}`);
+      assert.deepEqual(leaksIn(run, SECRET), [], `the masking removes the password as ${form}`);
+    } finally { rmSync(run, { recursive: true, force: true }); }
+  });
+}
+
+test("given the password in a form the masking does not know, when the run is secured, then the independent check fails the run", () => {
+  // given
+  const run = mkdtempSync(join(tmpdir(), "acceptance-redaction-"));
+  writeFileSync(join(run, "report.html"), `<p>${[...SECRET].map((c) => `&#${c.charCodeAt(0)};`).join("")}</p>`);
+  try {
+    // when / then
+    assert.throws(() => secureRun(run, SECRET), /report\.html/, "an entity-encoded password the masking leaves still fails the run");
+  } finally { rmSync(run, { recursive: true, force: true }); }
+});
+
+test("given an aria snapshot with a typed and a masked password box, when checked, then only the typed one is a leak until the run is secured", () => {
+  // given
+  const run = mkdtempSync(join(tmpdir(), "acceptance-redaction-"));
+  writeFileSync(join(run, "error-context.md"), `- textbox "Neues Passwort" [ref=e1]: <redacted>\n- textbox "Passwort wiederholen" [ref=e2]: typed-by-hand\n`);
+  writeFileSync(join(run, "masked.md"), `- textbox "Passwort" [ref=e1]: <redacted>\n`);
+  try {
+    // when
+    const before = leaksIn(run, SECRET);
+    secureRun(run, SECRET);
+    // then
+    assert.deepEqual(before, ["error-context.md"], "a password box with any typed value is a leak, a masked one is not");
+    assert.deepEqual(leaksIn(run, SECRET), []);
+  } finally { rmSync(run, { recursive: true, force: true }); }
+});
+
+import { applySetCookies, cookieHeader } from "../acceptance/lib/cookie-jar.mjs";
+
+test("given a jar and an answer's Set-Cookie lines, when applied, then new cookies are kept, replaced ones updated and expired ones removed", () => {
+  // given
+  const url = new URL("https://club.example.org/api/session");
+  const jar = [
+    { name: "XSRF-TOKEN", value: "old", domain: "club.example.org", path: "/", expires: -1, httpOnly: false, secure: true, sameSite: "Lax" },
+    { name: "__Host-SESSION", value: "anonymous", domain: "club.example.org", path: "/", expires: -1, httpOnly: true, secure: true, sameSite: "Lax" }
+  ];
+  // when
+  const next = applySetCookies(jar, [
+    "__Host-SESSION=signed-in; Path=/; Secure; HttpOnly; SameSite=Lax",
+    "XSRF-TOKEN=; Path=/; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT",
+    "LANG=de; Path=/api; Max-Age=3600; SameSite=Strict"
+  ], url, 1_000);
+  // then
+  assert.deepEqual(next.map(({ name, value, path, httpOnly, secure, sameSite }) => ({ name, value, path, httpOnly, secure, sameSite })), [
+    { name: "__Host-SESSION", value: "signed-in", path: "/", httpOnly: true, secure: true, sameSite: "Lax" },
+    { name: "LANG", value: "de", path: "/api", httpOnly: false, secure: false, sameSite: "Strict" }
+  ], "the session is replaced, the cleared token removed and the new cookie added");
+  assert.equal(next.find((cookie) => cookie.name === "LANG").expires, 1_000 + 3600, "Max-Age becomes an absolute expiry");
+});
+
+test("given a jar, when the cookie header for a request is built, then only cookies of its host, path and scheme are sent", () => {
+  // given
+  const jar = [
+    { name: "a", value: "1", domain: "club.example.org", path: "/", expires: -1, httpOnly: true, secure: true, sameSite: "Lax" },
+    { name: "b", value: "2", domain: "club.example.org", path: "/admin", expires: -1, httpOnly: false, secure: false, sameSite: "Lax" },
+    { name: "c", value: "3", domain: "other.example.org", path: "/", expires: -1, httpOnly: false, secure: false, sameSite: "Lax" },
+    { name: "d", value: "4", domain: "club.example.org", path: "/", expires: 10, httpOnly: false, secure: false, sameSite: "Lax" }
+  ];
+  // when / then
+  assert.equal(cookieHeader(jar, new URL("https://club.example.org/api/session"), 100), "a=1", "a foreign host, another path and an expired cookie stay home");
+  assert.equal(cookieHeader(jar, new URL("http://club.example.org/admin/x"), 5), "b=2; d=4", "a secure cookie never goes over plain http");
+});
+
+const traceLines = (...events) => Buffer.from(events.map((event) => JSON.stringify(event)).join("\n") + "\n");
+
+test("given a trace with a password request body and a typed password field, when redacted, then both are gone by structure whatever the password was", () => {
+  // given
+  const run = mkdtempSync(join(tmpdir(), "acceptance-redaction-"));
+  const network = traceLines(
+    { type: "resource-snapshot", snapshot: { request: { url: "https://club.example.org/api/session", method: "POST",
+      postData: { mimeType: "application/x-www-form-urlencoded", text: "username=jane.doe&password=typed-elsewhere", params: [{ name: "username", value: "jane.doe" }, { name: "password", value: "typed-elsewhere" }], _file: "resources/body.dat" } } } },
+    { type: "resource-snapshot", snapshot: { request: { url: "https://club.example.org/api/bookings", method: "POST", postData: { mimeType: "application/json", text: "{\"court\":1}", params: [], _file: "resources/booking.dat" } } } },
+    { type: "resource-snapshot", snapshot: { request: { url: "https://club.example.org/api/session/reauthentication", method: "POST", postData: { mimeType: "application/json", text: "", params: [], _file: "resources/reauth.json" } } } });
+  const page = traceLines({ type: "frame-snapshot", snapshot: { html: ["HTML", {}, ["BODY", {}, ["INPUT", { __playwright_value_: "typed-elsewhere", type: "password", name: "password" }], ["INPUT", { __playwright_value_: "jane.doe", name: "username" }]]] } });
+  writeFileSync(join(run, "trace.zip"), writeZip([
+    { name: "1-trace.network", data: network }, { name: "1-trace.trace", data: page },
+    { name: "resources/body.dat", data: Buffer.from("username=jane.doe&password=typed-elsewhere") },
+    { name: "resources/booking.dat", data: Buffer.from("{\"court\":1}") },
+    { name: "resources/reauth.json", data: Buffer.from("{\"password\":\"typed-elsewhere\"}") }]));
+  try {
+    // when
+    redactRun(run, SECRET);
+    // then
+    const entries = Object.fromEntries(readZip(readFileSync(join(run, "trace.zip"))).map((entry) => [entry.name, entry.data.toString("utf8")]));
+    assert.ok(!Object.values(entries).some((text) => text.includes("typed-elsewhere")), "no entry keeps a password the harness did not even know");
+    assert.equal(entries["resources/booking.dat"], "{\"court\":1}", "a body without a password field stays");
+    assert.equal(entries["resources/body.dat"], undefined, "the sign-in body is dropped");
+    assert.equal(entries["resources/reauth.json"], undefined, "a body kept only in its resource file is read and dropped");
+    assert.match(entries["1-trace.trace"], /"__playwright_value_":"jane.doe"/, "a text field keeps its snapshot value");
+  } finally { rmSync(run, { recursive: true, force: true }); }
+});
+
+test("given the password inside a base64 token, when redacted, then the whole token is masked and no edge of it is left", () => {
+  // given
+  const run = mkdtempSync(join(tmpdir(), "acceptance-redaction-"));
+  const token = Buffer.from(`xy${SECRET}z`).toString("base64");
+  writeFileSync(join(run, "body.txt"), `Authorization: Basic ${token}\n`);
+  try {
+    // when
+    redactRun(run, SECRET);
+    // then
+    assert.equal(readFileSync(join(run, "body.txt"), "utf8"), "Authorization: Basic <redacted>\n", "the token goes as a whole");
+  } finally { rmSync(run, { recursive: true, force: true }); }
+});
+
+const maskedLayers = (secret) => ({
+  "base64 of the form-encoded body": Buffer.from(`password=${new URLSearchParams({ p: secret }).toString().slice(2)}`).toString("base64"),
+  "base64 of a JSON body": Buffer.from(JSON.stringify({ username: "jane.doe", password: secret })).toString("base64url")
+});
+
+for (const [form, text] of Object.entries(maskedLayers(SECRET))) {
+  test(`given the password as ${form}, when the run is secured, then the masking removes it`, () => {
+    // given
+    const run = mkdtempSync(join(tmpdir(), "acceptance-redaction-"));
+    writeFileSync(join(run, "body.txt"), text);
+    try {
+      // when
+      const before = leaksIn(run, SECRET);
+      secureRun(run, SECRET);
+      // then
+      assert.deepEqual(before, ["body.txt"], `the check decodes ${form}`);
+      assert.deepEqual(leaksIn(run, SECRET), [], `the masking knows ${form}`);
+    } finally { rmSync(run, { recursive: true, force: true }); }
+  });
+}
+
+const deeperLayers = (secret) => ({
+  "percent-encoded base64": encodeURIComponent(Buffer.from(`k=${secret}`).toString("base64")),
+  "base64 of partly escaped JSON": Buffer.from(JSON.stringify({ password: secret }).replace(/[!&<>]/g, (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, "0")}`)).toString("base64")
+});
+
+for (const [form, text] of Object.entries(deeperLayers(SECRET))) {
+  test(`given the password as ${form}, when the run is secured, then the check finds it and the run is masked or fails`, () => {
+    // given
+    const run = mkdtempSync(join(tmpdir(), "acceptance-redaction-"));
+    writeFileSync(join(run, "body.txt"), text);
+    try {
+      // when
+      const before = leaksIn(run, SECRET);
+      let failed = false;
+      try { secureRun(run, SECRET); } catch { failed = true; }
+      // then
+      assert.deepEqual(before, ["body.txt"], `the check decodes ${form} through every layer`);
+      assert.ok(failed || leaksIn(run, SECRET).length === 0, `${form} is either masked or fails the run`);
+    } finally { rmSync(run, { recursive: true, force: true }); }
+  });
+}
+
+test("given wrapped base64 or half of the password, when checked, then each is a leak", () => {
+  // given
+  const run = mkdtempSync(join(tmpdir(), "acceptance-redaction-"));
+  writeFileSync(join(run, "wrapped.txt"), Buffer.from(`password=${SECRET}&more=1`).toString("base64").replace(/(.{12})/g, "$1\r\n"));
+  writeFileSync(join(run, "half.txt"), `typed ${SECRET.slice(0, Math.ceil(SECRET.length * 0.6))} then stopped`);
+  writeFileSync(join(run, "clean.txt"), "nothing to see");
+  try {
+    // when / then
+    assert.deepEqual(leaksIn(run, SECRET).sort(), ["half.txt", "wrapped.txt"], "a line-wrapped base64 body and a substantial part of the password are found");
+  } finally { rmSync(run, { recursive: true, force: true }); }
+});

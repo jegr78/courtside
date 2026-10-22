@@ -2,6 +2,7 @@ import { existsSync, mkdirSync } from "node:fs";
 import { expect, test, type Browser, type Page } from "@playwright/test";
 import { PASSWORD, persona, RUN, stateKey, type PersonaKey } from "./context";
 import { setPersona, watch } from "./checks";
+import { fillSecret } from "./secret-fill";
 
 export const statePath = (engine: string, key: string) => `${RUN}/state/${engine}/${key}.json`;
 
@@ -11,7 +12,7 @@ export async function signInByForm(page: Page, username: string, password: strin
   if (await link.isVisible()) await link.click();
   await expect(page.getByTestId("login-view")).toBeVisible();
   await page.getByTestId("username").fill(username);
-  await page.getByTestId("password").fill(password);
+  await fillSecret(page.getByTestId("password"), password);
   await page.getByTestId("login-submit").click();
 }
 
@@ -19,7 +20,7 @@ export async function reauthenticateIfAsked(page: Page) {
   const submit = page.getByTestId("admin-reauthentication-submit");
   await submit.waitFor({ state: "visible", timeout: 5_000 }).catch(() => undefined);
   if (await submit.isVisible()) {
-    await page.locator("#admin-reauthentication-password").fill(PASSWORD);
+    await fillSecret(page.locator("#admin-reauthentication-password"), PASSWORD);
     await submit.click();
     await expect(submit).toBeHidden();
   }

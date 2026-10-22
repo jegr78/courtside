@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { loadConfig } from "./config/schema.mjs";
 import { PROFILE_NAMES } from "./config/lanes.mjs";
 import { claimRunDirectory, harnessCommit } from "./lib/run-directory.mjs";
+import { redactRun, secureRun } from "./lib/redaction.mjs";
 import { analyse } from "./report/analysis.mjs";
 import { contactSheets } from "./report/sheets.mjs";
 import { renderReport } from "./report/html.mjs";
@@ -57,9 +58,14 @@ async function main() {
     await waitForLoad({ limit: config.loadLimit });
     const projects = args.projects.length ? args.projects : PROFILE_NAMES;
     exit = playwright(run, projects);
+    redactRun(run, config.password);
   }
-  if (args.phase === "all" || args.phase === "postflight") exit = playwright(run, ["postflight"]) || exit;
+  if (args.phase === "all" || args.phase === "postflight") {
+    exit = playwright(run, ["postflight"]) || exit;
+    secureRun(run, config.password);
+  }
   if (args.phase === "all" || args.phase === "report") {
+    secureRun(run, config.password);
     await analyse(run, config);
     const sheets = contactSheets(run);
     const commit = existsSync(join(run, "source.json")) ? JSON.parse(readFileSync(join(run, "source.json"), "utf8")).commit : harnessCommit(new URL(".", import.meta.url));
