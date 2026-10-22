@@ -19,6 +19,8 @@
 
 ### Bug fixes
 
+* **frontend:** open every dialog above the ones already open ([#1659](https://github.com/jegr78/courtside/issues/1659)) ([07df23e](https://github.com/jegr78/courtside/commit/07df23e5172b45d13d0b33d8ccab9d26b433b551))
+* **web:** log the exception with every 5xx the shared exception handler answers ([#1648](https://github.com/jegr78/courtside/issues/1648)) ([8f84b3f](https://github.com/jegr78/courtside/commit/8f84b3fa1631bb87a0fae88b867cfdef9e9ab4ae))
 * **booking:** refuse a withdrawal from a cancelled booking ([#1606](https://github.com/jegr78/courtside/issues/1606)) ([bd8267a](https://github.com/jegr78/courtside/commit/bd8267a49fe91f9b83f5ccf85b8e07b9f758adaf)), closes [#1595](https://github.com/jegr78/courtside/issues/1595)
 * **booking:** withdraw from a booking only under its row lock ([#1638](https://github.com/jegr78/courtside/issues/1638)) ([0b4c2b4](https://github.com/jegr78/courtside/commit/0b4c2b4aff21e3c0661cfcdcbbae644518e4d3e7)), closes [#1630](https://github.com/jegr78/courtside/issues/1630)
 * call the messages area Nachrichten and Messages wherever it is named ([#1611](https://github.com/jegr78/courtside/issues/1611)) ([8e3acde](https://github.com/jegr78/courtside/commit/8e3acde55b150cf6f127d3e387431d1ccf3c3382))
@@ -46,6 +48,10 @@
 * **security:** derive the active assessment's request budgets from the API instead of fixed shares ([#1551](https://github.com/jegr78/courtside/issues/1551)) ([bca79f6](https://github.com/jegr78/courtside/commit/bca79f6d450ce96945438088b54b55d9e8fdf25b))
 * wait for the stopped app to exit before the UAT smoke goes on ([#1543](https://github.com/jegr78/courtside/issues/1543)) ([8571d0b](https://github.com/jegr78/courtside/commit/8571d0bb853f5304587a8a09af48517a08eccec3))
 * **web:** replace the redundant court plan intro heading with a sign-in notice ([#1545](https://github.com/jegr78/courtside/issues/1545)) ([b21b692](https://github.com/jegr78/courtside/commit/b21b6925a2f7f01c9f86d3e2083edf04d96e23fb))
+
+### Performance
+
+* **web:** let browsers keep the content-hashed app assets ([#1655](https://github.com/jegr78/courtside/issues/1655)) ([a309b3a](https://github.com/jegr78/courtside/commit/a309b3aa235027190d769f73ab7071aeeafdfdf0))
 
 ### Documentation
 
