@@ -117,6 +117,9 @@ it("given the device is offline, when the court plan opens, then it explains why
   expect(screen.queryByTestId("week-grid")).not.toBeInTheDocument();
   expect(api.bookingGrid).not.toHaveBeenCalled();
   expect(api.allocations).not.toHaveBeenCalled();
+  expect(screen.queryByTestId("week-date"), "offline, no date can be chosen").not.toBeInTheDocument();
+  expect(screen.queryByTestId("week-previous"), "offline, no earlier week can load").not.toBeInTheDocument();
+  expect(screen.queryByTestId("week-next"), "offline, no later week can load").not.toBeInTheDocument();
 });
 
 it("given the current week, when it loads, then every day and active court is available", async () => {

@@ -444,7 +444,7 @@ export function WeekView({ today, clock = systemClock, canBook = true,
         <h1 id="occupancy-heading" data-testid="occupancy-heading" className="text-3xl font-bold">{t("week.title")}</h1>
         {days.length > 0 && hasCourts && <p className="text-muted text-sm">{formatWeekRange(days, language, calendarTimeZone)}</p>}
       </div>
-      {(!data || hasCourts) && <div className="desktop-week-controls flex gap-2">
+      {!offline && (!data || hasCourts) && <div className="desktop-week-controls flex gap-2">
         <input data-testid="week-date" type="date" value={selectedDate ?? ""} disabled={!data} onChange={(event) => selectDate(event.target.value)} aria-label={t("week.chooseDate")} className="desktop-week-date form-control rounded-lg border px-2" />
         <Button variant="secondary" type="button" data-testid="week-previous" onClick={() => setWeekOffset((offset) => offset - 1)} aria-label={t("week.previous")}>
           {t("week.previousShort")}
