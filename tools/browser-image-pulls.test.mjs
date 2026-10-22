@@ -13,7 +13,7 @@ const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), "utf
 const ACTION = "./.github/actions/browser-images";
 const packageScripts = JSON.parse(read("frontend/package.json")).scripts;
 const browserScripts = Object.keys(packageScripts)
-  .filter((name) => /^playwright test\b|webkit-reliability\.mjs (run|experiment)\b/.test(packageScripts[name]));
+  .filter((name) => /^(?:playwright test|node \.\.\/tools\/webkit-reliability\.mjs (?:run|experiment))\b/.test(packageScripts[name]));
 
 function e2eSources(directory = "frontend/e2e") {
   return readdirSync(new URL(`../${directory}/`, import.meta.url), { withFileTypes: true }).flatMap((entry) => {
@@ -35,8 +35,9 @@ function imageExpressions() {
 
 const startsBrowserSetup = (step) => {
   const run = String(step.run ?? "");
+  const words = run.split(/\s+/);
   return /\bplaywright test\b/.test(run)
-    || browserScripts.some((name) => new RegExp(`\\bnpm run ${name.replace(/[.:]/g, "\\$&")}(\\s|$)`).test(run));
+    || words.some((word, index) => word === "npm" && words[index + 1] === "run" && browserScripts.includes(words[index + 2]));
 };
 
 function workflowJobs() {
