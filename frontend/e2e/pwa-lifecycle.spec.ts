@@ -104,6 +104,8 @@ for (const locale of ["de", "en"] as const) {
     // then
     await expect(page.getByTestId("court-plan-offline")).toBeVisible();
     await expect(page.getByTestId("week-grid")).toHaveCount(0);
+    await expect(page.getByTestId("week-date"), "offline, the desk plan offers no date to choose").toHaveCount(0);
+    await expect(page.getByTestId("week-next"), "offline, the desk plan offers no later week").toHaveCount(0);
 
     // when
     await context.setOffline(false);
@@ -111,6 +113,7 @@ for (const locale of ["de", "en"] as const) {
 
     // then
     await expect(page.getByTestId("court-plan-view")).toBeVisible();
+    await expect(page.getByTestId("week-next"), "back online, the desk plan moves between weeks again").toBeVisible();
   });
 }
 
