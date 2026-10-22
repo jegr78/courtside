@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { api, type ImportPreview } from "../../api/client";
+import { api, type ImportPreview, type ImportSource } from "../../api/client";
 import i18n from "../../i18n";
 import { ImportPreviewPanel } from "./ImportPreviewPanel";
 
@@ -28,10 +28,11 @@ const preview: ImportPreview = {
   expiresAt: "2026-08-22T10:00:00Z"
 };
 
-function show(current: ImportPreview | undefined, previewed = vi.fn(), sourceEncoding = "UTF-8") {
+function show(current: ImportPreview | undefined, previewed = vi.fn(), sourceEncoding = "UTF-8", columnMode: ImportSource["columnMode"] = "HEADER") {
   render(<ImportPreviewPanel
     sourceId="source-1"
     sourceEncoding={sourceEncoding}
+    columnMode={columnMode}
     preview={current}
     disabled={false}
     previewed={previewed}
@@ -269,5 +270,19 @@ describe("ImportPreviewPanel", () => {
 
     // then
     expect(screen.getByTestId("preview-ignored-columns")).toHaveTextContent("IBAN");
+  });
+
+  it.each([
+    ["de", "Nicht zugeordnet und beim Import übersprungen: Spalte 4, Spalte 6"],
+    ["en", "Not mapped and skipped on import: Column 4, Column 6"]
+  ])("given a source read by position, when the preview names unmapped columns in %s, then each is named as a column", async (language, expected) => {
+    // given
+    await i18n.changeLanguage(language);
+
+    // when
+    show({ ...preview, ignoredColumns: ["4", "6"] }, vi.fn(), "UTF-8", "POSITION");
+
+    // then
+    expect(screen.getByTestId("preview-ignored-columns")).toHaveTextContent(expected);
   });
 });
