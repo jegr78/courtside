@@ -642,7 +642,6 @@ const en: Record<keyof typeof de, string> = {
   "series.create_one": "Create one appointment",
   "series.create_other": "Create {{count}} appointments",
   "series.created": "Appointments created: {{created}}",
-  "series.createdSuccess": "Series created.",
   "series.skipped": "Not created: {{skipped}}",
   "series.courtTaken": "The court is already taken at that time.",
   "admin.impact.ask": "Show affected bookings",
