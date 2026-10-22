@@ -85,6 +85,13 @@
       "validators": []
     },
     {
+      "path": ".github/actions/npm-network/action.yml",
+      "profiles": [
+        "full"
+      ],
+      "validators": []
+    },
+    {
       "path": ".github/actions/tool-dependencies/action.yml",
       "profiles": [
         "full"

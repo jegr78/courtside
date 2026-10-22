@@ -108,6 +108,7 @@
     { "path": "tools/node-toolchain.mjs", "profiles": ["full"], "test": false },
     { "path": "tools/node-toolchain.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/npm-audit-workflow.test.mjs", "profiles": ["tooling"], "test": true },
+    { "path": "tools/npm-network-workflow.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/npm-audit.mjs", "profiles": ["full"], "test": false },
     { "path": "tools/npm-audit.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/operational-log-deployment.test.mjs", "profiles": ["tooling"], "test": true },
