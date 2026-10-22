@@ -30,13 +30,13 @@ test("given an instance with a session cookie, when the API signs in and reauthe
     response.setHeader("content-type", "application/json");
     response.end(JSON.stringify({ authenticated: session !== "anonymous" && cookie.includes(`SESSION=${session}`) }));
   });
-  await new Promise<void>((done) => server.listen(0, "127.0.0.1", () => done()));
-  const base = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
+  await new Promise<void>((done) => server.listen(0, () => done()));
+  const base = `http://localhost:${(server.address() as { port: number }).port}`;
   const api = await anonymousApi(base);
   tracedIn = info.outputDir;
 
   // when
-  const signedIn = await api.credential("/api/session", { form: { username: "jane.doe", password: SECRET } });
+  const signedIn = await api.credential("/api/session", { form: { username: "acceptance-probe", password: SECRET } });
   const reauthenticated = await api.credential("/api/session/reauthentication", { json: { password: SECRET } });
   const after = await (await api.get(`/api/session?${MARKER}`)).json() as { authenticated: boolean };
 
