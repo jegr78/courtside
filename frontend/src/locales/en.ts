@@ -981,6 +981,7 @@ const en: Record<keyof typeof de, string> = {
   "booking.members": "Members",
   "booking.addMember": "Add {{name}}",
   "booking.removeMember": "Remove {{name}}",
+  "booking.removeMemberShort": "Remove",
   "booking.guest": "Guest name",
   "booking.guests": "Guests",
   "booking.guestNumber": "Guest name {{number}}",

@@ -45,7 +45,7 @@ export function Modal({ labelledBy, closed, width = "md", composed = false, test
   return createPortal(<div
     role="presentation"
     data-testid="modal-overlay"
-    className="fixed inset-0 z-20 flex items-center justify-center bg-(--cs-overlay) p-4"
+    className="modal-overlay fixed inset-0 z-20 flex items-center justify-center bg-(--cs-overlay) p-4"
     onMouseDown={(event) => { if (event.target === event.currentTarget) closed(); }}
   >
     <div ref={dialog} role="dialog" aria-modal="true" aria-labelledby={labelledBy} onKeyDown={handleKeyDown} data-testid={testId}
