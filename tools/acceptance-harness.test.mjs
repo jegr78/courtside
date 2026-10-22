@@ -1237,3 +1237,92 @@ test("given the guardian journey, when its source is read, then it records the r
   assert.match(source, /recordCreated\(\{ kind: "guardianship"/, "the relationship is recorded as soon as it exists");
   assert.match(source, /finally \{[\s\S]*removeGuardianships\(admin\)/, "the relationship is removed however the journey ends");
 });
+
+import { leaksIn, readZip, redactRun, secureRun, writeZip } from "../acceptance/lib/redaction.mjs";
+
+const SECRET = "Sh4red!pass&\"word<9>";
+const INTERIM = "acceptance-temporary-0123456789abcdef01";
+
+function leakyRun() {
+  const run = mkdtempSync(join(tmpdir(), "acceptance-redaction-"));
+  const failure = join(run, "test-results", "59-guardian-desktop-chrome");
+  mkdirSync(failure, { recursive: true });
+  writeFileSync(join(failure, "error-context.md"),
+    `- textbox "Passwort" [active] [ref=f1e68]: ${SECRET}\n- textbox "Neues Passwort" [ref=f1e70]: typed-elsewhere\n- textbox "Vorname" [ref=f1e78]: Deniz\n`);
+  writeFileSync(join(run, "results.json"), JSON.stringify({ error: `filled ${SECRET} then ${INTERIM}` }));
+  writeFileSync(join(failure, "test-failed-1.png"), Buffer.from([0x89, 0x50, 0x4e, 0x47, 1, 2, 3]));
+  writeFileSync(join(failure, "trace.zip"), writeZip([
+    { name: "trace.trace", data: Buffer.from(`{"method":"fill","params":{"value":${JSON.stringify(SECRET)}}}\n`) },
+    { name: "resources/page@1.html", data: Buffer.from(`<input value="${SECRET.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}">`) },
+    { name: "resources/shot.jpeg", data: Buffer.from([0xff, 0xd8, 9, 9]) }
+  ]));
+  return { run, failure };
+}
+
+test("given a run whose failure artefacts hold the password, when the leaks are listed, then each file and trace entry is named without the password", () => {
+  // given
+  const { run } = leakyRun();
+  try {
+    // when
+    const leaks = leaksIn(run, SECRET);
+    // then
+    assert.deepEqual(leaks.sort(), [
+      "results.json",
+      "test-results/59-guardian-desktop-chrome/error-context.md",
+      "test-results/59-guardian-desktop-chrome/trace.zip!resources/page@1.html",
+      "test-results/59-guardian-desktop-chrome/trace.zip!trace.trace"
+    ], "every artefact that carries the password, raw, JSON-escaped or HTML-escaped, is named");
+    assert.ok(leaks.every((leak) => !leak.includes(SECRET)), "the listing never repeats the password");
+  } finally { rmSync(run, { recursive: true, force: true }); }
+});
+
+test("given a run whose failure artefacts hold passwords, when redacted, then no artefact holds one and the rest is unchanged", () => {
+  // given
+  const { run, failure } = leakyRun();
+  try {
+    // when
+    redactRun(run, SECRET);
+    // then
+    const context = readFileSync(join(failure, "error-context.md"), "utf8");
+    assert.equal(context, `- textbox "Passwort" [active] [ref=f1e68]: <redacted>\n- textbox "Neues Passwort" [ref=f1e70]: <redacted>\n- textbox "Vorname" [ref=f1e78]: Deniz\n`,
+      "a password textbox keeps its line without its value, whatever was typed, and other fields stay");
+    assert.ok(!readFileSync(join(run, "results.json"), "utf8").includes(INTERIM), "an interim password is redacted too");
+    assert.deepEqual([...readFileSync(join(failure, "test-failed-1.png"))], [0x89, 0x50, 0x4e, 0x47, 1, 2, 3], "an image is left alone");
+    const entries = readZip(readFileSync(join(failure, "trace.zip")));
+    assert.deepEqual(entries.map((entry) => entry.name), ["trace.trace", "resources/page@1.html", "resources/shot.jpeg"], "the trace keeps every entry in order");
+    assert.match(entries[0].data.toString(), /"value":"<redacted>"/, "the fill action no longer carries the password");
+    assert.deepEqual([...entries[2].data], [0xff, 0xd8, 9, 9], "a trace image is left alone");
+    assert.deepEqual(leaksIn(run, SECRET), [], "nothing in the run directory holds the password");
+  } finally { rmSync(run, { recursive: true, force: true }); }
+});
+
+test("given a trace the harness cannot read, when the run is secured, then it fails and names the file", () => {
+  // given
+  const { run, failure } = leakyRun();
+  writeFileSync(join(failure, "trace.zip"), Buffer.from("not a zip"));
+  try {
+    // when / then
+    assert.throws(() => secureRun(run, SECRET), /trace\.zip/, "an artefact that cannot be checked fails the run instead of passing unseen");
+  } finally { rmSync(run, { recursive: true, force: true }); }
+});
+
+test("given a run with leaking artefacts, when secured, then it passes once nothing holds the password", () => {
+  // given
+  const { run } = leakyRun();
+  try {
+    // when / then
+    assert.doesNotThrow(() => secureRun(run, SECRET));
+    assert.deepEqual(leaksIn(run, SECRET), []);
+  } finally { rmSync(run, { recursive: true, force: true }); }
+});
+
+test("given the runner, when its phases are read, then every Playwright phase is followed by securing the run directory", () => {
+  // given
+  const source = readFileSync(new URL("../acceptance/run.mjs", import.meta.url), "utf8");
+  // then
+  const runs = source.match(/(?<!function )playwright\(run, [^)]*\)/g) ?? [];
+  const secured = source.match(/(?<!function )playwright\(run, [^)]*\)[^\n]*\n\s*secureRun\(run, config\.password\)/g) ?? [];
+  assert.ok(runs.length >= 2, "the runner starts the matrix and the postflight");
+  assert.equal(secured.length, runs.length, "the run directory is secured right after each Playwright phase");
+  assert.match(source, /phase === "report"\) \{\n\s*secureRun\(run, config\.password\)/, "the report phase secures a run before it reads it");
+});
