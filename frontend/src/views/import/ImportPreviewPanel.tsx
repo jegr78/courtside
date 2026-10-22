@@ -50,6 +50,7 @@ export function ImportPreviewPanel({ sourceId, sourceEncoding, columnMode, previ
   async function chooseFile(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     setChosen(file);
+    refusal.clear();
     setOverride(undefined);
     setAsksEncoding(false);
     if (!file) return;

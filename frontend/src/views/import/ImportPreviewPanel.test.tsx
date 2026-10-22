@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { api, type ImportPreview, type ImportSource } from "../../api/client";
+import { api, ApiError, type ImportPreview, type ImportSource } from "../../api/client";
 import i18n from "../../i18n";
 import { ImportPreviewPanel } from "./ImportPreviewPanel";
 
@@ -270,6 +270,24 @@ describe("ImportPreviewPanel", () => {
 
     // then
     expect(screen.getByTestId("preview-ignored-columns")).toHaveTextContent("IBAN");
+  });
+
+  it("given a refused file, when another file is chosen, then the refusal no longer stands beside it", async () => {
+    // given
+    vi.spyOn(api, "createImportPreview").mockRejectedValue(new ApiError(400, {
+      type: "urn:courtside:error:import-snapshot-unreadable", title: "Bad Request", status: 400,
+      violations: [{ code: "import.snapshot.columns.countChanged", params: { expected: 4, found: 3 } }]
+    }));
+    show(undefined);
+    await userEvent.upload(screen.getByTestId("snapshot-file"), new File(["1;Jane;Doe\n"], "short.csv", { type: "text/csv" }));
+    await userEvent.click(screen.getByTestId("upload-snapshot"));
+    await screen.findByTestId("snapshot-refusal");
+
+    // when
+    await userEvent.upload(screen.getByTestId("snapshot-file"), new File(["1;Jane;Doe;active\n"], "full.csv", { type: "text/csv" }));
+
+    // then
+    expect(screen.queryByTestId("snapshot-refusal"), "the refusal belongs to the file that was refused").not.toBeInTheDocument();
   });
 
   it.each([
