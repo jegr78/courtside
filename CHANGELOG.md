@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.3.0-rc.4](https://github.com/jegr78/courtside/compare/v0.3.0-rc.3...v0.3.0-rc.4) (2026-10-22)
+
+
+### Bug fixes
+
+* **frontend:** open every dialog above the ones already open ([#1659](https://github.com/jegr78/courtside/issues/1659)) ([07df23e](https://github.com/jegr78/courtside/commit/07df23e5172b45d13d0b33d8ccab9d26b433b551))
+* **web:** log the exception with every 5xx the shared exception handler answers ([#1648](https://github.com/jegr78/courtside/issues/1648)) ([8f84b3f](https://github.com/jegr78/courtside/commit/8f84b3fa1631bb87a0fae88b867cfdef9e9ab4ae))
+
+
+### Performance
+
+* **web:** let browsers keep the content-hashed app assets ([#1655](https://github.com/jegr78/courtside/issues/1655)) ([a309b3a](https://github.com/jegr78/courtside/commit/a309b3aa235027190d769f73ab7071aeeafdfdf0))
+
 ## 0.3.0 (2026-10-18)
 
 ### Features
