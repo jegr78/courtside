@@ -158,6 +158,8 @@ jobs:
       - if: needs.select.outputs.branch != 'main' && steps.java.outputs.cache-hit != 'true'
         uses: ./.github/actions/maven-plugins
 
+      - uses: ./.github/actions/npm-network
+
       - name: Package the selected commit
         run: ./mvnw -B package -DskipTests
 

@@ -282,6 +282,7 @@ jobs:
           "$RUNNER_TEMP/courtside-security-base/mvnw" -B \
             -f "$RUNNER_TEMP/courtside-security-base/pom.xml" \
             com.github.eirslett:frontend-maven-plugin:install-node-and-npm
+      - uses: ./.github/actions/npm-network
       - name: Install protected-base assessment dependencies
         working-directory: ${{ runner.temp }}/courtside-security-base/frontend
         run: ./node/node ./node/node_modules/npm/bin/npm-cli.js ci --ignore-scripts
@@ -534,6 +535,7 @@ jobs:
             .mvn/maven.config
             .mvn/wrapper/maven-wrapper.properties
           cache-read-only: true
+      - uses: ./.github/actions/npm-network
       - name: Install frontend toolchain
         run: >
           ./mvnw -B
@@ -890,6 +892,7 @@ jobs:
             .mvn/maven.config
             .mvn/wrapper/maven-wrapper.properties
           cache-read-only: true
+      - uses: ./.github/actions/npm-network
       - name: Install security toolchain
         run: >
           ./mvnw -B

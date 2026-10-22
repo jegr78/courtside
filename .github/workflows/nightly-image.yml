@@ -189,6 +189,8 @@ jobs:
             .mvn/wrapper/maven-wrapper.properties
           cache-read-only: true
 
+      - uses: ./.github/actions/npm-network
+
       - name: Package the selected revision
         run: ./mvnw -B package -DskipTests
 

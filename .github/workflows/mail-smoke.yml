@@ -21,6 +21,8 @@ jobs:
         with:
           persist-credentials: false
 
+      - uses: ./.github/actions/npm-network
+
       - name: Configure the shipped mail server and deliver through it
         run: node tools/courtside.mail-smoke.mjs
         env:

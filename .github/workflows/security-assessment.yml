@@ -46,6 +46,7 @@ jobs:
             .mvn/maven.config
             .mvn/wrapper/maven-wrapper.properties
           cache-read-only: true
+      - uses: ./.github/actions/npm-network
       - name: Install assessment tool dependencies
         run: >
           ./mvnw -B
