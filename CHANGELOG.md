@@ -1,17 +1,5 @@
 # Changelog
 
-## [0.3.0-rc.5](https://github.com/jegr78/courtside/compare/v0.3.0-rc.4...v0.3.0-rc.5) (2026-10-22)
-
-
-### Bug fixes
-
-* **acceptance:** read server log levels the report can trust ([#1667](https://github.com/jegr78/courtside/issues/1667)) ([d027032](https://github.com/jegr78/courtside/commit/d0270324f98fd483b9b13452e8ea0681a325cc92))
-* **acceptance:** scroll each capture to the element it is named after ([#1674](https://github.com/jegr78/courtside/issues/1674)) ([a8207fd](https://github.com/jegr78/courtside/commit/a8207fd185cabb4d2143f860de0f8f7ccadc3d6b))
-* **appointments:** report a created series once and close its form ([#1675](https://github.com/jegr78/courtside/issues/1675)) ([5d0e791](https://github.com/jegr78/courtside/commit/5d0e7917433b19e9a6e2f4a91f4098c04deb04b1))
-* **frontend:** keep the phone booking dialog body readable under its pinned title ([#1677](https://github.com/jegr78/courtside/issues/1677)) ([eb92c80](https://github.com/jegr78/courtside/commit/eb92c80f67790e66155772d17137b497c3217479))
-* **import:** answer a refused member list at its upload and drop the earlier preview ([#1670](https://github.com/jegr78/courtside/issues/1670)) ([2277c32](https://github.com/jegr78/courtside/commit/2277c32883230e74c882287df2c877b2b64519eb))
-* **plan:** hide the desk plan's week navigation while offline ([#1676](https://github.com/jegr78/courtside/issues/1676)) ([9fe3c34](https://github.com/jegr78/courtside/commit/9fe3c341c5caf074e22d09b005796f3e9cd76190))
-
 ## 0.3.0 (2026-10-18)
 
 ### Features
@@ -31,6 +19,12 @@
 
 ### Bug fixes
 
+* **acceptance:** read server log levels the report can trust ([#1667](https://github.com/jegr78/courtside/issues/1667)) ([d027032](https://github.com/jegr78/courtside/commit/d0270324f98fd483b9b13452e8ea0681a325cc92))
+* **acceptance:** scroll each capture to the element it is named after ([#1674](https://github.com/jegr78/courtside/issues/1674)) ([a8207fd](https://github.com/jegr78/courtside/commit/a8207fd185cabb4d2143f860de0f8f7ccadc3d6b))
+* **appointments:** report a created series once and close its form ([#1675](https://github.com/jegr78/courtside/issues/1675)) ([5d0e791](https://github.com/jegr78/courtside/commit/5d0e7917433b19e9a6e2f4a91f4098c04deb04b1))
+* **frontend:** keep the phone booking dialog body readable under its pinned title ([#1677](https://github.com/jegr78/courtside/issues/1677)) ([eb92c80](https://github.com/jegr78/courtside/commit/eb92c80f67790e66155772d17137b497c3217479))
+* **import:** answer a refused member list at its upload and drop the earlier preview ([#1670](https://github.com/jegr78/courtside/issues/1670)) ([2277c32](https://github.com/jegr78/courtside/commit/2277c32883230e74c882287df2c877b2b64519eb))
+* **plan:** hide the desk plan's week navigation while offline ([#1676](https://github.com/jegr78/courtside/issues/1676)) ([9fe3c34](https://github.com/jegr78/courtside/commit/9fe3c341c5caf074e22d09b005796f3e9cd76190))
 * **frontend:** open every dialog above the ones already open ([#1659](https://github.com/jegr78/courtside/issues/1659)) ([07df23e](https://github.com/jegr78/courtside/commit/07df23e5172b45d13d0b33d8ccab9d26b433b551))
 * **web:** log the exception with every 5xx the shared exception handler answers ([#1648](https://github.com/jegr78/courtside/issues/1648)) ([8f84b3f](https://github.com/jegr78/courtside/commit/8f84b3fa1631bb87a0fae88b867cfdef9e9ab4ae))
 * **booking:** refuse a withdrawal from a cancelled booking ([#1606](https://github.com/jegr78/courtside/issues/1606)) ([bd8267a](https://github.com/jegr78/courtside/commit/bd8267a49fe91f9b83f5ccf85b8e07b9f758adaf)), closes [#1595](https://github.com/jegr78/courtside/issues/1595)
