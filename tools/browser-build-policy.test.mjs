@@ -35,8 +35,8 @@ function temporaryBuild(context) {
 
 function browserBuild(files = {}) {
   const directory = mkdtempSync(join(tmpdir(), "courtside-browser-build-"));
-  for (const [name, content] of Object.entries({ "index.html": "<script src='/assets/app.js'></script>",
-    "assets/app.js": "console.log('Courtside')", ...files })) {
+  for (const [name, content] of Object.entries({ "index.html": "<script src='/assets/app-A1b2C3d4.js'></script>",
+    "assets/app-A1b2C3d4.js": "console.log('Courtside')", ...files })) {
     const path = join(directory, name);
     mkdirSync(dirname(path), { recursive: true });
     writeFileSync(path, content);
@@ -51,7 +51,7 @@ test("given a production browser build, when inspecting its files, then only inv
 
   // when / then
   verifyBrowserBuild(clean);
-  assert.throws(() => verifyBrowserBuild(build({ "assets/app.js.map": "{}" })), /source maps/);
+  assert.throws(() => verifyBrowserBuild(build({ "assets/app-A1b2C3d4.js.map": "{}" })), /source maps/);
   assert.throws(() => verifyBrowserBuild(build({
     "robots.txt": "Disallow: /admin"
   })), /unreviewed metadata resource/);
@@ -64,19 +64,22 @@ test("given a production browser build, when inspecting its files, then only inv
   assert.throws(() => verifyBrowserBuild(build({
     "assets/app.mjs": "console.log('Courtside')"
   })), /unreviewed public resource/);
+  assert.throws(() => verifyBrowserBuild(build({
+    "assets/vendor.js": "console.log('Courtside')"
+  })), /unreviewed public resource/, "an asset without a content hash would be cached for a year under a reused name");
 });
 
 function memberSurfaceBuild(context) {
   const build = temporaryBuild(context);
   const surface = {
-    "index.html": "<script type=\"module\" crossorigin src=\"/assets/index-a1.js\"></script>",
-    "assets/index-a1.js": "import{s}from\"./shared-b2.js\";const de={\"app.name\":\"Courtside\"};"
-      + "s(()=>import(\"./AdminRoutes-c3.js\"),()=>import(\"./en-d4.js\"),\"administration-link\")",
-    "assets/shared-b2.js": "export const s=(...a)=>a",
-    "assets/AdminRoutes-c3.js": "export default ()=>({\"data-testid\":\"admin-shell\"})",
-    "assets/en-d4.js": "export default {\"app.name\":\"Courtside\"}",
-    "sw.js": "precacheAndRoute([{url:\"index.html\",revision:\"1\"},{url:\"assets/index-a1.js\",revision:null},"
-      + "{url:\"assets/shared-b2.js\",revision:null},{url:\"assets/en-d4.js\",revision:null}])"
+    "index.html": "<script type=\"module\" crossorigin src=\"/assets/index-A1a1A1a1.js\"></script>",
+    "assets/index-A1a1A1a1.js": "import{s}from\"./shared-B2b2B2b2.js\";const de={\"app.name\":\"Courtside\"};"
+      + "s(()=>import(\"./AdminRoutes-C3c3C3c3.js\"),()=>import(\"./en-D4d4D4d4.js\"),\"administration-link\")",
+    "assets/shared-B2b2B2b2.js": "export const s=(...a)=>a",
+    "assets/AdminRoutes-C3c3C3c3.js": "export default ()=>({\"data-testid\":\"admin-shell\"})",
+    "assets/en-D4d4D4d4.js": "export default {\"app.name\":\"Courtside\"}",
+    "sw.js": "precacheAndRoute([{url:\"index.html\",revision:\"1\"},{url:\"assets/index-A1a1A1a1.js\",revision:null},"
+      + "{url:\"assets/shared-B2b2B2b2.js\",revision:null},{url:\"assets/en-D4d4D4d4.js\",revision:null}])"
   };
   return (changes = {}) => build({ ...surface, ...changes });
 }
@@ -95,12 +98,12 @@ test("given an administration view reached statically from the entry, when check
 
   // when / then
   assert.throws(() => verifyMemberSurface(build({
-    "assets/index-a1.js": "const de={\"app.name\":\"Courtside\"};export const v=\"admin-setup-view\";"
-      + "import(\"./AdminRoutes-c3.js\");import(\"./en-d4.js\")"
-  })), /member entry carries the administration surface: admin-setup-view in assets\/index-a1\.js/);
+    "assets/index-A1a1A1a1.js": "const de={\"app.name\":\"Courtside\"};export const v=\"admin-setup-view\";"
+      + "import(\"./AdminRoutes-C3c3C3c3.js\");import(\"./en-D4d4D4d4.js\")"
+  })), /member entry carries the administration surface: admin-setup-view in assets\/index-A1a1A1a1\.js/);
   assert.throws(() => verifyMemberSurface(build({
-    "assets/shared-b2.js": "export const s=(...a)=>a;export const v={\"data-testid\":`admin-shell`}"
-  })), /administration surface: admin-shell in assets\/shared-b2\.js/,
+    "assets/shared-B2b2B2b2.js": "export const s=(...a)=>a;export const v={\"data-testid\":`admin-shell`}"
+  })), /administration surface: admin-shell in assets\/shared-B2b2B2b2\.js/,
   "a chunk the entry imports statically loads with it");
 });
 
@@ -110,11 +113,11 @@ test("given a second locale bundle in the entry, when checking the build, then i
 
   // when / then
   assert.throws(() => verifyMemberSurface(build({
-    "assets/shared-b2.js": "export const s=(...a)=>a;export const en={\"app.name\":\"Courtside\"}"
+    "assets/shared-B2b2B2b2.js": "export const s=(...a)=>a;export const en={\"app.name\":\"Courtside\"}"
   })), /member entry carries 2 locale bundles instead of the default one/);
   assert.throws(() => verifyMemberSurface(build({
-    "assets/index-a1.js": "import(\"./AdminRoutes-c3.js\");import(\"./en-d4.js\");export const x={\"app\":1}",
-    "assets/shared-b2.js": "export const de={\"app.name\":\"Courtside\"}"
+    "assets/index-A1a1A1a1.js": "import(\"./AdminRoutes-C3c3C3c3.js\");import(\"./en-D4d4D4d4.js\");export const x={\"app\":1}",
+    "assets/shared-B2b2B2b2.js": "export const de={\"app.name\":\"Courtside\"}"
   })), /member entry carries 0 locale bundles instead of the default one/,
   "without the default bundle a failed fetch would leave keys on screen");
 });
@@ -125,13 +128,13 @@ test("given a build whose markers no longer match anything, when checking it, th
 
   // when / then
   assert.throws(() => verifyMemberSurface(build({
-    "assets/AdminRoutes-c3.js": "export default ()=>({\"data-testid\":\"board-shell\"})"
+    "assets/AdminRoutes-C3c3C3c3.js": "export default ()=>({\"data-testid\":\"board-shell\"})"
   })), /no longer identifies its administration surface/);
   assert.throws(() => verifyMemberSurface(build({
-    "assets/en-d4.js": "export default {\"title\":\"Courtside\"}"
+    "assets/en-D4d4D4d4.js": "export default {\"title\":\"Courtside\"}"
   })), /ships no locale bundle outside the member entry/);
   assert.throws(() => verifyMemberSurface(build({
-    "index.html": "<script src=\"/assets/index-a1.js\"></script>"
+    "index.html": "<script src=\"/assets/index-A1a1A1a1.js\"></script>"
   })), /no module entry script/);
   assert.throws(() => verifyMemberSurface(build({ "sw.js": "self.skipWaiting()" })), /no precache manifest/);
 });
@@ -143,15 +146,15 @@ test("given the precache, when it holds administration or misses the member surf
 
   // when / then
   assert.throws(() => verifyMemberSurface(build({
-    "sw.js": precache(["index.html", "assets/index-a1.js", "assets/shared-b2.js", "assets/en-d4.js",
-      "assets/AdminRoutes-c3.js"])
-  })), /precache holds the administration surface in assets\/AdminRoutes-c3\.js/);
+    "sw.js": precache(["index.html", "assets/index-A1a1A1a1.js", "assets/shared-B2b2B2b2.js", "assets/en-D4d4D4d4.js",
+      "assets/AdminRoutes-C3c3C3c3.js"])
+  })), /precache holds the administration surface in assets\/AdminRoutes-C3c3C3c3\.js/);
   assert.throws(() => verifyMemberSurface(build({
-    "sw.js": precache(["index.html", "assets/index-a1.js", "assets/en-d4.js"])
-  })), /precache misses assets\/shared-b2\.js/);
+    "sw.js": precache(["index.html", "assets/index-A1a1A1a1.js", "assets/en-D4d4D4d4.js"])
+  })), /precache misses assets\/shared-B2b2B2b2\.js/);
   assert.throws(() => verifyMemberSurface(build({
-    "sw.js": precache(["index.html", "assets/index-a1.js", "assets/shared-b2.js"])
-  })), /precache misses assets\/en-d4\.js/, "an offline launch in the other language needs its bundle");
+    "sw.js": precache(["index.html", "assets/index-A1a1A1a1.js", "assets/shared-B2b2B2b2.js"])
+  })), /precache misses assets\/en-D4d4D4d4\.js/, "an offline launch in the other language needs its bundle");
 });
 
 test("given every form an origin is written in, when the extractor reads it, then the host it names is the host a browser dials", () => {
@@ -247,8 +250,8 @@ test("given every declared credential and disclosure pattern, when its specimen 
 
   // when / then
   for (const { id, specimen } of declared) {
-    assert.throws(() => verifyBrowserBuild(build({ "assets/planted.js": specimen.join("") })),
-      new RegExp(`contains ${id} material in assets/planted.js`),
+    assert.throws(() => verifyBrowserBuild(build({ "assets/planted-P5p5P5p5.js": specimen.join("") })),
+      new RegExp(`contains ${id} material in assets/planted-P5p5P5p5.js`),
       `${id} no longer recognises the specimen its justification names`);
     assert.ok(specimen.length > 1,
       "a specimen is written in pieces so that no tracked file carries a credential-shaped string");
@@ -263,11 +266,11 @@ test("given shipped markup, styles and scripts, when reading their comments, the
 
   // when / then
   assert.throws(() => verifyBrowserBuild(build({
-    "assets/app.js": "/*! Courtside build 2026-09-10 */\nconsole.log('Courtside')"
-  })), /unreviewed comment in assets\/app\.js/);
+    "assets/app-A1b2C3d4.js": "/*! Courtside build 2026-09-10 */\nconsole.log('Courtside')"
+  })), /unreviewed comment in assets\/app-A1b2C3d4\.js/);
   assert.throws(() => verifyBrowserBuild(build({
-    "assets/app.css": "/* staging override */\nbody { margin: 0 }"
-  })), /unreviewed comment in assets\/app\.css/);
+    "assets/app-A1b2C3d4.css": "/* staging override */\nbody { margin: 0 }"
+  })), /unreviewed comment in assets\/app-A1b2C3d4\.css/);
   assert.throws(() => verifyBrowserBuild(build({
     "index.html": "<!-- deployed from the release runner -->"
   })), /unreviewed comment in index\.html/);
@@ -282,7 +285,7 @@ test("given shipped markup, styles and scripts, when reading their comments, the
   assert.throws(() => verifyBrowserBuild(build({
     "index.html": "<style>/* staging override */</style>"
   })), /unreviewed comment in index\.html/);
-  verifyBrowserBuild(build({ "assets/app.js": "const pattern = /\\/*/; console.log(pattern)" }));
+  verifyBrowserBuild(build({ "assets/app-A1b2C3d4.js": "const pattern = /\\/*/; console.log(pattern)" }));
 });
 
 test("given shipped resources, when reading the origins they name, then an unreviewed host is refused", (context) => {
@@ -292,19 +295,19 @@ test("given shipped resources, when reading the origins they name, then an unrev
 
   // when / then
   assert.throws(() => verifyBrowserBuild(build({
-    "assets/app.js": "fetch('https://telemetry.example.invalid/collect')"
-  })), /unreviewed origin telemetry\.example\.invalid in assets\/app\.js/);
+    "assets/app-A1b2C3d4.js": "fetch('https://telemetry.example.invalid/collect')"
+  })), /unreviewed origin telemetry\.example\.invalid in assets\/app-A1b2C3d4\.js/);
   assert.throws(() => verifyBrowserBuild(build({
     "icon.svg": "<svg xmlns=\"http://www.w3.org.example.invalid/2000/svg\"></svg>"
   })), /unreviewed origin www\.w3\.org\.example\.invalid in icon\.svg/);
   assert.throws(() => verifyBrowserBuild(build({
-    "assets/app.js": "fetch('https://github.com@evil.example/collect')"
+    "assets/app-A1b2C3d4.js": "fetch('https://github.com@evil.example/collect')"
   })), /unreviewed origin evil\.example/, "userinfo names the host the browser will not contact");
   assert.throws(() => verifyBrowserBuild(build({
-    "assets/app.js": "fetch('HTTPS://EVIL.EXAMPLE/collect')"
+    "assets/app-A1b2C3d4.js": "fetch('HTTPS://EVIL.EXAMPLE/collect')"
   })), /unreviewed origin evil\.example/);
   assert.throws(() => verifyBrowserBuild(build({
-    "assets/app.js": "new WebSocket('wss://evil.example/stream')"
+    "assets/app-A1b2C3d4.js": "new WebSocket('wss://evil.example/stream')"
   })), /unreviewed origin evil\.example/);
   assert.throws(() => verifyBrowserBuild(build({
     "index.html": "<script src=\"//evil.example/a.js\"></script>"
