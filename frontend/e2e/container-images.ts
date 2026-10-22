@@ -47,5 +47,6 @@ export function browserSetupImages(): string[] {
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  process.stdout.write(`${browserSetupImages().join("\n")}\n`);
+  const images = process.argv[2] === "--browser" ? [PINNED_BROWSER_IMAGE] : browserSetupImages();
+  process.stdout.write(`${images.join("\n")}\n`);
 }

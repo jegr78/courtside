@@ -168,8 +168,10 @@ jobs:
         run: |
           npm ci
           npm run typecheck
-          npx playwright install --with-deps chromium
-          npm test
+          image="$(node ../frontend/e2e/container-images.ts --browser)"
+          node ../tools/pull-images.mjs "$image"
+          docker run --rm --ipc=host --user "$(id -u):$(id -g)" --env HOME=/tmp \
+            --volume "$GITHUB_WORKSPACE:$GITHUB_WORKSPACE" --workdir "$PWD" "$image" npm test
       - id: actionlint
         name: Read the locked workflow linter version
         run: node tools/workflow-lint.mjs --github-output "$GITHUB_OUTPUT"

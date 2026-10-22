@@ -1,8 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
+import { createRequire } from "node:module";
+import { PINNED_BROWSER_IMAGE } from "../frontend/e2e/container-images.ts";
 
 const json = (path) => JSON.parse(readFileSync(new URL(`../${path}`, import.meta.url), "utf8"));
+const yaml = createRequire(new URL("../frontend/package.json", import.meta.url))("js-yaml");
 
 test("given the acceptance package, when its browser dependencies are read, then they equal the frontend's pins", () => {
   // given
@@ -1559,4 +1562,28 @@ test("given wrapped base64 or half of the password, when checked, then each is a
     // when / then
     assert.deepEqual(leaksIn(run, SECRET).sort(), ["half.txt", "wrapped.txt"], "a line-wrapped base64 body and a substantial part of the password are found");
   } finally { rmSync(run, { recursive: true, force: true }); }
+});
+
+test("given the pinned browser image, when its Playwright release is read, then the harness pins the same version", () => {
+  // given
+  const acceptance = json("acceptance/package.json");
+  // when
+  const release = /\/playwright:v([\d.]+)-/.exec(PINNED_BROWSER_IMAGE)?.[1];
+  // then
+  assert.equal(release, acceptance.dependencies["@playwright/test"], "the self-test drives the browsers the image ships");
+});
+
+test("given the build workflow, when the harness self-test runs, then it uses the pinned image instead of installing browsers", () => {
+  // given
+  const build = yaml.load(readFileSync(new URL("../.github/workflows/build.yml", import.meta.url), "utf8"));
+  // when
+  const run = build.jobs.tooling.steps.find((step) => step.name === "Verify the acceptance harness").run;
+  const lines = run.split("\n").map((line) => line.trim());
+  // then
+  assert.doesNotMatch(run, /playwright install/, "no browser or system package download");
+  assert.ok(lines.includes('image="$(node ../frontend/e2e/container-images.ts --browser)"'), "the image comes from its single source");
+  const pull = lines.indexOf('node ../tools/pull-images.mjs "$image"');
+  const start = lines.findIndex((line) => line.startsWith("docker run"));
+  assert.ok(pull >= 0 && pull < start, "the image is pulled with retries before it starts");
+  assert.match(run, /"\$image" npm test\s*$/, "the self-test runs inside the pinned image");
 });
