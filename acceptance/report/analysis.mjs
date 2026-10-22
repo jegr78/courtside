@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { attribute, classifyErrors } from "../lib/core.mjs";
+import { attribute, classifyErrors, logWindow } from "../lib/core.mjs";
 
 const P95 = "histogram_quantile(0.95, sum by (le) (rate(http_server_requests_seconds_bucket[1m])))";
 const jsonl = (path) => existsSync(path) ? readFileSync(path, "utf8").trim().split("\n").filter(Boolean).map((line) => JSON.parse(line)) : [];
@@ -51,9 +51,8 @@ export async function analyse(run, config) {
   const tests = testWindows(results);
   const from = existsSync(join(run, "run-started")) ? readFileSync(join(run, "run-started"), "utf8").trim() : "";
   const to = tests.map((test) => test.end).sort().at(-1) ?? new Date().toISOString();
-  const lines = Object.values(config.logs).filter((path) => existsSync(path))
-    .flatMap((path) => readFileSync(path, "utf8").split("\n"))
-    .filter((line) => { const at = line.slice(0, 24); return at >= from && at <= to; });
+  const { lines, sources } = logWindow(config.logs, from, to, (path) => existsSync(path) ? readFileSync(path, "utf8") : null);
+  writeFileSync(join(run, "log-sources.json"), JSON.stringify(sources, null, 2));
   const byStep = attribute(lines, steps);
   const byTest = attribute(lines, tests);
   const attribution = byStep.map((line, index) => line.steps.length ? line : { ...byTest[index], viaTest: true });

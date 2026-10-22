@@ -85,12 +85,42 @@ const instant = (line) => {
   return Date.parse(`${match[1]}${(match[2] ?? "").slice(0, 4)}${match[3] ?? "Z"}`);
 };
 
+const LEADING_STAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:?\d{2})\s/;
+
+// An ECS JSON line carries its level in log.level; words in its message say nothing about it.
+export function levelOf(line) {
+  const body = line.replace(LEADING_STAMP, "");
+  if (body.startsWith("{")) {
+    try {
+      const entry = JSON.parse(body);
+      const level = String(entry.log?.level ?? entry["log.level"] ?? entry.level ?? "").toUpperCase();
+      return level === "ERROR" || level === "WARN" ? level : null;
+    } catch { /* not JSON, read it as text */ }
+  }
+  return body.match(LEVEL)?.[1] ?? null;
+}
+
+// The window filter needs the prefix `docker logs --timestamps` writes; a file without it is unread, not empty.
+export function logWindow(files, from, to, read) {
+  const lines = [];
+  const sources = Object.entries(files).map(([name, path]) => {
+    const text = read(path);
+    if (text === null) return { name, state: "missing", lines: 0, inWindow: 0 };
+    const all = text.split("\n").filter(Boolean);
+    const stamped = all.filter((line) => LEADING_STAMP.test(line));
+    const inWindow = stamped.filter((line) => { const at = line.slice(0, 24); return at >= from && at <= to; });
+    lines.push(...inWindow);
+    return { name, state: all.length && !stamped.length ? "unread" : "read", lines: all.length, inWindow: inWindow.length };
+  });
+  return { lines, sources };
+}
+
 export function attribute(lines, steps) {
-  return lines.filter((line) => LEVEL.test(line)).map((line) => {
+  return lines.filter((line) => levelOf(line)).map((line) => {
     const at = instant(line);
     const hits = steps.filter((s) => at >= Date.parse(s.start) - 500 && at <= Date.parse(s.end) + 500)
       .map(({ project, persona, name }) => ({ project, persona, name }));
-    return { at: Number.isNaN(at) ? null : new Date(at).toISOString(), line: line.slice(0, 600), level: line.match(LEVEL)[1], steps: hits, ambiguous: hits.length > 1 };
+    return { at: Number.isNaN(at) ? null : new Date(at).toISOString(), line: line.slice(0, 600), level: levelOf(line), steps: hits, ambiguous: hits.length > 1 };
   });
 }
 

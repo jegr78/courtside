@@ -301,7 +301,7 @@ test("given club bookings on the window's weekend, when the weekend journeys are
   assert.deepEqual(conflicts, ["early", "sunday"], "a booking before the latest later opening and every Sunday booking would be displaced");
 });
 
-import { admitted, answers, bookingsBeyondWindow, sweepSlots, weeksToClear, attribute, classify, classifyErrors, foreignImportSources, foreignWordings, IMPORT_SOURCE_PREFIX, occupying, replayEntries } from "../acceptance/lib/core.mjs";
+import { admitted, answers, bookingsBeyondWindow, sweepSlots, weeksToClear, attribute, levelOf, logWindow, classify, classifyErrors, foreignImportSources, foreignWordings, IMPORT_SOURCE_PREFIX, occupying, replayEntries } from "../acceptance/lib/core.mjs";
 import { claimRunDirectory, harnessCommit } from "../acceptance/lib/run-directory.mjs";
 import { findExecutable } from "../acceptance/lib/executable.mjs";
 import { mkdtempSync, writeFileSync, mkdirSync, chmodSync, rmSync } from "node:fs";
@@ -496,6 +496,36 @@ test("given two overlapping steps, when an error falls in both windows, then it 
   assert.deepEqual(result[1].steps, [], "a line outside every step stays unattributed");
 });
 
+test("given an ECS JSON line, when its level is read, then it comes from log.level and not from words in the message", () => {
+  // given
+  const info = '2030-03-11T10:00:07.123456789Z {"@timestamp":"2030-03-11T10:00:07Z","log":{"level":"INFO"},"message":"Answering 422 for urn:courtside:error:booking-rules-violated"}';
+  const warn = '2030-03-11T10:00:08Z {"log":{"level":"WARN"},"message":"Security event"}';
+  const plain = "2030-03-11T10:00:09Z [warn] upstream timed out";
+  // when, then
+  assert.equal(levelOf(info), null, "an INFO line naming an error URN is no error");
+  assert.equal(levelOf(warn), "WARN");
+  assert.equal(levelOf(plain), "warn", "a plain line falls back to the text pattern");
+  assert.deepEqual(attribute([info, warn], []).map((line) => line.level), ["WARN"]);
+});
+
+test("given log files with and without the docker timestamp, when the run window is read, then an untimestamped file is named unread instead of counting zero", () => {
+  // given
+  const files = { app: "app.log", proxy: "proxy.log", gone: "gone.log" };
+  const contents = {
+    "app.log": '{"@timestamp":"2030-03-11T10:00:07Z","log":{"level":"WARN"},"message":"Security event"}\n{"log":{"level":"INFO"}}\n',
+    "proxy.log": "2030-03-11T09:59:00Z before\n2030-03-11T10:00:05.5Z [warn] inside\n2030-03-11T10:00:06 [warn] local time without a zone\n2030-03-11T11:00:00Z after\n"
+  };
+  // when
+  const window = logWindow(files, "2030-03-11T10:00:00Z", "2030-03-11T10:30:00Z", (path) => contents[path] ?? null);
+  // then
+  assert.deepEqual(window.sources, [
+    { name: "app", state: "unread", lines: 2, inWindow: 0 },
+    { name: "proxy", state: "read", lines: 4, inWindow: 1 },
+    { name: "gone", state: "missing", lines: 0, inWindow: 0 }
+  ]);
+  assert.deepEqual(window.lines, ["2030-03-11T10:00:05.5Z [warn] inside"], "only stamped lines inside the window are attributed");
+});
+
 test("given a run directory that already holds results, when claimed, then it is refused, and a fresh one is created", () => {
   // given
   const root = mkdtempSync(join(tmpdir(), "acceptance-run-"));
@@ -632,6 +662,27 @@ test("given a reason that names a username, an address, a host, a person or an i
   }
 });
 
+test("given an unread and a read log file, when the server logs are summarised, then the unread file is named and the count is limited to the files read", () => {
+  // given
+  const logs = [{ steps: [{ name: "book" }] }, { steps: [] }];
+  const sources = [{ name: "app", state: "unread", lines: 757, inWindow: 0 }, { name: "proxy", state: "read", lines: 3, inWindow: 1 }, { name: "gone", state: "missing", lines: 0, inWindow: 0 }];
+  // when
+  const summary = serverLogSummary(logs, sources);
+  // then
+  assert.equal(summary.counted, "2 WARN or ERROR lines in the files read, 1 not attributed to a step.");
+  assert.deepEqual(summary.files, ["app: 757 lines without the timestamp docker logs --timestamps writes, not read", "proxy: 3 lines, 1 in the run window", "gone: file missing, not read"]);
+  assert.deepEqual(summary.unread, ["app", "gone"], "the report lists every file it could not read");
+});
+
+test("given every log file read, when the server logs are summarised, then the count stands for the whole run", () => {
+  // when
+  const summary = serverLogSummary([], [{ name: "app", state: "read", lines: 759, inWindow: 640 }]);
+  // then
+  assert.equal(summary.counted, "0 WARN or ERROR lines, 0 not attributed to a step.");
+  assert.deepEqual(summary.unread, []);
+  assert.equal(serverLogSummary([], []).counted, "No log files were configured.", "without files nothing is counted");
+});
+
 test("given a configuration and a roster, when the forbidden terms are built, then every disposable, every roster name and the bare host are in them", () => {
   // given
   const config = { baseUrl: "https://club.example.org:8443", personas: { admin: "jane.doe", disposable: "john.major" }, disposables: ["john.major", "mary.roe"] };
@@ -665,7 +716,7 @@ test("given roster entries named like ordinary words, when the summary uses thos
   assert.throws(() => assertPrivacySafe("Seen by Admin only.", terms), /person/, "a capitalised name part alone is refused");
 });
 
-import { coverageOf } from "../acceptance/report/html.mjs";
+import { coverageOf, serverLogSummary } from "../acceptance/report/html.mjs";
 
 test("given Playwright results with passed, skipped and failed cells, when coverage is read, then setup and discovery are left out and each cell keeps its status", () => {
   // given
