@@ -100,8 +100,9 @@ test("given a headerless export, when the admin describes it by column position 
       expect(problem.type, "product: the file is refused as unreadable for this source").toBe("urn:courtside:error:import-snapshot-unreadable");
       expect(problem.violations, "product: the refusal names both column counts")
         .toEqual([{ code: "import.snapshot.columns.countChanged", params: { expected: columns, found: columns - 1 } }]);
-      await expect(page.getByRole("alert"), "product: the board reads the refusal with both counts").toContainText(String(columns - 1));
-      await capture(page, "import-headerless-refused", { expectedStatuses: [400] });
+      const refusal = page.getByTestId("import-part-preview").getByRole("alert");
+      await expect(refusal, "product: the board reads the refusal with both counts at the upload").toContainText(String(columns - 1));
+      await capture(page, "import-headerless-refused", { expectedStatuses: [400], subject: refusal });
     });
     // then
     await step("admin", "nothing reached the roster", async () => {
