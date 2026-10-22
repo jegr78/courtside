@@ -25,10 +25,12 @@ function files(directory) {
   });
 }
 
-function carriesPassword(postData) {
+const PASSWORD_FIELD = /(^|[&{,"\s])"?(pass(word|wort)?|secret|credential)"?\s*[=:]/i;
+
+function carriesPassword(postData, stored) {
   if (!postData) return false;
   return (postData.params ?? []).some((param) => PASSWORD_NAME.test(param.name ?? ""))
-    || /(^|[&{,"\s])"?(pass(word|wort)?|secret|credential)"?\s*[=:]/i.test(postData.text ?? "");
+    || PASSWORD_FIELD.test(postData.text ?? "") || PASSWORD_FIELD.test(stored?.toString("utf8") ?? "");
 }
 
 function scrubNode(node) {
@@ -40,6 +42,7 @@ function scrubNode(node) {
 }
 
 function scrubTrace(entries) {
+  const byName = new Map(entries.map((entry) => [entry.name, entry.data]));
   const dropped = new Set();
   const scrubbed = entries.map((entry) => {
     if (!/\.(trace|network)$/.test(entry.name)) return entry;
@@ -48,7 +51,7 @@ function scrubTrace(entries) {
       let event;
       try { event = JSON.parse(line); } catch { return line; }
       const postData = event.snapshot?.request?.postData;
-      if (carriesPassword(postData)) {
+      if (carriesPassword(postData, byName.get(postData?._file) ?? byName.get(`resources/${postData?._sha1}`))) {
         if (postData._file) dropped.add(postData._file);
         if (postData._sha1) dropped.add(`resources/${postData._sha1}`);
         event.snapshot.request.postData = { mimeType: postData.mimeType, text: MASK, params: [] };

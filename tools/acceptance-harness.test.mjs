@@ -1421,12 +1421,14 @@ test("given a trace with a password request body and a typed password field, whe
   const network = traceLines(
     { type: "resource-snapshot", snapshot: { request: { url: "https://club.example.org/api/session", method: "POST",
       postData: { mimeType: "application/x-www-form-urlencoded", text: "username=jane.doe&password=typed-elsewhere", params: [{ name: "username", value: "jane.doe" }, { name: "password", value: "typed-elsewhere" }], _file: "resources/body.dat" } } } },
-    { type: "resource-snapshot", snapshot: { request: { url: "https://club.example.org/api/bookings", method: "POST", postData: { mimeType: "application/json", text: "{\"court\":1}", params: [], _file: "resources/booking.dat" } } } });
+    { type: "resource-snapshot", snapshot: { request: { url: "https://club.example.org/api/bookings", method: "POST", postData: { mimeType: "application/json", text: "{\"court\":1}", params: [], _file: "resources/booking.dat" } } } },
+    { type: "resource-snapshot", snapshot: { request: { url: "https://club.example.org/api/session/reauthentication", method: "POST", postData: { mimeType: "application/json", text: "", params: [], _file: "resources/reauth.json" } } } });
   const page = traceLines({ type: "frame-snapshot", snapshot: { html: ["HTML", {}, ["BODY", {}, ["INPUT", { __playwright_value_: "typed-elsewhere", type: "password", name: "password" }], ["INPUT", { __playwright_value_: "jane.doe", name: "username" }]]] } });
   writeFileSync(join(run, "trace.zip"), writeZip([
     { name: "1-trace.network", data: network }, { name: "1-trace.trace", data: page },
     { name: "resources/body.dat", data: Buffer.from("username=jane.doe&password=typed-elsewhere") },
-    { name: "resources/booking.dat", data: Buffer.from("{\"court\":1}") }]));
+    { name: "resources/booking.dat", data: Buffer.from("{\"court\":1}") },
+    { name: "resources/reauth.json", data: Buffer.from("{\"password\":\"typed-elsewhere\"}") }]));
   try {
     // when
     redactRun(run, SECRET);
@@ -1435,6 +1437,7 @@ test("given a trace with a password request body and a typed password field, whe
     assert.ok(!Object.values(entries).some((text) => text.includes("typed-elsewhere")), "no entry keeps a password the harness did not even know");
     assert.equal(entries["resources/booking.dat"], "{\"court\":1}", "a body without a password field stays");
     assert.equal(entries["resources/body.dat"], undefined, "the sign-in body is dropped");
+    assert.equal(entries["resources/reauth.json"], undefined, "a body kept only in its resource file is read and dropped");
     assert.match(entries["1-trace.trace"], /"__playwright_value_":"jane.doe"/, "a text field keeps its snapshot value");
   } finally { rmSync(run, { recursive: true, force: true }); }
 });
