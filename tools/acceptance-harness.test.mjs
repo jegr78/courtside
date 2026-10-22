@@ -1412,3 +1412,97 @@ test("given a jar, when the cookie header for a request is built, then only cook
   assert.equal(cookieHeader(jar, new URL("https://club.example.org/api/session"), 100), "a=1", "a foreign host, another path and an expired cookie stay home");
   assert.equal(cookieHeader(jar, new URL("http://club.example.org/admin/x"), 5), "b=2; d=4", "a secure cookie never goes over plain http");
 });
+
+const traceLines = (...events) => Buffer.from(events.map((event) => JSON.stringify(event)).join("\n") + "\n");
+
+test("given a trace with a password request body and a typed password field, when redacted, then both are gone by structure whatever the password was", () => {
+  // given
+  const run = mkdtempSync(join(tmpdir(), "acceptance-redaction-"));
+  const network = traceLines(
+    { type: "resource-snapshot", snapshot: { request: { url: "https://club.example.org/api/session", method: "POST",
+      postData: { mimeType: "application/x-www-form-urlencoded", text: "username=jane.doe&password=typed-elsewhere", params: [{ name: "username", value: "jane.doe" }, { name: "password", value: "typed-elsewhere" }], _file: "resources/body.dat" } } } },
+    { type: "resource-snapshot", snapshot: { request: { url: "https://club.example.org/api/bookings", method: "POST", postData: { mimeType: "application/json", text: "{\"court\":1}", params: [], _file: "resources/booking.dat" } } } });
+  const page = traceLines({ type: "frame-snapshot", snapshot: { html: ["HTML", {}, ["BODY", {}, ["INPUT", { __playwright_value_: "typed-elsewhere", type: "password", name: "password" }], ["INPUT", { __playwright_value_: "jane.doe", name: "username" }]]] } });
+  writeFileSync(join(run, "trace.zip"), writeZip([
+    { name: "1-trace.network", data: network }, { name: "1-trace.trace", data: page },
+    { name: "resources/body.dat", data: Buffer.from("username=jane.doe&password=typed-elsewhere") },
+    { name: "resources/booking.dat", data: Buffer.from("{\"court\":1}") }]));
+  try {
+    // when
+    redactRun(run, SECRET);
+    // then
+    const entries = Object.fromEntries(readZip(readFileSync(join(run, "trace.zip"))).map((entry) => [entry.name, entry.data.toString("utf8")]));
+    assert.ok(!Object.values(entries).some((text) => text.includes("typed-elsewhere")), "no entry keeps a password the harness did not even know");
+    assert.equal(entries["resources/booking.dat"], "{\"court\":1}", "a body without a password field stays");
+    assert.equal(entries["resources/body.dat"], undefined, "the sign-in body is dropped");
+    assert.match(entries["1-trace.trace"], /"__playwright_value_":"jane.doe"/, "a text field keeps its snapshot value");
+  } finally { rmSync(run, { recursive: true, force: true }); }
+});
+
+test("given the password inside a base64 token, when redacted, then the whole token is masked and no edge of it is left", () => {
+  // given
+  const run = mkdtempSync(join(tmpdir(), "acceptance-redaction-"));
+  const token = Buffer.from(`xy${SECRET}z`).toString("base64");
+  writeFileSync(join(run, "body.txt"), `Authorization: Basic ${token}\n`);
+  try {
+    // when
+    redactRun(run, SECRET);
+    // then
+    assert.equal(readFileSync(join(run, "body.txt"), "utf8"), "Authorization: Basic <redacted>\n", "the token goes as a whole");
+  } finally { rmSync(run, { recursive: true, force: true }); }
+});
+
+const maskedLayers = (secret) => ({
+  "base64 of the form-encoded body": Buffer.from(`password=${new URLSearchParams({ p: secret }).toString().slice(2)}`).toString("base64"),
+  "base64 of a JSON body": Buffer.from(JSON.stringify({ username: "jane.doe", password: secret })).toString("base64url")
+});
+
+for (const [form, text] of Object.entries(maskedLayers(SECRET))) {
+  test(`given the password as ${form}, when the run is secured, then the masking removes it`, () => {
+    // given
+    const run = mkdtempSync(join(tmpdir(), "acceptance-redaction-"));
+    writeFileSync(join(run, "body.txt"), text);
+    try {
+      // when
+      const before = leaksIn(run, SECRET);
+      secureRun(run, SECRET);
+      // then
+      assert.deepEqual(before, ["body.txt"], `the check decodes ${form}`);
+      assert.deepEqual(leaksIn(run, SECRET), [], `the masking knows ${form}`);
+    } finally { rmSync(run, { recursive: true, force: true }); }
+  });
+}
+
+const deeperLayers = (secret) => ({
+  "percent-encoded base64": encodeURIComponent(Buffer.from(`k=${secret}`).toString("base64")),
+  "base64 of partly escaped JSON": Buffer.from(JSON.stringify({ password: secret }).replace(/[!&<>]/g, (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, "0")}`)).toString("base64")
+});
+
+for (const [form, text] of Object.entries(deeperLayers(SECRET))) {
+  test(`given the password as ${form}, when the run is secured, then the check finds it and the run is masked or fails`, () => {
+    // given
+    const run = mkdtempSync(join(tmpdir(), "acceptance-redaction-"));
+    writeFileSync(join(run, "body.txt"), text);
+    try {
+      // when
+      const before = leaksIn(run, SECRET);
+      let failed = false;
+      try { secureRun(run, SECRET); } catch { failed = true; }
+      // then
+      assert.deepEqual(before, ["body.txt"], `the check decodes ${form} through every layer`);
+      assert.ok(failed || leaksIn(run, SECRET).length === 0, `${form} is either masked or fails the run`);
+    } finally { rmSync(run, { recursive: true, force: true }); }
+  });
+}
+
+test("given wrapped base64 or half of the password, when checked, then each is a leak", () => {
+  // given
+  const run = mkdtempSync(join(tmpdir(), "acceptance-redaction-"));
+  writeFileSync(join(run, "wrapped.txt"), Buffer.from(`password=${SECRET}&more=1`).toString("base64").replace(/(.{12})/g, "$1\r\n"));
+  writeFileSync(join(run, "half.txt"), `typed ${SECRET.slice(0, Math.ceil(SECRET.length * 0.6))} then stopped`);
+  writeFileSync(join(run, "clean.txt"), "nothing to see");
+  try {
+    // when / then
+    assert.deepEqual(leaksIn(run, SECRET).sort(), ["half.txt", "wrapped.txt"], "a line-wrapped base64 body and a substantial part of the password are found");
+  } finally { rmSync(run, { recursive: true, force: true }); }
+});
