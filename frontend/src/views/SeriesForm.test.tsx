@@ -246,11 +246,11 @@ describe("SeriesForm", () => {
 
   it("given a series with a skipped date, when its notice is shown, then each skipped date is named", () => {
     // when
-    render(<SeriesCreatedNotice result={{ seriesId: "series-1", bookingIds: ["booking-1"], skipped: ["2026-09-14T16:00:00Z"] }}
+    const { container } = render(<SeriesCreatedNotice result={{ seriesId: "series-1", bookingIds: ["booking-1"], skipped: ["2026-09-14T16:00:00Z"] }}
       durationMinutes={60} timeZone="Europe/Berlin" />);
 
     // then — one blocked date does not undo the rest, and the caller has to see which one it was
-    expect(screen.getByText(i18n.t("series.created", { created: 1 }))).toBeInTheDocument();
+    expect(container).toHaveTextContent(i18n.t("series.created", { created: 1 }));
     expect(screen.getByTestId("series-skipped")).toHaveTextContent("14");
   });
 
