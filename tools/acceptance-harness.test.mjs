@@ -1593,7 +1593,7 @@ import { showSubject } from "../acceptance/lib/subject.mjs";
 const fakeSubject = (top, height = 40) => {
   let y = top;
   return { scrolled: false,
-    async scrollIntoViewIfNeeded() { this.scrolled = true; if (y >= 900 || y < 0) y = 120; },
+    async evaluate() { this.scrolled = true; if (y >= 900 || y < 0) y = 430; },
     async boundingBox() { return { x: 0, y, width: 300, height }; } };
 };
 
@@ -1609,14 +1609,14 @@ test("given a capture subject below the fold, when it is shown, then it is scrol
 
 test("given a capture subject that renders nothing, when it is shown, then the capture is told it is not visible", async () => {
   // given
-  const subject = { async scrollIntoViewIfNeeded() {}, async boundingBox() { return null; } };
+  const subject = { async evaluate() {}, async boundingBox() { return null; } };
   // when / then
   assert.equal(await showSubject(subject, { width: 390, height: 900 }), false, "a subject without a box is not shown");
 });
 
 test("given a subject that stays below the fold after scrolling, when it is shown, then it is not visible", async () => {
   // given
-  const subject = { async scrollIntoViewIfNeeded() {}, async boundingBox() { return { x: 0, y: 1500, width: 300, height: 40 }; } };
+  const subject = { async evaluate() {}, async boundingBox() { return { x: 0, y: 1500, width: 300, height: 40 }; } };
   // when / then
   assert.equal(await showSubject(subject, { width: 390, height: 900 }), false, "a box under the viewport is not shown");
 });
