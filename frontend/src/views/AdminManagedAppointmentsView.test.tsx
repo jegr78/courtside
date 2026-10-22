@@ -639,6 +639,54 @@ describe("AdminManagedAppointmentsView", () => {
     // then
     await waitFor(() => expect(reads).toBe(3));
     expect(screen.queryByTestId("managed-success"), "nothing is confirmed while the list is still reloading").not.toBeInTheDocument();
+    expect(screen.queryByTestId("series-created"), "the series is confirmed once the list holds it").not.toBeInTheDocument();
+  });
+
+  async function createOneSeries() {
+    vi.spyOn(api, "previewSeries").mockResolvedValue({
+      creatableCount: 1, truncatedByHorizon: false, horizonLimit: null,
+      occurrences: [{ startsAt: "2026-09-07T16:00:00Z", endsAt: "2026-09-07T17:00:00Z", blockedCourtIds: [], violations: [], creatable: true }]
+    });
+    vi.spyOn(api, "createSeries").mockResolvedValue({ seriesId: "series-2", bookingIds: ["booking-9"], skipped: [] });
+    await userEvent.click(await screen.findByTestId("new-series"));
+    await userEvent.selectOptions(await screen.findByTestId("series-courts"), ["court-1"]);
+    await userEvent.selectOptions(await screen.findByTestId("series-card"), ["card-training"]);
+    await userEvent.type(screen.getByTestId("series-starts-on"), "2026-09-07");
+    await userEvent.type(screen.getByTestId("series-start-time"), "18:00");
+    await userEvent.click(screen.getByTestId("series-weekday-MONDAY"));
+    await userEvent.click(screen.getByTestId("preview-series"));
+    await userEvent.click(await screen.findByTestId("confirm-series"));
+  }
+
+  it("given a described series, when it is created, then the form closes and one notice reports what was created", async () => {
+    // given
+    show();
+
+    // when
+    await createOneSeries();
+
+    // then
+    expect(await screen.findByTestId("series-created")).toHaveTextContent(i18n.t("series.created", { created: 1 }));
+    expect(screen.queryByTestId("series-form"), "the form's work is done once the series exists").not.toBeInTheDocument();
+    expect(screen.getByTestId("new-series"), "focus returns to where the form was opened").toHaveFocus();
+    expect(screen.queryByTestId("managed-success"), "the creation is reported once, not twice").not.toBeInTheDocument();
+  });
+
+  it("given a created series, when an appointment is cancelled next, then the cancellation replaces the creation notice", async () => {
+    // given
+    vi.spyOn(api, "cancelSeries").mockResolvedValue(undefined);
+    show();
+    await createOneSeries();
+    await screen.findByTestId("series-created");
+
+    // when
+    await userEvent.click(within(await screen.findByTestId("managed-series-series-1")).getByTestId("managed-series-summary"));
+    await userEvent.click(within(screen.getByTestId(`booking-${first.id}`)).getByTestId("managed-cancel"));
+    await userEvent.click(screen.getByTestId("confirm-cancellation"));
+
+    // then
+    expect(await screen.findByTestId("managed-success")).toHaveTextContent(i18n.t("booking.cancelledSuccess"));
+    expect(screen.queryByTestId("series-created"), "a notice belongs to the action that produced it").not.toBeInTheDocument();
   });
 
   it("given the list reloads, when it shows its loading state, then load more is not offered", async () => {
