@@ -26,7 +26,7 @@ class DeploymentImageParityTest {
 
     private static final Path DEPLOY = Path.of("deploy");
     private static final List<Path> READERS = List.of(
-            Path.of("frontend/e2e/global-setup.ts"),
+            Path.of("frontend/e2e/container-images.ts"),
             Path.of("tools/security-environment.mjs"));
 
     private static final Pattern COMPOSE_FILE = Pattern.compile("compose[\\w.-]*\\.yaml");
