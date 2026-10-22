@@ -1,8 +1,9 @@
 import { runPath } from "./context";
 import { appendFileSync, mkdirSync } from "node:fs";
 import AxeBuilder from "@axe-core/playwright";
-import { test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import { layoutProbe, layoutProbeArguments } from "./layout-probe.mjs";
+import { showSubject } from "./subject.mjs";
 
 export async function measure(page: Page, locale: "de" | "en") {
   return page.evaluate(layoutProbe, layoutProbeArguments(locale));
@@ -52,7 +53,7 @@ export async function fullPageShot(page: Page, path: string) {
   await page.evaluate(([left, top]) => window.scrollTo(left, top), [x, y]);
 }
 
-export async function capture(page: Page, label: string, opts: { expectedStatuses?: number[] } = {}) {
+export async function capture(page: Page, label: string, opts: { expectedStatuses?: number[]; subject?: Locator } = {}) {
   const info = test.info();
   trace(label, "start");
   const profile = info.project.metadata as { locale: "de" | "en"; phone: boolean };
@@ -67,6 +68,7 @@ export async function capture(page: Page, label: string, opts: { expectedStatuse
   const base = `${directory}/${String(count).padStart(2, "0")}-${label}`;
   trace(label, "idle done");
   for (let attempt = 1; ; attempt++) {
+    if (opts.subject) expect(await showSubject(opts.subject, page.viewportSize()), `harness: the ${label} capture shows its subject`).toBe(true);
     await page.screenshot({ path: `${base}.png` });
     trace(label, "viewport shot");
     await fullPageShot(page, `${base}-full.png`);

@@ -108,7 +108,7 @@ test("given a member looking for a partner, when the open place is offered, then
         await taker.getByTestId("my-bookings-link").click();
         const take = taker.locator(`[data-testid="take-open-place"][data-invitation-id="${place!.invitationId}"]`);
         await expect(take, "product: My bookings lists the open place").toBeVisible();
-        await capture(taker, "open-places");
+        await capture(taker, "open-places", { subject: take });
         const accepted = taker.waitForResponse(answers("POST", `/api/partner-invitations/${place!.invitationId}/acceptance`));
         await take.click();
         expect((await accepted).status(), "product: taking the open place is accepted").toBeLessThan(300);
@@ -350,7 +350,7 @@ test("given two members on the same slot, when both submit, then the second is r
       await second.getByTestId("my-bookings-link").click();
       const offered = second.getByTestId(`waitlist-entry-${entry.id}`);
       await expect(offered).toHaveAttribute("data-state", "OFFERED");
-      await capture(second, "waitlist-offered");
+      await capture(second, "waitlist-offered", { subject: offered });
       offerAnswered = new Date();
       const accepted = second.waitForResponse(answers("POST", `/api/my/waitlist/${entry.id}/acceptance`));
       await offered.getByTestId("waitlist-accept").click();

@@ -287,6 +287,11 @@ the run cancels it and confirms the cancellation.
 
 ## Review
 
+A capture is a viewport shot plus a full-page shot. A journey that captures a state lower on the
+page names its element with `capture(page, label, { subject })`; the harness centres that element
+before the viewport shot and fails the step when its top edge is still outside the viewport, so the
+contact sheet shows what the label promises on every profile.
+
 Every finding in the report carries a stable key: `axe:<rule>`, `console:<digest>`,
 `http:<status>:<path>` or `failure:<file>:<title>:<profile>`. Identifiers, dates and hosts are
 removed before a key is formed, so the same problem keeps its key from run to run.

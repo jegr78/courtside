@@ -1587,3 +1587,36 @@ test("given the build workflow, when the harness self-test runs, then it uses th
   assert.ok(pull >= 0 && pull < start, "the image is pulled with retries before it starts");
   assert.match(run, /"\$image" npm test\s*$/, "the self-test runs inside the pinned image");
 });
+
+import { showSubject } from "../acceptance/lib/subject.mjs";
+
+const fakeSubject = (top, height = 40) => {
+  let y = top;
+  return { scrolled: false,
+    async evaluate() { this.scrolled = true; if (y >= 900 || y < 0) y = 430; },
+    async boundingBox() { return { x: 0, y, width: 300, height }; } };
+};
+
+test("given a capture subject below the fold, when it is shown, then it is scrolled into the viewport first", async () => {
+  // given
+  const subject = fakeSubject(2400);
+  // when
+  const shown = await showSubject(subject, { width: 390, height: 900 });
+  // then
+  assert.equal(subject.scrolled, true, "the subject is scrolled before the shot");
+  assert.equal(shown, true, "the subject's top edge is inside the viewport");
+});
+
+test("given a capture subject that renders nothing, when it is shown, then the capture is told it is not visible", async () => {
+  // given
+  const subject = { async evaluate() {}, async boundingBox() { return null; } };
+  // when / then
+  assert.equal(await showSubject(subject, { width: 390, height: 900 }), false, "a subject without a box is not shown");
+});
+
+test("given a subject that stays below the fold after scrolling, when it is shown, then it is not visible", async () => {
+  // given
+  const subject = { async evaluate() {}, async boundingBox() { return { x: 0, y: 1500, width: 300, height: 40 }; } };
+  // when / then
+  assert.equal(await showSubject(subject, { width: 390, height: 900 }), false, "a box under the viewport is not shown");
+});
