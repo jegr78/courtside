@@ -173,7 +173,10 @@ export function AdminImportView() {
         columnMode={chosen.columnMode}
         preview={preview}
         disabled={pending}
-        previewed={setPreview}
+        previewed={(next) => {
+          setSuccess(undefined);
+          setPreview(next);
+        }}
         reportError={reportError}
       />
     </div>}

@@ -278,6 +278,28 @@ describe("AdminImportView", () => {
     expect(screen.getByTestId("import-step-preview")).toHaveAttribute("aria-current", "step");
   });
 
+  it("given a source just saved, when its first file is refused, then the saved notice makes way for the refusal", async () => {
+    // given
+    vi.spyOn(api, "importSources").mockResolvedValue([rosterSystem]);
+    vi.spyOn(api, "changeImportSource").mockResolvedValue(rosterSystem);
+    vi.spyOn(api, "createImportPreview").mockRejectedValue(new ApiError(400, {
+      type: "urn:courtside:error:import-snapshot-unreadable", title: "Bad Request", status: 400,
+      violations: [{ code: "import.snapshot.columns.countChanged", params: { expected: 4, found: 3 } }]
+    }));
+    show();
+    await userEvent.click(await screen.findByTestId("source-choice-source-1"));
+    await userEvent.type(await screen.findByTestId("source-name"), " 2");
+    await userEvent.click(screen.getByTestId("save-source"));
+    await screen.findByRole("status");
+
+    // when
+    await readSnapshot();
+
+    // then
+    await screen.findByRole("alert");
+    expect(screen.queryByRole("status"), "a notice of an earlier success does not stand beside the refusal").not.toBeInTheDocument();
+  });
+
   it("given a refused file, when a readable one is uploaded, then the refusal makes way for its preview", async () => {
     // given
     vi.spyOn(api, "importSources").mockResolvedValue([rosterSystem]);
