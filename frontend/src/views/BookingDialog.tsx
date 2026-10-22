@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useMemo, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ApiError, api, type Allocation, type BookingGrid, type BookingHours, type Dependant, type Problem, type PublicBookingCard, type PublicCourt, type PublicParticipantCard, type PublicParticipantMember } from "../api/client";
 import { idempotencyKey } from "../api/idempotency";
@@ -67,6 +67,9 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
   const [requestKey, setRequestKey] = useState(() => idempotencyKey());
   const [showsMore, setShowsMore] = useState(false);
   const [refusedAsTaken, setRefusedAsTaken] = useState<{ refreshFailed: boolean }>();
+  const durationField = useRef<HTMLSelectElement>(null);
+  // A refusal asks for another time, so the field that chooses it comes back into view beside the alert.
+  useEffect(() => { if (error) durationField.current?.scrollIntoView?.({ block: "nearest" }); }, [error]);
   const [bookFor, setBookFor] = useState(() => selfBookable ? "" : dependants[0]?.personId ?? "");
   const ownLimits = !bookFor;
   const maxBookingMinutes = ownLimits ? ownMaxBookingMinutes : undefined;
@@ -181,9 +184,9 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
   return <Modal labelledBy="booking-heading" closed={closed} width="xl" composed testId="booking-dialog">
     <form onSubmit={(event) => void submit(event)} className="flex min-h-0 flex-col">
       {/* Outside the scrolling form, so title and slot stay while the member fills the fields below. */}
-      <div data-testid="dialog-header" className="dialog-header border-structural shrink-0 border-b px-6 pt-6 pb-3">
+      <div data-testid="dialog-header" className="dialog-header border-structural shrink-0 border-b px-6 pt-5 pb-3">
         <h2 id="booking-heading" className="text-xl font-bold">{t(waitlist ? "waitlist.title" : "booking.title")}</h2>
-        <p data-testid="booking-period" aria-live="polite" className="mt-1 font-semibold">{formatBookingPeriod(period.startsAt, period.endsAt, i18n.language, grid.timeZone)}</p>
+        <p data-testid="booking-period" aria-live="polite" className="mt-1 text-sm font-semibold">{formatBookingPeriod(period.startsAt, period.endsAt, i18n.language, grid.timeZone)}</p>
       </div>
       <DialogBody padding="px-6 pt-4 pb-6">
       <FieldViolations id="booking-startsAt-errors" violations={fieldViolations("startsAt")} />
@@ -202,7 +205,7 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
       </>}
       {!slotTaken && !waitlist && <>
       <label className="mt-5 grid gap-2 font-medium">{t("booking.duration")}
-        <select data-testid="booking-duration" aria-describedby={durationDescription} value={refusedAsTaken ? "" : selectedDuration} onChange={(event) => {
+        <select ref={durationField} data-testid="booking-duration" aria-describedby={durationDescription} value={refusedAsTaken ? "" : selectedDuration} onChange={(event) => {
           setDurationMinutes(Number(event.target.value));
           setRefusedAsTaken(undefined);
         }} className="form-control rounded-lg border px-3 py-3">
