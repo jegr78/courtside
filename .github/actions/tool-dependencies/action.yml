@@ -4,6 +4,7 @@ description: Installs the locked Node and npm versions and the repository tool d
 runs:
   using: composite
   steps:
+    - uses: ./.github/actions/npm-network
     - id: toolchain
       name: Read locked tooling versions
       shell: bash
