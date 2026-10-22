@@ -196,12 +196,15 @@ A run writes into its own directory under `build/acceptance/` and refuses a dire
 holds results. It waits until the load average is below `loadLimit`, then runs setup, discovery
 and preflight, the journeys on all ten profiles, the postflight and the report.
 
-The harness types a password through `fillSecret`, so no recorded action, log line or error carries
-it. DOM snapshots and request bodies in `error-context.md` and `trace.zip` still do: after the
-journeys the runner masks every password the harness typed in the run directory, in its plain,
-escaped, form-encoded and base64 forms, trace entries included. After the postflight and before the
-report a separate check decodes each text file and trace entry and fails the run if it still holds
-the shared password, or if a trace cannot be read.
+The harness keeps its passwords out of what Playwright records. It types one through `fillSecret`,
+so no action, log line or error carries it, and sends every API request that holds one through
+Node's own `fetch`, which nothing traces. Browser sign-ins still leave the password in a trace's
+request bodies and DOM snapshots, so after the journeys the runner strips, by structure, every
+request body with a password field and every password input's value from each `trace.zip`, and
+then masks the password in its plain, escaped, form-encoded and base64 forms across the run
+directory. After the postflight and before the report a separate check decodes every text file and
+trace entry up to three layers deep and fails the run if it still holds the shared password or half
+of it, or if a trace cannot be read.
 
 - `--phase matrix` runs only the journeys; `--project <profile>` narrows them.
 - `--phase postflight --run <dir>` cleans up after an interrupted run.
