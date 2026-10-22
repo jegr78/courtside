@@ -1324,3 +1324,55 @@ test("given the runner, when its phases are read, then the matrix only masks and
   assert.match(source, /exit = playwright\(run, \["postflight"\]\) \|\| exit;\n\s*secureRun\(run, config\.password\);/, "the postflight fails the run on a leak");
   assert.match(source, /phase === "report"\) \{\n\s*secureRun\(run, config\.password\)/, "the report phase secures a run before it reads it");
 });
+
+const encodedForms = (secret) => {
+  const body = `username=jane.doe&password=${secret}`;
+  return {
+    "form-urlencoded": new URLSearchParams({ username: "jane.doe", password: secret }).toString(),
+    "JSON unicode escapes": `{"password":"${[...secret].map((c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, "0")}`).join("")}"}`,
+    "base64 of a form body": Buffer.from(body).toString("base64"),
+    "base64url of a form body": Buffer.from(`x${body}`).toString("base64url"),
+    "base64 of the bare secret": Buffer.from(`ab${secret}`).toString("base64")
+  };
+};
+
+for (const [form, text] of Object.entries(encodedForms(SECRET))) {
+  test(`given the password as ${form} in a trace resource, when the run is secured, then nothing holds it afterwards`, () => {
+    // given
+    const run = mkdtempSync(join(tmpdir(), "acceptance-redaction-"));
+    writeFileSync(join(run, "trace.zip"), writeZip([{ name: "resources/body.dat", data: Buffer.from(text) }]));
+    try {
+      // when
+      const before = leaksIn(run, SECRET);
+      secureRun(run, SECRET);
+      // then
+      assert.deepEqual(before, ["trace.zip!resources/body.dat"], `the check finds the password as ${form}`);
+      assert.deepEqual(leaksIn(run, SECRET), [], `the masking removes the password as ${form}`);
+    } finally { rmSync(run, { recursive: true, force: true }); }
+  });
+}
+
+test("given the password in a form the masking does not know, when the run is secured, then the independent check fails the run", () => {
+  // given
+  const run = mkdtempSync(join(tmpdir(), "acceptance-redaction-"));
+  writeFileSync(join(run, "report.html"), `<p>${[...SECRET].map((c) => `&#${c.charCodeAt(0)};`).join("")}</p>`);
+  try {
+    // when / then
+    assert.throws(() => secureRun(run, SECRET), /report\.html/, "an entity-encoded password the masking leaves still fails the run");
+  } finally { rmSync(run, { recursive: true, force: true }); }
+});
+
+test("given an aria snapshot with a typed and a masked password box, when checked, then only the typed one is a leak until the run is secured", () => {
+  // given
+  const run = mkdtempSync(join(tmpdir(), "acceptance-redaction-"));
+  writeFileSync(join(run, "error-context.md"), `- textbox "Neues Passwort" [ref=e1]: <redacted>\n- textbox "Passwort wiederholen" [ref=e2]: typed-by-hand\n`);
+  writeFileSync(join(run, "masked.md"), `- textbox "Passwort" [ref=e1]: <redacted>\n`);
+  try {
+    // when
+    const before = leaksIn(run, SECRET);
+    secureRun(run, SECRET);
+    // then
+    assert.deepEqual(before, ["error-context.md"], "a password box with any typed value is a leak, a masked one is not");
+    assert.deepEqual(leaksIn(run, SECRET), []);
+  } finally { rmSync(run, { recursive: true, force: true }); }
+});

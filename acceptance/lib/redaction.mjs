@@ -9,18 +9,55 @@ const HAS_INTERIM = /acceptance-temporary-[0-9a-f]+/;
 // An aria snapshot prints a password textbox with whatever was typed into it.
 const PASSWORD_BOX = /(textbox "[^"\n]*(?:Passwort|Password|password)[^"\n]*"[^\n:]*:) [^\n]+/g;
 
-function variants(secret) {
+const MIN_BASE64 = 6;
+
+// A value inside base64 depends on its offset, so each of the three alignments gives its own stable middle.
+function base64Fragments(secret, alphabet) {
+  if (secret.length < MIN_BASE64) return [];
+  return [0, 1, 2].map((shift) => {
+    const encoded = Buffer.from("\0".repeat(shift) + secret).toString(alphabet);
+    const head = Math.ceil((shift * 4) / 3) + (shift ? 1 : 0);
+    const tail = Math.ceil(((shift + Buffer.byteLength(secret)) % 3 ? 4 : 0));
+    return encoded.slice(head, encoded.replace(/=+$/, "").length - tail);
+  });
+}
+
+function encodedForms(secret) {
   const html = secret.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
-  return [...new Set([secret, JSON.stringify(secret).slice(1, -1), html, encodeURIComponent(secret)])];
+  const unicode = [...secret].map((char) => `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`).join("");
+  const form = new URLSearchParams({ v: secret }).toString().slice(2);
+  return [...new Set([secret, JSON.stringify(secret).slice(1, -1), html, encodeURIComponent(secret), form, unicode,
+    unicode.toUpperCase().replace(/\\U/g, "\\u"), ...base64Fragments(secret, "base64"), ...base64Fragments(secret, "base64url")])]
+    .filter((variant) => variant.length > 0);
 }
 
 function redactText(text, secret) {
   let out = text.replace(PASSWORD_BOX, `$1 ${MASK}`).replace(INTERIM, MASK);
-  for (const form of variants(secret)) out = out.split(form).join(MASK);
+  for (const form of encodedForms(secret)) out = out.split(form).join(MASK);
   return out;
 }
 
-const holds = (buffer, secret) => variants(secret).some((form) => buffer.includes(form)) || HAS_INTERIM.test(buffer.toString("latin1"));
+const holds = (buffer, secret) => encodedForms(secret).some((form) => buffer.includes(form)) || HAS_INTERIM.test(buffer.toString("latin1"));
+
+// The check decodes what it reads instead of reusing the masking's encodings, so a form the masking misses still fails the run.
+function decodings(text) {
+  const json = text.replace(/\\u([0-9a-fA-F]{4})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16))).replace(/\\(["\\/])/g, "$1");
+  const html = text.replace(/&#x([0-9a-f]+);/gi, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_, code) => String.fromCodePoint(Number(code)))
+    .replace(/&(quot|apos|lt|gt|amp);/g, (_, name) => ({ quot: "\"", apos: "'", lt: "<", gt: ">", amp: "&" })[name]);
+  const percent = text.replace(/\+/g, " ").replace(/(%[0-9a-fA-F]{2})+/g, (run) => { try { return decodeURIComponent(run); } catch { return run; } });
+  const base64 = [...text.matchAll(/[A-Za-z0-9+/_-]{8,}={0,2}/g)].map(([chunk]) => Buffer.from(chunk.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("latin1"));
+  return [text, json, html, percent, ...base64];
+}
+
+const TYPED_BOX = /textbox "[^"\n]*(?:Passwort|Password|password)[^"\n]*"[^\n:]*: (?!<redacted>$)[^\n]+$/m;
+
+function exposes(buffer, secret) {
+  const text = buffer.toString("utf8");
+  if (TYPED_BOX.test(text) || HAS_INTERIM.test(text)) return true;
+  const latin = Buffer.from(secret, "utf8").toString("latin1");
+  return decodings(text).some((decoded) => decoded.includes(secret) || decoded.includes(latin));
+}
 
 function files(directory) {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -128,8 +165,8 @@ export function leaksIn(run, secret) {
     if (path.toLowerCase().endsWith(".zip")) {
       let entries;
       try { entries = readZip(readFileSync(path)); } catch (error) { leaks.push(`${name} (unreadable: ${error.message})`); continue; }
-      for (const entry of entries) if (textual(entry.name) && holds(entry.data, secret)) leaks.push(`${name}!${entry.name}`);
-    } else if (textual(path) && holds(readFileSync(path), secret)) {
+      for (const entry of entries) if (textual(entry.name) && exposes(entry.data, secret)) leaks.push(`${name}!${entry.name}`);
+    } else if (textual(path) && exposes(readFileSync(path), secret)) {
       leaks.push(name);
     }
   }
