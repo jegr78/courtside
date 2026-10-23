@@ -628,6 +628,97 @@ test("given a known issue without an issue number or an unknown assessment, when
   assert.throws(() => validateReview({ assessments: { k: { assessment: "harness-gap", reason: "", followUp: "f" } }, manual: [] }), /reason/);
 });
 
+const assessed = { "axe:heading-order": { assessment: "known-issue", reason: "tracked", followUp: "none", issue: 1243 } };
+const sheetFindings = () => collectFindings({ metrics: [row({ axe: [{ id: "heading-order", impact: "moderate", targets: [] }] })], failures: [] });
+
+test("given every finding assessed and one contact sheet without a verdict, when the review is applied, then the report is a draft that names the sheet", () => {
+  // given
+  const review = { assessments: assessed, manual: [], sheets: { "admin--overview": { verdict: "clean", by: "reviewer" } } };
+  // when
+  const applied = applyReview(sheetFindings(), review, { names: ["admin--overview", "admin--usage"] });
+  // then
+  assert.equal(applied.status, "draft", "a sheet nobody judged keeps the report a draft");
+  assert.deepEqual(applied.sheets.unreviewed, ["admin--usage"]);
+});
+
+test("given every contact sheet with a verdict and every finding assessed, when the review is applied, then the report is final", () => {
+  // given
+  const review = { assessments: assessed, manual: [], sheets: {
+    "admin--overview": { verdict: ["axe:heading-order"], by: "reviewer" }, "admin--usage": { verdict: "clean", by: "reviewer" } } };
+  // when
+  const applied = applyReview(sheetFindings(), review, { names: ["admin--overview", "admin--usage"] });
+  // then
+  assert.equal(applied.status, "final");
+  assert.deepEqual(applied.sheets.unreviewed, []);
+  assert.deepEqual(applied.sheets.reviewed, ["admin--overview", "admin--usage"]);
+});
+
+test("given a verdict for a sheet this run did not produce, when applied, then it is reported stale", () => {
+  // when
+  const applied = applyReview([], { assessments: {}, manual: [], sheets: { "admin--gone": { verdict: "clean", by: "reviewer" } } }, { names: [] });
+  // then
+  assert.deepEqual(applied.sheets.stale, ["admin--gone"]);
+});
+
+test("given screenshots but no contact sheets, when applied, then the report stays a draft and says why", () => {
+  // when
+  const applied = applyReview([], { assessments: {}, manual: [] }, { names: [], unavailable: "ImageMagick not found on PATH" });
+  // then
+  assert.equal(applied.status, "draft", "a run whose sheets could not be made cannot have been reviewed");
+  assert.equal(applied.sheets.unavailable, "ImageMagick not found on PATH");
+});
+
+test("given a sheet verdict that is neither clean nor finding keys, lacks its reviewer or names an unknown finding, when applied, then each is refused", () => {
+  // given
+  const apply = (entry) => () => applyReview(sheetFindings(), { assessments: assessed, manual: [], sheets: { "admin--overview": entry } }, { names: ["admin--overview"] });
+  // when / then
+  assert.throws(apply({ verdict: "fine", by: "reviewer" }), /verdict/);
+  assert.throws(apply({ verdict: [], by: "reviewer" }), /verdict/);
+  assert.throws(apply({ verdict: "clean", by: "" }), /by/);
+  assert.throws(apply({ verdict: ["axe:color-contrast"], by: "reviewer" }), /axe:color-contrast/);
+});
+
+import { sheetChanges } from "../acceptance/report/sheets.mjs";
+
+test("given a previous run, when the sheets are compared, then changed and new sheets are marked and equal ones are not", () => {
+  // given
+  const root = mkdtempSync(join(tmpdir(), "sheet-changes-"));
+  const sheet = (run, name, pixels) => { mkdirSync(join(root, run, "sheets"), { recursive: true }); writeFileSync(join(root, run, "sheets", `${name}.png`), pixels); };
+  sheet("before", "admin--overview", "a"); sheet("before", "admin--usage", "b");
+  sheet("after", "admin--overview", "a"); sheet("after", "admin--usage", "c"); sheet("after", "admin--audit", "d");
+  const signature = (path) => readFileSync(path, "utf8");
+  // when
+  const changes = sheetChanges(join(root, "after"), join(root, "before"), { signature });
+  // then
+  assert.deepEqual(changes, { changed: ["admin--usage"], added: ["admin--audit"], unchanged: 1 });
+  rmSync(root, { recursive: true, force: true });
+});
+
+test("given a previous run without contact sheets, when compared, then the comparison says it is unavailable", () => {
+  // given
+  const root = mkdtempSync(join(tmpdir(), "sheet-changes-"));
+  mkdirSync(join(root, "after", "sheets"), { recursive: true });
+  // when
+  const changes = sheetChanges(join(root, "after"), join(root, "before"), { signature: () => "x" });
+  // then
+  assert.match(changes.unavailable, /no contact sheets/);
+  rmSync(root, { recursive: true, force: true });
+});
+
+import { sheetSection } from "../acceptance/report/html.mjs";
+
+test("given sheets without a verdict and a comparison, when the report section is rendered, then it names them and the changed sheets", () => {
+  // given
+  const sheets = { total: 3, reviewed: ["admin--overview"], unreviewed: ["admin--usage"], stale: ["admin--gone"], unavailable: null };
+  // when
+  const html = sheetSection(sheets, { changed: ["admin--overview"], added: ["admin--audit"], unchanged: 1 });
+  // then
+  assert.match(html, /1 of 3 contact sheets carry a verdict/);
+  assert.match(html, /Without a verdict:<\/p><ul><li><code>admin--usage<\/code>/, "every sheet without a verdict is listed");
+  assert.match(html, /did not produce:<\/p><ul><li><code>admin--gone<\/code>/);
+  assert.match(html, /1 changed, 1 new, 1 unchanged/);
+});
+
 import { assertPrivacySafe, forbiddenTerms, releaseSummary } from "../acceptance/report/release-summary.mjs";
 
 const forbidden = { usernames: ["jane.doe"], hosts: ["club.example.org"], names: ["Jane Doe"] };
@@ -653,6 +744,26 @@ test("given a draft review, when summarised, then the summary says it is not fin
   // then
   assert.match(summary, /Draft/);
   assert.match(summary, /axe:color-contrast/);
+});
+
+test("given contact sheets without a verdict, when summarised, then the summary is a draft that counts and names them", () => {
+  // given
+  const sheets = { total: 3, reviewed: ["admin--overview"], unreviewed: ["admin--audit", "admin--usage"], stale: [], unavailable: null };
+  // when
+  const summary = releaseSummary({ version: "1.2.3", runId: "r", harnessCommit: "c", cells: { passed: 1, failed: 0, skipped: 0 },
+    reviewed: { ...reviewed, status: "draft", sheets }, forbidden });
+  // then
+  assert.match(summary, /Draft/);
+  assert.match(summary, /2 of 3 contact sheet\(s\) without a verdict/, "the summary counts the sheets nobody judged");
+  assert.match(summary, /`admin--audit`, `admin--usage`/);
+});
+
+test("given every contact sheet judged, when summarised, then the summary says so", () => {
+  // when
+  const summary = releaseSummary({ version: "1.2.3", runId: "r", harnessCommit: "c", cells: { passed: 1, failed: 0, skipped: 0 },
+    reviewed: { ...reviewed, sheets: { total: 2, reviewed: ["a", "b"], unreviewed: [], stale: [], unavailable: null } }, forbidden });
+  // then
+  assert.match(summary, /Every finding is assessed and all 2 contact sheets carry a verdict\./);
 });
 
 test("given a reason that names a username, an address, a host, a person or an image, when summarised, then each is refused without echoing it", () => {
@@ -751,10 +862,11 @@ import { parseArguments, waitForLoad } from "../acceptance/run.mjs";
 
 test("when arguments are parsed, then a later phase needs an existing run and projects narrow the matrix", () => {
   // when / then
-  assert.deepEqual(parseArguments([]), { phase: "all", run: null, projects: [] });
-  assert.deepEqual(parseArguments(["--phase", "matrix", "--project", "ipad", "--project", "narrow"]), { phase: "matrix", run: null, projects: ["ipad", "narrow"] });
+  assert.deepEqual(parseArguments([]), { phase: "all", run: null, previous: null, projects: [] });
+  assert.deepEqual(parseArguments(["--phase", "matrix", "--project", "ipad", "--project", "narrow"]), { phase: "matrix", run: null, previous: null, projects: ["ipad", "narrow"] });
   assert.throws(() => parseArguments(["--phase", "report"]), /--run/);
   assert.throws(() => parseArguments(["--phase", "everything"]), /phase/);
+  assert.equal(parseArguments(["--phase", "report", "--run", "b", "--previous", "a"]).previous, "a", "the report compares its sheets with the named run");
 });
 
 test("given a load that falls below the limit, when waited for, then it returns, and a load that never falls stops at the deadline", async () => {

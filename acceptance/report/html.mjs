@@ -4,8 +4,8 @@ import { createHash } from "node:crypto";
 import { basename, join } from "node:path";
 import { collectFindings } from "./findings.mjs";
 import { applyReview } from "./review.mjs";
-import { forbiddenTerms, releaseSummary } from "./release-summary.mjs";
-import { imageMagick } from "./sheets.mjs";
+import { forbiddenTerms, releaseSummary, sheetStatus } from "./release-summary.mjs";
+import { imageMagick, sheetChanges } from "./sheets.mjs";
 
 const SEVERITY = { blocker: "Blocker", major: "Major", minor: "Minor", hint: "Hint" };
 const ORDER = { blocker: 0, major: 1, minor: 2, hint: 3 };
@@ -96,7 +96,27 @@ function card(run, finding, images) {
 const listOf = (findings, assessment, more = []) => [...findings.filter((finding) => finding.review?.assessment === assessment)
   .map((finding) => `<li><code>${esc(finding.key)}</code> ${esc(finding.title)}: ${esc(finding.review.reason)}</li>`), ...more].join("") || "<li>None.</li>";
 
-export function renderReport(run, config, { harnessCommit }) {
+function comparedSheets(run, previous) {
+  try { return sheetChanges(run, previous); } catch (failure) { return { unavailable: failure.message }; }
+}
+
+const names = (list) => list.map((name) => `<li><code>${esc(name)}</code></li>`).join("");
+
+export function sheetSection(sheets, changes) {
+  if (!sheets) return "";
+  const comparison = !changes ? ""
+    : changes.unavailable ? `<p>Comparison with the previous run unavailable: ${esc(changes.unavailable)}.</p>`
+      : `<p>Against the previous run: ${changes.changed.length} changed, ${changes.added.length} new, ${changes.unchanged} unchanged. Every sheet still needs its verdict.</p>
+${changes.changed.length ? `<details><summary>Changed sheets</summary><ul>${names(changes.changed)}</ul></details>` : ""}
+${changes.added.length ? `<details><summary>New sheets</summary><ul>${names(changes.added)}</ul></details>` : ""}`;
+  return `<section><h2>Contact sheet review</h2>
+<p>${sheets.unavailable ? `No contact sheets to review: ${esc(sheets.unavailable)}.` : `${sheets.reviewed.length} of ${sheets.total} contact sheets carry a verdict.`}</p>
+${sheets.unreviewed.length ? `<p class="unassessed">Without a verdict:</p><ul>${names(sheets.unreviewed)}</ul>` : ""}
+${sheets.stale.length ? `<p>Verdicts for sheets this run did not produce:</p><ul>${names(sheets.stale)}</ul>` : ""}
+${comparison}</section>`;
+}
+
+export function renderReport(run, config, { harnessCommit, sheets = null, previous = null }) {
   const metrics = jsonl(join(run, "metrics.jsonl"));
   const failures = json(join(run, "failures.json"), []);
   const results = json(join(run, "results.json"), { suites: [] });
@@ -110,7 +130,8 @@ export function renderReport(run, config, { harnessCommit }) {
   const surfaces = [...new Map(jsonl(join(run, "role-surfaces.jsonl")).map((row) => [row.key, row])).values()];
   const observations = jsonl(join(run, "observations.jsonl"));
   const review = json(join(run, "review.json"), { assessments: {}, manual: [] });
-  const reviewed = applyReview(collectFindings({ metrics, failures }), review);
+  const reviewed = applyReview(collectFindings({ metrics, failures }), review, sheets);
+  const changes = previous ? comparedSheets(run, previous) : null;
   reviewed.findings.sort((a, b) => ORDER[a.severity] - ORDER[b.severity]);
   const coverage = coverageOf(results);
   const projects = [...new Set(coverage.rows.flatMap((row) => Object.keys(row.cells)))].sort();
@@ -130,7 +151,8 @@ export function renderReport(run, config, { harnessCommit }) {
     return `${name}.png`;
   };
   const counts = Object.fromEntries(Object.keys(ORDER).map((severity) => [severity, reviewed.findings.filter((finding) => finding.severity === severity).length]));
-  const status = reviewed.status === "final" ? "Final: every finding is assessed." : `Draft: ${reviewed.unassessed.length} finding(s) not assessed.`;
+  const status = reviewed.status === "final" ? "Final: every finding is assessed and every contact sheet carries a verdict."
+    : `Draft: ${[reviewed.unassessed.length ? `${reviewed.unassessed.length} finding(s) not assessed.` : null, sheetStatus(reviewed.sheets)].filter(Boolean).join(" ")}`;
   const notChecked = [
     "The installed app's real standalone mode; Chromium does not emulate display-mode here and the app ships no display-mode CSS.",
     "Offline navigation in WebKit; Playwright WebKit aborts every offline navigation.",
@@ -188,6 +210,7 @@ ul { margin: 0; padding-left: 20px; display: grid; gap: 6px; max-width: 72ch; }
   <div class="tile"><b>${metrics.length}</b><span>Captures</span></div>
 </div></section>
 <section><h2>Findings</h2><div class="findings">${reviewed.findings.map((finding) => card(run, finding, images)).join("") || "<p>None.</p>"}</div></section>
+${sheetSection(reviewed.sheets, changes)}
 <section><h2>Coverage</h2><p class="lede">✓ passed, ✗ failed, – not planned for this profile.</p><div class="scroll"><table><thead><tr><th>Journey</th>${projects.map((p) => `<th>${esc(p)}</th>`).join("")}</tr></thead><tbody>
 ${coverage.rows.map((row) => `<tr><td>${esc(row.flow)}</td>${projects.map((p) => `<td class="st ${row.cells[p]?.status ?? ""}" title="${esc(row.cells[p]?.reason ?? "")}">${row.cells[p] ? STATUS[row.cells[p].status] : ""}</td>`).join("")}</tr>`).join("")}
 </tbody></table></div></section>
@@ -212,5 +235,6 @@ ${rawGroups(metrics).map((g) => `<tr><td>${SEVERITY[g.severity]}</td><td>${esc(g
     summary = `Release summary refused: ${refusal.message}\n`;
   }
   writeFileSync(join(run, "release-summary.md"), summary);
-  return { status: reviewed.status, unassessed: reviewed.unassessed, stale: reviewed.stale };
+  return { status: reviewed.status, unassessed: reviewed.unassessed, stale: reviewed.stale,
+    unreviewedSheets: reviewed.sheets?.unreviewed ?? [], staleSheets: reviewed.sheets?.stale ?? [], changedSheets: changes };
 }

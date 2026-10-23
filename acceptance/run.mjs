@@ -16,12 +16,13 @@ const PHASES = ["all", "matrix", "postflight", "report"];
 const here = fileURLToPath(new URL(".", import.meta.url));
 
 export function parseArguments(argv) {
-  const parsed = { phase: "all", run: null, projects: [] };
+  const parsed = { phase: "all", run: null, previous: null, projects: [] };
   for (let index = 0; index < argv.length; index++) {
     const value = argv[index + 1];
     if (argv[index] === "--phase") { parsed.phase = value; index++; }
     else if (argv[index] === "--run") { parsed.run = value; index++; }
     else if (argv[index] === "--project") { parsed.projects.push(value); index++; }
+    else if (argv[index] === "--previous") { parsed.previous = value; index++; }
     else throw new Error(`unknown argument ${argv[index]}`);
   }
   if (!PHASES.includes(parsed.phase)) throw new Error(`phase must be one of ${PHASES.join(", ")}`);
@@ -69,8 +70,8 @@ async function main() {
     await analyse(run, config);
     const sheets = contactSheets(run);
     const commit = existsSync(join(run, "source.json")) ? JSON.parse(readFileSync(join(run, "source.json"), "utf8")).commit : harnessCommit(new URL(".", import.meta.url));
-    const report = renderReport(run, config, { harnessCommit: commit });
-    console.log(JSON.stringify({ run, sheets, ...report }));
+    const report = renderReport(run, config, { harnessCommit: commit, sheets, previous: args.previous ? resolve(args.previous) : null });
+    console.log(JSON.stringify({ run, sheets: { sheets: sheets.sheets, skipped: sheets.skipped }, ...report }));
   }
   process.exitCode = exit;
 }

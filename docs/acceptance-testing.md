@@ -209,6 +209,8 @@ of it, or if a trace cannot be read.
 - `--phase matrix` runs only the journeys; `--project <profile>` narrows them.
 - `--phase postflight --run <dir>` cleans up after an interrupted run.
 - `--phase report --run <dir>` renders the report again, for example after the review.
+- `--previous <dir>` with the report phase compares this run's contact sheets with that run's by
+  their pixels and marks the changed and the new ones.
 
 Discovery writes `lanes.json`: the window, and for each profile and journey its day, court and
 hour. Preflight then proves every lane slot free before a journey starts.
@@ -305,7 +307,11 @@ removed before a key is formed, so the same problem keeps its key from run to ru
   },
   "manual": [
     { "key": "manual:update-notice", "severity": "major", "kind": "PWA", "title": "Update notice without a deployment", "detail": "", "where": [{ "project": "desktop-firefox" }] }
-  ]
+  ],
+  "sheets": {
+    "admin--the-admin-visits-every-administration-pa--overview": { "verdict": "clean", "by": "reviewer" },
+    "memberA--a-member-when-the-preferences-menu-is-op--preferences-open": { "verdict": ["manual:update-notice"], "by": "reviewer" }
+  }
 }
 ```
 
@@ -313,8 +319,16 @@ An assessment is one of `product-defect`, `known-issue` (with `issue`), `capture
 `harness-gap`, and always has a `reason` and a `followUp`. `manual` holds findings a person made
 while reading the captures; their keys start with `manual:`.
 
-A report with any finding left unassessed is a draft and says which keys are open. Assessments
-for keys the run did not produce are listed as stale. Findings assessed as capture artefacts
+`sheets` holds a verdict for every contact sheet the run produced, named as its file in `sheets/`
+without `.png`. A verdict is `clean` or the keys of the findings the sheet shows, and `by` names
+who read it. Reading every sheet is part of finishing a run: a sheet nobody judged is a sheet
+whose defects reach the next candidate unseen. With `--previous`, the report marks the sheets
+whose pixels changed against that run, which tells a reviewer where to look first; it never
+replaces a verdict.
+
+A report with any finding left unassessed or any sheet without a verdict is a draft and names what
+is open, and so is a run whose sheets could not be made. Assessments for keys and verdicts for
+sheets the run did not produce are listed as stale. Findings assessed as capture artefacts
 appear under rejected suspicions, harness gaps under their own heading.
 
 ## Release summary
