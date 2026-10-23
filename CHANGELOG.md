@@ -1,23 +1,10 @@
 # Changelog
 
-## [0.3.0-rc.6](https://github.com/jegr78/courtside/compare/v0.3.0-rc.5...v0.3.0-rc.6) (2026-10-23)
-
-
-### Features
-
-* **acceptance:** keep the report in draft until every contact sheet has a verdict ([#1688](https://github.com/jegr78/courtside/issues/1688)) ([a86a04e](https://github.com/jegr78/courtside/commit/a86a04e1664f1f753107e7edc3f907dc9b83ae8e))
-
-
-### Bug fixes
-
-* **acceptance:** name the subject of captures that missed their state ([#1687](https://github.com/jegr78/courtside/issues/1687)) ([e22f72e](https://github.com/jegr78/courtside/commit/e22f72ed263ac835ca9761a162796517eb9229f8)), closes [#1684](https://github.com/jegr78/courtside/issues/1684)
-* keep revealed booking details and partner names in view on phones ([#1695](https://github.com/jegr78/courtside/issues/1695)) ([da9a51f](https://github.com/jegr78/courtside/commit/da9a51f252a48a7b979ece80cf80a131994004af))
-* keep the whole account menu reachable on a short viewport ([#1691](https://github.com/jegr78/courtside/issues/1691)) ([4a5c855](https://github.com/jegr78/courtside/commit/4a5c8555031e8bffac496e950e088b9f8acdec0c))
-
 ## 0.3.0 (2026-10-18)
 
 ### Features
 
+* **acceptance:** keep the report in draft until every contact sheet has a verdict ([#1688](https://github.com/jegr78/courtside/issues/1688)) ([a86a04e](https://github.com/jegr78/courtside/commit/a86a04e1664f1f753107e7edc3f907dc9b83ae8e))
 * export the audit log and the message log from the administration UI ([#1547](https://github.com/jegr78/courtside/issues/1547)) ([ea091dc](https://github.com/jegr78/courtside/commit/ea091dcbcfdb3e4a7b5d8635ad2423796b0d289a))
 * give operators a health overview and bounded metrics for their instance ([#1562](https://github.com/jegr78/courtside/issues/1562)) ([8a90b80](https://github.com/jegr78/courtside/commit/8a90b80765c7eb4bcc2572b6051de5b603cabd8c))
 * import a membership export without a header row by column position ([#1559](https://github.com/jegr78/courtside/issues/1559)) ([0d78f00](https://github.com/jegr78/courtside/commit/0d78f0072714d328d63e94cf5f7c7150833e9ddf))
@@ -33,6 +20,9 @@
 
 ### Bug fixes
 
+* **acceptance:** name the subject of captures that missed their state ([#1687](https://github.com/jegr78/courtside/issues/1687)) ([e22f72e](https://github.com/jegr78/courtside/commit/e22f72ed263ac835ca9761a162796517eb9229f8)), closes [#1684](https://github.com/jegr78/courtside/issues/1684)
+* keep revealed booking details and partner names in view on phones ([#1695](https://github.com/jegr78/courtside/issues/1695)) ([da9a51f](https://github.com/jegr78/courtside/commit/da9a51f252a48a7b979ece80cf80a131994004af))
+* keep the whole account menu reachable on a short viewport ([#1691](https://github.com/jegr78/courtside/issues/1691)) ([4a5c855](https://github.com/jegr78/courtside/commit/4a5c8555031e8bffac496e950e088b9f8acdec0c))
 * **acceptance:** read server log levels the report can trust ([#1667](https://github.com/jegr78/courtside/issues/1667)) ([d027032](https://github.com/jegr78/courtside/commit/d0270324f98fd483b9b13452e8ea0681a325cc92))
 * **acceptance:** scroll each capture to the element it is named after ([#1674](https://github.com/jegr78/courtside/issues/1674)) ([a8207fd](https://github.com/jegr78/courtside/commit/a8207fd185cabb4d2143f860de0f8f7ccadc3d6b))
 * **appointments:** report a created series once and close its form ([#1675](https://github.com/jegr78/courtside/issues/1675)) ([5d0e791](https://github.com/jegr78/courtside/commit/5d0e7917433b19e9a6e2f4a91f4098c04deb04b1))
