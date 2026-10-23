@@ -731,10 +731,6 @@ input[type="time"] {
   }
 }
 
-.dialog-body {
-  scroll-padding-block-end: 3rem;
-}
-
 /* A landscape phone leaves little height between a pinned header and footer, so both shrink to give the form room. */
 @media (max-height: 30rem) {
   .modal-overlay {
@@ -755,23 +751,26 @@ input[type="time"] {
   }
 }
 
-.dialog-continues {
-  position: absolute;
-  inset-inline: 0;
-  bottom: 0;
+/* The form's bottom spacing, kept below the scroll so the signal in it neither covers content nor shifts it. */
+.dialog-end {
   display: flex;
-  align-items: flex-end;
+  flex-shrink: 0;
+  height: 1.25rem;
+}
+
+.dialog-continues {
+  display: flex;
+  flex: 1;
+  align-items: center;
   justify-content: center;
-  height: 3rem;
-  padding-bottom: 0.25rem;
   color: var(--cs-muted);
   pointer-events: none;
-  background: linear-gradient(to bottom, transparent, var(--cs-panel) 70%);
+  background: var(--cs-panel);
 }
 
 .dialog-continues svg {
-  width: 1.5rem;
-  height: 1.5rem;
+  width: 1.25rem;
+  height: 1.25rem;
 }
 
 @media (forced-colors: active) {

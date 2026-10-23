@@ -66,6 +66,7 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
   const [submitting, setSubmitting] = useState(false);
   const [requestKey, setRequestKey] = useState(() => idempotencyKey());
   const [showsMore, setShowsMore] = useState(false);
+  const moreSummary = useRef<HTMLElement>(null);
   const [refusedAsTaken, setRefusedAsTaken] = useState<{ refreshFailed: boolean }>();
   const durationField = useRef<HTMLSelectElement>(null);
   // A refusal asks for another time, so the field that chooses it comes back into view beside the alert.
@@ -188,7 +189,7 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
         <h2 id="booking-heading" className="text-xl font-bold">{t(waitlist ? "waitlist.title" : "booking.title")}</h2>
         <p data-testid="booking-period" aria-live="polite" className="mt-1 text-sm font-semibold">{formatBookingPeriod(period.startsAt, period.endsAt, i18n.language, grid.timeZone)}</p>
       </div>
-      <DialogBody padding="px-6 pt-4 pb-6">
+      <DialogBody padding="px-6 pt-4 pb-1">
       <FieldViolations id="booking-startsAt-errors" violations={fieldViolations("startsAt")} />
       {waitlist && <p data-testid="waitlist-explanation" className="text-muted mt-2 text-sm">{t("waitlist.explanation")}</p>}
       {!waitlist && dependants.length > 0 && <>
@@ -267,14 +268,19 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
             }}>{t("booking.addMember", { name: member.displayName })}</Button>
           </li>)}
         </ul>}
-        {selectedMembers.map((member) => <div key={member.personId} data-testid="selected-member" className="surface-raised flex items-center justify-between gap-3 rounded-lg px-3 py-2">
-          <span data-testid="selected-member-name" className="min-w-0">{member.displayName}</span>
-          <Button variant="secondary" type="button" data-testid="remove-member" aria-label={t("booking.removeMember", { name: member.displayName })} className="shrink-0 px-3 py-2" onClick={() => setSelectedMembers((current) => current.filter((selected) => selected.personId !== member.personId))}>{t("booking.removeMemberShort")}</Button>
+        {selectedMembers.map((member) => <div key={member.personId} data-testid="selected-member" className="surface-raised flex flex-wrap items-center justify-between gap-x-3 gap-y-2 rounded-lg px-3 py-2">
+          <span data-testid="selected-member-name" className="min-w-0 break-words">{member.displayName}</span>
+          <Button variant="secondary" type="button" data-testid="remove-member" aria-label={t("booking.removeMember", { name: member.displayName })} className="ml-auto shrink-0 px-3 py-2" onClick={() => setSelectedMembers((current) => current.filter((selected) => selected.personId !== member.personId))}>{t("booking.removeMemberShort")}</Button>
         </div>)}
       </fieldset>
       <FieldViolations id="booking-members-errors" violations={fieldViolations("members")} />
-      <details data-testid="booking-more" open={showsMore} onToggle={(event) => setShowsMore(event.currentTarget.open)} className="mt-4">
-      <summary data-testid="booking-more-summary" className="cursor-pointer font-semibold">{t("booking.more")}</summary>
+      <details data-testid="booking-more" open={showsMore} onToggle={(event) => {
+        const opened = event.currentTarget.open;
+        // Only a member's own opening scrolls; a refusal that opens it keeps its field in view.
+        if (opened && !showsMore) moreSummary.current?.scrollIntoView?.({ block: "start" });
+        setShowsMore(opened);
+      }} className="mt-4">
+      <summary ref={moreSummary} data-testid="booking-more-summary" className="cursor-pointer font-semibold">{t("booking.more")}</summary>
       <fieldset data-testid="guest-participants" className="mt-4 grid gap-3" aria-invalid={fieldViolations("participants").length > 0} aria-describedby={describedBy("participants")}>
         <legend className="font-semibold">{t("booking.guests")}</legend>
         {guestNames.map((guestName, index) => <label key={index} className="grid gap-2 font-medium">
