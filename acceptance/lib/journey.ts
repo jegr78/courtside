@@ -1,5 +1,5 @@
 import { runPath } from "./context";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { capture } from "./checks";
 import { recordCreated } from "./ledger";
@@ -37,12 +37,12 @@ export async function openSlot(page: Page, slot: Slot) {
   await expect(page.getByTestId("booking-dialog")).toBeVisible();
 }
 
-export async function bookAt(page: Page, who: string, slot: Slot, fill: (page: Page) => Promise<void>, options: { card?: string } = {}) {
+export async function bookAt(page: Page, who: string, slot: Slot, fill: (page: Page) => Promise<void>, options: { card?: string; filledSubject?: (page: Page) => Locator } = {}) {
   await openSlot(page, slot);
   await capture(page, "booking-dialog");
   if (options.card) await page.getByTestId("booking-card").selectOption(options.card);
   await fill(page);
-  await capture(page, "booking-dialog-filled");
+  await capture(page, "booking-dialog-filled", { subject: options.filledSubject?.(page) });
   const result = await submitBooking(page, who);
   expect(result.status, `product: the booking in ${slot.journey} is accepted (${JSON.stringify(result.body)})`).toBeLessThan(300);
   await expect(page.getByTestId("booking-dialog"), "product: the dialog closes after an accepted booking").not.toBeVisible();

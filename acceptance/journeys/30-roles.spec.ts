@@ -30,7 +30,7 @@ async function createSeries(page: Page, who: PersonaKey, card: string, courtValu
   await page.getByTestId("series-occurrence-count").fill("1");
   await page.getByTestId("preview-series").click();
   await expect(page.getByTestId("series-occurrence-0").or(page.getByTestId("series-skipped"))).toBeVisible();
-  await capture(page, "series-preview");
+  await capture(page, "series-preview", { subject: page.getByTestId("series-creatable-count") });
   const created = page.waitForResponse(answers("POST", "/api/booking-series"));
   await page.getByTestId("confirm-series").click();
   const response = await created;
@@ -188,7 +188,7 @@ test("given a member booking, when the groundskeeper plans a closure over it, th
     await grounds.getByTestId("preview-series").click();
     // then
     await expect(grounds.getByTestId("series-creatable-count")).toBeVisible();
-    await capture(grounds, "closure-over-booking-preview");
+    await capture(grounds, "closure-over-booking-preview", { subject: grounds.getByTestId("series-occurrence-0") });
     await expect(grounds.getByTestId("confirm-series"), "product: a closure over a member booking cannot be confirmed").toBeDisabled();
   } finally {
     await cancelQuietly(member, ids);

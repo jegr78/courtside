@@ -70,9 +70,9 @@ test("given a member, when a court is booked with a guest, then the booking is m
     // when / then
     ids.push(await step("memberC", "book with guest", () => bookAt(page, "memberC", slot, async (p) => {
       await p.getByTestId("booking-more-summary").click();
-      await capture(p, "booking-more");
+      await capture(p, "booking-more", { subject: p.getByTestId("guest-name") });
       await p.getByTestId("guest-name").fill("Richard Roe");
-    })));
+    }, { filledSubject: (p) => p.getByTestId("guest-name") })));
   } finally { await cancelQuietly(page, ids); await page.context().close(); }
 });
 
@@ -163,7 +163,7 @@ test("given a member, when a booking is made, cancelled and made again, then my 
         await expect.poll(() => entries.count()).toBeGreaterThan(shown);
       }
       await expect(row, "product: the new booking is listed with a cancel action").toBeVisible();
-      await capture(page, "my-bookings-with-new");
+      await capture(page, "my-bookings-with-new", { subject: row });
       await row.click();
       await capture(page, "cancel-confirmation");
       const cancelled = page.waitForResponse(answers("DELETE", `/api/bookings/${first}`));
