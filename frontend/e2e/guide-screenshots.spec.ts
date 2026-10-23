@@ -179,7 +179,7 @@ const drivers: Record<string, (page: Page, visualDate: string) => Promise<void>>
     await expect(page.getByTestId("opening-week-2026-11-02")).toBeVisible();
     await page.reload();
     await page.getByTestId("edit-opening-week-2026-11-02").click();
-    await expect(page.getByTestId("hours-close-MONDAY")).toHaveValue("20:00");
+    await expect(page.getByTestId("hours-close-MONDAY")).toHaveValue(await page.locator("html").getAttribute("lang") === "en" ? "08:00 PM" : "20:00");
   },
   "availability": async (page) => {
     await page.getByTestId("admin-opening-hours-link").click();
