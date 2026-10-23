@@ -1,3 +1,4 @@
+import { formatDateTime } from "../components/localizedDateTime";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createMemoryRouter, MemoryRouter, RouterProvider, useLocation, useNavigate } from "react-router-dom";
@@ -138,8 +139,8 @@ describe("AdminStatisticsView", () => {
     for (const section of [read.utilisation, read.bookings, read.members, read.messages]) {
       expect(section).toHaveBeenCalledExactlyOnceWith(undefined);
     }
-    expect(screen.getByTestId("utilisation-from")).toHaveValue("2026-02-01");
-    expect(screen.getByTestId("utilisation-to")).toHaveValue("2026-02-28");
+    expect(screen.getByTestId("utilisation-from")).toHaveValue(formatDateTime("2026-02-01", "date", "en"));
+    expect(screen.getByTestId("utilisation-to")).toHaveValue(formatDateTime("2026-02-28", "date", "en"));
     expect(screen.getByTestId("utilisation-period")).toHaveTextContent(/Feb 1\s*–\s*28, 2026/);
     expect(screen.getByTestId("utilisation-period")).toHaveTextContent("Europe/Zurich");
     expect(screen.getByTestId("address")).toHaveTextContent(/^$/);
@@ -375,8 +376,8 @@ describe("AdminStatisticsView", () => {
       expect(read.messages).toHaveBeenLastCalledWith({ from, to });
       expect(screen.getByTestId("address")).toHaveTextContent(`?from=${from}&to=${to}`);
       await waitFor(() => expect(screen.getByTestId(`statistics-choice-${choice}`)).toHaveAttribute("aria-pressed", "true"));
-      expect(screen.getByTestId("utilisation-from")).toHaveValue(from);
-      expect(screen.getByTestId("utilisation-to")).toHaveValue(to);
+      expect(screen.getByTestId("utilisation-from")).toHaveValue(formatDateTime(from, "date", "en"));
+      expect(screen.getByTestId("utilisation-to")).toHaveValue(formatDateTime(to, "date", "en"));
     }
   });
 
@@ -410,7 +411,7 @@ describe("AdminStatisticsView", () => {
     for (const section of [read.utilisation, read.bookings, read.members, read.messages]) {
       expect(section).toHaveBeenCalledExactlyOnceWith({ from: "2026-01-01", to: "2026-03-31" });
     }
-    expect(screen.getByTestId("utilisation-from")).toHaveValue("2026-01-01");
+    expect(screen.getByTestId("utilisation-from")).toHaveValue(formatDateTime("2026-01-01", "date", "en"));
     expect(screen.getByTestId("statistics-choice-3m")).toHaveAttribute("aria-pressed", "true");
   });
 
@@ -420,15 +421,15 @@ describe("AdminStatisticsView", () => {
     render(<MemoryRouter initialEntries={["/admin/utilisation", "/admin/utilisation?from=2026-01-01&to=2026-03-31"]} initialIndex={1}>
       <AdminStatisticsView /><Address /><Back /></MemoryRouter>);
     await loaded();
-    expect(screen.getByTestId("utilisation-from")).toHaveValue("2026-01-01");
+    expect(screen.getByTestId("utilisation-from")).toHaveValue(formatDateTime("2026-01-01", "date", "en"));
 
     // when
     await userEvent.click(screen.getByTestId("back"));
 
     // then
     await waitFor(() => expect(read.utilisation).toHaveBeenLastCalledWith(undefined));
-    await waitFor(() => expect(screen.getByTestId("utilisation-from")).toHaveValue("2026-02-01"));
-    expect(screen.getByTestId("utilisation-to")).toHaveValue("2026-02-28");
+    await waitFor(() => expect(screen.getByTestId("utilisation-from")).toHaveValue(formatDateTime("2026-02-01", "date", "en")));
+    expect(screen.getByTestId("utilisation-to")).toHaveValue(formatDateTime("2026-02-28", "date", "en"));
   });
 
   it("given an address whose period ends before it starts, when the statistics open, then the default period is read instead", async () => {
@@ -441,7 +442,7 @@ describe("AdminStatisticsView", () => {
     // then
     await loaded();
     expect(read.utilisation).toHaveBeenCalledExactlyOnceWith(undefined);
-    expect(screen.getByTestId("utilisation-from")).toHaveValue("2026-02-01");
+    expect(screen.getByTestId("utilisation-from")).toHaveValue(formatDateTime("2026-02-01", "date", "en"));
   });
 
   it("given a free range, when a board reads it, then the address carries it and the sections read it", async () => {

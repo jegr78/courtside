@@ -259,7 +259,7 @@ function GuardianshipForm({ entry, relationship, pending, error, save, closed }:
         </label>)}
       </fieldset>
       <TextField data-testid="guardianship-ended-on" type="date" label={t("admin.person.guardianshipEndedOn")} value={endedOn}
-                 aria-describedby="guardianship-ended-on-hint" onChange={(event) => setEndedOn(event.target.value)} />
+                 aria-describedby="guardianship-ended-on-hint" onValueChange={(value) => setEndedOn(value)} />
       <p id="guardianship-ended-on-hint" className="text-muted text-sm">{t("admin.person.guardianshipEndedOnHint")}</p>
       <div className="flex flex-wrap gap-3">
         <Button variant="primary" data-testid="save-guardianship" disabled={pending || grants.length === 0 || (!relationship && !chosen)} type="submit">

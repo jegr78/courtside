@@ -207,10 +207,10 @@ function PeriodForm({ draft, schedule, today, started, affected, disabled, chang
     <div className="grid gap-3 sm:grid-cols-2">
       <TextField data-testid="opening-period-starts-on" type="date" min={today} label={t("admin.availability.startsOn")}
                  disabled={disabled || started} value={draft.startsOn}
-                 onChange={(event) => changed(withStart(draft, event.target.value, schedule))} />
+                 onValueChange={(value) => changed(withStart(draft, value, schedule))} />
       <TextField data-testid="opening-period-ends-on" type="date" min={draft.startsOn || today}
                  label={t("admin.availability.endsOn")} disabled={disabled} value={draft.endsOn}
-                 onChange={(event) => changed({ ...draft, endsOn: event.target.value })} />
+                 onValueChange={(value) => changed({ ...draft, endsOn: value })} />
     </div>
     <fieldset className="grid gap-2" disabled={disabled || started}>
       <legend className="font-medium">{t(holiday ? "admin.availability.holidayHours" : "admin.availability.seasonHours")}</legend>
@@ -232,10 +232,10 @@ function HoursRow({ day, label, changed }: { day: Hours; label?: string; changed
   return <div data-testid={`opening-period-hours-${day.dayOfWeek}`} className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] items-end gap-2">
     <TextField data-testid={`opening-period-opens-${day.dayOfWeek}`} type="time" disabled={day.closed}
                label={label ? `${label}, ${t("admin.facility.opensAt")}` : t("admin.facility.opensAt")} value={day.opensAt}
-               onChange={(event) => changed({ ...day, opensAt: event.target.value })} />
+               onValueChange={(value) => changed({ ...day, opensAt: value })} />
     <TextField data-testid={`opening-period-closes-${day.dayOfWeek}`} type="time" disabled={day.closed}
                label={t("admin.facility.closesAt")} value={day.closesAt}
-               onChange={(event) => changed({ ...day, closesAt: event.target.value })} />
+               onValueChange={(value) => changed({ ...day, closesAt: value })} />
     <label className="flex min-h-11 items-center gap-2 font-medium">
       <input data-testid={`opening-period-closed-${day.dayOfWeek}`} type="checkbox" checked={day.closed}
              onChange={(event) => changed(event.target.checked ? { ...day, opensAt: "", closesAt: "", closed: true } : { ...day, closed: false })} />
@@ -263,10 +263,10 @@ function ClosureForm({ draft, courts, today, started, affected, disabled, change
     <div className="grid gap-3 sm:grid-cols-2">
       <TextField data-testid="court-closure-starts-on" type="date" min={today} label={t("admin.availability.startsOn")}
                  disabled={disabled || started} value={draft.startsOn}
-                 onChange={(event) => changed({ ...draft, startsOn: event.target.value })} />
+                 onValueChange={(value) => changed({ ...draft, startsOn: value })} />
       <TextField data-testid="court-closure-ends-on" type="date" min={draft.startsOn || today}
                  label={t("admin.availability.endsOn")} disabled={disabled} value={draft.endsOn}
-                 onChange={(event) => changed({ ...draft, endsOn: event.target.value })} />
+                 onValueChange={(value) => changed({ ...draft, endsOn: value })} />
     </div>
     <AffectedNotice testId="court-closure-affected" affected={affected} />
     <div className="flex flex-wrap gap-3">

@@ -1,3 +1,4 @@
+import { formatDateTime } from "../../components/localizedDateTime";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -53,7 +54,7 @@ describe("AdminOpeningHoursView", () => {
     show();
 
     // then
-    expect(await screen.findByTestId("hours-open-MONDAY")).toHaveValue("08:00");
+    expect(await screen.findByTestId("hours-open-MONDAY")).toHaveValue(formatDateTime("08:00", "time", "en"));
     expect(screen.getByTestId("hours-closed-SUNDAY")).toBeChecked();
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Opening hours");
   });
@@ -95,10 +96,10 @@ describe("AdminOpeningHoursView", () => {
     await user.click(screen.getByTestId("apply-hours"));
 
     // then
-    expect(screen.getByTestId("hours-open-SATURDAY")).toHaveValue("09:00");
-    expect(screen.getByTestId("hours-close-SUNDAY")).toHaveValue("18:00");
+    expect(screen.getByTestId("hours-open-SATURDAY")).toHaveValue(formatDateTime("09:00", "time", "en"));
+    expect(screen.getByTestId("hours-close-SUNDAY")).toHaveValue(formatDateTime("18:00", "time", "en"));
     expect(screen.getByTestId("hours-closed-SATURDAY")).not.toBeChecked();
-    expect(screen.getByTestId("hours-open-MONDAY")).toHaveValue("08:00");
+    expect(screen.getByTestId("hours-open-MONDAY")).toHaveValue(formatDateTime("08:00", "time", "en"));
   });
 
   it("given no day is picked, when the times are entered, then applying them is not offered", async () => {
@@ -144,7 +145,7 @@ describe("AdminOpeningHoursView", () => {
       const field = screen.getByTestId(testId);
       expect(field, `${testId} cannot be edited on a closed day`).toBeDisabled();
       expect(field, `${testId} is marked empty so no ghost time shows`).toHaveAttribute("data-empty", "true");
-      expect(field, `${testId} is announced as not set`).toHaveAccessibleDescription("Not set");
+      expect(field, `${testId} is announced as not set`).toHaveAccessibleDescription("Not set Example: 04:05 PM");
     }
     expect(screen.getByTestId("hours-open-TUESDAY"), "a day closed from the start shows as empty too").toHaveAttribute("data-empty", "true");
     expect(screen.getByTestId("hours-open-MONDAY-empty"), "a closed day shows the empty hint").toBeVisible();
@@ -283,7 +284,8 @@ describe("AdminOpeningHoursView", () => {
     await screen.findByTestId("hours-open-MONDAY");
 
     // when
-    await userEvent.type(screen.getByTestId("hours-open-MONDAY"), "09:00");
+    await userEvent.clear(screen.getByTestId("hours-open-MONDAY"));
+    await userEvent.type(screen.getByTestId("hours-open-MONDAY"), "09:00 AM");
 
     // then
     await waitFor(() => expect(screen.getByTestId("unsaved-count")).toHaveTextContent("1"));
@@ -310,7 +312,7 @@ describe("AdminOpeningHoursView", () => {
     await user.click(screen.getByTestId("discard-opening-hours"));
 
     // then
-    expect(screen.getByTestId("hours-open-MONDAY")).toHaveValue("08:00");
+    expect(screen.getByTestId("hours-open-MONDAY")).toHaveValue(formatDateTime("08:00", "time", "en"));
     expect(screen.getByTestId("hours-closed-MONDAY")).not.toBeChecked();
     expect(screen.queryByTestId("save-bar")).toBeNull();
     await waitFor(() => expect(screen.getByTestId("unsaved-count")).toHaveTextContent("0"));
@@ -371,7 +373,7 @@ describe("AdminOpeningHoursView", () => {
     expect(saveWeek).toHaveBeenCalledWith(later(7), week({ MONDAY: ["10:00", "18:00"] }));
     expect(await screen.findByTestId(`opening-week-${later(7)}`)).toHaveTextContent("Scheduled from");
     expect(screen.getByTestId(`edit-opening-week-${later(7)}`), "the saved week stays in the editor").toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByTestId("opening-hours-effective-from")).toHaveValue(later(7));
+    expect(screen.getByTestId("opening-hours-effective-from")).toHaveValue(formatDateTime(later(7), "date", "en"));
   });
 
   it("given an upcoming week, when it is chosen, then the editor holds its days and its first day", async () => {
@@ -388,8 +390,8 @@ describe("AdminOpeningHoursView", () => {
     await userEvent.click(screen.getByTestId(`edit-opening-week-${later(7)}`));
 
     // then
-    expect(screen.getByTestId("hours-open-MONDAY")).toHaveValue("10:00");
-    expect(screen.getByTestId("opening-hours-effective-from")).toHaveValue(later(7));
+    expect(screen.getByTestId("hours-open-MONDAY")).toHaveValue(formatDateTime("10:00", "time", "en"));
+    expect(screen.getByTestId("opening-hours-effective-from")).toHaveValue(formatDateTime(later(7), "date", "en"));
     expect(screen.queryByTestId("opening-hours-replaces"), "a week does not replace itself").toBeNull();
     expect(screen.getByTestId("opening-week-beginning")).toHaveTextContent("In force");
     expect(screen.getByTestId(`remove-opening-week-${later(7)}`), "each button names its week").toHaveAccessibleDescription(/^Scheduled from/);

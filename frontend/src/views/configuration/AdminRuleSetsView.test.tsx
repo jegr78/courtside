@@ -1,3 +1,4 @@
+import { formatDateTime } from "../../components/localizedDateTime";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -248,14 +249,14 @@ describe("AdminRuleSetsView", () => {
     fireEvent.click(screen.getByTestId("save-booking-rules"));
 
     // then
-    expect(earliestStart, "a board thinks of 20:00, not of 1200").toHaveAttribute("type", "time");
+    expect(earliestStart, "a board thinks of 20:00, not of 1200").toHaveAttribute("type", "text");
     expect(earliestStart).toHaveAccessibleName(i18n.t("admin.rules.parameter.earliestStart"));
     expect(latestEnd, "two inputs side by side still say which end of the window each sets")
       .toHaveAccessibleName(i18n.t("admin.rules.parameter.latestEnd"));
     const range = i18n.t("admin.rules.range", { minimum: "00:00", maximum: "23:59" });
     expect(screen.getByTestId("rule-BOOKING_HOURS-range"), "one hint line keeps the row as low as its neighbours").toHaveTextContent(range);
-    expect(earliestStart).toHaveAccessibleDescription(range);
-    expect(latestEnd).toHaveAccessibleDescription(range);
+    expect(earliestStart).toHaveAccessibleDescription(`${range} Example: 04:05 PM`);
+    expect(latestEnd).toHaveAccessibleDescription(`${range} Example: 04:05 PM`);
     await waitFor(() => expect(setRule).toHaveBeenCalledWith("rule-set", "BOOKING_HOURS", { earliestStart: 540, latestEnd: 1200 }));
   });
 
@@ -273,8 +274,8 @@ describe("AdminRuleSetsView", () => {
     render(<MemoryRouter><UnsavedChangesProvider><AdminRuleSetsView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
 
     // then
-    await waitFor(() => expect(screen.getByTestId("rule-BOOKING_HOURS-earliestStart")).toHaveValue("08:00"));
-    expect(screen.getByTestId("rule-BOOKING_HOURS-latestEnd")).toHaveValue("20:00");
+    await waitFor(() => expect(screen.getByTestId("rule-BOOKING_HOURS-earliestStart")).toHaveValue(formatDateTime("08:00", "time", "en")));
+    expect(screen.getByTestId("rule-BOOKING_HOURS-latestEnd")).toHaveValue(formatDateTime("20:00", "time", "en"));
     expect(screen.getByTestId("rule-BOOKING_HOURS-applies")).toBeChecked();
   });
 

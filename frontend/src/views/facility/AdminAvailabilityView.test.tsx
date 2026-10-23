@@ -177,14 +177,14 @@ describe("AdminAvailabilityView", () => {
     show();
     await screen.findByTestId("opening-period-form");
     fireEvent.change(screen.getByTestId("opening-period-starts-on"), { target: { value: "2099-07-07" } });
-    fireEvent.change(screen.getByTestId("opening-period-closes-MONDAY"), { target: { value: "13:00" } });
+    fireEvent.change(screen.getByTestId("opening-period-closes-MONDAY"), { target: { value: "01:00 PM" } });
 
     // when
     fireEvent.change(screen.getByTestId("opening-period-starts-on"), { target: { value: "2099-07-08" } });
 
     // then
-    expect(screen.getByTestId("opening-period-opens-MONDAY")).toHaveValue("10:00");
-    expect(screen.getByTestId("opening-period-closes-MONDAY"), "an edited window is the board's, not the week's").toHaveValue("13:00");
+    expect(screen.getByTestId("opening-period-opens-MONDAY")).toHaveValue("10:00 AM");
+    expect(screen.getByTestId("opening-period-closes-MONDAY"), "an edited window is the board's, not the week's").toHaveValue("01:00 PM");
   });
 
   it("given an untouched new entry, when it becomes a season, then each weekday starts with its own regular hours", async () => {
@@ -197,8 +197,8 @@ describe("AdminAvailabilityView", () => {
     await userEvent.selectOptions(screen.getByTestId("opening-period-kind"), "SEASON");
 
     // then
-    expect(screen.getByTestId("opening-period-opens-TUESDAY")).toHaveValue("10:00");
-    expect(screen.getByTestId("opening-period-opens-MONDAY"), "a season keeps every weekday's own window").toHaveValue("08:00");
+    expect(screen.getByTestId("opening-period-opens-TUESDAY")).toHaveValue("10:00 AM");
+    expect(screen.getByTestId("opening-period-opens-MONDAY"), "a season keeps every weekday's own window").toHaveValue("08:00 AM");
   });
 
   it("given a form without its days, when it is saved, then nothing is sent and the board is told what is missing", async () => {

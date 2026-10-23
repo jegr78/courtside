@@ -498,7 +498,7 @@ describe("AdminAuditView", () => {
     // then
     for (const testId of ["audit-filter-from", "audit-filter-to"]) {
       expect(screen.getByTestId(testId), `${testId} no longer looks active`).toHaveAttribute("data-empty", "true");
-      expect(screen.getByTestId(testId), `${testId} is announced as not set`).toHaveAccessibleDescription("Not set");
+      expect(screen.getByTestId(testId), `${testId} is announced as not set`).toHaveAccessibleDescription(/Not set/);
     }
   });
 

@@ -228,6 +228,12 @@ input[type="time"] {
     min-width: 0;
   }
 
+  .rule-time-input {
+    width: 10ch;
+    min-width: 10ch;
+    box-sizing: content-box;
+  }
+
   .date-time-field input[data-empty]:not(:focus) {
     -webkit-text-fill-color: transparent;
   }

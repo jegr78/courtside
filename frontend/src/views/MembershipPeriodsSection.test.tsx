@@ -115,7 +115,7 @@ describe("MembershipPeriodsSection", () => {
 
     // when
     expect(screen.getByTestId("period-type"), "the form starts from the stored period").toHaveValue("type-1");
-    expect(screen.getByTestId("period-started-on")).toHaveValue("2021-01-01");
+    expect(screen.getByTestId("period-started-on")).toHaveValue("01/01/2021");
     await userEvent.type(screen.getByTestId("period-ended-on"), "2999-06-01");
     await userEvent.click(screen.getByTestId("save-period"));
 

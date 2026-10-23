@@ -360,7 +360,7 @@ it("given a move nobody has edited, when the dialog opens, then the empty start 
 
   // then
   const start = screen.getByTestId("move-start-time");
-  expect(start, "an empty start keeps the current one and is announced so").toHaveAccessibleDescription("Unchanged");
+  expect(start, "an empty start keeps the current one and is announced so").toHaveAccessibleDescription(/Unchanged/);
   expect(screen.getByTestId("move-start-time-empty"), "the hint shows the same meaning").toHaveTextContent("Unchanged");
   expect(start, "the start field starts empty").toHaveAttribute("data-empty", "true");
 });

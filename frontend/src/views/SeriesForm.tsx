@@ -165,8 +165,8 @@ export function SeriesForm({ timeZone, courts, created, reportError }: {
     </div>
 
     <div className="grid gap-3 sm:grid-cols-2">
-      <TextField data-testid="series-starts-on" disabled={pending} type="date" label={t("series.startsOn")} value={draft.startsOn} onChange={(event) => change({ startsOn: event.target.value })} />
-      <TextField data-testid="series-start-time" disabled={pending} type="time" label={t("series.startTime")} value={draft.startTime} onChange={(event) => change({ startTime: event.target.value })} />
+      <TextField data-testid="series-starts-on" disabled={pending} type="date" label={t("series.startsOn")} value={draft.startsOn} onValueChange={(value) => change({ startsOn: value })} />
+      <TextField data-testid="series-start-time" disabled={pending} type="time" label={t("series.startTime")} value={draft.startTime} onValueChange={(value) => change({ startTime: value })} />
       <TextField data-testid="series-duration" disabled={pending} type="number" min={1} max={maxBookingMinutes ?? 1440} label={t("series.duration")} value={draft.durationMinutes} onChange={(event) => change({ durationMinutes: Number(event.target.value) })} />
       <TextField data-testid="series-interval-weeks" disabled={pending} type="number" min={1} max={52} label={t("series.intervalWeeks")} value={draft.intervalWeeks} onChange={(event) => change({ intervalWeeks: Number(event.target.value) })} />
     </div>
@@ -189,7 +189,7 @@ export function SeriesForm({ timeZone, courts, created, reportError }: {
       </select>
       {draft.ending === "occurrenceCount"
         ? <TextField data-testid="series-occurrence-count" disabled={pending} type="number" min={1} max={200} label={t("series.occurrenceCount")} value={draft.occurrenceCount} onChange={(event) => change({ occurrenceCount: Number(event.target.value) })} />
-        : <TextField data-testid="series-ends-on" disabled={pending} type="date" label={t("series.endsOn")} value={draft.endsOn} onChange={(event) => change({ endsOn: event.target.value })} />}
+        : <TextField data-testid="series-ends-on" disabled={pending} type="date" label={t("series.endsOn")} value={draft.endsOn} onValueChange={(value) => change({ endsOn: value })} />}
     </div>
 
     <TextField data-testid="series-note" maxLength={500} disabled={pending} label={t("series.note")} value={draft.note} onChange={(event) => change({ note: event.target.value })} />

@@ -1,3 +1,4 @@
+import { DateTimeInput } from "../../components/DateTimeInput";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useSearchParams } from "react-router-dom";
@@ -362,14 +363,21 @@ function RuleEditor({ type, stored, edit, disabled, changed }: { type: RuleTypeC
   const { t } = useTranslation();
   const timeWindow = type.parameters.length > 1 && type.parameters.every((parameter) => parameter.kind === "TIME_OF_DAY");
   const rangeId = (parameter: RuleParameter) => timeWindow ? `rule-${type.ruleType}-range` : `rule-${type.ruleType}-${parameter.name}-range`;
-  const input = (parameter: RuleParameter) => <input key={parameter.name} id={`rule-${type.ruleType}-${parameter.name}`} data-testid={`rule-${type.ruleType}-${parameter.name}`}
-    aria-label={timeWindow ? t(`admin.rules.parameter.${parameter.name}`) : undefined}
-    aria-describedby={rangeId(parameter)} disabled={disabled}
-    type={parameter.kind === "TIME_OF_DAY" ? "time" : "number"}
-    min={shown(parameter, parameter.minimum)} max={shown(parameter, parameter.maximum)}
-    className={`form-control ${parameter.kind === "TIME_OF_DAY" ? "w-[7rem] px-1.5 text-sm" : "w-24 px-3"} max-w-40 rounded-lg border py-1`}
-    value={edit.params[parameter.name] === undefined ? "" : shown(parameter, edit.params[parameter.name])}
-    onChange={(event) => changed({ applies: true, params: entered(edit.params, parameter, event.target.value) })} />;
+  const input = (parameter: RuleParameter) => {
+    const props = {
+      id: `rule-${type.ruleType}-${parameter.name}`,
+      "data-testid": `rule-${type.ruleType}-${parameter.name}`,
+      "aria-label": timeWindow ? t(`admin.rules.parameter.${parameter.name}`) : undefined,
+      "aria-describedby": rangeId(parameter), disabled,
+      min: shown(parameter, parameter.minimum), max: shown(parameter, parameter.maximum),
+      value: edit.params[parameter.name] === undefined ? "" : shown(parameter, edit.params[parameter.name])
+    };
+    return parameter.kind === "TIME_OF_DAY"
+      ? <DateTimeInput key={parameter.name} {...props} type="time" className="form-control rule-time-input rounded-lg border px-2 py-1 text-sm"
+          onValueChange={(value) => changed({ applies: true, params: entered(edit.params, parameter, value) })} />
+      : <input key={parameter.name} {...props} type="number" className="form-control w-24 max-w-40 rounded-lg border px-3 py-1"
+          onChange={(event) => changed({ applies: true, params: entered(edit.params, parameter, event.target.value) })} />;
+  };
   const first = type.parameters[0];
   const last = type.parameters.at(-1);
   return <article className="grid gap-x-3 gap-y-1 border-t py-0.5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
