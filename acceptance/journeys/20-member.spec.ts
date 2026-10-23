@@ -195,7 +195,7 @@ test("given a member whose category books only within set hours, when a slot out
     // then — the dialog names the hours and offers no booking
     await expect(page.getByTestId("booking-outside-hours"), "product: the dialog names the booking hours").toBeVisible();
     await expect(page.getByTestId("booking-submit"), "product: the dialog offers no booking outside them").toBeDisabled();
-    await capture(page, "booking-outside-hours");
+    await capture(page, "booking-outside-hours", { subject: page.getByTestId("booking-outside-hours") });
     // when / then — a request that bypasses the dialog is refused for the hours
     const courts = await (await api.get("/api/public/courts")).json() as { id: string; number: number }[];
     const card = discovery.cards.find((candidate: { active: boolean; allowedRoles: string[] }) => candidate.active && candidate.allowedRoles.length === 0);
@@ -233,7 +233,7 @@ test("given a member whose category limits the week and the booking length, when
       .toContainText(String(eligibility.maxWeeklyBookedHours));
     const offered = await page.getByTestId("booking-duration").locator("option").evaluateAll((options) => options.map((option) => Number((option as HTMLOptionElement).value)));
     expect(offered.every((minutes) => minutes >= eligibility.minBookingMinutes!), `product: no duration below the minimum is offered (${offered.join(", ")})`).toBe(true);
-    await capture(page, "booking-weekly-and-minimum");
+    await capture(page, "booking-weekly-and-minimum", { subject: page.getByTestId("booking-weekly-bound") });
     // when / then — requests that bypass the dialog are refused for the minimum and for the week
     const courts = await (await api.get("/api/public/courts")).json() as { id: string; number: number }[];
     const card = discovery.cards.find((candidate: { active: boolean; allowedRoles: string[] }) => candidate.active && candidate.allowedRoles.length === 0);
@@ -344,7 +344,7 @@ test("given two members on the same slot, when both submit, then the second is r
       await second.getByTestId("my-messages-link").click();
       const offer = second.locator('[data-testid="notification-offer"][data-open="true"]').first();
       await expect(offer, "product: the notification centre shows the open offer").toBeVisible();
-      await capture(second, "notification-offer");
+      await capture(second, "notification-offer", { subject: offer });
       const [entry] = await openWaitlistEntries("memberC", [slot]);
       expect(entry?.state, "product: the waiting entry is offered the slot").toBe("OFFERED");
       await second.getByTestId("my-bookings-link").click();

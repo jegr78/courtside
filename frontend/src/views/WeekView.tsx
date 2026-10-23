@@ -330,7 +330,7 @@ export function WeekView({ today, clock = systemClock, canBook = true,
   });
 
   const slotHeight = data ? Math.max(32, data.grid.slotMinutes * 4 / 3) : 40;
-  const currentSlot = currentTime && (slots.find((slot) => slot >= currentTime) ?? slots.at(-1));
+  const currentSlot = currentTime && (slots.findLast((slot) => slot <= currentTime) ?? slots[0]);
 
   function selectDate(value: string | undefined) {
     if (!value || !data) return;
@@ -401,6 +401,21 @@ export function WeekView({ today, clock = systemClock, canBook = true,
     scrolledToNowOn.current = selectedDate;
     scrollToSlot(planRef.current, currentSlot);
   }, [currentSlot, isToday, selectedDate]);
+
+  useLayoutEffect(() => {
+    const plan = planRef.current;
+    if (!plan || !data || !isToday || !currentTime) return;
+    const position = () => positionCurrentLine(plan, currentTime, data.grid.slotMinutes);
+    position();
+    const observer = typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(position);
+    const table = plan.querySelector("table");
+    if (table) observer?.observe(table);
+    window.addEventListener("resize", position);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", position);
+    };
+  }, [data, currentTime, isToday, selectedDate]);
 
   // Another day has no current time to scroll to.
   useEffect(() => {
@@ -890,6 +905,18 @@ function alignToItem(list: HTMLElement, item: HTMLElement) {
   if (Math.abs(reachable - list.scrollLeft) > 1) list.scrollLeft = reachable;
 }
 
+function positionCurrentLine(plan: HTMLDivElement, time: string, slotMinutes: number) {
+  const line = plan.querySelector<HTMLElement>('[data-testid="current-time-line"]');
+  const rows = [...plan.querySelectorAll<HTMLElement>("tr[data-slot]")];
+  const row = rows.findLast((candidate) => (candidate.dataset.slot ?? "") <= time) ?? rows[0];
+  const slot = row?.dataset.slot;
+  if (!line || !row || !slot) return;
+  const bounds = row.getBoundingClientRect();
+  if (bounds.height === 0) return;
+  const fraction = Math.max(0, Math.min(slotMinutes, timeToMinutes(time) - timeToMinutes(slot))) / slotMinutes;
+  line.style.top = `${bounds.top - plan.getBoundingClientRect().top + plan.scrollTop - plan.clientTop + fraction * bounds.height}px`;
+}
+
 function scrollToSlot(plan: HTMLDivElement | null, slot?: string) {
   const target = slot ? plan?.querySelector(`[data-slot="${slot}"]`) : undefined;
   if (!plan || !(target instanceof HTMLElement)) return;
@@ -897,8 +924,9 @@ function scrollToSlot(plan: HTMLDivElement | null, slot?: string) {
     if (typeof target.scrollIntoView === "function") target.scrollIntoView({ block: "center" });
     return;
   }
-  plan.scrollTop += target.getBoundingClientRect().top - plan.getBoundingClientRect().top
-    - (plan.clientHeight - target.clientHeight) / 2;
+  const headerHeight = plan.querySelector("thead")?.getBoundingClientRect().height ?? 0;
+  plan.scrollTop += target.getBoundingClientRect().top - plan.getBoundingClientRect().top - headerHeight
+    - Math.max(0, (plan.clientHeight - headerHeight - target.clientHeight) / 2);
 }
 
 function scrollToStart(plan: HTMLDivElement | null) {

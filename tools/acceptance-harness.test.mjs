@@ -1783,7 +1783,7 @@ test("given the captures whose state sits below the top of the page, when the jo
   const journeys = readdirSync(new URL("../acceptance/journeys/", import.meta.url)).filter((name) => name.endsWith(".spec.ts"))
     .map((name) => readFileSync(new URL(`../acceptance/journeys/${name}`, import.meta.url), "utf8")).join("\n");
   // when / then
-  for (const label of ["series-preview", "closure-over-booking-preview", "person-no-shows", "booking-more", "my-bookings-with-new"]) {
+  for (const label of ["series-preview", "closure-over-booking-preview", "person-no-shows", "booking-more", "my-bookings-with-new", "booking-outside-hours", "booking-weekly-and-minimum", "notification-offer"]) {
     assert.match(journeys, new RegExp(`capture\\(\\w+, "${label}", \\{[^}]*subject: `), `the ${label} capture names its subject`);
   }
   assert.match(journeys, /fill\("Richard Roe"\);\s*\}, \{ filledSubject: /, "the guest booking's filled dialog names the guest as its subject");

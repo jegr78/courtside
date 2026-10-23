@@ -2933,3 +2933,44 @@ it("given a selected week date, when it is cleared and retyped from the keyboard
   await waitFor(() => expect(api.allocationsBetween).toHaveBeenCalledWith("2026-09-07", "2026-09-13"));
   expect(screen.getByTestId("day-selector-2026-09-09")).toHaveAttribute("aria-pressed", "true");
 });
+
+it("given a fractional current time and a sticky court header, when now is shown, then its containing row centers below the header", async () => {
+  // given
+  render(<WeekView today={clubInstant("12:15")} />);
+  const plan = await screen.findByTestId("week-grid");
+  const current = plan.querySelector<HTMLElement>('[data-slot="12:00"]')!;
+  const next = plan.querySelector<HTMLElement>('[data-slot="12:30"]')!;
+  const header = plan.querySelector("thead")!;
+  Object.defineProperty(plan, "clientHeight", { configurable: true, value: 100 });
+  Object.defineProperty(current, "clientHeight", { configurable: true, value: 48 });
+  Object.defineProperty(next, "clientHeight", { configurable: true, value: 48 });
+  vi.spyOn(plan, "getBoundingClientRect").mockReturnValue(new DOMRect(0, 100, 100, 100));
+  vi.spyOn(current, "getBoundingClientRect").mockReturnValue(new DOMRect(0, 500, 100, 48));
+  vi.spyOn(next, "getBoundingClientRect").mockReturnValue(new DOMRect(0, 548, 100, 48));
+  vi.spyOn(header, "getBoundingClientRect").mockReturnValue(new DOMRect(0, 100, 100, 48));
+  vi.spyOn(window, "getComputedStyle").mockReturnValue({ overflowY: "auto" } as CSSStyleDeclaration);
+  plan.scrollTop = 0;
+
+  // when
+  await userEvent.click(screen.getByTestId("current-time"));
+
+  // then
+  expect(plan.scrollTop).toBe(350);
+});
+
+
+it("given rendered mobile rows taller than the configured slot height, when the current line is placed, then it follows the actual containing row", async () => {
+  // given
+  vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+    if (this.dataset.testid === "week-grid") return new DOMRect(0, 100, 300, 300);
+    if (this.dataset.slot === "12:00") return new DOMRect(0, 500, 300, 44);
+    return new DOMRect();
+  });
+
+  // when
+  render(<WeekView today={clubInstant("12:15")} />);
+
+  // then
+  const line = await screen.findByTestId("current-time-line");
+  await waitFor(() => expect(line.style.top).toBe("422px"));
+});
