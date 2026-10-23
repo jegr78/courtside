@@ -56,6 +56,36 @@ describe("AdminAvailabilityView", () => {
     vi.spyOn(api, "courtClosureImpact").mockResolvedValue(noImpact);
   });
 
+  it.each(["de", "en"])("given named and unnamed courts in %s, when closures load, then names stand alone and absent names use the court number", async (language) => {
+    // given
+    await i18n.changeLanguage(language);
+    const listed = [
+      { id: "court-1", number: 1, name: "Platz 1", active: true },
+      { id: "court-2", number: 2, name: null, active: true },
+      { id: "court-3", number: 3, name: "", active: true },
+      { id: "court-4", number: 4, name: "Centre Court", active: true }
+    ];
+    vi.mocked(api.adminCourts).mockResolvedValue(listed);
+    vi.mocked(api.adminCourtClosures).mockResolvedValue([...listed.map((court) => ({
+      id: court.id, courtId: court.id, name: "Resurfacing", startsOn: "2099-06-01", endsOn: "2099-06-30"
+    })), { id: "missing", courtId: "missing", name: "Resurfacing", startsOn: "2099-06-01", endsOn: "2099-06-30" }]);
+
+    // when
+    show();
+    await screen.findByTestId("court-closure-court-1");
+
+    // then
+    const expected = ["Platz 1", i18n.t("court.number", { number: 2 }), i18n.t("court.number", { number: 3 }), "Centre Court"];
+    const options = within(screen.getByTestId("court-closure-court")).getAllByRole("option");
+    listed.forEach((court, index) => {
+      expect(document.getElementById(`court-closure-label-${court.id}`)?.firstElementChild?.textContent)
+        .toBe(`${expected[index]}: Resurfacing`);
+      expect(options.find((option) => option.getAttribute("value") === court.id)).toHaveTextContent(expected[index]);
+      expect(options.find((option) => option.getAttribute("value") === court.id)?.textContent).toBe(expected[index]);
+    });
+    expect(screen.getByTestId("court-closure-missing")).toHaveTextContent(i18n.t("admin.availability.unknownCourt"));
+  });
+
   it("given entries in the past, running and ahead, when the view loads, then only what may still change offers it", async () => {
     // when
     show();

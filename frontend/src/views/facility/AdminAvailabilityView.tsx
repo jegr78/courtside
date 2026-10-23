@@ -305,7 +305,7 @@ function AffectedNotice({ testId, affected }: { testId: string; affected: number
 function courtLabel(courts: AdminCourt[], courtId: string, t: ReturnType<typeof useTranslation>["t"]): string {
   const court = courts.find((candidate) => candidate.id === courtId);
   if (!court) return t("admin.availability.unknownCourt");
-  return court.name ? `${t("court.number", { number: court.number })}, ${court.name}` : t("court.number", { number: court.number });
+  return court.name || t("court.number", { number: court.number });
 }
 
 // The week that governs a day is the last one taking effect on or before it; without a day, the one in force.

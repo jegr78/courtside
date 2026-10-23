@@ -113,7 +113,7 @@ export function AdminMessagesView() {
                 </td>
                 <td role="cell" className={cell}>
                   <span aria-hidden="true" data-testid="message-label-outcome" className={cellLabel}>{t("messages.column.outcome")}</span>
-                  <span data-testid="message-outcome" className="min-w-0 [overflow-wrap:anywhere]">{outcomeOf(entry) ?? t("messages.outcome.none")}</span>
+                  <span data-testid="message-outcome" className="min-w-min [overflow-wrap:normal]">{outcomeOf(entry) ?? t("messages.outcome.none")}</span>
                 </td>
                 <td role="cell" className={cell}>
                   <span aria-hidden="true" data-testid="message-label-message-id" className={cellLabel}>{t("messages.column.messageId")}</span>
