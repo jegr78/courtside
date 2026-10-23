@@ -323,9 +323,9 @@ for (const viewport of phoneSizes) {
   });
 }
 
-test("given a phone of the project's size, when the booking form starts to continue below, then the signal takes no height from the form", async ({ page, journeyService }) => {
+test("given a phone 393x852, when the booking form starts to continue below, then the signal takes no height from the form", async ({ page, journeyService }) => {
   // given
-  const dialog = await openBookingWithPartner(page, journeyService.visualDate);
+  const dialog = await openBookingWithPartner(page, journeyService.visualDate, { width: 393, height: 852 });
   const body = dialog.getByTestId("dialog-body");
   const gap = async () => (await dialog.getByTestId("booking-close").boundingBox())!.y - (await body.evaluate((element) => element.getBoundingClientRect().bottom));
   await expect(dialog.getByTestId("dialog-continues"), "the form fits before the details open").toBeHidden({ timeout: 10_000 });
@@ -333,6 +333,7 @@ test("given a phone of the project's size, when the booking form starts to conti
 
   // when
   await dialog.getByTestId("booking-more-summary").tap();
+  await body.evaluate((element) => element.scrollTo(0, 0));
 
   // then
   await expect(dialog.getByTestId("dialog-continues"), "the opened details make the form continue below").toBeVisible({ timeout: 10_000 });
