@@ -148,6 +148,15 @@ the preflight, once the instance runs the expected version, and the postflight d
 `memberC` in the database. Without it the run writes the statements to
 `erase-waitlist-entries-before.sql` and `erase-waitlist-entries.sql`.
 
+Every run also leaves the personas what it delivered and cancelled: notifications, logged messages,
+cancelled bookings and the series those belonged to. With `erasure` the postflight waits until every
+event published since `run-started` has reached its listeners, then deletes, for the personas only,
+the notifications and message log rows written since then and the cancelled bookings they hold that
+were created since then, with their series once no occurrence remains. A booking that still holds a
+court is never touched. The postflight fails when any of these rows is left, and the report's
+cleanup section names the counts. Without `erasure` the run writes the statement to
+`erase-persona-residue.sql`.
+
 ## Configuration
 
 `ACCEPTANCE_CONFIG` names a JSON file outside the repository. `ACCEPTANCE_PASSWORD` carries the
@@ -170,7 +179,7 @@ shows the shape with placeholder accounts.
 | `resetCodesPerHour` | Password-reset codes the instance mails per account and hour; default 5, the instance's own default | no |
 | `notifyClubBookings` | Let the weekend journeys run over club bookings and notify their bookers; only for an instance whose mail reaches a catcher; default false | no |
 | `welcomeAccounts` | Let one profile create an account to read its welcome; default false | no |
-| `erasure.ssh`, `erasure.container` | SSH host and database container through which the preflight and the postflight erase the members' closed waitlist entries and the postflight the welcome accounts the run created | no |
+| `erasure.ssh`, `erasure.container` | SSH host and database container through which the preflight and the postflight erase the members' closed waitlist entries and the postflight the welcome accounts the run created and what it delivered to and cancelled for the personas | no |
 
 The file is validated before any browser starts. A missing or malformed field, two actors sharing
 one username, a window start that is not a Monday or fewer than two courts stop the run and name

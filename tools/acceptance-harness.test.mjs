@@ -830,7 +830,7 @@ test("given roster entries named like ordinary words, when the summary uses thos
   assert.throws(() => assertPrivacySafe("Seen by Admin only.", terms), /person/, "a capitalised name part alone is refused");
 });
 
-import { coverageOf, serverLogSummary } from "../acceptance/report/html.mjs";
+import { coverageOf, residueSentence, serverLogSummary } from "../acceptance/report/html.mjs";
 
 test("given Playwright results with passed, skipped and failed cells, when coverage is read, then setup and discovery are left out and each cell keeps its status", () => {
   // given
@@ -1049,7 +1049,7 @@ test("given an erasure target, when parsed, then host and container are kept, an
   assert.equal(field({ ...valid(), erasure: { ssh: "ops-host", container: "club-db-1", user: "root" } }), "erasure.user");
 });
 
-import { attendanceErasureSql, deactivationLeftover, erasureCommand, erasedCount, noShowLimitOf, NO_SHOW_SEED_NOTE, seededBookingId, startedBookingSql, violationCodes, waitlistErasureSql, welcomeErasureSql } from "../acceptance/lib/core.mjs";
+import { attendanceErasureSql, deactivationLeftover, pendingOf, pendingPublicationsSql, personaResidueSql, residueOf, erasureCommand, erasedCount, noShowLimitOf, NO_SHOW_SEED_NOTE, seededBookingId, startedBookingSql, violationCodes, waitlistErasureSql, welcomeErasureSql } from "../acceptance/lib/core.mjs";
 
 test("given the persons a run recorded, when the erasure is written, then it names exactly them and erases only a deactivated welcome account nothing depends on", () => {
   // given
@@ -1109,6 +1109,51 @@ test("given the personas, when the attendance erasure is written, then it remove
   assert.equal(erasedCount(sql.includes("SELECT 'erased ' || count(*) FROM erased") ? "erased 1" : ""), 1, "the count line has the shape the postflight reads");
   assert.equal(attendanceErasureSql([]), null, "no persona, no statement");
   assert.throws(() => attendanceErasureSql(["x'); DELETE FROM booking; --"]), /not a username/);
+});
+
+test("given the personas and the run start, when the residue erasure is written, then it removes what the run left them and reports what is left after the commit", () => {
+  // when
+  const sql = personaResidueSql(["acceptance.member-a", "acceptance.trainer"], "2026-10-23T05:04:21.541Z");
+  // then
+  assert.match(sql, /^BEGIN;[\s\S]*COMMIT;\n[^\n]*'left '[^\n]*\n$/, "the erasure is one transaction and the leftover is read after it");
+  assert.ok(sql.includes("username IN ('acceptance.member-a', 'acceptance.trainer')"), "the erasure names exactly the personas");
+  assert.equal(sql.match(/timestamptz '2026-10-23T05:04:21.541Z'/g)?.length, 8, "every deletion and every leftover count is bounded by the run start");
+  for (const table of ["notification", "message_record", "booking_attendance", "booking_release", "partner_invitation", "booking", "booking_series"]) {
+    assert.match(sql, new RegExp(`DELETE FROM ${table} `), `the erasure removes the run's ${table} rows`);
+  }
+  assert.match(sql, /CREATE TEMP TABLE run_booking[^;]*status = 'CANCELLED'[^;]*;/, "a booking that still holds a court stays");
+  assert.match(sql, /DELETE FROM booking_series s[^;]*NOT EXISTS \(SELECT 1 FROM booking b WHERE b\.series_id = s\.id\)[^;]*;/, "a series keeps any occurrence the run did not erase");
+  assert.throws(() => personaResidueSql(["x'); DELETE FROM booking; --"], "2026-10-23T05:04:21.541Z"), /not a username/);
+  assert.throws(() => personaResidueSql(["acceptance.member-a"], "yesterday'; --"), /not a run start/);
+  assert.equal(personaResidueSql([], "2026-10-23T05:04:21.541Z"), null, "no persona, no statement");
+});
+
+test("given the output of the residue erasure, when it is read, then each erased count and the leftover come back as numbers", () => {
+  // when
+  const read = residueOf("BEGIN\nnotifications 336\nmessages 336\nbookings 107\nseries 10\nCOMMIT\nleft 0\n");
+  // then
+  assert.deepEqual(read, { notifications: 336, messages: 336, bookings: 107, series: 10, left: 0 });
+  assert.equal(residueOf("ERROR:  relation \"notification\" does not exist\n").left, null, "a failed erasure reports no leftover rather than zero");
+});
+
+test("given the residue the postflight erased, when the cleanup is reported, then it names each count and what is left", () => {
+  // when
+  const sentence = residueSentence({ notifications: 336, messages: 336, bookings: 107, series: 10, left: 0 });
+  // then
+  assert.equal(sentence, "Removed from the personas: 336 notifications, 336 logged messages, 107 cancelled bookings and 10 series; left: 0.");
+  assert.match(residueSentence({ notifications: null, messages: null, bookings: null, series: null, left: null }), /left: not read\.$/, "an unread leftover is not reported as none");
+  assert.equal(residueSentence(undefined), "", "a run without the erasure reports nothing");
+});
+
+test("given the run start, when the pending publications are counted, then only events of this run that no listener completed count", () => {
+  // when
+  const sql = pendingPublicationsSql("2026-10-23T05:04:21.541Z");
+  // then
+  assert.ok(sql.includes("completion_date IS NULL"), "a completed publication is done");
+  assert.ok(sql.includes("publication_date >= timestamptz '2026-10-23T05:04:21.541Z'"), "an older stuck publication does not hold this run");
+  assert.throws(() => pendingPublicationsSql("now()"), /not a run start/);
+  assert.equal(pendingOf("pending 3\n"), 3, "the count line has the shape the postflight polls");
+  assert.equal(pendingOf("ERROR:  permission denied\n"), null, "a failed count is not read as none pending");
 });
 
 test("given a rule set, when its no-show limit is read, then only NO_SHOW_LIMIT answers", () => {
