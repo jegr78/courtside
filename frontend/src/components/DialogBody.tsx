@@ -18,7 +18,7 @@ export function DialogBody({ children, padding = "p-6" }: { children: ReactNode;
     return () => observer.disconnect();
   }, [measure]);
 
-  return <div className="relative flex min-h-0 flex-col">
+  return <div className="flex min-h-0 flex-col">
     <div ref={body} data-testid="dialog-body" onScroll={measure} className={`dialog-body min-h-0 overflow-y-auto ${padding}`}>
       <div ref={content}>{children}</div>
     </div>
