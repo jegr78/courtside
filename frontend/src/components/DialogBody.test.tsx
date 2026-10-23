@@ -34,6 +34,7 @@ it("given a form taller than its dialog, when the body is laid out, then a signa
   act(() => resized?.());
 
   // then
+  expect(screen.getByTestId("dialog-body"), "overflow softens the clipped text edge").toHaveAttribute("data-continues", "true");
   expect(screen.getByTestId("dialog-continues"), "a body with content below shows the signal").toHaveAttribute("aria-hidden", "true");
 });
 
@@ -49,6 +50,7 @@ it("given a form taller than its dialog, when the member scrolls to its end, the
   fireEvent.scroll(body);
 
   // then
+  expect(body, "the end leaves its text unmasked").toHaveAttribute("data-continues", "false");
   expect(screen.queryByTestId("dialog-continues"), "nothing lies below the end of the form").toBeNull();
 });
 

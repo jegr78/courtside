@@ -66,7 +66,16 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
   const [submitting, setSubmitting] = useState(false);
   const [requestKey, setRequestKey] = useState(() => idempotencyKey());
   const [showsMore, setShowsMore] = useState(false);
-  const moreSummary = useRef<HTMLElement>(null);
+  const firstGuest = useRef<HTMLInputElement>(null);
+  const revealDetails = useRef(false);
+  const lastMember = useRef<HTMLDivElement>(null);
+  const revealMember = useRef(false);
+  useEffect(() => {
+    if (revealMember.current) {
+      lastMember.current?.scrollIntoView?.({ block: "nearest" });
+      revealMember.current = false;
+    }
+  }, [selectedMembers]);
   const [refusedAsTaken, setRefusedAsTaken] = useState<{ refreshFailed: boolean }>();
   const durationField = useRef<HTMLSelectElement>(null);
   // A refusal asks for another time, so the field that chooses it comes back into view beside the alert.
@@ -162,8 +171,6 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
   const minimumLeavesNoPeriod = !waitlist && freeDurations.length > 0 && durations.length === 0;
   const hours = bookingHours && { earliestStart: bookingHours.earliestStart.slice(0, 5), latestEnd: bookingHours.latestEnd.slice(0, 5) };
   const outsideHours = !waitlist && bookingHours !== undefined && leavesBookingHours(selection.slot, grid.slotMinutes, bookingHours);
-  // A list emptied by the bound is a different thing from one emptied by an occupied court: the
-  // second is the conflict the server reports on submit, and saying so is its job and not ours.
   const boundLeavesNoPeriod = !waitlist && maxBookingMinutes !== undefined && maxBookingMinutes !== null
     && maxBookingMinutes < grid.slotMinutes;
   const showsBound = maxBookingMinutes !== undefined && maxBookingMinutes !== null && !boundLeavesNoPeriod;
@@ -263,12 +270,14 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
         {memberMatches.length > 0 && <ul className="grid gap-2">
           {memberMatches.map((member) => <li key={member.personId}>
             <Button variant="secondary" type="button" data-testid="member-match" data-person-id={member.personId} className="w-full text-left" onClick={() => {
+              revealMember.current = true;
               setSelectedMembers((current) => [...current, member]);
               setMemberQuery("");
+              setMemberMatches([]);
             }}>{t("booking.addMember", { name: member.displayName })}</Button>
           </li>)}
         </ul>}
-        {selectedMembers.map((member) => <div key={member.personId} data-testid="selected-member" className="surface-raised flex flex-wrap items-center justify-between gap-x-3 gap-y-2 rounded-lg px-3 py-2">
+        {selectedMembers.map((member, index) => <div ref={index === selectedMembers.length - 1 ? lastMember : undefined} key={member.personId} data-testid="selected-member" className="surface-raised flex flex-wrap items-center justify-between gap-x-3 gap-y-2 rounded-lg px-3 py-2">
           <span data-testid="selected-member-name" className="min-w-0 break-words">{member.displayName}</span>
           <Button variant="secondary" type="button" data-testid="remove-member" aria-label={t("booking.removeMember", { name: member.displayName })} className="ml-auto shrink-0 px-3 py-2" onClick={() => setSelectedMembers((current) => current.filter((selected) => selected.personId !== member.personId))}>{t("booking.removeMemberShort")}</Button>
         </div>)}
@@ -276,16 +285,16 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
       <FieldViolations id="booking-members-errors" violations={fieldViolations("members")} />
       <details data-testid="booking-more" open={showsMore} onToggle={(event) => {
         const opened = event.currentTarget.open;
-        // Only a member's own opening scrolls; a refusal that opens it keeps its field in view.
-        if (opened && !showsMore) moreSummary.current?.scrollIntoView?.({ block: "start" });
+        // Pointer activation reveals the first field; keyboard activation keeps its focused summary visible.
+        if (opened && !showsMore && revealDetails.current) firstGuest.current?.scrollIntoView?.({ block: "nearest" });
         setShowsMore(opened);
       }} className="mt-4">
-      <summary ref={moreSummary} data-testid="booking-more-summary" className="cursor-pointer font-semibold">{t("booking.more")}</summary>
+      <summary data-testid="booking-more-summary" onClick={(event) => { revealDetails.current = event.detail > 0; }} className="cursor-pointer font-semibold">{t("booking.more")}</summary>
       <fieldset data-testid="guest-participants" className="mt-4 grid gap-3" aria-invalid={fieldViolations("participants").length > 0} aria-describedby={describedBy("participants")}>
         <legend className="font-semibold">{t("booking.guests")}</legend>
         {guestNames.map((guestName, index) => <label key={index} className="grid gap-2 font-medium">
           {index === 0 ? t("booking.guest") : t("booking.guestNumber", { number: index + 1 })}
-          <input data-testid="guest-name" value={guestName} onChange={(event) => setGuestNames((current) => current.map((name, currentIndex) => currentIndex === index ? event.target.value : name))} className="form-control rounded-lg border px-3 py-3" />
+          <input ref={index === 0 ? firstGuest : undefined} data-testid="guest-name" value={guestName} onChange={(event) => setGuestNames((current) => current.map((name, currentIndex) => currentIndex === index ? event.target.value : name))} className="form-control rounded-lg border px-3 py-3" />
         </label>)}
         <Button variant="secondary" type="button" className="justify-self-start" onClick={() => setGuestNames((current) => [...current, ""])}>{t("booking.addGuest")}</Button>
       </fieldset>
@@ -335,8 +344,6 @@ function availableDurations(selection: BookingSelection, grid: BookingGrid, cour
     .map((time) => zonedDateTime(selection.date, time.slice(0, 5), grid.timeZone))
     .sort((left, right) => Date.parse(left) - Date.parse(right))[0]
     ?? new Date(Date.parse(start) + grid.slotMinutes * 60_000).toISOString();
-  // The floor is one slot only where nothing else bounds the day; a rule set that bounds a booking
-  // shorter than a slot offers no period at all rather than one the server refuses.
   const untilClosing = Math.max(grid.slotMinutes, Math.floor((Date.parse(closesAt) - Date.parse(start)) / 60_000));
   const maximum = maxBookingMinutes === undefined || maxBookingMinutes === null
     ? untilClosing : Math.min(untilClosing, maxBookingMinutes);

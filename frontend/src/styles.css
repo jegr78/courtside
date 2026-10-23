@@ -751,6 +751,14 @@ input[type="time"] {
   }
 }
 
+.dialog-body {
+  scroll-padding-block: 1.25rem;
+}
+
+.dialog-body[data-continues="true"] {
+  mask-image: linear-gradient(to bottom, black calc(100% - 1.25rem), transparent);
+}
+
 /* The form's bottom spacing, kept below the scroll so the signal in it neither covers content nor shifts it. */
 .dialog-end {
   display: flex;

@@ -19,7 +19,7 @@ export function DialogBody({ children, padding = "px-6 pt-6 pb-1" }: { children:
   }, [measure]);
 
   return <div className="flex min-h-0 flex-col">
-    <div ref={body} data-testid="dialog-body" onScroll={measure} className={`dialog-body min-h-0 overflow-y-auto ${padding}`}>
+    <div ref={body} data-testid="dialog-body" data-continues={continues} onScroll={measure} className={`dialog-body min-h-0 overflow-y-auto ${padding}`}>
       <div ref={content}>{children}</div>
     </div>
     <div className="dialog-end">
