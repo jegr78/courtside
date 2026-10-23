@@ -305,3 +305,24 @@ it("given a request still in flight, when the session it belongs to ends first, 
   await waitFor(() => expect(api.changeOwnLocale).toHaveBeenCalled());
   expect(screen.queryByTestId("preferences-failure")).not.toBeInTheDocument();
 });
+
+it("given an overflowing account menu, when it scrolls to the end, then its continuation cue disappears", async () => {
+  // given
+  render(<Preferences authenticated signedOut={() => undefined} />);
+  await openPreferences();
+  const body = screen.getByTestId("preferences-body");
+  Object.defineProperties(body, {
+    scrollHeight: { configurable: true, value: 400 },
+    clientHeight: { configurable: true, value: 200 },
+    scrollTop: { configurable: true, writable: true, value: 0 }
+  });
+  // when
+  fireEvent.scroll(body);
+  // then
+  expect(screen.getByTestId("preferences-continues")).toHaveAttribute("aria-hidden", "true");
+  // when
+  body.scrollTop = 199.5;
+  fireEvent.scroll(body);
+  // then
+  expect(screen.queryByTestId("preferences-continues")).not.toBeInTheDocument();
+});

@@ -302,3 +302,25 @@ describe("AdminNavigation", () => {
     expect(screen.getByTestId("admin-navigation")).not.toHaveAttribute("open");
   });
 });
+
+it("given an overflowing mobile navigation, when it scrolls to the end, then its continuation cue disappears", async () => {
+  // given
+  resizeTo(375);
+  show("/admin/setup");
+  await userEvent.click(screen.getByTestId("admin-menu"));
+  const body = screen.getByTestId("admin-navigation-body");
+  Object.defineProperties(body, {
+    scrollHeight: { configurable: true, value: 800 },
+    clientHeight: { configurable: true, value: 200 },
+    scrollTop: { configurable: true, writable: true, value: 0 }
+  });
+  // when
+  fireEvent.scroll(body);
+  // then
+  expect(screen.getByTestId("admin-navigation-continues")).toHaveAttribute("aria-hidden", "true");
+  // when
+  body.scrollTop = 600;
+  fireEvent.scroll(body);
+  // then
+  expect(screen.queryByTestId("admin-navigation-continues")).not.toBeInTheDocument();
+});
