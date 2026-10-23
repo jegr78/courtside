@@ -628,6 +628,83 @@ test("given a known issue without an issue number or an unknown assessment, when
   assert.throws(() => validateReview({ assessments: { k: { assessment: "harness-gap", reason: "", followUp: "f" } }, manual: [] }), /reason/);
 });
 
+const assessed = { "axe:heading-order": { assessment: "known-issue", reason: "tracked", followUp: "none", issue: 1243 } };
+const sheetFindings = () => collectFindings({ metrics: [row({ axe: [{ id: "heading-order", impact: "moderate", targets: [] }] })], failures: [] });
+
+test("given every finding assessed and one contact sheet without a verdict, when the review is applied, then the report is a draft that names the sheet", () => {
+  // given
+  const review = { assessments: assessed, manual: [], sheets: { "admin--overview": { verdict: "clean", by: "reviewer" } } };
+  // when
+  const applied = applyReview(sheetFindings(), review, { names: ["admin--overview", "admin--usage"] });
+  // then
+  assert.equal(applied.status, "draft", "a sheet nobody judged keeps the report a draft");
+  assert.deepEqual(applied.sheets.unreviewed, ["admin--usage"]);
+});
+
+test("given every contact sheet with a verdict and every finding assessed, when the review is applied, then the report is final", () => {
+  // given
+  const review = { assessments: assessed, manual: [], sheets: {
+    "admin--overview": { verdict: ["axe:heading-order"], by: "reviewer" }, "admin--usage": { verdict: "clean", by: "reviewer" } } };
+  // when
+  const applied = applyReview(sheetFindings(), review, { names: ["admin--overview", "admin--usage"] });
+  // then
+  assert.equal(applied.status, "final");
+  assert.deepEqual(applied.sheets.unreviewed, []);
+  assert.deepEqual(applied.sheets.reviewed, ["admin--overview", "admin--usage"]);
+});
+
+test("given a verdict for a sheet this run did not produce, when applied, then it is reported stale", () => {
+  // when
+  const applied = applyReview([], { assessments: {}, manual: [], sheets: { "admin--gone": { verdict: "clean", by: "reviewer" } } }, { names: [] });
+  // then
+  assert.deepEqual(applied.sheets.stale, ["admin--gone"]);
+});
+
+test("given screenshots but no contact sheets, when applied, then the report stays a draft and says why", () => {
+  // when
+  const applied = applyReview([], { assessments: {}, manual: [] }, { names: [], unavailable: "ImageMagick not found on PATH" });
+  // then
+  assert.equal(applied.status, "draft", "a run whose sheets could not be made cannot have been reviewed");
+  assert.equal(applied.sheets.unavailable, "ImageMagick not found on PATH");
+});
+
+test("given a sheet verdict that is neither clean nor finding keys, lacks its reviewer or names an unknown finding, when applied, then each is refused", () => {
+  // given
+  const apply = (entry) => () => applyReview(sheetFindings(), { assessments: assessed, manual: [], sheets: { "admin--overview": entry } }, { names: ["admin--overview"] });
+  // when / then
+  assert.throws(apply({ verdict: "fine", by: "reviewer" }), /verdict/);
+  assert.throws(apply({ verdict: [], by: "reviewer" }), /verdict/);
+  assert.throws(apply({ verdict: "clean", by: "" }), /by/);
+  assert.throws(apply({ verdict: ["axe:color-contrast"], by: "reviewer" }), /axe:color-contrast/);
+});
+
+import { sheetChanges } from "../acceptance/report/sheets.mjs";
+
+test("given a previous run, when the sheets are compared, then changed and new sheets are marked and equal ones are not", () => {
+  // given
+  const root = mkdtempSync(join(tmpdir(), "sheet-changes-"));
+  const sheet = (run, name, pixels) => { mkdirSync(join(root, run, "sheets"), { recursive: true }); writeFileSync(join(root, run, "sheets", `${name}.png`), pixels); };
+  sheet("before", "admin--overview", "a"); sheet("before", "admin--usage", "b");
+  sheet("after", "admin--overview", "a"); sheet("after", "admin--usage", "c"); sheet("after", "admin--audit", "d");
+  const signature = (path) => readFileSync(path, "utf8");
+  // when
+  const changes = sheetChanges(join(root, "after"), join(root, "before"), { signature });
+  // then
+  assert.deepEqual(changes, { changed: ["admin--usage"], added: ["admin--audit"], unchanged: 1 });
+  rmSync(root, { recursive: true, force: true });
+});
+
+test("given a previous run without contact sheets, when compared, then the comparison says it is unavailable", () => {
+  // given
+  const root = mkdtempSync(join(tmpdir(), "sheet-changes-"));
+  mkdirSync(join(root, "after", "sheets"), { recursive: true });
+  // when
+  const changes = sheetChanges(join(root, "after"), join(root, "before"), { signature: () => "x" });
+  // then
+  assert.match(changes.unavailable, /no contact sheets/);
+  rmSync(root, { recursive: true, force: true });
+});
+
 import { assertPrivacySafe, forbiddenTerms, releaseSummary } from "../acceptance/report/release-summary.mjs";
 
 const forbidden = { usernames: ["jane.doe"], hosts: ["club.example.org"], names: ["Jane Doe"] };
