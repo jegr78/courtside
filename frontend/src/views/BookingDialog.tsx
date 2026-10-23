@@ -70,10 +70,21 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
   const moreSummary = useRef<HTMLElement>(null);
   const revealDetails = useRef(false);
   const lastMember = useRef<HTMLDivElement>(null);
+  const memberSearch = useRef<HTMLInputElement>(null);
   const revealMember = useRef(false);
   useEffect(() => {
     if (revealMember.current) {
-      lastMember.current?.scrollIntoView?.({ block: "nearest" });
+      const member = lastMember.current;
+      const search = memberSearch.current;
+      member?.scrollIntoView?.({ block: "nearest" });
+      const body = member?.closest<HTMLElement>(".dialog-body");
+      if (member && search && body) {
+        const style = getComputedStyle(body);
+        const available = body.clientHeight - (parseFloat(style.scrollPaddingTop) || 0) - (parseFloat(style.scrollPaddingBottom) || 0);
+        if (member.getBoundingClientRect().bottom - search.getBoundingClientRect().top <= available) {
+          search.scrollIntoView?.({ block: "nearest" });
+        }
+      }
       revealMember.current = false;
     }
   }, [selectedMembers]);
@@ -267,7 +278,7 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
       </p>}
       <fieldset className="mt-4 grid gap-3" aria-invalid={fieldViolations("members").length > 0} aria-describedby={describedBy("members")}>
         <legend id="booking-members-legend" className="font-semibold">{t("booking.members")}</legend>
-        <input data-testid="member-search" type="search" aria-labelledby="booking-members-legend" value={memberQuery} onChange={(event) => setMemberQuery(event.target.value)} className="form-control rounded-lg border px-3 py-3" />
+        <input ref={memberSearch} data-testid="member-search" type="search" aria-labelledby="booking-members-legend" value={memberQuery} onChange={(event) => setMemberQuery(event.target.value)} className="form-control rounded-lg border px-3 py-3" />
         {memberMatches.length > 0 && <ul className="grid gap-2">
           {memberMatches.map((member) => <li key={member.personId}>
             <Button variant="secondary" type="button" data-testid="member-match" data-person-id={member.personId} className="w-full text-left" onClick={() => {

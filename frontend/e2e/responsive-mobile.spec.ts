@@ -269,7 +269,7 @@ for (const viewport of phoneSizes) {
     const body = (await dialog.getByTestId("dialog-body").boundingBox())!;
     const search = (await dialog.getByTestId("member-search").boundingBox())!;
     const row = (await partner.boundingBox())!;
-    expect(search.y, "the search field is inside the scrolling area").toBeGreaterThanOrEqual(body.y - 1);
+    expect(search.y, `the search field is inside the scrolling area: ${JSON.stringify({ body, search, row })}`).toBeGreaterThanOrEqual(body.y - 1);
     expect(row.y + row.height, "the partner row is inside the scrolling area").toBeLessThanOrEqual(body.y + body.height + 1);
 
     for (const [index, name] of ["John Roe", "Richard Miles"].entries()) {
@@ -284,8 +284,8 @@ for (const viewport of phoneSizes) {
       await expect.poll(async () => {
         const frame = (await dialog.getByTestId("dialog-body").boundingBox())!;
         const added = (await dialog.getByTestId("selected-member").last().boundingBox())!;
-        return added.y >= frame.y - 1 && added.y + added.height <= frame.y + frame.height - 16;
-      }, { message: "each added doubles player is revealed by the app", timeout: 10_000 }).toBe(true);
+        return Math.min(added.y - frame.y, frame.y + frame.height - added.y - added.height - 16);
+      }, { message: "each added doubles player is revealed above the faded edge", timeout: 10_000 }).toBeGreaterThanOrEqual(-0.5);
     }
   });
 
@@ -1944,6 +1944,6 @@ test("given a keyboard user on a short landscape screen, when more booking detai
   await expect.poll(async () => {
     const frame = (await dialog.getByTestId("dialog-body").boundingBox())!;
     const control = (await summary.boundingBox())!;
-    return control.y >= frame.y - 1 && control.y + control.height <= frame.y + frame.height - 16;
-  }, { message: "the keyboard focus remains fully visible above the faded edge", timeout: 10_000 }).toBe(true);
+    return Math.min(control.y - frame.y, frame.y + frame.height - control.y - control.height - 16);
+  }, { message: "the keyboard focus remains fully visible above the faded edge", timeout: 10_000 }).toBeGreaterThanOrEqual(-0.5);
 });
