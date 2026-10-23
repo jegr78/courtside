@@ -67,6 +67,7 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
   const [requestKey, setRequestKey] = useState(() => idempotencyKey());
   const [showsMore, setShowsMore] = useState(false);
   const firstGuest = useRef<HTMLInputElement>(null);
+  const moreSummary = useRef<HTMLElement>(null);
   const revealDetails = useRef(false);
   const lastMember = useRef<HTMLDivElement>(null);
   const revealMember = useRef(false);
@@ -286,10 +287,13 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
       <details data-testid="booking-more" open={showsMore} onToggle={(event) => {
         const opened = event.currentTarget.open;
         // Pointer activation reveals the first field; keyboard activation keeps its focused summary visible.
-        if (opened && !showsMore && revealDetails.current) firstGuest.current?.scrollIntoView?.({ block: "nearest" });
+        if (opened && !showsMore) {
+          const target = revealDetails.current ? firstGuest.current : moreSummary.current;
+          target?.scrollIntoView?.({ block: "nearest" });
+        }
         setShowsMore(opened);
       }} className="mt-4">
-      <summary data-testid="booking-more-summary" onClick={(event) => { revealDetails.current = event.detail > 0; }} className="cursor-pointer font-semibold">{t("booking.more")}</summary>
+      <summary ref={moreSummary} data-testid="booking-more-summary" onClick={(event) => { revealDetails.current = event.detail > 0; }} className="cursor-pointer font-semibold">{t("booking.more")}</summary>
       <fieldset data-testid="guest-participants" className="mt-4 grid gap-3" aria-invalid={fieldViolations("participants").length > 0} aria-describedby={describedBy("participants")}>
         <legend className="font-semibold">{t("booking.guests")}</legend>
         {guestNames.map((guestName, index) => <label key={index} className="grid gap-2 font-medium">

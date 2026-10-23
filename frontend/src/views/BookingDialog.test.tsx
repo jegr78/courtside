@@ -196,5 +196,6 @@ it("given a keyboard user, when more details open, then the focused summary is n
 
   // then
   expect(summary).toHaveFocus();
-  expect(scrolled, "keyboard activation keeps the focused summary in view").not.toHaveBeenCalled();
+  expect(scrolled.mock.contexts, "keyboard activation keeps the focused summary in view").toContain(summary);
+  expect(scrolled.mock.contexts, "keyboard activation does not jump to the guest field").not.toContain(screen.getAllByTestId("guest-name")[0]);
 });
