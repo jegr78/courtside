@@ -189,7 +189,7 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
         <h2 id="booking-heading" className="text-xl font-bold">{t(waitlist ? "waitlist.title" : "booking.title")}</h2>
         <p data-testid="booking-period" aria-live="polite" className="mt-1 text-sm font-semibold">{formatBookingPeriod(period.startsAt, period.endsAt, i18n.language, grid.timeZone)}</p>
       </div>
-      <DialogBody padding="px-6 pt-4">
+      <DialogBody padding="px-6 pt-4 pb-1">
       <FieldViolations id="booking-startsAt-errors" violations={fieldViolations("startsAt")} />
       {waitlist && <p data-testid="waitlist-explanation" className="text-muted mt-2 text-sm">{t("waitlist.explanation")}</p>}
       {!waitlist && dependants.length > 0 && <>

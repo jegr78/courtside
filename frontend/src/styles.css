@@ -755,7 +755,7 @@ input[type="time"] {
 .dialog-end {
   display: flex;
   flex-shrink: 0;
-  height: 1.5rem;
+  height: 1.25rem;
 }
 
 .dialog-continues {

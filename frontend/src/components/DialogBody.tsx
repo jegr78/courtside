@@ -1,6 +1,6 @@
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 
-export function DialogBody({ children, padding = "px-6 pt-6" }: { children: ReactNode; padding?: string }) {
+export function DialogBody({ children, padding = "px-6 pt-6 pb-1" }: { children: ReactNode; padding?: string }) {
   const body = useRef<HTMLDivElement>(null);
   const content = useRef<HTMLDivElement>(null);
   const [continues, setContinues] = useState(false);
