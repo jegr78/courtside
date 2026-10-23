@@ -323,6 +323,22 @@ for (const viewport of phoneSizes) {
   });
 }
 
+test("given a phone of the project's size, when the booking form starts to continue below, then the signal takes no height from the form", async ({ page, journeyService }) => {
+  // given
+  const dialog = await openBookingWithPartner(page, journeyService.visualDate);
+  const body = dialog.getByTestId("dialog-body");
+  const gap = async () => (await dialog.getByTestId("booking-close").boundingBox())!.y - (await body.evaluate((element) => element.getBoundingClientRect().bottom));
+  await expect(dialog.getByTestId("dialog-continues"), "the form fits before the details open").toBeHidden({ timeout: 10_000 });
+  const fitting = await gap();
+
+  // when
+  await dialog.getByTestId("booking-more-summary").tap();
+
+  // then
+  await expect(dialog.getByTestId("dialog-continues"), "the opened details make the form continue below").toBeVisible({ timeout: 10_000 });
+  expect(await gap(), "the space between the form and its buttons is the same with the signal").toBeCloseTo(fitting, 0);
+});
+
 for (const name of ["Richard Miles", "Richard Miles-Major"]) {
   test(`given a phone 320 px wide in German, when ${name} is chosen as partner, then the name stays whole on one line beside its remove control`, async ({ page, journeyService }) => {
     // given

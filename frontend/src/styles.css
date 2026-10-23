@@ -751,13 +751,18 @@ input[type="time"] {
   }
 }
 
-/* A strip below the form rather than over it, so the signal never hides a field or a control. */
-.dialog-continues {
+/* The form's bottom spacing, kept below the scroll so the signal in it neither covers content nor shifts it. */
+.dialog-end {
   display: flex;
   flex-shrink: 0;
+  height: 1.5rem;
+}
+
+.dialog-continues {
+  display: flex;
+  flex: 1;
   align-items: center;
   justify-content: center;
-  height: 1.5rem;
   color: var(--cs-muted);
   pointer-events: none;
   background: var(--cs-panel);

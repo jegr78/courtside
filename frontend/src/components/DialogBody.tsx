@@ -1,6 +1,6 @@
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 
-export function DialogBody({ children, padding = "p-6" }: { children: ReactNode; padding?: string }) {
+export function DialogBody({ children, padding = "px-6 pt-6" }: { children: ReactNode; padding?: string }) {
   const body = useRef<HTMLDivElement>(null);
   const content = useRef<HTMLDivElement>(null);
   const [continues, setContinues] = useState(false);
@@ -22,10 +22,12 @@ export function DialogBody({ children, padding = "p-6" }: { children: ReactNode;
     <div ref={body} data-testid="dialog-body" onScroll={measure} className={`dialog-body min-h-0 overflow-y-auto ${padding}`}>
       <div ref={content}>{children}</div>
     </div>
-    {continues && <div data-testid="dialog-continues" aria-hidden="true" className="dialog-continues">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="m6 9 6 6 6-6" />
-      </svg>
-    </div>}
+    <div className="dialog-end">
+      {continues && <div data-testid="dialog-continues" aria-hidden="true" className="dialog-continues">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="m6 9 6 6 6-6" />
+        </svg>
+      </div>}
+    </div>
   </div>;
 }
