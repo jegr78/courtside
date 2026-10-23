@@ -255,7 +255,7 @@ test("joining the waitlist of a taken court is operable using only the keyboard"
   await expect(page.getByTestId("allocation").first()).toBeFocused({ timeout: 10_000 });
 });
 
-test("login and cancellation are operable using only the keyboard", async ({ page, browserName }) => {
+test("login and cancellation are operable using only the keyboard", async ({ page, browserName, journeyService }, testInfo) => {
   // given
   await page.goto("/login");
 
@@ -271,7 +271,27 @@ test("login and cancellation are operable using only the keyboard", async ({ pag
   // then
   await expectCourtPlanLoaded(page);
   await tabToTestId(page, "my-bookings-link", tabKey);
+  const loaded = page.waitForResponse((response) =>
+    new URL(response.url()).pathname === "/api/my/bookings"
+      && [null, "UPCOMING"].includes(new URL(response.url()).searchParams.get("view")));
   await page.keyboard.press("Enter");
+  const response = await loaded;
+  if (!response.ok()) {
+    const locks = await journeyService.executeSql(`
+      SELECT pid, state, wait_event_type, wait_event, pg_blocking_pids(pid),
+             extract(epoch FROM clock_timestamp() - xact_start) AS transaction_seconds,
+             CASE WHEN query ~* '^[[:space:]]*UPDATE[[:space:]]' THEN 'UPDATE'
+                  WHEN query ~* '^[[:space:]]*SELECT[[:space:]]' THEN 'SELECT'
+                  WHEN query ~* '^[[:space:]]*INSERT[[:space:]]' THEN 'INSERT'
+                  WHEN query ~* '^[[:space:]]*DELETE[[:space:]]' THEN 'DELETE'
+                  ELSE 'OTHER' END AS operation
+      FROM pg_stat_activity WHERE datname = current_database() AND pid <> pg_backend_pid()
+      ORDER BY pid
+    `).catch(() => "Lock metadata unavailable");
+    await testInfo.attach("database-lock-state", { body: locks, contentType: "text/plain" }).catch(() => undefined);
+  }
+  const problem = response.ok() ? undefined : await response.json().catch(() => undefined);
+  expect(response.status(), JSON.stringify({ type: problem?.type, retryable: problem?.retryable })).toBe(200);
   await expect(page.getByTestId("my-bookings-page")).toBeVisible();
   await tabToTestId(page, "personal-cancel", tabKey);
   await page.keyboard.press("Enter");
