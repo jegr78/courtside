@@ -41,8 +41,6 @@ Tests are placed at the lowest level that can prove the risk. Database guarantee
 |---|---:|---|
 | Local unit and contract feedback | under 2 minutes | Focused tests for the changed decision and its negative boundary. |
 | Required pull-request checks | under 15 minutes | Green required checks plus the pull-request risk and evidence declaration. |
-| Local single-area pull-request verification | under 15 minutes | `node tools/courtside.mjs check` selects and runs one protected reduced profile against a pinned commit. |
-| Local combined or full pull-request verification | under 25 minutes, plus 35 for the Docker release gates of `full` | Mixed profiles run additively; `full` validates workflows and documentation, runs clean non-browser verification, exercises a fresh Compose deployment, runs browser and WebKit reliability gates and then the qualification, Stalwart, restore, upgrade and active assessment gates against the same pinned commit. |
 | Nightly qualification | under 90 minutes | Periodic browser, order, concurrency, security and bounded performance evidence assigned by risk. |
 | Release qualification | under 45 minutes | Candidate-image, upgrade, restore and release-risk evidence; long soak runs are recorded separately. |
 
@@ -54,7 +52,6 @@ fails its own test with a trace and the pending step instead of consuming the jo
 test, the WebKit sweep of every board page on a desk, took at most 84 seconds in fourteen hosted
 runs on 13 October 2026. Every other browser project leaves its deadline to the job.
 
-The local Docker release gates follow the same rule: their 35 minutes are twice the 17.1 minutes the five gates took with a cold image build on an arm64 Mac.
 
 ## Evidence rules
 
@@ -79,6 +76,11 @@ Property tests use fixed, printed QuickTheories seeds and automatic shrinking so
 ### Pull-request checklist
 
 The repository pull-request template requires affected risk IDs, positive and negative evidence, residual risk and any contract change. The required build result is linked from the pull request rather than copied into this document.
+
+Local development uses targeted tests and runtime checks for the changed behavior and its failure
+paths. Pull requests record those commands and results against the committed head. Agents do not run
+a complete local verification or repeat the CI profile plan before pushing. Full integration,
+browser, deployment and security verification belongs to CI.
 
 The pull-request workflow uses a conservative test-profile plan to select its required jobs. One
 closed contract defines each profile's CI jobs and local tasks. CI reads it from the pull request's
@@ -153,13 +155,7 @@ executes, derived from what those jobs run rather than from which profile happen
 file. Unknown files, missing validators, a validator no selected job runs, and stale or
 duplicate manifest entries fail closed.
 
-The full local profile runs the pinned `actionlint` release and documentation checks before the
-longer build. It then runs clean Maven verification with browser journeys disabled, exercises the
-Compose wait contract with a uniquely named project and immutable image ID, and runs the browser and
-WebKit reliability gates. Last come the Docker release gates, each a task of its own so a red one is
-named in the result: `gate-uat` builds and qualifies `courtside:uat-local`, and `gate-mail`,
-`gate-restore`, `gate-upgrade` and `gate-active-security` refuse to start unless that qualification
-recorded the image ID the tag still names. CI downloads the matching official actionlint archive and
+CI downloads the matching official actionlint archive and
 verifies its GitHub attestation before running the same workflow check. ShellCheck remains a
 separate repository concern, so this invocation checks GitHub workflow structure, expressions, job
 dependencies and permissions without making a platform's optional ShellCheck installation part of
@@ -172,11 +168,10 @@ closed and everything unrecognised fails closed: an unclassified path, a structu
 rename or a deletion, a manifest entry whose file no longer exists and a classifier that throws all
 select `full`. The repository variable `COURTSIDE_TEST_PROFILES` forces the complete job set for every
 pull request unless it is empty or reads `admitted`, so a typo escalates rather than silently
-reducing, and the run summary says when it did. That is the immediate rollback. Locally,
-`check --full` is the same escalation. A passing local result is reusable only for the exact commit,
-merge base, classified changes, runtime fingerprint, profiles and task definitions it records. Any
-difference reruns the selected gates; `check --rerun` deliberately bypasses an otherwise compatible
-receipt.
+reducing, and the run summary says when it did. That is the immediate rollback. The retained local
+profile runner is diagnostic tooling, not an agent finalisation requirement. Local pre-push evidence
+comes from the focused checks for the change; CI enforces the selected complete job set.
+
 
 A release demands a nightly that verified it, rather than the absence of a complaint about one. The
 tag is refused unless a scheduled `build` run succeeded on its first attempt over a commit the

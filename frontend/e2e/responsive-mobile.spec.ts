@@ -260,15 +260,33 @@ for (const viewport of phoneSizes) {
     const dialog = await openBookingWithPartner(page, journeyService.visualDate, viewport);
     const partner = dialog.getByTestId("selected-member");
 
-    // when
-    await partner.evaluate((element) => element.scrollIntoView({ block: "end" }));
-
     // then
+    await expect.poll(async () => {
+      const frame = (await dialog.getByTestId("dialog-body").boundingBox())!;
+      const row = (await partner.boundingBox())!;
+      return row.y >= frame.y - 1 && row.y + row.height <= frame.y + frame.height - 16;
+    }, { message: "the app reveals the added player without test scrolling", timeout: 10_000 }).toBe(true);
     const body = (await dialog.getByTestId("dialog-body").boundingBox())!;
     const search = (await dialog.getByTestId("member-search").boundingBox())!;
     const row = (await partner.boundingBox())!;
-    expect(search.y, "the search field is inside the scrolling area").toBeGreaterThanOrEqual(body.y - 1);
+    expect(search.y, `the search field is inside the scrolling area: ${JSON.stringify({ body, search, row })}`).toBeGreaterThanOrEqual(body.y - 1);
     expect(row.y + row.height, "the partner row is inside the scrolling area").toBeLessThanOrEqual(body.y + body.height + 1);
+
+    for (const [index, name] of ["John Roe", "Richard Miles"].entries()) {
+      // when
+      await page.route("**/api/public/participant-members**", (route) => route.fulfill({ json: [{
+        personId: `00000000-0000-0000-0000-00000000020${index}`, displayName: name
+      }] }));
+      await dialog.getByTestId("member-search").fill(name);
+      await dialog.getByTestId("member-match").tap();
+
+      // then
+      await expect.poll(async () => {
+        const frame = (await dialog.getByTestId("dialog-body").boundingBox())!;
+        const added = (await dialog.getByTestId("selected-member").last().boundingBox())!;
+        return Math.min(added.y - frame.y, frame.y + frame.height - added.y - added.height - 16);
+      }, { message: "each added doubles player is revealed above the faded edge", timeout: 10_000 }).toBeGreaterThanOrEqual(-0.5);
+    }
   });
 
   test(`given a phone ${sizeName(viewport)}, when a partner is chosen, then the remove control is short and the partner's name stays on one line`, async ({ page, journeyService }) => {
@@ -318,6 +336,7 @@ for (const viewport of phoneSizes) {
       await expect(signal, `the form continues below at the ${position}`).toBeVisible({ timeout: 10_000 });
       const signalBox = (await signal.boundingBox())!;
       const bodyBox = (await body.boundingBox())!;
+      expect(await body.evaluate((element) => getComputedStyle(element).maskImage), "the clipped text fades above the separate signal").toContain("linear-gradient");
       expect(signalBox.y, `the signal starts below the scrolling area at the ${position}`).toBeGreaterThanOrEqual(bodyBox.y + bodyBox.height - 0.5);
     }
   });
@@ -1910,3 +1929,21 @@ for (const phone of landscapePhones) {
     await expect(dialog.locator("li").last(), "the last occurrence is reachable by scrolling the list").toBeInViewport({ ratio: 1, timeout: 10_000 });
   });
 }
+
+test("given a keyboard user on a short landscape screen, when more booking details open, then the focused summary stays visible", async ({ page, journeyService }) => {
+  // given
+  const dialog = await openBookingWithPartner(page, journeyService.visualDate, { width: 734, height: 343 });
+  const summary = dialog.getByTestId("booking-more-summary");
+  await summary.focus();
+
+  // when
+  await summary.press("Enter");
+
+  // then
+  await expect(summary).toBeFocused();
+  await expect.poll(async () => {
+    const frame = (await dialog.getByTestId("dialog-body").boundingBox())!;
+    const control = (await summary.boundingBox())!;
+    return Math.min(control.y - frame.y, frame.y + frame.height - control.y - control.height - 16);
+  }, { message: "the keyboard focus remains fully visible above the faded edge", timeout: 10_000 }).toBeGreaterThanOrEqual(-0.5);
+});

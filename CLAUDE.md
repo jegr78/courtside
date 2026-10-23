@@ -119,18 +119,13 @@ fails on the missing `BuildProperties` bean.
   * Without preconditions: `whenAction_thenResult()` is allowed
   * For exception tests: combine as `// when / then` around `assertThatThrownBy`
 * **Sequence:** unit tests → implementation → integration tests → E2E.
-* **Targeted runs during red/green:** `./mvnw test -Dtest=ClassName`. Before the final push, commit
-  the reviewed branch and run `node tools/courtside.mjs check`, with
-  `--base release/<major>.<minor>` for a fix on a release line. It uses the protected test-profile
-  contract against that target branch and verifies that exact commit in a detached worktree. A
-  `full` classification runs cheap workflow and documentation gates first, a clean Maven verification
-  without browser journeys, a fresh immutable-image Compose smoke, and then the browser and WebKit
-  reliability gates. Those tasks are read from the runner rather than from the contract so a
-  weakened contract cannot reduce them. An exact passing receipt may be reused only while the
-  commit, merge base, classified change evidence, runtime fingerprint, selected profiles and task
-  definitions still match; use `--rerun` when fresh execution is required. Unknown, structural or
-  untrusted change evidence fails closed to `full`; `--full` may escalate but never reduce the
-  selected verification.
+* **Local verification is targeted.** Run the tests and runtime checks that exercise the changed
+  behavior and its failure paths, for example `./mvnw test -Dtest=ClassName` or a named Vitest or
+  Playwright test. Record the commands, results and committed head in the pull request. Do not run
+  `node tools/courtside.mjs check`, `./mvnw clean verify`, the complete browser suite or the complete
+  release-gate set as a local finalisation step. The pull request's CI runs the required profiles
+  and gates against the current target branch. A failed CI check is investigated and reproduced
+  with a focused test before a fix; neither a blind rerun nor a larger timeout is a remedy.
 * **A change to the scanner normalizers is unverified until the assessment has run.**
   `tools/security-passive-deployment.mjs` reads what ZAP emits, and a unit test over it can only
   assert wordings somebody has already observed — so it is structurally unable to show that the
@@ -390,32 +385,29 @@ is now public enough to need.
   Plans and their numbering live in `docs/superpowers/`, which is git-ignored and stays local.
 
 * **Finalise a branch in cost order.** Complete targeted red/green checks first, then obtain the
-  required whole-branch review and resolve every finding with targeted verification. Only after the
-  review is clean, fetch the target branch, `origin/main` or for a fix on a release line its
-  `origin/release/<major>.<minor>`. Rebase the uncommitted work with autostash if the base moved,
-  inspect the resulting diff and conflicts, and commit. Run `node tools/courtside.mjs check` as the
-  final verification, with `--base release/<major>.<minor>` for a fix on a release line. It selects
-  the protected profile and builds the committed HEAD in a detached worktree, so the live tree
-  remains available while it runs. Do not run a separate `./mvnw clean verify` as well. `--full`
-  remains the manual escalation when the selected profile is insufficient for a known risk. Do not
-  spend a final run on a base already known to be stale or before the review can still change the
-  branch.
+  required whole-branch review and resolve every finding with targeted verification. Fetch the target
+  branch, `origin/main` or for a fix on a release line its `origin/release/<major>.<minor>`. Inspect
+  and integrate intervening commits, resolve conflicts and rerun the targeted checks affected by
+  those changes. Commit the reviewed result and record its head, target base and verification
+  evidence. Full local verification is not part of this sequence; the pull request's CI supplies
+  the complete verification of the pairing.
 
-  Only after the verification is green and its recorded head still equals the branch HEAD, acquire
-  the shared finalisation window by
-  creating the annotated tag `courtside-finalization-lock` at the branch HEAD. Its four message
-  fields are a random, privacy-safe `owner` token, the `workspace` label, the branch name and an
-  ISO-8601 `acquired-at` time. Push that tag without force; remote ref creation is atomic, so a
-  rejection means another workspace owns the window and this one waits. Delete the rejected local
-  candidate and create a fresh tag with a new owner and time before retrying.
+  After the targeted checks pass and their evidence matches the committed branch head, acquire the
+  shared finalisation window by creating the annotated tag `courtside-finalization-lock` at that
+  head. Its four message fields are a random, privacy-safe `owner` token, the `workspace` label,
+  the branch name and an ISO-8601 `acquired-at` time. Push that tag without force; remote ref
+  creation is atomic, so a rejection means another workspace owns the window and this one waits.
+  Delete only the rejected local candidate owned by this attempt and create a fresh tag with a
+  new owner and time before retrying. An existing foreign local tag remains untouched; an owned
+  helper ref may hold the new annotated tag object for the atomic remote creation.
 
   Once the window is held, retain the exact annotated-tag object ID as the ownership token and fetch
-  the target branch again. Compare it with the base commit recorded by the green verification. If they
-  match, push immediately: no build runs while the window is held in this common path. If the base
+  the target branch again. Compare it with the target base recorded alongside the targeted-check
+  evidence. If they match, push immediately: no build runs while the window is held in this common path. If the base
   moved, rebase onto it and inspect the intervening commits and the resulting diff.
 
   **A clean rebase does not earn a second local verification.** It leaves the branch's own diff
-  untouched — that content is what the green run verified, and it is still what will be reviewed and
+  untouched. That content is what the targeted checks exercised and what will be reviewed and
   squashed. What is unverified is only the combination with the new base, and the pull request's own
   build tests exactly that combination, in full, before auto-merge can fire. So push, and open or
   update the pull request with auto-merge armed: no rebased head reaches `main` without a green build
@@ -424,25 +416,22 @@ is now public enough to need.
 
   A rebase that stops on a conflict is a different case, because resolving it changes the branch's
   content. It releases the window with the lease-bound deletion below before the resolution, as does
-  a failed verification before its diagnosis; after the fix, restart the finalisation sequence —
-  which begins with a green verification of the resolved content — instead of keeping another
-  workspace blocked. A failed branch push follows the same release-and-restart rule.
+  a failed verification before its diagnosis. After the fix, rerun the affected targeted checks and
+  restart the finalisation sequence without keeping another workspace blocked. A failed branch push follows the same release-and-restart rule.
 
   **Scale that verification to what the resolution did.** A conflict where both sides added to the
   same list, table or section, and the resolution is exactly the union of what each added, changes
   no behaviour: nothing survives that neither side wrote. Prove that instead of rebuilding
-  everything — run the check that reads the merged result and show it carries both intents, then
+  everything. Run the check that reads the merged result and show it carries both intents, then
   push. The pull request's own build still tests the pairing in full, which is what makes the
   shorter proof safe rather than merely cheaper.
 
-  The full run stays the answer for every other resolution: a choice between the two sides, a
-  reworded line, a merge that had to be reasoned about, or any result containing something neither
-  side wrote. If you cannot state in one sentence which executed check covers the resolution, it is
-  one of those. The distinction is the resolution's effect, never its size.
+  For a behavioral conflict resolution, name and run the focused checks that exercise the resolved
+  paths and their failure cases. The complete integration check remains in CI.
 
   After pushing the branch, delete the remote lock with `--force-with-lease` bound to that exact
-  object ID, then delete the local tag. A lease mismatch means ownership changed and must leave the
-  remote tag untouched. Never overwrite or delete another workspace's lock. Only the maintainer may
+  object ID, then delete only the local tag or helper ref owned by this attempt. A lease mismatch
+  means ownership changed and must leave the remote tag untouched. Never overwrite or delete another workspace's lock. Only the maintainer may
   declare a lock orphaned after checking its message and object ID; recovery deletes that observed
   object with the same lease protection before another acquisition.
 

@@ -85,7 +85,7 @@ test("given a member looking for a partner, when the open place is offered, then
     ids.push(await step("memberA", "book looking for a partner", () => bookAt(holder, "memberA", slot, async (p) => {
       await p.getByTestId("booking-more-summary").click();
       await p.getByTestId("participant-card").selectOption(discovery.partnerMarker);
-    })));
+    }, { filledSubject: (p) => p.getByTestId("participant-card") })));
     // when — the holder offers the open place
     await step("memberA", "offer the open place", async () => {
       await holder.getByTestId("my-bookings-link").click();

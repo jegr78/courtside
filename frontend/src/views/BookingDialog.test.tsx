@@ -99,7 +99,7 @@ it("given a booking the club refuses, when the refusal arrives, then the duratio
   expect(scrolled).toHaveBeenCalledWith({ block: "nearest" });
 });
 
-it("given the booking form, when the member opens more details, then the form scrolls them in from their summary", async () => {
+it("given the booking form, when the member opens more details, then the first guest field comes into view", async () => {
   // given
   const scrolled = vi.fn();
   Object.defineProperty(HTMLElement.prototype, "scrollIntoView", { configurable: true, value: scrolled });
@@ -108,17 +108,18 @@ it("given the booking form, when the member opens more details, then the form sc
   const more = await screen.findByTestId<HTMLDetailsElement>("booking-more");
 
   // when
+  fireEvent.click(screen.getByTestId("booking-more-summary"), { detail: 1 });
   act(() => {
     more.open = true;
     more.dispatchEvent(new Event("toggle"));
   });
 
   // then
-  expect(scrolled.mock.contexts, "the summary is the element brought into view").toContain(screen.getByTestId("booking-more-summary"));
-  expect(scrolled).toHaveBeenCalledWith({ block: "start" });
+  expect(scrolled.mock.contexts, "the first guest field is brought into view").toContain(screen.getAllByTestId("guest-name")[0]);
+  expect(scrolled).toHaveBeenCalledWith({ block: "nearest" });
 });
 
-it("given a refusal about a note, when it opens more details, then the summary is not scrolled to", async () => {
+it("given a refusal about a note, when it opens more details, then the first guest field is not scrolled to", async () => {
   // given
   vi.spyOn(api, "bookingCards").mockResolvedValue([{
     id: "55555555-5555-5555-5555-555555555555", label: "Member booking", color: "#b85c38", allowedPlayerCounts: [1, 2, 4], guestAllowed: true
@@ -132,7 +133,13 @@ it("given a refusal about a note, when it opens more details, then the summary i
   onTestFinished(() => { delete (HTMLElement.prototype as { scrollIntoView?: unknown }).scrollIntoView; });
   show();
   const more = await screen.findByTestId<HTMLDetailsElement>("booking-more");
+  fireEvent.click(screen.getByTestId("booking-more-summary"), { detail: 1 });
+  act(() => {
+    more.open = false;
+    more.dispatchEvent(new Event("toggle"));
+  });
   await act(() => new Promise((settled) => setTimeout(settled, 50)));
+  scrolled.mockClear();
 
   // when
   fireEvent.click(screen.getByTestId("booking-submit"));
@@ -140,5 +147,85 @@ it("given a refusal about a note, when it opens more details, then the summary i
   act(() => { more.dispatchEvent(new Event("toggle")); });
 
   // then
-  expect(scrolled.mock.contexts, "the summary stays where the refusal left it").not.toContain(screen.getByTestId("booking-more-summary"));
+  expect(scrolled.mock.contexts, "the refusal does not jump to the guest field").not.toContain(screen.getAllByTestId("guest-name")[0]);
 });
+
+it("given a booking form, when a member is added, then their complete row is brought into view without scrolling on removal", async () => {
+  // given
+  vi.spyOn(api, "participantMembers").mockResolvedValue([
+    { personId: "00000000-0000-0000-0000-000000000103", displayName: "Mary Major" }
+  ]);
+  const scrolled = vi.fn();
+  Object.defineProperty(HTMLElement.prototype, "scrollIntoView", { configurable: true, value: scrolled });
+  onTestFinished(() => { delete (HTMLElement.prototype as { scrollIntoView?: unknown }).scrollIntoView; });
+  show();
+
+  // when
+  fireEvent.change(await screen.findByTestId("member-search"), { target: { value: "Mary" } });
+  fireEvent.click(await screen.findByTestId("member-match"));
+
+  // then
+  await waitFor(() => expect(scrolled.mock.contexts, "the added row is brought into view").toContain(screen.getByTestId("selected-member")));
+  expect(scrolled).toHaveBeenCalledWith({ block: "nearest" });
+  scrolled.mockClear();
+
+  // when
+  fireEvent.click(screen.getByTestId("remove-member"));
+
+  // then
+  expect(screen.queryByTestId("selected-member")).toBeNull();
+  expect(scrolled, "removal leaves the form where the member was reading").not.toHaveBeenCalled();
+});
+
+it("given a keyboard user, when more details open, then the focused summary is not scrolled away", async () => {
+  // given
+  const scrolled = vi.fn();
+  Object.defineProperty(HTMLElement.prototype, "scrollIntoView", { configurable: true, value: scrolled });
+  onTestFinished(() => { delete (HTMLElement.prototype as { scrollIntoView?: unknown }).scrollIntoView; });
+  show();
+  const more = await screen.findByTestId<HTMLDetailsElement>("booking-more");
+  const summary = screen.getByTestId("booking-more-summary");
+  summary.focus();
+
+  // when
+  fireEvent.click(summary, { detail: 0 });
+  act(() => {
+    more.open = true;
+    more.dispatchEvent(new Event("toggle"));
+  });
+
+  // then
+  expect(summary).toHaveFocus();
+  expect(scrolled.mock.contexts, "keyboard activation keeps the focused summary in view").toContain(summary);
+  expect(scrolled.mock.contexts, "keyboard activation does not jump to the guest field").not.toContain(screen.getAllByTestId("guest-name")[0]);
+});
+
+for (const [height, searchFits] of [[168, true], [160, true], [144, false], [100, false]] as const) {
+  it(`given a dialog body ${height} pixels high, when a player is added, then the search field is also revealed only if both fit`, async () => {
+    // given
+    vi.spyOn(api, "participantMembers").mockResolvedValue([
+      { personId: "00000000-0000-0000-0000-000000000103", displayName: "Mary Major" }
+    ]);
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+      if (this.dataset.testid === "member-search") return new DOMRect(0, 0, 100, 50);
+      if (this.dataset.testid === "selected-member") return new DOMRect(0, 62, 100, 66);
+      return new DOMRect();
+    });
+    const scrolled = vi.fn();
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", { configurable: true, value: scrolled });
+    onTestFinished(() => { delete (HTMLElement.prototype as { scrollIntoView?: unknown }).scrollIntoView; });
+    show();
+    const body = await screen.findByTestId("dialog-body");
+    Object.defineProperty(body, "clientHeight", { configurable: true, value: height });
+    body.style.scrollPaddingTop = "16px";
+    body.style.scrollPaddingBottom = "16px";
+
+    // when
+    fireEvent.change(screen.getByTestId("member-search"), { target: { value: "Mary" } });
+    fireEvent.click(await screen.findByTestId("member-match"));
+
+    // then
+    await waitFor(() => expect(scrolled.mock.contexts, "the added row is always revealed").toContain(screen.getByTestId("selected-member")));
+    expect(scrolled.mock.contexts.includes(screen.getByTestId("member-search")), "the search field is revealed only when the row remains visible").toBe(searchFits);
+  });
+}

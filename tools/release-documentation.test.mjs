@@ -245,8 +245,8 @@ test("given the gates a pull request runs, when the document states their limits
   assert.match(text, /The Stalwart journey starts no application image/);
   assert.match(text, /`github\.token` only to download artifacts of the same run, read-only/);
   assert.match(text, /a failed shifted-clock run keeps the nightly image from being published/);
-  assert.match(quality, /plus 35 for the Docker release gates of `full`/);
-  assert.match(quality, /twice the 17\.1 minutes the five gates took with a cold image build/);
+  assert.match(quality, /Local development uses targeted tests and runtime checks for the changed behavior and its failure paths/);
+  assert.match(quality, /Full integration, browser, deployment and security verification belongs to CI/);
 });
 
 test("given the rehearsal pipeline, when the document describes it, then it says how to run it and what it leaves behind",
