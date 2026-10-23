@@ -16,8 +16,8 @@ async function wordLines(value: Locator) {
     const node = element.firstChild!;
     return [...(node.textContent ?? "").matchAll(/\S+/g)].map((word) => {
       const range = document.createRange();
-      range.setStart(node, word.index!);
-      range.setEnd(node, word.index! + word[0].length);
+      range.setStart(node, word.index);
+      range.setEnd(node, word.index + word[0].length);
       return { word: word[0], lines: new Set([...range.getClientRects()].map((rect) => rect.top)).size };
     });
   });
