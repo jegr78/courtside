@@ -1121,8 +1121,8 @@ test("given the personas and the run start, when the residue erasure is written,
   for (const table of ["notification", "message_record", "booking_attendance", "booking_release", "partner_invitation", "booking", "booking_series"]) {
     assert.match(sql, new RegExp(`DELETE FROM ${table} `), `the erasure removes the run's ${table} rows`);
   }
-  assert.ok(sql.includes("status = 'CANCELLED'"), "a booking that still holds a court stays");
-  assert.ok(sql.includes("NOT EXISTS (SELECT 1 FROM booking b WHERE b.series_id = s.id)"), "a series keeps any occurrence the run did not erase");
+  assert.match(sql, /CREATE TEMP TABLE run_booking[^;]*status = 'CANCELLED'[^;]*;/, "a booking that still holds a court stays");
+  assert.match(sql, /DELETE FROM booking_series s[^;]*NOT EXISTS \(SELECT 1 FROM booking b WHERE b\.series_id = s\.id\)[^;]*;/, "a series keeps any occurrence the run did not erase");
   assert.throws(() => personaResidueSql(["x'); DELETE FROM booking; --"], "2026-10-23T05:04:21.541Z"), /not a username/);
   assert.throws(() => personaResidueSql(["acceptance.member-a"], "yesterday'; --"), /not a run start/);
   assert.equal(personaResidueSql([], "2026-10-23T05:04:21.541Z"), null, "no persona, no statement");
