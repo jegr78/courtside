@@ -85,6 +85,7 @@ describe("DependantsView", () => {
     expect(cancel).toHaveBeenCalledWith("person-2", lesson.id);
     expect(await screen.findByTestId("dependant-cancelled")).toHaveTextContent("The booking of John Roe was cancelled.");
     await waitFor(() => expect(api.dependantBookings).toHaveBeenCalledTimes(2));
+    expect(api.dependantNotifications).not.toHaveBeenCalled();
   });
 
   it("given reading messages is granted, when the page is shown, then the messages are shown read only", async () => {
@@ -199,6 +200,82 @@ describe("DependantsView", () => {
     expect(await screen.findByTestId("dependant-name")).toHaveTextContent("Mary Major");
     await waitFor(() => expect(api.dependantBookings).toHaveBeenLastCalledWith("person-3"));
   });
+  it("given messages and a pending older page, when cancellation succeeds, then fresh cancellation status replaces stale pages", async () => {
+    // given
+    vi.spyOn(api, "dependants").mockResolvedValue([john(["VIEW_BOOKINGS", "CANCEL_BOOKINGS", "READ_MESSAGES"])]);
+    vi.mocked(api.dependantBookings).mockResolvedValueOnce({ items: [lesson] }).mockResolvedValue({ items: [] });
+    vi.spyOn(api, "cancelDependantBooking").mockResolvedValue();
+    let finishOlder!: (page: { items: Notification[]; unread: number }) => void;
+    const older = new Promise<{ items: Notification[]; unread: number }>((resolve) => { finishOlder = resolve; });
+    vi.mocked(api.dependantNotifications).mockReset()
+      .mockResolvedValueOnce({ items: [unread], unread: 1, nextCursor: "older" })
+      .mockReturnValueOnce(older)
+      .mockResolvedValue({ items: [{ ...unread, booking: { ...unread.booking!, cancelled: true } }], unread: 1 });
+    show();
+    await screen.findByTestId(`notification-${unread.id}`);
+    await userEvent.click(screen.getByTestId("dependant-load-more-messages"));
+
+    // when
+    await userEvent.click(await screen.findByTestId("personal-cancel"));
+    await userEvent.click(screen.getByTestId("confirm-cancellation"));
+
+    // then
+    await waitFor(() => expect(screen.getByTestId(`notification-${unread.id}`)).toHaveTextContent("Cancelled"));
+    expect(screen.getByTestId("dependant-cancelled")).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByTestId("personal-cancel")).toBeNull());
+    expect(api.dependantNotifications).toHaveBeenLastCalledWith("person-2", undefined);
+    await act(async () => {
+      finishOlder({ items: [{ ...unread, id: "late-old-page" }], unread: 1 });
+      await older;
+    });
+    expect(screen.queryByTestId("notification-late-old-page")).toBeNull();
+    expect(screen.getByTestId(`notification-${unread.id}`)).toHaveTextContent("Cancelled");
+    expect(screen.queryByTestId("dependant-load-more-messages")).toBeNull();
+  });
+
+  it("given a rejected cancellation, when the guardian confirms it, then messages are not reloaded", async () => {
+    // given
+    vi.spyOn(api, "dependants").mockResolvedValue([john(["VIEW_BOOKINGS", "CANCEL_BOOKINGS", "READ_MESSAGES"])]);
+    vi.spyOn(api, "cancelDependantBooking").mockRejectedValue(new Error("cancel unavailable"));
+    show();
+    await screen.findByTestId(`notification-${unread.id}`);
+
+    // when
+    await userEvent.click(await screen.findByTestId("personal-cancel"));
+    await userEvent.click(screen.getByTestId("confirm-cancellation"));
+
+    // then
+    await within(screen.getByRole("dialog")).findByRole("alert");
+    expect(api.dependantNotifications).toHaveBeenCalledTimes(1);
+    expect(screen.queryByTestId("dependant-cancelled")).toBeNull();
+  });
+
+  it("given a cancelled booking whose messages cannot reload, when messages are retried, then success remains and the cancellation marker recovers", async () => {
+    // given
+    vi.spyOn(api, "dependants").mockResolvedValue([john(["VIEW_BOOKINGS", "CANCEL_BOOKINGS", "READ_MESSAGES"])]);
+    vi.spyOn(api, "cancelDependantBooking").mockResolvedValue();
+    vi.mocked(api.dependantNotifications).mockReset()
+      .mockResolvedValueOnce({ items: [unread], unread: 1 })
+      .mockRejectedValueOnce(new Error("messages unavailable"))
+      .mockResolvedValue({ items: [{ ...unread, booking: { ...unread.booking!, cancelled: true } }], unread: 1 });
+    show();
+    await screen.findByTestId(`notification-${unread.id}`);
+
+    // when
+    await userEvent.click(await screen.findByTestId("personal-cancel"));
+    await userEvent.click(screen.getByTestId("confirm-cancellation"));
+
+    // then
+    const messages = screen.getByTestId("dependant-messages");
+    await within(messages).findByTestId("retry-load");
+    expect(screen.getByTestId("dependant-cancelled")).toBeInTheDocument();
+    expect(screen.queryByTestId(`notification-${unread.id}`)).toBeNull();
+    await userEvent.click(within(messages).getByTestId("retry-load"));
+    await waitFor(() => expect(screen.getByTestId(`notification-${unread.id}`)).toHaveTextContent("Cancelled"));
+    expect(within(messages).queryByTestId("load-failure")).toBeNull();
+    expect(screen.getByTestId("dependant-cancelled")).toBeInTheDocument();
+  });
+
 });
 
 

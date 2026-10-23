@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { api, ApiError, type Dependant, type GuardianGrant, type Notification, type PersonalBooking, type PublicCourt } from "../api/client";
@@ -77,6 +77,7 @@ export function DependantsView() {
 function DependantPanel({ dependant, refused, acted }: { dependant: Dependant; refused: (cause: unknown) => Promise<void>; acted: () => void }) {
   const { t, i18n } = useTranslation();
   const name = nameOf(dependant);
+  const [messageRevision, setMessageRevision] = useState(0);
   const grants = GRANT_ORDER.filter((grant) => dependant.grants.includes(grant));
   const may = (grant: GuardianGrant) => dependant.grants.includes(grant);
   return <article data-testid={`dependant-${dependant.personId}`} aria-labelledby="dependant-name" className="grid gap-6">
@@ -94,8 +95,8 @@ function DependantPanel({ dependant, refused, acted }: { dependant: Dependant; r
         {t("dependants.toCourts")}
       </Link>
     </section>}
-    {may("VIEW_BOOKINGS") && <DependantBookings dependant={dependant} cancels={may("CANCEL_BOOKINGS")} refused={refused} acted={acted} />}
-    {may("READ_MESSAGES") && <DependantMessages dependant={dependant} refused={refused} />}
+    {may("VIEW_BOOKINGS") && <DependantBookings dependant={dependant} cancels={may("CANCEL_BOOKINGS")} refused={refused} acted={() => { acted(); setMessageRevision((revision) => revision + 1); }} />}
+    {may("READ_MESSAGES") && <DependantMessages dependant={dependant} refused={refused} revision={messageRevision} />}
     {may("ACCOUNT_TASKS") && <DependantCredentials dependant={dependant} refused={refused} acted={acted} />}
   </article>;
 }
@@ -166,38 +167,53 @@ function DependantBookings({ dependant, cancels, refused, acted }: {
   </section>;
 }
 
-function DependantMessages({ dependant, refused }: { dependant: Dependant; refused: (cause: unknown) => Promise<void> }) {
+function DependantMessages({ dependant, refused, revision }: { dependant: Dependant; refused: (cause: unknown) => Promise<void>; revision: number }) {
   const { t, i18n } = useTranslation();
   const { club } = useClubConfiguration();
   const name = nameOf(dependant);
   const [entries, setEntries] = useState<Notification[]>();
   const [nextCursor, setNextCursor] = useState<string>();
-  const { message: error, report } = useReportedFailure();
+  const { message: error, report, clear } = useReportedFailure();
+  const generation = useRef(0);
+  const [loading, setLoading] = useState(false);
 
   const load = useCallback(async (cursor?: string) => {
+    const requested = generation.current;
+    setLoading(true);
+    clear();
+    if (!cursor) { setEntries(undefined); setNextCursor(undefined); }
     try {
       const page = await api.dependantNotifications(dependant.personId, cursor);
+      if (requested !== generation.current) return;
       setEntries((current) => cursor ? [...(current ?? []), ...page.items] : page.items);
       setNextCursor(page.nextCursor ?? undefined);
     } catch (failure) {
+      if (requested !== generation.current) return;
       if (relationshipChanged(failure)) await refused(failure);
       else report(failure);
+    } finally {
+      if (requested === generation.current) setLoading(false);
     }
-  }, [dependant.personId, refused, report]);
+  }, [dependant.personId, refused, report, clear]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    generation.current += 1;
+    void load();
+    return () => { generation.current += 1; };
+  }, [load, revision]);
 
   return <section data-testid="dependant-messages" aria-labelledby="dependant-messages-title" className="grid gap-3">
     <h3 id="dependant-messages-title" className="text-xl font-semibold">{t("dependants.messages")}</h3>
     <p className="text-muted text-sm">{t("dependants.messagesReadOnly", { name })}</p>
-    {error && <Alert>{error}</Alert>}
+    {error && <LoadFailure message={error} retry={() => void load()} />}
+    {loading && !entries && <p role="status">{t("status.loading")}</p>}
     {entries && club && (entries.length === 0
       ? <p data-testid="dependant-messages-empty" className="text-muted">{t("dependants.noMessages", { name })}</p>
       : <ul data-testid="dependant-notifications" className="grid gap-3">
         {entries.map((notification) => <NotificationEntry key={notification.id} notification={notification}
           timeZone={club.timeZone} t={t} language={i18n.language} />)}
       </ul>)}
-    {nextCursor && <Button variant="secondary" data-testid="dependant-load-more-messages" className="justify-self-start"
+    {nextCursor && <Button variant="secondary" data-testid="dependant-load-more-messages" className="justify-self-start" disabled={loading}
       onClick={() => void load(nextCursor)}>{t("dependants.loadMoreMessages")}</Button>}
   </section>;
 }
