@@ -285,6 +285,73 @@ for (const viewport of phoneSizes) {
       element.getBoundingClientRect().height / parseFloat(getComputedStyle(element).lineHeight));
     expect(lines, "the name is not broken across lines").toBeLessThan(1.5);
   });
+
+  test(`given a phone ${sizeName(viewport)}, when more details are opened, then the guest field they reveal is on screen`, async ({ page, journeyService }) => {
+    // given
+    const dialog = await openBookingWithPartner(page, journeyService.visualDate, viewport);
+
+    // when
+    await dialog.getByTestId("booking-more-summary").tap();
+
+    // then
+    const guest = dialog.getByTestId("guest-name").first();
+    await expect.poll(async () => {
+      const body = await dialog.getByTestId("dialog-body").boundingBox();
+      const field = await guest.boundingBox();
+      return body !== null && field !== null && field.y >= body.y - 0.5 && field.y + field.height <= body.y + body.height + 0.5;
+    }, { message: "the first guest field lies inside the visible part of the form", timeout: 10_000 }).toBe(true);
+    await expect(guest, "the first guest field is on screen").toBeInViewport({ ratio: 1 });
+  });
+
+  test(`given a phone ${sizeName(viewport)}, when the form continues below, then the signal covers none of it`, async ({ page, journeyService }) => {
+    // given
+    const dialog = await openBookingWithPartner(page, journeyService.visualDate, viewport);
+    await dialog.getByTestId("booking-more-summary").tap();
+    const body = dialog.getByTestId("dialog-body");
+
+    for (const position of ["top", "middle"] as const) {
+      // when
+      await body.evaluate((element, where) => element.scrollTo(0, where === "top" ? 0 : (element.scrollHeight - element.clientHeight) / 2), position);
+
+      // then
+      const signal = dialog.getByTestId("dialog-continues");
+      await expect(signal, `the form continues below at the ${position}`).toBeVisible({ timeout: 10_000 });
+      const signalBox = (await signal.boundingBox())!;
+      const bodyBox = (await body.boundingBox())!;
+      expect(signalBox.y, `the signal starts below the scrolling area at the ${position}`).toBeGreaterThanOrEqual(bodyBox.y + bodyBox.height - 0.5);
+    }
+  });
+}
+
+for (const name of ["Richard Miles", "Richard Miles-Major"]) {
+  test(`given a phone 320 px wide in German, when ${name} is chosen as partner, then the name stays whole on one line beside its remove control`, async ({ page, journeyService }) => {
+    // given
+    await page.setViewportSize({ width: 320, height: 568 });
+    await page.goto("/login");
+    await page.evaluate(() => window.localStorage.setItem("courtside.locale", "de-DE"));
+    await page.route("**/api/public/participant-members", async (route) => {
+      const matches = await (await route.fetch()).json() as { displayName: string }[];
+      await route.fulfill({ json: matches.map((match) => ({ ...match, displayName: name })) });
+    });
+
+    // when
+    const dialog = await openBookingWithPartner(page, journeyService.visualDate);
+
+    // then
+    const partner = dialog.getByTestId("selected-member");
+    const shown = partner.getByTestId("selected-member-name");
+    await expect(shown, "the partner is named").toHaveText(name);
+    await expect(partner.getByTestId("remove-member"), "the control is the German short label").toHaveText("Entfernen");
+    const layout = await shown.evaluate((element) => ({
+      lines: element.getBoundingClientRect().height / parseFloat(getComputedStyle(element).lineHeight),
+      clipped: element.scrollWidth > element.clientWidth + 0.5
+    }));
+    expect(layout.lines, "the name is not broken across lines").toBeLessThan(1.5);
+    expect(layout.clipped, "the name is shown whole").toBe(false);
+    const row = (await partner.boundingBox())!;
+    const remove = (await partner.getByTestId("remove-member").boundingBox())!;
+    expect(remove.x + remove.width, "the remove control stays inside the row").toBeLessThanOrEqual(row.x + row.width + 0.5);
+  });
 }
 
 test("given a phone 320 px wide with text at 150 percent, when another day is chosen, then its first row starts below the plan's pinned header", async ({ page, journeyService }) => {
