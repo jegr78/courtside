@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.3.0-rc.6](https://github.com/jegr78/courtside/compare/v0.3.0-rc.5...v0.3.0-rc.6) (2026-10-23)
+
+
+### Features
+
+* **acceptance:** keep the report in draft until every contact sheet has a verdict ([#1688](https://github.com/jegr78/courtside/issues/1688)) ([a86a04e](https://github.com/jegr78/courtside/commit/a86a04e1664f1f753107e7edc3f907dc9b83ae8e))
+
+
+### Bug fixes
+
+* **acceptance:** name the subject of captures that missed their state ([#1687](https://github.com/jegr78/courtside/issues/1687)) ([e22f72e](https://github.com/jegr78/courtside/commit/e22f72ed263ac835ca9761a162796517eb9229f8)), closes [#1684](https://github.com/jegr78/courtside/issues/1684)
+* keep revealed booking details and partner names in view on phones ([#1695](https://github.com/jegr78/courtside/issues/1695)) ([da9a51f](https://github.com/jegr78/courtside/commit/da9a51f252a48a7b979ece80cf80a131994004af))
+* keep the whole account menu reachable on a short viewport ([#1691](https://github.com/jegr78/courtside/issues/1691)) ([4a5c855](https://github.com/jegr78/courtside/commit/4a5c8555031e8bffac496e950e088b9f8acdec0c))
+
 ## 0.3.0 (2026-10-18)
 
 ### Features
