@@ -570,6 +570,21 @@ test("a member reaches every destination from the bottom of a touch viewport", a
   expect(clearance).not.toBeNull();
   expect(clearance!.bar).toBeGreaterThan(0);
   expect(clearance!.reserved).toBeGreaterThanOrEqual(clearance!.bar);
+
+  for (const width of [page.viewportSize()!.width, 320]) {
+    // when
+    await page.setViewportSize({ width, height: 640 });
+    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+    const overlap = await page.evaluate(() => {
+      const top = document.querySelector("[data-testid='primary-navigation-bar']")!.getBoundingClientRect().top;
+      const lowest = Math.max(...[...document.querySelectorAll("footer > *")].map((item) => item.getBoundingClientRect().bottom));
+      return lowest - top;
+    });
+
+    // then
+    expect(overlap, `at ${width} px the footer's last item ends ${overlap} px below the top of the bottom bar`)
+      .toBeLessThanOrEqual(0);
+  }
 });
 
 test("a member holding two upcoming bookings sees both on the phone without scrolling", async ({ page, journeyService }) => {
