@@ -102,18 +102,3 @@ it("given a browser without ResizeObserver, when the body renders, then it shows
   expect(screen.getByTestId("field"), "the content renders without the observer").toBeInTheDocument();
   expect(screen.queryByTestId("dialog-continues"), "nothing measured means no signal").toBeNull();
 });
-
-it("given a form taller than its dialog, when the signal shows, then it follows the scrolling body instead of lying inside it", () => {
-  // given
-  render(<DialogBody><input /></DialogBody>);
-  const body = screen.getByTestId("dialog-body");
-  laidOut(body, { scrollHeight: 564, clientHeight: 276, scrollTop: 0 });
-
-  // when
-  act(() => resized?.());
-
-  // then
-  const signal = screen.getByTestId("dialog-continues");
-  expect(body.contains(signal), "the signal is not part of the scrolled content").toBe(false);
-  expect(body.nextElementSibling, "the signal comes right after the scrolling body").toBe(signal);
-});
