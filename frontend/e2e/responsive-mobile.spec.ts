@@ -502,6 +502,28 @@ test("the account menu stays inside the narrowest supported viewport", async ({ 
   await expect(page).toHaveURL(/\/login$/);
 });
 
+test("given a phone in landscape, when a member opens the account menu, then sign out is reached inside the menu without scrolling the page", async ({ page }) => {
+  // given
+  await page.setViewportSize({ width: 734, height: 343 });
+  await signIn(page, "doe.jane");
+  await expect(page.getByTestId("week-date")).toBeEnabled();
+
+  // when
+  await page.getByTestId("preferences-menu").tap();
+
+  // then
+  const panel = page.locator("details:has([data-testid='preferences-menu']) > div");
+  await expect(panel).toBeVisible();
+  const pageScroll = await page.evaluate(() => window.scrollY);
+  const panelBounds = await panel.boundingBox();
+  expect(panelBounds!.y + panelBounds!.height, "the menu ends inside the viewport").toBeLessThanOrEqual(343);
+  await panel.evaluate((element) => { element.scrollTop = element.scrollHeight; });
+  const logout = await page.getByTestId("logout").boundingBox();
+  expect(logout!.y, "sign out starts inside the viewport").toBeGreaterThanOrEqual(0);
+  expect(logout!.y + logout!.height, "sign out ends inside the viewport").toBeLessThanOrEqual(343);
+  expect(await page.evaluate(() => window.scrollY), "the page itself did not scroll").toBe(pageScroll);
+});
+
 test("a member reaches every destination from the bottom of a touch viewport", async ({ page }) => {
   // given
   await signIn(page, "doe.jane");
