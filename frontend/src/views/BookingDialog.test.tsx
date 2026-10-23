@@ -105,7 +105,7 @@ it("given the booking form, when the member opens more details, then the form sc
   Object.defineProperty(HTMLElement.prototype, "scrollIntoView", { configurable: true, value: scrolled });
   onTestFinished(() => { delete (HTMLElement.prototype as { scrollIntoView?: unknown }).scrollIntoView; });
   show();
-  const more = await screen.findByTestId("booking-more") as HTMLDetailsElement;
+  const more = await screen.findByTestId<HTMLDetailsElement>("booking-more");
 
   // when
   act(() => {
@@ -131,7 +131,7 @@ it("given a refusal about a note, when it opens more details, then the summary i
   Object.defineProperty(HTMLElement.prototype, "scrollIntoView", { configurable: true, value: scrolled });
   onTestFinished(() => { delete (HTMLElement.prototype as { scrollIntoView?: unknown }).scrollIntoView; });
   show();
-  const more = await screen.findByTestId("booking-more") as HTMLDetailsElement;
+  const more = await screen.findByTestId<HTMLDetailsElement>("booking-more");
   await act(() => new Promise((settled) => setTimeout(settled, 50)));
 
   // when
