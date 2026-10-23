@@ -43,6 +43,11 @@ const BOUNDARIES = {
     classification: "marks one destination as current, and never grants one",
     test: "src/components/AdminNavigation.test.tsx#given a page under administration, when the navigation is read, then only that destination is current"
   },
+  "src/components/AdminShell.tsx useLocation": {
+    value: "the path the browser is on",
+    classification: "triggers alignment of an already rendered current navigation entry inside its own scroller, and never grants a destination or reads data",
+    test: "src/components/AdminShell.test.tsx#given a desktop navigation with an active entry below its frame, when the window resizes, then only its scroll position reveals the entry"
+  },
   "src/components/PrimaryNavigation.tsx useLocation": {
     value: "the address the browser is on",
     classification: "marks one destination as current, and never grants one",
