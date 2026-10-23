@@ -329,10 +329,8 @@ for (const name of ["Richard Miles", "Richard Miles-Major"]) {
     await page.setViewportSize({ width: 320, height: 568 });
     await page.goto("/login");
     await page.evaluate(() => window.localStorage.setItem("courtside.locale", "de-DE"));
-    await page.route("**/api/public/participant-members", async (route) => {
-      const matches = await (await route.fetch()).json() as { displayName: string }[];
-      await route.fulfill({ json: matches.map((match) => ({ ...match, displayName: name })) });
-    });
+    await page.route("**/api/public/participant-members", (route) =>
+      route.fulfill({ json: [{ personId: "00000000-0000-0000-0000-000000000103", displayName: name }] }));
 
     // when
     const dialog = await openBookingWithPartner(page, journeyService.visualDate);
