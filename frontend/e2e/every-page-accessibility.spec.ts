@@ -290,8 +290,12 @@ test("login and cancellation are operable using only the keyboard", async ({ pag
     `).catch(() => "Lock metadata unavailable");
     await testInfo.attach("database-lock-state", { body: locks, contentType: "text/plain" }).catch(() => undefined);
   }
-  const problem = response.ok() ? undefined : await response.json().catch(() => undefined);
-  expect(response.status(), JSON.stringify({ type: problem?.type, retryable: problem?.retryable })).toBe(200);
+  const problem: unknown = response.ok() ? undefined : await response.json().catch(() => undefined);
+  const detail = problem && typeof problem === "object" ? {
+    type: "type" in problem ? problem.type : undefined,
+    retryable: "retryable" in problem ? problem.retryable : undefined
+  } : undefined;
+  expect(response.status(), JSON.stringify(detail)).toBe(200);
   await expect(page.getByTestId("my-bookings-page")).toBeVisible();
   await tabToTestId(page, "personal-cancel", tabKey);
   await page.keyboard.press("Enter");
