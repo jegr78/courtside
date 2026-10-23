@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, expect, it, onTestFinished, vi } from "vitest";
 import { ApiError, api } from "../api/client";
 import i18n from "../i18n";
@@ -95,7 +95,7 @@ it("given a booking the club refuses, when the refusal arrives, then the duratio
 
   // then
   await screen.findByTestId("booking-refusal");
-  expect(scrolled.mock.contexts, "the duration is the element brought into view").toContain(duration);
+  await waitFor(() => expect(scrolled.mock.contexts, "the duration is the element brought into view").toContain(duration));
   expect(scrolled).toHaveBeenCalledWith({ block: "nearest" });
 });
 
