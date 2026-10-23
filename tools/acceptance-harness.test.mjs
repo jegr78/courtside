@@ -705,6 +705,20 @@ test("given a previous run without contact sheets, when compared, then the compa
   rmSync(root, { recursive: true, force: true });
 });
 
+import { sheetSection } from "../acceptance/report/html.mjs";
+
+test("given sheets without a verdict and a comparison, when the report section is rendered, then it names them and the changed sheets", () => {
+  // given
+  const sheets = { total: 3, reviewed: ["admin--overview"], unreviewed: ["admin--usage"], stale: ["admin--gone"], unavailable: null };
+  // when
+  const html = sheetSection(sheets, { changed: ["admin--overview"], added: ["admin--audit"], unchanged: 1 });
+  // then
+  assert.match(html, /1 of 3 contact sheets carry a verdict/);
+  assert.match(html, /Without a verdict:<\/p><ul><li><code>admin--usage<\/code>/, "every sheet without a verdict is listed");
+  assert.match(html, /did not produce:<\/p><ul><li><code>admin--gone<\/code>/);
+  assert.match(html, /1 changed, 1 new, 1 unchanged/);
+});
+
 import { assertPrivacySafe, forbiddenTerms, releaseSummary } from "../acceptance/report/release-summary.mjs";
 
 const forbidden = { usernames: ["jane.doe"], hosts: ["club.example.org"], names: ["Jane Doe"] };
@@ -730,6 +744,26 @@ test("given a draft review, when summarised, then the summary says it is not fin
   // then
   assert.match(summary, /Draft/);
   assert.match(summary, /axe:color-contrast/);
+});
+
+test("given contact sheets without a verdict, when summarised, then the summary is a draft that counts and names them", () => {
+  // given
+  const sheets = { total: 3, reviewed: ["admin--overview"], unreviewed: ["admin--audit", "admin--usage"], stale: [], unavailable: null };
+  // when
+  const summary = releaseSummary({ version: "1.2.3", runId: "r", harnessCommit: "c", cells: { passed: 1, failed: 0, skipped: 0 },
+    reviewed: { ...reviewed, status: "draft", sheets }, forbidden });
+  // then
+  assert.match(summary, /Draft/);
+  assert.match(summary, /2 of 3 contact sheet\(s\) without a verdict/, "the summary counts the sheets nobody judged");
+  assert.match(summary, /`admin--audit`, `admin--usage`/);
+});
+
+test("given every contact sheet judged, when summarised, then the summary says so", () => {
+  // when
+  const summary = releaseSummary({ version: "1.2.3", runId: "r", harnessCommit: "c", cells: { passed: 1, failed: 0, skipped: 0 },
+    reviewed: { ...reviewed, sheets: { total: 2, reviewed: ["a", "b"], unreviewed: [], stale: [], unavailable: null } }, forbidden });
+  // then
+  assert.match(summary, /Every finding is assessed and all 2 contact sheets carry a verdict\./);
 });
 
 test("given a reason that names a username, an address, a host, a person or an image, when summarised, then each is refused without echoing it", () => {
@@ -828,10 +862,11 @@ import { parseArguments, waitForLoad } from "../acceptance/run.mjs";
 
 test("when arguments are parsed, then a later phase needs an existing run and projects narrow the matrix", () => {
   // when / then
-  assert.deepEqual(parseArguments([]), { phase: "all", run: null, projects: [] });
-  assert.deepEqual(parseArguments(["--phase", "matrix", "--project", "ipad", "--project", "narrow"]), { phase: "matrix", run: null, projects: ["ipad", "narrow"] });
+  assert.deepEqual(parseArguments([]), { phase: "all", run: null, previous: null, projects: [] });
+  assert.deepEqual(parseArguments(["--phase", "matrix", "--project", "ipad", "--project", "narrow"]), { phase: "matrix", run: null, previous: null, projects: ["ipad", "narrow"] });
   assert.throws(() => parseArguments(["--phase", "report"]), /--run/);
   assert.throws(() => parseArguments(["--phase", "everything"]), /phase/);
+  assert.equal(parseArguments(["--phase", "report", "--run", "b", "--previous", "a"]).previous, "a", "the report compares its sheets with the named run");
 });
 
 test("given a load that falls below the limit, when waited for, then it returns, and a load that never falls stops at the deadline", async () => {

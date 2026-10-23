@@ -31,11 +31,27 @@ const line = (finding) => {
   return `- \`${finding.key}\` ${finding.severity}, ${LABEL[review.assessment]}${issue}: ${review.reason} Follow-up: ${review.followUp}`;
 };
 
+const keys = (names) => names.map((name) => `\`${name}\``).join(", ");
+
+export function sheetStatus(sheets) {
+  if (!sheets) return null;
+  if (sheets.unavailable) return `No contact sheets to review: ${sheets.unavailable}.`;
+  if (sheets.unreviewed.length) return `${sheets.unreviewed.length} of ${sheets.total} contact sheet(s) without a verdict (${keys(sheets.unreviewed)}).`;
+  return null;
+}
+
+function statusLine(reviewed) {
+  const sheets = reviewed.sheets ?? null;
+  if (reviewed.status === "final") return sheets ? `Every finding is assessed and all ${sheets.total} contact sheets carry a verdict.` : "Every finding is assessed.";
+  const open = [reviewed.unassessed.length ? `${reviewed.unassessed.length} finding(s) not assessed (${keys(reviewed.unassessed)}).` : null, sheetStatus(sheets)];
+  return `Draft: ${open.filter(Boolean).join(" ")}`;
+}
+
 export function releaseSummary({ version, runId, harnessCommit, cells, reviewed, forbidden }) {
   const markdown = [
     `### Acceptance of ${version}`,
     "",
-    reviewed.status === "final" ? "Every finding is assessed." : `Draft: ${reviewed.unassessed.length} finding(s) not assessed (${reviewed.unassessed.map((key) => `\`${key}\``).join(", ")}).`,
+    statusLine(reviewed),
     "",
     `- Run \`${runId}\`, harness \`${harnessCommit}\``,
     `- Cells: ${cells.passed} passed, ${cells.failed} failed, ${cells.skipped} skipped`,
