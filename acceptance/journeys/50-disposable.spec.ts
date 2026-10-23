@@ -237,7 +237,7 @@ test("given a disposable member who did not turn up, when the board records the 
   try {
     await page.goto(`/admin/roster/${record.personId}`);
     await expect(page.getByTestId("no-shows-list"), "product: the person page lists the counting no-show").toBeVisible();
-    await capture(page, "person-no-shows");
+    await capture(page, "person-no-shows", { subject: page.getByTestId("no-shows-list") });
     await page.getByTestId("lift-no-shows").click();
     await expect(page.getByTestId("no-shows-lifted"), "product: the board lifts the no-shows").toBeVisible();
     await expect(page.getByTestId("no-shows-none"), "product: nothing counts after the lift").toBeVisible();
