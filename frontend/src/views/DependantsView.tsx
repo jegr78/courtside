@@ -12,6 +12,7 @@ import { SuccessFeedback } from "../components/SuccessFeedback";
 import { TextField } from "../components/TextField";
 import { useReportedFailure } from "../failures/useReportedFailure";
 import { announceDependantsChanged } from "../navigation/dependants";
+import { formatCalendarDate } from "../time/clubZone";
 import { CancelDialog } from "./AppointmentDialogs";
 import { BookingSection } from "./MyBookingsView";
 import { NotificationEntry } from "./MyMessagesView";
@@ -74,7 +75,7 @@ export function DependantsView() {
 }
 
 function DependantPanel({ dependant, refused, acted }: { dependant: Dependant; refused: (cause: unknown) => Promise<void>; acted: () => void }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const name = nameOf(dependant);
   const grants = GRANT_ORDER.filter((grant) => dependant.grants.includes(grant));
   const may = (grant: GuardianGrant) => dependant.grants.includes(grant);
@@ -84,7 +85,7 @@ function DependantPanel({ dependant, refused, acted }: { dependant: Dependant; r
       <p data-testid="dependant-grants" className="text-muted">
         {t("dependants.grants", { grants: grants.map((grant) => t(`guardianGrant.${grant}`)).join(", ") })}
       </p>
-      {dependant.endedOn && <p data-testid="dependant-ends-on" className="text-muted">{t("dependants.endsOn", { endedOn: dependant.endedOn })}</p>}
+      {dependant.endedOn && <p data-testid="dependant-ends-on" className="text-muted">{t("dependants.endsOn", { endedOn: formatCalendarDate(dependant.endedOn, i18n.resolvedLanguage ?? "de") })}</p>}
     </div>
     {may("BOOK") && <section data-testid="dependant-book" aria-labelledby="dependant-book-title" className="grid gap-2">
       <h3 id="dependant-book-title" className="text-xl font-semibold">{t("dependants.book", { name })}</h3>

@@ -1,5 +1,5 @@
 import { expect, it, vi } from "vitest";
-import { bookingTimeSlot, formatBookingPeriod, formatDateRange, isPastSlot, isValidZonedDateTime, zonedDateTime } from "./clubZone";
+import { formatCalendarDate, bookingTimeSlot, formatBookingPeriod, formatDateRange, isPastSlot, isValidZonedDateTime, zonedDateTime } from "./clubZone";
 
 const localTimeIn = (isoInstant: string, timeZone: string) =>
   new Intl.DateTimeFormat("en-GB", {
@@ -210,4 +210,14 @@ it("given repeated zero-offset probes, when the same instant is resolved within 
   } finally {
     parts.mockRestore();
   }
+});
+
+
+it("given a calendar date west of UTC, when its display locale changes, then its day remains unchanged", () => {
+  // given
+  const value = "2026-10-23";
+
+  // when / then
+  expect(formatCalendarDate(value, "de")).toBe("23.10.2026");
+  expect(formatCalendarDate(value, "en")).toBe("Oct 23, 2026");
 });

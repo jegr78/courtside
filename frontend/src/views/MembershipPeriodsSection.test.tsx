@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, ApiError, type MembershipPeriod, type MembershipType } from "../api/client";
@@ -45,7 +45,7 @@ describe("MembershipPeriodsSection", () => {
     expect(screen.getByTestId("membership-period-state-period-3"), "a period that begins later is not running yet")
       .toHaveAttribute("data-state", "scheduled");
     expect(screen.getByTestId("membership-period-period-3")).toHaveTextContent("Juniors");
-    expect(screen.getByTestId("membership-period-period-3")).toHaveTextContent("2999-01-01");
+    expect(screen.getByTestId("membership-period-period-3")).toHaveTextContent("Jan 1, 2999");
   });
 
   it("given dates the browser's calendar would read otherwise, when the section is shown, then the state the server gives on the club's day stands", async () => {
@@ -166,4 +166,23 @@ describe("MembershipPeriodsSection", () => {
     expect(removing).not.toHaveBeenCalled();
     expect(screen.getByTestId("membership-period-period-2")).toBeInTheDocument();
   });
+});
+
+
+it("given closed and open calendar ranges, when the language changes, then the displayed dates follow the locale", async () => {
+  // given
+  vi.spyOn(api, "membershipPeriods").mockResolvedValue([ended, running]);
+  await i18n.changeLanguage("en");
+  show();
+  const entry = await screen.findByTestId("membership-period-period-1");
+  expect(entry).toHaveTextContent("Jan 1, 2020");
+  expect(entry).toHaveTextContent("Jan 1, 2021");
+
+  // when
+  await act(() => i18n.changeLanguage("de"));
+
+  // then
+  expect(entry).toHaveTextContent("01.01.2020");
+  expect(entry).toHaveTextContent("01.01.2021");
+  expect(screen.getByTestId("membership-period-period-2")).toHaveTextContent("01.01.2021");
 });

@@ -6,6 +6,7 @@ import { Button } from "../components/Button";
 import { Modal } from "../components/Modal";
 import { TextField } from "../components/TextField";
 import { useReportedFailure } from "../failures/useReportedFailure";
+import { formatCalendarDate } from "../time/clubZone";
 
 type PeriodState = "running" | "scheduled" | "ended";
 
@@ -22,7 +23,7 @@ export function MembershipPeriodsSection({ personId, types, disabled, version, c
   version: string;
   changed: () => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { message: error, report, clear } = useReportedFailure();
   const [periods, setPeriods] = useState<MembershipPeriod[]>();
   const [editing, setEditing] = useState<Editing>();
@@ -82,8 +83,8 @@ export function MembershipPeriodsSection({ personId, types, disabled, version, c
               <span className="font-semibold">{names.get(period.membershipTypeId) ?? period.membershipTypeId}</span>
               {" "}
               {period.endedOn
-                ? t("admin.person.periodRange", { startedOn: period.startedOn, endedOn: period.endedOn })
-                : t("admin.person.periodOpen", { startedOn: period.startedOn })}
+                ? t("admin.person.periodRange", { startedOn: formatCalendarDate(period.startedOn, i18n.resolvedLanguage ?? "de"), endedOn: formatCalendarDate(period.endedOn, i18n.resolvedLanguage ?? "de") })
+                : t("admin.person.periodOpen", { startedOn: formatCalendarDate(period.startedOn, i18n.resolvedLanguage ?? "de") })}
             </span>
             <span data-testid={`membership-period-state-${period.id}`} data-state={state} className="text-sm font-medium">
               {t(`admin.person.periodState.${state}`)}

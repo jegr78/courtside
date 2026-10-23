@@ -17,6 +17,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 
 class RuleRejectionLogTest extends AbstractIntegrationTest {
 
@@ -56,6 +57,26 @@ class RuleRejectionLogTest extends AbstractIntegrationTest {
                 .containsExactly(OffsetDateTime.parse("2026-05-11T22:00:00Z").toInstant());
         assertThat(List.of(dayBefore, dayOf)).as("the refusal belongs to the club-local day it happened on")
                 .containsExactly(0L, 1L);
+    }
+
+    @Test
+    void givenRepeatedCodesAndDifferentOpeningReasons_whenReported_thenEachAttemptCountsOncePerExactCode() {
+        // given
+        RuleViolation closed = new RuleViolation("booking.rule.openingHours.closed", Map.of());
+        RuleViolation outside = new RuleViolation("booking.rule.openingHours.outside", Map.of());
+        RuleRejectionLog log = logAt("2026-05-12T10:00:00Z");
+        log.record(List.of(closed, closed, outside), MEMBER_BOOKING_CARD);
+        log.record(List.of(closed), MEMBER_BOOKING_CARD);
+
+        // when
+        var refusals = usage.report(LocalDate.of(2026, 5, 12), LocalDate.of(2026, 5, 12)).ruleRejections();
+
+        // then
+        assertThat(refusals.attempts()).isEqualTo(2);
+        assertThat(refusals.rules()).extracting("code", "attempts").containsExactlyInAnyOrder(
+                tuple("booking.rule.openingHours.closed", 2L),
+                tuple("booking.rule.openingHours.outside", 1L));
+        assertThat(jdbc.sql("SELECT count(*) FROM booking_rule_rejection").query(Long.class).single()).isEqualTo(3);
     }
 
     private RuleRejectionLog logAt(String instant) {

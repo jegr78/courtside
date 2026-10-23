@@ -8,6 +8,7 @@ import { TextField } from "../components/TextField";
 import { useStatisticsFormat } from "./statistics/format";
 import { BarList, KeyFigure, KeyFigures, Note, Section } from "./statistics/parts";
 import { isIsoDate, type Period, periodFromAddress } from "./statistics/period";
+import { formatCalendarDate } from "../time/clubZone";
 import { ruleLabel } from "./ruleLabel";
 import { useStatisticsRead } from "./statistics/useStatisticsRead";
 
@@ -60,7 +61,7 @@ export function AdminUsageView() {
 }
 
 function UsageParts({ usage }: { usage: UsageReport }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const format = useStatisticsFormat();
   const { capacity, cancellations, attendance, ruleRejections } = usage;
   const mostCancelled = Math.max(0, ...cancellations.cards.map((card) => card.cancelled));
@@ -68,7 +69,7 @@ function UsageParts({ usage }: { usage: UsageReport }) {
   const other = t("admin.usage.other");
   return <div className="grid min-w-0 gap-10">
     <div data-testid="usage-period" className="text-muted">
-      {t("admin.usage.period", { from: usage.from, to: usage.to })}
+      {t("admin.usage.period", { from: formatCalendarDate(usage.from, i18n.resolvedLanguage ?? "de"), to: formatCalendarDate(usage.to, i18n.resolvedLanguage ?? "de") })}
     </div>
     <div className="grid gap-4">
       <h3 className="text-xl font-semibold">{t("admin.usage.capacity.heading")}</h3>
