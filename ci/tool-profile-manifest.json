@@ -4,6 +4,7 @@
     { "path": "tools/acceptance-device.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/acceptance-harness.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/acceptance-literals.test.mjs", "profiles": ["tooling"], "test": true },
+    { "path": "tools/acceptance-sheets.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/accessibility-policy.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/assessment-disposition.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/assessment-probe-contract.test.mjs", "profiles": ["tooling"], "test": true },
