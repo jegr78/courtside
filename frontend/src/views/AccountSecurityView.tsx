@@ -4,8 +4,11 @@ import { api, ApiError, type AccountSession } from "../api/client";
 import { problemMessage } from "../api/problem-message";
 import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
+import { LoadFailure } from "../components/LoadFailure";
 import { Modal } from "../components/Modal";
 import { TextField } from "../components/TextField";
+import { useClubConfiguration } from "../club/registry";
+import { formatDateTime } from "../time/clubZone";
 
 const RECENT_AUTH = "urn:courtside:error:recent-authentication-required";
 
@@ -14,6 +17,7 @@ export function AccountSecurityView({ passwordChanged, signedOut }: {
   signedOut: () => void;
 }) {
   const { t, i18n } = useTranslation();
+  const { club, error: clubError, load: loadClub } = useClubConfiguration();
   const [sessions, setSessions] = useState<AccountSession[]>([]);
   const [failure, setFailure] = useState<string>();
   const [reauthenticationFailure, setReauthenticationFailure] = useState<string>();
@@ -84,20 +88,17 @@ export function AccountSecurityView({ passwordChanged, signedOut }: {
     await run(() => api.changeOwnPassword(current, replacement), passwordChanged);
   }
 
-  const date = (timestamp: string) => new Intl.DateTimeFormat(i18n.resolvedLanguage, {
-    dateStyle: "medium", timeStyle: "short"
-  }).format(new Date(timestamp));
-
   return <section data-testid="account-security-view" className="surface-panel grid w-full max-w-3xl gap-8 rounded-2xl border p-6 shadow-[0_20px_50px_var(--cs-shadow)] sm:p-8">
     <header><h1 className="text-2xl font-bold">{t("accountSecurity.title")}</h1><p className="text-muted mt-2">{t("accountSecurity.description")}</p></header>
     {failure && <Alert testId="account-security-failure">{failure}</Alert>}
     <section className="grid gap-4">
       <h2 className="text-xl font-bold">{t("accountSecurity.sessions.title")}</h2>
+      {clubError ? <LoadFailure message={clubError} retry={loadClub} /> : !club && <p role="status">{t("status.loading")}</p>}
       <ul className="grid gap-3">
         {sessions.map((session) => <li key={session.handle} className="grid gap-2 rounded-xl border p-4 sm:grid-cols-[1fr_auto] sm:items-center">
           <div id={`account-session-${session.handle}`}><strong>{t(`accountSecurity.browser.${session.browserFamily}`)}</strong>{session.current && <span className="ml-2">({t("accountSecurity.sessions.current")})</span>}
-            <div className="text-muted text-sm">{t("accountSecurity.sessions.created", { date: date(session.createdAt) })}</div>
-            <div className="text-muted text-sm">{t("accountSecurity.sessions.active", { date: date(session.lastActivityAt) })}</div></div>
+            {club && <div className="text-muted text-sm">{t("accountSecurity.sessions.created", { date: formatDateTime(session.createdAt, i18n.resolvedLanguage ?? "de", club.timeZone) })}</div>}
+            {club && <div className="text-muted text-sm">{t("accountSecurity.sessions.active", { date: formatDateTime(session.lastActivityAt, i18n.resolvedLanguage ?? "de", club.timeZone) })}</div>}</div>
           <Button variant={session.current ? "secondary" : "destructive"} disabled={pending} type="button"
             aria-describedby={`account-session-${session.handle}`}
             data-testid={session.current ? "end-current-session" : "end-other-session"}

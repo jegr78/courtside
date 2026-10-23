@@ -125,6 +125,10 @@ export function formatDate(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
+export function formatCalendarDate(value: string, locale: string): string {
+  return dateTimeFormatter(locale, { dateStyle: "medium" }).format(parseDate(value));
+}
+
 export function formatDateRange(from: string, to: string, locale: string): string {
   return dateTimeFormatter(locale, { dateStyle: "medium" }).formatRange(parseDate(from), parseDate(to));
 }

@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, ApiError, type GuardianRelationship, type RosterEntry } from "../api/client";
@@ -67,7 +67,7 @@ describe("GuardianshipsSection", () => {
     const actedFor = screen.getByTestId("guardianship-relationship-2");
     expect(actedFor).toHaveTextContent("is represented by Mary Major");
     expect(actedFor).toHaveAttribute("data-state", "ended");
-    expect(actedFor).toHaveTextContent("ending on 2025-06-01");
+    expect(actedFor).toHaveTextContent("ending on Jun 1, 2025");
     expect(screen.queryByTestId("end-guardianship-relationship-2"), "an ended relationship cannot be ended again").toBeNull();
   });
 
@@ -255,4 +255,23 @@ describe("GuardianshipsSection", () => {
     expect(remove).toHaveBeenCalledTimes(1);
     expect(remove).toHaveBeenCalledWith("person-1", "relationship-1");
   });
+});
+
+
+it("given closed and open calendar ranges, when the language changes, then the displayed dates follow the locale", async () => {
+  // given
+  vi.spyOn(api, "guardianRelationships").mockResolvedValue([actingForJohn, actedForByMary]);
+  await i18n.changeLanguage("en");
+  show();
+  const entry = await screen.findByTestId("guardianship-relationship-2");
+  expect(entry).toHaveTextContent("Jan 1, 2025");
+  expect(entry).toHaveTextContent("Jun 1, 2025");
+
+  // when
+  await act(() => i18n.changeLanguage("de"));
+
+  // then
+  expect(entry).toHaveTextContent("01.01.2025");
+  expect(entry).toHaveTextContent("01.06.2025");
+  expect(screen.getByTestId("guardianship-relationship-1")).toHaveTextContent("01.10.2026");
 });

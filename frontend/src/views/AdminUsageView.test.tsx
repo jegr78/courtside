@@ -102,7 +102,7 @@ describe("AdminUsageView", () => {
     expect(screen.queryByTestId("usage-attendance-off")).not.toBeInTheDocument();
     const rules = screen.getAllByTestId("usage-rule");
     expect(rules[0]).toHaveTextContent("Booking hours");
-    expect(rules[1]).toHaveTextContent("A booking cannot start in the past.");
+    expect(rules[1]).toHaveTextContent("Start in the past");
   });
 
   it("given a period, when the board reads another one, then the address carries it and the report is read for it", async () => {
@@ -176,4 +176,46 @@ describe("AdminUsageView", () => {
     // then
     expect(label).toBe("booking.rule.unheardOf.reached");
   });
+  it.each([
+    ["de", "01.04.2026 bis 30.04.2026"],
+    ["en", "Apr 1, 2026 to Apr 30, 2026"]
+  ])("given a report in %s, when its period is shown, then calendar dates follow the application language", async (locale, expected) => {
+    // given
+    await i18n.changeLanguage(locale);
+    vi.spyOn(api, "usageReport").mockResolvedValue(usage);
+
+    // when
+    show();
+
+    // then
+    expect(await screen.findByTestId("usage-period")).toHaveTextContent(expected);
+    await waitFor(() => expect(screen.getByTestId("usage-from")).toHaveValue("2026-04-01"));
+  });
+
+  it.each([
+    ["en", ["Facility closed", "Outside opening hours", "Court closure", "Start in the past"]],
+    ["de", ["Einrichtung geschlossen", "Außerhalb der Öffnungszeiten", "Platz gesperrt", "Beginn in der Vergangenheit"]]
+  ])("given distinct refusal reasons in %s, when the report is shown, then each retains its own label and count", async (locale, labels) => {
+    // given
+    await i18n.changeLanguage(locale);
+    vi.spyOn(api, "usageReport").mockResolvedValue({ ...usage, ruleRejections: {
+      attempts: 4,
+      rules: ["openingHours.closed", "openingHours.outside", "openingHours.courtClosed", "startsInPast"]
+        .map((reason, index) => ({ code: `booking.rule.${reason}`, attempts: index + 1 }))
+    } });
+
+    // when
+    show();
+
+    // then
+    await screen.findByTestId("usage-rules");
+    const rows = screen.getAllByTestId("usage-rule");
+    expect(rows).toHaveLength(4);
+    for (const [index, label] of labels.entries()) {
+      expect(rows[index]).toHaveTextContent(label);
+      expect(within(rows[index]).getByTestId("usage-rule-value")).toHaveTextContent(new RegExp(`^${index + 1}$`));
+    }
+    expect(screen.getByTestId("usage-refused-attempts-value")).toHaveTextContent("4");
+  });
+
 });

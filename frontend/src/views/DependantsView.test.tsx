@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -55,7 +55,7 @@ describe("DependantsView", () => {
     // then
     expect(await screen.findByTestId("dependant-name")).toHaveTextContent("John Roe");
     expect(screen.getByTestId("dependant-grants")).toHaveTextContent("You may: View bookings");
-    expect(screen.getByTestId("dependant-ends-on")).toHaveTextContent("2030-09-01");
+    expect(screen.getByTestId("dependant-ends-on")).toHaveTextContent("Sep 1, 2030");
     const entry = await screen.findByTestId(`booking-${lesson.id}`);
     expect(entry).toHaveTextContent("Centre Court");
     expect(within(entry).queryByTestId("personal-cancel"), "cancelling is not granted").toBeNull();
@@ -199,4 +199,20 @@ describe("DependantsView", () => {
     expect(await screen.findByTestId("dependant-name")).toHaveTextContent("Mary Major");
     await waitFor(() => expect(api.dependantBookings).toHaveBeenLastCalledWith("person-3"));
   });
+});
+
+
+it("given a dependant ending date, when the locale changes, then its prose date changes with it", async () => {
+  // given
+  vi.spyOn(api, "dependants").mockResolvedValue([john([], "2030-09-01")]);
+  await i18n.changeLanguage("en");
+  show();
+  const end = await screen.findByTestId("dependant-ends-on");
+  expect(end).toHaveTextContent("Sep 1, 2030");
+
+  // when
+  await act(() => i18n.changeLanguage("de"));
+
+  // then
+  expect(end).toHaveTextContent("01.09.2030");
 });

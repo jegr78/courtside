@@ -8,6 +8,7 @@ import { SuccessFeedback } from "../components/SuccessFeedback";
 import { TextField } from "../components/TextField";
 import { useReportedFailure } from "../failures/useReportedFailure";
 import { PERSON_SEARCH_DEBOUNCE_MS, PERSON_SEARCH_MIN_LENGTH } from "../person-search";
+import { formatCalendarDate } from "../time/clubZone";
 
 const GUARDIAN_GRANTS: GuardianGrant[] = ["VIEW_BOOKINGS", "BOOK", "CANCEL_BOOKINGS", "READ_MESSAGES", "ACCOUNT_TASKS"];
 
@@ -23,7 +24,7 @@ export function GuardianshipsSection({ entry, disabled, stepUp }: {
   disabled: boolean;
   stepUp: (retry: () => Promise<void>) => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const personId = entry.personId;
   const { message: error, report, clear } = useReportedFailure();
   const [relationships, setRelationships] = useState<GuardianRelationship[]>();
@@ -97,8 +98,8 @@ export function GuardianshipsSection({ entry, disabled, stepUp }: {
             </div>
             <span className="text-muted text-sm">
               {relationship.endedOn
-                ? t("admin.person.guardianshipRange", { startedOn: relationship.startedOn, endedOn: relationship.endedOn })
-                : t("admin.person.guardianshipOpen", { startedOn: relationship.startedOn })}
+                ? t("admin.person.guardianshipRange", { startedOn: formatCalendarDate(relationship.startedOn, i18n.resolvedLanguage ?? "de"), endedOn: formatCalendarDate(relationship.endedOn, i18n.resolvedLanguage ?? "de") })
+                : t("admin.person.guardianshipOpen", { startedOn: formatCalendarDate(relationship.startedOn, i18n.resolvedLanguage ?? "de") })}
             </span>
             <ul data-testid={`guardianship-grants-${relationship.id}`} className="flex flex-wrap gap-2">
               {GUARDIAN_GRANTS.filter((grant) => relationship.grants.includes(grant)).map((grant) =>

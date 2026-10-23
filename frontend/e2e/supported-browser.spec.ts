@@ -1,4 +1,4 @@
-import { expect, expectShownAsEmpty, selectJourneyDate, test, textFill, transparentText } from "./fixtures";
+import { expect, expectShownAsEmpty, selectJourneyDate, selectPreference, test, textFill, transparentText } from "./fixtures";
 
 interface CookieFacts {
   name: string;
@@ -337,4 +337,49 @@ test("an expired session cannot turn a supported browser back into an authentica
   const names = expiryCookies.map(({ name }) => name);
   expect(names).not.toContain(otherSessionName);
   expect(names).not.toContain(otherCsrfName);
+});
+
+
+test.describe("localized summaries", () => {
+  test.use({ timezoneId: "UTC", locale: "en-US", serviceWorkers: "block" });
+
+  test("given an English UTC browser, when German summaries load, then dates and reasons follow the app and club", async ({ page }) => {
+    test.setTimeout(60_000);
+    // given
+    expect(await page.evaluate(() => Intl.DateTimeFormat().resolvedOptions().timeZone)).toBe("UTC");
+    expect(await page.evaluate(() => navigator.language)).toBe("en-US");
+    await page.route("**/api/account/sessions", (route) => route.fulfill({ json: [{
+      handle: "A234567890123456789012", current: true, browserFamily: "FIREFOX",
+      createdAt: "2026-10-23T16:53:00Z", lastActivityAt: "2026-10-23T22:10:00Z"
+    }] }));
+    await page.route("**/api/admin/reports/usage**", (route) => route.fulfill({ json: {
+      from: "2026-10-20", to: "2026-11-01", timeZone: "Europe/Berlin",
+      capacity: { capacityMinutes: 0, closedMinutes: 0, uses: [] },
+      cancellations: { cancelled: 0, byHolder: 0, byClub: 0, released: 0, reasons: [], cards: [] },
+      attendance: { tracked: false, attended: 0, noShows: 0, liftedNoShows: 0 },
+      ruleRejections: { attempts: 3, rules: ["closed", "outside", "courtClosed"].map((code) => ({
+        code: `booking.rule.openingHours.${code}`, attempts: 1
+      })) }
+    } }));
+    await signIn(page, "configuration-admin");
+    await selectPreference(page, "#locale-preference", "de");
+
+    // when
+    await page.goto("/account/security");
+
+    // then
+    const session = page.getByTestId("account-security-view");
+    await expect(session).toContainText("23.10.2026, 18:53");
+    await expect(session).toContainText("24.10.2026, 00:10");
+    await page.goto("/admin/usage");
+    await expect(page.getByTestId("usage-period")).toHaveText("20.10.2026 bis 01.11.2026");
+    await expect(page.getByTestId("usage-rule-label")).toHaveText([
+      "Einrichtung geschlossen", "Außerhalb der Öffnungszeiten", "Platz gesperrt"
+    ]);
+    await selectPreference(page, "#locale-preference", "en");
+    await expect(page.getByTestId("usage-period")).toHaveText("Oct 20, 2026 to Nov 1, 2026");
+    await expect(page.getByTestId("usage-rule-label")).toHaveText([
+      "Facility closed", "Outside opening hours", "Court closure"
+    ]);
+  });
 });
