@@ -8,9 +8,9 @@ import { sweep } from "../lib/sweep";
 import { clearWeekend } from "../lib/weekend";
 import { canSignIn, restoreDisposable } from "../lib/disposable";
 import { config, disposables, PASSWORD, runPath } from "../lib/context";
-import { attendanceErasureSql, bookingsBeyondWindow, deactivationLeftover, foreignWordings, removalPath, waitlistErasureSql, welcomeErasureSql } from "../lib/core.mjs";
+import { attendanceErasureSql, bookingsBeyondWindow, deactivationLeftover, foreignWordings, pendingOf, pendingPublicationsSql, personaResidueSql, removalPath, residueOf, waitlistErasureSql, welcomeErasureSql } from "../lib/core.mjs";
 import { personaUsernames } from "../lib/attendance";
-import { erase } from "../lib/erasure";
+import { erase, runSql } from "../lib/erasure";
 import { leaveWaitlist, MEMBERS, openWaitlistEntries } from "../lib/waitlist";
 import { readPeriods, restorePeriods } from "../lib/retention";
 import { comparablePeriods, periodSnapshots, retentionRestorations } from "../lib/core.mjs";
@@ -148,4 +148,18 @@ test("when the run ends, then no guardian relationship this run created is left"
   // then
   expect(outcome.filter((removal) => removal.status >= 300 && removal.status !== 404), "every removal of this run's relationship is accepted").toEqual([]);
   expect(left, "no relationship of this run is left").toEqual([]);
+});
+
+test("when the run ends, then nothing the run delivered to the personas or cancelled for them is left", async () => {
+  // given
+  const since = readFileSync(runPath("run-started"), "utf8").trim();
+  const sql = personaResidueSql(personaUsernames(), since)!;
+  // when
+  if (config.erasure) {
+    await expect.poll(() => pendingOf(runSql(pendingPublicationsSql(since), "pending-publications.sql")), { message: "every event of this run reached its listeners before the erasure" }).toBe(0);
+  }
+  const residue = config.erasure ? residueOf(runSql(sql, "erase-persona-residue.sql")) : (writeFileSync(runPath("erase-persona-residue.sql"), sql), null);
+  writeFileSync(runPath("postflight-residue.json"), JSON.stringify({ since, residue }, null, 2));
+  // then
+  if (residue) expect(residue.left, "no message, notification, cancelled booking or series of this run is left with the personas").toBe(0);
 });

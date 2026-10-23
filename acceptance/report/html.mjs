@@ -26,6 +26,12 @@ export function serverLogSummary(logs, sources) {
   return { counted, files, unread };
 }
 
+export function residueSentence(residue) {
+  if (!residue) return "";
+  const left = residue.left === null ? "not read" : String(residue.left);
+  return `Removed from the personas: ${residue.notifications} notifications, ${residue.messages} logged messages, ${residue.bookings} cancelled bookings and ${residue.series} series; left: ${left}.`;
+}
+
 export function coverageOf(results) {
   const rows = new Map();
   const cells = { passed: 0, failed: 0, skipped: 0 };
@@ -127,6 +133,7 @@ export function renderReport(run, config, { harnessCommit, sheets = null, previo
   const serverLogs = serverLogSummary(logs, json(join(run, "log-sources.json"), []));
   const postflight = json(join(run, "postflight.json"), null);
   const cleanup = json(join(run, "cleanup.json"), null);
+  const residue = json(join(run, "postflight-residue.json"), null)?.residue;
   const surfaces = [...new Map(jsonl(join(run, "role-surfaces.jsonl")).map((row) => [row.key, row])).values()];
   const observations = jsonl(join(run, "observations.jsonl"));
   const review = json(join(run, "review.json"), { assessments: {}, manual: [] });
@@ -220,7 +227,7 @@ ${coverage.rows.map((row) => `<tr><td>${esc(row.flow)}</td>${projects.map((p) =>
 <section><h2>Harness gaps</h2><ul>${listOf(reviewed.findings, "harness-gap", [...observations.map((o) => `<li>${esc(o.project)}: ${esc(o.note)}</li>`),
   ...serverLogs.unread.map((name) => `<li>The server log ${esc(name)} was not read.</li>`)])}</ul></section>
 <section><h2>Server logs</h2><p>${esc(serverLogs.counted)}</p>${serverLogs.files.length ? `<ul>${serverLogs.files.map((line) => `<li>${esc(line)}</li>`).join("")}</ul>` : ""}</section>
-<section><h2>Cleanup</h2><p>${postflight ? `Bookings of this run left in reserved slots: ${postflight.left.length}; club bookings in reserved slots, left untouched: ${(postflight.foreign ?? []).length}; weeks of this run removed: ${postflight.weeks.length}; club weeks left untouched: ${(postflight.foreignWeeks ?? []).length}.` : "Postflight did not run."} ${(preflight.weekendConflicts ?? []).length ? `Club bookings the weekend journeys notified their bookers about: ${preflight.weekendConflicts.length}.` : ""} ${cleanup ? `Bookings of this run left in the window: ${cleanup.diff.flatMap((d) => d.ours ?? []).length}.` : ""}</p></section>
+<section><h2>Cleanup</h2><p>${postflight ? `Bookings of this run left in reserved slots: ${postflight.left.length}; club bookings in reserved slots, left untouched: ${(postflight.foreign ?? []).length}; weeks of this run removed: ${postflight.weeks.length}; club weeks left untouched: ${(postflight.foreignWeeks ?? []).length}.` : "Postflight did not run."} ${(preflight.weekendConflicts ?? []).length ? `Club bookings the weekend journeys notified their bookers about: ${preflight.weekendConflicts.length}.` : ""} ${cleanup ? `Bookings of this run left in the window: ${cleanup.diff.flatMap((d) => d.ours ?? []).length}.` : ""} ${residueSentence(residue)}</p></section>
 <section><h2>Raw page checks</h2><details><summary>${metrics.length} captures, unfiltered</summary><div class="scroll"><table><thead><tr><th>Grade</th><th>Kind</th><th>Check</th><th>Count</th><th>Profiles</th></tr></thead><tbody>
 ${rawGroups(metrics).map((g) => `<tr><td>${SEVERITY[g.severity]}</td><td>${esc(g.kind)}</td><td>${esc(g.title)}</td><td>${g.n}</td><td>${[...g.projects].map(esc).join(", ")}</td></tr>`).join("")}
 </tbody></table></div></details></section>

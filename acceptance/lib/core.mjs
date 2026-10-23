@@ -267,6 +267,53 @@ COMMIT;
 `;
 }
 
+const RUN_START = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?Z$/;
+const runStart = (since) => {
+  if (!RUN_START.test(since ?? "")) throw new Error(`not a run start: ${since}`);
+  return `timestamptz '${since}'`;
+};
+
+// What the run delivered to the personas and the bookings it cancelled for them; a booking that still holds a court stays.
+export function personaResidueSql(usernames, since) {
+  if (usernames.length === 0) return null;
+  const names = usernameList(usernames);
+  const start = runStart(since);
+  const ours = `account_id IN (SELECT id FROM user_account WHERE username IN (${names}))`;
+  return `BEGIN;
+CREATE TEMP TABLE persona ON COMMIT DROP AS SELECT id FROM user_account WHERE username IN (${names});
+CREATE TEMP TABLE run_booking ON COMMIT DROP AS
+  SELECT id, series_id FROM booking WHERE booked_by IN (SELECT id FROM persona) AND status = 'CANCELLED' AND created_at >= ${start};
+WITH gone AS (DELETE FROM notification WHERE account_id IN (SELECT id FROM persona) AND created_at >= ${start} RETURNING 1) SELECT 'notifications ' || count(*) FROM gone;
+WITH gone AS (DELETE FROM message_record WHERE account_id IN (SELECT id FROM persona) AND queued_at >= ${start} RETURNING 1) SELECT 'messages ' || count(*) FROM gone;
+DELETE FROM booking_attendance WHERE booking_id IN (SELECT id FROM run_booking);
+DELETE FROM booking_release WHERE booking_id IN (SELECT id FROM run_booking);
+DELETE FROM partner_invitation WHERE booking_id IN (SELECT id FROM run_booking);
+WITH gone AS (DELETE FROM booking WHERE id IN (SELECT id FROM run_booking) RETURNING 1) SELECT 'bookings ' || count(*) FROM gone;
+WITH gone AS (DELETE FROM booking_series s WHERE s.id IN (SELECT series_id FROM run_booking) AND s.created_at >= ${start}
+  AND NOT EXISTS (SELECT 1 FROM booking b WHERE b.series_id = s.id) RETURNING 1) SELECT 'series ' || count(*) FROM gone;
+COMMIT;
+SELECT 'left ' || ((SELECT count(*) FROM notification WHERE ${ours} AND created_at >= ${start}) + (SELECT count(*) FROM message_record WHERE ${ours} AND queued_at >= ${start}) + (SELECT count(*) FROM booking WHERE status = 'CANCELLED' AND booked_by IN (SELECT id FROM user_account WHERE username IN (${names})) AND created_at >= ${start}) + (SELECT count(*) FROM booking_series s WHERE s.created_at >= ${start} AND s.created_by IN (SELECT id FROM user_account WHERE username IN (${names})) AND NOT EXISTS (SELECT 1 FROM booking b WHERE b.series_id = s.id)));
+`;
+}
+
+export function residueOf(output) {
+  const count = (name) => {
+    const match = new RegExp(`^${name} (\\d+)$`, "m").exec(output);
+    return match ? Number(match[1]) : null;
+  };
+  return { notifications: count("notifications"), messages: count("messages"), bookings: count("bookings"), series: count("series"), left: count("left") };
+}
+
+// Notifications are written by event listeners, so the erasure waits until every event of the run has been handled.
+export function pendingPublicationsSql(since) {
+  return `SELECT 'pending ' || count(*) FROM event_publication WHERE completion_date IS NULL AND publication_date >= ${runStart(since)};\n`;
+}
+
+export function pendingOf(output) {
+  const match = /^pending (\d+)$/m.exec(output);
+  return match ? Number(match[1]) : null;
+}
+
 export function noShowLimitOf(rules) {
   const rule = (rules ?? []).find((candidate) => candidate.ruleType === "NO_SHOW_LIMIT");
   return rule ? { maxNoShows: rule.params.maxNoShows, windowDays: rule.params.windowDays } : null;
