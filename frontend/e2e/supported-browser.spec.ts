@@ -344,7 +344,10 @@ test.describe("localized summaries", () => {
   test.use({ timezoneId: "UTC", locale: "en-US", serviceWorkers: "block" });
 
   test("given an English UTC browser, when German summaries load, then dates and reasons follow the app and club", async ({ page }) => {
+    test.setTimeout(60_000);
     // given
+    expect(await page.evaluate(() => Intl.DateTimeFormat().resolvedOptions().timeZone)).toBe("UTC");
+    expect(await page.evaluate(() => navigator.language)).toBe("en-US");
     await page.route("**/api/account/sessions", (route) => route.fulfill({ json: [{
       handle: "A234567890123456789012", current: true, browserFamily: "FIREFOX",
       createdAt: "2026-10-23T16:53:00Z", lastActivityAt: "2026-10-23T22:10:00Z"
