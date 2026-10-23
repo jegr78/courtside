@@ -303,6 +303,18 @@ page names its element with `capture(page, label, { subject })`; the harness cen
 before the viewport shot and fails the step when its top edge is still outside the viewport, so the
 contact sheet shows what the label promises on every profile.
 
+Contact sheets preserve every screenshot's native pixel dimensions, including device pixel density.
+They separate desktop, tablet, portrait phone, landscape phone and unknown profiles. Desktop,
+tablet, landscape and unknown sheets contain at most two tiles in one column. Portrait sheets
+contain at most four tiles in two columns. Names end in the device class and a two-digit chunk
+number, for example `--desktop--01`. Regeneration removes obsolete sheets. Existing verdicts for
+older sheet names do not review the new chunks.
+
+The report lists each sheet as an expandable grid of native-size tiles. Scroll horizontally to
+read a tile wider than the report. Clicking a tile opens its original viewport PNG. Each tile
+also has explicit full-size viewport and full-page links. A missing full-page capture is marked
+unavailable. These originals are copied into the report without resizing or JPEG conversion.
+
 Every finding in the report carries a stable key: `axe:<rule>`, `console:<digest>`,
 `http:<status>:<path>` or `failure:<file>:<title>:<profile>`. Identifiers, dates and hosts are
 removed before a key is formed, so the same problem keeps its key from run to run.
