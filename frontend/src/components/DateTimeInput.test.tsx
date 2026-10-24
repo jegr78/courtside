@@ -3,7 +3,8 @@ import userEvent from "@testing-library/user-event";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
 import i18n from "../i18n";
-import { DateTimeInput, refuseUnparsedDrafts } from "./DateTimeInput";
+import { DateTimeInput } from "./DateTimeInput";
+import { refuseUnparsedDrafts } from "./unparsedDrafts";
 
 beforeEach(async () => {
   await i18n.changeLanguage("en");
@@ -156,7 +157,7 @@ it("given a saved date, when a draft cannot be parsed and the field is left, the
   expect(screen.queryByTestId("ends-invalid")).toBeNull();
 });
 
-it("given a form without browser validation, when it is submitted with an unparsed draft, then the submit handler never runs and the field is flagged and focused", async () => {
+it("given a form without browser validation, when it is submitted with an unparsed draft, then the submit handler never runs and the field is flagged and focused", () => {
   // given
   const submitted = vi.fn((event: FormEvent) => event.preventDefault());
   render(<form noValidate onSubmit={submitted}>

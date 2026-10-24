@@ -711,6 +711,24 @@ describe("AdminPersonView", () => {
     });
   });
 
+  it("given the end dialog, when its date cannot be read and the end is confirmed, then nothing is written and the dialog stays open", async () => {
+    // given
+    vi.spyOn(api, "assignMembership").mockResolvedValue({ ...jane, membershipEndedOn: "2026-03-31" });
+    showPerson();
+    await userEvent.click(await screen.findByTestId("end-membership"));
+    await userEvent.clear(screen.getByTestId("end-membership-date"));
+    await userEvent.type(screen.getByTestId("end-membership-date"), "3/31/2026");
+    await userEvent.type(screen.getByTestId("end-membership-date"), "x");
+
+    // when
+    await userEvent.click(screen.getByTestId("confirm-end-membership"));
+
+    // then
+    expect(api.assignMembership, "the end previously typed is not written behind an unreadable draft").not.toHaveBeenCalled();
+    expect(screen.getByTestId("end-membership-date")).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByTestId("confirm-end-membership")).toBeInTheDocument();
+  });
+
   it("given a period scheduled to follow, when the membership is ended, then the period list is read again without it", async () => {
     // given
     const running = { id: "period-1", membershipTypeId: "type-1", startedOn: "2026-01-01", endedOn: "2026-12-01", state: "RUNNING" as const };

@@ -1,7 +1,7 @@
 import type { MouseEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../components/Button";
-import { refuseUnparsedDrafts } from "../components/DateTimeInput";
+import { refuseUnparsedDrafts } from "../components/unparsedDrafts";
 import { markId } from "./markId";
 import { useUnsavedMark } from "./registry";
 

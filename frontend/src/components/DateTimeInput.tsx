@@ -1,6 +1,7 @@
 import { type InputHTMLAttributes, useId, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { dateTimeNumber, formatDateTime, parseDateTime } from "./localizedDateTime";
+import { UNPARSED } from "./unparsedDrafts";
 
 export type DateTimeType = "date" | "time" | "datetime-local";
 
@@ -10,15 +11,6 @@ export type DateTimeInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, "ty
   emptyHint?: string;
   "data-testid"?: string;
 };
-
-const UNPARSED = "data-date-time-unparsed";
-
-export function refuseUnparsedDrafts(scope: ParentNode | null | undefined, include: (field: HTMLInputElement) => boolean = () => true): boolean {
-  const fields = [...(scope ?? document).querySelectorAll<HTMLInputElement>(`input[${UNPARSED}]`)].filter(include);
-  for (const field of fields) field.dispatchEvent(new Event("invalid", { cancelable: true }));
-  fields[0]?.focus();
-  return fields.length > 0;
-}
 
 export function DateTimeInput({ type, value, defaultValue, emptyHint, onValueChange, onBlur, onInvalid, name, min, max, step, "aria-describedby": describedBy, ...props }: DateTimeInputProps) {
   const { t, i18n } = useTranslation();
