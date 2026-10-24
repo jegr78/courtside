@@ -122,6 +122,13 @@ ${sheets.stale.length ? `<p>Verdicts for sheets this run did not produce:</p><ul
 ${comparison}</section>`;
 }
 
+function sheetGallery(sheets, original) {
+  return (sheets?.entries ?? []).map((entry) => `<details class="sheet-gallery"><summary>${esc(entry.name)}</summary><div class="sheet-scroll"><div class="sheet-tiles" style="grid-template-columns:repeat(${entry.columns},max-content)">${entry.tiles.map((tile) => {
+    const viewport = original(tile.path);
+    return `<figure><figcaption>${esc(tile.label)} · <a href="${viewport}">Full-size viewport</a>${tile.fullPage ? ` · <a href="${original(tile.fullPage)}">Full-page</a>` : " · Full-page unavailable"}</figcaption><a href="${viewport}"><img loading="lazy" src="${viewport}" width="${tile.width}" height="${tile.height}" alt="${esc(tile.label)} viewport"></a></figure>`;
+  }).join("")}</div></div></details>`).join("");
+}
+
 export function renderReport(run, config, { harnessCommit, sheets = null, previous = null }) {
   const metrics = jsonl(join(run, "metrics.jsonl"));
   const failures = json(join(run, "failures.json"), []);
@@ -156,6 +163,11 @@ export function renderReport(run, config, { harnessCommit, sheets = null, previo
     if (convert) { if (!existsSync(join(directory, `${name}.jpg`))) execFileSync(convert, args); return `${name}.jpg`; }
     if (!existsSync(join(directory, `${name}.png`))) copyFileSync(source, join(directory, `${name}.png`));
     return `${name}.png`;
+  };
+  const original = (source) => {
+    const name = `img/${createHash("sha256").update(source).digest("hex")}.png`;
+    copyFileSync(source, join(directory, name));
+    return name;
   };
   const counts = Object.fromEntries(Object.keys(ORDER).map((severity) => [severity, reviewed.findings.filter((finding) => finding.severity === severity).length]));
   const status = reviewed.status === "final" ? "Final: every finding is assessed and every contact sheet carries a verdict."
@@ -200,6 +212,11 @@ details summary:focus-visible, a:focus-visible { outline: 2px solid var(--accent
 .shots { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 10px; } .shots figure { margin: 0; flex: 1 1 260px; min-width: 0; display: grid; gap: 4px; }
 .shots img { width: 100%; height: auto; border: 1px solid var(--line); border-radius: 4px; }
 figcaption { font-family: var(--mono); font-size: 0.75rem; color: var(--muted); }
+.sheet-gallery { min-width: 0; }
+.sheet-scroll { overflow: auto; max-width: 100%; }
+.sheet-tiles { display: grid; gap: 12px; width: max-content; }
+.sheet-tiles figure { margin: 0; }
+.sheet-tiles img { max-width: none; display: block; }
 .scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 4px; background: var(--surface); }
 table { border-collapse: collapse; width: 100%; font-size: 0.82rem; } th, td { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
 td.st { text-align: center; font-family: var(--mono); } td.ok { color: var(--ok); } td.fail { color: var(--blocker); font-weight: 600; } td.skip { color: var(--line); }
@@ -218,6 +235,7 @@ ul { margin: 0; padding-left: 20px; display: grid; gap: 6px; max-width: 72ch; }
 </div></section>
 <section><h2>Findings</h2><div class="findings">${reviewed.findings.map((finding) => card(run, finding, images)).join("") || "<p>None.</p>"}</div></section>
 ${sheetSection(reviewed.sheets, changes)}
+${sheetGallery(sheets, original)}
 <section><h2>Coverage</h2><p class="lede">✓ passed, ✗ failed, – not planned for this profile.</p><div class="scroll"><table><thead><tr><th>Journey</th>${projects.map((p) => `<th>${esc(p)}</th>`).join("")}</tr></thead><tbody>
 ${coverage.rows.map((row) => `<tr><td>${esc(row.flow)}</td>${projects.map((p) => `<td class="st ${row.cells[p]?.status ?? ""}" title="${esc(row.cells[p]?.reason ?? "")}">${row.cells[p] ? STATUS[row.cells[p].status] : ""}</td>`).join("")}</tr>`).join("")}
 </tbody></table></div></section>

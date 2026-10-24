@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, readdirSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, statSync, rmSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { findExecutable } from "../lib/executable.mjs";
 
@@ -27,31 +27,58 @@ export function imageMagick() {
   return null;
 }
 
+function deviceClass(project) {
+  if (project.startsWith("desktop-")) return "desktop";
+  if (project === "ipad") return "tablet";
+  if (/^(iphone-|pixel-|narrow$)/.test(project)) return project.includes("landscape") ? "landscape" : "portrait";
+  return "unknown";
+}
+
 export function contactSheets(run) {
   const tool = imageMagick();
   const root = join(run, "shots");
-  if (!existsSync(root)) return { sheets: 0, names: [], skipped: "no screenshots" };
-  if (!tool) return { sheets: 0, names: [], skipped: "ImageMagick not found on PATH", unavailable: "ImageMagick not found on PATH" };
+  const directory = join(run, "sheets");
+  rmSync(directory, { recursive: true, force: true });
+  if (!existsSync(root)) return { sheets: 0, names: [], entries: [], skipped: "no screenshots" };
+  if (!tool) return { sheets: 0, names: [], entries: [], skipped: "ImageMagick not found on PATH", unavailable: "ImageMagick not found on PATH" };
   const surfaces = new Map();
   for (const path of walk(root).filter((candidate) => candidate.endsWith(".png") && !candidate.endsWith("-full.png") && !candidate.includes("/mail/"))) {
     const [project, persona, testSlug, file] = path.slice(root.length + 1).split("/");
-    const surface = `${persona}--${testSlug}--${file.replace(/^\d+-/, "").replace(/\.png$/, "")}`;
-    if (!surfaces.has(surface)) surfaces.set(surface, []);
-    surfaces.get(surface).push({ path, label: project });
+    const kind = deviceClass(project);
+    const surface = `${persona}--${testSlug}--${file.replace(/^\d+-/, "").replace(/\.png$/, "")}--${kind}`;
+    if (!surfaces.has(surface)) surfaces.set(surface, { kind, tiles: [] });
+    const full = path.replace(/\.png$/, "-full.png");
+    const header = readFileSync(path);
+    if (header.length < 33 || !header.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
+      || header.readUInt32BE(8) !== 13 || header.toString("ascii", 12, 16) !== "IHDR"
+      || header.readUInt32BE(16) === 0 || header.readUInt32BE(20) === 0) {
+      const reason = `invalid PNG screenshot: ${project}/${persona}/${testSlug}/${file}`;
+      return { sheets: 0, names: [], entries: [], skipped: reason, unavailable: reason };
+    }
+    surfaces.get(surface).tiles.push({ path, label: project, width: header.readUInt32BE(16), height: header.readUInt32BE(20),
+      fullPage: existsSync(full) ? full : null });
   }
-  mkdirSync(join(run, "sheets"), { recursive: true });
-  // ImageMagick without a configured font cannot render the profile labels.
+  mkdirSync(directory, { recursive: true });
   const font = findFont();
-  for (const [surface, shots] of surfaces) {
-    shots.sort((a, b) => a.label.localeCompare(b.label));
-    const [binary, args] = tool.montage([...shots.flatMap((shot) => ["-label", shot.label, shot.path]), "-tile", `${Math.min(shots.length, 6)}x`,
-      "-geometry", "300x600>+6+6", ...(font ? ["-font", font] : []), "-pointsize", "13", "-background", "#888", join(run, "sheets", `${surface}.png`)]);
-    try { execFileSync(binary, args, { stdio: "pipe" }); } catch (failure) {
-      const reason = `ImageMagick failed: ${String(failure.stderr ?? failure.message).trim().slice(0, 200)}`;
-      return { sheets: 0, names: [], skipped: reason, unavailable: reason };
+  const entries = [];
+  for (const [surface, group] of [...surfaces].sort(([a], [b]) => a.localeCompare(b))) {
+    group.tiles.sort((a, b) => a.label.localeCompare(b.label));
+    const columns = group.kind === "portrait" ? 2 : 1;
+    const chunkSize = group.kind === "portrait" ? 4 : 2;
+    for (let offset = 0; offset < group.tiles.length; offset += chunkSize) {
+      const tiles = group.tiles.slice(offset, offset + chunkSize);
+      const name = `${surface}--${String(offset / chunkSize + 1).padStart(2, "0")}`;
+      const [binary, args] = tool.montage([...tiles.flatMap((shot) => ["-label", shot.label, shot.path]), "-tile", `${columns}x`,
+        "-geometry", "+6+6", "-gravity", "NorthWest", ...(font ? ["-font", font] : []), "-pointsize", "18", "-background", "#888", join(directory, `${name}.png`)]);
+      try { execFileSync(binary, args, { stdio: "pipe" }); } catch (failure) {
+        rmSync(directory, { recursive: true, force: true });
+        const reason = `ImageMagick failed: ${String(failure.stderr ?? failure.message).trim().slice(0, 200)}`;
+        return { sheets: 0, names: [], entries: [], skipped: reason, unavailable: reason };
+      }
+      entries.push({ name, columns, tiles });
     }
   }
-  return { sheets: surfaces.size, names: [...surfaces.keys()].sort() };
+  return { sheets: entries.length, names: entries.map((entry) => entry.name), entries };
 }
 
 const sheetNames = (directory) => readdirSync(directory).filter((name) => name.endsWith(".png")).map((name) => name.slice(0, -4)).sort();
