@@ -20,6 +20,24 @@ beforeEach(async () => {
 });
 
 describe("unread notifications in the primary navigation", () => {
+  it.each([
+    ["de", "Admin Verwaltung", "Verwaltung"],
+    ["en", "Admin Administration", "Administration"],
+  ])("given an administrator using %s, when navigation renders, then its visible labels name the administration link", async (locale, name, description) => {
+    // given
+    vi.spyOn(api, "ownNotifications").mockResolvedValue({ items: [], nextCursor: null, unread: 0 });
+    await i18n.changeLanguage(locale);
+
+    // when
+    show({ ...member, roles: ["ADMIN"] });
+
+    // then
+    const administration = screen.getByTestId("administration-link");
+    expect(administration).toHaveAccessibleName(name);
+    expect(administration).toHaveAccessibleDescription(description);
+    await waitFor(() => expect(api.ownNotifications).toHaveBeenCalled());
+  });
+
   it("given unread notifications, when a member's navigation renders, then the messages link shows and names the count", async () => {
     // given
     vi.spyOn(api, "ownNotifications").mockResolvedValue({ items: [], nextCursor: null, unread: 3 });
@@ -28,7 +46,10 @@ describe("unread notifications in the primary navigation", () => {
     show(member);
 
     // then
-    expect(await screen.findByTestId("my-messages-unread")).toHaveTextContent("3");
+    const badge = await screen.findByTestId("my-messages-unread");
+    expect(badge).toHaveTextContent("3");
+    expect(`${screen.getByTestId("my-messages-full-label").textContent}${badge.textContent}`).toBe("Messages 3");
+    expect(badge).toHaveAttribute("aria-hidden", "true");
     expect(screen.getByTestId("my-messages-link")).toHaveAccessibleName("Messages, 3 unread");
     expect(api.ownNotifications).toHaveBeenCalledWith(undefined, 1);
   });
@@ -42,7 +63,10 @@ describe("unread notifications in the primary navigation", () => {
     show(member);
 
     // then
-    expect(await screen.findByTestId("my-messages-unread")).toHaveTextContent("1");
+    const badge = await screen.findByTestId("my-messages-unread");
+    expect(badge).toHaveTextContent("1");
+    expect(`${screen.getByTestId("my-messages-full-label").textContent}${badge.textContent}`).toBe("Nachrichten 1");
+    expect(badge).toHaveAttribute("aria-hidden", "true");
     expect(screen.getByTestId("my-messages-link")).toHaveAccessibleName("Nachrichten, 1 ungelesen");
   });
 
@@ -56,7 +80,7 @@ describe("unread notifications in the primary navigation", () => {
     // then
     await waitFor(() => expect(api.ownNotifications).toHaveBeenCalled());
     expect(screen.queryByTestId("my-messages-unread")).not.toBeInTheDocument();
-    expect(screen.getByTestId("my-messages-link")).toHaveAccessibleName("Messages");
+    expect(screen.getByTestId("my-messages-link")).toHaveAccessibleName("Messages Messages");
   });
 
   it("given the count on screen, when the member moves to another page, then the count is read again", async () => {
@@ -88,7 +112,7 @@ describe("unread notifications in the primary navigation", () => {
 
     // then
     await waitFor(() => expect(screen.queryByTestId("my-messages-unread")).not.toBeInTheDocument());
-    expect(screen.getByTestId("my-messages-link")).toHaveAccessibleName("Messages");
+    expect(screen.getByTestId("my-messages-link")).toHaveAccessibleName("Messages Messages");
   });
 
   it("given the count cannot be read, when the navigation renders, then it shows no badge and stays usable", async () => {
@@ -102,7 +126,7 @@ describe("unread notifications in the primary navigation", () => {
     // then
     await waitFor(() => expect(warning).toHaveBeenCalled());
     expect(screen.queryByTestId("my-messages-unread")).not.toBeInTheDocument();
-    expect(screen.getByTestId("my-messages-link")).toHaveAccessibleName("Messages");
+    expect(screen.getByTestId("my-messages-link")).toHaveAccessibleName("Messages Messages");
   });
 
   it("given a count on screen, when the member signs out and another signs in, then the old count never shows for the new account", async () => {
