@@ -195,8 +195,14 @@ jobs:
             --english deploy/guides/generated-recipes.md \
             --site-english site/en/generated-operator-recipes.md \
             --german site/generated-operator-recipes.md --check
+      - name: Install the contact sheet renderer
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends imagemagick fonts-dejavu-core
       - name: Verify repository tooling
         working-directory: frontend
+        env:
+          COURTSIDE_SHEET_RENDERER: required
         run: npm run test:tools
 
   clock-shift:

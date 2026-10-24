@@ -588,7 +588,7 @@ export function WeekView({ today, clock = systemClock, canBook = true,
         role="img"
         aria-label={t("week.currentTime", { time: currentTime })}
         className="current-time-line"
-        style={{ top: `${48 + currentLineOffset(currentTime, slots, data.grid.slotMinutes, slotHeight)}px` }}
+        style={{ top: `${48 + unmeasuredLineOffset(currentTime, slots, data.grid.slotMinutes, slotHeight)}px` }}
       />}
       {slots.length === 0 && <p data-testid="day-closed" className="text-muted px-4 py-6 text-center">{t("week.closed")}</p>}
     </div>}
@@ -873,7 +873,7 @@ function OwnMarker() {
   </svg>;
 }
 
-function currentLineOffset(currentTime: string, slots: string[], slotMinutes: number, slotHeight: number): number {
+function unmeasuredLineOffset(currentTime: string, slots: string[], slotMinutes: number, slotHeight: number): number {
   const now = timeToMinutes(currentTime);
   const row = slots.findLastIndex((slot) => timeToMinutes(slot) <= now);
   if (row === -1) return 0;

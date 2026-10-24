@@ -64,8 +64,10 @@ export function validatePullRequestTitleWorkflow(candidate) {
   assert.equal(title["runs-on"], "ubuntu-latest");
   assert.equal(title.steps.length, 1);
   assert.match(title.steps[0].uses, /^amannn\/action-semantic-pull-request@[a-f0-9]{40}$/);
-  assert.deepEqual(Object.keys(title.steps[0]).sort(), ["env", "uses"]);
+  assert.deepEqual(Object.keys(title.steps[0]).sort(), ["env", "uses", "with"]);
   assert.deepEqual(title.steps[0].env, { GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}" });
+  assert.deepEqual(title.steps[0].with, { validateSingleCommit: true, validateSingleCommitMatchesPrTitle: true },
+    "a single commit whose subject differs from the title lands in the squash body and release-please lists it a second time");
 }
 
 test("given Dependabot metadata, when validating it, then every supported ecosystem and weekly schedule is explicit", () => {

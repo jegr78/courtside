@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { localeKeys } from "./i18n-bundle.mjs";
@@ -69,4 +69,25 @@ test("given every rule parameter the contract names, when checking both client b
   // then
   assert.ok(parameters.length > 0, "the contract must name at least one rule parameter");
   assert.deepEqual(missing, [], `these inputs would be labelled with their key: ${missing.join(", ")}`);
+});
+
+const javaSources = (directory) => readdirSync(directory, { recursive: true, withFileTypes: true })
+  .filter((entry) => entry.isFile() && entry.name.endsWith(".java"))
+  .map((entry) => readFileSync(join(entry.parentPath, entry.name), "utf8"));
+
+test("given every rule violation code the backend emits, when checking both client bundles, then the usage page has a label for it", () => {
+  // given
+  const { de, en } = localeKeys();
+  const codes = [...new Set(javaSources(join(root, "src/main/java"))
+    .flatMap((source) => [...source.matchAll(/"(booking\.rule\.[A-Za-z.]+)"/g)].map((match) => match[1])))];
+
+  // when
+  const missing = codes.flatMap((code) => [
+    ...(de.has(`admin.usage.reason.${code}`) ? [] : [`de:${code}`]),
+    ...(en.has(`admin.usage.reason.${code}`) ? [] : [`en:${code}`])
+  ]);
+
+  // then
+  assert.ok(codes.includes("booking.rule.openingHours.outside") && codes.includes("booking.rule.startsInPast"), `the backend's rule codes must be read whole, got ${codes.join(", ")}`);
+  assert.deepEqual(missing, [], `the usage page would show these refusals as raw codes: ${missing.join(", ")}`);
 });

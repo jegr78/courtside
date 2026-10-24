@@ -310,6 +310,11 @@ contain at most four tiles in two columns. Names end in the device class and a t
 number, for example `--desktop--01`. Regeneration removes obsolete sheets. Existing verdicts for
 older sheet names do not review the new chunks.
 
+A view captured on all ten profiles therefore yields six sheets: two desktop, one tablet, one
+landscape and two portrait. A full catalogue run produces about three sheets per captured view,
+and each one needs its own verdict. That is the cost of reading every tile at native size, and the
+review plans for it instead of judging a reduced montage.
+
 The report lists each sheet as an expandable grid of native-size tiles. Scroll horizontally to
 read a tile wider than the report. Clicking a tile opens its original viewport PNG. Each tile
 also has explicit full-size viewport and full-page links. A missing full-page capture is marked

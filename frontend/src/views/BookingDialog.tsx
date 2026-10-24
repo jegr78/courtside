@@ -183,6 +183,7 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
   const minimumLeavesNoPeriod = !waitlist && freeDurations.length > 0 && durations.length === 0;
   const hours = bookingHours && { earliestStart: bookingHours.earliestStart.slice(0, 5), latestEnd: bookingHours.latestEnd.slice(0, 5) };
   const outsideHours = !waitlist && bookingHours !== undefined && leavesBookingHours(selection.slot, grid.slotMinutes, bookingHours);
+  // Only the bound empties this list here; an occupied court is the conflict the server reports on submit.
   const boundLeavesNoPeriod = !waitlist && maxBookingMinutes !== undefined && maxBookingMinutes !== null
     && maxBookingMinutes < grid.slotMinutes;
   const showsBound = maxBookingMinutes !== undefined && maxBookingMinutes !== null && !boundLeavesNoPeriod;
@@ -359,6 +360,7 @@ function availableDurations(selection: BookingSelection, grid: BookingGrid, cour
     .map((time) => zonedDateTime(selection.date, time.slice(0, 5), grid.timeZone))
     .sort((left, right) => Date.parse(left) - Date.parse(right))[0]
     ?? new Date(Date.parse(start) + grid.slotMinutes * 60_000).toISOString();
+  // One slot is the floor only where nothing else bounds the day; a shorter bound offers no period at all.
   const untilClosing = Math.max(grid.slotMinutes, Math.floor((Date.parse(closesAt) - Date.parse(start)) / 60_000));
   const maximum = maxBookingMinutes === undefined || maxBookingMinutes === null
     ? untilClosing : Math.min(untilClosing, maxBookingMinutes);
