@@ -108,7 +108,7 @@ services:
       start_period: 5s
 
   api-ui:
-    image: swaggerapi/swagger-ui:v5.33.2@sha256:1f00ef02fcd0e4294657963cbc933202d644dc56f8d72ca5fdc35bfaa80c240e
+    image: swaggerapi/swagger-ui:v5.34.0@sha256:58c1fbf5f5cf6d2ae857e4d1296cb02192fa5de472c1cd76f58b2be99523e1d0
     user: "101:101"
     security_opt:
       - no-new-privileges:true
