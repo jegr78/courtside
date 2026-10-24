@@ -80,6 +80,8 @@ const en: Record<keyof typeof de, string> = {
   "password.description": "Choose a permanent password before using Courtside.",
   "password.new": "New password",
   "password.hide": "Hide password",
+  "field.dateTimeFormat": "Example: {{example}}",
+  "field.invalidDateTime": "Enter a valid value, for example {{example}}.",
   "field.notSet": "Not set",
   "password.show": "Show password",
   "password.confirm": "Confirm new password",

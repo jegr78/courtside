@@ -130,7 +130,7 @@ export function AdminOpeningHoursView() {
         <article className="grid gap-2 rounded-xl border p-4">
           <TextField disabled={saving} data-testid="opening-hours-effective-from" type="date" min={today} required
                      label={t("admin.facility.effectiveFrom")} value={draft.effectiveFrom}
-                     onChange={(event) => setDraft({ ...draft, effectiveFrom: event.target.value })} />
+                     onValueChange={(value) => setDraft({ ...draft, effectiveFrom: value })} />
           <p data-testid="opening-hours-effective-from-hint" className="text-sm text-[var(--cs-muted)]">
             {t(selected === 0 ? "admin.facility.effectiveFromHint" : "admin.facility.effectiveFromScheduledHint")}
           </p>
@@ -209,8 +209,8 @@ function ApplyToDays({ disabled, apply }: { disabled: boolean; apply: (days: Set
     <h2 className="font-bold">{t("admin.facility.applyToDays")}</h2>
     <p data-testid="apply-to-days-hint" className="text-sm text-[var(--cs-muted)]">{t("admin.facility.applyToDaysHint")}</p>
     <div className="grid gap-3 sm:grid-cols-2">
-      <TextField disabled={disabled} data-testid="apply-opens-at" type="time" label={t("admin.facility.opensAt")} value={opensAt} onChange={(event) => setOpensAt(event.target.value)} />
-      <TextField disabled={disabled} data-testid="apply-closes-at" type="time" label={t("admin.facility.closesAt")} value={closesAt} onChange={(event) => setClosesAt(event.target.value)} />
+      <TextField disabled={disabled} data-testid="apply-opens-at" type="time" label={t("admin.facility.opensAt")} value={opensAt} onValueChange={(value) => setOpensAt(value)} />
+      <TextField disabled={disabled} data-testid="apply-closes-at" type="time" label={t("admin.facility.closesAt")} value={closesAt} onValueChange={(value) => setClosesAt(value)} />
     </div>
     <fieldset className="grid gap-2">
       <legend className="font-medium">{t("admin.facility.applyDays")}</legend>
@@ -231,8 +231,8 @@ function DayEditor({ day, effectiveFrom, timeZone, disabled, rejected, changed, 
   return <article className="grid content-start gap-3 rounded-xl border p-4">
     <h2 className="font-bold">{t(`weekday.${day.dayOfWeek}`)}</h2>
     <div className="grid grid-cols-2 gap-3">
-      <TextField disabled={disabled || day.closed} data-testid={`hours-open-${day.dayOfWeek}`} type="time" aria-describedby={rejected ? errorId : undefined} label={t("admin.facility.opensAt")} value={day.opensAt} onChange={(event) => changed({ ...day, opensAt: event.target.value })} />
-      <TextField disabled={disabled || day.closed} data-testid={`hours-close-${day.dayOfWeek}`} type="time" aria-describedby={rejected ? errorId : undefined} label={t("admin.facility.closesAt")} value={day.closesAt} onChange={(event) => changed({ ...day, closesAt: event.target.value })} />
+      <TextField disabled={disabled || day.closed} data-testid={`hours-open-${day.dayOfWeek}`} type="time" aria-describedby={rejected ? errorId : undefined} label={t("admin.facility.opensAt")} value={day.opensAt} onValueChange={(value) => changed({ ...day, opensAt: value })} />
+      <TextField disabled={disabled || day.closed} data-testid={`hours-close-${day.dayOfWeek}`} type="time" aria-describedby={rejected ? errorId : undefined} label={t("admin.facility.closesAt")} value={day.closesAt} onValueChange={(value) => changed({ ...day, closesAt: value })} />
     </div>
     <label className="flex items-center gap-2 font-medium">
       <input data-testid={`hours-closed-${day.dayOfWeek}`} disabled={disabled} type="checkbox" checked={day.closed} onChange={(event) => changed(event.target.checked ? { ...day, opensAt: "", closesAt: "", closed: true } : { ...day, closed: false })} />

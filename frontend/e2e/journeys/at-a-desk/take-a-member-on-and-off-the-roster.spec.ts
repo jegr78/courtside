@@ -74,7 +74,7 @@ test("given a board that has taken on a new member, when they record the person,
     await activate(page.getByTestId("confirm-end-membership"));
 
     // then
-    await expect(page.getByTestId("membership-ended-on")).toHaveValue("2026-04-30");
+    await expect(page.getByTestId("membership-ended-on")).toHaveValue(language === "de" ? "30.04.2026" : "04/30/2026");
 
     // when
     await activate(page.getByTestId("end-account-sessions"));

@@ -119,11 +119,11 @@ it("given a password field without an id, when it is written, then it does not c
 
 it("given an empty time field in its label, when it renders, then the label names it and the hint only describes it", () => {
   // when
-  render(<TextField data-testid="opens-at" type="time" label="Opens at" value="" onChange={() => {}} />);
+  render(<TextField data-testid="opens-at" type="time" label="Opens at" value="" onValueChange={() => {}} />);
 
   // then
   const field = screen.getByTestId("opens-at");
   expect(field, "the hint inside the label stays out of the name").toHaveAccessibleName("Opens at");
-  expect(field, "the empty state is announced as a description").toHaveAccessibleDescription("Not set");
+  expect(field, "the empty state is announced as a description").toHaveAccessibleDescription(/Not set/);
   expect(field, "a time field in a label is marked empty for the stylesheet").toHaveAttribute("data-empty", "true");
 });

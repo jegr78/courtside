@@ -4,13 +4,15 @@ import { DateTimeInput, type DateTimeType } from "./DateTimeInput";
 
 interface FieldProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "type" | "id"> {
   label: string;
+  onValueChange?: (value: string) => void;
 }
 
 type TextFieldProps<T extends HTMLInputTypeAttribute> = FieldProps & { type?: T }
+  & ([T] extends [DateTimeType] ? { onChange?: never } : object)
   & ([T] extends ["password"] ? { id: string } : { id?: string });
 
 export function TextField<T extends HTMLInputTypeAttribute = "text">(
-  { label, id, className = "", type, ...props }: TextFieldProps<T>
+  { label, id, className = "", type, onValueChange, ...props }: TextFieldProps<T>
 ) {
   if (type === "password" && id !== undefined) {
     return <PasswordField label={label} id={id} className={className} {...props} />;
@@ -19,7 +21,7 @@ export function TextField<T extends HTMLInputTypeAttribute = "text">(
   return <label className="grid min-w-0 gap-2 font-medium" htmlFor={id}>
     {label}
     {isDateTimeType(type)
-      ? <DateTimeInput id={id} type={type} className={inputClassName} {...props} />
+      ? <DateTimeInput id={id} type={type} onValueChange={onValueChange} className={inputClassName} {...props} />
       : <input id={id} type={type} className={inputClassName} {...props} />}
   </label>;
 }

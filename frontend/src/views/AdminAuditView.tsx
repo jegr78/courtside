@@ -128,10 +128,10 @@ export function AdminAuditView() {
             </select>
           </label>
           <label className="grid gap-1 font-medium">{t("audit.filter.from")}
-            <DateTimeInput data-testid="audit-filter-from" type="datetime-local" className="form-control rounded-lg border px-3 py-2" value={from} onChange={(event) => setFrom(event.target.value)} />
+            <DateTimeInput data-testid="audit-filter-from" type="datetime-local" className="form-control rounded-lg border px-3 py-2" value={from} onValueChange={(value) => setFrom(value)} />
           </label>
           <label className="grid gap-1 font-medium">{t("audit.filter.to")}
-            <DateTimeInput data-testid="audit-filter-to" type="datetime-local" className="form-control rounded-lg border px-3 py-2" value={to} onChange={(event) => setTo(event.target.value)} />
+            <DateTimeInput data-testid="audit-filter-to" type="datetime-local" className="form-control rounded-lg border px-3 py-2" value={to} onValueChange={(value) => setTo(value)} />
           </label>
           <div className="flex flex-wrap gap-3 md:col-span-2 xl:col-span-4">
             <Button data-testid="audit-filter-apply" variant="primary" type="submit" disabled={pending}>{t("audit.filter.apply")}</Button>

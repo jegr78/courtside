@@ -17,6 +17,7 @@ describe("BookingsExport", () => {
 
   it("given a period a board typed, when it downloads the file, then the request carries that period", async () => {
     // given
+    await i18n.changeLanguage("de");
     const exportBookings = vi.spyOn(api, "exportBookings").mockResolvedValue({
       fileName: "bookings-2026-01-01-2026-03-31.csv", content: new Blob(["date"])
     });
@@ -24,8 +25,8 @@ describe("BookingsExport", () => {
     await waitFor(() => expect(screen.getByTestId("bookings-export-encoding")).toHaveValue("UTF-8"));
 
     // when
-    await userEvent.type(screen.getByTestId("bookings-export-from"), "2026-01-01");
-    await userEvent.type(screen.getByTestId("bookings-export-to"), "2026-03-31");
+    await userEvent.type(screen.getByTestId("bookings-export-from"), "01.01.2026");
+    await userEvent.type(screen.getByTestId("bookings-export-to"), "31.03.2026");
     await userEvent.click(screen.getByTestId("bookings-export-download"));
 
     // then

@@ -62,6 +62,10 @@ explicit browser choice wins over an account locale and persists locally. Theme 
 the same rule, with dark as the initial value. Neither preference depends on translated text or an
 authenticated session.
 
+Date and time editors follow the application language even when the browser uses another language.
+Submitted values retain their ISO format. Incomplete entries stay visible while the form receives
+an empty value until the entry is valid.
+
 ## Saving
 
 Every administrative page commits its edits through one save bar. The bar appears once a field

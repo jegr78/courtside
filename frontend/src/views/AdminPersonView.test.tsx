@@ -750,7 +750,7 @@ describe("AdminPersonView", () => {
       membershipTypeId: "type-1", startedOn: "2026-01-01", endedOn: "2026-03-31"
     }));
     expect(screen.getByTestId("membership-type"), "the unsaved type is still what the form shows").toHaveValue("type-2");
-    expect(screen.getByTestId("membership-ended-on"), "the end just written is not offered back as a change").toHaveValue("2026-03-31");
+    expect(screen.getByTestId("membership-ended-on"), "the end just written is not offered back as a change").toHaveValue("03/31/2026");
     expect(screen.getByTestId("save-person"), "the type edit still waits for the page save").toBeInTheDocument();
   });
 

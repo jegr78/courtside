@@ -2902,3 +2902,34 @@ it("given a closed court, when several courts can be chosen, then the closed one
   expect(screen.getByTestId(`booking-court-${courts[1].id}`), "a closed court is not offered").toBeDisabled();
   expect(screen.getByTestId(`booking-court-${courts[0].id}`)).toBeEnabled();
 });
+
+it("given a selected week date, when it is cleared and retyped from the keyboard, then partial digits survive and the new week is selected", async () => {
+  // given
+  const user = userEvent.setup();
+  render(<WeekView today={clubInstant("12:00")} />);
+  await screen.findByTestId("week-grid");
+  const field = screen.getByTestId("week-date");
+  expect(field).toHaveValue("08/10/2026");
+  await user.click(field);
+
+  // when
+  await user.keyboard("{End}{Backspace}");
+
+  // then
+  expect(field).toHaveValue("08/10/202");
+
+  // when
+  await user.clear(field);
+  await user.type(field, "0");
+
+  // then
+  expect(field).toHaveValue("0");
+
+  // when
+  await user.type(field, "9/09/2026");
+
+  // then
+  expect(field).toHaveValue("09/09/2026");
+  await waitFor(() => expect(api.allocationsBetween).toHaveBeenCalledWith("2026-09-07", "2026-09-13"));
+  expect(screen.getByTestId("day-selector-2026-09-09")).toHaveAttribute("aria-pressed", "true");
+});

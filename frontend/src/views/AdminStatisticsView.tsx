@@ -80,9 +80,9 @@ export function AdminStatisticsView() {
       {range.error && <div data-testid="statistics-range-failure"><LoadFailure message={range.error} retry={range.retry} /></div>}
       <form noValidate onSubmit={read} className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
         <TextField data-testid="utilisation-from" name="from" type="date" required label={t("admin.statistics.from")}
-          value={fields.from} onChange={(event) => setFields((current) => ({ ...current, from: event.target.value }))} />
+          value={fields.from} onValueChange={(value) => setFields((current) => ({ ...current, from: value }))} />
         <TextField data-testid="utilisation-to" name="to" type="date" required label={t("admin.statistics.to")}
-          value={fields.to} onChange={(event) => setFields((current) => ({ ...current, to: event.target.value }))} />
+          value={fields.to} onValueChange={(value) => setFields((current) => ({ ...current, to: value }))} />
         <Button variant="secondary" data-testid="utilisation-read" type="submit">{t("admin.statistics.read")}</Button>
       </form>
       {refusal && <Alert testId="statistics-period-refused">{refusal}</Alert>}

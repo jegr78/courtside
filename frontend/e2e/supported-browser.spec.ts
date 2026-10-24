@@ -383,3 +383,121 @@ test.describe("localized summaries", () => {
     ]);
   });
 });
+
+test.describe("application locale editors with an English browser", () => {
+  test.describe.configure({ timeout: 90_000 });
+  const localeExpect = expect.configure({ timeout: 10_000 });
+  test.use({ locale: "en-US" });
+
+  test("given German application language and an English browser, when dates and times are edited and saved, then localized editing persists ISO values after reload", async ({ page }) => {
+    // given
+    await page.addInitScript(() => {
+      if (!window.localStorage.getItem("courtside.locale")) window.localStorage.setItem("courtside.locale", "de");
+    });
+    await signIn(page, "configuration-admin");
+    const weekDate = page.getByTestId("week-date");
+    await weekDate.focus();
+    await weekDate.press("ControlOrMeta+A");
+    await weekDate.press("Backspace");
+    await localeExpect(weekDate).toHaveValue("");
+    await weekDate.pressSequentially("2");
+    await localeExpect(weekDate).toHaveValue("2");
+    await weekDate.pressSequentially("6.08.2026");
+    await localeExpect(weekDate).toHaveValue("26.08.2026");
+    await page.goto("/admin/facility/opening-hours");
+    await localeExpect(page.locator("html")).toHaveAttribute("lang", "de");
+    localeExpect(await page.evaluate(() => navigator.language)).toBe("en-US");
+    const date = page.getByTestId("opening-hours-effective-from");
+    const [day, month, year] = (await date.inputValue()).split(".").map(Number);
+    const later = new Date(Date.UTC(year, month - 1, day + 7));
+    const iso = later.toISOString().slice(0, 10);
+    const localized = `${String(later.getUTCDate()).padStart(2, "0")}.${String(later.getUTCMonth() + 1).padStart(2, "0")}.${later.getUTCFullYear()}`;
+    const opens = page.getByTestId("hours-open-MONDAY");
+    const closes = page.getByTestId("hours-close-MONDAY");
+
+    // when
+    await date.fill(localized);
+    await localeExpect(date).toBeFocused();
+    await localeExpect(date).toHaveValue(localized);
+    await opens.fill("09:30");
+    await localeExpect(opens).toBeFocused();
+    await localeExpect(opens).toHaveValue("09:30");
+    await closes.fill("18:30");
+    const saved = page.waitForResponse((response) => response.url().endsWith("/api/admin/opening-hours") && response.request().method() === "PUT");
+    await page.getByTestId("save-opening-hours").click();
+
+    // then
+    const response = await saved;
+    localeExpect(response.status()).toBe(200);
+    localeExpect(response.request().postDataJSON()).toMatchObject({ effectiveFrom: iso,
+      days: localeExpect.arrayContaining([localeExpect.objectContaining({ dayOfWeek: "MONDAY", opensAt: "09:30", closesAt: "18:30" })]) });
+    await page.reload();
+    await page.getByTestId(`edit-opening-week-${iso}`).click();
+    await localeExpect(date).toHaveValue(localized);
+    await localeExpect(opens).toHaveValue("09:30");
+    await localeExpect(closes).toHaveValue("18:30");
+    await selectPreference(page, "#locale-preference", "en");
+    await localeExpect(date).toHaveValue(`${iso.slice(5, 7)}/${iso.slice(8)}/${iso.slice(0, 4)}`);
+    await localeExpect(opens).toHaveValue("09:30 AM");
+    await localeExpect(closes).toHaveValue("06:30 PM");
+  });
+
+  test("given localized rule times, when desktop and mobile widths render, then values and empty hints fit without page overflow", async ({ page }) => {
+    // given
+    await page.addInitScript(() => window.localStorage.setItem("courtside.locale", "en"));
+    await signIn(page, "configuration-admin");
+    await page.goto("/admin/rule-sets");
+    const first = page.getByTestId("rule-BOOKING_HOURS-earliestStart");
+    const last = page.getByTestId("rule-BOOKING_HOURS-latestEnd");
+
+    // when
+    await first.fill("04:00 PM");
+    await last.fill("11:59 PM");
+
+    // then
+    for (const width of [1280, 320]) {
+      await page.setViewportSize({ width, height: 900 });
+      for (const field of [first, last]) {
+        const geometry = await field.evaluate((element) => {
+          const input = element as HTMLInputElement;
+          const style = getComputedStyle(input);
+          const canvas = document.createElement("canvas");
+          const context = canvas.getContext("2d")!;
+          context.font = style.font;
+          const textWidth = context.measureText(input.value).width + Math.max(0, input.value.length - 1) * (Number.parseFloat(style.letterSpacing) || 0);
+          const padding = Number.parseFloat(style.paddingLeft) + Number.parseFloat(style.paddingRight);
+          const bounds = input.getBoundingClientRect();
+          return { textWidth, contentWidth: input.clientWidth - padding, left: bounds.left, right: bounds.right };
+        });
+        localeExpect(geometry.textWidth).toBeLessThanOrEqual(geometry.contentWidth);
+        localeExpect(geometry.left).toBeGreaterThanOrEqual(0);
+        localeExpect(geometry.right).toBeLessThanOrEqual(width);
+      }
+      localeExpect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width + 1);
+    }
+    await localeExpect(first).toHaveValue("04:00 PM");
+    await localeExpect(last).toHaveValue("11:59 PM");
+
+    // when
+    await first.fill("");
+    await last.fill("");
+    await selectPreference(page, "#locale-preference", "de");
+    await page.getByTestId("rule-set-name").focus();
+
+    // then
+    for (const width of [1280, 320]) {
+      await page.setViewportSize({ width, height: 900 });
+      for (const testId of ["rule-BOOKING_HOURS-earliestStart-empty", "rule-BOOKING_HOURS-latestEnd-empty"]) {
+        const hint = page.getByTestId(testId);
+        await localeExpect(hint).toBeVisible();
+        await localeExpect(hint).toHaveText("Nicht gesetzt");
+        const bounds = await hint.evaluate((element) => {
+          const label = element.firstElementChild!;
+          return { needed: label.scrollWidth, available: label.clientWidth };
+        });
+        localeExpect(bounds.needed, `${width}px displays the whole empty hint`).toBeLessThanOrEqual(bounds.available);
+      }
+      localeExpect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width + 1);
+    }
+  });
+});

@@ -1,14 +1,15 @@
-import { expect, test } from "../../fixtures";
+import { type JourneyLanguage, expect, test } from "../../fixtures";
 import { activate, openTheApplication, reachAdministration, rewrite, signIn, walks, writeDate, writeInto } from "../../journey-walking";
 
 const STILL_BOOKED = "00000000-0000-0000-0000-000000000103";
 const STILL_A_MEMBER = "00000000-0000-0000-0000-000000000112";
 
-async function endTheMembershipOf(page: import("@playwright/test").Page, endedOn: string): Promise<void> {
+async function endTheMembershipOf(page: import("@playwright/test").Page, endedOn: string, language: JourneyLanguage): Promise<void> {
   await activate(page.getByTestId("end-membership"));
   await writeDate(page.getByTestId("end-membership-date"), endedOn);
   await activate(page.getByTestId("confirm-end-membership"));
-  await expect(page.getByTestId("membership-ended-on")).toHaveValue(endedOn);
+  const [year, month, day] = endedOn.split("-");
+  await expect(page.getByTestId("membership-ended-on")).toHaveValue(language === "de" ? `${day}.${month}.${year}` : `${month}/${day}/${year}`);
 }
 
 async function findOnTheRoster(page: import("@playwright/test").Page, name: string): Promise<void> {
@@ -37,13 +38,13 @@ test("given a board that keeps former members a month and bookings two years, wh
     await activate(page.getByTestId("save-person"));
     await expect(page.getByTestId("end-membership")).toBeVisible();
     const departed = new URL(page.url()).pathname.split("/").at(-1) ?? "";
-    await endTheMembershipOf(page, "2026-03-31");
+    await endTheMembershipOf(page, "2026-03-31", language);
 
     // given — and one who left at the same time but still plays in tomorrow's booking
     await findOnTheRoster(page, "Mary Major");
     await activate(page.getByTestId(`person-link-${STILL_BOOKED}`));
     await expect(page.getByTestId("admin-person-view")).toBeVisible();
-    await endTheMembershipOf(page, "2026-03-31");
+    await endTheMembershipOf(page, "2026-03-31", language);
 
     // when — the board sets the periods it chose
     await reachAdministration(page, "admin-retention-link");

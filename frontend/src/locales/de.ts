@@ -78,6 +78,8 @@ const de = {
   "password.description": "Lege ein dauerhaftes Passwort fest, bevor du Courtside verwendest.",
   "password.new": "Neues Passwort",
   "password.hide": "Passwort verbergen",
+  "field.dateTimeFormat": "Beispiel: {{example}}",
+  "field.invalidDateTime": "Bitte einen gültigen Wert eingeben, zum Beispiel {{example}}.",
   "field.notSet": "Nicht gesetzt",
   "password.show": "Passwort anzeigen",
   "password.confirm": "Neues Passwort bestätigen",

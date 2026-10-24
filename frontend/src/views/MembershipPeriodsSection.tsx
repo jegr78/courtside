@@ -150,9 +150,9 @@ function PeriodForm({ period, types, pending, error, save, closed }: {
         </select>
       </label>
       <TextField data-testid="period-started-on" required type="date" label={t("admin.person.startedOn")} value={startedOn}
-                 onChange={(event) => setStartedOn(event.target.value)} />
+                 onValueChange={(value) => setStartedOn(value)} />
       <TextField data-testid="period-ended-on" type="date" label={t("admin.person.endedOn")} value={endedOn}
-                 aria-describedby="period-ended-on-hint" onChange={(event) => setEndedOn(event.target.value)} />
+                 aria-describedby="period-ended-on-hint" onValueChange={(value) => setEndedOn(value)} />
       <p id="period-ended-on-hint" className="text-muted text-sm">{t("admin.person.endedOnHint")}</p>
       <div className="flex flex-wrap gap-3">
         <Button variant="primary" data-testid="save-period" disabled={pending || !membershipTypeId || !startedOn} type="submit">

@@ -1,3 +1,4 @@
+import { formatDateTime } from "../components/localizedDateTime";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, useLocation } from "react-router-dom";
@@ -64,8 +65,8 @@ describe("AdminUsageView", () => {
     // then
     await screen.findByTestId("usage-period");
     expect(read).toHaveBeenCalledWith(undefined);
-    await waitFor(() => expect(screen.getByTestId("usage-from")).toHaveValue("2026-04-01"));
-    expect(screen.getByTestId("usage-to")).toHaveValue("2026-04-30");
+    await waitFor(() => expect(screen.getByTestId("usage-from")).toHaveValue(formatDateTime("2026-04-01", "date", "en")));
+    expect(screen.getByTestId("usage-to")).toHaveValue(formatDateTime("2026-04-30", "date", "en"));
   });
 
   it("given an address whose period ends before it starts, when the page opens, then the default period is read instead", async () => {
@@ -78,7 +79,7 @@ describe("AdminUsageView", () => {
     // then
     await screen.findByTestId("usage-period");
     expect(read).toHaveBeenCalledExactlyOnceWith(undefined);
-    await waitFor(() => expect(screen.getByTestId("usage-from")).toHaveValue("2026-04-01"));
+    await waitFor(() => expect(screen.getByTestId("usage-from")).toHaveValue(formatDateTime("2026-04-01", "date", "en")));
   });
 
   it("given a report, when it is shown, then each of the four parts carries its figures and small groups read as Other", async () => {
@@ -110,7 +111,7 @@ describe("AdminUsageView", () => {
     const read = vi.spyOn(api, "usageReport").mockResolvedValue(usage);
     show();
     await screen.findByTestId("usage-period");
-    await waitFor(() => expect(screen.getByTestId("usage-to")).toHaveValue("2026-04-30"));
+    await waitFor(() => expect(screen.getByTestId("usage-to")).toHaveValue(formatDateTime("2026-04-30", "date", "en")));
 
     // when
     await userEvent.clear(screen.getByTestId("usage-from"));
@@ -129,7 +130,7 @@ describe("AdminUsageView", () => {
     const read = vi.spyOn(api, "usageReport").mockResolvedValue(usage);
     show();
     await screen.findByTestId("usage-period");
-    await waitFor(() => expect(screen.getByTestId("usage-to")).toHaveValue("2026-04-30"));
+    await waitFor(() => expect(screen.getByTestId("usage-to")).toHaveValue(formatDateTime("2026-04-30", "date", "en")));
     read.mockClear();
 
     // when
@@ -189,7 +190,7 @@ describe("AdminUsageView", () => {
 
     // then
     expect(await screen.findByTestId("usage-period")).toHaveTextContent(expected);
-    await waitFor(() => expect(screen.getByTestId("usage-from")).toHaveValue("2026-04-01"));
+    await waitFor(() => expect(screen.getByTestId("usage-from")).toHaveValue(formatDateTime("2026-04-01", "date", locale)));
   });
 
   it.each([

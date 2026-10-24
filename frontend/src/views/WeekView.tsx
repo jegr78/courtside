@@ -1,3 +1,4 @@
+import { DateTimeInput } from "../components/DateTimeInput";
 import { type CSSProperties, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { allocationLabel } from "../booking/allocationLabel";
@@ -445,7 +446,7 @@ export function WeekView({ today, clock = systemClock, canBook = true,
         {days.length > 0 && hasCourts && <p className="text-muted text-sm">{formatWeekRange(days, language, calendarTimeZone)}</p>}
       </div>
       {!offline && (!data || hasCourts) && <div className="desktop-week-controls flex gap-2">
-        <input data-testid="week-date" type="date" value={selectedDate ?? ""} disabled={!data} onChange={(event) => selectDate(event.target.value)} aria-label={t("week.chooseDate")} className="desktop-week-date form-control rounded-lg border px-2" />
+        <span className="desktop-week-date"><DateTimeInput data-testid="week-date" type="date" value={selectedDate ?? ""} disabled={!data} onValueChange={(value) => selectDate(value)} aria-label={t("week.chooseDate")} className="form-control rounded-lg border px-2" /></span>
         <Button variant="secondary" type="button" data-testid="week-previous" onClick={() => setWeekOffset((offset) => offset - 1)} aria-label={t("week.previous")}>
           {t("week.previousShort")}
         </Button>

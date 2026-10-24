@@ -37,6 +37,7 @@ describe("LogExport", () => {
 
   it("given a period, when the board downloads the message log, then the request carries that period", async () => {
     // given
+    await i18n.changeLanguage("de");
     const exportMessageLog = vi.spyOn(api, "exportMessageLog").mockResolvedValue({
       fileName: "message-log-2026-05-12.csv", content: new Blob(["queuedAt"])
     });
@@ -44,8 +45,8 @@ describe("LogExport", () => {
     await waitFor(() => expect(screen.getByTestId("messages-log-export-encoding")).toHaveValue("UTF-8"));
 
     // when
-    await userEvent.type(screen.getByTestId("messages-log-export-from"), "2026-01-01");
-    await userEvent.type(screen.getByTestId("messages-log-export-to"), "2026-03-31");
+    await userEvent.type(screen.getByTestId("messages-log-export-from"), "01.01.2026");
+    await userEvent.type(screen.getByTestId("messages-log-export-to"), "31.03.2026");
     await userEvent.click(screen.getByTestId("messages-log-export-download"));
 
     // then

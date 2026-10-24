@@ -409,8 +409,8 @@ function MembershipSection({ entry, types, disabled, membership, changed, end }:
           {types.map((type) => <option key={type.id} value={type.id}>{type.name}</option>)}
         </select>
       </label>
-      <TextField data-testid="membership-started-on" disabled={disabled} type="date" label={t("admin.person.startedOn")} value={membership.startedOn} onChange={(event) => changed({ ...membership, startedOn: event.target.value })} />
-      <TextField data-testid="membership-ended-on" disabled={disabled} type="date" label={t("admin.person.endedOn")} value={membership.endedOn} aria-describedby="membership-ended-on-hint" onChange={(event) => changed({ ...membership, endedOn: event.target.value })} />
+      <TextField data-testid="membership-started-on" disabled={disabled} type="date" label={t("admin.person.startedOn")} value={membership.startedOn} onValueChange={(value) => changed({ ...membership, startedOn: value })} />
+      <TextField data-testid="membership-ended-on" disabled={disabled} type="date" label={t("admin.person.endedOn")} value={membership.endedOn} aria-describedby="membership-ended-on-hint" onValueChange={(value) => changed({ ...membership, endedOn: value })} />
     </div>
     <p id="membership-ended-on-hint" className="text-muted text-sm">{t("admin.person.endedOnHint")}</p>
     {running && <Button variant="destructive" data-testid="end-membership" disabled={disabled} className="justify-self-start" type="button" onClick={() => setEnding(true)}>{t("admin.person.endMembership")}</Button>}
@@ -418,7 +418,7 @@ function MembershipSection({ entry, types, disabled, membership, changed, end }:
       <div className="grid gap-4">
         <h2 id="end-membership-title" className="text-2xl font-bold">{t("admin.person.endMembershipTitle")}</h2>
         <p>{t("admin.person.endMembershipExplain")}</p>
-        <TextField data-testid="end-membership-date" type="date" label={t("admin.person.endedOn")} value={chosenEnd} onChange={(event) => setChosenEnd(event.target.value)} />
+        <TextField data-testid="end-membership-date" type="date" label={t("admin.person.endedOn")} value={chosenEnd} onValueChange={(value) => setChosenEnd(value)} />
         <div className="flex flex-wrap gap-3">
           <Button variant="destructive-confirm" data-testid="confirm-end-membership" disabled={disabled || !chosenEnd} type="button" onClick={() => void endMembership()}>{t("admin.person.endMembership")}</Button>
           <Button variant="secondary" data-testid="cancel-end-membership" type="button" onClick={() => setEnding(false)}>{t("admin.cancel")}</Button>
