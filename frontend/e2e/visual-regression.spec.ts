@@ -127,7 +127,7 @@ for (const theme of ["dark", "light"] as const) {
       // given
       await page.setViewportSize({ width: 390, height: 844 });
       await signIn(page, "doe.jane");
-      await page.clock.setFixedTime(new Date(`${journeyService.visualDate}T07:15:00Z`));
+      await page.clock.setFixedTime(new Date(`${journeyService.visualDate}T07:10:00Z`));
 
       // when
       await page.reload();
