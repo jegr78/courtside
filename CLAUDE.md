@@ -356,6 +356,11 @@ is now public enough to need.
   default takes the *commit's* subject whenever a pull request holds exactly one commit, which
   would let a single-commit branch land a subject the lint never saw.
 
+  The other side of that choice: when a single commit's subject differs from the title, GitHub puts
+  that subject into the squashed body, and release-please reads it as a second change with its own
+  release-note entry. A single-commit branch therefore carries the pull request title as its commit
+  subject, and `PR Title Lint` refuses the pull request otherwise.
+
   Choose the type from what the change does to a **consumer of the API**, not from how the diff
   looks. A branch that is mostly refactoring but ends up correcting a response a member sees is a
   `fix:`. Add `!` or a `BREAKING CHANGE:` footer when a published surface changes shape — the
