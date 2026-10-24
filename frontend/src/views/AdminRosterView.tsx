@@ -12,6 +12,7 @@ import { noticeColours } from "../components/noticeTones";
 import { TextField } from "../components/TextField";
 import { formString } from "../forms/formString";
 import { useUnsavedForm } from "../unsaved/useUnsavedForm";
+import { formatCalendarDate } from "../time/clubZone";
 
 const NAME_LENGTH = 60;
 const EMAIL_LENGTH = 120;
@@ -87,14 +88,14 @@ function AccountMark({ entry, t }: { entry: RosterEntry; t: Translate }) {
   </span>;
 }
 
-function membershipLabel(entry: RosterEntry, names: Map<string, string>, t: Translate): string {
+function membershipLabel(entry: RosterEntry, names: Map<string, string>, t: Translate, language: string): string {
   if (!entry.membershipTypeId) return "—";
   const name = names.get(entry.membershipTypeId) ?? entry.membershipTypeId;
   if (entry.membershipCurrent) return name;
   if (entry.membershipState === "SCHEDULED" && entry.membershipStartedOn) {
-    return t("admin.roster.membershipScheduled", { name, date: entry.membershipStartedOn });
+    return t("admin.roster.membershipScheduled", { name, date: formatCalendarDate(entry.membershipStartedOn, language) });
   }
-  return t("admin.roster.membershipEnded", { date: entry.membershipEndedOn ?? "" });
+  return t("admin.roster.membershipEnded", { date: entry.membershipEndedOn ? formatCalendarDate(entry.membershipEndedOn, language) : "" });
 }
 
 function roleLabel(entry: RosterEntry, t: Translate): string {
@@ -114,7 +115,7 @@ function SortableHeading({ field, active, direction, label, changed, disabled, f
 }
 
 export function AdminRosterView() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const newPerson = useUnsavedForm("person:new");
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -352,7 +353,7 @@ export function AdminRosterView() {
                     </td>
                     <td role="cell" className="grid min-w-0 grid-cols-[minmax(0,8rem)_minmax(0,1fr)] gap-3 sm:table-cell sm:border-b sm:p-2">
                       <span aria-hidden="true" data-testid="roster-label-membership" className="font-medium sm:hidden">{t("admin.roster.columnMembership")}</span>
-                      <span data-testid={`roster-membership-${entry.personId}`} className="min-w-0 break-words">{membershipLabel(entry, typeNames, t)}</span>
+                      <span data-testid={`roster-membership-${entry.personId}`} className="min-w-0 break-words">{membershipLabel(entry, typeNames, t, i18n.resolvedLanguage ?? "de")}</span>
                     </td>
                     <td role="cell" className="grid min-w-0 grid-cols-[minmax(0,8rem)_minmax(0,1fr)] gap-3 sm:table-cell sm:border-b sm:p-2">
                       <span aria-hidden="true" data-testid="roster-label-roles" className="font-medium sm:hidden">{t("admin.roster.columnRoles")}</span>
