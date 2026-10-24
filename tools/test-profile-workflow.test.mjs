@@ -43,6 +43,8 @@ test("given profile classification, when the pull request runs, then selected qu
   assert.doesNotMatch(workflow, /npm-cli\.js audit/);
   assert.match(workflow, /security:[\s\S]+github\/codeql-action\/init@[a-f0-9]{40}/);
   assert.match(workflow, /tooling:[\s\S]+name: Verify repository tooling[\s\S]+npm run test:tools/);
+  assert.match(workflow, /tooling:[\s\S]+apt-get install --yes --no-install-recommends imagemagick fonts-dejavu-core[\s\S]+name: Verify repository tooling\n\s+working-directory: frontend\n\s+env:\n\s+COURTSIDE_SHEET_RENDERER: required\n\s+run: npm run test:tools/,
+    "the tooling job installs ImageMagick and a font and requires them for the contact sheet tests");
   assert.match(workflow, /tooling:[\s\S]+uses: \.\/\.github\/actions\/tool-dependencies/);
   assert.match(toolDependencies,
     /node tools\/node-toolchain\.mjs --github-output "\$GITHUB_OUTPUT"[\s\S]+node-version: \$\{\{ steps\.toolchain\.outputs\.node \}\}[\s\S]+NPM_VERSION: \$\{\{ steps\.toolchain\.outputs\.npm \}\}[\s\S]+npm install --global "npm@\$NPM_VERSION"[\s\S]+test "\$\(node --version\)" = "v\$NODE_VERSION"[\s\S]+test "\$\(npm --version\)" = "\$NPM_VERSION"[\s\S]+working-directory: frontend\n\s+run: npm ci/);
