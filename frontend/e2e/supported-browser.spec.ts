@@ -442,7 +442,7 @@ test.describe("application locale editors with an English browser", () => {
     await localeExpect(closes).toHaveValue("06:30 PM");
   });
 
-  test("given English twelve-hour rule times, when desktop and mobile widths render, then AM and PM fit without page overflow", async ({ page }) => {
+  test("given localized rule times, when desktop and mobile widths render, then values and empty hints fit without page overflow", async ({ page }) => {
     // given
     await page.addInitScript(() => window.localStorage.setItem("courtside.locale", "en"));
     await signIn(page, "configuration-admin");
@@ -477,5 +477,27 @@ test.describe("application locale editors with an English browser", () => {
     }
     await localeExpect(first).toHaveValue("04:00 PM");
     await localeExpect(last).toHaveValue("11:59 PM");
+
+    // when
+    await first.fill("");
+    await last.fill("");
+    await selectPreference(page, "#locale-preference", "de");
+    await page.getByTestId("rule-set-name").focus();
+
+    // then
+    for (const width of [1280, 320]) {
+      await page.setViewportSize({ width, height: 900 });
+      for (const testId of ["rule-BOOKING_HOURS-earliestStart-empty", "rule-BOOKING_HOURS-latestEnd-empty"]) {
+        const hint = page.getByTestId(testId);
+        await localeExpect(hint).toBeVisible();
+        await localeExpect(hint).toHaveText("Nicht gesetzt");
+        const bounds = await hint.evaluate((element) => {
+          const label = element.firstElementChild!;
+          return { needed: label.scrollWidth, available: label.clientWidth };
+        });
+        localeExpect(bounds.needed, `${width}px displays the whole empty hint`).toBeLessThanOrEqual(bounds.available);
+      }
+      localeExpect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width + 1);
+    }
   });
 });

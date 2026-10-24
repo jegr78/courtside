@@ -250,6 +250,10 @@ input[type="time"] {
     pointer-events: none;
   }
 
+  .rule-time-input ~ .date-time-empty {
+    padding: 0 0.5rem;
+  }
+
   .date-time-empty > span {
     min-width: 0;
     overflow: hidden;
