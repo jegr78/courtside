@@ -817,14 +817,14 @@ test("given a refusal that survived Schemathesis' own retries, when normalizing 
   }
 });
 
-test("given the fuzz policy, when rendering the Schemathesis configuration, then it paces by Retry-After and expects no 429 from a data check", () => {
+test("given the fuzz policy, when rendering the Schemathesis configuration, then it paces before the first request and expects no 429 from a data check", () => {
   // when
   const configuration = schemathesisConfiguration(openApiFuzzPolicy);
 
   // then
   const firstTable = configuration.indexOf("\n[");
-  assert.ok(configuration.indexOf('rate-limit = "auto"\n') > -1
-    && configuration.indexOf('rate-limit = "auto"\n') < firstTable,
+  assert.ok(configuration.indexOf('rate-limit = "2/s"\n') > -1
+    && configuration.indexOf('rate-limit = "2/s"\n') < firstTable,
   "rate-limit is a top-level key and must precede every table");
   for (const check of ["positive_data_acceptance", "negative_data_rejection"]) {
     const section = new RegExp(`\\n\\[checks\\.${check}\\]\\nexpected-statuses = (\\[[^\\]]*\\])\\n`).exec(configuration);
@@ -836,6 +836,30 @@ test("given the fuzz policy, when rendering the Schemathesis configuration, then
   }
   assert.doesNotMatch(configuration, /headers|Cookie|XSRF/,
     "a configured header is sent even when a case negates the credential it carries");
+});
+
+test("given production admission budgets, when pacing generated operations, then even the costliest request fits the refill rate", () => {
+  // given
+  const admission = yaml.load(readFileSync(new URL(
+    "../src/main/resources/application.yaml", import.meta.url), "utf8")).courtside.admission;
+  const inventory = JSON.parse(readFileSync(new URL(
+    "../security/resource-demand-inventory.json", import.meta.url), "utf8"));
+  const generated = buildOpenApiFuzzInventory(api).filter(({ modes }) => modes.includes("positive"));
+  const costOf = (operationId) => {
+    const classification = inventory.classifications.find(({ entryPoints }) => entryPoints.includes(operationId));
+    return admission.classes[classification?.id]?.cost ?? 1;
+  };
+  const perSecond = (limit) => Number(/:(\d+)\}$/.exec(limit["per-second"])[1]);
+
+  // when
+  const configured = /^rate-limit = "([1-9]\d*)\/s"$/m.exec(schemathesisConfiguration(openApiFuzzPolicy));
+
+  // then
+  assert.ok(configured, "generated requests need an explicit initial per-second limit");
+  const rate = Number(configured[1]);
+  const maximumCost = Math.max(...generated.map(({ operationId }) => costOf(operationId)));
+  assert.ok(rate * maximumCost <= Math.min(perSecond(admission.account), perSecond(admission.address)),
+    "the generated request rate must fit both principal budgets at the highest operation cost");
 });
 
 test("given a signed-in fuzz client, when its credentials are handed to Schemathesis, then the hook receives each one separately", () => {
