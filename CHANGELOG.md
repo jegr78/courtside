@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.3.0-rc.7](https://github.com/jegr78/courtside/compare/v0.3.0-rc.6...v0.3.0-rc.7) (2026-10-24)
+
+
+### Bug fixes
+
+* bump fast-uri from 3.1.8 to 3.1.9 in /frontend ([#1731](https://github.com/jegr78/courtside/issues/1731)) ([5dda5d1](https://github.com/jegr78/courtside/commit/5dda5d1a66328be6866d0b37200d26290b7d5426))
+* bump serialize-javascript from 7.1.0 to 7.1.4 in /frontend ([#1730](https://github.com/jegr78/courtside/issues/1730)) ([638c7ae](https://github.com/jegr78/courtside/commit/638c7ae285618b995ee85c99a08021ed4c42e772))
+* edit dates and times in the application language ([#1715](https://github.com/jegr78/courtside/issues/1715)) ([1ec2b72](https://github.com/jegr78/courtside/commit/1ec2b72e044244b7c59ff8b1ef5354301568e117))
+* keep navigation and administration details readable ([#1714](https://github.com/jegr78/courtside/issues/1714)) ([157bc7a](https://github.com/jegr78/courtside/commit/157bc7a5be870d9182b74b32afca15a07d672d21))
+* keep the current hour and capture subjects visible ([#1716](https://github.com/jegr78/courtside/issues/1716)) ([279006c](https://github.com/jegr78/courtside/commit/279006c24361d738aee36c83df396b6f722c39ce))
+* keep unparsed date and time drafts from clearing saved values ([#1727](https://github.com/jegr78/courtside/issues/1727)) ([5b6e5de](https://github.com/jegr78/courtside/commit/5b6e5ded99b93809f9ad90662050cf5f6eb88305))
+* localize account and administration summaries ([#1711](https://github.com/jegr78/courtside/issues/1711)) ([92d8c36](https://github.com/jegr78/courtside/commit/92d8c366cb942746c232b07324b88d87df71d6eb))
+* preserve accessible controls with frontend dependency updates ([#1719](https://github.com/jegr78/courtside/issues/1719)) ([75d200c](https://github.com/jegr78/courtside/commit/75d200cfc5faf5d9d21bd3de93bcf385832407bc))
+* preserve readable acceptance sheets and original links ([#1710](https://github.com/jegr78/courtside/issues/1710)) ([5089783](https://github.com/jegr78/courtside/commit/5089783f545acac2138aa258e9f7fd7f19ee3a9b))
+* refresh dependant messages after cancellation ([#1712](https://github.com/jegr78/courtside/issues/1712)) ([188a2e9](https://github.com/jegr78/courtside/commit/188a2e93a3f9f90ba70c55881021fd85a407eac1))
+* reveal added booking players inside the dialog ([#1709](https://github.com/jegr78/courtside/issues/1709)) ([b9cbaaf](https://github.com/jegr78/courtside/commit/b9cbaaf2598e954c71cb3f5458f4729cf6b3b1fb))
+* wrap message log findings on phones and format roster membership dates ([#1725](https://github.com/jegr78/courtside/issues/1725)) ([edeafd5](https://github.com/jegr78/courtside/commit/edeafd505c0ae33e0024d26298509cd5c323ce6a))
+
+
+### Build and dependencies
+
+* **deps-dev:** bump org.pitest:pitest-maven from 1.30.0 to 1.30.1 ([#1717](https://github.com/jegr78/courtside/issues/1717)) ([c339185](https://github.com/jegr78/courtside/commit/c33918557482ff4e6dd7ed87a08d0a9c25606445))
+* **deps:** bump the deployment-images group in /deploy with 5 updates ([#1718](https://github.com/jegr78/courtside/issues/1718)) ([4228335](https://github.com/jegr78/courtside/commit/4228335973d1f1b9c7cca55b22a45508b7d3cc38))
+
 ## 0.3.0 (2026-10-18)
 
 ### Features
