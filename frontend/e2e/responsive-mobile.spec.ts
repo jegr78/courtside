@@ -3,6 +3,7 @@ import { routePattern } from "./declared-routes";
 import { become, concretePath, PERSONAS, personas, routerPages } from "./page-sweep";
 import { expect, expectAdministrationOverview, expectShownAsEmpty, routeLongSeries, selectJourneyDate, seriesBookingId, test } from "./fixtures";
 import { LEAGUE_MATCH_CARD, MEMBER_BOOKING_CARD } from "./shipped-rows";
+import { expectNoWcagViolations } from "./accessibility-checks";
 
 async function expectNoHorizontalOverflow(page: import("@playwright/test").Page) {
   const overflow = await page.evaluate(() => {
@@ -1271,6 +1272,7 @@ test("given an own booking beside a league match and a squad training on four co
       await expect.poll(() => lastRowOfBookingIsOccupied(page, match, "15:30"), {
         message: `at ${width} px the last row of the match is drawn occupied, not left blank`, timeout: 10_000
       }).toBe(true);
+      await expectNoWcagViolations(page);
     }
 
     // when
@@ -1293,6 +1295,7 @@ test("given an own booking beside a league match and a squad training on four co
     await expect.poll(() => lastRowOfBookingIsOccupied(page, match, "15:30"), {
       message: "on a wide screen the last row of the match is drawn occupied", timeout: 10_000
     }).toBe(true);
+    await expectNoWcagViolations(page);
   } finally {
     await journeyService.executeSql(`
       DELETE FROM booking WHERE id IN ('${own}', '${match}', '${squad}');
