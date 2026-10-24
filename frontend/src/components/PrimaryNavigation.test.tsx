@@ -67,7 +67,7 @@ describe("PrimaryNavigation", () => {
       .toBeLessThanOrEqual(4);
   });
 
-  it("given an administrator, when rendered, then compact phone labels keep the full accessible destination names", () => {
+  it("given an administrator, when rendered, then visible destination labels name the links and full labels describe them", () => {
     // when
     show(administrator);
 
@@ -79,7 +79,8 @@ describe("PrimaryNavigation", () => {
       ["administration", "nav.administration", "nav.administrationCompact"]
     ];
     for (const [testId, fullLabel, compactLabel] of destinations) {
-      expect(screen.getByTestId(`${testId}-link`)).toHaveAccessibleName(fullLabel);
+      expect(screen.getByTestId(`${testId}-link`)).toHaveAccessibleName(`${compactLabel} ${fullLabel}`);
+      expect(screen.getByTestId(`${testId}-link`)).toHaveAccessibleDescription(fullLabel);
       expect(screen.getByTestId(`${testId}-compact-label`)).toHaveTextContent(compactLabel);
       expect(screen.getByTestId(`${testId}-full-label`)).toHaveTextContent(fullLabel);
       expect(screen.getByTestId(`${testId}-icon`)).toHaveAttribute("aria-hidden", "true");
@@ -171,7 +172,8 @@ describe("PrimaryNavigation", () => {
       // then
       const link = await screen.findByTestId("my-dependants-link");
       expect(link).toHaveAttribute("href", "/my-dependants");
-      expect(link).toHaveAccessibleName("nav.myDependants");
+      expect(link).toHaveAccessibleName("nav.myDependantsCompact nav.myDependants");
+      expect(link).toHaveAccessibleDescription("nav.myDependants");
       expect(screen.getByTestId("my-dependants-compact-label")).toHaveTextContent("nav.myDependantsCompact");
     });
 
