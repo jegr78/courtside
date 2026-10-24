@@ -8,12 +8,12 @@
     "device": "node device/iphone.mjs"
   },
   "dependencies": {
-    "@axe-core/playwright": "4.13.0",
-    "@playwright/test": "1.64.0"
+    "@axe-core/playwright": "4.14.0",
+    "@playwright/test": "1.64.1"
   },
   "overrides": {
     "@axe-core/playwright": {
-      "playwright-core": "1.64.0"
+      "playwright-core": "1.64.1"
     }
   },
   "devDependencies": {

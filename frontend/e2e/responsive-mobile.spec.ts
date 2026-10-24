@@ -3,6 +3,7 @@ import { routePattern } from "./declared-routes";
 import { become, concretePath, PERSONAS, personas, routerPages } from "./page-sweep";
 import { expect, expectAdministrationOverview, expectShownAsEmpty, routeLongSeries, selectJourneyDate, seriesBookingId, test } from "./fixtures";
 import { LEAGUE_MATCH_CARD, MEMBER_BOOKING_CARD } from "./shipped-rows";
+import { expectNoWcagViolations } from "./accessibility-checks";
 
 async function expectNoHorizontalOverflow(page: import("@playwright/test").Page) {
   const overflow = await page.evaluate(() => {
@@ -48,7 +49,7 @@ async function signIn(page: import("@playwright/test").Page, username: string) {
 
 async function expectPrimaryNavigationFits(
   page: import("@playwright/test").Page,
-  accessibleNames: string[]
+  accessibleDescriptions: string[]
 ) {
   const bar = page.getByTestId("primary-navigation-bar");
   await expect(bar).toBeVisible();
@@ -65,14 +66,21 @@ async function expectPrimaryNavigationFits(
       right: barBounds.right
     };
   });
-  expect(layout.links).toHaveLength(accessibleNames.length);
+  expect(layout.links).toHaveLength(accessibleDescriptions.length);
   expect(layout.scrollWidth).toBeLessThanOrEqual(layout.clientWidth);
   for (const link of layout.links) {
     expect(link.visible).toBe(true);
     expect(link.left).toBeGreaterThanOrEqual(layout.left);
     expect(link.right).toBeLessThanOrEqual(layout.right);
   }
-  for (const name of accessibleNames) await expect(page.getByRole("link", { name, exact: true })).toBeVisible();
+  const destinations = ["court-plan", "my-bookings", "my-messages", "administration"];
+  for (const [index, description] of accessibleDescriptions.entries()) {
+    const destination = destinations[index];
+    const link = bar.getByTestId(`${destination}-link`);
+    await expect(link).toBeVisible();
+    await expect(link).toHaveAccessibleName(await link.getByTestId(`${destination}-compact-label`).innerText());
+    await expect(link).toHaveAccessibleDescription(description);
+  }
 }
 
 test("administrator and member destinations fit the narrow phone bar", async ({ page }) => {
@@ -1276,6 +1284,7 @@ test("given an own booking beside a league match and a squad training on four co
       await expect.poll(() => lastRowOfBookingIsOccupied(page, match, "15:30"), {
         message: `at ${width} px the last row of the match is drawn occupied, not left blank`, timeout: 10_000
       }).toBe(true);
+      await expectNoWcagViolations(page);
     }
 
     // when
@@ -1298,6 +1307,7 @@ test("given an own booking beside a league match and a squad training on four co
     await expect.poll(() => lastRowOfBookingIsOccupied(page, match, "15:30"), {
       message: "on a wide screen the last row of the match is drawn occupied", timeout: 10_000
     }).toBe(true);
+    await expectNoWcagViolations(page);
   } finally {
     await journeyService.executeSql(`
       DELETE FROM booking WHERE id IN ('${own}', '${match}', '${squad}');
