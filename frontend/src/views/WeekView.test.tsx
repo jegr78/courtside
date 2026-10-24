@@ -2327,7 +2327,7 @@ it("given a gap between the open rows and a booking's rows, when the time falls 
 
   // then
   const line = await screen.findByTestId("current-time-line");
-  expect(line, "eight open rows, then half of the 18:00 row, 40 pixels each below the 48-pixel header")
+  expect(line, "without layout the estimate counts eight open rows, then half of the 18:00 row, 40 pixels each below the 48-pixel header")
     .toHaveStyle({ top: "388px" });
 });
 
@@ -2973,4 +2973,41 @@ it("given rendered mobile rows taller than the configured slot height, when the 
   // then
   const line = await screen.findByTestId("current-time-line");
   await waitFor(() => expect(line.style.top).toBe("422px"));
+});
+
+it("given a placed current line, when the rows change height on resize or layout, then the line follows the containing row", async () => {
+  // given
+  const observed: ResizeObserverCallback[] = [];
+  vi.stubGlobal("ResizeObserver", class {
+    constructor(private readonly callback: ResizeObserverCallback) {}
+    observe(target: Element) { if (target.tagName === "TABLE") observed.push(this.callback); }
+    disconnect() {}
+  });
+  let row = new DOMRect(0, 500, 300, 44);
+  vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+    if (this.dataset.testid === "week-grid") return new DOMRect(0, 100, 300, 300);
+    if (this.dataset.slot === "12:00") return row;
+    return new DOMRect();
+  });
+  try {
+    render(<WeekView today={clubInstant("12:15")} />);
+    const line = await screen.findByTestId("current-time-line");
+    await waitFor(() => expect(line.style.top).toBe("422px"));
+
+    // when
+    row = new DOMRect(0, 560, 300, 60);
+    act(() => { window.dispatchEvent(new Event("resize")); });
+
+    // then
+    expect(line.style.top, "a window resize re-measures the row: 460 above it plus half of 60").toBe("490px");
+
+    // when
+    row = new DOMRect(0, 620, 300, 80);
+    act(() => observed.forEach((callback) => callback([], {} as ResizeObserver)));
+
+    // then
+    expect(line.style.top, "a layout change of the table re-measures the row: 520 above it plus half of 80").toBe("560px");
+  } finally {
+    vi.unstubAllGlobals();
+  }
 });

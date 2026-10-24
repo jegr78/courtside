@@ -32,10 +32,14 @@ for (const viewport of [
     expect(line).not.toBeNull();
     expect(row).not.toBeNull();
     expect(header).not.toBeNull();
+    const visibleBottom = await page.evaluate(() => {
+      const bar = document.querySelector<HTMLElement>('[data-testid="primary-navigation-bar"]');
+      return bar && getComputedStyle(bar).position === "fixed" ? bar.getBoundingClientRect().top : window.innerHeight;
+    });
     expect(row!.y).toBeGreaterThanOrEqual(header!.y + header!.height - 1);
-    expect(row!.y + row!.height).toBeLessThanOrEqual(viewport.height + 1);
+    expect(row!.y + row!.height, "the current hour ends above the fixed navigation bar").toBeLessThanOrEqual(visibleBottom + 1);
     expect(line!.y).toBeGreaterThanOrEqual(row!.y);
     expect(line!.y + line!.height).toBeLessThanOrEqual(row!.y + row!.height);
-    expect(line!.y + line!.height).toBeLessThanOrEqual(viewport.height);
+    expect(line!.y + line!.height, "the now-line ends above the fixed navigation bar").toBeLessThanOrEqual(visibleBottom);
   });
 }

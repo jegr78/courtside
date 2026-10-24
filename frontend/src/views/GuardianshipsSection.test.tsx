@@ -255,23 +255,22 @@ describe("GuardianshipsSection", () => {
     expect(remove).toHaveBeenCalledTimes(1);
     expect(remove).toHaveBeenCalledWith("person-1", "relationship-1");
   });
-});
 
+  it("given closed and open calendar ranges, when the language changes, then the displayed dates follow the locale", async () => {
+    // given
+    vi.spyOn(api, "guardianRelationships").mockResolvedValue([actingForJohn, actedForByMary]);
+    await i18n.changeLanguage("en");
+    show();
+    const entry = await screen.findByTestId("guardianship-relationship-2");
+    expect(entry).toHaveTextContent("Jan 1, 2025");
+    expect(entry).toHaveTextContent("Jun 1, 2025");
 
-it("given closed and open calendar ranges, when the language changes, then the displayed dates follow the locale", async () => {
-  // given
-  vi.spyOn(api, "guardianRelationships").mockResolvedValue([actingForJohn, actedForByMary]);
-  await i18n.changeLanguage("en");
-  show();
-  const entry = await screen.findByTestId("guardianship-relationship-2");
-  expect(entry).toHaveTextContent("Jan 1, 2025");
-  expect(entry).toHaveTextContent("Jun 1, 2025");
+    // when
+    await act(() => i18n.changeLanguage("de"));
 
-  // when
-  await act(() => i18n.changeLanguage("de"));
-
-  // then
-  expect(entry).toHaveTextContent("01.01.2025");
-  expect(entry).toHaveTextContent("01.06.2025");
-  expect(screen.getByTestId("guardianship-relationship-1")).toHaveTextContent("01.10.2026");
+    // then
+    expect(entry).toHaveTextContent("01.01.2025");
+    expect(entry).toHaveTextContent("01.06.2025");
+    expect(screen.getByTestId("guardianship-relationship-1")).toHaveTextContent("01.10.2026");
+  });
 });
