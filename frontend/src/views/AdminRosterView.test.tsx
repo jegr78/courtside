@@ -237,7 +237,8 @@ describe("AdminRosterView", () => {
     expect(await screen.findByTestId("roster-membership-person-1")).toHaveTextContent("Adults");
     const ended = screen.getByTestId("roster-membership-person-3");
     expect(ended).not.toHaveTextContent("Adults");
-    expect(ended).toHaveTextContent("2026-03-31");
+    expect(ended, "the end day follows the application language").toHaveTextContent("Mar 31, 2026");
+    expect(ended).not.toHaveTextContent("2026-03-31");
   });
 
   it("given a membership the server reports as beginning later, when the list is read, then it shows its type with the day it begins whatever the browser's calendar says", async () => {
@@ -251,7 +252,8 @@ describe("AdminRosterView", () => {
     // then
     const label = await screen.findByTestId("roster-membership-person-6");
     expect(label, "a scheduled period names the type it will carry").toHaveTextContent("Adults");
-    expect(label, "and the day it begins").toHaveTextContent("2000-01-01");
+    expect(label, "and the day it begins in the application language").toHaveTextContent("Jan 1, 2000");
+    expect(label).not.toHaveTextContent("2000-01-01");
     expect(label.textContent, "it is not shown as a plain current type").not.toBe("Adults");
   });
 
