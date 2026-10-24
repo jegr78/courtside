@@ -609,9 +609,10 @@ test("given a desktop window shorter than the navigation, when an administrative
   await expect(page.getByTestId("logo-url")).toBeEnabled();
   const measured = await page.evaluate(() => {
     const frame = document.querySelector("[data-testid='admin-navigation-frame']")!;
+    const scroll = document.querySelector("[data-testid='admin-navigation-scroll']")!;
     const shell = document.querySelector("[data-testid='admin-shell']")!;
     return {
-      scrolls: frame.scrollHeight > frame.clientHeight,
+      scrolls: scroll.scrollHeight > scroll.clientHeight,
       end: frame.getBoundingClientRect().bottom + window.scrollY
         + document.documentElement.scrollHeight - (shell.getBoundingClientRect().bottom + window.scrollY),
       viewport: window.innerHeight

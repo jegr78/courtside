@@ -1,8 +1,12 @@
 import { useLayoutEffect, useRef } from "react";
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
 import { AdminNavigation } from "./AdminNavigation";
+import { ScrollContinuation } from "./ScrollContinuation";
+import { useScrollContinuation } from "./useScrollContinuation";
 
 export function AdminShell({ administrator = true }: { administrator?: boolean }) {
+  const { pathname } = useLocation();
+  const { body, content, continues, measure: measureContinuation } = useScrollContinuation(true, pathname);
   const shell = useRef<HTMLDivElement>(null);
   const frame = useRef<HTMLDivElement>(null);
 
@@ -22,11 +26,12 @@ export function AdminShell({ administrator = true }: { administrator?: boolean }
     };
   }, []);
 
-  // A page keeps its own height rather than being stretched to the navigation's, which would spread
-  // a short page's rows apart; the navigation still fills the row, because sticky needs the travel.
   return <div ref={shell} data-testid="admin-shell" className="grid w-full max-w-7xl gap-6 self-start lg:grid-cols-[15rem_1fr] lg:items-start lg:gap-8">
-    <div ref={frame} data-testid="admin-navigation-frame" className="lg:sticky lg:top-8 lg:max-h-[max(12rem,min(calc(100vh-4rem),var(--admin-navigation-room,100vh)))] lg:self-stretch lg:overflow-y-auto">
-      <AdminNavigation administrator={administrator} />
+    <div ref={frame} data-testid="admin-navigation-frame" className="lg:sticky lg:top-8 lg:max-h-[max(12rem,min(calc(100vh-4rem),var(--admin-navigation-room,100vh)))] lg:self-stretch lg:flex lg:min-h-0 lg:flex-col">
+      <div ref={body} data-testid="admin-navigation-scroll" onScroll={measureContinuation} className="lg:min-h-0 lg:overflow-y-auto lg:overscroll-contain">
+        <div ref={content}><AdminNavigation administrator={administrator} /></div>
+      </div>
+      <div className="hidden shrink-0 lg:block"><ScrollContinuation continues={continues} testId="admin-sidebar-continues" /></div>
     </div>
     <Outlet />
   </div>;

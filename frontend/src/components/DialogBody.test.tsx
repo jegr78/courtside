@@ -104,3 +104,15 @@ it("given a browser without ResizeObserver, when the body renders, then it shows
   expect(screen.getByTestId("field"), "the content renders without the observer").toBeInTheDocument();
   expect(screen.queryByTestId("dialog-continues"), "nothing measured means no signal").toBeNull();
 });
+
+it("given only trailing padding below the visible form, when the member scrolls, then no continuation cue remains", () => {
+  // given
+  render(<DialogBody><input /></DialogBody>);
+  const body = screen.getByTestId("dialog-body");
+  body.style.paddingBottom = "4px";
+  laidOut(body, { scrollHeight: 564, clientHeight: 276, scrollTop: 284 });
+  // when
+  fireEvent.scroll(body);
+  // then
+  expect(screen.queryByTestId("dialog-continues")).toBeNull();
+});

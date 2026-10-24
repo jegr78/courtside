@@ -8,6 +8,8 @@ import { initialTheme, setTheme, type Theme } from "../theme";
 import { Alert } from "./Alert";
 import { Button } from "./Button";
 import { LocaleSelect } from "./LocaleSelect";
+import { ScrollContinuation } from "./ScrollContinuation";
+import { useScrollContinuation } from "./useScrollContinuation";
 
 const controlClass = "form-control rounded-lg border px-3 py-2 text-sm font-semibold";
 
@@ -22,11 +24,10 @@ export function Preferences({ authenticated = false, supported, signedOut }: {
   const [failure, setFailure] = useState<string>();
   const session = useRef(0);
   const panel = useRef<HTMLDivElement>(null);
+  const { body, content, continues, measure: measureContinuation } = useScrollContinuation(open);
   const [panelHeight, setPanelHeight] = useState<number>();
   const locale = supportedLocale(i18n.resolvedLanguage) ?? i18n.resolvedLanguage ?? "";
 
-  // A message belongs to the session that raised it: the next one starts without it, and a request
-  // answering after the change no longer writes onto it.
   useLayoutEffect(() => {
     session.current += 1;
     setFailure(undefined);
@@ -48,8 +49,6 @@ export function Preferences({ authenticated = false, supported, signedOut }: {
     if (session.current === raisedDuring) setFailure(message);
   }
 
-  // Stored on the account rather than in the browser, so the next message the instance sends
-  // arrives in the language the member reads.
   async function changeLocale(value: SupportedLocale) {
     const raisedDuring = session.current;
     let applied: boolean;
@@ -68,8 +67,6 @@ export function Preferences({ authenticated = false, supported, signedOut }: {
     }
   }
 
-  // Signing out belongs to the account, beside language and appearance, rather than standing on
-  // every page as the largest and most colourful control on it.
   async function logout() {
     setFailure(undefined);
     const raisedDuring = session.current;
@@ -100,7 +97,9 @@ export function Preferences({ authenticated = false, supported, signedOut }: {
         {t(authenticated ? "preferences.accountMenu" : "preferences.menu")}
       </summary>
       <div ref={panel} style={{ maxHeight: panelHeight }}
-        className="surface-panel absolute left-0 z-30 mt-2 grid w-64 overflow-y-auto overscroll-contain max-w-[calc(100vw-2rem)] gap-4 rounded-xl border p-4 shadow-[0_20px_50px_var(--cs-shadow)] sm:left-auto sm:right-0">
+        className="surface-panel absolute left-0 z-30 mt-2 flex w-64 max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-xl border shadow-[0_20px_50px_var(--cs-shadow)] sm:left-auto sm:right-0">
+        <div ref={body} data-testid="preferences-body" onScroll={measureContinuation} className="min-h-0 overflow-y-auto overscroll-contain">
+          <div ref={content} className="grid gap-4 p-4 pb-1">
         <label className="grid gap-2 text-sm font-semibold" htmlFor="locale-preference">
           {t("preferences.language")}
           <LocaleSelect id="locale-preference" className={controlClass} value={locale} supported={supported} changed={(value) => void changeLocale(value)} />
@@ -117,6 +116,9 @@ export function Preferences({ authenticated = false, supported, signedOut }: {
           {t("accountSecurity.menu")}
         </Link>}
         {authenticated && <Button variant="secondary" type="button" data-testid="logout" onClick={() => void logout()}>{t("auth.logout")}</Button>}
+          </div>
+        </div>
+        <ScrollContinuation continues={continues} testId="preferences-continues" />
       </div>
     </details>
   </div>;

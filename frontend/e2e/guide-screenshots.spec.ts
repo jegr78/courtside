@@ -463,8 +463,8 @@ async function capture(page: Page, name: string, visualDate: string): Promise<vo
 
 // A guide shows every destination, so the window grows by what the navigation's own frame would scroll.
 async function showTheWholeNavigation(page: Page): Promise<void> {
-  const frame = page.getByTestId("admin-navigation-frame");
-  const hidden = () => frame.evaluate((element) => element.scrollHeight - element.clientHeight);
+  const body = page.getByTestId("admin-navigation-scroll");
+  const hidden = () => body.evaluate((element) => element.scrollHeight - element.clientHeight);
   const size = page.viewportSize();
   const overflow = await hidden();
   if (size !== null && overflow > 0) await page.setViewportSize({ width: size.width, height: size.height + overflow });
