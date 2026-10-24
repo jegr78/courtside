@@ -544,7 +544,12 @@ test("given a phone in landscape, when a member opens the account menu, then sig
   const pageScroll = await page.evaluate(() => window.scrollY);
   const panelBounds = await panel.boundingBox();
   expect(panelBounds!.y + panelBounds!.height, "the menu ends inside the viewport").toBeLessThanOrEqual(343);
+  const cue = page.getByTestId("preferences-continues");
+  await expect(cue, "the clipped menu shows that it continues").toBeVisible({ timeout: 10_000 });
+  const cueBounds = await cue.boundingBox();
+  expect(cueBounds!.y + cueBounds!.height, "the cue ends inside the viewport").toBeLessThanOrEqual(343);
   await page.getByTestId("preferences-body").evaluate((element) => { element.scrollTop = element.scrollHeight; });
+  await expect(cue, "the cue goes once the end of the menu is in view").toHaveCount(0, { timeout: 10_000 });
   const logout = await page.getByTestId("logout").boundingBox();
   expect(logout!.y, "sign out starts inside the viewport").toBeGreaterThanOrEqual(0);
   expect(logout!.y + logout!.height, "sign out ends inside the viewport").toBeLessThanOrEqual(343);

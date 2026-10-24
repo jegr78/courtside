@@ -207,60 +207,59 @@ describe("AccountSecurityView", () => {
     await waitFor(() => expect(signedOut).toHaveBeenCalledOnce());
     expect(passwordChanged).not.toHaveBeenCalled();
   });
-});
+
+  it("given session instants and a club zone, when the locale changes, then both dates retain the club time", async () => {
+    // given
+    vi.spyOn(api, "accountSessions").mockResolvedValue([{ ...current, createdAt: "2026-10-23T16:53:00Z", lastActivityAt: "2026-10-23T16:53:00Z" }]);
+    const club = { clubName: "Example Tennis Club", primaryColor: "#000000", accentColor: "#ffffff", defaultLocale: "de", supportedLocales: ["de", "en"], slotMinutes: 60, timeZone: "Europe/Berlin" };
+    await i18n.changeLanguage("de");
+    const rendered = render(<WithClubConfiguration club={club}><AccountSecurityView passwordChanged={vi.fn()} signedOut={vi.fn()} /></WithClubConfiguration>);
+    const view = await renderedSecurityView();
+    expect(view.textContent?.match(/18:53/g)).toHaveLength(2);
+
+    // when
+    await act(() => i18n.changeLanguage("en"));
+
+    // then
+    expect(view.textContent?.match(/6:53 PM/g)).toHaveLength(2);
+    rendered.rerender(<WithClubConfiguration club={{ ...club, timeZone: "America/New_York" }}><AccountSecurityView passwordChanged={vi.fn()} signedOut={vi.fn()} /></WithClubConfiguration>);
+    expect(view.textContent?.match(/12:53 PM/g)).toHaveLength(2);
+  });
+
+  it.each([undefined, "Configuration unavailable"])("given an unavailable club configuration %s, when sessions arrive, then no browser-zone dates appear", async (error) => {
+    // given
+    vi.spyOn(api, "accountSessions").mockResolvedValue([current]);
+
+    // when
+    render(<ClubConfigurationContext value={{ error, load: vi.fn(), changed: vi.fn() }}><AccountSecurityView passwordChanged={vi.fn()} signedOut={vi.fn()} /></ClubConfigurationContext>);
+    const view = await renderedSecurityView();
+
+    // then
+    expect(view).not.toHaveTextContent("Sep 7, 2026");
+    if (error) expect(screen.getByTestId("load-failure")).toHaveTextContent(error);
+    else expect(screen.getByRole("status")).toBeInTheDocument();
+  });
 
 
-it("given session instants and a club zone, when the locale changes, then both dates retain the club time", async () => {
-  // given
-  vi.spyOn(api, "accountSessions").mockResolvedValue([{ ...current, createdAt: "2026-10-23T16:53:00Z", lastActivityAt: "2026-10-23T16:53:00Z" }]);
-  const club = { clubName: "Example Tennis Club", primaryColor: "#000000", accentColor: "#ffffff", defaultLocale: "de", supportedLocales: ["de", "en"], slotMinutes: 60, timeZone: "Europe/Berlin" };
-  await i18n.changeLanguage("de");
-  const rendered = render(<WithClubConfiguration club={club}><AccountSecurityView passwordChanged={vi.fn()} signedOut={vi.fn()} /></WithClubConfiguration>);
-  const view = await renderedSecurityView();
-  expect(view.textContent?.match(/18:53/g)).toHaveLength(2);
+  it("given a failed club configuration, when loading is retried, then session dates return in the club zone", async () => {
+    // given
+    vi.spyOn(api, "accountSessions").mockResolvedValue([{ ...current, createdAt: "2026-10-23T16:53:00Z", lastActivityAt: "2026-10-23T16:53:00Z" }]);
+    const load = vi.fn();
+    const changed = vi.fn();
+    await i18n.changeLanguage("de");
+    const rendered = render(<ClubConfigurationContext value={{ error: "Configuration unavailable", load, changed }}><AccountSecurityView passwordChanged={vi.fn()} signedOut={vi.fn()} /></ClubConfigurationContext>);
+    await renderedSecurityView();
+    expect(screen.getByTestId("load-failure")).toHaveTextContent("Configuration unavailable");
+    expect(screen.getByTestId("end-current-session")).toBeEnabled();
+    const initialLoads = load.mock.calls.length;
 
-  // when
-  await act(() => i18n.changeLanguage("en"));
+    // when
+    await userEvent.click(screen.getByTestId("retry-load"));
+    expect(load).toHaveBeenCalledTimes(initialLoads + 1);
+    rendered.rerender(<ClubConfigurationContext value={{ club: { clubName: "Example Tennis Club", primaryColor: "#000000", accentColor: "#ffffff", defaultLocale: "de", supportedLocales: ["de", "en"], slotMinutes: 60, timeZone: "Europe/Berlin" }, load, changed }}><AccountSecurityView passwordChanged={vi.fn()} signedOut={vi.fn()} /></ClubConfigurationContext>);
 
-  // then
-  expect(view.textContent?.match(/6:53 PM/g)).toHaveLength(2);
-  rendered.rerender(<WithClubConfiguration club={{ ...club, timeZone: "America/New_York" }}><AccountSecurityView passwordChanged={vi.fn()} signedOut={vi.fn()} /></WithClubConfiguration>);
-  expect(view.textContent?.match(/12:53 PM/g)).toHaveLength(2);
-});
-
-it.each([undefined, "Configuration unavailable"])("given an unavailable club configuration %s, when sessions arrive, then no browser-zone dates appear", async (error) => {
-  // given
-  vi.spyOn(api, "accountSessions").mockResolvedValue([current]);
-
-  // when
-  render(<ClubConfigurationContext value={{ error, load: vi.fn(), changed: vi.fn() }}><AccountSecurityView passwordChanged={vi.fn()} signedOut={vi.fn()} /></ClubConfigurationContext>);
-  const view = await renderedSecurityView();
-
-  // then
-  expect(view).not.toHaveTextContent("Sep 7, 2026");
-  if (error) expect(screen.getByTestId("load-failure")).toHaveTextContent(error);
-  else expect(screen.getByRole("status")).toBeInTheDocument();
-});
-
-
-it("given a failed club configuration, when loading is retried, then session dates return in the club zone", async () => {
-  // given
-  vi.spyOn(api, "accountSessions").mockResolvedValue([{ ...current, createdAt: "2026-10-23T16:53:00Z", lastActivityAt: "2026-10-23T16:53:00Z" }]);
-  const load = vi.fn();
-  const changed = vi.fn();
-  await i18n.changeLanguage("de");
-  const rendered = render(<ClubConfigurationContext value={{ error: "Configuration unavailable", load, changed }}><AccountSecurityView passwordChanged={vi.fn()} signedOut={vi.fn()} /></ClubConfigurationContext>);
-  await renderedSecurityView();
-  expect(screen.getByTestId("load-failure")).toHaveTextContent("Configuration unavailable");
-  expect(screen.getByTestId("end-current-session")).toBeEnabled();
-  const initialLoads = load.mock.calls.length;
-
-  // when
-  await userEvent.click(screen.getByTestId("retry-load"));
-  expect(load).toHaveBeenCalledTimes(initialLoads + 1);
-  rendered.rerender(<ClubConfigurationContext value={{ club: { clubName: "Example Tennis Club", primaryColor: "#000000", accentColor: "#ffffff", defaultLocale: "de", supportedLocales: ["de", "en"], slotMinutes: 60, timeZone: "Europe/Berlin" }, load, changed }}><AccountSecurityView passwordChanged={vi.fn()} signedOut={vi.fn()} /></ClubConfigurationContext>);
-
-  // then
-  expect(screen.queryByTestId("load-failure")).toBeNull();
-  expect(screen.getByTestId("account-security-view").textContent?.match(/18:53/g)).toHaveLength(2);
+    // then
+    expect(screen.queryByTestId("load-failure")).toBeNull();
+    expect(screen.getByTestId("account-security-view").textContent?.match(/18:53/g)).toHaveLength(2);
+  });
 });

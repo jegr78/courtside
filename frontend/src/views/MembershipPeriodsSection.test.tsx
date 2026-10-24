@@ -166,23 +166,22 @@ describe("MembershipPeriodsSection", () => {
     expect(removing).not.toHaveBeenCalled();
     expect(screen.getByTestId("membership-period-period-2")).toBeInTheDocument();
   });
-});
 
+  it("given closed and open calendar ranges, when the language changes, then the displayed dates follow the locale", async () => {
+    // given
+    vi.spyOn(api, "membershipPeriods").mockResolvedValue([ended, running]);
+    await i18n.changeLanguage("en");
+    show();
+    const entry = await screen.findByTestId("membership-period-period-1");
+    expect(entry).toHaveTextContent("Jan 1, 2020");
+    expect(entry).toHaveTextContent("Jan 1, 2021");
 
-it("given closed and open calendar ranges, when the language changes, then the displayed dates follow the locale", async () => {
-  // given
-  vi.spyOn(api, "membershipPeriods").mockResolvedValue([ended, running]);
-  await i18n.changeLanguage("en");
-  show();
-  const entry = await screen.findByTestId("membership-period-period-1");
-  expect(entry).toHaveTextContent("Jan 1, 2020");
-  expect(entry).toHaveTextContent("Jan 1, 2021");
+    // when
+    await act(() => i18n.changeLanguage("de"));
 
-  // when
-  await act(() => i18n.changeLanguage("de"));
-
-  // then
-  expect(entry).toHaveTextContent("01.01.2020");
-  expect(entry).toHaveTextContent("01.01.2021");
-  expect(screen.getByTestId("membership-period-period-2")).toHaveTextContent("01.01.2021");
+    // then
+    expect(entry).toHaveTextContent("01.01.2020");
+    expect(entry).toHaveTextContent("01.01.2021");
+    expect(screen.getByTestId("membership-period-period-2")).toHaveTextContent("01.01.2021");
+  });
 });
