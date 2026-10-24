@@ -67,6 +67,33 @@ test("given a narrow desktop message log, when findings and long identifiers ren
   }), "detailed findings can still wrap at spaces").toBeGreaterThan(1);
 });
 
+test("given a phone message log, when a finding is a chain of exception types, then it wraps inside its card without widening the page", async ({ page }) => {
+  test.setTimeout(60_000);
+  // given
+  await page.addInitScript(() => window.localStorage.setItem("courtside.locale", "de"));
+  await page.route("**/api/admin/messages?**", (route) => route.fulfill({ json: {
+    entries: [{
+      id: "message-0", queuedAt: "2026-10-23T16:53:00Z", settledAt: "2026-10-23T16:53:01Z",
+      kind: "CREDENTIALS_NEW_ACCOUNT", state: "REFUSED",
+      reason: "MailSendException <- SMTPAddressFailedException", statusCode: 550, messageId: "<message-0@example.org>",
+      personId: "22222222-2222-2222-2222-222222222222", personName: "Richard Miles"
+    }], nextCursor: null
+  } }));
+  await signIn(page);
+
+  // when
+  await page.setViewportSize({ width: 375, height: 800 });
+  await page.goto("/admin/messages");
+  await expect(page.getByTestId("message-row")).toHaveCount(1, { timeout: 10_000 });
+
+  // then
+  const outcome = page.getByTestId("message-outcome");
+  const row = await page.getByTestId("message-row").boundingBox();
+  const box = await outcome.boundingBox();
+  expect(box!.x + box!.width, "the finding stays inside its card").toBeLessThanOrEqual(row!.x + row!.width + 0.5);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth), "the page does not scroll sideways at 375px").toBeLessThanOrEqual(375);
+});
+
 async function fieldOffsets(page: Page) {
   return Promise.all(["open", "close", "closed"].map((field) => page.getByTestId(`hours-${field}-FRIDAY`).evaluate((element) => {
     const card = element.closest("article")!.getBoundingClientRect();
