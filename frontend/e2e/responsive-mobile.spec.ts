@@ -606,16 +606,14 @@ test("a member reaches every destination from the bottom of a touch viewport", a
   for (const width of [page.viewportSize()!.width, 320]) {
     // when
     await page.setViewportSize({ width, height: 640 });
-    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
-    const overlap = await page.evaluate(() => {
+
+    // then — the emulated resize may reset the scroll position after it returns, so each attempt scrolls again
+    await expect.poll(() => page.evaluate(() => {
+      window.scrollTo(0, document.documentElement.scrollHeight);
       const top = document.querySelector("[data-testid='primary-navigation-bar']")!.getBoundingClientRect().top;
       const lowest = Math.max(...[...document.querySelectorAll("footer > *")].map((item) => item.getBoundingClientRect().bottom));
       return lowest - top;
-    });
-
-    // then
-    expect(overlap, `at ${width} px the footer's last item ends ${overlap} px below the top of the bottom bar`)
-      .toBeLessThanOrEqual(0);
+    }), { message: `at ${width} px the footer's last item ends below the top of the bottom bar` }).toBeLessThanOrEqual(0);
   }
 });
 
