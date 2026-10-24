@@ -8,6 +8,15 @@ import { contactSheets, findFont, imageMagick } from "../acceptance/report/sheet
 import { renderReport } from "../acceptance/report/html.mjs";
 import { applyReview } from "../acceptance/report/review.mjs";
 
+const required = process.env.COURTSIDE_SHEET_RENDERER === "required";
+const runsWithoutTooling = !required && !(imageMagick() && findFont());
+
+test("given a job that requires the sheet renderer, when the contact sheet tests start, then ImageMagick and a font are available", { skip: !required }, () => {
+  // then
+  assert.ok(imageMagick(), "the job provides ImageMagick, otherwise the sheet tests below would not run");
+  assert.ok(findFont(), "the job provides a TrueType font for the sheet labels");
+});
+
 function convert(args) {
   const [binary, argv] = imageMagick().convert(args);
   return execFileSync(binary, argv, { maxBuffer: 64 * 1024 * 1024 });
@@ -21,7 +30,7 @@ function shot(run, project, width, height, full = true) {
   return path;
 }
 
-test("given native desktop and phone captures, when sheets are rendered, then every source pixel survives with bounded device groups", { skip: !imageMagick() || !findFont() }, () => {
+test("given native desktop and phone captures, when sheets are rendered, then every source pixel survives with bounded device groups", { skip: runsWithoutTooling }, () => {
   // given
   const run = mkdtempSync(join(tmpdir(), "readable-sheets-"));
   try {
@@ -61,7 +70,7 @@ test("given native desktop and phone captures, when sheets are rendered, then ev
   } finally { rmSync(run, { recursive: true, force: true }); }
 });
 
-test("given colliding screenshot names and a missing full page, when the report renders, then tiles link to distinct unchanged originals", { skip: !imageMagick() || !findFont() }, () => {
+test("given colliding screenshot names and a missing full page, when the report renders, then tiles link to distinct unchanged originals", { skip: runsWithoutTooling }, () => {
   // given
   const run = mkdtempSync(join(tmpdir(), "sheet-report-"));
   try {
@@ -78,13 +87,14 @@ test("given colliding screenshot names and a missing full page, when the report 
     const full = [...html.matchAll(/href="(img\/[^"]+\.png)"[^>]*>Full-page/g)];
     assert.equal(full.length, 1);
     assert.deepEqual(readFileSync(join(run, "report", full[0][1])), readFileSync(first.replace(/\.png$/, "-full.png")));
+    assert.match(html, /<section><h2>Contact sheets<\/h2>\s*<details class="sheet-gallery">/, "the gallery is its own report section");
     assert.match(html, /class="sheet-tiles"/);
     assert.match(html, /\.sheet-tiles img\s*\{[^}]*max-width:\s*none/);
   } finally { rmSync(run, { recursive: true, force: true }); }
 });
 
 
-test("given a truncated screenshot, when sheets are generated, then the report stays draft with unavailable evidence", { skip: !imageMagick() }, () => {
+test("given a truncated screenshot, when sheets are generated, then the report stays draft with unavailable evidence", { skip: !required && !imageMagick() }, () => {
   // given
   const run = mkdtempSync(join(tmpdir(), "broken-sheets-"));
   try {
