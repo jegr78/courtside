@@ -97,6 +97,26 @@ describe("AdminManagedAppointmentsView", () => {
     expect(api.managedAppointments, "a retry reads only what this role may see").not.toHaveBeenCalled();
   });
 
+  it("given a series start date that cannot be read, when previewing, then no preview is asked for and the field names the expected format", async () => {
+    // given
+    const previewSeries = vi.spyOn(api, "previewSeries");
+    show({ managesAppointments: false, createsSeries: true });
+    await userEvent.click(await screen.findByTestId("new-series"));
+    await userEvent.selectOptions(await screen.findByTestId("series-courts"), ["court-1"]);
+    await userEvent.selectOptions(await screen.findByTestId("series-card"), ["card-training"]);
+    await userEvent.type(screen.getByTestId("series-starts-on"), "9/7/2026");
+    await userEvent.type(screen.getByTestId("series-start-time"), "6:00 PM");
+    await userEvent.click(screen.getByTestId("series-weekday-MONDAY"));
+    await userEvent.type(screen.getByTestId("series-starts-on"), "x");
+
+    // when
+    await userEvent.click(screen.getByTestId("preview-series"));
+
+    // then
+    expect(previewSeries, "the start typed before is not previewed behind an unreadable draft").not.toHaveBeenCalled();
+    expect(screen.getByTestId("series-starts-on")).toHaveAttribute("aria-invalid", "true");
+  });
+
   it("given recurring work, when upcoming appointments load, then the bounded page is grouped and collapsed", async () => {
     // given / when
     show();

@@ -1,4 +1,5 @@
 import { expect, it } from "vitest";
+import type { DateTimeType } from "./DateTimeInput";
 import { formatDateTime, parseDateTime } from "./localizedDateTime";
 
 it("given application locales, when wall dates and times are formatted, then their formats follow that locale", () => {
@@ -26,5 +27,34 @@ it("given impossible or partial components, when parsed, then they never roll in
   }
   for (const time of ["24:00", "12:60", "12:30:60", "1:", "00:30 PM", "13:00 AM"]) {
     expect(parseDateTime(time, "time", time.includes("M") ? "en" : "de"), time).toBeNull();
+  }
+});
+
+it("given common spellings with single digits, spaces or a joined day period, when parsed, then they keep their canonical wall values", () => {
+  // given
+  const cases: [string, DateTimeType, string, string][] = [
+    ["1.1.2027", "date", "de", "2027-01-01"],
+    ["1. 2. 2026", "date", "de", "2026-02-01"],
+    ["1/2/2026", "date", "en", "2026-01-02"],
+    ["8:00", "time", "de", "08:00"],
+    ["8:05", "time", "en", "08:05"],
+    ["4:05 PM", "time", "en", "16:05"],
+    ["04:05PM", "time", "en", "16:05"],
+    ["4:05pm", "time", "en", "16:05"],
+    ["1.2.2026 8:00", "datetime-local", "de", "2026-02-01T08:00"],
+    ["1. 2. 2026 8:00", "datetime-local", "de", "2026-02-01T08:00"],
+    ["1/2/2026 4:05 PM", "datetime-local", "en", "2026-01-02T16:05"]
+  ];
+
+  // when / then
+  for (const [text, type, locale, expected] of cases) {
+    expect(parseDateTime(text, type, locale), `${text} in ${locale}`).toBe(expected);
+  }
+});
+
+it("given a two-digit year or a one-digit minute, when parsed, then the value is refused rather than guessed", () => {
+  // when / then
+  for (const [text, type, locale] of [["01.02.26", "date", "de"], ["1/2/26", "date", "en"], ["8:5", "time", "de"], ["1.2.202", "date", "de"]] as const) {
+    expect(parseDateTime(text, type, locale), text).toBeNull();
   }
 });

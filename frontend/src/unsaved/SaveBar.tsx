@@ -1,5 +1,7 @@
+import type { MouseEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../components/Button";
+import { refuseUnparsedDrafts } from "../components/unparsedDrafts";
 import { markId } from "./markId";
 import { useUnsavedMark } from "./registry";
 
@@ -27,7 +29,9 @@ export function SaveBar({ id, subject, saveTestId, unsaved, pending, discard, sa
               onClick={discard}>{t("unsaved.discardChanges")}</Button>
       <Button variant="primary" data-testid={saveTestId} disabled={pending} className="py-2"
               aria-describedby={markId(id)}
-              {...(form === undefined ? { type: "button", onClick: save } : { type: "submit", form })}>
+              {...(form === undefined ? { type: "button", onClick: (event: MouseEvent<HTMLButtonElement>) => {
+                if (!refuseUnparsedDrafts(event.currentTarget.closest("main"), (field) => !field.form && !field.closest('[role="dialog"]'))) save();
+              } } : { type: "submit", form })}>
         {t("admin.save")}
       </Button>
     </div>

@@ -45,14 +45,18 @@ function parsePart(value: string, locale: string, date: boolean): string | null 
   const parts = formatter(locale, date, !date && value.split(":").length === 3).formatToParts(new Date(Date.UTC(2026, 9, 3, 16, 5, 12)));
   const fields: string[] = [];
   const pattern = parts.map((part) => {
-    if (part.type === "literal") return normalize(part.value) === "" ? "\\s+" : part.value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    if (part.type === "literal") return `\\s*${normalize(part.value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*`;
     fields.push(part.type);
-    return part.type === "dayPeriod" ? "(AM|PM)" : part.type === "year" ? "(\\d{4})" : part.type === "second" ? "(\\d{2}(?:\\.\\d{1,3})?)" : "(\\d{2})";
+    return part.type === "dayPeriod" ? "(AM|PM)" : part.type === "year" ? "(\\d{4})" : part.type === "second" ? "(\\d{2}(?:\\.\\d{1,3})?)"
+      : part.type === "minute" ? "(\\d{2})" : "(\\d{1,2})";
   }).join("");
   const match = new RegExp(`^${pattern}$`, "i").exec(value);
-  if (!match) return null;
-  const values = Object.fromEntries(fields.map((field, index) => [field, match[index + 1]]));
-  if (date) return `${values.year}-${values.month}-${values.day}`;
+  const twentyFourHours = match || date ? null : /^(\d{1,2}):(\d{2})$/.exec(value);
+  const values: Record<string, string> | undefined = match
+    ? Object.fromEntries(fields.map((field, index) => [field, match[index + 1]]))
+    : twentyFourHours ? { hour: twentyFourHours[1], minute: twentyFourHours[2] } : undefined;
+  if (!values) return null;
+  if (date) return `${values.year}-${pad(Number(values.month))}-${pad(Number(values.day))}`;
   let hour = Number(values.hour);
   if (values.dayPeriod) {
     if (hour < 1 || hour > 12) return null;
@@ -67,10 +71,12 @@ export function parseDateTime(value: string, type: DateTimeType, locale: string)
   if (canonical(text, type)) return text;
   let parsed: string | null;
   if (type === "datetime-local") {
-    const separator = text.indexOf(" ");
-    const date = parsePart(text.slice(0, separator), locale, true);
-    const time = parsePart(text.slice(separator + 1), locale, false);
-    parsed = date && time ? `${date}T${time}` : null;
+    parsed = null;
+    for (let separator = text.indexOf(" "); separator > 0 && parsed === null; separator = text.indexOf(" ", separator + 1)) {
+      const date = parsePart(text.slice(0, separator).trim(), locale, true);
+      const time = parsePart(text.slice(separator + 1).trim(), locale, false);
+      parsed = date && time ? `${date}T${time}` : null;
+    }
   } else parsed = parsePart(text, locale, type === "date");
   return parsed && canonical(parsed, type) ? parsed : null;
 }

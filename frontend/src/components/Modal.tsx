@@ -1,4 +1,4 @@
-import { type KeyboardEvent, type ReactNode, useEffect, useRef } from "react";
+import { type KeyboardEvent, type ReactNode, useLayoutEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { DialogBody } from "./DialogBody";
 
@@ -14,7 +14,7 @@ export function Modal({ labelledBy, closed, width = "md", composed = false, test
 }) {
   const dialog = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : undefined;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";

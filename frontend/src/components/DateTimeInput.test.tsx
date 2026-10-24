@@ -1,8 +1,10 @@
+import type { FormEvent } from "react";
 import userEvent from "@testing-library/user-event";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
 import i18n from "../i18n";
 import { DateTimeInput } from "./DateTimeInput";
+import { refuseUnparsedDrafts } from "./unparsedDrafts";
 
 beforeEach(async () => {
   await i18n.changeLanguage("en");
@@ -90,7 +92,7 @@ it("given German values, when editing and blurring, then the visible draft stays
   // then
   expect(field).toHaveValue("29.02.");
   expect(field).toBeInvalid();
-  expect(changed).toHaveBeenLastCalledWith("");
+  expect(changed, "an unparsed draft never reports an empty value").not.toHaveBeenCalled();
 
   // when
   fireEvent.change(field, { target: { value: "29.02.2028" } });
@@ -124,7 +126,88 @@ it("given a named default date, when a form is edited and reset, then FormData a
   expect(new FormData(form).get("starts")).toBe("2026-10-03");
 });
 
-it("given bounds and a minute step, when invalid drafts or out-of-range times are entered, then form submission is blocked", async () => {
+it("given a saved date, when a draft cannot be parsed and the field is left, then the saved value stays and the field says what it expects", async () => {
+  // given
+  await i18n.changeLanguage("de");
+  const changed = vi.fn();
+  render(<DateTimeInput data-testid="ends" type="date" aria-label="Ends" value="2026-12-31" onValueChange={changed} />);
+  const field = screen.getByTestId("ends");
+
+  // when
+  fireEvent.change(field, { target: { value: "1.1.27" } });
+
+  // then
+  expect(changed, "an unparsed draft keeps the saved value").not.toHaveBeenCalled();
+  expect(field, "no error while the draft is still being typed").not.toHaveAttribute("aria-invalid");
+
+  // when
+  fireEvent.blur(field);
+
+  // then
+  expect(field).toHaveAttribute("aria-invalid", "true");
+  expect(screen.getByTestId("ends-invalid")).toHaveTextContent("Bitte einen gültigen Wert eingeben, zum Beispiel 22.11.2006.");
+  expect(field).toHaveAccessibleDescription(expect.stringContaining("Bitte einen gültigen Wert eingeben"));
+
+  // when
+  fireEvent.change(field, { target: { value: "1.1.2027" } });
+
+  // then
+  expect(changed).toHaveBeenLastCalledWith("2027-01-01");
+  expect(field).not.toHaveAttribute("aria-invalid");
+  expect(screen.queryByTestId("ends-invalid")).toBeNull();
+});
+
+it("given a form without browser validation, when it is submitted with an unparsed draft, then the submit handler never runs and the field is flagged and focused", () => {
+  // given
+  const submitted = vi.fn((event: FormEvent) => event.preventDefault());
+  render(<form noValidate onSubmit={submitted}>
+    <DateTimeInput data-testid="starts" name="starts" type="date" aria-label="Starts" defaultValue="2026-10-03" />
+    <DateTimeInput data-testid="ends" name="ends" type="time" aria-label="Ends" defaultValue="16:05" />
+    <button data-testid="submit" type="submit">Save</button>
+  </form>);
+  fireEvent.change(screen.getByTestId("ends"), { target: { value: "4:5 PM" } });
+
+  // when
+  fireEvent.click(screen.getByTestId("submit"));
+
+  // then
+  expect(submitted, "an unparsed draft refuses the submission").not.toHaveBeenCalled();
+  expect(screen.getByTestId("ends")).toHaveAttribute("aria-invalid", "true");
+  expect(screen.getByTestId("ends")).toHaveFocus();
+  expect(screen.getByTestId("starts")).not.toHaveAttribute("aria-invalid");
+
+  // when
+  fireEvent.change(screen.getByTestId("ends"), { target: { value: "4:05 PM" } });
+  fireEvent.click(screen.getByTestId("submit"));
+
+  // then
+  expect(submitted).toHaveBeenCalledOnce();
+});
+
+it("given a scope with an unparsed draft, when a save action asks to refuse unparsed drafts, then it refuses and flags only fields in scope", () => {
+  // given
+  render(<>
+    <div data-testid="scope"><DateTimeInput data-testid="inside" type="time" aria-label="Inside" defaultValue="" /></div>
+    <DateTimeInput data-testid="outside" type="time" aria-label="Outside" defaultValue="" />
+  </>);
+  fireEvent.change(screen.getByTestId("outside"), { target: { value: "x" } });
+
+  // when / then
+  expect(refuseUnparsedDrafts(screen.getByTestId("scope")), "a clean scope saves").toBe(false);
+
+  // when
+  fireEvent.change(screen.getByTestId("inside"), { target: { value: "25:00" } });
+  let refused = false;
+  act(() => { refused = refuseUnparsedDrafts(screen.getByTestId("scope")); });
+
+  // then
+  expect(refused).toBe(true);
+  expect(screen.getByTestId("inside")).toHaveAttribute("aria-invalid", "true");
+  expect(screen.getByTestId("inside")).toHaveFocus();
+  expect(screen.getByTestId("outside")).not.toHaveAttribute("aria-invalid");
+});
+
+it("given bounds and a minute step, when invalid drafts or out-of-range times are entered, then the field reports itself invalid", async () => {
   // given
   await i18n.changeLanguage("de");
   render(<form data-testid="form"><DateTimeInput data-testid="starts" name="starts" type="time" required min="08:00" max="18:00" step={900} /></form>);

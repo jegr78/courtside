@@ -63,8 +63,10 @@ the same rule, with dark as the initial value. Neither preference depends on tra
 authenticated session.
 
 Date and time editors follow the application language even when the browser uses another language.
-Submitted values retain their ISO format. Incomplete entries stay visible while the form receives
-an empty value until the entry is valid.
+Submitted values retain their ISO format. They accept single-digit days, months and hours and
+refuse a two-digit year. An entry that cannot be read never replaces the stored value: the field
+names the expected format once it is left, and its form, save bar or dialog action refuses to run
+until the entry is corrected or cleared.
 
 ## Saving
 

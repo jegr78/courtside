@@ -55,6 +55,25 @@ describe("LogExport", () => {
     }));
   });
 
+  it("given a period start typed with a short year, when the board downloads, then nothing is exported instead of the whole log", async () => {
+    // given
+    await i18n.changeLanguage("de");
+    const exportMessageLog = vi.spyOn(api, "exportMessageLog").mockResolvedValue({
+      fileName: "message-log-2026-05-12.csv", content: new Blob(["queuedAt"])
+    });
+    render(<LogExport log="messages" onFailure={() => undefined} />);
+    await waitFor(() => expect(screen.getByTestId("messages-log-export-encoding")).toHaveValue("UTF-8"));
+
+    // when
+    await userEvent.type(screen.getByTestId("messages-log-export-from"), "1.1.26");
+    await userEvent.click(screen.getByTestId("messages-log-export-download"));
+
+    // then
+    expect(exportMessageLog, "an unreadable start never widens the export to the whole log").not.toHaveBeenCalled();
+    expect(screen.getByTestId("messages-log-export-from")).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByTestId("messages-log-export-from")).toHaveFocus();
+  });
+
   it("given one configured import source, when the export opens, then its format is offered without being changed", async () => {
     // given
     vi.spyOn(api, "importSources").mockResolvedValue([

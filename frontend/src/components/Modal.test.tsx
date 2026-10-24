@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useLayoutEffect } from "react";
 import { expect, it, vi } from "vitest";
 import { Modal } from "./Modal";
 
@@ -188,4 +189,19 @@ it("given a dialog open, when a second one opens, then both lie on the body in o
   const overlays = Array.from(document.body.children).filter((child) => child.getAttribute("data-testid") === "modal-overlay");
   expect(overlays.map((overlay) => overlay.querySelector("[role=dialog]")?.getAttribute("data-testid")),
     "each dialog lies directly on the body in opening order").toEqual(["first", "second"]);
+});
+
+it("given a dialog opening, when the first frame is drawn, then its first control already holds the focus", () => {
+  // given
+  let focusedAtLayout: Element | null = null;
+  function Probe() {
+    useLayoutEffect(() => { focusedAtLayout = document.activeElement; });
+    return null;
+  }
+
+  // when
+  render(<>{disclosureDialog()}<Probe /></>);
+
+  // then
+  expect(focusedAtLayout, "a field typed into right after opening keeps what was typed").toBe(screen.getByTestId("before"));
 });

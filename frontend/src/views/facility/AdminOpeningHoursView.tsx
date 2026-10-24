@@ -7,6 +7,7 @@ import { useClubConfiguration } from "../../club/registry";
 import { Button } from "../../components/Button";
 import { ImpactPanel } from "../../components/ImpactPanel";
 import { TextField } from "../../components/TextField";
+import { refuseUnparsedDrafts } from "../../components/unparsedDrafts";
 import { dateInTimeZoneValue, parseDate, shortTime } from "../../time/clubZone";
 import { differs } from "../../unsaved/differs";
 import { SaveBar } from "../../unsaved/SaveBar";
@@ -221,7 +222,7 @@ function ApplyToDays({ disabled, apply }: { disabled: boolean; apply: (days: Set
         </label>)}
       </div>
     </fieldset>
-    <Button variant="secondary" data-testid="apply-hours" className="justify-self-start" disabled={disabled || days.size === 0 || !opensAt || !closesAt} type="button" onClick={() => apply(days, opensAt, closesAt)}>{t("admin.facility.apply")}</Button>
+    <Button variant="secondary" data-testid="apply-hours" className="justify-self-start" disabled={disabled || days.size === 0 || !opensAt || !closesAt} type="button" onClick={(event) => { if (!refuseUnparsedDrafts(event.currentTarget.closest("article"))) apply(days, opensAt, closesAt); }}>{t("admin.facility.apply")}</Button>
   </article>;
 }
 

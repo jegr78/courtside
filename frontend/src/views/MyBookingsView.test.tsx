@@ -351,6 +351,23 @@ it("given a series occurrence, when previewing and confirming a move, then the s
   expect(screen.getByRole("status")).toHaveTextContent("Booking moved.");
 });
 
+it("given a move start time that cannot be read, when previewing, then no preview is asked for and the field names the expected format", async () => {
+  // given
+  render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} />);
+  await userEvent.click(await screen.findByTestId("move-booking"));
+  await userEvent.click(screen.getByTestId("scope-WHOLE_SERIES"));
+  await userEvent.type(screen.getByTestId("move-start-time"), "7 PM");
+  await userEvent.type(screen.getByTestId("move-duration"), "90");
+
+  // when
+  await userEvent.click(screen.getByTestId("preview-move"));
+
+  // then
+  expect(api.previewSeriesMove, "an unreadable start is not previewed as an unchanged start").not.toHaveBeenCalled();
+  expect(screen.getByTestId("move-start-time")).toHaveAttribute("aria-invalid", "true");
+  expect(screen.getByTestId("move-start-time-invalid")).toHaveTextContent("Enter a valid value, for example 04:05 PM.");
+});
+
 it("given a move nobody has edited, when the dialog opens, then the empty start time says the start stays unchanged", async () => {
   // given
   render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} />);
