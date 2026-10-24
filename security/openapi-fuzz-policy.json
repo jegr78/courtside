@@ -35,7 +35,7 @@
     "unsupported_method",
     "allow_header_conformance"
   ],
-  "rateLimit": "auto",
+  "rateLimit": "2/s",
   "expectedStatuses": {
     "positive_data_acceptance": ["2xx", "401", "403", "404", "409", "5xx"],
     "negative_data_rejection": ["400", "401", "403", "404", "405", "406", "409", "415", "422", "428", "5xx"]
