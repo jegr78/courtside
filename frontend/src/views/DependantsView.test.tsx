@@ -276,20 +276,19 @@ describe("DependantsView", () => {
     expect(screen.getByTestId("dependant-cancelled")).toBeInTheDocument();
   });
 
-});
 
+  it("given a dependant ending date, when the locale changes, then its prose date changes with it", async () => {
+    // given
+    vi.spyOn(api, "dependants").mockResolvedValue([john([], "2030-09-01")]);
+    await i18n.changeLanguage("en");
+    show();
+    const end = await screen.findByTestId("dependant-ends-on");
+    expect(end).toHaveTextContent("Sep 1, 2030");
 
-it("given a dependant ending date, when the locale changes, then its prose date changes with it", async () => {
-  // given
-  vi.spyOn(api, "dependants").mockResolvedValue([john([], "2030-09-01")]);
-  await i18n.changeLanguage("en");
-  show();
-  const end = await screen.findByTestId("dependant-ends-on");
-  expect(end).toHaveTextContent("Sep 1, 2030");
+    // when
+    await act(() => i18n.changeLanguage("de"));
 
-  // when
-  await act(() => i18n.changeLanguage("de"));
-
-  // then
-  expect(end).toHaveTextContent("01.09.2030");
+    // then
+    expect(end).toHaveTextContent("01.09.2030");
+  });
 });

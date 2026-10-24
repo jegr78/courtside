@@ -81,18 +81,19 @@ export function PrimaryNavigation({ session }: { session: SessionStatus }) {
             key={destination.testId}
             to={destination.to}
             data-testid={destination.testId}
-            aria-label={counted(destination) ? t("nav.myMessagesUnread", { count: unread }) : t(destination.label)}
+            aria-label={counted(destination) ? t("nav.myMessagesUnread", { count: unread }) : undefined}
+            title={t(destination.label)}
             aria-current={isCurrent(destination, pathname) ? "page" : undefined}
             className={linkClass}
           >
             {reachable ? <>
               <DestinationIcon destination={destination} />
-              <span data-testid={`${destination.testId.replace("-link", "")}-compact-label`} className="sm:hidden">{t(destination.compactLabel)}</span>
+              <span data-testid={`${destination.testId.replace("-link", "")}-compact-label`} className="sm:hidden">{t(destination.compactLabel)}</span>{" "}
               <span data-testid={`${destination.testId.replace("-link", "")}-full-label`} className="hidden sm:inline">{t(destination.label)}</span>
             </> : t(destination.label)}
             {counted(destination) && <span data-testid="my-messages-unread" aria-hidden="true"
               className="button-primary absolute top-0 right-1/4 min-w-5 rounded-full px-1.5 text-center text-xs leading-5 font-bold sm:static sm:ml-2 sm:inline-block">
-              {unread}
+              {" "}{unread}
             </span>}
           </Link>)}
       </nav>

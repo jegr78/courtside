@@ -123,10 +123,13 @@ ${comparison}</section>`;
 }
 
 function sheetGallery(sheets, original) {
-  return (sheets?.entries ?? []).map((entry) => `<details class="sheet-gallery"><summary>${esc(entry.name)}</summary><div class="sheet-scroll"><div class="sheet-tiles" style="grid-template-columns:repeat(${entry.columns},max-content)">${entry.tiles.map((tile) => {
+  const entries = sheets?.entries ?? [];
+  if (!entries.length) return "";
+  return `<section><h2>Contact sheets</h2>
+${entries.map((entry) => `<details class="sheet-gallery"><summary>${esc(entry.name)}</summary><div class="sheet-scroll"><div class="sheet-tiles" style="grid-template-columns:repeat(${entry.columns},max-content)">${entry.tiles.map((tile) => {
     const viewport = original(tile.path);
     return `<figure><figcaption>${esc(tile.label)} · <a href="${viewport}">Full-size viewport</a>${tile.fullPage ? ` · <a href="${original(tile.fullPage)}">Full-page</a>` : " · Full-page unavailable"}</figcaption><a href="${viewport}"><img loading="lazy" src="${viewport}" width="${tile.width}" height="${tile.height}" alt="${esc(tile.label)} viewport"></a></figure>`;
-  }).join("")}</div></div></details>`).join("");
+  }).join("")}</div></div></details>`).join("")}</section>`;
 }
 
 export function renderReport(run, config, { harnessCommit, sheets = null, previous = null }) {

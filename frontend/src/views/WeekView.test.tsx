@@ -122,6 +122,54 @@ it("given the device is offline, when the court plan opens, then it explains why
   expect(screen.queryByTestId("week-next"), "offline, no later week can load").not.toBeInTheDocument();
 });
 
+for (const language of ["de", "en"]) {
+  it(`given ${language} calendar navigation, when its controls are named, then visible labels remain in their accessible names`, async () => {
+    // given
+    await i18n.changeLanguage(language);
+
+    // when
+    render(<WeekView today={clubInstant("12:00")} />);
+    const day = await screen.findByTestId("day-selector-2026-08-10");
+
+    // then
+    for (const direction of ["previous", "next"]) {
+      const button = screen.getByTestId(`week-${direction}`);
+      expect(button).toHaveAccessibleName(button.textContent);
+      expect(button).toHaveAccessibleDescription(i18n.t(`week.${direction}`));
+    }
+    const visibleLabel = [...day.children].map((part) => part.textContent).join(" ");
+    expect(day).toHaveAccessibleName(visibleLabel);
+    expect(day).toHaveAccessibleDescription(language === "de" ? "Montag, 10. August" : "Monday, August 10");
+  });
+}
+
+for (const language of ["de", "en"]) {
+  it(`given ${language} bookable and past slots, when their names are read, then the visible state and booking context remain available`, async () => {
+    // given
+    await i18n.changeLanguage(language);
+
+    // when
+    render(<WeekView today={clubInstant("12:00")} />);
+    const available = await findFreeSlot(1, "13:00");
+    const past = freeSlot(1, "11:00");
+
+    // then
+    expect(available).toHaveAccessibleName(language === "de"
+      ? "Frei, Centre Court um 13:00 Uhr buchen" : "Available, Book Centre Court at 13:00");
+    expect(past).toHaveAccessibleName(language === "de"
+      ? "Vergangen, Centre Court um 11:00 Uhr liegt in der Vergangenheit" : "Past, Centre Court at 11:00 is in the past");
+    expect(past).toBeDisabled();
+  });
+}
+
+it("given an allocation label and its time range, when rendered, then a word boundary separates the visible text", async () => {
+  // when
+  render(<WeekView today={clubInstant("12:00")} />);
+
+  // then
+  expect(await screen.findByTestId("allocation")).toHaveTextContent(/Occ\s+6:00 PM/);
+});
+
 it("given the current week, when it loads, then every day and active court is available", async () => {
   // when
   render(<WeekView today={clubInstant("12:00")} />);
@@ -1137,10 +1185,10 @@ it("given an own booking, a league match and another member's booking, when the 
   expect(own).toHaveAccessibleName("You, Major, 6:00 PM – 7:00 PM, cancel booking");
   expect(shortLabel(match)).toBe("Lea");
   expect(within(match).getByTestId("allocation-label")).toHaveTextContent("League match");
-  expect(match).toHaveAccessibleName("Join the waitlist for League match, 6:00 PM – 9:00 PM");
+  expect(match).toHaveAccessibleName("Join the waitlist for League match, 6:00 PM – 9:00 PM, Lea");
   expect(within(match).queryByTestId("own-marker"), "only the viewer's own booking carries the marker").toBeNull();
   expect(shortLabel(occupied)).toBe("Occ");
-  expect(occupied).toHaveAccessibleName("Join the waitlist for Occupied · 2 participants, 2:00 PM – 3:00 PM");
+  expect(occupied).toHaveAccessibleName("Join the waitlist for Occupied · 2 participants, 2:00 PM – 3:00 PM, Occ");
   expect(screen.getByTestId("legend-allocation-card").textContent, "the legend decodes the short label of the match").toBe("Lea");
   expect(screen.getByTestId("legend-card-99999999-9999-9999-9999-999999999999").textContent).toBe("Tra");
   expect(screen.getByTestId("legend-occupied").textContent, "the legend decodes the short label of a hidden booking").toBe("Occ");
@@ -1169,21 +1217,21 @@ it("given an own booking on a card that names its kind, when the plan is shown, 
   const own = await screen.findByTestId("own-allocation");
   expect(within(own).getByTestId("own-marker")).toBeInTheDocument();
   expect(within(own).getByTestId("allocation-short-label").textContent).toBe("Tra");
-  expect(own).toHaveAccessibleName("You, Training, 6:00 PM – 7:00 PM, cancel booking");
+  expect(own).toHaveAccessibleName("You, Training, 6:00 PM – 7:00 PM, Tra, cancel booking");
 });
 
 it("given cards that share a long first word, when the plan is shown, then each booking shows a distinct code that its accessible name contains", async () => {
   // given
   vi.mocked(api.bookingCardLegend).mockResolvedValue([
-    { id: "a1111111-1111-1111-1111-111111111111", label: "Training Herren", color: "#34584a", showGenericOccupancy: false },
-    { id: "a2222222-2222-2222-2222-222222222222", label: "Training Damen", color: "#3a4a5c", showGenericOccupancy: false }
+    { id: "a1111111-1111-1111-1111-111111111111", label: "Training Men Masters", color: "#34584a", showGenericOccupancy: false },
+    { id: "a2222222-2222-2222-2222-222222222222", label: "Training Women Masters", color: "#3a4a5c", showGenericOccupancy: false }
   ]);
   vi.mocked(api.allocations).mockImplementation((date) => Promise.resolve(date === "2026-08-10" ? [{
     bookingId: "44444444-4444-4444-4444-444444444444",
     courtId: courts[0].id,
     startsAt: "2026-08-10T18:00:00+02:00",
     endsAt: "2026-08-10T19:00:00+02:00",
-    cardLabel: "Training Herren",
+    cardLabel: "Training Men Masters",
     cardColor: "#34584a",
     ownBooking: false,
     showGenericOccupancy: false,
@@ -1195,9 +1243,9 @@ it("given cards that share a long first word, when the plan is shown, then each 
 
   // then
   const allocation = await screen.findByTestId("allocation");
-  expect(within(allocation).getByTestId("allocation-short-label").textContent).toBe("TrH");
-  expect(allocation, "the visible code is part of the accessible name").toHaveAccessibleName("Join the waitlist for Training Herren (TrH), 6:00 PM – 7:00 PM");
-  expect(screen.getByTestId("legend-card-a2222222-2222-2222-2222-222222222222").textContent).toBe("TrD");
+  expect(within(allocation).getByTestId("allocation-short-label").textContent).toBe("TrMM");
+  expect(allocation, "the visible code is part of the accessible name").toHaveAccessibleName("Join the waitlist for Training Men Masters, 6:00 PM – 7:00 PM, TrMM");
+  expect(screen.getByTestId("legend-card-a2222222-2222-2222-2222-222222222222").textContent).toBe("TrWM");
 });
 
 it("given a card that begins with the viewer word, when the plan is shown, then its code differs from the own booking's", async () => {
@@ -1235,7 +1283,7 @@ it("given a past own booking on a card that names its kind, when the plan is sho
   // then
   const own = await screen.findByTestId("own-allocation");
   expect(own).toHaveRole("img");
-  expect(own, "a past own booking names its owner like every other own booking").toHaveAccessibleName("You, Training, 6:00 PM – 7:00 PM");
+  expect(own, "a past own booking names its owner like every other own booking").toHaveAccessibleName("You, Training, 6:00 PM – 7:00 PM, Tra");
 });
 
 it("given a league match from ten to four, when the plan is shown, then one coloured block covers every row of its court and no row below offers the court", async () => {
@@ -2327,7 +2375,7 @@ it("given a gap between the open rows and a booking's rows, when the time falls 
 
   // then
   const line = await screen.findByTestId("current-time-line");
-  expect(line, "eight open rows, then half of the 18:00 row, 40 pixels each below the 48-pixel header")
+  expect(line, "without layout the estimate counts eight open rows, then half of the 18:00 row, 40 pixels each below the 48-pixel header")
     .toHaveStyle({ top: "388px" });
 });
 
@@ -2482,7 +2530,7 @@ it("given calendar labels in the browser default zone, when that zone changes be
 
   // then
   expect(screen.getByTestId("day-selector-2026-08-10")).toHaveTextContent("Sun");
-  expect(screen.getByTestId("day-selector-2026-08-10")).toHaveAccessibleName(/Sunday/);
+  expect(screen.getByTestId("day-selector-2026-08-10")).toHaveAccessibleDescription(/Sunday/);
 });
 
 it("given unchanged allocations, when opening a booking dialog, then their local time boundaries are not formatted again for each cell", async () => {
@@ -2812,29 +2860,35 @@ it("given a court reserved for somebody else, when the plan is shown, then it re
   // then
   const reserved = await screen.findByTestId("allocation");
   expect(reserved.dataset.state).toBe("reserved");
-  expect(reserved).toHaveAccessibleName("Join the waitlist for Reserved, 4:00 PM – 5:00 PM");
+  expect(reserved).toHaveAccessibleName("Join the waitlist for Reserved, 4:00 PM – 5:00 PM, Res");
   expect(reserved.dataset.bookingId, "a reservation has no booking a member could address").toBeUndefined();
   expect(screen.getByTestId("legend-reserved")).toHaveTextContent("Res");
   expect(screen.getByTestId("legend-reserved").closest("li")).toHaveTextContent("Reserved");
 });
 
-it("given a court reserved for the viewer, when the plan is shown, then it leads to the offer instead of the waitlist", async () => {
-  // given
-  vi.mocked(api.allocations).mockResolvedValue([]);
-  vi.mocked(api.reservedSlots).mockImplementation((date) => Promise.resolve(date === "2026-08-10" ? [{
-    courtId: courts[1].id, startsAt: "2026-08-10T16:00:00+02:00", endsAt: "2026-08-10T17:00:00+02:00",
-    ownEntryId: "99999999-0000-0000-0000-000000000001"
-  }] : []));
+for (const language of ["de", "en"]) {
+  it(`given a court reserved for the viewer in ${language}, when the plan is shown, then the offer name includes its visible code`, async () => {
+    // given
+    await i18n.changeLanguage(language);
+    vi.mocked(api.allocations).mockResolvedValue([]);
+    vi.mocked(api.reservedSlots).mockImplementation((date) => Promise.resolve(date === "2026-08-10" ? [{
+      courtId: courts[1].id, startsAt: "2026-08-10T16:00:00+02:00", endsAt: "2026-08-10T17:00:00+02:00",
+      ownEntryId: "99999999-0000-0000-0000-000000000001"
+    }] : []));
 
-  // when
-  render(<WeekView today={clubInstant("12:00")} />);
+    // when
+    render(<WeekView today={clubInstant("12:00")} />);
 
-  // then
-  const offer = await screen.findByTestId("own-reservation");
-  expect(offer).toHaveAttribute("href", "/my-bookings#waitlist-99999999-0000-0000-0000-000000000001");
-  expect(offer).toHaveAccessibleName("Open your offer: Reserved for you, 4:00 PM – 5:00 PM");
-  expect(within(offer).getByTestId("own-marker")).toBeInTheDocument();
-});
+    // then
+    const offer = await screen.findByTestId("own-reservation");
+    expect(offer).toHaveAttribute("href", "/my-bookings#waitlist-99999999-0000-0000-0000-000000000001");
+    expect(offer).toHaveAccessibleName(language === "de"
+      ? "Dein Angebot öffnen: Für dich reserviert, 16:00 – 17:00, Du"
+      : "Open your offer: Reserved for you, 4:00 PM – 5:00 PM, You");
+    expect(within(offer).getByTestId("own-marker")).toBeInTheDocument();
+  });
+
+}
 
 it("given a visitor who cannot book, when the plan is shown, then a taken court offers no waitlist", async () => {
   // when
@@ -2973,4 +3027,41 @@ it("given rendered mobile rows taller than the configured slot height, when the 
   // then
   const line = await screen.findByTestId("current-time-line");
   await waitFor(() => expect(line.style.top).toBe("422px"));
+});
+
+it("given a placed current line, when the rows change height on resize or layout, then the line follows the containing row", async () => {
+  // given
+  const observed: ResizeObserverCallback[] = [];
+  vi.stubGlobal("ResizeObserver", class {
+    constructor(private readonly callback: ResizeObserverCallback) {}
+    observe(target: Element) { if (target.tagName === "TABLE") observed.push(this.callback); }
+    disconnect() {}
+  });
+  let row = new DOMRect(0, 500, 300, 44);
+  vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+    if (this.dataset.testid === "week-grid") return new DOMRect(0, 100, 300, 300);
+    if (this.dataset.slot === "12:00") return row;
+    return new DOMRect();
+  });
+  try {
+    render(<WeekView today={clubInstant("12:15")} />);
+    const line = await screen.findByTestId("current-time-line");
+    await waitFor(() => expect(line.style.top).toBe("422px"));
+
+    // when
+    row = new DOMRect(0, 560, 300, 60);
+    act(() => { window.dispatchEvent(new Event("resize")); });
+
+    // then
+    expect(line.style.top, "a window resize re-measures the row: 460 above it plus half of 60").toBe("490px");
+
+    // when
+    row = new DOMRect(0, 620, 300, 80);
+    act(() => observed.forEach((callback) => callback([], {} as ResizeObserver)));
+
+    // then
+    expect(line.style.top, "a layout change of the table re-measures the row: 520 above it plus half of 80").toBe("560px");
+  } finally {
+    vi.unstubAllGlobals();
+  }
 });

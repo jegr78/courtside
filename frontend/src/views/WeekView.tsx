@@ -462,10 +462,10 @@ export function WeekView({ today, clock = systemClock, canBook = true,
       </div>
       {!offline && (!data || hasCourts) && <div className="desktop-week-controls flex gap-2">
         <span className="desktop-week-date"><DateTimeInput data-testid="week-date" type="date" value={selectedDate ?? ""} disabled={!data} onValueChange={(value) => selectDate(value)} aria-label={t("week.chooseDate")} className="form-control rounded-lg border px-2" /></span>
-        <Button variant="secondary" type="button" data-testid="week-previous" onClick={() => setWeekOffset((offset) => offset - 1)} aria-label={t("week.previous")}>
+        <Button variant="secondary" type="button" data-testid="week-previous" onClick={() => setWeekOffset((offset) => offset - 1)} title={t("week.previous")}>
           {t("week.previousShort")}
         </Button>
-        <Button variant="secondary" type="button" data-testid="week-next" onClick={() => setWeekOffset((offset) => offset + 1)} aria-label={t("week.next")}>
+        <Button variant="secondary" type="button" data-testid="week-next" onClick={() => setWeekOffset((offset) => offset + 1)} title={t("week.next")}>
           {t("week.nextShort")}
         </Button>
       </div>}
@@ -485,13 +485,13 @@ export function WeekView({ today, clock = systemClock, canBook = true,
             key={date}
             type="button"
             data-testid={`day-selector-${date}`}
-            aria-label={`${formatDayLong(day, language, calendarTimeZone)}, ${freeCount}`}
+            title={formatDayLong(day, language, calendarTimeZone)}
             aria-pressed={selectedDate === date}
             className="week-day-option border-structural rounded-xl border px-3 py-2 text-left hover:border-(--club-primary) aria-pressed:border-(--club-primary) aria-pressed:bg-(--club-accent)/15"
             onClick={() => setSelectedDate(date)}
           >
-            <span className="block text-sm font-semibold">{formatWeekday(day, language, calendarTimeZone)}</span>
-            <span className="text-muted font-value text-sm">{formatDayMonth(day, language, calendarTimeZone)}</span>
+            <span className="block text-sm font-semibold">{formatWeekday(day, language, calendarTimeZone)}</span>{" "}
+            <span className="text-muted font-value text-sm">{formatDayMonth(day, language, calendarTimeZone)}</span>{" "}
             <span data-testid={`day-free-count-${date}`} data-free-count={count}
               className="text-muted mt-1 block text-xs">{freeCount}</span>
           </button>;
@@ -588,7 +588,7 @@ export function WeekView({ today, clock = systemClock, canBook = true,
         role="img"
         aria-label={t("week.currentTime", { time: currentTime })}
         className="current-time-line"
-        style={{ top: `${48 + currentLineOffset(currentTime, slots, data.grid.slotMinutes, slotHeight)}px` }}
+        style={{ top: `${48 + unmeasuredLineOffset(currentTime, slots, data.grid.slotMinutes, slotHeight)}px` }}
       />}
       {slots.length === 0 && <p data-testid="day-closed" className="text-muted px-4 py-6 text-center">{t("week.closed")}</p>}
     </div>}
@@ -777,7 +777,7 @@ function renderCell(
         : shortLabelOf.get(allocation.showGenericOccupancy ? t("week.occupied") : allocation.cardLabel) ?? label;
     const period = formatBookingTimeRange(allocation.startsAt, allocation.endsAt, locale, timeZone);
     const ownLabel = allocation.ownBooking && !allocation.showGenericOccupancy ? `${t("booking.viewer")}, ${label}` : label;
-    const spokenLabel = ownLabel.toLocaleLowerCase().includes(shortLabel.toLocaleLowerCase()) ? ownLabel : `${ownLabel} (${shortLabel})`;
+    const spokenLabel = `${ownLabel}, ${period}` + (allocation.ownBooking && allocation.showGenericOccupancy ? "" : `, ${shortLabel}`);
     const className = "day-plan-allocation h-full w-full rounded-md px-3 py-2 text-left font-semibold";
     const state = reservation ? "reserved" : allocation.ownBooking ? "own" : allocation.showGenericOccupancy ? "occupied" : "card";
     const style = allocation.ownBooking || reservation?.ownEntryId
@@ -788,7 +788,7 @@ function renderCell(
         {(allocation.ownBooking || reservation?.ownEntryId) && <OwnMarker />}
         <span data-testid="allocation-label" className="day-plan-allocation-full">{label}</span>
         <span data-testid="allocation-short-label" className="day-plan-allocation-short">{shortLabel}</span>
-      </span>
+      </span>{" "}
       <span data-testid="allocation-period" className="day-plan-allocation-period block text-xs">{period}</span>
     </span>;
     const ahead = !isPast && !startedBeforeVisibleSlot;
@@ -798,7 +798,7 @@ function renderCell(
         href={`/my-bookings#waitlist-${reservation.ownEntryId}`}
         data-testid="own-reservation"
         data-state={state}
-        aria-label={t("waitlist.openOfferLabel", { label: `${spokenLabel}, ${period}` })}
+        aria-label={t("waitlist.openOfferLabel", { label: spokenLabel })}
         className={`${className} focus-ring block no-underline`}
         style={style}
       >{content}</a> : allocation.ownBooking && !reservation && ahead ? <button
@@ -807,7 +807,7 @@ function renderCell(
         data-booking-id={allocation.bookingId}
         data-card-color={allocation.cardColor}
         data-state={state}
-        aria-label={t("booking.cancelLabel", { label: `${spokenLabel}, ${period}` })}
+        aria-label={t("booking.cancelLabel", { label: spokenLabel })}
         onClick={() => cancel(allocation)}
         className={className}
         style={style}
@@ -817,11 +817,11 @@ function renderCell(
         data-booking-id={reservation ? undefined : allocation.bookingId}
         data-card-color={allocation.cardColor}
         data-state={state}
-        aria-label={t("waitlist.joinLabel", { label: `${spokenLabel}, ${period}` })}
+        aria-label={t("waitlist.joinLabel", { label: spokenLabel })}
         onClick={() => queue(allocation)}
         className={className}
         style={style}
-      >{content}</button> : <div role="img" aria-label={`${spokenLabel}, ${period}`} data-testid={allocation.ownBooking ? "own-allocation" : "allocation"} data-booking-id={reservation ? undefined : allocation.bookingId} data-card-color={allocation.cardColor} data-state={state} className={className} style={style}>{content}</div>}
+      >{content}</button> : <div role="img" aria-label={spokenLabel} data-testid={allocation.ownBooking ? "own-allocation" : "allocation"} data-booking-id={reservation ? undefined : allocation.bookingId} data-card-color={allocation.cardColor} data-state={state} className={className} style={style}>{content}</div>}
     </td>;
   }
   const isCovered = isOccupied(allocations, court.id, slot);
@@ -852,7 +852,8 @@ function renderCell(
       disabled={isPast}
       data-state={isPast ? "past" : drag.selected ? "selected" : "free"}
       className="day-plan-slot day-plan-free-slot w-full rounded-md px-2 text-sm"
-      aria-label={isPast ? t("week.pastLabel", { court: courtName, time: slot }) : t("booking.open", { court: courtName, time: slot })}
+      aria-label={`${t(isPast ? "week.past" : "week.available")}, ${isPast
+        ? t("week.pastLabel", { court: courtName, time: slot }) : t("booking.open", { court: courtName, time: slot })}`}
       onClick={book}
       onPointerDown={(event) => drag.start(event.pointerType)}
       onPointerEnter={drag.extend}
@@ -872,7 +873,7 @@ function OwnMarker() {
   </svg>;
 }
 
-function currentLineOffset(currentTime: string, slots: string[], slotMinutes: number, slotHeight: number): number {
+function unmeasuredLineOffset(currentTime: string, slots: string[], slotMinutes: number, slotHeight: number): number {
   const now = timeToMinutes(currentTime);
   const row = slots.findLastIndex((slot) => timeToMinutes(slot) <= now);
   if (row === -1) return 0;

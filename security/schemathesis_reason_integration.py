@@ -1,5 +1,7 @@
 import json
 
+import jsonschema_rs
+
 from schemathesis.core.failures import ContentTypeServerError
 from schemathesis.engine.recorder import CheckFailureInfo
 from schemathesis.openapi.checks import JsonSchemaError, UndefinedContentType, UndefinedStatusCode
@@ -10,14 +12,14 @@ def projected(failure):
     return ndjson.serialize(CheckFailureInfo("curl with a credential", failure))["reason"]
 
 
-schema_reason = projected(JsonSchemaError(
-    operation="GET /api/admin/roster",
-    validation_message="response contained an opaque identifier",
-    schema_path=["properties", "items", "items", "required"],
-    schema={"type": "object", "required": ["id", "email"]},
-    instance_path=["items", 0],
-    instance={"id": "opaque-object-id"},
-    message="response contained a credential",
+response_schema = {"type": "object", "properties": {"items": {"type": "array", "items": {
+    "type": "object", "properties": {"id": {"type": "string"}, "email": {"type": "string"}},
+    "required": ["id", "email"],
+}}}}
+validation_error = next(jsonschema_rs.Draft202012Validator(response_schema).iter_errors(
+    {"items": [{"id": "opaque-object-id"}]}))
+schema_reason = projected(JsonSchemaError.from_exception(
+    operation="GET /api/admin/roster", exc=validation_error, root_schema=response_schema,
 ))
 assert schema_reason == {
     "kind": "schema",
