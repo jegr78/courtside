@@ -8,6 +8,7 @@ import { violationMessage } from "../api/problem-message";
 import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
 import { DateTimeInput } from "../components/DateTimeInput";
+import { refuseUnparsedDrafts } from "../components/unparsedDrafts";
 import { DialogBody } from "../components/DialogBody";
 import { Modal } from "../components/Modal";
 import { useReportedFailure } from "../failures/useReportedFailure";
@@ -102,7 +103,7 @@ export function MoveDialog({ booking, courts, timeZone, maxBookingMinutes, close
     {preview && <div ref={previewPanel} tabIndex={-1} role="group" aria-labelledby={previewCount} data-testid="move-preview" className="focus-ring"><p id={previewCount} className="font-semibold">{t("myBookings.previewCount", { count: preview.moves.length })}</p><ul className="mt-2 grid gap-2">{preview.moves.map((move) => <li key={move.bookingId}><p>{formatBookingPeriod(move.fromStartsAt, move.fromEndsAt, i18n.language, timeZone)} → {formatBookingPeriod(move.toStartsAt, move.toEndsAt, i18n.language, timeZone)}</p><MoveReasons move={move} courtNames={courtNames} t={t} /></li>)}</ul></div>}
     </div></DialogBody>
     {error && <div className="shrink-0 px-6 pt-3"><Alert>{error}</Alert></div>}
-    <div className="surface-panel border-structural flex shrink-0 gap-2 border-t px-6 py-4">{preview ? <Button ref={confirmButton} key="confirm-move" variant="primary" data-testid="confirm-move" aria-describedby={preview.executable ? previewCount : undefined} disabled={!preview.executable} onClick={() => void move()}>{t("myBookings.moveConfirm")}</Button> : <Button key="preview-move" variant="secondary" data-testid="preview-move" disabled={courtIds.length === 0 || (!startTime && !duration && courtIds.join() === booking.courtIds.join())} onClick={() => void previewMove()}>{t("myBookings.movePreview")}</Button>}<Button variant="secondary" onClick={closed}>{t("booking.close")}</Button></div>
+    <div className="surface-panel border-structural flex shrink-0 gap-2 border-t px-6 py-4">{preview ? <Button ref={confirmButton} key="confirm-move" variant="primary" data-testid="confirm-move" aria-describedby={preview.executable ? previewCount : undefined} disabled={!preview.executable} onClick={() => { if (!refuseUnparsedDrafts(dialog.current)) void move(); }}>{t("myBookings.moveConfirm")}</Button> : <Button key="preview-move" variant="secondary" data-testid="preview-move" disabled={courtIds.length === 0 || (!startTime && !duration && courtIds.join() === booking.courtIds.join())} onClick={() => { if (!refuseUnparsedDrafts(dialog.current)) void previewMove(); }}>{t("myBookings.movePreview")}</Button>}<Button variant="secondary" onClick={closed}>{t("booking.close")}</Button></div>
   </div></Modal>;
 }
 

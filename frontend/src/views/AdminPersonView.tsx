@@ -13,6 +13,7 @@ import { LocaleSelect } from "../components/LocaleSelect";
 import { Modal } from "../components/Modal";
 import { SuccessFeedback } from "../components/SuccessFeedback";
 import { TextField } from "../components/TextField";
+import { refuseUnparsedDrafts } from "../components/unparsedDrafts";
 import { downloadJson } from "../downloads/downloadJson";
 import { formString } from "../forms/formString";
 import { formatBookingPeriod } from "../time/clubZone";
@@ -420,7 +421,7 @@ function MembershipSection({ entry, types, disabled, membership, changed, end }:
         <p>{t("admin.person.endMembershipExplain")}</p>
         <TextField data-testid="end-membership-date" type="date" label={t("admin.person.endedOn")} value={chosenEnd} onValueChange={(value) => setChosenEnd(value)} />
         <div className="flex flex-wrap gap-3">
-          <Button variant="destructive-confirm" data-testid="confirm-end-membership" disabled={disabled || !chosenEnd} type="button" onClick={() => void endMembership()}>{t("admin.person.endMembership")}</Button>
+          <Button variant="destructive-confirm" data-testid="confirm-end-membership" disabled={disabled || !chosenEnd} type="button" onClick={(event) => { if (!refuseUnparsedDrafts(event.currentTarget.closest('[role="dialog"]'))) void endMembership(); }}>{t("admin.person.endMembership")}</Button>
           <Button variant="secondary" data-testid="cancel-end-membership" type="button" onClick={() => setEnding(false)}>{t("admin.cancel")}</Button>
         </div>
       </div>

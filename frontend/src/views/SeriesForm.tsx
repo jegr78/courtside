@@ -6,6 +6,7 @@ import {
 } from "../api/client";
 import { Button } from "../components/Button";
 import { TextField } from "../components/TextField";
+import { refuseUnparsedDrafts } from "../components/unparsedDrafts";
 import { formatBookingPeriod } from "../time/clubZone";
 import { violationMessage } from "../api/problem-message";
 
@@ -195,7 +196,7 @@ export function SeriesForm({ timeZone, courts, created, reportError }: {
     <TextField data-testid="series-note" maxLength={500} disabled={pending} label={t("series.note")} value={draft.note} onChange={(event) => change({ note: event.target.value })} />
 
     <div className="flex flex-wrap gap-3">
-      <Button variant="secondary" data-testid="preview-series" disabled={pending || !isComplete(draft)} type="button" onClick={() => void readPreview()}>
+      <Button variant="secondary" data-testid="preview-series" disabled={pending || !isComplete(draft)} type="button" onClick={(event) => { if (!refuseUnparsedDrafts(event.currentTarget.closest("section"))) void readPreview(); }}>
         {t("series.preview")}
       </Button>
       <Button variant="secondary" data-testid="cancel-series" type="button" onClick={() => { restoresFocus.current = true; setOpen(false); setDraft(EMPTY); setPreview(undefined); setChosen([]); }}>
@@ -217,7 +218,7 @@ export function SeriesForm({ timeZone, courts, created, reportError }: {
           </label>
         </li>)}
       </ul>
-      <Button variant="primary" data-testid="confirm-series" disabled={pending || chosen.length === 0} className="justify-self-start" type="button" onClick={() => void create()}>
+      <Button variant="primary" data-testid="confirm-series" disabled={pending || chosen.length === 0} className="justify-self-start" type="button" onClick={(event) => { if (!refuseUnparsedDrafts(event.currentTarget.closest("section"))) void create(); }}>
         {t("series.create", { count: chosen.length })}
       </Button>
     </div>}

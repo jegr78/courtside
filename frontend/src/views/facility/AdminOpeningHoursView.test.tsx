@@ -82,6 +82,24 @@ describe("AdminOpeningHoursView", () => {
     }));
   });
 
+  it("given an opening time that cannot be read, when applying it, then no day changes and the field names the expected format", async () => {
+    // given
+    show();
+    const user = userEvent.setup();
+    await screen.findByTestId("hours-open-MONDAY");
+    await user.type(screen.getByTestId("apply-opens-at"), "9:00 AM");
+    await user.type(screen.getByTestId("apply-closes-at"), "6:00 PM");
+    await user.type(screen.getByTestId("apply-opens-at"), "x");
+    await user.click(screen.getByTestId("apply-day-SATURDAY"));
+
+    // when
+    await user.click(screen.getByTestId("apply-hours"));
+
+    // then
+    expect(screen.getByTestId("hours-close-SATURDAY"), "a day takes no time from a form with an unreadable field").not.toHaveValue(formatDateTime("18:00", "time", "en"));
+    expect(screen.getByTestId("apply-opens-at")).toHaveAttribute("aria-invalid", "true");
+  });
+
   it("given times and several days, when applying them, then every picked day carries them", async () => {
     // given
     show();
