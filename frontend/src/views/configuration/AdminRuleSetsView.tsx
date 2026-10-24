@@ -1,4 +1,5 @@
 import { DateTimeInput } from "../../components/DateTimeInput";
+import { formatDateTime } from "../../components/localizedDateTime";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useSearchParams } from "react-router-dom";
@@ -360,7 +361,9 @@ export function AdminRuleSetsView({ configurationChanged }: { configurationChang
 }
 
 function RuleEditor({ type, stored, edit, disabled, changed }: { type: RuleTypeConfiguration; stored: RuleEdit; edit: RuleEdit; disabled: boolean; changed: (edit: RuleEdit) => void }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const hint = (parameter: RuleParameter, value: number) => parameter.kind === "TIME_OF_DAY"
+    ? formatDateTime(String(shown(parameter, value)), "time", i18n.resolvedLanguage ?? i18n.language) : value;
   const timeWindow = type.parameters.length > 1 && type.parameters.every((parameter) => parameter.kind === "TIME_OF_DAY");
   const rangeId = (parameter: RuleParameter) => timeWindow ? `rule-${type.ruleType}-range` : `rule-${type.ruleType}-${parameter.name}-range`;
   const input = (parameter: RuleParameter) => {
@@ -385,15 +388,15 @@ function RuleEditor({ type, stored, edit, disabled, changed }: { type: RuleTypeC
       <h4 data-testid={`rule-${type.ruleType}-title`} className="font-bold">{t(`admin.rules.type.${type.ruleType}`)}</h4>
       {timeWindow && first && last
         ? <p id={`rule-${type.ruleType}-range`} data-testid={`rule-${type.ruleType}-range`} className="sr-only">
-          {t("admin.rules.range", { minimum: shown(first, first.minimum), maximum: shown(last, last.maximum) })}
+          {t("admin.rules.range", { minimum: hint(first, first.minimum), maximum: hint(last, last.maximum) })}
         </p>
         : type.parameters.map((parameter) => <p key={parameter.name} className="text-sm">
           <label htmlFor={`rule-${type.ruleType}-${parameter.name}`}>{t(`admin.rules.parameter.${parameter.name}`)}</label>
           {" "}<span aria-hidden="true" data-testid={`rule-${type.ruleType}-${parameter.name}-range-short`} className="text-muted whitespace-nowrap">
-            {t("admin.rules.rangeShort", { minimum: shown(parameter, parameter.minimum), maximum: shown(parameter, parameter.maximum) })}
+            {t("admin.rules.rangeShort", { minimum: hint(parameter, parameter.minimum), maximum: hint(parameter, parameter.maximum) })}
           </span>
           <span id={rangeId(parameter)} data-testid={`rule-${type.ruleType}-${parameter.name}-range`} className="sr-only">
-            {t("admin.rules.range", { minimum: shown(parameter, parameter.minimum), maximum: shown(parameter, parameter.maximum) })}
+            {t("admin.rules.range", { minimum: hint(parameter, parameter.minimum), maximum: hint(parameter, parameter.maximum) })}
           </span>
         </p>)}
     </div>

@@ -253,11 +253,36 @@ describe("AdminRuleSetsView", () => {
     expect(earliestStart).toHaveAccessibleName(i18n.t("admin.rules.parameter.earliestStart"));
     expect(latestEnd, "two inputs side by side still say which end of the window each sets")
       .toHaveAccessibleName(i18n.t("admin.rules.parameter.latestEnd"));
-    const range = i18n.t("admin.rules.range", { minimum: "00:00", maximum: "23:59" });
+    const range = i18n.t("admin.rules.range", { minimum: "12:00 AM", maximum: "11:59 PM" });
     expect(screen.getByTestId("rule-BOOKING_HOURS-range"), "one hint line keeps the row as low as its neighbours").toHaveTextContent(range);
     expect(earliestStart).toHaveAccessibleDescription(`${range} Example: 04:05 PM`);
     expect(latestEnd).toHaveAccessibleDescription(`${range} Example: 04:05 PM`);
     await waitFor(() => expect(setRule).toHaveBeenCalledWith("rule-set", "BOOKING_HOURS", { earliestStart: 540, latestEnd: 1200 }));
+  });
+
+  it("given a window bound typed so it cannot be read, when the rules are saved, then nothing is written and the bound names the expected format", async () => {
+    // given
+    vi.mocked(api.ruleTypes).mockResolvedValue([
+      { ruleType: "BOOKING_HOURS", configurable: true, parameters: [
+        { name: "earliestStart", minimum: 0, maximum: 1438, kind: "TIME_OF_DAY" },
+        { name: "latestEnd", minimum: 1, maximum: 1439, kind: "TIME_OF_DAY" }
+      ] }
+    ]);
+    vi.mocked(api.rules).mockResolvedValue([{ ruleType: "BOOKING_HOURS", params: { earliestStart: 480, latestEnd: 1200 } }]);
+    const setRule = vi.spyOn(api, "setRule").mockResolvedValue({ ruleType: "BOOKING_HOURS", params: { earliestStart: 480, latestEnd: 1200 } });
+    render(<MemoryRouter><UnsavedChangesProvider><AdminRuleSetsView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
+    const latestEnd = await screen.findByTestId("rule-BOOKING_HOURS-latestEnd");
+    await waitFor(() => expect(latestEnd).toBeEnabled());
+    fireEvent.change(screen.getByTestId("rule-BOOKING_HOURS-earliestStart"), { target: { value: "9:00 AM" } });
+
+    // when
+    fireEvent.change(latestEnd, { target: { value: "8 PM" } });
+    fireEvent.click(screen.getByTestId("save-booking-rules"));
+
+    // then
+    expect(setRule, "an unreadable bound is never dropped from the saved window").not.toHaveBeenCalled();
+    expect(latestEnd).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByTestId("rule-BOOKING_HOURS-latestEnd-invalid")).toHaveTextContent("Enter a valid value, for example 04:05 PM.");
   });
 
   it("given a stored window, when it arrives, then the inputs show it as times of day", async () => {
