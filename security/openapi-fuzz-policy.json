@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "image": "schemathesis/schemathesis:v4.31.0@sha256:58a4ffa68cd690a04eb70fd2d1c790acd54cd73986c777ec2556c901b6b707e4",
+  "image": "schemathesis/schemathesis:v4.32.2@sha256:d6d1e1e33718e449006c0c486aa36f6f36c6666e10fc27ea1223430232920ad2",
   "seed": 24820260821,
   "maxExamples": 5,
   "workers": 1,
@@ -35,7 +35,7 @@
     "unsupported_method",
     "allow_header_conformance"
   ],
-  "rateLimit": "auto",
+  "rateLimit": "2/s",
   "expectedStatuses": {
     "positive_data_acceptance": ["2xx", "401", "403", "404", "409", "5xx"],
     "negative_data_rejection": ["400", "401", "403", "404", "405", "406", "409", "415", "422", "428", "5xx"]

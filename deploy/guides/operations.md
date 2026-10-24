@@ -545,10 +545,11 @@ plan is rendered, and the rendered copy lives in a volume rather than in the rep
 
 Two things about the mail container are worth knowing regardless:
 
-- **The web interface is not pinned.** Every image in the recipe files is pinned by digest; the admin
-  interface is the one artefact fetched at runtime from a release URL, and it is the component with
-  full control over the mail server. Its integrity rests on TLS to GitHub and nothing else. A
-  deliberate exception, not an oversight.
+- The web interface is not pinned by digest. Stalwart fetches the administration bundle from
+  `https://github.com/stalwartlabs/webui/releases/download/v1.0.11/webui.zip` at runtime. It maps
+  an existing `latest` bundle URL to this release and rejects bundles declaring a major version
+  above 1. The bundle controls mail administration. Its integrity depends on TLS to GitHub and
+  the upstream release asset. Courtside supplies no separate checksum.
 - **One ACME client, two names.** Caddy is still the only thing here that talks to a certificate
   authority, and it now issues for `COURTSIDE_MAIL_HOSTNAME` as well as `COURTSIDE_DOMAIN`. The
   `mail-certificate` helper copies that one certificate and its key into a volume of its own, which

@@ -122,7 +122,7 @@ services:
       org.courtside.security.instance-fingerprint: ${COURTSIDE_SECURITY_INSTANCE_FINGERPRINT:?required}
 
   mail:
-    image: axllent/mailpit:v1.31@sha256:94f6b70c1436defae6799d9ac7ff0eeff9540465b842026d5cdb018f1c0234ea
+    image: axllent/mailpit:v1.31@sha256:23fe39e81bde596a918000b3135c0f85dc8bb4c9ea6be274b051143f3e300387
     pull_policy: never
     user: ${COURTSIDE_SECURITY_MAIL_USER:?required}
     read_only: true
@@ -216,7 +216,7 @@ services:
 
   scanner-gateway:
     profiles: [assessment]
-    image: zaproxy/zap-stable:2.17.0@sha256:781a2bdaea47324e7bab583e2263f21d257b0aee61ed51521a5be45f5f5081ef
+    image: zaproxy/zap-stable:2.17.0@sha256:5ccfff9a411743ab2615136a2edd7416bec9ce41572fa94e935df38c14adb2b6
     pull_policy: never
     command: ["python3", "/opt/courtside/security-request-gateway.py"]
     read_only: true
@@ -256,7 +256,7 @@ services:
 
   zap:
     profiles: [assessment]
-    image: zaproxy/zap-stable:2.17.0@sha256:781a2bdaea47324e7bab583e2263f21d257b0aee61ed51521a5be45f5f5081ef
+    image: zaproxy/zap-stable:2.17.0@sha256:5ccfff9a411743ab2615136a2edd7416bec9ce41572fa94e935df38c14adb2b6
     pull_policy: never
     read_only: true
     tmpfs:
@@ -280,7 +280,7 @@ services:
 
   schemathesis:
     profiles: [assessment]
-    image: schemathesis/schemathesis:v4.31.0@sha256:58a4ffa68cd690a04eb70fd2d1c790acd54cd73986c777ec2556c901b6b707e4
+    image: schemathesis/schemathesis:v4.32.2@sha256:d6d1e1e33718e449006c0c486aa36f6f36c6666e10fc27ea1223430232920ad2
     pull_policy: never
     entrypoint: ["tail", "-f", "/dev/null"]
     read_only: true
