@@ -138,3 +138,71 @@ for (const effectiveFrom of [null, "2099-07-01"]) {
     });
   });
 }
+
+const RULE_SET = { id: "33333333-3333-3333-3333-333333333331", name: "Acceptance youth", active: true };
+
+async function valueWidths(control: Locator) {
+  return control.evaluate((element: HTMLInputElement | HTMLSelectElement) => {
+    const style = getComputedStyle(element);
+    const context = document.createElement("canvas").getContext("2d")!;
+    context.font = `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+    const text = element instanceof HTMLSelectElement ? element.selectedOptions[0].text : element.value;
+    const available = element.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+    return { text, needed: Math.ceil(context.measureText(text).width), available: Math.floor(available) };
+  });
+}
+
+async function expectWholeValue(control: Locator, where: string) {
+  const { text, needed, available } = await valueWidths(control);
+  expect(available, `${where}: "${text}" needs ${needed}px of the ${available}px its field shows`).toBeGreaterThanOrEqual(needed);
+}
+
+for (const viewport of [{ width: 1280, height: 800 }, { width: 820, height: 1180 }, { width: 412, height: 915 }]) {
+  test(`given German membership types at ${viewport.width}px, when the table renders, then every name and rule set shows its whole value`, async ({ page }) => {
+    test.setTimeout(60_000);
+    // given
+    const typeId = "44444444-4444-4444-4444-444444444441";
+    await page.route("**/api/admin/membership-types", (route) => route.fulfill({ json: [
+      { id: typeId, name: "Acceptance members", active: true, grantsAccount: true, ruleSetId: RULE_SET.id }
+    ] }));
+    await page.route("**/api/admin/rule-sets", (route) => route.fulfill({ json: [RULE_SET] }));
+    await page.route("**/api/admin/roster?**", (route) => route.fulfill({ json: { entries: [], matching: 0 } }));
+    await page.addInitScript(() => window.localStorage.setItem("courtside.locale", "de"));
+    await page.setViewportSize(viewport);
+    await signIn(page);
+
+    // when
+    await page.goto("/admin/membership-types");
+    await expect(page.getByTestId(`membership-type-holders-${typeId}`)).toHaveText("0", { timeout: 10_000 });
+
+    // then
+    await expectWholeValue(page.getByTestId(`membership-type-name-${typeId}`), "the type name");
+    await expectWholeValue(page.getByTestId(`membership-type-rule-set-${typeId}`), "the bound rule set");
+    expect(await page.evaluate(() => document.documentElement.scrollWidth), "the page does not scroll sideways").toBeLessThanOrEqual(viewport.width);
+  });
+}
+
+test("given a tablet change log, when an entry names its actor by a dotted username, then the username stays on one line", async ({ page }) => {
+  test.setTimeout(60_000);
+  // given
+  await page.route("**/api/admin/audit?**", (route) => route.fulfill({ json: { entries: [{
+    id: "audit-0", occurredAt: "2026-10-25T07:16:44Z", eventType: "booking.booking.cancelled", parameters: {},
+    subjectId: "55555555-5555-5555-5555-555555555555", subjectName: "Centre Court, Back Court",
+    actorAccountId: "66666666-6666-6666-6666-666666666666", actorUsername: "richard.miles"
+  }], nextCursor: null } }));
+  await page.setViewportSize({ width: 820, height: 1180 });
+  await signIn(page);
+
+  // when
+  await page.goto("/admin/audit");
+  await expect(page.getByTestId("audit-row")).toHaveCount(1, { timeout: 10_000 });
+
+  // then
+  const actor = page.getByTestId("audit-actor");
+  await expect(actor).toHaveText("richard.miles");
+  expect(await actor.evaluate((element) => {
+    const range = document.createRange();
+    range.selectNodeContents(element);
+    return new Set([...range.getClientRects()].map((rect) => Math.round(rect.top))).size;
+  }), "the username is not broken inside").toBe(1);
+});
