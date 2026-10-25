@@ -117,3 +117,41 @@ test("given an administrative page taller than the window, when the page scrolls
   expect(slack.below, `less than one entry stays empty below the cue: ${JSON.stringify(slack)}`).toBeLessThan(slack.tallest + 16);
   await expectWholeEntriesAtEdges(body);
 });
+
+async function leftEdge(page: Page, testId: string): Promise<number> {
+  return Math.round((await page.getByTestId(testId).boundingBox())!.x);
+}
+
+for (const width of [1440, 1920]) {
+  test(`given a ${width} px desktop, when a member moves between their pages and goes offline, then the navigation, the offline notice and each page start at one edge`, async ({ page, context }) => {
+    // given
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("/login");
+    await page.getByTestId("username").fill("doe.jane");
+    await page.getByTestId("password").fill("temporary-password");
+    await page.getByTestId("login-submit").click();
+    await expect(page.getByTestId("court-plan-view")).toBeVisible();
+    const navigation = await leftEdge(page, "primary-navigation");
+
+    // then
+    expect(await leftEdge(page, "court-plan-view"), "the court plan starts where the navigation starts").toBe(navigation);
+
+    // when
+    await page.getByTestId("my-messages-link").click();
+
+    // then
+    await expect(page.getByTestId("my-messages-view")).toBeVisible();
+    expect(await leftEdge(page, "my-messages-view"), "the narrower messages page starts where the navigation starts").toBe(navigation);
+
+    // when
+    await page.getByTestId("my-bookings-link").click();
+    await expect(page.getByTestId("my-bookings-page")).toBeVisible();
+    await context.setOffline(true);
+
+    // then
+    await expect(page.getByTestId("offline-status")).toBeVisible();
+    expect(await leftEdge(page, "offline-status"), "the offline notice starts where the navigation starts").toBe(navigation);
+    expect(await leftEdge(page, "my-bookings-page"), "the offline bookings start where the notice starts").toBe(navigation);
+    await context.setOffline(false);
+  });
+}
