@@ -1063,6 +1063,8 @@ it("given a booking looking for a partner, when its holder offers the place, the
   });
   render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} />);
   const entry = await screen.findByTestId(`booking-${single}`);
+  expect(within(entry).getByTestId("publish-open-place"), "the name starts with the visible label")
+    .toHaveAccessibleName("Look for a partner for Member booking on Aug 12, 2026, 6:00 PM – 7:00 PM at Centre Court");
 
   // when
   await userEvent.click(within(entry).getByTestId("publish-open-place"));
@@ -1071,6 +1073,8 @@ it("given a booking looking for a partner, when its holder offers the place, the
   expect(publish).toHaveBeenCalledWith(single);
   await waitFor(() => expect(within(screen.getByTestId(`booking-${single}`)).getByTestId("withdraw-open-place"))
     .toHaveTextContent("Stop looking"));
+  expect(within(screen.getByTestId(`booking-${single}`)).getByTestId("withdraw-open-place"), "the name starts with the visible label")
+    .toHaveAccessibleName("Stop looking for a partner for Member booking on Aug 12, 2026, 6:00 PM – 7:00 PM at Centre Court");
   expect(within(screen.getByTestId(`booking-${single}`)).getByTestId("partner-search-published"))
     .toHaveTextContent("Other members can take the open place.");
 });
