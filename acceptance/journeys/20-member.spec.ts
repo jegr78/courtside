@@ -144,7 +144,7 @@ test("given a member, when a booking is made, cancelled and made again, then my 
     await step("memberB", "my bookings", async () => {
       await page.getByTestId("my-bookings-link").click();
       await expect(page.getByTestId("my-bookings-page")).toBeVisible();
-      await capture(page, "my-bookings");
+      await capture(page, "my-bookings", { subject: page.getByTestId("upcoming-bookings").locator(":scope > p, li").first() });
       await page.getByTestId("court-plan-link").click();
     });
     // when
@@ -273,7 +273,7 @@ test("given a member, when the message choices are changed and changed back, the
     // when
     await page.getByTestId("my-messages-link").click();
     await expect(page.getByTestId("my-messages-view")).toBeVisible();
-    await capture(page, "my-messages");
+    await capture(page, "my-messages", { subject: page.locator('[data-testid="notifications"] > li, [data-testid="notifications-empty"]').first() });
     const choice = page.getByTestId("message-choice-BOOKING_REMINDER");
     const checked = await choice.isChecked();
     await choice.click();
