@@ -29,6 +29,7 @@ export function useScrollContinuation(active = true, destination?: string) {
     layout();
     const observer = typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(layout);
     if (body.current) observer?.observe(body.current);
+    if (body.current?.parentElement) observer?.observe(body.current.parentElement);
     if (content.current) observer?.observe(content.current);
     window.addEventListener("resize", layout);
     return () => {
