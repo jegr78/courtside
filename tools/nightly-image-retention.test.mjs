@@ -342,9 +342,145 @@ test("given a tag moves after planning, when deletion starts, then no stale vers
     expectedVersions: initial,
     deleteVersionIds: [1],
     loadVersions: async () => changed,
+    loadVersionCount: async () => changed.length,
+    loadNewestVersions: async () => changed,
+    loadVersion: async (id) => changed.find((item) => item.id === id) ?? null,
     deleteVersion: async (id) => deleted.push(id),
   }), /registry changed after retention planning/);
   assert.deepEqual(deleted, []);
+});
+
+test("given a version outside the plan changes before deletion starts, when the plan is applied, then nothing is deleted", async () => {
+  // given
+  const planned = version(1, `sha256:${"a".repeat(64)}`);
+  const kept = version(2, `sha256:${"b".repeat(64)}`, ["nightly"]);
+  const changed = [planned, version(2, kept.digest, ["nightly", "0.3.0"], "2026-09-13T12:01:00Z")];
+  const deleted = [];
+
+  // when / then
+  await assert.rejects(() => applyDeletionPlan({
+    expectedVersions: [planned, kept],
+    deleteVersionIds: [1],
+    loadVersions: async () => changed,
+    loadVersionCount: async () => changed.length,
+    loadNewestVersions: async () => [],
+    loadVersion: async (id) => changed.find((item) => item.id === id) ?? null,
+    deleteVersion: async (id) => deleted.push(id),
+  }), /registry changed after retention planning/);
+  assert.deepEqual(deleted, [], "a change anywhere in the registry before the first deletion must stop the run");
+});
+
+function registry(size, changes = {}, { newestFirst = true, updatedAt = () => old } = {}) {
+  const state = Array.from({ length: size }, (_, index) => version(index + 1,
+    `sha256:${(index + 1).toString(16).padStart(64, "0")}`, [], updatedAt(index + 1)));
+  const listed = () => state.toSorted((left, right) => (newestFirst ? right.id - left.id : left.id - right.id))
+    .map((item) => ({ ...item, tags: [...item.tags] }));
+  const expectedVersions = state.map((item) => ({ ...item, tags: [...item.tags] }));
+  const calls = { pages: 0, counts: 0, newest: 0, versions: 0, deletes: 0 };
+  const deleted = [];
+  return { expectedVersions, calls, deleted, operations: {
+    loadVersions: async () => {
+      calls.pages += Math.floor(state.length / 100) + 1;
+      return listed();
+    },
+    loadVersionCount: async () => {
+      calls.counts += 1;
+      return state.length;
+    },
+    loadNewestVersions: async (pages) => {
+      calls.newest += pages;
+      return listed().slice(0, pages * 100);
+    },
+    loadVersion: async (id) => {
+      calls.versions += 1;
+      const found = state.find((item) => item.id === id);
+      return found === undefined ? null : { ...found, tags: [...found.tags] };
+    },
+    deleteVersion: async (id) => {
+      calls.deletes += 1;
+      state.splice(state.findIndex((item) => item.id === id), 1);
+      deleted.push(id);
+      changes[deleted.length]?.(state);
+    },
+  } };
+}
+
+test("given a large registry, when a plan is applied, then each deletion costs a fixed number of requests", async () => {
+  // given
+  const { expectedVersions, calls, deleted, operations } = registry(1_400);
+  const deleteVersionIds = expectedVersions.slice(0, 182).map(({ id }) => id);
+
+  // when
+  await applyDeletionPlan({ expectedVersions, deleteVersionIds, ...operations });
+
+  // then
+  assert.deepEqual(deleted, deleteVersionIds);
+  assert.deepEqual(calls, { pages: 15, counts: 182, newest: 182, versions: 182, deletes: 182 },
+    "the full version list must be read once, not once per deletion");
+});
+
+test("given a planned version gains a tag during deletion, when its turn comes, then it is not deleted", async () => {
+  // given
+  const { expectedVersions, deleted, operations } = registry(150, {
+    2: (state) => { state.find(({ id }) => id === 3).tags.push("0.3.0"); },
+  });
+
+  // when / then
+  await assert.rejects(() => applyDeletionPlan({ expectedVersions, deleteVersionIds: [1, 2, 3, 4],
+    ...operations }), /registry changed after retention planning/);
+  assert.deepEqual(deleted, [1, 2], "a version tagged after planning must survive");
+});
+
+test("given a version is published outside the first listing page, when the next deletion starts, then it is refused", async () => {
+  // given
+  const { expectedVersions, deleted, operations } = registry(10, {
+    1: (state) => { state.push(version(11, `sha256:${"f".repeat(64)}`, ["nightly"], now)); },
+  });
+
+  // when / then
+  await assert.rejects(() => applyDeletionPlan({ expectedVersions, deleteVersionIds: [1, 2, 3],
+    ...operations, loadNewestVersions: async () => [] }), /registry changed after retention planning/);
+  assert.deepEqual(deleted, [1], "a new version may reference a planned digest, so nothing further is deleted");
+});
+
+test("given a recent version is retagged during deletion, when the next deletion starts, then it is refused", async () => {
+  // given
+  const { expectedVersions, deleted, operations } = registry(10, {
+    1: (state) => { state.find(({ id }) => id === 10).tags.push("release-candidate-retagged"); },
+  });
+
+  // when / then
+  await assert.rejects(() => applyDeletionPlan({ expectedVersions, deleteVersionIds: [1, 2, 3],
+    ...operations }), /registry changed after retention planning/);
+  assert.deepEqual(deleted, [1], "a newly kept version may reference a planned digest, so nothing further is deleted");
+});
+
+test("given a listing that is not newest first, when a recent version is retagged during deletion, then it is refused", async () => {
+  // given
+  const { expectedVersions, calls, deleted, operations } = registry(150, {
+    1: (state) => { state.find(({ id }) => id === 150).tags.push("release-candidate-retagged"); },
+  }, { newestFirst: false, updatedAt: (id) => (id > 140 ? now : old) });
+
+  // when / then
+  await assert.rejects(() => applyDeletionPlan({ expectedVersions, deleteVersionIds: [1, 2, 3],
+    ...operations }), /registry changed after retention planning/);
+  assert.deepEqual(deleted, [1], "a recent version on a later listing page must still be checked");
+  assert.equal(calls.newest, 4, "both pages up to the last recent version are read before each deletion");
+});
+
+test("given a planned version disappears during deletion, when its turn comes, then deletion stops", async () => {
+  // given
+  const { expectedVersions, deleted, operations } = registry(10, {
+    1: (state) => {
+      state.splice(state.findIndex(({ id }) => id === 2), 1);
+      state.push(version(11, `sha256:${"f".repeat(64)}`));
+    },
+  });
+
+  // when / then
+  await assert.rejects(() => applyDeletionPlan({ expectedVersions, deleteVersionIds: [1, 2, 3],
+    ...operations, loadNewestVersions: async () => [] }), /registry changed after retention planning/);
+  assert.deepEqual(deleted, [1], "a version that left the registry outside the plan must stop the run");
 });
 
 test("given run-unique candidate tags inside the promotion window, when retention runs, then both images remain", () => {

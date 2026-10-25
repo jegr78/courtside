@@ -144,6 +144,15 @@ manifest closure each retained digest needs. A candidate-only digest follows the
 evidence window; the daily nightly retention removes it after that window without touching a digest
 that also carries a published version.
 
+Retention deletes only what it planned against an unchanged registry. Before the first deletion it
+reads the complete version list once more and refuses if any version differs from the plan's input.
+An unplanned version no newer than every planned one is kept already, so only planned versions and
+newer ones can change the plan. Before each deletion retention reads the package's version count,
+the listing pages up to the last of those newer versions and the version it is about to delete. It
+refuses if the count is not the plan's minus the deletions so far, if a version on those pages is
+unknown or changed, or if the target changed. With the newest versions listed first that is one
+page, so a night costs one full listing plus four requests per deletion, whatever the registry holds.
+
 ### Nightly source attestation v1
 
 The nightly workflow's standard provenance identifies the workflow revision that performed the
