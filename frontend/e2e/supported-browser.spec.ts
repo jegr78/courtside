@@ -163,7 +163,23 @@ test("an administrator can open both core administration views", async ({ page }
   await expect(page.getByTestId("create-court")).toBeVisible();
 });
 
-test("an empty time filter hides the browser's ghost value until it is focused or filled", async ({ page, browserName }) => {
+test("given a wide screen, when the court plan loads, then its date field is as tall as the week buttons beside it", async ({ page }) => {
+  // given
+  await page.setViewportSize({ width: 1280, height: 900 });
+
+  // when
+  await page.goto("/");
+  const date = page.getByTestId("week-date");
+  await expect(date).toBeEnabled();
+
+  // then
+  const field = (await date.boundingBox())!;
+  const previous = (await page.getByTestId("week-previous").boundingBox())!;
+  expect(field.height, "the date field is as tall as the Back button").toBeCloseTo(previous.height, 0);
+  expect(field.y, "the date field starts level with the Back button").toBeCloseTo(previous.y, 0);
+});
+
+test("an empty time filter hides the browser's ghost value until it is focused or filled",async ({ page, browserName }) => {
   // given
   await signIn(page, "configuration-admin");
   await page.goto("/admin/audit");
