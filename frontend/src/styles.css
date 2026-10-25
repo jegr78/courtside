@@ -595,6 +595,10 @@ input[type="time"] {
   display: none;
 }
 
+.desktop-week-date {
+  display: grid;
+}
+
 .week-day-list {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
