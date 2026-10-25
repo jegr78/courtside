@@ -9,7 +9,7 @@ test("when a visitor reads the plan, the sign-in and the recovery page, then eve
   // when
   const page = await openAs(browser, "visitor");
   await step("visitor", "plan today", () => capture(page, "plan-today"));
-  await step("visitor", "plan in window", async () => { await gotoDay(page, lanePlan().saturday); await capture(page, "plan-signed-out"); });
+  await step("visitor", "plan in window", async () => { await gotoDay(page, lanePlan().saturday); await capture(page, "plan-signed-out", { subject: page.getByTestId("guest-guidance") }); });
   await step("visitor", "sign-in notice", async () => {
     await expect(page.getByTestId("guest-guidance"), "product: the plan tells a visitor how to book").toBeVisible();
     expect(await page.getByRole("heading", { level: 1 }).count(), "product: the plan carries exactly one page heading").toBe(1);
@@ -27,7 +27,7 @@ test("when a visitor reads the plan, the sign-in and the recovery page, then eve
   await step("visitor", "recovery page", async () => {
     await page.getByTestId("forgotten-credentials-link").click();
     await expect(page.getByTestId("account-recovery-view")).toBeVisible();
-    await capture(page, "account-recovery");
+    await capture(page, "account-recovery", { subject: page.getByTestId("recovery-username") });
   });
   await page.context().close();
 });
