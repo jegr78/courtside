@@ -433,6 +433,9 @@ test("given a phone 320 px wide in German, when the booking dialog opens, then e
   for (const action of ["booking-close", "booking-submit"]) {
     expect(await shownLines(dialog.getByTestId(action)), `${action} keeps its label on one line`).toBeLessThan(1.5);
   }
+  const close = (await dialog.getByTestId("booking-close").boundingBox())!;
+  const submit = (await dialog.getByTestId("booking-submit").boundingBox())!;
+  expect(submit.y, "both actions share one row").toBeCloseTo(close.y, 0);
 });
 
 for (const [username, account, destinations] of [["doe.jane", "102", 3], ["configuration-admin", "107", 4]] as const) {
