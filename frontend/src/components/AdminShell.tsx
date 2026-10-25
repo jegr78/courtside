@@ -11,23 +11,28 @@ export function AdminShell({ administrator = true }: { administrator?: boolean }
   const frame = useRef<HTMLDivElement>(null);
 
   useLayoutEffect(() => {
-    const measure = () => {
+    let below = 0;
+    const follow = () => {
       if (!shell.current || !frame.current) return;
       const top = shell.current.getBoundingClientRect().top;
-      const room = window.innerHeight - window.scrollY - spaceAfter(shell.current);
+      const room = window.innerHeight - window.scrollY - below;
       const page = frame.current.nextElementSibling?.getBoundingClientRect().bottom ?? 0;
       const bottom = Math.max(room, Math.min(window.innerHeight - stuckMargin, page));
       frame.current.style.setProperty("--admin-navigation-room", `${bottom - Math.max(stuckMargin, top)}px`);
+    };
+    const measure = () => {
+      if (shell.current) below = spaceAfter(shell.current);
+      follow();
     };
     measure();
     const resized = typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(measure);
     resized?.observe(document.body);
     window.addEventListener("resize", measure);
-    window.addEventListener("scroll", measure, { passive: true });
+    window.addEventListener("scroll", follow, { passive: true });
     return () => {
       resized?.disconnect();
       window.removeEventListener("resize", measure);
-      window.removeEventListener("scroll", measure);
+      window.removeEventListener("scroll", follow);
     };
   }, []);
 
@@ -43,6 +48,7 @@ export function AdminShell({ administrator = true }: { administrator?: boolean }
   </div>;
 }
 
+// The sticky offset lg:top-8, kept again below the frame.
 const stuckMargin = 32;
 
 // The page below the shell, its padding and the footer, which the navigation leaves room for so it alone never scrolls the page.
