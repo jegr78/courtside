@@ -6,6 +6,8 @@ export function useScrollContinuation(active = true, destination?: string) {
   const [continues, setContinues] = useState(false);
   const [precedes, setPrecedes] = useState(false);
   const [overflows, setOverflows] = useState(false);
+  const following = useRef(true);
+  const placed = useRef(0);
   const measure = useCallback(() => {
     const element = body.current;
     const padding = element ? (parseFloat(getComputedStyle(element).paddingBottom) || 0)
@@ -15,14 +17,21 @@ export function useScrollContinuation(active = true, destination?: string) {
     setOverflows(Boolean(active && element && element.scrollHeight - element.clientHeight >= 1));
   }, [active]);
 
+  const scrolled = useCallback(() => {
+    if (body.current && Math.abs(body.current.scrollTop - placed.current) >= 1) following.current = false;
+    measure();
+  }, [measure]);
+
   useLayoutEffect(() => {
     if (!active) return;
+    following.current = true;
     const layout = () => {
       const element = body.current;
       if (element && destination !== undefined) {
         element.style.maxHeight = "";
-        reveal(element);
+        if (following.current) reveal(element);
         endOnWholeEntries(element);
+        placed.current = element.scrollTop;
       }
       measure();
     };
@@ -38,7 +47,7 @@ export function useScrollContinuation(active = true, destination?: string) {
     };
   }, [active, destination, measure]);
 
-  return { body, content, continues, precedes, overflows, measure };
+  return { body, content, continues, precedes, overflows, measure: scrolled };
 }
 
 function reveal(element: HTMLElement) {

@@ -76,6 +76,23 @@ it("given a desktop navigation with an active entry below its frame, when the wi
   expect(screen.queryByTestId("admin-sidebar-precedes"), "nothing lies above the first entry").not.toBeInTheDocument();
 });
 
+it("given a navigation the member scrolled away from its active entry, when it resizes, then it keeps the member's position", async () => {
+  // given
+  window.innerWidth = 1280;
+  show("/admin/facility");
+  const body = screen.getByTestId("admin-navigation-scroll");
+  const entries = [...body.querySelectorAll<HTMLElement>("a, p")];
+  entries[11].setAttribute("aria-current", "page");
+  layOut(body, { top: 100, height: 200 }, entries.length * 32);
+  await act(() => window.dispatchEvent(new Event("resize")));
+  body.scrollTop = 0;
+  fireEvent.scroll(body);
+  // when
+  await act(() => window.dispatchEvent(new Event("resize")));
+  // then
+  expect(body.scrollTop, "the member's scroll position outlives a layout change").toBe(0);
+});
+
 it("given an administrative page taller than the window, when the page scrolls, then the navigation reaches down the window", async () => {
   // given
   window.innerHeight = 800;
