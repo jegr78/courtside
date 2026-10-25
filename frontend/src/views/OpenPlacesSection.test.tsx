@@ -32,7 +32,7 @@ it("given an open place, when the section shows, then it names the slot, the cou
   expect(within(entry).getByTestId("open-place-title")).toHaveTextContent("Centre Court");
   expect(within(entry).getByTestId("open-place-card")).toHaveTextContent("Member booking");
   expect(within(entry).getByTestId("take-open-place"))
-    .toHaveAccessibleName("Take the open place on Aug 10, 2026, 6:00 PM – 7:00 PM at Centre Court");
+    .toHaveAccessibleName("Take the place on Aug 10, 2026, 6:00 PM – 7:00 PM at Centre Court");
 });
 
 it("given an open place, when the member takes it, then the place is accepted and the bookings reload", async () => {

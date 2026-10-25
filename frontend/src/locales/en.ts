@@ -1065,9 +1065,9 @@ const en: Record<keyof typeof de, string> = {
   "myBookings.move": "Move",
   "myBookings.moveAccessible": "Move {{label}} on {{period}} at {{courts}}",
   "myBookings.searchPartner": "Look for a partner",
-  "myBookings.searchPartnerAccessible": "Offer the open place in {{label}} on {{period}} at {{courts}} to other members",
+  "myBookings.searchPartnerAccessible": "Look for a partner for {{label}} on {{period}} at {{courts}}",
   "myBookings.stopPartnerSearch": "Stop looking",
-  "myBookings.stopPartnerSearchAccessible": "Stop offering the open place in {{label}} on {{period}} at {{courts}}",
+  "myBookings.stopPartnerSearchAccessible": "Stop looking for a partner for {{label}} on {{period}} at {{courts}}",
   "myBookings.partnerSearchPublished": "Other members can take the open place.",
   "myBookings.partnerSearchStarted": "Other members now see the open place.",
   "myBookings.partnerSearchStopped": "The open place is no longer offered.",
@@ -1907,7 +1907,7 @@ const en: Record<keyof typeof de, string> = {
   "openPlaces.title": "Open places",
   "openPlaces.description": "Members looking for a partner offer these places. Nobody is named until you play.",
   "openPlaces.take": "Take the place",
-  "openPlaces.takeAccessible": "Take the open place on {{period}} at {{courts}}",
+  "openPlaces.takeAccessible": "Take the place on {{period}} at {{courts}}",
   "openPlaces.taken": "You play in this booking now."
 };
 
