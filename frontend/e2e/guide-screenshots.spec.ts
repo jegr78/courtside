@@ -461,13 +461,15 @@ async function capture(page: Page, name: string, visualDate: string): Promise<vo
   if (size !== null) await page.setViewportSize(size);
 }
 
-// A guide shows every destination, so the window grows by what the navigation's own frame would scroll.
+// A guide shows every destination, so the window grows until the navigation's own frame no longer scrolls.
 async function showTheWholeNavigation(page: Page): Promise<void> {
   const body = page.getByTestId("admin-navigation-scroll");
   const hidden = () => body.evaluate((element) => element.scrollHeight - element.clientHeight);
-  const size = page.viewportSize();
-  const overflow = await hidden();
-  if (size !== null && overflow > 0) await page.setViewportSize({ width: size.width, height: size.height + overflow });
+  for (let overflow = await hidden(), grown = 0; overflow > 0 && grown < 5; overflow = await hidden(), grown++) {
+    const size = page.viewportSize();
+    if (size === null) break;
+    await page.setViewportSize({ width: size.width, height: size.height + overflow });
+  }
   await expect.poll(hidden, { message: "every destination is in the picture", timeout: 10_000 }).toBe(0);
 }
 
