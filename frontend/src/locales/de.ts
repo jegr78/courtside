@@ -951,6 +951,7 @@ const de = {
   "week.time": "Zeit",
   "week.freeCount_one": "{{count}} freie Zeit",
   "week.freeCount_other": "{{count}} freie Zeiten",
+  "week.freeCountCompact": "{{count}} frei",
   "week.noCourtOpen": "Der Verein hat zurzeit keinen Platz zum Buchen freigegeben.",
   "week.closed": "An diesem Tag ist die Anlage geschlossen.",
   "week.available": "Frei",
