@@ -164,18 +164,45 @@ async function responseJson(response, context) {
   return response.json();
 }
 
-async function packageVersions({ owner, ownerKind, packageName, token }) {
+function packageEndpoint({ owner, ownerKind, packageName }) {
+  return `https://api.github.com/${ownerKind}/${encodeURIComponent(owner)}`
+    + `/packages/container/${encodeURIComponent(packageName)}`;
+}
+
+function versionOf(record) {
+  return { id: record.id, digest: record.name, tags: record.metadata?.container?.tags,
+    updatedAt: record.updated_at };
+}
+
+async function packageVersionPage({ token, page, ...target }) {
+  const endpoint = `${packageEndpoint(target)}/versions?per_page=100&page=${page}`;
+  const records = await responseJson(await fetch(endpoint, { headers: githubHeaders(token) }),
+    "GitHub package versions");
+  if (!Array.isArray(records)) throw new Error("GitHub package versions are invalid");
+  return records.map(versionOf);
+}
+
+async function packageVersions(target) {
   const versions = [];
   for (let page = 1; ; page += 1) {
-    const endpoint = `https://api.github.com/${ownerKind}/${encodeURIComponent(owner)}`
-      + `/packages/container/${encodeURIComponent(packageName)}/versions?per_page=100&page=${page}`;
-    const records = await responseJson(await fetch(endpoint, { headers: githubHeaders(token) }),
-      "GitHub package versions");
-    if (!Array.isArray(records)) throw new Error("GitHub package versions are invalid");
-    versions.push(...records.map((record) => ({ id: record.id, digest: record.name,
-      tags: record.metadata?.container?.tags, updatedAt: record.updated_at })));
+    const records = await packageVersionPage({ ...target, page });
+    versions.push(...records);
     if (records.length < 100) return versions;
   }
+}
+
+async function packageVersionCount({ token, ...target }) {
+  const record = await responseJson(await fetch(packageEndpoint(target), { headers: githubHeaders(token) }),
+    "GitHub package");
+  if (!Number.isSafeInteger(record.version_count)) throw new Error("GitHub package version count is invalid");
+  return record.version_count;
+}
+
+async function packageVersion({ token, id, ...target }) {
+  const response = await fetch(`${packageEndpoint(target)}/versions/${id}`, { headers: githubHeaders(token) });
+  if (response.status === 404) return null;
+  const record = await responseJson(response, `GitHub package version ${id}`);
+  return record.deleted_at ? null : versionOf(record);
 }
 
 async function registryBearer({ owner, packageName, actor, token }) {
@@ -213,27 +240,57 @@ function versionSnapshot(versions) {
     ({ id, digest, tags: [...tags].toSorted(), updatedAt })).toSorted((left, right) => left.id - right.id));
 }
 
-export async function applyDeletionPlan({ expectedVersions, deleteVersionIds, loadVersions, deleteVersion }) {
+export async function applyDeletionPlan({ expectedVersions, deleteVersionIds, loadVersions, loadVersionCount,
+  loadNewestVersions, loadVersion, deleteVersion }) {
   let expected = [...expectedVersions];
+  const listed = await loadVersions();
+  if (versionSnapshot(listed) !== versionSnapshot(expected)) {
+    throw new Error("registry changed after retention planning");
+  }
+  const planned = new Set(deleteVersionIds);
+  const newestPlanned = Math.max(...listed.filter(({ id }) => planned.has(id))
+    .map(({ updatedAt }) => Date.parse(updatedAt)));
+  // An unplanned version no newer than every planned one is kept already, so only newer ones matter.
+  const lastNewer = listed.findLastIndex(({ updatedAt }) => Date.parse(updatedAt) > newestPlanned);
+  const newerPages = Math.floor(Math.max(lastNewer, 0) / 100) + 1;
   for (const id of deleteVersionIds) {
-    const observed = await loadVersions();
-    if (versionSnapshot(observed) !== versionSnapshot(expected)) {
-      throw new Error("registry changed after retention planning");
+    const count = await loadVersionCount();
+    const newest = await loadNewestVersions(newerPages);
+    const observed = await loadVersion(id);
+    const target = expected.filter((version) => version.id === id);
+    const known = new Set(expected.map((version) => versionSnapshot([version])));
+    const unknown = newest.find((version) => !known.has(versionSnapshot([version])));
+    if (count !== expected.length) {
+      throw new Error(`registry changed after retention planning: ${count} versions, ${expected.length} planned`);
+    }
+    if (unknown !== undefined) {
+      throw new Error(`registry changed after retention planning: version ${unknown.id} is unknown or changed`);
+    }
+    if (observed === null || target.length !== 1 || versionSnapshot([observed]) !== versionSnapshot(target)) {
+      throw new Error(`registry changed after retention planning: version ${id} is missing or changed`);
     }
     await deleteVersion(id);
     expected = expected.filter((version) => version.id !== id);
   }
 }
 
-async function deleteVersions({ owner, ownerKind, packageName, token, versions, ids }) {
+async function deleteVersions({ token, versions, ids, ...target }) {
   const deleteVersion = async (id) => {
-    const endpoint = `https://api.github.com/${ownerKind}/${encodeURIComponent(owner)}`
-      + `/packages/container/${encodeURIComponent(packageName)}/versions/${id}`;
-    const response = await fetch(endpoint, { method: "DELETE", headers: githubHeaders(token) });
+    const response = await fetch(`${packageEndpoint(target)}/versions/${id}`,
+      { method: "DELETE", headers: githubHeaders(token) });
     if (response.status !== 204) throw new Error(`deleting package version ${id} returned ${response.status}`);
   };
   await applyDeletionPlan({ expectedVersions: versions, deleteVersionIds: ids,
-    loadVersions: () => packageVersions({ owner, ownerKind, packageName, token }), deleteVersion });
+    loadVersions: () => packageVersions({ token, ...target }),
+    loadVersionCount: () => packageVersionCount({ token, ...target }),
+    loadNewestVersions: async (pages) => {
+      const versions = [];
+      for (let page = 1; page <= pages; page += 1) {
+        versions.push(...await packageVersionPage({ token, page, ...target }));
+      }
+      return versions;
+    },
+    loadVersion: (id) => packageVersion({ token, id, ...target }), deleteVersion });
 }
 
 async function main(args) {
