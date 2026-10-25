@@ -83,6 +83,8 @@ const en: Record<keyof typeof de, string> = {
   "field.dateTimeFormat": "Example: {{example}}",
   "field.invalidDateTime": "Enter a valid value, for example {{example}}.",
   "field.notSet": "Not set",
+  "field.chooseFile": "Choose file",
+  "field.noFileChosen": "No file chosen",
   "password.show": "Show password",
   "password.confirm": "Confirm new password",
   "password.submit": "Save password",

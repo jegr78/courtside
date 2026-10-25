@@ -5,6 +5,7 @@ import { api, type ImportPersonChange, type ImportPreview, type ImportSource, ty
 import { NotUtf8Error, readCsvHeader } from "../../import/read-csv";
 import { Alert } from "../../components/Alert";
 import { Button } from "../../components/Button";
+import { FileInput } from "../../components/FileInput";
 import { useReportedFailure } from "../../failures/useReportedFailure";
 import { isExpired } from "./previewState";
 import { violationMessage } from "../../api/problem-message";
@@ -86,7 +87,7 @@ export function ImportPreviewPanel({ sourceId, sourceEncoding, columnMode, previ
 
     <div className="grid gap-2">
       <label className="font-semibold" htmlFor="snapshot-file">{t("admin.import.snapshotFile")}</label>
-      <input data-testid="snapshot-file" id="snapshot-file" type="file" accept=".csv,.txt,text/csv,text/plain" disabled={busy} onChange={(event) => void chooseFile(event)} />
+      <FileInput data-testid="snapshot-file" id="snapshot-file" file={chosen} accept=".csv,.txt,text/csv,text/plain" disabled={busy} onChange={(event) => void chooseFile(event)} />
     </div>
 
     {asksEncoding && <div className="grid gap-2">

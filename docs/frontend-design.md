@@ -68,6 +68,10 @@ refuse a two-digit year. An entry that cannot be read never replaces the stored 
 names the expected format once it is left, and its form, save bar or dialog action refuses to run
 until the entry is corrected or cleared.
 
+File fields follow the application language as well. The native file input stays in place for
+keyboard and assistive technology, while the visible trigger and the chosen file name come from
+the application's messages.
+
 ## Saving
 
 Every administrative page commits its edits through one save bar. The bar appears once a field

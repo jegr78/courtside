@@ -516,4 +516,44 @@ test.describe("application locale editors with an English browser", () => {
       localeExpect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width + 1);
     }
   });
+
+  test("given German application language and an English browser, when a member list is chosen by pointer and keyboard, then the file field reads in German and names the file", async ({ page }) => {
+    // given
+    await page.addInitScript(() => {
+      if (!window.localStorage.getItem("courtside.locale")) window.localStorage.setItem("courtside.locale", "de");
+    });
+    await signIn(page, "configuration-admin");
+    await page.goto("/admin/import");
+    await localeExpect(page.locator("html")).toHaveAttribute("lang", "de");
+    localeExpect(await page.evaluate(() => navigator.language)).toBe("en-US");
+    await page.getByTestId("new-source").click();
+    const input = page.getByTestId("source-file");
+    const trigger = page.getByTestId("source-file-trigger");
+    const status = page.getByTestId("source-file-status");
+    await localeExpect(trigger).toHaveText("Datei auswählen");
+    await localeExpect(status).toHaveText("Keine Datei ausgewählt");
+    const native = await input.boundingBox();
+    localeExpect(native!.width * native!.height, "the browser-labelled control is not painted").toBeLessThanOrEqual(1);
+
+    // when
+    const pointerChooser = page.waitForEvent("filechooser");
+    await trigger.click();
+    await (await pointerChooser).setFiles({ name: "members.csv", mimeType: "text/csv", buffer: Buffer.from("Number;Given\n9001;Jane\n") });
+
+    // then
+    await localeExpect(status).toHaveText("members.csv");
+    await localeExpect(input).toHaveAccessibleDescription("members.csv");
+
+    // when
+    await page.getByTestId("source-name").focus();
+    await page.keyboard.press("Tab");
+    await localeExpect(input).toBeFocused();
+    await localeExpect(trigger, "the focused input outlines its visible trigger").toHaveCSS("outline-style", "solid");
+    const keyboardChooser = page.waitForEvent("filechooser");
+    await page.keyboard.press("Space");
+    await (await keyboardChooser).setFiles({ name: "roster.csv", mimeType: "text/csv", buffer: Buffer.from("Number;Given\n9002;John\n") });
+
+    // then
+    await localeExpect(status).toHaveText("roster.csv");
+  });
 });

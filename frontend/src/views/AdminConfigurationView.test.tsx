@@ -202,11 +202,13 @@ describe("AdminConfigurationView", () => {
 
     // when
     await userEvent.upload(input, file);
+    expect(screen.getByTestId("logo-file-status"), "the chosen file is named before upload").toHaveTextContent("club.png");
     await userEvent.click(screen.getByTestId("upload-logo"));
 
     // then
     await waitFor(() => expect(upload).toHaveBeenCalledWith(file));
     expect(screen.getByTestId("logo-preview")).toHaveAttribute("src", uploaded.logoUrl);
+    expect(screen.getByTestId("logo-file-status"), "an uploaded file is no longer pending").toHaveTextContent("No file chosen");
     expect(configurationChanged).toHaveBeenCalledWith(uploaded);
   });
 
@@ -228,6 +230,7 @@ describe("AdminConfigurationView", () => {
     // then
     expect(await screen.findByTestId("admin-error")).toHaveTextContent(message);
     expect(upload).not.toHaveBeenCalled();
+    expect(screen.getByTestId("logo-file-status"), "a rejected file is not shown as chosen").toHaveTextContent("No file chosen");
   });
 
   it("given an uploaded logo and a URL fallback, when removing it, then the fallback becomes the preview", async () => {

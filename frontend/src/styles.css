@@ -167,8 +167,7 @@ input[type="time"] {
     opacity: 0.55;
   }
 
-  input[type="file"]::file-selector-button {
-    margin-inline-end: 0.75rem;
+  .file-input-trigger {
     padding: 0.5rem 1rem;
     border: 1px solid var(--cs-border);
     border-radius: 0.5rem;
@@ -177,6 +176,16 @@ input[type="time"] {
     font: inherit;
     font-weight: 600;
     cursor: pointer;
+  }
+
+  .file-input > input:focus-visible + .file-input-trigger {
+    outline: 2px solid var(--cs-focus);
+    outline-offset: 2px;
+  }
+
+  .file-input > input:disabled + .file-input-trigger {
+    cursor: not-allowed;
+    color: var(--cs-muted);
   }
 
   @media (forced-colors: active) {

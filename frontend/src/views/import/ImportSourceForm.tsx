@@ -4,6 +4,7 @@ import { api, type CanonicalField, type ImportSource, type ImportSourceRequest, 
 import { EncodingUnreadableHereError, NotUtf8Error, looksLikeHeader, readCsvColumn, readCsvHeader, readCsvRows, suggestSeparator } from "../../import/read-csv";
 import { Button } from "../../components/Button";
 import { TextField } from "../../components/TextField";
+import { FileInput } from "../../components/FileInput";
 import { differs } from "../../unsaved/differs";
 import { importSourceMark } from "./importSourceMark";
 import { SaveBar } from "../../unsaved/SaveBar";
@@ -248,7 +249,7 @@ export function ImportSourceForm({ source, types, disabled, save }: {
 
     <div className="grid gap-2">
       <label className="font-semibold" htmlFor={`${group}-file`}>{t("admin.import.file")}</label>
-      <input data-testid="source-file" id={`${group}-file`} type="file" accept=".csv,.txt,text/csv,text/plain" disabled={disabled} onChange={(event) => void chooseFile(event)} />
+      <FileInput data-testid="source-file" id={`${group}-file`} file={chosen} accept=".csv,.txt,text/csv,text/plain" disabled={disabled} onChange={(event) => void chooseFile(event)} />
       <p className="text-sm">{t("admin.import.fileStaysHere")}</p>
       <label className="font-semibold" htmlFor={`${group}-separator`}>{t("admin.import.separator")}</label>
       <input data-testid="source-separator" id={`${group}-separator`} className="form-control rounded-lg border px-3 py-3" maxLength={1} disabled={disabled} value={separator} onChange={(event) => void readWith(encoding, chosen, event.target.value)} />
