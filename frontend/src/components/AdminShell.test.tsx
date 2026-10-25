@@ -33,30 +33,85 @@ describe("AdminShell", () => {
   });
 });
 
-it("given a desktop navigation with an active entry below its frame, when the window resizes, then only its scroll position reveals the entry", async () => {
+// Each entry sits at its own height in the navigation, so moving the frame moves every entry with it.
+function layOut(body: HTMLElement, frame: { top: number; height: number }, scrollHeight: number) {
+  vi.spyOn(body, "getBoundingClientRect").mockImplementation(() => ({ top: frame.top, bottom: frame.top + frame.height } as DOMRect));
+  Object.defineProperties(body, {
+    scrollHeight: { configurable: true, value: scrollHeight },
+    clientHeight: { configurable: true, get: () => parseFloat(body.style.maxHeight) || frame.height },
+    scrollTop: { configurable: true, writable: true, value: 0 }
+  });
+  [...body.querySelectorAll<HTMLElement>("a, p")].forEach((entry, index) => {
+    vi.spyOn(entry, "getBoundingClientRect").mockImplementation(() =>
+      ({ top: frame.top + index * 32 - body.scrollTop, bottom: frame.top + index * 32 + 28 - body.scrollTop } as DOMRect));
+  });
+}
+
+it("given a desktop navigation with an active entry below its frame, when the window resizes, then the frame begins and ends on whole entries", async () => {
   // given
   window.innerWidth = 1280;
   show("/admin/facility");
   const body = screen.getByTestId("admin-navigation-scroll");
-  const active = screen.getByTestId("admin-courts-link");
+  const entries = [...body.querySelectorAll<HTMLElement>("a, p")];
+  const active = entries[11];
   active.setAttribute("aria-current", "page");
-  vi.spyOn(body, "getBoundingClientRect").mockReturnValue({ top: 100, bottom: 300 } as DOMRect);
-  vi.spyOn(active, "getBoundingClientRect").mockReturnValue({ top: 350, bottom: 380 } as DOMRect);
-  Object.defineProperties(body, {
-    scrollHeight: { configurable: true, value: 800 },
-    clientHeight: { configurable: true, value: 200 },
-    scrollTop: { configurable: true, writable: true, value: 0 }
-  });
+  layOut(body, { top: 100, height: 200 }, entries.length * 32);
   // when
   await act(() => window.dispatchEvent(new Event("resize")));
   // then
-  expect(body.scrollTop).toBe(80);
+  expect(body.scrollTop, "the frame begins at the first entry below the cut one").toBe(6 * 32);
+  expect(body.style.maxHeight, "the frame ends with the active entry").toBe(`${11 * 32 + 28 - 6 * 32}px`);
   expect(screen.getByTestId("admin-sidebar-continues")).toBeInTheDocument();
+  expect(screen.getByTestId("admin-sidebar-precedes")).toBeInTheDocument();
   // when
-  body.scrollTop = 600;
+  body.scrollTop = entries.length * 32;
   fireEvent.scroll(body);
   // then
   expect(screen.queryByTestId("admin-sidebar-continues")).not.toBeInTheDocument();
+  expect(screen.getByTestId("admin-sidebar-precedes")).toBeInTheDocument();
+  // when
+  body.scrollTop = 0;
+  fireEvent.scroll(body);
+  // then
+  expect(screen.queryByTestId("admin-sidebar-precedes"), "nothing lies above the first entry").not.toBeInTheDocument();
+});
+
+it("given an administrative page taller than the window, when the page scrolls, then the navigation reaches down the window", async () => {
+  // given
+  window.innerHeight = 800;
+  Object.defineProperty(window, "scrollY", { configurable: true, value: 0 });
+  show("/admin/facility");
+  const shell = screen.getByTestId("admin-shell");
+  const frame = screen.getByTestId("admin-navigation-frame");
+  const page = screen.getByTestId("a-page");
+  let scrolled = 0;
+  vi.spyOn(shell, "getBoundingClientRect").mockImplementation(() => ({ top: 150 - scrolled } as DOMRect));
+  vi.spyOn(page, "getBoundingClientRect").mockImplementation(() => ({ bottom: 2000 - scrolled } as DOMRect));
+  // when
+  await act(() => window.dispatchEvent(new Event("resize")));
+  // then
+  expect(frame.style.getPropertyValue("--admin-navigation-room")).toBe(`${800 - 150}px`);
+  // when
+  scrolled = 600;
+  Object.defineProperty(window, "scrollY", { configurable: true, value: scrolled });
+  await act(() => window.dispatchEvent(new Event("scroll")));
+  // then
+  expect(frame.style.getPropertyValue("--admin-navigation-room"), "stuck, the frame spans the window less its margins").toBe(`${800 - 64}px`);
+});
+
+it("given an administrative page shorter than the window, when it is shown, then the navigation leaves the page its height", async () => {
+  // given
+  window.innerHeight = 800;
+  Object.defineProperty(window, "scrollY", { configurable: true, value: 0 });
+  show("/admin/facility");
+  const shell = screen.getByTestId("admin-shell");
+  const frame = screen.getByTestId("admin-navigation-frame");
+  vi.spyOn(shell, "getBoundingClientRect").mockReturnValue({ top: 150 } as DOMRect);
+  vi.spyOn(screen.getByTestId("a-page"), "getBoundingClientRect").mockReturnValue({ bottom: 300 } as DOMRect);
+  // when
+  await act(() => window.dispatchEvent(new Event("resize")));
+  // then
+  expect(frame.style.getPropertyValue("--admin-navigation-room")).toBe(`${800 - 150}px`);
 });
 
 it.each([
