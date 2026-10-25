@@ -54,6 +54,18 @@ describe("unread notifications in the primary navigation", () => {
     expect(api.ownNotifications).toHaveBeenCalledWith(undefined, 1);
   });
 
+  it.each([[99, "99"], [100, "99+"], [108, "99+"]])("given %i unread notifications, when the navigation renders, then the badge shows %s and the name keeps the exact count", async (unread, shown) => {
+    // given
+    vi.spyOn(api, "ownNotifications").mockResolvedValue({ items: [], nextCursor: null, unread });
+
+    // when
+    show(member);
+
+    // then
+    expect((await screen.findByTestId("my-messages-unread")).textContent!.trim(), "the badge stays at most three characters wide").toBe(shown);
+    expect(screen.getByTestId("my-messages-link")).toHaveAccessibleName(`Messages, ${unread} unread`);
+  });
+
   it("given one unread notification, when the navigation renders in German, then the name uses the singular", async () => {
     // given
     vi.spyOn(api, "ownNotifications").mockResolvedValue({ items: [], nextCursor: null, unread: 1 });

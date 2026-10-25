@@ -406,8 +406,65 @@ for (const name of ["Richard Miles", "Richard Miles-Major"]) {
     const row = (await partner.boundingBox())!;
     const remove = (await partner.getByTestId("remove-member").boundingBox())!;
     expect(remove.x + remove.width, "the remove control stays inside the row").toBeLessThanOrEqual(row.x + row.width + 0.5);
+    const named = (await shown.boundingBox())!;
+    expect(remove.y, "the remove control sits beside the name, not below it").toBeLessThan(named.y + named.height);
   });
 }
+
+async function shownLines(control: import("@playwright/test").Locator): Promise<number> {
+  return control.evaluate((element) => {
+    const style = getComputedStyle(element);
+    const text = element.getBoundingClientRect().height - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom)
+      - parseFloat(style.borderTopWidth) - parseFloat(style.borderBottomWidth);
+    return text / parseFloat(style.lineHeight);
+  });
+}
+
+test("given a phone 320 px wide in German, when the booking dialog opens, then each of its actions keeps its label on one line", async ({ page, journeyService }) => {
+  // given
+  await page.setViewportSize({ width: 320, height: 568 });
+  await page.goto("/login");
+  await page.evaluate(() => window.localStorage.setItem("courtside.locale", "de-DE"));
+
+  // when
+  const dialog = await openBookingWithPartner(page, journeyService.visualDate);
+
+  // then
+  await expect(dialog.getByTestId("booking-submit"), "the booking action is the German label").toHaveText("Jetzt buchen");
+  for (const action of ["booking-close", "booking-submit"]) {
+    expect(await shownLines(dialog.getByTestId(action)), `${action} keeps its label on one line`).toBeLessThan(1.5);
+  }
+});
+
+test("given a member with 108 unread messages on a phone 320 px wide, when the bottom bar shows the count, then the badge leaves the envelope visible inside its destination", async ({ page, journeyService }) => {
+  // given
+  await journeyService.executeSql(`
+    INSERT INTO notification (id, account_id, kind, parameters, created_at)
+    SELECT ('7c000000-0000-0000-0000-' || lpad(n::text, 12, '0'))::uuid, '00000000-0000-0000-0000-000000000102', 'BOOKING_REMINDER', '{}', now()
+    FROM generate_series(1001, 1108) AS n;`);
+  try {
+    await page.setViewportSize({ width: 320, height: 640 });
+    await page.goto("/login");
+    await page.evaluate(() => window.localStorage.setItem("courtside.locale", "de-DE"));
+
+    // when
+    await signIn(page, "doe.jane");
+
+    // then
+    const destination = page.getByTestId("my-messages-link");
+    await expect(destination, "the destination names the exact count").toHaveAccessibleName(/108/);
+    const badge = destination.getByTestId("my-messages-unread");
+    await expect(badge).toBeVisible();
+    const shown = (await badge.boundingBox())!;
+    const envelope = (await destination.getByTestId("my-messages-icon").boundingBox())!;
+    const link = (await destination.boundingBox())!;
+    expect(shown.x, "the badge starts right of the envelope's middle").toBeGreaterThanOrEqual(envelope.x + envelope.width / 2);
+    expect(shown.x + shown.width, "the badge ends inside its destination").toBeLessThanOrEqual(link.x + link.width + 0.5);
+  } finally {
+    await journeyService.executeSql(`DELETE FROM notification WHERE id IN (
+      SELECT ('7c000000-0000-0000-0000-' || lpad(n::text, 12, '0'))::uuid FROM generate_series(1001, 1108) AS n);`);
+  }
+});
 
 test("given a phone 320 px wide with text at 150 percent, when another day is chosen, then its first row starts below the plan's pinned header", async ({ page, journeyService }) => {
   // given
@@ -1759,6 +1816,25 @@ async function selectedDayPlacement(page: Page) {
     };
   });
 }
+
+test("given an iPhone SE in German, when the court plan opens, then every day names its free count on one line", async ({ page }) => {
+  // given
+  await page.setViewportSize({ width: 375, height: 667 });
+  await page.goto("/login");
+  await page.evaluate(() => window.localStorage.setItem("courtside.locale", "de-DE"));
+
+  // when
+  await page.goto("/");
+
+  // then
+  const counts = page.getByTestId("mobile-week-days").locator('[data-testid^="day-free-count-"]');
+  await expect(counts.first()).toBeVisible();
+  const largest = Math.max(...await counts.evaluateAll((spans) => spans.map((span) => Number(span.getAttribute("data-free-count")))));
+  expect(largest, "the plan offers a three-digit count to measure").toBeGreaterThanOrEqual(100);
+  for (const count of await counts.all()) {
+    expect(await shownLines(count), `${await count.getAttribute("data-testid")} stays on one line`).toBeLessThan(1.5);
+  }
+});
 
 for (const phone of [{ name: "iPhone SE", width: 375, height: 667 }, { name: "landscape iPhone", width: 852, height: 393 }]) {
   test(`given a ${phone.name}, when the court plan opens and a later day is chosen, then the selected day lies whole inside the day strip and clear of the return to now`, async ({ page }) => {
