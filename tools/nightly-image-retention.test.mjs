@@ -370,10 +370,10 @@ test("given a version outside the plan changes before deletion starts, when the 
   assert.deepEqual(deleted, [], "a change anywhere in the registry before the first deletion must stop the run");
 });
 
-function registry(size, changes = {}, { newestFirst = true, updatedAt = () => old } = {}) {
+function registry(size, changes = {}, { order = (left, right) => right.id - left.id, updatedAt = () => old } = {}) {
   const state = Array.from({ length: size }, (_, index) => version(index + 1,
     `sha256:${(index + 1).toString(16).padStart(64, "0")}`, [], updatedAt(index + 1)));
-  const listed = () => state.toSorted((left, right) => (newestFirst ? right.id - left.id : left.id - right.id))
+  const listed = () => state.toSorted(order)
     .map((item) => ({ ...item, tags: [...item.tags] }));
   const expectedVersions = state.map((item) => ({ ...item, tags: [...item.tags] }));
   const calls = { pages: 0, counts: 0, newest: 0, versions: 0, deletes: 0 };
@@ -455,17 +455,59 @@ test("given a recent version is retagged during deletion, when the next deletion
   assert.deepEqual(deleted, [1], "a newly kept version may reference a planned digest, so nothing further is deleted");
 });
 
-test("given a listing that is not newest first, when a recent version is retagged during deletion, then it is refused", async () => {
+test("given a recent version on a later listing page, when it is retagged during deletion, then it is refused", async () => {
   // given
   const { expectedVersions, calls, deleted, operations } = registry(150, {
-    1: (state) => { state.find(({ id }) => id === 150).tags.push("release-candidate-retagged"); },
-  }, { newestFirst: false, updatedAt: (id) => (id > 140 ? now : old) });
+    1: (state) => { state.find(({ id }) => id === 5).tags.push("release-candidate-retagged"); },
+  }, { updatedAt: (id) => (id === 5 ? now : old) });
 
   // when / then
   await assert.rejects(() => applyDeletionPlan({ expectedVersions, deleteVersionIds: [1, 2, 3],
-    ...operations }), /registry changed after retention planning/);
+    ...operations }), /version 5 is unknown or changed/);
   assert.deepEqual(deleted, [1], "a recent version on a later listing page must still be checked");
   assert.equal(calls.newest, 4, "both pages up to the last recent version are read before each deletion");
+});
+
+function swapAtFirstDeletion(state) {
+  state.splice(state.findIndex(({ id }) => id === 50), 1);
+  state.push(version(151, `sha256:${"f".repeat(64)}`, ["nightly"], now));
+}
+
+test("given an old version is swapped for a new one during deletion, when the next deletion starts, then it is refused", async () => {
+  // given
+  const { expectedVersions, deleted, operations } = registry(150, { 1: swapAtFirstDeletion });
+
+  // when / then
+  await assert.rejects(() => applyDeletionPlan({ expectedVersions, deleteVersionIds: [1, 2, 3],
+    ...operations }), /version 151 is unknown or changed/);
+  assert.deepEqual(deleted, [1], "a deleted and a published version keep the count, so the new one must be seen");
+});
+
+test("given a listing ordered by update time, when an old version is swapped during deletion, then it is refused", async () => {
+  // given
+  const { expectedVersions, deleted, operations } = registry(150, { 1: swapAtFirstDeletion }, {
+    order: (left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt) || left.id - right.id,
+    updatedAt: (id) => new Date(Date.parse(old) + (id % 7) * 1_000).toISOString(),
+  });
+
+  // when / then
+  await assert.rejects(() => applyDeletionPlan({ expectedVersions, deleteVersionIds: [1, 2, 3],
+    ...operations }), /version 151 is unknown or changed/);
+  assert.deepEqual(deleted, [1], "a listing with the newest update first also shows a new version on page one");
+});
+
+test("given a listing that is not newest first, when an old version would be swapped during deletion, then nothing is deleted", async () => {
+  // given
+  const { expectedVersions, calls, deleted, operations } = registry(150, { 1: swapAtFirstDeletion }, {
+    order: (left, right) => left.id - right.id,
+    updatedAt: (id) => new Date(Date.parse(old) + id * 1_000).toISOString(),
+  });
+
+  // when / then
+  await assert.rejects(() => applyDeletionPlan({ expectedVersions, deleteVersionIds: [1, 2, 3],
+    ...operations }), /package versions are not listed newest first/);
+  assert.deepEqual(deleted, [], "a version published during deletion may sort onto a page no check reads");
+  assert.equal(calls.newest, 0, "the order is refused from the listing already read");
 });
 
 test("given a planned version disappears during deletion, when its turn comes, then deletion stops", async () => {
