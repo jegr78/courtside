@@ -263,8 +263,8 @@ with its state and the membership types it applies to. Choose a rule set there t
 
 Opening hours and the booking grid apply across the club, so they sit outside rule sets. Booking
 hours narrow the opening hours for one membership type and never widen them. With the facility
-open until 23:00, for example, a youth rule set can allow bookings until 20:00. Like the opening
-hours, booking hours end at 23:59 at the latest. For a window that lasts until closing, enter the
+open until 11:00 PM, for example, a youth rule set can allow bookings until 8:00 PM. Like the opening
+hours, booking hours end at 11:59 PM at the latest. For a window that lasts until closing, enter the
 facility's closing time as the latest end. The weekly booked hours count the confirmed bookings a
 member booked, by the week they start in. Cancelled bookings and booking kinds that do not count
 against limits, such as training or closures, stay out. Administrators may override the booking

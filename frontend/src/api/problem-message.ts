@@ -1,9 +1,12 @@
 import type { TFunction } from "i18next";
+import i18n from "../i18n";
+import { formatClockTime } from "../time/clubZone";
 import { ApiError, type Problem } from "./client";
 
 const TYPE_PREFIX = "urn:courtside:error:";
 // A default no bundle carries, so a missing key is told apart from a translation.
 const MISSING = "\u0000missing";
+const clockTimeParams = ["earliestStart", "latestEnd", "opensAt", "closesAt"];
 
 export function isUnauthenticated(failure: unknown): boolean {
   return failure instanceof ApiError && failure.problem?.type === `${TYPE_PREFIX}unauthenticated`;
@@ -32,10 +35,16 @@ export function failureReference(failure: unknown): string | undefined {
 }
 
 export function violationMessage(code: string, params: Record<string, unknown>, t: (key: string, options?: Record<string, unknown>) => string): string {
-  const message = t(code, { ...params, defaultValue: MISSING });
+  const message = t(code, { ...params, ...clockTimes(params), defaultValue: MISSING });
   if (message !== MISSING) return message;
   const unknown = t("error.unknownViolation");
   return import.meta.env.DEV ? `${unknown} [${code}]` : unknown;
+}
+
+function clockTimes(params: Record<string, unknown>): Record<string, string> {
+  const locale = i18n.resolvedLanguage ?? i18n.language;
+  return Object.fromEntries(clockTimeParams.filter((name) => typeof params[name] === "string")
+    .map((name) => [name, formatClockTime(params[name] as string, locale)]));
 }
 
 // A refusal this client explains is the user's to correct, unless it says the page itself sent it wrongly.

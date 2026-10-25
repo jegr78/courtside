@@ -20,7 +20,7 @@ import { CancellationDialog } from "./CancellationDialog";
 import { contrastColor } from "./cardColors";
 import {
   addDays, calendarDayNumber, dateInTimeZone, dateInTimeZoneValue, formatBookingTimeRange,
-  formatDate, formatTime, isValidZonedDateTime, parseDate, startOfWeek, timeToMinutes,
+  clockTimeParts, formatClockTime, formatDate, formatTime, isValidZonedDateTime, parseDate, startOfWeek, timeToMinutes,
   weekDays, zonedDateTime
 } from "../time/clubZone";
 import { closureOn, hoursOn, periodOn } from "../time/openingHours";
@@ -480,7 +480,6 @@ export function WeekView({ today, clock = systemClock, canBook = true,
         {days.map((day) => {
           const date = formatDate(day);
           const count = remainingCounts.get(date) ?? 0;
-          const freeCount = t("week.freeCount", { count });
           return <button
             key={date}
             type="button"
@@ -493,7 +492,10 @@ export function WeekView({ today, clock = systemClock, canBook = true,
             <span className="block text-sm font-semibold">{formatWeekday(day, language, calendarTimeZone)}</span>{" "}
             <span className="text-muted font-value text-sm">{formatDayMonth(day, language, calendarTimeZone)}</span>{" "}
             <span data-testid={`day-free-count-${date}`} data-free-count={count}
-              className="text-muted mt-1 block text-xs">{freeCount}</span>
+              className="text-muted mt-1 block text-xs">
+              <span className="lg:hidden">{t("week.freeCountCompact", { count })}</span>
+              <span className="hidden lg:inline">{t("week.freeCount", { count })}</span>
+            </span>
           </button>;
         })}
         <Button variant="secondary" type="button" data-testid="mobile-week-next"
@@ -568,7 +570,7 @@ export function WeekView({ today, clock = systemClock, canBook = true,
               data-state={outside ? "outside" : past ? "past" : "remaining"}
               className="day-plan-slot-row" style={{ "--slot-height": `${slotHeight}px` } as CSSProperties}>
             <th scope="row" data-testid={`slot-heading-${slot}`} className="font-value surface-panel border-structural whitespace-nowrap border-b px-3 text-left font-medium">
-              {slot}
+              <SlotHeading slot={slot} locale={language} />
             </th>
             {data.courts.map((court) => <DayPlanCell key={court.id}
               court={court} slot={slot} date={selectedDate} startsAt={visibleSlotStartsAt}
@@ -586,7 +588,7 @@ export function WeekView({ today, clock = systemClock, canBook = true,
       {isToday && currentTime && slots.length > 0 && <div
         data-testid="current-time-line"
         role="img"
-        aria-label={t("week.currentTime", { time: currentTime })}
+        aria-label={t("week.currentTime", { time: formatClockTime(currentTime, language) })}
         className="current-time-line"
         style={{ top: `${48 + unmeasuredLineOffset(currentTime, slots, data.grid.slotMinutes, slotHeight)}px` }}
       />}
@@ -843,6 +845,7 @@ function renderCell(
       </div>
     </td>;
   }
+  const clockTime = formatClockTime(slot, locale);
   const content = canBook ? <button
       type="button"
       data-testid="free-slot"
@@ -853,7 +856,7 @@ function renderCell(
       data-state={isPast ? "past" : drag.selected ? "selected" : "free"}
       className="day-plan-slot day-plan-free-slot w-full rounded-md px-2 text-sm"
       aria-label={`${t(isPast ? "week.past" : "week.available")}, ${isPast
-        ? t("week.pastLabel", { court: courtName, time: slot }) : t("booking.open", { court: courtName, time: slot })}`}
+        ? t("week.pastLabel", { court: courtName, time: clockTime }) : t("booking.open", { court: courtName, time: clockTime })}`}
       onClick={book}
       onPointerDown={(event) => drag.start(event.pointerType)}
       onPointerEnter={drag.extend}
@@ -980,6 +983,11 @@ function slotsOutsideHours(date: string, open: string[], allocations: Allocation
 
 function localDate(timestamp: string, timeZone: string): string | undefined {
   return dateInTimeZoneValue(new Date(timestamp), timeZone);
+}
+
+function SlotHeading({ slot, locale }: { slot: string; locale: string }) {
+  const { time, dayPeriod } = clockTimeParts(slot, locale);
+  return <>{time}{dayPeriod && <> <span className="day-plan-day-period">{dayPeriod}</span></>}</>;
 }
 
 function formatWeekday(date: Date, language: string, timeZone: string): string {

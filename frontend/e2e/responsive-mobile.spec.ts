@@ -24,6 +24,19 @@ async function expectNoHorizontalOverflow(page: import("@playwright/test").Page)
   expect(overflow).toEqual([]);
 }
 
+async function expectSlotHeadingsInsideTheirCells(page: Page, language: string) {
+  const overflowing = await page.locator('[data-testid^="slot-heading-"]').evaluateAll((headings) => headings
+    .filter((heading) => {
+      const range = document.createRange();
+      range.selectNodeContents(heading);
+      const text = range.getBoundingClientRect();
+      const cell = heading.getBoundingClientRect();
+      return text.left < cell.left || text.right > cell.right || text.top < cell.top || text.bottom > cell.bottom;
+    })
+    .map((heading) => heading.getAttribute("data-testid")));
+  expect(overflowing, `every ${language} time stays inside its row heading`).toEqual([]);
+}
+
 function renderedTextWidth(element: import("@playwright/test").Locator): Promise<number> {
   return element.evaluate((node) => {
     const range = document.createRange();
@@ -383,7 +396,7 @@ for (const name of ["Richard Miles", "Richard Miles-Major"]) {
     const partner = dialog.getByTestId("selected-member");
     const shown = partner.getByTestId("selected-member-name");
     await expect(shown, "the partner is named").toHaveText(name);
-    await expect(partner.getByTestId("remove-member"), "the control is the German short label").toHaveText("Entfernen");
+    await expect(partner.getByTestId("remove-member"), "the control carries the German short label as its tooltip").toHaveAttribute("title", "Entfernen");
     const layout = await shown.evaluate((element) => ({
       lines: element.getBoundingClientRect().height / parseFloat(getComputedStyle(element).lineHeight),
       clipped: element.scrollWidth > element.clientWidth + 0.5
@@ -393,6 +406,69 @@ for (const name of ["Richard Miles", "Richard Miles-Major"]) {
     const row = (await partner.boundingBox())!;
     const remove = (await partner.getByTestId("remove-member").boundingBox())!;
     expect(remove.x + remove.width, "the remove control stays inside the row").toBeLessThanOrEqual(row.x + row.width + 0.5);
+    const named = (await shown.boundingBox())!;
+    expect(remove.y, "the remove control sits beside the name, not below it").toBeLessThan(named.y + named.height);
+  });
+}
+
+async function shownLines(control: import("@playwright/test").Locator): Promise<number> {
+  return control.evaluate((element) => {
+    const range = document.createRange();
+    range.selectNodeContents(element);
+    return range.getBoundingClientRect().height / parseFloat(getComputedStyle(element).lineHeight);
+  });
+}
+
+test("given a phone 320 px wide in German, when the booking dialog opens, then each of its actions keeps its label on one line", async ({ page, journeyService }) => {
+  // given
+  await page.setViewportSize({ width: 320, height: 568 });
+  await page.goto("/login");
+  await page.evaluate(() => window.localStorage.setItem("courtside.locale", "de-DE"));
+
+  // when
+  const dialog = await openBookingWithPartner(page, journeyService.visualDate);
+
+  // then
+  await expect(dialog.getByTestId("booking-submit"), "the booking action is the German label").toHaveText("Jetzt buchen");
+  for (const action of ["booking-close", "booking-submit"]) {
+    expect(await shownLines(dialog.getByTestId(action)), `${action} keeps its label on one line`).toBeLessThan(1.5);
+  }
+  const close = (await dialog.getByTestId("booking-close").boundingBox())!;
+  const submit = (await dialog.getByTestId("booking-submit").boundingBox())!;
+  expect(submit.y, "both actions share one row").toBeCloseTo(close.y, 0);
+});
+
+for (const [username, account, destinations] of [["doe.jane", "102", 3], ["configuration-admin", "107", 4]] as const) {
+  test(`given ${destinations} destinations and 108 unread messages on a phone 320 px wide, when the bottom bar shows the count, then the badge leaves the envelope visible inside its destination`, async ({ page, journeyService }) => {
+    // given
+    await journeyService.executeSql(`
+      INSERT INTO notification (id, account_id, kind, parameters, created_at)
+      SELECT ('7c000000-0000-0000-0000-' || lpad(n::text, 12, '0'))::uuid, '00000000-0000-0000-0000-000000000${account}', 'BOOKING_REMINDER', '{}', now()
+      FROM generate_series(1001, 1108) AS n;`);
+    try {
+      await page.setViewportSize({ width: 320, height: 640 });
+      await page.goto("/login");
+      await page.evaluate(() => window.localStorage.setItem("courtside.locale", "de-DE"));
+
+      // when
+      await signIn(page, username);
+      await expect(page.getByTestId("primary-navigation-bar").getByRole("link")).toHaveCount(destinations);
+
+      // then
+      const destination = page.getByTestId("my-messages-link");
+      await expect(destination, "the destination names the exact count").toHaveAccessibleName(/108/);
+      const badge = destination.getByTestId("my-messages-unread");
+      await expect(badge).toBeVisible();
+      const shown = (await badge.boundingBox())!;
+      const envelope = (await destination.getByTestId("my-messages-icon").boundingBox())!;
+      const link = (await destination.boundingBox())!;
+      expect(shown.x, "the badge starts right of the envelope's middle").toBeGreaterThanOrEqual(envelope.x + envelope.width / 2);
+      expect(shown.x + shown.width, "the badge ends inside its destination").toBeLessThanOrEqual(link.x + link.width + 0.5);
+      await expect(badge, "the badge shows the exact count").toHaveText("108");
+    } finally {
+      await journeyService.executeSql(`DELETE FROM notification WHERE id IN (
+        SELECT ('7c000000-0000-0000-0000-' || lpad(n::text, 12, '0'))::uuid FROM generate_series(1001, 1108) AS n);`);
+    }
   });
 }
 
@@ -1179,6 +1255,17 @@ test("given elapsed rows on a phone, when the plan loads, then every row names i
   const elapsedSlot = page.locator('[data-testid="free-slot"][data-state="past"]').first();
   expect(await elapsedSlot.evaluate((slot) => getComputedStyle(slot, "::after").content),
     "an elapsed slot is marked by its hatching, not by a dash").toBe("none");
+
+
+  for (const [locale, lastSlot] of [["de-DE", "21:30"], ["en-GB", "9:30 PM"]]) {
+    // when
+    await page.evaluate((chosen) => window.localStorage.setItem("courtside.locale", chosen), locale);
+    await page.reload();
+    await expect(page.getByTestId("slot-heading-21:30"), `the ${locale} axis reads its own clock`).toHaveText(lastSlot);
+
+    // then
+    await expectSlotHeadingsInsideTheirCells(page, locale);
+  }
 });
 
 test("given bookings on a phone, when the plan scrolls past the navigation, then the courts stay named and bookings keep their label", async ({ page, journeyService }) => {
@@ -1735,6 +1822,25 @@ async function selectedDayPlacement(page: Page) {
     };
   });
 }
+
+test("given an iPhone SE in German, when the court plan opens, then every day names its free count on one line", async ({ page }) => {
+  // given
+  await page.setViewportSize({ width: 375, height: 667 });
+  await page.goto("/login");
+  await page.evaluate(() => window.localStorage.setItem("courtside.locale", "de-DE"));
+
+  // when
+  await page.goto("/");
+
+  // then
+  const counts = page.getByTestId("mobile-week-days").locator('[data-testid^="day-free-count-"]');
+  await expect(counts.first()).toBeVisible();
+  const largest = Math.max(...await counts.evaluateAll((spans) => spans.map((span) => Number(span.getAttribute("data-free-count")))));
+  expect(largest, "the plan offers a three-digit count to measure").toBeGreaterThanOrEqual(100);
+  for (const count of await counts.all()) {
+    expect(await shownLines(count), `${await count.getAttribute("data-testid")} stays on one line`).toBeLessThan(1.5);
+  }
+});
 
 for (const phone of [{ name: "iPhone SE", width: 375, height: 667 }, { name: "landscape iPhone", width: 852, height: 393 }]) {
   test(`given a ${phone.name}, when the court plan opens and a later day is chosen, then the selected day lies whole inside the day strip and clear of the return to now`, async ({ page }) => {

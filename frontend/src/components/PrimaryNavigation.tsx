@@ -92,7 +92,7 @@ export function PrimaryNavigation({ session }: { session: SessionStatus }) {
               <span data-testid={`${destination.testId.replace("-link", "")}-full-label`} className="hidden sm:inline">{t(destination.label)}</span>
             </> : t(destination.label)}
             {counted(destination) && <span data-testid="my-messages-unread" aria-hidden="true"
-              className="button-primary absolute top-0 right-1/4 min-w-5 rounded-full px-1.5 text-center text-xs leading-5 font-bold sm:static sm:ml-2 sm:inline-block">
+              className="button-primary absolute top-0 left-1/2 ml-0.5 min-w-5 rounded-full px-1.5 text-center text-xs leading-5 font-bold sm:static sm:ml-2 sm:inline-block">
               {" "}{unread}
             </span>}
           </Link>)}

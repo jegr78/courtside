@@ -951,6 +951,7 @@ const en: Record<keyof typeof de, string> = {
   "week.time": "Time",
   "week.freeCount_one": "{{count}} free slot",
   "week.freeCount_other": "{{count}} free slots",
+  "week.freeCountCompact": "{{count}} free",
   "week.noCourtOpen": "The club has no court open for booking at the moment.",
   "week.closed": "The facility is closed on this day.",
   "week.available": "Available",

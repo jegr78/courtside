@@ -29,6 +29,22 @@ it("given a coded violation, when resolving the problem, then its i18n key is tr
   expect(message).toBe(i18n.t("booking.rule.advanceWindow.exceeded", { maxDays: 14 }));
 });
 
+for (const [language, expected] of [
+  ["en", "Your membership type may book only between 4:00 PM and 9:00 PM."],
+  ["de", "Mit deiner Mitgliedsart kannst du nur zwischen 16:00 und 21:00 Uhr buchen."]
+]) {
+  it(`given ${language}, when a booking-hours refusal is resolved, then its times follow the application language`, async () => {
+    // given
+    await i18n.changeLanguage(language);
+
+    // when
+    const message = violationMessage("booking.rule.bookingHours.outside", { earliestStart: "16:00", latestEnd: "21:00" }, i18n.t);
+
+    // then
+    expect(message.replace(/\s/g, " "), `the ${language} refusal reads its own clock`).toBe(expected);
+  });
+}
+
 it("given a violation code this client does not carry, when resolving it, then it is told apart from a generic failure", () => {
   // when
   const message = violationMessage("booking.rule.introducedLater", {}, i18n.t);
