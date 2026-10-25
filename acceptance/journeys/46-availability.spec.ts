@@ -57,6 +57,15 @@ async function removeEntry(page: Page, form: "opening-period" | "court-closure",
   await expect(page.getByTestId(`${form}-${id}`), `product: the removed ${form} leaves the list`).toHaveCount(0);
 }
 
+// The time field shows the value in the application language, as the product's own formatter does.
+function shownTime(page: Page, time: string) {
+  return page.evaluate((value) => {
+    const [hour, minute] = value.split(":").map(Number);
+    return new Intl.DateTimeFormat(document.documentElement.lang, { hour: "2-digit", minute: "2-digit", timeZone: "UTC" })
+      .format(Date.UTC(1970, 0, 1, hour, minute)).replace(/[\u00a0\u202f]/g, " ");
+  }, time);
+}
+
 test("given a day beyond the lanes, when the admin adds a holiday and closes a court the day after, then the plan shows both, bookings there are refused and removing both opens the days again", async ({ browser }) => {
   // given
   const holiday = addDays(lanePlan().sunday, 8);
@@ -87,7 +96,7 @@ test("given a day beyond the lanes, when the admin adds a holiday and closes a c
       await page.getByTestId("opening-period-ends-on").fill(holiday);
       await expect(page.getByTestId("opening-period-closed-MONDAY"), "product: a new holiday is not closed by default").not.toBeChecked();
       await expect(page.getByTestId("opening-period-opens-MONDAY"), "product: a new holiday starts with its day's weekly hours")
-        .toHaveValue(governingHours(grid, holiday).opensAt!.slice(0, 5));
+        .toHaveValue(await shownTime(page, governingHours(grid, holiday).opensAt!.slice(0, 5)));
       await page.getByTestId("opening-period-closed-MONDAY").check();
       created.push({ form: "opening-period", path: "/api/admin/opening-periods",
         id: await saveEntry(page, "opening-period", "/api/admin/opening-periods") });
