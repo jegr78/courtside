@@ -93,7 +93,7 @@ export function AdminNavigation({ administrator = true }: { administrator?: bool
   const [unfolded, setUnfolded] = useState(false);
   const disclosure = useRef<HTMLDetailsElement>(null);
   const folding = unfolded && !laidOpen;
-  const { body, content, continues, measure: measureContinuation } = useScrollContinuation(folding, pathname);
+  const { body, content, continues, precedes, overflows, measure: measureContinuation } = useScrollContinuation(folding, pathname);
 
   const [wasLaidOpen, setWasLaidOpen] = useState(laidOpen);
   if (wasLaidOpen !== laidOpen) {
@@ -139,6 +139,7 @@ export function AdminNavigation({ administrator = true }: { administrator?: bool
       <span data-testid="admin-menu-indicator" aria-hidden="true" className="shrink-0 transition-transform group-open:rotate-180">▾</span>
     </summary>
     <div className="surface-panel absolute inset-x-0 top-full z-20 mt-2 flex max-h-[70vh] flex-col overflow-hidden rounded-xl border shadow-xl lg:static lg:mt-0 lg:max-h-none lg:overflow-visible lg:rounded-none lg:border-0 lg:bg-transparent lg:shadow-none">
+    {overflows && <div className="shrink-0 lg:hidden"><ScrollContinuation continues={precedes} testId="admin-navigation-precedes" above /></div>}
     <div ref={body} data-testid="admin-navigation-body" onScroll={measureContinuation} className="min-h-0 overflow-y-auto overscroll-contain lg:overflow-visible">
     <div ref={content}>
     <nav aria-label={t("nav.administration")} className="grid gap-5 p-4 pb-1 lg:gap-3 lg:p-0">

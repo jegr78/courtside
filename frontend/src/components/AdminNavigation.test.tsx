@@ -303,7 +303,7 @@ describe("AdminNavigation", () => {
   });
 });
 
-it("given an overflowing mobile navigation, when it scrolls to the end, then its continuation cue disappears", async () => {
+it("given an overflowing mobile navigation, when it scrolls to the end, then its continuation cue disappears and one marks the entries above", async () => {
   // given
   resizeTo(375);
   show("/admin/setup");
@@ -318,9 +318,11 @@ it("given an overflowing mobile navigation, when it scrolls to the end, then its
   fireEvent.scroll(body);
   // then
   expect(screen.getByTestId("admin-navigation-continues")).toHaveAttribute("aria-hidden", "true");
+  expect(screen.queryByTestId("admin-navigation-precedes"), "nothing lies above the first entry").not.toBeInTheDocument();
   // when
   body.scrollTop = 600;
   fireEvent.scroll(body);
   // then
   expect(screen.queryByTestId("admin-navigation-continues")).not.toBeInTheDocument();
+  expect(screen.getByTestId("admin-navigation-precedes")).toHaveAttribute("aria-hidden", "true");
 });
