@@ -1,4 +1,5 @@
 import type { Page } from "@playwright/test";
+import { expectNoWcagViolations } from "./accessibility-checks";
 import { expect, selectJourneyDate, test } from "./fixtures";
 
 const lookingForAPartner = "66666666-6666-6666-6666-666666666666";
@@ -31,8 +32,12 @@ test("a member offers the open place of their booking and another member takes i
 
   // when — its holder offers the place
   await page.getByTestId("my-bookings-link").click();
-  await page.locator(`[data-testid="publish-open-place"][data-booking-id="${bookingId}"]`).click();
+  const offer = page.locator(`[data-testid="publish-open-place"][data-booking-id="${bookingId}"]`);
+  await expect(offer).toBeVisible({ timeout: 10_000 });
+  await expectNoWcagViolations(page);
+  await offer.click();
   await expect(page.locator(`[data-testid="withdraw-open-place"][data-booking-id="${bookingId}"]`)).toBeVisible({ timeout: 10_000 });
+  await expectNoWcagViolations(page);
   await signOut(page);
 
   // then — another member sees the slot and nobody's name, and takes it
@@ -41,6 +46,7 @@ test("a member offers the open place of their booking and another member takes i
   const place = page.getByTestId("open-places").locator("li");
   await expect(place).toHaveCount(1, { timeout: 10_000 });
   await expect(place, "an open place names nobody").not.toContainText("Doe");
+  await expectNoWcagViolations(page);
   await place.getByTestId("take-open-place").click();
   await expect(page.getByTestId(`participation-${bookingId}`)).toBeVisible({ timeout: 10_000 });
   await expect(page.getByTestId("open-places")).toHaveCount(0);

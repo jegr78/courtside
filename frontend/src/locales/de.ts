@@ -1063,9 +1063,9 @@ const de = {
   "myBookings.move": "Verschieben",
   "myBookings.moveAccessible": "{{label}} am {{period}} auf {{courts}} verschieben",
   "myBookings.searchPartner": "Mitspieler suchen",
-  "myBookings.searchPartnerAccessible": "Den offenen Platz in {{label}} am {{period}} auf {{courts}} anderen Mitgliedern anbieten",
+  "myBookings.searchPartnerAccessible": "Für {{label}} am {{period}} auf {{courts}} Mitspieler suchen",
   "myBookings.stopPartnerSearch": "Suche beenden",
-  "myBookings.stopPartnerSearchAccessible": "Den offenen Platz in {{label}} am {{period}} auf {{courts}} nicht mehr anbieten",
+  "myBookings.stopPartnerSearchAccessible": "Für {{label}} am {{period}} auf {{courts}} die Suche beenden",
   "myBookings.partnerSearchPublished": "Andere Mitglieder können den offenen Platz übernehmen.",
   "myBookings.partnerSearchStarted": "Andere Mitglieder sehen jetzt den offenen Platz.",
   "myBookings.partnerSearchStopped": "Der offene Platz wird nicht mehr angeboten.",
@@ -1844,7 +1844,7 @@ const de = {
   "myWaitlist.decline": "Ablehnen",
   "myWaitlist.declineAccessible": "Angebot für {{label}} ablehnen",
   "myWaitlist.leave": "Warteliste verlassen",
-  "myWaitlist.leaveAccessible": "Warteliste für {{label}} verlassen",
+  "myWaitlist.leaveAccessible": "Für {{label}} die Warteliste verlassen",
   "myWaitlist.booked": "Der Platz ist jetzt deine Buchung.",
   "myWaitlist.declined": "Du hast das Angebot abgelehnt. Es geht an das nächste wartende Mitglied.",
   "myWaitlist.left": "Du stehst nicht mehr auf dieser Warteliste.",
@@ -1905,7 +1905,7 @@ const de = {
   "openPlaces.title": "Offene Plätze",
   "openPlaces.description": "Mitglieder, die einen Mitspieler suchen, bieten diese Plätze an. Namen siehst du erst, wenn du mitspielst.",
   "openPlaces.take": "Platz übernehmen",
-  "openPlaces.takeAccessible": "Den offenen Platz am {{period}} auf {{courts}} übernehmen",
+  "openPlaces.takeAccessible": "Am {{period}} auf {{courts}} den Platz übernehmen",
   "openPlaces.taken": "Du spielst jetzt in dieser Buchung mit."
 };
 
