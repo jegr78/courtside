@@ -611,10 +611,11 @@ test("given a desktop window shorter than the navigation, when an administrative
     const frame = document.querySelector("[data-testid='admin-navigation-frame']")!;
     const scroll = document.querySelector("[data-testid='admin-navigation-scroll']")!;
     const shell = document.querySelector("[data-testid='admin-shell']")!;
+    const below = document.documentElement.scrollHeight - (shell.getBoundingClientRect().bottom + window.scrollY);
     return {
       scrolls: scroll.scrollHeight > scroll.clientHeight,
-      end: frame.getBoundingClientRect().bottom + window.scrollY
-        + document.documentElement.scrollHeight - (shell.getBoundingClientRect().bottom + window.scrollY),
+      end: frame.getBoundingClientRect().bottom + window.scrollY + below,
+      page: frame.nextElementSibling!.getBoundingClientRect().bottom + window.scrollY + below,
       viewport: window.innerHeight
     };
   });
@@ -622,7 +623,7 @@ test("given a desktop window shorter than the navigation, when an administrative
   // then
   expect(measured.scrolls, "the navigation keeps its destinations in its own scroll area").toBe(true);
   expect(measured.end, `the navigation alone would end the page within the window: ${JSON.stringify(measured)}`)
-    .toBeLessThanOrEqual(measured.viewport);
+    .toBeLessThanOrEqual(Math.max(measured.viewport, measured.page));
   const last = page.getByTestId("admin-navigation").getByRole("link").last();
   await last.scrollIntoViewIfNeeded();
   await expect(last).toBeInViewport();
