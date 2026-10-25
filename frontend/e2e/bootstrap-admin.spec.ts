@@ -1,4 +1,4 @@
-import { expect, expectAdministrationOverview, selectJourneyDate, selectPreference, test } from "./fixtures";
+import { expect, expectAdministrationOverview, expectWholeValue, selectJourneyDate, selectPreference, test } from "./fixtures";
 import { credentialIn, messagesTo, messageTo, messageWith } from "./mailbox";
 import { MEMBER_BOOKING_CARD, STANDARD_RULE_SET } from "./shipped-rows";
 
@@ -863,29 +863,17 @@ test.describe("comparing membership types", () => {
     await journeyService.executeSql(`DELETE FROM membership_type WHERE id IN (${added.map((id) => `'${id}'`).join(", ")});`);
   });
 
-  test("a board compares ten membership types on one laptop screen, and a narrow desk still fits them", async ({ page, journeyService }) => {
+  test("a board reads each of ten membership types in full on a laptop screen, and a narrow desk still fits them", async ({ page, journeyService }) => {
     // given
     await journeyService.executeSql(`INSERT INTO membership_type (id, name, rule_set_id) VALUES ${added
-      .map((id, index) => `('${id}', 'Seasonal member group ${index + 1}', 'aaaaaaaa-0000-0000-0000-000000000001')`).join(", ")};`);
+      .map((id, index) => `('${id}', 'Acceptance training team ${String(index + 1).padStart(2, "0")}', 'aaaaaaaa-0000-0000-0000-000000000001')`).join(", ")};`);
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto("/login");
     await page.getByTestId("username").fill("configuration-admin");
     await page.getByTestId("password").fill("temporary-password");
     await page.getByTestId("login-submit").click();
     await selectPreference(page, "#locale-preference", "de");
-    const layout = () => page.evaluate(() => {
-      const rows = [...document.querySelectorAll<HTMLElement>('[data-testid^="membership-type-cccccccc"]')];
-      const first = rows[0].getBoundingClientRect();
-      const last = rows[rows.length - 1].getBoundingClientRect();
-      const name = rows[0].querySelector<HTMLElement>('[data-testid^="membership-type-name-"]')!.getBoundingClientRect();
-      const state = rows[0].querySelector<HTMLElement>('[data-testid^="membership-type-state-"]')!.getBoundingClientRect();
-      return {
-        overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
-        rowsHeight: last.bottom - first.top,
-        screen: window.innerHeight - document.querySelector("thead")!.getBoundingClientRect().height,
-        stateBesideName: state.left >= name.right && state.top < name.bottom && state.bottom > name.top
-      };
-    });
+    const overflow = () => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
 
     // when
     await page.getByTestId("administration-link").click();
@@ -894,16 +882,18 @@ test.describe("comparing membership types", () => {
     await expect(page.getByTestId("membership-type-holders-cccccccc-0000-0000-0000-000000000001")).toHaveText(/\d/);
 
     // then
-    const laptop = await layout();
-    expect(laptop.overflow, "the table fits beside the administration menu").toBeLessThanOrEqual(0);
-    expect(laptop.stateBesideName, "a type's availability sits beside its name").toBe(true);
-    expect(laptop.rowsHeight, "ten types and their column headings fit within one screen").toBeLessThanOrEqual(laptop.screen);
+    expect(await overflow(), "the table fits beside the administration menu").toBeLessThanOrEqual(0);
+    for (const row of await page.locator('[data-testid^="membership-type-cccccccc"]').all()) {
+      const id = (await row.getAttribute("data-testid"))!.replace("membership-type-", "");
+      await expectWholeValue(page.getByTestId(`membership-type-name-${id}`), `the name of ${id}`);
+      await expectWholeValue(page.getByTestId(`membership-type-rule-set-${id}`), `the rule set of ${id}`);
+    }
 
     // when
     await page.setViewportSize({ width: 1024, height: 800 });
 
     // then
-    await expect.poll(async () => (await layout()).overflow, { message: "the narrowest desk still fits the table" }).toBeLessThanOrEqual(0);
+    await expect.poll(overflow, { message: "the narrowest desk still fits the table" }).toBeLessThanOrEqual(0);
   });
 });
 

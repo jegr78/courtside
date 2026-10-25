@@ -253,7 +253,7 @@ export function AdminRuleSetsView({ configurationChanged }: { configurationChang
       : <>
         {error && <Alert testId="admin-error">{error}</Alert>}
         {success && <SuccessFeedback testId="admin-save-success">{success}</SuccessFeedback>}
-        <div data-testid="booking-rules" className="grid gap-6 [&>*]:min-w-0 xl:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] xl:items-start">
+        <div data-testid="booking-rules" className="grid gap-6 [&>*]:min-w-0 xl:grid-cols-[minmax(23rem,1fr)_minmax(0,2fr)] xl:items-start">
           <div className="grid gap-4">
             <h2 id="rule-set-overview-heading" className="text-2xl font-bold">{t("admin.ruleSets.overview")}</h2>
             <table role="table" data-testid="rule-set-overview" aria-labelledby="rule-set-overview-heading" className="w-full border-collapse text-left">
@@ -341,8 +341,10 @@ export function AdminRuleSetsView({ configurationChanged }: { configurationChang
               discard={() => { chooseRuleSet(pendingRuleSetId); setPendingRuleSetId(undefined); }}
             />}
             <div data-testid="rule-set-rules" className="grid gap-2">
-              <h3 data-testid="rule-set-rules-heading" className="text-xl font-bold">{t("admin.rules.ofRuleSet")}</h3>
-              <p aria-hidden="true" data-testid="rule-set-applies-heading" className="text-muted hidden justify-self-end text-sm font-medium xl:block">{t("admin.rules.applies")}</p>
+              <div className="flex items-baseline justify-between gap-3">
+                <h3 data-testid="rule-set-rules-heading" className="text-xl font-bold">{t("admin.rules.ofRuleSet")}</h3>
+                <p aria-hidden="true" data-testid="rule-set-applies-heading" className="text-muted hidden text-sm font-medium xl:block">{t("admin.rules.applies")}</p>
+              </div>
               <div data-testid="rule-set-rules-list" className="grid [&>*]:min-w-0">
                 {configurableTypes.map((type) => {
                   const stored = storedRule(definitionOf(type.ruleType));
@@ -376,15 +378,15 @@ function RuleEditor({ type, stored, edit, disabled, changed }: { type: RuleTypeC
       value: edit.params[parameter.name] === undefined ? "" : shown(parameter, edit.params[parameter.name])
     };
     return parameter.kind === "TIME_OF_DAY"
-      ? <DateTimeInput key={parameter.name} {...props} type="time" className="form-control rule-time-input rounded-lg border px-2 py-1 text-sm"
+      ? <DateTimeInput key={parameter.name} {...props} type="time" className="form-control rule-time-input rounded-lg border px-2 py-0.5 text-sm"
           onValueChange={(value) => changed({ applies: true, params: entered(edit.params, parameter, value) })} />
-      : <input key={parameter.name} {...props} type="number" className="form-control w-24 max-w-40 rounded-lg border px-3 py-1"
+      : <input key={parameter.name} {...props} type="number" className="form-control w-24 max-w-40 rounded-lg border px-3 py-0.5 text-sm"
           onChange={(event) => changed({ applies: true, params: entered(edit.params, parameter, event.target.value) })} />;
   };
   const first = type.parameters[0];
   const last = type.parameters.at(-1);
   return <article className="grid gap-x-3 gap-y-1 border-t py-0.5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
-    <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-0.5">
+    <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
       <h4 data-testid={`rule-${type.ruleType}-title`} className="font-bold">{t(`admin.rules.type.${type.ruleType}`)}</h4>
       {timeWindow && first && last
         ? <p id={`rule-${type.ruleType}-range`} data-testid={`rule-${type.ruleType}-range`} className="sr-only">

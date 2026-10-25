@@ -1,5 +1,5 @@
 import type { Locator, Page } from "@playwright/test";
-import { expect, test } from "./fixtures";
+import { expect, expectWholeValue, test } from "./fixtures";
 
 test.use({ serviceWorkers: "block", viewport: { width: 1280, height: 900 } });
 
@@ -139,35 +139,27 @@ for (const effectiveFrom of [null, "2099-07-01"]) {
   });
 }
 
-const RULE_SET = { id: "33333333-3333-3333-3333-333333333331", name: "Acceptance youth", active: true };
+const LANGUAGES = { de: "German", en: "English" } as const;
 
-async function valueWidths(control: Locator) {
-  return control.evaluate((element: HTMLInputElement | HTMLSelectElement) => {
-    const style = getComputedStyle(element);
-    const context = document.createElement("canvas").getContext("2d")!;
-    context.font = `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
-    const text = element instanceof HTMLSelectElement ? element.selectedOptions[0].text : element.value;
-    const available = element.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
-    return { text, needed: Math.ceil(context.measureText(text).width), available: Math.floor(available) };
-  });
-}
-
-async function expectWholeValue(control: Locator, where: string) {
-  const { text, needed, available } = await valueWidths(control);
-  expect(available, `${where}: "${text}" needs ${needed}px of the ${available}px its field shows`).toBeGreaterThanOrEqual(needed);
-}
-
-for (const viewport of [{ width: 1280, height: 800 }, { width: 820, height: 1180 }, { width: 412, height: 915 }]) {
-  test(`given German membership types at ${viewport.width}px, when the table renders, then every name and rule set shows its whole value`, async ({ page }) => {
+for (const { viewport, language, typeName, ruleSetName } of [
+  { viewport: { width: 1440, height: 900 }, language: "de", typeName: "Acceptance training members", ruleSetName: "Acceptance training rule set" },
+  { viewport: { width: 1440, height: 900 }, language: "en", typeName: "Acceptance training members", ruleSetName: "Acceptance training rule set" },
+  { viewport: { width: 1280, height: 800 }, language: "de", typeName: "Acceptance training members", ruleSetName: "Acceptance training rule set" },
+  { viewport: { width: 1280, height: 800 }, language: "en", typeName: "Acceptance training members", ruleSetName: "Acceptance training rule set" },
+  { viewport: { width: 820, height: 1180 }, language: "de", typeName: "Acceptance members", ruleSetName: "Acceptance youth" },
+  { viewport: { width: 412, height: 915 }, language: "de", typeName: "Acceptance members", ruleSetName: "Acceptance youth" }
+] as const) {
+  test(`given ${LANGUAGES[language]} membership types at ${viewport.width}px, when the table renders, then every name and rule set shows its whole value`, async ({ page }) => {
     test.setTimeout(60_000);
     // given
     const typeId = "44444444-4444-4444-4444-444444444441";
+    const ruleSet = { id: "33333333-3333-3333-3333-333333333331", name: ruleSetName, active: true };
     await page.route("**/api/admin/membership-types", (route) => route.fulfill({ json: [
-      { id: typeId, name: "Acceptance members", active: true, grantsAccount: true, ruleSetId: RULE_SET.id }
+      { id: typeId, name: typeName, active: true, grantsAccount: true, ruleSetId: ruleSet.id }
     ] }));
-    await page.route("**/api/admin/rule-sets", (route) => route.fulfill({ json: [RULE_SET] }));
+    await page.route("**/api/admin/rule-sets", (route) => route.fulfill({ json: [ruleSet] }));
     await page.route("**/api/admin/roster?**", (route) => route.fulfill({ json: { entries: [], matching: 0 } }));
-    await page.addInitScript(() => window.localStorage.setItem("courtside.locale", "de"));
+    await page.addInitScript((locale) => window.localStorage.setItem("courtside.locale", locale), language);
     await page.setViewportSize(viewport);
     await signIn(page);
 
@@ -179,6 +171,30 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 820, height: 1180
     await expectWholeValue(page.getByTestId(`membership-type-name-${typeId}`), "the type name");
     await expectWholeValue(page.getByTestId(`membership-type-rule-set-${typeId}`), "the bound rule set");
     expect(await page.evaluate(() => document.documentElement.scrollWidth), "the page does not scroll sideways").toBeLessThanOrEqual(viewport.width);
+  });
+}
+
+for (const { width, language } of [{ width: 1440, language: "de" }, { width: 1440, language: "en" }, { width: 1280, language: "de" }, { width: 1280, language: "en" }] as const) {
+  test(`given ${LANGUAGES[language]} booking rules at ${width}px, when a long rule set governs people without a membership type, then its select shows the whole name`, async ({ page }) => {
+    test.setTimeout(60_000);
+    // given
+    await page.addInitScript((locale) => window.localStorage.setItem("courtside.locale", locale), language);
+    await page.setViewportSize({ width, height: 1000 });
+    await signIn(page);
+    const sets = await page.evaluate(() => fetch("/api/admin/rule-sets").then((answer) => answer.json())) as { id: string; active: boolean }[];
+    const renamed = sets.find((set) => set.active)!.id;
+    await page.route("**/api/admin/rule-sets", (route) => route.request().method() === "GET"
+      ? route.fulfill({ json: sets.map((set) => set.id === renamed ? { ...set, name: "Acceptance without a membership type" } : set) })
+      : route.continue());
+    await page.goto("/admin/rule-sets");
+    await expect(page.getByTestId("rule-ADVANCE_WINDOW-maxDays")).toBeEnabled({ timeout: 10_000 });
+
+    // when
+    await page.getByTestId("no-membership-type-rule-set").selectOption(renamed);
+
+    // then
+    await expectWholeValue(page.getByTestId("no-membership-type-rule-set"), "the rule set for people without a membership type");
+    expect(await page.evaluate(() => document.documentElement.scrollWidth), "the page does not scroll sideways").toBeLessThanOrEqual(width);
   });
 }
 

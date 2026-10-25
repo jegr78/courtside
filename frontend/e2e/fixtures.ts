@@ -245,4 +245,16 @@ export async function expectShownAsEmpty(field: Locator, engine: string): Promis
   }, input), `${engine} lets a tap on the hint of ${testId} reach the field`).toBe(true);
 }
 
+export async function expectWholeValue(control: Locator, where: string): Promise<void> {
+  const { text, needed, available } = await control.evaluate((element: HTMLInputElement | HTMLSelectElement) => {
+    const style = getComputedStyle(element);
+    const context = document.createElement("canvas").getContext("2d")!;
+    context.font = `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+    const text = element instanceof HTMLSelectElement ? element.selectedOptions[0].text : element.value;
+    const available = element.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+    return { text, needed: Math.ceil(context.measureText(text).width), available: Math.floor(available) };
+  });
+  expect(available, `${where}: "${text}" needs ${needed}px of the ${available}px its field shows`).toBeGreaterThanOrEqual(needed);
+}
+
 export { expect };
