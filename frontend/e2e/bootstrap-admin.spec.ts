@@ -1030,12 +1030,12 @@ test("a checkbox, the setup progress and the file picker take their colours from
 
     // when
     await page.getByTestId("admin-configuration-link").click();
-    const logo = page.getByTestId("logo-file");
+    const logo = page.getByTestId("logo-file-trigger");
     await expect(logo).toBeVisible();
 
     // then
     const trigger = await logo.evaluate((element) => {
-      const style = getComputedStyle(element, "::file-selector-button");
+      const style = getComputedStyle(element);
       return { background: style.backgroundColor, color: style.color, border: style.borderTopColor };
     });
     expect(trigger, `${appearance}: the file trigger reads as a secondary button`)

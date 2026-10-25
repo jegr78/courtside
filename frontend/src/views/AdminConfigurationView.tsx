@@ -15,6 +15,7 @@ import { useUnsavedMark } from "../unsaved/registry";
 import { SaveBar } from "../unsaved/SaveBar";
 import { brandContrast } from "../brandColor";
 import { ColorInput } from "../components/ColorInput";
+import { FileInput } from "../components/FileInput";
 import { ownedFields, useClubConfigForm } from "./configuration/clubConfigForm";
 
 const MAX_LOGO_BYTES = 1024 * 1024;
@@ -203,9 +204,8 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
                 <legend className="px-1 font-semibold">{t("admin.config.logo")}</legend>
                 <label className="grid gap-2 font-medium">
                   {t("admin.config.logoFile")}
-                  <input ref={logoInput} data-testid="logo-file" type="file" accept="image/png,image/jpeg"
-                         disabled={configurationPending} onChange={selectLogoFile}
-                         className="form-control min-w-0 w-full rounded-lg border px-3 py-2" />
+                  <FileInput ref={logoInput} id="logo-file" data-testid="logo-file" file={logoFile} accept="image/png,image/jpeg"
+                             disabled={configurationPending} onChange={selectLogoFile} />
                 </label>
                 <div data-testid="logo-help-row" className="flex items-start justify-between gap-3">
                   <p className="text-muted min-w-0 text-sm">{t("admin.config.logoHelp")}</p>

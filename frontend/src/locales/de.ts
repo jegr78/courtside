@@ -81,6 +81,8 @@ const de = {
   "field.dateTimeFormat": "Beispiel: {{example}}",
   "field.invalidDateTime": "Bitte einen gültigen Wert eingeben, zum Beispiel {{example}}.",
   "field.notSet": "Nicht gesetzt",
+  "field.chooseFile": "Datei auswählen",
+  "field.noFileChosen": "Keine Datei ausgewählt",
   "password.show": "Passwort anzeigen",
   "password.confirm": "Neues Passwort bestätigen",
   "password.submit": "Passwort speichern",
