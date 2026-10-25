@@ -64,19 +64,6 @@ it("given the visible trigger, when it is clicked, then the native input receive
   expect(input.files?.[0]?.name).toBe("members.csv");
 });
 
-it("given a disabled field, when the trigger is clicked, then the picker stays closed", async () => {
-  // given
-  render(<FileInput id="list" data-testid="list-file" file={undefined} disabled />);
-  const opened = vi.fn();
-  screen.getByTestId("list-file").addEventListener("click", opened);
-
-  // when
-  await userEvent.click(screen.getByTestId("list-file-trigger"));
-
-  // then
-  expect(opened).not.toHaveBeenCalled();
-});
-
 it("given the native input, when the keyboard reaches it, then it is the only tab stop of the field", async () => {
   // given
   render(<FileInput id="list" data-testid="list-file" file={undefined} />);

@@ -10,7 +10,7 @@ interface FileInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "ty
 
 // The browser labels a native file input in its own language, so the input stays for keyboard,
 // assistive technology and tests while the visible trigger and status come from the application.
-export function FileInput({ id, "data-testid": testId, file, ref, disabled, ...props }: FileInputProps) {
+export function FileInput({ id, "data-testid": testId, file, ref, ...props }: FileInputProps) {
   const { t } = useTranslation();
   const input = useRef<HTMLInputElement>(null);
   useImperativeHandle<HTMLInputElement | null, HTMLInputElement | null>(ref, () => input.current, []);
@@ -18,11 +18,11 @@ export function FileInput({ id, "data-testid": testId, file, ref, disabled, ...p
 
   function choose(event: MouseEvent) {
     event.preventDefault();
-    if (!disabled) input.current?.click();
+    input.current?.click();
   }
 
   return <span className="file-input relative flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
-    <input ref={input} id={id} data-testid={testId} type="file" className="sr-only" disabled={disabled}
+    <input ref={input} id={id} data-testid={testId} type="file" className="sr-only"
            aria-describedby={status} {...props} />
     <span data-testid={`${testId}-trigger`} aria-hidden="true" onClick={choose} className="file-input-trigger">
       {t("field.chooseFile")}
