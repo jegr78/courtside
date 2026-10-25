@@ -1,5 +1,5 @@
 import { expect, it, vi } from "vitest";
-import { formatCalendarDate, bookingTimeSlot, formatBookingPeriod, formatDateRange, isPastSlot, isValidZonedDateTime, zonedDateTime } from "./clubZone";
+import { formatCalendarDate, formatClockTime, bookingTimeSlot, formatBookingPeriod, formatDateRange, isPastSlot, isValidZonedDateTime, zonedDateTime } from "./clubZone";
 
 const localTimeIn = (isoInstant: string, timeZone: string) =>
   new Intl.DateTimeFormat("en-GB", {
@@ -220,4 +220,22 @@ it("given a calendar date west of UTC, when its display locale changes, then its
   // when / then
   expect(formatCalendarDate(value, "de")).toBe("23.10.2026");
   expect(formatCalendarDate(value, "en")).toBe("Oct 23, 2026");
+});
+
+for (const [locale, time, expected] of [["en", "16:00", "4:00 PM"], ["en", "00:30:00", "12:30 AM"], ["de", "16:00", "16:00"], ["de", "06:05:00", "06:05"]]) {
+  it(`given the wall time ${time} in ${locale}, when formatted, then it reads ${expected}`, () => {
+    // when
+    const formatted = formatClockTime(time, locale);
+
+    // then
+    expect(formatted.replace(/\s/g, " ")).toBe(expected);
+  });
+}
+
+it("given a value that is no wall time, when formatted, then it is shown unchanged", () => {
+  // when
+  const formatted = formatClockTime("11:00 PM", "en");
+
+  // then
+  expect(formatted, "an already formatted time is not read a second time").toBe("11:00 PM");
 });

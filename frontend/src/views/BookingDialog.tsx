@@ -8,7 +8,7 @@ import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
 import { DialogBody } from "../components/DialogBody";
 import { Modal } from "../components/Modal";
-import { bookingTimeSlot, formatBookingPeriod, zonedDateTime } from "../time/clubZone";
+import { bookingTimeSlot, formatBookingPeriod, formatClockTime, zonedDateTime } from "../time/clubZone";
 import { leavesBookingHours } from "../time/bookingHours";
 import { closureOn, hoursOn } from "../time/openingHours";
 import { PERSON_SEARCH_DEBOUNCE_MS, PERSON_SEARCH_MIN_LENGTH } from "../person-search";
@@ -241,7 +241,7 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
         {t("booking.minimumBound", { duration: t("booking.durationMinutes", { count: minBookingMinutes }) })}
       </p>}
       {hours && !outsideHours && <p id="booking-hours-bound" data-testid="booking-hours-bound" className="text-muted mt-2 text-sm">
-        {t("booking.hoursBound", hours)}
+        {t("booking.hoursBound", { earliestStart: formatClockTime(hours.earliestStart, i18n.language), latestEnd: formatClockTime(hours.latestEnd, i18n.language) })}
       </p>}
       {showsWeekly && <p id="booking-weekly-bound" data-testid="booking-weekly-bound" className="text-muted mt-2 text-sm">
         {t("booking.weeklyBound", { hours: maxWeeklyBookedHours })}

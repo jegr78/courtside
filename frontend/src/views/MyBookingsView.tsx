@@ -6,7 +6,7 @@ import { Alert } from "../components/Alert";
 import { LoadFailure } from "../components/LoadFailure";
 import { Button } from "../components/Button";
 import { SuccessFeedback } from "../components/SuccessFeedback";
-import { formatBookingPeriod, formatDateTime, formatTime } from "../time/clubZone";
+import { formatBookingPeriod, formatClockTime, formatDateTime, formatTime } from "../time/clubZone";
 import { CancelDialog, MoveDialog } from "./AppointmentDialogs";
 import { OpenPlacesSection } from "./OpenPlacesSection";
 import { WaitlistSection } from "./WaitlistSection";
@@ -299,7 +299,7 @@ export function BookingSection({ testId, title, titleHidden = false, empty, book
           {booking.partnerSearch === "PUBLISHED" && <span data-testid="partner-search-published">{t("myBookings.partnerSearchPublished")}</span>}
           {booking.checkIn?.checkedIn && <span data-testid="checked-in">{t("myBookings.checkedIn")}</span>}
           {booking.checkIn && !booking.checkIn.checkedIn && reference && checkInToday(booking.checkIn, reference)
-            && <span data-testid="check-in-from" className="text-muted text-sm">{t("myBookings.checkInFrom", { time: formatTime(booking.checkIn.opensAt, timeZone) })}</span>}
+            && <span data-testid="check-in-from" className="text-muted text-sm">{t("myBookings.checkInFrom", { time: formatClockTime(formatTime(booking.checkIn.opensAt, timeZone), locale) })}</span>}
           {actionable && <div className="flex flex-wrap gap-2 pt-1">
             {booking.status === "CONFIRMED" && <>
               {checkIn && reference && booking.checkIn && !booking.checkIn.checkedIn && checkInOpen(booking.checkIn, reference)

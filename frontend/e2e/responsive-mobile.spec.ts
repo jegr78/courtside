@@ -24,6 +24,19 @@ async function expectNoHorizontalOverflow(page: import("@playwright/test").Page)
   expect(overflow).toEqual([]);
 }
 
+async function expectSlotHeadingsInsideTheirCells(page: Page, language: string) {
+  const overflowing = await page.locator('[data-testid^="slot-heading-"]').evaluateAll((headings) => headings
+    .filter((heading) => {
+      const range = document.createRange();
+      range.selectNodeContents(heading);
+      const text = range.getBoundingClientRect();
+      const cell = heading.getBoundingClientRect();
+      return text.left < cell.left || text.right > cell.right || text.top < cell.top || text.bottom > cell.bottom;
+    })
+    .map((heading) => heading.getAttribute("data-testid")));
+  expect(overflowing, `every ${language} time stays inside its row heading`).toEqual([]);
+}
+
 function renderedTextWidth(element: import("@playwright/test").Locator): Promise<number> {
   return element.evaluate((node) => {
     const range = document.createRange();
@@ -1179,6 +1192,17 @@ test("given elapsed rows on a phone, when the plan loads, then every row names i
   const elapsedSlot = page.locator('[data-testid="free-slot"][data-state="past"]').first();
   expect(await elapsedSlot.evaluate((slot) => getComputedStyle(slot, "::after").content),
     "an elapsed slot is marked by its hatching, not by a dash").toBe("none");
+
+
+  for (const [locale, lastSlot] of [["de-DE", "21:30"], ["en-GB", "9:30 PM"]]) {
+    // when
+    await page.evaluate((chosen) => window.localStorage.setItem("courtside.locale", chosen), locale);
+    await page.reload();
+    await expect(page.getByTestId("slot-heading-21:30"), `the ${locale} axis reads its own clock`).toHaveText(lastSlot);
+
+    // then
+    await expectSlotHeadingsInsideTheirCells(page, locale);
+  }
 });
 
 test("given bookings on a phone, when the plan scrolls past the navigation, then the courts stay named and bookings keep their label", async ({ page, journeyService }) => {

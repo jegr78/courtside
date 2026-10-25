@@ -79,6 +79,23 @@ export function shortTime(value: string | null | undefined): string {
   return value?.slice(0, 5) ?? "";
 }
 
+export function formatClockTime(time: string, locale: string): string {
+  const parts = clockTimeParts(time, locale);
+  return parts.dayPeriod ? `${parts.time} ${parts.dayPeriod}` : parts.time;
+}
+
+export function clockTimeParts(time: string, locale: string): { time: string; dayPeriod?: string } {
+  const match = /^(\d{2}):(\d{2})(?::\d{2}(?:\.\d+)?)?$/.exec(time);
+  if (!match) return { time };
+  const parts = dateTimeFormatter(locale, { timeStyle: "short", timeZone: "UTC" })
+    .formatToParts(new Date(Date.UTC(1970, 0, 1, Number(match[1]), Number(match[2]))));
+  const dayPeriod = parts.find((part) => part.type === "dayPeriod")?.value;
+  return {
+    time: parts.filter((part) => part.type !== "dayPeriod").map((part) => part.value).join("").trim(),
+    ...(dayPeriod ? { dayPeriod } : {})
+  };
+}
+
 export function formatTime(timestamp: string, timeZone: string): string {
   const parts = dateTimeFormatter("en-GB", {
     timeZone, hour: "2-digit", minute: "2-digit", hourCycle: "h23"
