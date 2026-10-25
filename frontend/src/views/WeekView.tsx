@@ -480,7 +480,6 @@ export function WeekView({ today, clock = systemClock, canBook = true,
         {days.map((day) => {
           const date = formatDate(day);
           const count = remainingCounts.get(date) ?? 0;
-          const freeCount = t("week.freeCount", { count });
           return <button
             key={date}
             type="button"
@@ -493,7 +492,10 @@ export function WeekView({ today, clock = systemClock, canBook = true,
             <span className="block text-sm font-semibold">{formatWeekday(day, language, calendarTimeZone)}</span>{" "}
             <span className="text-muted font-value text-sm">{formatDayMonth(day, language, calendarTimeZone)}</span>{" "}
             <span data-testid={`day-free-count-${date}`} data-free-count={count}
-              className="text-muted mt-1 block text-xs">{freeCount}</span>
+              className="text-muted mt-1 block text-xs">
+              <span className="lg:hidden">{t("week.freeCountCompact", { count })}</span>
+              <span className="hidden lg:inline">{t("week.freeCount", { count })}</span>
+            </span>
           </button>;
         })}
         <Button variant="secondary" type="button" data-testid="mobile-week-next"

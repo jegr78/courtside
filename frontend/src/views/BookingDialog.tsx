@@ -205,11 +205,11 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
   return <Modal labelledBy="booking-heading" closed={closed} width="xl" composed testId="booking-dialog">
     <form onSubmit={(event) => void submit(event)} className="flex min-h-0 flex-col">
       {/* Outside the scrolling form, so title and slot stay while the member fills the fields below. */}
-      <div data-testid="dialog-header" className="dialog-header border-structural shrink-0 border-b px-6 pt-5 pb-3">
+      <div data-testid="dialog-header" className="dialog-header border-structural shrink-0 border-b px-4 pt-5 pb-3 sm:px-6">
         <h2 id="booking-heading" className="text-xl font-bold">{t(waitlist ? "waitlist.title" : "booking.title")}</h2>
         <p data-testid="booking-period" aria-live="polite" className="mt-1 text-sm font-semibold">{formatBookingPeriod(period.startsAt, period.endsAt, i18n.language, grid.timeZone)}</p>
       </div>
-      <DialogBody padding="px-6 pt-4 pb-1">
+      <DialogBody padding="px-4 pt-4 pb-1 sm:px-6">
       <FieldViolations id="booking-startsAt-errors" violations={fieldViolations("startsAt")} />
       {waitlist && <p data-testid="waitlist-explanation" className="text-muted mt-2 text-sm">{t("waitlist.explanation")}</p>}
       {!waitlist && dependants.length > 0 && <>
@@ -290,9 +290,9 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
             }}>{t("booking.addMember", { name: member.displayName })}</Button>
           </li>)}
         </ul>}
-        {selectedMembers.map((member, index) => <div ref={index === selectedMembers.length - 1 ? lastMember : undefined} key={member.personId} data-testid="selected-member" className="surface-raised flex flex-wrap items-center justify-between gap-x-3 gap-y-2 rounded-lg px-3 py-2">
-          <span data-testid="selected-member-name" className="min-w-0 break-words">{member.displayName}</span>
-          <Button variant="secondary" type="button" data-testid="remove-member" aria-label={t("booking.removeMember", { name: member.displayName })} className="ml-auto shrink-0 px-3 py-2" onClick={() => setSelectedMembers((current) => current.filter((selected) => selected.personId !== member.personId))}>{t("booking.removeMemberShort")}</Button>
+        {selectedMembers.map((member, index) => <div ref={index === selectedMembers.length - 1 ? lastMember : undefined} key={member.personId} data-testid="selected-member" className="surface-raised flex items-center gap-3 rounded-lg px-3 py-2">
+          <span data-testid="selected-member-name" className="min-w-0 flex-1 break-words">{member.displayName}</span>
+          <Button variant="secondary" type="button" data-testid="remove-member" aria-label={t("booking.removeMember", { name: member.displayName })} title={t("booking.removeMemberShort")} className="min-w-11 shrink-0" onClick={() => setSelectedMembers((current) => current.filter((selected) => selected.personId !== member.personId))}><span aria-hidden="true">×</span></Button>
         </div>)}
       </fieldset>
       <FieldViolations id="booking-members-errors" violations={fieldViolations("members")} />
@@ -334,7 +334,7 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
       </div>
       </DialogBody>
       {/* Outside the scrolling form, so a refusal shows beside the button that caused it. */}
-      {(fieldViolations("general").length > 0 || error || reference) && <div data-testid="booking-outcome" className="shrink-0 grid gap-2 px-6 pt-3">
+      {(fieldViolations("general").length > 0 || error || reference) && <div data-testid="booking-outcome" className="shrink-0 grid gap-2 px-4 pt-3 sm:px-6">
         <FieldViolations id="booking-general-errors" violations={fieldViolations("general")} />
         {(error || reference) && <Alert>
           {error && <p data-testid="booking-refusal">{error}</p>}
@@ -344,7 +344,7 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
           </details>}
         </Alert>}
       </div>}
-      <div className="dialog-footer surface-panel border-structural flex shrink-0 justify-end gap-3 border-t px-6 py-4">
+      <div className="dialog-footer surface-panel border-structural flex shrink-0 flex-wrap justify-end gap-3 border-t px-4 py-4 whitespace-nowrap sm:px-6">
         <Button variant="secondary" type="button" data-testid="booking-close" onClick={closed}>{t("booking.close")}</Button>
         <Button variant="primary" type="submit" data-testid="booking-submit" disabled={submitting || courtIds.length === 0 || !cardId || boundLeavesNoPeriod || minimumLeavesNoPeriod || outsideHours || (refusedAsTaken !== undefined && !waitlist)}>{t(waitlist ? "waitlist.submit" : "booking.submit")}</Button>
       </div>

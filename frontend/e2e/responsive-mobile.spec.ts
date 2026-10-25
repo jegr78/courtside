@@ -396,7 +396,7 @@ for (const name of ["Richard Miles", "Richard Miles-Major"]) {
     const partner = dialog.getByTestId("selected-member");
     const shown = partner.getByTestId("selected-member-name");
     await expect(shown, "the partner is named").toHaveText(name);
-    await expect(partner.getByTestId("remove-member"), "the control is the German short label").toHaveText("Entfernen");
+    await expect(partner.getByTestId("remove-member"), "the control carries the German short label as its tooltip").toHaveAttribute("title", "Entfernen");
     const layout = await shown.evaluate((element) => ({
       lines: element.getBoundingClientRect().height / parseFloat(getComputedStyle(element).lineHeight),
       clipped: element.scrollWidth > element.clientWidth + 0.5
@@ -413,10 +413,9 @@ for (const name of ["Richard Miles", "Richard Miles-Major"]) {
 
 async function shownLines(control: import("@playwright/test").Locator): Promise<number> {
   return control.evaluate((element) => {
-    const style = getComputedStyle(element);
-    const text = element.getBoundingClientRect().height - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom)
-      - parseFloat(style.borderTopWidth) - parseFloat(style.borderBottomWidth);
-    return text / parseFloat(style.lineHeight);
+    const range = document.createRange();
+    range.selectNodeContents(element);
+    return range.getBoundingClientRect().height / parseFloat(getComputedStyle(element).lineHeight);
   });
 }
 
@@ -436,35 +435,39 @@ test("given a phone 320 px wide in German, when the booking dialog opens, then e
   }
 });
 
-test("given a member with 108 unread messages on a phone 320 px wide, when the bottom bar shows the count, then the badge leaves the envelope visible inside its destination", async ({ page, journeyService }) => {
-  // given
-  await journeyService.executeSql(`
-    INSERT INTO notification (id, account_id, kind, parameters, created_at)
-    SELECT ('7c000000-0000-0000-0000-' || lpad(n::text, 12, '0'))::uuid, '00000000-0000-0000-0000-000000000102', 'BOOKING_REMINDER', '{}', now()
-    FROM generate_series(1001, 1108) AS n;`);
-  try {
-    await page.setViewportSize({ width: 320, height: 640 });
-    await page.goto("/login");
-    await page.evaluate(() => window.localStorage.setItem("courtside.locale", "de-DE"));
+for (const [username, account, destinations] of [["doe.jane", "102", 3], ["configuration-admin", "107", 4]] as const) {
+  test(`given ${destinations} destinations and 108 unread messages on a phone 320 px wide, when the bottom bar shows the count, then the badge leaves the envelope visible inside its destination`, async ({ page, journeyService }) => {
+    // given
+    await journeyService.executeSql(`
+      INSERT INTO notification (id, account_id, kind, parameters, created_at)
+      SELECT ('7c000000-0000-0000-0000-' || lpad(n::text, 12, '0'))::uuid, '00000000-0000-0000-0000-000000000${account}', 'BOOKING_REMINDER', '{}', now()
+      FROM generate_series(1001, 1108) AS n;`);
+    try {
+      await page.setViewportSize({ width: 320, height: 640 });
+      await page.goto("/login");
+      await page.evaluate(() => window.localStorage.setItem("courtside.locale", "de-DE"));
 
-    // when
-    await signIn(page, "doe.jane");
+      // when
+      await signIn(page, username);
+      await expect(page.getByTestId("primary-navigation-bar").getByRole("link")).toHaveCount(destinations);
 
-    // then
-    const destination = page.getByTestId("my-messages-link");
-    await expect(destination, "the destination names the exact count").toHaveAccessibleName(/108/);
-    const badge = destination.getByTestId("my-messages-unread");
-    await expect(badge).toBeVisible();
-    const shown = (await badge.boundingBox())!;
-    const envelope = (await destination.getByTestId("my-messages-icon").boundingBox())!;
-    const link = (await destination.boundingBox())!;
-    expect(shown.x, "the badge starts right of the envelope's middle").toBeGreaterThanOrEqual(envelope.x + envelope.width / 2);
-    expect(shown.x + shown.width, "the badge ends inside its destination").toBeLessThanOrEqual(link.x + link.width + 0.5);
-  } finally {
-    await journeyService.executeSql(`DELETE FROM notification WHERE id IN (
-      SELECT ('7c000000-0000-0000-0000-' || lpad(n::text, 12, '0'))::uuid FROM generate_series(1001, 1108) AS n);`);
-  }
-});
+      // then
+      const destination = page.getByTestId("my-messages-link");
+      await expect(destination, "the destination names the exact count").toHaveAccessibleName(/108/);
+      const badge = destination.getByTestId("my-messages-unread");
+      await expect(badge).toBeVisible();
+      const shown = (await badge.boundingBox())!;
+      const envelope = (await destination.getByTestId("my-messages-icon").boundingBox())!;
+      const link = (await destination.boundingBox())!;
+      expect(shown.x, "the badge starts right of the envelope's middle").toBeGreaterThanOrEqual(envelope.x + envelope.width / 2);
+      expect(shown.x + shown.width, "the badge ends inside its destination").toBeLessThanOrEqual(link.x + link.width + 0.5);
+      await expect(badge, "the badge shows the exact count").toHaveText("108");
+    } finally {
+      await journeyService.executeSql(`DELETE FROM notification WHERE id IN (
+        SELECT ('7c000000-0000-0000-0000-' || lpad(n::text, 12, '0'))::uuid FROM generate_series(1001, 1108) AS n);`);
+    }
+  });
+}
 
 test("given a phone 320 px wide with text at 150 percent, when another day is chosen, then its first row starts below the plan's pinned header", async ({ page, journeyService }) => {
   // given
