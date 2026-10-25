@@ -6,7 +6,7 @@ import { useScrollContinuation } from "./useScrollContinuation";
 
 export function AdminShell({ administrator = true }: { administrator?: boolean }) {
   const { pathname } = useLocation();
-  const { body, content, continues, precedes, overflows, measure: measureContinuation } = useScrollContinuation(true, pathname);
+  const { body, content, continues, precedes, overflows, measure: measureContinuation, relayout } = useScrollContinuation(true, pathname);
   const shell = useRef<HTMLDivElement>(null);
   const frame = useRef<HTMLDivElement>(null);
 
@@ -15,10 +15,14 @@ export function AdminShell({ administrator = true }: { administrator?: boolean }
     const follow = () => {
       if (!shell.current || !frame.current) return;
       const top = shell.current.getBoundingClientRect().top;
-      const room = window.innerHeight - window.scrollY - below;
+      const free = window.innerHeight - window.scrollY - below;
       const page = frame.current.nextElementSibling?.getBoundingClientRect().bottom ?? 0;
-      const bottom = Math.max(room, Math.min(window.innerHeight - stuckMargin, page));
-      frame.current.style.setProperty("--admin-navigation-room", `${bottom - Math.max(stuckMargin, top)}px`);
+      const bottom = Math.max(free, Math.min(window.innerHeight - stuckMargin, page));
+      const room = `${bottom - Math.max(stuckMargin, top)}px`;
+      if (frame.current.style.getPropertyValue("--admin-navigation-room") === room) return;
+      frame.current.style.setProperty("--admin-navigation-room", room);
+      // A shortened navigation holds its frame short, so only a fresh layout lets it take the new room.
+      relayout();
     };
     const measure = () => {
       if (shell.current) below = spaceAfter(shell.current);
@@ -34,7 +38,7 @@ export function AdminShell({ administrator = true }: { administrator?: boolean }
       window.removeEventListener("resize", measure);
       window.removeEventListener("scroll", follow);
     };
-  }, []);
+  }, [relayout]);
 
   return <div ref={shell} data-testid="admin-shell" className="grid w-full max-w-7xl gap-6 self-start lg:grid-cols-[15rem_1fr] lg:items-start lg:gap-8">
     <div ref={frame} data-testid="admin-navigation-frame" className="lg:sticky lg:top-8 lg:max-h-[max(12rem,min(calc(100vh-4rem),var(--admin-navigation-room,100vh)))] lg:self-stretch lg:flex lg:min-h-0 lg:flex-col">

@@ -93,6 +93,29 @@ it("given a navigation the member scrolled away from its active entry, when it r
   expect(body.scrollTop, "the member's scroll position outlives a layout change").toBe(0);
 });
 
+it("given a shortened navigation, when the page gives its frame more room, then the navigation lays out into it", async () => {
+  // given
+  window.innerWidth = 1280;
+  window.innerHeight = 800;
+  Object.defineProperty(window, "scrollY", { configurable: true, value: 0 });
+  show("/admin/facility");
+  const body = screen.getByTestId("admin-navigation-scroll");
+  const entries = [...body.querySelectorAll<HTMLElement>("a, p")];
+  entries[11].setAttribute("aria-current", "page");
+  const frame = { top: 100, height: 200 };
+  layOut(body, frame, entries.length * 32);
+  let shellTop = 150;
+  vi.spyOn(screen.getByTestId("admin-shell"), "getBoundingClientRect").mockImplementation(() => ({ top: shellTop } as DOMRect));
+  await act(() => window.dispatchEvent(new Event("resize")));
+  expect(body.style.maxHeight).toBe(`${11 * 32 + 28 - 6 * 32}px`);
+  // when
+  frame.height = 600;
+  shellTop = 100;
+  await act(() => window.dispatchEvent(new Event("scroll")));
+  // then
+  expect(body.style.maxHeight, "the navigation ends on the last whole entry of the larger frame").toBe(`${23 * 32 + 28 - 6 * 32}px`);
+});
+
 it("given an administrative page taller than the window, when the page scrolls, then the navigation reaches down the window", async () => {
   // given
   window.innerHeight = 800;

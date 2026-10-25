@@ -8,6 +8,7 @@ export function useScrollContinuation(active = true, destination?: string) {
   const [overflows, setOverflows] = useState(false);
   const following = useRef(true);
   const placed = useRef(0);
+  const laidOut = useRef<() => void>(undefined);
   const measure = useCallback(() => {
     const element = body.current;
     const padding = element ? (parseFloat(getComputedStyle(element).paddingBottom) || 0)
@@ -35,6 +36,7 @@ export function useScrollContinuation(active = true, destination?: string) {
       }
       measure();
     };
+    laidOut.current = layout;
     layout();
     const observer = typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(layout);
     if (body.current) observer?.observe(body.current);
@@ -42,12 +44,15 @@ export function useScrollContinuation(active = true, destination?: string) {
     if (content.current) observer?.observe(content.current);
     window.addEventListener("resize", layout);
     return () => {
+      laidOut.current = undefined;
       observer?.disconnect();
       window.removeEventListener("resize", layout);
     };
   }, [active, destination, measure]);
 
-  return { body, content, continues, precedes, overflows, measure: scrolled };
+  const relayout = useCallback(() => laidOut.current?.(), []);
+
+  return { body, content, continues, precedes, overflows, measure: scrolled, relayout };
 }
 
 function reveal(element: HTMLElement) {
