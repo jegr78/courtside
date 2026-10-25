@@ -150,8 +150,17 @@ An unplanned version no newer than every planned one is kept already, so only pl
 newer ones can change the plan. Before each deletion retention reads the package's version count,
 the listing pages up to the last of those newer versions and the version it is about to delete. It
 refuses if the count is not the plan's minus the deletions so far, if a version on those pages is
-unknown or changed, or if the target changed. With the newest versions listed first that is one
-page, so a night costs one full listing plus four requests per deletion, whatever the registry holds.
+unknown or changed, or if the target changed. Usually that is one page, so a night costs one full
+listing plus four requests per deletion, whatever the registry holds.
+
+A version deleted by hand while another is published keeps the count, so the new version has to show
+up on the pages read. GitHub does not document the order of its version listing, and retention relies
+on two assumptions instead: a version published during the run gets the highest id and the latest
+update time, and the listing keeps the order retention observed. Before the first deletion retention checks that the full
+listing runs newest first, by strictly falling id or by update time, and refuses otherwise. A new
+version then sorts onto the first page. A version restored from GitHub's deleted versions keeps its
+old id and time, sorts deep into the listing and stays unseen. Retention accepts that, because a
+restore one minute after the run would leave the registry in the same state.
 
 ### Nightly source attestation v1
 
