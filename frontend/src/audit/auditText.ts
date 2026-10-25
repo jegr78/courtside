@@ -1,6 +1,7 @@
 import type { TFunction } from "i18next";
 import type { AuditEntry, DayOfWeek } from "../api/client";
-import { formatBookingPeriod, shortTime } from "../time/clubZone";
+import i18n from "../i18n";
+import { formatBookingPeriod, formatClockTime } from "../time/clubZone";
 
 const enabledFlagByEventType: Record<string, string> = {
   "roster.account.availabilityChanged": "enabled"
@@ -55,8 +56,9 @@ export function auditMessage(entry: AuditEntry, t: TFunction): string {
   const params = typeof entry.parameters.params === "object" && entry.parameters.params !== null
     ? paramsLabel(entry.parameters.params as Record<string, unknown>, t)
     : undefined;
-  const opensAt = typeof entry.parameters.opensAt === "string" ? shortTime(entry.parameters.opensAt) : undefined;
-  const closesAt = typeof entry.parameters.closesAt === "string" ? shortTime(entry.parameters.closesAt) : undefined;
+  const locale = i18n.resolvedLanguage ?? i18n.language;
+  const opensAt = typeof entry.parameters.opensAt === "string" ? formatClockTime(entry.parameters.opensAt, locale) : undefined;
+  const closesAt = typeof entry.parameters.closesAt === "string" ? formatClockTime(entry.parameters.closesAt, locale) : undefined;
   const kind = entry.eventType.startsWith("facility.openingPeriod.") && typeof entry.parameters.kind === "string"
     ? t(`admin.availability.kind.${entry.parameters.kind}`)
     : undefined;

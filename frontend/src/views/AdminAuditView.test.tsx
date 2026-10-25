@@ -317,7 +317,7 @@ describe("AdminAuditView", () => {
   });
 
   it.each([
-    ["facility.openingHours.set", { dayOfWeek: 1, opensAt: "08:00:00", closesAt: "22:00:00" }, "Opening hours set: Monday, 08:00 to 22:00"],
+    ["facility.openingHours.set", { dayOfWeek: 1, opensAt: "08:00:00", closesAt: "22:00:00" }, "Opening hours set: Monday, 8:00 AM to 10:00 PM"],
     ["facility.openingHours.closed", { dayOfWeek: 7 }, "Sunday closed"],
     ["facility.openingPeriod.set", { kind: "HOLIDAY", startsOn: "2026-12-25", endsOn: "2026-12-26" }, "Holiday set: 2026-12-25 to 2026-12-26"],
     ["facility.courtClosure.removed", { number: 2, startsOn: "2026-06-01", endsOn: "2026-06-30" }, "Closure of court 2 removed: 2026-06-01 to 2026-06-30"],

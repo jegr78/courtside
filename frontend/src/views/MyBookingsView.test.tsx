@@ -1122,3 +1122,22 @@ it("given the first load is half answered, when the page renders, then it shows 
   await waitFor(() => expect(api.personalBookings).toHaveBeenCalledWith({ view: "CANCELLED" }));
   expect(screen.queryByTestId("upcoming-bookings"), "a list before the first load completes would offer no actions").not.toBeInTheDocument();
 });
+
+for (const [language, expected] of [["en", "Check in from 5:45 PM"], ["de", "17:45"]]) {
+  it(`given ${language} and a check-in that opens later today, when the booking is listed, then its opening time follows the application language`, async () => {
+    // given
+    await i18n.changeLanguage(language);
+    vi.mocked(api.personalBookings).mockResolvedValue({ items: [{
+      id: upcomingId, courtIds: ["33333333-3333-3333-3333-333333333333"],
+      startsAt: "2026-08-11T16:00:00Z", endsAt: "2026-08-11T17:00:00Z",
+      cardLabel: "Member booking", cardColor: "#176b55", status: "CONFIRMED",
+      checkIn: { opensAt: "2026-08-11T15:45:00Z", closesAt: "2026-08-11T16:15:00Z", checkedIn: false }
+    }] });
+
+    // when
+    render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} />);
+
+    // then
+    expect(await screen.findByTestId("check-in-from"), `the ${language} list reads its own clock`).toHaveTextContent(expected);
+  });
+}

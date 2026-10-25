@@ -401,6 +401,10 @@ input[type="time"] {
   left: 0;
 }
 
+.day-plan-day-period {
+  font-size: 0.75em;
+}
+
 /* Dragging a period across the grid would otherwise select the cells' own labels as text. */
 .day-plan-slot {
   user-select: none;
@@ -677,6 +681,11 @@ input[type="time"] {
 
   .day-plan tbody th {
     padding-inline: 0.35rem;
+  }
+
+  .day-plan-day-period {
+    display: block;
+    line-height: 1;
   }
 
   .court-heading-full {

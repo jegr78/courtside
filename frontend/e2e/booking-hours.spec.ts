@@ -24,13 +24,22 @@ test("a member whose rule set limits the booking hours sees the window before bo
       await selectJourneyDate(page, journeyService.visualDate);
       const outside = freeSlot(page, 3, "16:00");
       await expect(outside).toBeVisible({ timeout: 10_000 });
+      await expect(page.getByTestId("slot-heading-16:00"), "the English time axis reads twelve-hour times").toHaveText("4:00 PM");
+      const overflowing = await page.locator('[data-testid^="slot-heading-"]').evaluateAll((headings) => headings
+        .filter((heading) => {
+          const range = document.createRange();
+          range.selectNodeContents(heading);
+          return range.getBoundingClientRect().right > heading.getBoundingClientRect().right;
+        })
+        .map((heading) => heading.getAttribute("data-testid")));
+      expect(overflowing, "every twelve-hour time fits the desktop time column").toEqual([]);
 
       // when
       await outside.click();
 
       // then
       await expect(page.getByTestId("booking-outside-hours"), "the refusal names the window before any submit")
-        .toHaveText("Your membership type may book only between 09:00 and 13:00.", { timeout: 10_000 });
+        .toHaveText("Your membership type may book only between 9:00 AM and 1:00 PM.", { timeout: 10_000 });
       await expect(page.getByTestId("booking-submit")).toBeDisabled({ timeout: 10_000 });
 
       // when
@@ -41,7 +50,7 @@ test("a member whose rule set limits the booking hours sees the window before bo
 
       // then
       await expect(page.getByTestId("booking-hours-bound"))
-        .toHaveText("Your membership type books between 09:00 and 13:00.", { timeout: 10_000 });
+        .toHaveText("Your membership type books between 9:00 AM and 1:00 PM.", { timeout: 10_000 });
       await expect(page.getByTestId("booking-outside-hours")).toHaveCount(0, { timeout: 10_000 });
 
       // when

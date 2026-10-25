@@ -155,10 +155,25 @@ for (const language of ["de", "en"]) {
 
     // then
     expect(available).toHaveAccessibleName(language === "de"
-      ? "Frei, Centre Court um 13:00 Uhr buchen" : "Available, Book Centre Court at 13:00");
+      ? "Frei, Centre Court um 13:00 Uhr buchen" : "Available, Book Centre Court at 1:00 PM");
     expect(past).toHaveAccessibleName(language === "de"
-      ? "Vergangen, Centre Court um 11:00 Uhr liegt in der Vergangenheit" : "Past, Centre Court at 11:00 is in the past");
+      ? "Vergangen, Centre Court um 11:00 Uhr liegt in der Vergangenheit" : "Past, Centre Court at 11:00 AM is in the past");
     expect(past).toBeDisabled();
+  });
+}
+
+for (const [language, heading] of [["de", "21:30"], ["en", "9:30 PM"]]) {
+  it(`given ${language}, when the time axis renders, then its headings follow the application language and the rows keep the canonical slot`, async () => {
+    // given
+    await i18n.changeLanguage(language);
+
+    // when
+    render(<WeekView today={clubInstant("12:00")} />);
+    const slotHeading = await screen.findByTestId("slot-heading-21:30");
+
+    // then
+    expect(slotHeading, `the ${language} axis shows ${heading}`).toHaveTextContent(new RegExp(`^${heading}$`));
+    expect(slotHeading.closest("tr"), "the row stays addressable by its canonical slot").toHaveAttribute("data-slot", "21:30");
   });
 }
 
@@ -189,8 +204,8 @@ it("given the current week, when it loads, then every day and active court is av
   expect(screen.getByTestId("court-heading-1")).toHaveRole("columnheader");
   expect(screen.getByTestId("court-heading-1"), "a column header is named by its court").toHaveAccessibleName("Centre Court");
   expect(screen.getByTestId("court-heading-1").querySelector(":not([aria-hidden])")?.textContent, "a column header keeps text a screen reader hears").toBe("Centre Court");
-  expect(screen.getByTestId("slot-heading-12:00")).toHaveTextContent("12:00");
-  expect(screen.getByTestId("slot-heading-21:30")).toHaveTextContent("21:30");
+  expect(screen.getByTestId("slot-heading-12:00")).toHaveTextContent("12:00 PM");
+  expect(screen.getByTestId("slot-heading-21:30")).toHaveTextContent("9:30 PM");
   const booking = screen.getByTestId("allocation");
   expect(booking).toHaveStyle({ backgroundColor: "rgb(153, 153, 153)" });
   expect(booking).toHaveAttribute("data-state", "occupied");
@@ -606,7 +621,7 @@ it("given today, when showing the plan, then current time and a return action ar
   render(<WeekView today={clubInstant("12:15")} />);
 
   // then
-  expect(await screen.findByTestId("current-time-line")).toHaveAttribute("aria-label", "Current time 12:15");
+  expect(await screen.findByTestId("current-time-line")).toHaveAttribute("aria-label", "Current time 12:15 PM");
   expect(screen.getByTestId("current-time")).toHaveRole("button");
 });
 
@@ -615,14 +630,14 @@ it("given the plan remains open, when one minute passes, then its current-time s
   vi.useFakeTimers({ shouldAdvanceTime: true });
   let now = clubInstant("12:15");
   render(<WeekView clock={() => now} />);
-  expect(await screen.findByTestId("current-time-line")).toHaveAttribute("aria-label", "Current time 12:15");
+  expect(await screen.findByTestId("current-time-line")).toHaveAttribute("aria-label", "Current time 12:15 PM");
 
   // when
   now = clubInstant("12:16");
   await vi.advanceTimersByTimeAsync(60_000);
 
   // then
-  await waitFor(() => expect(screen.getByTestId("current-time-line")).toHaveAttribute("aria-label", "Current time 12:16"));
+  await waitFor(() => expect(screen.getByTestId("current-time-line")).toHaveAttribute("aria-label", "Current time 12:16 PM"));
 });
 
 it("given a slot that starts in ten seconds, when it starts, then it is no longer offered without waiting for the minute refresh", async () => {
@@ -2059,7 +2074,7 @@ it("given a rule set limits the booking hours, when the dialog opens inside them
   expect(duration, "a period ending after 09:00 is one the server refuses").not.toContainHTML('value="90"');
   const hoursBound = screen.getByTestId("booking-hours-bound");
   expect(hoursBound, "the member reads the window before submitting").toHaveTextContent(
-    i18n.t("booking.hoursBound", { earliestStart: "08:00", latestEnd: "09:00" }));
+    "Your membership type books between 8:00 AM and 9:00 AM.");
   expect(duration.getAttribute("aria-describedby")?.split(" "), "the window describes the list it shortens").toContain(hoursBound.id);
   expect(screen.getByTestId("booking-submit")).toBeEnabled();
 });
@@ -2074,7 +2089,7 @@ it("given a rule set limits the booking hours, when the dialog opens on a slot o
 
   // then
   const outside = await screen.findByTestId("booking-outside-hours");
-  expect(outside).toHaveTextContent(i18n.t("booking.rule.bookingHours.outside", { earliestStart: "09:00", latestEnd: "20:00" }));
+  expect(outside, "the refusal shows the times like the dialog header").toHaveTextContent("Your membership type may book only between 9:00 AM and 8:00 PM.");
   expect(screen.getByTestId("booking-submit")).toBeDisabled();
 });
 
@@ -2406,7 +2421,7 @@ it("given the plan open on today, when the current time passes into the next slo
   // when
   now = clubInstant("12:31");
   await vi.advanceTimersByTimeAsync(60_000);
-  await waitFor(() => expect(screen.getByTestId("current-time-line")).toHaveAttribute("aria-label", "Current time 12:31"));
+  await waitFor(() => expect(screen.getByTestId("current-time-line")).toHaveAttribute("aria-label", "Current time 12:31 PM"));
   await nextFrame();
 
   // then
