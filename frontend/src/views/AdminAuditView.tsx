@@ -169,7 +169,7 @@ export function AdminAuditView() {
                   </td>
                   <td role="cell" className="grid min-w-0 grid-cols-[minmax(0,8rem)_minmax(0,1fr)] gap-3 sm:table-cell sm:border-t sm:p-2">
                     <span aria-hidden="true" data-testid="audit-label-actor" className="font-medium sm:hidden">{t("audit.column.actor")}</span>
-                    <span data-testid="audit-actor" className="min-w-0 [overflow-wrap:anywhere]">{actorLabel(entry, t)}</span>
+                    <span data-testid="audit-actor" className="min-w-0 break-words">{actorLabel(entry, t)}</span>
                   </td>
                 </tr>)}
               </tbody>

@@ -148,15 +148,15 @@ export function AdminMembershipTypesView() {
           </div>
           {types.length === 0
             ? <p data-testid="membership-types-empty">{t("admin.membershipTypes.empty")}</p>
-            : <table role="table" className="block w-full text-left md:table md:table-fixed">
+            : <table role="table" className="block w-full text-left lg:table lg:table-fixed">
               <colgroup>
-                <col className="md:w-[26%]" />
-                <col className="md:w-[27%]" />
-                <col className="md:w-[10%]" />
-                <col className="md:w-[9%]" />
-                <col className="md:w-[28%]" />
+                <col className="lg:w-[34%]" />
+                <col className="lg:w-[32%]" />
+                <col className="lg:w-[10%]" />
+                <col className="lg:w-[9%]" />
+                <col className="lg:w-[15%]" />
               </colgroup>
-              <thead role="rowgroup" className="sr-only md:not-sr-only">
+              <thead role="rowgroup" className="sr-only lg:not-sr-only">
                 <tr role="row">
                   <th role="columnheader" scope="col" className="p-2">{t("admin.membershipTypes.name")}</th>
                   <th role="columnheader" scope="col" className="p-2">{t("admin.membershipTypes.ruleSet")}</th>
@@ -165,7 +165,7 @@ export function AdminMembershipTypesView() {
                   <th role="columnheader" scope="col" className="p-2"><span className="sr-only">{t("admin.membershipTypes.actions")}</span></th>
                 </tr>
               </thead>
-              <tbody role="rowgroup" className="grid gap-3 md:table-row-group">
+              <tbody role="rowgroup" className="grid gap-3 lg:table-row-group">
                 {types.map((type) => <MembershipTypeRow
                   key={type.id}
                   type={type}
@@ -218,15 +218,15 @@ function MembershipTypeRow({ type, ruleSets, holders, disabled, value, changed, 
 }) {
   const { t } = useTranslation();
   const { name, ruleSetId, grantsAccount } = value;
-  const cell = "grid min-w-0 grid-cols-[minmax(0,8rem)_minmax(0,1fr)] items-center gap-3 md:table-cell md:border-t md:p-2 md:align-middle";
-  const label = "font-medium md:hidden";
+  const cell = "grid min-w-0 gap-1 sm:grid-cols-[minmax(0,8rem)_minmax(0,1fr)] sm:items-center sm:gap-3 lg:table-cell lg:border-t lg:p-2 lg:align-middle";
+  const label = "font-medium lg:hidden";
 
-  return <tr role="row" data-testid={`membership-type-${type.id}`} className="grid gap-2 rounded-xl border p-4 md:table-row md:rounded-none md:border-0 md:bg-transparent md:p-0">
+  return <tr role="row" data-testid={`membership-type-${type.id}`} className="grid gap-2 rounded-xl border p-4 lg:table-row lg:rounded-none lg:border-0 lg:bg-transparent lg:p-0">
     <th role="rowheader" scope="row" className={`${cell} font-normal`}>
       <span aria-hidden="true" data-testid="membership-type-label-name" className={label}>{t("admin.membershipTypes.name")}</span>
-      <span className="flex min-w-0 items-center gap-2">
+      <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
         <input data-testid={`membership-type-name-${type.id}`} aria-label={t("admin.membershipTypes.name")} disabled={disabled}
-               maxLength={NAME_LENGTH} className="form-control w-0 min-w-24 flex-1 rounded-lg border px-3 py-1.5 font-semibold"
+               maxLength={NAME_LENGTH} className="form-control w-full min-w-0 rounded-lg border px-3 py-1.5 font-semibold"
                value={name} onChange={(event) => changed({ name: event.target.value })} />
         <span data-testid={`membership-type-state-${type.id}`} className={`shrink-0 text-sm ${type.active ? "text-muted" : "font-semibold"}`}>
           {t(type.active ? "admin.membershipTypes.offered" : "admin.membershipTypes.retired")}
@@ -237,7 +237,7 @@ function MembershipTypeRow({ type, ruleSets, holders, disabled, value, changed, 
       <span aria-hidden="true" data-testid="membership-type-label-rule-set" className={label}>{t("admin.membershipTypes.ruleSet")}</span>
       <span className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
         <select data-testid={`membership-type-rule-set-${type.id}`} aria-label={t("admin.membershipTypes.ruleSet")} disabled={disabled}
-                className="form-control w-0 min-w-28 flex-1 rounded-lg border px-3 py-1.5" value={ruleSetId} onChange={(event) => changed({ ruleSetId: event.target.value })}>
+                className="form-control w-full min-w-0 rounded-lg border px-3 py-1.5" value={ruleSetId} onChange={(event) => changed({ ruleSetId: event.target.value })}>
           <option value="">{t("admin.membershipTypes.noRuleSet")}</option>
           {ruleSets.map((set) => <option key={set.id} value={set.id}>{set.name}</option>)}
         </select>
@@ -263,7 +263,7 @@ function MembershipTypeRow({ type, ruleSets, holders, disabled, value, changed, 
           <span aria-hidden="true">…</span><span className="sr-only">{t("status.loading")}</span>
         </span>}
     </td>
-    <td role="cell" className="min-w-0 md:border-t md:p-2 md:align-middle">
+    <td role="cell" className="min-w-0 lg:border-t lg:p-2 lg:align-middle">
       <div className="flex flex-wrap items-center gap-2">
         <Button variant={type.active ? "destructive" : "primary"} data-testid={`toggle-membership-type-${type.id}`} disabled={disabled} type="button"
                 className="px-3 py-1.5 text-sm" onClick={() => void toggle()}>{t(type.active ? "admin.deactivate" : "admin.activate")}</Button>
