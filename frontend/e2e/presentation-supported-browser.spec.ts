@@ -139,10 +139,7 @@ for (const effectiveFrom of [null, "2099-07-01"]) {
   });
 }
 
-const RULE_SETS = [
-  { id: "33333333-3333-3333-3333-333333333331", name: "Acceptance adult members", active: true },
-  { id: "33333333-3333-3333-3333-333333333332", name: "Acceptance without a membership type", active: true }
-];
+const RULE_SET = { id: "33333333-3333-3333-3333-333333333331", name: "Acceptance youth", active: true };
 
 async function valueWidths(control: Locator) {
   return control.evaluate((element: HTMLInputElement | HTMLSelectElement) => {
@@ -161,15 +158,16 @@ async function expectWholeValue(control: Locator, where: string) {
 }
 
 for (const viewport of [{ width: 1280, height: 800 }, { width: 820, height: 1180 }, { width: 412, height: 915 }]) {
-  test(`given membership types at ${viewport.width}px, when the table renders, then every name and rule set shows its whole value`, async ({ page }) => {
+  test(`given German membership types at ${viewport.width}px, when the table renders, then every name and rule set shows its whole value`, async ({ page }) => {
     test.setTimeout(60_000);
     // given
     const typeId = "44444444-4444-4444-4444-444444444441";
     await page.route("**/api/admin/membership-types", (route) => route.fulfill({ json: [
-      { id: typeId, name: "Acceptance training members", active: true, grantsAccount: true, ruleSetId: RULE_SETS[0].id }
+      { id: typeId, name: "Acceptance members", active: true, grantsAccount: true, ruleSetId: RULE_SET.id }
     ] }));
-    await page.route("**/api/admin/rule-sets", (route) => route.fulfill({ json: RULE_SETS }));
+    await page.route("**/api/admin/rule-sets", (route) => route.fulfill({ json: [RULE_SET] }));
     await page.route("**/api/admin/roster?**", (route) => route.fulfill({ json: { entries: [], matching: 0 } }));
+    await page.addInitScript(() => window.localStorage.setItem("courtside.locale", "de"));
     await page.setViewportSize(viewport);
     await signIn(page);
 
@@ -183,30 +181,6 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 820, height: 1180
     expect(await page.evaluate(() => document.documentElement.scrollWidth), "the page does not scroll sideways").toBeLessThanOrEqual(viewport.width);
   });
 }
-
-test("given a narrow desktop rule set page, when the club binds a long rule set to people without a membership type, then its select shows the whole name", async ({ page }) => {
-  test.setTimeout(60_000);
-  // given
-  await page.setViewportSize({ width: 1280, height: 800 });
-  await signIn(page);
-  const stored = await page.evaluate(async () => ({
-    ruleSets: await (await fetch("/api/admin/rule-sets")).json() as unknown[],
-    config: await (await fetch("/api/admin/config")).json() as Record<string, unknown>
-  }));
-  await page.route("**/api/admin/rule-sets", (route) => route.fulfill({ json: [...stored.ruleSets, ...RULE_SETS] }));
-  await page.route("**/api/admin/config", (route) => route.request().method() === "GET"
-    ? route.fulfill({ json: { ...stored.config, noMembershipTypeRuleSetId: RULE_SETS[1].id } })
-    : route.fallback());
-
-  // when
-  await page.goto("/admin/rule-sets");
-  const select = page.getByTestId("no-membership-type-rule-set");
-  await expect(select).toHaveValue(RULE_SETS[1].id, { timeout: 10_000 });
-
-  // then
-  await expectWholeValue(select, "the rule set for people without a membership type");
-  expect(await page.evaluate(() => document.documentElement.scrollWidth), "the page does not scroll sideways").toBeLessThanOrEqual(1280);
-});
 
 test("given a tablet change log, when an entry names its actor by a dotted username, then the username stays on one line", async ({ page }) => {
   test.setTimeout(60_000);

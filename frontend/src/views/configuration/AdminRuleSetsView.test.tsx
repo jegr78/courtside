@@ -196,7 +196,7 @@ describe("AdminRuleSetsView", () => {
     await screen.findByTestId("rule-ADVANCE_WINDOW-maxDays");
 
     // then
-    expect(screen.getByTestId("booking-rules")).toHaveClass("xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]");
+    expect(screen.getByTestId("booking-rules")).toHaveClass("xl:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]");
     expect(screen.getByTestId("rule-set-editor"), "the rules sit beside the overview, not below it")
       .toContainElement(screen.getByTestId("rule-set-rules"));
     expect(screen.getByTestId("rule-set-editor")).not.toContainElement(screen.getByTestId("rule-set-overview"));

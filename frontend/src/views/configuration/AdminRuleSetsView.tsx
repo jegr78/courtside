@@ -253,7 +253,7 @@ export function AdminRuleSetsView({ configurationChanged }: { configurationChang
       : <>
         {error && <Alert testId="admin-error">{error}</Alert>}
         {success && <SuccessFeedback testId="admin-save-success">{success}</SuccessFeedback>}
-        <div data-testid="booking-rules" className="grid gap-6 [&>*]:min-w-0 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] xl:items-start">
+        <div data-testid="booking-rules" className="grid gap-6 [&>*]:min-w-0 xl:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] xl:items-start">
           <div className="grid gap-4">
             <h2 id="rule-set-overview-heading" className="text-2xl font-bold">{t("admin.ruleSets.overview")}</h2>
             <table role="table" data-testid="rule-set-overview" aria-labelledby="rule-set-overview-heading" className="w-full border-collapse text-left">
