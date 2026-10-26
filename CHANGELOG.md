@@ -1,22 +1,5 @@
 # Changelog
 
-## [0.3.0-rc.8](https://github.com/jegr78/courtside/compare/v0.3.0-rc.7...v0.3.0-rc.8) (2026-10-26)
-
-
-### Bug fixes
-
-* **acceptance:** name the subject of the remaining landscape captures ([#1759](https://github.com/jegr78/courtside/issues/1759)) ([b4054dc](https://github.com/jegr78/courtside/commit/b4054dcfa429625ee31e1a269dafb7ded91c72c0)), closes [#1749](https://github.com/jegr78/courtside/issues/1749)
-* check each nightly retention deletion without relisting the registry ([#1761](https://github.com/jegr78/courtside/issues/1761)) ([4289525](https://github.com/jegr78/courtside/commit/4289525c24b0eaa4c2c9f65705af9032e220dde2))
-* fit badge, booking actions and day counts on narrow phones and align desktop pages ([#1757](https://github.com/jegr78/courtside/issues/1757)) ([d0be494](https://github.com/jegr78/courtside/commit/d0be494f1962967c2269d0ec4317a96db6bdf7c1))
-* give the plan's date field the height of the buttons beside it ([#1751](https://github.com/jegr78/courtside/issues/1751)) ([4666f68](https://github.com/jegr78/courtside/commit/4666f68774228a71caa63974553653b1753795c4))
-* keep admin table and select values readable and never break a username ([#1756](https://github.com/jegr78/courtside/issues/1756)) ([5e312a4](https://github.com/jegr78/courtside/commit/5e312a47cd89cff6e81e46d8c977e47d382f8865))
-* label file inputs in the application language ([#1758](https://github.com/jegr78/courtside/issues/1758)) ([8a31b18](https://github.com/jegr78/courtside/commit/8a31b18f19fe5827984c1df08e1c529d526bbfd5))
-* name the booking action buttons by their visible label ([#1752](https://github.com/jegr78/courtside/issues/1752)) ([5d72434](https://github.com/jegr78/courtside/commit/5d72434786250a9dcbf226186c320b6eb285afdd))
-* refuse nightly retention when a version swap could go unseen ([#1765](https://github.com/jegr78/courtside/issues/1765)) ([97e1479](https://github.com/jegr78/courtside/commit/97e1479e393ed7b405df05bdc1433e5c754cbf4d))
-* show booking-hours refusals and the plan's time axis in the application language ([#1755](https://github.com/jegr78/courtside/issues/1755)) ([f16c103](https://github.com/jegr78/courtside/commit/f16c103c0448f22d62ef4fd004722c4bcb51aedd))
-* show hidden admin sidebar entries in both directions and keep the sidebar full height ([#1754](https://github.com/jegr78/courtside/issues/1754)) ([1d86f47](https://github.com/jegr78/courtside/commit/1d86f4708505d1179290184acd4e300154f07b5d))
-* show long rule set and membership type names in full at desktop widths ([#1763](https://github.com/jegr78/courtside/issues/1763)) ([0cfe94c](https://github.com/jegr78/courtside/commit/0cfe94c82eff31b056321486e190ecd4618f8fdb)), closes [#1760](https://github.com/jegr78/courtside/issues/1760)
-
 ## 0.3.0 (2026-10-18)
 
 ### Features
@@ -37,6 +20,17 @@
 
 ### Bug fixes
 
+* **acceptance:** name the subject of the remaining landscape captures ([#1759](https://github.com/jegr78/courtside/issues/1759)) ([b4054dc](https://github.com/jegr78/courtside/commit/b4054dcfa429625ee31e1a269dafb7ded91c72c0)), closes [#1749](https://github.com/jegr78/courtside/issues/1749)
+* check each nightly retention deletion without relisting the registry ([#1761](https://github.com/jegr78/courtside/issues/1761)) ([4289525](https://github.com/jegr78/courtside/commit/4289525c24b0eaa4c2c9f65705af9032e220dde2))
+* fit badge, booking actions and day counts on narrow phones and align desktop pages ([#1757](https://github.com/jegr78/courtside/issues/1757)) ([d0be494](https://github.com/jegr78/courtside/commit/d0be494f1962967c2269d0ec4317a96db6bdf7c1))
+* give the plan's date field the height of the buttons beside it ([#1751](https://github.com/jegr78/courtside/issues/1751)) ([4666f68](https://github.com/jegr78/courtside/commit/4666f68774228a71caa63974553653b1753795c4))
+* keep admin table and select values readable and never break a username ([#1756](https://github.com/jegr78/courtside/issues/1756)) ([5e312a4](https://github.com/jegr78/courtside/commit/5e312a47cd89cff6e81e46d8c977e47d382f8865))
+* label file inputs in the application language ([#1758](https://github.com/jegr78/courtside/issues/1758)) ([8a31b18](https://github.com/jegr78/courtside/commit/8a31b18f19fe5827984c1df08e1c529d526bbfd5))
+* name the booking action buttons by their visible label ([#1752](https://github.com/jegr78/courtside/issues/1752)) ([5d72434](https://github.com/jegr78/courtside/commit/5d72434786250a9dcbf226186c320b6eb285afdd))
+* refuse nightly retention when a version swap could go unseen ([#1765](https://github.com/jegr78/courtside/issues/1765)) ([97e1479](https://github.com/jegr78/courtside/commit/97e1479e393ed7b405df05bdc1433e5c754cbf4d))
+* show booking-hours refusals and the plan's time axis in the application language ([#1755](https://github.com/jegr78/courtside/issues/1755)) ([f16c103](https://github.com/jegr78/courtside/commit/f16c103c0448f22d62ef4fd004722c4bcb51aedd))
+* show hidden admin sidebar entries in both directions and keep the sidebar full height ([#1754](https://github.com/jegr78/courtside/issues/1754)) ([1d86f47](https://github.com/jegr78/courtside/commit/1d86f4708505d1179290184acd4e300154f07b5d))
+* show long rule set and membership type names in full at desktop widths ([#1763](https://github.com/jegr78/courtside/issues/1763)) ([0cfe94c](https://github.com/jegr78/courtside/commit/0cfe94c82eff31b056321486e190ecd4618f8fdb)), closes [#1760](https://github.com/jegr78/courtside/issues/1760)
 * bump fast-uri from 3.1.8 to 3.1.9 in /frontend ([#1731](https://github.com/jegr78/courtside/issues/1731)) ([5dda5d1](https://github.com/jegr78/courtside/commit/5dda5d1a66328be6866d0b37200d26290b7d5426))
 * bump serialize-javascript from 7.1.0 to 7.1.4 in /frontend ([#1730](https://github.com/jegr78/courtside/issues/1730)) ([638c7ae](https://github.com/jegr78/courtside/commit/638c7ae285618b995ee85c99a08021ed4c42e772))
 * edit dates and times in the application language ([#1715](https://github.com/jegr78/courtside/issues/1715)) ([1ec2b72](https://github.com/jegr78/courtside/commit/1ec2b72e044244b7c59ff8b1ef5354301568e117))
