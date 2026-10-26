@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.3.0 (2026-10-18)
+## 0.3.0 (2026-10-26)
 
 ### Features
 
@@ -92,6 +92,7 @@
 
 ### Build and dependencies
 
+* graduate the 0.3.0 candidate line from rc.8 ([#1769](https://github.com/jegr78/courtside/issues/1769)) ([635f569](https://github.com/jegr78/courtside/commit/635f5691c42bfd970c6ac341ddc77a1fbb56ea9f))
 * **deps-dev:** bump org.pitest:pitest-maven from 1.30.0 to 1.30.1 ([#1717](https://github.com/jegr78/courtside/issues/1717)) ([c339185](https://github.com/jegr78/courtside/commit/c33918557482ff4e6dd7ed87a08d0a9c25606445))
 * **deps:** bump the deployment-images group in /deploy with 5 updates ([#1718](https://github.com/jegr78/courtside/issues/1718)) ([4228335](https://github.com/jegr78/courtside/commit/4228335973d1f1b9c7cca55b22a45508b7d3cc38))
 * **deps-dev:** bump org.codehaus.mojo:versions-maven-plugin from 2.22.0 to 2.23.0 ([#1555](https://github.com/jegr78/courtside/issues/1555)) ([0e7d569](https://github.com/jegr78/courtside/commit/0e7d56917a80ffcfdcd3337041bdb9e1ee669cb7))
