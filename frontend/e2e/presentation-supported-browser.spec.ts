@@ -222,3 +222,22 @@ test("given a tablet change log, when an entry names its actor by a dotted usern
     return new Set([...range.getClientRects()].map((rect) => Math.round(rect.top))).size;
   }), "the username is not broken inside").toBe(1);
 });
+
+for (const tag of ["input", "select"] as const) {
+  test(`given a padded ${tag}, when its value fits inside the content box, then whole-value measurement accepts it and rejects clipping`, async ({ page }) => {
+    // given
+    const style = "box-sizing: border-box; width: 160px; padding: 8px 20px; border: 2px solid; font: 16px monospace; appearance: none";
+    const field = tag === "input"
+      ? `<input data-testid="padded-field" style="${style}" value="Whole name">`
+      : `<select data-testid="padded-field" style="${style}"><option>Whole name</option></select>`;
+    await page.setContent(field);
+    const control = page.getByTestId("padded-field");
+
+    // when
+    await expectWholeValue(control, "the padded field");
+    await control.evaluate((element) => { element.style.width = "100px"; });
+
+    // then
+    await expect(expectWholeValue(control, "the clipped field")).rejects.toThrow(/the clipped field/);
+  });
+}

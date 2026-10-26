@@ -251,7 +251,9 @@ export async function expectWholeValue(control: Locator, where: string): Promise
     const context = document.createElement("canvas").getContext("2d")!;
     context.font = `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
     const text = element instanceof HTMLSelectElement ? element.selectedOptions[0].text : element.value;
-    const available = element.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+    const available = element.getBoundingClientRect().width
+      - parseFloat(style.borderLeftWidth) - parseFloat(style.borderRightWidth)
+      - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
     return { text, needed: Math.ceil(context.measureText(text).width), available: Math.floor(available) };
   });
   expect(available, `${where}: "${text}" needs ${needed}px of the ${available}px its field shows`).toBeGreaterThanOrEqual(needed);
