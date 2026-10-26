@@ -486,7 +486,7 @@ test("given an old version is swapped for a new one during deletion, when the ne
 test("given a listing ordered by update time, when an old version is swapped during deletion, then it is refused", async () => {
   // given
   const { expectedVersions, deleted, operations } = registry(150, { 1: swapAtFirstDeletion }, {
-    order: (left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt) || left.id - right.id,
+    order: (left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt) || right.id - left.id,
     updatedAt: (id) => new Date(Date.parse(old) + (id % 7) * 1_000).toISOString(),
   });
 
@@ -494,6 +494,33 @@ test("given a listing ordered by update time, when an old version is swapped dur
   await assert.rejects(() => applyDeletionPlan({ expectedVersions, deleteVersionIds: [1, 2, 3],
     ...operations }), /version 151 is unknown or changed/);
   assert.deepEqual(deleted, [1], "a listing with the newest update first also shows a new version on page one");
+});
+
+test("given equal update times and ascending ids, when an old version would be swapped, then nothing is deleted", async () => {
+  // given
+  const { expectedVersions, calls, deleted, operations } = registry(150, { 1: swapAtFirstDeletion }, {
+    order: (left, right) => left.id - right.id,
+  });
+
+  // when / then
+  await assert.rejects(() => applyDeletionPlan({ expectedVersions, deleteVersionIds: [1, 2, 3],
+    ...operations }), /package versions are not listed newest first/);
+  assert.deepEqual(deleted, [], "equal timestamps do not establish an order that puts a new version on page one");
+  assert.equal(calls.newest, 0, "ambiguous order is refused before the first deletion");
+});
+
+test("given a full first page of equal update times and ascending ids, when an old version would be swapped, then nothing is deleted", async () => {
+  // given
+  const { expectedVersions, calls, deleted, operations } = registry(150, { 1: swapAtFirstDeletion }, {
+    order: (left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt) || left.id - right.id,
+    updatedAt: (id) => id > 50 ? now : old,
+  });
+
+  // when / then
+  await assert.rejects(() => applyDeletionPlan({ expectedVersions, deleteVersionIds: [1, 2, 3],
+    ...operations }), /package versions are not listed newest first/);
+  assert.deepEqual(deleted, [], "a new version with a tied timestamp could fall behind the first hundred versions");
+  assert.equal(calls.newest, 0);
 });
 
 test("given a listing that is not newest first, when an old version would be swapped during deletion, then nothing is deleted", async () => {
@@ -508,6 +535,22 @@ test("given a listing that is not newest first, when an old version would be swa
     ...operations }), /package versions are not listed newest first/);
   assert.deepEqual(deleted, [], "a version published during deletion may sort onto a page no check reads");
   assert.equal(calls.newest, 0, "the order is refused from the listing already read");
+});
+
+test("given a listing that is not newest first, when nothing is planned for deletion, then the run succeeds", async () => {
+  // given
+  const { expectedVersions, deleted, operations } = registry(150, {}, {
+    order: (left, right) => left.id - right.id,
+    updatedAt: (id) => new Date(Date.parse(old) + id * 1_000).toISOString(),
+  });
+
+  // when
+  const outcome = await applyDeletionPlan({ expectedVersions, deleteVersionIds: [], ...operations })
+    .then(() => "applied", (error) => error.message);
+
+  // then
+  assert.equal(outcome, "applied", "an empty plan has no deletion a hidden swap could affect");
+  assert.deepEqual(deleted, []);
 });
 
 test("given a planned version disappears during deletion, when its turn comes, then deletion stops", async () => {

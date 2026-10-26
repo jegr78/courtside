@@ -252,8 +252,9 @@ export async function applyDeletionPlan({ expectedVersions, deleteVersionIds, lo
     throw new Error("registry changed after retention planning");
   }
   // A version published during deletion must sort onto the first page, where every check reads it.
-  if (!newestFirst(listed, ({ id }) => id, (left, right) => left > right)
-      && !newestFirst(listed, ({ updatedAt }) => Date.parse(updatedAt), (left, right) => left >= right)) {
+  if (deleteVersionIds.length > 0 && !newestFirst(listed, ({ id }) => id, (left, right) => left > right)
+      && !newestFirst(listed, ({ id, updatedAt }) => ({ id, time: Date.parse(updatedAt) }),
+        (left, right) => left.time > right.time || left.time === right.time && left.id > right.id)) {
     throw new Error("package versions are not listed newest first, so a version published during deletion "
       + "could go unseen");
   }
