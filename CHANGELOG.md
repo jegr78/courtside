@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/jegr78/courtside/compare/v0.3.0-rc.8...v0.3.0) (2026-10-26)
+
+
+### Build and dependencies
+
+* graduate the 0.3.0 candidate line from rc.8 ([#1769](https://github.com/jegr78/courtside/issues/1769)) ([635f569](https://github.com/jegr78/courtside/commit/635f5691c42bfd970c6ac341ddc77a1fbb56ea9f))
+
 ## 0.3.0 (2026-10-18)
 
 ### Features

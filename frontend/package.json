@@ -1,7 +1,7 @@
 {
   "name": "courtside-web",
   "private": true,
-  "version": "0.3.0-rc.8",
+  "version": "0.3.0",
   "type": "module",
   "engines": {
     "node": ">=24.0.0"
