@@ -106,6 +106,13 @@
       "validators": []
     },
     {
+      "path": ".github/actions/trivy-databases/action.yml",
+      "profiles": [
+        "full"
+      ],
+      "validators": []
+    },
+    {
       "path": ".github/codeql/codeql-config.yml",
       "profiles": [
         "full"
@@ -250,22 +257,22 @@
       "validators": []
     },
     {
-      "path": ".github/workflows/release-plan-sync.yml",
-      "profiles": [
-        "tooling"
-      ],
-      "validators": [
-        "tools/release-plan-sync.test.mjs",
-        "tools/workflow-action-pinning.test.mjs"
-      ]
-    },
-    {
       "path": ".github/workflows/release-plan-sync-nightly.yml",
       "profiles": [
         "tooling"
       ],
       "validators": [
         "tools/nightly-failure-workflow.test.mjs",
+        "tools/workflow-action-pinning.test.mjs"
+      ]
+    },
+    {
+      "path": ".github/workflows/release-plan-sync.yml",
+      "profiles": [
+        "tooling"
+      ],
+      "validators": [
+        "tools/release-plan-sync.test.mjs",
         "tools/workflow-action-pinning.test.mjs"
       ]
     },

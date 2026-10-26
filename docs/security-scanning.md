@@ -99,4 +99,10 @@ False positives are never suppressed by a broad scanner rule or permanent ignore
 
 ## Updating tools
 
-Actions are pinned to full commit hashes. Dependabot proposes action and container updates, and the required build qualifies them by behaviour. Trivy vulnerability databases remain cached but are refreshed by the action; a failed refresh is distinguishable from a finding-free result.
+Actions are pinned to full commit hashes. Dependabot proposes action and container updates, and the required build qualifies them by behaviour. The shared Trivy preparation action pins the CLI version and restores the database cache once per job. Native Trivy checks
+whether its vulnerability and Java databases need updates. Each database tries GHCR first and the
+GCR mirror once if preparation fails, including a layer download returning HTTP 404. Each native
+attempt has the existing five-minute budget. Failure of both sources stops the job, even if an old
+database remains in the cache. After preparation succeeds, the pinned scan actions reuse those
+databases without restoring an older cache or downloading again. Scan failures and vulnerability
+findings do not enter the download fallback; the existing finding-policy gates remain unchanged.

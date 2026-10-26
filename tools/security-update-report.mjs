@@ -10,11 +10,10 @@ const securityFiles = readdirSync(new URL("../security", import.meta.url))
 const securityToolFiles = readdirSync(new URL("../tools", import.meta.url))
   .filter((name) => name.startsWith("security-") && !name.includes(".test.") && /\.(?:mjs|py)$/.test(name))
   .map((name) => `tools/${name}`);
-// What a paired run varies: the assessment's own code and contract, the deployment description each
-// side reads, and the lockfile the tools resolve against. pom.xml and frontend/package.json describe
-// the application, and each side now builds its own — a dependency bump is not a tool update.
+// Paired assessments vary tool and deployment inputs, not the application's build descriptor.
 export const securityRuntimeFiles = [
   ".github/workflows/build.yml",
+  ".github/actions/trivy-databases/action.yml",
   "deploy/compose.security.yaml",
   "deploy/Caddyfile.security",
   "frontend/package-lock.json",
