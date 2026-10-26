@@ -920,9 +920,12 @@ jobs:
         run: |
           mkdir -p build/security/codeql
           java -Djarmode=tools -jar target/courtside-*.jar extract --layers --launcher --destination build/security/runtime
+      - uses: ./.github/actions/trivy-databases
       - id: trivy-runtime
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
         with:
+          skip-setup-trivy: 'true'
+          cache: 'false'
           scan-type: rootfs
           scan-ref: build/security/runtime
           scanners: vuln
@@ -933,6 +936,8 @@ jobs:
       - id: trivy-source
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
         with:
+          skip-setup-trivy: 'true'
+          cache: 'false'
           scan-type: fs
           scan-ref: .
           scanners: secret,misconfig

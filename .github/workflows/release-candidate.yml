@@ -175,8 +175,12 @@ jobs:
           ./node/node ./node/node_modules/npm/bin/npm-cli.js run audit:security -- \
             --output ../build/security/npm.json
 
+      - uses: ./.github/actions/trivy-databases
+
       - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
+          skip-setup-trivy: 'true'
+          cache: 'false'
           scan-type: rootfs
           scan-ref: build/layers
           scanners: vuln
@@ -187,6 +191,8 @@ jobs:
 
       - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
+          skip-setup-trivy: 'true'
+          cache: 'false'
           scan-type: fs
           scan-ref: .
           scanners: secret,misconfig
@@ -556,8 +562,12 @@ jobs:
           test -n "$COURTSIDE_UAT_BOOKING_SEED_COMPOSE"
           node tools/courtside.uat-smoke.mjs --confirm courtside-uat
 
+      - uses: ./.github/actions/trivy-databases
+
       - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
+          skip-setup-trivy: 'true'
+          cache: 'false'
           image-ref: ghcr.io/${{ github.repository }}@${{ needs.image.outputs.digest }}
           format: json
           output: build/uat-smoke/trivy-${{ matrix.architecture }}.json
@@ -566,6 +576,8 @@ jobs:
 
       - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
+          skip-setup-trivy: 'true'
+          cache: 'false'
           image-ref: ghcr.io/${{ github.repository }}@${{ needs.image.outputs.booking-seed-digest }}
           format: json
           output: build/uat-smoke/trivy-booking-seed-${{ matrix.architecture }}.json
