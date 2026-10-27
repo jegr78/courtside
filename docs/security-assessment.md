@@ -256,6 +256,8 @@ every envelope it produced is unreadable and stays that way. The mechanism's onl
 exactly this was two dates in a tracked file, which the workflow compared against the current date
 and which nothing ever checked against a key.
 
+The standalone workflow also retains the schema-validated passive deployment record. It contains fixed route templates, scanner rule IDs and normalized observations. Raw scanner responses and authenticated evidence stay private and are not uploaded.
+
 What remains is what a reader can act on. The manifests and summaries carry the candidate digest,
 the source commit, the target identity and the normalized outcome, and GitHub artifact attestation
 covers them, so their provenance is still provable:

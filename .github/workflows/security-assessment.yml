@@ -167,6 +167,7 @@ jobs:
           path: |
             build/security-gate/manifest*.json
             build/security-gate/summary*.json
+            build/security/${{ env.RUN_ID }}/assessment/attempt-1/evidence/passive-deployment.json
           retention-days: 14
           if-no-files-found: error
 

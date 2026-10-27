@@ -238,7 +238,8 @@ test("given evidence nobody can open, when the hosted run finishes, then it is n
     assert.doesNotMatch(assessment, trace, `the assessment document still describes ${trace}`);
   }
   assert.match(scheduled, /path:[\s\S]+build\/security-gate\/manifest\*\.json[\s\S]+build\/security-gate\/summary\*\.json/);
-  assert.doesNotMatch(scheduled, /path:[\s\S]+assessment\/attempt-1\/evidence/);
+  assert.match(scheduled, /build\/security\/\$\{\{ env\.RUN_ID \}\}\/assessment\/attempt-1\/evidence\/passive-deployment\.json/);
+  assert.doesNotMatch(scheduled, /evidence\/(?:\*|zap|raw|authenticated)/);
   assert.match(scheduled, /outputs:\s+evidence-artifact: \$\{\{ steps\.records\.outputs\.artifact-id \}\}/);
   assert.match(scheduled, /- id: records\n\s+uses: actions\/upload-artifact@/);
   assert.match(scheduled, /attest-evidence:[\s\S]+needs: assessment[\s\S]+if: always\(\) && needs\.assessment\.outputs\.evidence-artifact != ''/);
