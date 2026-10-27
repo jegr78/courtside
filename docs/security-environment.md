@@ -28,7 +28,13 @@ are pinned. A digest written here as well would be a second copy that nothing bu
 
 The command creates a random shared password, a seed fingerprint, a random instance fingerprint and a private state file below `build/security/run-0001`. It prints the synthetic credential once for the operator. The password never appears in a tracked file or command argument.
 
-Startup atomically reserves the run ID in Docker before Compose can create resources. The instance fingerprint binds that reservation, private state, manifests, containers and networks; another workspace cannot reuse or clean up the same run ID.
+Startup atomically reserves the run ID in Docker before Compose can create resources. The instance fingerprint binds that reservation, private state, manifests, containers, networks and volumes; another workspace cannot reuse or clean up the same run ID.
+
+The application and seeder share one run-local `mfa-keys` volume at
+`/var/lib/courtside/mfa-keys`, selected by `COURTSIDE_MFA_KEY_ROOT`. Their root filesystems remain
+read-only. No other service mounts this volume. Images that do not use this environment variable
+leave the volume unused. An image that persists application key material must own this directory
+with private permissions as its non-root application user.
 
 Before cleanup after a startup failure, the runner attempts to retain the exact owned seeder's bounded stdout, stderr and exit/OOM state in private `startup-diagnostics-attempt<N>` directories below the run directory. A refused or incomplete capture never replaces the startup error or prevents owned cleanup; these logs may contain private data and must not be published.
 
@@ -58,7 +64,10 @@ A different environment, run ID or seed fingerprint stops verification. Cleanup 
 node tools/courtside.mjs security-cleanup run-0001
 ```
 
-The database and Caddy state use size-limited tmpfs mounts, so no data volume survives `down`. Recover an interrupted attempt by its exact run and attempt identity:
+The database and Caddy state use size-limited tmpfs mounts. The application key volume survives
+container recreation within the same run. Owned cleanup removes it after validating its run, seed
+and instance labels, so a later instance cannot inherit its keys. Recover an interrupted attempt
+by its exact run and attempt identity:
 
 ```bash
 node tools/courtside.mjs security-recover run-0001 --attempt 1

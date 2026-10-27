@@ -1597,14 +1597,15 @@ test("given the security Compose file, when inspecting boundaries, then resource
     : Object.keys(entry?.labels ?? {});
   const services = Object.entries(declared.services);
   const networks = Object.entries(declared.networks ?? {});
+  const volumes = Object.entries(declared.volumes ?? {});
   assert.ok(services.length > 0, "the security environment declares its services");
   assert.deepEqual(networks.filter(([name, network]) => name !== "exposure" && network?.internal !== true)
     .map(([name]) => name), [], "every network but the published exposure is internal");
   assert.deepEqual(services.filter(([, service]) => service.pull_policy !== "never").map(([name]) => name), [],
     "every service runs a pinned or preloaded image without pulling");
-  assert.deepEqual([...services, ...networks].filter(([, entry]) => !labelsOf(entry).includes("org.courtside.security.run-id")
+  assert.deepEqual([...services, ...networks, ...volumes].filter(([, entry]) => !labelsOf(entry).includes("org.courtside.security.run-id")
     || !labelsOf(entry).includes("org.courtside.security.instance-fingerprint")).map(([name]) => name), [],
-    "every service and network carries the run and instance labels");
+    "every service, network and volume carries the run and instance labels");
   assert.match(compose, /\/var\/lib\/postgresql\/18\/docker:size=512m/);
   assert.match(compose, /https:\/\/localhost\/api\/source/);
   assert.match(compose, /zaproxy\/zap-stable:[\w.]+@sha256:[a-f0-9]{64}/);
@@ -1619,7 +1620,7 @@ test("given the security Compose file, when inspecting boundaries, then resource
   assert.match(compose, /scanner-gateway:[\s\S]*- scanner-client[\s\S]*- scanner-upstream/);
   assert.match(compose, /proxy:[\s\S]*networks:[\s\S]*- scanner-upstream/);
   assert.doesNotMatch(compose, /zap:[\s\S]*networks:[\s\S]*- frontend/);
-  assert.doesNotMatch(compose, /^volumes:/m);
+  assert.deepEqual(volumes.map(([name]) => name), ["mfa-keys"]);
 });
 
 test("given a policy that probes a method the gateway refuses, when deriving the relay cap, then it is refused", () => {
