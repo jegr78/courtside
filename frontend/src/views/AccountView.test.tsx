@@ -208,3 +208,25 @@ it("given a session action was already submitted, when the proof dialog closes b
   // then
   expect(signedOut, "dismissing proof cannot undo a server action already sent for this account").toHaveBeenCalledOnce();
 });
+
+it("given a proved session action is pending, when another account arrives before its response, then the old confirmed result cannot sign out the new account", async () => {
+  // given
+  let complete!: () => void;
+  vi.spyOn(api, "endOwnSessions").mockRejectedValueOnce(new ApiError(403, {
+    type: "urn:courtside:error:recent-authentication-required", title: "Proof required", status: 403
+  })).mockReturnValueOnce(new Promise((resolve) => { complete = resolve; }));
+  vi.spyOn(api, "reauthenticate").mockResolvedValue(undefined);
+  const signedOut = vi.fn();
+  const view = render(<WithClubConfiguration><AccountView session={profile} {...actions} signedOut={signedOut} /></WithClubConfiguration>);
+  await userEvent.click(screen.getByTestId("end-all-sessions"));
+  await userEvent.type(document.getElementById("reauthentication-password")!, "current-password");
+  await userEvent.click(screen.getByTestId("reauthentication-submit"));
+  expect(api.endOwnSessions).toHaveBeenCalledTimes(2);
+
+  // when
+  view.rerender(<WithClubConfiguration><AccountView session={{ ...profile, username: "roe.john" }} {...actions} signedOut={signedOut} /></WithClubConfiguration>);
+  await act(() => Promise.resolve().then(complete));
+
+  // then
+  expect(signedOut, "an action already sent for the former account cannot clear the new identity").not.toHaveBeenCalled();
+});
