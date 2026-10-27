@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -18,6 +18,38 @@ const digest = `sha256:${"a".repeat(64)}`;
 function stepsUsing(job, uses) {
   return (gates.jobs[job].steps ?? []).filter((step) => String(step.uses ?? "").startsWith(uses));
 }
+
+test("given a failed active assessment, when CI retains its first attempt, then normalized tool evidence survives without private runtime data", () => {
+  // given
+  const directory = mkdtempSync(join(tmpdir(), "active-assessment-evidence-"));
+  const runId = "run-0001";
+  const evidence = join(directory, "build/security", runId, "assessment/attempt-1/evidence");
+  mkdirSync(evidence, { recursive: true });
+  for (const name of ["openapi-fuzz.json", "authenticated-zap.json", "authorization-matrix.json"])
+    writeFileSync(join(evidence, name), JSON.stringify({ source: name }));
+  writeFileSync(join(evidence, "state-native.json"), "private-data");
+  const step = gates.jobs["active-security"].steps.find((entry) =>
+    entry.name === "Retain normalized first-attempt tool evidence");
+
+  // when
+  assert.ok(step, "CI must retain normalized first-attempt tool evidence");
+  const result = spawnSync("bash", ["-e", "-c", step.run], {
+    cwd: directory, encoding: "utf8", env: { PATH: process.env.PATH, RUN_ID: runId }
+  });
+
+  // then
+  assert.equal(step.if, "always()");
+  assert.equal(result.status, 0, result.stderr);
+  for (const name of ["openapi-fuzz.json", "authenticated-zap.json", "authorization-matrix.json"])
+    assert.deepEqual(JSON.parse(readFileSync(join(directory, "build/security-gate", name), "utf8")), { source: name });
+  assert.equal(existsSync(join(directory, "build/security-gate/state-native.json")), false);
+  const upload = stepsUsing("active-security", "actions/upload-artifact")[0];
+  assert.deepEqual(upload.with.path.trim().split("\n").sort(), [
+    "build/security-gate/active-security-summary.json", "build/security-gate/authenticated-zap.json",
+    "build/security-gate/authorization-matrix.json", "build/security-gate/manifest.json",
+    "build/security-gate/openapi-fuzz.json"
+  ]);
+});
 
 function resolveImage(environment) {
   const directory = mkdtempSync(join(tmpdir(), "gate-image-"));

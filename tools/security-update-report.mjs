@@ -59,14 +59,26 @@ function runtimeFiles(base) {
   return [...new Set([...securityRuntimeFiles, ...baseSecurity, ...baseTools])].toSorted();
 }
 
+function runtimeContent(path, bytes) {
+  if (bytes === null || path !== "frontend/package-lock.json") return bytes;
+  const lock = JSON.parse(bytes);
+  const root = lock.packages?.[""];
+  if (lock.lockfileVersion !== 3 || !root || root.name !== lock.name
+      || root.version !== lock.version || typeof lock.version !== "string"
+      || !/^\d+\.\d+\.\d+(?:-[\da-zA-Z.-]+)?(?:\+[\da-zA-Z.-]+)?$/.test(lock.version)) return bytes;
+  delete lock.version;
+  delete root.version;
+  return JSON.stringify(lock);
+}
+
 function combinedDigest(files, reader) {
-  return digest(files.map((path) => `${path}\0${reader(path) ?? "<missing>"}\0`).join(""));
+  return digest(files.map((path) => `${path}\0${runtimeContent(path, reader(path)) ?? "<missing>"}\0`).join(""));
 }
 
 function changedRows(files, base) {
   return files.map((path) => {
-    const current = currentFile(path);
-    const previous = baseFile(base, path);
+    const current = runtimeContent(path, currentFile(path));
+    const previous = runtimeContent(path, baseFile(base, path));
     return {
       path,
       previous: previous === null ? "not present" : digest(previous),
@@ -100,8 +112,6 @@ export function semanticChanges(path, base) {
   return semanticJsonChanges(baseFile(base, path), currentFile(path));
 }
 
-// Whether the paired assessments have to run at all. A branch that touches none of the runtime
-// files answers no, which is why no test may hardwire either answer against the working tree.
 export function runtimeComparisonRequired(identity) {
   return identity.baseRuntimeDigest !== identity.candidateRuntimeDigest;
 }

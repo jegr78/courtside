@@ -40,6 +40,8 @@ Docker's host and container runtime remain part of the host trust boundary. Run 
 
 The profile creates two enabled accounts for each product role and two accounts carrying the relevant member and manager role combination. Every identity uses an English placeholder name and an `@example.org` address. The dataset also contains current and ended memberships, two courts, foreign-owned bookings and a series with two usable occurrences. The shared password is unique to the run.
 
+Seeded appointments start at least two club calendar days after startup. The default 24-hour booking reminders therefore remain outside the 30-minute active assessment while the production scheduler stays enabled.
+
 The bootstrap administrator is separate and retains its mandatory initial-password state. Assessment code should use the role-specific accounts unless it is explicitly testing bootstrap behavior.
 
 ## Verify and remove
@@ -152,6 +154,8 @@ container with unchanged identity permits the recovery snapshot; identity drift,
 states fail, while absent state or deadline exhaustion remains incomplete. Effects, cleanup and
 recovery have separate outcomes and fingerprints. Missing race
 coverage, zero requests or an early clean interruption remains incomplete rather than a pass.
+
+The active CI gate retains the first attempt's normalized authorization, ZAP and OpenAPI reports with its manifest, including after a failure. Private runtime files are excluded.
 
 Raw snapshots, session projections, relay keys and the operation journal contain private data.
 Keep them in mode-`0700` instance directories with mode-`0600` files under ignored `build/security`;

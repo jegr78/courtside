@@ -1,11 +1,60 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { test } from "node:test";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runtimeComparisonRequired, securityRuntimeFiles, securityUpdateReport, semanticChanges,
   semanticJsonChanges, writeSecurityUpdateReport } from "./security-update-report.mjs";
+
+test("given the actual npm lockfile, when release metadata alone changes, then the CLI skips a paired assessment but still detects dependency changes", () => {
+  // given
+  const directory = realpathSync(mkdtempSync(join(tmpdir(), "release-assessment-identity-")));
+  for (const child of ["tools", "security", "frontend"]) mkdirSync(join(directory, child));
+  copyFileSync(new URL("./security-update-report.mjs", import.meta.url), join(directory, "tools/security-update-report.mjs"));
+  copyFileSync(new URL("../security/run-contract.json", import.meta.url), join(directory, "security/run-contract.json"));
+  const lock = JSON.parse(readFileSync(new URL("../frontend/package-lock.json", import.meta.url), "utf8"));
+  const lockPath = join(directory, "frontend/package-lock.json");
+  writeFileSync(lockPath, JSON.stringify(lock));
+  const git = (...args) => execFileSync("git", args, { cwd: directory, stdio: "pipe" });
+  git("init");
+  git("add", ".");
+  git("-c", "user.name=Example Developer", "-c", "user.email=developer@example.org", "commit", "-m", "test: capture the actual lockfile");
+  const compare = () => {
+    execFileSync(process.execPath, [join(directory, "tools/security-update-report.mjs"), "--base", "HEAD",
+      "--output", join(directory, "report.md"), "--identity-output", join(directory, "identity.json")], { stdio: "pipe" });
+    return JSON.parse(readFileSync(join(directory, "identity.json"), "utf8")).comparisonRequired;
+  };
+
+  // when / then
+  try {
+    const release = structuredClone(lock);
+    release.version = "0.4.0-rc.1";
+    release.packages[""].version = "0.4.0-rc.1";
+    writeFileSync(lockPath, JSON.stringify(release, null, 2) + "\n");
+    assert.equal(compare(), false, "release-please changes only the two root version fields");
+    const dependency = Object.keys(release.packages).find((name) => name.startsWith("node_modules/") && release.packages[name].version);
+    release.packages[dependency].version = "99.0.0";
+    writeFileSync(lockPath, JSON.stringify(release));
+    assert.equal(compare(), true, "a resolved dependency version remains part of the assessment runtime");
+    const constraint = structuredClone(lock);
+    constraint.packages[""].devDependencies.ajv = "99.0.0";
+    writeFileSync(lockPath, JSON.stringify(constraint));
+    assert.equal(compare(), true, "root dependency constraints remain part of the assessment runtime");
+    const inconsistent = structuredClone(lock);
+    inconsistent.packages[""].version = "99.0.0";
+    writeFileSync(lockPath, JSON.stringify(inconsistent));
+    assert.equal(compare(), true, "inconsistent release metadata does not receive normalization");
+    writeFileSync(lockPath, JSON.stringify(lock));
+    const policyPath = join(directory, "security/run-contract.json");
+    const policy = JSON.parse(readFileSync(policyPath, "utf8"));
+    policy.tools[0].version = "99.0.0";
+    writeFileSync(policyPath, JSON.stringify(policy));
+    assert.equal(compare(), true, "security tool version fields remain part of the assessment runtime");
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
 
 test("given a proposed security-tool update, when comparing it with the base, then versions policies and schemas are visible", () => {
   // when
