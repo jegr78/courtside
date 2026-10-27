@@ -2,6 +2,9 @@
 
 <!-- Describe the externally observable outcome and link the issue. -->
 
+- [ ] Related findings from the same review or area are included, or the reason for separate
+      delivery and links to that work are recorded above.
+
 ## Requirements matrix
 
 | Acceptance criterion | Production path | Positive test | Adversarial or failure-path test | Runtime evidence |

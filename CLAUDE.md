@@ -377,6 +377,14 @@ is now public enough to need.
   compiles against nothing. Say so in the pull request body rather than splitting it into pieces
   that do not stand up.
 
+* **Related review findings land in one pull request.** Keep findings from the same review, and
+  follow-ups that change the same area, on one branch with one commit per finding. Complete their
+  review and targeted checks together before finalising, rather than making each finding restart
+  every waiting pull request's CI. This rule applies to `next-issue` and every other agent workflow.
+  Separate a finding only when its urgency or independent risk means the others must not wait for
+  it. Record that reason in the pull request and link the related work. Unrelated changes still
+  belong in separate pull requests; grouping does not bypass review or required CI.
+
 * **Nothing outside this repository's own planning names a work package.** Branch names, pull
   request titles, issue titles and issue bodies describe *the change*, never the batch it belonged
   to. `feat/booking-series` and not `feat/milestone-5`; "the admin surface added an audit gap" and
