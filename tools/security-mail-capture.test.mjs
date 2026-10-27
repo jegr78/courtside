@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
+import { X509Certificate } from "node:crypto";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
-import { mkdtempSync, readFileSync, statSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createServer, connect } from "node:tls";
@@ -28,10 +29,11 @@ test("given a candidate and a private relay identity, when importing trust, then
   assert.equal(plan.args[plan.args.indexOf("--user") + 1], "1000:1000");
   assert.equal(plan.args[plan.args.indexOf("--memory") + 1], "128m");
   assert.equal(plan.args[plan.args.indexOf("--pids-limit") + 1], "32");
-  assert.equal(plan.args[plan.args.indexOf("--entrypoint") + 1], "/opt/java/openjdk/bin/keytool");
+  assert.equal(plan.args[plan.args.indexOf("--entrypoint") + 1], "/bin/sh");
   assert.ok(plan.args.includes(digest));
-  assert.ok(plan.args.includes("/trust/cert.pem"));
-  assert.ok(plan.args.includes("/trust/mail.p12"));
+  assert.ok(plan.args.includes("/opt/java/openjdk/bin/keytool"));
+  assert.ok(plan.args.includes("/opt/java/openjdk/lib/security/cacerts"));
+  assert.ok(plan.args.includes("/trust"));
   assert.ok(plan.args.includes("com.docker.compose.project=courtside-security-relay-run-0001"));
   assert.doesNotMatch(JSON.stringify(plan), /Xmx|MaxRAMPercentage|ssl\.trust|checkserveridentity/);
 });
@@ -48,6 +50,43 @@ test("given a rootless Docker daemon, when importing trust, then keytool runs as
     /Invalid bounded mail trust identity/, "a rootful daemon never runs the import as root");
   assert.throws(() => securityMailTrustPlan("/private/courtside/mail", digest, "0:1000", identity, true),
     /Invalid bounded mail trust identity/, "root is accepted only as the whole identity");
+});
+
+test("given existing candidate CA anchors and a private relay, when preparing mail trust, then retain both exact certificate identities", () => {
+  // given
+  const root = mkdtempSync(join(tmpdir(), "courtside-additive-trust-"));
+  const defaults = join(root, "defaults");
+  const relay = join(root, "relay");
+  const keytool = process.env.JAVA_HOME ? join(process.env.JAVA_HOME, "bin", "keytool") : "keytool";
+  try {
+    createSecurityMailCertificate(defaults);
+    createSecurityMailCertificate(relay);
+    const source = join(defaults, "cacerts.p12");
+    execFileSync(keytool, ["-importcert", "-noprompt", "-alias", "candidate-public-root", "-file",
+      join(defaults, "cert.pem"), "-keystore", source, "-storetype", "PKCS12", "-storepass", "changeit"],
+    { stdio: "pipe", timeout: 15000 });
+    const digest = `sha256:${"a".repeat(64)}`;
+    const plan = securityMailTrustPlan("/private/courtside/mail", digest, "1000:1000", {
+      runId: "relay-run-0001", seedFingerprint: digest, instanceFingerprint: digest
+    });
+    const bindings = new Map([["/opt/java/openjdk/bin/keytool", keytool],
+      ["/opt/java/openjdk/lib/security/cacerts", source], ["/trust", relay],
+      ["/trust/cert.pem", join(relay, "cert.pem")], ["/trust/mail.p12", join(relay, "mail.p12")]]);
+    const executable = plan.args[plan.args.indexOf("--entrypoint") + 1];
+    const arguments_ = plan.args.slice(plan.args.indexOf(digest) + 1)
+      .map(value => bindings.get(value) ?? value);
+    // when
+    execFileSync(bindings.get(executable) ?? executable, arguments_, { stdio: "pipe", timeout: 15000 });
+    // then
+    const exported = execFileSync(keytool, ["-list", "-rfc", "-keystore", join(relay, "mail.p12"),
+      "-storetype", "PKCS12", "-storepass", "changeit"], { encoding: "utf8", timeout: 15000 });
+    const fingerprints = [...exported.matchAll(/-----BEGIN CERTIFICATE-----[\s\S]*?-----END CERTIFICATE-----/g)]
+      .map(([pem]) => new X509Certificate(pem).fingerprint256).sort();
+    assert.deepEqual(fingerprints, [defaults, relay].map(directory =>
+      new X509Certificate(readFileSync(join(directory, "cert.pem"))).fingerprint256).sort());
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test("given the security mail sink, when reading its deployment, then keep relay data internal and preserve application memory limits", () => {
@@ -94,6 +133,7 @@ test("given a locally issued relay certificate, when checking its real TLS peer,
   try {
     // when / then
     assert.equal(await dial("mail"), true);
+    assert.equal(await dial("password-breach").catch(error => error.code), true);
     await assert.rejects(dial("foreign.example.org"), { code: "ERR_TLS_CERT_ALTNAME_INVALID" });
     assert.match(identity.fingerprint, /^sha256:[a-f0-9]{64}$/);
     assert.equal(statSync(join(directory, "key.pem")).mode & 0o777, 0o600);
