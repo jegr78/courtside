@@ -90,7 +90,7 @@ test("given native screenshots with five kinds of run data, when capture records
 test("given clipped date text and a fixed unread count, when comparison geometry is collected, then clipped pixels and uncertain full-page positions remain unmasked", async ({ page }) => {
   // given
   await page.setViewportSize({ width: 640, height: 480 });
-  await page.goto(`data:text/html,${encodeURIComponent('<html><body style="min-height:800px;font:16px sans-serif"><div data-testid="clipped-date" style="position:absolute;left:20px;top:100px;overflow:hidden;width:40px;white-space:nowrap">28.10.2026</div><span data-testid="my-messages-unread" style="position:fixed;left:20px;top:40px">31</span><p style="position:absolute;left:20px;top:200px">28.10.2026</p></body></html>')}`);
+  await page.goto(`data:text/html,${encodeURIComponent('<html><body style="min-height:800px;font:16px sans-serif"><div data-testid="clipped-date" style="position:absolute;left:200px;top:100px;overflow:hidden;width:40px;white-space:nowrap">28.10.2026</div><span data-testid="my-messages-unread" style="position:fixed;left:20px;top:40px">31</span><p style="position:absolute;left:20px;top:200px">28.10.2026</p></body></html>')}`);
   const clipped = await page.getByTestId("clipped-date").boundingBox();
   // when
   const viewport = await page.evaluate(runDataMaskProbe, { mode: "viewport" });
