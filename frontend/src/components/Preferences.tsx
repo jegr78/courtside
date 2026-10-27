@@ -94,7 +94,7 @@ export function Preferences({ authenticated = false, username, supported, signed
           event.preventDefault();
           setOpen((current) => !current);
         }}
-        className="form-control flex max-w-full cursor-pointer list-none flex-wrap items-center gap-x-2 rounded-lg border px-3 py-2 text-sm font-semibold [&::-webkit-details-marker]:hidden">
+        className="form-control flex max-w-full cursor-pointer list-none flex-wrap items-center gap-x-2 rounded-lg border px-3 py-2 text-sm font-semibold [&::-webkit-details-marker]:hidden [&>span]:pointer-events-none">
         <span className={authenticated ? "sr-only sm:not-sr-only sm:shrink-0" : undefined}>{t(authenticated ? "preferences.accountMenu" : "preferences.menu")}</span>{" "}
         {authenticated && <span data-testid="account-identity" className="min-w-0 break-all font-normal">{username ?? t("account.unavailable")}</span>}
       </summary>
