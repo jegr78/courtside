@@ -138,7 +138,11 @@ public class SecurityEventLog {
     public enum CredentialChange {
         PERMANENT_PASSWORD_REPLACED,
         TEMPORARY_CREDENTIAL_ISSUED,
-        TEMPORARY_CREDENTIAL_WITHDRAWN
+        TEMPORARY_CREDENTIAL_WITHDRAWN,
+        MFA_ENABLED,
+        MFA_METHOD_CHANGED,
+        MFA_DISABLED,
+        MFA_RECOVERY_CODES_REPLACED
     }
 
     public enum AdministrativeAction {

@@ -11,6 +11,7 @@ public enum MessageKind {
     CREDENTIALS_PASSWORD_RESET("credentials.passwordReset", false, true),
     ACCOUNT_USERNAME_REMINDER("account.usernameReminder", false, true),
     ACCOUNT_PASSWORD_RESET_CODE("account.passwordResetCode", false, true),
+    ACCOUNT_SECURITY_CHANGED("account.securityChanged", false, true),
     BOOKING_CONFIRMED("booking.confirmed", true, false),
     BOOKING_PLAYER_RECORDED("booking.playerRecorded", false, false),
     BOOKING_PLAYER_WITHDREW("booking.playerWithdrew", true, false),

@@ -51,6 +51,13 @@ class MfaRecoveryCodeRepository {
     }
 
     @Transactional
+    void clear(UUID account) {
+        requireAccount(account);
+        jdbc.sql("DELETE FROM mfa_recovery_code WHERE account_id = :account")
+                .param("account", account).update();
+    }
+
+    @Transactional
     boolean consume(UUID account, String code) {
         requireAccount(account);
         return MfaRecoveryCodes.verifier(code).map(hash -> jdbc.sql("""

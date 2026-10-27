@@ -294,6 +294,31 @@ components:
           minLength: 1
           maxLength: 128
 
+    MfaStatus:
+      type: object
+      required: [enabled, totpEnabled, recoveryCodesRemaining]
+      properties:
+        enabled: { type: boolean }
+        totpEnabled: { type: boolean }
+        recoveryCodesRemaining: { type: integer, minimum: 0, maximum: 10 }
+
+    TotpEnrollment:
+      type: object
+      required: [secret, uri]
+      properties:
+        secret: { type: string, pattern: "^[A-Z2-7]{32}$" }
+        uri: { type: string, format: uri }
+
+    MfaRecoveryCodeSet:
+      type: object
+      required: [codes]
+      properties:
+        codes:
+          type: array
+          maxItems: 10
+          items: { type: string }
+          description: Plaintext codes appear only in the response that generates them. Save them before signing in again.
+
     PasswordResetRequest:
       type: object
       description: |
@@ -3566,7 +3591,7 @@ components:
         What a message was. The client resolves its label from this; the value is the message's own
         name, not the reason another part of the instance had for asking.
       enum: [ACCOUNT_WELCOME, CREDENTIALS_NEW_ACCOUNT, CREDENTIALS_PASSWORD_RESET, ACCOUNT_USERNAME_REMINDER,
-             ACCOUNT_PASSWORD_RESET_CODE, BOOKING_CONFIRMED,
+             ACCOUNT_PASSWORD_RESET_CODE, ACCOUNT_SECURITY_CHANGED, BOOKING_CONFIRMED,
              BOOKING_PLAYER_RECORDED, BOOKING_PLAYER_WITHDREW, BOOKING_DISPLACED,
              BOOKING_REMINDER, BOOKING_CANCELLED, BOOKING_CANCELLED_BY_CLUB, BOOKING_RELEASED,
              BOOKING_SERIES_CREATED, BOOKING_SERIES_CANCELLED_BY_CLUB, BOOKING_SERIES_MOVED_BY_CLUB,
@@ -4841,6 +4866,171 @@ paths:
           $ref: "#/components/responses/RateLimited"
         "503":
           $ref: "#/components/responses/ServiceUnavailable"
+
+  /api/account/mfa:
+    get:
+      tags: [account-mfa]
+      operationId: getOwnMfaStatus
+      summary: Read the current holder's private MFA status.
+      description: |
+        Security-relevant factor changes revoke the account's sessions. A returned recovery-code
+        set must be saved before signing in again. An existing set is never returned a second time.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      responses:
+        "200":
+          description: The holder's MFA result.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MfaStatus" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+    delete:
+      tags: [account-mfa]
+      operationId: disableOwnMfa
+      summary: Disable all MFA methods after fresh full authentication.
+      description: |
+        Security-relevant factor changes revoke the account's sessions. A returned recovery-code
+        set must be saved before signing in again. An existing set is never returned a second time.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      responses:
+        "204":
+          description: The method change succeeded.
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/account/mfa/totp:
+    post:
+      tags: [account-mfa]
+      operationId: beginTotpEnrollment
+      summary: Begin TOTP setup after fresh full authentication.
+      description: |
+        Security-relevant factor changes revoke the account's sessions. A returned recovery-code
+        set must be saved before signing in again. An existing set is never returned a second time.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      responses:
+        "200":
+          description: The holder's MFA result.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TotpEnrollment" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+    delete:
+      tags: [account-mfa]
+      operationId: removeOwnTotp
+      summary: Remove the TOTP method after fresh full authentication.
+      description: |
+        Security-relevant factor changes revoke the account's sessions. A returned recovery-code
+        set must be saved before signing in again. An existing set is never returned a second time.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      responses:
+        "204":
+          description: The method change succeeded.
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/account/mfa/totp/confirmation:
+    post:
+      tags: [account-mfa]
+      operationId: confirmTotpEnrollment
+      summary: Activate TOTP after proving a setup code.
+      description: |
+        Security-relevant factor changes revoke the account's sessions. A returned recovery-code
+        set must be saved before signing in again. An existing set is never returned a second time.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MfaCodeProof" }
+      responses:
+        "200":
+          description: The holder's MFA result.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MfaRecoveryCodeSet" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/account/mfa/recovery-codes:
+    post:
+      tags: [account-mfa]
+      operationId: replaceOwnRecoveryCodes
+      summary: Replace recovery codes after fresh full authentication.
+      description: |
+        Security-relevant factor changes revoke the account's sessions. A returned recovery-code
+        set must be saved before signing in again. An existing set is never returned a second time.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      responses:
+        "200":
+          description: The holder's MFA result.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MfaRecoveryCodeSet" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/account/sessions:
     get:
