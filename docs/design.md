@@ -731,7 +731,7 @@ the security epoch and invalidates older sessions.
 
 ### Voluntary multi-factor authentication
 
-Every account can enable MFA under "My profile", in the account security section. Enrollment is
+Every account can enable MFA under "My account", in the account security section. Enrollment is
 voluntary for every role. An enrolled account signs in with its password and one enrolled factor.
 TOTP, WebAuthn and single-use recovery codes are alternatives. Courtside offers no passwordless
 login or trusted-browser exception.

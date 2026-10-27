@@ -36,6 +36,8 @@
         "src/main/java/org/courtside/identity/internal/PasswordPolicy.java",
         "src/main/java/org/courtside/identity/internal/PermanentPasswordService.java",
         "src/main/java/org/courtside/identity/internal/ReauthenticationService.java",
+        "src/main/java/org/courtside/identity/internal/MfaConfiguration.java",
+        "src/main/java/org/courtside/identity/internal/ControlledAccountRecovery.java",
         "src/main/java/org/courtside/identity/internal/BootstrapAdminInitializer.java",
         "src/main/java/org/courtside/identity/internal/AccountCredentialIssuer.java",
         "src/main/java/org/courtside/identity/internal/PasswordResetTokenService.java",
@@ -129,6 +131,198 @@
       ],
       "locations": [
         "src/main/java/org/courtside/identity/internal/ResetCodes.java"
+      ]
+    },
+    {
+      "id": "mfa-totp",
+      "purpose": "Verify an enrolled second factor with a time-based one-time code",
+      "algorithm": "HMAC-SHA-1",
+      "parameters": {
+        "secretBytes": 20,
+        "digits": 6,
+        "periodSeconds": 30,
+        "neighbouringSteps": 1
+      },
+      "implementation": "java-runtime",
+      "strength": {
+        "decidedBy": "repository",
+        "bits": 19,
+        "basis": "Six decimal digits carry fewer than twenty bits. Password proof, account and address attempt budgets, the three-step acceptance window and a persisted last-consumed counter bound online guessing and replay. The shared secret contains 160 random bits."
+      },
+      "class": "rate-bounded-secret",
+      "owner": "club-operator",
+      "storageBoundary": "The authenticator keeps the shared secret. Courtside reveals it only during setup and stores active and pending secrets encrypted under the separate instance keyring in account_mfa. Verification decrypts the secret in application memory.",
+      "permittedUse": "RFC 6238 second-factor proof after password authentication, including enrollment confirmation and sensitive-action reauthentication. HMAC-SHA-1 implements this protocol and is not used as a general digest or signature.",
+      "rotation": "Start a replacement enrollment and confirm a valid code before replacing the current secret. A pending setup expires after five minutes.",
+      "revocation": "Removing TOTP, disabling MFA or completing controlled account recovery removes the secret and revokes account sessions. The consumed step cannot authenticate again.",
+      "recovery": "Use another enrolled method or an unused recovery code. If every method is lost, controlled account recovery requires an identity check and a new permanent password.",
+      "retirement": "A protocol change requires a newly confirmed authenticator enrollment before the prior secret is removed.",
+      "evidence": "src/test/java/org/courtside/identity/internal/TotpCodesTest.java, src/test/java/org/courtside/identity/internal/MfaTotpRepositoryTest.java",
+      "detects": [
+        "javax.crypto",
+        "SecureRandom",
+        "MessageDigest"
+      ],
+      "locations": [
+        "src/main/java/org/courtside/identity/internal/TotpCodes.java"
+      ]
+    },
+    {
+      "id": "mfa-secret-encryption",
+      "purpose": "Encrypt account-bound TOTP secrets separately from the database and validate matching instance key material",
+      "algorithm": "AES-256-GCM",
+      "parameters": {
+        "keyBytes": 32,
+        "nonceBytes": 12,
+        "authenticationTagBits": 128,
+        "associatedData": "courtside-mfa prefix and immutable account UUID"
+      },
+      "implementation": "java-runtime",
+      "strength": {
+        "decidedBy": "repository",
+        "bits": 128,
+        "basis": "SecureRandom supplies 256-bit encryption keys and independent 96-bit nonces. GCM uses a 128-bit authentication tag and binds each ciphertext to its account UUID. The tag bounds integrity strength."
+      },
+      "class": "credential-protection",
+      "owner": "club-operator",
+      "storageBoundary": "Private mode-0600 keyrings live outside PostgreSQL in the persistent MFA key directory or an operator-selected file. PostgreSQL stores key identifiers, nonce and ciphertext envelopes plus an encrypted installation canary. Decrypted secrets remain in application memory.",
+      "permittedUse": "Encrypting and decrypting TOTP secrets and the installation canary. File locking serializes key publication and rotation. Constant-time MessageDigest comparison validates the decrypted canary, not a stored password or a content digest.",
+      "rotation": "The maintenance rotation atomically publishes a new random active key and retains every earlier key so existing ciphertext and backups remain decryptable.",
+      "revocation": "Removing a factor deletes its active and pending ciphertext. Rotation does not revoke old keys. Retiring a compromised key requires replacing affected enrollments and preserving or retiring backups that still require it.",
+      "recovery": "Complete backup and restore preserve database and matching keyrings together. Startup refuses missing or mismatched keys when encrypted enrollment data exists. A database-only dump requires the matching key material separately.",
+      "retirement": "Retain a key while any live ciphertext or retained backup requires it. Move to a successor encryption format only with a defined migration and matching restore support.",
+      "evidence": "src/test/java/org/courtside/identity/internal/MfaKeyRingTest.java, src/test/java/org/courtside/identity/internal/MfaSecretsTest.java, tools/mfa-operations.test.mjs",
+      "detects": [
+        "Cipher.getInstance",
+        "javax.crypto",
+        "SecureRandom",
+        "MessageDigest"
+      ],
+      "locations": [
+        "src/main/java/org/courtside/identity/internal/MfaKeyRing.java",
+        "src/main/java/org/courtside/identity/internal/MfaSecrets.java"
+      ]
+    },
+    {
+      "id": "mfa-recovery-code",
+      "purpose": "Replace one second-factor proof or authorize controlled recovery after an external identity check",
+      "algorithm": "SecureRandom",
+      "parameters": {
+        "alphabetSymbols": 30,
+        "characters": 24,
+        "recoverySetSize": 10
+      },
+      "implementation": "java-runtime",
+      "strength": {
+        "decidedBy": "repository",
+        "bits": 117,
+        "basis": "Twenty-four independent characters from a thirty-symbol alphabet provide more than 117 bits of entropy. Account and address budgets constrain redemption. A second-factor code also requires password proof; a controlled-recovery code expires under the configured reset-code lifetime."
+      },
+      "class": "rate-bounded-secret",
+      "owner": "club-operator",
+      "storageBoundary": "The holder sees a second-factor recovery set only when generated. A controlled-recovery code travels through the registered email channel. The database stores domain-separated SHA-256 verifiers, never plaintext codes.",
+      "permittedUse": "One second-factor proof for an MFA-enabled account or one controlled account recovery with a new permanent password. Distinct verifier prefixes separate these purposes from ordinary password reset.",
+      "rotation": "Regenerating the recovery set invalidates its predecessor. Mailing a controlled-recovery code replaces the outstanding code for that rescue request.",
+      "revocation": "Atomic redemption consumes a second-factor code once. MFA disablement or completed controlled recovery clears the set. Controlled recovery also checks request identity, address, security epoch and expiry.",
+      "recovery": "Lost second-factor codes cannot be recovered. Use another enrolled method or request controlled recovery after an external identity check. The server-access maintenance path supports a locked-out sole administrator.",
+      "retirement": "A successor verifier format must invalidate or explicitly migrate outstanding codes before accepting the new format.",
+      "evidence": "src/test/java/org/courtside/identity/internal/MfaRecoveryCodesTest.java, src/test/java/org/courtside/identity/internal/MfaRecoveryCodeRepositoryTest.java, src/test/java/org/courtside/identity/internal/ControlledAccountRecoveryTest.java",
+      "detects": [],
+      "locations": [
+        "src/main/java/org/courtside/identity/internal/MfaRecoveryCodes.java",
+        "src/main/java/org/courtside/identity/internal/MfaRecoveryCodeRepository.java",
+        "src/main/java/org/courtside/identity/internal/ControlledAccountRecovery.java"
+      ]
+    },
+    {
+      "id": "mfa-webauthn",
+      "purpose": "Verify a domain-bound authenticator as an optional second factor after password proof",
+      "algorithm": "WebAuthn-COSE",
+      "implementation": "spring-security",
+      "strength": {
+        "decidedBy": "spring-security",
+        "basis": "Spring Security supplies the advertised COSE algorithm set and WebAuthn4J verifies the selected signature. Courtside requires local user verification and binds each ceremony to its trusted origin, relying-party ID, account, session, purpose, security epoch and expiring challenge."
+      },
+      "class": "credential-protection",
+      "owner": "club-operator",
+      "storageBoundary": "The authenticator retains the private key. PostgreSQL stores the credential public key, credential ID, user handle, signature counter, backup flags, original attestation and holder-private label. Courtside receives no biometric data and requests no manufacturer attestation.",
+      "permittedUse": "Registration and second-factor authentication with mandatory local user verification. Passwordless authentication and arbitrary request-host relying-party configuration are not supported.",
+      "rotation": "Enroll another named credential with recent full authentication proof, then remove the old credential. Each ceremony uses a new server-generated challenge.",
+      "revocation": "Individual removal, MFA disablement and completed controlled recovery delete credentials and revoke sessions. A consumed challenge cannot authenticate again, and nonzero signature counters must advance.",
+      "recovery": "Use another enrolled method or an unused recovery code. After a domain change, enroll a new credential on the new domain. Controlled recovery is required when every remaining method is lost.",
+      "retirement": "Changing the supported algorithm set must preserve verification of enrolled credentials or require replacement enrollment before their algorithm is removed.",
+      "evidence": "src/test/java/org/courtside/identity/internal/MfaWebAuthnTest.java, src/test/java/org/courtside/identity/internal/MfaWebAuthnFlowTest.java",
+      "detects": [
+        "createPublicKey"
+      ],
+      "locations": [
+        "src/main/java/org/courtside/identity/internal/MfaWebAuthn.java",
+        "src/main/java/org/courtside/identity/internal/MfaWebAuthnCredentials.java",
+        "src/main/java/org/courtside/identity/internal/MfaChallenges.java"
+      ]
+    },
+    {
+      "id": "mfa-browser-authenticator",
+      "purpose": "Compute TOTP proofs for synthetic browser and security-acceptance accounts",
+      "algorithm": "HMAC-SHA-1",
+      "parameters": {
+        "digits": 6,
+        "periodMilliseconds": 30000
+      },
+      "implementation": "node-crypto",
+      "strength": {
+        "decidedBy": "repository",
+        "bits": 19,
+        "basis": "The fixtures compute the same six-digit protocol proof as an authenticator. Each uses its synthetic account setup secret and the selected acceptance clock. Application password proof and MFA attempt budgets remain in force."
+      },
+      "class": "rate-bounded-secret",
+      "owner": "repository-maintainer",
+      "storageBoundary": "The acceptance process keeps the synthetic setup secret and computed proof in memory. It supplies the proof only to that disposable account enrollment or login.",
+      "permittedUse": "Exercising actual TOTP enrollment, replay refusal and login against disposable acceptance deployments. It is never an operator credential or a production authenticator.",
+      "rotation": "Every browser journey starts from its own disposable account data and newly generated setup secret.",
+      "revocation": "The application consumes the TOTP step and removes the synthetic account with the acceptance dataset.",
+      "recovery": "Rerun the journey against a fresh acceptance dataset; no fixture secret needs to be recovered.",
+      "retirement": "Remove this helper with the TOTP browser journey or update it when the supported protocol changes.",
+      "evidence": "frontend/e2e/account-mfa.spec.ts, tools/security-mfa-fixture.test.mjs",
+      "detects": [
+        "createHmac"
+      ],
+      "locations": [
+        "frontend/e2e/account-mfa.spec.ts",
+        "tools/security-mfa-fixture.mjs"
+      ]
+    },
+    {
+      "id": "mfa-webauthn-fixture",
+      "purpose": "Create synthetic WebAuthn registration data and sign and independently verify assertions for the security acceptance harness",
+      "algorithm": "ECDSA-P256-SHA256",
+      "parameters": {
+        "namedCurve": "P-256",
+        "credentialIdBytes": 32
+      },
+      "implementation": "node-crypto",
+      "strength": {
+        "decidedBy": "repository",
+        "bits": 128,
+        "basis": "The fixture generates a P-256 key pair and signs the authenticator data plus the SHA-256 client-data digest with ECDSA-SHA256. The source key-generation gate rates this curve at 128 bits."
+      },
+      "class": "credential-protection",
+      "owner": "repository-maintainer",
+      "storageBoundary": "Each synthetic authenticator keeps its private key in the fixture process closure. Only the public key, credential identifier, signed data and attestation representation leave that process. The test independently checks signatures and COSE public-key coordinates.",
+      "permittedUse": "Producing and checking actual UV-marked WebAuthn protocol messages for disposable acceptance accounts. The fixture binds its configured HTTPS origin, RP ID, challenge, credential and increasing signature counter. It is not a hardware authenticator or a production credential provider.",
+      "rotation": "Each fixture authenticator generates a fresh key pair and random credential identifier.",
+      "revocation": "Removing the disposable account credential and terminating the fixture process retires its key. The application still enforces challenge consumption and account-session revocation.",
+      "recovery": "Rerun with a fresh synthetic authenticator. No private fixture key is retained for recovery.",
+      "retirement": "Replace the fixture protocol or algorithm together with its signature, COSE and live acceptance tests.",
+      "evidence": "tools/security-mfa-fixture.test.mjs",
+      "detects": [
+        "generateKeyPair",
+        "createHash",
+        "createPublicKey"
+      ],
+      "locations": [
+        "tools/security-mfa-fixture.mjs",
+        "tools/security-mfa-fixture.test.mjs"
       ]
     },
     {

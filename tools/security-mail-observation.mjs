@@ -1,3 +1,4 @@
+import { setTimeout as delay } from "node:timers/promises";
 export const securityMailObservationSource = Object.freeze({
   image: "axllent/mailpit:v1.31",
   version: "1.31.6",
@@ -286,3 +287,48 @@ export async function observeSecurityMail({ runId, command, baseline, identity }
   return finish();
 }
 import { isIP } from "node:net";
+
+export async function readSecurityMfaRecoveryCode({ runId, command, identity, username, after, excludedCodes = [] } = {}) {
+  if (typeof username !== "string" || !/^security\.(?:member|trainer|sport\.director|youth\.director|groundskeeper|treasurer|admin)\.2$/.test(username)
+      || !Number.isFinite(after) || after < 0 || !Array.isArray(excludedCodes) || excludedCodes.length > 200
+      || excludedCodes.some(code => typeof code !== "string" || code.length > 128)) throw new Error("mfa-mail-fixture-input-invalid");
+  const ctx = context(runId, command, identity);
+  ctx.runtimeBinding = await trustedSink(ctx);
+  const messages = (await mailbox(ctx)).filter(message => Date.parse(message.created) >= after);
+  const holder = new RegExp(`(?<![a-z0-9._-])${username.replaceAll(".", "\\.")}(?![a-z0-9._-])`);
+  const codes = new Set();
+  let bytes = 0;
+  for (const message of messages) {
+    if (message.size > limits.rawBytes || bytes + message.size > limits.totalRawBytes) throw new Error("mfa-mail-budget-exceeded");
+    bytes += message.size;
+    const detail = json(await get(ctx, `http://mail:8025/api/v1/message/${message.id}`, limits.rawBytes));
+    if (typeof detail?.Text !== "string" || Buffer.byteLength(detail.Text) > limits.rawBytes) throw new Error("mfa-mail-detail-incomplete");
+    if (!holder.test(detail.Text)) continue;
+    for (const match of detail.Text.matchAll(/^[2-9A-HJKMNP-TV-Z]{4}(?:-[2-9A-HJKMNP-TV-Z]{4}){5}\r?$/gm)) {
+      const code = match[0].replace(/\r$/, "");
+      if (!excludedCodes.includes(code)) codes.add(code);
+    }
+  }
+  await trustedSink(ctx, ctx.runtimeBinding);
+  if (codes.size > 1) throw new Error("mfa-mail-code-ambiguous");
+  return codes.values().next().value;
+}
+
+export function createSecurityMfaRecoveryReader({ runId, command, identity, control, wait = delay }) {
+  return async (username, options) => {
+    for (;;) {
+      control.beforeRequest();
+      const code = await readSecurityMfaRecoveryCode({ runId, command, identity, username, ...options });
+      if (code !== undefined) return code;
+      await wait(Math.min(200, control.remainingMilliseconds()), undefined, { signal: control.signal });
+    }
+  };
+}
+
+export async function withSecurityMfaRecoveryReader(control, options, action) {
+  try {
+    return await action(createSecurityMfaRecoveryReader(options()));
+  } finally {
+    control.close();
+  }
+}

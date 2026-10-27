@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "reviewedAt": "2026-10-12",
+  "reviewedAt": "2026-10-27",
   "sources": {
     "openapi": "src/main/resources/api/openapi.yaml",
     "scheduledFiles": [
@@ -24,8 +24,10 @@
       "src/main/java/org/courtside/identity/internal/SignInFailureLog.java",
       "src/main/java/org/courtside/member/internal/RosterSecurityEventLog.java",
       "src/main/java/org/courtside/member/internal/ShippedMembershipTypeNaming.java",
+      "src/main/java/org/courtside/notification/internal/AccountSecurityMailer.java",
       "src/main/java/org/courtside/notification/internal/BookingMailer.java",
       "src/main/java/org/courtside/notification/internal/CancellationMailer.java",
+      "src/main/java/org/courtside/notification/internal/ControlledRecoveryCodeMailer.java",
       "src/main/java/org/courtside/notification/internal/CredentialMailer.java",
       "src/main/java/org/courtside/notification/internal/DisplacementMailer.java",
       "src/main/java/org/courtside/notification/internal/ParticipationMailer.java",
@@ -49,10 +51,11 @@
     {
       "id": "ordinary-http",
       "kind": "ordinary",
-      "rationale": "These operations perform bounded single-record work or bounded page and calendar reads; their contract limits do not grow into a separate resource-demand decision.",
+      "rationale": "These operations perform bounded single-record work or bounded page and calendar reads; their contract limits do not grow into a separate resource-demand decision. MFA administration reads two flags or changes one account state; TOTP setup encrypts one 160-bit key, recovery-code replacement generates ten verifiers and credential renaming/removal addresses one holder-owned record.",
       "entryPoints": [
         "addMembershipPeriod",
         "assignMembership",
+        "beginTotpEnrollment",
         "changeAccountLocale",
         "changeAccountRoles",
         "changeAccountUsername",
@@ -91,6 +94,7 @@
         "endGuardianRelationship",
         "endOwnSession",
         "endOwnSessions",
+        "getAdministrativeMfaStatus",
         "getApiDocument",
         "getAppIcon",
         "getAttendancePolicy",
@@ -108,6 +112,7 @@
         "getSessionStatus",
         "getSourceOffer",
         "getWebManifest",
+        "initiateMfaRecovery",
         "liftNoShows",
         "linkExternalReference",
         "listCourtClosures",
@@ -151,9 +156,13 @@
         "removeMembershipPeriod",
         "removeOpeningPeriod",
         "removeOwnParticipation",
+        "removeOwnTotp",
+        "removeOwnWebauthnCredential",
         "removeRetentionPolicy",
         "removeRule",
         "removeScheduledOpeningHours",
+        "renameOwnWebauthnCredential",
+        "replaceOwnRecoveryCodes",
         "resetMessageTemplate",
         "setAccountActive",
         "setBookingCardActive",
@@ -193,18 +202,24 @@
       "entryPoints": [
         "changeInitialPassword",
         "changeOwnPassword",
+        "completeMfaLogin",
+        "completeWebauthnLogin",
+        "confirmTotpEnrollment",
+        "confirmWebauthnEnrollment",
         "createAccount",
+        "disableOwnMfa",
         "logIn",
         "reauthenticate",
-        "requestAccountCredentials",
+        "redeemMfaRecovery",
         "redeemPasswordReset",
+        "requestAccountCredentials",
+        "requestDependantCredentials",
         "requestPasswordReset",
-        "requestUsernameReminder",
-        "requestDependantCredentials"
+        "requestUsernameReminder"
       ],
-      "growthDrivers": "Argon2id memory and CPU work, a bounded HIBP range response, and credential delivery work dominate these paths.",
-      "inputOrDataBound": "Passwords and account fields have contract limits; HIBP responses stop at 256 KiB and their request deadline defaults to three seconds.",
-      "concurrencyOrRateBound": "Password verification admits two concurrent operations per application instance; login addresses and credential issuance also have persisted rate windows. Every operation here except the filter-handled sign-in also spends 5 tokens of its caller's request budget.",
+      "growthDrivers": "Password hashing and policy lookup, native WebAuthn signature/attestation verification, TOTP/recovery-code checks and credential delivery dominate these identity proof paths. Disabling MFA deletes the holder credential set, which grows with the number of enrolled credentials.",
+      "inputOrDataBound": "Passwords and account fields have contract limits; HIBP responses stop at 256 KiB and their request deadline defaults to three seconds. MFA code input stops at 128 characters; native JSON has bounded encoded authenticator/client-data/signature fields and server ceremony payloads stop at 65,536 characters. A challenge expires after five minutes and permits at most five attempts; regeneration does not reset persistent account/address guess budgets. The holder credential count has no per-account row ceiling.",
+      "concurrencyOrRateBound": "Password verification admits two concurrent operations per instance. Native factor verification has no additional global crypto bulkhead; account-row locks, persisted account/address attempt windows and five-attempt ceremonies bound its shared work. Every operation here except filter-handled password sign-in spends 5 tokens of the caller request budget; credential issuance has its own persisted window.",
       "executionModel": "Verification and password policy run synchronously in the request; a credential event queues its message in the same transaction for the mail outbox.",
       "failureBehavior": "Capacity exhaustion returns a typed 429, HIBP unavailability refuses a new password, and a failed transaction stores no partial credential change.",
       "consumerTimeoutBehavior": "The application rolls a request's transaction back after 30 seconds and cancels any statement after 15 seconds. The HIBP dependency has its own deadline. The reference proxy adds no arbitrary response deadline; a caller retry remains subject to rate and transaction rules.",
@@ -212,12 +227,18 @@
         "src/main/java/org/courtside/identity/internal/HaveIBeenPwnedPasswordLookup.java",
         "src/main/java/org/courtside/identity/internal/LoginAttemptFilter.java",
         "src/main/java/org/courtside/identity/internal/SecurityConfiguration.java",
-        "src/main/java/org/courtside/shared/web/AdmissionControl.java"
+        "src/main/java/org/courtside/shared/web/AdmissionControl.java",
+        "src/main/java/org/courtside/identity/internal/MfaFactors.java",
+        "src/main/java/org/courtside/identity/internal/MfaWebAuthn.java",
+        "src/main/java/org/courtside/identity/internal/MfaChallenges.java",
+        "src/main/java/org/courtside/identity/internal/ControlledAccountRecovery.java"
       ],
       "evidence": [
         "src/test/java/org/courtside/identity/LoginAttemptProtectionTest.java#givenPasswordVerificationCapacityIsOccupied_whenItBecomesFree_thenLoginRecoversImmediately",
         "src/test/java/org/courtside/identity/PasswordHashingTest.java#whenHashingAPassword_thenTheParametersAreTheOnesTheInventoryRecords",
-        "src/test/java/org/courtside/shared/web/AdmissionPlanTest.java#whenLoadingTheShippedPlan_thenEveryDemandingClassHasItsDecidedCostAndBulkhead"
+        "src/test/java/org/courtside/shared/web/AdmissionPlanTest.java#whenLoadingTheShippedPlan_thenEveryDemandingClassHasItsDecidedCostAndBulkhead",
+        "src/test/java/org/courtside/identity/internal/MfaLoginTest.java#givenMfa_whenRestartingPasswordLoginAfterFailedCodes_thenTheAccountGuessBudgetStillApplies",
+        "src/test/java/org/courtside/identity/internal/MfaWebAuthnTest.java#givenAnInvalidSignedAssertion_whenVerifying_thenTheStoredCounterAndOwnerStayUnchanged"
       ]
     },
     {
@@ -329,6 +350,10 @@
       "id": "tenant-scaled-reads",
       "kind": "demanding",
       "entryPoints": [
+        "beginWebauthnEnrollment",
+        "beginWebauthnLogin",
+        "beginWebauthnReauthentication",
+        "getOwnMfaStatus",
         "listAllocations",
         "listBookableCards",
         "listBookingCardLegend",
@@ -347,8 +372,8 @@
         "searchParticipantMembers",
         "searchRoster"
       ],
-      "growthDrivers": "Collection queries grow with courts, cards, members, import history, rule sets, audit history, published open places or up to seven days of occupied and reserved court slots in the club database.",
-      "inputOrDataBound": "Roster pages stop at 200, participant search at 20 and filtered audit search scans at most 2,500 candidate events per request; one occupancy or reserved-slot response spans at most seven days, refused beyond that with day-range-invalid, and at most 999 courts. Several configuration and import-history lists have no row ceiling beyond tenant data.",
+      "growthDrivers": "Collection queries grow with courts, cards, members, import history, rule sets, audit history, published open places or up to seven days of occupied and reserved court slots in the club database. MFA status and native WebAuthn options read the current holder credential collection.",
+      "inputOrDataBound": "Roster pages stop at 200, participant search at 20 and filtered audit search scans at most 2,500 candidate events per request; one occupancy or reserved-slot response spans at most seven days, refused beyond that with day-range-invalid, and at most 999 courts. Several configuration and import-history lists have no row ceiling beyond tenant data. Native credential lists have no per-holder row ceiling; reads remain restricted to one authenticated or password-verified pending holder, with fixed-size credential IDs/labels and per-field encoded-data limits.",
       "concurrencyOrRateBound": "Each read spends 2 tokens of its caller's request budget; the queries have no separate concurrency gate.",
       "executionModel": "Each operation is a synchronous read-only request; paged operations use a stable cursor while deliberately small configuration lists return together.",
       "failureBehavior": "Invalid cursors, limits and dates return typed failures. Query failure produces no mutation and no successful partial collection response.",
@@ -359,7 +384,9 @@
         "src/main/java/org/courtside/audit/internal/AuditService.java",
         "src/main/java/org/courtside/dataexchange/ExecutionService.java",
         "src/main/java/org/courtside/member/RosterService.java",
-        "src/main/java/org/courtside/shared/web/AdmissionControl.java"
+        "src/main/java/org/courtside/shared/web/AdmissionControl.java",
+        "src/main/java/org/courtside/identity/internal/MfaManagement.java",
+        "src/main/java/org/courtside/identity/internal/MfaWebAuthn.java"
       ],
       "evidence": [
         "src/test/java/org/courtside/audit/internal/AuditSearchBudgetTest.java#givenNoTextMatch_whenTheScanBudgetIsReached_thenThePageSaysItIsIncomplete",
@@ -536,6 +563,7 @@
       "id": "asynchronous-notifications",
       "kind": "demanding",
       "entryPoints": [
+        "AccountSecurityMailer#on(AccountMfaChanged)",
         "BookingMailer#on(BookingConfirmed)",
         "CancellationMailer#on(BookingCancelled)",
         "ClosureAnnouncements#on(AvailabilityChange.ClosureStored)",
@@ -544,6 +572,7 @@
         "ClosureAnnouncements#on(FacilityEvent.CourtAvailabilityChanged)",
         "ClosureAnnouncements#on(FacilityEvent.OpeningHoursClosed)",
         "ClosureAnnouncements#on(FacilityEvent.OpeningHoursSet)",
+        "ControlledRecoveryCodeMailer#on(ControlledRecoveryRequested)",
         "CredentialMailer#on(CredentialsRequested)",
         "DisplacementMailer#on(BookingDisplaced)",
         "MailOutbox#poll",
@@ -559,18 +588,20 @@
         "UsernameReminderMailer#on(UsernameReminderRequested)",
         "WaitlistMailer#on(WaitlistOffered)"
       ],
-      "growthDrivers": "Mail work fans out with booking participants, reminders, cancellations, series summaries, series changes and displaced future bookings; every fanned-out message is one stored outbox row, and relay latency holds an outbox worker for one handover.",
+      "growthDrivers": "Mail work fans out with booking participants, reminders, cancellations, series summaries, series changes and displaced future bookings; every fanned-out message is one stored outbox row, and relay latency holds an outbox worker for one handover. Controlled rescue adds one urgent mail row per accepted administrative or maintenance request; its code is generated only during transactional composition. A factor change queues one generic holder security notice without naming the credential.",
       "inputOrDataBound": "A booking has at most twenty participant positions, closure discovery pages by 100 and a stored season, holiday or court closure reads the future allocations within its dates once, a queued row carries identifiers only and at most the 200 occurrence ids a series can hold, and each SMTP connect and read wait stops after ten seconds.",
       "concurrencyOrRateBound": "Two outbox workers hand messages over, each holding one database connection while it composes and sends; a wake-up beyond one pending pass is discarded because that pass finds its row. Closure announcements use at most two threads and a queue of 100 with caller-run backpressure.",
       "executionModel": "A mail listener runs before commit inside the publishing transaction and only stores a queued message_record row, so the row commits with the change or not at all. The outbox workers claim due rows with FOR UPDATE SKIP LOCKED under a five-minute lease, then lock the row, compose, hand over and record the outcome in one transaction. A scheduled pass every five seconds resumes what a restart or a retry left due. Closure announcements run after commit through the publication registry, and each closure page runs in a new transaction outside the originating mutation.",
-      "failureBehavior": "A transport failure reschedules the row after 15 seconds and then gaps three times as long, and fails it on the sixth attempt; a refused recipient, a vanished booking, a cancelled booking other than the one a cancellation or release notice announces, a series with no occurrence left, a reminder past its start or an unreachable recipient settles it at once with its reason. A queue insert that fails rolls the originating change back. No message leaves the outbox without a settled row.",
+      "failureBehavior": "A transport failure reschedules the row after 15 seconds and then gaps three times as long, and fails it on the sixth attempt; a refused recipient, a vanished booking, a cancelled booking other than the one a cancellation or release notice announces, a series with no occurrence left, a reminder past its start or an unreachable recipient settles it at once with its reason. A queue insert that fails rolls the originating change back. No message leaves the outbox without a settled row. A stale rescue ID cannot compose a fresh code, and relay failure does not commit an unmailed verifier.",
       "consumerTimeoutBehavior": "The originating HTTP response waits for the queued row insert inside its own transaction and never for the relay. A saturated closure-announcement queue runs paging on the publishing thread, which queues rows but hands no message over.",
       "productionPaths": [
         "src/main/java/org/courtside/booking/internal/BookingConfiguration.java",
         "src/main/java/org/courtside/booking/internal/ClosureAnnouncements.java",
         "src/main/java/org/courtside/notification/internal/MailOutbox.java",
         "src/main/java/org/courtside/notification/internal/MessageOutbox.java",
-        "src/main/java/org/courtside/notification/internal/NotificationConfiguration.java"
+        "src/main/java/org/courtside/notification/internal/NotificationConfiguration.java",
+        "src/main/java/org/courtside/notification/internal/ControlledRecoveryCodeMailer.java",
+        "src/main/java/org/courtside/notification/internal/AccountSecurityMailer.java"
       ],
       "evidence": [
         "src/test/java/org/courtside/booking/internal/ClosureAnnouncementExecutorCapacityTest.java#givenTheAnnouncementExecutor_whenReadingItsCapacityPolicy_thenTheQueueIsBoundedAndSaturationUsesCallerRuns",

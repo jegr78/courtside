@@ -33,6 +33,7 @@ import {
   runAuthorizationAssessment
 } from "./security-authorization.mjs";
 import { contractOperationIds } from "./contract-operations.mjs";
+import { mfaFixtureOperationIds, mfaFixtureFirstAttemptRequests } from "./security-mfa-fixture.mjs";
 import { authenticatedZapPolicy } from "./security-authenticated-zap.mjs";
 
 const require = createRequire(new URL("../frontend/package.json", import.meta.url));
@@ -1045,6 +1046,7 @@ test("given the shipped contract and a target that answers every probe at once, 
   const attemptsBeforeLimit = 5;
   const evidenceDirectory = mkdtempSync(join(tmpdir(), "courtside-authorization-plan-"));
   const plan = planAuthorizationRequests(api, { attemptsBeforeLimit, durationSeconds: 1800 });
+  const exercised = [];
 
   // when
   const evidence = await runAuthorizationAssessment({
@@ -1055,15 +1057,94 @@ test("given the shipped contract and a target that answers every probe at once, 
     evidenceDirectory, stopFile: join(evidenceDirectory, "stop"), deadline: new Date(Date.now() + 600_000),
     maxRequests: plan.total, maxAddressFailures: attemptsBeforeLimit, sharedPassword: "secret",
     resetLoginAttempts: async () => {}, wait: async () => {}, now: () => 0,
-    transport: inMemoryAuthorizationTarget(attemptsBeforeLimit)
+    transport: inMemoryAuthorizationTarget(attemptsBeforeLimit),
+    mfaFixtureFactory: ({ request, clients }) => ({
+      supports: (id) => mfaFixtureOperationIds.includes(id),
+      exercise: (operation, actor, probe) => {
+        exercised.push([operation.operationId, actor]);
+        return request(clients[actor], probe, { csrf: operation.mutation });
+      }
+    })
   });
 
   // then
-  assert.equal(evidence.requestCount, plan.total - plan.proofRenewals,
+  const expectedFixtures = buildOperationAuthorizationMatrix(api).flatMap((operation) =>
+    mfaFixtureOperationIds.includes(operation.operationId) ? authorizationActors
+      .filter((actor) => operation.expectations[actor] === "allow")
+      .filter((actor) => !operation.proofRequirement || actor === "ANONYMOUS")
+      .map((actor) => [operation.operationId, actor]) : []);
+  assert.deepEqual(exercised, expectedFixtures);
+  assert.equal(evidence.results.filter((result) => result.proofSourceActor && result.proofSourceActor !== result.actor).length, 32);
+  for (const result of evidence.results.filter((entry) => entry.proofSourceActor)) {
+    assert.equal(result.proofSourceActor, "ANONYMOUS");
+    assert.equal(result.outcome, "passed");
+  }
+  const forged = structuredClone(evidence);
+  forged.results.find((result) => result.proofSourceActor !== undefined && result.proofSourceActor !== result.actor)
+    .proofSourceActor = "ADMIN";
+  assert.throws(() => validateAuthorizationEvidence(forged, buildOperationAuthorizationMatrix(api)), /shared MFA proof/);
+  assert.equal(plan.mfaProofFixtures, expectedFixtures.reduce((sum, [id]) => sum + mfaFixtureFirstAttemptRequests(id) - 1, 0));
+  assert.equal(evidence.requestCount, plan.total - plan.proofRenewals - plan.mfaProofFixtures,
     "the plan the runner budgets from has drifted from the requests the suite actually sends");
   const minimumRequests = evidence.results.length + evidence.identityChecks.length * 2
     + evidence.objectChecks.length + evidence.boundaryChecks.length
     + evidence.timing.samplesPerClass * 2 + evidence.bruteForce.attemptsBeforeLimit + 1;
   assert.ok(plan.total >= minimumRequests,
     `the plan of ${plan.total} requests is below the ${minimumRequests} the evidence check demands`);
+});
+
+test("given the MFA entry routes, when their admission is inventoried, then pending sessions and recovery codes remain explicit proof conditions", () => {
+  // given
+  const operations = [
+    ["/api/session/mfa", "completeMfaLogin", "pending-mfa-session"],
+    ["/api/session/mfa/webauthn/options", "beginWebauthnLogin", "pending-mfa-session"],
+    ["/api/session/mfa/webauthn", "completeWebauthnLogin", "pending-mfa-session"],
+    ["/api/account-recovery/mfa/redemption", "redeemMfaRecovery", "controlled-recovery-code"]
+  ];
+  const api = { security: [{ sessionCookie: [] }], paths: Object.fromEntries(operations.map(([path, operationId]) =>
+    [path, { post: { operationId } }])) };
+  // when
+  const matrix = buildOperationAuthorizationMatrix(api);
+  // then
+  for (const [, operationId, proof] of operations) {
+    const operation = matrix.find((candidate) => candidate.operationId === operationId);
+    assert.deepEqual(operation.expectations, Object.fromEntries(authorizationActors.map((actor) => [actor, "allow"])));
+    assert.equal(operation.proofRequirement, proof);
+  }
+});
+
+test("given an MFA proof operation without a valid proof fixture, when its generic request is rejected, then validation errors cannot count as authorization success", async () => {
+  // given
+  const matrix = buildOperationAuthorizationMatrix({ paths: {
+    "/api/session/mfa": { post: { operationId: "completeMfaLogin" } }
+  } });
+  // when
+  const results = await executeOperationMatrix(matrix, async () => ({ status: 400 }));
+  // then
+  assert.equal(results.length, authorizationActors.length);
+  assert.ok(results.every((result) => result.outcome === "failed"));
+  assert.ok(results.every((result) => result.observation === "required-proof-not-completed"));
+});
+
+test("given an MFA proof operation, when the server completes its proof or refuses it, then only successful completion passes", async () => {
+  // given
+  const matrix = buildOperationAuthorizationMatrix({ paths: {
+    "/api/account-recovery/mfa/redemption": { post: { operationId: "redeemMfaRecovery" } }
+  } });
+  // when / then
+  for (const status of [200, 204, 400, 401, 403, 409, 429, 500]) {
+    const results = await executeOperationMatrix(matrix, async () => ({ status }));
+    assert.ok(results.every((result) => result.outcome === (status < 300 ? "passed" : "failed")), String(status));
+  }
+});
+
+test("given ordinary authorization evidence, when a response claims another actor proof, then sharing cannot bypass its own role boundary", async () => {
+  // given
+  const evidence = await minimalEvidence();
+  const matrix = buildOperationAuthorizationMatrix({ paths: {
+    "/api/public/example": { get: { operationId: "readExample", security: [] } }
+  } });
+  evidence.results[1].proofSourceActor = "ANONYMOUS";
+  // when / then
+  assert.throws(() => validateAuthorizationEvidence(evidence, matrix), /shared MFA proof/);
 });

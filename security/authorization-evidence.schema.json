@@ -145,7 +145,22 @@
             "forbidden-boundary-mismatch",
             "authorization-gate-passed",
             "authorized-actor-rejected",
-            "admission-refused"
+            "admission-refused",
+            "required-proof-completed",
+            "required-proof-not-completed"
+          ]
+        },
+        "proofSourceActor": {
+          "enum": [
+            "ANONYMOUS",
+            "MEMBER",
+            "TRAINER",
+            "SPORT_DIRECTOR",
+            "YOUTH_DIRECTOR",
+            "GROUNDSKEEPER",
+            "TREASURER",
+            "ADMIN",
+            "INITIAL_PASSWORD"
           ]
         }
       }

@@ -27,7 +27,8 @@ import { immutableImageSelection, inspectReusableImages, verifyReusableImages,
   assertPerformanceReuseEmpty, preparePerformanceReuse, startPerformanceReuse,
   assertPerformanceReuse, resetPerformanceReuse, boundedImageCommand, cleanupPerformanceRunner,
   assertPerformanceStateOwnership } from "./immutable-image-reuse.mjs";
-import { runOwnedProcess } from "./security-passive-deployment.mjs";
+import { createAssessmentControl, runOwnedProcess } from "./security-passive-deployment.mjs";
+import { withSecurityMfaRecoveryReader } from "./security-mail-observation.mjs";
 import { failureReason } from "./failure-reason.mjs";
 import { containerIdentity, createMailCertificate } from "./mail-relay-certificate.mjs";
 import { executeLocalCheck, localCheckPrerequisites } from "./local-check.mjs";
@@ -799,12 +800,24 @@ async function execute(options) {
         inspectRuntime: inspectPassiveSecurityRuntime,
         runZap: (candidate, limits) => runPassiveZap(candidate, context.stopFile, limits)
       }),
-      runAuthorizationAssessment: async (selectedPlan, context) => runAuthorizationAssessment(selectedPlan, {
-        ...context,
-        ca,
-        sharedPassword: securityEnvironment.COURTSIDE_SECURITY_SHARED_PASSWORD,
-        maxAddressFailures: shippedLoginAddressMaxFailures()
-      }),
+      runAuthorizationAssessment: async (selectedPlan, context) => {
+        const control = createAssessmentControl(context.stopFile, context.deadline);
+        return withSecurityMfaRecoveryReader(control, () => {
+          const identity = readSecurityIdentity(options.runId);
+          return { runId: options.runId,
+            identity: { seedFingerprint: identity.seedFingerprint, instanceFingerprint: identity.instanceFingerprint }, control,
+            command: (args, limits) => {
+              control.beforeRequest();
+              return runOwnedProcess("docker", args, { ...limits, stopFile: context.stopFile,
+                timeoutMilliseconds: Math.min(limits.timeoutMilliseconds, control.remainingMilliseconds()),
+                environment: { ...process.env, ...securityEnvironment } });
+            } };
+        }, (readRecoveryCode) => runAuthorizationAssessment(selectedPlan, {
+          ...context, ca, readRecoveryCode,
+          sharedPassword: securityEnvironment.COURTSIDE_SECURITY_SHARED_PASSWORD,
+          maxAddressFailures: shippedLoginAddressMaxFailures()
+        }));
+      },
       planAuthorizationRequests: (selectedPlan) => planAssessedAuthorizationRequests({
         attemptsBeforeLimit: shippedLoginAddressMaxFailures(),
         durationSeconds: selectedPlan.budgets.durationSeconds

@@ -51,7 +51,7 @@ const networkInspect = () => [{ Id: networkId, Name: `${project}_backend`, Inter
 
 function harness({ lists = [list([]), list([summary()]), list([summary()])], body = raw,
   runtime = inspect(), appRuntime = appInspect(), networkRuntime = networkInspect(),
-  imageRuntime = [{ Id: imageId }], failure, parserOutput } = {}) {
+  imageRuntime = [{ Id: imageId }], failure, parserOutput, details } = {}) {
   const calls = [];
   let baselineList;
   const command = async (args, options = {}) => {
@@ -61,7 +61,8 @@ function harness({ lists = [list([]), list([summary()]), list([summary()])], bod
     if (args[0] === "network") return { stdout: JSON.stringify(networkRuntime) };
     if (args[0] === "inspect") return { stdout: JSON.stringify(args[1].endsWith("-app-1") ? appRuntime : runtime) };
     if (args.includes("curl")) {
-      return { stdout: args.at(-1).endsWith("/raw") ? body : baselineList ?? lists.shift() };
+      const detailRequest = /\/api\/v1\/message\/[A-Za-z0-9]+$/.test(args.at(-1));
+      return { stdout: detailRequest ? JSON.stringify(details) : args.at(-1).endsWith("/raw") ? body : baselineList ?? lists.shift() };
     }
     assert.deepEqual(args, ["exec", "-i", `courtside-security-${runId}-scanner-gateway-1`,
       "python3", "/opt/courtside/security-mail-receipt.py"]);
@@ -524,4 +525,79 @@ test("given a baseline producer changing during capture, when native identity is
   // then
   assert.equal(result.status, "incomplete");
   assert.equal(result.runtimeBinding, undefined);
+});
+
+test("given a new controlled recovery message in the owned sink, when its dedicated account reads it, then only the fresh code leaves memory", async () => {
+  // given
+  const code = "2345-6789-ABCD-EFGH-JKMN-PQRS";
+  const fixture = harness({ lists: [list([summary()])], details: { Text: `Recovery for security.member.2\n\n${code}\n` } });
+  // when
+  const { readSecurityMfaRecoveryCode } = await import("./security-mail-observation.mjs");
+  const actual = await readSecurityMfaRecoveryCode({ runId, command: fixture.command, identity,
+    username: "security.member.2", excludedCodes: [], after: Date.parse(created) - 1 });
+  // then
+  assert.equal(actual, code);
+});
+
+test("given stale or previously consumed recovery messages, when a dedicated fixture asks for its code, then none can be returned", async () => {
+  // given
+  const code = "2345-6789-ABCD-EFGH-JKMN-PQRS";
+  const { readSecurityMfaRecoveryCode } = await import("./security-mail-observation.mjs");
+  // when / then
+  for (const limits of [{ after: Date.parse(created) + 1, excludedCodes: [] }, { after: 0, excludedCodes: [code] }]) {
+    const fixture = harness({ lists: [list([summary()])], details: { Text: `Recovery for security.member.2\n\n${code}\n` } });
+    assert.equal(await readSecurityMfaRecoveryCode({ runId, command: fixture.command, identity,
+      username: "security.member.2", ...limits }), undefined);
+  }
+});
+
+test("given another holder or a foreign runtime, when the MFA fixture reads a rescue code, then no code crosses that boundary", async () => {
+  // given
+  const code = "2345-6789-ABCD-EFGH-JKMN-PQRS";
+  const { readSecurityMfaRecoveryCode } = await import("./security-mail-observation.mjs");
+  // when / then
+  const other = harness({ lists: [list([summary()])], details: { Text: `Recovery for security.admin.2\n\n${code}\n` } });
+  assert.equal(await readSecurityMfaRecoveryCode({ runId, command: other.command, identity,
+    username: "security.member.2", after: 0 }), undefined);
+  const foreign = harness({ runtime: [{ ...inspect()[0], Config: { ...inspect()[0].Config, Labels: labels("foreign") } }] });
+  await assert.rejects(readSecurityMfaRecoveryCode({ runId, command: foreign.command, identity,
+    username: "security.member.2", after: 0 }), /mail-sink-untrusted/);
+  assert.equal(foreign.calls.some(({ args }) => args.includes("curl")), false);
+});
+
+test("given a delayed owned rescue mail, when the assessment waits, then the deadline controls each bounded retry", async () => {
+  // given
+  const code = "2345-6789-ABCD-EFGH-JKMN-PQRS";
+  const fixture = harness({ lists: [list([]), list([summary()])], details: { Text: `Recovery for security.member.2\n\n${code}\n` } });
+  const waits = [];
+  let checks = 0;
+  const { createSecurityMfaRecoveryReader } = await import("./security-mail-observation.mjs");
+  const readCode = createSecurityMfaRecoveryReader({ runId, command: fixture.command, identity,
+    control: { beforeRequest: () => checks++, remainingMilliseconds: () => 100, signal: undefined },
+    wait: async (milliseconds) => waits.push(milliseconds) });
+  // when
+  const actual = await readCode("security.member.2", { after: 0 });
+  // then
+  assert.equal(actual, code);
+  assert.deepEqual(waits, [100]);
+  assert.equal(checks, 2);
+});
+
+test("given an assessment monitor, when MFA observation finishes or fails, then its process exits without a live timer", () => {
+  // given
+  const observation = new URL("./security-mail-observation.mjs", import.meta.url).href;
+  const passive = new URL("./security-passive-deployment.mjs", import.meta.url).href;
+  // when / then
+  for (const fails of [false, true]) {
+    const source = `import { withSecurityMfaRecoveryReader } from ${JSON.stringify(observation)};
+      import { createAssessmentControl } from ${JSON.stringify(passive)};
+      const control = createAssessmentControl('/tmp/courtside-mfa-unused-stop', new Date(Date.now() + 60000));
+      let rejected = false;
+      try { await withSecurityMfaRecoveryReader(control, () => ({ control }), async () => { if (${fails}) throw new Error('expected-assessment-failure'); return true; }); }
+      catch (error) { if (error.message !== 'expected-assessment-failure') throw error; rejected = true; }
+      if (rejected !== ${fails}) throw new Error('assessment outcome changed');`;
+    const child = spawnSync(process.execPath, ["--input-type=module", "-e", source], { encoding: "utf8", timeout: 1500 });
+    assert.equal(child.error, undefined, "the owned monitor must not keep the finished assessment alive");
+    assert.equal(child.status, 0, child.stderr);
+  }
 });

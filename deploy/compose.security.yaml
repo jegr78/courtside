@@ -95,6 +95,7 @@ services:
       SPRING_DATASOURCE_USERNAME: courtside
       SPRING_DATASOURCE_PASSWORD: ${COURTSIDE_SECURITY_SHARED_PASSWORD:?required}
       COURTSIDE_COOKIE_SECURE: "true"
+      COURTSIDE_PUBLIC_URL: https://localhost:${COURTSIDE_SECURITY_HTTPS_PORT:?required}
       COURTSIDE_ENVIRONMENT: SECURITY
       MANAGEMENT_PROMETHEUS_METRICS_EXPORT_ENABLED: "true"
       # The proxy refuses /actuator paths, so telemetry remains container-internal.

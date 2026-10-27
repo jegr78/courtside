@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "reviewedAt": "2026-10-11",
+  "reviewedAt": "2026-10-27",
   "source": "src/main/resources/api/openapi.yaml",
   "authorizationSource": "security/authorization-policy.json",
   "workflows": [
@@ -91,11 +91,11 @@
         "UsernameReminderMailer#on(UsernameReminderRequested)"
       ],
       "stateTransitions": [
-        "Credentials create a server-side session.",
+        "Password login creates an authenticated session only without MFA; enrolled accounts first receive a roleless pending session.",
         "Password or security changes revoke earlier authority.",
         "Logout and session termination delete or invalidate sessions.",
         "Locale and message choices update account preferences.",
-        "An unauthenticated recovery request by username issues a one-time credential and ends the account's sessions; one by address issues nothing.",
+        "Ordinary recovery mails a single-use password-reset code while retaining enrolled factors; an address request only reminds the holder of usernames.",
         "A guardian granted account tasks has new credentials issued to a dependant's account under the account's issuing limit."
       ],
       "alternatePaths": [
@@ -801,6 +801,78 @@
         "src/test/java/org/courtside/dataexchange/ConcurrentRetentionRunTest.java#givenABoardLengtheningThePeriodWhileTheRunStarts_whenTheRunReachesThePreview_thenItWaitsAndRunsNothing",
         "src/test/java/org/courtside/dataexchange/web/RetentionAdminControllerTest.java#givenRecordsThatTieAnOldBookingToPeople_whenTheRunApplies_thenNoTableKeepsItBesideAPersonOrAccount",
         "src/test/java/org/courtside/dataexchange/web/RetentionAdminControllerTest.java#givenAPreviewUnderAPeriod_whenThePeriodIsRemoved_thenThePreviewCanNoLongerRun"
+      ]
+    },
+    {
+      "id": "mfa-account-security",
+      "actors": [
+        "ANONYMOUS",
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN",
+        "INITIAL_PASSWORD"
+      ],
+      "entryPoints": "Password-first pending MFA login, authenticated own-factor operations, two coarse administrator flags, fresh-MFA administrator rescue and public mailed-code redemption.",
+      "operationIds": [
+        "completeMfaLogin",
+        "getAdministrativeMfaStatus",
+        "initiateMfaRecovery",
+        "redeemMfaRecovery",
+        "getOwnMfaStatus",
+        "disableOwnMfa",
+        "beginTotpEnrollment",
+        "removeOwnTotp",
+        "confirmTotpEnrollment",
+        "replaceOwnRecoveryCodes",
+        "beginWebauthnEnrollment",
+        "confirmWebauthnEnrollment",
+        "removeOwnWebauthnCredential",
+        "renameOwnWebauthnCredential",
+        "beginWebauthnReauthentication",
+        "beginWebauthnLogin",
+        "completeWebauthnLogin"
+      ],
+      "backgroundEntryPoints": [
+        "AccountSecurityMailer#on(AccountMfaChanged)",
+        "ControlledRecoveryCodeMailer#on(ControlledRecoveryRequested)"
+      ],
+      "stateTransitions": [
+        "The password creates a roleless pending session; only a valid bound factor consumes its challenge and grants authenticated roles.",
+        "First TOTP confirmation or native WebAuthn registration generates recovery codes once; later changes and regeneration revoke sessions and require a new login.",
+        "A controlled rescue revokes authority and blocks ordinary credential paths while retaining factors until a mailed code and new permanent password complete redemption.",
+        "The operator may initiate rescue or correct a verified holder email through separate audited maintenance operations."
+      ],
+      "alternatePaths": [
+        "TOTP, native WebAuthn and single-use recovery codes may complete a pending login.",
+        "Initial enrollment requires recent password proof; an enrolled holder renews sensitive proof with password plus an existing factor.",
+        "WebAuthn labels and method identities remain visible only to the holder; administrators see enabled and recovery-pending flags.",
+        "An unconfigured trusted HTTPS origin disables WebAuthn without disabling TOTP or password login."
+      ],
+      "failurePaths": [
+        "Missing, expired, consumed, wrong-session, wrong-purpose or revoked-epoch challenges cannot grant authority.",
+        "Wrong native origin, RP, signature, user verification, credential owner/handle or regressing counter cannot authenticate.",
+        "Expired proof, a different holder or a pending rescue refuses factor changes.",
+        "Missing administrator MFA, stale full proof or absent external identity confirmation refuses rescue.",
+        "Wrong, expired, spent, address-mismatched or epoch-mismatched rescue codes and persistent guessing limits leave the account blocked.",
+        "Plaintext setup and recovery material is never returned by administrator status or ordinary exports."
+      ],
+      "productionPaths": [
+        "src/main/java/org/courtside/identity/internal/MfaLogin.java",
+        "src/main/java/org/courtside/identity/internal/MfaManagement.java",
+        "src/main/java/org/courtside/identity/internal/MfaWebAuthn.java",
+        "src/main/java/org/courtside/identity/internal/MfaWebAuthnFlow.java",
+        "src/main/java/org/courtside/identity/internal/ControlledAccountRecovery.java",
+        "src/main/java/org/courtside/identity/AccountSecurityMaintenance.java"
+      ],
+      "evidence": [
+        "src/test/java/org/courtside/identity/internal/MfaLoginTest.java#givenAPendingLogin_whenTheSecondFactorSucceeds_thenAReplacementSessionHasAccountPrivileges",
+        "src/test/java/org/courtside/identity/internal/MfaManagementTest.java#givenFreshPasswordProof_whenEnrollingAndConfirmingTotp_thenCodesAreShownOnceAndOldSessionsAreRevoked",
+        "src/test/java/org/courtside/identity/internal/MfaWebAuthnFlowTest.java#givenNoTotp_whenEnrollingAndUsingWebAuthn_thenPasswordAndTheEnrolledKeyGrantAccountAccess",
+        "src/test/java/org/courtside/identity/internal/MfaRecoveryFlowTest.java#givenFreshMfaAdmin_whenRecoveringALostAccount_thenOnlyTheMailedCodeAndNewPasswordUnblockIt"
       ]
     }
   ]

@@ -227,3 +227,13 @@ zero-counter copy cannot be distinguished from the enrolled authenticator by its
 assertion still needs a fresh, session-bound challenge, the configured origin and RP, and signed
 user verification. Nonzero counters must increase. Reconsider this bound if supported authenticators
 provide another interoperable clone signal or the product adopts an explicit credential restriction.
+
+## Administrator MFA remains voluntary
+
+An administrator who has not enrolled a second factor can still sign in with a password alone.
+An attacker needs that account's password to obtain its administrative access. All roles may enroll
+TOTP or WebAuthn, and enrolled accounts require a factor on every new sign-in and sensitive-action
+proof. Initiating another account's controlled recovery additionally requires an MFA-authenticated
+administrator. Voluntary enrollment does not establish the blanket ASVS Level 2 authentication
+strength claim for every administrator. Reconsider this bound only if the product adopts mandatory
+administrator enrollment; the current MFA contract explicitly excludes a role-based mandate.

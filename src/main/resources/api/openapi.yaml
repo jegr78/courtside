@@ -777,7 +777,7 @@ components:
           type: string
           minLength: 1
           maxLength: 100
-          pattern: ^(?=.*\S)[^\p{Cntrl}]+$
+          pattern: ^(?=.*\S)[^\p{Cc}]+$
         credential:
           $ref: '#/components/schemas/WebAuthnRegistrationCredential'
     WebAuthnLabelRequest:
@@ -789,7 +789,7 @@ components:
           type: string
           minLength: 1
           maxLength: 100
-          pattern: ^(?=.*\S)[^\p{Cntrl}]+$
+          pattern: ^(?=.*\S)[^\p{Cc}]+$
 
     RuleType:
       type: string

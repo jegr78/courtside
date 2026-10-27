@@ -373,3 +373,11 @@ test("given the selected UAT share, when cleanup runs, then it resets that ingre
   assert.throws(() => cleanupUatFunnel(true, { ...runtime, readConfig: (_command, stored, node, env) => classifyFunnelConfig(wrongPort, stored, node, env) }), /no longer belongs/);
   assert.deepEqual(calls, []);
 });
+
+test("given a disposable SECURITY target, when native WebAuthn options are created, then its RP uses the configured HTTPS port", () => {
+  // given
+  const compose = yaml.parse(read("deploy/compose.security.yaml"));
+  // when / then
+  assert.equal(compose.services.app.environment.COURTSIDE_PUBLIC_URL,
+    "https://localhost:${COURTSIDE_SECURITY_HTTPS_PORT:?required}");
+});

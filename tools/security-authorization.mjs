@@ -5,6 +5,7 @@ import { createRequire } from "node:module";
 import { chmodSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { apiDocumentPath } from "./security-api-document.mjs";
+import { createMfaFixture, mfaFixtureOperationIds, mfaFixtureRequestLimit, mfaFixtureFirstAttemptRequests } from "./security-mfa-fixture.mjs";
 import { createAssessmentControl } from "./security-passive-deployment.mjs";
 
 const require = createRequire(new URL("../frontend/package.json", import.meta.url));
@@ -48,7 +49,8 @@ export function buildOperationAuthorizationMatrix(api) {
           parameters: [...(pathItem.parameters ?? []), ...(operation.parameters ?? [])],
           requestBody: operation.requestBody,
           security: operation.security ?? inheritedSecurity,
-          expectations: operationExpectations(path, method, operation.security ?? inheritedSecurity)
+          expectations: operationExpectations(path, method, operation.security ?? inheritedSecurity),
+          ...(mfaEntryProof(path) ? { proofRequirement: mfaEntryProof(path) } : {})
         };
       }));
 }
@@ -89,6 +91,13 @@ function declaresLimit(operation) {
   return Boolean(schema?.properties?.limit) || Boolean(body?.$ref);
 }
 
+function mfaEntryProof(path) {
+  if (["/api/session/mfa", "/api/session/mfa/webauthn/options", "/api/session/mfa/webauthn"].includes(path)) {
+    return "pending-mfa-session";
+  }
+  return path === "/api/account-recovery/mfa/redemption" ? "controlled-recovery-code" : null;
+}
+
 function operationExpectations(path, method, security) {
   const expectations = Object.fromEntries(authorizationActors.map((actor) => [actor, "deny-forbidden"]));
   if (path === "/api/account/initial-password") {
@@ -109,7 +118,7 @@ function operationExpectations(path, method, security) {
     expectations.INITIAL_PASSWORD = "allow";
     return expectations;
   }
-  if (security.length === 0) {
+  if (mfaEntryProof(path) || security.length === 0) {
     return Object.fromEntries(authorizationActors.map((actor) => [actor, "allow"]));
   }
   expectations.ANONYMOUS = "deny-unauthenticated";
@@ -189,9 +198,10 @@ export async function executeOperationMatrix(matrix, send, beforeOperation = asy
       await beforeCase(operation, actor);
       const expected = operation.expectations[actor];
       const response = await send(operation, actor, buildOperationProbe(operation));
-      const evaluated = evaluateOperationResult(expected, response);
+      const evaluated = evaluateOperationResult(expected, response, operation.proofRequirement);
       results.push({ operationId: operation.operationId, actor, expected, status: response.status,
-        ...(response.problemType ? { problemType: response.problemType } : {}), ...evaluated });
+        ...(response.problemType ? { problemType: response.problemType } : {}),
+        ...(response.proofSourceActor ? { proofSourceActor: response.proofSourceActor } : {}), ...evaluated });
     }
   }
   return results;
@@ -220,7 +230,7 @@ export function deriveAuthorizationOutcome(checks) {
     : checks.some(({ outcome }) => outcome === "incomplete") ? "incomplete" : "passed";
 }
 
-export function evaluateOperationResult(expected, response) {
+export function evaluateOperationResult(expected, response, proofRequirement = null) {
   if (admissionRefused(response)) return { outcome: "incomplete", observation: "admission-refused" };
   if (expected === "deny-unauthenticated") {
     const passed = response.status === 401
@@ -233,6 +243,11 @@ export function evaluateOperationResult(expected, response) {
       && response.problemType === "urn:courtside:error:access-denied";
     return { outcome: passed ? "passed" : "failed",
       observation: passed ? "typed-access-denied" : "forbidden-boundary-mismatch" };
+  }
+  if (proofRequirement) {
+    const passed = response.status >= 200 && response.status < 300;
+    return { outcome: passed ? "passed" : "failed",
+      observation: passed ? "required-proof-completed" : "required-proof-not-completed" };
   }
   const passed = ![401, 403].includes(response.status);
   return { outcome: passed ? "passed" : "failed",
@@ -536,10 +551,20 @@ export function validateAuthorizationEvidence(evidence, matrix) {
   if (evidence.results.some((result) => expectations.get(`${result.operationId}:${result.actor}`) !== result.expected)) {
     throw new Error("The authorization evidence contradicts the generated policy");
   }
+  const proofRequirements = new Map(matrix.map((operation) => [operation.operationId, operation.proofRequirement]));
   if (evidence.results.some((result) => {
-    const evaluated = evaluateOperationResult(result.expected, result);
+    const evaluated = evaluateOperationResult(result.expected, result, proofRequirements.get(result.operationId));
     return result.outcome !== evaluated.outcome || result.observation !== evaluated.observation;
   })) throw new Error("The authorization evidence contains an invalid operation result");
+  for (const result of evidence.results.filter((entry) => entry.proofSourceActor)) {
+    const operation = matrix.find((entry) => entry.operationId === result.operationId);
+    const source = evidence.results.find((entry) => entry.operationId === result.operationId
+      && entry.actor === result.proofSourceActor);
+    if (!operation?.proofRequirement || !source || source.proofSourceActor !== source.actor
+        || source.outcome !== "passed" || result.outcome !== "passed" || result.status !== source.status) {
+      throw new Error("The authorization evidence contains an invalid shared MFA proof");
+    }
+  }
   const expectedObjects = ["horizontal-booking-cancel", "horizontal-managed-detail", "horizontal-series-cancel",
     "identifier-substitution", "existence-not-disclosed", "vertical-admin-management", "mass-assignment",
     "rejected-attacks-preserve-bookings"];
@@ -596,14 +621,22 @@ export function planAuthorizationRequests(api, { attemptsBeforeLimit, durationSe
   const proven = signedIn.filter((actor) => actor !== "INITIAL_PASSWORD");
   const terminal = matrix.filter(({ operationId }) => terminalOperationOrder.has(operationId)).length;
   const logIn = matrix.filter(({ operationId }) => operationId === "logIn").length;
+  const sharedProofs = matrix.filter((operation) => operation.proofRequirement
+    && mfaFixtureOperationIds.includes(operation.operationId));
+  const reusedProofCases = sharedProofs.reduce((count, operation) => count + Object.values(operation.expectations)
+    .filter((expectation) => expectation === "allow").length - 1, 0);
   const phases = {
     signIn: (signedIn.length + 1) * signInRequests,
     identity: roles.length * (signInRequests + 2) + managerCombinationCount * (signInRequests + 3),
     boundary: matrix.filter(({ mutation }) => mutation).length * mutationBoundaries.length,
     object: objectProbeRequests,
-    matrix: matrix.length * authorizationActors.length
+    matrix: matrix.length * authorizationActors.length - reusedProofCases
       + logIn * authorizationActors.length * (signInRequests - 1)
       + terminal * signedIn.length * signInRequests,
+    mfaProofFixtures: matrix.filter((operation) => mfaFixtureOperationIds.includes(operation.operationId))
+      .reduce((count, operation) => count + Object.values(operation.expectations)
+        .filter((expectation) => expectation === "allow").slice(0, operation.proofRequirement ? 1 : undefined).length
+        * (mfaFixtureFirstAttemptRequests(operation.operationId) - 1), 0),
     csrfBootstrap: 1,
     authentication: 1 + loginTimingSamplesPerClass * (2 + signInRequests + 2) + attemptsBeforeLimit + 1,
     proofRenewals: proven.length * Math.ceil(durationSeconds * 1000 / recentProofRenewalMilliseconds)
@@ -677,7 +710,34 @@ export async function runAuthorizationAssessment(plan, context) {
     const objectClients = { MEMBER_OWNER: clients.MEMBER, MEMBER_NON_OWNER: secondMember, ADMIN: clients.ADMIN };
     const objectChecks = await executeObjectAuthorizationChecks((actor, probe) =>
       request(objectClients[actor], probe, { csrf: probe.method !== "GET" }), rosterListing);
+    let mfaRequests = 0;
+    let mfaRequestLimit = 0;
+    const mfa = (context.mfaFixtureFactory ?? createMfaFixture)({
+      request: async (...args) => {
+        if (++mfaRequests > mfaRequestLimit) throw new Error("The MFA fixture request budget was exceeded");
+        return request(...args);
+      },
+      makeClient: () => new SecurityCookieJar(), clients, sharedPassword: context.sharedPassword,
+      origin: plan.target, resetLoginAttempts: context.resetLoginAttempts,
+      readRecoveryCode: context.readRecoveryCode, now: context.now ?? Date.now
+    });
+    const sharedMfaProofs = new Map();
     const results = await executeOperationMatrix(matrix, async (operation, actor, probe) => {
+      if (mfa.supports(operation.operationId) && operation.expectations[actor] === "allow") {
+        if (operation.proofRequirement && sharedMfaProofs.has(operation.operationId)) {
+          return sharedMfaProofs.get(operation.operationId);
+        }
+        mfaRequests = 0;
+        mfaRequestLimit = mfaFixtureRequestLimit(operation.operationId);
+        const response = await mfa.exercise(operation, actor, probe);
+        if (!operation.proofRequirement) return response;
+        if (response.status < 200 || response.status >= 300 || response.problemType) {
+          throw new Error("A shared MFA proof did not complete successfully");
+        }
+        const proof = { status: response.status, proofSourceActor: actor };
+        sharedMfaProofs.set(operation.operationId, proof);
+        return proof;
+      }
       if (operation.operationId === "logIn") {
         if (actor === "ANONYMOUS") return signInSecurityActor(request, new SecurityCookieJar(), "MEMBER",
           context.sharedPassword, context.resetLoginAttempts);

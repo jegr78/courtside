@@ -225,6 +225,16 @@
       "name": "v",
       "in": "query",
       "class": "identifier"
+    },
+    {
+      "name": "accountId",
+      "in": "path",
+      "class": "identifier"
+    },
+    {
+      "name": "credentialId",
+      "in": "path",
+      "class": "identifier"
     }
   ],
   "levels": {
@@ -248,9 +258,20 @@
     "waitlist-sweep": "Deleted by the waitlist sweep once the slot it waited for has ended; removed with the account it belongs to.",
     "partner-sweep": "Deleted when the place is taken or withdrawn, and by the partner sweep once its booking is gone, cancelled or started.",
     "usage-record": "A count of refused attempts by rule and card that names nobody; no retention category covers it and nothing deletes it.",
-    "retention-preview": "Deleted when its run starts, when the board changes or removes a period it applies, and by the preview sweep once it has expired; removed with the account that created it."
+    "retention-preview": "Deleted when its run starts, when the board changes or removes a period it applies, and by the preview sweep once it has expired; removed with the account that created it.",
+    "mfa-factor": "Active and pending TOTP state is replaced by a new setup, cleared by removal, disablement or controlled recovery, and removed with the account. Expiry refuses a pending setup but does not itself delete its ciphertext.",
+    "mfa-recovery-code": "Consumed once, replaced on regeneration, cleared when MFA or its final method is removed or controlled recovery succeeds, and removed with the account.",
+    "mfa-ceremony": "A five-minute ceremony refuses expired proofs. Consumption removes it; a new ceremony replaces its session/purpose predecessor and deletes expired ceremonies for that account. Per-purpose limits bound remaining rows; account deletion cascades.",
+    "mfa-instance-key": "The installation UUID and encrypted key check live with the instance database. Rotation retains the installation binding; removing a person does not remove instance key state.",
+    "mfa-credential": "Removed by its holder, MFA disablement, successful controlled recovery or account deletion. Labels and usage metadata remain private to the holder while the credential exists.",
+    "mfa-controlled-recovery": "Replaced by a new rescue, invalidated by address correction and removed by successful redemption or account deletion. Expiry denies redemption and retains the recovery block until a new rescue completes."
   },
   "inMemoryState": {
+    "AuditAdminController": {
+      "level": "personal",
+      "holds": "Audit entry payloads and resolved person metadata assembled for an administrator response.",
+      "bounded": "The audit search request that reads it."
+    },
     "BookingController": {
       "level": "personal",
       "holds": "The participant specifications of one booking request, each able to name a guest.",
@@ -265,6 +286,16 @@
       "level": "personal",
       "holds": "The participants of a booking request, hashed into the fingerprint that makes a retry idempotent.",
       "bounded": "The request that built it."
+    },
+    "BookingStatistics": {
+      "level": "personal",
+      "holds": "Configured participant-card labels and aggregate booking figures assembled for one report.",
+      "bounded": "The report request that reads it."
+    },
+    "BookingStatisticsService": {
+      "level": "personal",
+      "holds": "Configured participant-card labels read alongside aggregate booking figures.",
+      "bounded": "The report request that reads it."
     },
     "BookingWriter": {
       "level": "personal",
@@ -376,6 +407,11 @@
       "holds": "The rows parsed out of one uploaded roster file.",
       "bounded": "The preview it belongs to, which expires."
     },
+    "StatisticsService": {
+      "level": "personal",
+      "holds": "Configured participant-card labels and aggregate figures rendered in one administrator report.",
+      "bounded": "The report request that reads it."
+    },
     "SubjectAccessAdminController": {
       "level": "personal",
       "holds": "The reservations of one person, as a subject-access response renders them.",
@@ -447,6 +483,62 @@
     }
   },
   "storedFields": {
+    "account_mfa": {
+      "account_id": {
+        "level": "pseudonymous",
+        "lifecycle": "mfa-factor"
+      },
+      "pending_totp_expires_at": {
+        "level": "operational",
+        "lifecycle": "mfa-factor"
+      },
+      "pending_totp_secret": {
+        "level": "secret",
+        "lifecycle": "mfa-factor"
+      },
+      "recovery_pending": {
+        "level": "operational",
+        "lifecycle": "mfa-factor"
+      },
+      "totp_last_step": {
+        "level": "operational",
+        "lifecycle": "mfa-factor"
+      },
+      "totp_secret": {
+        "level": "secret",
+        "lifecycle": "mfa-factor"
+      }
+    },
+    "account_mfa_recovery": {
+      "account_id": {
+        "level": "pseudonymous",
+        "lifecycle": "mfa-controlled-recovery"
+      },
+      "address_hash": {
+        "level": "pseudonymous",
+        "lifecycle": "mfa-controlled-recovery"
+      },
+      "code_hash": {
+        "level": "secret",
+        "lifecycle": "mfa-controlled-recovery"
+      },
+      "created_at": {
+        "level": "operational",
+        "lifecycle": "mfa-controlled-recovery"
+      },
+      "expires_at": {
+        "level": "operational",
+        "lifecycle": "mfa-controlled-recovery"
+      },
+      "recovery_id": {
+        "level": "pseudonymous",
+        "lifecycle": "mfa-controlled-recovery"
+      },
+      "security_epoch": {
+        "level": "operational",
+        "lifecycle": "mfa-controlled-recovery"
+      }
+    },
     "attendance_policy": {
       "enabled": {
         "level": "operational",
@@ -1417,6 +1509,72 @@
         "lifecycle": "club-configuration"
       }
     },
+    "mfa_challenge": {
+      "account_id": {
+        "level": "pseudonymous",
+        "lifecycle": "mfa-ceremony"
+      },
+      "attempt_count": {
+        "level": "operational",
+        "lifecycle": "mfa-ceremony"
+      },
+      "created_seq": {
+        "level": "operational",
+        "lifecycle": "mfa-ceremony"
+      },
+      "expires_at": {
+        "level": "operational",
+        "lifecycle": "mfa-ceremony"
+      },
+      "id": {
+        "level": "pseudonymous",
+        "lifecycle": "mfa-ceremony"
+      },
+      "payload": {
+        "level": "personal",
+        "lifecycle": "mfa-ceremony"
+      },
+      "purpose": {
+        "level": "operational",
+        "lifecycle": "mfa-ceremony"
+      },
+      "security_epoch": {
+        "level": "operational",
+        "lifecycle": "mfa-ceremony"
+      },
+      "session_hash": {
+        "level": "pseudonymous",
+        "lifecycle": "mfa-ceremony"
+      }
+    },
+    "mfa_instance_key": {
+      "id": {
+        "level": "operational",
+        "lifecycle": "mfa-instance-key"
+      },
+      "installation_id": {
+        "level": "operational",
+        "lifecycle": "mfa-instance-key"
+      },
+      "key_check": {
+        "level": "secret",
+        "lifecycle": "mfa-instance-key"
+      }
+    },
+    "mfa_recovery_code": {
+      "account_id": {
+        "level": "pseudonymous",
+        "lifecycle": "mfa-recovery-code"
+      },
+      "code_hash": {
+        "level": "secret",
+        "lifecycle": "mfa-recovery-code"
+      },
+      "created_at": {
+        "level": "operational",
+        "lifecycle": "mfa-recovery-code"
+      }
+    },
     "notification": {
       "account_id": {
         "level": "pseudonymous",
@@ -1613,6 +1771,46 @@
         "lifecycle": "roster-record"
       }
     },
+    "retention_policy": {
+      "category": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "retain_months": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      }
+    },
+    "retention_preview": {
+      "id": {
+        "level": "operational",
+        "lifecycle": "retention-preview"
+      },
+      "created_by": {
+        "level": "pseudonymous",
+        "lifecycle": "retention-preview"
+      },
+      "created_at": {
+        "level": "operational",
+        "lifecycle": "retention-preview"
+      },
+      "expires_at": {
+        "level": "operational",
+        "lifecycle": "retention-preview"
+      },
+      "bookings_ended_before": {
+        "level": "operational",
+        "lifecycle": "retention-preview"
+      },
+      "memberships_ended_before": {
+        "level": "operational",
+        "lifecycle": "retention-preview"
+      },
+      "former_member_ids": {
+        "level": "pseudonymous",
+        "lifecycle": "retention-preview"
+      }
+    },
     "rule_definition": {
       "id": {
         "level": "operational",
@@ -1749,6 +1947,82 @@
         "lifecycle": "account-cascade"
       }
     },
+    "user_credentials": {
+      "attestation_client_data_json": {
+        "level": "pseudonymous",
+        "lifecycle": "mfa-credential"
+      },
+      "attestation_object": {
+        "level": "pseudonymous",
+        "lifecycle": "mfa-credential"
+      },
+      "authenticator_transports": {
+        "level": "operational",
+        "lifecycle": "mfa-credential"
+      },
+      "backup_eligible": {
+        "level": "operational",
+        "lifecycle": "mfa-credential"
+      },
+      "backup_state": {
+        "level": "operational",
+        "lifecycle": "mfa-credential"
+      },
+      "created": {
+        "level": "operational",
+        "lifecycle": "mfa-credential"
+      },
+      "credential_id": {
+        "level": "pseudonymous",
+        "lifecycle": "mfa-credential"
+      },
+      "label": {
+        "level": "personal",
+        "lifecycle": "mfa-credential"
+      },
+      "last_used": {
+        "level": "personal",
+        "lifecycle": "mfa-credential"
+      },
+      "public_key": {
+        "level": "pseudonymous",
+        "lifecycle": "mfa-credential"
+      },
+      "public_key_credential_type": {
+        "level": "operational",
+        "lifecycle": "mfa-credential"
+      },
+      "signature_count": {
+        "level": "operational",
+        "lifecycle": "mfa-credential"
+      },
+      "user_entity_user_id": {
+        "level": "pseudonymous",
+        "lifecycle": "mfa-credential"
+      },
+      "uv_initialized": {
+        "level": "operational",
+        "lifecycle": "mfa-credential"
+      }
+    },
+    "user_entities": {
+      "account_id": {
+        "level": "pseudonymous",
+        "lifecycle": "account-cascade"
+      },
+      "display_name": {
+        "level": "pseudonymous",
+        "lifecycle": "account-cascade"
+      },
+      "id": {
+        "level": "pseudonymous",
+        "lifecycle": "account-cascade"
+      },
+      "name": {
+        "level": "pseudonymous",
+        "lifecycle": "account-cascade"
+      }
+    },
     "waitlist_entry": {
       "account_id": {
         "level": "pseudonymous",
@@ -1831,46 +2105,6 @@
       "position": {
         "level": "operational",
         "lifecycle": "waitlist-sweep"
-      }
-    },
-    "retention_policy": {
-      "category": {
-        "level": "operational",
-        "lifecycle": "club-configuration"
-      },
-      "retain_months": {
-        "level": "operational",
-        "lifecycle": "club-configuration"
-      }
-    },
-    "retention_preview": {
-      "id": {
-        "level": "operational",
-        "lifecycle": "retention-preview"
-      },
-      "created_by": {
-        "level": "pseudonymous",
-        "lifecycle": "retention-preview"
-      },
-      "created_at": {
-        "level": "operational",
-        "lifecycle": "retention-preview"
-      },
-      "expires_at": {
-        "level": "operational",
-        "lifecycle": "retention-preview"
-      },
-      "bookings_ended_before": {
-        "level": "operational",
-        "lifecycle": "retention-preview"
-      },
-      "memberships_ended_before": {
-        "level": "operational",
-        "lifecycle": "retention-preview"
-      },
-      "former_member_ids": {
-        "level": "pseudonymous",
-        "lifecycle": "retention-preview"
       }
     }
   }

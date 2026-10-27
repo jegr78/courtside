@@ -102,6 +102,33 @@ class RequestEntryPointInventoryTest extends AbstractIntegrationTest {
             Map.entry("org/courtside/identity/internal/AccountSessionService.java",
                     new Boundary("the session the request already carries, and the marks this"
                             + " application itself wrote into it", List.of("getAttribute", "getSession"))),
+            Map.entry("org/courtside/identity/internal/AccountMfaController.java",
+                    new Boundary("the proxy-normalized peer address for the account and address MFA attempt budgets",
+                            List.of("getRemoteAddr"))),
+            Map.entry("org/courtside/identity/internal/AccountWebauthnController.java",
+                    new Boundary("the server-written ceremony id and browser session that bind enrollment and proof,"
+                            + " and the proxy-normalized peer address for the MFA attempt budgets",
+                            List.of("getAttribute", "getRemoteAddr", "getSession"))),
+            Map.entry("org/courtside/identity/internal/MfaRecoveryController.java",
+                    new Boundary("the proxy-normalized peer address for controlled-recovery attempt budgets",
+                            List.of("getRemoteAddr"))),
+            Map.entry("org/courtside/identity/internal/MfaSessionAuthentication.java",
+                    new Boundary("the browser session renewed after completed MFA, with its server-written challenge",
+                            List.of("getSession"))),
+            Map.entry("org/courtside/identity/internal/MfaWebAuthnFlow.java",
+                    new Boundary("the server-written reauthentication challenge id and the browser session it binds",
+                            List.of("getAttribute", "getSession"))),
+            Map.entry("org/courtside/identity/internal/ReauthenticationService.java",
+                    new Boundary("the proxy-normalized peer address for second-factor attempt budgets",
+                            List.of("getRemoteAddr"))),
+            Map.entry("org/courtside/identity/internal/SessionMfaController.java",
+                    new Boundary("the server-written password challenge and its browser session,"
+                            + " and the proxy-normalized peer address for MFA attempt budgets",
+                            List.of("getAttribute", "getRemoteAddr", "getSession"))),
+            Map.entry("org/courtside/identity/internal/SessionWebauthnController.java",
+                    new Boundary("the server-written password challenge and its browser session,"
+                            + " and the proxy-normalized peer address for MFA attempt budgets",
+                            List.of("getAttribute", "getRemoteAddr", "getSession"))),
             Map.entry("org/courtside/identity/internal/InvalidSessionCookieFilter.java",
                     new Boundary("the session the request already carries, beside the session cookie"
                             + " the document declares as a security scheme", List.of("getSession"))),

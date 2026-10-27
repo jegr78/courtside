@@ -2825,7 +2825,7 @@
       "surface": "authentication",
       "profile": "active",
       "prerequisites": [
-        "Administrative MFA product capability"
+        "Mandatory administrative enrollment policy, which the voluntary MFA product contract excludes"
       ],
       "expectedSecureOutcome": "Administrative access requires the documented ASVS Level 2 authentication strength.",
       "executionMode": "manual",
@@ -2835,7 +2835,7 @@
       "qualityRiskIds": [
         "ID-2"
       ],
-      "rationale": "Courtside does not yet provide a second factor for administrators.",
+      "rationale": "Courtside provides voluntary TOTP, WebAuthn and recovery codes for administrators and every other role. Enrolled administrators require password plus a factor. Unenrolled administrators retain password-only access, so capability and enrollment evidence do not establish the blanket ASVS Level 2 authentication-strength claim. The accepted voluntary-enrollment bound is recorded in docs/security-risks.md; issue 69 records the delivered capability and its explicit no-mandate contract.",
       "trackingIssue": 69
     },
     {
