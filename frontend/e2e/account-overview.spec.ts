@@ -34,11 +34,14 @@ async function fits(page: Page) {
 }
 
 for (const locale of ["de", "en"] as const) {
-  test(`given a signed-in member in ${locale}, when the account menu and security shortcut are used, then identity and both sections remain reachable by keyboard`, async ({ page }) => {
+  test(`given a signed-in member in ${locale}, when the account menu and security shortcut are used, then identity and both sections remain reachable by keyboard`, async ({ page }, info) => {
     // given
     await signIn(page, "doe.jane", locale);
     await expect(page.getByTestId("preferences-menu")).toHaveAccessibleName(
       `${locale === "de" ? "Konto und Darstellung" : "Account and appearance"} doe.jane`);
+    await page.evaluate(() => document.fonts.ready);
+    await page.screenshot({ path: info.outputPath(`account-control-${locale}.png`),
+      style: "[data-testid='pwa-registration-warning'] { visibility: hidden; }" });
 
     // when
     await page.getByTestId("preferences-menu").focus();
