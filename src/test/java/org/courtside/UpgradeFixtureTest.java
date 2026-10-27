@@ -3,6 +3,8 @@ package org.courtside;
 import org.courtside.shared.DatabaseMigration;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.api.io.TempDir;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -113,6 +115,99 @@ class UpgradeFixtureTest {
                     .as("a migration on these tables never meets data in the upgrade proof; seed them in %s",
                             FIXTURE)
                     .isEmpty();
+        }
+    }
+
+    @Test
+    void givenTheMfaFixture_whenVerificationReadsIt_thenEverySecurityRowIsBoundToItsDisabledAccount() throws Exception {
+        // given
+        try (Connection connection = connect()) {
+            // when
+            JsonNode proof = proof(connection);
+            // then
+            for (String key : List.of("mfaAccountRows", "mfaRecoveryCodeRows", "mfaInstanceKeyRows", "mfaChallengeRows",
+                    "webAuthnUserRows", "webAuthnCredentialRows", "mfaAccountRecoveryRows")) {
+                assertThat(proof.path(key).size()).as(key).isEqualTo(1);
+            }
+            JsonNode state = proof.path("mfaAccountRows").get(0);
+            assertThat(state.path("account_id").asText()).isEqualTo("72000000-0000-0000-0000-000000000003");
+            assertThat(state.path("totp_secret").isNull()).isTrue();
+            assertThat(state.path("pending_totp_secret").isNull()).isTrue();
+            assertThat(state.path("recovery_pending").asBoolean()).isTrue();
+            assertThat(proof.path("mfaInstanceKeyRows").get(0).path("key_check").isNull()).isTrue();
+            assertThat(proof.path("mfaRecoveryCodeRows").get(0).path("code_hash").asText())
+                    .matches("[0-9a-f]{32}").isNotEqualTo("f".repeat(64));
+            assertThat(proof.path("webAuthnCredentialRows").get(0).path("public_key").asText())
+                    .matches("[0-9a-f]{32}");
+            try (var statement = connection.createStatement()) {
+                var account = statement.executeQuery("""
+                        SELECT a.enabled, p.email FROM user_account a JOIN person p ON p.id = a.person_id
+                        WHERE a.id = '72000000-0000-0000-0000-000000000003'
+                        """);
+                assertThat(account.next()).isTrue();
+                assertThat(account.getBoolean(1)).isFalse();
+                assertThat(account.getString(2)).isEqualTo("mfa-upgrade@example.org");
+            }
+        }
+    }
+
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+            "mfaAccountRows | account_mfa | recovery_pending = false",
+            "mfaRecoveryCodeRows | mfa_recovery_code | code_hash = repeat('1', 64)",
+            "mfaInstanceKeyRows | mfa_instance_key | installation_id = '7f200000-0000-0000-0000-000000000099'",
+            "mfaChallengeRows | mfa_challenge | attempt_count = 2",
+            "webAuthnUserRows | user_entities | display_name = 'Richard Miles updated'",
+            "webAuthnCredentialRows | user_credentials | signature_count = 8",
+            "mfaAccountRecoveryRows | account_mfa_recovery | address_hash = repeat('2', 64)"
+    })
+    void givenMfaFixtureRows_whenAStoredValueChanges_thenTheProofDetectsIt(String key, String table, String change) throws Exception {
+        // given
+        try (Connection connection = connect(); var statement = connection.createStatement()) {
+            connection.setAutoCommit(false);
+            JsonNode before = proof(connection).path(key);
+            assertThat(before.size()).as(key).isEqualTo(1);
+            try {
+                // when
+                assertThat(statement.executeUpdate("UPDATE " + table + " SET " + change)).isEqualTo(1);
+                JsonNode after = proof(connection).path(key);
+                // then
+                assertThat(after).as(key).isNotEqualTo(before);
+            } finally {
+                connection.rollback();
+            }
+        }
+    }
+
+    @Test
+    void givenAnExistingInstanceKey_whenTheFixtureCanaryStatementRuns_thenItsInstallationAndCheckAreRetained() throws Exception {
+        // given
+        String fixture = Files.readString(FIXTURE);
+        int start = fixture.indexOf("INSERT INTO mfa_instance_key");
+        assertThat(start).as("fixture includes the legacy keyless installation row").isNotNegative();
+        String canary = fixture.substring(start, fixture.indexOf(';', start) + 1);
+        try (Connection connection = connect(); var statement = connection.createStatement()) {
+            connection.setAutoCommit(false);
+            try {
+                statement.executeUpdate("""
+                        UPDATE mfa_instance_key SET installation_id = '7f200000-0000-0000-0000-000000000099',
+                            key_check = 'existing-installation-check'
+                        """);
+                JsonNode before = proof(connection).path("mfaInstanceKeyRows");
+                // when
+                statement.execute(canary);
+                // then
+                assertThat(proof(connection).path("mfaInstanceKeyRows")).isEqualTo(before);
+            } finally {
+                connection.rollback();
+            }
+        }
+    }
+
+    private static JsonNode proof(Connection connection) throws Exception {
+        try (var statement = connection.createStatement(); var result = statement.executeQuery(Files.readString(VERIFICATION))) {
+            assertThat(result.next()).isTrue();
+            return new ObjectMapper().readTree(result.getString(1));
         }
     }
 

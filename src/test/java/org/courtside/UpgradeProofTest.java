@@ -32,7 +32,9 @@ class UpgradeProofTest extends AbstractIntegrationTest {
             "participantRows", "seriesRows", "seriesCourtRows", "sessionRows", "loginLimitRows",
             "fixtureAuditEvents", "fixtureMessageRecords", "fixtureMessageOptouts", "fixtureEventPublications",
             "fixtureImportSources", "fixtureImportMappings", "fixtureImportTypeMappings",
-            "fixtureImportOwnedFields", "fixtureImportReferences", "fixtureImportPreviews", "fixtureImportRuns");
+            "fixtureImportOwnedFields", "fixtureImportReferences", "fixtureImportPreviews", "fixtureImportRuns",
+            "mfaAccountRows", "mfaRecoveryCodeRows", "mfaInstanceKeyRows", "mfaChallengeRows",
+            "webAuthnUserRows", "webAuthnCredentialRows", "mfaAccountRecoveryRows");
 
     @Autowired
     private JdbcClient jdbc;
@@ -79,8 +81,7 @@ class UpgradeProofTest extends AbstractIntegrationTest {
 
         // then
         assertThat(account.propertyNames())
-                .as("the proof captures whole rows, so a column added by a migration is included "
-                        + "without anyone editing it — which is why the redaction must be a rule")
+                .as("the proof captures every account column")
                 .contains("security_epoch", "version", "enabled", "created_at");
     }
 
