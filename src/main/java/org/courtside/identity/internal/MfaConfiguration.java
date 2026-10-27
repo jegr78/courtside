@@ -38,7 +38,10 @@ class MfaConfiguration {
     }
 
     @Bean
-    ApplicationRunner validateMfaKeys(MfaSecrets secrets) {
-        return arguments -> secrets.initialize();
+    ApplicationRunner validateMfaKeys(MfaSecrets secrets, MfaKeysHealth health) {
+        return arguments -> {
+            secrets.initialize();
+            health.validated();
+        };
     }
 }
