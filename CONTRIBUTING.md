@@ -88,19 +88,15 @@ once under **Settings → Pages** before the first deployment can publish.
 
 ## Verifying
 
-During red and green, run the targeted tests: `./mvnw test -Dtest=ClassName`. Before pushing,
-commit the reviewed branch and run the full gate:
+Run targeted local tests for the changed behavior and its failure paths, for example
+`./mvnw test -Dtest=ClassName` or a named Vitest or Playwright case. Finish the whole-branch review
+and its corrections, then record the commands, results and committed head in the pull request.
+Follow the shared finalisation window in `CLAUDE.md` before synchronising and pushing.
 
-```bash
-JAVA_HOME=/path/to/temurin-25 node tools/courtside.mjs check
-```
-
-It classifies the change the way pull-request CI does, checks the committed head out in a separate
-worktree and runs the verification that classification selects. `check --plan` shows the decision,
-`check --full` escalates it. Unknown or untrusted change evidence fails closed to the full build.
-
-CI is what decides. A local run counts insofar as it reproduces the gate, and a difference between
-the two is itself a defect worth reporting.
+Do not run the full local check, `./mvnw clean verify`, the complete browser suite or all release
+gates as a finalisation step. Pull-request CI runs the required profiles against the current
+target branch. Investigate a failed check and reproduce it with a focused test before changing
+code. A blind rerun or a larger timeout does not resolve the failure.
 
 ## Commits and pull requests
 
@@ -110,6 +106,9 @@ the two is itself a defect worth reporting.
   Conventional Commit. Choose the type from what the change does to a consumer of the API rather
   than from how the diff looks, and add `!` when a published surface changes shape.
 - Keep a branch small enough that one squashed commit is an honest unit of history.
+- Keep findings from one review, and follow-ups in the same area, in one pull request with one
+  commit per finding. Separate an independently urgent or risky finding only when the others must
+  not wait for it, and document the reason and related links. This also governs `next-issue`.
 - Fill in [the pull request template](.github/pull_request_template.md). Its requirements matrix
   maps each acceptance criterion to its production path, its positive test, its adversarial test
   and the runtime evidence. An unresolved row blocks review, and the quality-evidence block under
