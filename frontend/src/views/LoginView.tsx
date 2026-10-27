@@ -8,9 +8,10 @@ import { isUnauthenticated, problemMessage } from "../api/problem-message";
 import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
 import { TextField } from "../components/TextField";
+import { getSecurityKey, supportsSecurityKeys } from "../security/webauthn";
 import { returnSearch } from "../navigation/returnTarget";
 
-export function LoginView({ refreshSession, passwordChanged = false, mfaRequired = false, totpAvailable = true }: { refreshSession: (signal?: AbortSignal) => Promise<void>; passwordChanged?: boolean; mfaRequired?: boolean; totpAvailable?: boolean }) {
+export function LoginView({ refreshSession, passwordChanged = false, mfaRequired = false, totpAvailable = true, webauthnAvailable = false }: { refreshSession: (signal?: AbortSignal) => Promise<void>; passwordChanged?: boolean; mfaRequired?: boolean; totpAvailable?: boolean; webauthnAvailable?: boolean }) {
   const { t } = useTranslation();
   const { search } = useLocation();
   const [factorStage, setFactorStage] = useState<boolean>();
@@ -20,9 +21,14 @@ export function LoginView({ refreshSession, passwordChanged = false, mfaRequired
   const [waitingSeconds, setWaitingSeconds] = useState<number>();
   const attempt = useRef<AbortController | undefined>(undefined);
 
-  useEffect(() => () => {
-    attempt.current?.abort();
-    attempt.current = undefined;
+  useEffect(() => {
+    const cancel = (event: KeyboardEvent) => { if (event.key === "Escape") attempt.current?.abort(); };
+    window.addEventListener("keydown", cancel);
+    return () => {
+      window.removeEventListener("keydown", cancel);
+      attempt.current?.abort();
+      attempt.current = undefined;
+    };
   }, []);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -90,6 +96,33 @@ export function LoginView({ refreshSession, passwordChanged = false, mfaRequired
   }
 
 
+  async function completeSecurityKey() {
+    if (attempt.current) return;
+    const controller = new AbortController();
+    attempt.current = controller;
+    setPending(true);
+    setError(undefined);
+    const deadline = setTimeout(() => controller.abort(new DOMException("Sign-in timed out", "TimeoutError")), 60_000);
+    try {
+      const options = await abortable(() => api.webauthnLoginOptions(controller.signal), controller.signal);
+      const credential = await getSecurityKey(options, controller.signal);
+      controller.signal.throwIfAborted();
+      await abortable(() => api.completeWebauthnLogin(credential, controller.signal), controller.signal);
+      controller.signal.throwIfAborted();
+      await abortable(() => refreshSession(controller.signal), controller.signal);
+    } catch (failure) {
+      if (attempt.current === controller && !controller.signal.aborted) {
+        setError(failure instanceof DOMException && failure.name === "NotAllowedError" ? t("mfa.keyCancelled") : problemMessage(failure, t));
+      }
+    } finally {
+      clearTimeout(deadline);
+      if (attempt.current === controller) {
+        attempt.current = undefined;
+        setPending(false);
+      }
+    }
+  }
+
   async function restart() {
     if (attempt.current) return;
     const controller = new AbortController();
@@ -119,13 +152,15 @@ export function LoginView({ refreshSession, passwordChanged = false, mfaRequired
 
   return <section data-testid="login-view" className="surface-panel w-full max-w-md rounded-2xl border p-6 shadow-[0_20px_50px_var(--cs-shadow)] sm:p-8">
     <h1 className="text-2xl font-bold">{t("auth.signIn")}</h1>
-    {factorRequired ? <form className="mt-6 grid gap-5" onSubmit={(event) => void completeFactor(event)}>
+    {factorRequired ? <form key="factor" className="mt-6 grid gap-5" onSubmit={(event) => void completeFactor(event)}>
       <p>{t(totpAvailable ? "mfa.loginHint" : "mfa.recoveryLoginHint")}</p>
       {error && <Alert>{error}</Alert>}
+      {webauthnAvailable && supportsSecurityKeys() && <Button variant="secondary" type="button" data-testid="login-security-key" disabled={pending} onClick={() => void completeSecurityKey()}>{t("mfa.useKey")}</Button>}
       <TextField id="mfa-code" name="mfa-code" data-testid="login-mfa-code" label={t("mfa.code")} autoComplete="one-time-code" autoFocus required maxLength={128} disabled={pending} />
       <Button variant="primary" type="submit" data-testid="login-mfa-submit" disabled={pending}>{t("auth.submit")}</Button>
+      <Link data-testid="login-mfa-help" to={`/account-recovery${returnSearch(search)}#controlled-mfa`} className="font-semibold underline underline-offset-4">{t("mfa.lostFactors")}</Link>
       <Button variant="secondary" type="button" data-testid="login-mfa-restart" disabled={pending} onClick={() => void restart()}>{t("mfa.restart")}</Button>
-    </form> : <form className="mt-6 grid gap-5" onSubmit={(event) => void submit(event)}>
+    </form> : <form key="password" className="mt-6 grid gap-5" onSubmit={(event) => void submit(event)}>
       {passwordChanged && <Alert tone="success">{t("password.changed")}</Alert>}
       {error && <Alert>{error}</Alert>}
       {waitingSeconds !== undefined && <Alert tone="info">{t("auth.waiting", { count: waitingSeconds })}</Alert>}

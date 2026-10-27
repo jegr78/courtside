@@ -2,38 +2,46 @@ import { type FormEvent, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useLocation } from "react-router-dom";
 import { api } from "../api/client";
+import { abortable } from "../api/abortable";
 import { problemMessage } from "../api/problem-message";
 import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
 import { TextField } from "../components/TextField";
 import { returnSearch } from "../navigation/returnTarget";
 
-type RecoveryForm = "password" | "redeem" | "usernames";
+type RecoveryForm = "password" | "redeem" | "usernames" | "mfa";
 
 export function AccountRecoveryView() {
   const { t } = useTranslation();
   const { search } = useLocation();
   const [pending, setPending] = useState(false);
   const [answer, setAnswer] = useState<{ form: RecoveryForm; error?: string; done?: string }>();
+  const attempt = useRef<AbortController | undefined>(undefined);
   const outcome = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     outcome.current?.scrollIntoView?.({ block: "nearest" });
   }, [answer]);
 
-  function submit(sent: RecoveryForm, act: (form: FormData) => Promise<void>, done: string) {
+  useEffect(() => () => { attempt.current?.abort(); attempt.current = undefined; }, []);
+
+  function submit(sent: RecoveryForm, act: (form: FormData, signal: AbortSignal) => Promise<void>, done: string) {
     return async (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
+      if (attempt.current) return;
       const form = new FormData(event.currentTarget);
+      const controller = new AbortController();
+      attempt.current = controller;
       setPending(true);
       setAnswer(undefined);
       try {
-        await act(form);
+        await abortable(() => act(form, controller.signal), controller.signal);
+        controller.signal.throwIfAborted();
         setAnswer({ form: sent, done });
       } catch (failure) {
-        setAnswer({ form: sent, error: problemMessage(failure, t) });
+        if (!controller.signal.aborted) setAnswer({ form: sent, error: problemMessage(failure, t) });
       } finally {
-        setPending(false);
+        if (attempt.current === controller) { attempt.current = undefined; setPending(false); }
       }
     };
   }
@@ -78,6 +86,29 @@ export function AccountRecoveryView() {
       <TextField id="recovery-email" name="email" label={t("recovery.email")} data-testid="recovery-email" type="email" autoComplete="email" required />
       <Button variant="secondary" type="submit" data-testid="recovery-usernames-submit" disabled={pending}>{t("recovery.usernames.submit")}</Button>
       {outcomeOf("usernames")}
+    </form>
+    <form id="controlled-mfa" className="mt-10 grid gap-4" onSubmit={(event) => {
+      event.preventDefault();
+      const current = event.currentTarget;
+      const data = new FormData(current);
+      if (text(data, "password") !== text(data, "password-confirm")) {
+        setAnswer({ form: "mfa", error: t("password.mismatch") });
+        return;
+      }
+      void submit("mfa", async (form, signal) => {
+        await api.redeemMfaRecovery(text(form, "username"), text(form, "code").trim(), text(form, "password"), signal);
+        signal.throwIfAborted();
+        current.reset();
+      }, "mfa.recoveryRedeemed")(event);
+    }}>
+      <h2 className="text-xl font-bold">{t("mfa.recoveryTitleControlled")}</h2>
+      <p className="text-muted">{t("mfa.recoveryControlledHint")}</p>
+      <TextField id="controlled-mfa-username" name="username" data-testid="controlled-mfa-username" label={t("auth.username")} autoComplete="username" required disabled={pending} />
+      <TextField id="controlled-mfa-code" name="code" data-testid="controlled-mfa-code" label={t("recovery.redeem.code")} autoComplete="one-time-code" maxLength={128} required disabled={pending} />
+      <TextField id="controlled-mfa-password" name="password" data-testid="controlled-mfa-password" type="password" label={t("password.new")} autoComplete="new-password" minLength={12} maxLength={256} required disabled={pending} />
+      <TextField id="controlled-mfa-password-confirm" name="password-confirm" data-testid="controlled-mfa-password-confirm" type="password" label={t("password.confirm")} autoComplete="new-password" minLength={12} maxLength={256} required disabled={pending} />
+      <Button variant="primary" type="submit" data-testid="controlled-mfa-submit" disabled={pending}>{t("mfa.recoveryRedeem")}</Button>
+      {outcomeOf("mfa")}
     </form>
     <p className="mt-8">
       <Link data-testid="recovery-back-to-login" to={`/login${returnSearch(search)}`} className="font-semibold underline underline-offset-4">{t("recovery.backToSignIn")}</Link>

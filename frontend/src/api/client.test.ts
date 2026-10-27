@@ -1005,3 +1005,55 @@ it("given an MFA proof and enrollment, when invoking holder operations, then use
   expect(calls).toEqual([{ code: "123456" }, { password: "secret", code: "RECOVERY-CODE" }, { code: "654321" }]);
   expect(JSON.stringify(stored.mock.calls)).not.toMatch(/EXAMPLEKEY|EXAMPLE-CODE|NEW-CODE|RECOVERY-CODE/);
 });
+
+it("given WebAuthn credentials, when invoking key management and login, then preserve structured payloads and private device identifiers", async () => {
+  // given
+  document.cookie = "XSRF-TOKEN=csrf";
+  const calls: { path: string; body: unknown }[] = [];
+  const assertion = { id: "AQ", rawId: "AQ", type: "public-key" as const, response: { authenticatorData: "Ag", clientDataJSON: "Aw", signature: "BA", userHandle: null } };
+  const registration = { id: "AQ", rawId: "AQ", type: "public-key" as const, response: { attestationObject: "Ag", clientDataJSON: "Aw", transports: ["usb" as const] } };
+  server.use(
+    http.post("/api/account/mfa/webauthn/registration-options", () => HttpResponse.json({ challenge: "AQ" })),
+    http.post("/api/account/mfa/webauthn", async ({ request }) => { calls.push({ path: new URL(request.url).pathname, body: await request.json() }); return HttpResponse.json({ codes: [] }); }),
+    http.patch("/api/account/mfa/webauthn/credentials/:id", async ({ request }) => { calls.push({ path: new URL(request.url).pathname, body: await request.json() }); return new HttpResponse(null, { status: 204 }); }),
+    http.delete("/api/account/mfa/webauthn/credentials/:id", ({ request }) => { calls.push({ path: new URL(request.url).pathname, body: null }); return new HttpResponse(null, { status: 204 }); }),
+    http.post("/api/account/mfa/webauthn/authentication-options", () => HttpResponse.json({ challenge: "Ag" })),
+    http.post("/api/session/mfa/webauthn/options", () => HttpResponse.json({ challenge: "Aw" })),
+    http.post("/api/session/mfa/webauthn", async ({ request }) => { calls.push({ path: new URL(request.url).pathname, body: await request.json() }); return new HttpResponse(null, { status: 200 }); }),
+    http.post("/api/session/reauthentication", async ({ request }) => { calls.push({ path: new URL(request.url).pathname, body: await request.json() }); return new HttpResponse(null, { status: 204 }); })
+  );
+  // when
+  await expect(api.webauthnRegistrationOptions()).resolves.toMatchObject({ challenge: "AQ" });
+  await api.registerWebauthn("Travel key", registration);
+  await api.renameWebauthn("AQ", "Spare key");
+  await api.removeWebauthn("AQ");
+  await expect(api.webauthnProofOptions()).resolves.toMatchObject({ challenge: "Ag" });
+  await expect(api.webauthnLoginOptions()).resolves.toMatchObject({ challenge: "Aw" });
+  await api.completeWebauthnLogin(assertion);
+  await api.reauthenticate("current-password", undefined, assertion);
+  // then
+  expect(calls).toEqual([
+    { path: "/api/account/mfa/webauthn", body: { label: "Travel key", credential: registration } },
+    { path: "/api/account/mfa/webauthn/credentials/AQ", body: { label: "Spare key" } },
+    { path: "/api/account/mfa/webauthn/credentials/AQ", body: null },
+    { path: "/api/session/mfa/webauthn", body: assertion },
+    { path: "/api/session/reauthentication", body: { password: "current-password", credential: assertion } }
+  ]);
+});
+
+it("given controlled account recovery, when starting and redeeming it, then distinguish the administrative and public contracts", async () => {
+  // given
+  document.cookie = "XSRF-TOKEN=csrf";
+  const calls: unknown[] = [];
+  server.use(
+    http.get("/api/admin/accounts/:id/mfa", () => HttpResponse.json({ enabled: true, recoveryPending: false })),
+    http.post("/api/admin/accounts/:id/mfa-recovery", async ({ request }) => { calls.push(await request.json()); return new HttpResponse(null, { status: 202 }); }),
+    http.post("/api/account-recovery/mfa/redemption", async ({ request }) => { calls.push(await request.json()); return new HttpResponse(null, { status: 204 }); })
+  );
+  // when
+  await expect(api.accountMfa("account-1")).resolves.toEqual({ enabled: true, recoveryPending: false });
+  await api.recoverAccountMfa("account-1");
+  await api.redeemMfaRecovery("doe.jane", "ABCD-EFGH", "clay-court-evening");
+  // then
+  expect(calls).toEqual([{ identityChecked: true }, { username: "doe.jane", code: "ABCD-EFGH", password: "clay-court-evening" }]);
+});

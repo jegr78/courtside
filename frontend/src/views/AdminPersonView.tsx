@@ -1,7 +1,7 @@
 import { useProofContinuation } from "../security/useProofContinuation";
 import { ReauthenticationCode } from "../components/ReauthenticationCode";
-import { reauthenticateForm } from "../security/reauthentication";
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { ProofOwnerContext, reauthenticateForm } from "../security/reauthentication";
+import { useCallback, useContext, useEffect, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useLocation, useParams } from "react-router-dom";
 import { api, ApiError, type ClubConfig, type MembershipType, type MessageEntry, type NoShow, type PersonRequest, type Role, type RosterEntry } from "../api/client";
@@ -24,6 +24,7 @@ import { differs } from "../unsaved/differs";
 import { SaveBar } from "../unsaved/SaveBar";
 import { saveInTurn, StepFailed, type SaveStep } from "../unsaved/saveInTurn";
 import { useUnsavedForm } from "../unsaved/useUnsavedForm";
+import { AdminMfaRecovery } from "./AdminMfaRecovery";
 import { GuardianshipsSection } from "./GuardianshipsSection";
 import { MembershipPeriodsSection } from "./MembershipPeriodsSection";
 
@@ -86,6 +87,8 @@ export function AdminPersonView() {
     : undefined);
   const [pending, setPending] = useState(false);
   const proofContinuation = useProofContinuation(personId);
+  const securityContinuation = useProofContinuation(personId);
+  const proofOwner = useContext(ProofOwnerContext);
   const [retry, setRetry] = useState<{ run: () => Promise<void> }>();
   const [reauthenticationFailure, setReauthenticationFailure] = useState<string>();
   const [draft, setDraft] = useState<Draft>({});
@@ -140,22 +143,25 @@ export function AdminPersonView() {
 
   async function runSecurityAction(action: () => Promise<void>, message: string, signsOut = false) {
     if (pending) return;
+    const ownsAction = securityContinuation.begin();
     setPending(true);
     try {
       await action();
-      securityActionCompleted(message, signsOut);
+      if (ownsAction()) securityActionCompleted(message, signsOut);
     } catch (failure) {
+      if (!ownsAction()) return;
       if (failure instanceof ApiError && failure.problem?.type === RECENT_AUTH) {
         setReauthenticationFailure(undefined);
         setRetry({ run: async () => {
+          if (!ownsAction()) return;
           await action();
-          securityActionCompleted(message, signsOut);
+          if (ownsAction()) securityActionCompleted(message, signsOut);
         } });
       } else {
         reportError(failure);
       }
     } finally {
-      setPending(false);
+      if (ownsAction()) setPending(false);
     }
   }
 
@@ -358,6 +364,7 @@ export function AdminPersonView() {
             disabled={pending}
             create={(request) => mutate(() => api.createAccount(personId, request))}
           />}
+        {entry.accountId && <AdminMfaRecovery key={entry.accountId} accountId={entry.accountId} disabled={pending || !entry.enabled} run={(action, message) => runSecurityAction(action, message, Boolean(proofOwner && entry.username === proofOwner))} />}
         {entry.accountId && <NoShowsSection personId={personId} timeZone={club.timeZone} />}
         {entry.accountId && <GuardianshipsSection entry={entry} disabled={pending} stepUp={(run) => {
           setReauthenticationFailure(undefined);

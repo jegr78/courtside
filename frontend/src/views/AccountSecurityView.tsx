@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { type ComponentProps, type FormEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { api, ApiError, type AccountSession } from "../api/client";
 import { problemMessage } from "../api/problem-message";
@@ -15,7 +15,11 @@ import { formatDateTime } from "../time/clubZone";
 
 const RECENT_AUTH = "urn:courtside:error:recent-authentication-required";
 
-export function AccountSecurityView({ passwordChanged, signedOut, embedded = false, focusRequested = false, mfaEnabled, username }: {
+export function AccountSecurityView(props: ComponentProps<typeof AccountSecurityContent>) {
+  return <AccountSecurityContent key={props.username} {...props} />;
+}
+
+function AccountSecurityContent({ passwordChanged, signedOut, embedded = false, focusRequested = false, mfaEnabled, username }: {
   mfaEnabled?: boolean;
   username?: string;
   passwordChanged: () => void;
@@ -32,10 +36,11 @@ export function AccountSecurityView({ passwordChanged, signedOut, embedded = fal
   const heading = useRef<HTMLHeadingElement>(null);
   const actionVersion = useRef(0);
   const proofVersion = useRef(0);
+  const proofAttempt = useRef<AbortController | undefined>(undefined);
   const Heading = embedded ? "h2" : "h1";
   const Subheading = embedded ? "h3" : "h2";
   const [retry, setRetry] = useState<{
-    action: () => Promise<void>;
+    action: (signal?: AbortSignal) => Promise<void>;
     completed?: () => void;
   }>();
 
@@ -43,7 +48,7 @@ export function AccountSecurityView({ passwordChanged, signedOut, embedded = fal
     void api.accountSessions().then(setSessions).catch((error) => setFailure(problemMessage(error, t)));
   }, [t]);
 
-  useLayoutEffect(() => () => { actionVersion.current += 1; }, []);
+  useLayoutEffect(() => () => { actionVersion.current += 1; proofAttempt.current?.abort(); }, []);
 
   function isCurrent(version: number) { return actionVersion.current === version; }
 
@@ -53,7 +58,7 @@ export function AccountSecurityView({ passwordChanged, signedOut, embedded = fal
     heading.current?.focus({ preventScroll: true });
   }, [focusRequested]);
 
-  async function run(action: () => Promise<void>, completed?: () => void) {
+  async function run(action: (signal?: AbortSignal) => Promise<void>, completed?: () => void) {
     const version = actionVersion.current;
     setPending(true);
     setFailure(undefined);
@@ -81,6 +86,9 @@ export function AccountSecurityView({ passwordChanged, signedOut, embedded = fal
     if (typeof password !== "string" || !retry) return;
     const version = actionVersion.current;
     const proof = proofVersion.current;
+    const controller = new AbortController();
+    proofAttempt.current?.abort();
+    proofAttempt.current = controller;
     event.currentTarget.querySelector<HTMLInputElement>("#reauthentication-password")?.focus();
     setPending(true);
     setReauthenticationFailure(undefined);
@@ -88,7 +96,7 @@ export function AccountSecurityView({ passwordChanged, signedOut, embedded = fal
       await reauthenticateForm(event.currentTarget, password);
       if (!isCurrent(version) || proofVersion.current !== proof) return;
       const pendingAction = retry;
-      await pendingAction.action();
+      await pendingAction.action(controller.signal);
       if (!isCurrent(version)) return;
       if (proofVersion.current === proof) setRetry(undefined);
       if (pendingAction.completed) pendingAction.completed();
@@ -145,6 +153,7 @@ export function AccountSecurityView({ passwordChanged, signedOut, embedded = fal
     </section>
     {retry && <Modal labelledBy="account-reauthentication-title" closed={() => {
       proofVersion.current += 1;
+      proofAttempt.current?.abort();
       setPending(false);
       setRetry(undefined);
       setReauthenticationFailure(undefined);

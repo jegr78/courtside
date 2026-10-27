@@ -221,3 +221,43 @@ describe("LoginView", () => {
   });
 
 });
+
+it("given a resumed pending login with a security key, when the holder uses it, then refresh only after its assertion succeeds", async () => {
+  // given
+  vi.stubGlobal("isSecureContext", true);
+  vi.stubGlobal("PublicKeyCredential", class {});
+  const get = vi.fn<(options: CredentialRequestOptions) => Promise<unknown>>().mockResolvedValue({ id: "AQ", rawId: new Uint8Array([1]).buffer, type: "public-key", getClientExtensionResults: () => ({}), response: { authenticatorData: new Uint8Array([1]).buffer, clientDataJSON: new Uint8Array([2]).buffer, signature: new Uint8Array([3]).buffer, userHandle: null } });
+  vi.stubGlobal("navigator", { credentials: { create: vi.fn(), get } });
+  vi.spyOn(api, "webauthnLoginOptions").mockResolvedValue({ challenge: "AQ", rpId: "example.org", allowCredentials: [], userVerification: "required" });
+  const complete = vi.spyOn(api, "completeWebauthnLogin").mockResolvedValue(undefined);
+  const refresh = vi.fn().mockResolvedValue(undefined);
+  render(<MemoryRouter><LoginView mfaRequired webauthnAvailable refreshSession={refresh} /></MemoryRouter>);
+  // when
+  fireEvent.click(screen.getByTestId("login-security-key"));
+  // then
+  await screen.findByTestId("login-mfa-code");
+  await vi.waitFor(() => expect(refresh).toHaveBeenCalledOnce());
+  expect(complete.mock.calls[0][0].response.signature).toBe("Aw");
+  expect(screen.queryByTestId("password")).toBeNull();
+  vi.unstubAllGlobals();
+});
+
+it("given a security key prompt, when Escape cancels it, then leave recovery code sign-in usable and discard late credentials", async () => {
+  // given
+  vi.stubGlobal("isSecureContext", true);
+  vi.stubGlobal("PublicKeyCredential", class {});
+  const get = vi.fn<(options: CredentialRequestOptions) => Promise<unknown>>().mockImplementation(() => new Promise(() => {}));
+  vi.stubGlobal("navigator", { credentials: { create: vi.fn(), get } });
+  vi.spyOn(api, "webauthnLoginOptions").mockResolvedValue({ challenge: "AQ", rpId: "example.org", allowCredentials: [], userVerification: "required" });
+  const complete = vi.spyOn(api, "completeWebauthnLogin").mockResolvedValue(undefined);
+  render(<MemoryRouter><LoginView mfaRequired webauthnAvailable refreshSession={vi.fn()} /></MemoryRouter>);
+  // when
+  fireEvent.click(screen.getByTestId("login-security-key"));
+  await vi.waitFor(() => expect(get).toHaveBeenCalledOnce());
+  fireEvent.keyDown(window, { key: "Escape" });
+  // then
+  await vi.waitFor(() => expect(screen.getByTestId("login-mfa-code")).toBeEnabled());
+  expect(get.mock.calls[0][0].signal?.aborted).toBe(true);
+  expect(complete).not.toHaveBeenCalled();
+  vi.unstubAllGlobals();
+});

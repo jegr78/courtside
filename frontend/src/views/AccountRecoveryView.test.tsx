@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
@@ -146,8 +146,7 @@ describe("AccountRecoveryView", () => {
     await userEvent.type(screen.getByTestId("recovery-new-password"), "clay-court-evening");
     await userEvent.click(screen.getByTestId("recovery-redeem-submit"));
 
-    // then — the contract pattern is anchored, so a code pasted with its surrounding blanks would
-    // be refused as a malformed request rather than compared
+    // then
     expect(redeemed).toHaveBeenCalledWith("ABCD-EFGH", "clay-court-evening");
     expect(await screen.findByTestId("recovery-sent"))
       .toHaveTextContent("The password is set. You can sign in with it now.");
@@ -220,4 +219,68 @@ describe("AccountRecoveryView", () => {
       .toHaveTextContent("That has been asked too often. Try again later.");
     expect(screen.queryByTestId("recovery-sent")).not.toBeInTheDocument();
   });
+});
+
+it("given a club-issued MFA recovery code, when the holder chooses a new password, then redeem only the controlled-recovery contract and clear secrets", async () => {
+  // given
+  const redeem = vi.spyOn(api, "redeemMfaRecovery").mockResolvedValue(undefined);
+  const ordinary = vi.spyOn(api, "redeemPasswordReset").mockResolvedValue(undefined);
+  const storage = vi.spyOn(Storage.prototype, "setItem");
+  show();
+  // when
+  await userEvent.type(screen.getByTestId("controlled-mfa-username"), "doe.jane");
+  await userEvent.type(screen.getByTestId("controlled-mfa-code"), "  ABCD-EFGH  ");
+  await userEvent.type(screen.getByTestId("controlled-mfa-password"), "clay-court-evening");
+  await userEvent.type(screen.getByTestId("controlled-mfa-password-confirm"), "clay-court-evening");
+  await userEvent.click(screen.getByTestId("controlled-mfa-submit"));
+  // then
+  expect(redeem).toHaveBeenCalledWith("doe.jane", "ABCD-EFGH", "clay-court-evening", expect.any(AbortSignal));
+  expect(ordinary).not.toHaveBeenCalled();
+  expect(await screen.findByTestId("recovery-sent")).toHaveTextContent(i18n.t("mfa.recoveryRedeemed"));
+  expect(screen.getByTestId("controlled-mfa-code")).toHaveValue("");
+  expect(screen.getByTestId("controlled-mfa-password")).toHaveValue("");
+  expect(JSON.stringify(storage.mock.calls)).not.toMatch(/ABCD-EFGH|clay-court-evening/);
+});
+
+it("given different controlled-recovery passwords, when redeeming, then explain the mismatch before sending a code", async () => {
+  // given
+  const redeem = vi.spyOn(api, "redeemMfaRecovery").mockResolvedValue(undefined);
+  show();
+  await userEvent.type(screen.getByTestId("controlled-mfa-username"), "doe.jane");
+  await userEvent.type(screen.getByTestId("controlled-mfa-code"), "ABCD-EFGH");
+  await userEvent.type(screen.getByTestId("controlled-mfa-password"), "clay-court-evening");
+  await userEvent.type(screen.getByTestId("controlled-mfa-password-confirm"), "another-evening-password");
+  // when
+  await userEvent.click(screen.getByTestId("controlled-mfa-submit"));
+  // then
+  expect(await screen.findByRole("alert")).toHaveTextContent(i18n.t("password.mismatch"));
+  expect(redeem).not.toHaveBeenCalled();
+});
+
+it("given a controlled recovery request in flight, when the form submits twice, then send a single redemption", () => {
+  // given
+  const redeem = vi.spyOn(api, "redeemMfaRecovery").mockImplementation(() => new Promise<never>(() => {}));
+  show();
+  const field = screen.getByTestId("controlled-mfa-username");
+  // when
+  fireEvent.submit(field.closest("form")!);
+  fireEvent.submit(field.closest("form")!);
+  // then
+  expect(redeem).toHaveBeenCalledOnce();
+});
+
+it("given a refused controlled recovery code, when redemption fails, then keep a usable form without publishing success", async () => {
+  // given
+  vi.spyOn(api, "redeemMfaRecovery").mockRejectedValue(new ApiError(403, { type: "urn:courtside:error:mfa-proof-failed", title: "Proof failed", status: 403, violations: [{ code: "identity.mfa.proofFailed", params: {} }] }));
+  show();
+  fireEvent.change(screen.getByTestId("controlled-mfa-username"), { target: { value: "doe.jane" } });
+  fireEvent.change(screen.getByTestId("controlled-mfa-code"), { target: { value: "WRONG-CODE" } });
+  fireEvent.change(screen.getByTestId("controlled-mfa-password"), { target: { value: "clay-court-evening" } });
+  fireEvent.change(screen.getByTestId("controlled-mfa-password-confirm"), { target: { value: "clay-court-evening" } });
+  // when
+  await userEvent.click(screen.getByTestId("controlled-mfa-submit"));
+  // then
+  expect(await screen.findByRole("alert")).toHaveTextContent(i18n.t("identity.mfa.proofFailed"));
+  expect(screen.queryByTestId("recovery-sent")).toBeNull();
+  expect(screen.getByTestId("controlled-mfa-submit")).toBeEnabled();
 });

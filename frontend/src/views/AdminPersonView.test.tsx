@@ -483,6 +483,7 @@ describe("AdminPersonView", () => {
 
   beforeEach(async () => {
     vi.restoreAllMocks();
+    vi.spyOn(api, "accountMfa").mockResolvedValue({ enabled: false, recoveryPending: false });
     vi.mocked(downloadJson).mockClear();
     await i18n.changeLanguage("en");
     vi.spyOn(api, "membershipTypes").mockResolvedValue([adults, juniors]);
@@ -535,7 +536,7 @@ describe("AdminPersonView", () => {
 
       // then
       await waitFor(() => expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Jane Doe"));
-      expect(screen.queryByRole("status")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("admin-save-success")).not.toBeInTheDocument();
     }
   });
 
@@ -1201,4 +1202,47 @@ describe("AdminPersonView", () => {
     expect(changing).toHaveBeenCalledOnce();
   });
 
+});
+
+it("given an administrator recovering their own account, when identity is confirmed and recovery starts, then immediately leave the revoked session", async () => {
+  // given
+  vi.spyOn(api, "accountMfa").mockResolvedValue({ enabled: true, recoveryPending: false });
+  vi.spyOn(api, "membershipTypes").mockResolvedValue([adults]);
+  vi.spyOn(api, "membershipPeriods").mockResolvedValue([]);
+  vi.spyOn(api, "guardianRelationships").mockResolvedValue([]);
+  vi.spyOn(api, "messages").mockResolvedValue({ entries: [], nextCursor: null });
+  const recover = vi.spyOn(api, "recoverAccountMfa").mockResolvedValue(undefined);
+  const events = vi.spyOn(window, "dispatchEvent");
+  const owner = proofOwnerHarness();
+  showPerson(jane, club, owner.Wrapper);
+  // when
+  await userEvent.click(await screen.findByTestId("admin-mfa-identity-checked"));
+  await userEvent.click(screen.getByTestId("admin-mfa-recover"));
+  // then
+  await waitFor(() => expect(recover).toHaveBeenCalledWith("account-1", expect.any(AbortSignal)));
+  expect(events.mock.calls.some(([event]) => event.type === "courtside:unauthenticated")).toBe(true);
+});
+
+it("given self-recovery in flight, when another administrator becomes the actor, then a late result must not sign out the new actor", async () => {
+  // given
+  vi.restoreAllMocks();
+  vi.spyOn(api, "accountMfa").mockResolvedValue({ enabled: true, recoveryPending: false });
+  vi.spyOn(api, "membershipTypes").mockResolvedValue([adults]);
+  vi.spyOn(api, "membershipPeriods").mockResolvedValue([]);
+  vi.spyOn(api, "guardianRelationships").mockResolvedValue([]);
+  vi.spyOn(api, "messages").mockResolvedValue({ entries: [], nextCursor: null });
+  let finish!: () => void;
+  const recover = vi.spyOn(api, "recoverAccountMfa").mockImplementation(() => new Promise<void>((resolve) => { finish = resolve; }));
+  const events = vi.spyOn(window, "dispatchEvent");
+  const owner = proofOwnerHarness();
+  showPerson(jane, club, owner.Wrapper);
+  await userEvent.click(await screen.findByTestId("admin-mfa-identity-checked"));
+  await userEvent.click(screen.getByTestId("admin-mfa-recover"));
+  await waitFor(() => expect(recover).toHaveBeenCalledOnce());
+  // when
+  act(() => owner.change());
+  await act(async () => { finish(); await Promise.resolve(); });
+  // then
+  expect(events.mock.calls.some(([event]) => event.type === "courtside:unauthenticated")).toBe(false);
+  expect(screen.queryByTestId("admin-save-success")).toBeNull();
 });

@@ -28,7 +28,7 @@ import { MyMessagesView } from "./views/MyMessagesView";
 import { DependantsView } from "./views/DependantsView";
 import { AccountView } from "./views/AccountView";
 import { clearRecoveryCodes } from "./security/recoveryCodes";
-import { MfaProofContext, ProofOwnerContext } from "./security/reauthentication";
+import { MfaProofContext, ProofOwnerContext, WebauthnProofContext } from "./security/reauthentication";
 import { RecoveryCodesNotice } from "./components/RecoveryCodesNotice";
 import { warnAbout } from "./api/failureWarning";
 
@@ -62,7 +62,7 @@ export function AppRoutes({ session, refreshSession, passwordChanged, initialPas
       <Route path="*" element={<Navigate to={`/initial-password${returnQuery(address)}`} replace />} />
     </Routes>;
   }
-  return <ProofOwnerContext value={session.username}><MfaProofContext value={Boolean(session.mfaEnabled)}><UnsavedChangesProvider>
+  return <ProofOwnerContext value={session.username}><MfaProofContext value={Boolean(session.mfaEnabled)}><WebauthnProofContext value={Boolean(session.webauthnAvailable)}><UnsavedChangesProvider>
     <div key={session.username ?? "anonymous"} className="flex w-full flex-col items-center gap-4">
     <UnsavedChangesGuard />
     {!administrative && <PrimaryNavigation session={session} />}
@@ -74,7 +74,7 @@ export function AppRoutes({ session, refreshSession, passwordChanged, initialPas
       : <AccountRecoveryView />} />
     <Route path="/login" element={session.authenticated
       ? <Navigate to={returnTargetIn(address.search) ?? afterSignIn} replace />
-      : <LoginView refreshSession={refreshSession} passwordChanged={passwordChanged} mfaRequired={session.mfaRequired} totpAvailable={session.totpAvailable} />} />
+      : <LoginView refreshSession={refreshSession} passwordChanged={passwordChanged} mfaRequired={session.mfaRequired} totpAvailable={session.totpAvailable} webauthnAvailable={session.webauthnAvailable} />} />
     <Route path="/my-bookings" element={session.authenticated
       ? <MyBookingsPage session={session} offline={offline} />
       : signInFirst} />
@@ -103,7 +103,7 @@ export function AppRoutes({ session, refreshSession, passwordChanged, initialPas
     <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
     </div>
-  </UnsavedChangesProvider></MfaProofContext></ProofOwnerContext>;
+  </UnsavedChangesProvider></WebauthnProofContext></MfaProofContext></ProofOwnerContext>;
 }
 
 function applyBranding(config: ClubConfig) {

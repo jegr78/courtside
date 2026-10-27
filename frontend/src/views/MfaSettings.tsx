@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useState } from "react";
+import { type FormEvent, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import qrcode from "qrcode-generator";
 import { api, type MfaRecoveryCodeSet, type MfaStatus, type TotpEnrollment } from "../api/client";
@@ -6,25 +6,88 @@ import { problemMessage } from "../api/problem-message";
 import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
 import { TextField } from "../components/TextField";
+import { abortable } from "../api/abortable";
+import { createSecurityKey, supportsSecurityKeys } from "../security/webauthn";
+import { ProofOwnerContext } from "../security/reauthentication";
 import { showRecoveryCodes } from "../security/recoveryCodes";
 
 export function MfaSettings({ username, pending, run, signedOut }: {
   username?: string;
   pending: boolean;
-  run: (action: () => Promise<void>, completed?: () => void) => Promise<void>;
+  run: (action: (signal?: AbortSignal) => Promise<void>, completed?: () => void) => Promise<void>;
   signedOut: (preserveRecoveryCodes?: boolean) => void;
 }) {
   const { t } = useTranslation();
+  const owner = useContext(ProofOwnerContext);
+  const keyLifetime = useRef(new AbortController());
   const [status, setStatus] = useState<MfaStatus>();
   const [failure, setFailure] = useState<string>();
   const [loadVersion, setLoadVersion] = useState(0);
+  const keyAttempt = useRef<AbortController | undefined>(undefined);
+  const [keyPending, setKeyPending] = useState(false);
+  const [keyPreparing, setKeyPreparing] = useState(false);
   const [enrollment, setEnrollment] = useState<TotpEnrollment>();
   useEffect(() => {
     let active = true;
-    void api.ownMfa().then((value) => { if (active) { setStatus(value); setFailure(undefined); } })
+    const controller = new AbortController();
+    void api.ownMfa(AbortSignal.any([controller.signal, keyLifetime.current.signal])).then((value) => { if (active) { setStatus(value); setFailure(undefined); } })
       .catch((error) => { if (active) setFailure(problemMessage(error, t)); });
-    return () => { active = false; };
-  }, [t, loadVersion]);
+    return () => { active = false; controller.abort(); };
+  }, [t, loadVersion, owner, username]);
+
+  useLayoutEffect(() => {
+    const lifetime = new AbortController();
+    keyLifetime.current = lifetime;
+    const cancel = (event: KeyboardEvent) => { if (event.key === "Escape") keyAttempt.current?.abort(); };
+    window.addEventListener("keydown", cancel);
+    return () => { lifetime.abort(); window.removeEventListener("keydown", cancel); keyAttempt.current?.abort(); keyAttempt.current = undefined; };
+  }, [username, owner]);
+
+  function registerKey(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const label = new FormData(event.currentTarget).get("mfa-key-label");
+    if (typeof label !== "string" || !label.trim() || keyAttempt.current) return;
+    let result: MfaRecoveryCodeSet;
+    const actorSignal = keyLifetime.current.signal;
+    return run(async (proofSignal) => {
+      const controller = new AbortController();
+      keyAttempt.current = controller;
+      const preparation = AbortSignal.any([controller.signal, actorSignal, ...(proofSignal ? [proofSignal] : [])]);
+      setKeyPending(true);
+      setKeyPreparing(true);
+      setFailure(undefined);
+      try {
+        const options = await abortable(() => api.webauthnRegistrationOptions(preparation), preparation);
+        const credential = await createSecurityKey(options, preparation);
+        preparation.throwIfAborted();
+        setKeyPreparing(false);
+        result = await abortable(() => api.registerWebauthn(label.trim(), credential, actorSignal), actorSignal);
+      } catch (error) {
+        if (controller.signal.aborted || error instanceof DOMException && error.name === "NotAllowedError") {
+          if (keyAttempt.current === controller) setFailure(t("mfa.keyCancelled"));
+          throw controller.signal.aborted ? new DOMException("Security key request cancelled", "AbortError") : error;
+        }
+        throw error;
+      } finally {
+        if (keyAttempt.current === controller) { keyAttempt.current = undefined; setKeyPending(false); setKeyPreparing(false); }
+      }
+    }, () => {
+      if (result.codes.length) showRecoveryCodes(result.codes, username);
+      signedOut(result.codes.length > 0);
+    });
+  }
+
+  function renameKey(event: FormEvent<HTMLFormElement>, id: string) {
+    event.preventDefault();
+    const label = new FormData(event.currentTarget).get("device-label");
+    if (typeof label !== "string" || !label.trim()) return;
+    void mutateKey((signal) => api.renameWebauthn(id, label.trim(), signal));
+  }
+
+  function mutateKey(action: (signal: AbortSignal) => Promise<void>) {
+    const signal = keyLifetime.current.signal;
+    return run(() => action(signal), signedOut);
+  }
 
   function begin() {
     let next: TotpEnrollment;
@@ -63,6 +126,22 @@ export function MfaSettings({ username, pending, run, signedOut }: {
         </>}
       </div>}
     </>}
+    {status && <section className="grid gap-4 rounded-xl border p-4">
+      <h4 className="font-bold">{t("mfa.keyList")}</h4>
+      <p className="text-muted text-sm">{t("mfa.keyPrivacy")}</p>
+      {(status.devices ?? []).map((device) => <form key={device.id} className="grid gap-3 rounded-lg border p-3" onSubmit={(event) => renameKey(event, device.id)}>
+        <TextField id={`mfa-device-${device.id}`} name="device-label" data-testid={`mfa-device-label-${device.id}`} label={t("mfa.keyLabel")} defaultValue={device.label} maxLength={100} required disabled={pending || keyPending} />
+        <div className="flex flex-wrap gap-3">
+          <Button variant="secondary" type="submit" data-testid={`mfa-device-rename-${device.id}`} disabled={pending || keyPending}>{t("mfa.keyRename")}</Button>
+          <Button variant="destructive" type="button" data-testid={`mfa-device-remove-${device.id}`} disabled={pending || keyPending} onClick={() => void mutateKey((signal) => api.removeWebauthn(device.id, signal))}>{t("mfa.keyRemove")}</Button>
+        </div>
+      </form>)}
+      {status.webauthnAvailable && supportsSecurityKeys() ? <form className="grid gap-3" onSubmit={(event) => void registerKey(event)}>
+        <TextField id="mfa-key-label" name="mfa-key-label" data-testid="mfa-key-label" label={t("mfa.keyLabel")} maxLength={100} required disabled={pending || keyPending} />
+        <Button variant="secondary" type="submit" data-testid="mfa-add-key" disabled={pending || keyPending}>{t("mfa.addKey")}</Button>
+        {keyPreparing && <Button variant="secondary" type="button" data-testid="mfa-cancel-key" onClick={() => keyAttempt.current?.abort()}>{t("mfa.cancel")}</Button>}
+      </form> : <p data-testid="mfa-key-unavailable" className="text-muted text-sm">{t("mfa.keyUnavailable")}</p>}
+    </section>}
     {enrollment && <form className="grid gap-4 rounded-xl border p-4" onSubmit={confirm}>
       <p>{t("mfa.setupHint")}</p>
       <EnrollmentQr uri={enrollment.uri} />
