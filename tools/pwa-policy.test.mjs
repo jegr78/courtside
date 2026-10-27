@@ -16,6 +16,8 @@ const eslintConfiguration = readFileSync(join(repository, "frontend/eslint.confi
 const typescriptConfiguration = readFileSync(join(repository, "frontend/tsconfig.app.json"), "utf8");
 const frontendPackage = JSON.parse(readFileSync(join(repository, "frontend/package.json"), "utf8"));
 const REVIEWED_PASSWORD_FIELDS = [
+  "frontend/src/views/AccountRecoveryView.tsx#controlled-mfa-password",
+  "frontend/src/views/AccountRecoveryView.tsx#controlled-mfa-password-confirm",
   "frontend/src/views/AccountRecoveryView.tsx#recovery-new-password",
   "frontend/src/views/AccountSecurityView.tsx#confirm-password",
   "frontend/src/views/AccountSecurityView.tsx#current-password",
@@ -164,16 +166,59 @@ test("given shipped identity contracts, when enforcing the authentication-factor
     join(repository, "src", "main", "resources", "api", "openapi.yaml"),
     ...shippedBrowserSources.map(({ path }) => path)
   ];
-  const knowledgeChallenge = /password[\s_-]*hint|(?:security|secret)[\s_-]*(?:question|answer)|knowledge[\s_-]*based|mother(?:s|['’]s)?[\s_-]*maiden[\s_-]*name|favou?rite[\s_-]*(?:colou?r|place|teacher)|birth[\s_-]*(?:place|city)|first[\s_-]*pet[\s_-]*name|\bchallenge\b/i;
-
   // when
-  const offenders = identitySources
-    .filter((path) => knowledgeChallenge.test(readFileSync(path, "utf8")))
-    .map((path) => path.slice(repository.length + 1));
+  const offenders = knowledgeFactorSources(identitySources.map((path) => ({
+    path: path.slice(repository.length + 1), source: readFileSync(path, "utf8")
+  })));
 
   // then
   assert.deepEqual(offenders, []);
 });
+
+test("given cryptographic MFA ceremonies, when enforcing the knowledge-factor boundary, then random challenges remain permitted", () => {
+  // given
+  const sources = [
+    { path: "identity/MfaChallenges.java", source: "UUID challenge = UUID.randomUUID();" },
+    { path: "identity/MfaLogin.java", source: "return challenges.consume(challenge);" },
+    { path: "api/openapi.yaml", source: "challenge: { type: string, format: byte }" },
+    { path: "frontend/security/webauthn.ts", source: "navigator.credentials.get({ publicKey: { challenge: decode(options.challenge) } });" }
+  ];
+
+  // when / then
+  assert.deepEqual(knowledgeFactorSources(sources), []);
+});
+
+test("given knowledge-based recovery hidden in MFA sources, when enforcing the factor boundary, then hints and personal questions stay forbidden", () => {
+  // given
+  const path = "identity/MfaLogin.java";
+  const forbidden = [
+    'String securityQuestion = "Where did you grow up?";',
+    'String passwordHint = "my old address";',
+    'String secretAnswer = "saved response";',
+    'String challengeQuestion = "Which school did you attend?";',
+    'String recoveryAnswer = "saved response";',
+    'String challenge = "Where did you meet your spouse?";',
+    '"challenge": "Which school did you attend?"',
+    'String prompt = "Mother\'s maiden name";',
+    'String prompt = "Favourite colour";',
+    'String prompt = "Birth city";',
+    'String prompt = "First pet name";'
+  ];
+
+  // when / then
+  for (const source of forbidden) {
+    for (const context of [source, `UUID challenge = UUID.randomUUID(); ${source}`]) {
+      assert.deepEqual(knowledgeFactorSources([{ path, source: context }]), [path], context);
+    }
+  }
+});
+
+function knowledgeFactorSources(sources) {
+  const knowledgeChallenge = /password[\s_-]*hint|(?:security|secret|challenge|recovery|authentication)[\s_-]*(?:question|answer)|knowledge[\s_-]*based|mother(?:s|['’]s)?[\s_-]*maiden[\s_-]*name|favou?rite[\s_-]*(?:colou?r|place|teacher)|birth[\s_-]*(?:place|city)|first[\s_-]*pet[\s_-]*name/i;
+  const humanChallenge = /\bchallenge\b["']?\s*[:=]\s*["'](?:(?:what|where|when|who|which|how)\b|[^"'\r\n]*\?)/i;
+  return sources.filter(({ source }) => knowledgeChallenge.test(source) || humanChallenge.test(source))
+    .map(({ path }) => path);
+}
 
 function jsxPasswordFields(path, source) {
   if (!/\.(?:jsx|tsx)$/.test(path)) return [];
