@@ -43,6 +43,25 @@ CREATE TABLE user_entities (
     display_name varchar(200)
 );
 
+CREATE TABLE user_credentials (
+    credential_id varchar(1500) PRIMARY KEY,
+    user_entity_user_id varchar(1000) NOT NULL REFERENCES user_entities (id) ON DELETE CASCADE,
+    public_key bytea NOT NULL,
+    signature_count bigint NOT NULL CHECK (signature_count BETWEEN 0 AND 4294967295),
+    uv_initialized boolean NOT NULL,
+    backup_eligible boolean NOT NULL,
+    authenticator_transports varchar(1000),
+    public_key_credential_type varchar(100),
+    backup_state boolean NOT NULL,
+    attestation_object bytea NOT NULL,
+    attestation_client_data_json bytea NOT NULL,
+    created timestamptz NOT NULL,
+    last_used timestamptz NOT NULL,
+    label varchar(100) NOT NULL
+);
+
+CREATE INDEX user_credentials_by_holder ON user_credentials (user_entity_user_id);
+
 ALTER TABLE message_record
     DROP CONSTRAINT message_record_kind_known,
     ADD CONSTRAINT message_record_kind_known CHECK (
