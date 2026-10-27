@@ -201,7 +201,7 @@ export function createMfaFixture({ request, makeClient, clients, sharedPassword,
     return code;
   }
   async function accountId(account) {
-    const response = await successful(clients.ADMIN, "POST", "/api/admin/roster-search", { query: account.username, limit: 100 });
+    const response = await successful(clients.ADMIN, "POST", "/api/admin/roster-search", { role: account.role, limit: 100 });
     const entry = json(response).entries?.find((candidate) => candidate.username === account.username);
     if (!entry?.accountId) throw new Error("The synthetic MFA fixture holder was not found");
     return entry.accountId;

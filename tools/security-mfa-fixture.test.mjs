@@ -175,7 +175,14 @@ function unitProtocol({ sessionRoles } = {}) {
         return ok(undefined, holder.enabled ? 202 : 200);
       }
       if (method === "GET" && path === "/api/session") return ok({ authenticated: Boolean(client.account && !client.pending), username: client.account?.username, roles: client.account && !client.pending ? sessionRoles ?? [roles[client.account.username]] : [] });
-      if (method === "POST" && path === "/api/admin/roster-search") return ok({ entries: [{ accountId: account(body.query).id, username: body.query }] });
+      if (method === "POST" && path === "/api/admin/roster-search") {
+        const entries = [...accounts.values()]
+          .filter((holder) => !body.role || roles[holder.username] === body.role)
+          .filter((holder) => !body.query || ("Security " + roles[holder.username] + "2")
+            .toLowerCase().includes(body.query.toLowerCase()))
+          .map((holder) => ({ accountId: holder.id, username: holder.username }));
+        return ok({ entries });
+      }
       if (method === "POST" && path === "/api/account-recovery/mfa/redemption") {
         const holder = account(body.username);
         assert.equal(body.code, holder.rescueCode);
@@ -314,4 +321,14 @@ test("given all direct positive MFA cases, when allocating bounded replays and C
   assert.ok(limit + 2492 < 10_000);
   assert.throws(() => mfaFixtureRequestLimit("untracked-operation"));
   assert.throws(() => mfaFixtureFirstAttemptRequests("untracked-operation"));
+});
+
+test("given roster search matches names rather than usernames, when resolving a rescue holder, then role filtering finds the exact synthetic account", async () => {
+  // given
+  const protocol = unitProtocol();
+  const fixture = createMfaFixture(protocol.configuration);
+  // when / then
+  await assert.doesNotReject(() => fixture.exercise({
+    operationId: "getAdministrativeMfaStatus", mutation: false, expectations: { ADMIN: "allow" }
+  }, "ADMIN", {}));
 });
