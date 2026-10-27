@@ -830,7 +830,51 @@ test("given roster entries named like ordinary words, when the summary uses thos
   assert.throws(() => assertPrivacySafe("Seen by Admin only.", terms), /person/, "a capitalised name part alone is refused");
 });
 
-import { coverageOf, residueSentence, serverLogSummary } from "../acceptance/report/html.mjs";
+import { coverageOf, renderReport, residueSentence, serverLogSummary } from "../acceptance/report/html.mjs";
+
+test("given repeated observer warnings in different phases, when collected, then one stable finding retains each observation", () => {
+  // given
+  const message = "pageerror: ResizeObserver loop completed with undelivered notifications.";
+  const consoleEvents = [
+    { kind: "pageerror", message, observedAt: "2030-03-11T09:00:00.000Z", phase: "journey", stack: null, location: null },
+    { kind: "pageerror", message, observedAt: "2030-03-11T09:00:01.000Z", phase: "axe", stack: "observer@/assets/app.js:10:20", location: null }
+  ];
+
+  // when
+  const findings = collectFindings({ metrics: [row({ console: [message, message], consoleEvents })], failures: [] });
+
+  // then
+  assert.equal(findings.length, 1, "phase metadata does not split the historical finding key");
+  assert.equal(findings[0].key, "console:3971f57666f3");
+  assert.deepEqual(findings[0].where.map((where) => where.consoleEvent), consoleEvents);
+  assert.equal(findings[0].severity, "minor", "capture-phase warnings still require an assessment");
+});
+
+test("given browser context with unsafe markup, when the report is rendered, then reviewers see escaped phase and source evidence", () => {
+  // given
+  const root = mkdtempSync(join(tmpdir(), "courtside-console-report-"));
+  const message = "pageerror: ResizeObserver loop completed with undelivered notifications.";
+  const stack = "observer@/assets/app.js:10:20 <img src=x onerror=alert(1)>";
+  const metric = row({ console: [message], consoleEvents: [
+    { kind: "pageerror", message, observedAt: "2030-03-11T09:00:01.000Z", phase: "axe", stack,
+      location: { url: "/assets/app.js", lineNumber: 0, columnNumber: 0 } }
+  ], documentOverflow: false, overflow: [], occluded: [], i18nKeys: [], germanOnEn: [], truncated: [], smallTargets: [] });
+  writeFileSync(join(root, "metrics.jsonl"), `${JSON.stringify(metric)}\n`);
+
+  // when
+  try {
+    const result = renderReport(root, valid(), { harnessCommit: "a".repeat(40) });
+    const html = readFileSync(join(root, "report/index.html"), "utf8");
+
+    // then
+    assert.ok(html.includes("2030-03-11T09:00:01.000Z"), "the observation time reaches the rendered report");
+    assert.ok(html.includes("axe"), "the observed phase reaches the rendered report");
+    assert.ok(html.includes("/assets/app.js:0:0"), "zero-based source positions remain available");
+    assert.ok(html.includes("&lt;img src=x onerror=alert(1)&gt;"), "stack text is escaped");
+    assert.ok(!html.includes("<img src=x onerror=alert(1)>"), "browser text cannot inject report markup");
+    assert.deepEqual(result.unassessed, ["console:3971f57666f3"], "phase alone never dismisses an observer warning");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
 
 test("given Playwright results with passed, skipped and failed cells, when coverage is read, then setup and discovery are left out and each cell keeps its status", () => {
   // given

@@ -10,5 +10,5 @@
     "skipLibCheck": true,
     "types": ["node"]
   },
-  "include": ["playwright.config.ts", "journeys/**/*.ts", "lib/**/*.ts", "test/**/*.ts"]
+  "include": ["playwright.config.ts", "journeys/**/*.ts", "lib/**/*.ts", "test/**/*.ts", "diagnostics/**/*.ts"]
 }

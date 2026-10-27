@@ -82,6 +82,16 @@ function evidence(run, finding, images) {
   return figures ? `<details class="ev"><summary>Show evidence</summary><div class="shots">${figures}</div></details>` : "";
 }
 
+function consoleEvidence(finding) {
+  const observations = finding.where.filter((where) => where.consoleEvent);
+  if (!observations.length) return "";
+  return `<details class="console-context"><summary>Browser event context</summary>
+${observations.map(({ project, consoleEvent: event }) => `<div>
+<p>${esc(project)} · <code>${esc(event.phase)}</code> · ${esc(event.observedAt)}</p>
+${event.location ? `<pre>${esc(`${event.location.url}:${event.location.lineNumber}:${event.location.columnNumber}`)}</pre>` : ""}
+<pre>${esc(event.stack ?? "The browser supplied no stack.")}</pre></div>`).join("")}</details>`;
+}
+
 function card(run, finding, images) {
   const review = finding.review;
   const assessment = review
@@ -95,6 +105,7 @@ function card(run, finding, images) {
   ${finding.detail ? `<p class="detail">${esc(finding.detail)}</p>` : ""}
   ${assessment}
   <p class="where"><span class="label">Where</span> ${[...new Set(finding.where.map((where) => where.project).filter(Boolean))].map(esc).join(", ")}</p>
+  ${consoleEvidence(finding)}
   ${evidence(run, finding, images)}
 </article>`;
 }
@@ -208,6 +219,7 @@ p { margin: 0; max-width: 68ch; } section { display: grid; gap: 16px; min-width:
 .sev-blocker .pill { color: var(--blocker); } .sev-major .pill { color: var(--major); } .sev-minor .pill { color: var(--minor); } .sev-hint .pill { color: var(--hint); }
 .kind { color: var(--muted); } .id { margin-left: auto; font-family: var(--mono); color: var(--muted); overflow-wrap: anywhere; }
 .detail { color: var(--muted); font-size: 0.9rem; overflow-wrap: anywhere; }
+.console-context pre { white-space: pre-wrap; overflow-wrap: anywhere; }
 .where { font-size: 0.85rem; } .unassessed { color: var(--blocker); font-weight: 600; }
 .label { font-size: 0.72rem; text-transform: uppercase; color: var(--muted); margin-right: 6px; }
 details summary { cursor: pointer; color: var(--accent); font-weight: 600; font-size: 0.9rem; }
