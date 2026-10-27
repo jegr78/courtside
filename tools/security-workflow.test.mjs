@@ -714,3 +714,18 @@ test("given the release trusts the verifiers' exit codes, when it verifies, then
       "a tag instead of a digest would verify whatever the tag points to now");
   }
 });
+
+test("given the password breach runtime smoke, when the assessment starts, then pinned images precede the explicit smoke and disposable target", () => {
+  // given
+  const steps = yaml.load(scheduled).jobs.assessment.steps;
+  // when
+  const prepare = steps.findIndex(step => step.name === "Prepare pinned assessment images");
+  const smoke = steps.findIndex(step => /node --test tools\/security-password-breach-smoke\.mjs/.test(step.run ?? ""));
+  const start = steps.findIndex(step => step.name === "Start the disposable security target");
+  // then
+  assert.ok(prepare >= 0 && smoke > prepare && start > smoke,
+    "the native bridge smoke needs preloaded images and must pass before the target starts");
+  assert.equal(steps[smoke].run, "frontend/node/node --test tools/security-password-breach-smoke.mjs");
+  assert.equal(steps[smoke].if, undefined);
+  assert.equal(steps[smoke]["continue-on-error"], undefined);
+});

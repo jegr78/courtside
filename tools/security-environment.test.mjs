@@ -1212,7 +1212,8 @@ test("given the security Compose file, when reading the assessed target, then it
   assert.deepEqual(app.depends_on, {
     db: { condition: "service_healthy" },
     seeder: { condition: "service_completed_successfully" },
-    mail: { condition: "service_started" }
+    mail: { condition: "service_started" },
+    "password-breach": { condition: "service_started" }
   });
   assert.equal(seeder.image, "${COURTSIDE_SECURITY_FIXTURES_IMAGE:?required}");
   assert.equal(seeder.environment.SPRING_PROFILES_ACTIVE, "security");
@@ -2209,4 +2210,31 @@ test("given a gateway that has relayed nothing yet, when the real sampler watche
   assert.equal(result.settled, true, "the warm-up must not depend on a gateway it deliberately bypasses");
   assert.ok(result.samples.every(({ requestP95Milliseconds, errorRate }) => requestP95Milliseconds === 0 && errorRate === 0),
     "no request passed the gateway, so it reports neither latency nor errors");
+});
+
+
+test("given the password breach dependency, when inspecting its boundary, then the application retains only internal networks and a bounded fixed bridge", () => {
+  // given
+  const { app, proxy, "password-breach": bridge } = securityServices();
+  // when / then
+  assert.ok(bridge, "password checks need an explicitly bounded dependency bridge");
+  assert.deepEqual(app.networks, ["backend", "frontend"]);
+  assert.equal(app.environment.COURTSIDE_PASSWORD_BREACH_ENDPOINT, "https://password-breach/range/");
+  assert.equal(bridge.image, proxy.image);
+  assert.equal(bridge.ports, undefined);
+  assert.deepEqual(bridge.networks, ["backend", "exposure"]);
+  assert.equal(bridge.user, "${COURTSIDE_SECURITY_MAIL_USER:?required}");
+  assert.equal(bridge.read_only, true);
+  assert.equal(bridge.cpus, 0.25);
+  assert.equal(bridge.mem_limit, "128m");
+  assert.equal(bridge.pids_limit, 32);
+  assert.deepEqual(bridge.cap_drop, ["ALL"]);
+  assert.deepEqual(bridge.cap_add, ["NET_BIND_SERVICE"]);
+  assert.deepEqual(bridge.security_opt, ["no-new-privileges:true"]);
+  assert.deepEqual(bridge.volumes, [
+    "./Caddyfile.security-password-breach:/etc/caddy/Caddyfile:ro",
+    "${COURTSIDE_SECURITY_MAIL_DIRECTORY:?required}/cert.pem:/trust/cert.pem:ro",
+    "${COURTSIDE_SECURITY_MAIL_DIRECTORY:?required}/key.pem:/trust/key.pem:ro"
+  ]);
+  assert.deepEqual(bridge.tmpfs, ["/config:size=1m,mode=1777", "/data:size=1m,mode=1777", "/tmp:size=1m,mode=1777"]);
 });

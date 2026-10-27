@@ -857,12 +857,15 @@
     },
     {
       "id": "security-mail-fixture-certificate",
-      "purpose": "Generate the private relay identity used to exercise real STARTTLS mail delivery inside one disposable security environment",
+      "purpose": "Generate the private identity for real STARTTLS mail and HTTPS password-breach forwarding inside one disposable security environment",
       "algorithm": "RSA-3072",
       "parameters": {
         "modulusBits": 3072,
         "validityDays": 1,
-        "dnsName": "mail"
+        "dnsNames": [
+          "mail",
+          "password-breach"
+        ]
       },
       "implementation": "openssl",
       "strength": {
@@ -872,13 +875,13 @@
       },
       "class": "credential-protection",
       "owner": "repository-maintainer",
-      "storageBoundary": "The ignored per-run mail directory below build/security includes the full random instance fingerprint in its name. It is created with mode 0700 and its unencrypted key.pem has mode 0600. Mailpit reads the certificate and private key through a read-only bind mount on the internal backend network. Retained private diagnostic assets can outlive teardown; no key, certificate fingerprint or raw mail is published or tracked.",
-      "permittedUse": "Presenting the self-signed certificate for the DNS name mail in the disposable SECURITY environment. The application and seeder trust it through the separate fixture truststore entry. X509Certificate checks the generated certificate's hostname and self-signature; fingerprint256 records its identity as private metadata and does not perform TLS peer pinning.",
+      "storageBoundary": "The ignored per-run mail directory below build/security includes the full random instance fingerprint in its name. It is created with mode 0700 and its unencrypted key.pem has mode 0600. Mailpit and the bounded password-breach bridge read the certificate and private key through read-only bind mounts. Retained private diagnostic assets can outlive teardown; no key, certificate fingerprint or raw mail is published or tracked.",
+      "permittedUse": "Presenting the self-signed certificate for the exact DNS names mail and password-breach in the disposable SECURITY environment. The application and seeder trust it through the separate fixture truststore entry. X509Certificate checks both hostnames and the self-signature; fingerprint256 records private metadata and does not perform TLS peer pinning.",
       "rotation": "The first start attempt creates a fresh certificate unconditionally. Bind retries within that same start retain the same identity and assets. A new random instance uses a distinct directory even when the run ID is reused, and never reuses retained material.",
       "revocation": "Remove the run-owned consumers and their trust configuration to stop using the identity. There is no external authority or revocation service. Retaining a diagnostic key does not extend trust into a new instance.",
       "recovery": "Retained material is diagnostic evidence, not a backup for a fresh environment. Start a new instance to create a new key and certificate; existing same-start retry assets are not regenerated or independently revalidated by the retry path.",
       "retirement": "Stop all consumers before replacing the fixture identity scheme. Retained private diagnostic assets remain under the operator's evidence-retention control rather than being silently deleted by teardown.",
-      "evidence": "tools/security-mail-capture.test.mjs, tools/security-environment.test.mjs",
+      "evidence": "tools/security-mail-capture.test.mjs, tools/security-password-breach-smoke.mjs, tools/security-environment.test.mjs",
       "detects": [
         "openssl",
         "newkey",
@@ -890,28 +893,30 @@
         "tools/security-mail-capture.test.mjs",
         "tools/security-environment.mjs",
         "tools/security-environment.test.mjs",
-        "deploy/compose.security.yaml"
+        "deploy/compose.security.yaml",
+        "deploy/Caddyfile.security-password-breach",
+        "tools/security-password-breach-smoke.mjs"
       ]
     },
     {
       "id": "security-mail-fixture-trust",
-      "purpose": "Configure certificate-authority trust for real STARTTLS delivery to the disposable security environment's mail relay without disabling issuer or hostname validation",
+      "purpose": "Preserve candidate CA anchors and add private dependency trust for STARTTLS and bounded HTTPS forwarding without disabling issuer or hostname validation",
       "algorithm": "RSA-3072",
       "implementation": "openssl",
       "strength": {
         "decidedBy": "repository",
         "bits": 128,
-        "basis": "The OpenSSL-generated RSA-3072 public key trusted by the JVM has 128 bits of security. This rates the imported trust anchor, not the TLS cipher suite or the PKCS12 protection algorithms. The candidate's JDK implements keytool import, certificate validation and TLS negotiation; no suite or store protection algorithm is selected here."
+        "basis": "The added OpenSSL-generated RSA-3072 fixture anchor has 128 bits of security. This rates that anchor, not the candidate default CA policy, TLS cipher suite or PKCS12 protection algorithms. The candidate JDK implements truststore conversion, certificate import, validation and TLS negotiation; no suite or store protection algorithm is selected here."
       },
       "class": "transport",
       "owner": "repository-maintainer",
-      "storageBoundary": "The candidate image's keytool imports cert.pem into the per-instance mail.p12 as a trusted certificate, not a private-key entry, in an offline bounded container running with the host owner's numeric identity. The owner-only parent directory protects the retained asset; mail.p12 is made mode 0444 so non-root application and seeder users can read their read-only file mounts. The fixed store password is not a credential or the confidentiality boundary.",
-      "permittedUse": "Setting javax.net.ssl.trustStore for the application and seeder JVMs in the disposable SECURITY environment. This replaces their default truststore process-wide, not only for SMTP. STARTTLS remains required and relay hostname validation remains enabled. This is certificate-authority trust, not a comparison with a pinned peer fingerprint; the fixture fingerprint is metadata only. Never use this trust anchor in a club deployment.",
+      "storageBoundary": "The digest-bound candidate image keytool first imports its existing default CA anchors into per-instance mail.p12, then adds cert.pem as a trusted certificate without a private-key entry. An offline bounded container runs as the host numeric owner. The owner-only parent directory protects retained assets; mode 0444 allows non-root application and seeder users to read their read-only mounts. The fixed store password is not a credential or confidentiality boundary.",
+      "permittedUse": "Setting javax.net.ssl.trustStore for the application and seeder JVMs in the disposable SECURITY environment. The separate process-wide store preserves their candidate default CA anchors and adds the local mail/password-breach identity. STARTTLS and hostname validation remain required. The bridge verifies the official upstream with the pinned Caddy image default CA policy. Fixture fingerprints remain metadata rather than peer pins. Never install this fixture anchor in a club deployment.",
       "rotation": "Import the newly generated certificate for each new instance before starting its consumers. Same-start bind retries reuse that instance's truststore. Replacing a truststore requires restarting its JVM consumers; retained stores are not reused by a fresh instance.",
       "revocation": "Stop the run-owned JVM consumers and withdraw their truststore configuration. No certificate revocation service is configured for this isolated fixture authority.",
       "recovery": "A failed initial import stops startup rather than enabling unverified TLS. Create a new instance and import its fresh certificate instead of reusing retained diagnostic assets from an older instance.",
       "retirement": "Remove the JVM truststore configuration and mounts with the fixture relay scheme. Retained public-certificate stores and private keys stay within the private diagnostic evidence boundary until the operator retires those assets.",
-      "evidence": "tools/security-mail-capture.test.mjs, tools/security-environment.test.mjs",
+      "evidence": "tools/security-mail-capture.test.mjs, tools/security-password-breach-smoke.mjs, tools/security-environment.test.mjs",
       "detects": [
         "keystore",
         "truststore",
@@ -925,7 +930,9 @@
         "tools/security-mail-capture.test.mjs",
         "tools/security-environment.mjs",
         "tools/security-environment.test.mjs",
-        "deploy/compose.security.yaml"
+        "deploy/compose.security.yaml",
+        "deploy/Caddyfile.security-password-breach",
+        "tools/security-password-breach-smoke.mjs"
       ]
     },
     {

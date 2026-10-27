@@ -144,6 +144,11 @@ encrypted enrollments without matching keys fails before the instance reports he
 private keys remain with authenticators; the instance stores their public keys and verification
 metadata.
 
+The disposable SECURITY environment issues one private certificate for the exact `mail` and
+`password-breach` names. Its offline trust preparation retains the candidate JDK's default CA
+anchors and adds that certificate. The password-breach bridge validates the official HTTPS
+upstream with its own default CA policy. Fixture trust never enters a club deployment.
+
 ## What this file is not
 
 Neither this file nor the JSON holds key material, a fingerprint or anything from which material

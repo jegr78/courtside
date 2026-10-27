@@ -63,6 +63,8 @@ jobs:
           ASSESSMENT_PROFILE="$PROFILE"
           if [[ "$PROFILE" = baseline ]]; then ASSESSMENT_PROFILE=active; fi
           frontend/node/node tools/security-image-inventory.mjs "$ASSESSMENT_PROFILE" | xargs -n1 docker pull
+      - name: Verify the fixed password breach dependency boundary
+        run: frontend/node/node --test tools/security-password-breach-smoke.mjs
       - name: Start the disposable security target
         env:
           IMAGE_DIGEST: ${{ steps.candidate.outputs.digest }}
