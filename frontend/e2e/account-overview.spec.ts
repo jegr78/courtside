@@ -1,5 +1,5 @@
 import { type Page } from "@playwright/test";
-import type { SessionStatus } from "../src/api/client";
+import type { components } from "../src/api/schema";
 import { expect, selectPreference, test } from "./fixtures";
 
 async function signIn(page: Page, username: string, locale: "de" | "en") {
@@ -73,7 +73,7 @@ for (const locale of ["de", "en"] as const) {
     const lastName = "Doe Roe ".repeat(8).trim();
     await page.route("**/api/session", async (route) => {
       const response = await route.fetch();
-      const current = await response.json() as SessionStatus;
+      const current = await response.json() as components["schemas"]["SessionStatus"];
       await route.fulfill({ response, json: { ...current, username, firstName, lastName,
         roles: ["MEMBER", "TRAINER", "SPORT_DIRECTOR", "YOUTH_DIRECTOR", "GROUNDSKEEPER", "TREASURER", "ADMIN"] } });
     });
