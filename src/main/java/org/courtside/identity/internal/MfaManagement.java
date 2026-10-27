@@ -1,6 +1,8 @@
 package org.courtside.identity.internal;
 
 import lombok.RequiredArgsConstructor;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
 import org.courtside.api.ApiMfaStatus;
 import org.courtside.api.ApiTotpEnrollment;
 import org.courtside.config.ClubIdentity;
@@ -24,6 +26,7 @@ import java.util.List;
 @RequiredArgsConstructor
 class MfaManagement {
     private final CurrentUser currentUser;
+    private final EntityManager entities;
     private final RecentAuthentication recent;
     private final MfaFactors factors;
     private final MfaTotpRepository totp;
@@ -98,6 +101,7 @@ class MfaManagement {
 
     private UserAccount currentForChange() {
         UserAccount account = currentUser.requireAccountForUpdate();
+        entities.refresh(account, LockModeType.PESSIMISTIC_WRITE);
         var authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !(authentication.getPrincipal() instanceof CourtsideUserDetails user)
                 || !account.isEnabled() || account.isPasswordChangeRequired()
