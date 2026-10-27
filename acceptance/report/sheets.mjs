@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, readdirSync, statSync, rmSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { createHash } from "node:crypto";
+import { existsSync, mkdirSync, readdirSync, statSync, rmSync, readFileSync, writeFileSync } from "node:fs";
+import { join, relative } from "node:path";
 import { findExecutable } from "../lib/executable.mjs";
 
 const walk = (directory) => readdirSync(directory).flatMap((name) => {
@@ -39,6 +40,7 @@ export function contactSheets(run) {
   const root = join(run, "shots");
   const directory = join(run, "sheets");
   rmSync(directory, { recursive: true, force: true });
+  rmSync(join(run, "sheet-evidence.json"), { force: true });
   if (!existsSync(root)) return { sheets: 0, names: [], entries: [], skipped: "no screenshots" };
   if (!tool) return { sheets: 0, names: [], entries: [], skipped: "ImageMagick not found on PATH", unavailable: "ImageMagick not found on PATH" };
   const surfaces = new Map();
@@ -78,6 +80,13 @@ export function contactSheets(run) {
       entries.push({ name, columns, tiles });
     }
   }
+  const image = (path) => path === null ? null : {
+    path: relative(run, path), digest: createHash("sha256").update(readFileSync(path)).digest("hex")
+  };
+  writeFileSync(join(run, "sheet-evidence.json"), JSON.stringify({ schemaVersion: 1,
+    sheets: entries.map((entry) => ({ name: entry.name, columns: entry.columns,
+      tiles: entry.tiles.map((tile) => ({ label: tile.label, viewport: image(tile.path), fullPage: image(tile.fullPage) })) }))
+  }, null, 2) + "\n");
   return { sheets: entries.length, names: entries.map((entry) => entry.name), entries };
 }
 
