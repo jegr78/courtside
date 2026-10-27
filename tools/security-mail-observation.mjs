@@ -17,6 +17,7 @@ const messageId = /^<[^<>\s]{1,512}@[^<>\s]{1,255}>$/;
 const calendarUid = /^booking-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}@courtside$/;
 const listUrl = "http://mail:8025/api/v1/messages?start=0&limit=100";
 const limits = securityMailObservationLimits;
+const addresses = entries => Array.isArray(entries) ? entries.map(entry => entry?.Address) : undefined;
 export const securityMailObservationImage =
   `${securityMailObservationSource.image}@${securityMailObservationSource.imageDigest}`;
 const dockerId = /^[a-f0-9]{64}$/;
@@ -164,7 +165,7 @@ function instant(value) {
     && civil.getUTCHours() === hour && civil.getUTCMinutes() === minute && civil.getUTCSeconds() === second;
 }
 
-async function mailbox(ctx) {
+async function mailbox(ctx, recipients = false) {
   const native = json(await get(ctx, listUrl, limits.listBytes));
   if (!Array.isArray(native?.messages) || !Number.isSafeInteger(native.total) || native.total < 0
     || native.total > limits.messages || native.start !== 0
@@ -179,7 +180,8 @@ async function mailbox(ctx) {
       throw new Error("mail-list-incomplete");
     }
     ids.add(message.ID);
-    return { id: message.ID, created: message.Created, size: message.Size, messageId: message.MessageID };
+    return { id: message.ID, created: message.Created, size: message.Size, messageId: message.MessageID,
+      ...(recipients ? { to: addresses(message.To), cc: addresses(message.Cc), bcc: addresses(message.Bcc) } : {}) };
   });
 }
 
@@ -327,8 +329,92 @@ export function createSecurityMfaRecoveryReader({ runId, command, identity, cont
 
 export async function withSecurityMfaRecoveryReader(control, options, action) {
   try {
-    return await action(createSecurityMfaRecoveryReader(options()));
+    const configuration = options();
+    return await action(createSecurityMfaRecoveryReader(configuration), createSecurityMfaMailScope(configuration));
   } finally {
     control.close();
   }
+}
+
+
+const mfaHolder = /^security\.(?:member|trainer|sport\.director|youth\.director|groundskeeper|treasurer|admin)\.2$/;
+const mfaKinds = new Set(["ACCOUNT_SECURITY_CHANGED", "ACCOUNT_MFA_RECOVERY_CODE"]);
+function checkedOutbox(projection, usernames) {
+  if (!projection || typeof projection.watermark !== "string" || !/^(?:0|[1-9][0-9]{0,18})$/.test(projection.watermark)
+      || !/^[a-f0-9]{64}$/.test(projection.fingerprint ?? "") || !Array.isArray(projection.records)
+      || projection.records.length > limits.messages) throw new Error("mfa-mail-outbox-incomplete");
+  const ids = new Set();
+  for (const record of projection.records) {
+    if (!record || typeof record !== "object" || !usernames.includes(record.username) || record.email !== `${record.username}@example.org`
+        || !mfaKinds.has(record.kind) || !["QUEUED", "HANDED_OVER"].includes(record.state)
+        || !messageId.test(record.messageId) || ids.has(record.messageId)) throw new Error("mfa-mail-outbox-incomplete");
+    ids.add(record.messageId);
+  }
+  return projection;
+}
+
+export function createSecurityMfaMailScope({ runId, command, identity, control, projectOutbox, wait = delay } = {}) {
+  return async (usernames) => {
+    if (!Array.isArray(usernames) || usernames.length < 1 || usernames.length > 2
+        || new Set(usernames).size !== usernames.length || usernames.some(name => typeof name !== "string" || !mfaHolder.test(name))
+        || typeof projectOutbox !== "function" || typeof control?.beforeRequest !== "function"
+        || typeof control?.remainingMilliseconds !== "function") {
+      throw new Error("mfa-mail-scope-invalid");
+    }
+    control.beforeRequest();
+    const ctx = context(runId, command, identity);
+    ctx.runtimeBinding = await trustedSink(ctx);
+    const baseline = await mailbox(ctx);
+    if (baseline.length === limits.messages) throw new Error("mfa-mail-capacity-reached");
+    const initial = checkedOutbox(await projectOutbox(null, usernames, ctx.runtimeBinding), usernames);
+    if (initial.records.length) throw new Error("mfa-mail-outbox-incomplete");
+    const baselineIds = new Set(baseline.map(message => message.id));
+    let finished = false;
+    return async () => {
+      if (finished) throw new Error("mfa-mail-scope-already-finished");
+      finished = true;
+      let outbox;
+      do {
+        control.beforeRequest();
+        outbox = checkedOutbox(await projectOutbox(initial.watermark, usernames, ctx.runtimeBinding), usernames);
+        if (outbox.records.some(record => record.state === "QUEUED")) {
+          await wait(Math.min(200, control.remainingMilliseconds()), undefined, { signal: control.signal });
+        }
+      } while (outbox.records.some(record => record.state === "QUEUED"));
+      await trustedSink(ctx, ctx.runtimeBinding);
+      const messages = await mailbox(ctx, true);
+      const byMessageId = new Map();
+      for (const message of messages) {
+        const key = `<${message.messageId}>`;
+        byMessageId.set(key, [...(byMessageId.get(key) ?? []), message]);
+      }
+      if (baseline.some(message => !messages.some(current => current.id === message.id))) throw new Error("mfa-mail-baseline-changed");
+      const remove = [];
+      for (const record of outbox.records) {
+        const candidates = byMessageId.get(record.messageId) ?? [];
+        if (candidates.length !== 1) throw new Error("mfa-mail-delivery-incomplete");
+        const message = candidates[0];
+        if (baselineIds.has(message.id) || !Array.isArray(message.to) || message.to.length !== 1
+            || message.to[0] !== record.email || !Array.isArray(message.cc) || message.cc.length
+            || !Array.isArray(message.bcc) || message.bcc.length) throw new Error("mfa-mail-recipient-untrusted");
+        remove.push(message.id);
+      }
+      if (remove.length) {
+        if (new Set(remove).size !== remove.length || remove.length > limits.messages) throw new Error("mfa-mail-delete-invalid");
+        control.beforeRequest();
+        await output(ctx, ["exec", "-i", ctx.runtimeBinding.appId, "curl", "-q", "--silent", "--fail",
+          "--noproxy", "*", "--proto", "=http", "--connect-timeout", "2", "--max-time", "5",
+          "--max-filesize", String(limits.receiptBytes), "--resolve", `mail:8025:${ctx.runtimeBinding.sinkIPv4}`,
+          "--request", "DELETE", "--header", "content-type: application/json", "--data-binary", "@-",
+          "--url", "http://mail:8025/api/v1/messages"], limits.receiptBytes, JSON.stringify({ IDs: remove }));
+      }
+      await trustedSink(ctx, ctx.runtimeBinding);
+      const after = await mailbox(ctx);
+      const retained = messages.filter(message => !remove.includes(message.id)).map(message => message.id).sort();
+      if (JSON.stringify(after.map(message => message.id).sort()) !== JSON.stringify(retained)) throw new Error("mfa-mail-cleanup-incomplete");
+      const final = checkedOutbox(await projectOutbox(initial.watermark, usernames, ctx.runtimeBinding), usernames);
+      if (final.fingerprint !== outbox.fingerprint) throw new Error("mfa-mail-application-state-changed");
+      return { removedMessages: remove.length, retainedMessages: after.length };
+    };
+  };
 }

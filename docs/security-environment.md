@@ -54,6 +54,8 @@ Seeded appointments start at least two club calendar days after startup. The def
 
 The bootstrap administrator is separate and retains its mandatory initial-password state. Assessment code should use the role-specific accounts unless it is explicitly testing bootstrap behavior.
 
+Each MFA fixture owns a bounded mail scope for its dedicated second accounts. After successful account cleanup and completed outbox handover, the runner removes only new Mailpit messages whose unique Message-ID, exact sole seed recipient and two MFA message kinds match the read-only outbox projection. Baseline messages, first-account mail and other message kinds remain. The application message records, notification history and security audit log remain. A failed account cleanup retains its mail for diagnosis; incomplete lists and ownership changes still stop the run.
+
 ## Verify and remove
 
 Before an active request, verify the live source marker and the container labels against the private run state:

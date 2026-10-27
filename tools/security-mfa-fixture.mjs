@@ -135,8 +135,9 @@ const actorNames = {
 };
 const jsonHeaders = { "content-type": "application/json" };
 
-export function createMfaFixture({ request, makeClient, clients, sharedPassword, origin, resetLoginAttempts, readRecoveryCode, now = Date.now }) {
+export function createMfaFixture({ request, makeClient, clients, sharedPassword, origin, resetLoginAttempts, readRecoveryCode, beginMailScope, now = Date.now }) {
   trustedOrigin(origin);
+  if (typeof beginMailScope !== "function") throw new Error("MFA fixtures require a bounded mail scope");
   if (typeof request !== "function" || typeof makeClient !== "function" || typeof sharedPassword !== "string") throw new Error("Incomplete MFA fixture configuration");
   const observedRecoveryCodes = new Set();
   async function send(client, method, path, body) {
@@ -245,6 +246,9 @@ export function createMfaFixture({ request, makeClient, clients, sharedPassword,
       const publicProof = ["completeMfaLogin", "beginWebauthnLogin", "completeWebauthnLogin", "redeemMfaRecovery"].includes(id);
       const account = holder(publicProof || id === "getAdministrativeMfaStatus" || id === "initiateMfaRecovery" ? "MEMBER" : actor);
       const accounts = [account];
+      const finishMail = await beginMailScope([account.username,
+        ...(["getAdministrativeMfaStatus", "initiateMfaRecovery", "redeemMfaRecovery"].includes(id) ? [actorNames.ADMIN] : [])]);
+      if (typeof finishMail !== "function") throw new Error("MFA fixtures require a bounded mail scope");
       let response;
       let failure;
       try {
@@ -296,6 +300,7 @@ export function createMfaFixture({ request, makeClient, clients, sharedPassword,
         try { await cleanup(account); } catch (error) { failure = failure ? new AggregateError([failure, error], "MFA fixture operation and cleanup failed") : error; }
       }
       if (failure) throw failure;
+      await finishMail();
       return response;
     }
   };

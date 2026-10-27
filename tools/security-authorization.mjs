@@ -654,6 +654,7 @@ export async function runAuthorizationAssessment(plan, context) {
         .every((testId) => plan.selectedTests.includes(testId))) {
     throw new Error("The authorization suite requires active authentication and authorization tests in SECURITY");
   }
+  if (typeof context.beginMailScope !== "function") throw new Error("The authorization suite requires a bounded MFA mail scope");
   const document = readFileSync(apiDocumentPath());
   const specificationDigest = `sha256:${createHash("sha256").update(document).digest("hex")}`;
   const api = yaml.load(document.toString("utf8"));
@@ -719,7 +720,7 @@ export async function runAuthorizationAssessment(plan, context) {
       },
       makeClient: () => new SecurityCookieJar(), clients, sharedPassword: context.sharedPassword,
       origin: plan.target, resetLoginAttempts: context.resetLoginAttempts,
-      readRecoveryCode: context.readRecoveryCode, now: context.now ?? Date.now
+      readRecoveryCode: context.readRecoveryCode, beginMailScope: context.beginMailScope, now: context.now ?? Date.now
     });
     const sharedMfaProofs = new Map();
     const results = await executeOperationMatrix(matrix, async (operation, actor, probe) => {

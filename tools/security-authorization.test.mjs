@@ -1058,13 +1058,16 @@ test("given the shipped contract and a target that answers every probe at once, 
     maxRequests: plan.total, maxAddressFailures: attemptsBeforeLimit, sharedPassword: "secret",
     resetLoginAttempts: async () => {}, wait: async () => {}, now: () => 0,
     transport: inMemoryAuthorizationTarget(attemptsBeforeLimit),
-    mfaFixtureFactory: ({ request, clients }) => ({
+    beginMailScope: async () => async () => {},
+    mfaFixtureFactory: ({ request, clients, beginMailScope }) => {
+      assert.equal(typeof beginMailScope, "function");
+      return ({
       supports: (id) => mfaFixtureOperationIds.includes(id),
       exercise: (operation, actor, probe) => {
         exercised.push([operation.operationId, actor]);
         return request(clients[actor], probe, { csrf: operation.mutation });
       }
-    })
+    }); }
   });
 
   // then
@@ -1147,4 +1150,17 @@ test("given ordinary authorization evidence, when a response claims another acto
   evidence.results[1].proofSourceActor = "ANONYMOUS";
   // when / then
   assert.throws(() => validateAuthorizationEvidence(evidence, matrix), /shared MFA proof/);
+});
+
+test("given an MFA authorization run without mail cleanup, when it starts, then reject before the first target request", async () => {
+  // given
+  let requests = 0;
+  const plan = { profile: "active", environment: "SECURITY", target: "https://127.0.0.1:9443",
+    selectedTests: ["CSA-AUTHN-001", "CSA-AUTHZ-001", "CSA-DAST-001"] };
+  // when / then
+  await assert.rejects(runAuthorizationAssessment(plan, {
+    stopFile: join(tmpdir(), "courtside-no-mail-scope-stop"), deadline: new Date(Date.now() + 10000), maxRequests: 1, maxAddressFailures: 5,
+    resetLoginAttempts: async () => {}, transport: async () => { requests++; throw new Error("unexpected target request"); }
+  }), /bounded MFA mail scope/);
+  assert.equal(requests, 0);
 });

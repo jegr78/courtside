@@ -2240,3 +2240,30 @@ test("given every public Funnel address failing, when the identity is requested,
     return true;
   });
 });
+
+test("given an owned authorization control, when its MFA mail callbacks run, then bind projection and native commands to its stop and remaining deadline", async () => {
+  // given
+  const module = await import("./courtside.mjs");
+  assert.equal(typeof module.securityMfaObservationOptions, "function", "the live MFA callbacks need the assessment control");
+  const calls = [];
+  let checked = 0;
+  const control = { beforeRequest() { checked++; }, remainingMilliseconds: () => 47 };
+  const options = module.securityMfaObservationOptions({ runId: "run-0001", identity: { seedFingerprint: "seed", instanceFingerprint: "instance" },
+    context: { stopFile: "/private/STOP" }, environment: { COURTSIDE_ENVIRONMENT: "SECURITY" }, control }, {
+    project: ({ command }) => async (...args) => { calls.push(args); await command(["inspect", "database"], { timeoutMilliseconds: 10000, outputLimitBytes: 32768 }); return "projection"; },
+    run: async (...args) => { calls.push(args); return { stdout: "native" }; }
+  });
+  // when
+  assert.equal(await options.projectOutbox("12", ["security.member.2"]), "projection");
+  await options.command(["inspect", "owned"], { timeoutMilliseconds: 10000, outputLimitBytes: 100 });
+  // then
+  assert.equal(checked, 2);
+  assert.deepEqual(calls[0], ["12", ["security.member.2"]]);
+  assert.equal(calls[1][0], "docker");
+  assert.deepEqual(calls[1][1], ["inspect", "database"]);
+  assert.deepEqual(calls[2][1], ["inspect", "owned"]);
+  assert.equal(calls[1][2].timeoutMilliseconds, 47);
+  assert.equal(calls[1][2].stopFile, "/private/STOP");
+  assert.equal(calls[1][2].outputLimitBytes, 32768);
+  assert.equal(calls[2][2].outputLimitBytes, 100);
+});

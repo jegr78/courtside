@@ -14,7 +14,7 @@ import { createRequire } from "node:module";
 import {
   inspectPassiveSecurityRuntime, readSecurityEnvironment, readSecurityIdentity, readSecurityProxyCa,
   recoverSecurityEnvironment, runAuthenticatedZap, runOpenApiFuzzer, runPassiveZap, runResourceAbuse,
-  resetSecurityLoginAttempts, securityDomainStateFingerprint,
+  resetSecurityLoginAttempts, securityDomainStateFingerprint, createSecurityMfaOutboxProjector,
   securityProject, securityStateRoot, seedSecurityEnvironment, shippedLoginAddressMaxFailures,
   startSecurityEnvironment, stopSecurityEnvironment, verifySecurityEnvironment, verifySecurityEnvironmentForAssessment
 } from "./security-environment.mjs";
@@ -803,17 +803,10 @@ async function execute(options) {
       runAuthorizationAssessment: async (selectedPlan, context) => {
         const control = createAssessmentControl(context.stopFile, context.deadline);
         return withSecurityMfaRecoveryReader(control, () => {
-          const identity = readSecurityIdentity(options.runId);
-          return { runId: options.runId,
-            identity: { seedFingerprint: identity.seedFingerprint, instanceFingerprint: identity.instanceFingerprint }, control,
-            command: (args, limits) => {
-              control.beforeRequest();
-              return runOwnedProcess("docker", args, { ...limits, stopFile: context.stopFile,
-                timeoutMilliseconds: Math.min(limits.timeoutMilliseconds, control.remainingMilliseconds()),
-                environment: { ...process.env, ...securityEnvironment } });
-            } };
-        }, (readRecoveryCode) => runAuthorizationAssessment(selectedPlan, {
-          ...context, ca, readRecoveryCode,
+          return securityMfaObservationOptions({ runId: options.runId, identity: readSecurityIdentity(options.runId),
+            control, context, environment: securityEnvironment });
+        }, (readRecoveryCode, beginMailScope) => runAuthorizationAssessment(selectedPlan, {
+          ...context, ca, readRecoveryCode, beginMailScope,
           sharedPassword: securityEnvironment.COURTSIDE_SECURITY_SHARED_PASSWORD,
           maxAddressFailures: shippedLoginAddressMaxFailures()
         }));
@@ -2521,4 +2514,17 @@ function showHelp() {
 const invokedPath = process.argv[1] ? pathToFileURL(resolve(process.argv[1])).href : undefined;
 if (import.meta.url === invokedPath) {
   await main();
+}
+
+
+export function securityMfaObservationOptions({ runId, identity, control, context, environment },
+    runtime = { project: createSecurityMfaOutboxProjector, run: runOwnedProcess }) {
+  const command = (args, limits) => {
+    control.beforeRequest();
+    return runtime.run("docker", args, { ...limits, stopFile: context.stopFile,
+      timeoutMilliseconds: Math.min(limits.timeoutMilliseconds, control.remainingMilliseconds()),
+      environment: { ...process.env, ...environment } });
+  };
+  return { runId, identity: { seedFingerprint: identity.seedFingerprint, instanceFingerprint: identity.instanceFingerprint }, control,
+    projectOutbox: runtime.project({ runId, identity, command }), command };
 }

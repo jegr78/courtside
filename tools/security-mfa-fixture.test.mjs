@@ -75,7 +75,7 @@ test("given a normal denied actor, when exercising an MFA operation, then keep i
   // given
   const anonymous = {};
   const sent = [];
-  const fixture = createMfaFixture({ request: async (...args) => { sent.push(args); return { status: 401 }; }, makeClient: () => ({}), clients: { ANONYMOUS: anonymous }, sharedPassword: "fixture-original-password", origin: "https://courtside.example" });
+  const fixture = createMfaFixture({ beginMailScope: async () => async () => {}, request: async (...args) => { sent.push(args); return { status: 401 }; }, makeClient: () => ({}), clients: { ANONYMOUS: anonymous }, sharedPassword: "fixture-original-password", origin: "https://courtside.example" });
   // when
   const response = await fixture.exercise({ operationId: "disableOwnMfa", mutation: true, expectations: { ANONYMOUS: "deny-unauthenticated" } }, "ANONYMOUS", { method: "DELETE", path: "/api/account/mfa", headers: {} });
   // then
@@ -155,6 +155,7 @@ function unitProtocol({ sessionRoles } = {}) {
   const configuration = {
     makeClient: () => ({}), clients: { ADMIN: { administrator: true } }, sharedPassword: original,
     origin: "https://courtside.example", now: () => 59_000,
+    beginMailScope: async () => async () => {},
     readRecoveryCode: async (username, { excludedCodes, after }) => {
       assert.ok(Number.isFinite(after));
       const holder = account(username);
@@ -331,4 +332,39 @@ test("given roster search matches names rather than usernames, when resolving a 
   await assert.doesNotReject(() => fixture.exercise({
     operationId: "getAdministrativeMfaStatus", mutation: false, expectations: { ADMIN: "allow" }
   }, "ADMIN", {}));
+});
+
+test("given a real MFA fixture operation, when no bounded mail scope exists, then reject before any account request", () => {
+  // given
+  const protocol = unitProtocol();
+  delete protocol.configuration.beginMailScope;
+  // when / then
+  assert.throws(() => createMfaFixture(protocol.configuration), /bounded mail scope/);
+});
+
+test("given an owned MFA fixture, when account cleanup succeeds, then finish its exact holder mail scope afterwards", async () => {
+  // given
+  const protocol = unitProtocol();
+  const events = [];
+  protocol.configuration.beginMailScope = async holders => {
+    events.push(holders);
+    return async () => { assert.ok(protocol.requests() > 0); events.push("finished"); };
+  };
+  // when
+  await createMfaFixture(protocol.configuration).exercise({ operationId: "getOwnMfaStatus", expectations: { MEMBER: "allow" } }, "MEMBER", {});
+  // then
+  assert.deepEqual(events, [["security.member.2"], "finished"]);
+});
+
+test("given failed MFA account cleanup, when its fixture aborts, then retain the mail scope for diagnosis", async () => {
+  // given
+  const protocol = unitProtocol();
+  let finished = false;
+  protocol.configuration.beginMailScope = async () => async () => { finished = true; };
+  const request = protocol.configuration.request;
+  protocol.configuration.request = (client, probe, options) => probe.method === "DELETE" && probe.path === "/api/account/mfa"
+    ? { status: 503 } : request(client, probe, options);
+  // when / then
+  await assert.rejects(createMfaFixture(protocol.configuration).exercise({ operationId: "getOwnMfaStatus", expectations: { MEMBER: "allow" } }, "MEMBER", {}), /requires 2xx/);
+  assert.equal(finished, false);
 });
