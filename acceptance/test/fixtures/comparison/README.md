@@ -12,3 +12,7 @@ changed adjacent static text, overlays, ordinary welcome text, date formatting, 
 generated pseudo-element badges and numeric and date-shaped booking-card labels, and other static numeric report copy, configured statistics labels and date-shaped text without temporal semantics.
 Explicit temporal statistics buckets remain maskable. Usage metric values stay maskable. Regenerate those pairs with the same capture producer and
 copy each case's prefixed files to its matching directory without modifying either bytes or metadata.
+
+`page.html` holds the synthetic capture input, including previous/current native dates. The self-test
+inserts the pinned font and application stylesheet into its two placeholders. These dates are test
+data; real acceptance journeys continue to discover their date window from the deployment.

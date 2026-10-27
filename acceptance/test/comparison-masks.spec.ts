@@ -8,19 +8,8 @@ type MaskRectangle = { x: number; y: number; width: number; height: number };
 
 const font = readFileSync(new URL("../../frontend/node_modules/@fontsource-variable/geist-mono/files/geist-mono-latin-wght-normal.woff2", import.meta.url)).toString("base64");
 const appStyles = readFileSync(new URL("../../frontend/src/styles.css", import.meta.url), "utf8");
-const body = `<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width"><style>
-@font-face { font-family: Capture; font-style: normal; font-weight: 100 900; src: url(data:font/woff2;base64,${font}); }
-${appStyles}
-body { min-height: 800px; margin: 0; padding: 8px; box-sizing: border-box; font: 16px/24px Capture; } p { margin: 8px 0; } input, button, time { font: inherit; } input:not([type="checkbox"]):not([type="radio"]) { width: 160px; }
-</style></head><body><main><h1>Profile</h1><p id="date" data-testid="allocation-period">27.10.2026</p><p id="time" data-testid="managed-period">12:34 PM</p>
-<p><span data-testid="my-messages-unread">31</span> unread messages</p>
-<button data-testid="build-identity">v0.4.0-rc.1 · abcdef1</button><p id="name">UAT-wording-abc12345</p>
-<p data-testid="static-copy">Court 2 has 4 rules</p><p data-testid="raw-iso"><time>2026-10-27T11:34:00+02:00</time></p>
-<input data-testid="event-date" type="date" value="2026-10-27"><p><input data-testid="club-option" type="checkbox" checked><input type="radio" checked></p>
-<span class="date-time-field"><input data-testid="localized-date" type="text" data-date-time-type="date" value="27.10.2026"><input type="hidden" value="2026-10-27"></span>
-<span class="date-time-field"><input data-testid="localized-time" type="text" data-date-time-type="time" value="12:34 PM"><input type="hidden" value="12:34"></span>
-<section data-testid="usage-report"><div data-testid="usage-cancelled-card-label">1</div><dd data-testid="usage-cancelled-value">16</dd></section>
-<section data-testid="statistics-progression"><span data-testid="statistics-bucket-2026-10-27-label">27.10.2026</span></section></main></body></html>`;
+const body = readFileSync(new URL("./fixtures/comparison/page.html", import.meta.url), "utf8")
+  .replace("__FONT__", font).replace("__APP_STYLES__", appStyles);
 
 test("given native screenshots with five kinds of run data, when capture records comparison evidence, then only bounded changing text is masked", async ({ page }, info) => {
   // given
@@ -40,7 +29,8 @@ test("given native screenshots with five kinds of run data, when capture records
       document.querySelector('[data-testid="my-messages-unread"]')!.textContent = "32";
       document.querySelector('[data-testid="build-identity"]')!.textContent = "v0.4.0-rc.2 · bcdef12";
       document.getElementById("name")!.textContent = "UAT-wording-ade67895";
-      (document.querySelector('[data-testid="event-date"]') as HTMLInputElement).value = "2026-10-28";
+      const nativeDate = document.querySelector<HTMLInputElement>('[data-testid="event-date"]')!;
+      nativeDate.value = nativeDate.dataset.currentValue!;
       (document.querySelector('[data-testid="localized-date"]') as HTMLInputElement).value = "28.10.2026";
       (document.querySelector('[data-testid="localized-time"]') as HTMLInputElement).value = "12:35 PM";
       document.querySelector('[data-testid="usage-cancelled-value"]')!.textContent = "17";
@@ -83,7 +73,7 @@ test("given native screenshots with five kinds of run data, when capture records
       const source = metric.shot.replace(/\.png$/, `${suffix}.png`);
       const evidence = JSON.parse(readFileSync(source.replace(/\.png$/, ".comparison.json"), "utf8"));
       if (suffix === "-full") {
-        const bucket = await page.getByTestId("statistics-bucket-2026-10-27-label").boundingBox();
+        const bucket = await page.getByTestId("statistics-bucket-example-label").boundingBox();
         expect(evidence.masks.filter((mask: { kind: string }) => mask.kind === "date").some((mask: { rects: MaskRectangle[] }) => mask.rects.some((rect) => rect.y >= bucket!.y && rect.y < bucket!.y + bucket!.height)), "explicit temporal bucket labels remain maskable").toBe(true);
         const figure = await page.getByTestId("usage-cancelled-value").boundingBox();
         expect(evidence.masks.filter((mask: { kind: string; rects: MaskRectangle[] }) => mask.kind === "count").some((mask: { rects: MaskRectangle[] }) => mask.rects.some((rect) => rect.y >= figure!.y && rect.y < figure!.y + figure!.height)), "usage metrics keep their bounded changing-number mask").toBe(true);
@@ -122,7 +112,7 @@ for (const change of ["raw", "unparsed", "invalid", "escaped-pseudo"]) {
     const input = page.getByTestId("localized-date");
     await input.evaluate((element, value) => {
       const field = element as HTMLInputElement;
-      if (value === "raw") field.value = "2026-10-27";
+      if (value === "raw") field.value = field.ownerDocument.querySelector<HTMLInputElement>('[data-testid="event-date"]')!.value;
       if (value === "unparsed") field.setAttribute("data-date-time-unparsed", "true");
       if (value === "invalid") field.setCustomValidity("Invalid date");
     }, change);
