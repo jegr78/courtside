@@ -114,7 +114,7 @@ function maskedRun(root, name, kind, runText, { defect = false, mutate = (record
     const bytes = readFileSync(path);
     const width = bytes.readUInt32BE(16);
     const height = bytes.readUInt32BE(20);
-    const record = { schemaVersion: 1, safe: true,
+    const record = { schemaVersion: 2, safe: true,
       image: { digest: createHash("sha256").update(bytes).digest("hex"), width, height },
       capture: { width, height, devicePixelRatio: 1, userAgent: "fixture", locale: "en-US", timeZone: "UTC", mode: suffix ? "full" : "viewport", scrollX: 0, scrollY: 0 },
       masks: [{ key: `body:0/p:1/text:0/${kind}:0`, kind, style: "18px fixture sans-serif black", rects: [{ x: 20, y: 44, width: 180, height: 26 }] }] };
@@ -146,6 +146,7 @@ for (const [kind, earlier, current] of [
 }
 
 for (const [condition, mutate] of [
+  ["legacy mask protocol", (record) => { record.schemaVersion = 1; return record; }],
   ["changed presentation", (record) => { record.masks[0].style = "36px fixture serif red"; return record; }],
   ["moved text", (record) => { record.masks[0].rects[0].x += 3; return record; }],
   ["oversized mask", (record) => { record.masks[0].rects[0].width = 295; return record; }],
@@ -387,3 +388,63 @@ test("given a newly generated sheet frame differs while native captures match, w
     assert.equal(result.status, "draft", "matching native tiles do not erase a changed label, gap or frame");
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+for (const scenario of ["adjacent", "overlay", "welcome", "format", "background", "pseudo"]) {
+  test(`given real producer output with a static ${scenario} change, when native evidence is compared, then it cannot inherit a clean verdict`, { skip }, () => {
+    // given
+    const root = mkdtempSync(join(tmpdir(), "sheet-inheritance-static-rejection-"));
+    try {
+      const runs = ["previous", "current"].map((name) => {
+        const run = join(root, name);
+        const directory = join(run, "shots", "desktop-chrome", "memberA", "overview");
+        mkdirSync(directory, { recursive: true });
+        for (const suffix of ["", "-full"]) for (const extension of [".png", ".comparison.json"]) {
+          copyFileSync(new URL(`../acceptance/test/fixtures/comparison/rejections/${scenario}/${name}${suffix}${extension}`, import.meta.url),
+            join(directory, `01-state${suffix}${extension}`));
+        }
+        return { run, sheets: contactSheets(run) };
+      });
+      reviewRun(runs[0]);
+      // when
+      const result = report(runs[1], runs[0]);
+      // then
+      assert.equal(result.status, "draft", `the static ${scenario} pixels require reading despite nearby changing run data`);
+      assert.deepEqual(json(join(runs[1].run, "sheet-review.json")).verdicts, {});
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+}
+
+for (const target of ["sheet-evidence", "sheet-review"]) {
+  test(`given a legacy ${target} protocol, when the next report compares matching images, then prior evidence needs a fresh reading`, { skip }, () => {
+    // given
+    const root = mkdtempSync(join(tmpdir(), "sheet-inheritance-legacy-protocol-"));
+    try {
+      const previous = makeRun(root, "previous"); reviewRun(previous);
+      const path = join(previous.run, `${target}.json`);
+      const record = json(path); record.schemaVersion = 1;
+      writeFileSync(path, JSON.stringify(record));
+      const current = makeRun(root, "current");
+      // when
+      const result = report(current, previous);
+      // then
+      assert.equal(result.status, "draft", `${target} must use the current evidence protocol`);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+}
+for (const [condition, mutate] of [
+  ["oversized common masks", (record) => { record.masks[0].rects[0].width = 295; return record; }],
+  ["excessive common coverage", (record) => { record.masks[0].rects = Array.from({ length: 4 }, () => ({ ...record.masks[0].rects[0] })); return record; }]
+]) {
+  test(`given ${condition}, when both captures have identical geometry, then their masks still cannot authorize inheritance`, { skip }, () => {
+    // given
+    const root = mkdtempSync(join(tmpdir(), "sheet-inheritance-common-unsafe-mask-"));
+    try {
+      const previous = maskedRun(root, "previous", "time", "12:34", { mutate }); reviewRun(previous);
+      const current = maskedRun(root, "current", "time", "12:35", { mutate });
+      // when
+      const result = report(current, previous);
+      // then
+      assert.equal(result.status, "draft", `${condition} cannot erase arbitrary evidence`);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+}

@@ -390,13 +390,19 @@ inherited marker into human `review.json`.
 Each capture writes a value-free `.comparison.json` beside its viewport and full-page PNGs. It
 binds mask geometry and presentation to those exact image bytes. Recognized formatted dates,
 times, run-state counts, the version badge and generated acceptance-name suffixes can be masked.
-Static labels, numeric configuration limits, raw ISO timestamps and unsupported or clipped regions
-remain visible to comparison. Native date/time controls retain their borders and picker area. The journey's value assertions run unchanged.
-Fixed or sticky positions that cannot be established for a full-page image remain unmasked.
+Static labels, numeric configuration limits, ordinary welcome text, raw ISO timestamps and unsupported or clipped regions
+remain visible to comparison. Native date/time controls retain their borders and picker area.
+Localized application date/time fields retain their borders and reject raw, unparsed or invalid drafts.
+The journey's value assertions run unchanged.
+Overlapping elements prevent a region from being masked. Full-page masks also avoid the horizontal
+span of fixed or sticky content whose final paint position cannot be established. Generated
+pseudo-elements and native list markers disable masking unless a checkbox or radio indicator is
+proven to stay inside its control. Unsupported visual effects leave their text unmasked.
 
 `sheet-evidence.json` records native image membership, image hashes, comparison-record hashes and
 the contact sheet frame. Inheritance requires compatible membership and frame pixels, unchanged
-pixels outside compatible bounded masks in both the viewport and full-page image, and a previous
+pixels outside masks with identical position, width, height and formatting in both the viewport
+and full-page image, and a previous
 clean verdict bound to its review and evidence. Changed layout, styling, browser language,
 timezone or pixel density prevents masking from transferring a verdict. Missing, malformed,
 modified or legacy evidence falls back to a fresh reading. Older unchunked sheet names never

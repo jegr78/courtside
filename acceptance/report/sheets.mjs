@@ -87,7 +87,7 @@ export function contactSheets(run) {
       comparisonDigest: existsSync(comparison) && !lstatSync(comparison).isSymbolicLink()
         ? createHash("sha256").update(readFileSync(comparison)).digest("hex") : null };
   };
-  writeFileSync(join(run, "sheet-evidence.json"), JSON.stringify({ schemaVersion: 1,
+  writeFileSync(join(run, "sheet-evidence.json"), JSON.stringify({ schemaVersion: 2,
     sheets: entries.map((entry) => ({ name: entry.name, columns: entry.columns,
       imageDigest: createHash("sha256").update(readFileSync(join(directory, `${entry.name}.png`))).digest("hex"),
       frameSignature: sheetFrameSignature(join(directory, `${entry.name}.png`), entry),

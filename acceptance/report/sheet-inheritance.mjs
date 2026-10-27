@@ -11,7 +11,7 @@ function manifest(run) {
   const path = join(run, "sheet-evidence.json");
   const bytes = readFileSync(path);
   const evidence = JSON.parse(bytes.toString("utf8"));
-  if (evidence.schemaVersion !== 1 || !Array.isArray(evidence.sheets)
+  if (evidence.schemaVersion !== 2 || !Array.isArray(evidence.sheets)
     || new Set(evidence.sheets.map((sheet) => sheet.name)).size !== evidence.sheets.length) throw new Error("Incompatible sheet evidence");
   return { evidence, digest: digest(bytes) };
 }
@@ -77,7 +77,7 @@ export function inheritSheetVerdicts(run, previous, sheets, review) {
       const earlier = manifest(previous);
       const audit = read(join(previous, "sheet-review.json"));
       const reviewBytes = existsSync(join(previous, "review.json")) ? readFileSync(join(previous, "review.json")) : Buffer.from("null");
-      if (audit.schemaVersion !== 1 || audit.manifestDigest !== earlier.digest || audit.reviewDigest !== digest(reviewBytes)) {
+      if (audit.schemaVersion !== 2 || audit.manifestDigest !== earlier.digest || audit.reviewDigest !== digest(reviewBytes)) {
         throw new Error("Previous review evidence is stale");
       }
       const manual = JSON.parse(reviewBytes.toString("utf8")) ?? {};
@@ -112,7 +112,7 @@ export function inheritSheetVerdicts(run, previous, sheets, review) {
 export function writeSheetReview(run, inheritance, reviewed, reviewHash) {
   let evidenceDigest = null;
   try { evidenceDigest = manifest(run).digest; } catch { /* Unavailable evidence cannot become an inheritance source. */ }
-  writeFileSync(join(run, "sheet-review.json"), JSON.stringify({ schemaVersion: 1, manifestDigest: evidenceDigest,
+  writeFileSync(join(run, "sheet-review.json"), JSON.stringify({ schemaVersion: 2, manifestDigest: evidenceDigest,
     reviewDigest: reviewHash, previous: inheritance.previous, inherited: inheritance.inherited,
     verdicts: inheritance.review.sheets ?? {} }, null, 2) + "\n", { mode: 0o600 });
   const pending = reviewed.sheets?.unreviewed ?? [];

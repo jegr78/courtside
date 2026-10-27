@@ -7,14 +7,18 @@ import { runDataMaskProbe } from "../lib/comparison-masks.mjs";
 type MaskRectangle = { x: number; y: number; width: number; height: number };
 
 const font = readFileSync(new URL("../../frontend/node_modules/@fontsource-variable/geist-mono/files/geist-mono-latin-wght-normal.woff2", import.meta.url)).toString("base64");
+const appStyles = readFileSync(new URL("../../frontend/src/styles.css", import.meta.url), "utf8");
 const body = `<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width"><style>
 @font-face { font-family: Capture; font-style: normal; font-weight: 100 900; src: url(data:font/woff2;base64,${font}); }
-body { min-height: 800px; margin: 8px; font: 16px/24px Capture; } p { margin: 8px 0; } input, button { font: inherit; } input { width: 160px; }
+${appStyles}
+body { min-height: 800px; margin: 0; padding: 8px; box-sizing: border-box; font: 16px/24px Capture; } p { margin: 8px 0; } input, button { font: inherit; } input:not([type="checkbox"]):not([type="radio"]) { width: 160px; }
 </style></head><body><main><h1>Profile</h1><p id="date">27.10.2026</p><p id="time">12:34 PM</p>
 <p><span data-testid="my-messages-unread">31</span> unread messages</p>
 <button data-testid="build-identity">v0.4.0-rc.1 · abcdef1</button><p id="name">UAT-wording-abc12345</p>
 <p data-testid="static-copy">Court 2 has 4 rules</p><p data-testid="raw-iso">2026-10-27T11:34:00+02:00</p>
-<input data-testid="event-date" type="date" value="2026-10-27"></main></body></html>`;
+<input data-testid="event-date" type="date" value="2026-10-27"><p><input data-testid="club-option" type="checkbox" checked><input type="radio" checked></p>
+<span class="date-time-field"><input data-testid="localized-date" type="text" data-date-time-type="date" value="27.10.2026"><input type="hidden" value="2026-10-27"></span>
+<span class="date-time-field"><input data-testid="localized-time" type="text" data-date-time-type="time" value="12:34 PM"><input type="hidden" value="12:34"></span></main></body></html>`;
 
 test("given native screenshots with five kinds of run data, when capture records comparison evidence, then only bounded changing text is masked", async ({ page }, info) => {
   // given
@@ -33,8 +37,10 @@ test("given native screenshots with five kinds of run data, when capture records
       document.getElementById("time")!.textContent = "12:35 PM";
       document.querySelector('[data-testid="my-messages-unread"]')!.textContent = "32";
       document.querySelector('[data-testid="build-identity"]')!.textContent = "v0.4.0-rc.2 · bcdef12";
-      document.getElementById("name")!.textContent = "UAT-wording-def67890";
+      document.getElementById("name")!.textContent = "UAT-wording-ade67895";
       (document.querySelector('[data-testid="event-date"]') as HTMLInputElement).value = "2026-10-28";
+      (document.querySelector('[data-testid="localized-date"]') as HTMLInputElement).value = "28.10.2026";
+      (document.querySelector('[data-testid="localized-time"]') as HTMLInputElement).value = "12:35 PM";
     });
     await capture(page, label);
     const rows = readFileSync(runPath("metrics.jsonl"), "utf8").trim().split("\n").map((line) => JSON.parse(line));
@@ -48,6 +54,8 @@ test("given native screenshots with five kinds of run data, when capture records
     const image = readFileSync(metric.shot);
     expect(record.image.width).toBe(image.readUInt32BE(16));
     expect(record.image.height).toBe(image.readUInt32BE(20));
+    expect(Math.round(record.capture.width * record.capture.devicePixelRatio)).toBe(record.image.width);
+    expect(Math.round(record.capture.height * record.capture.devicePixelRatio)).toBe(record.image.height);
     expect(record.capture.devicePixelRatio).toBe(info.project.use.deviceScaleFactor ?? 1);
     expect(record.capture.locale).toBe(await page.evaluate(() => navigator.language));
     expect(record.capture.timeZone).toBe(await page.evaluate(() => Intl.DateTimeFormat().resolvedOptions().timeZone));
@@ -60,7 +68,7 @@ test("given native screenshots with five kinds of run data, when capture records
       expect(rect.x + rect.width).toBeLessThanOrEqual(input!.x + input!.width - 32);
       expect(rect.y + rect.height).toBeLessThanOrEqual(input!.y + input!.height - 1);
     }
-    expect(JSON.stringify(record)).not.toMatch(/27\.10\.2026|28\.10\.2026|abc12345|def67890|11:34:00/);
+    expect(JSON.stringify(record)).not.toMatch(/27\.10\.2026|28\.10\.2026|abc12345|ade67895|11:34:00/);
     for (const id of ["static-copy", "raw-iso"]) {
       const box = await page.getByTestId(id).boundingBox();
       expect(record.masks.flatMap((mask: { rects: MaskRectangle[] }) => mask.rects)
@@ -69,6 +77,8 @@ test("given native screenshots with five kinds of run data, when capture records
     }
     for (const suffix of ["", "-full"]) {
       const source = metric.shot.replace(/\.png$/, `${suffix}.png`);
+      const evidence = JSON.parse(readFileSync(source.replace(/\.png$/, ".comparison.json"), "utf8"));
+      if (suffix === "-full") expect(evidence.masks.filter((mask: { key: string }) => mask.key.includes("/localized-input:")), "application text date and time fields produce bounded masks beside styled checkboxes").toHaveLength(2);
       copyFileSync(source, info.outputPath(`${label}${suffix}.png`));
       copyFileSync(source.replace(/\.png$/, ".comparison.json"), info.outputPath(`${label}${suffix}.comparison.json`));
     }
@@ -93,3 +103,26 @@ test("given clipped date text and a fixed unread count, when comparison geometry
       && rect.y < clipped!.y + clipped!.height && rect.y + rect.height > clipped!.y)), `${record.capture.mode} leaves clipped content exposed`).toBe(false);
   }
 });
+
+for (const change of ["raw", "unparsed", "invalid", "escaped-pseudo"]) {
+  test(`given ${change} application field evidence, when mask geometry is collected, then unsupported pixels remain exposed`, async ({ page }) => {
+    // given
+    await page.setViewportSize({ width: 640, height: 480 });
+    await page.goto(`data:text/html,${encodeURIComponent(body)}`);
+    const input = page.getByTestId("localized-date");
+    await input.evaluate((element, value) => {
+      const field = element as HTMLInputElement;
+      if (value === "raw") field.value = "2026-10-27";
+      if (value === "unparsed") field.setAttribute("data-date-time-unparsed", "true");
+      if (value === "invalid") field.setCustomValidity("Invalid date");
+    }, change);
+    if (change === "escaped-pseudo") await page.addStyleTag({ content: 'input[type="checkbox"]::before { position:absolute;left:40px;top:60px;width:100px;height:20px;transform:none; }' });
+    // when
+    const records = await Promise.all(["viewport", "full"].map((mode) => page.evaluate(runDataMaskProbe, { mode })));
+    // then
+    for (const record of records) {
+      if (change === "escaped-pseudo") expect(record.masks).toHaveLength(0);
+      else expect(record.masks.filter((mask) => mask.key.includes("/localized-input:date:"))).toHaveLength(0);
+    }
+  });
+}

@@ -17,7 +17,7 @@ function comparison(path, evidence) {
   const capture = record.capture;
   const width = source.readUInt32BE(16);
   const height = source.readUInt32BE(20);
-  if (record.schemaVersion !== 1 || record.safe !== true || record.image?.digest !== evidence.digest
+  if (record.schemaVersion !== 2 || record.safe !== true || record.image?.digest !== evidence.digest
     || record.image.width !== width || record.image.height !== height || !capture
     || !finite(capture.width) || !finite(capture.height) || capture.width <= 0 || capture.height <= 0
     || !finite(capture.devicePixelRatio) || capture.devicePixelRatio < 1 || capture.devicePixelRatio > 4
@@ -62,8 +62,8 @@ export function matchingImages(path, evidence, previous, oldEvidence) {
     if (mask.key !== old.key || mask.kind !== old.kind || mask.style !== old.style || mask.rects.length !== old.rects.length) return false;
     for (const [position, rect] of mask.rects.entries()) {
       const earlier = old.rects[position];
-      if (rect.x !== earlier.x || rect.y !== earlier.y || rect.height !== earlier.height) return false;
-      rectangles.push({ ...rect, width: Math.max(rect.width, earlier.width) });
+      if (rect.x !== earlier.x || rect.y !== earlier.y || rect.height !== earlier.height || rect.width !== earlier.width) return false;
+      rectangles.push(rect);
     }
   }
   if (rectangles.reduce((sum, rect) => sum + rect.width * rect.height, 0) > now.capture.width * now.capture.height * 0.2) return false;

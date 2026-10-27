@@ -1,6 +1,6 @@
 import { defineConfig } from "@playwright/test";
 export default defineConfig({
-  testDir: ".", testMatch: /(measure|settle|full-shot|secret-fill|credential|console-context|comparison-masks)\.spec\.ts$/,
+  testDir: ".", testMatch: /(measure|settle|full-shot|secret-fill|credential|console-context|comparison-masks|comparison-rejections)\.spec\.ts$/,
   outputDir: "../../build/acceptance-selftest/results",
   projects: [
     { name: "chromium", use: { browserName: "chromium" } },
