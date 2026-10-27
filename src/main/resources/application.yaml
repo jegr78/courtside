@@ -52,6 +52,9 @@ server:
         same-site: lax
 
 courtside:
+  mfa:
+    key-root: ${COURTSIDE_MFA_KEY_ROOT:.courtside/keys}
+    key-file: ${COURTSIDE_MFA_KEY_FILE:}
   source-url: ${COURTSIDE_SOURCE_URL:@project.url@}
   public-url: ${COURTSIDE_PUBLIC_URL:}
   operations:
