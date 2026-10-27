@@ -20,6 +20,21 @@ async function openAccount(page: Page) {
   await expect(page).toHaveURL(/\/account$/);
 }
 
+async function accountScreenshot(page: Page, options: Parameters<Page["screenshot"]>[0]) {
+  const warning = page.getByTestId("pwa-registration-warning");
+  await expect(warning).toBeVisible({ timeout: 10_000 });
+  const hidden = await warning.getAttribute("hidden");
+  await warning.evaluate((element) => element.setAttribute("hidden", ""));
+  try {
+    await page.screenshot(options);
+  } finally {
+    await warning.evaluate((element, previous) => {
+      if (previous === null) element.removeAttribute("hidden");
+      else element.setAttribute("hidden", previous);
+    }, hidden);
+  }
+}
+
 async function fits(page: Page) {
   await page.evaluate(() => document.fonts.ready);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth),
@@ -40,8 +55,7 @@ for (const locale of ["de", "en"] as const) {
     await expect(page.getByTestId("preferences-menu")).toHaveAccessibleName(
       `${locale === "de" ? "Konto und Darstellung" : "Account and appearance"} doe.jane`);
     await page.evaluate(() => document.fonts.ready);
-    await page.screenshot({ path: info.outputPath(`account-control-${locale}.png`),
-      style: "[data-testid='pwa-registration-warning'] { visibility: hidden; }" });
+    await accountScreenshot(page, { path: info.outputPath(`account-control-${locale}.png`) });
 
     // when
     await page.getByTestId("preferences-menu").focus();
@@ -100,14 +114,12 @@ for (const locale of ["de", "en"] as const) {
       await logout.scrollIntoViewIfNeeded();
       await expect(logout).toBeInViewport();
       await page.getByTestId("preferences-menu").click();
-      await page.screenshot({ path: info.outputPath(`account-${locale}-${width}.png`), fullPage: true,
-        style: "[data-testid='pwa-registration-warning'] { visibility: hidden; }" });
+      await accountScreenshot(page, { path: info.outputPath(`account-${locale}-${width}.png`), fullPage: true });
     }
     await expect(page.getByTestId("profile-first-name")).toHaveText(firstName);
     await expect(page.getByTestId("profile-last-name")).toHaveText(lastName);
     await expect(page.getByTestId("profile-role")).toHaveCount(7);
-    await page.screenshot({ path: info.outputPath(`account-${locale}.png`), fullPage: true,
-      style: "[data-testid='pwa-registration-warning'] { visibility: hidden; }" });
+    await accountScreenshot(page, { path: info.outputPath(`account-${locale}.png`), fullPage: true });
     await page.unroute("**/api/session");
     await page.getByTestId("preferences-menu").click();
     await page.getByTestId("logout").click();
