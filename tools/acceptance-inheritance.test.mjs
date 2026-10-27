@@ -1,11 +1,13 @@
-import test from "node:test";
+import test, { mock } from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { execFileSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync, copyFileSync, symlinkSync } from "node:fs";
+import childProcess, { execFileSync, spawnSync } from "node:child_process";
+import fs, { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync, copyFileSync, symlinkSync } from "node:fs";
 import { join } from "node:path";
+import { syncBuiltinESMExports } from "node:module";
 import { tmpdir } from "node:os";
 import { contactSheets, imageMagick, findFont, sheetFrameSignature } from "../acceptance/report/sheets.mjs";
+import { findExecutable } from "../acceptance/lib/executable.mjs";
 import { renderReport } from "../acceptance/report/html.mjs";
 
 const required = process.env.COURTSIDE_SHEET_RENDERER === "required";
@@ -106,8 +108,8 @@ test("given a previous sheet carrying a finding, when its pixels are unchanged, 
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-function maskedRun(root, name, kind, runText, { defect = false, mutate = (record) => record } = {}) {
-  const entry = makeRun(root, name, { runText, defect });
+function maskedRun(root, name, kind, runText, { defect = false, defectColor = "red", mutate = (record) => record } = {}) {
+  const entry = makeRun(root, name, { runText, defect, defectColor });
   const directory = join(entry.run, "shots", "desktop-chrome", "memberA", "overview");
   for (const suffix of ["", "-full"]) {
     const path = join(directory, `01-account${suffix}.png`);
@@ -454,3 +456,136 @@ for (const [condition, mutate] of [
     } finally { rmSync(root, { recursive: true, force: true }); }
   });
 }
+
+test("given a comparison sidecar exchanged after opening, when sheets record its digest, then the original opened file remains the evidence", { skip }, () => {
+  // given
+  const root = mkdtempSync(join(tmpdir(), "sheet-inheritance-sidecar-race-"));
+  try {
+    const current = maskedRun(root, "current", "time", "12:34");
+    const path = join(current.run, "shots", "desktop-chrome", "memberA", "overview", "01-account.comparison.json");
+    const original = readFileSync(path);
+    const external = join(root, "outside.json");
+    writeFileSync(external, '{"outside":true}');
+    const open = fs.openSync;
+    const read = fs.readFileSync;
+    let opened;
+    let exchanged = false;
+    mock.method(fs, "openSync", (...args) => {
+      const descriptor = open(...args);
+      if (args[0] === path) opened = descriptor;
+      return descriptor;
+    });
+    mock.method(fs, "readFileSync", (file, ...args) => {
+      if (!exchanged && (file === path || (opened !== undefined && file === opened))) {
+        fs.renameSync(path, `${path}.original`);
+        symlinkSync(external, path);
+        exchanged = true;
+      }
+      return read(file, ...args);
+    });
+    syncBuiltinESMExports();
+    // when
+    contactSheets(current.run);
+    // then
+    assert.equal(exchanged, true, "the filename actually changes at the read boundary");
+    assert.equal(json(join(current.run, "sheet-evidence.json")).sheets[0].tiles[0].viewport.comparisonDigest,
+      createHash("sha256").update(original).digest("hex"), "the opened record cannot become the replacement symlink target");
+    assert.throws(() => fs.fstatSync(opened), { code: "EBADF" }, "the evidence reader releases its file descriptor");
+  } finally {
+    mock.restoreAll();
+    syncBuiltinESMExports();
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("given a comparison sidecar is an external symlink, when sheets record evidence, then that record cannot supply a digest", { skip }, () => {
+  // given
+  const root = mkdtempSync(join(tmpdir(), "sheet-inheritance-sidecar-symlink-"));
+  try {
+    const current = maskedRun(root, "current", "time", "12:34");
+    const path = join(current.run, "shots", "desktop-chrome", "memberA", "overview", "01-account.comparison.json");
+    const external = join(root, "outside.json");
+    copyFileSync(path, external); rmSync(path); symlinkSync(external, path);
+    // when
+    contactSheets(current.run);
+    // then
+    assert.equal(json(join(current.run, "sheet-evidence.json")).sheets[0].tiles[0].viewport.comparisonDigest, null);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("given a comparison sidecar is a named pipe, when sheets record evidence, then unsupported streams are rejected without reading", { skip }, () => {
+  // given
+  const root = mkdtempSync(join(tmpdir(), "sheet-inheritance-sidecar-pipe-"));
+  try {
+    const current = maskedRun(root, "current", "time", "12:34");
+    const path = join(current.run, "shots", "desktop-chrome", "memberA", "overview", "01-account.comparison.json");
+    rmSync(path);
+    const binary = findExecutable("mkfifo");
+    assert.ok(binary, "the native fixture requires the POSIX named-pipe tool");
+    execFileSync(binary, [path]);
+    // when
+    const result = spawnSync(process.execPath, ["--input-type=module", "-e",
+      'const { contactSheets } = await import(process.argv[1]); contactSheets(process.argv[2]);',
+      new URL("../acceptance/report/sheets.mjs", import.meta.url).href, current.run], { timeout: 8000, encoding: "utf8" });
+    // then
+    assert.equal(result.status, 0, "recording evidence must finish without waiting for a pipe writer");
+    assert.equal(json(join(current.run, "sheet-evidence.json")).sheets[0].tiles[0].viewport.comparisonDigest, null,
+      "only regular comparison files can supply an evidence digest");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+for (const mode of ["raw", "masked"]) {
+  test(`given a ${mode} PNG exchanged after source hashing, when ImageMagick compares, then the original defect cannot inherit a clean verdict`, { skip }, () => {
+    // given
+    const root = mkdtempSync(join(tmpdir(), "sheet-inheritance-pixel-race-"));
+    try {
+      const previous = mode === "raw" ? makeRun(root, "previous") : maskedRun(root, "previous", "time", "12:34");
+      reviewRun(previous);
+      const current = mode === "raw" ? makeRun(root, "current", { defect: true, defectColor: "black" })
+        : maskedRun(root, "current", "time", "12:35", { defect: true, defectColor: "black" });
+      const clean = mode === "raw" ? previous : maskedRun(root, "clean-current", "time", "12:35");
+      const image = (entry) => join(entry.run, "shots", "desktop-chrome", "memberA", "overview", "01-account.png");
+      const exec = childProcess.execFileSync;
+      let exchanged = false;
+      mock.method(childProcess, "execFileSync", (binary, args, options) => {
+        if (!exchanged && (mode === "raw" || args.includes("-draw"))) {
+          copyFileSync(image(clean), image(current));
+          exchanged = true;
+        }
+        return exec(binary, args, options);
+      });
+      syncBuiltinESMExports();
+      // when
+      const result = report(current, previous);
+      // then
+      assert.equal(exchanged, true, "the image filename changes at the actual comparison boundary");
+      assert.equal(result.status, "draft", "the compared pixels must be the bytes whose hash was validated");
+    } finally {
+      mock.restoreAll();
+      syncBuiltinESMExports();
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+}
+
+test("given a valid comparison sidecar replaced with a pipe, when the report reads it, then the reading finishes with a manual verdict required", { skip }, () => {
+  // given
+  const root = mkdtempSync(join(tmpdir(), "sheet-inheritance-sidecar-consumer-pipe-"));
+  try {
+    const previous = maskedRun(root, "previous", "time", "12:34"); reviewRun(previous);
+    const current = maskedRun(root, "current", "time", "12:35");
+    const path = join(current.run, "shots", "desktop-chrome", "memberA", "overview", "01-account.comparison.json");
+    rmSync(path);
+    const binary = findExecutable("mkfifo");
+    assert.ok(binary, "the native fixture requires the POSIX named-pipe tool");
+    execFileSync(binary, [path]);
+    // when
+    const result = spawnSync(process.execPath, ["--input-type=module", "-e",
+      'const { renderReport } = await import(process.argv[1]); const result = renderReport(process.argv[2], JSON.parse(process.argv[3]), JSON.parse(process.argv[4])); process.stdout.write(result.status);',
+      new URL("../acceptance/report/html.mjs", import.meta.url).href, current.run, JSON.stringify(config),
+      JSON.stringify({ harnessCommit: "fixture", sheets: current.sheets, previous: previous.run })], { timeout: 8000, encoding: "utf8" });
+    // then
+    assert.equal(result.status, 0, "comparison must finish without waiting for a sidecar pipe writer");
+    assert.equal(result.stdout, "draft", "a stream cannot supply an inherited clean judgment");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});

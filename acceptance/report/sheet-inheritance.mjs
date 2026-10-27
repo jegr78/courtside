@@ -1,36 +1,38 @@
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { realpathSync, writeFileSync } from "node:fs";
 import { basename, isAbsolute, join, resolve, sep } from "node:path";
 import { sheetChanges } from "./sheets.mjs";
 import { matchingImages } from "./image-comparison.mjs";
+import { readEvidence } from "./evidence-file.mjs";
 
 const digest = (bytes) => createHash("sha256").update(bytes).digest("hex");
-const read = (path) => JSON.parse(readFileSync(path, "utf8"));
+const read = (path) => JSON.parse(readEvidence(path).toString("utf8"));
 
 function manifest(run) {
   const path = join(run, "sheet-evidence.json");
-  const bytes = readFileSync(path);
+  const bytes = readEvidence(path);
   const evidence = JSON.parse(bytes.toString("utf8"));
   if (evidence.schemaVersion !== 3 || !Array.isArray(evidence.sheets)
     || new Set(evidence.sheets.map((sheet) => sheet.name)).size !== evidence.sheets.length) throw new Error("Incompatible sheet evidence");
   return { evidence, digest: digest(bytes) };
 }
 
-function imagePath(run, image) {
+function imageSource(run, image) {
   if (!image || typeof image.path !== "string" || isAbsolute(image.path) || image.path.split(/[\\/]/).includes("..")
     || !image.path.startsWith("shots/") || !/\.png$/.test(image.path)) throw new Error("Unsafe screenshot evidence path");
   const root = realpathSync(run);
   const path = resolve(root, image.path);
-  if (!path.startsWith(join(root, "shots") + sep) || realpathSync(path) !== path
-    || digest(readFileSync(path)) !== image.digest) throw new Error("Screenshot evidence changed");
-  return path;
+  if (!path.startsWith(join(root, "shots") + sep) || realpathSync(path) !== path) throw new Error("Unsafe screenshot evidence path");
+  const bytes = readEvidence(path);
+  if (digest(bytes) !== image.digest) throw new Error("Screenshot evidence changed");
+  return { path, bytes };
 }
 
 function matchingSheet(current, previous, now, before) {
   for (const [run, sheet] of [[current, now], [previous, before]]) {
     if (typeof sheet.name !== "string" || !/^[a-zA-Z0-9_.-]+$/.test(sheet.name)) return false;
     const path = join(realpathSync(run), "sheets", `${sheet.name}.png`);
-    if (realpathSync(path) !== path || digest(readFileSync(path)) !== sheet.imageDigest) return false;
+    if (realpathSync(path) !== path || digest(readEvidence(path)) !== sheet.imageDigest) return false;
   }
   if (typeof now.frameSignature !== "string" || !/^[a-f0-9]{64}$/.test(now.frameSignature)
     || now.frameSignature !== before.frameSignature) return false;
@@ -43,7 +45,7 @@ function matchingSheet(current, previous, now, before) {
       const oldImage = earlier[kind];
       if (!image || !oldImage) return false;
       if (image.path !== oldImage.path) return false;
-      return matchingImages(imagePath(current, image), image, imagePath(previous, oldImage), oldImage);
+      return matchingImages(imageSource(current, image), image, imageSource(previous, oldImage), oldImage);
     });
   });
 }
@@ -76,7 +78,11 @@ export function inheritSheetVerdicts(run, previous, sheets, review) {
       const current = manifest(run);
       const earlier = manifest(previous);
       const audit = read(join(previous, "sheet-review.json"));
-      const reviewBytes = existsSync(join(previous, "review.json")) ? readFileSync(join(previous, "review.json")) : Buffer.from("null");
+      let reviewBytes;
+      try { reviewBytes = readEvidence(join(previous, "review.json")); } catch (failure) {
+        if (failure.code !== "ENOENT") throw failure;
+        reviewBytes = Buffer.from("null");
+      }
       if (audit.schemaVersion !== 3 || audit.manifestDigest !== earlier.digest || audit.reviewDigest !== digest(reviewBytes)) {
         throw new Error("Previous review evidence is stale");
       }

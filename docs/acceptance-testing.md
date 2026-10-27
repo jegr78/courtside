@@ -403,7 +403,8 @@ pseudo-elements and native list markers disable masking unless a checkbox or rad
 proven to stay inside its control. Unsupported visual effects leave their text unmasked.
 
 `sheet-evidence.json` records native image membership, image hashes, comparison-record hashes and
-the contact sheet frame. Inheritance requires compatible membership and frame pixels, unchanged
+the contact sheet frame. Evidence reads use regular non-symlink file descriptors. Pixel signatures
+receive the verified PNG bytes through standard input. Inheritance requires compatible membership and frame pixels, unchanged
 pixels outside masks with identical position, width, height and formatting in both the viewport
 and full-page image, and a previous
 clean verdict bound to its review and evidence. Changed layout, styling, browser language,

@@ -1,22 +1,22 @@
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { readFileSync, realpathSync } from "node:fs";
-import { imageMagick, pixelSignature } from "./sheets.mjs";
+import { realpathSync } from "node:fs";
+import { imageMagick } from "./sheets.mjs";
+import { readEvidence } from "./evidence-file.mjs";
 
 const KINDS = new Set(["date", "time", "count", "version", "generated-name"]);
 const digest = (bytes) => createHash("sha256").update(bytes).digest("hex");
 const finite = (number) => typeof number === "number" && Number.isFinite(number);
 
-function comparison(path, evidence) {
-  const source = readFileSync(path);
-  const metadata = path.replace(/\.png$/, ".comparison.json");
+function comparison(source, evidence) {
+  const metadata = source.path.replace(/\.png$/, ".comparison.json");
   if (!evidence.comparisonDigest || realpathSync(metadata) !== metadata) throw new Error("Comparison evidence unavailable");
-  const bytes = readFileSync(metadata);
+  const bytes = readEvidence(metadata);
   if (digest(bytes) !== evidence.comparisonDigest) throw new Error("Comparison evidence changed");
   const record = JSON.parse(bytes.toString("utf8"));
   const capture = record.capture;
-  const width = source.readUInt32BE(16);
-  const height = source.readUInt32BE(20);
+  const width = source.bytes.readUInt32BE(16);
+  const height = source.bytes.readUInt32BE(20);
   if (record.schemaVersion !== 3 || record.safe !== true || record.image?.digest !== evidence.digest
     || record.image.width !== width || record.image.height !== height || !capture
     || !finite(capture.width) || !finite(capture.height) || capture.width <= 0 || capture.height <= 0
@@ -45,15 +45,15 @@ function comparison(path, evidence) {
   return record;
 }
 
-function maskedSignature(path, rectangles, density) {
+function imageSignature(source, rectangles = [], density = 1) {
   const drawing = rectangles.map((rect) => `rectangle ${Math.floor(rect.x * density)},${Math.floor(rect.y * density)} ${Math.ceil((rect.x + rect.width) * density) - 1},${Math.ceil((rect.y + rect.height) * density) - 1}`).join(" ");
-  const [binary, args] = imageMagick().convert([path, "-fill", "#000000", "-draw", drawing, "-format", "%#", "info:"]);
-  return execFileSync(binary, args, { encoding: "utf8" }).trim();
+  const [binary, args] = imageMagick().convert(["png:-", ...(drawing ? ["-fill", "#000000", "-draw", drawing] : []), "-format", "%#", "info:"]);
+  return execFileSync(binary, args, { input: source.bytes, encoding: "utf8" }).trim();
 }
 
-export function matchingImages(path, evidence, previous, oldEvidence) {
-  if (pixelSignature(path) === pixelSignature(previous)) return true;
-  const now = comparison(path, evidence);
+export function matchingImages(source, evidence, previous, oldEvidence) {
+  if (imageSignature(source) === imageSignature(previous)) return true;
+  const now = comparison(source, evidence);
   const before = comparison(previous, oldEvidence);
   if (JSON.stringify(now.capture) !== JSON.stringify(before.capture) || now.masks.length !== before.masks.length) return false;
   const rectangles = [];
@@ -67,6 +67,6 @@ export function matchingImages(path, evidence, previous, oldEvidence) {
     }
   }
   if (rectangles.reduce((sum, rect) => sum + rect.width * rect.height, 0) > now.capture.width * now.capture.height * 0.2) return false;
-  return maskedSignature(path, rectangles, now.capture.devicePixelRatio)
-    === maskedSignature(previous, rectangles, now.capture.devicePixelRatio);
+  return imageSignature(source, rectangles, now.capture.devicePixelRatio)
+    === imageSignature(previous, rectangles, now.capture.devicePixelRatio);
 }

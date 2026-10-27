@@ -1,8 +1,9 @@
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readdirSync, statSync, lstatSync, rmSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, statSync, rmSync, readFileSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { findExecutable } from "../lib/executable.mjs";
+import { readEvidence } from "./evidence-file.mjs";
 
 const walk = (directory) => readdirSync(directory).flatMap((name) => {
   const path = join(directory, name);
@@ -26,6 +27,10 @@ export function imageMagick() {
   const magick = findExecutable("magick");
   if (magick) return { montage: (args) => [magick, ["montage", ...args]], convert: (args) => [magick, args] };
   return null;
+}
+
+function comparisonDigest(path) {
+  try { return createHash("sha256").update(readEvidence(path)).digest("hex"); } catch { return null; }
 }
 
 function deviceClass(project) {
@@ -84,8 +89,7 @@ export function contactSheets(run) {
     if (path === null) return null;
     const comparison = path.replace(/\.png$/, ".comparison.json");
     return { path: relative(run, path), digest: createHash("sha256").update(readFileSync(path)).digest("hex"),
-      comparisonDigest: existsSync(comparison) && !lstatSync(comparison).isSymbolicLink()
-        ? createHash("sha256").update(readFileSync(comparison)).digest("hex") : null };
+      comparisonDigest: comparisonDigest(comparison) };
   };
   writeFileSync(join(run, "sheet-evidence.json"), JSON.stringify({ schemaVersion: 3,
     sheets: entries.map((entry) => ({ name: entry.name, columns: entry.columns,
