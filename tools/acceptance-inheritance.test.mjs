@@ -423,6 +423,12 @@ for (const target of ["sheet-evidence", "sheet-review"]) {
       const path = join(previous.run, `${target}.json`);
       const record = json(path); record.schemaVersion = 1;
       writeFileSync(path, JSON.stringify(record));
+      if (target === "sheet-evidence") {
+        const auditPath = join(previous.run, "sheet-review.json");
+        const audit = json(auditPath);
+        audit.manifestDigest = createHash("sha256").update(readFileSync(path)).digest("hex");
+        writeFileSync(auditPath, JSON.stringify(audit));
+      }
       const current = makeRun(root, "current");
       // when
       const result = report(current, previous);
