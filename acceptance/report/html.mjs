@@ -129,6 +129,7 @@ ${changes.added.length ? `<details><summary>New sheets</summary><ul>${names(chan
 ${sheets.inherited?.length ? `<details><summary>Inherited verdicts</summary><ul>${sheets.inherited.map((name) => `<li><code>${esc(name)}</code> ${esc(sheets.verdicts[name].by)}</li>`).join("")}</ul></details>` : ""}
 ${sheets.unreviewed.length ? `<p class="unassessed">Without a verdict:</p><ul>${names(sheets.unreviewed)}</ul>` : ""}
 ${sheets.stale.length ? `<p>Verdicts for sheets this run did not produce:</p><ul>${names(sheets.stale)}</ul>` : ""}
+${changes?.inheritanceUnavailable ? `<p>Verdict inheritance unavailable: ${esc(changes.inheritanceUnavailable)}.</p>` : ""}
 ${comparison}</section>`;
 }
 
@@ -156,7 +157,8 @@ export function renderReport(run, config, { harnessCommit, sheets = null, previo
   const residue = json(join(run, "postflight-residue.json"), null)?.residue;
   const surfaces = [...new Map(jsonl(join(run, "role-surfaces.jsonl")).map((row) => [row.key, row])).values()];
   const observations = jsonl(join(run, "observations.jsonl"));
-  const review = json(join(run, "review.json"), { assessments: {}, manual: [] });
+  const reviewBytes = existsSync(join(run, "review.json")) ? readFileSync(join(run, "review.json")) : Buffer.from("null");
+  const review = JSON.parse(reviewBytes.toString("utf8")) ?? { assessments: {}, manual: [] };
   const inheritance = inheritSheetVerdicts(run, previous, sheets, review);
   const reviewed = applyReview(collectFindings({ metrics, failures }), inheritance.review, sheets);
   const changes = inheritance.changes;
@@ -164,7 +166,7 @@ export function renderReport(run, config, { harnessCommit, sheets = null, previo
     reviewed.sheets.inherited = inheritance.inherited;
     reviewed.sheets.verdicts = inheritance.review.sheets;
   }
-  writeSheetReview(run, inheritance, reviewed);
+  writeSheetReview(run, inheritance, reviewed, createHash("sha256").update(reviewBytes).digest("hex"));
   reviewed.findings.sort((a, b) => ORDER[a.severity] - ORDER[b.severity]);
   const coverage = coverageOf(results);
   const projects = [...new Set(coverage.rows.flatMap((row) => Object.keys(row.cells)))].sort();

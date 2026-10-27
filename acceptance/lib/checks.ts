@@ -1,9 +1,10 @@
 import { PASSWORD, runPath } from "./context";
-import { appendFileSync, mkdirSync } from "node:fs";
+import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { layoutProbe, layoutProbeArguments } from "./layout-probe.mjs";
 import { showSubject } from "./subject.mjs";
+import { runDataMaskProbe, screenshotComparison } from "./comparison-masks.mjs";
 
 export async function measure(page: Page, locale: "de" | "en") {
   return page.evaluate(layoutProbe, layoutProbeArguments(locale));
@@ -99,6 +100,14 @@ export async function fullPageShot(page: Page, path: string) {
   await inCapturePhase(page, "restore-scroll", () => page.evaluate(([left, top]) => window.scrollTo(left, top), [x, y]));
 }
 
+async function comparisonShot(page: Page, path: string, mode: "viewport" | "full") {
+  const before = await inCapturePhase(page, "comparison-probe", () => page.evaluate(runDataMaskProbe, { mode }));
+  if (mode === "full") await fullPageShot(page, path);
+  else await inCapturePhase(page, "viewport-screenshot", () => page.screenshot({ path }));
+  const after = await inCapturePhase(page, "comparison-probe", () => page.evaluate(runDataMaskProbe, { mode }));
+  writeFileSync(path.replace(/\.png$/, ".comparison.json"), JSON.stringify(screenshotComparison(readFileSync(path), before, after)) + "\n", { mode: 0o600 });
+}
+
 export async function capture(page: Page, label: string, opts: { expectedStatuses?: number[]; subject?: Locator } = {}) {
   const record = watched.get(page);
   const previous = record?.capture ?? null;
@@ -124,9 +133,9 @@ async function capturePage(page: Page, label: string, opts: { expectedStatuses?:
   trace(label, "idle done");
   for (let attempt = 1; ; attempt++) {
     if (opts.subject) expect(await inCapturePhase(page, "subject", () => showSubject(opts.subject!, page.viewportSize())), `harness: the ${label} capture shows its subject`).toBe(true);
-    await inCapturePhase(page, "viewport-screenshot", () => page.screenshot({ path: `${base}.png` }));
+    await comparisonShot(page, `${base}.png`, "viewport");
     trace(label, "viewport shot");
-    await fullPageShot(page, `${base}-full.png`);
+    await comparisonShot(page, `${base}-full.png`, "full");
     trace(label, "full shot");
     const stillQuiet = await page.locator(LOADING_NOTICE).count() === 0;
     if (stillQuiet || !settled || attempt === 3) { settled = settled && stillQuiet; break; }

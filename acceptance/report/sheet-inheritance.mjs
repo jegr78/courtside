@@ -1,18 +1,19 @@
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { basename, isAbsolute, join, resolve, sep } from "node:path";
-import { pixelSignature, sheetChanges } from "./sheets.mjs";
+import { sheetChanges } from "./sheets.mjs";
+import { matchingImages } from "./image-comparison.mjs";
 
 const digest = (bytes) => createHash("sha256").update(bytes).digest("hex");
 const read = (path) => JSON.parse(readFileSync(path, "utf8"));
-const reviewDigest = (run) => digest(existsSync(join(run, "review.json")) ? readFileSync(join(run, "review.json")) : "null");
 
 function manifest(run) {
   const path = join(run, "sheet-evidence.json");
-  const evidence = read(path);
+  const bytes = readFileSync(path);
+  const evidence = JSON.parse(bytes.toString("utf8"));
   if (evidence.schemaVersion !== 1 || !Array.isArray(evidence.sheets)
     || new Set(evidence.sheets.map((sheet) => sheet.name)).size !== evidence.sheets.length) throw new Error("Incompatible sheet evidence");
-  return { evidence, digest: digest(readFileSync(path)) };
+  return { evidence, digest: digest(bytes) };
 }
 
 function imagePath(run, image) {
@@ -26,6 +27,13 @@ function imagePath(run, image) {
 }
 
 function matchingSheet(current, previous, now, before) {
+  for (const [run, sheet] of [[current, now], [previous, before]]) {
+    if (typeof sheet.name !== "string" || !/^[a-zA-Z0-9_.-]+$/.test(sheet.name)) return false;
+    const path = join(realpathSync(run), "sheets", `${sheet.name}.png`);
+    if (realpathSync(path) !== path || digest(readFileSync(path)) !== sheet.imageDigest) return false;
+  }
+  if (typeof now.frameSignature !== "string" || !/^[a-f0-9]{64}$/.test(now.frameSignature)
+    || now.frameSignature !== before.frameSignature) return false;
   if (now.columns !== before.columns || now.tiles.length !== before.tiles.length) return false;
   return now.tiles.every((tile, index) => {
     const earlier = before.tiles[index];
@@ -35,7 +43,7 @@ function matchingSheet(current, previous, now, before) {
       const oldImage = earlier[kind];
       if (!image || !oldImage) return false;
       if (image.path !== oldImage.path) return false;
-      return pixelSignature(imagePath(current, image)) === pixelSignature(imagePath(previous, oldImage));
+      return matchingImages(imagePath(current, image), image, imagePath(previous, oldImage), oldImage);
     });
   });
 }
@@ -44,6 +52,7 @@ function trustedVerdict(audit, manual, name) {
   const entry = audit.verdicts?.[name];
   if (!entry || entry.verdict !== "clean" || typeof entry.by !== "string" || !entry.by.trim()) return null;
   if (entry.by.startsWith("inherited:")) {
+    if (manual.sheets?.[name]) return null;
     return typeof audit.previous === "string" && entry.by === `inherited:${audit.previous}`
       && Array.isArray(audit.inherited) && audit.inherited.includes(name) ? entry : null;
   }
@@ -67,10 +76,11 @@ export function inheritSheetVerdicts(run, previous, sheets, review) {
       const current = manifest(run);
       const earlier = manifest(previous);
       const audit = read(join(previous, "sheet-review.json"));
-      if (audit.schemaVersion !== 1 || audit.manifestDigest !== earlier.digest || audit.reviewDigest !== reviewDigest(previous)) {
+      const reviewBytes = existsSync(join(previous, "review.json")) ? readFileSync(join(previous, "review.json")) : Buffer.from("null");
+      if (audit.schemaVersion !== 1 || audit.manifestDigest !== earlier.digest || audit.reviewDigest !== digest(reviewBytes)) {
         throw new Error("Previous review evidence is stale");
       }
-      const manual = existsSync(join(previous, "review.json")) ? read(join(previous, "review.json")) : {};
+      const manual = JSON.parse(reviewBytes.toString("utf8")) ?? {};
       const old = new Map(earlier.evidence.sheets.map((sheet) => [sheet.name, sheet]));
       const changed = [];
       const added = [];
@@ -88,21 +98,25 @@ export function inheritSheetVerdicts(run, previous, sheets, review) {
       }
       changes = { changed, added, unchanged: unchanged.length };
     } catch (failure) {
-      try { changes = { ...sheetChanges(run, previous), inheritanceUnavailable: failure.message }; }
-      catch { changes = { unavailable: failure.message }; }
+      const known = ["The previous run is the current run", "Incompatible sheet evidence", "Previous review evidence is stale"];
+      const reason = known.includes(failure.message) ? failure.message : "Previous review or screenshot evidence is missing or invalid";
+      try {
+        const fallback = sheetChanges(run, previous);
+        changes = fallback.unavailable ? { unavailable: reason } : { ...fallback, inheritanceUnavailable: reason };
+      } catch { changes = { unavailable: reason }; }
     }
   }
   return { review: { ...review, sheets: { ...inherited, ...review.sheets } }, inherited: Object.keys(inherited), previous: previousName, changes };
 }
 
-export function writeSheetReview(run, inheritance, reviewed) {
+export function writeSheetReview(run, inheritance, reviewed, reviewHash) {
   let evidenceDigest = null;
   try { evidenceDigest = manifest(run).digest; } catch { /* Unavailable evidence cannot become an inheritance source. */ }
   writeFileSync(join(run, "sheet-review.json"), JSON.stringify({ schemaVersion: 1, manifestDigest: evidenceDigest,
-    reviewDigest: reviewDigest(run), previous: inheritance.previous, inherited: inheritance.inherited,
-    verdicts: inheritance.review.sheets ?? {} }, null, 2) + "\n");
+    reviewDigest: reviewHash, previous: inheritance.previous, inherited: inheritance.inherited,
+    verdicts: inheritance.review.sheets ?? {} }, null, 2) + "\n", { mode: 0o600 });
   const pending = reviewed.sheets?.unreviewed ?? [];
   const batches = [];
   for (let offset = 0; offset < pending.length; offset += 8) batches.push(pending.slice(offset, offset + 8));
-  writeFileSync(join(run, "review-batches.json"), JSON.stringify({ schemaVersion: 1, batchSize: 8, batches }, null, 2) + "\n");
+  writeFileSync(join(run, "review-batches.json"), JSON.stringify({ schemaVersion: 1, batchSize: 8, batches }, null, 2) + "\n", { mode: 0o600 });
 }

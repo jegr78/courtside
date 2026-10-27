@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readdirSync, statSync, rmSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, statSync, lstatSync, rmSync, readFileSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { findExecutable } from "../lib/executable.mjs";
 
@@ -80,14 +80,34 @@ export function contactSheets(run) {
       entries.push({ name, columns, tiles });
     }
   }
-  const image = (path) => path === null ? null : {
-    path: relative(run, path), digest: createHash("sha256").update(readFileSync(path)).digest("hex")
+  const image = (path) => {
+    if (path === null) return null;
+    const comparison = path.replace(/\.png$/, ".comparison.json");
+    return { path: relative(run, path), digest: createHash("sha256").update(readFileSync(path)).digest("hex"),
+      comparisonDigest: existsSync(comparison) && !lstatSync(comparison).isSymbolicLink()
+        ? createHash("sha256").update(readFileSync(comparison)).digest("hex") : null };
   };
   writeFileSync(join(run, "sheet-evidence.json"), JSON.stringify({ schemaVersion: 1,
     sheets: entries.map((entry) => ({ name: entry.name, columns: entry.columns,
+      imageDigest: createHash("sha256").update(readFileSync(join(directory, `${entry.name}.png`))).digest("hex"),
+      frameSignature: sheetFrameSignature(join(directory, `${entry.name}.png`), entry),
       tiles: entry.tiles.map((tile) => ({ label: tile.label, viewport: image(tile.path), fullPage: image(tile.fullPage) })) }))
-  }, null, 2) + "\n");
+  }, null, 2) + "\n", { mode: 0o600 });
   return { sheets: entries.length, names: entries.map((entry) => entry.name), entries };
+}
+
+export function sheetFrameSignature(path, entry) {
+  const header = readFileSync(path);
+  const columns = Math.min(entry.columns, entry.tiles.length);
+  const cellWidth = header.readUInt32BE(16) / columns;
+  const cellHeight = header.readUInt32BE(20) / Math.ceil(entry.tiles.length / entry.columns);
+  const drawing = entry.tiles.map((tile, index) => {
+    const x = index % columns * cellWidth + 6;
+    const y = Math.floor(index / columns) * cellHeight + 6;
+    return `rectangle ${x},${y} ${x + tile.width - 1},${y + tile.height - 1}`;
+  }).join(" ");
+  const [binary, args] = imageMagick().convert([path, "-fill", "#000000", "-draw", drawing, "-format", "%#", "info:"]);
+  return execFileSync(binary, args, { encoding: "utf8" }).trim();
 }
 
 const sheetNames = (directory) => readdirSync(directory).filter((name) => name.endsWith(".png")).map((name) => name.slice(0, -4)).sort();

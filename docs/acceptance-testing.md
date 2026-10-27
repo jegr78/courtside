@@ -218,8 +218,9 @@ of it, or if a trace cannot be read.
 - `--phase matrix` runs only the journeys; `--project <profile>` narrows them.
 - `--phase postflight --run <dir>` cleans up after an interrupted run.
 - `--phase report --run <dir>` renders the report again, for example after the review.
-- `--previous <dir>` with the report phase compares this run's contact sheets with that run's by
-  their pixels and marks the changed and the new ones.
+- `--previous <dir>` with the report phase compares native image evidence with that run after
+  bounded masking of recognized run data. Proven unchanged sheets inherit only previous clean
+  verdicts. Repeat this argument when regenerating a report that uses inheritance.
 
 Discovery writes `lanes.json`: the window, and for each profile and journey its day, court and
 hour. Preflight then proves every lane slot free before a journey starts.
@@ -312,8 +313,8 @@ older sheet names do not review the new chunks.
 
 A view captured on all ten profiles therefore yields six sheets: two desktop, one tablet, one
 landscape and two portrait. A full catalogue run produces about three sheets per captured view,
-and each one needs its own verdict. That is the cost of reading every tile at native size, and the
-review plans for it instead of judging a reduced montage.
+and each one needs its own verdict. A first reading opens every tile at native size. An inherited
+verdict requires the native evidence checks below. A reduced montage never substitutes for either.
 
 The report lists each sheet as an expandable grid of native-size tiles. Scroll horizontally to
 read a tile wider than the report. Clicking a tile opens its original viewport PNG. Each tile
@@ -327,7 +328,7 @@ removed before a key is formed, so the same problem keeps its key from run to ru
 Browser console errors and page errors also retain `consoleEvents` with the receipt time,
 the operation running when the event arrived, and the stack or source location the browser
 supplied. Capture operations distinguish settling, subject placement, viewport and full-page
-screenshots, scroll restoration, layout measurement and axe. Events outside capture work use
+screenshots, comparison geometry probes, scroll restoration, layout measurement and axe. Events outside capture work use
 `journey`. The phase returns to its previous value even when an operation fails.
 
 `browser-events.jsonl` records each event immediately, including events from a capture that fails
@@ -380,12 +381,39 @@ An assessment is one of `product-defect`, `known-issue` (with `issue`), `capture
 `harness-gap`, and always has a `reason` and a `followUp`. `manual` holds findings a person made
 while reading the captures; their keys start with `manual:`.
 
-`sheets` holds a verdict for every contact sheet the run produced, named as its file in `sheets/`
-without `.png`. A verdict is `clean` or the keys of the findings the sheet shows, and `by` names
-who read it. Reading every sheet is part of finishing a run: a sheet nobody judged is a sheet
-whose defects reach the next candidate unseen. With `--previous`, the report marks the sheets
-whose pixels changed against that run, which tells a reviewer where to look first; it never
-replaces a verdict.
+`sheets` holds a human verdict for each sheet read, named as its file in `sheets/` without `.png`.
+A verdict is `clean` or the keys of the findings it shows, and `by` names who read it. The report
+keeps inherited verdicts in generated `sheet-review.json`, with `by` set to
+`inherited:<previous run>`. It lists human and inherited judgments separately. Do not copy an
+inherited marker into human `review.json`.
+
+Each capture writes a value-free `.comparison.json` beside its viewport and full-page PNGs. It
+binds mask geometry and presentation to those exact image bytes. Recognized formatted dates,
+times, run-state counts, the version badge and generated acceptance-name suffixes can be masked.
+Static labels, numeric configuration limits, raw ISO timestamps and unsupported or clipped regions
+remain visible to comparison. Native date/time controls retain their borders and picker area. The journey's value assertions run unchanged.
+Fixed or sticky positions that cannot be established for a full-page image remain unmasked.
+
+`sheet-evidence.json` records native image membership, image hashes, comparison-record hashes and
+the contact sheet frame. Inheritance requires compatible membership and frame pixels, unchanged
+pixels outside compatible bounded masks in both the viewport and full-page image, and a previous
+clean verdict bound to its review and evidence. Changed layout, styling, browser language,
+timezone or pixel density prevents masking from transferring a verdict. Missing, malformed,
+modified or legacy evidence falls back to a fresh reading. Older unchunked sheet names never
+approve new chunks. Original PNGs and human verdicts remain unchanged.
+
+A previous finding-bearing verdict always requires reading again, even when the pixels match.
+A current explicit human verdict takes precedence. Inherited clean judgments can continue across
+candidate runs because each generated review audit remains bound to its own review and evidence.
+Every new finding still needs an assessment before the report can be final.
+
+`review-batches.json` lists the pending sheets in batches of at most eight. Give a reviewer one
+batch at a time. Open its current native tiles, write the verdicts into `review.json` as soon as
+that batch finishes, and merge those writes before assigning another batch. Do not keep dozens
+of sheets in one agent context. Load previous-run pictures only when a sheet changed and the
+comparison helps explain the change. Previously flagged sheets still receive their own reading.
+Regenerate the report with the same `--previous` argument to refresh the pending batches and
+resolve inherited verdicts.
 
 A report with any finding left unassessed or any sheet without a verdict is a draft and names what
 is open, and so is a run whose sheets could not be made. Assessments for keys and verdicts for
