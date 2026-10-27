@@ -7,7 +7,8 @@ RUN apt-get update \
  && rm -f /usr/bin/pebble \
  && groupadd --system --gid 10001 courtside \
  && useradd --system --uid 10001 --gid 10001 --no-create-home courtside \
- && install -d -o 10001 -g 10001 /var/lib/courtside/operational-logs
+ && install -d -o 10001 -g 10001 /var/lib/courtside/operational-logs \
+ && install -d -m 0700 -o 10001 -g 10001 /var/lib/courtside/mfa-keys
 
 WORKDIR /app
 

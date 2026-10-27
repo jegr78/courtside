@@ -422,7 +422,7 @@ export function preparePerformanceReuse(proof, { root, environment, telemetry = 
   const labels = { "org.courtside.image-reuse.owner": owner };
   const services = ["app", "db", "mail", "proxy", ...(telemetry ? ["postgres-exporter", "prometheus", "grafana"] : [])];
   const networks = ["backend", "frontend", "load", ...(telemetry ? ["telemetry"] : [])];
-  const volumes = ["db", "caddy-data", "caddy-config", ...(telemetry ? ["prometheus-data", "grafana-data"] : [])];
+  const volumes = ["db", "mfa-keys", "caddy-data", "caddy-config", ...(telemetry ? ["prometheus-data", "grafana-data"] : [])];
   mkdirSync(join(root, "build"), { recursive: true, mode: 0o700 });
   writeFileSync(override, `${JSON.stringify({ services: Object.fromEntries(services.map((name) => [name,
     { labels, ...(name === "app" ? { image: proof.fixturesImageID } : {}), pull_policy: "never" }])),

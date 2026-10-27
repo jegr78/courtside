@@ -2,7 +2,7 @@
 set -euo pipefail
 
 readonly configuration_schema=1
-readonly usage="usage: courtside [--directory <path>] <init|reconfigure|backup|prune|restore-check|update|update-check|adopt|rotate-secret|mail-check|seed-bookings|doctor|up|status|finalize-bootstrap|diagnose|uninstall> [options]"
+readonly usage="usage: courtside [--directory <path>] <init|reconfigure|backup|prune|restore-check|mfa-recover|mfa-correct-email|mfa-rotate-keys|update|update-check|adopt|rotate-secret|mail-check|seed-bookings|doctor|up|status|finalize-bootstrap|diagnose|uninstall> [options]"
 script_path=${BASH_SOURCE[0]}
 case "$script_path" in
   */*) script_parent=${script_path%/*} ;;
@@ -27,7 +27,9 @@ env_path=""
 curl_path=""
 declare -a docker_command=()
 restore_cleanup_active=false
+restore_owner=""
 declare -a restore_compose=()
+declare -a restore_owned_volumes=()
 database_upgrade_cleanup_active=false
 declare -a database_upgrade_compose=()
 database_target_volume_cleanup=""
@@ -89,8 +91,8 @@ prepare_executables
 
 cleanup() {
   local result=$?
-  if [ "$restore_cleanup_active" = true ] && [ "${#restore_compose[@]}" -gt 0 ]; then
-    "${restore_compose[@]}" down --volumes --remove-orphans >/dev/null 2>&1 || true
+  if [ "$restore_cleanup_active" = true ] || [ "${#restore_owned_volumes[@]}" -gt 0 ]; then
+    cleanup_restore_resources >/dev/null 2>&1 || true
   fi
   if [ "$database_upgrade_cleanup_active" = true ] \
     && [ "${#database_upgrade_compose[@]}" -gt 0 ]; then
@@ -1156,8 +1158,72 @@ command_prune() {
   [ "$pruned" -gt 0 ] || printf 'Nothing to remove\n'
 }
 
+backup_mfa_keys() {
+  local destination=$1
+  "${compose[@]}" run --rm --no-deps -T --entrypoint /bin/sh app -ec '
+    if test -n "${COURTSIDE_MFA_KEY_FILE:-}"; then
+      test -f "$COURTSIDE_MFA_KEY_FILE" && test ! -L "$COURTSIDE_MFA_KEY_FILE" \
+        || { echo "MFA keyfile must be a regular file" >&2; exit 2; }
+      tar --transform="s|^[^/]*$|./provided/mfa.keys|" -C "$(dirname "$COURTSIDE_MFA_KEY_FILE")" -cf - "$(basename "$COURTSIDE_MFA_KEY_FILE")"
+    else
+      tar --exclude="*.lock" --exclude=".mfa-*.keys" -C "$COURTSIDE_MFA_KEY_ROOT" -cf - .
+    fi
+  ' > "$destination"
+  chmod 600 "$destination"
+  /bin/bash "$installation_directory/current/mfa-keys.sh" "$destination"
+}
+
+restore_volume_owner() {
+  "${docker_command[@]}" volume inspect "$1" --format '{{index .Labels "org.courtside.restore-owner"}}'
+}
+
+reserve_restore_volume() {
+  local logical=$1 name="${restore_project}_$1" owner
+  "${docker_command[@]}" volume create --label "org.courtside.restore-owner=$restore_owner" \
+    --label "com.docker.compose.project=$restore_project" --label "com.docker.compose.volume=$logical" "$name" >/dev/null
+  owner=$(restore_volume_owner "$name") || refuse "cannot inspect restore volume ownership"
+  [ "$owner" = "$restore_owner" ] || refuse "restore volume $name belongs to another run"
+  restore_owned_volumes+=("$name")
+}
+
+cleanup_restore_resources() {
+  local containers container owner name failed=false
+  if [ "$restore_cleanup_active" = true ]; then
+    containers=$("${docker_command[@]}" ps -aq --filter "label=com.docker.compose.project=$restore_project") || return 1
+    for container in $containers; do
+      owner=$("${docker_command[@]}" inspect "$container" --format '{{index .Config.Labels "org.courtside.restore-owner"}}') || return 1
+      [ "$owner" = "$restore_owner" ] || return 1
+    done
+    "${restore_compose[@]}" down --remove-orphans || return 1
+    restore_cleanup_active=false
+  fi
+  for name in "${restore_owned_volumes[@]}"; do
+    owner=$(restore_volume_owner "$name") || { failed=true; continue; }
+    if [ "$owner" = "$restore_owner" ]; then
+      "${docker_command[@]}" volume rm "$name" >/dev/null || failed=true
+    else
+      failed=true
+    fi
+  done
+  [ "$failed" = false ] || return 1
+  restore_owned_volumes=()
+}
+
+restore_mfa_keys() {
+  local archive=$1 name owner
+  for name in "${restore_owned_volumes[@]}"; do
+    owner=$(restore_volume_owner "$name") || return 1
+    [ "$owner" = "$restore_owner" ] || return 1
+  done
+  "${restore_compose[@]}" run --rm --no-deps -T --entrypoint /bin/sh app -ec '
+    umask 077
+    tar --no-same-owner --no-same-permissions -C /var/lib/courtside/mfa-keys -xf -
+    chmod -R go-rwx /var/lib/courtside/mfa-keys
+  ' < "$archive"
+}
+
 create_backup() {
-  local retain=$1 pruned=0 dropped_recovery_units="" staging final timestamp path effective_image image_trust=official
+  local retain=$1 pruned=0 dropped_recovery_units="" staging final timestamp path effective_image image_trust=official mfa_keys=legacy
   load_configuration
   compose_command
   mkdir -p "$installation_directory/backups"
@@ -1168,6 +1234,13 @@ create_backup() {
   chmod 700 "$staging"
   database_backup "$staging/database.dump"
   chmod 600 "$staging/database.dump"
+  if grep -q 'COURTSIDE_MFA_KEY_ROOT:' "$installation_directory/current/compose.yaml"; then
+    mfa_keys=external-required
+    if [ "$config_recovery_material" = included ]; then
+      backup_mfa_keys "$staging/mfa-keys.tar"
+      mfa_keys=included
+    fi
+  fi
   mkdir "$staging/configuration" "$staging/secrets"
   chmod 700 "$staging/configuration" "$staging/secrets"
   cp "$installation_directory/config/installation.conf" "$staging/configuration/installation.conf"
@@ -1197,6 +1270,7 @@ create_backup() {
   {
     printf 'schema=1\nrelease=%s\nrevision=%s\nimage=%s\nimage_trust=%s\nrecipe=%s\n' \
       "$config_release" "$config_revision" "$effective_image" "$image_trust" "$config_recipe"
+    printf 'mfa_keys=%s\n' "$mfa_keys"
     printf 'created_at=%s\nenvironment=%s\nlocal_override=%s\nmail_state=%s\n' \
       "$timestamp" "$config_recovery_material" \
       "$([ -f "$staging/configuration/local.override.yaml" ] && printf present || printf absent)" \
@@ -1204,6 +1278,10 @@ create_backup() {
   } > "$staging/recovery.conf"
   printf 'Restore with: %s/current/courtside restore-check --recovery %s/backups/<recovery-unit>\n' \
     "$installation_directory" "$installation_directory" > "$staging/restore-instructions.txt"
+  if [ "$mfa_keys" = external-required ]; then
+    printf 'Encrypted TOTP enrollments require the matching MFA key archive. Supply it with restore-check --mfa-keys <private-archive>. A database-only backup cannot recover these enrollments.\n' \
+      >> "$staging/restore-instructions.txt"
+  fi
   chmod -R go-rwx "$staging"
   write_recovery_checksums "$staging"
   final="$installation_directory/backups/recovery-$timestamp-$config_release-$$"
@@ -1212,6 +1290,103 @@ create_backup() {
   verify_recovery_unit "$final"
   created_recovery=$final
   prune_recovery_units "$retain"
+}
+
+trusted_email_parents() {
+  local lexical physical start directory owner mode child_owner="" child_mode="" child_directory=false operator
+  operator=$(id -u)
+  lexical=$(dirname "$1")
+  physical=$(cd -P "$lexical" 2>/dev/null && pwd -P) || return 1
+  for start in "$lexical" "$physical"; do
+    directory=$start
+    child_owner=""; child_mode=""; child_directory=false
+    while :; do
+      owner=$(path_owner "$directory")
+      mode=$(path_mode "$directory")
+      [[ "$mode" =~ ^[0-7]{3,4}$ ]] || return 1
+      [ "$owner" = 0 ] || [ "$owner" = "$operator" ] || return 1
+      [ -d "$directory" ] || return 1
+      if [ ! -L "$directory" ] && (( (8#$mode & 0022) != 0 )); then
+        [ "$owner" = 0 ] && (( (8#$mode & 01000) != 0 )) \
+          && [ "$child_directory" = true ] && [ "$child_owner" = "$operator" ] \
+          && (( (8#$child_mode & 0077) == 0 )) || return 1
+      fi
+      [ "$directory" != / ] || break
+      child_owner=$owner; child_mode=$mode; child_directory=false
+      [ ! -L "$directory" ] && child_directory=true
+      directory=$(dirname "$directory")
+    done
+  done
+}
+
+email_file_identity() {
+  if [ "${2:-}" = descriptor ]; then
+    stat -L -c '%d:%i:%u:%a:%h:%s' "$1" 2>/dev/null \
+      || stat -f '%d:%i:%u:%Lp:%l:%z' <&9 2>/dev/null
+  else
+    stat -c '%d:%i:%u:%a:%h:%s' "$1" 2>/dev/null \
+      || stat -f '%d:%i:%u:%Lp:%l:%z' "$1" 2>/dev/null
+  fi
+}
+
+open_maintenance_email() {
+  local file=$1 before opened device inode owner mode links size
+  [[ "$file" = /* ]] || file="$PWD/$file"
+  trusted_email_parents "$file" || refuse "email input requires a trusted directory"
+  [ -f "$file" ] && [ ! -L "$file" ] || refuse "email input must be a private regular file"
+  before=$(email_file_identity "$file") || refuse "cannot inspect private email input"
+  { exec 9< "$file"; } 2>/dev/null || refuse "cannot open private email input"
+  opened=$(email_file_identity /dev/fd/9 descriptor) || refuse "cannot inspect opened email input"
+  IFS=: read -r device inode owner mode links size <<< "$opened"
+  [ -f /dev/fd/9 ] && [ "$owner" = "$(id -u)" ] && [ "$mode" = 600 ] && [ "$links" = 1 ] \
+    && [ "$size" -ge 1 ] && [ "$size" -le 255 ] || refuse "email input must be a private operator-owned mode-0600 regular file of at most 255 bytes"
+  [ "$before" = "$opened" ] && [ ! -L "$file" ] && [ "$(email_file_identity "$file")" = "$opened" ] \
+    || refuse "private email input changed while opening"
+  trusted_email_parents "$file" || refuse "email input requires a trusted directory"
+}
+
+command_mfa_maintenance() {
+  local action=$1 account_id="" identity_checked=false email_file=""
+  shift
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --account-id) [ $# -ge 2 ] && [ -z "$account_id" ] || refuse "--account-id needs one UUID"; account_id=$2; shift 2 ;;
+      --identity-checked) [ "$identity_checked" = false ] || refuse "duplicate --identity-checked"; identity_checked=true; shift ;;
+      --email-file) [ $# -ge 2 ] && [ -z "$email_file" ] || refuse "--email-file needs one private file"; email_file=$2; shift 2 ;;
+      *) refuse "unknown MFA maintenance option $1" ;;
+    esac
+  done
+  if [ "$action" = mfa-rotate-keys ]; then
+    [ -z "$account_id$email_file" ] && [ "$identity_checked" = false ] || refuse "key rotation accepts no account or email options"
+  else
+    [[ "$account_id" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]] \
+      || refuse "MFA maintenance requires --account-id <UUID>"
+    [ "$identity_checked" = true ] || refuse "MFA maintenance requires --identity-checked after an external identity check"
+  fi
+  if [ "$action" = mfa-correct-email ]; then
+    [ -n "$email_file" ] || refuse "email correction requires --email-file <private-file>"
+    open_maintenance_email "$email_file"
+  else
+    [ -z "$email_file" ] || refuse "this action accepts no email file"
+  fi
+  acquire_lock
+  compose_command
+  local -a arguments=("--courtside.maintenance.action=$action")
+  if [ -n "$account_id" ]; then
+    arguments+=("--courtside.maintenance.account-id=$account_id" "--courtside.maintenance.identity-checked=true")
+  fi
+  if [ "$action" = mfa-correct-email ]; then
+    "${compose[@]}" run --rm --no-deps -T --entrypoint /bin/sh app -ec '
+      umask 077
+      mkdir -p /tmp/courtside-maintenance
+      cat > /tmp/courtside-maintenance/email
+      exec java --sun-misc-unsafe-memory-access=deny -XX:MaxRAMPercentage=50.0 -XX:+ExitOnOutOfMemoryError -XX:TieredStopAtLevel=1 \
+        org.springframework.boot.loader.launch.JarLauncher "$@"
+    ' courtside-maintenance "${arguments[@]}" --courtside.maintenance.email-file=/tmp/courtside-maintenance/email <&9
+    exec 9<&-
+  else
+    "${compose[@]}" run --rm --no-deps -T app "${arguments[@]}"
+  fi
 }
 
 command_backup() {
@@ -1554,7 +1729,7 @@ recovery_path() {
 }
 
 restore_probe() {
-  local port=$1 cookie_jar=$2 username_file=$3 password_file=$4 after courts token
+  local port=$1 cookie_jar=$2 username_file=$3 password_file=$4 mfa_proof_file=${5:-} after courts token
   local -a safe_curl
   [ -n "$curl_path" ] || { printf 'curl is required for the restored application probe\n' >&2; return 1; }
   safe_curl=("$env_path" -i "PATH=$PATH" "$curl_path" -q --noproxy '*')
@@ -1568,8 +1743,19 @@ restore_probe() {
     || { printf 'the restored account could not sign in\n' >&2; return 1; }
   after=$("${safe_curl[@]}" -fsS -b "$cookie_jar" "http://$port/api/session") \
     || { printf 'the restored signed-in session could not be read\n' >&2; return 1; }
+  if [[ "$after" != *'"authenticated":true'* ]] && [ -n "$mfa_proof_file" ]; then
+    token=$(awk '$6 == "XSRF-TOKEN" { print $7 }' "$cookie_jar" | tail -n 1)
+    "${safe_curl[@]}" -fsS -b "$cookie_jar" -c "$cookie_jar" -H "X-XSRF-TOKEN: $token" \
+      -H 'Content-Type: application/json' --data-binary "@$mfa_proof_file" \
+      "http://$port/api/session/mfa" >/dev/null \
+      || { printf 'the restored account rejected its MFA proof\n' >&2; return 1; }
+    after=$("${safe_curl[@]}" -fsS -b "$cookie_jar" "http://$port/api/session") \
+      || { printf 'the restored MFA session could not be read\n' >&2; return 1; }
+  fi
   [[ "$after" == *'"authenticated":true'* ]] \
-    || { printf 'the restored account did not produce an authenticated session\n' >&2; return 1; }
+    || { printf 'the restored account did not produce an authenticated session; MFA accounts require COURTSIDE_RESTORE_MFA_CODE_FILE\n' >&2; return 1; }
+  grep -Eq '"roles":\[[^]]*"ADMIN"' <<< "$after" \
+    || { printf 'the restored probe requires an administrator account\n' >&2; return 1; }
   courts=$("${safe_curl[@]}" -fsS -b "$cookie_jar" "http://$port/api/public/courts") \
     || { printf 'the restored application could not read persisted courts\n' >&2; return 1; }
   [[ "$courts" == \[* ]] && [ "$courts" != "[]" ] \
@@ -1577,13 +1763,14 @@ restore_probe() {
 }
 
 command_restore_check() {
-  local requested="" restore_project restore_environment restore_output port cookie_jar username_file password_file
-  local restore_runtime table_count failure="" recovery_source_url recovery_config_recipe helper archive
+  local requested="" requested_mfa_keys="" mfa_keys_archive="" mfa_key_mode=standard mfa_keys_state restore_environment restore_output port cookie_jar username_file password_file
+  local restore_runtime table_count failure="" recovery_source_url recovery_config_recipe helper archive mfa_code mfa_proof_file=""
   local trusted_recovery_release trusted_manifest_sha configured_manifest_sha recovery_overlays
   local recovery_custom_repository recovery_custom_digest expected_recovery_image expected_image_trust
   while [ $# -gt 0 ]; do
     case "$1" in
       --recovery) [ $# -ge 2 ] || refuse "--recovery needs a directory"; requested=$2; shift 2 ;;
+      --mfa-keys) [ $# -ge 2 ] || refuse "--mfa-keys needs an archive"; requested_mfa_keys=$2; shift 2 ;;
       *) refuse "unknown restore-check option $1" ;;
     esac
   done
@@ -1642,6 +1829,22 @@ command_restore_check() {
         || refuse "$archive in the recovery unit is not a readable archive"
     done
   fi
+  mfa_keys_state=$(recovery_value "$selected_recovery/recovery.conf" mfa_keys)
+  case "$mfa_keys_state" in
+    included) mfa_keys_archive="$selected_recovery/mfa-keys.tar" ;;
+    external-required)
+      [ -n "$requested_mfa_keys" ] || refuse "encrypted TOTP recovery requires the matching MFA key archive via --mfa-keys"
+      mfa_keys_archive=$requested_mfa_keys
+      ;;
+    legacy | "") ;;
+    *) refuse "recovery metadata has an invalid MFA key mode" ;;
+  esac
+  if [ -n "$mfa_keys_archive" ]; then
+    [ "$(path_mode "$mfa_keys_archive")" = 600 ] && [ "$(path_owner "$mfa_keys_archive")" = "$(id -u)" ] \
+      || refuse "MFA key archive must be an operator-owned mode-0600 file"
+    mfa_key_mode=$(/bin/bash "$trusted_recovery_release/mfa-keys.sh" "$mfa_keys_archive" --mode) \
+      || refuse "MFA key archive failed validation"
+  fi
   restore_project="$config_project-restore-check-$$"
   restore_output=$("${docker_command[@]}" compose ls --format json)
   [[ "$restore_output" != *'"Name":"'"$config_project"'-restore-check-'* ]] \
@@ -1649,6 +1852,10 @@ command_restore_check() {
   if "${docker_command[@]}" volume inspect "${restore_project}_db" >/dev/null 2>&1; then
     refuse "restore target $restore_project already has a database volume"
   fi
+  if "${docker_command[@]}" volume inspect "${restore_project}_mfa-keys" >/dev/null 2>&1; then
+    refuse "restore target $restore_project already has an MFA key volume"
+  fi
+  restore_owner=$(random_secret)
   restore_runtime=$(mktemp -d "$installation_directory/.restore.partial.XXXXXX")
   temporary_path=$restore_runtime
   chmod 700 "$restore_runtime"
@@ -1657,11 +1864,17 @@ command_restore_check() {
     environment_line COURTSIDE_RECOVERY_IMAGE_REPOSITORY "${recovery_image%@sha256:*}"
     environment_line COURTSIDE_RECOVERY_IMAGE_DIGEST "${recovery_image##*@sha256:}"
     environment_line COURTSIDE_RECOVERY_DATABASE_PASSWORD "$(random_secret)"
+    environment_line COURTSIDE_RECOVERY_OWNER "$restore_owner"
     environment_line COURTSIDE_RECOVERY_SOURCE_URL "$recovery_source_url"
+    if [ "$mfa_key_mode" = provided ]; then
+      environment_line COURTSIDE_RECOVERY_MFA_KEY_FILE /var/lib/courtside/mfa-keys/provided/mfa.keys
+    fi
   } > "$restore_environment"
+  printf 'services:\n  db:\n    labels:\n      org.courtside.restore-owner: %s\n  app:\n    labels:\n      org.courtside.restore-owner: %s\n' \
+    "$restore_owner" "$restore_owner" > "$restore_runtime/ownership.yaml"
   restore_compose=("${docker_command[@]}" compose --project-name "$restore_project" \
     --project-directory "$trusted_recovery_release" --env-file "$restore_environment" \
-    -f "$trusted_recovery_release/compose.recovery-check.yaml")
+    -f "$trusted_recovery_release/compose.recovery-check.yaml" -f "$restore_runtime/ownership.yaml")
   restore_output=$("${restore_compose[@]}" ps -a --format json)
   [ -z "$restore_output" ] || [ "$restore_output" = "[]" ] \
     || refuse "restore target $restore_project is not empty"
@@ -1671,9 +1884,23 @@ command_restore_check() {
   username_file="$restore_runtime/username"
   printf '%s' "$COURTSIDE_RESTORE_USERNAME" > "$username_file"
   chmod 600 "$username_file"
+  if [ -n "${COURTSIDE_RESTORE_MFA_CODE_FILE:-}" ]; then
+    [ -f "$COURTSIDE_RESTORE_MFA_CODE_FILE" ] && [ ! -L "$COURTSIDE_RESTORE_MFA_CODE_FILE" ] \
+      && [ "$(path_mode "$COURTSIDE_RESTORE_MFA_CODE_FILE")" = 600 ] \
+      && [ "$(path_owner "$COURTSIDE_RESTORE_MFA_CODE_FILE")" = "$(id -u)" ] \
+      || refuse "MFA proof must be an operator-owned mode-0600 regular file"
+    mfa_code=$(< "$COURTSIDE_RESTORE_MFA_CODE_FILE")
+    [[ "$mfa_code" =~ ^[A-Za-z0-9-]{6,64}$ ]] || refuse "MFA proof file has an invalid code format"
+    mfa_proof_file="$restore_runtime/mfa-proof"
+    printf '{"code":"%s"}' "$mfa_code" > "$mfa_proof_file"
+    chmod 600 "$mfa_proof_file"
+    mfa_code=""
+  fi
   cookie_jar="$restore_runtime/cookies"
   : > "$cookie_jar"
   chmod 600 "$cookie_jar"
+  reserve_restore_volume db
+  reserve_restore_volume mfa-keys
   restore_cleanup_active=true
   if ! "${restore_compose[@]}" up -d --wait db; then
     failure="PostgreSQL 18 did not become healthy"
@@ -1687,6 +1914,9 @@ command_restore_check() {
     --single-transaction --exit-on-error -U courtside -d courtside < "$selected_recovery/database.dump"; then
     failure="the PostgreSQL dump could not be restored transactionally"
   fi
+  if [ -z "$failure" ] && [ -n "$mfa_keys_archive" ] && ! restore_mfa_keys "$mfa_keys_archive"; then
+    failure="the MFA key archive could not be restored"
+  fi
   if [ -z "$failure" ] && ! "${restore_compose[@]}" up -d --wait app; then
     failure="the restored application did not become healthy"
   fi
@@ -1696,13 +1926,11 @@ command_restore_check() {
     [[ "$port" =~ ^[0-9]+$ ]] || failure="restore-check could not resolve the application port"
   fi
   if [ -z "$failure" ] \
-    && ! restore_probe "127.0.0.1:$port" "$cookie_jar" "$username_file" "$password_file"; then
+    && ! restore_probe "127.0.0.1:$port" "$cookie_jar" "$username_file" "$password_file" "$mfa_proof_file"; then
     failure="the restored application failed its login or domain-data probe"
   fi
-  if ! "${restore_compose[@]}" down --volumes --remove-orphans; then
-    [ -n "$failure" ] || failure="the isolated restore target could not be removed"
-  else
-    restore_cleanup_active=false
+  if ! cleanup_restore_resources; then
+    [ -n "$failure" ] || failure="the isolated restore target could not be removed without touching foreign resources"
   fi
   chmod -R u+w "$restore_runtime"
   rm -rf -- "$restore_runtime"
@@ -2828,6 +3056,7 @@ case "$command" in
   backup) command_backup "$@" ;;
   prune) command_prune "$@" ;;
   restore-check) command_restore_check "$@" ;;
+  mfa-recover | mfa-correct-email | mfa-rotate-keys) command_mfa_maintenance "$command" "$@" ;;
   update) command_update "$@" ;;
   update-check) command_update_check "$@" ;;
   adopt) command_adopt "$@" ;;

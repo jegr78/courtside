@@ -24,8 +24,8 @@ define.
   [Verifying what you are about to run](guides/operations.md#verifying-what-you-are-about-to-run) describes.
 - The process runs as UID 10001 and GID 10001. It needs no root and no Linux capability. The
   reference deployment drops every capability and sets `no-new-privileges`.
-- It runs on a read-only root filesystem. The only writable path it needs is `/tmp`, which the
-  reference deployment mounts as a tmpfs.
+- It runs on a read-only root filesystem. It needs writable `/tmp`, which the reference deployment
+  mounts as a tmpfs, and persistent `/var/lib/courtside/mfa-keys` for its private MFA keyrings.
 - It listens on port 8080. `COURTSIDE_APP_TLS_MODE` is `plaintext` by default. Set it to `serve`
   with `COURTSIDE_APP_TLS_CERTIFICATE` and `COURTSIDE_APP_TLS_KEY` to serve TLS on the same port, as
   [Encrypting the connection between the proxy and the application](guides/operations.md#encrypting-the-connection-between-the-proxy-and-the-application)
@@ -68,7 +68,7 @@ groups and carries no components. It returns `503` when a check fails. With the 
 unreachable, the `503` takes about 30 seconds to arrive, because it waits for a database connection
 first.
 
-A starting instance answers `503` until it has warmed its request paths, for at most
+A starting instance answers `503` until it has validated its MFA keyring and warmed its request paths, for at most
 `COURTSIDE_WARM_UP_DEADLINE`, and reports ready afterwards even if a warm-up step failed. The
 default of 30 seconds leaves the declared 90-second start period a minute for the start itself. A
 platform that allows less time shortens the deadline so that the start and the deadline together
@@ -226,6 +226,7 @@ These inputs are paths to files the container reads, so mount each one readable 
 - `COURTSIDE_DB_OWNER_PASSWORD_FILE`
 - `COURTSIDE_DB_RUNTIME_PASSWORD_FILE`
 - `COURTSIDE_DB_TLS_ROOT_CERTIFICATE`
+- `COURTSIDE_MFA_KEY_FILE`
 - `COURTSIDE_PASSWORD_TERMS_FILE`
 
 No other input this page lists has a file variant. `SPRING_DATASOURCE_PASSWORD`,
@@ -329,6 +330,8 @@ they name a file on the host, in the container the path it is mounted at. The
 | `COURTSIDE_PASSWORD_RESET_MAIL_RETENTION` | `24h` |
 | `COURTSIDE_PASSWORD_RESET_MAIL_WINDOW` | `1h` |
 | `COURTSIDE_PASSWORD_TERMS_FILE` | unset |
+| `COURTSIDE_MFA_KEY_FILE` | unset |
+| `COURTSIDE_MFA_KEY_ROOT` | `.courtside/keys` |
 | `COURTSIDE_PUBLIC_URL` | unset |
 | `COURTSIDE_SESSION_ABSOLUTE_LIFETIME` | `24h` |
 | `COURTSIDE_SESSION_CLEANUP_CRON` | `0 * * * * *` |
@@ -341,3 +344,55 @@ they name a file on the host, in the container the path it is mounted at. The
 | `COURTSIDE_WARM_UP_DEADLINE` | `30s` |
 | `COURTSIDE_WARM_UP_ENABLED` | `true` |
 | `COURTSIDE_WARM_UP_ROUNDS` | `200` |
+
+## MFA key storage
+
+The image creates `/var/lib/courtside/mfa-keys` with mode `0700`, owned by `10001:10001`.
+Mount a persistent writable volume there and set `COURTSIDE_MFA_KEY_ROOT` to that path when the
+root filesystem is read-only. All maintained container deployments supply this volume. Keep it
+when replacing the application container or image. Each database installation has its own UUID
+subdirectory and a mode-`0600` keyring. PostgreSQL contains encrypted TOTP secrets and a key-check
+value, never the encryption keys.
+
+For a custom runtime, the default key root is `.courtside/keys` below the working directory.
+`COURTSIDE_MFA_KEY_FILE` selects an operator-provided keyring instead. Its file must be private,
+owned by the application user, and every parent must be service-controlled. Mount its private parent directory writable in the
+application container and set the variable to the file path there. The sibling lock and atomic
+keyring replacement need the writable directory. A single-file bind mount cannot replace its inode
+during rotation. The maintained backup commands
+capture that actual file as `provided/mfa.keys` inside `mfa-keys.tar`. The recovery check restores it
+into the private key volume and sets the exact keyfile path for its application.
+
+To move an operator-provided keyring to a fresh standard deployment, restore that archive into the
+new `mfa-keys` volume and set `COURTSIDE_MFA_KEY_FILE` to
+`/var/lib/courtside/mfa-keys/provided/mfa.keys` before starting the restored database. Keep the file
+owned by `10001:10001` with mode `0600` and its directory at `0700`. This preserves the complete
+keyring, including every retained key. Do not convert it into a new key or write the bytes to `.env`.
+
+An operator-provided keyring is a Java properties file with this format:
+
+```properties
+format=1
+active=<random-key-uuid>
+key.<random-key-uuid>=<base64url-encoded-32-random-bytes-without-padding>
+```
+
+The active UUID must name one key entry. Generate independent random key bytes for each
+installation. Retain previous `key.<uuid>` entries after a new active key is selected. Preserve the
+whole file during backup and migration. The application does not accept a password or a short
+shared string as an encryption key.
+
+## Account security maintenance
+
+`--courtside.maintenance.action=mfa-recover` initiates account-specific recovery.
+`--courtside.maintenance.action=mfa-correct-email` changes an unreachable address through the
+security audit. Both need `--courtside.maintenance.account-id=<uuid>` and
+`--courtside.maintenance.identity-checked=true`. Email correction additionally needs
+`--courtside.maintenance.email-file=<absolute-private-file>`. The UTF-8 file must be regular,
+owned by the process user with mode `0600`, at most 254 bytes plus an optional final newline.
+The maintained launchers transfer the address through standard input to private container tmpfs.
+
+`--courtside.maintenance.action=mfa-rotate-keys` adds a new active encryption key and retains all
+previous entries. All three actions need the normal database and persistent key configuration.
+The process binds application and management servers only to loopback on ephemeral ports, executes
+the action and closes its context. The launchers publish no container ports for these commands.

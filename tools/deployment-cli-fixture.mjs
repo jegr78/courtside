@@ -85,16 +85,38 @@ case "$*" in
     fi
     ;;
 esac
+case "$*" in
+  *' up -d --wait app')
+    if [ -f "${root}/docker-steal-restore-keys" ]; then
+      for owner_file in "${root}"/restore-owner-*_mfa-keys; do printf '%s\\n' 'foreign' > "$owner_file"; done
+      exit 9
+    fi
+    ;;
+esac
 [ "\${COURTSIDE_IMAGE_DIGEST+x}" != x ] || printf '%s\\n' 'leaked COURTSIDE_IMAGE_DIGEST' >> "${dockerLog}"
 [ "\${POSTGRES_PASSWORD+x}" != x ] || printf '%s\\n' 'leaked POSTGRES_PASSWORD' >> "${dockerLog}"
 case "$*" in
+  *"tar --exclude="*) tar -cf - -T /dev/null ;;
   *' pg_dump '*) printf '%s\\n' 'PGDMP courtside fixture' ;;
   *' pg_restore --list'*) cat >/dev/null ;;
   *"select count(*) from pg_tables where schemaname = 'public'"*) printf '%s\\n' '0' ;;
   *' tar -C /source -cf - .'*) printf '%s\\n' 'TAR courtside fixture' ;;
   *'compose ls --format json') [ ! -f "${join(root, "docker-compose-list")}" ] || cat "${join(root, "docker-compose-list")}" ;;
   *'volume ls --filter label=com.docker.compose.project='*) [ ! -f "${join(root, "docker-volumes")}" ] || cat "${join(root, "docker-volumes")}" ;;
+  *'volume create '*)
+    name=''; owner=''
+    for argument in "$@"; do
+      name=$argument
+      case "$argument" in org.courtside.restore-owner=*) owner=\${argument#*=} ;; esac
+    done
+    case "$name" in *_mfa-keys) [ ! -f "${root}/docker-race-restore-keys" ] || owner=foreign ;; esac
+    printf '%s\\n' "$owner" > "${root}/restore-owner-$name"
+    printf '%s\\n' "$name"
+    ;;
+  *'volume inspect '*'org.courtside.restore-owner'*) cat "${root}/restore-owner-$3" ;;
+  *'volume rm '*restore-check-*) rm -f "${root}/restore-owner-$3" ;;
   *'volume inspect '*'--format'*) if [ -f "${join(root, "docker-volume-labels")}" ]; then cat "${join(root, "docker-volume-labels")}"; else printf '%s\n' 'example-club|db'; fi ;;
+  *'volume inspect '*'_mfa-keys') [ -f "${join(root, "docker-mfa-volume-exists")}" ] && exit 0 || exit 1 ;;
   *'volume inspect '*) [ -f "${join(root, "docker-volume-exists")}" ] && exit 0 || exit 1 ;;
   *'network ls --filter label=com.docker.compose.project='*) printf '%s\n' 'example-club_default' ;;
   *'network inspect '*'--format'*) printf '%s\n' 'example-club|default' ;;
@@ -127,7 +149,8 @@ for argument in "$@"; do
   previous=$argument
 done
 case "$*" in
-  *'/api/session'*) printf '%s\\n' '{"authenticated":true}' ;;
+  *'/api/session/mfa'*) touch "${join(root, "curl-mfa-completed")}"; printf '%s\\n' '{}' ;;
+  *'/api/session'*) if [ -f "${join(root, "curl-mfa-required")}" ] && [ ! -f "${join(root, "curl-mfa-completed")}" ]; then printf '%s\\n' '{"authenticated":false}'; else printf '%s\\n' '{"authenticated":true,"roles":["ADMIN"]}'; fi ;;
   *'/api/public/courts'*) printf '%s\\n' '[{"id":"court-1"}]' ;;
 esac
 `, { mode: 0o755 });

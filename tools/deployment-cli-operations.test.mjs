@@ -418,7 +418,8 @@ test("given restore failure after target creation, when restore-check exits, the
 
     assert.equal(result.status, 2);
     assert.match(result.stderr, /could not be restored transactionally/);
-    assert.match(readFileSync(context.dockerLog, "utf8"), / down --volumes --remove-orphans/);
+    assert.match(readFileSync(context.dockerLog, "utf8"), / down --remove-orphans/);
+    assert.match(readFileSync(context.dockerLog, "utf8"), /volume rm .*_mfa-keys/);
   });
 });
 
@@ -614,5 +615,127 @@ test("given current selecting another release than the configuration names, when
     assert.match(result.stderr, /current does not select releases\/0\.1\.2/);
     assert.deepEqual(readdirSync(join(context.target, "releases")).sort(), ["0.1.0", "0.1.1", "0.1.2"]);
     assert.equal(readdirSync(join(context.target, "backups")).filter((name) => name.startsWith("recovery-")).length, 2);
+  });
+});
+
+test("given included recovery material, when backup and restore-check run, then MFA keys accompany the database before application validation", () => {
+  fixture((context) => {
+    // given
+    assert.equal(initialize(context).status, 0);
+    // when
+    const backup = run(context.archive, context.target, ["backup"], context.environment);
+    assert.equal(backup.status, 0, backup.stderr);
+    const recovery = join(context.target, "backups", readdirSync(join(context.target, "backups"))[0]);
+    const restored = run(context.archive, context.target, ["restore-check", "--recovery", recovery], {
+      ...context.environment, COURTSIDE_RESTORE_USERNAME: "doe.jane", COURTSIDE_RESTORE_PASSWORD: "private-restore-password"
+    });
+    // then
+    assert.equal(backup.status, 0, backup.stderr);
+    assert.ok(existsSync(join(recovery, "mfa-keys.tar")));
+    assert.match(readFileSync(join(recovery, "recovery.conf"), "utf8"), /^mfa_keys=included$/m);
+    assert.equal(restored.status, 0, restored.stderr);
+    assert.match(readFileSync(context.dockerLog, "utf8"), /mfa-keys.*-xf[\s\S]*up -d --wait app/);
+  });
+});
+
+test("given external recovery material, when backup runs, then the matching MFA key prerequisite is explicit and keys are excluded", () => {
+  fixture((context) => {
+    // given
+    assert.equal(initialize(context, { recovery_material: "external-verified" }).status, 0);
+    // when
+    const result = run(context.archive, context.target, ["backup"], context.environment);
+    const recovery = join(context.target, "backups", readdirSync(join(context.target, "backups"))[0]);
+    // then
+    assert.equal(result.status, 0, result.stderr);
+    assert.ok(!existsSync(join(recovery, "mfa-keys.tar")));
+    assert.match(readFileSync(join(recovery, "recovery.conf"), "utf8"), /^mfa_keys=external-required$/m);
+    assert.match(readFileSync(join(recovery, "restore-instructions.txt"), "utf8"), /matching MFA key archive/);
+  });
+});
+
+test("given an MFA-enabled restored account, when the recovery login probe receives a second factor, then it completes MFA without logging the code", () => {
+  fixture((context) => {
+    // given
+    assert.equal(initialize(context).status, 0);
+    assert.equal(run(context.archive, context.target, ["backup"], context.environment).status, 0);
+    const recovery = join(context.target, "backups", readdirSync(join(context.target, "backups"))[0]);
+    writeFileSync(join(context.root, "curl-mfa-required"), "required");
+    const proofFile = join(context.root, "mfa-code");
+    writeFileSync(proofFile, "123456", { mode: 0o600 });
+    // when
+    const result = run(context.archive, context.target, ["restore-check", "--recovery", recovery], {
+      ...context.environment, COURTSIDE_RESTORE_USERNAME: "doe.jane", COURTSIDE_RESTORE_PASSWORD: "private-restore-password", COURTSIDE_RESTORE_MFA_CODE_FILE: proofFile
+    });
+    // then
+    assert.equal(result.status, 0, result.stderr);
+    const calls = readFileSync(join(context.root, "curl.log"), "utf8");
+    assert.match(calls, /--data-binary @.*mfa-proof.*\/api\/session\/mfa/);
+    assert.doesNotMatch(result.stdout + result.stderr + calls, /123456|private-restore-password/);
+  });
+});
+
+test("given an existing restore key volume, when restore-check starts, then neither extraction nor cleanup may touch it", () => {
+  fixture((context) => {
+    // given
+    assert.equal(initialize(context).status, 0);
+    assert.equal(run(context.archive, context.target, ["backup"], context.environment).status, 0);
+    const recovery = join(context.target, "backups", readdirSync(join(context.target, "backups"))[0]);
+    writeFileSync(join(context.root, "docker-mfa-volume-exists"), "foreign keys\n");
+    rmSync(context.dockerLog, { force: true });
+    // when
+    const result = run(context.archive, context.target, ["restore-check", "--recovery", recovery], {
+      ...context.environment, COURTSIDE_RESTORE_USERNAME: "doe.jane", COURTSIDE_RESTORE_PASSWORD: "private-password"
+    });
+    // then
+    assert.equal(result.status, 2);
+    assert.match(result.stderr, /already has an MFA key volume/);
+    assert.doesNotMatch(readFileSync(context.dockerLog, "utf8"), /volume create| up | down | -xf/);
+    assert.equal(readFileSync(join(context.root, "docker-mfa-volume-exists"), "utf8"), "foreign keys\n");
+  });
+});
+
+test("given ownership changes after restore reservation, when restore-check fails, then cleanup retains the foreign key volume", () => {
+  fixture((context) => {
+    // given
+    assert.equal(initialize(context).status, 0);
+    assert.equal(run(context.archive, context.target, ["backup"], context.environment).status, 0);
+    const recovery = join(context.target, "backups", readdirSync(join(context.target, "backups"))[0]);
+    writeFileSync(join(context.root, "docker-steal-restore-keys"), "yes\n");
+    rmSync(context.dockerLog, { force: true });
+    // when
+    const result = run(context.archive, context.target, ["restore-check", "--recovery", recovery], {
+      ...context.environment, COURTSIDE_RESTORE_USERNAME: "doe.jane", COURTSIDE_RESTORE_PASSWORD: "private-password"
+    });
+    // then
+    assert.equal(result.status, 2);
+    const calls = readFileSync(context.dockerLog, "utf8");
+    assert.doesNotMatch(calls, /down --volumes|volume rm .*_mfa-keys/);
+    const retained = readdirSync(context.root).filter((name) => /^restore-owner-.*_mfa-keys$/.test(name));
+    assert.equal(retained.length, 1);
+    assert.equal(readFileSync(join(context.root, retained[0]), "utf8"), "foreign\n");
+  });
+});
+
+test("given a key volume appears during restore reservation, when its owner differs, then only the already reserved database volume is removed", () => {
+  fixture((context) => {
+    // given
+    assert.equal(initialize(context).status, 0);
+    assert.equal(run(context.archive, context.target, ["backup"], context.environment).status, 0);
+    const recovery = join(context.target, "backups", readdirSync(join(context.target, "backups"))[0]);
+    writeFileSync(join(context.root, "docker-race-restore-keys"), "yes\n");
+    rmSync(context.dockerLog, { force: true });
+    // when
+    const result = run(context.archive, context.target, ["restore-check", "--recovery", recovery], {
+      ...context.environment, COURTSIDE_RESTORE_USERNAME: "doe.jane", COURTSIDE_RESTORE_PASSWORD: "private-password"
+    });
+    // then
+    assert.equal(result.status, 2);
+    assert.match(result.stderr, /belongs to another run/);
+    const calls = readFileSync(context.dockerLog, "utf8");
+    assert.match(calls, /volume rm .*_db/);
+    assert.doesNotMatch(calls, /volume rm .*_mfa-keys| up | down | -xf/);
+    const retained = readdirSync(context.root).filter((name) => /^restore-owner-.*_mfa-keys$/.test(name));
+    assert.equal(retained.length, 1);
+    assert.equal(readFileSync(join(context.root, retained[0]), "utf8"), "foreign\n");
   });
 });

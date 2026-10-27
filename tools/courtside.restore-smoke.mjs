@@ -1,3 +1,5 @@
+import { exportMfaKeys, importMfaKeys } from "./mfa-key-custody.mjs";
+import { runInteractive } from "./courtside.mjs";
 import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
 import { once } from "node:events";
@@ -338,6 +340,9 @@ async function execute() {
   const mailCertificateDirectory = createMailCertificateDirectory(tmpdir(), "courtside-restore-mail-");
   const applicationDumpPath = join(privateDirectory, "application.dump");
   const legacyDumpPath = join(privateDirectory, "legacy.dump");
+  const applicationKeysPath = join(privateDirectory, "application-keys.tar");
+  const fixtureKeysPath = join(privateDirectory, "fixture-keys.tar");
+  const keyCompose = ["compose", "-p", project, "-f", composeFile];
   const password = newBootstrapPassword();
   const permanentPassword = newBootstrapPassword();
   createMailCertificate(mailCertificateDirectory);
@@ -381,6 +386,7 @@ async function execute() {
     writeFileSync(applicationDumpPath, applicationDump, { mode: 0o600 });
     const imageId = run("docker", ["image", "inspect", "--format", "{{.Id}}", image]).stdout.trim();
 
+    exportMfaKeys(applicationKeysPath, keyCompose, { ...process.env, ...environment }, runInteractive);
     compose(project, environment, ["down", "--volumes", "--remove-orphans"]);
     compose(project, environment, ["up", "-d", "--wait", "db"]);
     const corrupt = applicationDump.subarray(0, Math.max(1, Math.floor(applicationDump.length / 2)));
@@ -398,6 +404,7 @@ async function execute() {
     await proveInterruptedRestore(
       project, environment, applicationDump, applicationAfter, applicationEvidence);
     compose(project, environment, ["start", "mail"]);
+    importMfaKeys(applicationKeysPath, keyCompose, { ...process.env, ...environment }, runInteractive);
     compose(project, environment, ["up", "-d", "--wait", "app"]);
     await verifyRestoredApplication(
       permanentPassword, publishedPort(project, environment), applicationIdentity);
@@ -412,10 +419,12 @@ async function execute() {
     const dump = compose(project, environment,
       ["exec", "-T", "db", "pg_dump", "-Fc", "--no-owner", "-U", "courtside", "courtside"], { binary: true }).stdout;
     writeFileSync(legacyDumpPath, dump, { mode: 0o600 });
+    exportMfaKeys(fixtureKeysPath, keyCompose, { ...process.env, ...environment }, runInteractive);
 
     compose(project, environment, ["down", "--volumes", "--remove-orphans"]);
     compose(project, environment, ["up", "-d", "--wait", "db"]);
     restore(project, environment, dump);
+    importMfaKeys(fixtureKeysPath, keyCompose, { ...process.env, ...environment }, runInteractive);
     const after = databaseEvidence(project, environment);
     writeFileSync(join(build, "after.json"), `${JSON.stringify(after, null, 2)}\n`);
     assert.deepEqual(after, before, "restored database differs from its backup source");

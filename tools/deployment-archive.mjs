@@ -8,7 +8,7 @@ import { crc32 } from "node:zlib";
 
 const YAML = createRequire(new URL("../frontend/package.json", import.meta.url))("yaml");
 
-const roots = ["courtside", "recipe.sh", ".env.example", "README.md", "container-contract.md",
+const roots = ["courtside", "recipe.sh", "mfa-keys.sh", ".env.example", "README.md", "container-contract.md",
   "compose.booking-seed.yaml", "compose.database-upgrade.yaml", "compose.recovery-check.yaml",
   "examples", "guides"];
 

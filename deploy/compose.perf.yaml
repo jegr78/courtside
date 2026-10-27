@@ -57,6 +57,7 @@ services:
       mail:
         condition: service_healthy
     environment:
+      COURTSIDE_MFA_KEY_ROOT: /var/lib/courtside/mfa-keys
       SPRING_PROFILES_ACTIVE: perf
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/courtside_perf
       SPRING_DATASOURCE_USERNAME: courtside
@@ -83,6 +84,9 @@ services:
       timeout: 3s
       retries: 120
 
+    volumes:
+      - mfa-keys:/var/lib/courtside/mfa-keys
+
   proxy:
     image: caddy:2-alpine@sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f
     security_opt:
@@ -108,6 +112,7 @@ services:
       - load
 
 volumes:
+  mfa-keys:
   db:
   caddy-data:
   caddy-config:

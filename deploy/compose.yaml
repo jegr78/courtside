@@ -74,6 +74,8 @@ services:
       db:
         condition: service_healthy
     environment:
+      COURTSIDE_MFA_KEY_FILE: ${COURTSIDE_MFA_KEY_FILE:-}
+      COURTSIDE_MFA_KEY_ROOT: /var/lib/courtside/mfa-keys
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/courtside
       SPRING_DATASOURCE_USERNAME: courtside
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-}
@@ -135,6 +137,7 @@ services:
         gw_priority: 1
       database: {}
     volumes:
+      - mfa-keys:/var/lib/courtside/mfa-keys
       - operational-logs:/var/lib/courtside/operational-logs:ro
 
   log-collector:
@@ -175,6 +178,7 @@ networks:
   log-collection:
 
 volumes:
+  mfa-keys:
   db:
     name: ${COURTSIDE_DATABASE_VOLUME:?set COURTSIDE_DATABASE_VOLUME in .env}
   operational-logs:

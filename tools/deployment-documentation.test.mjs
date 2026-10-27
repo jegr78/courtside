@@ -99,9 +99,10 @@ test("given the reference deployment, when a variable is read, then it is docume
       .find((paragraph) => paragraph.includes("no longer read")) ?? "";
     const retired = named(retirement, /`(COURTSIDE_[A-Z0-9_]+)`/g);
     const read = named(properties, /\$\{(COURTSIDE_[A-Z0-9_]+)/g);
+    const launcherRead = named(readFileSync(fileURLToPath(new URL("../deploy/courtside", import.meta.url)), "utf8"), /\$\{?(COURTSIDE_[A-Z0-9_]+)/g);
     for (const variable of documented) {
-      assert.ok(interpolated.has(variable) || read.has(variable) || retired.has(variable),
-        `README.md names ${variable} and neither Compose nor application.yaml reads it, so it `
+      assert.ok(interpolated.has(variable) || read.has(variable) || launcherRead.has(variable) || retired.has(variable),
+        `README.md names ${variable} and neither Compose, application.yaml nor the launcher reads it, so it `
         + "documents a variable that does nothing");
     }
   });

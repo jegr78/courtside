@@ -1715,7 +1715,7 @@ test("given the exact Courtside Funnel handler and marker, when classifying it, 
     },
     AllowFunnel: { "uat.example.ts.net:443": true }
   });
-  const marker = { target: "http://127.0.0.1:8083", nodeId: "node-example" };
+  const marker = { project: "courtside-uat", sharedPort: 8083, httpsPort: 8443, target: "http://127.0.0.1:8083", nodeId: "node-example" };
 
   // when / then
   assert.deepEqual(classifyFunnelConfig(status, marker, "node-example"), {

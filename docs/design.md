@@ -798,7 +798,7 @@ restart. Cleanup removes rows expired by either rule.
 
 An account may hold a configured number of sessions. A later sign-in removes least-recently-active
 excess sessions rather than refusing access. Members can list browsers and revoke sessions.
-Administrators may revoke one account or all sessions after recent password proof.
+Administrators may revoke one account or all sessions after recent full authentication proof.
 
 Browser-visible revocation handles are one-way values, not session credentials. The view exposes
 neither raw user agents nor source addresses.
@@ -820,7 +820,7 @@ and punctuation, so a wording cannot make it part of a link. The subject stays o
 neither part holds a control character. Nothing else is
 refused, links included. The wording changes what a message says and never who receives it, whether
 it is sent or whether a member may decline it. Changing or resetting a wording needs a recent
-full-password proof, because it decides what the credential and reset-code mails say, and each
+full authentication proof, because it decides what the credential and reset-code mails say, and each
 change is recorded as `notification.template.changed` or `notification.template.reset`. When a
 message is composed, a stored wording is checked again with the same rules and the same placeholder
 parser; a wording that fails that check or cannot be filled is skipped, and the shipped wording goes
@@ -1039,7 +1039,7 @@ administrator role, a booking or series the run keeps still names them, or they 
 
 Every run starts as a preview that changes nothing, counts what it would change and lists the
 blocked people with their reason. Only the account that took the preview can run it, with a recent
-full-password proof, once, before it expires and while the periods it applies are unchanged. A run
+full authentication proof, once, before it expires and while the periods it applies are unchanged. A run
 re-checks each former member under a lock and skips one who became ineligible. Pseudonymising a
 booking also reaches the records that would tie it back to a person: its change log entries lose
 their actor and the person and account fields of their payload but keep type, time and subject, and

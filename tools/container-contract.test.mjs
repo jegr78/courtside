@@ -208,8 +208,9 @@ test("given the reference application service, when the contract describes the f
     // given
     const service = appService(compose);
     const tmpfs = /^ {4}tmpfs:(?<paths>(?: \[.*\])?\n(?: {6}- .*\n)*)/m.exec(service)?.groups.paths ?? "";
-    const writable = all(tmpfs, /(?:^ {6}- |[[,]\s*)(\/[^\s,\]]+)/gm);
-    const stated = backticked(between(prose, "The only writable path it needs is", "which"), /\/[^`]+/);
+    const writable = [...new Set([...all(tmpfs, /(?:^ {6}- |[[,]\s*)(\/[^\s,\]]+)/gm),
+      ...all(service, /^ {6}- [^:\n]+:(\/[^\s:]+)(?::rw)?$/gm)])].sort();
+    const stated = backticked(between(prose, "It needs writable", "for its private MFA keyrings."), /\/[^`]+/);
 
     // when / then
     assert.match(service, /^ {4}read_only: true$/m, "the reference application no longer runs read-only");

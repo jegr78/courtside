@@ -32,6 +32,8 @@ import { failureReason } from "./failure-reason.mjs";
 import { containerIdentity, createMailCertificate } from "./mail-relay-certificate.mjs";
 import { executeLocalCheck, localCheckPrerequisites } from "./local-check.mjs";
 import { targetBranch } from "./release-line.mjs";
+import { mfaMaintenancePlan, openMaintenanceEmail, validateMfaMaintenance } from "./mfa-maintenance.mjs";
+import { createUatRecovery, restoreUatRecovery } from "./mfa-key-custody.mjs";
 import { isGitHubLogin } from "./nightly-failure-tracker.mjs";
 
 async function securityAssessments() {
@@ -52,7 +54,6 @@ const uatComposeFile = join(root, "deploy", "compose.uat.yaml");
 const uatDbComposeFile = join(root, "deploy", "compose.uat-db.yaml");
 const uatSeedComposeFile = join(root, "deploy", "compose.uat-seed.yaml");
 const uatProject = "courtside-uat";
-const funnelTarget = "http://127.0.0.1:8083";
 const stateFile = join(root, "build", "dev-processes.json");
 export function uatStateFile(environment = process.env) {
   const { project } = uatInstance(environment);
@@ -96,6 +97,7 @@ export function parseArguments(argv) {
   const supported = new Set([
     "build", "verify", "check", "dev", "dev-debug", "dev-stop", "dev-reset", "uat", "uat-stop",
     "uat-share", "uat-logs", "uat-db-shell", "uat-cert", "uat-backup", "uat-restore",
+    "uat-mfa-recover", "uat-mfa-correct-email", "uat-mfa-rotate-keys",
     "uat-reset", "uat-seed-bookings", "perf", "perf-stop", "perf-logs", "perf-db-shell", "perf-reset",
     "perf-run", "perf-promote", "perf-compare",
     "security", "security-seed", "security-verify", "security-plan", "security-run", "security-report",
@@ -119,7 +121,14 @@ export function parseArguments(argv) {
   let explicitImage = false;
   for (let index = 0; index < flags.length; index++) {
     const flag = flags[index];
-    if (["--image", "--fixtures-image", "--source-commit"].includes(flag)
+    if (["--account-id", "--email-file"].includes(flag) && command.startsWith("uat-mfa-")) {
+      const key = flag === "--account-id" ? "accountId" : "emailFile";
+      if (options[key] !== undefined) throw new Error(`Duplicate ${flag}`);
+      options[key] = requiredOptionValue(flags, ++index, flag);
+    } else if (flag === "--identity-checked" && command.startsWith("uat-mfa-")) {
+      if (options.identityChecked) throw new Error("Duplicate --identity-checked");
+      options.identityChecked = true;
+    } else if (["--image", "--fixtures-image", "--source-commit"].includes(flag)
         && ["perf", "security"].includes(command)) {
       const key = { "--image": "image", "--fixtures-image": "fixturesImage", "--source-commit": "sourceCommit" }[flag];
       if (options[key] !== undefined) throw new Error("Duplicate immutable image selection");
@@ -212,6 +221,7 @@ export function parseArguments(argv) {
       throw new Error(`Unknown option for ${command}: ${flag}`);
     }
   }
+  if (command.startsWith("uat-mfa-")) validateMfaMaintenance({ ...options, action: command.slice(4) });
   if (explicitImage || options.fixturesImage !== undefined || options.sourceCommit !== undefined) {
     immutableImageSelection(options);
     if (options.skipVerify) throw new Error("Immutable image reuse cannot select a build/verify option");
@@ -399,7 +409,23 @@ export function parseTailscaleNodeStatus(output) {
   };
 }
 
-export function classifyFunnelConfig(output, marker, nodeId) {
+export function uatFunnelAssociation(environment = process.env) {
+  const { project, sharedPort, httpsPort } = uatInstance(environment);
+  return { project, sharedPort, httpsPort, target: `http://127.0.0.1:${sharedPort}` };
+}
+
+function matchesUatFunnelAssociation(marker, environment) {
+  return marker && Object.entries(uatFunnelAssociation(environment)).every(([name, value]) => marker[name] === value);
+}
+
+function assertUatFunnelAssociation(marker, environment) {
+  if (marker && !matchesUatFunnelAssociation(marker, environment)) {
+    throw new Error("The stored Funnel association does not match the selected UAT project and ports");
+  }
+}
+
+export function classifyFunnelConfig(output, marker, nodeId, environment = process.env) {
+  const { target } = uatFunnelAssociation(environment);
   const status = parseJsonObject(output, "Tailscale Funnel status");
   const tcp = status.TCP ?? {};
   const web = status.Web ?? {};
@@ -417,12 +443,12 @@ export function classifyFunnelConfig(output, marker, nodeId) {
     && webEntries.length === 1
     && handlerEntries.length === 1
     && handlerEntries[0][0] === "/"
-    && handlerEntries[0][1]?.Proxy === funnelTarget
+    && handlerEntries[0][1]?.Proxy === target
     && allowedEntries.length === 1
     && allowedEntries[0][0] === webEntries[0][0]
     && allowedEntries[0][1] === true;
   if (!hasCourtsideTarget) return { ownership: "foreign" };
-  const isCourtside = marker?.target === funnelTarget
+  const isCourtside = matchesUatFunnelAssociation(marker, environment)
     && typeof marker.nodeId === "string"
     && marker.nodeId.length > 0
     && marker.nodeId === nodeId;
@@ -432,10 +458,10 @@ export function classifyFunnelConfig(output, marker, nodeId) {
   };
 }
 
-export function funnelPlan(command) {
+export function funnelPlan(command, environment = process.env) {
   return {
     command,
-    args: ["funnel", "--yes", "--https=443", funnelTarget]
+    args: ["funnel", "--yes", "--https=443", uatFunnelAssociation(environment).target]
   };
 }
 
@@ -661,6 +687,17 @@ async function execute(options) {
   }
   if (options.command === "uat-cert") {
     exportUatCertificate(options.file);
+    return;
+  }
+  if (options.command.startsWith("uat-mfa-")) {
+    const state = readUatState();
+    const environment = { ...process.env, COURTSIDE_UAT_IMAGE: state.image, COURTSIDE_UAT_ADMIN_PASSWORD: "", COURTSIDE_UAT_PUBLIC_URL: state.publicUrl, COURTSIDE_UAT_MFA_KEY_FILE: state.mfaKeyFile ?? "" };
+    const input = options.emailFile ? openMaintenanceEmail(options.emailFile) : undefined;
+    try {
+      runInteractive(mfaMaintenancePlan({ ...options, action: options.command.slice(4) }, uatComposeArgs(state.dbPort), environment, input));
+    } finally {
+      if (input !== undefined) closeSync(input);
+    }
     return;
   }
   if (options.command === "uat-backup") {
@@ -906,7 +943,7 @@ function startUat(options) {
     });
   }
   mkdirSync(dirname(uatStateFile()), { recursive: true });
-  writeFileSync(uatStateFile(), `${JSON.stringify({ image: environment.COURTSIDE_UAT_IMAGE, dbPort: options.dbPort }, null, 2)}\n`, { mode: 0o600 });
+  writeFileSync(uatStateFile(), `${JSON.stringify({ image: environment.COURTSIDE_UAT_IMAGE, dbPort: options.dbPort, publicUrl: environment.COURTSIDE_UAT_PUBLIC_URL, mfaKeyFile: environment.COURTSIDE_UAT_MFA_KEY_FILE }, null, 2)}\n`, { mode: 0o600 });
   process.stdout.write(uatStartupSummary(password, needsBootstrap, options));
 }
 
@@ -995,11 +1032,29 @@ export function redactUatDiagnostics(value, secrets) {
   return redacted;
 }
 
-function uatEnvironment(version, password) {
+export function uatTrustedOrigin(environment = process.env, tailscaleDns) {
+  if (tailscaleDns === undefined) return `https://localhost:${uatInstance(environment).httpsPort}`;
+  if (!/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+\.ts\.net$/.test(tailscaleDns)) {
+    throw new Error("The trusted UAT origin requires a valid Tailscale DNS name");
+  }
+  return `https://${tailscaleDns}`;
+}
+
+function configureUatOrigin(publicUrl, environment = process.env) {
+  const state = readUatState(environment);
+  runInteractive({ command: "docker", args: [...uatComposeArgs(state.dbPort, environment), "up", "-d", "--wait", "--no-deps", "--force-recreate", "app"],
+    environment: { ...environment, COURTSIDE_UAT_IMAGE: state.image, COURTSIDE_UAT_ADMIN_PASSWORD: "", COURTSIDE_UAT_PUBLIC_URL: publicUrl, COURTSIDE_UAT_MFA_KEY_FILE: state.mfaKeyFile ?? "" } });
+  writeFileSync(uatStateFile(environment), `${JSON.stringify({ ...state, publicUrl }, null, 2)}\n`, { mode: 0o600 });
+}
+
+export function uatEnvironment(version, password, environment = process.env, state) {
+  state ??= readUatState(environment);
   return {
-    ...process.env,
-    COURTSIDE_UAT_IMAGE: uatImageReference(version),
-    COURTSIDE_UAT_ADMIN_PASSWORD: password
+    ...environment,
+    COURTSIDE_UAT_IMAGE: uatImageReference(version, environment),
+    COURTSIDE_UAT_ADMIN_PASSWORD: password,
+    COURTSIDE_UAT_MFA_KEY_FILE: environment.COURTSIDE_UAT_MFA_KEY_FILE ?? state.mfaKeyFile ?? "",
+    COURTSIDE_UAT_PUBLIC_URL: uatTrustedOrigin(environment)
   };
 }
 
@@ -1660,39 +1715,57 @@ function comparePerformanceFiles(options) {
   }
 }
 
-async function shareUat() {
-  const tailscale = locateTailscale();
+export async function shareUat(runtime = {}) {
+  const environment = runtime.environment ?? process.env;
+  const association = uatFunnelAssociation(environment);
+  const readMarker = runtime.readMarker ?? readUatFunnelState;
+  const marker = readMarker();
+  assertUatFunnelAssociation(marker, environment);
+  const locate = runtime.locate ?? locateTailscale;
+  const readConfig = runtime.readConfig ?? readFunnelConfig;
+  const tailscale = locate();
   const node = parseTailscaleNodeStatus(tailscale.status);
   requireFunnelPrerequisites(node);
-  const existing = assertFunnelShareable(readFunnelConfig(tailscale.command, readUatFunnelState(), node.nodeId));
-  if (existing.ownership === "courtside") {
-    resetFunnel(tailscale.command);
-  }
-  rmSync(uatFunnelStateFile, { force: true });
-  if (!await isUatShareReady()) {
-    startUat(parseArguments(["uat"]));
-  }
-  if (!await isUatShareReady()) {
-    throw new Error("The UAT public ingress is not ready on 127.0.0.1:8083");
-  }
-  const currentTailscale = locateTailscale();
+  const existing = assertFunnelShareable(readConfig(tailscale.command, marker, node.nodeId, environment));
+  if (existing.ownership === "courtside") (runtime.reset ?? resetFunnel)(tailscale.command);
+  (runtime.removeMarker ?? (() => rmSync(uatFunnelStateFile, { force: true })))();
+  const ready = runtime.ready ?? isUatShareReady;
+  if (!await ready(environment)) (runtime.start ?? startUat)(parseArguments(["uat"]));
+  if (!await ready(environment)) throw new Error(`The UAT public ingress is not ready on ${association.target}`);
+  const currentTailscale = locate();
   const currentNode = parseTailscaleNodeStatus(currentTailscale.status);
   requireFunnelPrerequisites(currentNode);
-  assertFunnelShareable(readFunnelConfig(currentTailscale.command));
-  mkdirSync(dirname(uatFunnelStateFile), { recursive: true });
-  writeFileSync(uatFunnelStateFile, `${JSON.stringify({ target: funnelTarget, nodeId: currentNode.nodeId }, null, 2)}\n`, { mode: 0o600 });
+  assertFunnelShareable(readConfig(currentTailscale.command, undefined, undefined, environment));
+  const publicUrl = uatTrustedOrigin(environment, currentNode.dnsName);
+  (runtime.configure ?? configureUatOrigin)(publicUrl, environment);
+  const share = { ...association, nodeId: currentNode.nodeId, publicUrl };
+  if (runtime.writeMarker) runtime.writeMarker(share);
+  else {
+    mkdirSync(dirname(uatFunnelStateFile), { recursive: true });
+    writeFileSync(uatFunnelStateFile, `${JSON.stringify(share, null, 2)}\n`, { mode: 0o600 });
+  }
   process.stdout.write("Public UAT requires synthetic data and individual test accounts. Press Ctrl+C to stop sharing.\n");
-  await superviseFunnel(funnelPlan(currentTailscale.command), {
-    spawn,
-    signals: process,
-    platform: process.platform,
-    cleanup: () => cleanupUatFunnel(true)
+  await (runtime.supervise ?? superviseFunnel)(funnelPlan(currentTailscale.command, environment), {
+    spawn, signals: process, platform: process.platform,
+    cleanup: () => cleanupUatFunnel(true, { environment })
   });
 }
 
-async function isUatShareReady() {
+export async function isUatShareReady(environment = process.env, request = localRequest, capture = runCaptured) {
   try {
-    const response = await localRequest({ secure: false, port: 8083, path: "/api/source",
+    const { project, sharedPort } = uatInstance(environment);
+    const selected = capture({ command: "docker", args: [...uatComposeArgs(false, environment), "ps", "--all", "--quiet", "proxy"], environment }).trim();
+    if (!/^[0-9a-f]{64}$/.test(selected)) return false;
+    const containers = JSON.parse(capture({ command: "docker", args: ["inspect", selected], environment }));
+    if (!Array.isArray(containers) || containers.length !== 1) return false;
+    const proxy = containers[0];
+    const bindings = proxy.NetworkSettings?.Ports?.["8083/tcp"];
+    if (proxy.Id !== selected || proxy.State?.Running !== true
+        || proxy.Config?.Labels?.["com.docker.compose.project"] !== project
+        || proxy.Config?.Labels?.["com.docker.compose.service"] !== "proxy"
+        || !Array.isArray(bindings) || bindings.length !== 1
+        || bindings[0].HostIp !== "127.0.0.1" || bindings[0].HostPort !== String(sharedPort)) return false;
+    const response = await request({ secure: false, port: sharedPort, path: "/api/source",
       probeDeadlineMilliseconds: 1000 });
     return response.statusCode === 200;
   } catch {
@@ -1735,12 +1808,12 @@ function locateTailscale() {
   throw new Error("The Tailscale CLI is required for public UAT sharing");
 }
 
-function readFunnelConfig(command, marker, nodeId) {
+function readFunnelConfig(command, marker, nodeId, environment = process.env) {
   const result = spawnSync(command, ["funnel", "status", "--json"], { encoding: "utf8" });
   if (result.error || result.status !== 0) {
     throw new Error(`Tailscale Funnel status failed: ${(result.stderr ?? result.error?.message ?? "unknown error").trim()}`);
   }
-  return classifyFunnelConfig(result.stdout, marker, nodeId);
+  return classifyFunnelConfig(result.stdout, marker, nodeId, environment);
 }
 
 function readUatFunnelState() {
@@ -1760,24 +1833,34 @@ function resetFunnel(command) {
   }
 }
 
-function cleanupUatFunnel(required = existsSync(uatFunnelStateFile)) {
+export function cleanupUatFunnel(required, runtime = {}) {
+  const environment = runtime.environment ?? process.env;
+  const marker = (runtime.readMarker ?? readUatFunnelState)();
+  required ??= marker?.project === uatInstance(environment).project
+    || (marker && !marker.project && uatInstance(environment).project === "courtside-uat");
+  if (!matchesUatFunnelAssociation(marker, environment)) {
+    if (required) throw new Error("The stored Funnel association does not match the selected UAT project and ports");
+    return;
+  }
   let tailscale;
   try {
-    tailscale = locateTailscale();
+    tailscale = (runtime.locate ?? locateTailscale)();
   } catch (failure) {
     if (required) throw failure;
     return;
   }
   const node = parseTailscaleNodeStatus(tailscale.status);
-  const funnel = readFunnelConfig(tailscale.command, readUatFunnelState(), node.nodeId);
+  if (marker.nodeId !== node.nodeId) throw new Error("The stored Funnel association belongs to another Tailscale node");
+  const funnel = (runtime.readConfig ?? readFunnelConfig)(tailscale.command, marker, node.nodeId, environment);
   const reset = funnelResetPlan(tailscale.command, funnel, required);
   if (reset) {
-    const result = spawnSync(reset.command, reset.args, { stdio: "inherit" });
+    const result = (runtime.execute ?? spawnSync)(reset.command, reset.args, { stdio: "inherit" });
     if (result.error || result.status !== 0) {
       throw new Error("Courtside could not disable its Funnel. Run 'tailscale funnel reset' after verifying ownership");
     }
   }
-  rmSync(uatFunnelStateFile, { force: true });
+  if (marker.publicUrl) (runtime.configure ?? configureUatOrigin)(uatTrustedOrigin(environment), environment);
+  (runtime.removeMarker ?? (() => rmSync(uatFunnelStateFile, { force: true })))();
 }
 
 export function newBootstrapPassword() {
@@ -1835,26 +1918,11 @@ function exportUatCertificate(file) {
 }
 
 function backupUat(file) {
-  const destination = resolve(root, file ?? join("build", "backups", `courtside-uat-${backupTimestamp()}.dump`));
-  mkdirSync(dirname(destination), { recursive: true });
-  const output = openSync(destination, "w", 0o600);
-  let backupFailure;
-  try {
-    runInteractive({
-      command: "docker",
-      args: [...uatComposeArgs(), "exec", "-T", "db", "pg_dump", "-Fc", "-U", "courtside", "courtside"],
-      stdout: output
-    });
-  } catch (failure) {
-    backupFailure = failure;
-  } finally {
-    closeSync(output);
-  }
-  if (backupFailure) {
-    rmSync(destination, { force: true });
-    throw backupFailure;
-  }
-  process.stdout.write(`Backup written to ${destination}\n`);
+  const destination = resolve(root, file ?? join("build", "backups", `courtside-uat-${backupTimestamp()}`));
+  const state = readUatState();
+  const environment = { ...process.env, COURTSIDE_UAT_IMAGE: state.image, COURTSIDE_UAT_ADMIN_PASSWORD: "", COURTSIDE_UAT_PUBLIC_URL: state.publicUrl, COURTSIDE_UAT_MFA_KEY_FILE: state.mfaKeyFile ?? process.env.COURTSIDE_UAT_MFA_KEY_FILE ?? "" };
+  createUatRecovery(destination, uatComposeArgs(state.dbPort), environment, runInteractive);
+  process.stdout.write(`Complete backup written to ${destination}\n`);
 }
 
 function backupTimestamp() {
@@ -1896,14 +1964,10 @@ function seedUatBookings(write) {
 function restoreUat(file) {
   const source = resolve(root, file);
   const state = readUatState();
-  const environment = { ...process.env, COURTSIDE_UAT_IMAGE: state.image, COURTSIDE_UAT_ADMIN_PASSWORD: "" };
+  const environment = { ...process.env, COURTSIDE_UAT_IMAGE: state.image, COURTSIDE_UAT_ADMIN_PASSWORD: "", COURTSIDE_UAT_PUBLIC_URL: state.publicUrl, COURTSIDE_UAT_MFA_KEY_FILE: state.mfaKeyFile ?? process.env.COURTSIDE_UAT_MFA_KEY_FILE ?? "" };
   const composeArgs = uatComposeArgs(state.dbPort);
-  const input = openBackupForRestore(source);
-  try {
-    restoreDatabase(input, composeArgs, environment);
-  } finally {
-    closeSync(input);
-  }
+  const mfaKeyFile = restoreUatRecovery(source, composeArgs, environment, runInteractive);
+  writeFileSync(uatStateFile(), `${JSON.stringify({ ...state, mfaKeyFile }, null, 2)}\n`, { mode: 0o600 });
   process.stdout.write(`Backup restored from ${source}\n`);
 }
 
@@ -1936,17 +2000,18 @@ export function restoreDatabase(input, composeArgs, environment, execute = runIn
   if (restoreFailure) throw restoreFailure;
 }
 
-function resetUat(all) {
-  cleanupUatFunnel();
-  const plans = uatResetPlans(all);
-  runLifecyclePlans(plans);
+export function resetUat(all, runtime = {}) {
+  const environment = runtime.environment ?? process.env;
+  const stateFile = runtime.stateFile ?? uatStateFile(environment);
+  (runtime.cleanupFunnel ?? (() => cleanupUatFunnel(undefined, { environment })))();
+  const plans = uatResetPlans(all, environment);
+  runLifecyclePlans(plans, runtime.execute ?? runInteractive);
   if (all) {
-    rmSync(uatStateFile(), { force: true });
-    process.stdout.write("UAT database and local certificate authority removed.\n");
+    rmSync(stateFile, { force: true });
+    process.stdout.write("UAT database, keys and local certificate authority removed.\n");
     return;
   }
-  rmSync(uatStateFile(), { force: true });
-  process.stdout.write("UAT database removed; the local certificate authority was retained.\n");
+  process.stdout.write("UAT database removed; keys, key configuration and the local certificate authority were retained.\n");
 }
 
 export function runLifecyclePlans(plans, run = runInteractive) {
@@ -1963,15 +2028,17 @@ export function uatResetPlans(all, environment = process.env) {
   ];
 }
 
-function readUatState() {
+function readUatState(environment = process.env) {
   try {
-    const state = JSON.parse(readFileSync(uatStateFile(), "utf8"));
+    const state = JSON.parse(readFileSync(uatStateFile(environment), "utf8"));
     return {
-      image: typeof state.image === "string" ? state.image : uatInstance().image,
-      dbPort: state.dbPort === true
+      image: typeof state.image === "string" ? state.image : uatInstance(environment).image,
+      dbPort: state.dbPort === true,
+      mfaKeyFile: typeof state.mfaKeyFile === "string" ? state.mfaKeyFile : "",
+      publicUrl: typeof state.publicUrl === "string" ? state.publicUrl : uatTrustedOrigin(environment)
     };
   } catch {
-    return { image: uatInstance().image, dbPort: false };
+    return { image: uatInstance(environment).image, dbPort: false, publicUrl: uatTrustedOrigin(environment) };
   }
 }
 
@@ -2435,7 +2502,7 @@ function parseJson(value) {
 }
 
 function showHelp() {
-  process.stdout.write(`Usage: node tools/courtside.mjs <command>\n\nCommands:\n  build\n  verify\n  check [--plan] [--full] [--rerun] [--base <main|release/x.y>]\n  dev\n  dev-debug [--suspend]\n  dev-stop\n  dev-reset\n  uat [--version <tag>] [--skip-verify] [--db-port] [--no-credential-output]\n  uat share\n  uat-stop\n  uat-logs\n  uat-db-shell\n  uat-cert [file]\n  uat-backup [file]\n  uat-restore <file> --confirm courtside-uat\n  uat-reset courtside-uat [--all]\n  uat-seed-bookings [--confirm courtside-uat]\n  perf --image <ENGINE_ID> --fixtures-image <ENGINE_ID> --source-commit <COMMIT> [--db-port] [--telemetry]\n  perf [--skip-verify] [--db-port] [--telemetry] [--no-credential-output]\n  perf-run <smoke|baseline|peak|stress|contention|soak|browser> [--confirm courtside-perf] [--fresh] [--remote-write]\n  perf-run funnel-smoke --target <https-origin> --confirm courtside-uat-funnel\n  perf-promote <summary.json> --confirm courtside-perf\n  perf-compare <summary.json> --baseline <baseline.json> --output <comparison.json>\n  perf-stop\n  perf-logs\n  perf-db-shell\n  perf-reset courtside-perf\n  security <RUN_ID> --image <ENGINE_ID> --fixtures-image <ENGINE_ID> --source-commit <COMMIT>\n  security <RUN_ID> <IMAGE_DIGEST> [--fixtures-image <ENGINE_ID> --source-commit <COMMIT>]\n  security-seed <RUN_ID> <IMAGE_DIGEST> --state <environment.json> [--compose-root <absolute-checkout>]\n  security-verify <RUN_ID>\n  security-plan <RUN_ID> <safe|active|destructive>\n  security-run <RUN_ID> <safe|active|destructive> --qualification <qualification.json> [--authorize <exact-authorization>]\n  security-report <RUN_ID> [--attempt <number>]\n  security-stop <RUN_ID>\n  security-cleanup <RUN_ID>\n  security-recover <RUN_ID> --attempt <number>\n  security-reset <RUN_ID> --confirm courtside-security-<RUN_ID>\n  status <dev|uat|perf> [--json]\n`);
+  process.stdout.write(`Usage: node tools/courtside.mjs <command>\n\nCommands:\n  build\n  verify\n  check [--plan] [--full] [--rerun] [--base <main|release/x.y>]\n  dev\n  dev-debug [--suspend]\n  dev-stop\n  dev-reset\n  uat [--version <tag>] [--skip-verify] [--db-port] [--no-credential-output]\n  uat share\n  uat-stop\n  uat-logs\n  uat-db-shell\n  uat-cert [file]\n  uat-mfa-recover --account-id <UUID> --identity-checked\n  uat-mfa-correct-email --account-id <UUID> --identity-checked --email-file <private-file>\n  uat-mfa-rotate-keys\n  uat-backup [file]\n  uat-restore <file> --confirm courtside-uat\n  uat-reset courtside-uat [--all]\n  uat-seed-bookings [--confirm courtside-uat]\n  perf --image <ENGINE_ID> --fixtures-image <ENGINE_ID> --source-commit <COMMIT> [--db-port] [--telemetry]\n  perf [--skip-verify] [--db-port] [--telemetry] [--no-credential-output]\n  perf-run <smoke|baseline|peak|stress|contention|soak|browser> [--confirm courtside-perf] [--fresh] [--remote-write]\n  perf-run funnel-smoke --target <https-origin> --confirm courtside-uat-funnel\n  perf-promote <summary.json> --confirm courtside-perf\n  perf-compare <summary.json> --baseline <baseline.json> --output <comparison.json>\n  perf-stop\n  perf-logs\n  perf-db-shell\n  perf-reset courtside-perf\n  security <RUN_ID> --image <ENGINE_ID> --fixtures-image <ENGINE_ID> --source-commit <COMMIT>\n  security <RUN_ID> <IMAGE_DIGEST> [--fixtures-image <ENGINE_ID> --source-commit <COMMIT>]\n  security-seed <RUN_ID> <IMAGE_DIGEST> --state <environment.json> [--compose-root <absolute-checkout>]\n  security-verify <RUN_ID>\n  security-plan <RUN_ID> <safe|active|destructive>\n  security-run <RUN_ID> <safe|active|destructive> --qualification <qualification.json> [--authorize <exact-authorization>]\n  security-report <RUN_ID> [--attempt <number>]\n  security-stop <RUN_ID>\n  security-cleanup <RUN_ID>\n  security-recover <RUN_ID> --attempt <number>\n  security-reset <RUN_ID> --confirm courtside-security-<RUN_ID>\n  status <dev|uat|perf> [--json]\n`);
 }
 
 const invokedPath = process.argv[1] ? pathToFileURL(resolve(process.argv[1])).href : undefined;
