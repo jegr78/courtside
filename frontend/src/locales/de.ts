@@ -100,6 +100,7 @@ const de = {
   "identity.password.tooGuessable": "Bitte wähle ein anderes Passwort. Dieses steht auf einer öffentlichen Liste häufiger Passwörter oder enthält deinen Namen, deinen Benutzernamen, deine E-Mail-Adresse oder den Vereinsnamen.",
   "identity.password.breachCheckUnavailable": "Passwortänderungen sind vorübergehend nicht verfügbar, weil die Prüfung auf bekannte Datenlecks nicht abgeschlossen werden konnte. Bitte versuche es später erneut.",
   "identity.reauthentication.failed": "Das Passwort wurde nicht akzeptiert.",
+  "error.type.mfa-proof-failed": "$t(identity.mfa.proofFailed)",
   "error.type.mfa-resource-not-found": "$t(identity.mfa.notFound)",
   "identity.mfa.notFound": "Dieses MFA-Gerät ist nicht mehr verfügbar. Lade die Sicherheitseinstellungen neu.",
   "identity.mfa.proofFailed": "Der zweite Faktor wurde nicht akzeptiert. Prüfe den Code oder beginne die Anmeldung erneut.",

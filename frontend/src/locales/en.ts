@@ -102,6 +102,7 @@ const en: Record<keyof typeof de, string> = {
   "identity.password.tooGuessable": "Choose a different password. This one is on a public list of common passwords, or it contains your name, your username, your email address or the club name.",
   "identity.password.breachCheckUnavailable": "Password changes are temporarily unavailable because the breach check could not be completed. Please try again later.",
   "identity.reauthentication.failed": "The password was not accepted.",
+  "error.type.mfa-proof-failed": "$t(identity.mfa.proofFailed)",
   "error.type.mfa-resource-not-found": "$t(identity.mfa.notFound)",
   "identity.mfa.notFound": "This MFA device is no longer available. Reload your security settings.",
   "identity.mfa.proofFailed": "The second factor was not accepted. Check the code or start sign-in again.",
