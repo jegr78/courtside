@@ -21,6 +21,8 @@ class SessionStatusController implements SessionStatusApi {
     private final AppointmentAccess appointmentAccess;
     private final MfaTotpRepository totp;
     private final MfaFactors factors;
+    private final MfaWebAuthn webAuthn;
+    private final MfaWebAuthnCredentials credentials;
 
     @Override
     public ResponseEntity<ApiSessionStatus> getSessionStatus() {
@@ -42,6 +44,7 @@ class SessionStatusController implements SessionStatusApi {
                 .locale(account.getLocale())
                 .mfaEnabled(factors.enabled(account.getId()))
                 .totpAvailable(totp.enabled(account.getId()))
+                .webauthnAvailable(webAuthn.available() && credentials.enabled(account.getId()))
                 .managesAppointments(reach.managesAppointments())
                 .createsSeries(reach.createsSeries());
     }
@@ -51,7 +54,8 @@ class SessionStatusController implements SessionStatusApi {
                 .managesAppointments(false)
                 .createsSeries(false);
         if (SecurityContextHolder.getContext().getAuthentication() instanceof MfaPendingAuthentication pending) {
-            status.mfaRequired(true).totpAvailable(totp.enabled(pending.getPrincipal().account()));
+            status.mfaRequired(true).totpAvailable(totp.enabled(pending.getPrincipal().account()))
+                    .webauthnAvailable(webAuthn.available() && credentials.enabled(pending.getPrincipal().account()));
         }
         return status;
     }

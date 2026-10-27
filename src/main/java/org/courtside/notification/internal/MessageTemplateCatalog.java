@@ -20,6 +20,7 @@ final class MessageTemplateCatalog {
             MessageKind.CREDENTIALS_NEW_ACCOUNT, Set.of("username", "credential"),
             MessageKind.CREDENTIALS_PASSWORD_RESET, Set.of("username", "credential"),
             MessageKind.ACCOUNT_PASSWORD_RESET_CODE, Set.of("username", "resetCode"),
+            MessageKind.ACCOUNT_MFA_RECOVERY_CODE, Set.of("username", "resetCode"),
             MessageKind.ACCOUNT_USERNAME_REMINDER, Set.of("username"));
 
     // A subject is shown on lock screens and in message lists, so a secret never travels in one.

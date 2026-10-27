@@ -104,6 +104,30 @@ class MfaChallengesTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenAPasswordChallenge_whenIssuingNewWebAuthnOptions_thenItsOriginalExpiryAndAttemptBudgetCannotBeRenewed() {
+        // given
+        UUID account = account();
+        UUID id = challenges.issue(account, 0, MfaChallenges.Purpose.LOGIN, "one", "").orElseThrow();
+        var originalExpiry = jdbc.sql("SELECT expires_at FROM mfa_challenge WHERE id = :id").param("id", id)
+                .query(java.time.OffsetDateTime.class).single();
+        // when / then
+        assertThat(challenges.setPayload(id, account, 0, MfaChallenges.Purpose.LOGIN, "one", "first-options")).isTrue();
+        assertThat(challenges.setPayload(id, account, 0, MfaChallenges.Purpose.LOGIN, "other", "foreign-options")).isFalse();
+        assertThat(challenges.attempt(id, account, 0, MfaChallenges.Purpose.LOGIN, "one"))
+                .contains(new MfaChallenges.Challenge(id, "first-options"));
+        assertThat(challenges.setPayload(id, account, 0, MfaChallenges.Purpose.LOGIN, "one", "new-options")).isTrue();
+        assertThat(jdbc.sql("SELECT expires_at FROM mfa_challenge WHERE id = :id").param("id", id)
+                .query(java.time.OffsetDateTime.class).single()).isEqualTo(originalExpiry);
+        assertThat(jdbc.sql("SELECT attempt_count FROM mfa_challenge WHERE id = :id").param("id", id)
+                .query(Integer.class).single()).isEqualTo(1);
+        // when
+        jdbc.sql("UPDATE mfa_challenge SET expires_at = :now WHERE id = :id").param("id", id)
+                .param("now", clock.instant().atOffset(ZoneOffset.UTC)).update();
+        // then
+        assertThat(challenges.setPayload(id, account, 0, MfaChallenges.Purpose.LOGIN, "one", "late-options")).isFalse();
+    }
+
+    @Test
     void givenThePendingSessionLimit_whenIssuingChallengesForMoreBrowsers_thenOnlyTheNewestChallengesRemain() {
         // given
         UUID account = account();

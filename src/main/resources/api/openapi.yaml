@@ -284,6 +284,8 @@ components:
           minLength: 1
           maxLength: 128
           description: An unused TOTP step or recovery code, required when the account has MFA enabled.
+        credential:
+          $ref: "#/components/schemas/WebAuthnAssertionCredential"
 
     MfaCodeProof:
       type: object
@@ -301,6 +303,10 @@ components:
         enabled: { type: boolean }
         totpEnabled: { type: boolean }
         recoveryCodesRemaining: { type: integer, minimum: 0, maximum: 10 }
+        webauthnAvailable: { type: boolean }
+        devices:
+          type: array
+          items: { $ref: "#/components/schemas/WebAuthnDevice" }
 
     TotpEnrollment:
       type: object
@@ -332,6 +338,27 @@ components:
           minLength: 3
           maxLength: 60
           pattern: "^[a-z0-9._-]+$"
+
+    MfaAdministrativeStatus:
+      type: object
+      required: [enabled, recoveryPending]
+      properties:
+        enabled: { type: boolean }
+        recoveryPending: { type: boolean }
+    MfaRecoveryInitiation:
+      type: object
+      required: [identityChecked]
+      properties:
+        identityChecked:
+          type: boolean
+          description: The administrator verified the holder's identity outside this request.
+    MfaRecoveryRedemption:
+      type: object
+      required: [username, code, password]
+      properties:
+        username: { type: string, minLength: 1, maxLength: 100 }
+        code: { type: string, minLength: 1, maxLength: 128 }
+        password: { type: string, minLength: 12, maxLength: 256 }
 
     PasswordResetRedemptionRequest:
       type: object
@@ -395,6 +422,8 @@ components:
           description: Whether this authenticated holder needs a second factor for fresh sensitive-action proof.
         totpAvailable:
           type: boolean
+        webauthnAvailable:
+          type: boolean
         username:
           type: string
         displayName:
@@ -424,6 +453,343 @@ components:
             book it, which is what creating a series requires. A card without booking roles counts
             for every role. Always true for an administrator, false without a session. A client
             that lacks the field treats it as false.
+
+    WebAuthnRp:
+      type: object
+      required:
+      - id
+      - name
+      properties:
+        id:
+          type: string
+          minLength: 1
+          maxLength: 253
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+    WebAuthnUser:
+      type: object
+      required:
+      - id
+      - name
+      - displayName
+      properties:
+        id:
+          type: string
+          minLength: 1
+          maxLength: 86
+          pattern: ^[A-Za-z0-9_-]+$
+        name:
+          type: string
+          minLength: 1
+          maxLength: 60
+        displayName:
+          type: string
+          minLength: 1
+          maxLength: 200
+    WebAuthnCredentialDescriptor:
+      type: object
+      required:
+      - id
+      - type
+      properties:
+        id:
+          type: string
+          minLength: 1
+          maxLength: 1500
+          pattern: ^[A-Za-z0-9_-]+$
+        type:
+          type: string
+          enum:
+          - public-key
+        transports:
+          type: array
+          items:
+            type: string
+            enum:
+            - usb
+            - nfc
+            - ble
+            - internal
+            - hybrid
+            - smart-card
+    WebAuthnCreationOptions:
+      type: object
+      required:
+      - rp
+      - user
+      - challenge
+      - pubKeyCredParams
+      - authenticatorSelection
+      properties:
+        rp:
+          $ref: '#/components/schemas/WebAuthnRp'
+        user:
+          $ref: '#/components/schemas/WebAuthnUser'
+        challenge:
+          type: string
+          minLength: 1
+          maxLength: 512
+          pattern: ^[A-Za-z0-9_-]+$
+        pubKeyCredParams:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required:
+            - type
+            - alg
+            properties:
+              type:
+                type: string
+                enum:
+                - public-key
+              alg:
+                type: integer
+        timeout:
+          type: integer
+          format: int64
+          minimum: 1
+        excludeCredentials:
+          type: array
+          items:
+            $ref: '#/components/schemas/WebAuthnCredentialDescriptor'
+        authenticatorSelection:
+          type: object
+          required:
+          - userVerification
+          properties:
+            residentKey:
+              type: string
+              enum:
+              - discouraged
+              - preferred
+              - required
+            requireResidentKey:
+              type: boolean
+            userVerification:
+              type: string
+              enum:
+              - discouraged
+              - preferred
+              - required
+        attestation:
+          type: string
+          enum:
+          - none
+          - indirect
+          - direct
+          - enterprise
+        extensions:
+          type: object
+          additionalProperties: true
+    WebAuthnRequestOptions:
+      type: object
+      required:
+      - challenge
+      - rpId
+      - allowCredentials
+      - userVerification
+      properties:
+        challenge:
+          type: string
+          minLength: 1
+          maxLength: 512
+          pattern: ^[A-Za-z0-9_-]+$
+        timeout:
+          type: integer
+          format: int64
+          minimum: 1
+        rpId:
+          type: string
+          minLength: 1
+          maxLength: 253
+        allowCredentials:
+          type: array
+          items:
+            $ref: '#/components/schemas/WebAuthnCredentialDescriptor'
+        userVerification:
+          type: string
+          enum:
+          - discouraged
+          - preferred
+          - required
+        extensions:
+          type: object
+          additionalProperties: true
+    WebAuthnAttestationResponse:
+      type: object
+      required:
+      - attestationObject
+      - clientDataJSON
+      properties:
+        attestationObject:
+          type: string
+          minLength: 1
+          maxLength: 131072
+          pattern: ^[A-Za-z0-9_-]+$
+        clientDataJSON:
+          type: string
+          minLength: 1
+          maxLength: 8192
+          pattern: ^[A-Za-z0-9_-]+$
+        transports:
+          type: array
+          items:
+            type: string
+            enum:
+            - usb
+            - nfc
+            - ble
+            - internal
+            - hybrid
+            - smart-card
+    WebAuthnAssertionResponse:
+      type: object
+      required:
+      - authenticatorData
+      - clientDataJSON
+      - signature
+      properties:
+        authenticatorData:
+          type: string
+          minLength: 1
+          maxLength: 131072
+          pattern: ^[A-Za-z0-9_-]+$
+        clientDataJSON:
+          type: string
+          minLength: 1
+          maxLength: 8192
+          pattern: ^[A-Za-z0-9_-]+$
+        signature:
+          type: string
+          minLength: 1
+          maxLength: 2048
+          pattern: ^[A-Za-z0-9_-]+$
+        userHandle:
+          type:
+          - string
+          - 'null'
+          minLength: 1
+          maxLength: 86
+          pattern: ^[A-Za-z0-9_-]+$
+    WebAuthnDevice:
+      type: object
+      required:
+      - id
+      - label
+      - createdAt
+      - lastUsedAt
+      properties:
+        id:
+          type: string
+          minLength: 1
+          maxLength: 1500
+          pattern: ^[A-Za-z0-9_-]+$
+        label:
+          type: string
+          minLength: 1
+          maxLength: 100
+        createdAt:
+          type: string
+          format: date-time
+        lastUsedAt:
+          type: string
+          format: date-time
+    WebAuthnRegistrationCredential:
+      type: object
+      required:
+      - id
+      - rawId
+      - type
+      - response
+      properties:
+        id:
+          type: string
+          minLength: 1
+          maxLength: 1500
+          pattern: ^[A-Za-z0-9_-]+$
+        rawId:
+          type: string
+          minLength: 1
+          maxLength: 1500
+          pattern: ^[A-Za-z0-9_-]+$
+        type:
+          type: string
+          enum:
+          - public-key
+        response:
+          $ref: '#/components/schemas/WebAuthnAttestationResponse'
+        clientExtensionResults:
+          type: object
+          additionalProperties: true
+        authenticatorAttachment:
+          type:
+          - string
+          - 'null'
+          enum:
+          - platform
+          - cross-platform
+          - null
+    WebAuthnAssertionCredential:
+      type: object
+      required:
+      - id
+      - rawId
+      - type
+      - response
+      properties:
+        id:
+          type: string
+          minLength: 1
+          maxLength: 1500
+          pattern: ^[A-Za-z0-9_-]+$
+        rawId:
+          type: string
+          minLength: 1
+          maxLength: 1500
+          pattern: ^[A-Za-z0-9_-]+$
+        type:
+          type: string
+          enum:
+          - public-key
+        response:
+          $ref: '#/components/schemas/WebAuthnAssertionResponse'
+        clientExtensionResults:
+          type: object
+          additionalProperties: true
+        authenticatorAttachment:
+          type:
+          - string
+          - 'null'
+          enum:
+          - platform
+          - cross-platform
+          - null
+    WebAuthnEnrollmentRequest:
+      type: object
+      required:
+      - label
+      - credential
+      properties:
+        label:
+          type: string
+          minLength: 1
+          maxLength: 100
+          pattern: ^(?=.*\S)[^\p{Cntrl}]+$
+        credential:
+          $ref: '#/components/schemas/WebAuthnRegistrationCredential'
+    WebAuthnLabelRequest:
+      type: object
+      required:
+      - label
+      properties:
+        label:
+          type: string
+          minLength: 1
+          maxLength: 100
+          pattern: ^(?=.*\S)[^\p{Cntrl}]+$
 
     RuleType:
       type: string
@@ -3594,7 +3960,7 @@ components:
         What a message was. The client resolves its label from this; the value is the message's own
         name, not the reason another part of the instance had for asking.
       enum: [ACCOUNT_WELCOME, CREDENTIALS_NEW_ACCOUNT, CREDENTIALS_PASSWORD_RESET, ACCOUNT_USERNAME_REMINDER,
-             ACCOUNT_PASSWORD_RESET_CODE, ACCOUNT_SECURITY_CHANGED, BOOKING_CONFIRMED,
+             ACCOUNT_PASSWORD_RESET_CODE, ACCOUNT_MFA_RECOVERY_CODE, ACCOUNT_SECURITY_CHANGED, BOOKING_CONFIRMED,
              BOOKING_PLAYER_RECORDED, BOOKING_PLAYER_WITHDREW, BOOKING_DISPLACED,
              BOOKING_REMINDER, BOOKING_CANCELLED, BOOKING_CANCELLED_BY_CLUB, BOOKING_RELEASED,
              BOOKING_SERIES_CREATED, BOOKING_SERIES_CANCELLED_BY_CLUB, BOOKING_SERIES_MOVED_BY_CLUB,
@@ -4705,6 +5071,101 @@ paths:
         "429":
           $ref: "#/components/responses/RateLimited"
 
+  /api/admin/accounts/{accountId}/mfa:
+    get:
+      tags:
+      - mfa-recovery
+      operationId: getAdministrativeMfaStatus
+      summary: Read an account's MFA and controlled recovery state.
+      description: Requires the administrator role. Never reveals methods, labels, setup secrets or recovery codes.
+      security:
+      - sessionCookie: []
+      parameters:
+      - name: accountId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Only the account's enabled and recovery-block flags.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MfaAdministrativeStatus'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '400':
+          $ref: '#/components/responses/Invalid'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /api/admin/accounts/{accountId}/mfa-recovery:
+    post:
+      tags:
+      - mfa-recovery
+      operationId: initiateMfaRecovery
+      summary: Block an account and mail a controlled recovery code after an identity check.
+      description: Requires an enabled MFA administrator with fresh password and factor proof. Existing methods remain
+        until successful redemption.
+      security:
+      - sessionCookie: []
+        csrfToken: []
+      parameters:
+      - name: accountId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MfaRecoveryInitiation'
+      responses:
+        '202':
+          description: The account is blocked and a recovery message is queued.
+        '400':
+          $ref: '#/components/responses/Invalid'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /api/account-recovery/mfa/redemption:
+    post:
+      tags: [mfa-recovery]
+      operationId: redeemMfaRecovery
+      summary: Choose a permanent password and remove lost factors using the mailed recovery code.
+      description: The blocked holder supplies their username, current single-use rescue code and a new permanent password. Ordinary password recovery cannot clear the block or remove factors.
+      security:
+        - csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MfaRecoveryRedemption" }
+      responses:
+        "204": { description: "The new password is set, all factors removed and every old session revoked." }
+        "400": { $ref: "#/components/responses/Invalid" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "415": { $ref: "#/components/responses/UnsupportedMediaType" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+
   /api/account-recovery/password/redemption:
     post:
       tags: [account-recovery]
@@ -4880,7 +5341,6 @@ paths:
         set must be saved before signing in again. An existing set is never returned a second time.
       security:
         - sessionCookie: []
-          csrfToken: []
       responses:
         "200":
           description: The holder's MFA result.
@@ -5034,6 +5494,215 @@ paths:
           $ref: "#/components/responses/UnsupportedMediaType"
         "429":
           $ref: "#/components/responses/RateLimited"
+
+  /api/account/mfa/webauthn/registration-options:
+    post:
+      tags:
+      - account-webauthn
+      operationId: beginWebauthnEnrollment
+      summary: Begin a private WebAuthn registration after fresh full authentication.
+      security:
+      - sessionCookie: []
+        csrfToken: []
+      responses:
+        '200':
+          description: The MFA operation succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebAuthnCreationOptions'
+        '400':
+          $ref: '#/components/responses/Invalid'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /api/account/mfa/webauthn:
+    post:
+      tags:
+      - account-webauthn
+      operationId: confirmWebauthnEnrollment
+      summary: Enroll the verified authenticator and return newly generated recovery codes.
+      security:
+      - sessionCookie: []
+        csrfToken: []
+      responses:
+        '200':
+          description: The MFA operation succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MfaRecoveryCodeSet'
+        '400':
+          $ref: '#/components/responses/Invalid'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WebAuthnEnrollmentRequest'
+  /api/account/mfa/webauthn/credentials/{credentialId}:
+    delete:
+      tags:
+      - account-webauthn
+      operationId: removeOwnWebauthnCredential
+      summary: Remove one of the holder's authenticators after fresh full proof.
+      security:
+      - sessionCookie: []
+        csrfToken: []
+      responses:
+        '204':
+          description: The MFA operation succeeded.
+        '400':
+          $ref: '#/components/responses/Invalid'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      parameters:
+      - name: credentialId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 1500
+          pattern: ^[A-Za-z0-9_-]+$
+    patch:
+      tags:
+      - account-webauthn
+      operationId: renameOwnWebauthnCredential
+      summary: Change a private authenticator label after fresh full proof.
+      security:
+      - sessionCookie: []
+        csrfToken: []
+      responses:
+        '204':
+          description: The MFA operation succeeded.
+        '400':
+          $ref: '#/components/responses/Invalid'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      parameters:
+      - name: credentialId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 1500
+          pattern: ^[A-Za-z0-9_-]+$
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WebAuthnLabelRequest'
+
+  /api/account/mfa/webauthn/authentication-options:
+    post:
+      tags:
+      - account-webauthn
+      operationId: beginWebauthnReauthentication
+      summary: Issue a session-bound challenge for proving a sensitive action.
+      security:
+      - sessionCookie: []
+        csrfToken: []
+      responses:
+        '200':
+          description: The MFA operation succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebAuthnRequestOptions'
+        '400':
+          $ref: '#/components/responses/Invalid'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /api/session/mfa/webauthn/options:
+    post:
+      tags:
+      - session-webauthn
+      operationId: beginWebauthnLogin
+      summary: Issue WebAuthn options within the existing pending password challenge.
+      security:
+      - csrfToken: []
+      responses:
+        '200':
+          description: The MFA operation succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebAuthnRequestOptions'
+        '400':
+          $ref: '#/components/responses/Invalid'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /api/session/mfa/webauthn:
+    post:
+      tags:
+      - session-webauthn
+      operationId: completeWebauthnLogin
+      summary: Complete a pending password login with a verified enrolled authenticator.
+      security:
+      - csrfToken: []
+      responses:
+        '200':
+          description: The MFA operation succeeded.
+        '400':
+          $ref: '#/components/responses/Invalid'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WebAuthnAssertionCredential'
 
   /api/account/sessions:
     get:

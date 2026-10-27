@@ -36,8 +36,9 @@ class AccountRecoveryServiceTest {
     private final PasswordResetTokenService resetTokens = mock(PasswordResetTokenService.class);
     private final LoginAttemptProtection protection = mock(LoginAttemptProtection.class);
     private final ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
+    private final MfaFactors factors = mock(MfaFactors.class);
     private final AccountRecoveryService recovery =
-            new AccountRecoveryService(accounts, mailLimit, resetTokens, protection, events);
+            new AccountRecoveryService(accounts, mailLimit, resetTokens, protection, events, factors);
 
     @BeforeEach
     void allowTheCaller() {
@@ -170,4 +171,15 @@ class AccountRecoveryServiceTest {
         account.enable();
         return account;
     }
+    @Test
+    void givenPendingMfaRecovery_whenAResetIsRequested_thenTheRequestQueuesNothing() {
+        // given
+        UserAccount account = known("doe.jane", "jane.doe@example.org");
+        when(factors.recoveryPending(account.getId())).thenReturn(true);
+        // when
+        recovery.mailAResetCode("doe.jane", CALLER);
+        // then
+        verifyNoInteractions(events);
+    }
+
 }

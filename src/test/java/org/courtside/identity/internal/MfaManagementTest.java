@@ -206,6 +206,27 @@ class MfaManagementTest extends AbstractIntegrationTest {
         }
     }
 
+    @Test
+    void givenAReusedUsername_whenReadingPrivateFactorStatus_thenThePrincipalAccountKeepsItsOwnData() {
+        // given
+        Person john = people.save(new Person("John", "Roe", "john.roe@example.org"));
+        UserAccount other = new UserAccount(john, "roe.john", passwords.encode("another-password"), Set.of(Role.MEMBER), "en");
+        other.enable();
+        accounts.save(other);
+        recovery.replace(other.getId(), MfaRecoveryCodes.generate());
+        var principal = new CourtsideUserDetails(account, other.getUsername(), "unused", true, true,
+                List.of("ROLE_MEMBER"), 0);
+        var security = SecurityContextHolder.createEmptyContext();
+        security.setAuthentication(UsernamePasswordAuthenticationToken.authenticated(principal, null, principal.getAuthorities()));
+        SecurityContextHolder.setContext(security);
+        // when / then
+        try {
+            assertThat(management.status().getRecoveryCodesRemaining()).isZero();
+        } finally {
+            SecurityContextHolder.clearContext();
+        }
+    }
+
     private MockHttpSession complete(String code) throws Exception {
         return (MockHttpSession) mvc.perform(post("/api/session/mfa").session(signIn(202)).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON).content("{\"code\":\"" + code + "\"}"))

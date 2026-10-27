@@ -28,7 +28,7 @@ class PermanentPasswordService {
 
     @Transactional
     void change(String currentPassword, String replacement) {
-        UserAccount account = currentUser.requireAccountForUpdate();
+        UserAccount account = currentUser.requireAccount();
         entities.refresh(account, LockModeType.PESSIMISTIC_WRITE);
         var authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication != null && authentication.getPrincipal() instanceof CourtsideUserDetails user

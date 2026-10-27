@@ -64,7 +64,7 @@ class MfaFreshActorTest extends AbstractIntegrationTest {
         try {
             assertThatThrownBy(() -> new TransactionTemplate(transactions).executeWithoutResult(status -> {
                 accounts.findById(account.getId()).orElseThrow();
-                jdbc.sql("UPDATE user_account SET security_epoch = security_epoch + 1 WHERE id = :id")
+                jdbc.sql("UPDATE user_account SET security_epoch = security_epoch + 1, version = version + 1 WHERE id = :id")
                         .param("id", account.getId()).update();
                 if (action == Action.TOTP_SETUP) management.beginTotp();
                 else permanentPasswords.change("correct-horse", "durable-pine-forest-2026");

@@ -79,7 +79,9 @@ public class SecurityConfiguration {
                 .matcher(HttpMethod.PUT, "/api/account/password");
         RequestMatcher resetRedemption = PathPatternRequestMatcher.withDefaults()
                 .matcher(HttpMethod.POST, "/api/account-recovery/password/redemption");
-        return request -> reauthentication.matches(request)
+        RequestMatcher mfaRecovery = PathPatternRequestMatcher.withDefaults()
+                .matcher(HttpMethod.POST, "/api/account-recovery/mfa/redemption");
+        return request -> mfaRecovery.matches(request) || reauthentication.matches(request)
                 || initialPasswordChange.matches(request)
                 || passwordChange.matches(request)
                 || resetRedemption.matches(request);
@@ -183,10 +185,10 @@ public class SecurityConfiguration {
                                 "/manifest.webmanifest", "/sw.js",
                                 "/workbox-*.js").permitAll()
                         .requestMatchers("/api/session").permitAll()
-                        .requestMatchers("/api/session/mfa").permitAll()
+                        .requestMatchers("/api/session/mfa", "/api/session/mfa/**").permitAll()
                         .requestMatchers("/api/account-recovery/password",
                                 "/api/account-recovery/password/redemption",
-                                "/api/account-recovery/usernames").permitAll()
+                                "/api/account-recovery/usernames", "/api/account-recovery/mfa/redemption").permitAll()
                         .requestMatchers("/api/session/logout").authenticated()
                         .requestMatchers("/api/account/initial-password").access(
                                 (authentication, context) -> new AuthorizationDecision(

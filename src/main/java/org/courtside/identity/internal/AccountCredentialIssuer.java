@@ -27,11 +27,13 @@ class AccountCredentialIssuer implements CredentialIssuer {
     private final AccountSessions sessions;
     private final PasswordEncoder passwordEncoder;
     private final SecurityEventLog securityEvents;
+    private final RecoveryAccountGuard recoveryGuard;
     private final SecureRandom random = new SecureRandom();
 
     @Override
     @Transactional
     public void issueFor(UUID accountId, Instant expiresAt, Consumer<IssuedCredential> handOver) {
+        recoveryGuard.lockAndRequireAvailable(accountId);
         UserAccount account = accounts.findById(accountId).orElseThrow(() ->
                 new IllegalStateException("No account to issue a credential for"));
         String address = account.getPerson().getEmail();
@@ -41,7 +43,6 @@ class AccountCredentialIssuer implements CredentialIssuer {
         }
         String credential = generated();
         String username = account.getUsername();
-        // Nothing is written before this returns, so no account row is held across the relay.
         handOver.accept(new IssuedCredential(address, account.getPerson().getFirstName(),
                 account.getLocale(), username, credential, expiresAt));
         accounts.issueCredential(accountId, passwordEncoder.encode(credential), expiresAt);
@@ -50,7 +51,6 @@ class AccountCredentialIssuer implements CredentialIssuer {
                 SecurityEventLog.CredentialChange.TEMPORARY_CREDENTIAL_ISSUED);
     }
 
-    // Base64 without padding, so nothing a member retypes is a character they have to guess at.
     private String generated() {
         byte[] bytes = new byte[CREDENTIAL_BYTES];
         random.nextBytes(bytes);

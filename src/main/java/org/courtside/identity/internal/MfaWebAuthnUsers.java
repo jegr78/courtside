@@ -89,7 +89,7 @@ class MfaWebAuthnUsers implements PublicKeyCredentialUserEntityRepository {
         }
     }
 
-    private static Bytes handle(UUID account) {
+    static Bytes handle(UUID account) {
         return new Bytes(ByteBuffer.allocate(16).putLong(account.getMostSignificantBits())
                 .putLong(account.getLeastSignificantBits()).array());
     }

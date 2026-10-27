@@ -729,6 +729,64 @@ Correcting an email address invalidates credentials and reset codes sent to the 
 an account, removing a role, changing membership, correcting username or replacing a password raises
 the security epoch and invalidates older sessions.
 
+### Voluntary multi-factor authentication
+
+Every account can enable MFA under "My profile", in the account security section. Enrollment is
+voluntary for every role. An enrolled account signs in with its password and one enrolled factor.
+TOTP, WebAuthn and single-use recovery codes are alternatives. Courtside offers no passwordless
+login or trusted-browser exception.
+
+TOTP uses a separate 160-bit secret, six digits and a 30-second period. Enrollment shows a QR code
+and a manual key, but activates only after a valid test code. Verification accepts the neighbouring
+time steps and persists the consumed counter to reject replay. A replacement setup leaves the
+current method usable until confirmation. Recovery codes appear once when generated; the database
+holds only their verifiers. Regeneration invalidates the previous set, and concurrent redemption
+has one winner.
+
+WebAuthn supports multiple credentials with holder-private labels, individual removal and renaming.
+An account may enroll WebAuthn without TOTP. Registration and authentication require local user
+verification. Courtside receives the signed result, never biometric data. Relying-party ID and
+allowed origin come from the explicitly configured public HTTPS address, including maintained local
+HTTPS and shared UAT. Request Host headers cannot choose them. A credential is bound to its domain.
+After a domain change, the holder signs in with a remaining method or recovery code and enrolls a
+new credential. A lost-factor account uses controlled recovery.
+
+Password verification creates an unauthenticated, roleless pending session for an MFA account.
+Its database challenge binds account ID, security epoch, browser session and purpose. Challenges
+expire after five minutes and permit at most five proof attempts. Requesting fresh WebAuthn options
+does not extend the password challenge's lifetime or reset its attempt budget. Account and address
+budgets also survive a restarted login. Only a completed factor creates an authenticated session,
+records sign-in and establishes recent proof. WebAuthn signature counters cannot decrease; a
+synchronized credential that consistently reports zero remains supported.
+
+Initial enrollment requires recent password proof. Later factor changes, recovery-code generation,
+disablement and sensitive actions require recent password plus one existing factor. The proof
+window remains five minutes. Security-relevant factor changes revoke existing sessions and notify
+the holder without naming a credential or exposing a secret. Generated recovery codes remain in
+that browser's memory long enough to save them after its own session ends. External account changes
+and a different signed-in holder clear them. Administrators see only whether another account has
+MFA and whether controlled recovery blocks it.
+
+Ordinary password recovery and administrative credential issuance preserve enrolled factors. A
+controlled rescue requires a fresh MFA-authenticated administrator and an explicit identity check.
+It immediately revokes sessions and blocks login, ordinary password recovery and issued credentials.
+Existing factors remain until the holder redeems the single-use code mailed to the account's
+current address together with a new permanent password. Redemption removes all factors, recovery
+codes and pending challenges. Expiry, address changes, security-epoch changes and guessing limits
+invalidate or refuse the code without clearing the block. The maintained operator command supports
+a sole administrator who has lost every method. Its separately audited address-correction command
+invalidates an older rescue code and requires a new rescue request.
+
+TOTP secrets use account-bound AES-256-GCM encryption with random nonces. The instance generates its
+keyring automatically and persists it outside PostgreSQL, under a private local directory or a
+separate writable container volume. A database installation ID selects the default key location;
+a canary and encrypted state validate the matching keyring before the instance reports healthy.
+An operator may supply a private key file. Rotation retains prior keys for existing ciphertext.
+A database with encrypted factors cannot start using missing or mismatched keys. Complete backup
+and restore preserve both the database and key material, and preflight validates them together
+before replacing the target database. A database-only restore with encrypted factors needs the
+matching keys restored separately.
+
 ### Sessions
 
 Spring Session stores sessions in PostgreSQL. HTTPS uses `__Host-SESSION` with `HttpOnly`, `Secure`,

@@ -5,6 +5,7 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
 import org.courtside.api.ApiMfaStatus;
 import org.courtside.api.ApiTotpEnrollment;
+import org.courtside.api.ApiWebAuthnDevice;
 import org.courtside.config.ClubIdentity;
 import org.courtside.identity.AccountMfaChanged;
 import org.courtside.identity.AccountSessions;
@@ -21,6 +22,7 @@ import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.time.ZoneOffset;
 
 @Service
 @RequiredArgsConstructor
@@ -36,11 +38,17 @@ class MfaManagement {
     private final ClubIdentity club;
     private final SecurityEventLog securityEvents;
     private final ApplicationEventPublisher events;
+    private final MfaWebAuthnCredentials credentials;
+    private final MfaWebAuthn webAuthn;
 
     @Transactional(readOnly = true)
     ApiMfaStatus status() {
-        var account = currentUser.requireAccount().getId();
-        return new ApiMfaStatus(factors.enabled(account), totp.enabled(account), recovery.remaining(account));
+        var account = currentUser.accountId().orElseThrow(MfaProofFailedException::new);
+        return new ApiMfaStatus(factors.enabled(account), totp.enabled(account), recovery.remaining(account))
+                .webauthnAvailable(webAuthn.available())
+                .devices(credentials.findByUserId(MfaWebAuthnUsers.handle(account)).stream().map(device ->
+                        new ApiWebAuthnDevice(device.getCredentialId().toBase64UrlString(), device.getLabel(),
+                                device.getCreated().atOffset(ZoneOffset.UTC), device.getLastUsed().atOffset(ZoneOffset.UTC))).toList());
     }
 
     @Transactional
@@ -66,9 +74,7 @@ class MfaManagement {
             return new Confirmation(false, false, List.of());
         }
         attempts.clearCredentialAccountAttempt(bucket);
-        List<String> codes = previouslyEnabled ? List.of() : replaceCodes(account);
-        changed(account, previouslyEnabled ? SecurityEventLog.CredentialChange.MFA_METHOD_CHANGED
-                : SecurityEventLog.CredentialChange.MFA_ENABLED);
+        List<String> codes = activated(account, previouslyEnabled);
         return new Confirmation(true, false, codes);
     }
 
@@ -95,12 +101,19 @@ class MfaManagement {
         UserAccount account = currentForChange();
         boolean enabled = factors.enabled(account.getId());
         totp.remove(account.getId());
+        credentials.deleteAll(account.getId());
         recovery.clear(account.getId());
         if (enabled) changed(account, SecurityEventLog.CredentialChange.MFA_DISABLED);
     }
 
-    private UserAccount currentForChange() {
-        UserAccount account = currentUser.requireAccountForUpdate();
+    UserAccount currentForChange() {
+        UserAccount account = currentHolderForUpdate();
+        recent.requireRecent();
+        return account;
+    }
+
+    UserAccount currentHolderForUpdate() {
+        UserAccount account = currentUser.requireAccount();
         entities.refresh(account, LockModeType.PESSIMISTIC_WRITE);
         var authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !(authentication.getPrincipal() instanceof CourtsideUserDetails user)
@@ -109,8 +122,14 @@ class MfaManagement {
                 || account.getSecurityEpoch() != user.securityEpoch() || factors.recoveryPending(account.getId())) {
             throw new MfaProofFailedException();
         }
-        recent.requireRecent();
         return account;
+    }
+
+    List<String> activated(UserAccount account, boolean previouslyEnabled) {
+        List<String> codes = previouslyEnabled ? List.of() : replaceCodes(account);
+        changed(account, previouslyEnabled ? SecurityEventLog.CredentialChange.MFA_METHOD_CHANGED
+                : SecurityEventLog.CredentialChange.MFA_ENABLED);
+        return codes;
     }
 
     private List<String> replaceCodes(UserAccount account) {
@@ -119,7 +138,7 @@ class MfaManagement {
         return codes;
     }
 
-    private void changed(UserAccount account, SecurityEventLog.CredentialChange action) {
+    void changed(UserAccount account, SecurityEventLog.CredentialChange action) {
         sessions.revoke(account);
         securityEvents.credentialChangedAfterCommit(account.getId(), account.getId(), action);
         events.publishEvent(new AccountMfaChanged(account.getId()));

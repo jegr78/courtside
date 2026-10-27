@@ -48,7 +48,7 @@ class MailOutbox {
     private static final List<String> URGENT = Stream.of(MessageKind.ACCOUNT_WELCOME,
                     MessageKind.CREDENTIALS_NEW_ACCOUNT,
                     MessageKind.CREDENTIALS_PASSWORD_RESET, MessageKind.ACCOUNT_USERNAME_REMINDER,
-                    MessageKind.ACCOUNT_PASSWORD_RESET_CODE, MessageKind.WAITLIST_OFFER)
+                    MessageKind.ACCOUNT_PASSWORD_RESET_CODE, MessageKind.ACCOUNT_MFA_RECOVERY_CODE, MessageKind.WAITLIST_OFFER)
             .map(Enum::name)
             .toList();
 

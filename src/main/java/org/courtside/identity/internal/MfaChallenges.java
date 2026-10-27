@@ -20,6 +20,20 @@ class MfaChallenges {
     enum Purpose { LOGIN, REAUTHENTICATION, WEBAUTHN_REGISTRATION }
 
     @Transactional
+    boolean setPayload(UUID id, UUID account, long epoch, Purpose purpose, String session, String payload) {
+        requireBindings(account, purpose, session);
+        if (payload == null || payload.length() > 65_536) throw new IllegalStateException("Invalid MFA challenge options");
+        if (id == null || !lockCurrentAccount(account, epoch)) return false;
+        return jdbc.sql("""
+                UPDATE mfa_challenge SET payload = :payload
+                WHERE id = :id AND account_id = :account AND security_epoch = :epoch
+                    AND purpose = :purpose AND session_hash = :session AND expires_at > :now AND attempt_count < 5
+                """).param("id", id).param("account", account).param("epoch", epoch)
+                .param("purpose", purpose.name()).param("session", sessionHash(session)).param("payload", payload)
+                .param("now", clock.instant().atOffset(ZoneOffset.UTC)).update() == 1;
+    }
+
+    @Transactional
     Optional<UUID> issue(UUID account, long epoch, Purpose purpose, String session, String payload) {
         requireBindings(account, purpose, session);
         if (payload == null || payload.length() > 65_536) {
