@@ -279,6 +279,20 @@ components:
           format: password
           minLength: 1
           maxLength: 256
+        code:
+          type: string
+          minLength: 1
+          maxLength: 128
+          description: An unused TOTP step or recovery code, required when the account has MFA enabled.
+
+    MfaCodeProof:
+      type: object
+      required: [code]
+      properties:
+        code:
+          type: string
+          minLength: 1
+          maxLength: 128
 
     PasswordResetRequest:
       type: object
@@ -347,6 +361,11 @@ components:
       required: [authenticated, roles, passwordChangeRequired]
       properties:
         authenticated:
+          type: boolean
+        mfaRequired:
+          type: boolean
+          description: A password was accepted but no account privileges exist until MFA succeeds.
+        totpAvailable:
           type: boolean
         username:
           type: string
@@ -4510,10 +4529,41 @@ paths:
                 status, replacing the password and signing out are what the session can do until
                 the replacement succeeds; every other operation answers 403.
               schema: { type: boolean }
+        "202":
+          description: The password was accepted. Complete MFA before the session grants account access.
         "401":
           $ref: "#/components/responses/Unauthenticated"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/session/mfa:
+    post:
+      tags: [session-mfa]
+      operationId: completeMfaLogin
+      summary: Complete a pending password login with TOTP or a single-use recovery code.
+      description: |
+        The pending browser session binds the account and its expiring challenge. A successful
+        proof replaces the session identifier and grants the account's current privileges.
+      security:
+        - csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MfaCodeProof" }
+      responses:
+        "200":
+          description: Both factors succeeded. The replacement session cookie is set.
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
         "429":
           $ref: "#/components/responses/RateLimited"
 
@@ -4538,8 +4588,8 @@ paths:
       summary: Prove the current account's authentication factors again.
       description: |
         A successful proof is retained only in this server-side session for five minutes. Courtside
-        currently supports the account password as its full proof; a later second factor extends
-        this operation rather than being bypassed by sensitive operations.
+        requires the account password and, for an MFA-enabled account, an enrolled second factor
+        or single-use recovery code.
 
         An account still marked for an initial password change is refused here. Nothing the proof
         unlocks is reachable in that state, so the proof is not either.

@@ -9,6 +9,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.InsufficientAuthenticationException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.access.AccessDeniedHandler;
@@ -24,11 +25,17 @@ class ProblemDetailAccessDeniedHandler implements AccessDeniedHandler {
 
     private final ObjectMapper objectMapper;
     private final SecurityEventLog securityEvents;
+    private final ProblemDetailAuthenticationEntryPoint authenticationEntryPoint;
 
     @Override
     public void handle(HttpServletRequest request, HttpServletResponse response,
                        AccessDeniedException exception) throws IOException {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication instanceof MfaPendingAuthentication && !(exception instanceof CsrfException)) {
+            authenticationEntryPoint.commence(request, response,
+                    new InsufficientAuthenticationException("The second authentication factor is required"));
+            return;
+        }
         CourtsideUserDetails user = authentication != null
                 && authentication.getPrincipal() instanceof CourtsideUserDetails details ? details : null;
         if (exception instanceof CsrfException) {
