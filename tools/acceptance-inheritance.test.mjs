@@ -13,14 +13,14 @@ const skip = !required && !(imageMagick() && findFont());
 const config = { personas: {}, baseUrl: "https://example.org" };
 const json = (path) => JSON.parse(readFileSync(path, "utf8"));
 
-function makeRun(root, name, { defect = false, fullDefect = false, runText = "" } = {}) {
+function makeRun(root, name, { defect = false, fullDefect = false, runText = "", defectColor = "red" } = {}) {
   const run = join(root, name);
   const shots = join(run, "shots", "desktop-chrome", "memberA", "overview");
   mkdirSync(shots, { recursive: true });
   const shot = join(shots, "01-account.png");
   for (const [path, height, changed] of [[shot, 160, defect], [shot.replace(/\.png$/, "-full.png"), 240, fullDefect]]) {
     const [binary, args] = imageMagick().convert(["-size", `320x${height}`, "xc:white", "-font", findFont(),
-      "-pointsize", "18", "-fill", "black", "-annotate", "+20+35", "Profile", ...(runText ? ["-annotate", "+20+65", runText] : []), ...(changed ? ["-fill", "red", "-draw", `point 280,${height - 20}`] : []), path]);
+      "-pointsize", "18", "-fill", "black", "-annotate", "+20+35", "Profile", ...(runText ? ["-annotate", "+20+65", runText] : []), ...(changed ? ["-fill", defectColor, "-draw", `point 280,${height - 20}`] : []), path]);
     execFileSync(binary, args);
   }
   return { run, sheets: contactSheets(run) };
@@ -247,7 +247,7 @@ test("given an old image replaced with the current defective capture, when the s
   const root = mkdtempSync(join(tmpdir(), "sheet-inheritance-stale-source-"));
   try {
     const previous = makeRun(root, "previous"); reviewRun(previous);
-    const current = makeRun(root, "current", { defect: true });
+    const current = makeRun(root, "current", { defect: true, defectColor: "black" });
     const image = (entry) => join(entry.run, "shots", "desktop-chrome", "memberA", "overview", "01-account.png");
     copyFileSync(image(current), image(previous));
     // when
