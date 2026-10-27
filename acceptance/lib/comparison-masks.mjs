@@ -113,7 +113,10 @@ export function runDataMaskProbe({ mode }) {
   for (let node = walker.nextNode(); node; node = walker.nextNode()) {
     const element = node.parentElement;
     if (!element || element.closest("script,style,textarea,select,option,svg,canvas,math,video") || !visible(element)) continue;
-    if (element.closest('[data-testid="usage-report"]') && element.closest('[data-testid$="-label"]')) continue;
+    const label = element.closest('[data-testid$="-label"]');
+    const dateBucket = label?.matches('[data-testid^="statistics-bucket-"]') && label.closest('[data-testid="statistics-progression"]');
+    if (label && !dateBucket) continue;
+    const temporal = dateBucket || element.closest('time, [data-testid="usage-period"], [data-testid="utilisation-period"], [data-testid="booking-period"], [data-testid="allocation-period"], [data-testid="managed-period"], [data-testid="cancellation-period"], [data-testid^="day-selector-"], [data-testid^="mobile-day-selector-"]');
     const text = node.textContent ?? "";
     if (/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(text)) continue;
     const matches = [];
@@ -128,8 +131,7 @@ export function runDataMaskProbe({ mode }) {
     if (element.closest('[data-testid="build-identity"]')) {
       record("version", /\bv?\d+\.\d+\.\d+(?:-rc\.\d+)?(?:\s*[·•]\s*[a-f0-9]{7,40})?\b/g);
     } else {
-      record("date", dates);
-      record("time", times);
+      if (temporal) { record("date", dates); record("time", times); }
       if (element.closest('[data-testid^="day-selector-"], [data-testid^="mobile-day-selector-"]')) record("date", /\b\d{1,2}[/.]\d{1,2}\.?\b/g);
       const count = element.closest('[data-testid="my-messages-unread"], [data-testid="notifications-count"], [data-testid="series-creatable-count"]')
         || (element.closest('[data-testid="usage-report"]') && element.closest('[data-testid^="usage-"][data-testid$="-value"]'));
@@ -170,7 +172,7 @@ export function runDataMaskProbe({ mode }) {
 }
 
 export function screenshotComparison(bytes, before, after) {
-  return { schemaVersion: 2, safe: before.safe && after.safe && JSON.stringify(before) === JSON.stringify(after),
+  return { schemaVersion: 3, safe: before.safe && after.safe && JSON.stringify(before) === JSON.stringify(after),
     image: { digest: createHash("sha256").update(bytes).digest("hex"), width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20) },
     capture: before.capture, masks: before.masks.map((mask) => ({ ...mask, style: createHash("sha256").update(mask.style).digest("hex") })) };
 }

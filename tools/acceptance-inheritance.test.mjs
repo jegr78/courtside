@@ -114,7 +114,7 @@ function maskedRun(root, name, kind, runText, { defect = false, mutate = (record
     const bytes = readFileSync(path);
     const width = bytes.readUInt32BE(16);
     const height = bytes.readUInt32BE(20);
-    const record = { schemaVersion: 2, safe: true,
+    const record = { schemaVersion: 3, safe: true,
       image: { digest: createHash("sha256").update(bytes).digest("hex"), width, height },
       capture: { width, height, devicePixelRatio: 1, userAgent: "fixture", locale: "en-US", timeZone: "UTC", mode: suffix ? "full" : "viewport", scrollX: 0, scrollY: 0 },
       masks: [{ key: `body:0/p:1/text:0/${kind}:0`, kind, style: "18px fixture sans-serif black", rects: [{ x: 20, y: 44, width: 180, height: 26 }] }] };
@@ -146,7 +146,7 @@ for (const [kind, earlier, current] of [
 }
 
 for (const [condition, mutate] of [
-  ["legacy mask protocol", (record) => { record.schemaVersion = 1; return record; }],
+  ["legacy mask protocol", (record) => { record.schemaVersion = 2; return record; }],
   ["changed presentation", (record) => { record.masks[0].style = "36px fixture serif red"; return record; }],
   ["moved text", (record) => { record.masks[0].rects[0].x += 3; return record; }],
   ["oversized mask", (record) => { record.masks[0].rects[0].width = 295; return record; }],
@@ -389,7 +389,7 @@ test("given a newly generated sheet frame differs while native captures match, w
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-for (const scenario of ["adjacent", "overlay", "welcome", "format", "background", "pseudo", "numeric-label", "date-label"]) {
+for (const scenario of ["adjacent", "overlay", "welcome", "format", "background", "pseudo", "numeric-label", "date-label", "numeric-heading", "statistics-label", "unscoped-date"]) {
   test(`given real producer output with a static ${scenario} change, when native evidence is compared, then it cannot inherit a clean verdict`, { skip }, () => {
     // given
     const root = mkdtempSync(join(tmpdir(), "sheet-inheritance-static-rejection-"));
@@ -421,7 +421,7 @@ for (const target of ["sheet-evidence", "sheet-review"]) {
     try {
       const previous = makeRun(root, "previous"); reviewRun(previous);
       const path = join(previous.run, `${target}.json`);
-      const record = json(path); record.schemaVersion = 1;
+      const record = json(path); record.schemaVersion = 2;
       writeFileSync(path, JSON.stringify(record));
       if (target === "sheet-evidence") {
         const auditPath = join(previous.run, "sheet-review.json");

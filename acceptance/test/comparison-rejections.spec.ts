@@ -4,14 +4,17 @@ import { capture } from "../lib/checks";
 import { runPath } from "../lib/context";
 
 const font = readFileSync(new URL("../../frontend/node_modules/@fontsource-variable/geist-mono/files/geist-mono-latin-wght-normal.woff2", import.meta.url)).toString("base64");
-const cases = [
+const cases: { key: string; situation: string; previous: string; current: string; container?: string; label?: string }[] = [
   { key: "adjacent", situation: "static text added beside a shorter date", previous: "28.10.2026 Label", current: "1.1.2026 X Label" },
   { key: "overlay", situation: "a changed badge partially covering a date", previous: "28.10.2026", current: "29.10.2026" },
   { key: "welcome", situation: "changed ordinary welcome text", previous: "Welcome everyone", current: "Welcome visitors" },
   { key: "format", situation: "a changed date presentation format", previous: "28.10.2026", current: "10/28/2026" },
   { key: "background", situation: "a changed ancestor background behind a date", previous: "28.10.2026", current: "29.10.2026" },
-  { key: "date-label", situation: "a changed date-shaped booking card label in usage", previous: "28.10.2026", current: "29.10.2026" },
-  { key: "numeric-label", situation: "a changed numeric booking card label in usage", previous: "1", current: "2" },
+  { key: "unscoped-date", situation: "changed date-shaped text without temporal semantics", previous: "28.10.2026", current: "29.10.2026" },
+  { key: "statistics-label", situation: "a changed date-shaped configured statistics card label", previous: "28.10.2026", current: "29.10.2026", container: "statistics-cards", label: "statistics-card-example-label" },
+  { key: "numeric-heading", situation: "changed static numeric copy in the usage report", previous: "1", current: "2", container: "usage-report" },
+  { key: "date-label", situation: "a changed date-shaped booking card label in usage", previous: "28.10.2026", current: "29.10.2026", container: "usage-report", label: "usage-cancelled-card-label" },
+  { key: "numeric-label", situation: "a changed numeric booking card label in usage", previous: "1", current: "2", container: "usage-report", label: "usage-cancelled-card-label" },
   { key: "pseudo", situation: "a changed generated badge partly covering a date", previous: "28.10.2026", current: "29.10.2026" }
 ];
 
@@ -19,12 +22,13 @@ for (const fixture of cases) {
   test(`given ${fixture.situation}, when native comparison pairs are captured, then the original images retain that static change`, async ({ page }, info) => {
     // given
     await page.setViewportSize({ width: 640, height: 480 });
+    const tag = fixture.key === "unscoped-date" ? "p" : "time";
     const html = `<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width"><style>
       @font-face { font-family: Capture; font-style: normal; font-weight: 100 900; src: url(data:font/woff2;base64,${font}); }
       body { min-height:800px;margin:8px;font:16px/24px Capture; }
       [data-testid="rejection-value"] { position:absolute;left:40px;top:60px;margin:0; }
       [data-testid="pseudo-badge"]::before { content:"";position:absolute;left:var(--left);top:var(--top);width:8px;height:var(--height);background:var(--color);pointer-events:none;z-index:2; }
-      </style></head><body><h1>Comparison</h1><div data-testid="paint">${["numeric-label", "date-label"].includes(fixture.key) ? '<div data-testid="usage-report"><div data-testid="usage-cancelled-card-label">' : ""}<p data-testid="rejection-value">${fixture.previous}</p>${["numeric-label", "date-label"].includes(fixture.key) ? "</div></div>" : ""}</div>
+      </style></head><body><h1>Comparison</h1><div data-testid="paint">${fixture.container ? `<div data-testid="${fixture.container}">` : ""}${fixture.label ? `<div data-testid="${fixture.label}">` : ""}<${tag} data-testid="rejection-value">${fixture.previous}</${tag}>${fixture.label ? "</div>" : ""}${fixture.container ? "</div>" : ""}</div>
       ${fixture.key === "overlay" ? '<div data-testid="badge"></div>' : ""}
       ${fixture.key === "pseudo" ? '<div data-testid="pseudo-badge" style="display:contents"></div>' : ""}</body></html>`;
     await page.goto(`data:text/html,${encodeURIComponent(html)}`);
@@ -75,7 +79,7 @@ for (const fixture of cases) {
     // then
     await expect(page.getByTestId("rejection-value")).toHaveText(fixture.current);
     expect(images[0].equals(images[1]), "the native pair includes the actual changed text or badge pixels").toBe(false);
-    if (["overlay", "welcome", "pseudo", "numeric-label", "date-label"].includes(fixture.key)) for (const record of records) {
+    if (["overlay", "welcome", "pseudo", "numeric-label", "date-label", "numeric-heading", "statistics-label", "unscoped-date"].includes(fixture.key)) for (const record of records) {
       expect(record.masks, "static welcome text and partially covered dates remain unmasked in both image modes").toHaveLength(0);
     }
   });

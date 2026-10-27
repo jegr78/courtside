@@ -17,7 +17,7 @@ function comparison(path, evidence) {
   const capture = record.capture;
   const width = source.readUInt32BE(16);
   const height = source.readUInt32BE(20);
-  if (record.schemaVersion !== 2 || record.safe !== true || record.image?.digest !== evidence.digest
+  if (record.schemaVersion !== 3 || record.safe !== true || record.image?.digest !== evidence.digest
     || record.image.width !== width || record.image.height !== height || !capture
     || !finite(capture.width) || !finite(capture.height) || capture.width <= 0 || capture.height <= 0
     || !finite(capture.devicePixelRatio) || capture.devicePixelRatio < 1 || capture.devicePixelRatio > 4
