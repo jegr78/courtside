@@ -49,6 +49,21 @@ class MfaChallengesTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenAChallengeFromBeforeRevocation_whenTheCurrentEpochUsesIt_thenNeitherProofNorOptionsCanReviveIt() {
+        // given
+        UUID account = account();
+        UUID id = challenges.issue(account, 0, MfaChallenges.Purpose.LOGIN, "one", "original-options").orElseThrow();
+        jdbc.sql("UPDATE user_account SET security_epoch = 1 WHERE id = :id").param("id", account).update();
+        // when / then
+        assertThat(challenges.attempt(id, account, 1, MfaChallenges.Purpose.LOGIN, "one")).isEmpty();
+        assertThat(challenges.setPayload(id, account, 1, MfaChallenges.Purpose.LOGIN, "one", "new-options")).isFalse();
+        assertThat(jdbc.sql("SELECT payload FROM mfa_challenge WHERE id = :id").param("id", id)
+                .query(String.class).single()).isEqualTo("original-options");
+        assertThat(jdbc.sql("SELECT attempt_count FROM mfa_challenge WHERE id = :id").param("id", id)
+                .query(Integer.class).single()).isZero();
+    }
+
+    @Test
     void givenAnExpiredOrExhaustedChallenge_whenAttempting_thenItIsRefused() {
         // given
         UUID account = account();
