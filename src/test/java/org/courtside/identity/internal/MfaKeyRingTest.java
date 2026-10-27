@@ -5,16 +5,21 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.PosixFilePermission;
+import java.time.Duration;
 import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
+import static org.awaitility.Awaitility.await;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.catchThrowable;
@@ -179,6 +184,63 @@ class MfaKeyRingTest {
         assertThatThrownBy(() -> MfaKeyRing.open(file, true))
                 .isInstanceOf(IllegalStateException.class).hasMessageContaining("MFA");
         assertThat(Files.readString(file)).isEqualTo(malformed);
+    }
+
+    @Test
+    void givenAnInstanceLockHeldByAnotherProcess_whenStarting_thenNoKeyIsPublishedUntilThatLockIsReleased() throws Exception {
+        // given
+        Path file = temporary.resolve("mfa.keys");
+        Path ready = temporary.resolve("ready");
+        Path start = temporary.resolve("start");
+        Path result = temporary.resolve("result");
+        String java = Path.of(System.getProperty("java.home"), "bin", "java").toAbsolutePath().toString();
+        Process process = new ProcessBuilder(java, "-cp", System.getProperty("java.class.path"),
+                MfaKeyRingProcess.class.getName(), file.toString(), ready.toString(), start.toString(), result.toString())
+                .redirectError(ProcessBuilder.Redirect.INHERIT).start();
+        try (FileChannel channel = FileChannel.open(temporary.resolve("mfa.keys.lock"),
+                StandardOpenOption.CREATE, StandardOpenOption.WRITE)) {
+            try (var held = channel.lock()) {
+                await().atMost(Duration.ofSeconds(20)).until(() -> Files.exists(ready));
+                // when
+                Files.writeString(start, "start");
+                // then
+                assertThat(process.waitFor(1, TimeUnit.SECONDS))
+                        .as("another process must not publish a key while the instance lock is held").isFalse();
+                assertThat(file).doesNotExist();
+            }
+            // when
+            assertThat(process.waitFor(20, TimeUnit.SECONDS)).isTrue();
+            // then
+            assertThat(process.exitValue()).isZero();
+            assertThat(Files.readString(result)).isEqualTo(MfaKeyRing.open(file, true).activeKeyId());
+        } finally {
+            if (process.isAlive()) process.destroyForcibly();
+        }
+    }
+
+    @Test
+    void givenAnExposedKeyFile_whenOpening_thenItsPermissionsMustBeCorrectedFirst() throws Exception {
+        // given
+        Path file = temporary.resolve("mfa.keys");
+        MfaKeyRing.open(file, false);
+        Files.setPosixFilePermissions(file, java.nio.file.attribute.PosixFilePermissions.fromString("rw-r--r--"));
+        // when / then
+        assertThatThrownBy(() -> MfaKeyRing.open(file, true))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("private regular file");
+    }
+
+    @Test
+    void givenAKeyFileSymlink_whenOpening_thenTheTargetRemainsUntouched() throws Exception {
+        // given
+        Path target = temporary.resolve("original.keys");
+        MfaKeyRing.open(target, false);
+        String original = Files.readString(target);
+        Path link = temporary.resolve("linked.keys");
+        Files.createSymbolicLink(link, target);
+        // when / then
+        assertThatThrownBy(() -> MfaKeyRing.open(link, true))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("private regular file");
+        assertThat(Files.readString(target)).isEqualTo(original);
     }
 
 }
