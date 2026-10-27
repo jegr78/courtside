@@ -9,5 +9,5 @@ To regenerate them, run only `comparison-masks.spec.ts` in the pinned browser im
 
 The `comparison-rejections.spec.ts` Chromium cases generate the `rejections/` pairs. They preserve
 changed adjacent static text, overlays, ordinary welcome text, date formatting, ancestor backgrounds
-and generated pseudo-element badges. Regenerate those pairs with the same capture producer and
+generated pseudo-element badges and numeric and date-shaped booking-card labels. Usage metric values stay maskable. Regenerate those pairs with the same capture producer and
 copy each case's prefixed files to its matching directory without modifying either bytes or metadata.

@@ -113,6 +113,7 @@ export function runDataMaskProbe({ mode }) {
   for (let node = walker.nextNode(); node; node = walker.nextNode()) {
     const element = node.parentElement;
     if (!element || element.closest("script,style,textarea,select,option,svg,canvas,math,video") || !visible(element)) continue;
+    if (element.closest('[data-testid="usage-report"]') && element.closest('[data-testid$="-label"]')) continue;
     const text = node.textContent ?? "";
     if (/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(text)) continue;
     const matches = [];
@@ -130,7 +131,8 @@ export function runDataMaskProbe({ mode }) {
       record("date", dates);
       record("time", times);
       if (element.closest('[data-testid^="day-selector-"], [data-testid^="mobile-day-selector-"]')) record("date", /\b\d{1,2}[/.]\d{1,2}\.?\b/g);
-      const count = element.closest('[data-testid="my-messages-unread"], [data-testid="usage-report"], [data-testid="notifications-count"], [data-testid="series-creatable-count"]');
+      const count = element.closest('[data-testid="my-messages-unread"], [data-testid="notifications-count"], [data-testid="series-creatable-count"]')
+        || (element.closest('[data-testid="usage-report"]') && element.closest('[data-testid^="usage-"][data-testid$="-value"]'));
       if (count && /^\s*\d[\d.,\s]*(?:%|\+)?\s*$/.test(text)) record("count", /\d[\d.,]*(?:\s?%)?/g);
       record("generated-name", /\b(?:UAT-wording-|acceptance-welcome-|acceptance-headerless-|ACC-)([a-z0-9]{6,16})(?=[\s@-]|$)/g, 1);
       record("generated-name", /\b(?:Acceptance headerless |Acceptance Welcome )([a-z0-9]{6,16})\b/g, 1);

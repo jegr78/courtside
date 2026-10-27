@@ -389,8 +389,8 @@ inherited marker into human `review.json`.
 
 Each capture writes a value-free `.comparison.json` beside its viewport and full-page PNGs. It
 binds mask geometry and presentation to those exact image bytes. Recognized formatted dates,
-times, run-state counts, the version badge and generated acceptance-name suffixes can be masked.
-Static labels, numeric configuration limits, ordinary welcome text, raw ISO timestamps and unsupported or clipped regions
+times, run-state counts in identified value fields, the version badge and generated acceptance-name suffixes can be masked.
+Static labels, including numeric usage-card names, numeric configuration limits, ordinary welcome text, raw ISO timestamps and unsupported or clipped regions
 remain visible to comparison. Native date/time controls retain their borders and picker area.
 Localized application date/time fields retain their borders and reject raw, unparsed or invalid drafts.
 The journey's value assertions run unchanged.

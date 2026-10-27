@@ -18,7 +18,8 @@ body { min-height: 800px; margin: 0; padding: 8px; box-sizing: border-box; font:
 <p data-testid="static-copy">Court 2 has 4 rules</p><p data-testid="raw-iso">2026-10-27T11:34:00+02:00</p>
 <input data-testid="event-date" type="date" value="2026-10-27"><p><input data-testid="club-option" type="checkbox" checked><input type="radio" checked></p>
 <span class="date-time-field"><input data-testid="localized-date" type="text" data-date-time-type="date" value="27.10.2026"><input type="hidden" value="2026-10-27"></span>
-<span class="date-time-field"><input data-testid="localized-time" type="text" data-date-time-type="time" value="12:34 PM"><input type="hidden" value="12:34"></span></main></body></html>`;
+<span class="date-time-field"><input data-testid="localized-time" type="text" data-date-time-type="time" value="12:34 PM"><input type="hidden" value="12:34"></span>
+<section data-testid="usage-report"><div data-testid="usage-cancelled-card-label">1</div><dd data-testid="usage-cancelled-value">16</dd></section></main></body></html>`;
 
 test("given native screenshots with five kinds of run data, when capture records comparison evidence, then only bounded changing text is masked", async ({ page }, info) => {
   // given
@@ -41,6 +42,7 @@ test("given native screenshots with five kinds of run data, when capture records
       (document.querySelector('[data-testid="event-date"]') as HTMLInputElement).value = "2026-10-28";
       (document.querySelector('[data-testid="localized-date"]') as HTMLInputElement).value = "28.10.2026";
       (document.querySelector('[data-testid="localized-time"]') as HTMLInputElement).value = "12:35 PM";
+      document.querySelector('[data-testid="usage-cancelled-value"]')!.textContent = "17";
     });
     await capture(page, label);
     const rows = readFileSync(runPath("metrics.jsonl"), "utf8").trim().split("\n").map((line) => JSON.parse(line));
@@ -69,7 +71,7 @@ test("given native screenshots with five kinds of run data, when capture records
       expect(rect.y + rect.height).toBeLessThanOrEqual(input!.y + input!.height - 1);
     }
     expect(JSON.stringify(record)).not.toMatch(/27\.10\.2026|28\.10\.2026|abc12345|ade67895|11:34:00/);
-    for (const id of ["static-copy", "raw-iso"]) {
+    for (const id of ["static-copy", "raw-iso", "usage-cancelled-card-label"]) {
       const box = await page.getByTestId(id).boundingBox();
       expect(record.masks.flatMap((mask: { rects: MaskRectangle[] }) => mask.rects)
         .some((rect: MaskRectangle) => rect.x < box!.x + box!.width && rect.x + rect.width > box!.x
@@ -78,6 +80,10 @@ test("given native screenshots with five kinds of run data, when capture records
     for (const suffix of ["", "-full"]) {
       const source = metric.shot.replace(/\.png$/, `${suffix}.png`);
       const evidence = JSON.parse(readFileSync(source.replace(/\.png$/, ".comparison.json"), "utf8"));
+      if (suffix === "-full") {
+        const figure = await page.getByTestId("usage-cancelled-value").boundingBox();
+        expect(evidence.masks.filter((mask: { kind: string; rects: MaskRectangle[] }) => mask.kind === "count").some((mask: { rects: MaskRectangle[] }) => mask.rects.some((rect) => rect.y >= figure!.y && rect.y < figure!.y + figure!.height)), "usage metrics keep their bounded changing-number mask").toBe(true);
+      }
       if (suffix === "-full") expect(evidence.masks.filter((mask: { key: string }) => mask.key.includes("/localized-input:")), "application text date and time fields produce bounded masks beside styled checkboxes").toHaveLength(2);
       copyFileSync(source, info.outputPath(`${label}${suffix}.png`));
       copyFileSync(source.replace(/\.png$/, ".comparison.json"), info.outputPath(`${label}${suffix}.comparison.json`));

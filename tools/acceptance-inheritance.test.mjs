@@ -389,7 +389,7 @@ test("given a newly generated sheet frame differs while native captures match, w
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-for (const scenario of ["adjacent", "overlay", "welcome", "format", "background", "pseudo"]) {
+for (const scenario of ["adjacent", "overlay", "welcome", "format", "background", "pseudo", "numeric-label", "date-label"]) {
   test(`given real producer output with a static ${scenario} change, when native evidence is compared, then it cannot inherit a clean verdict`, { skip }, () => {
     // given
     const root = mkdtempSync(join(tmpdir(), "sheet-inheritance-static-rejection-"));

@@ -10,6 +10,8 @@ const cases = [
   { key: "welcome", situation: "changed ordinary welcome text", previous: "Welcome everyone", current: "Welcome visitors" },
   { key: "format", situation: "a changed date presentation format", previous: "28.10.2026", current: "10/28/2026" },
   { key: "background", situation: "a changed ancestor background behind a date", previous: "28.10.2026", current: "29.10.2026" },
+  { key: "date-label", situation: "a changed date-shaped booking card label in usage", previous: "28.10.2026", current: "29.10.2026" },
+  { key: "numeric-label", situation: "a changed numeric booking card label in usage", previous: "1", current: "2" },
   { key: "pseudo", situation: "a changed generated badge partly covering a date", previous: "28.10.2026", current: "29.10.2026" }
 ];
 
@@ -22,7 +24,7 @@ for (const fixture of cases) {
       body { min-height:800px;margin:8px;font:16px/24px Capture; }
       [data-testid="rejection-value"] { position:absolute;left:40px;top:60px;margin:0; }
       [data-testid="pseudo-badge"]::before { content:"";position:absolute;left:var(--left);top:var(--top);width:8px;height:var(--height);background:var(--color);pointer-events:none;z-index:2; }
-      </style></head><body><h1>Comparison</h1><div data-testid="paint"><p data-testid="rejection-value">${fixture.previous}</p></div>
+      </style></head><body><h1>Comparison</h1><div data-testid="paint">${["numeric-label", "date-label"].includes(fixture.key) ? '<div data-testid="usage-report"><div data-testid="usage-cancelled-card-label">' : ""}<p data-testid="rejection-value">${fixture.previous}</p>${["numeric-label", "date-label"].includes(fixture.key) ? "</div></div>" : ""}</div>
       ${fixture.key === "overlay" ? '<div data-testid="badge"></div>' : ""}
       ${fixture.key === "pseudo" ? '<div data-testid="pseudo-badge" style="display:contents"></div>' : ""}</body></html>`;
     await page.goto(`data:text/html,${encodeURIComponent(html)}`);
@@ -73,7 +75,7 @@ for (const fixture of cases) {
     // then
     await expect(page.getByTestId("rejection-value")).toHaveText(fixture.current);
     expect(images[0].equals(images[1]), "the native pair includes the actual changed text or badge pixels").toBe(false);
-    if (["overlay", "welcome", "pseudo"].includes(fixture.key)) for (const record of records) {
+    if (["overlay", "welcome", "pseudo", "numeric-label", "date-label"].includes(fixture.key)) for (const record of records) {
       expect(record.masks, "static welcome text and partially covered dates remain unmasked in both image modes").toHaveLength(0);
     }
   });
