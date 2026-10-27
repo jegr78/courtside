@@ -6,6 +6,7 @@ let resized: (() => void) | undefined;
 const disconnect = vi.fn();
 
 beforeEach(() => {
+  vi.useFakeTimers();
   vi.stubGlobal("ResizeObserver", class {
     constructor(callback: () => void) { resized = callback; }
     observe() {}
@@ -15,6 +16,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.useRealTimers();
   disconnect.mockClear();
   resized = undefined;
 });
@@ -31,7 +33,7 @@ it("given a form taller than its dialog, when the body is laid out, then a signa
   laidOut(screen.getByTestId("dialog-body"), { scrollHeight: 564, clientHeight: 276, scrollTop: 0 });
 
   // when
-  act(() => resized?.());
+  act(() => { resized?.(); vi.advanceTimersToNextFrame(); });
 
   // then
   expect(screen.getByTestId("dialog-body"), "overflow softens the clipped text edge").toHaveAttribute("data-continues", "true");
@@ -43,7 +45,7 @@ it("given a form taller than its dialog, when the member scrolls to its end, the
   render(<DialogBody><input /></DialogBody>);
   const body = screen.getByTestId("dialog-body");
   laidOut(body, { scrollHeight: 564, clientHeight: 276, scrollTop: 0 });
-  act(() => resized?.());
+  act(() => { resized?.(); vi.advanceTimersToNextFrame(); });
 
   // when
   laidOut(body, { scrollHeight: 564, clientHeight: 276, scrollTop: 288 });
@@ -60,7 +62,7 @@ it("given a form that fits its dialog, when the body is laid out, then no signal
   laidOut(screen.getByTestId("dialog-body"), { scrollHeight: 276, clientHeight: 276, scrollTop: 0 });
 
   // when
-  act(() => resized?.());
+  act(() => { resized?.(); vi.advanceTimersToNextFrame(); });
 
   // then
   expect(screen.queryByTestId("dialog-continues"), "a form that fits needs no signal").toBeNull();
@@ -71,7 +73,7 @@ it("given a form scrolled to within a fraction of a pixel of its end, when it sc
   render(<DialogBody><input /></DialogBody>);
   const body = screen.getByTestId("dialog-body");
   laidOut(body, { scrollHeight: 564, clientHeight: 276, scrollTop: 0 });
-  act(() => resized?.());
+  act(() => { resized?.(); vi.advanceTimersToNextFrame(); });
 
   // when
   laidOut(body, { scrollHeight: 564, clientHeight: 276, scrollTop: 287.5 });

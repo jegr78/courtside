@@ -171,3 +171,128 @@ it.each([
   // then
   expect(body.scrollTop).toBe(expected);
 });
+
+it("given a resized page, when its observer delivers, then the navigation frame changes outside that delivery", () => {
+  // given
+  vi.useFakeTimers();
+  const callbacks: (() => void)[] = [];
+  vi.stubGlobal("ResizeObserver", class {
+    constructor(callback: () => void) { callbacks.push(callback); }
+    observe() {}
+    disconnect() {}
+  });
+  try {
+    window.innerHeight = 800;
+    Object.defineProperty(window, "scrollY", { configurable: true, value: 0 });
+    show("/admin/facility");
+    const shell = screen.getByTestId("admin-shell");
+    const frame = screen.getByTestId("admin-navigation-frame");
+    vi.spyOn(shell, "getBoundingClientRect").mockReturnValue({ top: 150 } as DOMRect);
+    vi.spyOn(screen.getByTestId("a-page"), "getBoundingClientRect").mockReturnValue({ bottom: 300 } as DOMRect);
+    const before = frame.style.getPropertyValue("--admin-navigation-room");
+    // when
+    act(() => callbacks.forEach((deliver) => deliver()));
+    // then
+    expect(frame.style.getPropertyValue("--admin-navigation-room")).toBe(before);
+    // when
+    act(() => { vi.advanceTimersToNextFrame(); });
+    // then
+    expect(frame.style.getPropertyValue("--admin-navigation-room")).toBe("650px");
+  } finally {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  }
+});
+
+it("given clipped navigation entries, when their observer delivers, then shortening waits until after that delivery", () => {
+  // given
+  vi.useFakeTimers();
+  const callbacks: (() => void)[] = [];
+  vi.stubGlobal("ResizeObserver", class {
+    constructor(callback: () => void) { callbacks.push(callback); }
+    observe() {}
+    disconnect() {}
+  });
+  try {
+    show("/admin/facility");
+    const body = screen.getByTestId("admin-navigation-scroll");
+    const entries = [...body.querySelectorAll<HTMLElement>("a, p")];
+    entries[11].setAttribute("aria-current", "page");
+    layOut(body, { top: 100, height: 200 }, entries.length * 32);
+    // when
+    act(() => callbacks.forEach((deliver) => deliver()));
+    // then
+    expect(body.style.maxHeight).toBe("");
+    // when
+    act(() => { vi.advanceTimersToNextFrame(); });
+    // then
+    expect(body.style.maxHeight).toBe(`${11 * 32 + 28 - 6 * 32}px`);
+  } finally {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  }
+});
+
+it("given navigation with a pending resize, when the member scrolls before its scroll event arrives, then layout keeps that position", () => {
+  // given
+  vi.useFakeTimers();
+  const callbacks: (() => void)[] = [];
+  vi.stubGlobal("ResizeObserver", class {
+    constructor(callback: () => void) { callbacks.push(callback); }
+    observe() {}
+    disconnect() {}
+  });
+  try {
+    show("/admin/facility");
+    const body = screen.getByTestId("admin-navigation-scroll");
+    const entries = [...body.querySelectorAll<HTMLElement>("a, p")];
+    entries[11].setAttribute("aria-current", "page");
+    layOut(body, { top: 100, height: 200 }, entries.length * 32);
+    act(() => { window.dispatchEvent(new Event("resize")); });
+    expect(body.scrollTop).toBeGreaterThan(0);
+    act(() => callbacks.forEach((deliver) => deliver()));
+    // when
+    body.scrollTop = 0;
+    act(() => { vi.advanceTimersToNextFrame(); });
+    // then
+    expect(body.scrollTop, "a queued layout must not undo scrolling before the scroll event is delivered").toBe(0);
+    expect(screen.queryByTestId("admin-sidebar-precedes")).not.toBeInTheDocument();
+  } finally {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  }
+});
+
+it("given navigation following its active entry, when growing content clamps its scroll position, then shrinking the frame still reveals that entry", () => {
+  // given
+  vi.useFakeTimers();
+  const callbacks: (() => void)[] = [];
+  vi.stubGlobal("ResizeObserver", class {
+    constructor(callback: () => void) { callbacks.push(callback); }
+    observe() {}
+    disconnect() {}
+  });
+  try {
+    show("/admin/facility");
+    const body = screen.getByTestId("admin-navigation-scroll");
+    const entries = [...body.querySelectorAll<HTMLElement>("a, p")];
+    entries[11].setAttribute("aria-current", "page");
+    const frame = { top: 100, height: 200 };
+    layOut(body, frame, entries.length * 32);
+    act(() => { window.dispatchEvent(new Event("resize")); });
+    expect(body.scrollTop).toBeGreaterThan(0);
+    // when
+    frame.height = entries.length * 32 + 100;
+    body.style.maxHeight = "";
+    body.scrollTop = 0;
+    fireEvent.scroll(body);
+    frame.height = 200;
+    act(() => callbacks.forEach((deliver) => deliver()));
+    act(() => { vi.advanceTimersToNextFrame(); });
+    // then
+    expect(body.scrollTop, "automatic clamping must not cancel following the active entry").toBe(6 * 32);
+  } finally {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  }
+});

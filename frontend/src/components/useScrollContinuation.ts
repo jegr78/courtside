@@ -1,4 +1,5 @@
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
+import { observeResize } from "./observeResize";
 
 export function useScrollContinuation(active = true, destination?: string) {
   const body = useRef<HTMLDivElement>(null);
@@ -19,7 +20,10 @@ export function useScrollContinuation(active = true, destination?: string) {
   }, [active]);
 
   const scrolled = useCallback(() => {
-    if (body.current && Math.abs(body.current.scrollTop - placed.current) >= 1) following.current = false;
+    if (body.current) {
+      if (movedFrom(body.current, placed.current)) following.current = false;
+      placed.current = body.current.scrollTop;
+    }
     measure();
   }, [measure]);
 
@@ -36,16 +40,17 @@ export function useScrollContinuation(active = true, destination?: string) {
       }
       measure();
     };
-    laidOut.current = layout;
+    const resized = () => {
+      if (body.current && movedFrom(body.current, placed.current)) following.current = false;
+      layout();
+    };
+    laidOut.current = resized;
     layout();
-    const observer = typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(layout);
-    if (body.current) observer?.observe(body.current);
-    if (body.current?.parentElement) observer?.observe(body.current.parentElement);
-    if (content.current) observer?.observe(content.current);
+    const disconnect = observeResize(resized, [body.current, body.current?.parentElement ?? null, content.current]);
     window.addEventListener("resize", layout);
     return () => {
       laidOut.current = undefined;
-      observer?.disconnect();
+      disconnect();
       window.removeEventListener("resize", layout);
     };
   }, [active, destination, measure]);
@@ -53,6 +58,11 @@ export function useScrollContinuation(active = true, destination?: string) {
   const relayout = useCallback(() => laidOut.current?.(), []);
 
   return { body, content, continues, precedes, overflows, measure: scrolled, relayout };
+}
+
+function movedFrom(element: HTMLElement, placed: number) {
+  const expected = Math.min(placed, Math.max(0, element.scrollHeight - element.clientHeight));
+  return Math.abs(element.scrollTop - expected) >= 1;
 }
 
 function reveal(element: HTMLElement) {
