@@ -19,7 +19,7 @@ export function MfaSettings({ username, pending, run, signedOut }: {
 }) {
   const { t } = useTranslation();
   const owner = useContext(ProofOwnerContext);
-  const keyLifetime = useRef(new AbortController());
+  const accountLifetime = useRef(new AbortController());
   const [status, setStatus] = useState<MfaStatus>();
   const [failure, setFailure] = useState<string>();
   const [loadVersion, setLoadVersion] = useState(0);
@@ -30,14 +30,14 @@ export function MfaSettings({ username, pending, run, signedOut }: {
   useEffect(() => {
     let active = true;
     const controller = new AbortController();
-    void api.ownMfa(AbortSignal.any([controller.signal, keyLifetime.current.signal])).then((value) => { if (active) { setStatus(value); setFailure(undefined); } })
+    void api.ownMfa(AbortSignal.any([controller.signal, accountLifetime.current.signal])).then((value) => { if (active) { setStatus(value); setFailure(undefined); } })
       .catch((error) => { if (active) setFailure(problemMessage(error, t)); });
     return () => { active = false; controller.abort(); };
   }, [t, loadVersion, owner, username]);
 
   useLayoutEffect(() => {
     const lifetime = new AbortController();
-    keyLifetime.current = lifetime;
+    accountLifetime.current = lifetime;
     const cancel = (event: KeyboardEvent) => { if (event.key === "Escape") keyAttempt.current?.abort(); };
     window.addEventListener("keydown", cancel);
     return () => { lifetime.abort(); window.removeEventListener("keydown", cancel); keyAttempt.current?.abort(); keyAttempt.current = undefined; };
@@ -48,7 +48,7 @@ export function MfaSettings({ username, pending, run, signedOut }: {
     const label = new FormData(event.currentTarget).get("mfa-key-label");
     if (typeof label !== "string" || !label.trim() || keyAttempt.current) return;
     let result: MfaRecoveryCodeSet;
-    const actorSignal = keyLifetime.current.signal;
+    const actorSignal = accountLifetime.current.signal;
     return run(async (proofSignal) => {
       const controller = new AbortController();
       keyAttempt.current = controller;
@@ -81,22 +81,25 @@ export function MfaSettings({ username, pending, run, signedOut }: {
     event.preventDefault();
     const label = new FormData(event.currentTarget).get("device-label");
     if (typeof label !== "string" || !label.trim()) return;
-    void mutateKey((signal) => api.renameWebauthn(id, label.trim(), signal));
+    void mutate((signal) => api.renameWebauthn(id, label.trim(), signal));
   }
 
-  function mutateKey(action: (signal: AbortSignal) => Promise<void>) {
-    const signal = keyLifetime.current.signal;
-    return run(() => action(signal), signedOut);
+  function mutate(action: (signal: AbortSignal) => Promise<void>) {
+    const signal = accountLifetime.current.signal;
+    return run(async () => { await abortable(() => action(signal), signal); signal.throwIfAborted(); }, () => { if (!signal.aborted) signedOut(); });
   }
 
   function begin() {
     let next: TotpEnrollment;
-    return run(async () => { next = await api.beginTotpEnrollment(); }, () => setEnrollment(next));
+    const signal = accountLifetime.current.signal;
+    return run(async () => { next = await abortable(() => api.beginTotpEnrollment(signal), signal); signal.throwIfAborted(); }, () => { if (!signal.aborted) setEnrollment(next); });
   }
 
-  function changed(action: () => Promise<MfaRecoveryCodeSet>) {
+  function changed(action: (signal: AbortSignal) => Promise<MfaRecoveryCodeSet>) {
     let result: MfaRecoveryCodeSet;
-    return run(async () => { result = await action(); }, () => {
+    const signal = accountLifetime.current.signal;
+    return run(async () => { result = await abortable(() => action(signal), signal); signal.throwIfAborted(); }, () => {
+      if (signal.aborted) return;
       if (result.codes.length) showRecoveryCodes(result.codes, username);
       setEnrollment(undefined);
       signedOut(result.codes.length > 0);
@@ -106,7 +109,7 @@ export function MfaSettings({ username, pending, run, signedOut }: {
   function confirm(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const code = new FormData(event.currentTarget).get("totp-confirmation-code");
-    if (typeof code === "string") void changed(() => api.confirmTotpEnrollment(code));
+    if (typeof code === "string") void changed((signal) => api.confirmTotpEnrollment(code, signal));
   }
 
   return <section data-testid="mfa-settings" className="grid gap-4">
@@ -119,10 +122,10 @@ export function MfaSettings({ username, pending, run, signedOut }: {
       {status.enabled && <p data-testid="mfa-recovery-remaining">{t("mfa.remaining", { count: status.recoveryCodesRemaining })}</p>}
       {!enrollment && <div className="flex flex-wrap gap-3">
         <Button variant="secondary" type="button" data-testid="mfa-enroll-totp" disabled={pending} onClick={() => void begin()}>{t(status.totpEnabled ? "mfa.replaceTotp" : "mfa.enrollTotp")}</Button>
-        {status.totpEnabled && <Button variant="destructive" type="button" data-testid="mfa-remove-totp" disabled={pending} onClick={() => void run(api.removeTotp, signedOut)}>{t("mfa.removeTotp")}</Button>}
+        {status.totpEnabled && <Button variant="destructive" type="button" data-testid="mfa-remove-totp" disabled={pending} onClick={() => void mutate(api.removeTotp)}>{t("mfa.removeTotp")}</Button>}
         {status.enabled && <>
           <Button variant="secondary" type="button" data-testid="mfa-replace-recovery" disabled={pending} onClick={() => void changed(api.replaceRecoveryCodes)}>{t("mfa.replaceRecovery")}</Button>
-          <Button variant="destructive" type="button" data-testid="mfa-disable" disabled={pending} onClick={() => void run(api.disableMfa, signedOut)}>{t("mfa.disable")}</Button>
+          <Button variant="destructive" type="button" data-testid="mfa-disable" disabled={pending} onClick={() => void mutate(api.disableMfa)}>{t("mfa.disable")}</Button>
         </>}
       </div>}
     </>}
@@ -133,7 +136,7 @@ export function MfaSettings({ username, pending, run, signedOut }: {
         <TextField id={`mfa-device-${device.id}`} name="device-label" data-testid={`mfa-device-label-${device.id}`} label={t("mfa.keyLabel")} defaultValue={device.label} maxLength={100} required disabled={pending || keyPending} />
         <div className="flex flex-wrap gap-3">
           <Button variant="secondary" type="submit" data-testid={`mfa-device-rename-${device.id}`} disabled={pending || keyPending}>{t("mfa.keyRename")}</Button>
-          <Button variant="destructive" type="button" data-testid={`mfa-device-remove-${device.id}`} disabled={pending || keyPending} onClick={() => void mutateKey((signal) => api.removeWebauthn(device.id, signal))}>{t("mfa.keyRemove")}</Button>
+          <Button variant="destructive" type="button" data-testid={`mfa-device-remove-${device.id}`} disabled={pending || keyPending} onClick={() => void mutate((signal) => api.removeWebauthn(device.id, signal))}>{t("mfa.keyRemove")}</Button>
         </div>
       </form>)}
       {status.webauthnAvailable && supportsSecurityKeys() ? <form className="grid gap-3" onSubmit={(event) => void registerKey(event)}>

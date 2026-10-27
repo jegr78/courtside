@@ -71,7 +71,7 @@ it("given confirmed enrollment, when sessions end, then codes remain until the h
   await userEvent.keyboard("{Escape}");
   // then
   expect(screen.getByTestId("mfa-recovery-codes")).toHaveTextContent("ABCD-EFGH-IJKL-MNOP-QRST-UVWX");
-  expect(confirm).toHaveBeenCalledWith("123456");
+  expect(confirm).toHaveBeenCalledWith("123456", expect.any(AbortSignal));
   expect(JSON.stringify(storage.mock.calls)).not.toContain("ABCD-EFGH");
   await userEvent.click(screen.getByTestId("mfa-codes-saved"));
   expect(screen.queryByTestId("mfa-recovery-codes")).toBeNull();

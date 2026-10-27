@@ -410,13 +410,13 @@ export const api = {
     method: "POST", signal, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username, code, password })
   }),
   ownMfa: (signal?: AbortSignal) => request<MfaStatus>("/api/account/mfa", { signal }),
-  beginTotpEnrollment: () => request<TotpEnrollment>("/api/account/mfa/totp", { method: "POST" }),
-  confirmTotpEnrollment: (code: string) => request<MfaRecoveryCodeSet>("/api/account/mfa/totp/confirmation", {
-    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code })
+  beginTotpEnrollment: (signal?: AbortSignal) => request<TotpEnrollment>("/api/account/mfa/totp", { method: "POST", signal }),
+  confirmTotpEnrollment: (code: string, signal?: AbortSignal) => request<MfaRecoveryCodeSet>("/api/account/mfa/totp/confirmation", {
+    method: "POST", signal, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code })
   }, true, true),
-  replaceRecoveryCodes: () => request<MfaRecoveryCodeSet>("/api/account/mfa/recovery-codes", { method: "POST" }, true, true),
-  removeTotp: () => request<void>("/api/account/mfa/totp", { method: "DELETE" }, true, true),
-  disableMfa: () => request<void>("/api/account/mfa", { method: "DELETE" }, true, true),
+  replaceRecoveryCodes: (signal?: AbortSignal) => request<MfaRecoveryCodeSet>("/api/account/mfa/recovery-codes", { method: "POST", signal }, true, true),
+  removeTotp: (signal?: AbortSignal) => request<void>("/api/account/mfa/totp", { method: "DELETE", signal }, true, true),
+  disableMfa: (signal?: AbortSignal) => request<void>("/api/account/mfa", { method: "DELETE", signal }, true, true),
   completeMfaLogin: (code: string, signal?: AbortSignal) => request<void>("/api/session/mfa", {
     method: "POST", signal, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code })
   }, false, true),
