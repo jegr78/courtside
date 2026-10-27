@@ -259,8 +259,8 @@ and which nothing ever checked against a key.
 The standalone workflow also retains the schema-validated passive deployment record. It contains fixed route templates, scanner rule IDs and normalized observations. Raw scanner responses and authenticated evidence stay private and are not uploaded.
 
 What remains is what a reader can act on. The manifests and summaries carry the candidate digest,
-the source commit, the target identity and the normalized outcome, and GitHub artifact attestation
-covers them, so their provenance is still provable:
+the source commit, the target identity and the normalized outcome. GitHub artifact attestation
+covers the manifests, so their provenance is still provable:
 
 ```bash
 gh attestation verify manifest.json --repo jegr78/courtside

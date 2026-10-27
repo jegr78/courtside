@@ -740,16 +740,11 @@ test("given an alert nothing has classified, when building evidence, then the ru
   assert.equal(evidence.outcome, "incomplete");
 });
 
-const acceptedDirectives = ["connect-src", "font-src", "form-action", "frame-src", "img-src",
-  "manifest-src", "media-src", "object-src", "script-src", "style-src", "worker-src"];
+const acceptedDirectives = ["default-src", "img-src", "style-src"];
 const acceptedOccurrences = 5;
 const acceptedWordings = [
   (directives) => `The following directives either allow wildcard sources (or ancestors), are not defined,`
-    + ` or are overly broadly defined:\n${directives.join("\n")}`,
-  (directives) => `The directive(s): ${directives.join(", ")} is/are among the directives that do not`
-    + " fallback to default-src.",
-  () => "script-src includes unsafe-inline.",
-  () => "style-src includes unsafe-inline."
+    + ` or are overly broadly defined:\n${directives.join("\n")}`
 ];
 const policyAlert = (directives, riskcode = "2", occurrences = acceptedOccurrences) => ({
   pluginid: "10055", riskcode, confidence: "3",
@@ -763,7 +758,7 @@ test("given an alert an unexpired acceptance covers, when building evidence, the
   const alerts = [policyAlert(acceptedDirectives)];
 
   // when
-  const evidence = evidenceFor(alerts, "2026-09-10");
+  const evidence = evidenceFor(alerts, "2026-10-27");
 
   // then
   assert.equal(evidence.zap.alerts[0].state, "accepted-risk");
@@ -776,7 +771,7 @@ test("given the same rule reports a louder risk, when building evidence, then th
   const alerts = [policyAlert(acceptedDirectives, "3")];
 
   // when
-  const evidence = evidenceFor(alerts, "2026-09-10");
+  const evidence = evidenceFor(alerts, "2026-10-27");
 
   // then
   assert.equal(evidence.zap.alerts[0].state, "candidate");
@@ -791,7 +786,7 @@ test("given the same rule reports something else, when building evidence, then t
       otherinfo: "The following pattern was used: \\bSELECT\\b and it matched secret-like text." }] }];
 
     // when
-    const evidence = evidenceFor(alerts, "2026-09-10");
+    const evidence = evidenceFor(alerts, "2026-10-27");
 
     // then — the disposed alert on this route matched the word query, and this one does not
     assert.equal(evidence.zap.alerts[0].state, "candidate");
@@ -840,7 +835,7 @@ test("given a record whose own rule and route miss its fingerprint, when it is m
 
 test("given a back-dated evidence file, when it is validated, then its own day cannot revive an expiry", () => {
   // given — an artefact claiming it was read before the acceptance was written
-  const evidence = evidenceFor([policyAlert(acceptedDirectives)], "2026-09-10");
+  const evidence = evidenceFor([policyAlert(acceptedDirectives)], "2026-10-27");
   evidence.readOn = "2020-01-01";
 
   // when / then — the record it used is newer than the day it claims, which no clock can produce
@@ -857,7 +852,7 @@ test("given resolved alerts beside an open one, when the summary is written, the
   () => {
     // given
     const evidence = evidenceFor([policyAlert(acceptedDirectives), cookieAlert("/font-licenses.txt")],
-      "2026-09-10");
+      "2026-10-27");
 
     // when / then — alerts.length was the candidate count until a record could resolve one
     assert.equal(openCandidateCount(evidence), 1);
@@ -887,7 +882,7 @@ test("given evidence rewording a disposition it did record, when it is validated
 
 test("given evidence rewording an acceptance it did record, when it is validated, then it fails closed", () => {
   // given — the acceptance the evidence publishes has to be the one the record resolved it against
-  const evidence = evidenceFor([policyAlert(acceptedDirectives)], "2026-09-10");
+  const evidence = evidenceFor([policyAlert(acceptedDirectives)], "2026-10-27");
   assert.equal(evidence.zap.alerts[0].state, "accepted-risk");
   evidence.zap.alerts[0].acceptance = { id: "forged-acceptance-id" };
 
@@ -906,6 +901,22 @@ const acceptedAlert = (overrides = {}) => {
 };
 const acceptanceMap = () => new Map(acceptances.map((entry) => [entry.id, entry]));
 
+test("given the hosted passive policy observation, when matching its reviewed disposition, then only that exact observation is covered", () => {
+  // given
+  const observation = { kind: "policy-directive", headerName: "content-security-policy",
+    directives: ["default-src", "img-src", "style-src"], templates: ["wildcard"] };
+  const alert = acceptedAlert({ ruleEvidence: observation });
+
+  // when / then
+  assert.equal(recordCovers(acceptedRecord(), alert), true);
+  assert.equal(recordCovers(acceptedRecord(), { ...alert, ruleEvidence: {
+    ...observation, directives: [...observation.directives, "script-src"].toSorted()
+  } }), false);
+  assert.equal(recordCovers(acceptedRecord(), { ...alert, ruleEvidence: {
+    ...observation, templates: [...observation.templates, "scriptsrc.unsafe"].toSorted()
+  } }), false);
+});
+
 test("given the rule reports a different confidence, when it is matched, then the record covers nothing", () => {
   // given — a rule that grows more certain about the same route is saying something new
   const record = acceptedRecord();
@@ -920,7 +931,7 @@ test("given a record naming an acceptance nobody wrote, when it is resolved, the
   const record = { ...acceptedRecord(), acceptanceId: "no-such-acceptance-2026" };
 
   // when
-  const resolved = resolveAlertAgainst([record], acceptanceMap(), acceptedAlert(), "2026-09-10");
+  const resolved = resolveAlertAgainst([record], acceptanceMap(), acceptedAlert(), "2026-10-27");
 
   // then
   assert.deepEqual(resolved, { state: "candidate" });
@@ -932,7 +943,7 @@ test("given an acceptance written about another alert, when it is resolved, then
 
   // when
   const resolved = resolveAlertAgainst([acceptedRecord()], new Map(foreign.map((e) => [e.id, e])),
-    acceptedAlert(), "2026-09-10");
+    acceptedAlert(), "2026-10-27");
 
   // then
   assert.deepEqual(resolved, { state: "candidate" });
@@ -980,7 +991,7 @@ test("given a second wording merged into an accepted alert, when building eviden
       otherinfo: "The header X-WebKit-CSP was found on this response." }] }];
 
   // when
-  const evidence = evidenceFor(alerts, "2026-09-10");
+  const evidence = evidenceFor(alerts, "2026-10-27");
 
   // then
   assert.deepEqual(evidence.zap.alerts[0].ruleEvidence.directives, acceptedDirectives);
@@ -1000,7 +1011,7 @@ test("given a second asset matching the same pattern, when building evidence, th
     ] }];
 
   // when
-  const evidence = evidenceFor(alerts, "2026-09-10");
+  const evidence = evidenceFor(alerts, "2026-10-27");
 
   // then — the pattern set is unchanged, so the record that read this pattern still resolves it
   assert.deepEqual(evidence.zap.alerts[0].ruleEvidence.matches.map(({ patternId }) => patternId),
