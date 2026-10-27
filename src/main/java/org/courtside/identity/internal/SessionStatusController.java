@@ -20,6 +20,7 @@ class SessionStatusController implements SessionStatusApi {
     private final CurrentUser currentUser;
     private final AppointmentAccess appointmentAccess;
     private final MfaTotpRepository totp;
+    private final MfaFactors factors;
 
     @Override
     public ResponseEntity<ApiSessionStatus> getSessionStatus() {
@@ -39,6 +40,8 @@ class SessionStatusController implements SessionStatusApi {
                 .firstName(account.getPerson().getFirstName())
                 .lastName(account.getPerson().getLastName())
                 .locale(account.getLocale())
+                .mfaEnabled(factors.enabled(account.getId()))
+                .totpAvailable(totp.enabled(account.getId()))
                 .managesAppointments(reach.managesAppointments())
                 .createsSeries(reach.createsSeries());
     }

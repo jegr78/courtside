@@ -82,7 +82,8 @@ class MfaLoginTest extends AbstractIntegrationTest {
         // then
         assertThat(full.getId()).isNotEqualTo(pending.getId());
         mvc.perform(get("/api/session").session(full)).andExpect(status().isOk())
-                .andExpect(jsonPath("$.authenticated").value(true)).andExpect(jsonPath("$.username").value("doe.jane"));
+                .andExpect(jsonPath("$.authenticated").value(true)).andExpect(jsonPath("$.username").value("doe.jane"))
+                .andExpect(jsonPath("$.mfaEnabled").value(true));
         mvc.perform(get("/api/account/sessions").session(full)).andExpect(status().isOk());
         assertThat(jdbc.sql("SELECT last_login_at FROM user_account WHERE id = :id").param("id", account)
                 .query((rs, row) -> rs.getTimestamp(1).toInstant()).single()).isEqualTo(clock.instant());
@@ -125,7 +126,8 @@ class MfaLoginTest extends AbstractIntegrationTest {
                         .param("username", "doe.jane").param("password", "correct-horse"))
                 .andExpect(status().isOk()).andReturn().getRequest().getSession(false);
         // then
-        mvc.perform(get("/api/session").session(session)).andExpect(jsonPath("$.authenticated").value(true));
+        mvc.perform(get("/api/session").session(session)).andExpect(jsonPath("$.authenticated").value(true))
+                .andExpect(jsonPath("$.mfaEnabled").value(false));
     }
 
     @Test

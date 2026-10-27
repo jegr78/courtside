@@ -390,6 +390,9 @@ components:
         mfaRequired:
           type: boolean
           description: A password was accepted but no account privileges exist until MFA succeeds.
+        mfaEnabled:
+          type: boolean
+          description: Whether this authenticated holder needs a second factor for fresh sensitive-action proof.
         totpAvailable:
           type: boolean
         username:
