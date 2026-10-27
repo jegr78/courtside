@@ -30,8 +30,12 @@ export function collectFindings({ metrics, failures }) {
       add(findingKey.axe(violation.id), { severity: AXE_GRADE[violation.impact] ?? "hint", kind: "accessibility",
         title: `axe ${violation.id} (${violation.impact})`, detail: violation.targets.slice(0, 3).join(" | ") }, where);
     }
+    const observations = [...(row.consoleEvents ?? [])];
     for (const message of row.console.filter((candidate) => !EXPECTED_CONSOLE.some((pattern) => pattern.test(candidate)))) {
-      add(findingKey.console(message), { severity: "minor", kind: "console", title: `Console error: ${normalise(message).slice(0, 140)}`, detail: message.slice(0, 300) }, where);
+      const index = observations.findIndex((event) => event.message === message);
+      const observation = index >= 0 ? observations.splice(index, 1)[0] : null;
+      add(findingKey.console(message), { severity: "minor", kind: "console", title: `Console error: ${normalise(message).slice(0, 140)}`, detail: message.slice(0, 300) },
+        { ...where, ...(observation ? { consoleEvent: observation } : {}) });
     }
     for (const error of row.httpErrors.filter((candidate) => candidate.status >= 500)) {
       add(findingKey.http(error.status, error.url), { severity: "major", kind: "http", title: `HTTP ${error.status} ${normalise(pathOf(error.url))}`, detail: "" }, where);

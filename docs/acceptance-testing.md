@@ -324,6 +324,41 @@ Every finding in the report carries a stable key: `axe:<rule>`, `console:<digest
 `http:<status>:<path>` or `failure:<file>:<title>:<profile>`. Identifiers, dates and hosts are
 removed before a key is formed, so the same problem keeps its key from run to run.
 
+Browser console errors and page errors also retain `consoleEvents` with the receipt time,
+the operation running when the event arrived, and the stack or source location the browser
+supplied. Capture operations distinguish settling, subject placement, viewport and full-page
+screenshots, scroll restoration, layout measurement and axe. Events outside capture work use
+`journey`. The phase returns to its previous value even when an operation fails.
+
+`browser-events.jsonl` records each event immediately, including events from a capture that fails
+before writing metrics. Source locations omit URL credentials, query strings and fragments;
+inline source bodies are not retained. The harness reads no request bodies or console arguments
+for these diagnostics. Existing run redaction still protects the resulting artifacts. The report
+shows each event's context alongside its finding, without changing the finding key or dismissing
+an error because it occurred during a capture operation. Receipt phase is an observation, not
+proof that the operation caused the error.
+
+The acceptance package's `npm test` runs its Chromium helper tests and the focused WebKit console
+regressions. Run `npm test -- console-context.spec.ts --project chromium` or
+`npm test -- console-context.spec.ts --project webkit-console` for targeted checks.
+The native ResizeObserver-warning case specifically runs in WebKit; Chromium's
+Playwright protocol does not expose that warning as a page error. This distinction changes no
+error filter in the capture helper.
+
+For a bounded WebKit investigation, use the existing private acceptance configuration and password
+environment with a new private run directory, then run from `acceptance/`:
+
+```sh
+node node_modules/@playwright/test/cli.js test --config diagnostics/playwright.config.ts
+```
+
+The probe uses the desktop Safari operator-health view and the iPad appointments view. It repeats
+navigation, viewport screenshot, full-page screenshot, layout measurement and axe three times
+each in isolation. It writes operation boundaries and browser observations to
+`resize-observer-probe.jsonl`. It uses the existing administrator and changes no booking or club
+configuration. Redact the run with the harness's `secureRun` before sharing it. An empty result
+establishes bounded non-reproduction, not the cause of a historical error.
+
 `review.json` in the run directory holds an assessment for each key:
 
 ```json
