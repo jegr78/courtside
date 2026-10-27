@@ -15,6 +15,7 @@ import java.util.UUID;
 class MfaChallenges {
     private final JdbcClient jdbc;
     private final Clock clock;
+    private final CourtsideSessionProperties sessions;
 
     enum Purpose { LOGIN, REAUTHENTICATION, WEBAUTHN_REGISTRATION }
 
@@ -39,6 +40,12 @@ class MfaChallenges {
                 .param("purpose", purpose.name()).param("session", sessionHash)
                 .param("expires", clock.instant().plusSeconds(300).atOffset(ZoneOffset.UTC))
                 .param("payload", payload).update();
+        jdbc.sql("""
+                DELETE FROM mfa_challenge WHERE id IN (
+                    SELECT id FROM mfa_challenge WHERE account_id = :account AND purpose = :purpose
+                    ORDER BY created_seq DESC OFFSET :limit)
+                """).param("account", account).param("purpose", purpose.name())
+                .param("limit", sessions.concurrentLimit()).update();
         return Optional.of(id);
     }
 

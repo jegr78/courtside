@@ -4,6 +4,7 @@ import org.courtside.AbstractIntegrationTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.test.context.TestPropertySource;
 
 import java.time.Clock;
 import java.time.ZoneOffset;
@@ -11,6 +12,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+@TestPropertySource(properties = "courtside.session.concurrent-limit=2")
 class MfaChallengesTest extends AbstractIntegrationTest {
     @Autowired private MfaChallenges challenges;
     @Autowired private JdbcClient jdbc;
@@ -99,5 +101,21 @@ class MfaChallengesTest extends AbstractIntegrationTest {
                 VALUES (:id, :id, :username, 'en', true, true)
                 """).param("id", id).param("username", "mfa." + id).update();
         return id;
+    }
+
+    @Test
+    void givenThePendingSessionLimit_whenIssuingChallengesForMoreBrowsers_thenOnlyTheNewestChallengesRemain() {
+        // given
+        UUID account = account();
+        UUID first = challenges.issue(account, 0, MfaChallenges.Purpose.LOGIN, "one", "").orElseThrow();
+        UUID second = challenges.issue(account, 0, MfaChallenges.Purpose.LOGIN, "two", "").orElseThrow();
+        // when
+        UUID third = challenges.issue(account, 0, MfaChallenges.Purpose.LOGIN, "three", "").orElseThrow();
+        // then
+        assertThat(jdbc.sql("SELECT count(*) FROM mfa_challenge WHERE account_id = :id")
+                .param("id", account).query(Integer.class).single()).isEqualTo(2);
+        assertThat(challenges.attempt(first, account, 0, MfaChallenges.Purpose.LOGIN, "one")).isEmpty();
+        assertThat(challenges.attempt(second, account, 0, MfaChallenges.Purpose.LOGIN, "two")).isPresent();
+        assertThat(challenges.attempt(third, account, 0, MfaChallenges.Purpose.LOGIN, "three")).isPresent();
     }
 }

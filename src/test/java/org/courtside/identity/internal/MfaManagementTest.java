@@ -15,6 +15,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.mock.web.MockHttpSession;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -27,6 +32,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -44,6 +50,7 @@ class MfaManagementTest extends AbstractIntegrationTest {
     @Autowired private JdbcClient jdbc;
     @Autowired private Clock clock;
     @Autowired private ObjectMapper json;
+    @Autowired private MfaManagement management;
     private MockMvc mvc;
     private UUID account;
 
@@ -170,6 +177,33 @@ class MfaManagementTest extends AbstractIntegrationTest {
                         .content("{\"code\":\"" + TotpCodes.code(secret, clock.instant().minusSeconds(30)) + "\"}"))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
         return json.readValue(body, ApiMfaRecoveryCodeSet.class).getCodes();
+    }
+
+    @Test
+    void givenAReusedPrincipalName_whenTheLockedAccountHasAnotherIdentity_thenItCannotReceiveTheFirstHoldersSetup() {
+        // given
+        Person john = people.save(new Person("John", "Roe", "john.roe@example.org"));
+        UserAccount other = new UserAccount(john, "roe.john", passwords.encode("another-password"), Set.of(Role.MEMBER), "en");
+        other.enable();
+        accounts.save(other);
+        var principal = new CourtsideUserDetails(account, other.getUsername(), "unused", true, true,
+                List.of("ROLE_MEMBER"), 0);
+        var security = SecurityContextHolder.createEmptyContext();
+        security.setAuthentication(UsernamePasswordAuthenticationToken.authenticated(principal, null, principal.getAuthorities()));
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.getSession().setAttribute("courtside.authenticated-at", clock.instant().toEpochMilli());
+        var previous = RequestContextHolder.getRequestAttributes();
+        SecurityContextHolder.setContext(security);
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
+        // when / then
+        try {
+            assertThatThrownBy(management::beginTotp).isInstanceOf(MfaProofFailedException.class);
+            assertThat(jdbc.sql("SELECT count(*) FROM account_mfa WHERE account_id = :id")
+                    .param("id", other.getId()).query(Integer.class).single()).isZero();
+        } finally {
+            SecurityContextHolder.clearContext();
+            RequestContextHolder.setRequestAttributes(previous);
+        }
     }
 
     private MockHttpSession complete(String code) throws Exception {

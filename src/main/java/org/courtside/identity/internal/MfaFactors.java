@@ -32,6 +32,9 @@ class MfaFactors {
 
     @Transactional
     Verification verify(UUID account, String code, String address) {
+        if (account == null) throw new IllegalStateException("MFA account is required");
+        if (jdbc.sql("SELECT id FROM user_account WHERE id = :id FOR UPDATE")
+                .param("id", account).query(UUID.class).optional().isEmpty()) return Verification.INVALID;
         String bucket = "mfa:" + account;
         if (attempts.registerCredentialAttempt(bucket, address).isPresent()) return Verification.LIMITED;
         if (!enabled(account) || recoveryPending(account)

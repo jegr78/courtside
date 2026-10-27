@@ -27,6 +27,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -192,6 +193,19 @@ class MfaLoginTest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"code\":\"" + TotpCodes.code(secret, clock.instant()) + "\"}"))
                 .andExpect(status().isOk()).andReturn().getRequest().getSession(false);
+    }
+
+    @Test
+    void givenMfaAndExpiredFullProof_whenChangingThePasswordWithOnlyItsCurrentValue_thenThePasswordStaysUnchanged() throws Exception {
+        // given
+        MockHttpSession session = full(enroll());
+        session.setAttribute("courtside.authenticated-at", clock.instant().minusSeconds(360).toEpochMilli());
+        // when / then
+        mvc.perform(put("/api/account/password").session(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"currentPassword\":\"correct-horse\",\"newPassword\":\"durable-pine-forest-2026\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:recent-authentication-required"));
+        assertThat(passwords.matches("correct-horse", accounts.findById(account).orElseThrow().getPasswordHash())).isTrue();
     }
 
     private byte[] enroll() {

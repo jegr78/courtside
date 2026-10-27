@@ -101,6 +101,7 @@ class MfaManagement {
         var authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !(authentication.getPrincipal() instanceof CourtsideUserDetails user)
                 || !account.isEnabled() || account.isPasswordChangeRequired()
+                || !account.getId().equals(user.accountId())
                 || account.getSecurityEpoch() != user.securityEpoch() || factors.recoveryPending(account.getId())) {
             throw new MfaProofFailedException();
         }

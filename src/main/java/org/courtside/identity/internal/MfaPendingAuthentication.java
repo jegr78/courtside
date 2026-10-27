@@ -3,6 +3,7 @@ package org.courtside.identity.internal;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
 
 import java.io.Serializable;
+import java.security.Principal;
 import java.util.List;
 import java.util.UUID;
 
@@ -18,7 +19,7 @@ final class MfaPendingAuthentication extends AbstractAuthenticationToken {
 
     @Override public Object getCredentials() { return null; }
     @Override public Pending getPrincipal() { return principal; }
-    @Override public String getName() { return ""; }
+    @Override public String getName() { return principal.getName(); }
 
     @Override
     public void setAuthenticated(boolean authenticated) {
@@ -26,5 +27,7 @@ final class MfaPendingAuthentication extends AbstractAuthenticationToken {
         super.setAuthenticated(false);
     }
 
-    record Pending(UUID account, long epoch) implements Serializable { }
+    record Pending(UUID account, long epoch) implements Serializable, Principal {
+        @Override public String getName() { return "mfa-pending:" + account; }
+    }
 }
