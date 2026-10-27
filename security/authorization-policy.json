@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
-  "reviewedAt": "2026-10-21",
+  "reviewedAt": "2026-10-27",
   "purpose": "This is the normative authorization policy for the shipped Courtside API. OpenAPI defines the transport shape; this policy defines who may perform each operation, which resource attributes narrow that permission, and which protected fields each projection may read or write.",
-  "openApiFieldInventorySha256": "b69dc26062b4e902a0f97d0600fd7ebc143b89b1b29d175bbd4c20a2468728ef",
-  "protectedFieldInventorySha256": "986f4786b6d260347b8e21f3a8b68ca4a04580a75cd23738a6a0252da159ed5f",
-  "productionAuthorizationSha256": "3f819cef69715c472230c83fe0994847a62f0822fdb943c4f9bb71714c8bcfc8",
+  "openApiFieldInventorySha256": "f99c57c17fcae16c2323ea4bcd42d0c1c0a546dbf14b7f3317b25d529c206aec",
+  "protectedFieldInventorySha256": "6d8408f4e71ee28dfec6a2dd0483d7973e5271593970c28e71cc76f187474f70",
+  "productionAuthorizationSha256": "8c2d53997fc90d538612a48bb2c7ef79bd73e9a1029c5512ec77f9f1162910b5",
   "ordinaryFields": [
     "Problem.detail",
     "Problem.fieldErrors",
@@ -3993,7 +3993,7 @@
     {
       "id": "own-account-scope",
       "title": "Own account scope",
-      "rule": "The authenticated account identifier selects session, locale, appointment reach, message-choice, channel-choice and notification state; callers cannot supply another account identifier to these operations, and a notification id outside the account answers as not found.",
+      "rule": "The authenticated account identifier selects profile identity, session, locale, appointment reach, message-choice, channel-choice and notification state; callers cannot supply another account identifier to these operations, and a notification id outside the account answers as not found.",
       "attributes": [
         "current-account",
         "session-handle"
@@ -4017,12 +4017,15 @@
       "positiveTests": [
         "src/test/java/org/courtside/identity/AccountSessionLifecycleTest.java#givenTwoActiveSessions_whenOneIsListedAndEnded_thenOnlyPrivacySafeMetadataAndTheOtherRemain",
         "src/test/java/org/courtside/notification/web/NotificationControllerTest.java#givenNotificationsForTwoMembers_whenOneReadsTheCentre_thenOnlyTheirOwnAreServedWithContentAndLink",
-        "src/test/java/org/courtside/identity/SessionAppointmentAccessTest.java#givenACardNamingTheTreasurerOnlyAsManagingRole_whenItReadsTheSession_thenItManagesButCreatesNoSeries"
+        "src/test/java/org/courtside/identity/SessionAppointmentAccessTest.java#givenACardNamingTheTreasurerOnlyAsManagingRole_whenItReadsTheSession_thenItManagesButCreatesNoSeries",
+        "src/test/java/org/courtside/identity/SessionProfileTest.java#givenAnAccountWithAssignedRoles_whenReadingItsSession_thenItsOwnNamePartsAndExactRolesAreReturned"
       ],
       "negativeTests": [
         "src/test/java/org/courtside/identity/internal/AccountSessionServiceTest.java#givenAnUnknownHandle_whenASessionIsEnded_thenNothingIsDeleted",
         "src/test/java/org/courtside/notification/web/NotificationControllerTest.java#givenAnotherMembersNotification_whenAMemberMarksItRead_thenItIsNotFoundAndStaysUnread",
-        "src/test/java/org/courtside/identity/SessionAppointmentAccessTest.java#givenNoActiveCardNamingTheTreasurer_whenItReadsTheSession_thenItNeitherManagesNorCreatesSeries"
+        "src/test/java/org/courtside/identity/SessionAppointmentAccessTest.java#givenNoActiveCardNamingTheTreasurer_whenItReadsTheSession_thenItNeitherManagesNorCreatesSeries",
+        "src/test/java/org/courtside/identity/SessionProfileTest.java#givenNoAccountSession_whenReadingTheSession_thenNoIdentityValuesAreExposed",
+        "src/test/java/org/courtside/identity/SessionProfileTest.java#givenARevokedAccountSession_whenReadingTheSession_thenThePreviousIdentityIsAbsent"
       ]
     },
     {
@@ -4591,6 +4594,8 @@
       "fields": [
         "SessionStatus.username",
         "SessionStatus.displayName",
+        "SessionStatus.firstName",
+        "SessionStatus.lastName",
         "SessionStatus.locale",
         "SessionStatus.roles",
         "SessionStatus.passwordChangeRequired",
