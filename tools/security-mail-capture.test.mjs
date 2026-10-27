@@ -113,10 +113,11 @@ test("given the security mail sink, when reading its deployment, then keep relay
   assert.doesNotMatch(compose.services.app.environment.JAVA_TOOL_OPTIONS, /Xmx|MaxRAMPercentage|mail\.smtp\.ssl\.trust|checkserveridentity=false/);
 });
 
-test("given a locally issued relay certificate, when checking its real TLS peer, then accept the fixture CA and mail hostname and reject a different host", async () => {
+test("given a locally issued dependency certificate, when checking its real TLS peer, then accept both dependency hostnames and reject a different host", async () => {
   // given
   const directory = join(mkdtempSync(join(tmpdir(), "courtside-mail-state-")), "mail");
-  const identity = createSecurityMailCertificate(directory);
+  let identity;
+  assert.doesNotThrow(() => { identity = createSecurityMailCertificate(directory); });
   const certificate = readFileSync(join(directory, "cert.pem"));
   const key = readFileSync(join(directory, "key.pem"));
   const server = createServer({ cert: certificate, key }, (socket) => socket.end());
