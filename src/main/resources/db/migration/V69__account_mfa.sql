@@ -36,6 +36,13 @@ CREATE TABLE mfa_challenge (
 CREATE INDEX mfa_challenge_by_account ON mfa_challenge (account_id);
 CREATE INDEX mfa_challenge_expiry ON mfa_challenge (expires_at);
 
+CREATE TABLE user_entities (
+    id varchar(1000) PRIMARY KEY,
+    account_id uuid UNIQUE REFERENCES user_account (id) ON DELETE CASCADE,
+    name varchar(100) NOT NULL,
+    display_name varchar(200)
+);
+
 ALTER TABLE message_record
     DROP CONSTRAINT message_record_kind_known,
     ADD CONSTRAINT message_record_kind_known CHECK (
