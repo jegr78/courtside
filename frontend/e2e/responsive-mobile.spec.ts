@@ -586,7 +586,7 @@ test("the account menu stays inside the narrowest supported viewport", async ({ 
 
   const controls = [
     ...await panel.locator("label").all(),
-    page.getByTestId("account-security-link"),
+    page.getByTestId("account-link"),
     page.getByTestId("logout")
   ];
   for (const control of controls) {
@@ -598,8 +598,8 @@ test("the account menu stays inside the narrowest supported viewport", async ({ 
   }
 
   // and the account actions remain reachable rather than merely painted inside the viewport
-  await page.getByTestId("account-security-link").tap();
-  await expect(page).toHaveURL(/\/account\/security$/);
+  await page.getByTestId("account-link").tap();
+  await expect(page).toHaveURL(/\/account$/);
   await page.getByTestId("preferences-menu").tap();
   await page.getByTestId("logout").tap();
   await expect(page).toHaveURL(/\/login$/);

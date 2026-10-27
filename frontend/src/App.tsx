@@ -26,7 +26,7 @@ import { LoginView } from "./views/LoginView";
 import { MyBookingsPage } from "./views/MyBookingsPage";
 import { MyMessagesView } from "./views/MyMessagesView";
 import { DependantsView } from "./views/DependantsView";
-import { AccountSecurityView } from "./views/AccountSecurityView";
+import { AccountView } from "./views/AccountView";
 import { warnAbout } from "./api/failureWarning";
 
 const DEFAULT_DOCUMENTATION_URL = "https://jegr78.github.io/courtside/";
@@ -81,8 +81,12 @@ export function AppRoutes({ session, refreshSession, passwordChanged, initialPas
     <Route path="/my-dependants" element={session.authenticated
       ? <DependantsView />
       : signInFirst} />
+    <Route path="/account" element={session.authenticated
+      ? <AccountView key={address.key} session={session} offline={offline} passwordChanged={() => initialPasswordChanged?.()}
+        signedOut={() => signedOut?.()} />
+      : signInFirst} />
     <Route path="/account/security" element={session.authenticated
-      ? <AccountSecurityView passwordChanged={() => initialPasswordChanged?.()}
+      ? <AccountView key={address.key} session={session} offline={offline} focusSecurity passwordChanged={() => initialPasswordChanged?.()}
         signedOut={() => signedOut?.()} />
       : signInFirst} />
     {/* The role is asked once for the whole surface rather than once per destination. */}
@@ -292,7 +296,8 @@ export function App() {
         {club?.logoUrl ? <img src={club.logoUrl} alt="" data-testid="club-logo" className="h-10 w-10 rounded-lg object-contain" /> : <CourtsideMark />}
         <span data-testid="club-brand-name" className="text-xl font-bold">{club?.clubName ?? offlineClub ?? t("app.name")}</span>
       </div>
-      <Preferences authenticated={authenticated} supported={club?.supportedLocales} signedOut={signOut} />
+      <Preferences authenticated={authenticated} username={offline ? undefined : session?.username}
+        supported={club?.supportedLocales} signedOut={signOut} />
     </header>
     <EnvironmentMarker source={source} identityStatus={identityStatus} offline={offline} />
     <main className="flex flex-1 items-start justify-center px-4 py-8">

@@ -342,7 +342,15 @@ Save your choices. They apply to future messages only.
 
 ## Your account
 
-Open *Account security* to manage your password and sessions.
+Your username appears by the *Account and appearance* menu. Open *My account* there.
+The *Profile* section shows your username, separate first and last names and every role the club
+assigned to your account. Even while managing a dependant, this profile describes your own account.
+Courtside shows no unverified account details while offline.
+
+![Your profile with username, separate name fields and assigned roles.](../screenshots/en/account-profile.png)
+
+*Account security* follows the profile, with your password and sessions.
+Existing direct security links still reach that section.
 
 You must enter the current password before changing it. After saving, Courtside ends every session,
 including the one you are using. Sign in with the new password.

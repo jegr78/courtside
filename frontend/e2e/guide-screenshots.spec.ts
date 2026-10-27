@@ -121,9 +121,14 @@ const drivers: Record<string, (page: Page, visualDate: string) => Promise<void>>
     await page.getByTestId("my-messages-link").click();
     await expect(page.getByTestId("my-messages-save")).toBeVisible();
   },
+  "account-profile": async (page) => {
+    await page.getByTestId("preferences-menu").click();
+    await page.getByTestId("account-link").click();
+    await expect(page.getByTestId("account-profile")).toBeVisible();
+  },
   "account-security": async (page) => {
     await page.getByTestId("preferences-menu").click();
-    await page.getByTestId("account-security-link").click();
+    await page.getByTestId("account-link").click();
     await expect(page.getByTestId("current-password")).toBeVisible();
   },
   "admin-navigation": async (page) => {
@@ -358,6 +363,7 @@ test("every surface a member decides about their own account on is captured", as
 
   // when / then
   await capture(page, "notification-choices", journeyService.visualDate);
+  await capture(page, "account-profile", journeyService.visualDate);
   await capture(page, "account-security", journeyService.visualDate);
 });
 

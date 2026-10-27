@@ -62,6 +62,14 @@ explicit browser choice wins over an account locale and persists locally. Theme 
 the same rule, with dark as the initial value. Neither preference depends on translated text or an
 authenticated session.
 
+The account-menu control shows the active username before it opens. Long usernames wrap instead
+of being clipped. My account is its single account destination; Profile appears before Account
+security on the shared page. Existing security links still reach that section directly, with
+scroll and keyboard focus on its heading. The phone's primary navigation gains no destination.
+Profile fields are read-only text with translated assigned roles and an explicit empty-role
+state. Unavailable or offline identity is labelled as unavailable, without inventing name parts
+or displaying the offline booking fallback's synthetic role as an account assignment.
+
 Date and time editors follow the application language even when the browser uses another language.
 Submitted values retain their ISO format. They accept single-digit days, months and hours and
 refuse a two-digit year. An entry that cannot be read never replaces the stored value: the field

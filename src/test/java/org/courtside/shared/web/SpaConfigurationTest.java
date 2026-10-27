@@ -97,11 +97,12 @@ class SpaConfigurationTest extends AbstractIntegrationTest {
                 .andExpect(content().string(SHELL));
     }
 
-    @Test
-    void givenAnAnonymousVisitor_whenOpeningAccountSecurity_thenTheLoginCapableAppShellIsServed()
+    @ParameterizedTest
+    @ValueSource(strings = {"/account", "/account/security"})
+    void givenAnAnonymousVisitor_whenOpeningTheAccountArea_thenTheLoginCapableAppShellIsServed(String path)
             throws Exception {
         // when / then
-        mockMvc.perform(get("/account/security"))
+        mockMvc.perform(get(path))
                 .andExpect(status().isOk())
                 .andExpect(content().contentType("text/html"))
                 .andExpect(content().string(SHELL));

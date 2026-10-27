@@ -34,7 +34,7 @@ const temporary = () => `acceptance-temporary-${randomBytes(9).toString("hex")}`
 
 async function changePassword(page: Page, from: string, to: string) {
   await page.getByTestId("preferences-menu").click();
-  await page.getByTestId("account-security-link").click();
+  await page.getByTestId("account-link").click();
   await expect(page.getByTestId("account-security-view")).toBeVisible();
   await fillSecret(page.getByTestId("current-password"), from);
   await fillSecret(page.getByTestId("new-password"), to);
@@ -69,7 +69,7 @@ test("given the disposable member, when the password is changed and changed back
   try {
     await step("disposable", "security page", async () => {
       await page.getByTestId("preferences-menu").click();
-      await page.getByTestId("account-security-link").click();
+      await page.getByTestId("account-link").click();
       await expect(page.getByTestId("account-security-view")).toBeVisible();
       await capture(page, "account-security");
       await page.goto("/");

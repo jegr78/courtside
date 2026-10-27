@@ -31,6 +31,47 @@ async function openPreferences() {
   await userEvent.click(screen.getByTestId("preferences-menu"));
 }
 
+it("given a verified account, when the closed menu renders, then its visible username is included in the control's accessible name", async () => {
+  // given
+  render(<Preferences authenticated username="doe.jane" signedOut={() => undefined} />);
+
+  // when
+  const control = screen.getByTestId("preferences-menu");
+
+  // then
+  expect(screen.getByTestId("account-identity")).toBeVisible();
+  expect(control).toHaveAccessibleName("Konto und Darstellung doe.jane");
+  await userEvent.click(control);
+  expect(screen.getByTestId("account-link")).toHaveAttribute("href", "/account");
+  expect(screen.getByTestId("account-link")).toHaveTextContent("Mein Konto");
+  expect(screen.queryByTestId("account-security-link")).not.toBeInTheDocument();
+});
+
+it("given account identity changes or disappears, when the menu renders again, then it replaces or removes the previous username", () => {
+  // given
+  const view = render(<Preferences authenticated username="doe.jane" signedOut={() => undefined} />);
+
+  // when
+  view.rerender(<MemoryRouter><Preferences authenticated username="roe.john" signedOut={() => undefined} /></MemoryRouter>);
+
+  // then
+  expect(screen.getByTestId("account-identity")).toHaveTextContent("roe.john");
+  expect(screen.getByTestId("preferences-menu")).not.toHaveTextContent("doe.jane");
+
+  // when
+  view.rerender(<MemoryRouter><Preferences authenticated signedOut={() => undefined} /></MemoryRouter>);
+
+  // then
+  expect(screen.getByTestId("account-identity")).toHaveTextContent("Kontodaten derzeit nicht verfügbar");
+
+  // when
+  view.rerender(<MemoryRouter><Preferences username="roe.john" signedOut={() => undefined} /></MemoryRouter>);
+
+  // then
+  expect(screen.queryByTestId("account-identity")).not.toBeInTheDocument();
+  expect(screen.queryByTestId("account-link")).not.toBeInTheDocument();
+});
+
 it("given preferences chosen once, when the header is shown, then they stay inside a compact account menu", async () => {
   // given
   render(<Preferences authenticated signedOut={() => undefined} />);
@@ -165,7 +206,7 @@ it("given the account refuses the change, when selecting another language, then 
   // when
   await userEvent.selectOptions(document.getElementById("locale-preference")!, "en");
 
-  // then — the page has already switched, so silence would leave the two disagreeing unnoticed
+  // then
   expect(await screen.findByTestId("preferences-failure")).toBeInTheDocument();
   await userEvent.click(screen.getByTestId("preferences-menu"));
   expect(screen.getByTestId("preferences-failure")).toBeVisible();
@@ -213,8 +254,6 @@ it("given an administrator deep in an administrative page, when signing out, the
   expect(signedOut).toHaveBeenCalled();
 });
 
-// Left standing, the panel covers the page it was opened over, and the next click on the control
-// that opens it closes it instead.
 it("given the account menu is open, when signing out succeeds, then the menu closes behind it", async () => {
   // given
   vi.spyOn(api, "logout").mockResolvedValue();
@@ -257,8 +296,6 @@ it("given signing out fails, when it is attempted, then the failure is shown and
   expect(signedOut).not.toHaveBeenCalled();
 });
 
-// Signing out was once answered 401 for a session the instance had already ended, and that answer
-// was swallowed. The instance answers 204 for it now, so a 401 means the sign-out did not happen.
 it("given signing out is refused as unauthenticated, when it is attempted, then it is reported rather than claimed done", async () => {
   // given
   const signedOut = vi.fn();
@@ -297,7 +334,7 @@ it("given a request still in flight, when the session it belongs to ends first, 
   await openPreferences();
   await userEvent.selectOptions(document.getElementById("locale-preference")!, "en");
 
-  // when — another request sees the session end first, so the flip is spent before the refusal lands
+  // when
   rerender(<Preferences authenticated={false} signedOut={() => undefined} />);
   refuse(new Error("network"));
 
