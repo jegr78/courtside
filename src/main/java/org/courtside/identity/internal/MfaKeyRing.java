@@ -27,31 +27,32 @@ import java.util.Set;
 import java.util.UUID;
 
 final class MfaKeyRing {
+    private static final int MAX_FILE_BYTES = 65_536;
     private static final SecureRandom RANDOM = new SecureRandom();
     private static final Base64.Encoder ENCODER = Base64.getUrlEncoder().withoutPadding();
     private static final Base64.Decoder DECODER = Base64.getUrlDecoder();
     private static final Set<PosixFilePermission> OWNER_ONLY = PosixFilePermissions.fromString("rw-------");
     private final Path file;
-    private volatile State state;
-
-    private MfaKeyRing(Path file, State state) {
+    private MfaKeyRing(Path file) {
         this.file = file;
-        this.state = state;
     }
 
     static MfaKeyRing open(Path file, boolean required) {
+        if (file == null) throw failure("MFA key file path is required", null);
         Path location = file.toAbsolutePath().normalize();
         return locked(location, () -> {
             if (!Files.exists(location, LinkOption.NOFOLLOW_LINKS)) {
                 if (required) throw failure("MFA instance key file is missing; restore the matching key material", null);
                 write(location, fresh(Map.of()));
             }
-            return new MfaKeyRing(location, read(location));
+            read(location);
+            return new MfaKeyRing(location);
         });
     }
 
     String encrypt(UUID account, byte[] value) {
-        State current = state;
+        if (account == null || value == null) throw failure("MFA encryption requires an account and value", null);
+        State current = current();
         byte[] nonce = new byte[12];
         RANDOM.nextBytes(nonce);
         try {
@@ -64,10 +65,11 @@ final class MfaKeyRing {
     }
 
     byte[] decrypt(UUID account, String value) {
+        if (account == null || value == null) throw failure("MFA decryption requires an account and value", null);
         try {
             String[] pieces = value.split("\\.", -1);
             if (pieces.length != 3) throw failure("Invalid encrypted MFA data", null);
-            SecretKey key = state.keys().get(pieces[0]);
+            SecretKey key = current().keys().get(pieces[0]);
             if (key == null) throw failure("Encrypted MFA data requires an unavailable instance key", null);
             byte[] nonce = DECODER.decode(pieces[1]);
             if (nonce.length != 12) throw failure("Invalid encrypted MFA nonce", null);
@@ -78,16 +80,19 @@ final class MfaKeyRing {
     }
 
     String activeKeyId() {
-        return state.active();
+        return current().active();
     }
 
     void rotate() {
         locked(file, () -> {
             State next = fresh(read(file).keys());
             write(file, next);
-            state = next;
             return null;
         });
+    }
+
+    private State current() {
+        return locked(file, () -> read(file));
     }
 
     private static Cipher cipher(int mode, SecretKey key, byte[] nonce, UUID account)
@@ -109,7 +114,10 @@ final class MfaKeyRing {
     }
 
     private static State read(Path file) throws IOException {
-        if (!Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS) || Files.size(file) > 65_536
+        if (!Files.exists(file, LinkOption.NOFOLLOW_LINKS)) {
+            throw failure("MFA instance key file is missing; restore the matching key material", null);
+        }
+        if (!Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS) || Files.size(file) > MAX_FILE_BYTES
                 || !OWNER_ONLY.containsAll(Files.getPosixFilePermissions(file))) {
             throw failure("MFA key material must be a private regular file", null);
         }
@@ -142,10 +150,14 @@ final class MfaKeyRing {
         value.keys().forEach((id, key) -> stored.setProperty("key." + id, ENCODER.encodeToString(key.getEncoded())));
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         stored.store(bytes, null);
-        Path temporary = Files.createTempFile(file.getParent(), ".mfa-", ".keys",
-                PosixFilePermissions.asFileAttribute(OWNER_ONLY));
+        if (bytes.size() > MAX_FILE_BYTES) throw failure("MFA key rotation would exceed the key file limit", null);
+        Path temporary = file.resolveSibling(".mfa-" + UUID.randomUUID() + ".keys");
+        boolean created = false;
         try {
-            try (FileChannel channel = FileChannel.open(temporary, StandardOpenOption.WRITE)) {
+            try (FileChannel channel = FileChannel.open(temporary,
+                    Set.of(StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE, LinkOption.NOFOLLOW_LINKS),
+                    PosixFilePermissions.asFileAttribute(OWNER_ONLY))) {
+                created = true;
                 ByteBuffer buffer = ByteBuffer.wrap(bytes.toByteArray());
                 while (buffer.hasRemaining()) channel.write(buffer);
                 channel.force(true);
@@ -155,7 +167,7 @@ final class MfaKeyRing {
                 directory.force(true);
             }
         } finally {
-            Files.deleteIfExists(temporary);
+            if (created) Files.deleteIfExists(temporary);
         }
     }
 
@@ -163,6 +175,8 @@ final class MfaKeyRing {
         try {
             Files.createDirectories(file.getParent(), PosixFilePermissions.asFileAttribute(
                     PosixFilePermissions.fromString("rwx------")));
+            trustedDirectories(file.getParent());
+            trustedDirectories(file.getParent().toRealPath());
             Path lock = file.resolveSibling(file.getFileName() + ".lock");
             try (FileChannel channel = FileChannel.open(lock,
                     Set.of(StandardOpenOption.CREATE, StandardOpenOption.WRITE, LinkOption.NOFOLLOW_LINKS),
@@ -172,6 +186,17 @@ final class MfaKeyRing {
             }
         } catch (IOException exception) {
             throw failure("MFA instance key material cannot be read or persisted", exception);
+        }
+    }
+
+    private static void trustedDirectories(Path directory) throws IOException {
+        for (Path current = directory; current != null; current = current.getParent()) {
+            Set<PosixFilePermission> permissions = Files.getPosixFilePermissions(current);
+            if ((permissions.contains(PosixFilePermission.GROUP_WRITE)
+                    || permissions.contains(PosixFilePermission.OTHERS_WRITE))
+                    && ((int) Files.getAttribute(current, "unix:mode") & 01000) == 0) {
+                throw failure("MFA key directory must not be writable by other users", null);
+            }
         }
     }
 

@@ -14,6 +14,7 @@ import java.nio.file.attribute.PosixFilePermission;
 import java.time.Duration;
 import java.util.Base64;
 import java.util.List;
+import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
@@ -22,6 +23,7 @@ import java.util.concurrent.TimeUnit;
 import static org.awaitility.Awaitility.await;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.catchThrowable;
 
 class MfaKeyRingTest {
@@ -241,6 +243,100 @@ class MfaKeyRingTest {
         assertThatThrownBy(() -> MfaKeyRing.open(link, true))
                 .isInstanceOf(IllegalStateException.class).hasMessageContaining("private regular file");
         assertThat(Files.readString(target)).isEqualTo(original);
+    }
+
+    @Test
+    void givenMissingEncryptionInputs_whenUsingTheKeyRing_thenTheOperationFailsWithoutAnonymousBinding() {
+        // given
+        MfaKeyRing keys = MfaKeyRing.open(temporary.resolve("mfa.keys"), false);
+        String encrypted = keys.encrypt(ACCOUNT, SECRET);
+        // when / then
+        assertThatThrownBy(() -> keys.encrypt(null, SECRET)).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> keys.encrypt(ACCOUNT, null)).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> keys.decrypt(null, encrypted)).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> keys.decrypt(ACCOUNT, null)).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> MfaKeyRing.open(null, false)).isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void givenAKeyRingNearItsReadLimit_whenRotationWouldExceedIt_thenTheOldFileRemainsUsable() throws Exception {
+        // given
+        Path file = temporary.resolve("mfa.keys");
+        MfaKeyRing keys = MfaKeyRing.open(file, false);
+        String encrypted = keys.encrypt(ACCOUNT, SECRET);
+        Properties stored = new Properties();
+        try (var input = Files.newInputStream(file)) { stored.load(input); }
+        String material = stored.getProperty("key." + keys.activeKeyId());
+        StringBuilder contents = new StringBuilder("format=1\nactive=" + keys.activeKeyId() + "\n");
+        contents.append("key.").append(keys.activeKeyId()).append('=').append(material).append('\n');
+        while (contents.length() + 85 < 65_536) {
+            contents.append("key.").append(UUID.randomUUID()).append('=').append(material).append('\n');
+        }
+        Files.writeString(file, contents);
+        // when / then
+        assertThatThrownBy(keys::rotate).isInstanceOf(IllegalStateException.class).hasMessageContaining("MFA");
+        assertThat(Files.readString(file)).isEqualTo(contents.toString());
+        assertThat(MfaKeyRing.open(file, true).decrypt(ACCOUNT, encrypted)).isEqualTo(SECRET);
+    }
+
+    @Test
+    void givenAKeyDirectoryWritableByOtherUsers_whenOpening_thenNoKeyIsCreated() throws Exception {
+        // given
+        Path directory = temporary.resolve("shared");
+        Files.createDirectory(directory);
+        Files.setPosixFilePermissions(directory, java.nio.file.attribute.PosixFilePermissions.fromString("rwxrwxrwx"));
+        Path file = directory.resolve("mfa.keys");
+        // when / then
+        assertThatThrownBy(() -> MfaKeyRing.open(file, false))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("MFA key directory");
+        assertThat(file).doesNotExist();
+    }
+
+    @Test
+    void givenAPrivateKeyDirectoryInsideAnUntrustedParent_whenOpening_thenNoKeyIsCreated() throws Exception {
+        // given
+        Path shared = temporary.resolve("shared");
+        Path directory = shared.resolve("private");
+        Files.createDirectories(directory);
+        Files.setPosixFilePermissions(shared, java.nio.file.attribute.PosixFilePermissions.fromString("rwxrwxrwx"));
+        Files.setPosixFilePermissions(directory, java.nio.file.attribute.PosixFilePermissions.fromString("rwx------"));
+        Path file = directory.resolve("mfa.keys");
+        // when / then
+        assertThatThrownBy(() -> MfaKeyRing.open(file, false))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("MFA key directory");
+        assertThat(file).doesNotExist();
+    }
+
+    @Test
+    void givenTwoOpenKeyRings_whenOneRotates_thenBothUseTheCurrentMaterial() {
+        // given
+        Path file = temporary.resolve("mfa.keys");
+        MfaKeyRing first = MfaKeyRing.open(file, false);
+        MfaKeyRing second = MfaKeyRing.open(file, true);
+        // when
+        second.rotate();
+        String encrypted = second.encrypt(ACCOUNT, SECRET);
+        // then
+        assertThatCode(() -> first.decrypt(ACCOUNT, encrypted)).doesNotThrowAnyException();
+        assertThat(first.decrypt(ACCOUNT, encrypted)).isEqualTo(SECRET);
+        assertThat(first.activeKeyId()).isEqualTo(second.activeKeyId());
+        assertThat(first.encrypt(ACCOUNT, SECRET)).startsWith(second.activeKeyId() + ".");
+    }
+
+    @Test
+    void givenAnOpenKeyRing_whenItsFileIsLost_thenNoOperationUsesStaleMaterial() throws Exception {
+        // given
+        Path file = temporary.resolve("mfa.keys");
+        MfaKeyRing keys = MfaKeyRing.open(file, false);
+        String encrypted = keys.encrypt(ACCOUNT, SECRET);
+        // when
+        Files.delete(file);
+        // then
+        assertThatThrownBy(() -> keys.encrypt(ACCOUNT, SECRET))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("MFA");
+        assertThatThrownBy(() -> keys.decrypt(ACCOUNT, encrypted))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("MFA");
+        assertThat(file).doesNotExist();
     }
 
 }
