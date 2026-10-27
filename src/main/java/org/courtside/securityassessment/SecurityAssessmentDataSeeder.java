@@ -150,10 +150,10 @@ class SecurityAssessmentDataSeeder implements ApplicationRunner {
 
     private void createBookingsAndSeries(List<SecurityIdentity> identities, List<Court> courts) {
         Instant now = clock.instant();
-        LocalDate tomorrow = LocalDate.now(clock.withZone(timeZone.zoneId())).plusDays(1);
+        LocalDate firstBookingDay = LocalDate.now(clock.withZone(timeZone.zoneId())).plusDays(2);
         for (int index = 0; index < SecurityAssessmentDataset.standaloneBookings(); index++) {
             SecurityIdentity owner = identities.get(index);
-            Instant start = ZonedDateTime.of(tomorrow.plusDays(index), LocalTime.of(10, 0),
+            Instant start = ZonedDateTime.of(firstBookingDay.plusDays(index), LocalTime.of(10, 0),
                     timeZone.zoneId()).toInstant();
             Booking booking = new Booking(MEMBER_BOOKING_CARD, owner.account().getId(),
                     "Security assessment booking " + (index + 1), now);
@@ -161,7 +161,7 @@ class SecurityAssessmentDataSeeder implements ApplicationRunner {
             booking.addParticipant(ParticipantSpec.member(owner.person().getId()));
             bookings.save(booking);
         }
-        createSeries(identities.getFirst(), courts.getFirst(), tomorrow.plusWeeks(1), now);
+        createSeries(identities.getFirst(), courts.getFirst(), firstBookingDay.plusWeeks(1), now);
     }
 
     private void createSeries(SecurityIdentity owner, Court court, LocalDate startsOn, Instant now) {
