@@ -36,7 +36,8 @@ import {
 } from "./resource-timeline";
 import { ResourceSampling } from "./resource-sampling";
 import { browserLanguage } from "./browser-language";
-import { deployedMailSinkImage, deployedPostgresImage, deployedProxyImage, PINNED_BROWSER_IMAGE } from "./container-images";
+import { browserSetupImages, deployedMailSinkImage, deployedPostgresImage, deployedProxyImage, PINNED_BROWSER_IMAGE } from "./container-images";
+import { prepareBrowserImages } from "./image-preparation";
 import {
   browserContainerLabels,
   ObservableGenericContainer,
@@ -559,6 +560,7 @@ async function emptyMailbox(mailboxURL: string): Promise<void> {
 }
 
 export async function startJourneyService(): Promise<StartedJourneyService> {
+  await prepareBrowserImages(browserSetupImages());
   const retainReliabilityResources = process.env.COURTSIDE_WEBKIT_RELIABILITY === "true";
   let postgres: StartedTestContainer | undefined;
   let application: ChildProcess | undefined;

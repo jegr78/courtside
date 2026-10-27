@@ -9,6 +9,12 @@ Firefox, iPhone/Safari emulation and Android/Chrome emulation. Emulation exercis
 input and browser-engine behaviour; it is not evidence for operating-system integration or a
 physical device.
 
+Journey startup checks every image from `frontend/e2e/container-images.ts` before creating its
+resources. Cached images need no pull. Each missing image is pulled once with Docker's progress
+output before a browser fixture can start. A daemon inspection error or failed pull stops setup
+with the image name and reason. Hosted image preparation and direct local Playwright runs use
+the same inventory; a cold cache no longer spends an individual test's fixture deadline pulling it.
+
 The application shell is available offline after installation. Booking, account and administration
 operations require the network. The precache holds the member surface and every language bundle,
 but not the administration surface: its chunk loads when an administrator opens it, and the build
