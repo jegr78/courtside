@@ -688,6 +688,10 @@ name fields only for an authenticated account; anonymous and revoked sessions ex
 section. Initial-password requirements and sign-in return targets apply to both routes.
 The identity remains in session memory only. Offline fallback shows unavailable account details
 and never presents its synthetic booking-access role as an actual assignment.
+Pending security continuations belong to the account that started them. An account change
+discards old completions and unsubmitted proof actions. Cancelling a pending proof prevents its
+follow-up action; a server action already submitted still applies its confirmed result to that
+same account.
 
 Temporary login admission refusals are retried only for the typed login rate-limit problem with a
 valid server-directed wait of one to five seconds. One submission allows at most five credential

@@ -1,4 +1,4 @@
-import { fireEvent, render as testingRender, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render as testingRender, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
@@ -70,6 +70,23 @@ it("given account identity changes or disappears, when the menu renders again, t
   // then
   expect(screen.queryByTestId("account-identity")).not.toBeInTheDocument();
   expect(screen.queryByTestId("account-link")).not.toBeInTheDocument();
+});
+
+it("given another account replaces one with a pending preference request, when the old request fails, then its error cannot reach the new identity", async () => {
+  // given
+  let refuse!: (error: Error) => void;
+  vi.spyOn(api, "changeOwnLocale").mockReturnValue(new Promise((_, reject) => { refuse = reject; }));
+  const view = render(<Preferences authenticated username="doe.jane" signedOut={() => undefined} />);
+  await openPreferences();
+  await userEvent.selectOptions(document.getElementById("locale-preference")!, "en");
+
+  // when
+  view.rerender(<MemoryRouter><Preferences authenticated username="roe.john" signedOut={() => undefined} /></MemoryRouter>);
+  await act(() => Promise.resolve().then(() => refuse(new Error("old request failed"))));
+
+  // then
+  expect(screen.getByTestId("account-identity")).toHaveTextContent("roe.john");
+  expect(screen.queryByTestId("preferences-failure")).not.toBeInTheDocument();
 });
 
 it("given preferences chosen once, when the header is shown, then they stay inside a compact account menu", async () => {

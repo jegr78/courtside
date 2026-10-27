@@ -25,6 +25,8 @@ export function AccountSecurityView({ passwordChanged, signedOut, embedded = fal
   const [reauthenticationFailure, setReauthenticationFailure] = useState<string>();
   const [pending, setPending] = useState(false);
   const heading = useRef<HTMLHeadingElement>(null);
+  const actionVersion = useRef(0);
+  const proofVersion = useRef(0);
   const Heading = embedded ? "h2" : "h1";
   const Subheading = embedded ? "h3" : "h2";
   const [retry, setRetry] = useState<{
@@ -36,6 +38,10 @@ export function AccountSecurityView({ passwordChanged, signedOut, embedded = fal
     void api.accountSessions().then(setSessions).catch((error) => setFailure(problemMessage(error, t)));
   }, [t]);
 
+  useLayoutEffect(() => () => { actionVersion.current += 1; }, []);
+
+  function isCurrent(version: number) { return actionVersion.current === version; }
+
   useLayoutEffect(() => {
     if (!focusRequested) return;
     heading.current?.scrollIntoView?.({ block: "start" });
@@ -43,13 +49,16 @@ export function AccountSecurityView({ passwordChanged, signedOut, embedded = fal
   }, [focusRequested]);
 
   async function run(action: () => Promise<void>, completed?: () => void) {
+    const version = actionVersion.current;
     setPending(true);
     setFailure(undefined);
     try {
       await action();
+      if (!isCurrent(version)) return;
       if (completed) completed();
       else setSessions(await api.accountSessions());
     } catch (error) {
+      if (!isCurrent(version)) return;
       if (error instanceof ApiError && error.problem?.type === RECENT_AUTH) {
         setReauthenticationFailure(undefined);
         setRetry({ action, completed });
@@ -57,7 +66,7 @@ export function AccountSecurityView({ passwordChanged, signedOut, embedded = fal
         setFailure(problemMessage(error, t));
       }
     } finally {
-      setPending(false);
+      if (isCurrent(version)) setPending(false);
     }
   }
 
@@ -65,19 +74,24 @@ export function AccountSecurityView({ passwordChanged, signedOut, embedded = fal
     event.preventDefault();
     const password = new FormData(event.currentTarget).get("reauthentication-password");
     if (typeof password !== "string" || !retry) return;
+    const version = actionVersion.current;
+    const proof = proofVersion.current;
+    event.currentTarget.querySelector<HTMLInputElement>("#reauthentication-password")?.focus();
     setPending(true);
     setReauthenticationFailure(undefined);
     try {
       await api.reauthenticate(password);
+      if (!isCurrent(version) || proofVersion.current !== proof) return;
       const pendingAction = retry;
       await pendingAction.action();
-      setRetry(undefined);
+      if (!isCurrent(version)) return;
+      if (proofVersion.current === proof) setRetry(undefined);
       if (pendingAction.completed) pendingAction.completed();
       else setSessions(await api.accountSessions());
     } catch (error) {
-      setReauthenticationFailure(problemMessage(error, t));
+      if (isCurrent(version) && proofVersion.current === proof) setReauthenticationFailure(problemMessage(error, t));
     } finally {
-      setPending(false);
+      if (isCurrent(version) && proofVersion.current === proof) setPending(false);
     }
   }
 
@@ -124,6 +138,8 @@ export function AccountSecurityView({ passwordChanged, signedOut, embedded = fal
         onClick={() => void run(api.endOwnSessions, signedOut)}>{t("accountSecurity.sessions.endAll")}</Button></div>
     </section>
     {retry && <Modal labelledBy="account-reauthentication-title" closed={() => {
+      proofVersion.current += 1;
+      setPending(false);
       setRetry(undefined);
       setReauthenticationFailure(undefined);
     }}>

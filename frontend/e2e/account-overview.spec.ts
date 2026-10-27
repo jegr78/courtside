@@ -2,6 +2,8 @@ import { type Page } from "@playwright/test";
 import type { components } from "../src/api/schema";
 import { expect, selectPreference, test } from "./fixtures";
 
+test.use({ serviceWorkers: "block" });
+
 async function signIn(page: Page, username: string, locale: "de" | "en") {
   await page.goto("/login");
   await selectPreference(page, "#locale-preference", locale);
@@ -19,6 +21,7 @@ async function openAccount(page: Page) {
 }
 
 async function fits(page: Page) {
+  await page.evaluate(() => document.fonts.ready);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth),
     "account content introduces no horizontal page overflow").toBe(true);
   for (const id of ["account-identity", "profile-username", "profile-first-name", "profile-last-name", "profile-role"]) {
@@ -63,6 +66,9 @@ for (const locale of ["de", "en"] as const) {
     expect(await heading.evaluate((element) => element.matches(":focus-visible")), "the direct-entry focus target is visible").toBe(true);
     await expect(page.getByTestId("current-password")).toBeVisible();
     await expect(page.getByTestId("end-current-session")).toHaveCount(1);
+    await page.getByTestId("end-current-session").click();
+    await expect(page.getByTestId("account-identity")).toHaveCount(0);
+    await expect(page.getByTestId("account-profile")).toHaveCount(0);
   });
 
   test(`given long account values in ${locale}, when desktop and phone widths render them, then the profile and sign-out stay readable and reachable`, async ({ page }, info) => {
@@ -71,12 +77,13 @@ for (const locale of ["de", "en"] as const) {
     const username = "jane.doe." + "longaccount".repeat(5);
     const firstName = "Jane Mary ".repeat(8).trim();
     const lastName = "Doe Roe ".repeat(8).trim();
-    await page.route("**/api/session", async (route) => {
-      const response = await route.fetch();
-      const current = await response.json() as components["schemas"]["SessionStatus"];
-      await route.fulfill({ response, json: { ...current, username, firstName, lastName,
-        roles: ["MEMBER", "TRAINER", "SPORT_DIRECTOR", "YOUTH_DIRECTOR", "GROUNDSKEEPER", "TREASURER", "ADMIN"] } });
+    const current = await page.evaluate(async () => {
+      const response = await fetch("/api/session", { cache: "no-store" });
+      return await response.json() as components["schemas"]["SessionStatus"];
     });
+    expect(current.authenticated).toBe(true);
+    await page.route("**/api/session", (route) => route.fulfill({ json: { ...current, username, firstName, lastName,
+      roles: ["MEMBER", "TRAINER", "SPORT_DIRECTOR", "YOUTH_DIRECTOR", "GROUNDSKEEPER", "TREASURER", "ADMIN"] } }));
     await page.goto("/account");
     await expect(page.getByTestId("profile-username")).toHaveText(username);
     const widths = info.project.use.isMobile ? [320, 375, 734] : [1440];
@@ -90,6 +97,7 @@ for (const locale of ["de", "en"] as const) {
       await logout.scrollIntoViewIfNeeded();
       await expect(logout).toBeInViewport();
       await page.getByTestId("preferences-menu").click();
+      await page.screenshot({ path: info.outputPath(`account-${locale}-${width}.png`), fullPage: true });
     }
     await expect(page.getByTestId("profile-first-name")).toHaveText(firstName);
     await expect(page.getByTestId("profile-last-name")).toHaveText(lastName);
@@ -106,12 +114,18 @@ for (const locale of ["de", "en"] as const) {
     // given
     const accounts = [
       { username: "sport.major", firstName: "Mary", lastName: "Major", roles: [locale === "de" ? "Sportwart" : "Sport director"] },
-      { username: "trainer.doe", firstName: "John", lastName: "Doe", roles: [locale === "de" ? "Mitglied" : "Member", "Trainer"] }
+      { username: "trainer.doe", firstName: "John", lastName: "Doe", roles: [locale === "de" ? "Mitglied" : "Member", "Trainer"] },
+      { username: "configuration-admin", firstName: "Richard", lastName: "Miles", roles: ["Administrator"] }
     ];
 
     // when / then
     for (const account of accounts) {
       await signIn(page, account.username, locale);
+      if (account.username === "configuration-admin") {
+        await page.goto("/admin");
+        await expect(page.getByTestId("admin-shell")).toBeVisible();
+        await expect(page.getByTestId("account-identity")).toHaveText(account.username);
+      }
       await openAccount(page);
       await expect(page.getByTestId("profile-username")).toHaveText(account.username);
       await expect(page.getByTestId("profile-first-name")).toHaveText(account.firstName);
