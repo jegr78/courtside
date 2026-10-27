@@ -171,3 +171,64 @@ it.each([
   // then
   expect(body.scrollTop).toBe(expected);
 });
+
+it("given a resized page, when its observer delivers, then the navigation frame changes outside that delivery", () => {
+  // given
+  vi.useFakeTimers();
+  const callbacks: (() => void)[] = [];
+  vi.stubGlobal("ResizeObserver", class {
+    constructor(callback: () => void) { callbacks.push(callback); }
+    observe() {}
+    disconnect() {}
+  });
+  try {
+    window.innerHeight = 800;
+    Object.defineProperty(window, "scrollY", { configurable: true, value: 0 });
+    show("/admin/facility");
+    const shell = screen.getByTestId("admin-shell");
+    const frame = screen.getByTestId("admin-navigation-frame");
+    vi.spyOn(shell, "getBoundingClientRect").mockReturnValue({ top: 150 } as DOMRect);
+    vi.spyOn(screen.getByTestId("a-page"), "getBoundingClientRect").mockReturnValue({ bottom: 300 } as DOMRect);
+    const before = frame.style.getPropertyValue("--admin-navigation-room");
+    // when
+    act(() => callbacks.forEach((deliver) => deliver()));
+    // then
+    expect(frame.style.getPropertyValue("--admin-navigation-room")).toBe(before);
+    // when
+    act(() => { vi.advanceTimersToNextFrame(); });
+    // then
+    expect(frame.style.getPropertyValue("--admin-navigation-room")).toBe("650px");
+  } finally {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  }
+});
+
+it("given clipped navigation entries, when their observer delivers, then shortening waits until after that delivery", () => {
+  // given
+  vi.useFakeTimers();
+  const callbacks: (() => void)[] = [];
+  vi.stubGlobal("ResizeObserver", class {
+    constructor(callback: () => void) { callbacks.push(callback); }
+    observe() {}
+    disconnect() {}
+  });
+  try {
+    show("/admin/facility");
+    const body = screen.getByTestId("admin-navigation-scroll");
+    const entries = [...body.querySelectorAll<HTMLElement>("a, p")];
+    entries[11].setAttribute("aria-current", "page");
+    layOut(body, { top: 100, height: 200 }, entries.length * 32);
+    // when
+    act(() => callbacks.forEach((deliver) => deliver()));
+    // then
+    expect(body.style.maxHeight).toBe("");
+    // when
+    act(() => { vi.advanceTimersToNextFrame(); });
+    // then
+    expect(body.style.maxHeight).toBe(`${11 * 32 + 28 - 6 * 32}px`);
+  } finally {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  }
+});

@@ -1,4 +1,5 @@
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
+import { observeResize } from "./observeResize";
 
 export function useScrollContinuation(active = true, destination?: string) {
   const body = useRef<HTMLDivElement>(null);
@@ -38,14 +39,11 @@ export function useScrollContinuation(active = true, destination?: string) {
     };
     laidOut.current = layout;
     layout();
-    const observer = typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(layout);
-    if (body.current) observer?.observe(body.current);
-    if (body.current?.parentElement) observer?.observe(body.current.parentElement);
-    if (content.current) observer?.observe(content.current);
+    const disconnect = observeResize(layout, [body.current, body.current?.parentElement ?? null, content.current]);
     window.addEventListener("resize", layout);
     return () => {
       laidOut.current = undefined;
-      observer?.disconnect();
+      disconnect();
       window.removeEventListener("resize", layout);
     };
   }, [active, destination, measure]);

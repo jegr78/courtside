@@ -162,3 +162,30 @@ for (const width of [1440, 1920]) {
     await context.setOffline(false);
   });
 }
+
+test("given a long administrative page, when its content shrinks, then navigation settles without resize observer errors", async ({ page }) => {
+  // given
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await signIn(page);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/admin/operator-health");
+  const frame = page.getByTestId("admin-navigation-frame");
+  await expect(page.getByTestId("admin-operator-health-link")).toHaveAttribute("aria-current", "page");
+  // when
+  for (const height of [240, 2000, 300]) {
+    await frame.evaluate((element, pixels) => {
+      const content = element.nextElementSibling as HTMLElement;
+      content.style.height = `${pixels}px`;
+      content.style.minHeight = "0";
+      content.style.overflow = "hidden";
+    }, height);
+    await page.evaluate(async () => {
+      for (let frame = 0; frame < 8; frame++) await new Promise(requestAnimationFrame);
+    });
+  }
+  // then
+  await expectInside(page.getByTestId("admin-operator-health-link"), page.getByTestId("admin-navigation-scroll"));
+  await expectWholeEntriesAtEdges(page.getByTestId("admin-navigation-scroll"));
+  expect(errors).toEqual([]);
+});

@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef } from "react";
 import { Outlet, useLocation } from "react-router-dom";
+import { observeResize } from "./observeResize";
 import { AdminNavigation } from "./AdminNavigation";
 import { ScrollContinuation } from "./ScrollContinuation";
 import { useScrollContinuation } from "./useScrollContinuation";
@@ -29,12 +30,11 @@ export function AdminShell({ administrator = true }: { administrator?: boolean }
       follow();
     };
     measure();
-    const resized = typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(measure);
-    resized?.observe(document.body);
+    const disconnect = observeResize(measure, [document.body]);
     window.addEventListener("resize", measure);
     window.addEventListener("scroll", follow, { passive: true });
     return () => {
-      resized?.disconnect();
+      disconnect();
       window.removeEventListener("resize", measure);
       window.removeEventListener("scroll", follow);
     };
