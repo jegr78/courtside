@@ -339,4 +339,13 @@ class MfaKeyRingTest {
         assertThat(file).doesNotExist();
     }
 
+    @Test
+    void givenTheFilesystemRootAsKeyFile_whenOpening_thenTheConfigurationFailsExplicitly() {
+        // given
+        Path root = temporary.getRoot();
+        // when / then
+        assertThatThrownBy(() -> MfaKeyRing.open(root, false))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("MFA");
+    }
+
 }

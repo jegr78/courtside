@@ -40,6 +40,7 @@ final class MfaKeyRing {
     static MfaKeyRing open(Path file, boolean required) {
         if (file == null) throw failure("MFA key file path is required", null);
         Path location = file.toAbsolutePath().normalize();
+        if (location.getParent() == null) throw failure("MFA key file must name a file inside a directory", null);
         return locked(location, () -> {
             if (!Files.exists(location, LinkOption.NOFOLLOW_LINKS)) {
                 if (required) throw failure("MFA instance key file is missing; restore the matching key material", null);
