@@ -1,3 +1,5 @@
+import type { ComponentType, ReactNode } from "react";
+import { proofOwnerHarness } from "../test/ProofOwner";
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
@@ -32,8 +34,8 @@ const refused = (type: string, status: number) => new ApiError(status, {
   ...(type === "guardian-action-not-granted" ? { violations: [{ code: "guardianship.actionNotGranted", params: { action: "VIEW_BOOKINGS" } }] } : {})
 });
 
-function show() {
-  render(<MemoryRouter><WithClubConfiguration><DependantsView /></WithClubConfiguration></MemoryRouter>);
+function show(wrapper?: ComponentType<{ children: ReactNode }>) {
+  return render(<MemoryRouter><WithClubConfiguration><DependantsView /></WithClubConfiguration></MemoryRouter>, { wrapper });
 }
 
 describe("DependantsView", () => {
@@ -291,4 +293,28 @@ describe("DependantsView", () => {
     // then
     expect(end).toHaveTextContent("01.09.2030");
   });
+  it.each(["escape", "unmount", "account switch"])("given a proof awaiting its response, when %s invalidates its dialog, then never send the saved mutation", async (ending) => {
+    // given
+    const owner = proofOwnerHarness();
+    let proved!: () => void;
+    vi.spyOn(api, "reauthenticate").mockReturnValue(new Promise((resolve) => { proved = resolve; }));
+    vi.spyOn(api, "dependants").mockResolvedValue([john(["ACCOUNT_TASKS"])]);
+    const changing = vi.spyOn(api, "requestDependantCredentials").mockRejectedValueOnce(refused("recent-authentication-required", 403)).mockResolvedValue(undefined);
+    const shown = show(owner.Wrapper);
+    await userEvent.click(await screen.findByTestId("request-dependant-credentials"));
+    await userEvent.type(document.getElementById("dependant-reauthentication-password")!, "current-password");
+    await userEvent.click(screen.getByTestId("dependant-reauthentication-submit"));
+    // when
+    if (ending === "escape") {
+      await userEvent.click(screen.getByRole("dialog").querySelector("input")!);
+      await userEvent.keyboard("{Escape}");
+      expect(screen.queryByRole("dialog")).toBeNull();
+    }
+    else if (ending === "unmount") shown.unmount();
+    else act(owner.change);
+    await act(async () => { proved(); await Promise.resolve(); });
+    // then
+    expect(changing).toHaveBeenCalledOnce();
+  });
+
 });

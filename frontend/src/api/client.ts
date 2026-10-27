@@ -63,6 +63,9 @@ export type MessageChannel = components["schemas"]["MessageChannel"];
 export type MessageChannelChoice = components["schemas"]["MessageChannelChoice"];
 export type Notification = components["schemas"]["Notification"];
 export type NotificationPage = components["schemas"]["NotificationPage"];
+export type MfaStatus = components["schemas"]["MfaStatus"];
+export type TotpEnrollment = components["schemas"]["TotpEnrollment"];
+export type MfaRecoveryCodeSet = components["schemas"]["MfaRecoveryCodeSet"];
 export type AccountSession = components["schemas"]["AccountSession"];
 export type PersonRequest = components["schemas"]["PersonRequest"];
 export type MembershipRequest = components["schemas"]["MembershipRequest"];
@@ -373,9 +376,20 @@ export const api = {
   requestUsernameReminder: (email: string) => request<void>("/api/account-recovery/usernames", {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email })
   }),
-  reauthenticate: (password: string) => request<void>("/api/session/reauthentication", {
-    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password })
+  reauthenticate: (password: string, code?: string) => request<void>("/api/session/reauthentication", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password, code })
   }),
+  ownMfa: () => request<MfaStatus>("/api/account/mfa"),
+  beginTotpEnrollment: () => request<TotpEnrollment>("/api/account/mfa/totp", { method: "POST" }),
+  confirmTotpEnrollment: (code: string) => request<MfaRecoveryCodeSet>("/api/account/mfa/totp/confirmation", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code })
+  }, true, true),
+  replaceRecoveryCodes: () => request<MfaRecoveryCodeSet>("/api/account/mfa/recovery-codes", { method: "POST" }, true, true),
+  removeTotp: () => request<void>("/api/account/mfa/totp", { method: "DELETE" }, true, true),
+  disableMfa: () => request<void>("/api/account/mfa", { method: "DELETE" }, true, true),
+  completeMfaLogin: (code: string, signal?: AbortSignal) => request<void>("/api/session/mfa", {
+    method: "POST", signal, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code })
+  }, false, true),
   changeOwnPassword: (currentPassword: string, newPassword: string) => request<void>(
     "/api/account/password", {
       method: "PUT", headers: { "Content-Type": "application/json" },
@@ -869,16 +883,19 @@ export const api = {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(move)
     }
   ),
-  login: (username: string, password: string, signal?: AbortSignal, maximumRequests = 2) => request<void>("/api/session", {
-    method: "POST",
-    signal,
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({ username, password })
-  }, false, true, maximumRequests),
+  login: async (username: string, password: string, signal?: AbortSignal, maximumRequests = 2) => {
+    const response = await send("/api/session", {
+      method: "POST",
+      signal,
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ username, password })
+    }, false, true, maximumRequests);
+    return response.status === 202 ? "mfa-required" as const : undefined;
+  },
   changeInitialPassword: (password: string) => request<void>("/api/account/initial-password", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ password })
   }, true, true),
-  logout: () => request<void>("/api/session/logout", { method: "POST" }, false, true)
+  logout: (signal?: AbortSignal) => request<void>("/api/session/logout", { method: "POST", signal }, false, true)
 };

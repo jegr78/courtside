@@ -44,7 +44,7 @@ describe("LoginView", () => {
   it("given temporary admission pressure, when the member signs in, then show translated waiting feedback and keep credentials out of storage", async () => {
     // given
     const refusal = new ApiError(429, { type: "urn:courtside:error:login-rate-limited", title: "Busy", status: 429 }, 1);
-    const login = vi.spyOn(api, "login").mockRejectedValueOnce(refusal).mockResolvedValueOnce();
+    const login = vi.spyOn(api, "login").mockRejectedValueOnce(refusal).mockResolvedValueOnce(undefined);
     const persisted = vi.spyOn(Storage.prototype, "setItem");
     const refreshed = vi.fn().mockResolvedValue(undefined);
     render(<MemoryRouter><LoginView refreshSession={refreshed} /></MemoryRouter>);
@@ -120,7 +120,7 @@ describe("LoginView", () => {
 
   it("given a successful credential check and stalled session refresh, when the deadline expires, then unlock and cancel the refresh without submitting credentials again", async () => {
     // given
-    const login = vi.spyOn(api, "login").mockResolvedValue();
+    const login = vi.spyOn(api, "login").mockResolvedValue(undefined);
     const refreshed = vi.fn<(signal?: AbortSignal) => Promise<void>>().mockImplementation(() => new Promise(() => {}));
     render(<MemoryRouter><LoginView refreshSession={refreshed} /></MemoryRouter>);
     await userEvent.type(screen.getByTestId("username"), "doe.jane");
@@ -137,4 +137,87 @@ describe("LoginView", () => {
     expect(login).toHaveBeenCalledOnce();
     expect(vi.getTimerCount()).toBe(0);
   });
+  it("given a pending password login, when the holder submits a recovery code, then only the completed factor refreshes account access", async () => {
+    // given
+    vi.spyOn(api, "login").mockResolvedValue("mfa-required");
+    const complete = vi.spyOn(api, "completeMfaLogin").mockResolvedValue(undefined);
+    const refreshed = vi.fn().mockResolvedValue(undefined);
+    render(<MemoryRouter><LoginView refreshSession={refreshed} /></MemoryRouter>);
+    await userEvent.type(screen.getByTestId("username"), "doe.jane");
+    await userEvent.type(screen.getByTestId("password"), "private-password");
+    // when
+    await userEvent.click(screen.getByTestId("login-submit"));
+    const code = await screen.findByTestId("login-mfa-code");
+    expect(screen.queryByTestId("password")).toBeNull();
+    await userEvent.type(code, "ABCD-EFGH-IJKL-MNOP-QRST-UVWX");
+    await userEvent.click(screen.getByTestId("login-mfa-submit"));
+    // then
+    expect(complete).toHaveBeenCalledWith("ABCD-EFGH-IJKL-MNOP-QRST-UVWX", expect.any(AbortSignal));
+    expect(refreshed).toHaveBeenCalledTimes(2);
+  });
+
+  it("given an interrupted factor challenge, when the holder changes account, then discard the challenge before showing credentials", async () => {
+    // given
+    const logout = vi.spyOn(api, "logout").mockResolvedValue(undefined);
+    const refresh = vi.fn().mockResolvedValue(undefined);
+    render(<MemoryRouter><LoginView refreshSession={refresh} mfaRequired /></MemoryRouter>);
+    // when
+    await userEvent.click(screen.getByTestId("login-mfa-restart"));
+    // then
+    expect(await screen.findByTestId("username")).toHaveValue("");
+    expect(logout).toHaveBeenCalledOnce();
+    expect(refresh).toHaveBeenCalledOnce();
+  });
+
+  it("given an unresponsive factor request, when the sign-in deadline expires, then cancel it and allow another proof", async () => {
+    // given
+    const complete = vi.spyOn(api, "completeMfaLogin").mockImplementation(() => new Promise(() => undefined));
+    render(<MemoryRouter><LoginView refreshSession={vi.fn()} mfaRequired /></MemoryRouter>);
+    await userEvent.type(screen.getByTestId("login-mfa-code"), "123456");
+    vi.useFakeTimers();
+    fireEvent.submit(screen.getByTestId("login-mfa-code").closest("form")!);
+    // when
+    await act(() => vi.advanceTimersByTimeAsync(15000));
+    // then
+    expect(screen.getByRole("alert")).toHaveTextContent("Sign-in took too long. Please try again.");
+    expect(screen.getByTestId("login-mfa-submit")).toBeEnabled();
+    expect(complete.mock.calls[0][1]?.aborted).toBe(true);
+  });
+
+  it.each(["logout", "refresh"])("given a restart stalled during %s, when its deadline expires, then cancel and allow a new restart", async (phase) => {
+    // given
+    const logout = vi.spyOn(api, "logout").mockImplementation(() => phase === "logout" ? new Promise(() => undefined) : Promise.resolve());
+    const refresh = vi.fn<(signal?: AbortSignal) => Promise<void>>().mockImplementation(() => phase === "refresh" ? new Promise(() => undefined) : Promise.resolve());
+    render(<MemoryRouter><LoginView refreshSession={refresh} mfaRequired /></MemoryRouter>);
+    vi.useFakeTimers();
+    fireEvent.click(screen.getByTestId("login-mfa-restart"));
+    await act(() => vi.advanceTimersByTimeAsync(0));
+    // when
+    await act(() => vi.advanceTimersByTimeAsync(15000));
+    // then
+    expect(screen.getByRole("alert")).toHaveTextContent("Sign-in took too long. Please try again.");
+    expect(screen.getByTestId("login-mfa-restart")).toBeEnabled();
+    expect(screen.getByTestId("login-mfa-submit")).toBeEnabled();
+    expect(logout).toHaveBeenCalledOnce();
+    if (phase === "refresh") expect(refresh.mock.calls[0][0]?.aborted).toBe(true);
+    else expect(logout.mock.calls[0][0]?.aborted).toBe(true);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("given a restart waiting for logout, when leaving sign-in, then abort logout and remove its deadline", async () => {
+    // given
+    const logout = vi.spyOn(api, "logout").mockImplementation(() => new Promise(() => undefined));
+    const refresh = vi.fn().mockResolvedValue(undefined);
+    const shown = render(<MemoryRouter><LoginView refreshSession={refresh} mfaRequired /></MemoryRouter>);
+    vi.useFakeTimers();
+    fireEvent.click(screen.getByTestId("login-mfa-restart"));
+    // when
+    shown.unmount();
+    await act(() => vi.advanceTimersByTimeAsync(0));
+    // then
+    expect(logout.mock.calls[0][0]?.aborted).toBe(true);
+    expect(refresh).not.toHaveBeenCalled();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
 });

@@ -16,7 +16,7 @@ function busy(seconds = 1) {
 it("given short typed admission pressure, when signing in, then wait the server duration before a successful retry", async () => {
   // given
   vi.useFakeTimers();
-  const login = vi.spyOn(api, "login").mockRejectedValueOnce(busy()).mockResolvedValueOnce();
+  const login = vi.spyOn(api, "login").mockRejectedValueOnce(busy()).mockResolvedValueOnce(undefined);
   const waiting = vi.fn();
   const controller = new AbortController();
   // when

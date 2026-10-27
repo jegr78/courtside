@@ -1,3 +1,6 @@
+import { useProofContinuation } from "../security/useProofContinuation";
+import { ReauthenticationCode } from "../components/ReauthenticationCode";
+import { reauthenticateForm } from "../security/reauthentication";
 import { useEffect, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { api, ApiError, type MessageKind, type MessageTemplate, type MessageTemplateLanguage, type MessageTemplateText } from "../api/client";
@@ -26,6 +29,7 @@ export function AdminMessageWordingView() {
   const [refusals, setRefusals] = useState<string[]>([]);
   const [error, setError] = useState<string>();
   const [success, setSuccess] = useState<string>();
+  const proofContinuation = useProofContinuation(kind);
   const [retry, setRetry] = useState<Write>();
   const [reauthenticationFailure, setReauthenticationFailure] = useState<string>();
   const [pending, setPending] = useState(false);
@@ -109,15 +113,18 @@ export function AdminMessageWordingView() {
     const password = new FormData(event.currentTarget).get("admin-reauthentication-password");
     const requested = retry;
     if (typeof password !== "string" || !requested || pending) return;
+    const ownsProof = proofContinuation.begin();
     setPending(true);
     setReauthenticationFailure(undefined);
     try {
-      await api.reauthenticate(password);
+      await reauthenticateForm(event.currentTarget, password);
     } catch (failure) {
+      if (!ownsProof()) return;
       setReauthenticationFailure(problemMessage(failure, t));
       setPending(false);
       return;
     }
+    if (!ownsProof()) return;
     setRetry(undefined);
     setPending(false);
     await run(() => perform(requested), requested);
@@ -173,6 +180,8 @@ export function AdminMessageWordingView() {
         </div>}
       </>}
     {retry && <Modal labelledBy="admin-reauthentication-title" closed={() => {
+      proofContinuation.cancel();
+      setPending(false);
       setRetry(undefined);
       setReauthenticationFailure(undefined);
     }}>
@@ -181,6 +190,7 @@ export function AdminMessageWordingView() {
         <p>{t("accountSecurity.reauthenticate")}</p>
         {reauthenticationFailure && <Alert testId="admin-reauthentication-failure">{reauthenticationFailure}</Alert>}
         <TextField data-testid="admin-reauthentication-password" id="admin-reauthentication-password" name="admin-reauthentication-password" type="password" autoComplete="current-password" required label={t("auth.password")} />
+        <ReauthenticationCode />
         <Button data-testid="admin-reauthentication-submit" variant="primary" disabled={pending} type="submit">{t("accountSecurity.continue")}</Button>
       </form>
     </Modal>}

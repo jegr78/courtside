@@ -1,3 +1,6 @@
+import { useProofContinuation } from "../../security/useProofContinuation";
+import { ReauthenticationCode } from "../../components/ReauthenticationCode";
+import { reauthenticateForm } from "../../security/reauthentication";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { api, ApiError, type ImportPreview, type ImportRun } from "../../api/client";
@@ -27,6 +30,7 @@ export function ImportExecutionPanel({ sourceId, preview, disabled, timeZone, ex
   const [runs, setRuns] = useState<ImportRun[]>();
   const [result, setResult] = useState<ImportRun>();
   const [confirming, setConfirming] = useState(false);
+  const proofContinuation = useProofContinuation(sourceId);
   const [retry, setRetry] = useState<ImportPreview>();
   const [pending, setPending] = useState(false);
 
@@ -61,9 +65,11 @@ export function ImportExecutionPanel({ sourceId, preview, disabled, timeZone, ex
     event.preventDefault();
     const password = new FormData(event.currentTarget).get("import-reauthentication-password");
     if (typeof password !== "string" || !retry || pending) return;
+    const ownsProof = proofContinuation.begin();
     setPending(true);
     try {
-      await api.reauthenticate(password);
+      await reauthenticateForm(event.currentTarget, password);
+      if (!ownsProof()) return;
       const reviewed = retry;
       setRetry(undefined);
       const run = await api.executeImportPreview(reviewed.previewId, reviewed.needsConfirmation);
@@ -71,9 +77,10 @@ export function ImportExecutionPanel({ sourceId, preview, disabled, timeZone, ex
       setRuns((current) => [run, ...(current ?? [])]);
       executed(run);
     } catch (failure) {
+      if (!ownsProof()) return;
       reportError(failure);
     } finally {
-      setPending(false);
+      if (ownsProof()) setPending(false);
     }
   }
 
@@ -130,11 +137,12 @@ export function ImportExecutionPanel({ sourceId, preview, disabled, timeZone, ex
         </div>
       </div>
     </Modal>}
-    {retry && <Modal labelledBy="import-reauthentication-title" closed={() => setRetry(undefined)}>
+    {retry && <Modal labelledBy="import-reauthentication-title" closed={() => { proofContinuation.cancel(); setRetry(undefined); setPending(false); }}>
       <form className="grid gap-4" onSubmit={(event) => void reauthenticate(event)}>
         <h2 id="import-reauthentication-title" className="text-2xl font-bold">{t("accountSecurity.reauthenticateTitle")}</h2>
         <p>{t("accountSecurity.reauthenticate")}</p>
         <TextField data-testid="import-reauthentication-password" id="import-reauthentication-password" name="import-reauthentication-password" type="password" autoComplete="current-password" required label={t("auth.password")} />
+        <ReauthenticationCode />
         <Button data-testid="confirm-import-reauthentication" variant="primary" disabled={pending} type="submit">{t("accountSecurity.continue")}</Button>
       </form>
     </Modal>}

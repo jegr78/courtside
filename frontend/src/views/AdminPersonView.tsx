@@ -1,3 +1,6 @@
+import { useProofContinuation } from "../security/useProofContinuation";
+import { ReauthenticationCode } from "../components/ReauthenticationCode";
+import { reauthenticateForm } from "../security/reauthentication";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useLocation, useParams } from "react-router-dom";
@@ -82,6 +85,7 @@ export function AdminPersonView() {
     ? t("admin.roster.personCreated")
     : undefined);
   const [pending, setPending] = useState(false);
+  const proofContinuation = useProofContinuation(personId);
   const [retry, setRetry] = useState<{ run: () => Promise<void> }>();
   const [reauthenticationFailure, setReauthenticationFailure] = useState<string>();
   const [draft, setDraft] = useState<Draft>({});
@@ -158,17 +162,20 @@ export function AdminPersonView() {
   async function reauthenticate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const password = new FormData(event.currentTarget).get("admin-reauthentication-password");
-    if (typeof password !== "string" || !retry) return;
+    if (typeof password !== "string" || !retry || pending) return;
+    const ownsProof = proofContinuation.begin();
     setPending(true);
     setReauthenticationFailure(undefined);
     let proofCompleted = false;
     try {
-      await api.reauthenticate(password);
+      await reauthenticateForm(event.currentTarget, password);
+      if (!ownsProof()) return;
       proofCompleted = true;
       const action = retry;
       await action.run();
-      setRetry(undefined);
+      if (ownsProof()) setRetry(undefined);
     } catch (failure) {
+      if (!ownsProof()) return;
       if (!proofCompleted || (failure instanceof ApiError && failure.problem?.type === RECENT_AUTH)) {
         setReauthenticationFailure(problemMessage(failure, t));
       } else {
@@ -176,7 +183,7 @@ export function AdminPersonView() {
         reportError(failure);
       }
     } finally {
-      setPending(false);
+      if (ownsProof()) setPending(false);
     }
   }
 
@@ -291,6 +298,8 @@ export function AdminPersonView() {
         {problem && <Alert>{problem}</Alert>}
         {success && <SuccessFeedback testId="admin-save-success">{success}</SuccessFeedback>}
         {retry && <Modal labelledBy="admin-reauthentication-title" closed={() => {
+          proofContinuation.cancel();
+          setPending(false);
           setRetry(undefined);
           setReauthenticationFailure(undefined);
         }}>
@@ -299,6 +308,7 @@ export function AdminPersonView() {
             <p>{t("accountSecurity.reauthenticate")}</p>
             {reauthenticationFailure && <Alert>{reauthenticationFailure}</Alert>}
             <TextField id="admin-reauthentication-password" name="admin-reauthentication-password" type="password" autoComplete="current-password" required label={t("auth.password")} />
+        <ReauthenticationCode />
             <Button variant="primary" disabled={pending} type="submit" data-testid="admin-reauthentication-submit">{t("accountSecurity.continue")}</Button>
           </form>
         </Modal>}

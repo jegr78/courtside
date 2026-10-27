@@ -974,3 +974,34 @@ it("given no period, when the message log is exported, then only the format reac
   expect(init?.method).toBe("POST");
   expect(offered.fileName).toBe("message-log-2026-05-12.csv");
 });
+
+
+it("given an MFA proof and enrollment, when invoking holder operations, then use the generated JSON contracts without storing secrets", async () => {
+  // given
+  const calls: unknown[] = [];
+  document.cookie = "XSRF-TOKEN=csrf";
+  server.use(
+    http.post("/api/session", () => new HttpResponse(null, { status: 202 })),
+    http.post("/api/session/mfa", async ({ request }) => { calls.push(await request.json()); return new HttpResponse(null, { status: 200 }); }),
+    http.post("/api/session/reauthentication", async ({ request }) => { calls.push(await request.json()); return new HttpResponse(null, { status: 204 }); }),
+    http.get("/api/account/mfa", () => HttpResponse.json({ enabled: false, totpEnabled: false, recoveryCodesRemaining: 0 })),
+    http.post("/api/account/mfa/totp", () => HttpResponse.json({ secret: "EXAMPLEKEY", uri: "otpauth://totp/Example" })),
+    http.post("/api/account/mfa/totp/confirmation", async ({ request }) => { calls.push(await request.json()); return HttpResponse.json({ codes: ["EXAMPLE-CODE"] }); }),
+    http.post("/api/account/mfa/recovery-codes", () => HttpResponse.json({ codes: ["NEW-CODE"] })),
+    http.delete("/api/account/mfa/totp", () => new HttpResponse(null, { status: 204 })),
+    http.delete("/api/account/mfa", () => new HttpResponse(null, { status: 204 }))
+  );
+  const stored = vi.spyOn(Storage.prototype, "setItem");
+  // when / then
+  await expect(api.login("doe.jane", "secret")).resolves.toBe("mfa-required");
+  await api.completeMfaLogin("123456");
+  await api.reauthenticate("secret", "RECOVERY-CODE");
+  await expect(api.ownMfa()).resolves.toMatchObject({ enabled: false });
+  await expect(api.beginTotpEnrollment()).resolves.toMatchObject({ secret: "EXAMPLEKEY" });
+  await expect(api.confirmTotpEnrollment("654321")).resolves.toEqual({ codes: ["EXAMPLE-CODE"] });
+  await expect(api.replaceRecoveryCodes()).resolves.toEqual({ codes: ["NEW-CODE"] });
+  await api.removeTotp();
+  await api.disableMfa();
+  expect(calls).toEqual([{ code: "123456" }, { password: "secret", code: "RECOVERY-CODE" }, { code: "654321" }]);
+  expect(JSON.stringify(stored.mock.calls)).not.toMatch(/EXAMPLEKEY|EXAMPLE-CODE|NEW-CODE|RECOVERY-CODE/);
+});

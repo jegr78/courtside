@@ -1,3 +1,6 @@
+import { useProofContinuation } from "../security/useProofContinuation";
+import { ReauthenticationCode } from "../components/ReauthenticationCode";
+import { reauthenticateForm } from "../security/reauthentication";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
@@ -225,6 +228,7 @@ function DependantCredentials({ dependant, refused, acted }: {
   const name = nameOf(dependant);
   const [pending, setPending] = useState(false);
   const [sent, setSent] = useState(false);
+  const proofContinuation = useProofContinuation(dependant.personId);
   const [proving, setProving] = useState(false);
   const [proofFailure, setProofFailure] = useState<string>();
   const { message: error, report, clear } = useReportedFailure();
@@ -258,16 +262,19 @@ function DependantCredentials({ dependant, refused, acted }: {
   async function prove(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const password = new FormData(event.currentTarget).get("dependant-reauthentication-password");
-    if (typeof password !== "string") return;
+    if (typeof password !== "string" || pending) return;
+    const ownsProof = proofContinuation.begin();
     setPending(true);
     try {
-      await api.reauthenticate(password);
+      await reauthenticateForm(event.currentTarget, password);
+      if (!ownsProof()) return;
       setProving(false);
       await request();
     } catch (failure) {
+      if (!ownsProof()) return;
       setProofFailure(problemMessage(failure, t));
     } finally {
-      setPending(false);
+      if (ownsProof()) setPending(false);
     }
   }
 
@@ -278,13 +285,14 @@ function DependantCredentials({ dependant, refused, acted }: {
     {sent && <SuccessFeedback testId="dependant-credentials-sent">{t("dependants.credentialsSent", { name })}</SuccessFeedback>}
     <Button variant="secondary" data-testid="request-dependant-credentials" className="justify-self-start" disabled={pending}
             onClick={() => void start()}>{t("dependants.requestCredentials")}</Button>
-    {proving && <Modal labelledBy="dependant-reauthentication-title" closed={() => setProving(false)}>
+    {proving && <Modal labelledBy="dependant-reauthentication-title" closed={() => { proofContinuation.cancel(); setProving(false); setPending(false); }}>
       <form className="grid gap-4" onSubmit={(event) => void prove(event)}>
         <h2 id="dependant-reauthentication-title" className="text-2xl font-bold">{t("accountSecurity.reauthenticateTitle")}</h2>
         <p>{t("accountSecurity.reauthenticate")}</p>
         {proofFailure && <Alert>{proofFailure}</Alert>}
         <TextField id="dependant-reauthentication-password" name="dependant-reauthentication-password" type="password"
                    autoComplete="current-password" required label={t("auth.password")} />
+        <ReauthenticationCode />
         <Button variant="primary" disabled={pending} type="submit" data-testid="dependant-reauthentication-submit">{t("accountSecurity.continue")}</Button>
       </form>
     </Modal>}

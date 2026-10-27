@@ -1,3 +1,5 @@
+import type { ComponentType, ReactNode } from "react";
+import { proofOwnerHarness } from "../test/ProofOwner";
 import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -41,14 +43,14 @@ const handedOver: MessageEntry = {
 const adults: MembershipType = { id: "type-1", name: "Adults", ruleSetId: null, active: true, grantsAccount: false };
 const juniors: MembershipType = { id: "type-2", name: "Juniors", ruleSetId: null, active: true, grantsAccount: false };
 
-function showPerson(entry: RosterEntry = jane, shown: ClubConfig = club) {
+function showPerson(entry: RosterEntry = jane, shown: ClubConfig = club, wrapper?: ComponentType<{ children: ReactNode }>) {
   vi.spyOn(api, "person").mockResolvedValue(entry);
-  render(<MemoryRouter initialEntries={["/admin/roster/person-1"]}><WithClubConfiguration club={shown}><UnsavedChangesProvider>
+  return render(<MemoryRouter initialEntries={["/admin/roster/person-1"]}><WithClubConfiguration club={shown}><UnsavedChangesProvider>
     <UnsavedCount />
     <Routes>
       <Route path="/admin/roster/:personId" element={<AdminPersonView />} />
     </Routes>
-  </UnsavedChangesProvider></WithClubConfiguration></MemoryRouter>);
+  </UnsavedChangesProvider></WithClubConfiguration></MemoryRouter>, { wrapper });
 }
 
 function input(id: string): HTMLInputElement {
@@ -1175,4 +1177,28 @@ describe("AdminPersonView", () => {
     expect(await screen.findByRole("alert")).toBeInTheDocument();
     expect(downloadJson).not.toHaveBeenCalled();
   });
+  it.each(["escape", "unmount", "account switch"])("given a proof awaiting its response, when %s invalidates its dialog, then never send the saved mutation", async (ending) => {
+    // given
+    const owner = proofOwnerHarness();
+    let proved!: () => void;
+    vi.spyOn(api, "reauthenticate").mockReturnValue(new Promise((resolve) => { proved = resolve; }));
+    const changing = vi.spyOn(api, "changeAccountRoles").mockRejectedValueOnce(new ApiError(403, { type: "urn:courtside:error:recent-authentication-required", title: "Proof required", status: 403 })).mockResolvedValue({ ...jane, roles: ["MEMBER", "TRAINER"] });
+    const shown = showPerson(jane, club, owner.Wrapper);
+    await userEvent.click(await screen.findByTestId("account-roles-TRAINER"));
+    await userEvent.click(screen.getByTestId("save-person"));
+    await userEvent.type(document.getElementById("admin-reauthentication-password")!, "current-password");
+    await userEvent.click(screen.getByTestId("admin-reauthentication-submit"));
+    // when
+    if (ending === "escape") {
+      await userEvent.click(screen.getByRole("dialog").querySelector("input")!);
+      await userEvent.keyboard("{Escape}");
+      expect(screen.queryByRole("dialog")).toBeNull();
+    }
+    else if (ending === "unmount") shown.unmount();
+    else act(owner.change);
+    await act(async () => { proved(); await Promise.resolve(); });
+    // then
+    expect(changing).toHaveBeenCalledOnce();
+  });
+
 });

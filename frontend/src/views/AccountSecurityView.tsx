@@ -8,13 +8,18 @@ import { LoadFailure } from "../components/LoadFailure";
 import { Modal } from "../components/Modal";
 import { TextField } from "../components/TextField";
 import { useClubConfiguration } from "../club/registry";
+import { MfaSettings } from "./MfaSettings";
+import { ReauthenticationCode } from "../components/ReauthenticationCode";
+import { reauthenticateForm } from "../security/reauthentication";
 import { formatDateTime } from "../time/clubZone";
 
 const RECENT_AUTH = "urn:courtside:error:recent-authentication-required";
 
-export function AccountSecurityView({ passwordChanged, signedOut, embedded = false, focusRequested = false }: {
+export function AccountSecurityView({ passwordChanged, signedOut, embedded = false, focusRequested = false, mfaEnabled, username }: {
+  mfaEnabled?: boolean;
+  username?: string;
   passwordChanged: () => void;
-  signedOut: () => void;
+  signedOut: (preserveRecoveryCodes?: boolean) => void;
   embedded?: boolean;
   focusRequested?: boolean;
 }) {
@@ -80,7 +85,7 @@ export function AccountSecurityView({ passwordChanged, signedOut, embedded = fal
     setPending(true);
     setReauthenticationFailure(undefined);
     try {
-      await api.reauthenticate(password);
+      await reauthenticateForm(event.currentTarget, password);
       if (!isCurrent(version) || proofVersion.current !== proof) return;
       const pendingAction = retry;
       await pendingAction.action();
@@ -117,6 +122,7 @@ export function AccountSecurityView({ passwordChanged, signedOut, embedded = fal
     <header><Heading ref={heading} tabIndex={-1} data-testid="account-security-title"
       className="focus-ring scroll-mt-4 rounded text-2xl font-bold">{t("accountSecurity.title")}</Heading><p className="text-muted mt-2">{t("accountSecurity.description")}</p></header>
     {failure && <Alert testId="account-security-failure">{failure}</Alert>}
+    {mfaEnabled !== undefined && <MfaSettings username={username} pending={pending} run={run} signedOut={signedOut} />}
     <section className="grid gap-4">
       <Subheading className="text-xl font-bold">{t("accountSecurity.sessions.title")}</Subheading>
       {clubError ? <LoadFailure message={clubError} retry={loadClub} /> : !club && <p role="status">{t("status.loading")}</p>}
@@ -148,6 +154,7 @@ export function AccountSecurityView({ passwordChanged, signedOut, embedded = fal
         <p>{t("accountSecurity.reauthenticate")}</p>
         {reauthenticationFailure && <Alert>{reauthenticationFailure}</Alert>}
         <TextField id="reauthentication-password" name="reauthentication-password" type="password" autoComplete="current-password" required label={t("auth.password")} />
+        <ReauthenticationCode required={mfaEnabled} />
         <div><Button variant="primary" disabled={pending} type="submit" data-testid="reauthentication-submit">{t("accountSecurity.continue")}</Button></div>
       </form>
     </Modal>}

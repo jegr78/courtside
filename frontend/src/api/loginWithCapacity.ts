@@ -3,7 +3,7 @@ import { abortable, abortReason } from "./abortable";
 
 export async function loginWithCapacity(username: string, password: string,
   signal: AbortSignal, waiting: (seconds: number) => void,
-  refresh?: (signal: AbortSignal) => Promise<void>): Promise<void> {
+  refresh?: (signal: AbortSignal) => Promise<void>): Promise<"mfa-required" | void> {
   signal.throwIfAborted();
   const lifetime = new AbortController();
   const cancel = () => lifetime.abort(signal.reason);
@@ -14,8 +14,9 @@ export async function loginWithCapacity(username: string, password: string,
   try {
     for (let attempt = 1; attempt <= 5; attempt++) {
       lifetime.signal.throwIfAborted();
+      let outcome: "mfa-required" | undefined;
       try {
-        await abortable(() => api.login(username, password, lifetime.signal,
+        outcome = await abortable(() => api.login(username, password, lifetime.signal,
           Math.min(2, remainingRequests)), lifetime.signal);
       } catch (failure) {
         lifetime.signal.throwIfAborted();
@@ -33,7 +34,7 @@ export async function loginWithCapacity(username: string, password: string,
       lifetime.signal.throwIfAborted();
       if (refresh) await abortable(() => refresh(lifetime.signal), lifetime.signal);
       lifetime.signal.throwIfAborted();
-      return;
+      return outcome;
     }
   } finally {
     clearTimeout(deadline);
