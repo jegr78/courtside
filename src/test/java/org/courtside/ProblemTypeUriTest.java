@@ -28,6 +28,8 @@ class ProblemTypeUriTest {
     // Every URN src/main may produce. Two sources: a domain failure carries a ProblemType
     // constant, a framework exception only a literal in the advice answering for it.
     private static final List<String> KNOWN_FAILURE_SLUGS = List.of(
+            "urn:courtside:error:mfa-proof-failed",
+            "urn:courtside:error:mfa-resource-not-found",
             "urn:courtside:error:account-address-missing",
             "urn:courtside:error:account-deactivated",
             "urn:courtside:error:account-recovery-code-expired",

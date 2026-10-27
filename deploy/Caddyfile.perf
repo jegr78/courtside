@@ -71,7 +71,7 @@ https://localhost:443, https://proxy:443 {
 		method QUERY
 		path /api/*
 	}
-	method @unknownMethod PATCH
+	method @unknownMethod TRACE
 
 	handle {
 		reverse_proxy app:8080 {

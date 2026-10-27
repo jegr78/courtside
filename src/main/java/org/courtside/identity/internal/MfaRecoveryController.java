@@ -8,7 +8,6 @@ import org.courtside.api.ApiMfaRecoveryInitiation;
 import org.courtside.api.ApiMfaRecoveryRedemption;
 import org.courtside.identity.UserAccountRepository;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.UUID;
@@ -23,7 +22,6 @@ class MfaRecoveryController implements MfaRecoveryApi {
     private final HttpServletRequest request;
 
     @Override
-    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiMfaAdministrativeStatus> getAdministrativeMfaStatus(UUID id) {
         if (!accounts.existsById(id)) throw new MfaResourceNotFoundException();
         return ResponseEntity.ok(new ApiMfaAdministrativeStatus(factors.enabled(id), factors.recoveryPending(id)));

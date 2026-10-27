@@ -27,7 +27,7 @@
 		method QUERY
 		path /api/*
 	}
-	method @unknownMethod PATCH
+	method @unknownMethod TRACE
 	@forwardedInput header X-Forwarded-Host *
 	respond @forwardedInput 421
 	reverse_proxy app:8080 {

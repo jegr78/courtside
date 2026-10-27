@@ -3,19 +3,21 @@ package org.courtside.notification.internal;
 import org.courtside.config.ClubIdentity;
 import org.courtside.identity.ControlledRecoveryCodeIssuer;
 import org.courtside.identity.ControlledRecoveryRequested;
-import org.courtside.identity.Person;
-import org.courtside.identity.UserAccount;
 import org.courtside.identity.UserAccountRepository;
+import org.courtside.identity.testfixture.IdentityTestFixture;
+import org.courtside.AbstractIntegrationTest;
 import org.courtside.notification.MessageKind;
 import org.courtside.shared.IssuedResetCode;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
 
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -25,13 +27,20 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-class ControlledRecoveryCodeMailerTest {
+@Import(IdentityTestFixture.class)
+class ControlledRecoveryCodeMailerTest extends AbstractIntegrationTest {
     private final ControlledRecoveryCodeIssuer codes = mock(ControlledRecoveryCodeIssuer.class);
-    private final UserAccountRepository accounts = mock(UserAccountRepository.class);
+    @Autowired private UserAccountRepository accounts;
+    @Autowired private IdentityTestFixture identity;
     private final ClubIdentity club = mock(ClubIdentity.class);
     private final MessageOutbox outbox = mock(MessageOutbox.class);
-    private final ControlledRecoveryCodeMailer mailer = new ControlledRecoveryCodeMailer(codes, accounts, club,
-            new MailTemplates(mock(MessageTemplateOverrides.class)), new InstanceLinks(""), outbox);
+    private ControlledRecoveryCodeMailer mailer;
+
+    @BeforeEach
+    void setUp() {
+        mailer = new ControlledRecoveryCodeMailer(codes, accounts, club,
+                new MailTemplates(mock(MessageTemplateOverrides.class)), new InstanceLinks(""), outbox);
+    }
 
     @Test
     void givenRecoveryInitiation_whenQueued_thenNoPlaintextCodeIsWritten() {
@@ -66,11 +75,10 @@ class ControlledRecoveryCodeMailerTest {
     }
 
     private List<OutgoingMail> compose(String locale) {
-        UUID id = UUID.randomUUID();
+        UUID id = identity.createEnabledAccount(identity.createPerson("Jane", "Doe", "jane.doe@example.org"),
+                "doe.jane", Set.of());
+        identity.changeLocale(id, locale);
         UUID recovery = UUID.randomUUID();
-        UserAccount account = new UserAccount(new Person("Jane", "Doe", "jane.doe@example.org"), "doe.jane", "hash", Set.of(), locale);
-        account.enable();
-        when(accounts.findById(id)).thenReturn(Optional.of(account));
         when(codes.issueFor(id, recovery)).thenReturn(new IssuedResetCode("jane.doe@example.org", "Jane", locale,
                 "doe.jane", "ABCD-EFGH", Instant.parse("2026-10-27T18:00:00Z")));
         when(club.clubName()).thenReturn("Example Tennis Club");
