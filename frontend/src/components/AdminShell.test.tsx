@@ -232,3 +232,67 @@ it("given clipped navigation entries, when their observer delivers, then shorten
     vi.useRealTimers();
   }
 });
+
+it("given navigation with a pending resize, when the member scrolls before its scroll event arrives, then layout keeps that position", () => {
+  // given
+  vi.useFakeTimers();
+  const callbacks: (() => void)[] = [];
+  vi.stubGlobal("ResizeObserver", class {
+    constructor(callback: () => void) { callbacks.push(callback); }
+    observe() {}
+    disconnect() {}
+  });
+  try {
+    show("/admin/facility");
+    const body = screen.getByTestId("admin-navigation-scroll");
+    const entries = [...body.querySelectorAll<HTMLElement>("a, p")];
+    entries[11].setAttribute("aria-current", "page");
+    layOut(body, { top: 100, height: 200 }, entries.length * 32);
+    act(() => { window.dispatchEvent(new Event("resize")); });
+    expect(body.scrollTop).toBeGreaterThan(0);
+    act(() => callbacks.forEach((deliver) => deliver()));
+    // when
+    body.scrollTop = 0;
+    act(() => { vi.advanceTimersToNextFrame(); });
+    // then
+    expect(body.scrollTop, "a queued layout must not undo scrolling before the scroll event is delivered").toBe(0);
+    expect(screen.queryByTestId("admin-sidebar-precedes")).not.toBeInTheDocument();
+  } finally {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  }
+});
+
+it("given navigation following its active entry, when growing content clamps its scroll position, then shrinking the frame still reveals that entry", () => {
+  // given
+  vi.useFakeTimers();
+  const callbacks: (() => void)[] = [];
+  vi.stubGlobal("ResizeObserver", class {
+    constructor(callback: () => void) { callbacks.push(callback); }
+    observe() {}
+    disconnect() {}
+  });
+  try {
+    show("/admin/facility");
+    const body = screen.getByTestId("admin-navigation-scroll");
+    const entries = [...body.querySelectorAll<HTMLElement>("a, p")];
+    entries[11].setAttribute("aria-current", "page");
+    const frame = { top: 100, height: 200 };
+    layOut(body, frame, entries.length * 32);
+    act(() => { window.dispatchEvent(new Event("resize")); });
+    expect(body.scrollTop).toBeGreaterThan(0);
+    // when
+    frame.height = entries.length * 32 + 100;
+    body.style.maxHeight = "";
+    body.scrollTop = 0;
+    fireEvent.scroll(body);
+    frame.height = 200;
+    act(() => callbacks.forEach((deliver) => deliver()));
+    act(() => { vi.advanceTimersToNextFrame(); });
+    // then
+    expect(body.scrollTop, "automatic clamping must not cancel following the active entry").toBe(6 * 32);
+  } finally {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  }
+});

@@ -20,7 +20,10 @@ export function useScrollContinuation(active = true, destination?: string) {
   }, [active]);
 
   const scrolled = useCallback(() => {
-    if (body.current && Math.abs(body.current.scrollTop - placed.current) >= 1) following.current = false;
+    if (body.current) {
+      if (movedFrom(body.current, placed.current)) following.current = false;
+      placed.current = body.current.scrollTop;
+    }
     measure();
   }, [measure]);
 
@@ -37,9 +40,13 @@ export function useScrollContinuation(active = true, destination?: string) {
       }
       measure();
     };
-    laidOut.current = layout;
+    const resized = () => {
+      if (body.current && movedFrom(body.current, placed.current)) following.current = false;
+      layout();
+    };
+    laidOut.current = resized;
     layout();
-    const disconnect = observeResize(layout, [body.current, body.current?.parentElement ?? null, content.current]);
+    const disconnect = observeResize(resized, [body.current, body.current?.parentElement ?? null, content.current]);
     window.addEventListener("resize", layout);
     return () => {
       laidOut.current = undefined;
@@ -51,6 +58,11 @@ export function useScrollContinuation(active = true, destination?: string) {
   const relayout = useCallback(() => laidOut.current?.(), []);
 
   return { body, content, continues, precedes, overflows, measure: scrolled, relayout };
+}
+
+function movedFrom(element: HTMLElement, placed: number) {
+  const expected = Math.min(placed, Math.max(0, element.scrollHeight - element.clientHeight));
+  return Math.abs(element.scrollTop - expected) >= 1;
 }
 
 function reveal(element: HTMLElement) {
