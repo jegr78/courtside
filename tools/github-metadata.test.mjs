@@ -52,6 +52,11 @@ export function validateDependabot(candidate) {
     return `${update["package-ecosystem"]}:${update.directory}`;
   });
   assert.deepEqual(locations.sort(), ["docker-compose:/deploy", "docker:/", "github-actions:/", "maven:/", "npm:/frontend", "npm:/site"]);
+  const frontend = candidate.updates.find((update) => update["package-ecosystem"] === "npm" && update.directory === "/frontend");
+  assert.deepEqual(frontend.groups, {
+    "frontend-minor-and-patch": { "applies-to": "version-updates", patterns: ["*"], "update-types": ["minor", "patch"] }
+  }, "Frontend dependency updates need one compatible version-only catch-all group; security fixes remain ungrouped");
+  assert.equal(frontend.ignore, undefined, "Frontend dependency updates must not silently ignore available fixes");
 }
 
 export function validatePullRequestTitleWorkflow(candidate) {
@@ -88,6 +93,29 @@ test("given Dependabot metadata loses an ecosystem or gains an unknown root fiel
   // when / then
   assert.throws(() => validateDependabot(missing));
   assert.throws(() => validateDependabot(open));
+});
+
+test("given frontend dependency grouping drifts, when validating, then routine updates cannot split or absorb security fixes", () => {
+  // given
+  const source = parse(readFileSync(new URL("../.github/dependabot.yml", import.meta.url), "utf8"));
+  const mutations = [
+    (frontend) => { delete frontend.groups; },
+    (frontend) => { frontend.groups["frontend-minor-and-patch"].patterns = ["vitest"]; },
+    (frontend) => { frontend.groups["frontend-minor-and-patch"]["applies-to"] = "security-updates"; },
+    (frontend) => { delete frontend.groups["frontend-minor-and-patch"]["applies-to"]; },
+    (frontend) => { frontend.groups.security = { "applies-to": "security-updates", patterns: ["*"] }; },
+    (frontend) => { frontend.groups["frontend-minor-and-patch"]["update-types"] = ["minor"]; },
+    (frontend) => { frontend.groups["frontend-minor-and-patch"]["update-types"].push("major"); },
+    (frontend) => { frontend.ignore = [{ "dependency-name": "*", "update-types": ["version-update:semver-patch"] }]; }
+  ];
+
+  // when / then
+  for (const mutate of mutations) {
+    const candidate = structuredClone(source);
+    mutate(candidate.updates.find((update) => update["package-ecosystem"] === "npm" && update.directory === "/frontend"));
+    assert.throws(() => validateDependabot(candidate), /Frontend dependency updates/,
+      "frontend minor and patch versions share one explicit version-only catch-all group without ignored updates");
+  }
 });
 
 test("given Dependabot nested fields are malformed, when validating, then each fails closed", () => {
@@ -152,7 +180,7 @@ export function validateCodeOwners(source) {
 }
 
 test("given the code owners, when validating them, then the security record and the workflows are owned", () => {
-  // given — a record under security/ can move the assessment gate to passed, so it never lands unread
+  // given
   const source = readFileSync(new URL("../.github/CODEOWNERS", import.meta.url), "utf8");
 
   // when / then
