@@ -42,7 +42,14 @@ test("given a landscape phone account menu, when the member opens it, then a cue
   await page.getByTestId("preferences-menu").click();
   await page.setViewportSize({ width: 852, height: 350 });
   // when
-  await page.getByTestId("preferences-menu").click();
+  const identity = await page.getByTestId("account-identity").boundingBox();
+  const control = await page.getByTestId("preferences-menu").boundingBox();
+  expect(identity).not.toBeNull();
+  expect(control).not.toBeNull();
+  await page.getByTestId("preferences-menu").click({ position: {
+    x: identity!.x - control!.x + identity!.width / 2,
+    y: identity!.y - control!.y + identity!.height / 2
+  } });
   // then
   const cue = page.getByTestId("preferences-continues");
   await expect(cue).toBeVisible({ timeout: 10_000 });

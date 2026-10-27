@@ -23,7 +23,7 @@ test("given a member who wants their account in order, when they choose a new pa
 
     // when — the browsers this account is signed in on are read
     await openTheAccountMenu(page);
-    await activate(page.getByTestId("account-security-link"));
+    await activate(page.getByTestId("account-link"));
     await expect(page.getByTestId("account-security-view")).toBeVisible();
     await expect(page.getByTestId("end-current-session")).toHaveCount(1);
     await activate(page.getByTestId("end-current-session"));
@@ -35,7 +35,7 @@ test("given a member who wants their account in order, when they choose a new pa
     await signIn(page, "doe.jane");
     await expect(page.getByTestId("court-plan-view")).toBeVisible();
     await openTheAccountMenu(page);
-    await activate(page.getByTestId("account-security-link"));
+    await activate(page.getByTestId("account-link"));
     await expect(page.getByTestId("account-security-view")).toBeVisible();
     await writeInto(page.getByTestId("current-password"), "temporary-password");
     await writeInto(page.getByTestId("new-password"), "a-password-nobody-guesses");

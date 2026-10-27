@@ -34,6 +34,8 @@ class SessionStatusController implements SessionStatusApi {
         return new ApiSessionStatus(true, roles, account.isPasswordChangeRequired())
                 .username(account.getUsername())
                 .displayName(account.getPerson().getDisplayName())
+                .firstName(account.getPerson().getFirstName())
+                .lastName(account.getPerson().getLastName())
                 .locale(account.getLocale())
                 .managesAppointments(reach.managesAppointments())
                 .createsSeries(reach.createsSeries());

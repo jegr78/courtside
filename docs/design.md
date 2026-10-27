@@ -678,6 +678,21 @@ Accounts sign in by username. Passwords use Argon2id with `m=19456`, `t=2`, `p=1
 rehashes an older encoding when possible. Failure to store that opportunistic rehash does not reject
 the correct password.
 
+The global account control displays the signed-in username. Its single My account entry opens
+`/account`, with a read-only profile followed by account security. The profile shows username,
+separate first and last names from the account's Person, and every role assigned to that account.
+It is available to every authenticated account without requiring membership or roster access.
+Managing a dependant does not replace the session holder's identity. Session status supplies the
+name fields only for an authenticated account; anonymous and revoked sessions expose none.
+`/account/security` remains a direct authenticated entry that scrolls and focuses the security
+section. Initial-password requirements and sign-in return targets apply to both routes.
+The identity remains in session memory only. Offline fallback shows unavailable account details
+and never presents its synthetic booking-access role as an actual assignment.
+Pending security continuations belong to the account that started them. An account change
+discards old completions and unsubmitted proof actions. Cancelling a pending proof prevents its
+follow-up action; a server action already submitted still applies its confirmed result to that
+same account.
+
 Temporary login admission refusals are retried only for the typed login rate-limit problem with a
 valid server-directed wait of one to five seconds. One submission allows at most five credential
 POSTs, including CSRF recovery, and ten seconds of accumulated waiting. The fifteen-second deadline

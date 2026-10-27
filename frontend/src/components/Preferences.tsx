@@ -13,8 +13,9 @@ import { useScrollContinuation } from "./useScrollContinuation";
 
 const controlClass = "form-control rounded-lg border px-3 py-2 text-sm font-semibold";
 
-export function Preferences({ authenticated = false, supported, signedOut }: {
+export function Preferences({ authenticated = false, username, supported, signedOut }: {
   authenticated?: boolean;
+  username?: string;
   supported?: string[];
   signedOut: () => void;
 }) {
@@ -31,7 +32,7 @@ export function Preferences({ authenticated = false, supported, signedOut }: {
   useLayoutEffect(() => {
     session.current += 1;
     setFailure(undefined);
-  }, [authenticated]);
+  }, [authenticated, username]);
 
   // A short viewport scrolls the menu itself, so sign out stays reachable without moving the page.
   useLayoutEffect(() => {
@@ -87,14 +88,15 @@ export function Preferences({ authenticated = false, supported, signedOut }: {
 
   return <div className="grid w-full justify-items-start gap-2 sm:w-auto sm:justify-items-end">
     {failure && <Alert testId="preferences-failure">{failure}</Alert>}
-    <details className="relative" open={open}>
+    <details className="relative min-w-0 max-w-full" open={open}>
       <summary data-testid="preferences-menu"
         onClick={(event) => {
           event.preventDefault();
           setOpen((current) => !current);
         }}
-        className="form-control cursor-pointer list-none rounded-lg border px-3 py-2 text-sm font-semibold [&::-webkit-details-marker]:hidden">
-        {t(authenticated ? "preferences.accountMenu" : "preferences.menu")}
+        className="form-control flex max-w-full cursor-pointer list-none flex-wrap items-center gap-x-2 rounded-lg border px-3 py-2 text-sm font-semibold [&::-webkit-details-marker]:hidden [&>span]:pointer-events-none">
+        <span className={authenticated ? "sr-only sm:not-sr-only sm:shrink-0" : undefined}>{t(authenticated ? "preferences.accountMenu" : "preferences.menu")}</span>{" "}
+        {authenticated && <span data-testid="account-identity" className="min-w-0 break-all font-normal">{username ?? t("account.unavailable")}</span>}
       </summary>
       <div ref={panel} style={{ maxHeight: panelHeight }}
         className="surface-panel absolute left-0 z-30 mt-2 flex w-64 max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-xl border shadow-[0_20px_50px_var(--cs-shadow)] sm:left-auto sm:right-0">
@@ -111,9 +113,9 @@ export function Preferences({ authenticated = false, supported, signedOut }: {
             <option value="light">{t("preferences.light")}</option>
           </select>
         </label>
-        {authenticated && <Link to="/account/security" data-testid="account-security-link"
+        {authenticated && <Link to="/account" data-testid="account-link"
           onClick={() => setOpen(false)} className="focus-ring rounded-lg border px-4 py-3 text-center font-semibold hover:brightness-90">
-          {t("accountSecurity.menu")}
+          {t("account.title")}
         </Link>}
         {authenticated && <Button variant="secondary" type="button" data-testid="logout" onClick={() => void logout()}>{t("auth.logout")}</Button>}
           </div>

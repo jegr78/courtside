@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useState } from "react";
+import { type FormEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { api, ApiError, type AccountSession } from "../api/client";
 import { problemMessage } from "../api/problem-message";
@@ -12,9 +12,11 @@ import { formatDateTime } from "../time/clubZone";
 
 const RECENT_AUTH = "urn:courtside:error:recent-authentication-required";
 
-export function AccountSecurityView({ passwordChanged, signedOut }: {
+export function AccountSecurityView({ passwordChanged, signedOut, embedded = false, focusRequested = false }: {
   passwordChanged: () => void;
   signedOut: () => void;
+  embedded?: boolean;
+  focusRequested?: boolean;
 }) {
   const { t, i18n } = useTranslation();
   const { club, error: clubError, load: loadClub } = useClubConfiguration();
@@ -22,6 +24,11 @@ export function AccountSecurityView({ passwordChanged, signedOut }: {
   const [failure, setFailure] = useState<string>();
   const [reauthenticationFailure, setReauthenticationFailure] = useState<string>();
   const [pending, setPending] = useState(false);
+  const heading = useRef<HTMLHeadingElement>(null);
+  const actionVersion = useRef(0);
+  const proofVersion = useRef(0);
+  const Heading = embedded ? "h2" : "h1";
+  const Subheading = embedded ? "h3" : "h2";
   const [retry, setRetry] = useState<{
     action: () => Promise<void>;
     completed?: () => void;
@@ -31,14 +38,27 @@ export function AccountSecurityView({ passwordChanged, signedOut }: {
     void api.accountSessions().then(setSessions).catch((error) => setFailure(problemMessage(error, t)));
   }, [t]);
 
+  useLayoutEffect(() => () => { actionVersion.current += 1; }, []);
+
+  function isCurrent(version: number) { return actionVersion.current === version; }
+
+  useLayoutEffect(() => {
+    if (!focusRequested) return;
+    heading.current?.scrollIntoView?.({ block: "start" });
+    heading.current?.focus({ preventScroll: true });
+  }, [focusRequested]);
+
   async function run(action: () => Promise<void>, completed?: () => void) {
+    const version = actionVersion.current;
     setPending(true);
     setFailure(undefined);
     try {
       await action();
+      if (!isCurrent(version)) return;
       if (completed) completed();
       else setSessions(await api.accountSessions());
     } catch (error) {
+      if (!isCurrent(version)) return;
       if (error instanceof ApiError && error.problem?.type === RECENT_AUTH) {
         setReauthenticationFailure(undefined);
         setRetry({ action, completed });
@@ -46,7 +66,7 @@ export function AccountSecurityView({ passwordChanged, signedOut }: {
         setFailure(problemMessage(error, t));
       }
     } finally {
-      setPending(false);
+      if (isCurrent(version)) setPending(false);
     }
   }
 
@@ -54,19 +74,24 @@ export function AccountSecurityView({ passwordChanged, signedOut }: {
     event.preventDefault();
     const password = new FormData(event.currentTarget).get("reauthentication-password");
     if (typeof password !== "string" || !retry) return;
+    const version = actionVersion.current;
+    const proof = proofVersion.current;
+    event.currentTarget.querySelector<HTMLInputElement>("#reauthentication-password")?.focus();
     setPending(true);
     setReauthenticationFailure(undefined);
     try {
       await api.reauthenticate(password);
+      if (!isCurrent(version) || proofVersion.current !== proof) return;
       const pendingAction = retry;
       await pendingAction.action();
-      setRetry(undefined);
+      if (!isCurrent(version)) return;
+      if (proofVersion.current === proof) setRetry(undefined);
       if (pendingAction.completed) pendingAction.completed();
       else setSessions(await api.accountSessions());
     } catch (error) {
-      setReauthenticationFailure(problemMessage(error, t));
+      if (isCurrent(version) && proofVersion.current === proof) setReauthenticationFailure(problemMessage(error, t));
     } finally {
-      setPending(false);
+      if (isCurrent(version) && proofVersion.current === proof) setPending(false);
     }
   }
 
@@ -89,10 +114,11 @@ export function AccountSecurityView({ passwordChanged, signedOut }: {
   }
 
   return <section data-testid="account-security-view" className="surface-panel grid w-full max-w-3xl gap-8 rounded-2xl border p-6 shadow-[0_20px_50px_var(--cs-shadow)] sm:p-8">
-    <header><h1 className="text-2xl font-bold">{t("accountSecurity.title")}</h1><p className="text-muted mt-2">{t("accountSecurity.description")}</p></header>
+    <header><Heading ref={heading} tabIndex={-1} data-testid="account-security-title"
+      className="focus-ring scroll-mt-4 rounded text-2xl font-bold">{t("accountSecurity.title")}</Heading><p className="text-muted mt-2">{t("accountSecurity.description")}</p></header>
     {failure && <Alert testId="account-security-failure">{failure}</Alert>}
     <section className="grid gap-4">
-      <h2 className="text-xl font-bold">{t("accountSecurity.sessions.title")}</h2>
+      <Subheading className="text-xl font-bold">{t("accountSecurity.sessions.title")}</Subheading>
       {clubError ? <LoadFailure message={clubError} retry={loadClub} /> : !club && <p role="status">{t("status.loading")}</p>}
       <ul className="grid gap-3">
         {sessions.map((session) => <li key={session.handle} className="grid gap-2 rounded-xl border p-4 sm:grid-cols-[1fr_auto] sm:items-center">
@@ -112,6 +138,8 @@ export function AccountSecurityView({ passwordChanged, signedOut }: {
         onClick={() => void run(api.endOwnSessions, signedOut)}>{t("accountSecurity.sessions.endAll")}</Button></div>
     </section>
     {retry && <Modal labelledBy="account-reauthentication-title" closed={() => {
+      proofVersion.current += 1;
+      setPending(false);
       setRetry(undefined);
       setReauthenticationFailure(undefined);
     }}>
@@ -124,7 +152,7 @@ export function AccountSecurityView({ passwordChanged, signedOut }: {
       </form>
     </Modal>}
     <form className="grid gap-4" onSubmit={(event) => void changePassword(event)}>
-      <h2 className="text-xl font-bold">{t("accountSecurity.password.title")}</h2>
+      <Subheading className="text-xl font-bold">{t("accountSecurity.password.title")}</Subheading>
       <TextField id="current-password" name="current-password" data-testid="current-password" type="password" autoComplete="current-password" required label={t("accountSecurity.password.current")} />
       <TextField id="new-password" name="new-password" data-testid="new-password" type="password" autoComplete="new-password" minLength={12} maxLength={256} required label={t("password.new")} />
       <TextField id="confirm-password" name="confirm-password" data-testid="confirm-password" type="password" autoComplete="new-password" minLength={12} maxLength={256} required label={t("password.confirm")} />

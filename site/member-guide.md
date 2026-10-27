@@ -355,7 +355,15 @@ Speichere die Auswahl. Die Einstellung gilt nur für künftige Nachrichten.
 
 ## Dein Konto
 
-Öffne *Kontosicherheit*, um dein Passwort und deine Sitzungen zu verwalten.
+Dein Benutzername steht am Menü *Konto und Darstellung*. Öffne dort *Mein Konto*.
+Im Abschnitt *Profil* siehst du deinen Benutzernamen, Vor- und Nachnamen und alle Rollen,
+die der Verein deinem Konto zugewiesen hat. Auch wenn du eine angehörige Person verwaltest,
+zeigt das Profil dein eigenes Konto. Ohne Verbindung zeigt Courtside keine unbestätigten Kontodaten.
+
+![Das eigene Profil mit Benutzername, getrennten Namensfeldern und zugewiesenen Rollen.](screenshots/de/account-profile.png)
+
+Unter dem Profil findest du die *Kontosicherheit* mit Passwort und Sitzungen.
+Vorhandene direkte Links zur Kontosicherheit führen weiterhin zu diesem Abschnitt.
 
 Beim Ändern des Passworts musst du das aktuelle Passwort eingeben. Nach dem Speichern beendet
 Courtside alle Sitzungen, auch die gerade verwendete. Melde dich danach mit dem neuen Passwort an.

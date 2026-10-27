@@ -162,7 +162,7 @@ test("ending the current session removes a personal view from every open tab", a
   await otherPage.getByTestId("my-bookings-link").click();
   await expect(otherPage.getByTestId("my-bookings-page")).toBeVisible();
   await page.getByTestId("preferences-menu").click();
-  await page.getByTestId("account-security-link").click();
+  await page.getByTestId("account-link").click();
   await expect(page.getByTestId("end-current-session")).toHaveCount(1);
 
   // when

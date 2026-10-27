@@ -55,12 +55,12 @@ const configuredProjects = [
   { name: "guides-en", testMatch: /guide-screenshots\.spec\.ts/, snapshotPathTemplate: "{testDir}/../../site/screenshots/en/{arg}{ext}", use: { browserName: "chromium" as const, locale: "en-GB" } },
   { name: "chromium", testIgnore: /accessibility\.spec\.ts|responsive-mobile\.spec\.ts|visual-regression\.spec\.ts|guide-screenshots\.spec\.ts|journeys\//, use: { browserName: "chromium" as const } },
   { name: "chromium-accessibility", testMatch: /accessibility\.spec\.ts/, use: { browserName: "chromium" as const } },
-  { name: "webkit-core", testMatch: /supported-browser\.spec\.ts|browser-security-smoke\.spec\.ts/, use: { browserName: "webkit" as const } },
+  { name: "webkit-core", testMatch: /supported-browser\.spec\.ts|browser-security-smoke\.spec\.ts|account-overview\.spec\.ts/, use: { browserName: "webkit" as const } },
   { name: "webkit-pwa", testMatch: /pwa-browser-compatibility\.spec\.ts|pwa-first-install\.spec\.ts/, use: { browserName: "webkit" as const } },
   // Both engines, because a phone layout breaks per engine: the booking dialog was swallowed by a
   // bar on WebKit and the footer was covered on Chromium, each invisible to the other.
-  { name: "iphone", testMatch: /responsive-mobile\.spec\.ts/, use: { ...devices["iPhone 15"] } },
-  { name: "android", testMatch: /responsive-mobile\.spec\.ts/, use: { ...devices["Pixel 7"] } },
+  { name: "iphone", testMatch: /responsive-mobile\.spec\.ts|account-overview\.spec\.ts/, use: { ...devices["iPhone 15"] } },
+  { name: "android", testMatch: /responsive-mobile\.spec\.ts|account-overview\.spec\.ts/, use: { ...devices["Pixel 7"] } },
   ...qualificationProjects,
   ...periodicProjects,
   ...journeyProjects

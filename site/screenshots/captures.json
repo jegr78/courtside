@@ -73,6 +73,11 @@
       "pages": { "de": "site/member-guide.md", "en": "site/en/member-guide.md" }
     },
     {
+      "name": "account-profile",
+      "surface": "account-profile",
+      "pages": { "de": "site/member-guide.md", "en": "site/en/member-guide.md" }
+    },
+    {
       "name": "account-security",
       "surface": "account-security-view",
       "pages": { "de": "site/member-guide.md", "en": "site/en/member-guide.md" }
