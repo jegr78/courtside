@@ -193,7 +193,8 @@ class ControlledAccountRecovery implements ControlledRecoveryCodeIssuer {
     }
 
     private record RecoveryEmail(@jakarta.validation.constraints.NotBlank @jakarta.validation.constraints.Email
-                                 @jakarta.validation.constraints.Size(max = 254) String value) { }
+                                 @jakarta.validation.constraints.Size(max = 120)
+                                 @jakarta.validation.constraints.Pattern(regexp = "[^\\x00-\\x20\\x7f-\\x9f@]+@[^\\x00-\\x20\\x7f-\\x9f@.]+(\\.[^\\x00-\\x20\\x7f-\\x9f@.]+)+") String value) { }
 
     enum Redemption { ACCEPTED, INVALID, EXPIRED, LIMITED }
     private record Recovery(UUID recoveryId, long epoch, String addressHash, String codeHash, Instant expires) { }

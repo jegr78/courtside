@@ -218,3 +218,12 @@ The assessment catalog contains controls whose universal wording cannot be prove
 Their rationale remains visible and is not reported as automated evidence. Courtside does not claim
 complete conformance from those entries. A control with a concrete product remedy becomes tracked
 work. Reconsider when an inventory or executable test can replace the reasoning.
+
+## Synchronized passkeys may not supply a clone-detection counter
+
+Courtside permits credentials that consistently report a zero signature counter, as synchronized
+passkeys may do. If an attacker obtains both the private credential and the account password, a
+zero-counter copy cannot be distinguished from the enrolled authenticator by its counter. Every
+assertion still needs a fresh, session-bound challenge, the configured origin and RP, and signed
+user verification. Nonzero counters must increase. Reconsider this bound if supported authenticators
+provide another interoperable clone signal or the product adopts an explicit credential restriction.

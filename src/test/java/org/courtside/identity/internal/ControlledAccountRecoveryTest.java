@@ -243,6 +243,19 @@ class ControlledAccountRecoveryTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenTheRosterAddressLimits_whenMaintenanceCorrectsAnEmail_thenItCannotCreateAnAddressTheBoardCannotEdit() {
+        // given
+        String original = accounts.findById(account).orElseThrow().getPerson().getEmail();
+        List<String> invalid = List.of("jane@localhost", "a".repeat(60) + "@" + "b".repeat(60) + ".org");
+        // when / then
+        for (String address : invalid) {
+            assertThatThrownBy(() -> recovery.correctEmailFromMaintenance(account, address, true))
+                    .isInstanceOf(MfaProofFailedException.class);
+            assertThat(accounts.findById(account).orElseThrow().getPerson().getEmail()).isEqualTo(original);
+        }
+    }
+
+    @Test
     void givenMfaAndNormalPasswordReset_whenRedeemed_thenMfaRemainsEnabled() {
         // given
         String code = reset.issueFor(account).code();
