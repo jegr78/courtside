@@ -54,6 +54,7 @@ const NO_METHOD_BESIDE_IT = new Map([
 
 const EXTERNAL_OPERATIONS = new Set([
   "tools/security-mail-observation.mjs http://mail:8025/api/v1/messages",
+  "tools/security-mail-observation.mjs http://mail:8025/api/v1/message/{id}",
   "tools/security-mail-observation.mjs http://mail:8025/api/v1/message/{id}/raw"
 ]);
 
@@ -164,7 +165,8 @@ test("given a listed exception, when the runtime stops naming it, then the list 
 
 test("given trusted Mailpit URLs, when their source and origin match, then exclude only those external operations", () => {
   // given
-  const source = 'http://mail:8025/api/v1/messages http://mail:8025/api/v1/message/${message.id}/raw';
+  const source = 'http://mail:8025/api/v1/messages http://mail:8025/api/v1/message/${message.id}/raw'
+    + ' http://mail:8025/api/v1/message/${message.id}';
   // when / then
   assert.deepEqual([...namedPaths([["tools/security-mail-observation.mjs", source]]).keys()], []);
   for (const [file, text] of [
@@ -173,13 +175,13 @@ test("given trusted Mailpit URLs, when their source and origin match, then exclu
     ["tools/security-mail-observation.mjs", source.replaceAll("http://", "https://")],
     ["tools/security-mail-observation.mjs", source.replaceAll("http://mail:8025", "")]
   ]) {
-    assert.equal(namedPaths([[file, text]]).size, 2);
+    assert.equal(namedPaths([[file, text]]).size, 3);
   }
   assert.deepEqual([...namedPaths([["tools/security-mail-observation.mjs", "http://mail:8025/api/v1/unknown"]]).keys()],
     ["/api/v1/unknown"]);
   assert.equal(namedPaths([
     ["tools/security-mail-observation.mjs", source], ["tools/security-other.mjs", source]
-  ]).size, 2);
+  ]).size, 3);
 });
 
 test("given an external declaration, when its runtime URL disappears, then detect its stale source binding", () => {
@@ -187,6 +189,7 @@ test("given an external declaration, when its runtime URL disappears, then detec
   const sources = [["tools/security-mail-observation.mjs", "http://mail:8025/api/v1/messages"]];
   // when / then
   assert.deepEqual(staleExternalDeclarations(sources), [
+    "tools/security-mail-observation.mjs http://mail:8025/api/v1/message/{id}",
     "tools/security-mail-observation.mjs http://mail:8025/api/v1/message/{id}/raw"
   ]);
   assert.deepEqual(staleExternalDeclarations(), []);
