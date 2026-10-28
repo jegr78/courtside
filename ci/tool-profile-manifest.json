@@ -183,6 +183,7 @@
     { "path": "tools/security-findings.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/security-image-inventory.mjs", "profiles": ["full"], "test": false },
     { "path": "tools/security-image-inventory.test.mjs", "profiles": ["tooling"], "test": true },
+    { "path": "tools/security-key-storage.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/security-manual-assessment.mjs", "profiles": ["full"], "test": false },
     { "path": "tools/security-openapi-fuzz.mjs", "profiles": ["full"], "test": false },
     { "path": "tools/security-openapi-fuzz.test.mjs", "profiles": ["tooling"], "test": true },

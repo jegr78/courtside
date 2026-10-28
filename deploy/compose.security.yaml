@@ -40,6 +40,7 @@ services:
       db:
         condition: service_healthy
     environment:
+      COURTSIDE_MFA_KEY_ROOT: /var/lib/courtside/mfa-keys
       SPRING_PROFILES_ACTIVE: security
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/courtside_security
       SPRING_DATASOURCE_USERNAME: courtside
@@ -59,6 +60,7 @@ services:
       COURTSIDE_MAIL_FROM: no-reply@example.org
       COURTSIDE_MAIL_REPLY_TO: board@example.org
     volumes:
+      - mfa-keys:/var/lib/courtside/mfa-keys
       - ${COURTSIDE_SECURITY_MAIL_DIRECTORY:?required}/mail.p12:/trust/mail.p12:ro
     networks:
       - backend
@@ -88,6 +90,7 @@ services:
       mail:
         condition: service_started
     environment:
+      COURTSIDE_MFA_KEY_ROOT: /var/lib/courtside/mfa-keys
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/courtside_security
       SPRING_DATASOURCE_USERNAME: courtside
       SPRING_DATASOURCE_PASSWORD: ${COURTSIDE_SECURITY_SHARED_PASSWORD:?required}
@@ -106,6 +109,7 @@ services:
       COURTSIDE_MAIL_REPLY_TO: board@example.org
       MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,prometheus,mappings
     volumes:
+      - mfa-keys:/var/lib/courtside/mfa-keys
       - ${COURTSIDE_SECURITY_MAIL_DIRECTORY:?required}/mail.p12:/trust/mail.p12:ro
     networks:
       - backend
@@ -328,6 +332,14 @@ services:
       - ../security/resource-abuse.js:/scripts/resource-abuse.js:ro
     networks:
       - scanner-client
+    labels:
+      org.courtside.environment: SECURITY
+      org.courtside.security.run-id: ${COURTSIDE_SECURITY_RUN_ID:?required}
+      org.courtside.security.seed-fingerprint: ${COURTSIDE_SECURITY_SEED_FINGERPRINT:?required}
+      org.courtside.security.instance-fingerprint: ${COURTSIDE_SECURITY_INSTANCE_FINGERPRINT:?required}
+
+volumes:
+  mfa-keys:
     labels:
       org.courtside.environment: SECURITY
       org.courtside.security.run-id: ${COURTSIDE_SECURITY_RUN_ID:?required}

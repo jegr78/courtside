@@ -238,13 +238,27 @@ test("given evidence nobody can open, when the hosted run finishes, then it is n
     assert.doesNotMatch(assessment, trace, `the assessment document still describes ${trace}`);
   }
   assert.match(scheduled, /path:[\s\S]+build\/security-gate\/manifest\*\.json[\s\S]+build\/security-gate\/summary\*\.json/);
-  assert.doesNotMatch(scheduled, /path:[\s\S]+assessment\/attempt-1\/evidence/);
+  assert.match(scheduled, /build\/security-gate\/passive-deployment\.json/);
+  assert.doesNotMatch(scheduled, /evidence\/(?:\*|zap|raw|authenticated)/);
   assert.match(scheduled, /outputs:\s+evidence-artifact: \$\{\{ steps\.records\.outputs\.artifact-id \}\}/);
   assert.match(scheduled, /- id: records\n\s+uses: actions\/upload-artifact@/);
   assert.match(scheduled, /attest-evidence:[\s\S]+needs: assessment[\s\S]+if: always\(\) && needs\.assessment\.outputs\.evidence-artifact != ''/);
   assert.match(scheduled, /subject-path: build\/security-gate\/manifest\*\.json/);
   assert.match(scheduled, /attest-evidence:[\s\S]+permissions:[\s\S]+attestations: write[\s\S]+id-token: write/);
   assert.doesNotMatch(workflowPermissions, /attestations: write|id-token: write/);
+});
+
+test("given normalized passive evidence, when uploading the assessment artifact, then its manifests retain the attested root", () => {
+  // given
+  const workflow = yaml.load(scheduled);
+  const records = workflow.jobs.assessment.steps.find((step) => step.id === "records");
+
+  // when / then
+  for (const path of records.with.path.trim().split(/\n\s*/)) {
+    assert.match(path, /^build\/security-gate\/[^/]+$/);
+  }
+  assert.match(records.with.path, /build\/security-gate\/passive-deployment\.json/);
+  assert.match(scheduled, /cp -- "build\/security\/\$RUN_ID\/assessment\/attempt-1\/evidence\/passive-deployment\.json" build\/security-gate\/passive-deployment\.json/);
 });
 
 test("given the active duration contract, when the workflow chooses its job budget, then active retains the safe cleanup reserve", () => {

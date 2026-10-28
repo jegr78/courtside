@@ -156,6 +156,12 @@ jobs:
           --subject "$IMAGE_DIGEST"
           --source-commit "${{ github.sha }}"
           --output build/security-gate/summary-active.json
+      - name: Capture the normalized passive record
+        if: always() && env.PROFILE != 'active'
+        run: |
+          if [[ -f "build/security/$RUN_ID/assessment/attempt-1/evidence/passive-deployment.json" ]]; then
+            cp -- "build/security/$RUN_ID/assessment/attempt-1/evidence/passive-deployment.json" build/security-gate/passive-deployment.json
+          fi
       - name: Remove the disposable security target
         if: always()
         run: frontend/node/node tools/courtside.mjs security-cleanup "$RUN_ID"
@@ -167,6 +173,7 @@ jobs:
           path: |
             build/security-gate/manifest*.json
             build/security-gate/summary*.json
+            build/security-gate/passive-deployment.json
           retention-days: 14
           if-no-files-found: error
 

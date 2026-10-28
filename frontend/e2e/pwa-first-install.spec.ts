@@ -1,7 +1,52 @@
-import type { Browser, BrowserContextOptions } from "@playwright/test";
+import type { Browser, BrowserContextOptions, Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
 
 const personPage = "/admin/roster/00000000-0000-0000-0000-000000000103";
+
+async function reportActivationFailure(page: Page, visit: number, phase: "first-page" | "person-page") {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const snapshot = await Promise.race([
+      page.evaluate(async () => {
+        const pathClass = (value: string, knownPath: string) => {
+          try {
+            return new URL(value).pathname === knownPath ? "known" : "other";
+          } catch {
+            return "unavailable";
+          }
+        };
+        const workerState = (worker: ServiceWorker | null) => worker ? {
+          state: worker.state,
+          script: pathClass(worker.scriptURL, "/sw.js")
+        } : null;
+        const secureContext = isSecureContext;
+        if (!("serviceWorker" in navigator)) return { status: "unavailable", secureContext };
+        const controller = workerState(navigator.serviceWorker.controller);
+        try {
+          const registrations = await navigator.serviceWorker.getRegistrations();
+          return {
+            status: "available", secureContext, controller,
+            truncated: registrations.length > 4,
+            registrations: registrations.slice(0, 4).map((registration) => ({
+              scope: pathClass(registration.scope, "/"),
+              installing: workerState(registration.installing),
+              waiting: workerState(registration.waiting),
+              active: workerState(registration.active)
+            }))
+          };
+        } catch {
+          return { status: "unavailable", secureContext, controller };
+        }
+      }),
+      new Promise<{ status: "unavailable" }>((resolve) => {
+        timer = setTimeout(() => resolve({ status: "unavailable" }), 1_000);
+      })
+    ]).catch(() => ({ status: "unavailable" }));
+    console.log(JSON.stringify({ diagnostic: "pwa-activation", visit, phase, snapshot }));
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 async function administratorSession(browser: Browser, origin: BrowserContextOptions) {
   const context = await browser.newContext({ ...origin, serviceWorkers: "block" });
@@ -39,6 +84,7 @@ test("given an administrator's first visit, when a person page opens straight af
           navigator.serviceWorker.ready.then(() => true),
           new Promise<boolean>((expired) => setTimeout(() => expired(false), 10_000))
         ]));
+        if (!installed) await reportActivationFailure(page, visit, "first-page");
         expect(installed, `visit ${visit}: the service worker activates on the first page within ten seconds`).toBe(true);
       }
       await page.goto(personPage);
@@ -48,6 +94,7 @@ test("given an administrator's first visit, when a person page opens straight af
           requestAnimationFrame(() => requestAnimationFrame(() => rendered(true))))),
         new Promise<boolean>((expired) => setTimeout(() => expired(false), 10_000))
       ]));
+      if (!activated) await reportActivationFailure(page, visit, "person-page");
       expect(activated, `visit ${visit}: the service worker activates within ten seconds`).toBe(true);
       if (await page.getByTestId("pwa-update-prompt").count() > 0) prompted.push(visit);
     } finally {
