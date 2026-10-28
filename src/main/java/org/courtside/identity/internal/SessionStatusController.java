@@ -37,6 +37,7 @@ class SessionStatusController implements SessionStatusApi {
                 .map(role -> ApiRole.valueOf(role.name()))
                 .toList();
         return new ApiSessionStatus(true, roles, account.isPasswordChangeRequired())
+                .mfaRequired(false)
                 .username(account.getUsername())
                 .displayName(account.getPerson().getDisplayName())
                 .firstName(account.getPerson().getFirstName())
@@ -51,6 +52,10 @@ class SessionStatusController implements SessionStatusApi {
 
     private ApiSessionStatus anonymous() {
         ApiSessionStatus status = new ApiSessionStatus(false, List.of(), false)
+                .mfaRequired(false)
+                .mfaEnabled(false)
+                .totpAvailable(false)
+                .webauthnAvailable(false)
                 .managesAppointments(false)
                 .createsSeries(false);
         if (SecurityContextHolder.getContext().getAuthentication() instanceof MfaPendingAuthentication pending) {
