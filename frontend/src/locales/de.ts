@@ -1335,6 +1335,7 @@ const de = {
   "validation.Min": "Dieses Feld muss mindestens {{value}} sein.",
   "validation.MoveChangesSomething": "Eine Verschiebung muss Zeit, Dauer oder Plätze ändern.",
   "validation.NoDuplicates": "Jeder Eintrag darf nur einmal vorkommen.",
+  "validation.NotBlank": "Dieses Feld darf nicht leer sein.",
   "validation.NotNull": "Dieses Feld ist erforderlich.",
   "validation.SeriesEndsOnce": "Eine Serie endet entweder an einem Datum oder nach einer Anzahl von Terminen.",
   "validation.SizeAtLeast": "Dieses Feld muss mindestens {{min}} lang sein.",

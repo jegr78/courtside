@@ -73,6 +73,9 @@ class MfaProxyMethodTest extends AbstractIntegrationTest {
                     .isEqualTo("Private security key");
             assertThat(refused.statusCode()).as(refused.body()).isEqualTo(405);
             assertThat(refused.body()).contains("urn:courtside:error:method-not-supported");
+            assertThat(refused.headers().allValues("Allow")).hasSize(1);
+            assertThat(refused.headers().firstValue("Allow").orElseThrow().split(",\\s*"))
+                    .containsExactlyInAnyOrder("PATCH", "DELETE");
             var accepted = send("PATCH", route, "{\"label\":\"Intended rename\"}", "application/json");
             assertThat(accepted.statusCode()).as(accepted.body()).isEqualTo(204);
             assertThat(credentials.findByCredentialId(authenticator.credentialId()).getLabel())

@@ -174,8 +174,9 @@ class RequestEntryPointInventoryTest extends AbstractIntegrationTest {
                             "getDispatcherType", "getMethod", "getRemoteAddr"))),
             Map.entry("org/courtside/shared/web/ContainerErrorController.java",
                     new Boundary("the attributes the servlet container sets on an error dispatch;"
-                            + " the address among them is the one the client asked for, echoed into"
-                            + " the problem instance and nowhere else", List.of("getAttribute"))),
+                            + " the original address identifies the problem instance and the registered"
+                            + " target methods, with the servlet context removed before path matching",
+                            List.of("getAttribute", "getContextPath"))),
             Map.entry("org/courtside/shared/web/RejectsRepeatedParameters.java",
                     new Boundary("nothing of the request itself: it asks the reading below for a"
                             + " repeated name and reports one", List.of())),
@@ -269,7 +270,9 @@ class RequestEntryPointInventoryTest extends AbstractIntegrationTest {
 
     private static final Map<String, String> REVIEWED_UNBOUND_PARAMETERS = Map.of(
             "HttpServletRequest", "the error dispatch, whose reads this inventory carries under"
-                    + " ContainerErrorController");
+                    + " ContainerErrorController",
+            "HttpServletResponse", "the container error response, whose Allow header contains only"
+                    + " server-registered target method names and binds no request input");
 
     private static final Map<String, String> OPERATIONS_NO_HANDLER_SERVES = Map.of(
             "post /api/session", "the form login, whose fields the login guard below compares",

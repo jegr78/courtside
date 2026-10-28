@@ -84,7 +84,9 @@ class ResponseHeaderSurfaceTest extends AbstractIntegrationTest {
             Map.entry("org/courtside/identity/internal/SecurityRequestObservationFilter.java "
                     + "X-Courtside-Observed-Host", "the host the request named"),
             Map.entry("org/courtside/identity/internal/SecurityRequestObservationFilter.java "
-                    + "X-Courtside-Observed-Scheme", "the scheme the request arrived on"));
+                    + "X-Courtside-Observed-Scheme", "the scheme the request arrived on"),
+            Map.entry("org/courtside/shared/web/ContainerErrorController.java Allow",
+                    "only server-registered mapping method names for the original resource path"));
 
     @LocalServerPort
     private int port;

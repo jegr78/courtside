@@ -1337,6 +1337,7 @@ const en: Record<keyof typeof de, string> = {
   "validation.Min": "This field must be at least {{value}}.",
   "validation.MoveChangesSomething": "A move must change the time, the duration or the courts.",
   "validation.NoDuplicates": "Each entry may appear at most once.",
+  "validation.NotBlank": "This field must not be blank.",
   "validation.NotNull": "This field is required.",
   "validation.SeriesEndsOnce": "A series ends either on a date or after a number of occurrences.",
   "validation.SizeAtLeast": "This field must be at least {{min}} in length.",
