@@ -16,6 +16,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
@@ -489,7 +490,7 @@ class AuditAdminControllerTest extends AbstractIntegrationTest {
         assertThat(JsonPath.<List<String>>read(byActor, "$.entries[*].subjectId")).contains(courtId.toString());
     }
 
-    private org.springframework.test.web.servlet.ResultActions search(String body) throws Exception {
+    private ResultActions search(String body) throws Exception {
         return mockMvc.perform(post("/api/admin/audit/search").with(user(administrator)).with(csrf())
                 .contentType("application/json")
                 .content(body));
