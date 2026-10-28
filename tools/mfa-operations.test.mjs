@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { createRequire } from "node:module";
+import { createRequire, syncBuiltinESMExports } from "node:module";
 import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
@@ -380,4 +380,202 @@ test("given a disposable SECURITY target, when native WebAuthn options are creat
   // when / then
   assert.equal(compose.services.app.environment.COURTSIDE_PUBLIC_URL,
     "https://localhost:${COURTSIDE_SECURITY_HTTPS_PORT:?required}");
+});
+
+function recoverySource(directory, name, content) {
+  const source = join(directory, name);
+  mkdirSync(join(source, "provided"), { recursive: true });
+  writeFileSync(join(source, "provided/mfa.keys"), `format=1\n${content}\n`, { mode: 0o600 });
+  writeFileSync(join(source, "database.dump"), `PGDMP-${content}`, { mode: 0o600 });
+  assert.equal(spawnSync("tar", ["-C", source, "-cf", join(source, "mfa-keys.tar"), "./provided"]).status, 0);
+  return source;
+}
+
+for (const change of ["a symlinked directory", "replaced files", "in place writes"]) {
+  test(`given ${change} after recovery validation, when the target restore reads its input, then it consumes exactly the validated database and key bytes`, async () => {
+    // given
+    const { restoreUatRecovery } = await import("./mfa-key-custody.mjs");
+    const directory = mkdtempSync(join(tmpdir(), "courtside-recovery-swap-"));
+    const source = recoverySource(directory, "source", "original");
+    const replacement = recoverySource(directory, "replacement", "changed");
+    const originalDatabase = readFileSync(join(source, "database.dump"));
+    const originalKeys = readFileSync(join(source, "mfa-keys.tar"));
+    const target = "courtside-uat-owned-race-proof";
+    const databases = [];
+    const keys = [];
+    const execute = (plan) => {
+      if (plan.stdin !== undefined) {
+        const received = readFileSync(plan.stdin);
+        if (plan.args.includes("pg_restore")) databases.push(received);
+        else keys.push(received);
+      }
+      if (plan.args.includes("down")) {
+        if (change === "a symlinked directory") {
+          renameSync(source, join(directory, "retained"));
+          symlinkSync(replacement, source, "dir");
+        } else {
+          for (const file of ["database.dump", "mfa-keys.tar"]) {
+            if (change === "replaced files") rmSync(join(source, file));
+            writeFileSync(join(source, file), readFileSync(join(replacement, file)));
+          }
+        }
+      }
+    };
+    try {
+      // when
+      restoreUatRecovery(source, ["compose", "-p", target], { COURTSIDE_UAT_IMAGE: "courtside:uat-local" }, execute);
+      // then
+      assert.equal(databases.length, 2);
+      assert.equal(keys.length, 2);
+      assert.deepEqual(databases, [originalDatabase, originalDatabase]);
+      assert.deepEqual(keys, [originalKeys, originalKeys]);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+}
+
+test("given an archive replaced between native tar checks, when key mode is verified, then both checks read the same private bytes", async () => {
+  // given
+  const { verifyMfaKeyArchive } = await import("./mfa-key-custody.mjs");
+  const { execFileSync } = await import("node:child_process");
+  const directory = mkdtempSync(join(tmpdir(), "courtside-archive-swap-"));
+  const source = recoverySource(directory, "source", "original");
+  const replacement = recoverySource(directory, "replacement", "changed");
+  const archive = join(source, "mfa-keys.tar");
+  const expected = readFileSync(archive);
+  const observed = [];
+  const execute = (command, args, options) => {
+    observed.push(readFileSync(args[1]));
+    const result = execFileSync(command, args, options);
+    if (observed.length === 1) writeFileSync(archive, readFileSync(join(replacement, "mfa-keys.tar")));
+    return result;
+  };
+  try {
+    // when
+    assert.equal(verifyMfaKeyArchive(archive, execute), "provided");
+    // then
+    assert.deepEqual(observed, [expected, expected]);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+for (const linked of ["directory", "database.dump", "mfa-keys.tar"]) {
+  test(`given a linked ${linked} recovery input, when restore captures the source, then no target or probe command runs`, async () => {
+    // given
+    const { restoreUatRecovery } = await import("./mfa-key-custody.mjs");
+    const directory = mkdtempSync(join(tmpdir(), "courtside-recovery-link-"));
+    const source = recoverySource(directory, "source", "original");
+    const replacement = recoverySource(directory, "replacement", "changed");
+    let selected = source;
+    if (linked === "directory") {
+      selected = join(directory, "linked");
+      symlinkSync(source, selected, "dir");
+    } else {
+      rmSync(join(source, linked));
+      symlinkSync(join(replacement, linked), join(source, linked));
+    }
+    const calls = [];
+    try {
+      // when / then
+      assert.throws(() => restoreUatRecovery(selected, [], {}, (plan) => calls.push(plan)), /symbolic link|regular file|ELOOP/);
+      assert.equal(calls.length, 0);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+}
+
+for (const change of ["changed length", "same length overwrite"]) {
+  test(`given ${change} during source capture, when recovery snapshots the open file, then it refuses before any environment command`, async () => {
+    // given
+    const { restoreUatRecovery } = await import("./mfa-key-custody.mjs");
+    const fs = createRequire(import.meta.url)("node:fs");
+    const directory = mkdtempSync(join(tmpdir(), "courtside-capture-write-"));
+    const source = recoverySource(directory, "source", "original");
+    const database = join(source, "database.dump");
+    const before = fs.statSync(database, { bigint: true });
+    const originalRead = fs.readSync;
+    const calls = [];
+    let changed = false;
+    fs.readSync = (...args) => {
+      const result = originalRead(...args);
+      const metadata = fs.fstatSync(args[0], { bigint: true });
+      if (!changed && metadata.dev === before.dev && metadata.ino === before.ino && result > 0) {
+        changed = true;
+        writeFileSync(database, "X".repeat(Number(before.size) + (change === "changed length" ? 1 : 0)));
+        fs.utimesSync(database, new Date("2030-01-01T00:00:00Z"), new Date("2030-01-01T00:00:00Z"));
+      }
+      return result;
+    };
+    syncBuiltinESMExports();
+    try {
+      // when / then
+      assert.throws(() => restoreUatRecovery(source, [], {}, (plan) => calls.push(plan)), /changed while being captured/);
+      assert.equal(changed, true);
+      assert.equal(calls.length, 0);
+    } finally {
+      fs.readSync = originalRead;
+      syncBuiltinESMExports();
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+}
+
+test("given an archive changed after its native type check, when keys are imported independently, then the stream still contains only the checked bytes", async () => {
+  // given
+  const { importMfaKeys } = await import("./mfa-key-custody.mjs");
+  const childProcess = createRequire(import.meta.url)("node:child_process");
+  const originalExecute = childProcess.execFileSync;
+  const directory = mkdtempSync(join(tmpdir(), "courtside-import-swap-"));
+  const source = recoverySource(directory, "source", "original");
+  const replacement = recoverySource(directory, "replacement", "changed");
+  const archive = join(source, "mfa-keys.tar");
+  const expected = readFileSync(archive);
+  let changed = false;
+  let received;
+  childProcess.execFileSync = (command, args, options) => {
+    const result = originalExecute(command, args, options);
+    if (command === "tar" && args[0] === "-tvf") {
+      writeFileSync(archive, readFileSync(join(replacement, "mfa-keys.tar")));
+      changed = true;
+    }
+    return result;
+  };
+  syncBuiltinESMExports();
+  try {
+    // when
+    importMfaKeys(archive, [], {}, (plan) => { received = readFileSync(plan.stdin); });
+    // then
+    assert.equal(changed, true);
+    assert.deepEqual(received, expected);
+  } finally {
+    childProcess.execFileSync = originalExecute;
+    syncBuiltinESMExports();
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("given private archive inspection that fails, when verification unwinds, then no private snapshot remains", async () => {
+  // given
+  const { verifyMfaKeyArchive } = await import("./mfa-key-custody.mjs");
+  const { existsSync, statSync } = await import("node:fs");
+  const { dirname } = await import("node:path");
+  const directory = mkdtempSync(join(tmpdir(), "courtside-private-capture-"));
+  const source = recoverySource(directory, "source", "original");
+  let snapshot;
+  try {
+    // when / then
+    assert.throws(() => verifyMfaKeyArchive(join(source, "mfa-keys.tar"), (_command, args) => {
+      snapshot = args[1];
+      assert.notEqual(snapshot, join(source, "mfa-keys.tar"));
+      assert.equal(statSync(snapshot).mode & 0o777, 0o600);
+      assert.equal(statSync(dirname(snapshot)).mode & 0o777, 0o700);
+      throw new Error("archive inspection interrupted");
+    }), /archive inspection interrupted/);
+    assert.equal(existsSync(dirname(snapshot)), false);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
 });

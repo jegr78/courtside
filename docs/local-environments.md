@@ -313,6 +313,11 @@ isolated database and key volume and waits for the same application's key valida
 Only then does it stop the target app, import matching keys and restore the target database
 transactionally. It restarts the target even when that restore fails.
 
+The backup directory and its files must not be symbolic links. Restore first copies the regular
+dump and key archive into private temporary storage and rejects source changes observed during
+copying. Validation and the target restore consume that same captured pair. Later changes to the
+original do not change either input. Temporary copies are removed on success and failure.
+
 A legacy `.dump` file remains accepted. Its validation uses the target's current keyring. Dumps
 from before MFA initialize keys automatically. Encrypted TOTP enrollments require their matching
 retained keys. Missing or wrong keys stop validation before the target database changes. An
