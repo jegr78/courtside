@@ -68,7 +68,7 @@ class MfaStoredSessionsTest extends AbstractIntegrationTest {
         // then
         assertThat(jdbc.sql("SELECT count(*) FROM spring_session").query(Integer.class).single()).isEqualTo(2);
         mvc.perform(get("/api/session").cookie(first)).andExpect(jsonPath("$.authenticated").value(false))
-                .andExpect(jsonPath("$.mfaRequired").doesNotExist());
+                .andExpect(jsonPath("$.mfaRequired").value(false));
         mvc.perform(get("/api/session").cookie(latest)).andExpect(jsonPath("$.authenticated").value(false))
                 .andExpect(jsonPath("$.mfaRequired").value(true));
     }
