@@ -262,6 +262,29 @@ class MfaWebAuthnTest extends AbstractIntegrationTest {
         assertThatThrownBy(() -> unavailable.verify(UUID.randomUUID(), null, null)).isInstanceOf(MfaProofFailedException.class);
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"https://192.0.2.10", "https://[2001:db8::1]:8443"})
+    void givenAnIpAddressDeployment_whenWebAuthnIsRequested_thenItIsUnavailableAndProofFailsGenerically(String configured) {
+        // given
+        var unavailable = new MfaWebAuthn(new InstanceAddress(configured), club, users, credentials, jdbc, clock);
+        UUID account = account("doe.jane");
+        // when / then
+        assertThat(unavailable.available()).as("browsers refuse an IP address as relying-party id").isFalse();
+        assertThatThrownBy(() -> unavailable.registrationOptions(account)).isInstanceOf(MfaProofFailedException.class);
+        assertThatThrownBy(() -> unavailable.authenticationOptions(account)).isInstanceOf(MfaProofFailedException.class);
+    }
+
+    @Test
+    void givenACapitalisedDeploymentDomain_whenRegistering_thenTheRelyingPartyIdIsLowerCase() {
+        // given
+        var capitalised = new MfaWebAuthn(new InstanceAddress("https://Courts.Example.org:8443"),
+                club, users, credentials, jdbc, clock);
+        // when
+        var options = capitalised.registrationOptions(account("doe.jane"));
+        // then
+        assertThat(options.getRp().getId()).isEqualTo(RP_ID);
+    }
+
     private WebAuthnAuthenticatorFixture register(UUID account, String label) {
         var authenticator = new WebAuthnAuthenticatorFixture();
         var options = roundTrip(webAuthn.registrationOptions(account));

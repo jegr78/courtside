@@ -53,7 +53,7 @@ class MfaWebAuthn {
     private final ObjectConverter converter = new ObjectConverter();
 
     boolean available() {
-        return address.origin().isPresent();
+        return address.relyingPartyId().isPresent();
     }
 
     @Transactional
@@ -163,7 +163,7 @@ class MfaWebAuthn {
     }
 
     private URI origin() {
-        return address.origin().orElseThrow(MfaProofFailedException::new);
+        return address.relyingPartyId().flatMap(id -> address.origin()).orElseThrow(MfaProofFailedException::new);
     }
 
     private static UsernamePasswordAuthenticationToken principal(String username) {

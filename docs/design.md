@@ -747,7 +747,10 @@ WebAuthn supports multiple credentials with holder-private labels, individual re
 An account may enroll WebAuthn without TOTP. Registration and authentication require local user
 verification. Courtside receives the signed result, never biometric data. Relying-party ID and
 allowed origin come from the explicitly configured public HTTPS address, including maintained local
-HTTPS and shared UAT. Request Host headers cannot choose them. A credential is bound to its domain.
+HTTPS and shared UAT. Request Host headers cannot choose them. The relying-party ID is the
+address's host in lower-case ASCII, so its spelling in `COURTSIDE_PUBLIC_URL` does not matter.
+Browsers refuse an IP address as relying-party ID, so an address whose host is one leaves WebAuthn
+unavailable while the instance and TOTP keep working. A credential is bound to its domain.
 After a domain change, the holder signs in with a remaining method or recovery code and enrolls a
 new credential. A lost-factor account uses controlled recovery.
 
