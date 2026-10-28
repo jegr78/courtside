@@ -225,6 +225,7 @@ test("given a holder who lost all factors, when an MFA-authenticated administrat
   await expect(page.getByTestId("controlled-mfa-code")).toHaveValue("");
   await expect(page.getByTestId("controlled-mfa-password")).toHaveValue("");
   await activate(page.getByTestId("recovery-back-to-login"));
+  await expect(page.getByTestId("login-view")).toBeVisible();
   await signIn(page, "doe.jane", newPassword);
   await reachYourAccount(page);
   await expect(page.getByTestId("mfa-status")).toHaveText(messages[language].disabled);
