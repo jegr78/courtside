@@ -784,7 +784,7 @@ TOTP secrets use account-bound AES-256-GCM encryption with random nonces. The in
 keyring automatically and persists it outside PostgreSQL, under a private local directory or a
 separate writable container volume. A database installation ID selects the default key location;
 a canary and encrypted state validate the matching keyring before the instance reports healthy,
-and every later health check reads the keyring and its canary again.
+and afterwards health reads the keyring and its canary again once the previous reading is 5 seconds old.
 An operator may supply a private key file. Rotation retains prior keys for existing ciphertext.
 A database with encrypted factors cannot start using missing or mismatched keys. Complete backup
 and restore preserve both the database and key material, and preflight validates them together
