@@ -416,11 +416,3 @@ networks:
       org.courtside.security.run-id: ${COURTSIDE_SECURITY_RUN_ID:?required}
       org.courtside.security.seed-fingerprint: ${COURTSIDE_SECURITY_SEED_FINGERPRINT:?required}
       org.courtside.security.instance-fingerprint: ${COURTSIDE_SECURITY_INSTANCE_FINGERPRINT:?required}
-
-volumes:
-  mfa-keys:
-    labels:
-      org.courtside.environment: SECURITY
-      org.courtside.security.run-id: ${COURTSIDE_SECURITY_RUN_ID:?required}
-      org.courtside.security.seed-fingerprint: ${COURTSIDE_SECURITY_SEED_FINGERPRINT:?required}
-      org.courtside.security.instance-fingerprint: ${COURTSIDE_SECURITY_INSTANCE_FINGERPRINT:?required}
