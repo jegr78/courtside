@@ -365,6 +365,23 @@ class WaitlistTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenABookedOffer_whenTheMemberLeavesIt_thenTheBookingStandsAndNobodyElseIsOffered() {
+        // given
+        UUID entry = offerTo(first);
+        UUID secondEntry = jdbc.sql("SELECT id FROM waitlist_entry WHERE account_id = :account")
+                .param("account", second.accountId()).query(UUID.class).single();
+        waitlist.accept(entry, first.accountId(), first.personId(), Set.of(Role.MEMBER));
+
+        // when
+        waitlist.leave(entry, first.accountId());
+
+        // then
+        assertThat(stateOf(entry)).as("a closed entry stays as it closed").isEqualTo("BOOKED");
+        assertThat(stateOf(secondEntry)).as("the slot is booked, so the next member keeps waiting").isEqualTo("WAITING");
+        assertThat(confirmedOnCourt()).isEqualTo(1);
+    }
+
+    @Test
     void givenAWeekFilledAfterJoining_whenTheSlotFrees_thenTheMemberIsSkippedAndCannotTakeIt() {
         // given
         configuration.bindPeopleWithoutAMembershipTypeTo(rulesFixture.ruleSetLimitingWeeklyHours("An hour a week", 1));
