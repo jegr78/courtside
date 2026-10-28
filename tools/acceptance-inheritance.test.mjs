@@ -155,7 +155,10 @@ for (const [condition, mutate] of [
   ["out-of-bounds mask", (record) => { record.masks[0].rects[0].x = -1; return record; }],
   ["stale image binding", (record) => { record.image.digest = "0".repeat(64); return record; }],
   ["unstable capture", (record) => { record.safe = false; return record; }],
-  ["changed pixel density", (record) => { record.capture.devicePixelRatio = 2; return record; }]
+  ["inconsistent pixel density", (record) => { record.capture.devicePixelRatio = 2; return record; }],
+  ["changed browser language", (record) => { record.capture.locale = "de-DE"; return record; }],
+  ["changed time zone", (record) => { record.capture.timeZone = "America/New_York"; return record; }],
+  ["changed browser", (record) => { record.capture.userAgent = "other fixture"; return record; }]
 ]) {
   test(`given run-data masking with ${condition}, when native evidence is compared, then the sheet still needs reading`, { skip }, () => {
     // given
@@ -171,6 +174,23 @@ for (const [condition, mutate] of [
     } finally { rmSync(root, { recursive: true, force: true }); }
   });
 }
+
+test("given run-data masks captured at another pixel density, when native evidence is compared, then the sheet still needs reading", { skip }, () => {
+  // given
+  const root = mkdtempSync(join(tmpdir(), "sheet-inheritance-density-"));
+  const halved = (record) => { record.masks[0].rects = [{ x: 10, y: 22, width: 90, height: 13 }]; return record; };
+  const doubled = (record) => Object.assign(halved(record).capture,
+    { devicePixelRatio: 2, width: record.capture.width / 2, height: record.capture.height / 2 }) && record;
+  try {
+    const previous = maskedRun(root, "previous", "time", "12:34", { mutate: halved }); reviewRun(previous);
+    const next = maskedRun(root, "current", "time", "12:35", { mutate: doubled });
+    // when
+    const result = report(next, previous);
+    // then
+    assert.equal(result.status, "draft", "a verdict read at one pixel density does not transfer to another");
+    assert.deepEqual(json(join(next.run, "sheet-review.json")).verdicts, {});
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
 
 test("given valid run-data masks and an unmasked defect, when the report compares native pixels, then it refuses inheritance", { skip }, () => {
   // given
