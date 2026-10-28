@@ -78,10 +78,11 @@ dispatched `build` rebuilds the nightly image even when the revision already car
 digest the rehearsal binds is qualified in the same run, and then calls `release-gates.yml` with it.
 That is the workflow the candidate's `gates` job calls, with the same jobs and commands:
 `archive-reproducibility`, `mail`, `active-security`, `security-record`, `restore`, `npm-audit` and
-`upgrade`. At night `upgrade` starts from the earliest retained dated nightly whose migrations and
-`upgrade/verify.sql` the candidate still carries unchanged, because Flyway refuses a database whose
-applied migration was corrected in place; a release passes the published versions it upgrades from
-instead.
+`upgrade`. At night `upgrade` starts from the earliest retained dated nightly whose migrations the
+candidate still carries unchanged, because Flyway refuses a database whose applied migration was
+corrected in place; a release passes the published versions it upgrades from instead. A change to
+`upgrade/verify.sql` disqualifies no nightly: each origin is measured with its own query, and a key
+the candidate removes or renames fails the gate, as described under the upgrade proof below.
 The scheduled `security` job runs the release-build policy with npm audit evidence and the same
 command line as the candidate's `release-build` job. A push to `main` builds and qualifies its image but does not
 rehearse the gates.

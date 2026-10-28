@@ -179,23 +179,23 @@ export function gitHistory(candidate, cwd = root) {
       return shown.status === 0 ? Number(shown.stdout.trim()) : Number.POSITIVE_INFINITY;
     },
     unchangedSince: (ref) => run("git", ["diff", "--quiet", "--diff-filter=MDR", ref, candidate, "--",
-      "src/main/resources/db/migration", originVerification], { allowFailure: true, cwd }).status === 0
+      "src/main/resources/db/migration"], { allowFailure: true, cwd }).status === 0
   };
 }
 
-function upgradeInputsChangedBy(filter, base, candidate, cwd) {
+function upgradeInputsChangedBy(filter, base, candidate, cwd, paths) {
   const mergeBase = run("git", ["merge-base", base, candidate], { cwd }).stdout.trim();
-  return run("git", ["diff", "--name-only", `--diff-filter=${filter}`, mergeBase, candidate, "--",
-    "src/main/resources/db/migration", originVerification], { cwd }).stdout.split("\n").filter(Boolean);
+  return run("git", ["diff", "--name-only", `--diff-filter=${filter}`, mergeBase, candidate, "--", ...paths],
+    { cwd }).stdout.split("\n").filter(Boolean);
 }
 
 export function modifiedUpgradeInputs(base, candidate, cwd = root) {
-  return upgradeInputsChangedBy("MDR", base, candidate, cwd);
+  return upgradeInputsChangedBy("MDR", base, candidate, cwd, ["src/main/resources/db/migration"]);
 }
 
 // Adding a migration is the only legal change after a release, so it alone already needs the published origins.
 export function changedUpgradeInputs(base, candidate, cwd = root) {
-  return upgradeInputsChangedBy("AMDR", base, candidate, cwd);
+  return upgradeInputsChangedBy("AMDR", base, candidate, cwd, ["src/main/resources/db/migration", originVerification]);
 }
 
 export function emptyOriginNotice(paths) {
