@@ -26,20 +26,30 @@ class ReauthenticationService {
     @Transactional(noRollbackFor = {ReauthenticationFailedException.class, PasswordVerificationRateLimitedException.class})
     void reauthenticate(String password, String code, ApiWebAuthnAssertionCredential credential) {
         UserAccount account = management.currentHolderForUpdate();
-        if (password == null || account.getPasswordHash() == null
+        if (password == null) throw passwordRefused(account);
+        if (account.getPasswordHash() == null
                 || !passwordEncoder.matches(password, account.getPasswordHash())) {
-            securityEvents.controlRefused(account.getId(),
-                    SecurityEventLog.ControlRefusal.REAUTHENTICATION_FAILED);
-            throw new ReauthenticationFailedException();
+            throw passwordRefused(account);
         }
         if (factors.enabled(account.getId())) {
-            if (credential != null && code != null && !code.isBlank()) throw new ReauthenticationFailedException();
-            MfaFactors.Verification result = credential == null
-                    ? factors.verify(account.getId(), code, request.getRemoteAddr())
-                    : webAuthn.verifyReauthentication(account, codec.assertion(credential), request.getRemoteAddr());
+            MfaFactors.Verification result = verifySecondFactor(account, code, credential);
             if (result == MfaFactors.Verification.LIMITED) throw new PasswordVerificationRateLimitedException();
             if (result != MfaFactors.Verification.VALID) throw new ReauthenticationFailedException();
         }
         recentAuthentication.renew();
+    }
+
+    private MfaFactors.Verification verifySecondFactor(UserAccount account, String code,
+                                                      ApiWebAuthnAssertionCredential credential) {
+        if (credential == null) {
+            return factors.verify(account.getId(), code, request.getRemoteAddr());
+        }
+        if (code != null && !code.isBlank()) throw new ReauthenticationFailedException();
+        return webAuthn.verifyReauthentication(account, codec.assertion(credential), request.getRemoteAddr());
+    }
+
+    private ReauthenticationFailedException passwordRefused(UserAccount account) {
+        securityEvents.controlRefused(account.getId(), SecurityEventLog.ControlRefusal.REAUTHENTICATION_FAILED);
+        return new ReauthenticationFailedException();
     }
 }

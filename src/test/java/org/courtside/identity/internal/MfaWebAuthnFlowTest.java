@@ -10,6 +10,8 @@ import org.courtside.identity.UserAccount;
 import org.courtside.identity.UserAccountRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -53,6 +55,7 @@ class MfaWebAuthnFlowTest extends AbstractIntegrationTest {
     @Autowired private MfaWebAuthnCredentials credentials;
     @Autowired private JdbcClient jdbc;
     @Autowired private Clock clock;
+    @Autowired private MfaTotpRepository totp;
     private MockMvc mvc;
     private UUID account;
 
@@ -112,8 +115,10 @@ class MfaWebAuthnFlowTest extends AbstractIntegrationTest {
         assertThat(credentials.findByCredentialId(authenticator.credentialId()).getSignatureCount()).isZero();
     }
 
-    @Test
-    void givenAWebAuthnSessionWithExpiredProof_whenReauthenticating_thenPasswordAndTheKeyAreBothRequired() throws Exception {
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void givenAWebAuthnSessionWithExpiredProof_whenReauthenticating_thenPasswordAndTheKeyAreBothRequired(
+            boolean blankCode) throws Exception {
         // given
         var authenticator = enroll();
         Cookie pending = password(202);
@@ -126,12 +131,58 @@ class MfaWebAuthnFlowTest extends AbstractIntegrationTest {
         String json = mvc.perform(post("/api/account/mfa/webauthn/authentication-options").cookie(full).with(csrf()))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
         var options = codec.decode(json, PublicKeyCredentialRequestOptions.class);
+        String code = blankCode ? ",\"code\":\"   \"" : "";
         var result = mvc.perform(post("/api/session/reauthentication").cookie(full).with(csrf()).contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"password\":\"correct-horse\",\"credential\":" + codec.encode(authenticator.assertion(options, ORIGIN)) + "}"))
+                        .content("{\"password\":\"correct-horse\"" + code + ",\"credential\":"
+                                + codec.encode(authenticator.assertion(options, ORIGIN)) + "}"))
                 .andExpect(status().isNoContent()).andReturn();
         Cookie renewed = session(result);
         assertThat(renewed.getValue()).isNotEqualTo(full.getValue());
         mvc.perform(get("/api/session").cookie(renewed)).andExpect(jsonPath("$.authenticated").value(true));
+        assertThat(credentials.findByCredentialId(authenticator.credentialId()).getSignatureCount()).isEqualTo(2);
+        assertThat(jdbc.sql("SELECT count(*) FROM mfa_challenge WHERE account_id = :id AND purpose = 'REAUTHENTICATION'")
+                .param("id", account).query(Integer.class).single()).isZero();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"wrong-origin", "wrong-password", "both-proofs", "missing-challenge", "missing-password-hash"})
+    void givenAnExpiredWebAuthnProof_whenARequiredProofIsInvalid_thenNeitherFreshnessNorTheKeyCounterChanges(
+            String invalidProof) throws Exception {
+        // given
+        var authenticator = enroll();
+        Cookie pending = password(202);
+        Cookie full = prove(pending, authenticator, options(pending));
+        expire(sessions, full);
+        String json = mvc.perform(post("/api/account/mfa/webauthn/authentication-options").cookie(full).with(csrf()))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        var options = codec.decode(json, PublicKeyCredentialRequestOptions.class);
+        String origin = invalidProof.equals("wrong-origin") ? "https://foreign.example.org" : ORIGIN;
+        String password = invalidProof.equals("wrong-password") ? "wrong-password" : "correct-horse";
+        String code = invalidProof.equals("both-proofs") ? ",\"code\":\"123456\"" : "";
+        if (invalidProof.equals("missing-challenge")) {
+            jdbc.sql("DELETE FROM mfa_challenge WHERE account_id = :id AND purpose = 'REAUTHENTICATION'")
+                    .param("id", account).update();
+        }
+        if (invalidProof.equals("missing-password-hash")) {
+            jdbc.sql("UPDATE user_account SET password_hash = NULL WHERE id = :id").param("id", account).update();
+        }
+
+        // when / then
+        mvc.perform(post("/api/session/reauthentication").cookie(full).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"password\":\"" + password + "\"" + code + ",\"credential\":"
+                                + codec.encode(authenticator.assertion(options, origin)) + "}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:reauthentication-failed"));
+        String id = new String(Base64.getDecoder().decode(full.getValue()), StandardCharsets.UTF_8);
+        assertThat(sessions.findById(id)).isNotNull();
+        assertThat(sessions.findById(id).<Long>getAttribute("courtside.authenticated-at"))
+                .isEqualTo(clock.instant().minusSeconds(360).toEpochMilli());
+        assertThat(credentials.findByCredentialId(authenticator.credentialId()).getSignatureCount()).isEqualTo(1);
+        if (invalidProof.equals("wrong-password") || invalidProof.equals("both-proofs")
+                || invalidProof.equals("missing-password-hash")) {
+            assertThat(jdbc.sql("SELECT attempt_count FROM mfa_challenge WHERE account_id = :id AND purpose = 'REAUTHENTICATION'")
+                    .param("id", account).query(Integer.class).single()).isZero();
+        }
     }
 
     @Test
@@ -145,6 +196,64 @@ class MfaWebAuthnFlowTest extends AbstractIntegrationTest {
                         .delete("/api/account/mfa/webauthn/credentials/{id}", "dW5rbm93bg").cookie(full).with(csrf()))
                 .andExpect(status().isNotFound()).andExpect(jsonPath("$.type").value("urn:courtside:error:mfa-resource-not-found"));
         assertThat(credentials.enabled(account)).isTrue();
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void givenAnEnrolledSecurityKey_whenRemovingTheLastKey_thenOnlyAnExistingTotpKeepsMfaAndRecoveryCodesActive(
+            boolean keepTotp) throws Exception {
+        // given
+        var authenticator = enroll();
+        if (keepTotp) {
+            byte[] secret = totp.begin(account);
+            assertThat(totp.confirm(account, TotpCodes.code(secret, clock.instant().minusSeconds(30)))).isTrue();
+        }
+        Cookie pending = password(202);
+        Cookie full = prove(pending, authenticator, options(pending));
+        // when
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .delete("/api/account/mfa/webauthn/credentials/{id}", authenticator.credentialId().toBase64UrlString())
+                        .cookie(full).with(csrf())).andExpect(status().isNoContent());
+        // then
+        assertThat(credentials.findByCredentialId(authenticator.credentialId())).isNull();
+        assertThat(totp.enabled(account)).isEqualTo(keepTotp);
+        assertThat(jdbc.sql("SELECT count(*) FROM mfa_recovery_code WHERE account_id = :id")
+                .param("id", account).query(Integer.class).single()).isEqualTo(keepTotp ? 10 : 0);
+        mvc.perform(get("/api/session").cookie(full)).andExpect(jsonPath("$.authenticated").value(false));
+        password(keepTotp ? 202 : 200);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void givenATrustedWebAuthnOrigin_whenTotpOrAKeyProtectsTheAccount_thenSessionCapabilitiesNameOnlyEnrolledFactors(
+            boolean useKey) throws Exception {
+        // given
+        Cookie plain = password(200);
+        mvc.perform(get("/api/session").cookie(plain)).andExpect(jsonPath("$.authenticated").value(true))
+                .andExpect(jsonPath("$.mfaRequired").value(false)).andExpect(jsonPath("$.webauthnAvailable").value(false));
+        WebAuthnAuthenticatorFixture authenticator = null;
+        byte[] secret = null;
+        if (useKey) authenticator = enroll();
+        else {
+            secret = totp.begin(account);
+            assertThat(totp.confirm(account, TotpCodes.code(secret, clock.instant().minusSeconds(30)))).isTrue();
+        }
+
+        // when
+        Cookie pending = password(202);
+        mvc.perform(get("/api/session").cookie(pending)).andExpect(jsonPath("$.authenticated").value(false))
+                .andExpect(jsonPath("$.mfaRequired").value(true)).andExpect(jsonPath("$.username").doesNotExist())
+                .andExpect(jsonPath("$.totpAvailable").value(!useKey)).andExpect(jsonPath("$.webauthnAvailable").value(useKey));
+        Cookie full;
+        if (useKey) full = prove(pending, authenticator, options(pending));
+        else full = session(mvc.perform(post("/api/session/mfa").cookie(pending).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"code\":\"" + TotpCodes.code(secret, clock.instant()) + "\"}"))
+                .andExpect(status().isOk()).andReturn());
+
+        // then
+        mvc.perform(get("/api/session").cookie(full)).andExpect(jsonPath("$.authenticated").value(true))
+                .andExpect(jsonPath("$.mfaRequired").value(false)).andExpect(jsonPath("$.mfaEnabled").value(true))
+                .andExpect(jsonPath("$.totpAvailable").value(!useKey)).andExpect(jsonPath("$.webauthnAvailable").value(useKey));
     }
 
     private WebAuthnAuthenticatorFixture enroll() throws Exception {

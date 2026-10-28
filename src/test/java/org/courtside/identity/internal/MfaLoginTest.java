@@ -41,6 +41,7 @@ class MfaLoginTest extends AbstractIntegrationTest {
     @Autowired private MfaRecoveryCodeRepository recovery;
     @Autowired private JdbcClient jdbc;
     @Autowired private Clock clock;
+    @Autowired private LoginAttemptProtection attempts;
     private MockMvc mvc;
     private UUID account;
 
@@ -188,6 +189,58 @@ class MfaLoginTest extends AbstractIntegrationTest {
                         .content("{\"password\":\"correct-horse\",\"code\":\"" + code + "\"}"))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:reauthentication-failed"));
+    }
+
+    @Test
+    void givenAnMfaSession_whenARecoveryCodeRenewsProof_thenItIsConsumedAndCannotRenewProofAgain() throws Exception {
+        // given
+        MockHttpSession session = full(enroll());
+        var codes = MfaRecoveryCodes.generate();
+        recovery.replace(account, codes);
+        long previous = clock.instant().minusSeconds(360).toEpochMilli();
+        session.setAttribute("courtside.authenticated-at", previous);
+
+        // when
+        MockHttpSession renewed = (MockHttpSession) mvc.perform(post("/api/session/reauthentication")
+                        .session(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"password\":\"correct-horse\",\"code\":\"" + codes.getFirst() + "\"}"))
+                .andExpect(status().isNoContent()).andReturn().getRequest().getSession(false);
+
+        // then
+        assertThat(renewed.getId()).isNotEqualTo(session.getId());
+        assertThat(renewed.getAttribute("courtside.authenticated-at")).isEqualTo(clock.instant().toEpochMilli());
+        assertThat(recovery.remaining(account)).isEqualTo(9);
+        renewed.setAttribute("courtside.authenticated-at", previous);
+        mvc.perform(post("/api/session/reauthentication").session(renewed).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"password\":\"correct-horse\",\"code\":\"" + codes.getFirst() + "\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:reauthentication-failed"));
+        assertThat(renewed.getAttribute("courtside.authenticated-at")).isEqualTo(previous);
+        assertThat(recovery.remaining(account)).isEqualTo(9);
+    }
+
+    @Test
+    void givenALimitedMfaProofBudget_whenAValidTotpIsSubmitted_thenNoProofIsRenewedOrStepConsumed() throws Exception {
+        // given
+        byte[] secret = enroll();
+        MockHttpSession session = full(secret);
+        long previous = clock.instant().minusSeconds(360).toEpochMilli();
+        session.setAttribute("courtside.authenticated-at", previous);
+        long consumedStep = jdbc.sql("SELECT totp_last_step FROM account_mfa WHERE account_id = :id")
+                .param("id", account).query(Long.class).single();
+        for (int attempt = 1; attempt <= 5; attempt++) {
+            assertThat(attempts.registerCredentialAttempt("mfa:" + account, "192.0.2." + attempt)).isEmpty();
+        }
+
+        // when / then
+        mvc.perform(post("/api/session/reauthentication").session(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"password\":\"correct-horse\",\"code\":\""
+                                + TotpCodes.code(secret, clock.instant().plusSeconds(30)) + "\"}"))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:password-verification-rate-limited"));
+        assertThat(session.getAttribute("courtside.authenticated-at")).isEqualTo(previous);
+        assertThat(jdbc.sql("SELECT totp_last_step FROM account_mfa WHERE account_id = :id")
+                .param("id", account).query(Long.class).single()).isEqualTo(consumedStep);
     }
 
     private MockHttpSession full(byte[] secret) throws Exception {
