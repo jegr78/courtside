@@ -166,6 +166,15 @@ jobs:
           else
             echo "::warning::passive-deployment.json was not produced by the first attempt"
           fi
+      - name: Retain normalized active evidence
+        if: always() && env.PROFILE != 'safe'
+        run: |
+          umask 077
+          mkdir -p build/security-gate
+          ATTEMPT=1
+          if [[ "$PROFILE" = baseline ]]; then ATTEMPT=2; fi
+          SOURCE="build/security/$RUN_ID/assessment/attempt-$ATTEMPT/evidence/openapi-fuzz.json"
+          if [[ -f "$SOURCE" ]]; then cp -- "$SOURCE" build/security-gate/openapi-fuzz.json; fi
       - name: Remove the disposable security target
         if: always()
         run: frontend/node/node tools/courtside.mjs security-cleanup "$RUN_ID"
@@ -178,6 +187,7 @@ jobs:
             build/security-gate/manifest*.json
             build/security-gate/summary*.json
             build/security-gate/passive-deployment.json
+            build/security-gate/openapi-fuzz.json
           retention-days: 14
           if-no-files-found: error
 

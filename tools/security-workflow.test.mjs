@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { test } from "node:test";
@@ -289,6 +289,36 @@ for (const present of [true, false]) {
     }
   });
 }
+test("given normalized active evidence, when an active or baseline workflow retains it, then the matching attempt stays beside its attested manifests", () => {
+  // given
+  const workflow = yaml.load(scheduled);
+  const steps = workflow.jobs.assessment.steps;
+  const capture = steps.find((step) => step.name === "Retain normalized active evidence");
+  const records = steps.find((step) => step.id === "records");
+  assert.ok(capture, "the normalized fuzzer record must survive target cleanup");
+  assert.equal(capture.if, "always() && env.PROFILE != 'safe'");
+  assert.match(records.with.path, /^\s*build\/security-gate\/openapi-fuzz\.json$/m);
+  assert.ok(steps.indexOf(capture) < steps.findIndex((step) => step.name === "Remove the disposable security target"));
+  for (const [profile, attempt] of [["active", 1], ["baseline", 2]]) {
+    const directory = mkdtempSync(join(tmpdir(), "courtside-fuzz-evidence-"));
+    try {
+      for (const index of [1, 2]) {
+        const source = join(directory, "build/security/example-run/assessment", `attempt-${index}`, "evidence");
+        mkdirSync(source, { recursive: true });
+        writeFileSync(join(source, "openapi-fuzz.json"), `attempt-${index}\n`);
+      }
+      // when
+      const result = spawnSync("bash", ["-eu", "-c", capture.run], {
+        cwd: directory, env: { ...process.env, PROFILE: profile, RUN_ID: "example-run" }, encoding: "utf8"
+      });
+      // then
+      assert.equal(result.status, 0, result.stderr);
+      assert.equal(readFileSync(join(directory, "build/security-gate/openapi-fuzz.json"), "utf8"), `attempt-${attempt}\n`);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  }
+});
 
 test("given the active duration contract, when the workflow chooses its job budget, then active retains the safe cleanup reserve", () => {
   // given
