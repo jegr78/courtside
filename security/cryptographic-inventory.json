@@ -283,12 +283,12 @@
       "revocation": "The application consumes the TOTP step and removes the synthetic account with the acceptance dataset.",
       "recovery": "Rerun the journey against a fresh acceptance dataset; no fixture secret needs to be recovered.",
       "retirement": "Remove this helper with the TOTP browser journey or update it when the supported protocol changes.",
-      "evidence": "frontend/e2e/journeys/at-a-desk/secure-your-account.spec.ts, tools/security-mfa-fixture.test.mjs",
+      "evidence": "frontend/e2e/mfa-authenticator.test.ts, frontend/e2e/journeys/at-a-desk/secure-your-account.spec.ts, tools/security-mfa-fixture.test.mjs",
       "detects": [
         "createHmac"
       ],
       "locations": [
-        "frontend/e2e/journeys/at-a-desk/secure-your-account.spec.ts",
+        "frontend/e2e/mfa-authenticator.ts",
         "tools/security-mfa-fixture.mjs"
       ]
     },

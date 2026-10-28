@@ -271,7 +271,7 @@ class CryptographicStrengthTest {
         assertThat(totp).contains("Mac.getInstance(\"HmacSHA1\")");
         assertThat(keyring).contains("Cipher.getInstance(\"AES/GCM/NoPadding\")");
         JsonNode browserParameters = entry("mfa-browser-authenticator").get("parameters");
-        for (String path : List.of("frontend/e2e/account-mfa.spec.ts", "tools/security-mfa-fixture.mjs")) {
+        for (String path : List.of("frontend/e2e/mfa-authenticator.ts", "tools/security-mfa-fixture.mjs")) {
             String fixture = read(Path.of(path));
             int fixtureCodes = literal(fixture, "% ([0-9_]+)", "fixture authenticator code space");
             int fixturePeriod = literal(fixture, "/ ([0-9_]+)\\) \\+", "fixture authenticator period");
