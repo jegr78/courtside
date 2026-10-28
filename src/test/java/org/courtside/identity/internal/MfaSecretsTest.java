@@ -99,6 +99,30 @@ class MfaSecretsTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenADatabaseWithoutAnInstallationOrEncryptedFactors_whenVerifying_thenNothingNeedsAKey() {
+        // given
+        jdbc.sql("DELETE FROM mfa_instance_key").update();
+        jdbc.sql("UPDATE account_mfa SET totp_secret = NULL, pending_totp_secret = NULL").update();
+        // when / then
+        store(root.resolve("never-initialized")).verify();
+        assertThat(root.resolve("never-initialized")).as("verification creates no key material").doesNotExist();
+    }
+
+    @Test
+    void givenEncryptedEnrollmentsWithoutAnInstallation_whenVerifying_thenTheMissingIdentityIsReported() {
+        // given
+        MfaSecrets secrets = store(root);
+        secrets.initialize();
+        UUID account = account();
+        jdbc.sql("INSERT INTO account_mfa (account_id, totp_secret) VALUES (:id, :secret)")
+                .param("id", account).param("secret", secrets.encrypt(account, TotpCodes.newSecret())).update();
+        jdbc.sql("DELETE FROM mfa_instance_key").update();
+        // when / then
+        assertThatThrownBy(secrets::verify).isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("identity is missing");
+    }
+
+    @Test
     void givenAnInitializedInstallation_whenAnUnrelatedKeyReplacesItsFile_thenVerificationFails() throws Exception {
         // given
         Path supplied = root.resolve("supplied/mfa.keys");
