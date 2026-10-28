@@ -104,6 +104,20 @@ export function qualificationCandidate(candidate, scratch) {
   return mirror;
 }
 
+// An origin whose compose kept MFA keys only in the container may lose them on update, which is allowed without encrypted factors.
+export function comparablePersistedData(before, after, { originKeepsMfaKeys }) {
+  if (originKeepsMfaKeys) return [before, after];
+  const [earlier] = before.mfaInstanceKeyRows ?? [];
+  const [later] = after.mfaInstanceKeyRows ?? [];
+  if (earlier && later?.installation_id !== earlier.installation_id) {
+    throw new Error("installed update changed the MFA installation identity");
+  }
+  if (earlier && !later?.key_check) throw new Error("installed update left no MFA key check");
+  const withoutKeyCheck = (data) => ({ ...data,
+    mfaInstanceKeyRows: data.mfaInstanceKeyRows?.map((row) => ({ ...row, key_check: undefined })) ?? null });
+  return [withoutKeyCheck(before), withoutKeyCheck(after)];
+}
+
 function answerFile(root, project) {
   const path = join(root, "answers.conf");
   writeFileSync(path, `schema=1
@@ -174,7 +188,9 @@ function execute() {
     assert.match(updated.stdout, /Updated from .* to .* after recovery unit/);
     const after = psql(join(installation, "current"), installation, project,
       join(repository, "upgrade", "verify.sql"));
-    assert.deepEqual(JSON.parse(after), JSON.parse(snapshot), "installed update changed persisted data");
+    const originKeepsMfaKeys = readFileSync(join(oldRelease, "compose.yaml"), "utf8").includes("COURTSIDE_MFA_KEY_ROOT");
+    const [expected, actual] = comparablePersistedData(JSON.parse(snapshot), JSON.parse(after), { originKeepsMfaKeys });
+    assert.deepEqual(actual, expected, "installed update changed persisted data");
     assert.equal(psqlInput(join(installation, "current"), installation, project, auditSql),
       auditSnapshot, "installed update changed audit data");
     const passwordAfter = /^POSTGRES_PASSWORD="([^"]+)"$/m

@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
-import { qualificationCandidate } from "./installed-upgrade-smoke.mjs";
+import { comparablePersistedData, qualificationCandidate } from "./installed-upgrade-smoke.mjs";
 
 const nightlySigner =
   "https://github.com/jegr78/courtside/.github/workflows/nightly-image.yml@refs/heads/main";
@@ -56,4 +56,31 @@ test("given a nightly from another signer, when installed upgrade qualification 
   } finally {
     rmSync(context.root, { recursive: true, force: true });
   }
+});
+
+const persisted = (keyCheck, installation = "b7d0fd17-1d30-44a4-bbc6-5be2a1c196a2") => ({
+  accounts: 4,
+  mfaInstanceKeyRows: [{ id: 1, installation_id: installation, key_check: keyCheck }]
+});
+
+test("given an origin release without an MFA key store, when the update writes a new key check, then only the key check is exempt", () => {
+  // when
+  const [before, after] = comparablePersistedData(persisted("51a9e8ad"), persisted("24f91e3c"), { originKeepsMfaKeys: false });
+  // then
+  assert.deepEqual(after, before, "an origin that kept its keys nowhere cannot prove their preservation");
+});
+
+test("given an origin release without an MFA key store, when the update changes the installation, then the update is refused", () => {
+  // when / then
+  assert.throws(() => comparablePersistedData(persisted("51a9e8ad"), persisted("24f91e3c", "00000000-0000-0000-0000-000000000000"),
+    { originKeepsMfaKeys: false }), /installation/, "the database installation identity must survive the update");
+  assert.throws(() => comparablePersistedData(persisted("51a9e8ad"), persisted(null), { originKeepsMfaKeys: false }),
+    /key check/, "the updated instance must hold a key check");
+});
+
+test("given an origin release with an MFA key store, when the update writes a new key check, then the change stays visible", () => {
+  // when
+  const [before, after] = comparablePersistedData(persisted("51a9e8ad"), persisted("24f91e3c"), { originKeepsMfaKeys: true });
+  // then
+  assert.notDeepEqual(after, before, "a preserved key store must keep its key check");
 });
