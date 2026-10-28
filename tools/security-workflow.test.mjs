@@ -369,6 +369,21 @@ test("given changed assessment bytes, when the required build runs, then paired 
   assert.match(build, /candidate-ref "\$HEAD_REF"/);
 });
 
+test("given candidate qualification fails before comparison, when artifacts are retained, then the sanitized failure and container diagnostics survive cleanup", () => {
+  // given
+  const comparison = yaml.load(build).jobs["tool-update-comparison"];
+  const upload = comparison.steps.find((step) => step.with?.name === "security-tool-update-${{ github.run_id }}");
+
+  // when
+  const paths = upload.with.path.trim().split(/\n\s*/);
+
+  // then
+  assert.equal(upload.if, "always()");
+  assert.ok(paths.includes("build/uat-smoke/qualification.json"));
+  assert.ok(paths.includes("build/uat-smoke/container-logs.txt"));
+  assert.ok(!paths.includes("build/uat-smoke"), "only the sanitized diagnostic files may be uploaded");
+});
+
 test("given a scanner update, when the comparison runs, then both Schemathesis adapters are proven against the pinned image first", () => {
   // given
   const comparison = jobIn(build, "tool-update-comparison");
