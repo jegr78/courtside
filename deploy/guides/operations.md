@@ -1535,7 +1535,7 @@ custom trust mode rather than substituting the official release image.
 Retention reads and verifies only recovery units directly below the configured `backups/`
 directory. An unknown or malformed target stops pruning.
 
-Prove a recovery unit in a disposable PostgreSQL 18 target. Supply an existing administrator whose
+Prove a recovery unit in a disposable PostgreSQL 18 target. Supply an existing account whose
 persisted password and court data should survive the restore. In a private shell, read the password
 without echo into <code>COURTSIDE_RESTORE_PASSWORD</code>, export it, set
 <code>COURTSIDE_RESTORE_USERNAME</code>, and run
@@ -1543,10 +1543,9 @@ without echo into <code>COURTSIDE_RESTORE_PASSWORD</code>, export it, set
 /srv/courtside/backups/recovery-&lt;timestamp&gt;-&lt;version&gt;-&lt;id&gt;</code>. Unset the password
 variable when the check finishes.
 
-For an MFA-enabled administrator, set `COURTSIDE_RESTORE_MFA_CODE_FILE` to an operator-owned
+For an MFA-enabled account, set `COURTSIDE_RESTORE_MFA_CODE_FILE` to an operator-owned
 mode-`0600` file containing a fresh six-digit TOTP or unused recovery code. The probe posts it only
-after the password leaves the session unauthenticated. It verifies the completed session and
-administrator role. The code is read through a private JSON file and is never printed or included
+after the password leaves the session unauthenticated. It verifies the completed session. The code is read through a private JSON file and is never printed or included
 in command arguments. Remove the input file and unset its path when the check finishes. A recovery
 code is consumed only in the disposable restored database, so the original backup still contains
 its verifier.

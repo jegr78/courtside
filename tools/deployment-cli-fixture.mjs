@@ -150,7 +150,7 @@ for argument in "$@"; do
 done
 case "$*" in
   *'/api/session/mfa'*) touch "${join(root, "curl-mfa-completed")}"; printf '%s\\n' '{}' ;;
-  *'/api/session'*) if [ -f "${join(root, "curl-mfa-required")}" ] && [ ! -f "${join(root, "curl-mfa-completed")}" ]; then printf '%s\\n' '{"authenticated":false}'; else printf '%s\\n' '{"authenticated":true,"roles":["ADMIN"]}'; fi ;;
+  *'/api/session'*) if [ -f "${join(root, "curl-mfa-required")}" ] && [ ! -f "${join(root, "curl-mfa-completed")}" ]; then printf '%s\\n' '{"authenticated":false}'; elif [ -f "${join(root, "curl-member-role")}" ]; then printf '%s\\n' '{"authenticated":true,"roles":["MEMBER"]}'; else printf '%s\\n' '{"authenticated":true,"roles":["ADMIN"]}'; fi ;;
   *'/api/public/courts'*) printf '%s\\n' '[{"id":"court-1"}]' ;;
 esac
 `, { mode: 0o755 });

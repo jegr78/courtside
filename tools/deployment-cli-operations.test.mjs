@@ -674,6 +674,23 @@ test("given an MFA-enabled restored account, when the recovery login probe recei
   });
 });
 
+test("given a restored member account without administrator role, when the login probe runs, then any authenticated account proves the recovery", () => {
+  fixture((context) => {
+    // given
+    assert.equal(initialize(context).status, 0);
+    assert.equal(run(context.archive, context.target, ["backup"], context.environment).status, 0);
+    const recovery = join(context.target, "backups", readdirSync(join(context.target, "backups"))[0]);
+    writeFileSync(join(context.root, "curl-member-role"), "member");
+    // when
+    const result = run(context.archive, context.target, ["restore-check", "--recovery", recovery], {
+      ...context.environment, COURTSIDE_RESTORE_USERNAME: "doe.jane", COURTSIDE_RESTORE_PASSWORD: "private-restore-password"
+    });
+    // then
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(readFileSync(join(context.root, "curl.log"), "utf8"), /api\/public\/courts/);
+  });
+});
+
 test("given an existing restore key volume, when restore-check starts, then neither extraction nor cleanup may touch it", () => {
   fixture((context) => {
     // given

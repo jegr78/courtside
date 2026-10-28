@@ -1754,8 +1754,6 @@ restore_probe() {
   fi
   [[ "$after" == *'"authenticated":true'* ]] \
     || { printf 'the restored account did not produce an authenticated session; MFA accounts require COURTSIDE_RESTORE_MFA_CODE_FILE\n' >&2; return 1; }
-  grep -Eq '"roles":\[[^]]*"ADMIN"' <<< "$after" \
-    || { printf 'the restored probe requires an administrator account\n' >&2; return 1; }
   courts=$("${safe_curl[@]}" -fsS -b "$cookie_jar" "http://$port/api/public/courts") \
     || { printf 'the restored application could not read persisted courts\n' >&2; return 1; }
   [[ "$courts" == \[* ]] && [ "$courts" != "[]" ] \
