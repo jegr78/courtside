@@ -1212,7 +1212,8 @@ test("given the security Compose file, when reading the assessed target, then it
   assert.deepEqual(app.depends_on, {
     db: { condition: "service_healthy" },
     seeder: { condition: "service_completed_successfully" },
-    mail: { condition: "service_started" }
+    mail: { condition: "service_started" },
+    "password-breach": { condition: "service_started" }
   });
   assert.equal(seeder.image, "${COURTSIDE_SECURITY_FIXTURES_IMAGE:?required}");
   assert.equal(seeder.environment.SPRING_PROFILES_ACTIVE, "security");
@@ -2210,3 +2211,126 @@ test("given a gateway that has relayed nothing yet, when the real sampler watche
   assert.ok(result.samples.every(({ requestP95Milliseconds, errorRate }) => requestP95Milliseconds === 0 && errorRate === 0),
     "no request passed the gateway, so it reports neither latency nor errors");
 });
+
+
+test("given the password breach dependency, when inspecting its boundary, then the application retains only internal networks and a bounded fixed bridge", () => {
+  // given
+  const { app, proxy, "password-breach": bridge } = securityServices();
+  // when / then
+  assert.ok(bridge, "password checks need an explicitly bounded dependency bridge");
+  assert.deepEqual(app.networks, ["backend", "frontend"]);
+  assert.equal(app.environment.COURTSIDE_PASSWORD_BREACH_ENDPOINT, "https://password-breach/range/");
+  assert.equal(bridge.image, proxy.image);
+  assert.equal(bridge.ports, undefined);
+  assert.deepEqual(bridge.networks, ["backend", "exposure"]);
+  assert.equal(bridge.user, "${COURTSIDE_SECURITY_MAIL_USER:?required}");
+  assert.equal(bridge.read_only, true);
+  assert.equal(bridge.cpus, 0.25);
+  assert.equal(bridge.mem_limit, "128m");
+  assert.equal(bridge.pids_limit, 32);
+  assert.deepEqual(bridge.cap_drop, ["ALL"]);
+  assert.deepEqual(bridge.cap_add, ["NET_BIND_SERVICE"]);
+  assert.deepEqual(bridge.security_opt, ["no-new-privileges:true"]);
+  assert.deepEqual(bridge.volumes, [
+    "./Caddyfile.security-password-breach:/etc/caddy/Caddyfile:ro",
+    "${COURTSIDE_SECURITY_MAIL_DIRECTORY:?required}/cert.pem:/trust/cert.pem:ro",
+    "${COURTSIDE_SECURITY_MAIL_DIRECTORY:?required}/key.pem:/trust/key.pem:ro"
+  ]);
+  assert.deepEqual(bridge.tmpfs, ["/config:size=1m,mode=1777", "/data:size=1m,mode=1777", "/tmp:size=1m,mode=1777"]);
+});
+
+test("given bounded MFA mail ownership, when projecting its outbox, then use a sequence boundary and exact holders without write statements", async () => {
+  // given
+  const module = await import("./security-environment.mjs");
+  assert.equal(typeof module.securityMfaOutboxProjectionSql, "function", "MFA cleanup needs an explicit read-only outbox projection");
+  // when
+  const sql = module.securityMfaOutboxProjectionSql("12", ["security.member.2", "security.admin.2"]);
+  // then
+  assert.match(sql, /queued_seq > 12/);
+  assert.match(sql, /ACCOUNT_SECURITY_CHANGED/);
+  assert.match(sql, /ACCOUNT_MFA_RECOVERY_CODE/);
+  assert.match(sql, /LIMIT 101/);
+  assert.match(sql, /person/);
+  assert.doesNotMatch(sql, /\b(?:DELETE|UPDATE|INSERT|TRUNCATE)\b/i);
+  for (const [after, names] of [["12;DELETE", ["security.member.2"]], ["1", ["security.member.1"]], ["1", []], ["-1", ["security.member.2"]]]) {
+    assert.throws(() => module.securityMfaOutboxProjectionSql(after, names), /Invalid MFA mail projection/);
+  }
+});
+
+function mfaDatabaseProtocol() {
+  const project = "courtside-security-db-run-0001";
+  const runId = "db-run-0001";
+  const fingerprint = `sha256:${"1".repeat(64)}`;
+  const identity = { seedFingerprint: fingerprint, instanceFingerprint: fingerprint };
+  const binding = { appId: "2".repeat(64), backendNetworkId: "3".repeat(64) };
+  const databaseId = "4".repeat(64), imageId = `sha256:${"5".repeat(64)}`;
+  const pinned = securityServices().db.image;
+  const labels = { "org.courtside.environment": "SECURITY", "org.courtside.security.run-id": runId,
+    "org.courtside.security.seed-fingerprint": fingerprint, "org.courtside.security.instance-fingerprint": fingerprint,
+    "com.docker.compose.project": project };
+  const image = { Id: imageId, Config: { Entrypoint: ["docker-entrypoint.sh"], Cmd: ["postgres"] } };
+  const database = { Id: databaseId, Name: `/${project}-db-1`, Image: imageId, State: { Running: true },
+    Config: { Image: pinned, Entrypoint: image.Config.Entrypoint, Cmd: image.Config.Cmd,
+      Labels: { ...labels, "com.docker.compose.service": "db" } },
+    NetworkSettings: { Networks: { [`${project}_backend`]: { NetworkID: binding.backendNetworkId, IPAddress: "172.30.0.2", Aliases: ["db"] } } } };
+  const network = { Id: binding.backendNetworkId, Name: `${project}_backend`, Internal: true,
+    Labels: { ...labels, "com.docker.compose.network": "backend" }, Containers: {
+      [databaseId]: { Name: `${project}-db-1`, IPv4Address: "172.30.0.2/24" },
+      [binding.appId]: { Name: `${project}-app-1`, IPv4Address: "172.30.0.3/24" }
+    } };
+  const calls = [];
+  const command = async (args, limits) => {
+    calls.push({ args, limits });
+    if (args[0] === "image") return { stdout: JSON.stringify([image]) };
+    if (args[0] === "inspect") return { stdout: JSON.stringify([database]) };
+    if (args[0] === "network") return { stdout: JSON.stringify([network]) };
+    assert.equal(args[0], "exec");
+    return { stdout: JSON.stringify({ watermark: "12", records: [], fingerprint: "a".repeat(64) }) };
+  };
+  return { runId, identity, binding, image, database, network, command, calls };
+}
+
+test("given the owned PostgreSQL runtime, when projecting MFA mail, then use only bounded native calls and the exact retained database ID", async () => {
+  // given
+  const module = await import("./security-environment.mjs");
+  assert.equal(typeof module.createSecurityMfaOutboxProjector, "function", "the projector must not call the legacy HTTP verifier");
+  const h = mfaDatabaseProtocol();
+  const project = module.createSecurityMfaOutboxProjector(h);
+  // when
+  const result = await project(null, ["security.member.2"], h.binding);
+  // then
+  assert.equal(result.fingerprint, "a".repeat(64));
+  assert.deepEqual(h.calls.map(({ args }) => args[0]), ["image", "inspect", "network", "exec"]);
+  const execution = h.calls.at(-1).args;
+  assert.equal(execution[execution.indexOf("-e") + 2], h.database.Id);
+  assert.ok(execution.includes("PGOPTIONS=-c default_transaction_read_only=on"));
+  assert.ok(execution.includes("/var/run/postgresql"));
+  for (const { limits } of h.calls) {
+    assert.equal(limits.timeoutMilliseconds, 10000);
+    assert.equal(limits.outputLimitBytes, 32768);
+  }
+});
+
+for (const changed of ["labels", "container ID", "image", "network ID", "external network", "missing app membership", "overridden entrypoint", "published port", "network labels"]) {
+  test(`given changed database ${changed}, when a retained MFA mail projection runs, then refuse before SQL`, async () => {
+    // given
+    const module = await import("./security-environment.mjs");
+    assert.equal(typeof module.createSecurityMfaOutboxProjector, "function");
+    const h = mfaDatabaseProtocol();
+    const project = module.createSecurityMfaOutboxProjector(h);
+    await project(null, ["security.member.2"], h.binding);
+    if (changed === "labels") h.database.Config.Labels["org.courtside.security.run-id"] = "foreign-run";
+    if (changed === "container ID") h.database.Id = "9".repeat(64);
+    if (changed === "image") h.database.Image = `sha256:${"9".repeat(64)}`;
+    if (changed === "network ID") h.database.NetworkSettings.Networks["courtside-security-db-run-0001_backend"].NetworkID = "9".repeat(64);
+    if (changed === "external network") h.network.Internal = false;
+    if (changed === "missing app membership") delete h.network.Containers[h.binding.appId];
+    if (changed === "overridden entrypoint") h.database.Config.Entrypoint = ["sh"];
+    if (changed === "published port") h.database.NetworkSettings.Ports = { "5432/tcp": [{ HostPort: "5432" }] };
+    if (changed === "network labels") h.network.Labels["org.courtside.security.run-id"] = "foreign-run";
+    const executions = h.calls.filter(({ args }) => args[0] === "exec").length;
+    // when / then
+    await assert.rejects(project("12", ["security.member.2"], h.binding), /mfa-mail-database-untrusted/);
+    assert.equal(h.calls.filter(({ args }) => args[0] === "exec").length, executions);
+  });
+}

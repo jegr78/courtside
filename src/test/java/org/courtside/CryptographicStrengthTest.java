@@ -4,11 +4,22 @@ import org.bouncycastle.crypto.generators.Argon2BytesGenerator;
 import org.bouncycastle.crypto.params.Argon2Parameters;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.web.webauthn.api.PublicKeyCredentialRpEntity;
+import org.springframework.security.web.webauthn.api.PublicKeyCredentialType;
+import org.springframework.security.web.webauthn.management.ImmutablePublicKeyCredentialCreationOptionsRequest;
+import org.springframework.security.web.webauthn.management.MapPublicKeyCredentialUserEntityRepository;
+import org.springframework.security.web.webauthn.management.MapUserCredentialRepository;
+import org.springframework.security.web.webauthn.management.Webauthn4JRelyingPartyOperations;
 import org.springframework.security.crypto.argon2.Argon2PasswordEncoder;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
+import javax.crypto.Cipher;
+import javax.crypto.Mac;
+import javax.crypto.spec.GCMParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileVisitResult;
@@ -16,6 +27,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
@@ -31,6 +43,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class CryptographicStrengthTest {
 
@@ -56,7 +69,8 @@ class CryptographicStrengthTest {
 
     // A rate-bounded secret escapes the minimum on the strength of a literal in the code, so its
     // bits have to be ones this test recomputes rather than ones the entry may simply assert.
-    private static final Set<String> RECOMPUTED = Set.of("password-reset-code");
+    private static final Set<String> RECOMPUTED = Set.of("password-reset-code", "mfa-totp",
+            "mfa-recovery-code", "mfa-browser-authenticator");
 
     private static final Set<String> IMPLEMENTATIONS = Set.of("java-runtime", "bouncy-castle",
             "spring-security", "web-crypto", "node-crypto", "openssl", "sigstore", "stalwart",
@@ -68,9 +82,9 @@ class CryptographicStrengthTest {
     // What each implementation this test can start actually computes, proved by the probes below
     // rather than asserted here.
     private static final Map<String, Set<String>> EXERCISED = Map.of(
-            "java-runtime", Set.of("SHA-256", "SHA-1", "SecureRandom", "UUIDv4"),
+            "java-runtime", Set.of("SHA-256", "SHA-1", "SecureRandom", "UUIDv4", "HMAC-SHA-1", "AES-256-GCM"),
             "bouncy-castle", Set.of("argon2id"),
-            "spring-security", Set.of("platform-provided"));
+            "spring-security", Set.of("platform-provided", "WebAuthn-COSE"));
 
     private static final String RUNTIME_MODULE = "java.base";
 
@@ -85,9 +99,8 @@ class CryptographicStrengthTest {
     private static final String DOCUMENTATION = ".md";
     private static final Path DATA = Path.of("src/main/resources/security/common-passwords.txt");
 
-    // Both carry the patterns below as literals, so a scan that read them would find its own words.
-    // Neither generates a key or draws a random value.
-    private static final Set<Path> POLICY = Set.of(
+    // Policy regexes and detector names describe calls without executing them.
+    private static final Set<Path> POLICY = Set.of(INVENTORY,
             Path.of("src/test/java/org/courtside/CryptographicInventoryTest.java"),
             Path.of("src/test/java/org/courtside/CryptographicStrengthTest.java"));
 
@@ -98,6 +111,12 @@ class CryptographicStrengthTest {
             "-newkey\"?,?\\s*\"?(rsa:\\d+)|ec_paramgen_curve:(P-\\d+)"
                     + "|namedCurve\"?\\s*:\\s*\"(P-\\d+)\"|rsa_keygen_bits:(\\d+)"
                     + "|modulusLength\"?\\s*:\\s*(\\d+)|-b\\s+(\\d+)");
+    private static final Pattern JAVA_EC_GENERATION = Pattern.compile(
+            "(?:var|KeyPairGenerator)\\s+(\\w+)\\s*=\\s*KeyPairGenerator\\.getInstance\\(\"EC\"\\);\\s*"
+                    + "\\1\\.initialize\\(new ECGenParameterSpec\\(\"(secp256r1)\"\\)\\);\\s*"
+                    + "\\w+\\s*=\\s*\\1\\.generateKeyPair\\(\\)");
+    private static final Pattern KEY_GENERATOR_IMPORT = Pattern.compile(
+            "(?m)^import java\\.security\\.KeyPairGenerator;[ \\t]*$");
     private static final Pattern HARNESS_DRAW = Pattern.compile("randomBytes\\((\\d+)\\)");
     private static final Pattern HARNESS_CREDENTIAL = Pattern.compile(
             "(?i)password\\s*=\\s*randomBytes\\((\\d+)\\)");
@@ -168,6 +187,108 @@ class CryptographicStrengthTest {
                             + " that reaches it", id(entry))
                     .anyMatch(location -> location.endsWith(".java"));
         }
+    }
+
+    @Test
+    void whenTheMfaProvidersAreExercised_thenTheyComputeTheAdvertisedPrimitives() throws GeneralSecurityException {
+        // given
+        byte[] secret = new byte[32];
+        byte[] nonce = new byte[12];
+        byte[] plaintext = "account-bound secret".getBytes(StandardCharsets.US_ASCII);
+        Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+        Mac mac = Mac.getInstance("HmacSHA1");
+        var operations = new Webauthn4JRelyingPartyOperations(new MapPublicKeyCredentialUserEntityRepository(),
+                new MapUserCredentialRepository(), PublicKeyCredentialRpEntity.builder()
+                        .id("courts.example.org").name("Example Tennis Club").build(), Set.of("https://courts.example.org"));
+
+        // when
+        cipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(secret, "AES"), new GCMParameterSpec(128, nonce));
+        cipher.updateAAD("account".getBytes(StandardCharsets.US_ASCII));
+        byte[] encrypted = cipher.doFinal(plaintext);
+        cipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(secret, "AES"), new GCMParameterSpec(128, nonce));
+        cipher.updateAAD("account".getBytes(StandardCharsets.US_ASCII));
+        byte[] decrypted = cipher.doFinal(encrypted);
+        byte[] hmacKey = new byte[20];
+        java.util.Arrays.fill(hmacKey, (byte) 0x0b);
+        mac.init(new SecretKeySpec(hmacKey, "HmacSHA1"));
+        var options = operations.createPublicKeyCredentialCreationOptions(
+                new ImmutablePublicKeyCredentialCreationOptionsRequest(
+                        UsernamePasswordAuthenticationToken.authenticated("jane.doe", null, List.of())));
+
+        // then
+        assertThat(cipher.getProvider().getClass().getModule().getName()).isEqualTo(RUNTIME_MODULE);
+        assertThat(mac.getProvider().getClass().getModule().getName()).isEqualTo(RUNTIME_MODULE);
+        assertThat(decrypted).isEqualTo(plaintext);
+        assertThat(encrypted).hasSize(plaintext.length + 16);
+        assertThat(java.util.HexFormat.of().formatHex(mac.doFinal("Hi There".getBytes(StandardCharsets.US_ASCII))))
+                .isEqualTo("b617318655057264e28bc0b6fb378c8ef146be00");
+        assertThat(options.getRp().getId()).isEqualTo("courts.example.org");
+        assertThat(options.getChallenge().getBytes()).isNotEmpty();
+        assertThat(options.getPubKeyCredParams()).isNotEmpty().allSatisfy(parameter -> {
+            assertThat(parameter.getType()).isEqualTo(PublicKeyCredentialType.PUBLIC_KEY);
+            assertThat(parameter.getAlg()).isNotNull();
+        });
+    }
+
+    @Test
+    void whenTheMfaGeneratorsAreRead_thenTheInventoryRecordsTheirActualParameters() throws IOException {
+        // given
+        Path directory = Path.of("src/main/java/org/courtside/identity/internal");
+        String totp = read(directory.resolve("TotpCodes.java"));
+        String keyring = read(directory.resolve("MfaKeyRing.java"));
+        String recovery = read(directory.resolve("MfaRecoveryCodes.java"));
+        String reset = read(RESET_CODES);
+
+        // when
+        int secretBytes = literal(totp, "byte\\[\\] secret = new byte\\[(\\d+)\\]", "TOTP secret bytes");
+        int decimalCodes = literal(totp, "truncated % ([0-9_]+)", "TOTP code space");
+        int period = literal(totp, "getEpochSecond\\(\\) / (\\d+)", "TOTP period");
+        int keyBytes = literal(keyring, "byte\\[\\] material = new byte\\[(\\d+)\\]", "MFA encryption key bytes");
+        int nonceBytes = literal(keyring, "byte\\[\\] nonce = new byte\\[(\\d+)\\]", "MFA encryption nonce bytes");
+        int tagBits = literal(keyring, "GCMParameterSpec\\((\\d+)", "MFA authentication tag bits");
+        Matcher alphabet = RESET_CODE_ALPHABET.matcher(reset);
+        assertThat(alphabet.find()).as("the shared code generator declares its alphabet").isTrue();
+        int symbols = (int) alphabet.group(1).chars().distinct().count();
+        int characters = literal(reset, "CHARACTERS\\s*=\\s*(\\d+)", "shared code length");
+        int components = recovery.split("ResetCodes\\.generate\\(\\)", -1).length - 1;
+        int recoveryBits = (int) Math.floor(characters * components * Math.log(symbols) / Math.log(2));
+
+        // then
+        JsonNode totpParameters = entry("mfa-totp").get("parameters");
+        assertThat(totpParameters.get("secretBytes").asInt()).isEqualTo(secretBytes);
+        assertThat(totpParameters.get("digits").asInt()).isEqualTo((int) Math.log10(decimalCodes));
+        assertThat(totpParameters.get("periodSeconds").asInt()).isEqualTo(period);
+        assertThat(bitsOf("mfa-totp")).isEqualTo((int) Math.floor(Math.log(decimalCodes) / Math.log(2)));
+        JsonNode encryption = entry("mfa-secret-encryption").get("parameters");
+        assertThat(encryption.get("keyBytes").asInt()).isEqualTo(keyBytes);
+        assertThat(encryption.get("nonceBytes").asInt()).isEqualTo(nonceBytes);
+        assertThat(encryption.get("authenticationTagBits").asInt()).isEqualTo(tagBits);
+        assertThat(bitsOf("mfa-secret-encryption")).isEqualTo(Math.min(keyBytes * BITS_PER_BYTE, tagBits));
+        JsonNode recoveryParameters = entry("mfa-recovery-code").get("parameters");
+        assertThat(recoveryParameters.get("alphabetSymbols").asInt()).isEqualTo(symbols);
+        assertThat(recoveryParameters.get("characters").asInt()).isEqualTo(characters * components);
+        assertThat(bitsOf("mfa-recovery-code")).isEqualTo(recoveryBits);
+        assertThat(totp).contains("Mac.getInstance(\"HmacSHA1\")");
+        assertThat(keyring).contains("Cipher.getInstance(\"AES/GCM/NoPadding\")");
+        JsonNode browserParameters = entry("mfa-browser-authenticator").get("parameters");
+        for (String path : List.of("frontend/e2e/mfa-authenticator.ts", "tools/security-mfa-fixture.mjs")) {
+            String fixture = read(Path.of(path));
+            int fixtureCodes = literal(fixture, "% ([0-9_]+)", "fixture authenticator code space");
+            int fixturePeriod = literal(fixture, "/ ([0-9_]+)\\) \\+", "fixture authenticator period");
+            assertThat(browserParameters.get("digits").asInt()).isEqualTo((int) Math.log10(fixtureCodes));
+            assertThat(browserParameters.get("periodMilliseconds").asInt()).isEqualTo(fixturePeriod);
+            assertThat(bitsOf("mfa-browser-authenticator"))
+                    .isEqualTo((int) Math.floor(Math.log(fixtureCodes) / Math.log(2)));
+            assertThat(fixture).contains("createHmac(\"sha1\"");
+        }
+        String nativeFixture = read(Path.of("tools/security-mfa-fixture.mjs"));
+        Matcher curve = Pattern.compile("namedCurve: \"(P-\\d+)\"").matcher(nativeFixture);
+        assertThat(curve.find()).as("the native fixture declares its selected curve").isTrue();
+        JsonNode fixtureParameters = entry("mfa-webauthn-fixture").get("parameters");
+        assertThat(fixtureParameters.get("namedCurve").asText()).isEqualTo(curve.group(1));
+        assertThat(bitsOf("mfa-webauthn-fixture")).isEqualTo(strengthOf(curve.group(1)));
+        assertThat(fixtureParameters.get("credentialIdBytes").asInt())
+                .isEqualTo(literal(nativeFixture, "const id = crypto\\.randomBytes\\((\\d+)\\)", "fixture credential id bytes"));
     }
 
     @Test
@@ -245,7 +366,7 @@ class CryptographicStrengthTest {
         int drawn = (int) Math.floor(Integer.parseInt(characters.group(1))
                 * (Math.log(symbols) / Math.log(2)));
 
-        // then — a wider alphabet or a longer code is a change to what the entry claims
+        // then
         assertThat(bitsOf("password-reset-code"))
                 .as("the entry records what the generator draws")
                 .isEqualTo(drawn);
@@ -298,15 +419,40 @@ class CryptographicStrengthTest {
                 .isEqualTo(generated.values().stream().min(Integer::compare).orElseThrow());
     }
 
+    @Test
+    void givenJavaEcKeyGeneration_whenItsCurveOrGeneratorBindingChanges_thenThePolicyRefusesIt() throws IOException {
+        // given
+        Path fixture = Path.of("src/test/java/org/courtside/identity/internal/WebAuthnAuthenticatorFixture.java");
+        String source = read(fixture);
+
+        // when / then
+        assertThat(generatedKeyPairs(Map.of(fixture, source))).containsEntry(fixture + " Java EC secp256r1", 128);
+        assertThatThrownBy(() -> generatedKeyPairs(Map.of(fixture, source.replace("secp256r1", "secp192r1"))))
+                .isInstanceOf(AssertionError.class).hasMessageContaining("names no parameter");
+        assertThatThrownBy(() -> generatedKeyPairs(Map.of(fixture, source.replace("generator.initialize", "other.initialize"))))
+                .isInstanceOf(AssertionError.class).hasMessageContaining("names no parameter");
+    }
+
     private static Map<String, Integer> generatedKeyPairs() throws IOException {
+        return generatedKeyPairs(sources());
+    }
+
+    private static Map<String, Integer> generatedKeyPairs(Map<Path, String> sources) {
         Map<String, Integer> rated = new TreeMap<>();
-        for (Map.Entry<Path, String> file : sources().entrySet()) {
-            Matcher generation = KEY_GENERATION.matcher(file.getValue());
+        for (Map.Entry<Path, String> file : sources.entrySet()) {
+            String source = KEY_GENERATOR_IMPORT.matcher(file.getValue()).replaceAll("");
+            Matcher javaEc = JAVA_EC_GENERATION.matcher(source);
+            while (javaEc.find()) {
+                rated.put(file.getKey() + " Java EC " + javaEc.group(2), 128);
+            }
+            source = JAVA_EC_GENERATION.matcher(source).replaceAll("");
+            Map.Entry<Path, String> remaining = Map.entry(file.getKey(), source);
+            Matcher generation = KEY_GENERATION.matcher(source);
             while (generation.find()) {
-                String call = file.getValue().substring(generation.start(), Math.min(
-                        generation.start() + WITHIN_THE_CALL, file.getValue().length()));
+                String call = source.substring(generation.start(), Math.min(
+                        generation.start() + WITHIN_THE_CALL, source.length()));
                 Matcher parameter = KEY_PARAMETERS.matcher(call);
-                String where = where(file, generation) + " generates a key pair with "
+                String where = where(remaining, generation) + " generates a key pair with "
                         + generation.group();
                 assertThat(parameter.find())
                         .as("%s, and names no parameter this policy can read", where).isTrue();
@@ -353,6 +499,12 @@ class CryptographicStrengthTest {
         assertThat(recomputed)
                 .as("Bouncy Castle recomputes the Argon2id hash the shipped encoder writes")
                 .isEqualTo(Base64.getDecoder().decode(fields[5]));
+    }
+
+    private static int literal(String source, String pattern, String name) {
+        Matcher found = Pattern.compile(pattern).matcher(source);
+        assertThat(found.find()).as("%s is declared in the production source", name).isTrue();
+        return Integer.parseInt(found.group(1).replace("_", ""));
     }
 
     // NIST SP 800-57 part 1, table 2: what a modulus or a curve is worth in bits of security.

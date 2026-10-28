@@ -14,7 +14,7 @@ class SessionReauthenticationController implements SessionReauthenticationApi {
 
     @Override
     public ResponseEntity<Void> reauthenticate(ApiReauthenticationRequest request) {
-        reauthentication.reauthenticate(request.getPassword());
+        reauthentication.reauthenticate(request.getPassword(), request.getCode(), request.getCredential());
         return ResponseEntity.noContent().build();
     }
 }

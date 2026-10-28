@@ -1,3 +1,6 @@
+import { useProofContinuation } from "../security/useProofContinuation";
+import { ReauthenticationCode } from "../components/ReauthenticationCode";
+import { reauthenticateForm } from "../security/reauthentication";
 import { type FormEvent, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
@@ -35,6 +38,7 @@ export function AdminRetentionView() {
   const [error, setError] = useState<string>();
   const [loadFailure, setLoadFailure] = useState<string>();
   const [success, setSuccess] = useState<string>();
+  const proofContinuation = useProofContinuation();
   const [retry, setRetry] = useState<RetentionPreview>();
   const [reauthenticationFailure, setReauthenticationFailure] = useState<string>();
   const [pending, setPending] = useState(false);
@@ -138,15 +142,18 @@ export function AdminRetentionView() {
     const password = new FormData(event.currentTarget).get("retention-reauthentication-password");
     const reviewed = retry;
     if (typeof password !== "string" || !reviewed || pending) return;
+    const ownsProof = proofContinuation.begin();
     setPending(true);
     setReauthenticationFailure(undefined);
     try {
-      await api.reauthenticate(password);
+      await reauthenticateForm(event.currentTarget, password);
     } catch (failure) {
+      if (!ownsProof()) return;
       setReauthenticationFailure(problemMessage(failure, t));
       setPending(false);
       return;
     }
+    if (!ownsProof()) return;
     setRetry(undefined);
     setPending(false);
     await attempt(() => apply(reviewed));
@@ -239,6 +246,8 @@ export function AdminRetentionView() {
         </div>
       </>}
     {retry && <Modal labelledBy="retention-reauthentication-title" closed={() => {
+      proofContinuation.cancel();
+      setPending(false);
       setRetry(undefined);
       setReauthenticationFailure(undefined);
     }}>
@@ -248,6 +257,7 @@ export function AdminRetentionView() {
         {reauthenticationFailure && <Alert testId="retention-reauthentication-failure">{reauthenticationFailure}</Alert>}
         <TextField data-testid="retention-reauthentication-password" id="retention-reauthentication-password" name="retention-reauthentication-password"
           type="password" autoComplete="current-password" required label={t("auth.password")} />
+        <ReauthenticationCode />
         <Button data-testid="retention-reauthentication-submit" variant="primary" disabled={pending} type="submit">{t("accountSecurity.continue")}</Button>
       </form>
     </Modal>}

@@ -1,4 +1,6 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import type { ComponentType, ReactNode } from "react";
+import { proofOwnerHarness } from "../test/ProofOwner";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
@@ -22,8 +24,8 @@ function reminder(englishOwn: typeof own | null = null): MessageTemplate {
   };
 }
 
-function show() {
-  render(<MemoryRouter><AdminMessageWordingView /></MemoryRouter>);
+function show(wrapper?: ComponentType<{ children: ReactNode }>) {
+  return render(<MemoryRouter><AdminMessageWordingView /></MemoryRouter>, { wrapper });
 }
 
 async function chooseEnglish() {
@@ -145,4 +147,28 @@ describe("AdminMessageWordingView", () => {
     expect(resetting).toHaveBeenCalledWith("ACCOUNT_USERNAME_REMINDER", "en");
     expect(screen.getByTestId("wording-state")).toHaveAttribute("data-own", "false");
   });
+  it.each(["escape", "unmount", "account switch"])("given a proof awaiting its response, when %s invalidates its dialog, then never send the saved mutation", async (ending) => {
+    // given
+    const owner = proofOwnerHarness();
+    let proved!: () => void;
+    vi.spyOn(api, "reauthenticate").mockReturnValue(new Promise((resolve) => { proved = resolve; }));
+    const changing = vi.spyOn(api, "changeMessageTemplate").mockRejectedValueOnce(new ApiError(403, { type: "urn:courtside:error:recent-authentication-required", title: "Proof required", status: 403 })).mockResolvedValue(undefined);
+    const shown = show(owner.Wrapper);
+    await chooseEnglish();
+    await userEvent.click(screen.getByTestId("wording-save"));
+    await userEvent.type(await screen.findByTestId("admin-reauthentication-password"), "current-password");
+    await userEvent.click(screen.getByTestId("admin-reauthentication-submit"));
+    // when
+    if (ending === "escape") {
+      await userEvent.click(screen.getByRole("dialog").querySelector("input")!);
+      await userEvent.keyboard("{Escape}");
+      expect(screen.queryByRole("dialog")).toBeNull();
+    }
+    else if (ending === "unmount") shown.unmount();
+    else act(owner.change);
+    await act(async () => { proved(); await Promise.resolve(); });
+    // then
+    expect(changing).toHaveBeenCalledOnce();
+  });
+
 });

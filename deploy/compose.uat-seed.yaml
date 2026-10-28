@@ -20,6 +20,7 @@ services:
       db:
         condition: service_healthy
     environment:
+      COURTSIDE_MFA_KEY_ROOT: /var/lib/courtside/mfa-keys
       SPRING_PROFILES_ACTIVE: uat-seed
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/courtside
       SPRING_DATASOURCE_USERNAME: courtside
@@ -29,5 +30,7 @@ services:
       COURTSIDE_MAIL_RELAY_HOST: mail.invalid
       COURTSIDE_MAIL_FROM: no-reply@example.org
       COURTSIDE_MAIL_REPLY_TO: board@example.org
+    volumes:
+      - mfa-keys:/var/lib/courtside/mfa-keys
     networks:
       - backend

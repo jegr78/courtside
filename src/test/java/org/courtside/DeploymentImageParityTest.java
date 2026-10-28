@@ -36,6 +36,22 @@ class DeploymentImageParityTest {
     private static final Pattern REQUIRED_VARIABLE = Pattern.compile("\\$\\{\\w+(?:}|:?\\?)");
     private static final Pattern VARIANT = Pattern.compile("-(?:alpine|with-browser)$");
     private static final Pattern IMAGE_LINE = Pattern.compile("(?m)^\\s*image:\\s*[\"']?([^\\s\"']+)");
+    private static final String RECOVERY_APPLICATION_IMAGE =
+            "${COURTSIDE_RECOVERY_IMAGE:-${COURTSIDE_RECOVERY_IMAGE_REPOSITORY:-ghcr.io/jegr78/courtside}"
+                    + "@sha256:${COURTSIDE_RECOVERY_IMAGE_DIGEST:-}}";
+
+    @Test
+    void givenAnOptionalRecoveryImage_whenClassifyingIt_thenOnlyTheReviewedApplicationSelectionIsAccepted() {
+        // given
+        Path recovery = DEPLOY.resolve("compose.recovery-check.yaml");
+
+        // when / then
+        assertThat(isRecoveryApplicationImage(recovery, RECOVERY_APPLICATION_IMAGE)).isTrue();
+        assertThat(isRecoveryApplicationImage(DEPLOY.resolve("compose.yaml"), RECOVERY_APPLICATION_IMAGE)).isFalse();
+        assertThat(isRecoveryApplicationImage(recovery,
+                RECOVERY_APPLICATION_IMAGE.replace("ghcr.io/jegr78/courtside", "postgres"))).isFalse();
+        assertThat(isRecoveryApplicationImage(recovery, "${COURTSIDE_RECOVERY_IMAGE:-postgres:latest}")).isFalse();
+    }
 
     @Test
     void whenTheDeploymentNamesAnImage_thenEveryFileUnderItAgreesOnOneVersionAndDigest() throws Exception {
@@ -175,7 +191,8 @@ class DeploymentImageParityTest {
                 for (MatchResult line : IMAGE_LINE.matcher(content(file)).results().toList()) {
                     String image = line.group(1);
                     boolean candidate = REQUIRED_VARIABLE.matcher(image).find()
-                            || image.replaceFirst("^\\$\\{\\w+:-", "").startsWith("courtside:");
+                            || image.replaceFirst("^\\$\\{\\w+:-", "").startsWith("courtside:")
+                            || isRecoveryApplicationImage(file, image);
                     if (!candidate && pinsIn(image).isEmpty()) {
                         unread.add(file + " runs " + image);
                     }
@@ -183,6 +200,11 @@ class DeploymentImageParityTest {
             }
         }
         return unread;
+    }
+
+    private static boolean isRecoveryApplicationImage(Path file, String image) {
+        return file.equals(DEPLOY.resolve("compose.recovery-check.yaml"))
+                && image.equals(RECOVERY_APPLICATION_IMAGE);
     }
 
     private static List<Pin> pinsIn(String text) {

@@ -1,4 +1,6 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import type { ComponentType, ReactNode } from "react";
+import { proofOwnerHarness } from "../test/ProofOwner";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -31,8 +33,8 @@ const recentAuthenticationRequired = new ApiError(403, {
   type: "urn:courtside:error:recent-authentication-required", title: "Forbidden", status: 403
 });
 
-function show() {
-  render(<MemoryRouter><WithClubConfiguration><AdminRetentionView /></WithClubConfiguration></MemoryRouter>);
+function show(wrapper?: ComponentType<{ children: ReactNode }>) {
+  return render(<MemoryRouter><WithClubConfiguration><AdminRetentionView /></WithClubConfiguration></MemoryRouter>, { wrapper });
 }
 
 async function previewed() {
@@ -209,4 +211,31 @@ describe("AdminRetentionView", () => {
     expect(await screen.findByTestId("retention-error")).toHaveTextContent(i18n.t("error.type.retention-preview-expired"));
     await waitFor(() => expect(screen.queryByTestId("retention-preview-result")).toBeNull());
   });
+  it.each(["escape", "unmount", "account switch"])("given a proof awaiting its response, when %s invalidates its dialog, then never send the saved mutation", async (ending) => {
+    // given
+    const owner = proofOwnerHarness();
+    let proved!: () => void;
+    vi.spyOn(api, "reauthenticate").mockReturnValue(new Promise((resolve) => { proved = resolve; }));
+    vi.spyOn(api, "retentionPolicies").mockResolvedValue(configured);
+    vi.spyOn(api, "previewRetention").mockResolvedValue(preview);
+    const changing = vi.spyOn(api, "runRetention").mockRejectedValueOnce(recentAuthenticationRequired).mockResolvedValue(run);
+    const shown = show(owner.Wrapper);
+    await userEvent.click(await screen.findByTestId("retention-preview"));
+    await userEvent.click(await screen.findByTestId("retention-acknowledge"));
+    await userEvent.click(screen.getByTestId("retention-run"));
+    await userEvent.type(await screen.findByTestId("retention-reauthentication-password"), "current-password");
+    await userEvent.click(screen.getByTestId("retention-reauthentication-submit"));
+    // when
+    if (ending === "escape") {
+      await userEvent.click(screen.getByRole("dialog").querySelector("input")!);
+      await userEvent.keyboard("{Escape}");
+      expect(screen.queryByRole("dialog")).toBeNull();
+    }
+    else if (ending === "unmount") shown.unmount();
+    else act(owner.change);
+    await act(async () => { proved(); await Promise.resolve(); });
+    // then
+    expect(changing).toHaveBeenCalledOnce();
+  });
+
 });

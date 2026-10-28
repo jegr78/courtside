@@ -42,12 +42,12 @@ $env:JAVA_HOME = "C:\path\to\temurin-25"
 | `node tools/courtside.mjs uat-logs` | Follows all UAT container logs, including the proxy's access and error entries without query strings, headers or full client addresses. |
 | `node tools/courtside.mjs uat-db-shell` | Opens `psql` inside the private UAT database container. |
 | `node tools/courtside.mjs uat-cert [file]` | Exports the UAT root certificate and prints trust instructions. |
-| `node tools/courtside.mjs uat-backup [file]` | Creates a portable compressed PostgreSQL dump. |
-| `node tools/courtside.mjs uat-restore <file> --confirm courtside-uat` | Replaces the UAT database from a dump and restarts the application. |
+| `node tools/courtside.mjs uat-backup [file]` | Creates a private complete backup directory with a PostgreSQL dump and matching MFA key archive. |
+| `node tools/courtside.mjs uat-restore <file> --confirm courtside-uat` | Validates a complete backup or legacy dump in an isolated environment before replacing the UAT database. |
 | `node tools/courtside.mjs uat-seed-bookings` | Previews additive sample bookings against the existing UAT database. |
 | `node tools/courtside.mjs uat-seed-bookings --confirm courtside-uat` | Backs up UAT and adds the previewed sample bookings. |
-| `node tools/courtside.mjs uat-reset courtside-uat` | Deletes the UAT database but retains its local CA. |
-| `node tools/courtside.mjs uat-reset courtside-uat --all` | Deletes the UAT database and local CA. |
+| `node tools/courtside.mjs uat-reset courtside-uat` | Deletes the UAT database but retains its MFA keys, key configuration and local CA. |
+| `node tools/courtside.mjs uat-reset courtside-uat --all` | Deletes the UAT database, MFA keys and local CA. |
 | `node tools/courtside.mjs status dev` | Reports Dev health, processes, ports, containers, and volumes. |
 | `node tools/courtside.mjs status uat` | Reports UAT health, ports, containers, and volumes. |
 | `node tools/courtside.mjs status <dev\|uat> --json` | Emits the same status as JSON. |
@@ -305,14 +305,69 @@ platform as verified.
 
 ### Persistence and recovery
 
-`uat-stop` keeps both persistent volumes. `uat-backup` defaults to a timestamped file below
-`build/backups`; an explicit destination is also accepted. Restore requires the exact confirmation
-`--confirm courtside-uat`, stops the application during `pg_restore`, and starts it again even when
-restore fails.
+`uat-stop` keeps the database, MFA keys and local certificate volumes. `uat-backup` defaults to a
+timestamped private directory below `build/backups`; an explicit unused destination is also
+accepted. It contains `database.dump` and `mfa-keys.tar`. Keep both files protected and together.
+Restore requires the exact confirmation `--confirm courtside-uat`. It first restores into an
+isolated database and key volume and waits for the same application's key validation to pass.
+Only then does it stop the target app, import matching keys and restore the target database
+transactionally. It restarts the target even when that restore fails.
 
-`uat-reset courtside-uat` is intentionally explicit and destructive. It deletes only the database,
-so the next start bootstraps a fresh admin while browsers can continue trusting the same CA. Add
-`--all` only when both database and CA should be discarded.
+The backup directory and its files must not be symbolic links. Restore first copies the regular
+dump and key archive into private temporary storage and rejects source changes observed during
+copying. Validation and the target restore consume that same captured pair. Later changes to the
+original do not change either input. Temporary copies are removed on success and failure.
+
+A legacy `.dump` file remains accepted. Its validation uses the target's current keyring. Dumps
+from before MFA initialize keys automatically. Encrypted TOTP enrollments require their matching
+retained keys. Missing or wrong keys stop validation before the target database changes. An
+existing different keyring is never overwritten. After rotation, supply the current retained-key
+archive or restore into a fresh environment rather than replacing it with an older key snapshot.
+
+For an operator-provided keyfile, backup captures the configured container file as
+`provided/mfa.keys`. Restore validates it with the same application's explicit keyfile setting and
+records the restored path for future starts. A custom existing target path must contain the same
+keyring or the restore stops before changing the database. Mount a private writable parent
+directory for a custom keyfile so locking and atomic rotation can work. The recovered default
+location is inside the private key volume.
+
+`uat-reset courtside-uat` deletes only the database and keeps the keys, configured keyfile and local
+CA. The new database receives a new installation UUID. With automatic keys it initializes its own
+keyring, and with an operator-provided keyfile it keeps that selected keyring. Retained keys still
+permit a deliberate restore of the previous database. `--all` discards every volume,
+including keys and the CA. Save a complete backup before that reset if you need to recover the data.
+
+Local HTTPS sets the trusted WebAuthn origin to `https://localhost:<configured-https-port>`.
+`uat share` changes it to the verified Tailscale DNS origin and recreates the app before exposing
+the share. Stopping the share restores the local origin. Credentials registered at one hostname
+remain bound to that hostname. Use another enrolled factor or a recovery code to sign in at the
+other hostname and enroll a device there.
+
+A share's marker binds its project, shared port, local HTTPS port and Tailscale node. Readiness and
+Funnel target the selected project's configured shared port. Readiness verifies the selected
+Compose proxy's container identity, ownership and published loopback port before probing HTTP.
+Tailscale permits only one active
+Courtside share per node. Another UAT project's stop or reset leaves that share and its origin
+unchanged. Starting a share refuses a foreign or stale association, and cleanup refuses changed
+ports or ownership instead of resetting another instance's Funnel.
+
+For the same server-access maintenance paths in UAT, use:
+
+```sh
+node tools/courtside.mjs uat-mfa-recover --account-id <account-uuid> --identity-checked
+node tools/courtside.mjs uat-mfa-correct-email --account-id <account-uuid> --identity-checked --email-file /private/corrected-email
+node tools/courtside.mjs uat-mfa-rotate-keys
+```
+
+The account operations require the external identity check. The email input is a private
+operator-owned mode-`0600` UTF-8 file, at most 254 bytes plus an optional final newline. UAT sends
+its content only through standard input to the maintenance container's private tmpfs. Create the
+file without hard links in a private mode-`0700` directory. Every parent must belong to the
+operator or root and prevent writes by other users. A root-owned sticky temporary directory is
+accepted when its direct child is the operator's private directory. The launcher validates the
+opened descriptor and keeps reading that descriptor if the path changes. The
+commands reuse the recorded image, database and key configuration. Take a complete backup before
+and after key rotation. The database must already be running.
 
 ## Bruno API collection
 

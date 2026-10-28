@@ -184,6 +184,39 @@ in a log by its time, and a day the report counts still starts at club-local mid
 A refused single booking, booking series and cancellation each write it. Nothing deletes its rows
 yet; how long a club keeps them belongs to the retention controls by record category.
 
+## Account factors and controlled recovery
+
+| Table | Holds | References |
+|---|---|---|
+| `account_mfa` | One account's encrypted active and pending TOTP secret, last consumed step, pending expiry and controlled-recovery block | `user_account`, cascades on deletion |
+| `mfa_recovery_code` | Single-use code verifiers and their creation times | `user_account`, cascades on deletion |
+| `mfa_challenge` | A pending ceremony's account, security epoch, purpose, session hash, expiry, attempt count and server-generated options | `user_account`, cascades on deletion |
+| `mfa_instance_key` | Singleton database installation UUID and encrypted key-check canary | None |
+| `user_entities` | Native WebAuthn user handle, opaque account identity and display metadata | `user_account`, one handle per account, cascades on deletion |
+| `user_credentials` | Credential ID, public key, signature counter, user-verification and backup flags, transports, original attestation, timestamps and private label | `user_entities`, cascades on deletion |
+| `account_mfa_recovery` | Current rescue request ID, security epoch, address verifier, optional issued-code verifier and expiry, and creation time | `user_account`, cascades on deletion |
+
+Active and pending TOTP are separate so an abandoned replacement cannot remove a working method.
+A pending ciphertext and its expiry are either both present or both absent. `totp_last_step` starts
+at -1 and advances only after valid confirmation or authentication. Ciphertext identifies a key in
+the separate instance keyring; the database contains no decryption key.
+
+Recovery-code verifiers are unique within an account and are deleted atomically on use. Challenge
+purposes are `LOGIN`, `REAUTHENTICATION` and `WEBAUTHN_REGISTRATION`. Attempt counts are bounded to
+0 through 5, option payloads to 65,536 characters. Session identifiers are stored only as hashes.
+A generated creation sequence makes pruning to the account's session limit deterministic.
+
+WebAuthn user handles derive from immutable account UUIDs. Native metadata stores opaque names;
+the repository resolves current business usernames separately, so renamed or reused usernames
+cannot transfer credentials. Signature counters are unsigned 32-bit values held in PostgreSQL
+bigints. The original attestation and client data support native signature verification; credential
+labels and method details remain private to their holder.
+
+The singleton installation row has ID 1. Its canary authenticates key custody without storing the
+key. A rescue row has one unique request ID and at most one unique issued-code verifier. Code hash
+and expiry become present together when the mailer issues the message. The pending block remains
+separate from the token, so losing or expiring a token cannot restore password-only access.
+
 ## People, memberships and accounts
 
 | Table | Holds | References |

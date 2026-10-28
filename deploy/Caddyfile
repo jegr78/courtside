@@ -111,7 +111,7 @@ http://:80 {
 		method QUERY
 		path /api/*
 	}
-	method @unknownMethod PATCH
+	method @unknownMethod TRACE
 
 	import {$COURTSIDE_INGRESS_MODE:publicIngress}
 }

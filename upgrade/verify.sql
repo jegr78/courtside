@@ -43,6 +43,28 @@ WITH captured(name, sort_key, row_data) AS (
     UNION ALL
     SELECT 'loginLimitRows', l.scope || ':' || l.subject_hash, to_jsonb(l)
     FROM login_attempt_limit l WHERE subject_hash = repeat('b', 64)
+    UNION ALL
+    SELECT 'mfaAccountRows', a.account_id::text, to_jsonb(a)
+    FROM account_mfa a WHERE account_id = '72000000-0000-0000-0000-000000000003'
+    UNION ALL
+    SELECT 'mfaRecoveryCodeRows', r.account_id::text || ':' || r.code_hash, to_jsonb(r)
+    FROM mfa_recovery_code r WHERE account_id = '72000000-0000-0000-0000-000000000003'
+    UNION ALL
+    SELECT 'mfaInstanceKeyRows', k.id::text, to_jsonb(k)
+    FROM mfa_instance_key k WHERE id = 1
+    UNION ALL
+    SELECT 'mfaChallengeRows', c.id::text, to_jsonb(c)
+    FROM mfa_challenge c WHERE id = '7f300000-0000-0000-0000-000000000001'
+    UNION ALL
+    SELECT 'webAuthnUserRows', u.id, to_jsonb(u)
+    FROM user_entities u WHERE account_id = '72000000-0000-0000-0000-000000000003'
+    UNION ALL
+    SELECT 'webAuthnCredentialRows', c.credential_id, to_jsonb(c)
+    FROM user_credentials c JOIN user_entities u ON u.id = c.user_entity_user_id
+    WHERE u.account_id = '72000000-0000-0000-0000-000000000003'
+    UNION ALL
+    SELECT 'mfaAccountRecoveryRows', r.account_id::text, to_jsonb(r)
+    FROM account_mfa_recovery r WHERE account_id = '72000000-0000-0000-0000-000000000003'
 ),
 redacted(name, sort_key, row_data) AS (
     SELECT name, sort_key, (
@@ -100,5 +122,12 @@ SELECT jsonb_build_object(
     'seriesRows', (SELECT jsonb_agg(row_data ORDER BY sort_key) FROM redacted WHERE name = 'seriesRows'),
     'seriesCourtRows', (SELECT jsonb_agg(row_data ORDER BY sort_key) FROM redacted WHERE name = 'seriesCourtRows'),
     'sessionRows', (SELECT jsonb_agg(row_data ORDER BY sort_key) FROM redacted WHERE name = 'sessionRows'),
-    'loginLimitRows', (SELECT jsonb_agg(row_data ORDER BY sort_key) FROM redacted WHERE name = 'loginLimitRows')
+    'loginLimitRows', (SELECT jsonb_agg(row_data ORDER BY sort_key) FROM redacted WHERE name = 'loginLimitRows'),
+    'mfaAccountRows', (SELECT jsonb_agg(row_data ORDER BY sort_key) FROM redacted WHERE name = 'mfaAccountRows'),
+    'mfaRecoveryCodeRows', (SELECT jsonb_agg(row_data ORDER BY sort_key) FROM redacted WHERE name = 'mfaRecoveryCodeRows'),
+    'mfaInstanceKeyRows', (SELECT jsonb_agg(row_data ORDER BY sort_key) FROM redacted WHERE name = 'mfaInstanceKeyRows'),
+    'mfaChallengeRows', (SELECT jsonb_agg(row_data ORDER BY sort_key) FROM redacted WHERE name = 'mfaChallengeRows'),
+    'webAuthnUserRows', (SELECT jsonb_agg(row_data ORDER BY sort_key) FROM redacted WHERE name = 'webAuthnUserRows'),
+    'webAuthnCredentialRows', (SELECT jsonb_agg(row_data ORDER BY sort_key) FROM redacted WHERE name = 'webAuthnCredentialRows'),
+    'mfaAccountRecoveryRows', (SELECT jsonb_agg(row_data ORDER BY sort_key) FROM redacted WHERE name = 'mfaAccountRecoveryRows')
 )::text;

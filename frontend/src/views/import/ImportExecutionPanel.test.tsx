@@ -1,4 +1,6 @@
-import { render, screen } from "@testing-library/react";
+import type { ComponentType, ReactNode } from "react";
+import { proofOwnerHarness } from "../../test/ProofOwner";
+import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api, ApiError, type ImportPreview, type ImportRun } from "../../api/client";
@@ -41,15 +43,15 @@ const run: ImportRun = {
   executedAt: "2026-08-21T10:05:00Z"
 };
 
-function show(current: ImportPreview | undefined, executed = vi.fn(), timeZone: string | undefined = "Europe/Berlin") {
-  render(<ImportExecutionPanel
+function show(current: ImportPreview | undefined, executed = vi.fn(), timeZone: string | undefined = "Europe/Berlin", wrapper?: ComponentType<{ children: ReactNode }>) {
+  return render(<ImportExecutionPanel
     sourceId="source-1"
     preview={current}
     disabled={false}
     timeZone={timeZone}
     executed={executed}
     reportError={vi.fn()}
-  />);
+  />, { wrapper });
 }
 
 describe("ImportExecutionPanel", () => {
@@ -222,4 +224,28 @@ describe("ImportExecutionPanel", () => {
     // then
     expect(await screen.findByTestId("import-run-run-1")).toBeInTheDocument();
   });
+  it.each(["escape", "unmount", "account switch"])("given a proof awaiting its response, when %s invalidates its dialog, then never send the saved mutation", async (ending) => {
+    // given
+    const owner = proofOwnerHarness();
+    let proved!: () => void;
+    vi.spyOn(api, "reauthenticate").mockReturnValue(new Promise((resolve) => { proved = resolve; }));
+    const changing = vi.spyOn(api, "executeImportPreview").mockRejectedValueOnce(new ApiError(403, { type: "urn:courtside:error:recent-authentication-required", title: "Proof required", status: 403 })).mockResolvedValue(run);
+    const shown = show(preview, undefined, undefined, owner.Wrapper);
+    await userEvent.click(await screen.findByTestId("execute-preview"));
+    await userEvent.click(await screen.findByTestId("confirm-execute"));
+    await userEvent.type(await screen.findByTestId("import-reauthentication-password"), "current-password");
+    await userEvent.click(screen.getByTestId("confirm-import-reauthentication"));
+    // when
+    if (ending === "escape") {
+      await userEvent.click(screen.getByRole("dialog").querySelector("input")!);
+      await userEvent.keyboard("{Escape}");
+      expect(screen.queryByRole("dialog")).toBeNull();
+    }
+    else if (ending === "unmount") shown.unmount();
+    else act(owner.change);
+    await act(async () => { proved(); await Promise.resolve(); });
+    // then
+    expect(changing).toHaveBeenCalledOnce();
+  });
+
 });

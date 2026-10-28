@@ -729,6 +729,64 @@ Correcting an email address invalidates credentials and reset codes sent to the 
 an account, removing a role, changing membership, correcting username or replacing a password raises
 the security epoch and invalidates older sessions.
 
+### Voluntary multi-factor authentication
+
+Every account can enable MFA under "My account", in the account security section. Enrollment is
+voluntary for every role. An enrolled account signs in with its password and one enrolled factor.
+TOTP, WebAuthn and single-use recovery codes are alternatives. Courtside offers no passwordless
+login or trusted-browser exception.
+
+TOTP uses a separate 160-bit secret, six digits and a 30-second period. Enrollment shows a QR code
+and a manual key, but activates only after a valid test code. Verification accepts the neighbouring
+time steps and persists the consumed counter to reject replay. A replacement setup leaves the
+current method usable until confirmation. Recovery codes appear once when generated; the database
+holds only their verifiers. Regeneration invalidates the previous set, and concurrent redemption
+has one winner.
+
+WebAuthn supports multiple credentials with holder-private labels, individual removal and renaming.
+An account may enroll WebAuthn without TOTP. Registration and authentication require local user
+verification. Courtside receives the signed result, never biometric data. Relying-party ID and
+allowed origin come from the explicitly configured public HTTPS address, including maintained local
+HTTPS and shared UAT. Request Host headers cannot choose them. A credential is bound to its domain.
+After a domain change, the holder signs in with a remaining method or recovery code and enrolls a
+new credential. A lost-factor account uses controlled recovery.
+
+Password verification creates an unauthenticated, roleless pending session for an MFA account.
+Its database challenge binds account ID, security epoch, browser session and purpose. Challenges
+expire after five minutes and permit at most five proof attempts. Requesting fresh WebAuthn options
+does not extend the password challenge's lifetime or reset its attempt budget. Account and address
+budgets also survive a restarted login. Only a completed factor creates an authenticated session,
+records sign-in and establishes recent proof. WebAuthn signature counters cannot decrease; a
+synchronized credential that consistently reports zero remains supported.
+
+Initial enrollment requires recent password proof. Later factor changes, recovery-code generation,
+disablement and sensitive actions require recent password plus one existing factor. The proof
+window remains five minutes. Security-relevant factor changes revoke existing sessions and notify
+the holder without naming a credential or exposing a secret. Generated recovery codes remain in
+that browser's memory long enough to save them after its own session ends. External account changes
+and a different signed-in holder clear them. Administrators see only whether another account has
+MFA and whether controlled recovery blocks it.
+
+Ordinary password recovery and administrative credential issuance preserve enrolled factors. A
+controlled rescue requires a fresh MFA-authenticated administrator and an explicit identity check.
+It immediately revokes sessions and blocks login, ordinary password recovery and issued credentials.
+Existing factors remain until the holder redeems the single-use code mailed to the account's
+current address together with a new permanent password. Redemption removes all factors, recovery
+codes and pending challenges. Expiry, address changes, security-epoch changes and guessing limits
+invalidate or refuse the code without clearing the block. The maintained operator command supports
+a sole administrator who has lost every method. Its separately audited address-correction command
+invalidates an older rescue code and requires a new rescue request.
+
+TOTP secrets use account-bound AES-256-GCM encryption with random nonces. The instance generates its
+keyring automatically and persists it outside PostgreSQL, under a private local directory or a
+separate writable container volume. A database installation ID selects the default key location;
+a canary and encrypted state validate the matching keyring before the instance reports healthy.
+An operator may supply a private key file. Rotation retains prior keys for existing ciphertext.
+A database with encrypted factors cannot start using missing or mismatched keys. Complete backup
+and restore preserve both the database and key material, and preflight validates them together
+before replacing the target database. A database-only restore with encrypted factors needs the
+matching keys restored separately.
+
 ### Sessions
 
 Spring Session stores sessions in PostgreSQL. HTTPS uses `__Host-SESSION` with `HttpOnly`, `Secure`,
@@ -740,7 +798,7 @@ restart. Cleanup removes rows expired by either rule.
 
 An account may hold a configured number of sessions. A later sign-in removes least-recently-active
 excess sessions rather than refusing access. Members can list browsers and revoke sessions.
-Administrators may revoke one account or all sessions after recent password proof.
+Administrators may revoke one account or all sessions after recent full authentication proof.
 
 Browser-visible revocation handles are one-way values, not session credentials. The view exposes
 neither raw user agents nor source addresses.
@@ -762,7 +820,7 @@ and punctuation, so a wording cannot make it part of a link. The subject stays o
 neither part holds a control character. Nothing else is
 refused, links included. The wording changes what a message says and never who receives it, whether
 it is sent or whether a member may decline it. Changing or resetting a wording needs a recent
-full-password proof, because it decides what the credential and reset-code mails say, and each
+full authentication proof, because it decides what the credential and reset-code mails say, and each
 change is recorded as `notification.template.changed` or `notification.template.reset`. When a
 message is composed, a stored wording is checked again with the same rules and the same placeholder
 parser; a wording that fails that check or cannot be filled is skipped, and the shipped wording goes
@@ -836,8 +894,20 @@ left, or, for a reminder, its booking has already started by the time it is due.
 stays on the row with its reason, and the message statistics count the messages that needed a
 retry. Credential creation and handover share a transaction, so a credential the relay never
 accepted does not replace the stored one, and no plaintext credential waits in the outbox. Credential
-messages for one account are composed one after the other, so the last one sent carries the
-credential the account holds.
+issuance takes its account lock after relay handover and password encoding. It checks controlled
+recovery before handover and again under that lock, and replaces the credential only while the
+stored password hash still matches the one read before handover. A password change during handover
+fails that credential job permanently instead of retrying it against the new password.
+
+Starting controlled recovery permanently supersedes that account's older credential and ordinary
+password-reset-code jobs. The rescue message's retained queue sequence binds this boundary after
+redemption as well, so an older job's first delivery or retry cannot issue new credentials.
+Credential and ordinary reset-code requests hold the account lock through queue creation and refuse
+or silently omit requests while recovery is pending. Explicit requests after redemption remain
+allowed. Before settling a successful handover, the same transaction checks the recovery boundary
+again while the issuer still holds the account lock. A later recovery rolls back that old job's
+credential or reset-token write. The outbox continues to serialize credential messages for one
+account.
 
 Every message addressed to an account also becomes an entry in that account's notification centre,
 whether or not mail goes out. An entry stores the kind, the identifiers it concerns and when it was
@@ -981,7 +1051,7 @@ administrator role, a booking or series the run keeps still names them, or they 
 
 Every run starts as a preview that changes nothing, counts what it would change and lists the
 blocked people with their reason. Only the account that took the preview can run it, with a recent
-full-password proof, once, before it expires and while the periods it applies are unchanged. A run
+full authentication proof, once, before it expires and while the periods it applies are unchanged. A run
 re-checks each former member under a lock and skips one who became ineligible. Pseudonymising a
 booking also reaches the records that would tie it back to a person: its change log entries lose
 their actor and the person and account fields of their payload but keep type, time and subject, and

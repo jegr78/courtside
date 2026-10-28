@@ -1,6 +1,7 @@
 package org.courtside;
 
 import org.courtside.operations.OperationalLogCollection;
+import org.courtside.identity.AccountSecurityMaintenance;
 import org.courtside.shared.DatabaseMigration;
 import org.courtside.shared.DatabaseProvisioning;
 import org.springframework.boot.SpringApplication;
@@ -22,6 +23,10 @@ public class CourtsideApplication {
         }
         if (DatabaseMigration.requested(args)) {
             DatabaseMigration.migrate(System.getenv());
+            return;
+        }
+        if (AccountSecurityMaintenance.requested(args)) {
+            AccountSecurityMaintenance.runApplication(CourtsideApplication.class, args);
             return;
         }
         SpringApplication.run(CourtsideApplication.class, args);

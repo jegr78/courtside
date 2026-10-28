@@ -29,6 +29,52 @@ SELECT '72000000-0000-0000-0000-000000000002', '71000000-0000-0000-0000-00000000
        'upgrade-guardian', password_hash, 'en', true, '2025-01-01T00:00:00Z', false
 FROM user_account WHERE username = 'admin';
 
+INSERT INTO person (id, first_name, last_name, email)
+VALUES ('71000000-0000-0000-0000-000000000003', 'Richard', 'Miles', 'mfa-upgrade@example.org');
+
+INSERT INTO user_account
+    (id, person_id, username, password_hash, locale, enabled, created_at, password_change_required)
+SELECT '72000000-0000-0000-0000-000000000003', '71000000-0000-0000-0000-000000000003',
+       'upgrade-mfa-disabled', password_hash, 'en', false, '2025-01-01T00:00:00Z', false
+FROM user_account WHERE username = 'admin';
+
+INSERT INTO user_account_role (user_account_id, role)
+VALUES ('72000000-0000-0000-0000-000000000003', 'MEMBER');
+
+INSERT INTO mfa_instance_key (id, installation_id)
+VALUES (1, '7f200000-0000-0000-0000-000000000001')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO account_mfa (account_id, totp_last_step, recovery_pending)
+VALUES ('72000000-0000-0000-0000-000000000003', -1, true);
+
+INSERT INTO mfa_recovery_code (account_id, code_hash, created_at)
+VALUES ('72000000-0000-0000-0000-000000000003', repeat('f', 64), '2025-01-01T00:00:00Z');
+
+INSERT INTO mfa_challenge (id, account_id, security_epoch, purpose, session_hash, expires_at, attempt_count, payload)
+VALUES ('7f300000-0000-0000-0000-000000000001', '72000000-0000-0000-0000-000000000003', 0,
+        'REAUTHENTICATION', repeat('a', 64), '2025-01-01T00:05:00Z', 1,
+        '{"challenge":"dXBncmFkZS1jaGFsbGVuZ2U","rpId":"example.org"}');
+
+INSERT INTO user_entities (id, account_id, name, display_name)
+VALUES ('cgAAAAAAAAAAAAAAAAAAAw', '72000000-0000-0000-0000-000000000003',
+        '72000000-0000-0000-0000-000000000003', 'Richard Miles');
+
+INSERT INTO user_credentials
+    (credential_id, user_entity_user_id, public_key, signature_count, uv_initialized, backup_eligible,
+     authenticator_transports, public_key_credential_type, backup_state, attestation_object,
+     attestation_client_data_json, created, last_used, label)
+VALUES ('dXBncmFkZS1wYXNza2V5', 'cgAAAAAAAAAAAAAAAAAAAw',
+        decode('a50102032620012158206b17d1f2e12c4247f8bce6e563a440f277037d812deb33a0f4a13945d898c2962258204fe342e2fe1a7f9b8ee7eb4a7c0f9e162bce33576b315ececbb6406837bf51f5', 'hex'), 7, true, false,
+        'usb', 'public-key', false, decode('a363666d74646e6f6e656761747453746d74a06861757468446174615825bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b50100000000', 'hex'),
+        convert_to('{"type":"webauthn.create","challenge":"dXBncmFkZS1jaGFsbGVuZ2U","origin":"https://example.org"}', 'UTF8'),
+        '2025-01-01T00:00:00Z', '2025-01-01T00:01:00Z', 'Upgrade security key');
+
+INSERT INTO account_mfa_recovery
+    (account_id, recovery_id, security_epoch, address_hash, code_hash, created_at, expires_at)
+VALUES ('72000000-0000-0000-0000-000000000003', '7f400000-0000-0000-0000-000000000001',
+        0, repeat('b', 64), repeat('c', 64), '2025-01-01T00:00:00Z', '2025-01-01T00:15:00Z');
+
 INSERT INTO user_account_role (user_account_id, role) VALUES
     ('72000000-0000-0000-0000-000000000001', 'MEMBER'),
     ('72000000-0000-0000-0000-000000000001', 'TRAINER'),

@@ -22,9 +22,11 @@ nobody keeps current.
 `java-runtime`, `bouncy-castle`, `spring-security`, `web-crypto`, `node-crypto`, `openssl`,
 `sigstore`, `stalwart`, `caddy`, `postgresql-jdbc`. A name outside it fails the build, so adding an
 implementation is a decision somebody makes rather than a spelling. The three this build can start
-are exercised rather than believed: the JDK's digests and `SecureRandom` have to resolve to a
-provider inside `java.base`, Bouncy Castle has to recompute the Argon2id hash the shipped encoder
-writes, and Spring Security has to issue the CSRF token this project does not generate.
+are exercised rather than believed. The JDK's digests, `SecureRandom`, AES-GCM and HMAC-SHA-1
+must resolve to providers inside `java.base`. The tests encrypt and decrypt with AES-GCM and check
+an HMAC-SHA-1 reference vector. Bouncy Castle recomputes the shipped Argon2id hash. Spring Security
+issues the CSRF token and WebAuthn creation options, including its advertised COSE algorithm set.
+The MFA tests verify actual registration and signed assertions through its WebAuthn4J integration.
 
 `strength` says who decides how strong the primitive is and what that rests on. `decidedBy` is
 `repository` or the party that decides instead, and `basis` says in prose what the number or the
@@ -49,8 +51,8 @@ names them and says what is known.
 
 Two classes do not reach the 128-bit minimum. `identifier` does not, because an identifier answers
 to uniqueness rather than to secrecy. `rate-bounded-secret` does not, because the value is short on
-purpose, a person retypes it from a mail, and what makes it hard to spend is the budget an
-attacker gets rather than the size of the value. Entries in both still state their bits and still
+purpose, a person retypes an authenticator or recovery code, and the attempt budget bounds guessing.
+An MFA proof also requires the account password. Entries in both still state their bits and still
 say what the bits buy. Where a literal in the code determines those bits, moving an entry into
 either class to escape the minimum changes nothing, because the recomputation still reads what the
 code draws.
@@ -135,9 +137,17 @@ so plainly instead of describing a procedure this product does not perform.
 
 **Where nothing can be lost, the entry says that** rather than inventing a recovery procedure. A
 keyless release signature has no private key; a `SecureRandom` credential has no key to recover; an
-in-memory counter rebuilds itself. No entry here now carries a private key this project must keep:
-the one that did, the security-evidence envelope, was withdrawn once it emerged that its key had
-never been created and its envelopes could never be opened.
+in-memory counter rebuilds itself. TOTP encryption does require persistent symmetric instance keys.
+The application creates them outside PostgreSQL in a private keyring, and rotation retains earlier
+keys for existing ciphertext. Complete backups preserve that keyring with the database. Restoring
+encrypted enrollments without matching keys fails before the instance reports healthy. WebAuthn
+private keys remain with authenticators; the instance stores their public keys and verification
+metadata.
+
+The disposable SECURITY environment issues one private certificate for the exact `mail` and
+`password-breach` names. Its offline trust preparation retains the candidate JDK's default CA
+anchors and adds that certificate. The password-breach bridge validates the official HTTPS
+upstream with its own default CA policy. Fixture trust never enters a club deployment.
 
 ## What this file is not
 

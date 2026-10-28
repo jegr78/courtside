@@ -118,8 +118,12 @@ public class IdentityTestFixture {
         accounts.saveAndFlush(account);
     }
 
-    // No operation removes an account yet, so what section 11 will one day do is spelled out here
-    // for the modules whose records have to survive it.
+    public void changeLocale(UUID accountId, String locale) {
+        UserAccount account = accounts.findById(accountId).orElseThrow();
+        account.changeLocale(locale);
+        accounts.saveAndFlush(account);
+    }
+
     public void removeAccount(UUID accountId) {
         accounts.deleteById(accountId);
         accounts.flush();

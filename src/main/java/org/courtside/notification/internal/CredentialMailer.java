@@ -57,6 +57,7 @@ class CredentialMailer implements MessageComposer {
 
     @Override
     public void compose(QueuedMessage message, Consumer<OutgoingMail> handOver) {
+        holdTheAccountsCredentialMail(message.accountId());
         boolean addressed = accounts.findById(message.accountId())
                 .map(account -> account.getPerson().getEmail())
                 .filter(address -> !address.isBlank())
@@ -67,7 +68,6 @@ class CredentialMailer implements MessageComposer {
         CredentialsRequested.Reason reason = message.kind() == MessageKind.CREDENTIALS_NEW_ACCOUNT
                 ? CredentialsRequested.Reason.NEW_ACCOUNT
                 : CredentialsRequested.Reason.PASSWORD_RESET;
-        holdTheAccountsCredentialMail(message.accountId());
         Instant expiresAt = clock.instant().plus(validity.validFor(reason));
         credentials.issueFor(message.accountId(), expiresAt,
                 issued -> handOver.accept(write(message.kind(), issued, expiresAt)));

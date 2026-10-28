@@ -127,6 +127,8 @@ class SafeMethodStateInvarianceTest extends AbstractIntegrationTest {
             entry("/manifest.webmanifest", read()),
             entry("/api/session", read()),
             entry("/api/account/sessions", read()),
+            entry("/api/account/mfa", read()),
+            entry("/api/admin/accounts/{accountId}/mfa", read("accountId", "")),
             entry("/api/account/messages", read()),
             entry("/api/account/messages/channels", read()),
             entry("/api/account/notifications", read()),
@@ -281,6 +283,7 @@ class SafeMethodStateInvarianceTest extends AbstractIntegrationTest {
 
         identifiers.put("courtId", courtId.toString());
         identifiers.put("personId", personId.toString());
+        identifiers.put("accountId", accountId.toString());
         identifiers.put("dependantPersonId", aDependantOf(personId).toString());
         identifiers.put("bookingId", bookingId.toString());
         identifiers.put("bookingCardId", bookingCardId);

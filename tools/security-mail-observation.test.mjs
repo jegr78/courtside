@@ -28,7 +28,7 @@ const labels = (service) => ({ "org.courtside.environment": "SECURITY", "org.cou
 
 const summary = (ID = id, extra = {}) => ({ ID, MessageID: "receipt-1@example.org", Read: false,
   From: { Name: "John Roe", Address: "john@example.org" }, To: [{ Name: "Jane Doe", Address: "jane@example.org" }],
-  Cc: [], Bcc: [], ReplyTo: [], Subject: "Example booking", Created: created, Username: "", Tags: [],
+  Cc: null, Bcc: null, ReplyTo: [], Subject: "Example booking", Created: created, Username: "", Tags: [],
   Size: Buffer.byteLength(raw), Attachments: 1, Snippet: "Private body", ...extra });
 const list = (messages) => JSON.stringify({ total: messages.length, unread: messages.length,
   count: messages.length, messages_count: messages.length, messages_unread: messages.length,
@@ -51,7 +51,7 @@ const networkInspect = () => [{ Id: networkId, Name: `${project}_backend`, Inter
 
 function harness({ lists = [list([]), list([summary()]), list([summary()])], body = raw,
   runtime = inspect(), appRuntime = appInspect(), networkRuntime = networkInspect(),
-  imageRuntime = [{ Id: imageId }], failure, parserOutput } = {}) {
+  imageRuntime = [{ Id: imageId }], failure, parserOutput, details } = {}) {
   const calls = [];
   let baselineList;
   const command = async (args, options = {}) => {
@@ -61,7 +61,9 @@ function harness({ lists = [list([]), list([summary()]), list([summary()])], bod
     if (args[0] === "network") return { stdout: JSON.stringify(networkRuntime) };
     if (args[0] === "inspect") return { stdout: JSON.stringify(args[1].endsWith("-app-1") ? appRuntime : runtime) };
     if (args.includes("curl")) {
-      return { stdout: args.at(-1).endsWith("/raw") ? body : baselineList ?? lists.shift() };
+      if (args.includes("DELETE")) return { stdout: "{}" };
+      const detailRequest = /\/api\/v1\/message\/[A-Za-z0-9]+$/.test(args.at(-1));
+      return { stdout: detailRequest ? JSON.stringify(details) : args.at(-1).endsWith("/raw") ? body : baselineList ?? lists.shift() };
     }
     assert.deepEqual(args, ["exec", "-i", `courtside-security-${runId}-scanner-gateway-1`,
       "python3", "/opt/courtside/security-mail-receipt.py"]);
@@ -524,4 +526,229 @@ test("given a baseline producer changing during capture, when native identity is
   // then
   assert.equal(result.status, "incomplete");
   assert.equal(result.runtimeBinding, undefined);
+});
+
+test("given a new controlled recovery message in the owned sink, when its dedicated account reads it, then only the fresh code leaves memory", async () => {
+  // given
+  const code = "2345-6789-ABCD-EFGH-JKMN-PQRS";
+  const fixture = harness({ lists: [list([summary()])], details: { Text: `Recovery for security.member.2\n\n${code}\n` } });
+  // when
+  const { readSecurityMfaRecoveryCode } = await import("./security-mail-observation.mjs");
+  const actual = await readSecurityMfaRecoveryCode({ runId, command: fixture.command, identity,
+    username: "security.member.2", excludedCodes: [], after: Date.parse(created) - 1 });
+  // then
+  assert.equal(actual, code);
+});
+
+test("given stale or previously consumed recovery messages, when a dedicated fixture asks for its code, then none can be returned", async () => {
+  // given
+  const code = "2345-6789-ABCD-EFGH-JKMN-PQRS";
+  const { readSecurityMfaRecoveryCode } = await import("./security-mail-observation.mjs");
+  // when / then
+  for (const limits of [{ after: Date.parse(created) + 1, excludedCodes: [] }, { after: 0, excludedCodes: [code] }]) {
+    const fixture = harness({ lists: [list([summary()])], details: { Text: `Recovery for security.member.2\n\n${code}\n` } });
+    assert.equal(await readSecurityMfaRecoveryCode({ runId, command: fixture.command, identity,
+      username: "security.member.2", ...limits }), undefined);
+  }
+});
+
+test("given another holder or a foreign runtime, when the MFA fixture reads a rescue code, then no code crosses that boundary", async () => {
+  // given
+  const code = "2345-6789-ABCD-EFGH-JKMN-PQRS";
+  const { readSecurityMfaRecoveryCode } = await import("./security-mail-observation.mjs");
+  // when / then
+  const other = harness({ lists: [list([summary()])], details: { Text: `Recovery for security.admin.2\n\n${code}\n` } });
+  assert.equal(await readSecurityMfaRecoveryCode({ runId, command: other.command, identity,
+    username: "security.member.2", after: 0 }), undefined);
+  const foreign = harness({ runtime: [{ ...inspect()[0], Config: { ...inspect()[0].Config, Labels: labels("foreign") } }] });
+  await assert.rejects(readSecurityMfaRecoveryCode({ runId, command: foreign.command, identity,
+    username: "security.member.2", after: 0 }), /mail-sink-untrusted/);
+  assert.equal(foreign.calls.some(({ args }) => args.includes("curl")), false);
+});
+
+test("given a delayed owned rescue mail, when the assessment waits, then the deadline controls each bounded retry", async () => {
+  // given
+  const code = "2345-6789-ABCD-EFGH-JKMN-PQRS";
+  const fixture = harness({ lists: [list([]), list([summary()])], details: { Text: `Recovery for security.member.2\n\n${code}\n` } });
+  const waits = [];
+  let checks = 0;
+  const { createSecurityMfaRecoveryReader } = await import("./security-mail-observation.mjs");
+  const readCode = createSecurityMfaRecoveryReader({ runId, command: fixture.command, identity,
+    control: { beforeRequest: () => checks++, remainingMilliseconds: () => 100, signal: undefined },
+    wait: async (milliseconds) => waits.push(milliseconds) });
+  // when
+  const actual = await readCode("security.member.2", { after: 0 });
+  // then
+  assert.equal(actual, code);
+  assert.deepEqual(waits, [100]);
+  assert.equal(checks, 2);
+});
+
+test("given an assessment monitor, when MFA observation finishes or fails, then its process exits without a live timer", () => {
+  // given
+  const observation = new URL("./security-mail-observation.mjs", import.meta.url).href;
+  const passive = new URL("./security-passive-deployment.mjs", import.meta.url).href;
+  // when / then
+  for (const fails of [false, true]) {
+    const source = `import { withSecurityMfaRecoveryReader } from ${JSON.stringify(observation)};
+      import { createAssessmentControl } from ${JSON.stringify(passive)};
+      const control = createAssessmentControl('/tmp/courtside-mfa-unused-stop', new Date(Date.now() + 60000));
+      let rejected = false;
+      try { await withSecurityMfaRecoveryReader(control, () => ({ control }), async () => { if (${fails}) throw new Error('expected-assessment-failure'); return true; }); }
+      catch (error) { if (error.message !== 'expected-assessment-failure') throw error; rejected = true; }
+      if (rejected !== ${fails}) throw new Error('assessment outcome changed');`;
+    const child = spawnSync(process.execPath, ["--input-type=module", "-e", source], { encoding: "utf8", timeout: 1500 });
+    assert.equal(child.error, undefined, "the owned monitor must not keep the finished assessment alive");
+    assert.equal(child.status, 0, child.stderr);
+  }
+});
+
+test("given successful owned MFA fixture mail, when cleanup runs, then remove only new accepted MFA deliveries and preserve both fixture and foreign sentinels", async () => {
+  // given
+  const module = await import("./security-mail-observation.mjs");
+  assert.equal(typeof module.createSecurityMfaMailScope, "function", "MFA fixtures need bounded trusted mail cleanup");
+  const own = summary(id, { MessageID: "mfa@example.org", To: [{ Address: "security.member.2@example.org" }] });
+  const foreignId = "2123456789ABCDEFGHIJKL";
+  const foreign = summary(foreignId, { MessageID: "booking@example.org", To: [{ Address: "security.member.2@example.org" }] });
+  const h = harness({ lists: [list([summary(oldId)]), list([own, foreign, summary(oldId)]), list([foreign, summary(oldId)])] });
+  const projections = [{ watermark: "10", records: [], fingerprint: "a".repeat(64) },
+    { watermark: "11", records: [{ username: "security.member.2", email: "security.member.2@example.org", kind: "ACCOUNT_SECURITY_CHANGED", state: "HANDED_OVER", messageId: "<mfa@example.org>" }], fingerprint: "b".repeat(64) },
+    { watermark: "11", records: [{ username: "security.member.2", email: "security.member.2@example.org", kind: "ACCOUNT_SECURITY_CHANGED", state: "HANDED_OVER", messageId: "<mfa@example.org>" }], fingerprint: "b".repeat(64) }];
+  const begin = module.createSecurityMfaMailScope({ runId, command: h.command, identity,
+    control: { beforeRequest() {}, remainingMilliseconds: () => 1000 }, projectOutbox: async (_after, _holders, binding) => {
+      assert.equal(binding.backendNetworkId, networkId); assert.equal(binding.appId, appId); return projections.shift();
+    } });
+  // when
+  const finish = await begin(["security.member.2"]);
+  const result = await finish();
+  // then
+  assert.deepEqual(result, { removedMessages: 1, retainedMessages: 2 });
+  const deletions = h.calls.filter(({ args }) => args.includes("DELETE"));
+  assert.equal(deletions.length, 1);
+  assert.deepEqual(JSON.parse(deletions[0].options.input), { IDs: [id] });
+  assert.equal(JSON.stringify(result).includes("mfa@example.org"), false);
+});
+
+
+for (const [scenario, recordDelta, messageDelta, expected] of [
+  ["a first account", { username: "security.member.1" }, {}, "mfa-mail-outbox-incomplete"],
+  ["a non-MFA kind", { kind: "BOOKING_CONFIRMED" }, {}, "mfa-mail-outbox-incomplete"],
+  ["a refused delivery", { state: "REFUSED" }, {}, "mfa-mail-outbox-incomplete"],
+  ["a foreign database recipient", { email: "foreign@example.org" }, {}, "mfa-mail-outbox-incomplete"],
+  ["a mixed To recipient", {}, { To: [{ Address: "security.member.2@example.org" }, { Address: "security.member.1@example.org" }] }, "mfa-mail-recipient-untrusted"],
+  ["a copied recipient", {}, { Cc: [{ Address: "security.member.1@example.org" }] }, "mfa-mail-recipient-untrusted"],
+  ["a blind recipient", {}, { Bcc: [{ Address: "security.member.1@example.org" }] }, "mfa-mail-recipient-untrusted"],
+  ["a malformed recipient", {}, { To: {} }, "mfa-mail-recipient-untrusted"],
+  ["a null primary recipient", {}, { To: null }, "mfa-mail-recipient-untrusted"],
+  ["a missing primary recipient", {}, { To: undefined }, "mfa-mail-recipient-untrusted"],
+  ["a missing copy field", {}, { Cc: undefined }, "mfa-mail-recipient-untrusted"],
+  ["a missing blind copy field", {}, { Bcc: undefined }, "mfa-mail-recipient-untrusted"],
+  ["a malformed copy field", {}, { Cc: {} }, "mfa-mail-recipient-untrusted"],
+  ["a malformed blind copy field", {}, { Bcc: false }, "mfa-mail-recipient-untrusted"],
+  ["a string copy field", {}, { Cc: "" }, "mfa-mail-recipient-untrusted"],
+  ["a numeric blind copy field", {}, { Bcc: 0 }, "mfa-mail-recipient-untrusted"]
+]) {
+  test(`given ${scenario}, when fixture mail cleanup evaluates ownership, then refuse before deleting any mail`, async () => {
+    // given
+    const { createSecurityMfaMailScope } = await import("./security-mail-observation.mjs");
+    const own = summary(id, { MessageID: "mfa@example.org", To: [{ Address: "security.member.2@example.org" }], ...messageDelta });
+    const h = harness({ lists: [list([]), list([own])] });
+    let queries = 0;
+    const begin = createSecurityMfaMailScope({ runId, command: h.command, identity,
+      control: { beforeRequest() {}, remainingMilliseconds: () => 1000 },
+      projectOutbox: async () => ({ watermark: "1", fingerprint: "a".repeat(64), records: queries++ ? [
+        { username: "security.member.2", email: "security.member.2@example.org", kind: "ACCOUNT_SECURITY_CHANGED", state: "HANDED_OVER", messageId: "<mfa@example.org>", ...recordDelta }
+      ] : [] }) });
+    // when
+    const finish = await begin(["security.member.2"]);
+    // then
+    await assert.rejects(finish(), { message: expected });
+    assert.equal(h.calls.some(({ args }) => args.includes("DELETE")), false);
+  });
+}
+
+test("given Mailpit exceeds its pruning cap, when fixture mail scope starts, then retain the existing incomplete-list refusal", async () => {
+  // given
+  const { createSecurityMfaMailScope } = await import("./security-mail-observation.mjs");
+  const h = harness({ lists: [JSON.stringify({ total: 101, messages_count: 101, start: 0, messages: Array.from({ length: 100 }, () => summary()) })] });
+  const begin = createSecurityMfaMailScope({ runId, command: h.command, identity,
+    control: { beforeRequest() {}, remainingMilliseconds: () => 1000 }, projectOutbox: async () => { throw new Error("must not read the database"); } });
+  // when / then
+  await assert.rejects(begin(["security.member.2"]), { message: "mail-list-incomplete" });
+  assert.equal(h.calls.some(({ args }) => args.includes("DELETE")), false);
+});
+
+for (const scenario of ["duplicate MIME identity", "missing delivery", "partial deletion", "changed application rows", "evicted baseline"]) {
+  test(`given ${scenario}, when fixture mail cleanup completes, then retain an explicit incomplete outcome`, async () => {
+    // given
+    const { createSecurityMfaMailScope } = await import("./security-mail-observation.mjs");
+    const own = summary(id, { MessageID: "mfa@example.org", To: [{ Address: "security.member.2@example.org" }] });
+    const baseline = summary(oldId);
+    const messages = scenario === "missing delivery" ? [baseline]
+      : scenario === "duplicate MIME identity" ? [own, { ...own, ID: "2123456789ABCDEFGHIJKL" }, baseline]
+      : scenario === "evicted baseline" ? [own] : [own, baseline];
+    const h = harness({ lists: [list([baseline]), list(messages), list(scenario === "partial deletion" ? messages : [baseline])] });
+    let queries = 0;
+    const begin = createSecurityMfaMailScope({ runId, command: h.command, identity,
+      control: { beforeRequest() {}, remainingMilliseconds: () => 1000 },
+      projectOutbox: async () => ({ watermark: "11", fingerprint: (scenario === "changed application rows" && queries === 2 ? "b" : "a").repeat(64),
+        records: queries++ === 0 ? [] : [{ username: "security.member.2", email: "security.member.2@example.org", kind: "ACCOUNT_SECURITY_CHANGED", state: "HANDED_OVER", messageId: "<mfa@example.org>" }] }) });
+    // when
+    const finish = await begin(["security.member.2"]);
+    // then
+    const errors = { "duplicate MIME identity": "mfa-mail-delivery-incomplete", "missing delivery": "mfa-mail-delivery-incomplete",
+      "partial deletion": "mfa-mail-cleanup-incomplete", "changed application rows": "mfa-mail-application-state-changed", "evicted baseline": "mfa-mail-baseline-changed" };
+    await assert.rejects(finish(), { message: errors[scenario] });
+    if (!["partial deletion", "changed application rows"].includes(scenario)) assert.equal(h.calls.some(({ args }) => args.includes("DELETE")), false);
+  });
+}
+
+test("given queued MFA mail, when fixture cleanup waits for handover, then remain inside the existing control before removing its accepted delivery", async () => {
+  // given
+  const { createSecurityMfaMailScope } = await import("./security-mail-observation.mjs");
+  const own = summary(id, { MessageID: "mfa@example.org", To: [{ Address: "security.member.2@example.org" }] });
+  const h = harness({ lists: [list([]), list([own]), list([])] });
+  let queries = 0;
+  const waits = [];
+  const begin = createSecurityMfaMailScope({ runId, command: h.command, identity,
+    control: { beforeRequest() {}, remainingMilliseconds: () => 50 }, wait: async ms => waits.push(ms),
+    projectOutbox: async () => ({ watermark: "11", fingerprint: "a".repeat(64), records: queries++ === 0 ? [] : [
+      { username: "security.member.2", email: "security.member.2@example.org", kind: "ACCOUNT_MFA_RECOVERY_CODE", state: queries === 2 ? "QUEUED" : "HANDED_OVER", messageId: "<mfa@example.org>" }
+    ] }) });
+  // when
+  const finish = await begin(["security.member.2"]);
+  await finish();
+  // then
+  assert.deepEqual(waits, [50]);
+  assert.equal(h.calls.filter(({ args }) => args.includes("DELETE")).length, 1);
+});
+
+test("given no new MFA delivery, when fixture cleanup completes, then never issue a global empty-ID deletion", async () => {
+  // given
+  const { createSecurityMfaMailScope } = await import("./security-mail-observation.mjs");
+  const h = harness({ lists: [list([summary(oldId)]), list([summary(oldId)]), list([summary(oldId)])] });
+  const begin = createSecurityMfaMailScope({ runId, command: h.command, identity,
+    control: { beforeRequest() {}, remainingMilliseconds: () => 100 },
+    projectOutbox: async () => ({ watermark: "11", fingerprint: "a".repeat(64), records: [] }) });
+  // when
+  const finish = await begin(["security.member.2"]);
+  const result = await finish();
+  // then
+  assert.deepEqual(result, { removedMessages: 0, retainedMessages: 1 });
+  assert.equal(h.calls.some(({ args }) => args.includes("DELETE")), false);
+});
+
+test("given changed application ownership, when fixture mail cleanup reaches the native sink, then refuse before deletion", async () => {
+  // given
+  const { createSecurityMfaMailScope } = await import("./security-mail-observation.mjs");
+  const appRuntime = appInspect();
+  const h = harness({ lists: [list([])], appRuntime });
+  const begin = createSecurityMfaMailScope({ runId, command: h.command, identity,
+    control: { beforeRequest() {}, remainingMilliseconds: () => 100 },
+    projectOutbox: async () => ({ watermark: "11", fingerprint: "a".repeat(64), records: [] }) });
+  const finish = await begin(["security.member.2"]);
+  appRuntime[0].Config.Labels["org.courtside.security.instance-fingerprint"] = `sha256:${"9".repeat(64)}`;
+  // when / then
+  await assert.rejects(finish(), { message: "mail-app-untrusted" });
+  assert.equal(h.calls.some(({ args }) => args.includes("DELETE")), false);
 });

@@ -40,6 +40,10 @@ Before cleanup after a startup failure, the runner attempts to retain the exact 
 
 Each run gets its own Compose project, networks, containers and dynamically allocated loopback TLS port. Both application networks are Docker-internal. The application and scanners attached only to these networks have no routed Internet or private-network access.
 
+Password changes use the real Pwned Passwords service through the dedicated `password-breach` Caddy bridge. The application reaches only `https://password-breach/range/` on the internal backend. The bridge joins backend and exposure without publishing a host port. It accepts only GET requests with exactly five uppercase hexadecimal prefix characters and no query. It rewrites the validated prefix to the fixed `https://api.pwnedpasswords.com` upstream, sets its Host and TLS server name, verifies its public certificate with Caddy's default CA store, and removes credential and forwarding headers. Other requests return 404. Connect, response-header and read timeouts are three seconds. The provider receives only the SHA-1 prefix required by the production password policy. This dependency needs external DNS and HTTPS access; failures keep password changes closed.
+
+The bridge adds a 128 MiB memory limit, 0.25 CPU and 32 processes to the target environment. It runs as the private relay identity with a read-only root filesystem, bounded tmpfs, no new privileges and only the bind-service capability. The private certificate names both `mail` and `password-breach`. The application's PKCS12 trust store preserves the candidate JRE's public CA anchors and adds that exact private certificate. Assessment duration, request and scanner-resource budgets remain unchanged.
+
 Docker's host and container runtime remain part of the host trust boundary. Run active and destructive assessments inside a dedicated VM with no sensitive host services or private-network access. The Compose isolation alone is sufficient only for safe checks.
 
 ## Dataset
@@ -49,6 +53,8 @@ The profile creates two enabled accounts for each product role and two accounts 
 Seeded appointments start at least two club calendar days after startup. The default 24-hour booking reminders therefore remain outside the 30-minute active assessment while the production scheduler stays enabled.
 
 The bootstrap administrator is separate and retains its mandatory initial-password state. Assessment code should use the role-specific accounts unless it is explicitly testing bootstrap behavior.
+
+Each MFA fixture owns a bounded mail scope for its dedicated second accounts. After successful account cleanup and completed outbox handover, the runner removes only new Mailpit messages whose unique Message-ID, exact sole seed recipient and two MFA message kinds match the read-only outbox projection. Baseline messages, first-account mail and other message kinds remain. The application message records, notification history and security audit log remain. A failed account cleanup retains its mail for diagnosis; incomplete lists and ownership changes still stop the run.
 
 ## Verify and remove
 

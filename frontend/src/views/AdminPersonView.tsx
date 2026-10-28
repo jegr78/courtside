@@ -1,4 +1,7 @@
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useProofContinuation } from "../security/useProofContinuation";
+import { ReauthenticationCode } from "../components/ReauthenticationCode";
+import { ProofOwnerContext, reauthenticateForm } from "../security/reauthentication";
+import { useCallback, useContext, useEffect, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useLocation, useParams } from "react-router-dom";
 import { api, ApiError, type ClubConfig, type MembershipType, type MessageEntry, type NoShow, type PersonRequest, type Role, type RosterEntry } from "../api/client";
@@ -21,6 +24,7 @@ import { differs } from "../unsaved/differs";
 import { SaveBar } from "../unsaved/SaveBar";
 import { saveInTurn, StepFailed, type SaveStep } from "../unsaved/saveInTurn";
 import { useUnsavedForm } from "../unsaved/useUnsavedForm";
+import { AdminMfaRecovery } from "./AdminMfaRecovery";
 import { GuardianshipsSection } from "./GuardianshipsSection";
 import { MembershipPeriodsSection } from "./MembershipPeriodsSection";
 
@@ -82,6 +86,9 @@ export function AdminPersonView() {
     ? t("admin.roster.personCreated")
     : undefined);
   const [pending, setPending] = useState(false);
+  const proofContinuation = useProofContinuation(personId);
+  const securityContinuation = useProofContinuation(personId);
+  const proofOwner = useContext(ProofOwnerContext);
   const [retry, setRetry] = useState<{ run: () => Promise<void> }>();
   const [reauthenticationFailure, setReauthenticationFailure] = useState<string>();
   const [draft, setDraft] = useState<Draft>({});
@@ -136,39 +143,45 @@ export function AdminPersonView() {
 
   async function runSecurityAction(action: () => Promise<void>, message: string, signsOut = false) {
     if (pending) return;
+    const ownsAction = securityContinuation.begin();
     setPending(true);
     try {
       await action();
-      securityActionCompleted(message, signsOut);
+      if (ownsAction()) securityActionCompleted(message, signsOut);
     } catch (failure) {
+      if (!ownsAction()) return;
       if (failure instanceof ApiError && failure.problem?.type === RECENT_AUTH) {
         setReauthenticationFailure(undefined);
         setRetry({ run: async () => {
+          if (!ownsAction()) return;
           await action();
-          securityActionCompleted(message, signsOut);
+          if (ownsAction()) securityActionCompleted(message, signsOut);
         } });
       } else {
         reportError(failure);
       }
     } finally {
-      setPending(false);
+      if (ownsAction()) setPending(false);
     }
   }
 
   async function reauthenticate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const password = new FormData(event.currentTarget).get("admin-reauthentication-password");
-    if (typeof password !== "string" || !retry) return;
+    if (typeof password !== "string" || !retry || pending) return;
+    const ownsProof = proofContinuation.begin();
     setPending(true);
     setReauthenticationFailure(undefined);
     let proofCompleted = false;
     try {
-      await api.reauthenticate(password);
+      await reauthenticateForm(event.currentTarget, password);
+      if (!ownsProof()) return;
       proofCompleted = true;
       const action = retry;
       await action.run();
-      setRetry(undefined);
+      if (ownsProof()) setRetry(undefined);
     } catch (failure) {
+      if (!ownsProof()) return;
       if (!proofCompleted || (failure instanceof ApiError && failure.problem?.type === RECENT_AUTH)) {
         setReauthenticationFailure(problemMessage(failure, t));
       } else {
@@ -176,7 +189,7 @@ export function AdminPersonView() {
         reportError(failure);
       }
     } finally {
-      setPending(false);
+      if (ownsProof()) setPending(false);
     }
   }
 
@@ -291,6 +304,8 @@ export function AdminPersonView() {
         {problem && <Alert>{problem}</Alert>}
         {success && <SuccessFeedback testId="admin-save-success">{success}</SuccessFeedback>}
         {retry && <Modal labelledBy="admin-reauthentication-title" closed={() => {
+          proofContinuation.cancel();
+          setPending(false);
           setRetry(undefined);
           setReauthenticationFailure(undefined);
         }}>
@@ -299,6 +314,7 @@ export function AdminPersonView() {
             <p>{t("accountSecurity.reauthenticate")}</p>
             {reauthenticationFailure && <Alert>{reauthenticationFailure}</Alert>}
             <TextField id="admin-reauthentication-password" name="admin-reauthentication-password" type="password" autoComplete="current-password" required label={t("auth.password")} />
+        <ReauthenticationCode />
             <Button variant="primary" disabled={pending} type="submit" data-testid="admin-reauthentication-submit">{t("accountSecurity.continue")}</Button>
           </form>
         </Modal>}
@@ -348,6 +364,7 @@ export function AdminPersonView() {
             disabled={pending}
             create={(request) => mutate(() => api.createAccount(personId, request))}
           />}
+        {entry.accountId && <AdminMfaRecovery key={entry.accountId} accountId={entry.accountId} disabled={pending || !entry.enabled} run={(action, message) => runSecurityAction(action, message, Boolean(proofOwner && entry.username === proofOwner))} />}
         {entry.accountId && <NoShowsSection personId={personId} timeZone={club.timeZone} />}
         {entry.accountId && <GuardianshipsSection entry={entry} disabled={pending} stepUp={(run) => {
           setReauthenticationFailure(undefined);

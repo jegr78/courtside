@@ -1,3 +1,5 @@
+import { exportMfaKeys, importMfaKeys, restoreUatDatabase } from "./mfa-key-custody.mjs";
+import { runInteractive } from "./courtside.mjs";
 import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
 import { once } from "node:events";
@@ -325,6 +327,32 @@ async function proveInterruptedRestore(project, environment, dump, before, evide
   }
 }
 
+function proveLegacyUatRestore(project, environment) {
+  const keyCompose = ["compose", "-p", project, "-f", composeFile];
+  const before = applicationEvidence(project, environment);
+  const legacy = compose(project, environment, ["exec", "-T", "db", "pg_dump", "-Fc", "--no-owner",
+    ...["mfa_instance_key", "account_mfa", "mfa_recovery_code", "mfa_challenge", "user_entities", "user_credentials", "account_mfa_recovery"]
+      .map((table) => `--exclude-table=public.${table}`), "-U", "courtside", "courtside"], { binary: true }).stdout;
+  const incomplete = compose(project, environment,
+    ["exec", "-T", "db", "pg_dump", "-Fc", "--data-only", "-U", "courtside", "courtside"], { binary: true }).stdout;
+  const replace = (archive) => restoreUatDatabase(archive, keyCompose, { ...process.env, ...environment },
+    (plan) => run(plan.command, plan.args, { environment: plan.environment, input: plan.stdin }));
+  assert.throws(() => replace(incomplete), /exited with status/,
+    "a valid archive that fails during SQL import must roll back schema removal");
+  assert.deepEqual(applicationEvidence(project, environment), before,
+    "failed legacy replacement changed the target database");
+  assert.equal(psql(project, environment, ["-Atc", "SELECT to_regclass('public.account_mfa') IS NOT NULL"]).stdout.trim(), "t",
+    "failed legacy replacement removed current-schema MFA tables");
+  replace(legacy);
+  assert.deepEqual(applicationEvidence(project, environment), { ...before,
+    sequences: before.sequences.filter((sequence) => sequence.name !== "mfa_challenge_created_seq_seq") },
+    "legacy replacement lost the original application data");
+  assert.equal(psql(project, environment, ["-Atc", "SELECT to_regclass('public.account_mfa') IS NULL"]).stdout.trim(), "t",
+    "legacy replacement retained tables absent from the older dump");
+  assert.equal(psql(project, environment, ["-Atc", "SELECT count(*) FROM pg_extension WHERE extname = 'btree_gist'"]).stdout.trim(), "1",
+    "legacy replacement lost the booking exclusion extension");
+}
+
 async function execute() {
   if (process.argv.slice(2).join(" ") !== "--confirm courtside-restore") {
     throw new Error("Restore qualification is destructive; pass --confirm courtside-restore");
@@ -338,6 +366,9 @@ async function execute() {
   const mailCertificateDirectory = createMailCertificateDirectory(tmpdir(), "courtside-restore-mail-");
   const applicationDumpPath = join(privateDirectory, "application.dump");
   const legacyDumpPath = join(privateDirectory, "legacy.dump");
+  const applicationKeysPath = join(privateDirectory, "application-keys.tar");
+  const fixtureKeysPath = join(privateDirectory, "fixture-keys.tar");
+  const keyCompose = ["compose", "-p", project, "-f", composeFile];
   const password = newBootstrapPassword();
   const permanentPassword = newBootstrapPassword();
   createMailCertificate(mailCertificateDirectory);
@@ -381,6 +412,7 @@ async function execute() {
     writeFileSync(applicationDumpPath, applicationDump, { mode: 0o600 });
     const imageId = run("docker", ["image", "inspect", "--format", "{{.Id}}", image]).stdout.trim();
 
+    exportMfaKeys(applicationKeysPath, keyCompose, { ...process.env, ...environment }, runInteractive);
     compose(project, environment, ["down", "--volumes", "--remove-orphans"]);
     compose(project, environment, ["up", "-d", "--wait", "db"]);
     const corrupt = applicationDump.subarray(0, Math.max(1, Math.floor(applicationDump.length / 2)));
@@ -398,6 +430,7 @@ async function execute() {
     await proveInterruptedRestore(
       project, environment, applicationDump, applicationAfter, applicationEvidence);
     compose(project, environment, ["start", "mail"]);
+    importMfaKeys(applicationKeysPath, keyCompose, { ...process.env, ...environment }, runInteractive);
     compose(project, environment, ["up", "-d", "--wait", "app"]);
     await verifyRestoredApplication(
       permanentPassword, publishedPort(project, environment), applicationIdentity);
@@ -412,10 +445,12 @@ async function execute() {
     const dump = compose(project, environment,
       ["exec", "-T", "db", "pg_dump", "-Fc", "--no-owner", "-U", "courtside", "courtside"], { binary: true }).stdout;
     writeFileSync(legacyDumpPath, dump, { mode: 0o600 });
+    exportMfaKeys(fixtureKeysPath, keyCompose, { ...process.env, ...environment }, runInteractive);
 
     compose(project, environment, ["down", "--volumes", "--remove-orphans"]);
     compose(project, environment, ["up", "-d", "--wait", "db"]);
     restore(project, environment, dump);
+    importMfaKeys(fixtureKeysPath, keyCompose, { ...process.env, ...environment }, runInteractive);
     const after = databaseEvidence(project, environment);
     writeFileSync(join(build, "after.json"), `${JSON.stringify(after, null, 2)}\n`);
     assert.deepEqual(after, before, "restored database differs from its backup source");
@@ -427,8 +462,10 @@ async function execute() {
        '70000000-0000-0000-0000-000000000001', '2025-01-05T09:30:00Z', '2025-01-05T10:30:00Z', 'CONFIRMED')`],
     { allowFailure: true });
     assert.notEqual(overlap.status, 0, "restored overlap constraint accepted conflicting data");
+    compose(project, environment, ["stop", "app"]);
+    proveLegacyUatRestore(project, environment);
     const result = {
-      status: "passed", image, imageId, schemaVersion: after.structure.schemaVersion,
+      status: "passed", image, imageId, legacyUatReplacement: "passed", schemaVersion: after.structure.schemaVersion,
       applicationStateTables,
       applicationBackupBytes: statSync(applicationDumpPath).size,
       legacyBackupBytes: statSync(legacyDumpPath).size,

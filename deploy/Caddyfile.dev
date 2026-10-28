@@ -19,7 +19,7 @@
 		method QUERY
 		path /api/*
 	}
-	method @unknownMethod PATCH
+	method @unknownMethod TRACE
 
 	handle /api-ui* {
 		reverse_proxy api-ui:8080 {

@@ -36,8 +36,9 @@ class AccountRecoveryServiceTest {
     private final PasswordResetTokenService resetTokens = mock(PasswordResetTokenService.class);
     private final LoginAttemptProtection protection = mock(LoginAttemptProtection.class);
     private final ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
+    private final MfaFactors factors = mock(MfaFactors.class);
     private final AccountRecoveryService recovery =
-            new AccountRecoveryService(accounts, mailLimit, resetTokens, protection, events);
+            new AccountRecoveryService(accounts, mailLimit, resetTokens, protection, events, factors);
 
     @BeforeEach
     void allowTheCaller() {
@@ -64,7 +65,7 @@ class AccountRecoveryServiceTest {
     @Test
     void givenNoAccountOfThatName_whenSomebodyAsks_thenNothingIsIssuedAndNothingIsRefused() {
         // given
-        when(accounts.findByUsername("nobody.here")).thenReturn(Optional.empty());
+        when(accounts.findWithLockByUsername("nobody.here")).thenReturn(Optional.empty());
 
         // when / then
         assertThatCode(() -> recovery.mailAResetCode("nobody.here", CALLER))
@@ -78,7 +79,7 @@ class AccountRecoveryServiceTest {
         UserAccount account = UserAccount.awaitingCredentials(
                 new Person("Jane", "Doe", "jane.doe@example.org"), "doe.jane",
                 Set.of(Role.MEMBER), "de");
-        when(accounts.findByUsername("doe.jane")).thenReturn(Optional.of(account));
+        when(accounts.findWithLockByUsername("doe.jane")).thenReturn(Optional.of(account));
 
         // when
         recovery.mailAResetCode("doe.jane", CALLER);
@@ -157,7 +158,7 @@ class AccountRecoveryServiceTest {
 
     private UserAccount known(String username, String email) {
         UserAccount account = enabled(account(username, email));
-        when(accounts.findByUsername(username)).thenReturn(Optional.of(account));
+        when(accounts.findWithLockByUsername(username)).thenReturn(Optional.of(account));
         return account;
     }
 
@@ -170,4 +171,15 @@ class AccountRecoveryServiceTest {
         account.enable();
         return account;
     }
+    @Test
+    void givenPendingMfaRecovery_whenAResetIsRequested_thenTheRequestQueuesNothing() {
+        // given
+        UserAccount account = known("doe.jane", "jane.doe@example.org");
+        when(factors.recoveryPending(account.getId())).thenReturn(true);
+        // when
+        recovery.mailAResetCode("doe.jane", CALLER);
+        // then
+        verifyNoInteractions(events);
+    }
+
 }

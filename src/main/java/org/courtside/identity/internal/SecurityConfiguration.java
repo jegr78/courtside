@@ -25,6 +25,9 @@ import org.springframework.security.crypto.argon2.Argon2PasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.authorization.AuthorizationDecision;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.savedrequest.NullRequestCache;
 import org.springframework.security.web.access.intercept.AuthorizationFilter;
@@ -76,7 +79,9 @@ public class SecurityConfiguration {
                 .matcher(HttpMethod.PUT, "/api/account/password");
         RequestMatcher resetRedemption = PathPatternRequestMatcher.withDefaults()
                 .matcher(HttpMethod.POST, "/api/account-recovery/password/redemption");
-        return request -> reauthentication.matches(request)
+        RequestMatcher mfaRecovery = PathPatternRequestMatcher.withDefaults()
+                .matcher(HttpMethod.POST, "/api/account-recovery/mfa/redemption");
+        return request -> mfaRecovery.matches(request) || reauthentication.matches(request)
                 || initialPasswordChange.matches(request)
                 || passwordChange.matches(request)
                 || resetRedemption.matches(request);
@@ -128,6 +133,8 @@ public class SecurityConfiguration {
             CurrentUser currentUser,
             RecentAuthentication recentAuthentication,
             UserAccountRepository accounts,
+            AuthenticationManager accountAuthenticationManager,
+            MfaLogin mfaLogin,
             CourtsideSessionProperties sessionPolicy,
             SessionRegistry sessionRegistry,
             CookieSerializer sessionCookieSerializer,
@@ -135,6 +142,7 @@ public class SecurityConfiguration {
             @Value("${server.servlet.session.cookie.secure}") boolean secureCookies)
             throws Exception {
         return http
+                .authenticationManager(accountAuthenticationManager)
                 .authorizeHttpRequests(auth -> auth
                         // The error dispatch is the tail of a request already decided, not a new one.
                         .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
@@ -177,9 +185,10 @@ public class SecurityConfiguration {
                                 "/manifest.webmanifest", "/sw.js",
                                 "/workbox-*.js").permitAll()
                         .requestMatchers("/api/session").permitAll()
+                        .requestMatchers("/api/session/mfa", "/api/session/mfa/**").permitAll()
                         .requestMatchers("/api/account-recovery/password",
                                 "/api/account-recovery/password/redemption",
-                                "/api/account-recovery/usernames").permitAll()
+                                "/api/account-recovery/usernames", "/api/account-recovery/mfa/redemption").permitAll()
                         .requestMatchers("/api/session/logout").authenticated()
                         .requestMatchers("/api/account/initial-password").access(
                                 (authentication, context) -> new AuthorizationDecision(
@@ -202,6 +211,20 @@ public class SecurityConfiguration {
                             request.getSession(true).setAttribute(AccountSessionService.BROWSER_FAMILY,
                                     AccountSessionService.browserFamily(
                                             request.getHeader("User-Agent")).name());
+                            if (authentication instanceof MfaPendingAuthentication pending) {
+                                var session = request.getSession();
+                                var challenge = mfaLogin.begin(pending, session.getId());
+                                if (challenge.isEmpty()) {
+                                    SecurityContextHolder.clearContext();
+                                    session.invalidate();
+                                    authenticationEntryPoint.commence(request, response,
+                                            new BadCredentialsException("MFA login is no longer current"));
+                                    return;
+                                }
+                                session.setAttribute(MfaLogin.CHALLENGE, challenge.orElseThrow());
+                                response.setStatus(HttpStatus.ACCEPTED.value());
+                                return;
+                            }
                             if (authentication.getPrincipal() instanceof CourtsideUserDetails user) {
                                 securityEvents.authenticationSucceeded(user.accountId());
                                 recentAuthentication.record(request);

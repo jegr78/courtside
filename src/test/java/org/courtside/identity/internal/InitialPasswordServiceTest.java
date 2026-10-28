@@ -8,6 +8,11 @@ import org.courtside.identity.UserAccount;
 import org.courtside.identity.UserAccountRepository;
 import org.courtside.shared.SecurityEventLog;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.AfterEach;
+import jakarta.persistence.EntityManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
+import java.util.List;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -27,23 +32,25 @@ import static org.mockito.Mockito.when;
 class InitialPasswordServiceTest {
 
     @Mock private CurrentUser currentUser;
+    @Mock private EntityManager entities;
     @Mock private UserAccountRepository accounts;
     @Mock private PasswordEncoder encoder;
     @Mock private AccountSessions sessions;
     @Mock private PasswordPolicy policy;
     @Mock private SecurityEventLog securityEvents;
+    @Mock private RecoveryAccountGuard recoveryGuard;
 
     @Test
     void givenActiveSessions_whenChangingTheInitialPassword_thenTheyAreEnded() {
         // given
-        UserAccount account = new UserAccount(new Person("Ada", "Admin", "admin@localhost.invalid"),
+        UserAccount account = new UserAccount(new Person("Jane", "Doe", "jane.doe@example.org"),
                 "admin", "temporary-hash", Set.of(Role.ADMIN), "de");
         account.requirePasswordChange();
-        when(currentUser.requireAccount()).thenReturn(account);
+        prepare(account);
         when(encoder.encode("new-permanent-password")).thenReturn("new-hash");
         when(accounts.changeInitialPassword(account.getId(), "new-hash")).thenReturn(1);
         InitialPasswordService service = new InitialPasswordService(
-                currentUser, accounts, encoder, sessions, policy, securityEvents);
+                currentUser, entities, accounts, encoder, sessions, policy, securityEvents, recoveryGuard);
 
         // when
         service.change("new-permanent-password");
@@ -57,37 +64,34 @@ class InitialPasswordServiceTest {
     @Test
     void givenAnotherSessionAlreadyChangedThePassword_whenChangingIt_thenThePasswordIsNotOverwritten() {
         // given
-        UserAccount account = new UserAccount(new Person("Ada", "Admin", "admin@localhost.invalid"),
+        UserAccount account = new UserAccount(new Person("Jane", "Doe", "jane.doe@example.org"),
                 "admin", "temporary-hash", Set.of(Role.ADMIN), "de");
         account.requirePasswordChange();
-        when(currentUser.requireAccount()).thenReturn(account);
+        prepare(account);
         when(encoder.encode("new-permanent-password")).thenReturn("new-hash");
         when(accounts.changeInitialPassword(account.getId(), "new-hash")).thenReturn(0);
         InitialPasswordService service = new InitialPasswordService(
-                currentUser, accounts, encoder, sessions, policy, securityEvents);
+                currentUser, entities, accounts, encoder, sessions, policy, securityEvents, recoveryGuard);
 
         // when / then
         assertThatThrownBy(() -> service.change("new-permanent-password"))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessage("The initial password was already changed");
+                .isInstanceOf(ReauthenticationFailedException.class);
         verify(accounts).changeInitialPassword(account.getId(), "new-hash");
         verifyNoInteractions(securityEvents);
     }
 
-    // The policy has to answer before anything is written, or a refused password would still have
-    // ended every session of the account and left the member signed out for nothing.
     @Test
     void givenAGuessablePassword_whenChangingTheInitialOne_thenNeitherTheHashNorTheSessionsChange() {
         // given
-        UserAccount account = new UserAccount(new Person("Ada", "Admin", "admin@localhost.invalid"),
+        UserAccount account = new UserAccount(new Person("Jane", "Doe", "jane.doe@example.org"),
                 "admin", "temporary-hash", Set.of(Role.ADMIN), "de");
         account.requirePasswordChange();
-        when(currentUser.requireAccount()).thenReturn(account);
+        prepare(account);
         doThrow(new GuessablePasswordException())
                 .when(policy).requireUnguessable("q1w2e3r4t5y6", account);
         InitialPasswordService service =
                 new InitialPasswordService(
-                        currentUser, accounts, encoder, sessions, policy, securityEvents);
+                        currentUser, entities, accounts, encoder, sessions, policy, securityEvents, recoveryGuard);
 
         // when / then
         assertThatThrownBy(() -> service.change("q1w2e3r4t5y6"))
@@ -97,4 +101,34 @@ class InitialPasswordServiceTest {
         verify(sessions, never()).endFor(any());
         verifyNoInteractions(securityEvents);
     }
+    @Test
+    void givenPendingAccountRecovery_whenInitialPasswordChanges_thenNoPasswordOrSessionIsChanged() {
+        // given
+        UserAccount account = new UserAccount(new Person("Jane", "Doe", "jane.doe@example.org"),
+                "doe.jane", "temporary-hash", Set.of(Role.MEMBER), "en");
+        prepare(account);
+        doThrow(new ResetCodeInvalidException()).when(recoveryGuard).lockAndRequireAvailable(account.getId());
+        InitialPasswordService service = new InitialPasswordService(currentUser, entities, accounts, encoder, sessions,
+                policy, securityEvents, recoveryGuard);
+        // when / then
+        assertThatThrownBy(() -> service.change("another-unusual-password")).isInstanceOf(ResetCodeInvalidException.class);
+        verifyNoInteractions(policy, encoder, sessions, securityEvents);
+    }
+
+    private void prepare(UserAccount account) {
+        account.enable();
+        account.requirePasswordChange();
+        when(currentUser.account()).thenReturn(java.util.Optional.of(account));
+        var principal = new CourtsideUserDetails(account.getId(), account.getUsername(), "unused", true, true,
+                List.of("ROLE_MEMBER"), account.getSecurityEpoch());
+        var context = SecurityContextHolder.createEmptyContext();
+        context.setAuthentication(UsernamePasswordAuthenticationToken.authenticated(principal, null, principal.getAuthorities()));
+        SecurityContextHolder.setContext(context);
+    }
+
+    @AfterEach
+    void clearPrincipal() {
+        SecurityContextHolder.clearContext();
+    }
+
 }

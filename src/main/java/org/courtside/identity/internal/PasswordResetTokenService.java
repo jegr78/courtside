@@ -35,10 +35,12 @@ class PasswordResetTokenService implements PasswordResetCodeIssuer {
     private final ApplicationEventPublisher events;
     private final Clock clock;
     private final JdbcClient jdbc;
+    private final RecoveryAccountGuard recoveryGuard;
 
     @Override
     @Transactional
     public IssuedResetCode issueFor(UUID accountId) {
+        recoveryGuard.lockAndRequireAvailable(accountId);
         UserAccount account = accounts.findById(accountId).orElseThrow(() ->
                 new IllegalStateException("No account to mail a reset code for: " + accountId));
         String address = account.getPerson().getEmail();
@@ -49,8 +51,6 @@ class PasswordResetTokenService implements PasswordResetCodeIssuer {
         String code = ResetCodes.generate();
         Instant now = clock.instant();
         Instant expiresAt = now.plus(validity.resetCodeLifetime());
-        // Two requests for one account would otherwise both delete and both insert, and the one
-        // whose insert lost would already have handed its code to the relay.
         lockIssuing(accountId);
         tokens.deleteForAccount(accountId);
         tokens.save(new PasswordResetToken(accountId, ResetCodes.fingerprint(code),
@@ -64,8 +64,6 @@ class PasswordResetTokenService implements PasswordResetCodeIssuer {
     void redeem(String code, String password) {
         PasswordResetToken token = tokens.findByCodeHash(ResetCodes.fingerprint(code))
                 .orElseThrow(ResetCodeInvalidException::new);
-        // The row outlives the refusal: it is what lets a member who retries be told their code ran
-        // out rather than that it never existed.
         if (token.hasExpiredBy(clock.instant())) {
             throw new ResetCodeExpiredException();
         }
@@ -74,8 +72,7 @@ class PasswordResetTokenService implements PasswordResetCodeIssuer {
                 .filter(token::stillDescribes)
                 .orElseThrow(ResetCodeInvalidException::new);
         requireAcceptable(password, account);
-        // Keyed on the code and not on its account: a request that replaced this code while the
-        // rules ran must not have its replacement deleted by the code it replaced.
+        recoveryGuard.lockAndRequireAvailable(account.getId());
         if (tokens.deleteByCodeHash(token.getCodeHash()) != 1) {
             throw new ResetCodeInvalidException();
         }
@@ -89,8 +86,6 @@ class PasswordResetTokenService implements PasswordResetCodeIssuer {
         events.publishEvent(new PasswordResetRedeemed(account.getId()));
     }
 
-    // Nobody proved the current password to get here, so telling a caller they guessed it would
-    // hand a stolen code more than the account it unlocks.
     private void requireAcceptable(String password, UserAccount account) {
         try {
             policy.requireUnguessable(password, account);

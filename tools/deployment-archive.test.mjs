@@ -484,3 +484,12 @@ test("given the release workflow, when it publishes, then it attaches the archiv
   assert.match(publish, /gh attestation verify "build\/courtside-deployment-/,
     "the archive's own attestation is created and never read back");
 });
+
+
+test("given the SECURITY password breach bridge, when building a production archive, then its dependency configuration stays outside the distribution", () => {
+  // given
+  const { manifest } = buildArchive({ deploy, ...release });
+  // when / then
+  assert.equal(manifest.files["Caddyfile.security-password-breach"], undefined);
+  assert.equal(manifest.files["compose.security.yaml"], undefined);
+});

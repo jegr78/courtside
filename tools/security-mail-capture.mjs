@@ -27,19 +27,20 @@ export function securityMailTrustPlan(directory, image, user, identity, rootless
     "--cap-drop", "ALL", "--security-opt", "no-new-privileges:true", "--memory", "128m",
     "--cpus", "0.25", "--pids-limit", "32", "--tmpfs", "/tmp:size=16m",
     "--mount", `type=bind,src=${directory},dst=/trust`,
-    "--entrypoint", "/opt/java/openjdk/bin/keytool", image, "-importcert", "-noprompt",
-    "-alias", "courtside-security-mail", "-file", "/trust/cert.pem", "-keystore", "/trust/mail.p12",
-    "-storetype", "PKCS12", "-storepass", "changeit"] };
+    "--entrypoint", "/bin/sh", image, "-ec",
+    '"$1" -importkeystore -noprompt -srckeystore "$2" -srcstorepass changeit -destkeystore "$3/mail.p12" -deststoretype PKCS12 -deststorepass changeit\n'
+      + 'exec "$1" -importcert -noprompt -alias courtside-security-mail -file "$3/cert.pem" -keystore "$3/mail.p12" -storetype PKCS12 -storepass changeit',
+    "courtside-security-mail-trust", "/opt/java/openjdk/bin/keytool", "/opt/java/openjdk/lib/security/cacerts", "/trust"] };
 }
 
 export function createSecurityMailCertificate(directory) {
   mkdirSync(directory, { mode: 0o700 });
   execFileSync("openssl", ["req", "-x509", "-newkey", "rsa:3072", "-nodes", "-days", "1",
-    "-subj", "/CN=mail", "-addext", "subjectAltName=DNS:mail", "-keyout", join(directory, "key.pem"),
+    "-subj", "/CN=mail", "-addext", "subjectAltName=DNS:mail,DNS:password-breach", "-keyout", join(directory, "key.pem"),
     "-out", join(directory, "cert.pem")], { stdio: ["ignore", "pipe", "pipe"], timeout: 30_000 });
   chmodSync(join(directory, "key.pem"), 0o600);
   const certificate = new X509Certificate(readFileSync(join(directory, "cert.pem")));
-  if (!certificate.checkHost("mail") || !certificate.verify(certificate.publicKey)) {
+  if (!certificate.checkHost("mail") || !certificate.checkHost("password-breach") || !certificate.verify(certificate.publicKey)) {
     throw new Error("The issued security relay certificate has invalid identity");
   }
   return { fingerprint: `sha256:${certificate.fingerprint256.replaceAll(":", "").toLowerCase()}` };

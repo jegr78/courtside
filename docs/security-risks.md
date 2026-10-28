@@ -218,3 +218,22 @@ The assessment catalog contains controls whose universal wording cannot be prove
 Their rationale remains visible and is not reported as automated evidence. Courtside does not claim
 complete conformance from those entries. A control with a concrete product remedy becomes tracked
 work. Reconsider when an inventory or executable test can replace the reasoning.
+
+## Synchronized passkeys may not supply a clone-detection counter
+
+Courtside permits credentials that consistently report a zero signature counter, as synchronized
+passkeys may do. If an attacker obtains both the private credential and the account password, a
+zero-counter copy cannot be distinguished from the enrolled authenticator by its counter. Every
+assertion still needs a fresh, session-bound challenge, the configured origin and RP, and signed
+user verification. Nonzero counters must increase. Reconsider this bound if supported authenticators
+provide another interoperable clone signal or the product adopts an explicit credential restriction.
+
+## Administrator MFA remains voluntary
+
+An administrator who has not enrolled a second factor can still sign in with a password alone.
+An attacker needs that account's password to obtain its administrative access. All roles may enroll
+TOTP or WebAuthn, and enrolled accounts require a factor on every new sign-in and sensitive-action
+proof. Initiating another account's controlled recovery additionally requires an MFA-authenticated
+administrator. Voluntary enrollment does not establish the blanket ASVS Level 2 authentication
+strength claim for every administrator. Reconsider this bound only if the product adopts mandatory
+administrator enrollment; the current MFA contract explicitly excludes a role-based mandate.

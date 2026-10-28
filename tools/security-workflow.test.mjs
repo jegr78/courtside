@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { test } from "node:test";
@@ -289,6 +289,36 @@ for (const present of [true, false]) {
     }
   });
 }
+test("given normalized active evidence, when an active or baseline workflow retains it, then the matching attempt stays beside its attested manifests", () => {
+  // given
+  const workflow = yaml.load(scheduled);
+  const steps = workflow.jobs.assessment.steps;
+  const capture = steps.find((step) => step.name === "Retain normalized active evidence");
+  const records = steps.find((step) => step.id === "records");
+  assert.ok(capture, "the normalized fuzzer record must survive target cleanup");
+  assert.equal(capture.if, "always() && env.PROFILE != 'safe'");
+  assert.match(records.with.path, /^\s*build\/security-gate\/openapi-fuzz\.json$/m);
+  assert.ok(steps.indexOf(capture) < steps.findIndex((step) => step.name === "Remove the disposable security target"));
+  for (const [profile, attempt] of [["active", 1], ["baseline", 2]]) {
+    const directory = mkdtempSync(join(tmpdir(), "courtside-fuzz-evidence-"));
+    try {
+      for (const index of [1, 2]) {
+        const source = join(directory, "build/security/example-run/assessment", `attempt-${index}`, "evidence");
+        mkdirSync(source, { recursive: true });
+        writeFileSync(join(source, "openapi-fuzz.json"), `attempt-${index}\n`);
+      }
+      // when
+      const result = spawnSync("bash", ["-eu", "-c", capture.run], {
+        cwd: directory, env: { ...process.env, PROFILE: profile, RUN_ID: "example-run" }, encoding: "utf8"
+      });
+      // then
+      assert.equal(result.status, 0, result.stderr);
+      assert.equal(readFileSync(join(directory, "build/security-gate/openapi-fuzz.json"), "utf8"), `attempt-${attempt}\n`);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  }
+});
 
 test("given the active duration contract, when the workflow chooses its job budget, then active retains the safe cleanup reserve", () => {
   // given
@@ -337,6 +367,21 @@ test("given changed assessment bytes, when the required build runs, then paired 
   assert.match(build,
     /needs: \[docs, backend, backend-coverage, frontend, browser_visual, browser, deployment, tooling, security, gates-image, gates, clock-shift, assessment-runtime, tool-update-comparison, test-profile-plan\]/);
   assert.match(build, /candidate-ref "\$HEAD_REF"/);
+});
+
+test("given candidate qualification fails before comparison, when artifacts are retained, then the sanitized failure and container diagnostics survive cleanup", () => {
+  // given
+  const comparison = yaml.load(build).jobs["tool-update-comparison"];
+  const upload = comparison.steps.find((step) => step.with?.name === "security-tool-update-${{ github.run_id }}");
+
+  // when
+  const paths = upload.with.path.trim().split(/\n\s*/);
+
+  // then
+  assert.equal(upload.if, "always()");
+  assert.ok(paths.includes("build/uat-smoke/qualification.json"));
+  assert.ok(paths.includes("build/uat-smoke/container-logs.txt"));
+  assert.ok(!paths.includes("build/uat-smoke"), "only the sanitized diagnostic files may be uploaded");
 });
 
 test("given a scanner update, when the comparison runs, then both Schemathesis adapters are proven against the pinned image first", () => {
@@ -713,4 +758,19 @@ test("given the release trusts the verifiers' exit codes, when it verifies, then
     assert.match(verify.env[image], /@\$\{\{ needs\.candidate\.outputs\.(?:booking-seed|image)-digest \}\}$/,
       "a tag instead of a digest would verify whatever the tag points to now");
   }
+});
+
+test("given the password breach runtime smoke, when the assessment starts, then pinned images precede the explicit smoke and disposable target", () => {
+  // given
+  const steps = yaml.load(scheduled).jobs.assessment.steps;
+  // when
+  const prepare = steps.findIndex(step => step.name === "Prepare pinned assessment images");
+  const smoke = steps.findIndex(step => /node --test tools\/security-password-breach-smoke\.mjs/.test(step.run ?? ""));
+  const start = steps.findIndex(step => step.name === "Start the disposable security target");
+  // then
+  assert.ok(prepare >= 0 && smoke > prepare && start > smoke,
+    "the native bridge smoke needs preloaded images and must pass before the target starts");
+  assert.equal(steps[smoke].run, "frontend/node/node --test tools/security-password-breach-smoke.mjs");
+  assert.equal(steps[smoke].if, undefined);
+  assert.equal(steps[smoke]["continue-on-error"], undefined);
 });

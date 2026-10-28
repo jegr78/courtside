@@ -9,8 +9,10 @@ event payload.
 
 The events cover authentication decisions, authorization refusals, session termination,
 credential issuance, replacement and withdrawal, administrative security changes, triggered rate
-protections and concrete refusals by rate, CSRF and request-validation controls. A known account is named only by its
-immutable `account.id`; an administrative actor uses `actor.account.id`. Request-bound events
+protections and concrete refusals by rate, CSRF and request-validation controls. MFA actions include
+factor activation, correction and removal, recovery-code replacement, controlled recovery and
+maintenance email correction. Failed factor and controlled-recovery proofs use typed refusal reasons.
+A known account is named only by its immutable `account.id`; an administrative actor uses `actor.account.id`. Request-bound events
 inherit the short-lived `traceId` and `spanId` from the normal logging context.
 
 For `courtside.control.triggered`, `event.outcome=success` means the protection or observation was

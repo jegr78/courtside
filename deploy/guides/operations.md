@@ -86,10 +86,10 @@ answer file. Optional decisions are `overlays` as a comma-separated list, `synth
 select only a forwarded-ingress recipe such as `funnel` or `existing-infrastructure` when its
 unprivileged port threshold excludes ports 80 or 25.
 
-`recovery_material=included` keeps `.env` and local secret files inside each private recovery unit.
+`recovery_material=included` keeps `.env`, local secret files and the MFA key archive inside each private recovery unit.
 Use `external-verified` only after a separate secret store has proved that it can restore every
-value and file. Recovery units then omit both `.env` and `secrets/` contents rather than pretending
-that application data alone is enough.
+value and file. Recovery units then omit `.env`, `secrets/` contents and the MFA key archive. Restore requires the
+matching externally preserved MFA keys when encrypted TOTP enrollments exist.
 
 After installation, use the installed launcher so every command follows the selected release:
 
@@ -1162,6 +1162,8 @@ default.
 | `COURTSIDE_APP_TLS_KEY` | *unset* | Path **inside the container** to the private key belonging to that certificate. `compose.app-tls.yaml` sets it to `/etc/courtside/tls/app/server.key`; set it yourself only when running the image without that overlay. |
 | `COURTSIDE_APP_TLS_MATERIAL` | `/srv/courtside/tls/app` | Host directory holding `server.crt` and `server.key`, the certificate the application serves to the proxy and the key belonging to it. Read by `compose.app-tls.yaml` only. |
 | `COURTSIDE_APP_TLS_AUTHORITY` | `/srv/courtside/tls/app-authority/authority.pem` | Host path to the certificate authority that issued it. Mounted as that single file into both the application and the proxy. |
+| `COURTSIDE_MFA_KEY_ROOT` | `.courtside/keys` in the standalone application | Private keyring directory. Reference containers set `/var/lib/courtside/mfa-keys` and mount the persistent `mfa-keys` volume there. |
+| `COURTSIDE_MFA_KEY_FILE` | *unset* | Optional operator-provided keyring path inside the container. Mount it privately for UID `10001`. Included backups capture this file and restore-check explicitly selects the recovered file. |
 | `COURTSIDE_BACKUP_EVIDENCE_FILE` | *unset* | Path **inside the container** to the JSON file the backup job writes after each successful backup, such as `{"completedAt":"2026-10-17T02:00:00Z"}`. The operator health overview and `courtside.backup.age` read the backup age from it. Unset or missing, the backup counts as unavailable. The reference Compose files pass it on but do not mount the file; [Tell the instance when the last backup finished](#tell-the-instance-when-the-last-backup-finished) shows the mount. |
 | `COURTSIDE_BOOTSTRAP_ADMIN_USERNAME` | *required on an empty account table* | Username of the first local administrator. |
 | `COURTSIDE_BOOTSTRAP_ADMIN_PASSWORD` | *required on an empty account table* | One-time password, at least 12 characters. |
@@ -1515,7 +1517,10 @@ The private directory under `backups/` contains a validated PostgreSQL custom-fo
 with `pg_dump -Fc`, the
 exact release and effective image identity, installation configuration, optional local override, restore
 instructions and a checksum inventory. With local secret recovery it also contains `.env` and the
-local secret files. A full-self-hosted backup stops Stalwart once, captures `mail-config` and
+local secret files and `mfa-keys.tar`. The archive preserves the separate `mfa-keys` volume,
+including every retained key after rotation. `recovery_material=external-verified` omits this archive
+and records `mfa_keys=external-required`. Pass the operator-owned mode-`0600` archive to
+`restore-check --mfa-keys /private/mfa-keys.tar` in that case. A full-self-hosted backup stops Stalwart once, captures `mail-config` and
 `mail-data` from that same interval, then waits for mail health before publishing the unit.
 The launcher stages the directory with `mktemp`, checks the dump with `pg_restore --list`, and
 publishes it only with `mv "$temporary" "$backup"` after every artifact is durable. Restore uses
@@ -1526,7 +1531,7 @@ custom trust mode rather than substituting the official release image.
 Retention reads and verifies only recovery units directly below the configured `backups/`
 directory. An unknown or malformed target stops pruning.
 
-Prove a recovery unit in a disposable PostgreSQL 18 target. Supply an existing account whose
+Prove a recovery unit in a disposable PostgreSQL 18 target. Supply an existing administrator whose
 persisted password and court data should survive the restore. In a private shell, read the password
 without echo into <code>COURTSIDE_RESTORE_PASSWORD</code>, export it, set
 <code>COURTSIDE_RESTORE_USERNAME</code>, and run
@@ -1534,7 +1539,17 @@ without echo into <code>COURTSIDE_RESTORE_PASSWORD</code>, export it, set
 /srv/courtside/backups/recovery-&lt;timestamp&gt;-&lt;version&gt;-&lt;id&gt;</code>. Unset the password
 variable when the check finishes.
 
-`restore-check` refuses a changed checksum or a non-empty target, restores with
+For an MFA-enabled administrator, set `COURTSIDE_RESTORE_MFA_CODE_FILE` to an operator-owned
+mode-`0600` file containing a fresh six-digit TOTP or unused recovery code. The probe posts it only
+after the password leaves the session unauthenticated. It verifies the completed session and
+administrator role. The code is read through a private JSON file and is never printed or included
+in command arguments. Remove the input file and unset its path when the check finishes. A recovery
+code is consumed only in the disposable restored database, so the original backup still contains
+its verifier.
+
+`restore-check` refuses a changed checksum or a pre-existing database or MFA key volume. It
+reserves both volumes with a unique run owner, verifies ownership before key extraction and deletes
+only resources still owned by that run. It restores with
 `--single-transaction --exit-on-error`, starts the matching image, signs in and reads persisted
 court data. It executes the restore model only from the corresponding locally installed and
 manifest-verified immutable release; the release copy inside the recovery unit is evidence, not
@@ -1543,6 +1558,96 @@ It then removes the isolated target, including after an interrupted or failed ch
 proves the unit; restoring a live installation remains an explicit replacement of the complete
 installation state, never an in-place database rollback. Keep installed releases for as long as
 their recovery units must remain verifiable.
+
+### MFA key custody and restored domains
+
+The application initializes its instance key automatically. The image runs as `10001:10001`,
+keeps its root filesystem read-only and writes keys only to its private persistent `mfa-keys`
+volume. Restarting, recreating or updating the application keeps that volume. A database's
+installation UUID selects its own keyring inside the volume, so different databases do not share
+an encryption key. Local development uses the ignored `.courtside/keys` directory.
+
+Keep `database.dump` and `mfa-keys.tar` together in protected recovery storage. The key archive is
+separate from the database and can decrypt that database's TOTP secrets. Restrict access to both.
+`restore-check` validates archive paths and file types, imports keys into its fresh private volume,
+and waits until the matching application has completed its key checks. A missing or wrong key
+prevents health. It never clears enrollments or generates replacement keys over encrypted data.
+Older database dumps without encrypted MFA factors remain importable and initialize keys on start.
+A database-only dump with encrypted TOTP requires the matching keyring, including its old retained
+keys. WebAuthn credentials and recovery-code verifiers reside in the database and cannot replace
+missing encryption keys at startup.
+
+For a live recovery, stop the old application and restore the complete unit onto a fresh,
+separate installation. Preserve its database and key volume together. Prove the unit with
+`restore-check` before directing traffic to it. Never overwrite a retained keyring with an older
+snapshot or discard old keys after rotation. Rotation adds a new active key and retains every
+previous key so existing ciphertext remains decryptable. Back up the resulting complete keyring
+before resuming normal operation. Use `courtside mfa-rotate-keys` against the existing database and
+key volume. An operator-provided `COURTSIDE_MFA_KEY_FILE` may be mounted outside the normal key
+root. Mount its private parent directory writable for the application user so locking and atomic
+rotation can replace the file. Included backups capture the actual configured file as `provided/mfa.keys` in the same
+archive. `restore-check` detects this mode and sets its application to that restored file inside
+its private volume. With external recovery material, preserve the same normalized archive in the
+external secret store and supply it through `--mfa-keys`. For migration to a fresh standard
+installation, restore the archive into `mfa-keys` with ownership `10001:10001`, directories at
+`0700` and files at `0600`. Set `COURTSIDE_MFA_KEY_FILE` in the new `.env` to
+`/var/lib/courtside/mfa-keys/provided/mfa.keys` before starting the matching database. Existing
+keyrings must retain all old keys. UAT records this configured path automatically during restore.
+
+WebAuthn binds credentials to the hostname derived from the explicit `COURTSIDE_PUBLIC_URL`.
+The standard recipe derives that URL from `COURTSIDE_DOMAIN`. Keep the public hostname stable.
+After a hostname change, use TOTP or a recovery code to sign in and enroll a new device at the new
+address. A credential registered for an unrelated hostname does not transfer. If no other factor
+or recovery code remains, use the controlled account recovery procedure.
+
+### Account-specific MFA recovery with server access
+
+Use the installed launcher when the only administrator has lost every second factor and recovery
+code. Confirm the holder's identity outside Courtside first. Select the account by its UUID.
+The command never disables MFA for other accounts and never prints a password or recovery code.
+It starts the installed application as a maintenance process against the existing database and
+key volume, with no published ports. The database must already be running.
+
+```sh
+/srv/courtside/current/courtside mfa-recover --account-id <account-uuid> --identity-checked
+```
+
+Initiation blocks the old login and ends the target account's sessions. The holder receives the
+expiring single-use recovery message through the configured email channel. Only redemption with
+a new permanent password removes the old factors and recovery codes. Ordinary password reset
+and credential issuance keep MFA.
+
+If the stored email address cannot receive the message, prepare an operator-owned mode-`0600`
+UTF-8 file containing only the corrected address and an optional final newline. Create it without
+hard links in a private mode-`0700` directory. Every parent must belong to the operator or root
+and prevent writes by other users. A root-owned sticky temporary directory is accepted when its
+direct child is the operator's private directory. The address may occupy at most 254 bytes.
+Correct it through the audited command, then initiate recovery:
+
+```sh
+/srv/courtside/current/courtside mfa-correct-email --account-id <account-uuid> --identity-checked --email-file /private/corrected-email
+/srv/courtside/current/courtside mfa-recover --account-id <account-uuid> --identity-checked
+```
+
+The launcher sends the email file through standard input into a mode-`0600` file on the
+maintenance container's `/tmp` tmpfs. It checks the opened descriptor and reads only that
+descriptor after validation. The address never enters command arguments or environment
+values. Delete the host input file after the operation. Both operations record the target account
+UUID in the security audit. Server access authorizes this rescue path; the product's ordinary
+administrator recovery path still requires the administrator's own MFA and fresh proof.
+
+Rotate encryption keys while preserving all previous keys:
+
+```sh
+/srv/courtside/current/courtside backup --retain 7
+/srv/courtside/current/courtside mfa-rotate-keys
+/srv/courtside/current/courtside backup --retain 7
+```
+
+The rotation uses the same persistent key configuration as the application. It neither removes
+old key entries nor clears encrypted enrollments. Keep the complete keyring with the matching
+backup. Restore to a fresh volume or use the current retained-key archive when an older backup's
+keyring differs from the running installation.
 
 ### Tell the instance when the last backup finished
 

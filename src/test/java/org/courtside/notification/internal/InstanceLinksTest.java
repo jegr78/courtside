@@ -99,6 +99,7 @@ class InstanceLinksTest {
         String booking = ADDRESS + "/my-bookings#booking-" + BOOKING;
         String bookings = ADDRESS + "/my-bookings";
         expected.put(MessageKind.ACCOUNT_WELCOME, ADDRESS + "/");
+        expected.put(MessageKind.ACCOUNT_SECURITY_CHANGED, ADDRESS + "/account#security");
         expected.put(MessageKind.BOOKING_CONFIRMED, booking);
         expected.put(MessageKind.BOOKING_PLAYER_RECORDED, booking);
         expected.put(MessageKind.BOOKING_PLAYER_WITHDREW, booking);

@@ -44,6 +44,7 @@ services:
       db:
         condition: service_healthy
     environment:
+      COURTSIDE_MFA_KEY_ROOT: /var/lib/courtside/mfa-keys
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/courtside
       SPRING_DATASOURCE_USERNAME: courtside
       SPRING_DATASOURCE_PASSWORD: courtside-restore
@@ -67,5 +68,9 @@ services:
       timeout: 3s
       retries: 45
 
+    volumes:
+      - mfa-keys:/var/lib/courtside/mfa-keys
+
 volumes:
+  mfa-keys:
   db:

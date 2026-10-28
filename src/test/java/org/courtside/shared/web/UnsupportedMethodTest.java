@@ -13,6 +13,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.context.annotation.Import;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.context.TestPropertySource;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -26,6 +27,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@TestPropertySource(properties = "server.servlet.context-path=/club")
 @Import(IdentityTestFixture.class)
 class UnsupportedMethodTest extends AbstractIntegrationTest {
 
@@ -89,27 +91,29 @@ class UnsupportedMethodTest extends AbstractIntegrationTest {
                 .isEqualTo("urn:courtside:error:method-not-supported");
     }
 
-    @Test
-    void givenASignedInMember_whenTheyUseAMethodTheContainerRefuses_thenTheRefusalIsATypedProblem()
-            throws Exception {
-        // when — Tomcat answers TRACE itself, so this never reaches a handler
-        HttpResponse<String> response = send("TRACE", "/api/public/config", sessionCookie);
+    @ParameterizedTest
+    @ValueSource(strings = {"/api/public/config", "/api/public/courts"})
+    void givenASignedInMember_whenTheyUseAMethodTheContainerRefuses_thenTheRefusalIsATypedProblem(
+            String path) throws Exception {
+        // when
+        HttpResponse<String> response = send("TRACE", path, sessionCookie);
 
         // then
         assertThat(response.statusCode()).isEqualTo(405);
         assertThat(response.headers().firstValue("Content-Type").orElseThrow())
                 .startsWith(PROBLEM_JSON);
-        assertThat(response.headers().firstValue("Allow")).isPresent();
+        assertThat(response.headers().allValues("Allow")).containsExactly("GET");
         JsonNode problem = objectMapper.readTree(response.body());
         assertThat(problem.at("/type").asString())
                 .isEqualTo("urn:courtside:error:method-not-supported");
         assertThat(problem.at("/title").asString()).isEqualTo("Method not allowed");
+        assertThat(problem.at("/instance").asString()).isEqualTo("/club" + path);
     }
 
     @Test
     void whenAMethodNobodyRecognisesArrives_thenItIsRejectedAsATypedProblemRatherThanAServerError()
             throws Exception {
-        // when — the request firewall answers before authentication
+        // when
         HttpResponse<String> response = send("PROPFIND", "/api/public/config", null);
 
         // then
@@ -159,7 +163,7 @@ class UnsupportedMethodTest extends AbstractIntegrationTest {
     @Test
     void givenNobodyIsSignedIn_whenTheyAskForAProtectedResource_thenTheyAreStillTurnedAway()
             throws Exception {
-        // when - permitting the error dispatch decides nothing about the request itself
+        // when
         HttpResponse<String> response = send("GET", "/api/my/bookings", null);
 
         // then
@@ -219,6 +223,6 @@ class UnsupportedMethodTest extends AbstractIntegrationTest {
     }
 
     private URI uri(String path) {
-        return URI.create("http://localhost:" + port + path);
+        return URI.create("http://localhost:" + port + "/club" + path);
     }
 }

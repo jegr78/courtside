@@ -63,6 +63,14 @@ export type MessageChannel = components["schemas"]["MessageChannel"];
 export type MessageChannelChoice = components["schemas"]["MessageChannelChoice"];
 export type Notification = components["schemas"]["Notification"];
 export type NotificationPage = components["schemas"]["NotificationPage"];
+export type WebAuthnCreationOptions = components["schemas"]["WebAuthnCreationOptions"];
+export type WebAuthnRequestOptions = components["schemas"]["WebAuthnRequestOptions"];
+export type WebAuthnRegistrationCredential = components["schemas"]["WebAuthnRegistrationCredential"];
+export type WebAuthnAssertionCredential = components["schemas"]["WebAuthnAssertionCredential"];
+export type MfaAdministrativeStatus = components["schemas"]["MfaAdministrativeStatus"];
+export type MfaStatus = components["schemas"]["MfaStatus"];
+export type TotpEnrollment = components["schemas"]["TotpEnrollment"];
+export type MfaRecoveryCodeSet = components["schemas"]["MfaRecoveryCodeSet"];
 export type AccountSession = components["schemas"]["AccountSession"];
 export type PersonRequest = components["schemas"]["PersonRequest"];
 export type MembershipRequest = components["schemas"]["MembershipRequest"];
@@ -219,6 +227,7 @@ async function send(path: string, init: RequestInit, notifyUnauthorized: boolean
   let requestAttempts = 1;
   let response = await fetch(path, carrying(init, sent));
   let problem = await problemIn(response);
+  init.signal?.throwIfAborted();
   // A request that started alongside this one can mint a token of its own and replace the cookie,
   // and the rotation is what tells that refusal apart from one the account has actually earned.
   if (write && problem?.type === ACCESS_DENIED && csrfToken() !== sent && requestAttempts < maximumRequests) {
@@ -227,6 +236,7 @@ async function send(path: string, init: RequestInit, notifyUnauthorized: boolean
     requestAttempts++;
     response = await fetch(path, carrying(init, replacement));
     problem = await problemIn(response);
+    init.signal?.throwIfAborted();
   }
   const admissionWait = retryAfterSeconds(response);
   if (!write && response.status === 429 && ADMISSION_REFUSALS.has(problem?.type ?? "")
@@ -235,10 +245,12 @@ async function send(path: string, init: RequestInit, notifyUnauthorized: boolean
     requestAttempts++;
     response = await fetch(path, carrying(init, sent));
     problem = await problemIn(response);
+    init.signal?.throwIfAborted();
   }
   if (!response.ok) {
     if (response.status === 401 && notifyUnauthorized) {
       await clearPersonalBookingsOfflineData();
+      init.signal?.throwIfAborted();
       notifyOtherClientsOfSessionChange();
       window.dispatchEvent(new Event("courtside:unauthenticated"));
     }
@@ -246,6 +258,7 @@ async function send(path: string, init: RequestInit, notifyUnauthorized: boolean
   }
   if (write) {
     await clearPersonalBookingsOfflineData();
+    init.signal?.throwIfAborted();
     if (announceSessionChange) notifyOtherClientsOfSessionChange();
   }
   return response;
@@ -373,9 +386,40 @@ export const api = {
   requestUsernameReminder: (email: string) => request<void>("/api/account-recovery/usernames", {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email })
   }),
-  reauthenticate: (password: string) => request<void>("/api/session/reauthentication", {
-    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password })
+  reauthenticate: (password: string, code?: string, credential?: WebAuthnAssertionCredential, signal?: AbortSignal) => request<void>("/api/session/reauthentication", {
+    method: "POST", headers: { "Content-Type": "application/json" }, signal, body: JSON.stringify({ password, code, credential })
   }),
+  webauthnRegistrationOptions: (signal?: AbortSignal) => request<WebAuthnCreationOptions>("/api/account/mfa/webauthn/registration-options", { method: "POST", signal }),
+  registerWebauthn: (label: string, credential: WebAuthnRegistrationCredential, signal?: AbortSignal) => request<MfaRecoveryCodeSet>("/api/account/mfa/webauthn", {
+    method: "POST", signal, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ label, credential })
+  }, true, true),
+  renameWebauthn: (id: string, label: string, signal?: AbortSignal) => request<void>(`/api/account/mfa/webauthn/credentials/${encodeURIComponent(id)}`, {
+    method: "PATCH", signal, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ label })
+  }, true, true),
+  removeWebauthn: (id: string, signal?: AbortSignal) => request<void>(`/api/account/mfa/webauthn/credentials/${encodeURIComponent(id)}`, { method: "DELETE", signal }, true, true),
+  webauthnProofOptions: (signal?: AbortSignal) => request<WebAuthnRequestOptions>("/api/account/mfa/webauthn/authentication-options", { method: "POST", signal }),
+  webauthnLoginOptions: (signal?: AbortSignal) => request<WebAuthnRequestOptions>("/api/session/mfa/webauthn/options", { method: "POST", signal }, false),
+  completeWebauthnLogin: (credential: WebAuthnAssertionCredential, signal?: AbortSignal) => request<void>("/api/session/mfa/webauthn", {
+    method: "POST", signal, headers: { "Content-Type": "application/json" }, body: JSON.stringify(credential)
+  }, false, true),
+  accountMfa: (accountId: string, signal?: AbortSignal) => request<MfaAdministrativeStatus>(`/api/admin/accounts/${encodeURIComponent(accountId)}/mfa`, { signal }),
+  recoverAccountMfa: (accountId: string, signal?: AbortSignal) => request<void>(`/api/admin/accounts/${encodeURIComponent(accountId)}/mfa-recovery`, {
+    method: "POST", signal, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ identityChecked: true })
+  }, true, true),
+  redeemMfaRecovery: (username: string, code: string, password: string, signal?: AbortSignal) => request<void>("/api/account-recovery/mfa/redemption", {
+    method: "POST", signal, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username, code, password })
+  }),
+  ownMfa: (signal?: AbortSignal) => request<MfaStatus>("/api/account/mfa", { signal }),
+  beginTotpEnrollment: (signal?: AbortSignal) => request<TotpEnrollment>("/api/account/mfa/totp", { method: "POST", signal }),
+  confirmTotpEnrollment: (code: string, signal?: AbortSignal) => request<MfaRecoveryCodeSet>("/api/account/mfa/totp/confirmation", {
+    method: "POST", signal, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code })
+  }, true, true),
+  replaceRecoveryCodes: (signal?: AbortSignal) => request<MfaRecoveryCodeSet>("/api/account/mfa/recovery-codes", { method: "POST", signal }, true, true),
+  removeTotp: (signal?: AbortSignal) => request<void>("/api/account/mfa/totp", { method: "DELETE", signal }, true, true),
+  disableMfa: (signal?: AbortSignal) => request<void>("/api/account/mfa", { method: "DELETE", signal }, true, true),
+  completeMfaLogin: (code: string, signal?: AbortSignal) => request<void>("/api/session/mfa", {
+    method: "POST", signal, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code })
+  }, false, true),
   changeOwnPassword: (currentPassword: string, newPassword: string) => request<void>(
     "/api/account/password", {
       method: "PUT", headers: { "Content-Type": "application/json" },
@@ -869,16 +913,19 @@ export const api = {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(move)
     }
   ),
-  login: (username: string, password: string, signal?: AbortSignal, maximumRequests = 2) => request<void>("/api/session", {
-    method: "POST",
-    signal,
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({ username, password })
-  }, false, true, maximumRequests),
+  login: async (username: string, password: string, signal?: AbortSignal, maximumRequests = 2) => {
+    const response = await send("/api/session", {
+      method: "POST",
+      signal,
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ username, password })
+    }, false, true, maximumRequests);
+    return response.status === 202 ? "mfa-required" as const : undefined;
+  },
   changeInitialPassword: (password: string) => request<void>("/api/account/initial-password", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ password })
   }, true, true),
-  logout: () => request<void>("/api/session/logout", { method: "POST" }, false, true)
+  logout: (signal?: AbortSignal) => request<void>("/api/session/logout", { method: "POST", signal }, false, true)
 };

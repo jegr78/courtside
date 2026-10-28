@@ -38,9 +38,11 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, UUID> 
                 account.passwordChangeRequired = true,
                 account.securityEpoch = account.securityEpoch + 1
             WHERE account.id = :id
+              AND (account.passwordHash = :previousHash
+                   OR (account.passwordHash IS NULL AND :previousHash IS NULL))
             """)
     int issueCredential(@Param("id") UUID id, @Param("passwordHash") String passwordHash,
-                        @Param("expiresAt") Instant expiresAt);
+                        @Param("expiresAt") Instant expiresAt, @Param("previousHash") String previousHash);
 
     Optional<UserAccount> findByUsername(String username);
 

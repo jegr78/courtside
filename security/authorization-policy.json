@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
-  "reviewedAt": "2026-10-27",
+  "reviewedAt": "2026-10-28",
   "purpose": "This is the normative authorization policy for the shipped Courtside API. OpenAPI defines the transport shape; this policy defines who may perform each operation, which resource attributes narrow that permission, and which protected fields each projection may read or write.",
-  "openApiFieldInventorySha256": "f99c57c17fcae16c2323ea4bcd42d0c1c0a546dbf14b7f3317b25d529c206aec",
-  "protectedFieldInventorySha256": "6d8408f4e71ee28dfec6a2dd0483d7973e5271593970c28e71cc76f187474f70",
-  "productionAuthorizationSha256": "8c2d53997fc90d538612a48bb2c7ef79bd73e9a1029c5512ec77f9f1162910b5",
+  "openApiFieldInventorySha256": "df9c19674d6b9312b80adea2031ed69cd71263ff51cb882ccc133979695b9c72",
+  "protectedFieldInventorySha256": "7e50ec306adc1d5975ac22e6d37452ab356c3cac585cd2679461c06ed79e59a8",
+  "productionAuthorizationSha256": "56eef8ae3cee51928c695dab6c9371c5d7cec49021efee1ed0e62cc6c1d300c2",
   "ordinaryFields": [
     "Problem.detail",
     "Problem.fieldErrors",
@@ -61,6 +61,60 @@
     "assignMembership:response:Violation.code",
     "assignMembership:response:Violation.params",
     "assignMembership:response:Violation.params.*",
+    "beginTotpEnrollment:response:$response.header.Accept",
+    "beginTotpEnrollment:response:$response.header.Retry-After",
+    "beginTotpEnrollment:response:FieldError.code",
+    "beginTotpEnrollment:response:FieldError.field",
+    "beginTotpEnrollment:response:FieldError.params",
+    "beginTotpEnrollment:response:FieldError.params.*",
+    "beginTotpEnrollment:response:Violation.code",
+    "beginTotpEnrollment:response:Violation.params",
+    "beginTotpEnrollment:response:Violation.params.*",
+    "beginWebauthnEnrollment:response:$response.header.Accept",
+    "beginWebauthnEnrollment:response:$response.header.Retry-After",
+    "beginWebauthnEnrollment:response:FieldError.code",
+    "beginWebauthnEnrollment:response:FieldError.field",
+    "beginWebauthnEnrollment:response:FieldError.params",
+    "beginWebauthnEnrollment:response:FieldError.params.*",
+    "beginWebauthnEnrollment:response:Violation.code",
+    "beginWebauthnEnrollment:response:Violation.params",
+    "beginWebauthnEnrollment:response:Violation.params.*",
+    "beginWebauthnEnrollment:response:WebAuthnCreationOptions.attestation",
+    "beginWebauthnEnrollment:response:WebAuthnCreationOptions.authenticatorSelection",
+    "beginWebauthnEnrollment:response:WebAuthnCreationOptions.authenticatorSelection.requireResidentKey",
+    "beginWebauthnEnrollment:response:WebAuthnCreationOptions.authenticatorSelection.residentKey",
+    "beginWebauthnEnrollment:response:WebAuthnCreationOptions.authenticatorSelection.userVerification",
+    "beginWebauthnEnrollment:response:WebAuthnCreationOptions.pubKeyCredParams",
+    "beginWebauthnEnrollment:response:WebAuthnCreationOptions.pubKeyCredParams.items.alg",
+    "beginWebauthnEnrollment:response:WebAuthnCreationOptions.pubKeyCredParams.items.type",
+    "beginWebauthnEnrollment:response:WebAuthnCreationOptions.rp",
+    "beginWebauthnEnrollment:response:WebAuthnCreationOptions.timeout",
+    "beginWebauthnEnrollment:response:WebAuthnRp.id",
+    "beginWebauthnEnrollment:response:WebAuthnRp.name",
+    "beginWebauthnLogin:response:$response.header.Accept",
+    "beginWebauthnLogin:response:$response.header.Retry-After",
+    "beginWebauthnLogin:response:FieldError.code",
+    "beginWebauthnLogin:response:FieldError.field",
+    "beginWebauthnLogin:response:FieldError.params",
+    "beginWebauthnLogin:response:FieldError.params.*",
+    "beginWebauthnLogin:response:Violation.code",
+    "beginWebauthnLogin:response:Violation.params",
+    "beginWebauthnLogin:response:Violation.params.*",
+    "beginWebauthnLogin:response:WebAuthnRequestOptions.rpId",
+    "beginWebauthnLogin:response:WebAuthnRequestOptions.timeout",
+    "beginWebauthnLogin:response:WebAuthnRequestOptions.userVerification",
+    "beginWebauthnReauthentication:response:$response.header.Accept",
+    "beginWebauthnReauthentication:response:$response.header.Retry-After",
+    "beginWebauthnReauthentication:response:FieldError.code",
+    "beginWebauthnReauthentication:response:FieldError.field",
+    "beginWebauthnReauthentication:response:FieldError.params",
+    "beginWebauthnReauthentication:response:FieldError.params.*",
+    "beginWebauthnReauthentication:response:Violation.code",
+    "beginWebauthnReauthentication:response:Violation.params",
+    "beginWebauthnReauthentication:response:Violation.params.*",
+    "beginWebauthnReauthentication:response:WebAuthnRequestOptions.rpId",
+    "beginWebauthnReauthentication:response:WebAuthnRequestOptions.timeout",
+    "beginWebauthnReauthentication:response:WebAuthnRequestOptions.userVerification",
     "bookingCardImpact:parameter:$parameter.path.cardId",
     "bookingCardImpact:parameter:$parameter.query.cursor",
     "bookingCardImpact:parameter:$parameter.query.limit",
@@ -480,6 +534,42 @@
     "clearAttendance:response:Violation.code",
     "clearAttendance:response:Violation.params",
     "clearAttendance:response:Violation.params.*",
+    "completeMfaLogin:response:$response.header.Accept",
+    "completeMfaLogin:response:$response.header.Retry-After",
+    "completeMfaLogin:response:FieldError.code",
+    "completeMfaLogin:response:FieldError.field",
+    "completeMfaLogin:response:FieldError.params",
+    "completeMfaLogin:response:FieldError.params.*",
+    "completeMfaLogin:response:Violation.code",
+    "completeMfaLogin:response:Violation.params",
+    "completeMfaLogin:response:Violation.params.*",
+    "completeWebauthnLogin:response:$response.header.Accept",
+    "completeWebauthnLogin:response:$response.header.Retry-After",
+    "completeWebauthnLogin:response:FieldError.code",
+    "completeWebauthnLogin:response:FieldError.field",
+    "completeWebauthnLogin:response:FieldError.params",
+    "completeWebauthnLogin:response:FieldError.params.*",
+    "completeWebauthnLogin:response:Violation.code",
+    "completeWebauthnLogin:response:Violation.params",
+    "completeWebauthnLogin:response:Violation.params.*",
+    "confirmTotpEnrollment:response:$response.header.Accept",
+    "confirmTotpEnrollment:response:$response.header.Retry-After",
+    "confirmTotpEnrollment:response:FieldError.code",
+    "confirmTotpEnrollment:response:FieldError.field",
+    "confirmTotpEnrollment:response:FieldError.params",
+    "confirmTotpEnrollment:response:FieldError.params.*",
+    "confirmTotpEnrollment:response:Violation.code",
+    "confirmTotpEnrollment:response:Violation.params",
+    "confirmTotpEnrollment:response:Violation.params.*",
+    "confirmWebauthnEnrollment:response:$response.header.Accept",
+    "confirmWebauthnEnrollment:response:$response.header.Retry-After",
+    "confirmWebauthnEnrollment:response:FieldError.code",
+    "confirmWebauthnEnrollment:response:FieldError.field",
+    "confirmWebauthnEnrollment:response:FieldError.params",
+    "confirmWebauthnEnrollment:response:FieldError.params.*",
+    "confirmWebauthnEnrollment:response:Violation.code",
+    "confirmWebauthnEnrollment:response:Violation.params",
+    "confirmWebauthnEnrollment:response:Violation.params.*",
     "correctMembershipPeriod:parameter:$parameter.path.periodId",
     "correctMembershipPeriod:parameter:$parameter.path.personId",
     "correctMembershipPeriod:request:MembershipPeriodRequest.endedOn",
@@ -885,6 +975,15 @@
     "deleteImportSource:response:Violation.code",
     "deleteImportSource:response:Violation.params",
     "deleteImportSource:response:Violation.params.*",
+    "disableOwnMfa:response:$response.header.Accept",
+    "disableOwnMfa:response:$response.header.Retry-After",
+    "disableOwnMfa:response:FieldError.code",
+    "disableOwnMfa:response:FieldError.field",
+    "disableOwnMfa:response:FieldError.params",
+    "disableOwnMfa:response:FieldError.params.*",
+    "disableOwnMfa:response:Violation.code",
+    "disableOwnMfa:response:Violation.params",
+    "disableOwnMfa:response:Violation.params.*",
     "endAccountSessions:parameter:$parameter.path.personId",
     "endAccountSessions:response:$response.header.Retry-After",
     "endAccountSessions:response:FieldError.code",
@@ -1073,6 +1172,15 @@
     "facilityUtilisation:response:Violation.code",
     "facilityUtilisation:response:Violation.params",
     "facilityUtilisation:response:Violation.params.*",
+    "getAdministrativeMfaStatus:parameter:$parameter.path.accountId",
+    "getAdministrativeMfaStatus:response:$response.header.Retry-After",
+    "getAdministrativeMfaStatus:response:FieldError.code",
+    "getAdministrativeMfaStatus:response:FieldError.field",
+    "getAdministrativeMfaStatus:response:FieldError.params",
+    "getAdministrativeMfaStatus:response:FieldError.params.*",
+    "getAdministrativeMfaStatus:response:Violation.code",
+    "getAdministrativeMfaStatus:response:Violation.params",
+    "getAdministrativeMfaStatus:response:Violation.params.*",
     "getApiDocument:response:$response.header.Retry-After",
     "getApiDocument:response:FieldError.code",
     "getApiDocument:response:FieldError.field",
@@ -1274,6 +1382,15 @@
     "getMembershipType:response:Violation.code",
     "getMembershipType:response:Violation.params",
     "getMembershipType:response:Violation.params.*",
+    "getOwnMfaStatus:response:$response.header.Accept",
+    "getOwnMfaStatus:response:$response.header.Retry-After",
+    "getOwnMfaStatus:response:FieldError.code",
+    "getOwnMfaStatus:response:FieldError.field",
+    "getOwnMfaStatus:response:FieldError.params",
+    "getOwnMfaStatus:response:FieldError.params.*",
+    "getOwnMfaStatus:response:Violation.code",
+    "getOwnMfaStatus:response:Violation.params",
+    "getOwnMfaStatus:response:Violation.params.*",
     "getParticipantCard:parameter:$parameter.path.id",
     "getParticipantCard:response:$response.header.Retry-After",
     "getParticipantCard:response:FieldError.code",
@@ -1345,6 +1462,16 @@
     "getWebManifest:response:WebManifestIcon.type",
     "getWebManifest:response:WebManifestShortcut.name",
     "getWebManifest:response:WebManifestShortcut.url",
+    "initiateMfaRecovery:parameter:$parameter.path.accountId",
+    "initiateMfaRecovery:response:$response.header.Accept",
+    "initiateMfaRecovery:response:$response.header.Retry-After",
+    "initiateMfaRecovery:response:FieldError.code",
+    "initiateMfaRecovery:response:FieldError.field",
+    "initiateMfaRecovery:response:FieldError.params",
+    "initiateMfaRecovery:response:FieldError.params.*",
+    "initiateMfaRecovery:response:Violation.code",
+    "initiateMfaRecovery:response:Violation.params",
+    "initiateMfaRecovery:response:Violation.params.*",
     "joinWaitlist:request:JoinWaitlistRequest.cardId",
     "joinWaitlist:request:JoinWaitlistRequest.courtId",
     "joinWaitlist:request:JoinWaitlistRequest.endsAt",
@@ -2517,6 +2644,15 @@
     "recordAttendance:response:Violation.code",
     "recordAttendance:response:Violation.params",
     "recordAttendance:response:Violation.params.*",
+    "redeemMfaRecovery:response:$response.header.Accept",
+    "redeemMfaRecovery:response:$response.header.Retry-After",
+    "redeemMfaRecovery:response:FieldError.code",
+    "redeemMfaRecovery:response:FieldError.field",
+    "redeemMfaRecovery:response:FieldError.params",
+    "redeemMfaRecovery:response:FieldError.params.*",
+    "redeemMfaRecovery:response:Violation.code",
+    "redeemMfaRecovery:response:Violation.params",
+    "redeemMfaRecovery:response:Violation.params.*",
     "redeemPasswordReset:response:$response.header.Accept",
     "redeemPasswordReset:response:$response.header.Retry-After",
     "redeemPasswordReset:response:FieldError.code",
@@ -2582,6 +2718,25 @@
     "removeOwnParticipation:response:Violation.code",
     "removeOwnParticipation:response:Violation.params",
     "removeOwnParticipation:response:Violation.params.*",
+    "removeOwnTotp:response:$response.header.Accept",
+    "removeOwnTotp:response:$response.header.Retry-After",
+    "removeOwnTotp:response:FieldError.code",
+    "removeOwnTotp:response:FieldError.field",
+    "removeOwnTotp:response:FieldError.params",
+    "removeOwnTotp:response:FieldError.params.*",
+    "removeOwnTotp:response:Violation.code",
+    "removeOwnTotp:response:Violation.params",
+    "removeOwnTotp:response:Violation.params.*",
+    "removeOwnWebauthnCredential:parameter:$parameter.path.credentialId",
+    "removeOwnWebauthnCredential:response:$response.header.Accept",
+    "removeOwnWebauthnCredential:response:$response.header.Retry-After",
+    "removeOwnWebauthnCredential:response:FieldError.code",
+    "removeOwnWebauthnCredential:response:FieldError.field",
+    "removeOwnWebauthnCredential:response:FieldError.params",
+    "removeOwnWebauthnCredential:response:FieldError.params.*",
+    "removeOwnWebauthnCredential:response:Violation.code",
+    "removeOwnWebauthnCredential:response:Violation.params",
+    "removeOwnWebauthnCredential:response:Violation.params.*",
     "removeRetentionPolicy:parameter:$parameter.path.category",
     "removeRetentionPolicy:response:$response.header.Retry-After",
     "removeRetentionPolicy:response:FieldError.code",
@@ -2610,6 +2765,25 @@
     "removeScheduledOpeningHours:response:Violation.code",
     "removeScheduledOpeningHours:response:Violation.params",
     "removeScheduledOpeningHours:response:Violation.params.*",
+    "renameOwnWebauthnCredential:parameter:$parameter.path.credentialId",
+    "renameOwnWebauthnCredential:response:$response.header.Accept",
+    "renameOwnWebauthnCredential:response:$response.header.Retry-After",
+    "renameOwnWebauthnCredential:response:FieldError.code",
+    "renameOwnWebauthnCredential:response:FieldError.field",
+    "renameOwnWebauthnCredential:response:FieldError.params",
+    "renameOwnWebauthnCredential:response:FieldError.params.*",
+    "renameOwnWebauthnCredential:response:Violation.code",
+    "renameOwnWebauthnCredential:response:Violation.params",
+    "renameOwnWebauthnCredential:response:Violation.params.*",
+    "replaceOwnRecoveryCodes:response:$response.header.Accept",
+    "replaceOwnRecoveryCodes:response:$response.header.Retry-After",
+    "replaceOwnRecoveryCodes:response:FieldError.code",
+    "replaceOwnRecoveryCodes:response:FieldError.field",
+    "replaceOwnRecoveryCodes:response:FieldError.params",
+    "replaceOwnRecoveryCodes:response:FieldError.params.*",
+    "replaceOwnRecoveryCodes:response:Violation.code",
+    "replaceOwnRecoveryCodes:response:Violation.params",
+    "replaceOwnRecoveryCodes:response:Violation.params.*",
     "requestAccountCredentials:parameter:$parameter.path.personId",
     "requestAccountCredentials:response:$response.header.Retry-After",
     "requestAccountCredentials:response:FieldError.code",
@@ -3200,6 +3374,38 @@
     {
       "id": "waitlist-entry-owner",
       "description": "The account that joined a waitlist entry."
+    },
+    {
+      "id": "mfa-pending-session",
+      "description": "A password-verified pending browser session has no authenticated roles or account privileges."
+    },
+    {
+      "id": "mfa-challenge",
+      "description": "A server-stored ceremony binds account, browser session, purpose, security epoch, expiry and attempt count."
+    },
+    {
+      "id": "mfa-factor-enabled",
+      "description": "The current account has an active TOTP or native WebAuthn method; recovery codes are single-use alternatives."
+    },
+    {
+      "id": "mfa-recovery-pending",
+      "description": "A controlled rescue blocks password login, ordinary reset, issued credentials and factor changes."
+    },
+    {
+      "id": "mfa-security-epoch",
+      "description": "The locked account security epoch must match the principal or saved challenge."
+    },
+    {
+      "id": "mfa-identity-check",
+      "description": "An administrator explicitly confirms an identity check outside the request."
+    },
+    {
+      "id": "mfa-guess-budget",
+      "description": "Persistent account and address limits survive newly requested ceremonies or rescue codes."
+    },
+    {
+      "id": "mfa-current-address",
+      "description": "The rescue verifier binds the current account email address and security epoch."
     }
   ],
   "operationRules": [
@@ -3903,13 +4109,161 @@
         "recent-authentication",
         "administrative-projection"
       ]
+    },
+    {
+      "id": "pending-mfa-login",
+      "description": "Public admission to a password-first pending ceremony, not unrestricted authentication.",
+      "operationIds": [
+        "completeMfaLogin",
+        "beginWebauthnLogin",
+        "completeWebauthnLogin"
+      ],
+      "actors": [
+        "ANONYMOUS",
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN",
+        "INITIAL_PASSWORD"
+      ],
+      "decisions": [
+        "request-boundary",
+        "mfa-pending-login",
+        "mfa-factor-proof"
+      ]
+    },
+    {
+      "id": "own-mfa-status",
+      "description": "Holder-private MFA status and credential labels.",
+      "operationIds": [
+        "getOwnMfaStatus"
+      ],
+      "actors": [
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN"
+      ],
+      "decisions": [
+        "permanent-account-gate",
+        "mfa-holder"
+      ]
+    },
+    {
+      "id": "own-mfa-change",
+      "description": "Factor and recovery-code changes require current holder identity and recent full proof.",
+      "operationIds": [
+        "beginTotpEnrollment",
+        "confirmTotpEnrollment",
+        "replaceOwnRecoveryCodes",
+        "removeOwnTotp",
+        "disableOwnMfa",
+        "beginWebauthnEnrollment",
+        "confirmWebauthnEnrollment",
+        "removeOwnWebauthnCredential",
+        "renameOwnWebauthnCredential"
+      ],
+      "actors": [
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN"
+      ],
+      "decisions": [
+        "permanent-account-gate",
+        "mfa-holder",
+        "recent-authentication",
+        "mfa-factor-proof"
+      ]
+    },
+    {
+      "id": "own-webauthn-proof-options",
+      "description": "Obtain an account/session-bound assertion challenge to renew expired full proof.",
+      "operationIds": [
+        "beginWebauthnReauthentication"
+      ],
+      "actors": [
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN"
+      ],
+      "decisions": [
+        "permanent-account-gate",
+        "mfa-holder",
+        "mfa-factor-proof"
+      ]
+    },
+    {
+      "id": "administrative-mfa-status",
+      "description": "Only the two coarse administrative factor-state flags.",
+      "operationIds": [
+        "getAdministrativeMfaStatus"
+      ],
+      "actors": [
+        "ADMIN"
+      ],
+      "decisions": [
+        "administrator-gate",
+        "mfa-admin-projection"
+      ]
+    },
+    {
+      "id": "administrative-mfa-rescue",
+      "description": "Fresh MFA administrator proof plus an explicit external identity check.",
+      "operationIds": [
+        "initiateMfaRecovery"
+      ],
+      "actors": [
+        "ADMIN"
+      ],
+      "decisions": [
+        "administrator-gate",
+        "recent-authentication",
+        "mfa-controlled-rescue"
+      ]
+    },
+    {
+      "id": "public-mfa-rescue-redemption",
+      "description": "Public admission still requires the mailed single-use code and an acceptable permanent password.",
+      "operationIds": [
+        "redeemMfaRecovery"
+      ],
+      "actors": [
+        "ANONYMOUS",
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN",
+        "INITIAL_PASSWORD"
+      ],
+      "decisions": [
+        "request-boundary",
+        "credential-write-only",
+        "mfa-controlled-rescue"
+      ]
     }
   ],
   "decisions": [
     {
       "id": "request-boundary",
       "title": "Public request boundary",
-      "rule": "Only explicitly public routes admit an anonymous caller; all other shipped operations require a valid server-side session.",
+      "rule": "Only explicitly public routes admit an anonymous caller; all other shipped operations require a valid server-side session. MFA login routes still require the password-verified pending ceremony, and controlled recovery still requires its valid mailed code.",
       "attributes": [
         "route",
         "authenticated-session",
@@ -3922,7 +4276,7 @@
         "src/main/java/org/courtside/identity/internal/SessionStatusController.java#getSessionStatus"
       ],
       "positiveTests": [
-        "src/test/java/org/courtside/identity/AdminSurfaceTest.java#givenAnAnonymousCaller_whenCallingEveryAnonymousAllowedEndpoint_thenEveryOneOfThemSucceeds"
+        "src/test/java/org/courtside/identity/AdminSurfaceTest.java#givenAnAnonymousCaller_whenCallingEveryAnonymousAllowedEndpoint_thenEveryOneOfThemPassesAuthorization"
       ],
       "negativeTests": [
         "src/test/java/org/courtside/identity/AdminSurfaceTest.java#givenAnAnonymousCaller_whenCallingEveryAuthenticatedEndpoint_thenEveryOneOfThemIsUnauthorized"
@@ -3993,7 +4347,7 @@
     {
       "id": "own-account-scope",
       "title": "Own account scope",
-      "rule": "The authenticated account identifier selects profile identity, session, locale, appointment reach, message-choice, channel-choice and notification state; callers cannot supply another account identifier to these operations, and a notification id outside the account answers as not found.",
+      "rule": "The authenticated account identifier selects profile identity, session, locale, appointment reach, message-choice, channel-choice and notification state; callers cannot supply another account identifier to these operations, and a notification id outside the account answers as not found. MFA state follows immutable principal identity rather than a reused username.",
       "attributes": [
         "current-account",
         "session-handle"
@@ -4329,8 +4683,8 @@
     },
     {
       "id": "recent-authentication",
-      "title": "Recent full-password proof",
-      "rule": "Sensitive account administration, guardian relationships, a guardian's credential request for a dependant, another browser's session termination, import execution and changes to message wording require a successful full-password proof no older than five minutes.",
+      "title": "Recent full authentication proof",
+      "rule": "Sensitive operations require full proof no older than five minutes. Accounts without MFA prove their password; enrolled accounts prove their password plus an unused TOTP/recovery code or valid native WebAuthn assertion. Password-only repetition cannot renew an enrolled account proof. Factor enrollment and changes use the same current-account and recent-proof gate.",
       "attributes": [
         "authenticated-at",
         "current-session",
@@ -4359,13 +4713,15 @@
       ],
       "positiveTests": [
         "src/test/java/org/courtside/identity/AdminRecentAuthenticationTest.java#givenAnotherAccountsSessions_whenAdminProofIsRefreshed_thenOnlyTheTargetEnds",
-        "src/test/java/org/courtside/dataexchange/web/RetentionAdminControllerTest.java#givenARemovableFormerMember_whenTheRunApplies_thenThePersonAndTheirAccountLeaveAndTheLogKeepsCountsOnly"
+        "src/test/java/org/courtside/dataexchange/web/RetentionAdminControllerTest.java#givenARemovableFormerMember_whenTheRunApplies_thenThePersonAndTheirAccountLeaveAndTheLogKeepsCountsOnly",
+        "src/test/java/org/courtside/identity/internal/MfaLoginTest.java#givenAnMfaSession_whenPasswordAndAnotherTotpStepAreRepeated_thenFreshProofRenewsTheSession"
       ],
       "negativeTests": [
         "src/test/java/org/courtside/identity/AdminRecentAuthenticationTest.java#givenNoRecentProof_whenAnAdminPerformsSensitiveChanges_thenEveryChangeIsRefused",
         "src/test/java/org/courtside/dataexchange/web/RetentionAdminControllerTest.java#givenNoRecentProof_whenARunIsAsked_thenItIsRefusedAndThePreviewStillWaits",
         "src/test/java/org/courtside/member/web/GuardianshipAdminControllerTest.java#givenAStaleSignIn_whenTheBoardWritesARelationship_thenEveryWriteAsksForAFreshProof",
-        "src/test/java/org/courtside/member/web/DependantControllerTest.java#givenAStaleSignIn_whenTheGuardianAsksForCredentials_thenAFreshProofIsRequiredAndNothingIsIssued"
+        "src/test/java/org/courtside/member/web/DependantControllerTest.java#givenAStaleSignIn_whenTheGuardianAsksForCredentials_thenAFreshProofIsRequiredAndNothingIsIssued",
+        "src/test/java/org/courtside/identity/internal/MfaLoginTest.java#givenAnMfaSessionWithExpiredProof_whenOnlyThePasswordIsRepeated_thenSensitiveProofIsNotRenewed"
       ]
     },
     {
@@ -4554,6 +4910,151 @@
         "src/test/java/org/courtside/operations/OperationalLogAdminControllerTest.java#givenAMemberOrMissingCsrf_whenSearching_thenAccessIsRefused",
         "src/test/java/org/courtside/dataexchange/web/LogExportAdminControllerTest.java#givenAMember_whenTheyAskForEitherLog_thenTheyAreRefusedAndNothingIsRecorded"
       ]
+    },
+    {
+      "id": "mfa-pending-login",
+      "title": "Password-first pending MFA login",
+      "rule": "MFA login entry points admit a request before full authentication, but succeed only for its password-verified pending session and unexpired account/session/purpose/epoch-bound challenge. Only a valid factor consumes that challenge, rotates the session, grants roles and records sign-in. Generic malformed requests do not prove successful authorization.",
+      "attributes": [
+        "mfa-pending-session",
+        "mfa-challenge",
+        "mfa-security-epoch",
+        "mfa-guess-budget"
+      ],
+      "productionPaths": [
+        "src/main/java/org/courtside/identity/internal/MfaLogin.java#begin",
+        "src/main/java/org/courtside/identity/internal/MfaLogin.java#complete",
+        "src/main/java/org/courtside/identity/internal/MfaLogin.java#webAuthnOptions",
+        "src/main/java/org/courtside/identity/internal/MfaLogin.java#completeWebAuthn",
+        "src/main/java/org/courtside/identity/internal/MfaLogin.java#finish",
+        "src/main/java/org/courtside/identity/internal/MfaSessionAuthentication.java#complete",
+        "src/main/java/org/courtside/identity/internal/SessionMfaController.java#completeMfaLogin",
+        "src/main/java/org/courtside/identity/internal/SessionWebauthnController.java#pending",
+        "src/main/java/org/courtside/identity/internal/SessionWebauthnController.java#challenge"
+      ],
+      "positiveTests": [
+        "src/test/java/org/courtside/identity/internal/MfaLoginTest.java#givenAPendingLogin_whenTheSecondFactorSucceeds_thenAReplacementSessionHasAccountPrivileges"
+      ],
+      "negativeTests": [
+        "src/test/java/org/courtside/identity/internal/MfaLoginTest.java#givenEnabledMfa_whenOnlyThePasswordSucceeds_thenNoIdentityOrAccountAccessIsGranted",
+        "src/test/java/org/courtside/identity/internal/MfaLoginTest.java#givenARevokedPendingLogin_whenTheCodeIsCorrect_thenItStillCannotAuthenticate"
+      ]
+    },
+    {
+      "id": "mfa-holder",
+      "title": "Private MFA holder scope",
+      "rule": "An authenticated permanent account selects its MFA state by immutable principal ID. Changes refresh and lock that account, require its current epoch, enabled state and no pending rescue. A native credential may be renamed or removed only by its holder. Holder-private labels, usage times and credential identities never enter administrative or ordinary export projections.",
+      "attributes": [
+        "current-account",
+        "mfa-security-epoch",
+        "mfa-recovery-pending",
+        "response-schema"
+      ],
+      "productionPaths": [
+        "src/main/java/org/courtside/identity/internal/MfaManagement.java#status",
+        "src/main/java/org/courtside/identity/internal/MfaManagement.java#currentHolderForUpdate",
+        "src/main/java/org/courtside/identity/internal/MfaManagement.java#currentForChange",
+        "src/main/java/org/courtside/identity/internal/MfaWebAuthnFlow.java#ownCredential",
+        "src/main/java/org/courtside/identity/internal/MfaWebAuthnFlow.java#remove",
+        "src/main/java/org/courtside/identity/internal/MfaWebAuthnFlow.java#rename"
+      ],
+      "positiveTests": [
+        "src/test/java/org/courtside/identity/internal/MfaManagementTest.java#givenAReusedUsername_whenReadingPrivateFactorStatus_thenThePrincipalAccountKeepsItsOwnData"
+      ],
+      "negativeTests": [
+        "src/test/java/org/courtside/identity/internal/MfaManagementTest.java#givenAReusedPrincipalName_whenTheLockedAccountHasAnotherIdentity_thenItCannotReceiveTheFirstHoldersSetup",
+        "src/test/java/org/courtside/identity/internal/MfaWebAuthnFlowTest.java#givenAnUnknownCredential_whenTheHolderRemovesIt_thenTheResponseNamesAnAbsentResource"
+      ]
+    },
+    {
+      "id": "mfa-factor-proof",
+      "title": "MFA method and ceremony proof",
+      "rule": "First enrollment requires recent password proof; changes to an enrolled account require recent password plus an existing factor. TOTP activates only after a valid unused step. Native WebAuthn registration/assertion checks origin, RP, challenge, user verification, credential owner and monotone counter. Codes and setup secrets appear only in their holder generating response; only verifiers or account-bound ciphertext remain stored.",
+      "attributes": [
+        "mfa-factor-enabled",
+        "mfa-challenge",
+        "mfa-guess-budget",
+        "current-account",
+        "recent-authentication"
+      ],
+      "productionPaths": [
+        "src/main/java/org/courtside/identity/internal/MfaManagement.java#beginTotp",
+        "src/main/java/org/courtside/identity/internal/MfaManagement.java#confirmTotp",
+        "src/main/java/org/courtside/identity/internal/MfaManagement.java#replaceRecoveryCodes",
+        "src/main/java/org/courtside/identity/internal/MfaWebAuthnFlow.java#beginRegistration",
+        "src/main/java/org/courtside/identity/internal/MfaWebAuthnFlow.java#register",
+        "src/main/java/org/courtside/identity/internal/MfaWebAuthnFlow.java#beginReauthentication",
+        "src/main/java/org/courtside/identity/internal/MfaWebAuthnFlow.java#verifyReauthentication",
+        "src/main/java/org/courtside/identity/internal/MfaWebAuthn.java#register",
+        "src/main/java/org/courtside/identity/internal/MfaWebAuthn.java#verify",
+        "src/main/java/org/courtside/identity/internal/MfaChallenges.java#lockCurrentAccount"
+      ],
+      "positiveTests": [
+        "src/test/java/org/courtside/identity/internal/MfaManagementTest.java#givenFreshPasswordProof_whenEnrollingAndConfirmingTotp_thenCodesAreShownOnceAndOldSessionsAreRevoked",
+        "src/test/java/org/courtside/identity/internal/MfaWebAuthnFlowTest.java#givenNoTotp_whenEnrollingAndUsingWebAuthn_thenPasswordAndTheEnrolledKeyGrantAccountAccess"
+      ],
+      "negativeTests": [
+        "src/test/java/org/courtside/identity/internal/MfaManagementTest.java#givenPendingSetup_whenAnInvalidCodeIsConfirmed_thenMfaAndRecoveryCodesRemainDisabled",
+        "src/test/java/org/courtside/identity/internal/MfaWebAuthnTest.java#givenAnInvalidSignedAssertion_whenVerifying_thenTheStoredCounterAndOwnerStayUnchanged"
+      ]
+    },
+    {
+      "id": "mfa-admin-projection",
+      "title": "Administrative MFA projection",
+      "rule": "Only ADMIN may read another account MFA status. That projection contains only enabled and recovery-pending flags, with no method identities, labels, usage metadata, setup secret or recovery code.",
+      "attributes": [
+        "administrator",
+        "target-account",
+        "response-schema"
+      ],
+      "productionPaths": [
+        "src/main/java/org/courtside/identity/internal/MfaRecoveryController.java#getAdministrativeMfaStatus"
+      ],
+      "positiveTests": [
+        "src/test/java/org/courtside/identity/internal/MfaRecoveryFlowTest.java#givenFreshMfaAdmin_whenRecoveringALostAccount_thenOnlyTheMailedCodeAndNewPasswordUnblockIt"
+      ],
+      "negativeTests": [
+        "src/test/java/org/courtside/identity/internal/MfaRecoveryFlowTest.java#givenAMember_whenReadingAnotherAccountsMfaStatus_thenThePrivateAccountRouteIsRefused"
+      ]
+    },
+    {
+      "id": "mfa-controlled-rescue",
+      "title": "Controlled MFA account rescue",
+      "rule": "Rescue initiation requires a currently enabled ADMIN with active MFA, fresh full proof and explicit external identity confirmation. It revokes sessions and blocks ordinary credential routes while retaining factors. Public redemption requires the single-use mailed code, matching username/current address/security epoch, unexpired state, persistent guess budget and acceptable permanent password. Only successful redemption removes factors and clears the block. Operator rescue and separately audited address correction require identity confirmation. Ordinary credential and reset-code jobs queued before rescue must finish permanently without replacing recovered credentials or leaving a usable reset code, including delayed and retried jobs. New requests after completed rescue follow the ordinary policy.",
+      "attributes": [
+        "administrator",
+        "recent-authentication",
+        "mfa-factor-enabled",
+        "mfa-identity-check",
+        "mfa-current-address",
+        "mfa-security-epoch",
+        "mfa-guess-budget",
+        "mfa-recovery-pending"
+      ],
+      "productionPaths": [
+        "src/main/java/org/courtside/identity/internal/ControlledAccountRecovery.java#initiate",
+        "src/main/java/org/courtside/identity/internal/ControlledAccountRecovery.java#initiateLocked",
+        "src/main/java/org/courtside/identity/internal/ControlledAccountRecovery.java#redeem",
+        "src/main/java/org/courtside/identity/internal/ControlledAccountRecovery.java#correctEmailFromMaintenance",
+        "src/main/java/org/courtside/identity/internal/ControlledAccountRecovery.java#valid",
+        "src/main/java/org/courtside/identity/internal/RecoveryAccountGuard.java#lockAndRequireAvailable",
+        "src/main/java/org/courtside/identity/internal/AccountCredentialIssuer.java#issueFor",
+        "src/main/java/org/courtside/notification/internal/MailOutbox.java#handOverAndSettle",
+        "src/main/java/org/courtside/notification/internal/MailOutbox.java#supersededCredential"
+      ],
+      "positiveTests": [
+        "src/test/java/org/courtside/identity/internal/ControlledAccountRecoveryTest.java#givenFreshMfaAdministrator_whenIdentityWasChecked_thenRecoveryStarts",
+        "src/test/java/org/courtside/identity/internal/ControlledAccountRecoveryTest.java#givenLostFactors_whenMaintenanceStartsRecovery_thenOldFactorsRemainAndOnlyAPasswordRedemptionRemovesThem",
+        "src/test/java/org/courtside/identity/internal/ControlledAccountRecoveryTest.java#givenAnOldUnstartedCredentialJob_whenRecoveryCompletes_thenOnlyAnExplicitNewRequestCanIssueACredential"
+      ],
+      "negativeTests": [
+        "src/test/java/org/courtside/identity/internal/ControlledAccountRecoveryTest.java#givenAdministratorWithoutMfa_whenRequestingRecovery_thenItIsRefused",
+        "src/test/java/org/courtside/identity/internal/ControlledAccountRecoveryTest.java#givenUnconfirmedIdentity_whenMaintenanceStartsRecovery_thenNothingChanges",
+        "src/test/java/org/courtside/identity/internal/ControlledAccountRecoveryTest.java#givenAddressChangedWithoutAnEpochChange_whenOldRecoveryCodeIsRedeemed_thenItsAddressBindingRefusesIt",
+        "src/test/java/org/courtside/identity/internal/ControlledAccountRecoveryTest.java#givenAnOutboxCredentialBeingSent_whenRecoveryCompletes_thenTheJobFailsPermanentlyWithoutOverwritingThePassword",
+        "src/test/java/org/courtside/identity/internal/ControlledAccountRecoveryTest.java#givenTwoOldCredentialJobs_whenTheSecondWaitsDuringRecovery_thenNeitherCanReplaceTheRecoveryPassword",
+        "src/test/java/org/courtside/identity/internal/ControlledAccountRecoveryTest.java#givenAnOldResetCodeJobWaitingForTheAccount_whenRecoveryCommits_thenItsIssuedTokenRollsBack"
+      ]
     }
   ],
   "fieldRules": [
@@ -4590,7 +5091,7 @@
     {
       "id": "session-identity-read",
       "access": "read",
-      "description": "Session identity fields describe only the account attached to the current session and become absent, empty or false for an anonymous caller.",
+      "description": "Session identity fields describe only the account attached to the current session and become absent, empty or false for an anonymous caller. Pending status exposes available methods without granting identity or roles.",
       "fields": [
         "SessionStatus.username",
         "SessionStatus.displayName",
@@ -4600,7 +5101,11 @@
         "SessionStatus.roles",
         "SessionStatus.passwordChangeRequired",
         "SessionStatus.managesAppointments",
-        "SessionStatus.createsSeries"
+        "SessionStatus.createsSeries",
+        "SessionStatus.mfaRequired",
+        "SessionStatus.mfaEnabled",
+        "SessionStatus.totpAvailable",
+        "SessionStatus.webauthnAvailable"
       ],
       "operationIds": [
         "getSessionStatus"
@@ -4706,9 +5211,11 @@
     {
       "id": "reauthentication-password-write-only",
       "access": "never-read",
-      "description": "A password proof is accepted only by the reauthentication operation and never appears in a response projection.",
+      "description": "Password and optional second-factor proof are accepted only by reauthentication and never projected back. An enrolled holder must supply a valid second factor.",
       "fields": [
-        "ReauthenticationRequest.password"
+        "ReauthenticationRequest.password",
+        "ReauthenticationRequest.code",
+        "ReauthenticationRequest.credential"
       ],
       "operationIds": [
         "reauthenticate"
@@ -5691,6 +6198,436 @@
       "decisions": [
         "administrator-gate",
         "administrative-projection"
+      ]
+    },
+    {
+      "id": "own-mfa-state-read",
+      "access": "read",
+      "description": "Only the holder reads factor state, remaining-code count, native credential IDs, private labels and usage times.",
+      "fields": [
+        "MfaStatus.enabled",
+        "MfaStatus.totpEnabled",
+        "MfaStatus.recoveryCodesRemaining",
+        "MfaStatus.webauthnAvailable",
+        "MfaStatus.devices"
+      ],
+      "operationIds": [
+        "getOwnMfaStatus"
+      ],
+      "actors": [
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN"
+      ],
+      "attributes": [
+        "current-account"
+      ],
+      "decisions": [
+        "mfa-holder"
+      ]
+    },
+    {
+      "id": "totp-setup-holder-read",
+      "access": "read",
+      "description": "The setup secret and QR URI go only to the requesting holder during recent-proof enrollment, never to administrators or exports.",
+      "fields": [
+        "TotpEnrollment.secret",
+        "TotpEnrollment.uri"
+      ],
+      "operationIds": [
+        "beginTotpEnrollment"
+      ],
+      "actors": [
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN"
+      ],
+      "attributes": [
+        "current-account",
+        "recent-authentication"
+      ],
+      "decisions": [
+        "mfa-holder",
+        "mfa-factor-proof"
+      ]
+    },
+    {
+      "id": "recovery-set-generating-holder-read",
+      "access": "read",
+      "description": "Plaintext recovery codes appear once, only in their holder generating response. Status, administrators and exports never return them.",
+      "fields": [
+        "MfaRecoveryCodeSet.codes"
+      ],
+      "operationIds": [
+        "confirmTotpEnrollment",
+        "confirmWebauthnEnrollment",
+        "replaceOwnRecoveryCodes"
+      ],
+      "actors": [
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN"
+      ],
+      "attributes": [
+        "current-account",
+        "recent-authentication"
+      ],
+      "decisions": [
+        "mfa-holder",
+        "mfa-factor-proof"
+      ]
+    },
+    {
+      "id": "pending-mfa-code-write-only",
+      "access": "never-read",
+      "description": "A code completes only the current pending password-first session and is never returned.",
+      "fields": [
+        "MfaCodeProof.code"
+      ],
+      "operationIds": [
+        "completeMfaLogin"
+      ],
+      "actors": [
+        "ANONYMOUS",
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN",
+        "INITIAL_PASSWORD"
+      ],
+      "attributes": [
+        "mfa-pending-session",
+        "mfa-challenge"
+      ],
+      "decisions": [
+        "mfa-pending-login"
+      ]
+    },
+    {
+      "id": "totp-confirmation-write-only",
+      "access": "never-read",
+      "description": "The holder supplies an unused code to confirm its pending setup; the response never echoes the proof.",
+      "fields": [
+        "MfaCodeProof.code"
+      ],
+      "operationIds": [
+        "confirmTotpEnrollment"
+      ],
+      "actors": [
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN"
+      ],
+      "attributes": [
+        "current-account",
+        "recent-authentication"
+      ],
+      "decisions": [
+        "mfa-factor-proof"
+      ]
+    },
+    {
+      "id": "webauthn-registration-context-read",
+      "access": "read",
+      "description": "The holder alone receives its bound user identity, challenge and excluded credential identifiers.",
+      "fields": [
+        "WebAuthnCreationOptions.user",
+        "WebAuthnCreationOptions.challenge",
+        "WebAuthnCreationOptions.excludeCredentials",
+        "WebAuthnCreationOptions.extensions"
+      ],
+      "operationIds": [
+        "beginWebauthnEnrollment"
+      ],
+      "actors": [
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN"
+      ],
+      "attributes": [
+        "current-account",
+        "mfa-challenge"
+      ],
+      "decisions": [
+        "mfa-holder",
+        "mfa-factor-proof"
+      ]
+    },
+    {
+      "id": "webauthn-pending-assertion-context-read",
+      "access": "read",
+      "description": "Challenge and allowed credential identifiers belong only to this bound browser/account ceremony.",
+      "fields": [
+        "WebAuthnRequestOptions.challenge",
+        "WebAuthnRequestOptions.allowCredentials",
+        "WebAuthnRequestOptions.extensions"
+      ],
+      "operationIds": [
+        "beginWebauthnLogin"
+      ],
+      "actors": [
+        "ANONYMOUS",
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN",
+        "INITIAL_PASSWORD"
+      ],
+      "attributes": [
+        "mfa-pending-session",
+        "mfa-challenge"
+      ],
+      "decisions": [
+        "mfa-pending-login"
+      ]
+    },
+    {
+      "id": "webauthn-holder-assertion-context-read",
+      "access": "read",
+      "description": "Challenge and allowed credential identifiers belong only to this bound browser/account ceremony.",
+      "fields": [
+        "WebAuthnRequestOptions.challenge",
+        "WebAuthnRequestOptions.allowCredentials",
+        "WebAuthnRequestOptions.extensions"
+      ],
+      "operationIds": [
+        "beginWebauthnReauthentication"
+      ],
+      "actors": [
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN"
+      ],
+      "attributes": [
+        "current-account",
+        "mfa-challenge"
+      ],
+      "decisions": [
+        "mfa-holder",
+        "mfa-factor-proof"
+      ]
+    },
+    {
+      "id": "webauthn-registration-proof-write-only",
+      "access": "never-read",
+      "description": "Native attestation, client data, raw credential IDs and extensions are accepted only for this holder enrollment ceremony and never echoed.",
+      "fields": [
+        "WebAuthnEnrollmentRequest.credential"
+      ],
+      "operationIds": [
+        "confirmWebauthnEnrollment"
+      ],
+      "actors": [
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN"
+      ],
+      "attributes": [
+        "current-account",
+        "mfa-challenge"
+      ],
+      "decisions": [
+        "mfa-holder",
+        "mfa-factor-proof"
+      ]
+    },
+    {
+      "id": "webauthn-enrollment-label-write",
+      "access": "write",
+      "description": "The private human label is writable only while enrolling this holder credential.",
+      "fields": [
+        "WebAuthnEnrollmentRequest.label"
+      ],
+      "operationIds": [
+        "confirmWebauthnEnrollment"
+      ],
+      "actors": [
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN"
+      ],
+      "attributes": [
+        "current-account",
+        "recent-authentication"
+      ],
+      "decisions": [
+        "mfa-holder"
+      ]
+    },
+    {
+      "id": "webauthn-holder-label-write",
+      "access": "write",
+      "description": "A label can be renamed only on the current holder credential with fresh full proof.",
+      "fields": [
+        "WebAuthnLabelRequest.label"
+      ],
+      "operationIds": [
+        "renameOwnWebauthnCredential"
+      ],
+      "actors": [
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN"
+      ],
+      "attributes": [
+        "current-account",
+        "recent-authentication"
+      ],
+      "decisions": [
+        "mfa-holder"
+      ]
+    },
+    {
+      "id": "webauthn-pending-proof-write-only",
+      "access": "never-read",
+      "description": "The native assertion authenticates only its saved pending session challenge and is never echoed in a response.",
+      "fields": [
+        "WebAuthnAssertionCredential.id",
+        "WebAuthnAssertionCredential.rawId",
+        "WebAuthnAssertionCredential.type",
+        "WebAuthnAssertionCredential.response",
+        "WebAuthnAssertionCredential.clientExtensionResults",
+        "WebAuthnAssertionCredential.authenticatorAttachment"
+      ],
+      "operationIds": [
+        "completeWebauthnLogin"
+      ],
+      "actors": [
+        "ANONYMOUS",
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN",
+        "INITIAL_PASSWORD"
+      ],
+      "attributes": [
+        "mfa-pending-session",
+        "mfa-challenge"
+      ],
+      "decisions": [
+        "mfa-pending-login",
+        "mfa-factor-proof"
+      ]
+    },
+    {
+      "id": "administrative-mfa-flags-read",
+      "access": "read",
+      "description": "Administrators read only enabled and recovery-pending flags for the selected account. No method identity, private label or credential leaves this projection.",
+      "fields": [
+        "MfaAdministrativeStatus.enabled",
+        "MfaAdministrativeStatus.recoveryPending"
+      ],
+      "operationIds": [
+        "getAdministrativeMfaStatus"
+      ],
+      "actors": [
+        "ADMIN"
+      ],
+      "attributes": [
+        "administrator",
+        "target-account"
+      ],
+      "decisions": [
+        "mfa-admin-projection"
+      ]
+    },
+    {
+      "id": "controlled-rescue-identity-confirmation-write",
+      "access": "write",
+      "description": "An active MFA administrator confirms the external identity check only after fresh full proof.",
+      "fields": [
+        "MfaRecoveryInitiation.identityChecked"
+      ],
+      "operationIds": [
+        "initiateMfaRecovery"
+      ],
+      "actors": [
+        "ADMIN"
+      ],
+      "attributes": [
+        "administrator",
+        "recent-authentication",
+        "mfa-identity-check"
+      ],
+      "decisions": [
+        "mfa-controlled-rescue"
+      ]
+    },
+    {
+      "id": "controlled-rescue-redemption-write-only",
+      "access": "never-read",
+      "description": "Username, mailed rescue code and permanent password are accepted by the bound rescue workflow and never returned.",
+      "fields": [
+        "MfaRecoveryRedemption.username",
+        "MfaRecoveryRedemption.code",
+        "MfaRecoveryRedemption.password"
+      ],
+      "operationIds": [
+        "redeemMfaRecovery"
+      ],
+      "actors": [
+        "ANONYMOUS",
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN",
+        "INITIAL_PASSWORD"
+      ],
+      "attributes": [
+        "mfa-current-address",
+        "mfa-guess-budget"
+      ],
+      "decisions": [
+        "mfa-controlled-rescue",
+        "credential-write-only"
       ]
     }
   ]

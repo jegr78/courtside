@@ -2,7 +2,7 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
 import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, resolve } from "node:path";
-import { createServer } from "node:net";
+import { createServer, isIP } from "node:net";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 import { passiveScannerOrigin, runOwnedProcess } from "./security-passive-deployment.mjs";
@@ -1779,4 +1779,93 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     process.stderr.write(`${failure.stderr || failure.message}\n`);
     process.exitCode = 1;
   }
+}
+
+export function securityMfaOutboxProjectionSql(after, usernames) {
+  if ((after !== null && (typeof after !== "string" || !/^(?:0|[1-9][0-9]{0,18})$/.test(after)
+        || BigInt(after) > 9223372036854775807n)) || !Array.isArray(usernames) || usernames.length < 1 || usernames.length > 2
+      || new Set(usernames).size !== usernames.length
+      || usernames.some(name => typeof name !== "string" || !/^security\.(?:member|trainer|sport\.director|youth\.director|groundskeeper|treasurer|admin)\.2$/.test(name))) {
+    throw new Error("Invalid MFA mail projection");
+  }
+  const names = usernames.map(name => `'${name}'`).join(",");
+  const condition = after === null ? "false" : `m.queued_seq > ${after}`;
+  return `SELECT json_build_object(
+    'watermark', (SELECT COALESCE(max(queued_seq),0)::text FROM message_record),
+    'records', (SELECT COALESCE(json_agg(row_to_json(projected)), '[]'::json) FROM (
+      SELECT a.username, p.email, m.kind, m.state, m.message_id AS "messageId"
+      FROM message_record m JOIN user_account a ON a.id=m.account_id JOIN person p ON p.id=a.person_id
+      WHERE ${condition} AND a.username IN (${names})
+        AND m.kind IN ('ACCOUNT_SECURITY_CHANGED','ACCOUNT_MFA_RECOVERY_CODE')
+      ORDER BY m.queued_seq LIMIT 101) projected),
+    'fingerprint', encode(sha256(convert_to(
+      (SELECT COALESCE(string_agg(encode(sha256(convert_to(to_jsonb(m)::text,'UTF8')),'hex'),'' ORDER BY m.id),'') FROM message_record m)
+      || ':' || (SELECT COALESCE(string_agg(encode(sha256(convert_to(to_jsonb(n)::text,'UTF8')),'hex'),'' ORDER BY n.id),'') FROM notification n), 'UTF8')), 'hex'))`;
+}
+
+export function createSecurityMfaOutboxProjector({ runId, identity, command }) {
+  const project = securityProject(runId);
+  if (typeof command !== "function" || ![identity?.seedFingerprint, identity?.instanceFingerprint]
+      .every(value => typeof value === "string" && /^sha256:[a-f0-9]{64}$/.test(value))) {
+    throw new Error("mfa-mail-database-untrusted");
+  }
+  const pinned = createRequire(new URL("../frontend/package.json", import.meta.url))("js-yaml")
+    .load(readFileSync(composeFile, "utf8")).services.db.image;
+  if (!/^postgres:18-alpine@sha256:[a-f0-9]{64}$/.test(pinned)) throw new Error("mfa-mail-database-untrusted");
+  let retained;
+  const labelsMatch = labels => labels?.["org.courtside.environment"] === "SECURITY"
+    && labels["org.courtside.security.run-id"] === runId && labels["com.docker.compose.project"] === project
+    && labels["org.courtside.security.seed-fingerprint"] === identity.seedFingerprint
+    && labels["org.courtside.security.instance-fingerprint"] === identity.instanceFingerprint;
+  const native = async args => {
+    const result = await command(args, { timeoutMilliseconds: 10000, outputLimitBytes: 32768, acceptedExitCodes: [0] });
+    if (result?.truncated || result?.timedOut || (result?.exitCode !== undefined && result.exitCode !== 0)
+        || (result?.code !== undefined && result.code !== 0)
+        || !(typeof result?.stdout === "string" || Buffer.isBuffer(result?.stdout))
+        || Buffer.byteLength(result.stdout) > 32768) throw new Error("mfa-mail-database-incomplete");
+    return JSON.parse(result.stdout);
+  };
+  return async (after, usernames, binding) => {
+    const sql = securityMfaOutboxProjectionSql(after, usernames);
+    if (![binding?.appId, binding?.backendNetworkId].every(value => typeof value === "string" && /^[a-f0-9]{64}$/.test(value))) {
+      throw new Error("mfa-mail-database-untrusted");
+    }
+    const images = await native(["image", "inspect", pinned]);
+    const databases = await native(["inspect", `${project}-db-1`]);
+    const image = Array.isArray(images) && images.length === 1 ? images[0] : undefined;
+    const db = Array.isArray(databases) && databases.length === 1 ? databases[0] : undefined;
+    const backend = db?.NetworkSettings?.Networks?.[`${project}_backend`];
+    const octets = typeof backend?.IPAddress === "string" ? backend.IPAddress.split(".").map(Number) : [];
+    const privateAddress = isIP(backend?.IPAddress ?? "") === 4 && (octets[0] === 10
+      || octets[0] === 172 && octets[1] >= 16 && octets[1] <= 31 || octets[0] === 192 && octets[1] === 168);
+    if (!image || !/^sha256:[a-f0-9]{64}$/.test(image.Id) || !Array.isArray(image.Config?.Entrypoint)
+        || !Array.isArray(image.Config?.Cmd) || !db || !/^[a-f0-9]{64}$/.test(db.Id)
+        || db.Name !== `/${project}-db-1` || db.State?.Running !== true || db.Image !== image.Id
+        || db.Config?.Image !== pinned || !labelsMatch(db.Config?.Labels)
+        || db.Config.Labels["com.docker.compose.service"] !== "db"
+        || JSON.stringify(db.Config.Entrypoint) !== JSON.stringify(image.Config?.Entrypoint)
+        || JSON.stringify(db.Config.Cmd) !== JSON.stringify(image.Config?.Cmd)
+        || JSON.stringify(Object.keys(db.NetworkSettings?.Networks ?? {})) !== JSON.stringify([`${project}_backend`])
+        || backend?.NetworkID !== binding.backendNetworkId || !privateAddress
+        || !Array.isArray(backend?.Aliases) || !backend.Aliases.includes("db")
+        || Object.values(db.NetworkSettings?.Ports ?? {}).some(ports => ports !== null)) throw new Error("mfa-mail-database-untrusted");
+    const current = { databaseId: db.Id, imageId: image.Id, appId: binding.appId, networkId: binding.backendNetworkId };
+    if (retained && JSON.stringify(retained) !== JSON.stringify(current)) throw new Error("mfa-mail-database-untrusted");
+    const networks = await native(["network", "inspect", binding.backendNetworkId]);
+    const network = Array.isArray(networks) && networks.length === 1 ? networks[0] : undefined;
+    const databaseEndpoint = network?.Containers?.[db.Id];
+    const appEndpoint = network?.Containers?.[binding.appId];
+    if (!network || network.Id !== binding.backendNetworkId || network.Name !== `${project}_backend`
+        || network.Internal !== true || !labelsMatch(network.Labels)
+        || network.Labels["com.docker.compose.network"] !== "backend"
+        || databaseEndpoint?.Name !== `${project}-db-1`
+        || databaseEndpoint.IPv4Address?.split("/")[0] !== backend.IPAddress
+        || appEndpoint?.Name !== `${project}-app-1` || typeof appEndpoint.IPv4Address !== "string") {
+      throw new Error("mfa-mail-database-untrusted");
+    }
+    retained = current;
+    return native(["exec", "-e", "PGOPTIONS=-c default_transaction_read_only=on", retained.databaseId,
+      "psql", "-X", "-q", "-A", "-t", "-h", "/var/run/postgresql", "-p", "5432",
+      "-v", "ON_ERROR_STOP=1", "-U", "courtside", "courtside_security", "-c", sql]);
+  };
 }

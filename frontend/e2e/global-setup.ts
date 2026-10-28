@@ -747,6 +747,7 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
       COURTSIDE_SESSION_CLEANUP_CRON: JOURNEY_SESSION_CLEANUP_CRON,
       LOGGING_LEVEL_ORG_HIBERNATE_ORM_JDBC_ERROR: "ERROR",
       COURTSIDE_ENVIRONMENT: "DEVELOPMENT",
+      COURTSIDE_PUBLIC_URL: "https://courtside.test",
       COURTSIDE_CLOCK_FIXED_INSTANT: journeyInstant,
       COURTSIDE_COOKIE_SECURE: "false",
       COURTSIDE_PASSWORD_BREACH_ENDPOINT: breachCheck.endpoint,

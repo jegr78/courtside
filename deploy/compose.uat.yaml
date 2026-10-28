@@ -47,10 +47,13 @@ services:
       db:
         condition: service_healthy
     environment:
+      COURTSIDE_MFA_KEY_FILE: ${COURTSIDE_UAT_MFA_KEY_FILE:-}
+      COURTSIDE_MFA_KEY_ROOT: /var/lib/courtside/mfa-keys
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/courtside
       SPRING_DATASOURCE_USERNAME: courtside
       SPRING_DATASOURCE_PASSWORD: courtside-uat
       COURTSIDE_COOKIE_SECURE: "true"
+      COURTSIDE_PUBLIC_URL: ${COURTSIDE_UAT_PUBLIC_URL:-https://localhost:${COURTSIDE_UAT_HTTPS_PORT:-8443}}
       COURTSIDE_ENVIRONMENT: UAT
       COURTSIDE_BOOTSTRAP_ADMIN_USERNAME: admin
       COURTSIDE_BOOTSTRAP_ADMIN_PASSWORD: ${COURTSIDE_UAT_ADMIN_PASSWORD:-}
@@ -64,6 +67,7 @@ services:
       - backend
       - frontend
     volumes:
+      - mfa-keys:/var/lib/courtside/mfa-keys
       - operational-logs:/var/lib/courtside/operational-logs:ro
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/actuator/health"]
@@ -150,6 +154,7 @@ services:
       - frontend
 
 volumes:
+  mfa-keys:
   db:
   operational-logs:
   caddy-data:

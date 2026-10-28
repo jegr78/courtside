@@ -138,7 +138,12 @@ public class SecurityEventLog {
     public enum CredentialChange {
         PERMANENT_PASSWORD_REPLACED,
         TEMPORARY_CREDENTIAL_ISSUED,
-        TEMPORARY_CREDENTIAL_WITHDRAWN
+        TEMPORARY_CREDENTIAL_WITHDRAWN,
+        MFA_ENABLED,
+        MFA_METHOD_CHANGED,
+        MFA_DISABLED,
+        MFA_RECOVERY_CODES_REPLACED,
+        MFA_RECOVERY_REDEEMED
     }
 
     public enum AdministrativeAction {
@@ -147,7 +152,10 @@ public class SecurityEventLog {
         USERNAME_CHANGED,
         CREDENTIAL_REQUESTED,
         ACCOUNT_ENABLED,
-        ACCOUNT_DISABLED
+        ACCOUNT_DISABLED,
+        MFA_RECOVERY_INITIATED,
+        MFA_RECOVERY_MAINTENANCE_INITIATED,
+        MFA_RECOVERY_EMAIL_CORRECTED
     }
 
     public enum ControlRefusal {
@@ -158,6 +166,8 @@ public class SecurityEventLog {
         ADMINISTRATOR_CONTINUITY,
         RECENT_AUTHENTICATION,
         REAUTHENTICATION_FAILED,
+        MFA_PROOF_FAILED,
+        MFA_RECOVERY_FAILED,
         REQUEST_VALIDATION,
         OPERATION_CAPACITY
     }

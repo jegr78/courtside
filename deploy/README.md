@@ -69,3 +69,9 @@ launcher from the verified candidate archive as the operations handbook describe
 The club owns its host, external services, credentials, backups and availability. Courtside checks
 the software-controlled part of the selected recipe. Public DNS, routing, certificate issuance,
 mail reputation and third-party delivery remain operator-owned conditions.
+
+The application needs the persistent `mfa-keys` volume as well as PostgreSQL. It creates its own
+private keys there without an additional setup variable. Keep this volume across image updates
+and container recreation. Included recovery units contain `mfa-keys.tar` separately from
+`database.dump`. External recovery material must include a matching private key archive. See the
+[recovery procedure](guides/operations.md#recovery-units).

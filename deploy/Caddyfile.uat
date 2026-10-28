@@ -75,7 +75,7 @@ https://localhost:443 {
 		method QUERY
 		path /api/*
 	}
-	method @unknownMethod PATCH
+	method @unknownMethod TRACE
 
 	handle /api-ui* {
 		reverse_proxy api-ui:8080 {
@@ -123,7 +123,7 @@ http://:8083 {
 		method QUERY
 		path /api/*
 	}
-	method @unknownMethod PATCH
+	method @unknownMethod TRACE
 
 	@private path /api-ui* /actuator* /api/openapi.yaml
 	handle @private {

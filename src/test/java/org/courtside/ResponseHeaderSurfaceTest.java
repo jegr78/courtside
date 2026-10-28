@@ -62,30 +62,31 @@ class ResponseHeaderSurfaceTest extends AbstractIntegrationTest {
     private static final String OUTBOUND =
             "org/courtside/identity/internal/HaveIBeenPwnedPasswordLookup.java";
 
-    private static final Map<String, String> REVIEWED_SOURCES = Map.of(
-            "org/courtside/booking/web/BookingController.java Location",
-            "an identifier this application generated",
-            "org/courtside/booking/web/DependantBookingController.java Location",
-            "a dependant the guardian was granted and an identifier this application generated",
-            "org/courtside/booking/web/SeriesController.java Location",
-            "an identifier this application generated",
-            "org/courtside/booking/web/WaitlistController.java Location",
-            "an identifier this application generated",
-            "org/courtside/dataexchange/web/ExternalReferenceAdminController.java Location",
-            "a stored identifier, escaped into one path segment",
-            "org/courtside/dataexchange/web/ExportAdminController.java CONTENT_DISPOSITION",
-            "a name built here from dates the request states",
-            "org/courtside/identity/internal/LoginRateLimitHandler.java Retry-After",
-            "a count of seconds this application formatted",
-            "org/courtside/identity/internal/SecurityConfiguration.java "
-                    + "X-Courtside-Password-Change-Required",
-            "a constant",
-            "org/courtside/identity/internal/SecurityRequestObservationFilter.java "
-                    + "X-Courtside-Observed-Host",
-            "the host the request named",
-            "org/courtside/identity/internal/SecurityRequestObservationFilter.java "
-                    + "X-Courtside-Observed-Scheme",
-            "the scheme the request arrived on");
+    private static final Map<String, String> REVIEWED_SOURCES = Map.ofEntries(
+            Map.entry("org/courtside/booking/web/BookingController.java Location",
+                    "an identifier this application generated"),
+            Map.entry("org/courtside/booking/web/DependantBookingController.java Location",
+                    "a dependant the guardian was granted and an identifier this application generated"),
+            Map.entry("org/courtside/booking/web/SeriesController.java Location",
+                    "an identifier this application generated"),
+            Map.entry("org/courtside/booking/web/WaitlistController.java Location",
+                    "an identifier this application generated"),
+            Map.entry("org/courtside/dataexchange/web/ExternalReferenceAdminController.java Location",
+                    "a stored identifier, escaped into one path segment"),
+            Map.entry("org/courtside/dataexchange/web/ExportAdminController.java CONTENT_DISPOSITION",
+                    "a name built here from dates the request states"),
+            Map.entry("org/courtside/identity/internal/LoginRateLimitHandler.java Retry-After",
+                    "a count of seconds this application formatted"),
+            Map.entry("org/courtside/identity/internal/MfaSessionAuthentication.java "
+                    + "X-Courtside-Password-Change-Required", "a constant after completed MFA"),
+            Map.entry("org/courtside/identity/internal/SecurityConfiguration.java "
+                    + "X-Courtside-Password-Change-Required", "a constant"),
+            Map.entry("org/courtside/identity/internal/SecurityRequestObservationFilter.java "
+                    + "X-Courtside-Observed-Host", "the host the request named"),
+            Map.entry("org/courtside/identity/internal/SecurityRequestObservationFilter.java "
+                    + "X-Courtside-Observed-Scheme", "the scheme the request arrived on"),
+            Map.entry("org/courtside/shared/web/ContainerErrorController.java Allow",
+                    "only server-registered mapping method names for the original resource path"));
 
     @LocalServerPort
     private int port;

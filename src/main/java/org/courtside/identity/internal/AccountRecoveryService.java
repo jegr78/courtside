@@ -23,12 +23,14 @@ class AccountRecoveryService {
     private final PasswordResetTokenService resetTokens;
     private final LoginAttemptProtection protection;
     private final ApplicationEventPublisher events;
+    private final MfaFactors factors;
 
     @Transactional
     void mailAResetCode(String username, String callerAddress) {
         refuseWhenLimited(username, callerAddress);
-        accounts.findByUsername(username)
+        accounts.findWithLockByUsername(username)
                 .filter(AccountRecoveryService::reachable)
+                .filter(account -> !factors.recoveryPending(account.getId()))
                 .ifPresent(this::mailACodeUnlessTheMailboxHasHadEnough);
     }
 
@@ -45,8 +47,6 @@ class AccountRecoveryService {
         resetTokens.redeem(code, password);
     }
 
-    // The per-account window spares a mailbox, it does not answer questions: letting it reach an
-    // unauthenticated caller would tell them the name they guessed belongs to somebody.
     private void mailACodeUnlessTheMailboxHasHadEnough(UserAccount account) {
         if (!mailLimit.recordWithinWindow(account.getId())) {
             log.debug("Recovery found the reset-mail window already met for account {}",

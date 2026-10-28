@@ -40,16 +40,23 @@ class SessionVariableScopeTest extends AbstractIntegrationTest {
         MockHttpSession planted = new MockHttpSession();
         planted.setAttribute("courtside.authenticated-at", Long.MAX_VALUE);
         planted.setAttribute("courtside.browser-family", "CHROME");
-
-        // The last two writers name request attributes, which are gone with the request that carried them.
+        planted.setAttribute("courtside.mfa-login-challenge", java.util.UUID.randomUUID());
+        planted.setAttribute("courtside.webauthn-registration", java.util.UUID.randomUUID());
+        planted.setAttribute("courtside.webauthn-reauthentication", java.util.UUID.randomUUID());
 
         // when / then
         assertThat(writers).containsExactly(
                 "org/courtside/identity/RecentAuthentication.java:.setAttribute(AUTHENTICATED_AT, clock.instant().toEpochMilli());",
+                "org/courtside/identity/internal/AccountWebauthnController.java:session.setAttribute(MfaWebAuthnFlow.REAUTHENTICATION, result.id());",
+                "org/courtside/identity/internal/AccountWebauthnController.java:session.setAttribute(MfaWebAuthnFlow.REGISTRATION, result.id());",
                 "org/courtside/identity/internal/SecurityConfiguration.java:request.getSession(true).setAttribute(AccountSessionService.BROWSER_FAMILY,",
+                "org/courtside/identity/internal/SecurityConfiguration.java:session.setAttribute(MfaLogin.CHALLENGE, challenge.orElseThrow());",
                 "org/courtside/shared/web/AdmissionControl.java:request.setAttribute(PERMIT, new Permit(bulkhead, principal));",
                 "org/courtside/shared/web/RefusesAmbiguity.java:request.setAttribute(DETAIL, QUOTABLE.matcher(name).matches()");
         mockMvc.perform(get("/api/account/sessions").session(planted))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:unauthenticated"));
+        mockMvc.perform(get("/api/account/mfa").session(planted))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:unauthenticated"));
     }

@@ -383,7 +383,7 @@ public class ReferenceDeploymentSecurityTest {
                         "Permissions-Policy \"geolocation=(), camera=(), microphone=()\"",
                         "-Server", "-Via",
                         "respond \"Request could not be completed.\" {http.error.status_code}",
-                        "@unknownMethod {", "method QUERY", "path /api/*", "method @unknownMethod PATCH",
+                        "@unknownMethod {", "method QUERY", "path /api/*", "method @unknownMethod TRACE",
                         "import {$COURTSIDE_INGRESS_MODE:publicIngress}"),
                 "plaintext-site", List.of("@browserNavigation {", "host {$COURTSIDE_DOMAIN}", "method GET HEAD",
                         "path / /courts /login /initial-password /account-recovery /my-bookings /my-messages /my-dependants /account /account/security /admin /admin/* /index.html /assets/* /font-licenses.txt /icon.svg /manifest.webmanifest /sw.js /workbox-*.js",
@@ -550,9 +550,7 @@ public class ReferenceDeploymentSecurityTest {
 
         // when / then
         assertThat(upstreams).hasSizeGreaterThan(6).allSatisfy(upstream -> {
-            assertThat(APPLICATION_UPSTREAMS).as("%s dials the uninventoried %s",
-                    upstream.origin(), upstream.dial()).containsKey(upstream.dial());
-            if (!Boolean.TRUE.equals(APPLICATION_UPSTREAMS.get(upstream.dial()))) {
+            if (!isApplicationUpstream(upstream)) {
                 return;
             }
             Set<String> contradicted = new LinkedHashSet<>(upstream.asserted().keySet());
@@ -567,6 +565,36 @@ public class ReferenceDeploymentSecurityTest {
                     assertThat(value).as("%s asserts %s from what the client sent",
                             upstream.origin(), name).doesNotContain(CLIENT_HEADER_PLACEHOLDER));
         });
+    }
+
+    @Test
+    void givenAFixedProviderBridge_whenClassifyingUpstreams_thenOnlyItsReviewedDestinationIsNonApplication() {
+        // given
+        var bridge = new AdaptedUpstream("Caddyfile.security-password-breach@plaintext",
+                "api.pwnedpasswords.com:443", Map.of(), Set.of());
+
+        // when / then
+        assertThat(isApplicationUpstream(bridge)).isFalse();
+        assertThatThrownBy(() -> isApplicationUpstream(new AdaptedUpstream(
+                "Caddyfile.dev@plaintext", bridge.dial(), Map.of(), Set.of())))
+                .isInstanceOf(AssertionError.class);
+        for (String dial : List.of("evil.example:443", "app:8080")) {
+            assertThatThrownBy(() -> isApplicationUpstream(new AdaptedUpstream(
+                    bridge.origin(), dial, Map.of(), Set.of())))
+                    .isInstanceOf(AssertionError.class);
+        }
+    }
+
+    private static boolean isApplicationUpstream(AdaptedUpstream upstream) {
+        if (TLS_MODES.stream().anyMatch(mode -> upstream.origin()
+                .equals("Caddyfile.security-password-breach@" + mode))) {
+            assertThat(upstream.dial()).as("%s is a fixed external provider bridge", upstream.origin())
+                    .isEqualTo("api.pwnedpasswords.com:443");
+            return false;
+        }
+        assertThat(APPLICATION_UPSTREAMS).as("%s dials the uninventoried %s",
+                upstream.origin(), upstream.dial()).containsKey(upstream.dial());
+        return Boolean.TRUE.equals(APPLICATION_UPSTREAMS.get(upstream.dial()));
     }
 
     private record AdaptedUpstream(String origin, String dial, Map<String, String> asserted,
@@ -791,18 +819,18 @@ public class ReferenceDeploymentSecurityTest {
     }
 
     @Test
-    void givenTheApiHasNoPatchOperation_whenReadingProxiedDeployments_thenUnknownMethodsReachSpringAsPatch()
+    void givenTheApiHasNoTraceOperation_whenReadingProxiedDeployments_thenUnknownMethodsUseTheDisabledTraceMethod()
             throws IOException {
         // given
         String api = Files.readString(Path.of("src/main/resources/api/openapi.yaml"));
 
         // when / then
-        assertThat(api).doesNotContain("    patch:");
+        assertThat(api).doesNotContain("    trace:");
         for (String name : List.of(
                 "Caddyfile", "Caddyfile.dev", "Caddyfile.perf", "Caddyfile.security", "Caddyfile.uat")) {
             assertThat(Files.readString(Path.of("deploy", name)))
                     .as(name)
-                    .contains("@unknownMethod {", "method QUERY", "path /api/*", "method @unknownMethod PATCH");
+                    .contains("@unknownMethod {", "method QUERY", "path /api/*", "method @unknownMethod TRACE");
         }
     }
 

@@ -13,7 +13,8 @@ import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -67,6 +68,7 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
     private static final Set<String> ANONYMOUS_ALLOWED_PATHS = Set.of(
             "/api/account-recovery/password",
             "/api/account-recovery/password/redemption",
+            "/api/account-recovery/mfa/redemption",
             "/api/account-recovery/usernames",
             "/api/openapi.yaml",
             "/api/public/booking-card-legend",
@@ -78,11 +80,22 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
             "/api/public/opening-hours",
             "/api/reserved-slots",
             "/api/session",
+            "/api/session/mfa",
+            "/api/session/mfa/webauthn",
+            "/api/session/mfa/webauthn/options",
             "/api/source",
             "/manifest.webmanifest");
 
     private static final Set<String> AUTHENTICATED_PATHS = Set.of(
             "/api/account/locale",
+            "/api/account/mfa",
+            "/api/account/mfa/totp",
+            "/api/account/mfa/totp/confirmation",
+            "/api/account/mfa/recovery-codes",
+            "/api/account/mfa/webauthn",
+            "/api/account/mfa/webauthn/registration-options",
+            "/api/account/mfa/webauthn/authentication-options",
+            "/api/account/mfa/webauthn/credentials/{credentialId}",
             "/api/account/messages",
             "/api/account/messages/channels",
             "/api/account/notifications",
@@ -121,7 +134,22 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
             "/api/partner-invitations/{invitationId}/acceptance");
 
     private static final Set<String> RECENT_AUTHENTICATION_ENDPOINTS = Set.of(
-            "DELETE /api/account/sessions");
+            "DELETE /api/account/sessions",
+            "POST /api/account/mfa/totp",
+            "POST /api/account/mfa/totp/confirmation",
+            "POST /api/account/mfa/recovery-codes",
+            "DELETE /api/account/mfa/totp",
+            "DELETE /api/account/mfa",
+            "POST /api/account/mfa/webauthn/registration-options",
+            "PATCH /api/account/mfa/webauthn/credentials/{credentialId}",
+            "DELETE /api/account/mfa/webauthn/credentials/{credentialId}");
+
+    private static final Set<String> MFA_PROOF_REQUIRED_ENDPOINTS = Set.of(
+            "POST /api/session/mfa",
+            "POST /api/session/mfa/webauthn",
+            "POST /api/session/mfa/webauthn/options",
+            "POST /api/account/mfa/webauthn",
+            "POST /api/account/mfa/webauthn/authentication-options");
 
     @Autowired
     @Qualifier("requestMappingHandlerMapping")
@@ -139,7 +167,11 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
+    @Autowired
+    private UserDetailsService users;
+
     private MockMvc mockMvc;
+    private UserDetails member;
 
     @BeforeEach
     void setUp() {
@@ -150,6 +182,7 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
                 person, "doe.jane", passwordEncoder.encode("secret"), Set.of(Role.MEMBER), "de");
         account.enable();
         accounts.save(account);
+        member = users.loadUserByUsername(account.getUsername());
     }
 
     @Test
@@ -161,7 +194,8 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
         assertThat(endpointsMatching(pattern -> true).stream()
                         .map(endpoint -> endpoint.method() + " " + endpoint.pattern()))
                 .as("every declared recent-authentication exception must name a mapped endpoint")
-                .containsAll(RECENT_AUTHENTICATION_ENDPOINTS);
+                .containsAll(RECENT_AUTHENTICATION_ENDPOINTS)
+                .containsAll(MFA_PROOF_REQUIRED_ENDPOINTS);
 
         List<String> mapped = mappedPatterns();
 
@@ -178,7 +212,6 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @WithMockUser(username = "doe.jane", roles = "MEMBER")
     void givenAMember_whenCallingEveryAdminEndpoint_thenEveryOneOfThemIsForbidden() {
         // given
         List<MappedEndpoint> endpoints = endpointsMatching(AdminSurfaceTest::isPrivileged);
@@ -215,7 +248,7 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void givenAnAnonymousCaller_whenCallingEveryAnonymousAllowedEndpoint_thenEveryOneOfThemSucceeds() {
+    void givenAnAnonymousCaller_whenCallingEveryAnonymousAllowedEndpoint_thenEveryOneOfThemPassesAuthorization() {
         // given
         List<MappedEndpoint> endpoints = endpointsMatchingAccess(AdminSurfaceTest::isAnonymousAllowed);
         assertThat(endpoints).isNotEmpty();
@@ -271,7 +304,6 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @WithMockUser(username = "doe.jane", roles = "MEMBER")
     void givenAnAuthenticatedMember_whenCallingEveryAuthenticatedEndpoint_thenNoneOfThemIsUnauthorized() {
         // given
         List<MappedEndpoint> endpoints = endpointsMatchingAccess(AdminSurfaceTest::isAuthenticatedOnly);
@@ -369,6 +401,7 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
             mockMvc.perform(request(endpoint.method(), endpoint.concretePath())
                             .contentType(endpoint.consumes())
                             .content(endpoint.probeBody())
+                            .with(user(member))
                             .with(csrf()))
                     .andExpect(status().isForbidden())
                     .andExpect(jsonPath("$.type").value("urn:courtside:error:access-denied"));
@@ -408,13 +441,16 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
             if (endpoint.pattern().equals("/api/public/config/icon")) {
                 request.param("size", "192");
             }
-            if (endpoint.pattern().equals("/api/account-recovery/password/redemption")) {
-                // The only anonymous operation that needs a secret to succeed: the refusal it names
-                // is what shows the route and its authorization were both reached.
+            if (endpoint.pattern().equals("/api/account-recovery/password/redemption")
+                    || endpoint.pattern().equals("/api/account-recovery/mfa/redemption")) {
                 mockMvc.perform(request)
                         .andExpect(status().isBadRequest())
                         .andExpect(jsonPath("$.type")
                                 .value("urn:courtside:error:account-recovery-code-invalid"));
+            } else if (MFA_PROOF_REQUIRED_ENDPOINTS.contains(endpoint.key())) {
+                mockMvc.perform(request)
+                        .andExpect(status().isForbidden())
+                        .andExpect(jsonPath("$.type").value("urn:courtside:error:mfa-proof-failed"));
             } else if (endpoint.pattern().equals("/api/public/config/logo")) {
                 mockMvc.perform(request)
                         .andExpect(status().isNotFound())
@@ -434,25 +470,29 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
         }
     }
 
-    // Only this app's two gates produce 401 and 403.
     private String reachableAsAuthenticatedMemberFailure(MappedEndpoint endpoint) {
         try {
-            MockHttpServletResponse response = mockMvc.perform(request(endpoint.method(), endpoint.concretePath())
+            var result = mockMvc.perform(request(endpoint.method(), endpoint.concretePath())
                             .contentType(endpoint.consumes())
                             .content(endpoint.probeBody())
-                            .with(csrf()))
-                    .andReturn().getResponse();
+                            .with(user(member))
+                            .with(csrf()));
+            MockHttpServletResponse response = result.andReturn().getResponse();
+            if (RECENT_AUTHENTICATION_ENDPOINTS.contains(endpoint.key())) {
+                result.andExpect(status().isForbidden())
+                        .andExpect(jsonPath("$.type").value("urn:courtside:error:recent-authentication-required"));
+                return null;
+            }
+            if (MFA_PROOF_REQUIRED_ENDPOINTS.contains(endpoint.key())) {
+                result.andExpect(status().isForbidden())
+                        .andExpect(jsonPath("$.type").value("urn:courtside:error:mfa-proof-failed"));
+                return null;
+            }
             int status = response.getStatus();
             if (status == HttpStatus.UNAUTHORIZED.value()) {
                 return "still answered 401 Unauthorized";
             }
             if (status == HttpStatus.FORBIDDEN.value()) {
-                String endpointKey = endpoint.method() + " " + endpoint.pattern();
-                if (RECENT_AUTHENTICATION_ENDPOINTS.contains(endpointKey)
-                        && response.getContentAsString().contains(
-                        "urn:courtside:error:recent-authentication-required")) {
-                    return null;
-                }
                 return "answered 403 Forbidden — gated beyond plain authentication";
             }
             return null;
@@ -463,17 +503,22 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
 
     private String initialPasswordDecisionFailure(Role role, MappedEndpoint endpoint) {
         try {
-            MockHttpServletResponse response = mockMvc.perform(
+            var result = mockMvc.perform(
                             request(endpoint.method(), endpoint.concretePath())
                                     .contentType(endpoint.consumes())
                                     .content(endpoint.probeBody())
                                     .with(user("initial").authorities(
                                             new SimpleGrantedAuthority("ROLE_" + role.name()),
                                             new SimpleGrantedAuthority("PASSWORD_CHANGE_REQUIRED")))
-                                    .with(csrf()))
-                    .andReturn().getResponse();
+                                    .with(csrf()));
+            MockHttpServletResponse response = result.andReturn().getResponse();
             boolean admitted = isAnonymousAllowed(endpoint)
                     || endpoint.pattern().equals(INITIAL_PASSWORD_PATH);
+            if (isAnonymousAllowed(endpoint) && MFA_PROOF_REQUIRED_ENDPOINTS.contains(endpoint.key())) {
+                result.andExpect(status().isForbidden())
+                        .andExpect(jsonPath("$.type").value("urn:courtside:error:mfa-proof-failed"));
+                return null;
+            }
             if (admitted && (response.getStatus() == HttpStatus.UNAUTHORIZED.value()
                     || response.getStatus() == HttpStatus.FORBIDDEN.value())) {
                 return "the authorization gate refused an admitted operation with "
@@ -482,6 +527,9 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
             if (!admitted && response.getStatus() != HttpStatus.FORBIDDEN.value()) {
                 return "an operation outside the initial-password boundary answered "
                         + response.getStatus();
+            }
+            if (!admitted) {
+                result.andExpect(jsonPath("$.type").value("urn:courtside:error:access-denied"));
             }
             return null;
         } catch (Exception | AssertionError failure) {
@@ -570,8 +618,6 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
     private record MappedEndpoint(HttpMethod method, String pattern, MediaType produces,
                                   MediaType consumes) {
 
-        // Recovery refuses an empty body before the route is reached, and names nobody holds keep
-        // the probe from issuing anything to a member.
         String probeBody() {
             if (pattern.equals("/api/account-recovery/password")) {
                 return "{\"username\":\"nobody.here\"}";
@@ -579,10 +625,35 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
             if (pattern.equals("/api/account-recovery/password/redemption")) {
                 return "{\"code\":\"ABCD-EFGH\",\"password\":\"nobody-holds-this-code\"}";
             }
+            if (pattern.equals("/api/account-recovery/mfa/redemption")) {
+                return "{\"username\":\"nobody.here\",\"code\":\"ABCD-EFGH\",\"password\":\"nobody-holds-this-code\"}";
+            }
             if (pattern.equals("/api/account-recovery/usernames")) {
                 return "{\"email\":\"nobody@example.org\"}";
             }
+            if (pattern.equals("/api/session/mfa") || pattern.equals("/api/account/mfa/totp/confirmation")) {
+                return "{\"code\":\"000000\"}";
+            }
+            if (pattern.equals("/api/session/mfa/webauthn")) {
+                return """
+                        {"id":"AA","rawId":"AA","type":"public-key","response":{
+                        "clientDataJSON":"e30","authenticatorData":"AA","signature":"AA"}}
+                        """;
+            }
+            if (pattern.equals("/api/account/mfa/webauthn")) {
+                return """
+                        {"label":"Example key","credential":{"id":"AA","rawId":"AA","type":"public-key",
+                        "response":{"clientDataJSON":"e30","attestationObject":"AA"}}}
+                        """;
+            }
+            if (pattern.equals("/api/account/mfa/webauthn/credentials/{credentialId}") && method == HttpMethod.PATCH) {
+                return "{\"label\":\"Example key\"}";
+            }
             return MediaType.APPLICATION_JSON.includes(consumes) ? "{}" : "";
+        }
+
+        String key() {
+            return method + " " + pattern;
         }
 
         // Nothing answers a problem document on the way out, so declaring it as the only content

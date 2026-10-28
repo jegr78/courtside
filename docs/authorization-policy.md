@@ -68,6 +68,14 @@ The maintained JSON classifies every reachable OpenAPI field either as ordinary 
 | `target-person` | The person whose roster projection or identity data is being administered. |
 | `viewer-account` | The optional current account used to select viewer-specific public fields. |
 | `waitlist-entry-owner` | The account that joined a waitlist entry. |
+| `mfa-pending-session` | A password-verified pending browser session has no authenticated roles or account privileges. |
+| `mfa-challenge` | A server-stored ceremony binds account, browser session, purpose, security epoch, expiry and attempt count. |
+| `mfa-factor-enabled` | The current account has an active TOTP or native WebAuthn method; recovery codes are single-use alternatives. |
+| `mfa-recovery-pending` | A controlled rescue blocks password login, ordinary reset, issued credentials and factor changes. |
+| `mfa-security-epoch` | The locked account security epoch must match the principal or saved challenge. |
+| `mfa-identity-check` | An administrator explicitly confirms an identity check outside the request. |
+| `mfa-guess-budget` | Persistent account and address limits survive newly requested ceremonies or rescue codes. |
+| `mfa-current-address` | The rescue verifier binds the current account email address and security epoch. |
 
 ## Operation rules
 
@@ -102,18 +110,25 @@ The maintained JSON classifies every reachable OpenAPI field either as ordinary 
 | `import-execution` | `executeImportPreview` | `ADMIN` | `administrator-gate`, `recent-authentication`, `import-preview-owner`, `administrative-projection` |
 | `retention-run` | `runRetention` | `ADMIN` | `administrator-gate`, `recent-authentication`, `retention-preview-owner`, `administrative-projection` |
 | `message-wording` | `changeMessageTemplate`, `resetMessageTemplate` | `ADMIN` | `administrator-gate`, `recent-authentication`, `administrative-projection` |
+| `pending-mfa-login` | `completeMfaLogin`, `beginWebauthnLogin`, `completeWebauthnLogin` | `ANONYMOUS`, `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN`, `INITIAL_PASSWORD` | `request-boundary`, `mfa-pending-login`, `mfa-factor-proof` |
+| `own-mfa-status` | `getOwnMfaStatus` | `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN` | `permanent-account-gate`, `mfa-holder` |
+| `own-mfa-change` | `beginTotpEnrollment`, `confirmTotpEnrollment`, `replaceOwnRecoveryCodes`, `removeOwnTotp`, `disableOwnMfa`, `beginWebauthnEnrollment`, `confirmWebauthnEnrollment`, `removeOwnWebauthnCredential`, `renameOwnWebauthnCredential` | `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN` | `permanent-account-gate`, `mfa-holder`, `recent-authentication`, `mfa-factor-proof` |
+| `own-webauthn-proof-options` | `beginWebauthnReauthentication` | `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN` | `permanent-account-gate`, `mfa-holder`, `mfa-factor-proof` |
+| `administrative-mfa-status` | `getAdministrativeMfaStatus` | `ADMIN` | `administrator-gate`, `mfa-admin-projection` |
+| `administrative-mfa-rescue` | `initiateMfaRecovery` | `ADMIN` | `administrator-gate`, `recent-authentication`, `mfa-controlled-rescue` |
+| `public-mfa-rescue-redemption` | `redeemMfaRecovery` | `ANONYMOUS`, `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN`, `INITIAL_PASSWORD` | `request-boundary`, `credential-write-only`, `mfa-controlled-rescue` |
 
 ## Authorization decisions
 
 ### Public request boundary
 
-Only explicitly public routes admit an anonymous caller; all other shipped operations require a valid server-side session.
+Only explicitly public routes admit an anonymous caller; all other shipped operations require a valid server-side session. MFA login routes still require the password-verified pending ceremony, and controlled recovery still requires its valid mailed code.
 
 Attributes: `route`, `authenticated-session`, `account-enabled`, `password-change-required`.
 
 Production: `src/main/java/org/courtside/identity/internal/SecurityConfiguration.java#filterChain`, `src/main/java/org/courtside/identity/internal/LoginAttemptFilter.java#doFilterInternal`, `src/main/java/org/courtside/identity/internal/SessionStatusController.java#getSessionStatus`.
 
-Positive tests: `src/test/java/org/courtside/identity/AdminSurfaceTest.java#givenAnAnonymousCaller_whenCallingEveryAnonymousAllowedEndpoint_thenEveryOneOfThemSucceeds`.
+Positive tests: `src/test/java/org/courtside/identity/AdminSurfaceTest.java#givenAnAnonymousCaller_whenCallingEveryAnonymousAllowedEndpoint_thenEveryOneOfThemPassesAuthorization`.
 
 Negative tests: `src/test/java/org/courtside/identity/AdminSurfaceTest.java#givenAnAnonymousCaller_whenCallingEveryAuthenticatedEndpoint_thenEveryOneOfThemIsUnauthorized`.
 
@@ -155,7 +170,7 @@ Negative tests: `src/test/java/org/courtside/identity/AdminAuthorizationTest.jav
 
 ### Own account scope
 
-The authenticated account identifier selects profile identity, session, locale, appointment reach, message-choice, channel-choice and notification state; callers cannot supply another account identifier to these operations, and a notification id outside the account answers as not found.
+The authenticated account identifier selects profile identity, session, locale, appointment reach, message-choice, channel-choice and notification state; callers cannot supply another account identifier to these operations, and a notification id outside the account answers as not found. MFA state follows immutable principal identity rather than a reused username.
 
 Attributes: `current-account`, `session-handle`.
 
@@ -273,17 +288,17 @@ Positive tests: `src/test/java/org/courtside/booking/series/SeriesMovePreviewTes
 
 Negative tests: `src/test/java/org/courtside/booking/series/SeriesMovePreviewTest.java#givenTheCallerDoesNotOwnTheSeriesAndIsNotAdmin_whenPreviewingAMove_thenItIsRejected`.
 
-### Recent full-password proof
+### Recent full authentication proof
 
-Sensitive account administration, guardian relationships, a guardian's credential request for a dependant, another browser's session termination, import execution and changes to message wording require a successful full-password proof no older than five minutes.
+Sensitive operations require full proof no older than five minutes. Accounts without MFA prove their password; enrolled accounts prove their password plus an unused TOTP/recovery code or valid native WebAuthn assertion. Password-only repetition cannot renew an enrolled account proof. Factor enrollment and changes use the same current-account and recent-proof gate.
 
 Attributes: `authenticated-at`, `current-session`, `five-minute-window`.
 
 Production: `src/main/java/org/courtside/identity/RecentAuthentication.java#requireRecent`, `src/main/java/org/courtside/identity/GlobalSessionAdministration.java#endAll`, `src/main/java/org/courtside/member/web/RosterAdminController.java#changePerson`, `src/main/java/org/courtside/member/web/RosterAdminController.java#createAccount`, `src/main/java/org/courtside/member/web/RosterAdminController.java#changeAccountRoles`, `src/main/java/org/courtside/member/web/RosterAdminController.java#changeAccountUsername`, `src/main/java/org/courtside/member/web/RosterAdminController.java#requestAccountCredentials`, `src/main/java/org/courtside/member/web/RosterAdminController.java#setAccountActive`, `src/main/java/org/courtside/member/web/RosterAdminController.java#endAccountSessions`, `src/main/java/org/courtside/member/web/RosterAdminController.java#endAllSessions`, `src/main/java/org/courtside/dataexchange/web/ImportExecutionAdminController.java#executeImportPreview`, `src/main/java/org/courtside/notification/web/MessageTemplateAdminController.java#changeMessageTemplate`, `src/main/java/org/courtside/notification/web/MessageTemplateAdminController.java#resetMessageTemplate`, `src/main/java/org/courtside/dataexchange/web/RetentionAdminController.java#runRetention`, `src/main/java/org/courtside/member/web/RosterAdminController.java#createGuardianRelationship`, `src/main/java/org/courtside/member/web/RosterAdminController.java#changeGuardianRelationship`, `src/main/java/org/courtside/member/web/RosterAdminController.java#endGuardianRelationship`, `src/main/java/org/courtside/member/web/RosterAdminController.java#removeGuardianRelationship`, `src/main/java/org/courtside/member/DependantService.java#requestCredentials`.
 
-Positive tests: `src/test/java/org/courtside/identity/AdminRecentAuthenticationTest.java#givenAnotherAccountsSessions_whenAdminProofIsRefreshed_thenOnlyTheTargetEnds`, `src/test/java/org/courtside/dataexchange/web/RetentionAdminControllerTest.java#givenARemovableFormerMember_whenTheRunApplies_thenThePersonAndTheirAccountLeaveAndTheLogKeepsCountsOnly`.
+Positive tests: `src/test/java/org/courtside/identity/AdminRecentAuthenticationTest.java#givenAnotherAccountsSessions_whenAdminProofIsRefreshed_thenOnlyTheTargetEnds`, `src/test/java/org/courtside/dataexchange/web/RetentionAdminControllerTest.java#givenARemovableFormerMember_whenTheRunApplies_thenThePersonAndTheirAccountLeaveAndTheLogKeepsCountsOnly`, `src/test/java/org/courtside/identity/internal/MfaLoginTest.java#givenAnMfaSession_whenPasswordAndAnotherTotpStepAreRepeated_thenFreshProofRenewsTheSession`.
 
-Negative tests: `src/test/java/org/courtside/identity/AdminRecentAuthenticationTest.java#givenNoRecentProof_whenAnAdminPerformsSensitiveChanges_thenEveryChangeIsRefused`, `src/test/java/org/courtside/dataexchange/web/RetentionAdminControllerTest.java#givenNoRecentProof_whenARunIsAsked_thenItIsRefusedAndThePreviewStillWaits`, `src/test/java/org/courtside/member/web/GuardianshipAdminControllerTest.java#givenAStaleSignIn_whenTheBoardWritesARelationship_thenEveryWriteAsksForAFreshProof`, `src/test/java/org/courtside/member/web/DependantControllerTest.java#givenAStaleSignIn_whenTheGuardianAsksForCredentials_thenAFreshProofIsRequiredAndNothingIsIssued`.
+Negative tests: `src/test/java/org/courtside/identity/AdminRecentAuthenticationTest.java#givenNoRecentProof_whenAnAdminPerformsSensitiveChanges_thenEveryChangeIsRefused`, `src/test/java/org/courtside/dataexchange/web/RetentionAdminControllerTest.java#givenNoRecentProof_whenARunIsAsked_thenItIsRefusedAndThePreviewStillWaits`, `src/test/java/org/courtside/member/web/GuardianshipAdminControllerTest.java#givenAStaleSignIn_whenTheBoardWritesARelationship_thenEveryWriteAsksForAFreshProof`, `src/test/java/org/courtside/member/web/DependantControllerTest.java#givenAStaleSignIn_whenTheGuardianAsksForCredentials_thenAFreshProofIsRequiredAndNothingIsIssued`, `src/test/java/org/courtside/identity/internal/MfaLoginTest.java#givenAnMfaSessionWithExpiredProof_whenOnlyThePasswordIsRepeated_thenSensitiveProofIsNotRenewed`.
 
 ### Administrator continuity
 
@@ -369,16 +384,76 @@ Positive tests: `src/test/java/org/courtside/dataexchange/web/SubjectAccessAdmin
 
 Negative tests: `src/test/java/org/courtside/dataexchange/web/SubjectAccessAdminControllerTest.java#givenABookingSomebodyElseMade_whenABoardAsksAboutTheNamedMember_thenNeitherMakerNorNoteIsNamed`, `src/test/java/org/courtside/operations/OperationalLogAdminControllerTest.java#givenAMemberOrMissingCsrf_whenSearching_thenAccessIsRefused`, `src/test/java/org/courtside/dataexchange/web/LogExportAdminControllerTest.java#givenAMember_whenTheyAskForEitherLog_thenTheyAreRefusedAndNothingIsRecorded`.
 
+### Password-first pending MFA login
+
+MFA login entry points admit a request before full authentication, but succeed only for its password-verified pending session and unexpired account/session/purpose/epoch-bound challenge. Only a valid factor consumes that challenge, rotates the session, grants roles and records sign-in. Generic malformed requests do not prove successful authorization.
+
+Attributes: `mfa-pending-session`, `mfa-challenge`, `mfa-security-epoch`, `mfa-guess-budget`.
+
+Production: `src/main/java/org/courtside/identity/internal/MfaLogin.java#begin`, `src/main/java/org/courtside/identity/internal/MfaLogin.java#complete`, `src/main/java/org/courtside/identity/internal/MfaLogin.java#webAuthnOptions`, `src/main/java/org/courtside/identity/internal/MfaLogin.java#completeWebAuthn`, `src/main/java/org/courtside/identity/internal/MfaLogin.java#finish`, `src/main/java/org/courtside/identity/internal/MfaSessionAuthentication.java#complete`, `src/main/java/org/courtside/identity/internal/SessionMfaController.java#completeMfaLogin`, `src/main/java/org/courtside/identity/internal/SessionWebauthnController.java#pending`, `src/main/java/org/courtside/identity/internal/SessionWebauthnController.java#challenge`.
+
+Positive tests: `src/test/java/org/courtside/identity/internal/MfaLoginTest.java#givenAPendingLogin_whenTheSecondFactorSucceeds_thenAReplacementSessionHasAccountPrivileges`.
+
+Negative tests: `src/test/java/org/courtside/identity/internal/MfaLoginTest.java#givenEnabledMfa_whenOnlyThePasswordSucceeds_thenNoIdentityOrAccountAccessIsGranted`, `src/test/java/org/courtside/identity/internal/MfaLoginTest.java#givenARevokedPendingLogin_whenTheCodeIsCorrect_thenItStillCannotAuthenticate`.
+
+### Private MFA holder scope
+
+An authenticated permanent account selects its MFA state by immutable principal ID. Changes refresh and lock that account, require its current epoch, enabled state and no pending rescue. A native credential may be renamed or removed only by its holder. Holder-private labels, usage times and credential identities never enter administrative or ordinary export projections.
+
+Attributes: `current-account`, `mfa-security-epoch`, `mfa-recovery-pending`, `response-schema`.
+
+Production: `src/main/java/org/courtside/identity/internal/MfaManagement.java#status`, `src/main/java/org/courtside/identity/internal/MfaManagement.java#currentHolderForUpdate`, `src/main/java/org/courtside/identity/internal/MfaManagement.java#currentForChange`, `src/main/java/org/courtside/identity/internal/MfaWebAuthnFlow.java#ownCredential`, `src/main/java/org/courtside/identity/internal/MfaWebAuthnFlow.java#remove`, `src/main/java/org/courtside/identity/internal/MfaWebAuthnFlow.java#rename`.
+
+Positive tests: `src/test/java/org/courtside/identity/internal/MfaManagementTest.java#givenAReusedUsername_whenReadingPrivateFactorStatus_thenThePrincipalAccountKeepsItsOwnData`.
+
+Negative tests: `src/test/java/org/courtside/identity/internal/MfaManagementTest.java#givenAReusedPrincipalName_whenTheLockedAccountHasAnotherIdentity_thenItCannotReceiveTheFirstHoldersSetup`, `src/test/java/org/courtside/identity/internal/MfaWebAuthnFlowTest.java#givenAnUnknownCredential_whenTheHolderRemovesIt_thenTheResponseNamesAnAbsentResource`.
+
+### MFA method and ceremony proof
+
+First enrollment requires recent password proof; changes to an enrolled account require recent password plus an existing factor. TOTP activates only after a valid unused step. Native WebAuthn registration/assertion checks origin, RP, challenge, user verification, credential owner and monotone counter. Codes and setup secrets appear only in their holder generating response; only verifiers or account-bound ciphertext remain stored.
+
+Attributes: `mfa-factor-enabled`, `mfa-challenge`, `mfa-guess-budget`, `current-account`, `recent-authentication`.
+
+Production: `src/main/java/org/courtside/identity/internal/MfaManagement.java#beginTotp`, `src/main/java/org/courtside/identity/internal/MfaManagement.java#confirmTotp`, `src/main/java/org/courtside/identity/internal/MfaManagement.java#replaceRecoveryCodes`, `src/main/java/org/courtside/identity/internal/MfaWebAuthnFlow.java#beginRegistration`, `src/main/java/org/courtside/identity/internal/MfaWebAuthnFlow.java#register`, `src/main/java/org/courtside/identity/internal/MfaWebAuthnFlow.java#beginReauthentication`, `src/main/java/org/courtside/identity/internal/MfaWebAuthnFlow.java#verifyReauthentication`, `src/main/java/org/courtside/identity/internal/MfaWebAuthn.java#register`, `src/main/java/org/courtside/identity/internal/MfaWebAuthn.java#verify`, `src/main/java/org/courtside/identity/internal/MfaChallenges.java#lockCurrentAccount`.
+
+Positive tests: `src/test/java/org/courtside/identity/internal/MfaManagementTest.java#givenFreshPasswordProof_whenEnrollingAndConfirmingTotp_thenCodesAreShownOnceAndOldSessionsAreRevoked`, `src/test/java/org/courtside/identity/internal/MfaWebAuthnFlowTest.java#givenNoTotp_whenEnrollingAndUsingWebAuthn_thenPasswordAndTheEnrolledKeyGrantAccountAccess`.
+
+Negative tests: `src/test/java/org/courtside/identity/internal/MfaManagementTest.java#givenPendingSetup_whenAnInvalidCodeIsConfirmed_thenMfaAndRecoveryCodesRemainDisabled`, `src/test/java/org/courtside/identity/internal/MfaWebAuthnTest.java#givenAnInvalidSignedAssertion_whenVerifying_thenTheStoredCounterAndOwnerStayUnchanged`.
+
+### Administrative MFA projection
+
+Only ADMIN may read another account MFA status. That projection contains only enabled and recovery-pending flags, with no method identities, labels, usage metadata, setup secret or recovery code.
+
+Attributes: `administrator`, `target-account`, `response-schema`.
+
+Production: `src/main/java/org/courtside/identity/internal/MfaRecoveryController.java#getAdministrativeMfaStatus`.
+
+Positive tests: `src/test/java/org/courtside/identity/internal/MfaRecoveryFlowTest.java#givenFreshMfaAdmin_whenRecoveringALostAccount_thenOnlyTheMailedCodeAndNewPasswordUnblockIt`.
+
+Negative tests: `src/test/java/org/courtside/identity/internal/MfaRecoveryFlowTest.java#givenAMember_whenReadingAnotherAccountsMfaStatus_thenThePrivateAccountRouteIsRefused`.
+
+### Controlled MFA account rescue
+
+Rescue initiation requires a currently enabled ADMIN with active MFA, fresh full proof and explicit external identity confirmation. It revokes sessions and blocks ordinary credential routes while retaining factors. Public redemption requires the single-use mailed code, matching username/current address/security epoch, unexpired state, persistent guess budget and acceptable permanent password. Only successful redemption removes factors and clears the block. Operator rescue and separately audited address correction require identity confirmation. Ordinary credential and reset-code jobs queued before rescue must finish permanently without replacing recovered credentials or leaving a usable reset code, including delayed and retried jobs. New requests after completed rescue follow the ordinary policy.
+
+Attributes: `administrator`, `recent-authentication`, `mfa-factor-enabled`, `mfa-identity-check`, `mfa-current-address`, `mfa-security-epoch`, `mfa-guess-budget`, `mfa-recovery-pending`.
+
+Production: `src/main/java/org/courtside/identity/internal/ControlledAccountRecovery.java#initiate`, `src/main/java/org/courtside/identity/internal/ControlledAccountRecovery.java#initiateLocked`, `src/main/java/org/courtside/identity/internal/ControlledAccountRecovery.java#redeem`, `src/main/java/org/courtside/identity/internal/ControlledAccountRecovery.java#correctEmailFromMaintenance`, `src/main/java/org/courtside/identity/internal/ControlledAccountRecovery.java#valid`, `src/main/java/org/courtside/identity/internal/RecoveryAccountGuard.java#lockAndRequireAvailable`, `src/main/java/org/courtside/identity/internal/AccountCredentialIssuer.java#issueFor`, `src/main/java/org/courtside/notification/internal/MailOutbox.java#handOverAndSettle`, `src/main/java/org/courtside/notification/internal/MailOutbox.java#supersededCredential`.
+
+Positive tests: `src/test/java/org/courtside/identity/internal/ControlledAccountRecoveryTest.java#givenFreshMfaAdministrator_whenIdentityWasChecked_thenRecoveryStarts`, `src/test/java/org/courtside/identity/internal/ControlledAccountRecoveryTest.java#givenLostFactors_whenMaintenanceStartsRecovery_thenOldFactorsRemainAndOnlyAPasswordRedemptionRemovesThem`, `src/test/java/org/courtside/identity/internal/ControlledAccountRecoveryTest.java#givenAnOldUnstartedCredentialJob_whenRecoveryCompletes_thenOnlyAnExplicitNewRequestCanIssueACredential`.
+
+Negative tests: `src/test/java/org/courtside/identity/internal/ControlledAccountRecoveryTest.java#givenAdministratorWithoutMfa_whenRequestingRecovery_thenItIsRefused`, `src/test/java/org/courtside/identity/internal/ControlledAccountRecoveryTest.java#givenUnconfirmedIdentity_whenMaintenanceStartsRecovery_thenNothingChanges`, `src/test/java/org/courtside/identity/internal/ControlledAccountRecoveryTest.java#givenAddressChangedWithoutAnEpochChange_whenOldRecoveryCodeIsRedeemed_thenItsAddressBindingRefusesIt`, `src/test/java/org/courtside/identity/internal/ControlledAccountRecoveryTest.java#givenAnOutboxCredentialBeingSent_whenRecoveryCompletes_thenTheJobFailsPermanentlyWithoutOverwritingThePassword`, `src/test/java/org/courtside/identity/internal/ControlledAccountRecoveryTest.java#givenTwoOldCredentialJobs_whenTheSecondWaitsDuringRecovery_thenNeitherCanReplaceTheRecoveryPassword`, `src/test/java/org/courtside/identity/internal/ControlledAccountRecoveryTest.java#givenAnOldResetCodeJobWaitingForTheAccount_whenRecoveryCommits_thenItsIssuedTokenRollsBack`.
+
 ## Protected field rules
 
 | Rule | Access | Fields | Operations | Actors and attributes |
 |---|---|---|---|---|
 | `login-credentials-write-only` | never-read | `$request.username`, `$request.password` | `logIn` | `ANONYMOUS`, `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN`, `INITIAL_PASSWORD`; `dedicated-workflow`, `request-field` |
-| `session-identity-read` | read | `SessionStatus.username`, `SessionStatus.displayName`, `SessionStatus.firstName`, `SessionStatus.lastName`, `SessionStatus.locale`, `SessionStatus.roles`, `SessionStatus.passwordChangeRequired`, `SessionStatus.managesAppointments`, `SessionStatus.createsSeries` | `getSessionStatus` | `ANONYMOUS`, `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN`, `INITIAL_PASSWORD`; `current-session` |
+| `session-identity-read` | read | `SessionStatus.username`, `SessionStatus.displayName`, `SessionStatus.firstName`, `SessionStatus.lastName`, `SessionStatus.locale`, `SessionStatus.roles`, `SessionStatus.passwordChangeRequired`, `SessionStatus.managesAppointments`, `SessionStatus.createsSeries`, `SessionStatus.mfaRequired`, `SessionStatus.mfaEnabled`, `SessionStatus.totpAvailable`, `SessionStatus.webauthnAvailable` | `getSessionStatus` | `ANONYMOUS`, `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN`, `INITIAL_PASSWORD`; `current-session` |
 | `own-session-metadata-read` | read | `AccountSession.handle`, `AccountSession.createdAt`, `AccountSession.lastActivityAt`, `AccountSession.current`, `AccountSession.browserFamily` | `listOwnSessions` | `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN`; `current-account` |
 | `initial-credential-input-write-only` | never-read | `InitialPasswordChangeRequest.password` | `changeInitialPassword` | `INITIAL_PASSWORD`; `dedicated-workflow` |
 | `permanent-password-change-write-only` | never-read | `PasswordChangeRequest.currentPassword`, `PasswordChangeRequest.newPassword` | `changeOwnPassword` | `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN`; `dedicated-workflow`, `current-account` |
-| `reauthentication-password-write-only` | never-read | `ReauthenticationRequest.password` | `reauthenticate` | `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN`; `dedicated-workflow`, `current-account` |
+| `reauthentication-password-write-only` | never-read | `ReauthenticationRequest.password`, `ReauthenticationRequest.code`, `ReauthenticationRequest.credential` | `reauthenticate` | `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN`; `dedicated-workflow`, `current-account` |
 | `participant-member-read` | read | `PublicParticipantMember.personId`, `PublicParticipantMember.displayName` | `searchParticipantMembers` | `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN`; `current-membership` |
 | `public-allocation-read` | read | `Allocation.ownBooking`, `Allocation.participantLastNames`, `Allocation.bookedByName`, `Allocation.cardLabel`, `Allocation.cardColor` | `listAllocations` | `ANONYMOUS`, `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN`, `INITIAL_PASSWORD`; `viewer-account`, `booking-owner`, `booking-card-generic-occupancy` |
 | `personal-booking-read` | read | `PersonalBooking.id`, `PersonalBooking.seriesId`, `PersonalBooking.note` | `listPersonalBookings`, `listDependantBookings` | `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN`; `booking-owner`, `current-account` |
@@ -413,5 +488,20 @@ Negative tests: `src/test/java/org/courtside/dataexchange/web/SubjectAccessAdmin
 | `reserved-slot-holder-read` | read | `ReservedSlot.ownEntryId` | `listReservedSlots` | `ANONYMOUS`, `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN`, `INITIAL_PASSWORD`; `viewer-account`, `waitlist-entry-owner` |
 | `no-show-record-read` | read | `NoShow.bookingId`, `NoShow.startsAt`, `NoShow.endsAt` | `listNoShows` | `ADMIN`; `administrator`, `target-person` |
 | `retention-blocked-read` | read | `RetentionBlockedRecord.personId`, `RetentionBlockedRecord.reason` | `previewRetention` | `ADMIN`; `administrator`, `target-person` |
+| `own-mfa-state-read` | read | `MfaStatus.enabled`, `MfaStatus.totpEnabled`, `MfaStatus.recoveryCodesRemaining`, `MfaStatus.webauthnAvailable`, `MfaStatus.devices` | `getOwnMfaStatus` | `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN`; `current-account` |
+| `totp-setup-holder-read` | read | `TotpEnrollment.secret`, `TotpEnrollment.uri` | `beginTotpEnrollment` | `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN`; `current-account`, `recent-authentication` |
+| `recovery-set-generating-holder-read` | read | `MfaRecoveryCodeSet.codes` | `confirmTotpEnrollment`, `confirmWebauthnEnrollment`, `replaceOwnRecoveryCodes` | `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN`; `current-account`, `recent-authentication` |
+| `pending-mfa-code-write-only` | never-read | `MfaCodeProof.code` | `completeMfaLogin` | `ANONYMOUS`, `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN`, `INITIAL_PASSWORD`; `mfa-pending-session`, `mfa-challenge` |
+| `totp-confirmation-write-only` | never-read | `MfaCodeProof.code` | `confirmTotpEnrollment` | `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN`; `current-account`, `recent-authentication` |
+| `webauthn-registration-context-read` | read | `WebAuthnCreationOptions.user`, `WebAuthnCreationOptions.challenge`, `WebAuthnCreationOptions.excludeCredentials`, `WebAuthnCreationOptions.extensions` | `beginWebauthnEnrollment` | `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN`; `current-account`, `mfa-challenge` |
+| `webauthn-pending-assertion-context-read` | read | `WebAuthnRequestOptions.challenge`, `WebAuthnRequestOptions.allowCredentials`, `WebAuthnRequestOptions.extensions` | `beginWebauthnLogin` | `ANONYMOUS`, `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN`, `INITIAL_PASSWORD`; `mfa-pending-session`, `mfa-challenge` |
+| `webauthn-holder-assertion-context-read` | read | `WebAuthnRequestOptions.challenge`, `WebAuthnRequestOptions.allowCredentials`, `WebAuthnRequestOptions.extensions` | `beginWebauthnReauthentication` | `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN`; `current-account`, `mfa-challenge` |
+| `webauthn-registration-proof-write-only` | never-read | `WebAuthnEnrollmentRequest.credential` | `confirmWebauthnEnrollment` | `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN`; `current-account`, `mfa-challenge` |
+| `webauthn-enrollment-label-write` | write | `WebAuthnEnrollmentRequest.label` | `confirmWebauthnEnrollment` | `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN`; `current-account`, `recent-authentication` |
+| `webauthn-holder-label-write` | write | `WebAuthnLabelRequest.label` | `renameOwnWebauthnCredential` | `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN`; `current-account`, `recent-authentication` |
+| `webauthn-pending-proof-write-only` | never-read | `WebAuthnAssertionCredential.id`, `WebAuthnAssertionCredential.rawId`, `WebAuthnAssertionCredential.type`, `WebAuthnAssertionCredential.response`, `WebAuthnAssertionCredential.clientExtensionResults`, `WebAuthnAssertionCredential.authenticatorAttachment` | `completeWebauthnLogin` | `ANONYMOUS`, `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN`, `INITIAL_PASSWORD`; `mfa-pending-session`, `mfa-challenge` |
+| `administrative-mfa-flags-read` | read | `MfaAdministrativeStatus.enabled`, `MfaAdministrativeStatus.recoveryPending` | `getAdministrativeMfaStatus` | `ADMIN`; `administrator`, `target-account` |
+| `controlled-rescue-identity-confirmation-write` | write | `MfaRecoveryInitiation.identityChecked` | `initiateMfaRecovery` | `ADMIN`; `administrator`, `recent-authentication`, `mfa-identity-check` |
+| `controlled-rescue-redemption-write-only` | never-read | `MfaRecoveryRedemption.username`, `MfaRecoveryRedemption.code`, `MfaRecoveryRedemption.password` | `redeemMfaRecovery` | `ANONYMOUS`, `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN`, `INITIAL_PASSWORD`; `mfa-current-address`, `mfa-guess-budget` |
 
 Every field not declared by an operation's OpenAPI request schema is rejected before the operation runs. Every field not declared by its response schema is outside that operation's projection. The rules above name the fields whose visibility or mutability is narrower than merely satisfying that schema.

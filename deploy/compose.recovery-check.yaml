@@ -16,7 +16,7 @@ services:
       retries: 30
 
   app:
-    image: ${COURTSIDE_RECOVERY_IMAGE_REPOSITORY:?set COURTSIDE_RECOVERY_IMAGE_REPOSITORY}@sha256:${COURTSIDE_RECOVERY_IMAGE_DIGEST:?set COURTSIDE_RECOVERY_IMAGE_DIGEST}
+    image: ${COURTSIDE_RECOVERY_IMAGE:-${COURTSIDE_RECOVERY_IMAGE_REPOSITORY:-ghcr.io/jegr78/courtside}@sha256:${COURTSIDE_RECOVERY_IMAGE_DIGEST:-}}
     read_only: true
     tmpfs:
       - /tmp
@@ -28,13 +28,15 @@ services:
       db:
         condition: service_healthy
     environment:
+      COURTSIDE_MFA_KEY_FILE: ${COURTSIDE_RECOVERY_MFA_KEY_FILE:-}
+      COURTSIDE_MFA_KEY_ROOT: /var/lib/courtside/mfa-keys
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/courtside
       SPRING_DATASOURCE_USERNAME: courtside
       SPRING_DATASOURCE_PASSWORD: ${COURTSIDE_RECOVERY_DATABASE_PASSWORD}
       SPRING_JPA_HIBERNATE_DDL_AUTO: validate
       COURTSIDE_COOKIE_SECURE: "false"
       COURTSIDE_ENVIRONMENT: UAT
-      COURTSIDE_SOURCE_URL: ${COURTSIDE_RECOVERY_SOURCE_URL:?set COURTSIDE_RECOVERY_SOURCE_URL}
+      COURTSIDE_SOURCE_URL: ${COURTSIDE_RECOVERY_SOURCE_URL:-https://github.com/jegr78/courtside}
       COURTSIDE_MAIL_RELAY_HOST: mail.invalid
       COURTSIDE_MAIL_FROM: no-reply@example.org
       COURTSIDE_MAIL_REPLY_TO: board@example.org
@@ -47,5 +49,9 @@ services:
       timeout: 3s
       retries: 45
 
+    volumes:
+      - mfa-keys:/var/lib/courtside/mfa-keys
+
 volumes:
+  mfa-keys:
   db:

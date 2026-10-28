@@ -5,6 +5,7 @@ import org.courtside.identity.AccountSessions;
 import org.courtside.identity.UserAccount;
 import org.courtside.identity.UserAccountRepository;
 import org.courtside.shared.CredentialIssuer;
+import org.courtside.shared.CredentialSupersededException;
 import org.courtside.shared.IssuedCredential;
 import org.courtside.shared.SecurityEventLog;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -27,6 +28,7 @@ class AccountCredentialIssuer implements CredentialIssuer {
     private final AccountSessions sessions;
     private final PasswordEncoder passwordEncoder;
     private final SecurityEventLog securityEvents;
+    private final RecoveryAccountGuard recoveryGuard;
     private final SecureRandom random = new SecureRandom();
 
     @Override
@@ -34,6 +36,7 @@ class AccountCredentialIssuer implements CredentialIssuer {
     public void issueFor(UUID accountId, Instant expiresAt, Consumer<IssuedCredential> handOver) {
         UserAccount account = accounts.findById(accountId).orElseThrow(() ->
                 new IllegalStateException("No account to issue a credential for"));
+        recoveryGuard.requireAvailable(accountId);
         String address = account.getPerson().getEmail();
         if (address == null || address.isBlank()) {
             throw new IllegalStateException("Account " + accountId
@@ -41,16 +44,19 @@ class AccountCredentialIssuer implements CredentialIssuer {
         }
         String credential = generated();
         String username = account.getUsername();
-        // Nothing is written before this returns, so no account row is held across the relay.
+        String previousHash = account.getPasswordHash();
         handOver.accept(new IssuedCredential(address, account.getPerson().getFirstName(),
                 account.getLocale(), username, credential, expiresAt));
-        accounts.issueCredential(accountId, passwordEncoder.encode(credential), expiresAt);
+        String encoded = passwordEncoder.encode(credential);
+        recoveryGuard.lockAndRequireAvailable(accountId);
+        if (accounts.issueCredential(accountId, encoded, expiresAt, previousHash) != 1) {
+            throw new CredentialSupersededException();
+        }
         sessions.endFor(username);
         securityEvents.credentialChangedAfterCommit(accountId, null,
                 SecurityEventLog.CredentialChange.TEMPORARY_CREDENTIAL_ISSUED);
     }
 
-    // Base64 without padding, so nothing a member retypes is a character they have to guess at.
     private String generated() {
         byte[] bytes = new byte[CREDENTIAL_BYTES];
         random.nextBytes(bytes);

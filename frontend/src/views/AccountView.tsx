@@ -5,7 +5,7 @@ import { AccountSecurityView } from "./AccountSecurityView";
 
 export function AccountView({ session, offline = false, focusSecurity = false, passwordChanged, signedOut }: {
   session: SessionStatus; offline?: boolean; focusSecurity?: boolean;
-  passwordChanged: () => void; signedOut: () => void;
+  passwordChanged: () => void; signedOut: (preserveRecoveryCodes?: boolean) => void;
 }) {
   const { t } = useTranslation();
   const heading = useRef<HTMLHeadingElement>(null);
@@ -34,6 +34,6 @@ export function AccountView({ session, offline = false, focusSecurity = false, p
       </dl> : <p data-testid="profile-unavailable" role="status">{t("account.unavailable")}</p>}
     </section>
     <AccountSecurityView key={session.username ?? "unavailable"} embedded focusRequested={focusSecurity}
-      passwordChanged={passwordChanged} signedOut={signedOut} />
+      passwordChanged={passwordChanged} signedOut={signedOut} mfaEnabled={session.mfaEnabled} username={session.username} />
   </div>;
 }

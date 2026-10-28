@@ -13,12 +13,22 @@ async function signIn(page: Page) {
 }
 
 async function expectInside(link: Locator, body: Locator) {
-  const item = await link.boundingBox();
-  const frame = await body.boundingBox();
-  expect(item).not.toBeNull();
-  expect(frame).not.toBeNull();
-  expect(item!.y).toBeGreaterThanOrEqual(frame!.y - 1);
-  expect(item!.y + item!.height).toBeLessThanOrEqual(frame!.y + frame!.height + 1);
+  const container = await body.elementHandle();
+  expect(container).not.toBeNull();
+  try {
+    await expect.poll(() => link.evaluate((element, container) => {
+      const item = element.getBoundingClientRect();
+      const frame = container.getBoundingClientRect();
+      return {
+        visible: item.width > 0 && item.height > 0 && frame.width > 0 && frame.height > 0,
+        top: item.top >= frame.top - 1,
+        bottom: item.bottom <= frame.bottom + 1
+      };
+    }, container), { message: "the whole entry stays within the navigation", timeout: 10_000 })
+      .toEqual({ visible: true, top: true, bottom: true });
+  } finally {
+    await container?.dispose();
+  }
 }
 
 async function expectWholeEntriesAtEdges(body: Locator) {

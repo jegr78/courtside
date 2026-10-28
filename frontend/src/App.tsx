@@ -27,6 +27,9 @@ import { MyBookingsPage } from "./views/MyBookingsPage";
 import { MyMessagesView } from "./views/MyMessagesView";
 import { DependantsView } from "./views/DependantsView";
 import { AccountView } from "./views/AccountView";
+import { clearRecoveryCodes } from "./security/recoveryCodes";
+import { MfaProofContext, ProofOwnerContext, WebauthnProofContext } from "./security/reauthentication";
+import { RecoveryCodesNotice } from "./components/RecoveryCodesNotice";
 import { warnAbout } from "./api/failureWarning";
 
 const DEFAULT_DOCUMENTATION_URL = "https://jegr78.github.io/courtside/";
@@ -38,7 +41,7 @@ interface AppRoutesProps {
   refreshSession: (signal?: AbortSignal) => Promise<void>;
   passwordChanged?: boolean;
   initialPasswordChanged?: (returnQuery?: string) => void;
-  signedOut?: () => void;
+  signedOut?: (preserveRecoveryCodes?: boolean) => void;
   configurationChanged?: (config: ClubConfig) => void;
   offline?: boolean;
 }
@@ -59,8 +62,8 @@ export function AppRoutes({ session, refreshSession, passwordChanged, initialPas
       <Route path="*" element={<Navigate to={`/initial-password${returnQuery(address)}`} replace />} />
     </Routes>;
   }
-  return <UnsavedChangesProvider>
-    <div className="flex w-full flex-col items-center gap-4">
+  return <ProofOwnerContext value={session.username}><MfaProofContext value={Boolean(session.mfaEnabled)}><WebauthnProofContext value={Boolean(session.webauthnAvailable)}><UnsavedChangesProvider>
+    <div key={session.username ?? "anonymous"} className="flex w-full flex-col items-center gap-4">
     <UnsavedChangesGuard />
     {!administrative && <PrimaryNavigation session={session} />}
     <Routes>
@@ -71,7 +74,7 @@ export function AppRoutes({ session, refreshSession, passwordChanged, initialPas
       : <AccountRecoveryView />} />
     <Route path="/login" element={session.authenticated
       ? <Navigate to={returnTargetIn(address.search) ?? afterSignIn} replace />
-      : <LoginView refreshSession={refreshSession} passwordChanged={passwordChanged} />} />
+      : <LoginView refreshSession={refreshSession} passwordChanged={passwordChanged} mfaRequired={session.mfaRequired} totpAvailable={session.totpAvailable} webauthnAvailable={session.webauthnAvailable} />} />
     <Route path="/my-bookings" element={session.authenticated
       ? <MyBookingsPage session={session} offline={offline} />
       : signInFirst} />
@@ -83,11 +86,11 @@ export function AppRoutes({ session, refreshSession, passwordChanged, initialPas
       : signInFirst} />
     <Route path="/account" element={session.authenticated
       ? <AccountView key={address.key} session={session} offline={offline} passwordChanged={() => initialPasswordChanged?.()}
-        signedOut={() => signedOut?.()} />
+        signedOut={(preserve) => signedOut?.(preserve)} />
       : signInFirst} />
     <Route path="/account/security" element={session.authenticated
       ? <AccountView key={address.key} session={session} offline={offline} focusSecurity passwordChanged={() => initialPasswordChanged?.()}
-        signedOut={() => signedOut?.()} />
+        signedOut={(preserve) => signedOut?.(preserve)} />
       : signInFirst} />
     {/* The role is asked once for the whole surface rather than once per destination. */}
     <Route path="/admin/*" element={!session.authenticated ? signInFirst : reachesAdministration(session)
@@ -100,7 +103,7 @@ export function AppRoutes({ session, refreshSession, passwordChanged, initialPas
     <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
     </div>
-  </UnsavedChangesProvider>;
+  </UnsavedChangesProvider></WebauthnProofContext></MfaProofContext></ProofOwnerContext>;
 }
 
 function applyBranding(config: ClubConfig) {
@@ -198,12 +201,14 @@ export function App() {
     if (!current.authenticated) await clearPersonalBookingsOfflineData();
     signal?.throwIfAborted();
     if (requestedBefore !== sessionInvalidations.current) return;
+    if (current.mfaRequired) clearRecoveryCodes();
     setSession(current);
     setOffline(false);
   }, []);
 
   useEffect(() => {
     const unauthenticated = () => {
+      clearRecoveryCodes();
       sessionInvalidations.current += 1;
       setOfflineClub(undefined);
       setSession({ authenticated: false, roles: [], passwordChangeRequired: false });
@@ -280,7 +285,8 @@ export function App() {
 
   // The session has to be gone before the route is chosen: signing out from a role-guarded page
   // would otherwise be sent home by that page's own redirect before this one is applied.
-  function signOut() {
+  function signOut(preserveRecoveryCodes = false) {
+    if (!preserveRecoveryCodes) clearRecoveryCodes();
     sessionInvalidations.current += 1;
     setOfflineClub(undefined);
     flushSync(() => setSession({ authenticated: false, roles: [], passwordChangeRequired: false }));
@@ -291,6 +297,7 @@ export function App() {
 
   return <div className="flex min-h-screen flex-col bg-(--cs-page) text-(--cs-text)">
     <PwaLifecycle />
+    <RecoveryCodesNotice session={session} signedOut={signOut} />
     <header className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 sm:px-8">
       <div className="flex items-center gap-3">
         {club?.logoUrl ? <img src={club.logoUrl} alt="" data-testid="club-logo" className="h-10 w-10 rounded-lg object-contain" /> : <CourtsideMark />}
