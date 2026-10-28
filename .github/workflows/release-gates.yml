@@ -571,6 +571,56 @@ jobs:
           retention-days: 14
           if-no-files-found: error
 
+  installed-upgrade:
+    # The nightly and the candidate run this smoke in their qualification, against the image they pushed.
+    if: inputs.image-source == 'artifact'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.source-commit }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: ./.github/actions/tool-dependencies
+
+      - id: image
+        uses: ./.github/actions/gate-image
+        with:
+          source: ${{ inputs.image-source }}
+          digest: ${{ inputs.image-digest }}
+          repository: ${{ github.repository }}
+          artifact: ${{ inputs.image-artifact }}
+          run-id: ${{ inputs.artifacts-run-id || github.run_id }}
+          github-token: ${{ github.token }}
+
+      - name: Upgrade an installed PostgreSQL 17 nightly through the shipped launcher
+        env:
+          IMAGE: ${{ inputs.image-digest }}
+          BOOKING_SEED_IMAGE: ${{ inputs.booking-seed-digest }}
+          VERSION: ${{ inputs.archive-version }}
+          ARCHIVE_REF: ${{ inputs.archive-ref }}
+          ARCHIVE_WORKFLOW: ${{ inputs.archive-workflow }}
+          SOURCE_COMMIT: ${{ inputs.source-commit }}
+        run: >
+          node tools/installed-upgrade-gate.mjs --image "$IMAGE" --booking-seed-image "$BOOKING_SEED_IMAGE"
+          --repository "$GITHUB_REPOSITORY" --version "$VERSION" --revision "$SOURCE_COMMIT"
+          --ref "$ARCHIVE_REF" --workflow "$ARCHIVE_WORKFLOW" --confirm installed-upgrade-gate
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        if: always()
+        with:
+          name: installed-database-upgrade
+          path: |
+            build/installed-database-upgrade
+            build/installed-upgrade-gate
+          retention-days: 14
+          if-no-files-found: error
+
   npm-audit:
     if: inputs.image-source == 'registry'
     runs-on: ubuntu-latest

@@ -189,8 +189,8 @@
     },
     {
       "scope": "release-gates",
-      "ci": "Backend, frontend and full pull requests run archive reproducibility, the Stalwart journey, the active assessment, restore and upgrade on an amd64 image built in the run",
-      "local": "The full profile runs the qualification, Stalwart, restore, upgrade and active gates against courtside:uat-local on the host architecture; archive reproducibility runs only in CI"
+      "ci": "Backend, frontend and full pull requests run archive reproducibility, the Stalwart journey, the active assessment, restore, the installed upgrade and upgrade on an amd64 image built in the run",
+      "local": "The full profile runs the qualification, Stalwart, restore, upgrade and active gates against courtside:uat-local on the host architecture; archive reproducibility runs only in CI, and the installed upgrade runs locally only through tools/installed-upgrade-gate.mjs on a rootful Docker host with passwordless sudo"
     },
     {
       "scope": "site",

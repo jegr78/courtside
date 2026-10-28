@@ -102,18 +102,52 @@ test("given an image from a pull request, when the gates run, then nothing logs 
   for (const login of logins) {
     assert.equal(login.condition, "inputs.image-source == 'registry'", `${login.name} logs in for a PR image`);
   }
-  assert.doesNotMatch(gatesSource, /push: true|docker push/, "no gate writes to a registry");
+  assert.doesNotMatch(gatesSource, /push: true|docker push/,
+    "no gate step writes to a registry; the installed upgrade pushes only to its own loopback stand-in");
+});
+
+test("given an image from a pull request, when the gates run, then the shipped launcher installs and updates it by digest", () => {
+  // given
+  const job = gates.jobs["installed-upgrade"];
+  const steps = job?.steps ?? [];
+  const checkout = steps.find((step) => String(step.uses ?? "").startsWith("actions/checkout"));
+  const image = steps.find((step) => step.id === "image");
+  const smoke = steps.find((step) => /node tools\/installed-upgrade-gate\.mjs/.test(step.run ?? ""));
+  const upload = steps.find((step) => String(step.uses ?? "").startsWith("actions/upload-artifact"));
+
+  // when / then
+  assert.ok(job, "a pull request must prove the installed update the nightly proves in its qualification");
+  assert.equal(job.if, "inputs.image-source == 'artifact'", "the nightly and the candidate qualify a pushed image themselves");
+  assert.deepEqual(Object.keys(job.permissions).sort(), ["actions", "contents"], "the job needs no registry scope");
+  assert.equal(checkout.with["fetch-depth"], 0, "the smoke archives the published origin's deployment from history");
+  assert.equal(checkout.with.ref, "${{ inputs.source-commit }}");
+  assert.equal(image.uses, "./.github/actions/gate-image");
+  assert.equal(image.with.load ?? action.inputs.load.default, "true", "the stand-in registry serves the loaded image");
+  assert.equal(image.with.artifact, "${{ inputs.image-artifact }}");
+  assert.match(smoke.run, /--confirm installed-upgrade-gate/);
+  for (const input of ["image-digest", "booking-seed-digest", "archive-version", "archive-ref", "archive-workflow",
+    "source-commit"]) {
+    assert.ok(Object.values(smoke.env).includes(`\${{ inputs.${input} }}`), `the smoke archives the candidate with ${input}`);
+  }
+  assert.equal(upload.if, "always()", "a failed update keeps its evidence and the registry log");
+  assert.deepEqual(upload.with.path.trim().split("\n").sort(),
+    ["build/installed-database-upgrade", "build/installed-upgrade-gate"]);
 });
 
 test("given an image from a pull request, when the gates run, then only the npm audit and the release record stay out", () => {
   // given
   const registryOnly = ["npm-audit", "security-record"];
+  const artifactOnly = ["installed-upgrade"];
 
   // when / then
   for (const job of registryOnly) {
     assert.equal(gates.jobs[job].if, "inputs.image-source == 'registry'", `${job} must not run on a PR image`);
   }
-  for (const [name, job] of Object.entries(gates.jobs).filter(([name]) => !registryOnly.includes(name))) {
+  for (const job of artifactOnly) {
+    assert.equal(gates.jobs[job]?.if, "inputs.image-source == 'artifact'", `${job} repeats the nightly qualification`);
+  }
+  for (const [name, job] of Object.entries(gates.jobs)
+    .filter(([name]) => !registryOnly.includes(name) && !artifactOnly.includes(name))) {
     assert.doesNotMatch(String(job.if ?? ""), /image-source|registry/,
       `${name} is a release gate a pull request must run; a registry-only gate needs a reason here first`);
   }

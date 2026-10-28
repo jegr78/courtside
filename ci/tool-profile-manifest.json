@@ -82,6 +82,8 @@
     { "path": "tools/immutable-image-reuse.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/immutable-qualification.mjs", "profiles": ["full"], "test": false },
     { "path": "tools/immutable-qualification.test.mjs", "profiles": ["tooling"], "test": true },
+    { "path": "tools/installed-upgrade-gate.mjs", "profiles": ["full"], "test": false },
+    { "path": "tools/installed-upgrade-gate.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/installed-upgrade-smoke.mjs", "profiles": ["full"], "test": false },
     { "path": "tools/installed-upgrade-smoke.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/journey-index.mjs", "profiles": ["tooling"], "test": false },
