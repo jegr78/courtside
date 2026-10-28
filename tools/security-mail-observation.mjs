@@ -18,6 +18,7 @@ const calendarUid = /^booking-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0
 const listUrl = "http://mail:8025/api/v1/messages?start=0&limit=100";
 const limits = securityMailObservationLimits;
 const addresses = entries => Array.isArray(entries) ? entries.map(entry => entry?.Address) : undefined;
+const copiedAddresses = entries => entries === null ? [] : addresses(entries);
 export const securityMailObservationImage =
   `${securityMailObservationSource.image}@${securityMailObservationSource.imageDigest}`;
 const dockerId = /^[a-f0-9]{64}$/;
@@ -181,7 +182,7 @@ async function mailbox(ctx, recipients = false) {
     }
     ids.add(message.ID);
     return { id: message.ID, created: message.Created, size: message.Size, messageId: message.MessageID,
-      ...(recipients ? { to: addresses(message.To), cc: addresses(message.Cc), bcc: addresses(message.Bcc) } : {}) };
+      ...(recipients ? { to: addresses(message.To), cc: copiedAddresses(message.Cc), bcc: copiedAddresses(message.Bcc) } : {}) };
   });
 }
 

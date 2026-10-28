@@ -28,7 +28,7 @@ const labels = (service) => ({ "org.courtside.environment": "SECURITY", "org.cou
 
 const summary = (ID = id, extra = {}) => ({ ID, MessageID: "receipt-1@example.org", Read: false,
   From: { Name: "John Roe", Address: "john@example.org" }, To: [{ Name: "Jane Doe", Address: "jane@example.org" }],
-  Cc: [], Bcc: [], ReplyTo: [], Subject: "Example booking", Created: created, Username: "", Tags: [],
+  Cc: null, Bcc: null, ReplyTo: [], Subject: "Example booking", Created: created, Username: "", Tags: [],
   Size: Buffer.byteLength(raw), Attachments: 1, Snippet: "Private body", ...extra });
 const list = (messages) => JSON.stringify({ total: messages.length, unread: messages.length,
   count: messages.length, messages_count: messages.length, messages_unread: messages.length,
@@ -638,7 +638,15 @@ for (const [scenario, recordDelta, messageDelta, expected] of [
   ["a mixed To recipient", {}, { To: [{ Address: "security.member.2@example.org" }, { Address: "security.member.1@example.org" }] }, "mfa-mail-recipient-untrusted"],
   ["a copied recipient", {}, { Cc: [{ Address: "security.member.1@example.org" }] }, "mfa-mail-recipient-untrusted"],
   ["a blind recipient", {}, { Bcc: [{ Address: "security.member.1@example.org" }] }, "mfa-mail-recipient-untrusted"],
-  ["a malformed recipient", {}, { To: {} }, "mfa-mail-recipient-untrusted"]
+  ["a malformed recipient", {}, { To: {} }, "mfa-mail-recipient-untrusted"],
+  ["a null primary recipient", {}, { To: null }, "mfa-mail-recipient-untrusted"],
+  ["a missing primary recipient", {}, { To: undefined }, "mfa-mail-recipient-untrusted"],
+  ["a missing copy field", {}, { Cc: undefined }, "mfa-mail-recipient-untrusted"],
+  ["a missing blind copy field", {}, { Bcc: undefined }, "mfa-mail-recipient-untrusted"],
+  ["a malformed copy field", {}, { Cc: {} }, "mfa-mail-recipient-untrusted"],
+  ["a malformed blind copy field", {}, { Bcc: false }, "mfa-mail-recipient-untrusted"],
+  ["a string copy field", {}, { Cc: "" }, "mfa-mail-recipient-untrusted"],
+  ["a numeric blind copy field", {}, { Bcc: 0 }, "mfa-mail-recipient-untrusted"]
 ]) {
   test(`given ${scenario}, when fixture mail cleanup evaluates ownership, then refuse before deleting any mail`, async () => {
     // given
