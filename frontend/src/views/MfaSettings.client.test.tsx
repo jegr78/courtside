@@ -9,9 +9,9 @@ import { AccountSecurityView } from "./AccountSecurityView";
 const operations = [
   { operation: "begin", button: "mfa-enroll-totp", path: "/api/account/mfa/totp", method: "POST" },
   { operation: "confirm", button: "mfa-confirm-totp", path: "/api/account/mfa/totp/confirmation", method: "POST" },
-  { operation: "remove", button: "mfa-remove-totp", path: "/api/account/mfa/totp", method: "DELETE" },
+  { operation: "remove", button: "mfa-remove-totp", path: "/api/account/mfa/totp", method: "DELETE", confirmed: true },
   { operation: "recovery", button: "mfa-replace-recovery", path: "/api/account/mfa/recovery-codes", method: "POST" },
-  { operation: "disable", button: "mfa-disable", path: "/api/account/mfa", method: "DELETE" }
+  { operation: "disable", button: "mfa-disable", path: "/api/account/mfa", method: "DELETE", confirmed: true }
 ];
 const scenarios = operations.flatMap((operation) => [false, true].flatMap((proof) =>
   ["issue", "replay"].flatMap((stage) => [false, true].map((changed) => ({ ...operation, proof, stage, changed })))));
@@ -25,7 +25,7 @@ beforeEach(() => {
 });
 afterEach(() => { vi.restoreAllMocks(); clearRecoveryCodes(); document.cookie = "XSRF-TOKEN=; Max-Age=0"; });
 
-it.each(scenarios)("given $operation with proof retry $proof and CSRF $stage, when actor replacement is $changed before the token arrives, then only the same actor can send the mutation", async ({ operation, button, path, method, proof, stage, changed }) => {
+it.each(scenarios)("given $operation with proof retry $proof and CSRF $stage, when actor replacement is $changed before the token arrives, then only the same actor can send the mutation", async ({ operation, button, path, method, confirmed, proof, stage, changed }) => {
   // given
   if (operation === "confirm") vi.spyOn(api, "beginTotpEnrollment").mockResolvedValue({ secret: "JBSWY3DPEHPK3PXP", uri: "otpauth://totp/Example?secret=JBSWY3DPEHPK3PXP" });
   let mutations = 0;
@@ -56,6 +56,7 @@ it.each(scenarios)("given $operation with proof retry $proof and CSRF $stage, wh
   }
   if (!proof && stage === "issue") document.cookie = "XSRF-TOKEN=; Max-Age=0";
   fireEvent.click(screen.getByTestId(button));
+  if (confirmed) fireEvent.click(screen.getByTestId("mfa-confirm-removal"));
   if (proof) {
     await screen.findByRole("dialog");
     fireEvent.change(document.getElementById("reauthentication-password")!, { target: { value: "current-password" } });

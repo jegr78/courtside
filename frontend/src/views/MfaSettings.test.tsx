@@ -88,6 +88,7 @@ it("given MFA protects an action, when fresh proof is required, then submit pass
   show(true, signedOut);
   // when
   await userEvent.click(await screen.findByTestId("mfa-disable"));
+  await userEvent.click(screen.getByTestId("mfa-confirm-removal"));
   await userEvent.type(document.getElementById("reauthentication-password")!, "current-password");
   await userEvent.type(screen.getByTestId("reauthentication-mfa-code"), "ABCD-EFGH-IJKL-MNOP-QRST-UVWX");
   await userEvent.click(screen.getByTestId("reauthentication-submit"));
@@ -166,6 +167,7 @@ it("given an enrolled authenticator, when removing it, then end this session wit
   show(true, signedOut);
   // when
   await userEvent.click(await screen.findByTestId("mfa-remove-totp"));
+  await userEvent.click(within(screen.getByRole("dialog")).getByTestId("mfa-confirm-removal"));
   // then
   expect(remove).toHaveBeenCalledOnce();
   expect(signedOut).toHaveBeenCalledOnce();
@@ -216,6 +218,7 @@ it("given private enrolled devices, when correcting a label and removing a devic
   fireEvent.click(screen.getByTestId("mfa-device-rename-AQ"));
   await waitFor(() => expect(rename).toHaveBeenCalledWith("AQ", "Travel key", expect.any(AbortSignal)));
   fireEvent.click(screen.getByTestId("mfa-device-remove-Ag"));
+  fireEvent.click(within(await screen.findByRole("dialog")).getByTestId("mfa-confirm-removal"));
   // then
   await waitFor(() => expect(remove).toHaveBeenCalledWith("Ag", expect.any(AbortSignal)));
   expect(signedOut).toHaveBeenCalledTimes(2);
@@ -400,4 +403,53 @@ it.each([
   expect(await within(dialog).findByRole("alert")).toHaveTextContent(i18n.t(key));
   expect(prove).not.toHaveBeenCalled();
   vi.unstubAllGlobals();
+});
+
+const removals = [
+  ["mfa-disable", "disableMfa"],
+  ["mfa-remove-totp", "removeTotp"],
+  ["mfa-device-remove-AQ", "removeWebauthn"]
+] as const;
+
+it.each(removals)("given recent proof, when the holder presses %s and cancels, then nothing is removed and no session ends", async (trigger, operation) => {
+  // given
+  vi.mocked(api.ownMfa).mockResolvedValue({ enabled: true, totpEnabled: true, recoveryCodesRemaining: 4, devices: [{ id: "AQ", label: "Travel key", createdAt: "2026-10-01T12:00:00Z", lastUsedAt: "2026-10-01T12:00:00Z" }] });
+  const remove = vi.spyOn(api, operation).mockResolvedValue(undefined);
+  const signedOut = vi.fn();
+  show(true, signedOut);
+  // when
+  await userEvent.click(await screen.findByTestId(trigger));
+  const dialog = screen.getByRole("dialog");
+  await userEvent.click(within(dialog).getByTestId("mfa-cancel-removal"));
+  // then
+  expect(remove, "pressing the button alone removes nothing").not.toHaveBeenCalled();
+  expect(signedOut).not.toHaveBeenCalled();
+  expect(screen.queryByRole("dialog")).toBeNull();
+});
+
+it.each(removals)("given recent proof, when the holder presses %s and confirms, then the protection is removed once and the session ends", async (trigger, operation) => {
+  // given
+  vi.mocked(api.ownMfa).mockResolvedValue({ enabled: true, totpEnabled: true, recoveryCodesRemaining: 4, devices: [{ id: "AQ", label: "Travel key", createdAt: "2026-10-01T12:00:00Z", lastUsedAt: "2026-10-01T12:00:00Z" }] });
+  const remove = vi.spyOn(api, operation).mockResolvedValue(undefined);
+  const signedOut = vi.fn();
+  show(true, signedOut);
+  await userEvent.click(await screen.findByTestId(trigger));
+  const dialog = screen.getByRole("dialog");
+  expect(remove, "the confirmation comes before the request").not.toHaveBeenCalled();
+  // when
+  await userEvent.click(within(dialog).getByTestId("mfa-confirm-removal"));
+  // then
+  await waitFor(() => expect(remove).toHaveBeenCalledOnce());
+  expect(signedOut).toHaveBeenCalledOnce();
+  expect(screen.queryByRole("dialog")).toBeNull();
+});
+
+it("given a security key, when its removal is asked for, then the confirmation names that key", async () => {
+  // given
+  vi.mocked(api.ownMfa).mockResolvedValue({ enabled: true, totpEnabled: false, recoveryCodesRemaining: 4, devices: [{ id: "AQ", label: "Travel key", createdAt: "2026-10-01T12:00:00Z", lastUsedAt: "2026-10-01T12:00:00Z" }] });
+  show(true);
+  // when
+  await userEvent.click(await screen.findByTestId("mfa-device-remove-AQ"));
+  // then
+  expect(screen.getByRole("dialog")).toHaveTextContent(i18n.t("mfa.confirmRemoveKeyExplain", { label: "Travel key" }));
 });
