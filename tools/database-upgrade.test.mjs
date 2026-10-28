@@ -614,6 +614,23 @@ test("given a history where a shipped migration was corrected, when git is asked
   }
 });
 
+test("given a nightly before the upgrade verification read more, when git is asked, then that nightly stays an origin", () => {
+  // given
+  const { directory, commit, base } = upgradeHistory();
+  try {
+    const extended = commit("upgrade/verify.sql", "select 1; select 2;");
+
+    // when
+    const history = gitHistory(extended, directory);
+
+    // then
+    assert.ok(history.unchangedSince(base),
+      "each origin's own verify.sql takes the snapshot before the upgrade, so a richer check compares what both hold");
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 function upgradeHistory() {
   const directory = mkdtempSync(join(tmpdir(), "courtside-upgrade-change-"));
   const git = (args) => execFileSync("git", args, { cwd: directory, encoding: "utf8",
@@ -651,15 +668,19 @@ test("given a change that corrects a shipped migration, when no nightly origin r
   }
 });
 
-test("given a change that rewrites the upgrade verification, when no nightly origin remains, then the gate passes with a notice", () => {
+test("given a change that rewrites the upgrade verification, when no nightly origin remains, then the empty origin set fails", () => {
   // given
   const { directory, git, commit, base } = upgradeHistory();
   try {
     git(["switch", "-q", "-c", "change"]);
     const candidate = commit("upgrade/verify.sql", "select 2;");
 
-    // when / then
-    assert.deepEqual(modifiedUpgradeInputs(base, candidate, directory), ["upgrade/verify.sql"]);
+    // when
+    const paths = modifiedUpgradeInputs(base, candidate, directory);
+
+    // then
+    assert.deepEqual(paths, [], "a changed verification keeps every nightly an origin, so it explains no empty set");
+    assert.throws(() => emptyOriginNotice(paths), /no upgrade origin/);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
