@@ -8,6 +8,7 @@ import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
 import { TextField } from "../components/TextField";
 import { returnSearch } from "../navigation/returnTarget";
+import { useFragmentTarget } from "../navigation/useFragmentTarget";
 
 type RecoveryForm = "password" | "redeem" | "usernames" | "mfa";
 
@@ -18,6 +19,7 @@ export function AccountRecoveryView() {
   const [answer, setAnswer] = useState<{ form: RecoveryForm; error?: string; done?: string }>();
   const attempt = useRef<AbortController | undefined>(undefined);
   const outcome = useRef<HTMLDivElement>(null);
+  useFragmentTarget("controlled-mfa", true);
 
   useEffect(() => {
     outcome.current?.scrollIntoView?.({ block: "nearest" });
@@ -87,7 +89,7 @@ export function AccountRecoveryView() {
       <Button variant="secondary" type="submit" data-testid="recovery-usernames-submit" disabled={pending}>{t("recovery.usernames.submit")}</Button>
       {outcomeOf("usernames")}
     </form>
-    <form id="controlled-mfa" className="mt-10 grid gap-4" onSubmit={(event) => {
+    <form id="controlled-mfa" tabIndex={-1} aria-labelledby="controlled-mfa-title" className="focus-ring mt-10 grid scroll-mt-4 gap-4 rounded" onSubmit={(event) => {
       event.preventDefault();
       const current = event.currentTarget;
       const data = new FormData(current);
@@ -101,7 +103,7 @@ export function AccountRecoveryView() {
         current.reset();
       }, "mfa.recoveryRedeemed")(event);
     }}>
-      <h2 className="text-xl font-bold">{t("mfa.recoveryTitleControlled")}</h2>
+      <h2 id="controlled-mfa-title" className="text-xl font-bold">{t("mfa.recoveryTitleControlled")}</h2>
       <p className="text-muted">{t("mfa.recoveryControlledHint")}</p>
       <TextField id="controlled-mfa-username" name="username" data-testid="controlled-mfa-username" label={t("auth.username")} autoComplete="username" required disabled={pending} />
       <TextField id="controlled-mfa-code" name="code" data-testid="controlled-mfa-code" label={t("recovery.redeem.code")} autoComplete="one-time-code" maxLength={128} required disabled={pending} />

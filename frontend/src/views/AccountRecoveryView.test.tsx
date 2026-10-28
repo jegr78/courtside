@@ -1,10 +1,11 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import { ApiError, api } from "../api/client";
 import i18n from "../i18n";
 import { AccountRecoveryView } from "./AccountRecoveryView";
+import { LoginView } from "./LoginView";
 
 function show() {
   render(<MemoryRouter><AccountRecoveryView /></MemoryRouter>);
@@ -283,4 +284,22 @@ it("given a refused controlled recovery code, when redemption fails, then keep a
   expect(await screen.findByRole("alert")).toHaveTextContent(i18n.t("identity.mfa.proofFailed"));
   expect(screen.queryByTestId("recovery-sent")).toBeNull();
   expect(screen.getByTestId("controlled-mfa-submit")).toBeEnabled();
+});
+
+it("given a pending second factor, when the holder follows the lost-factor link, then the controlled recovery form is scrolled to and focused", async () => {
+  // given
+  const scrolled = vi.fn();
+  Object.defineProperty(HTMLElement.prototype, "scrollIntoView", { configurable: true, value(this: HTMLElement) { scrolled(this.id); } });
+  onTestFinished(() => { delete (HTMLElement.prototype as Partial<HTMLElement>).scrollIntoView; });
+  render(<MemoryRouter initialEntries={["/login"]}><Routes>
+    <Route path="/login" element={<LoginView mfaRequired refreshSession={vi.fn()} />} />
+    <Route path="/account-recovery" element={<AccountRecoveryView />} />
+  </Routes></MemoryRouter>);
+  // when
+  await userEvent.click(screen.getByTestId("login-mfa-help"));
+  // then
+  const form = document.getElementById("controlled-mfa");
+  expect(form, "the controlled recovery form is rendered").not.toBeNull();
+  expect(document.activeElement, "focus lands on the controlled recovery form").toBe(form);
+  expect(scrolled, "the controlled recovery form is scrolled into view").toHaveBeenCalledWith("controlled-mfa");
 });
