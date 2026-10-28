@@ -109,10 +109,17 @@ class LoginAttemptProtection {
             return retryAfter;
         }
 
-        recordFactorAttempt(accountId, account);
         recordAttempt(Scope.ADDRESS, source, properties.address(),
                 SecurityEventLog.ControlTrigger.PASSWORD_VERIFICATION_ADDRESS_LIMIT);
         return Optional.empty();
+    }
+
+    @Transactional
+    void registerFactorFailure(UUID accountId) {
+        if (accountId == null) throw new IllegalStateException("A second-factor failure needs its account");
+        String account = "factor-account:" + accountId;
+        lock(Scope.FACTOR, hash(account));
+        recordFactorAttempt(accountId, account);
     }
 
     @Transactional

@@ -58,8 +58,9 @@ class MfaFactors {
                 """).param("id", account).param("now", clock.instant().atOffset(ZoneOffset.UTC))
                 .query(Boolean.class).optional().orElse(false)) return Verification.INVALID;
         if (attempts.registerFactorAttempt(account, address).isPresent()) return Verification.LIMITED;
-        if (!enabled(account) || recoveryPending(account)
-                || !proof.getAsBoolean()) {
+        boolean available = enabled(account) && !recoveryPending(account);
+        if (!available || !proof.getAsBoolean()) {
+            if (available) attempts.registerFactorFailure(account);
             events.controlRefused(account, SecurityEventLog.ControlRefusal.MFA_PROOF_FAILED);
             return Verification.INVALID;
         }

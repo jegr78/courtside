@@ -73,9 +73,8 @@ class SecondFactorAttemptLimitTest extends AbstractIntegrationTest {
         jdbc.sql("UPDATE login_attempt_limit SET window_started_at = window_started_at - INTERVAL '6 hours'").update();
         cleanup.deleteExpiredAttempts();
         // when
-        Optional<LoginBlock> fifth = attempt();
+        failTimes(1);
         // then
-        assertThat(fifth).isEmpty();
         assertThat(attempt()).as("failures far apart are consecutive failures, not a new window")
                 .map(LoginBlock::retryAfter).contains(Duration.ofMinutes(1));
     }
@@ -127,7 +126,10 @@ class SecondFactorAttemptLimitTest extends AbstractIntegrationTest {
     }
 
     private void failTimes(int times) {
-        for (int failure = 0; failure < times; failure++) assertThat(attempt()).isEmpty();
+        for (int failure = 0; failure < times; failure++) {
+            assertThat(attempt()).isEmpty();
+            attempts.registerFactorFailure(account);
+        }
     }
 
     private void passBlock() {

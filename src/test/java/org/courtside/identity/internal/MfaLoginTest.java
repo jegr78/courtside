@@ -155,6 +155,26 @@ class MfaLoginTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenFourMistypedCodes_whenTheFifthCodeIsRight_thenTheHolderSignsInWithoutAPauseOrAlarm() throws Exception {
+        // given
+        byte[] secret = enroll();
+        for (int attempt = 1; attempt <= 4; attempt++) {
+            mvc.perform(post("/api/session/mfa").session(pending()).with(csrf())
+                    .contentType(MediaType.APPLICATION_JSON).content("{\"code\":\"invalid\"}"))
+                    .andExpect(status().isForbidden());
+        }
+        // when
+        full(secret);
+        // then
+        assertThat(jdbc.sql("""
+                SELECT count(*) FROM notification WHERE account_id = :id AND kind = 'ACCOUNT_FACTOR_GUESSING_BLOCKED'
+                """).param("id", account).query(Long.class).single())
+                .as("only five failed proofs alarm the holder, not four and a success").isZero();
+        assertThat(jdbc.sql("SELECT count(*) FROM login_attempt_limit WHERE scope = 'FACTOR'").query(Long.class).single())
+                .as("a successful proof ends the run").isZero();
+    }
+
+    @Test
     void givenAnMfaSessionWithExpiredProof_whenOnlyThePasswordIsRepeated_thenSensitiveProofIsNotRenewed() throws Exception {
         // given
         byte[] secret = enroll();
@@ -228,9 +248,7 @@ class MfaLoginTest extends AbstractIntegrationTest {
         session.setAttribute("courtside.authenticated-at", previous);
         long consumedStep = jdbc.sql("SELECT totp_last_step FROM account_mfa WHERE account_id = :id")
                 .param("id", account).query(Long.class).single();
-        for (int attempt = 1; attempt <= 5; attempt++) {
-            assertThat(attempts.registerFactorAttempt(account, "192.0.2." + attempt)).isEmpty();
-        }
+        for (int attempt = 1; attempt <= 5; attempt++) attempts.registerFactorFailure(account);
 
         // when / then
         mvc.perform(post("/api/session/reauthentication").session(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
