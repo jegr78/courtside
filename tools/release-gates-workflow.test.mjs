@@ -51,6 +51,27 @@ test("given a failed active assessment, when CI retains its first attempt, then 
   ]);
 });
 
+test("given an active assessment that stopped before one tool wrote evidence, when CI retains its first attempt, then the run names the missing record", () => {
+  // given
+  const directory = mkdtempSync(join(tmpdir(), "active-assessment-missing-evidence-"));
+  const runId = "run-0002";
+  const evidence = join(directory, "build/security", runId, "assessment/attempt-1/evidence");
+  mkdirSync(evidence, { recursive: true });
+  for (const name of ["openapi-fuzz.json", "authenticated-zap.json"]) writeFileSync(join(evidence, name), "{}");
+  const step = gates.jobs["active-security"].steps.find((entry) =>
+    entry.name === "Retain normalized first-attempt tool evidence");
+
+  // when
+  const result = spawnSync("bash", ["-e", "-c", step.run], {
+    cwd: directory, encoding: "utf8", env: { PATH: process.env.PATH, RUN_ID: runId }
+  });
+
+  // then
+  assert.equal(result.status, 0, "a missing record must not hide the assessment's own outcome");
+  assert.match(result.stdout, /^::warning::.*authorization-matrix\.json/m, "the absent record is named in the run");
+  assert.doesNotMatch(result.stdout, /openapi-fuzz\.json|authenticated-zap\.json/, "only absent records are reported");
+});
+
 function resolveImage(environment) {
   const directory = mkdtempSync(join(tmpdir(), "gate-image-"));
   const output = join(directory, "output");

@@ -155,7 +155,10 @@ for (const [condition, mutate] of [
   ["out-of-bounds mask", (record) => { record.masks[0].rects[0].x = -1; return record; }],
   ["stale image binding", (record) => { record.image.digest = "0".repeat(64); return record; }],
   ["unstable capture", (record) => { record.safe = false; return record; }],
-  ["changed pixel density", (record) => { record.capture.devicePixelRatio = 2; return record; }]
+  ["inconsistent pixel density", (record) => { record.capture.devicePixelRatio = 2; return record; }],
+  ["changed browser language", (record) => { record.capture.locale = "de-DE"; return record; }],
+  ["changed time zone", (record) => { record.capture.timeZone = "America/New_York"; return record; }],
+  ["changed browser", (record) => { record.capture.userAgent = "other fixture"; return record; }]
 ]) {
   test(`given run-data masking with ${condition}, when native evidence is compared, then the sheet still needs reading`, { skip }, () => {
     // given
@@ -171,6 +174,72 @@ for (const [condition, mutate] of [
     } finally { rmSync(root, { recursive: true, force: true }); }
   });
 }
+
+test("given run-data masks captured at another pixel density, when native evidence is compared, then the sheet still needs reading", { skip }, () => {
+  // given
+  const root = mkdtempSync(join(tmpdir(), "sheet-inheritance-density-"));
+  const halved = (record) => { record.masks[0].rects = [{ x: 10, y: 22, width: 90, height: 13 }]; return record; };
+  const doubled = (record) => Object.assign(halved(record).capture,
+    { devicePixelRatio: 2, width: record.capture.width / 2, height: record.capture.height / 2 }) && record;
+  try {
+    const previous = maskedRun(root, "previous", "time", "12:34", { mutate: halved }); reviewRun(previous);
+    const next = maskedRun(root, "current", "time", "12:35", { mutate: doubled });
+    // when
+    const result = report(next, previous);
+    // then
+    assert.equal(result.status, "draft", "a verdict read at one pixel density does not transfer to another");
+    assert.deepEqual(json(join(next.run, "sheet-review.json")).verdicts, {});
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("given an invalid masking record, when the report compares native evidence, then the changed sheet keeps the reason it could not be compared", { skip }, () => {
+  // given
+  const root = mkdtempSync(join(tmpdir(), "sheet-inheritance-unverifiable-"));
+  try {
+    const previous = maskedRun(root, "previous", "time", "12:34"); reviewRun(previous);
+    const next = maskedRun(root, "current", "time", "12:35", { mutate: (record) => { record.schemaVersion = 2; return record; } });
+    const name = next.sheets.names[0];
+    // when
+    const result = report(next, previous);
+    // then
+    assert.deepEqual(result.changedSheets.changed, [name], "evidence that cannot be compared still needs a fresh reading");
+    assert.deepEqual(result.changedSheets.unverifiable, { [name]: "Invalid comparison evidence" },
+      "the report retains why the sheet could not be compared");
+    assert.match(readFileSync(join(next.run, "report", "index.html"), "utf8"), /Invalid comparison evidence/,
+      "the reader sees the reason beside the changed sheet");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("given a previous run without its review audit, when the next report compares it, then the unavailable inheritance names the missing evidence", { skip }, () => {
+  // given
+  const root = mkdtempSync(join(tmpdir(), "sheet-inheritance-missing-audit-"));
+  try {
+    const previous = makeRun(root, "previous");
+    const current = makeRun(root, "current");
+    // when
+    const result = report(current, previous);
+    // then
+    assert.equal(result.status, "draft");
+    assert.match(result.changedSheets.inheritanceUnavailable, /missing or invalid: .*previous\/sheet-review\.json/,
+      "the fallback keeps the underlying failure rather than only its category");
+    assert.equal(result.changedSheets.inheritanceUnavailable.includes(root), false, "the report names no local directory");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("given a previous run directory that does not exist, when the report compares it, then the comparison is unavailable without a local path", { skip }, () => {
+  // given
+  const root = mkdtempSync(join(tmpdir(), "sheet-inheritance-missing-run-"));
+  try {
+    const current = makeRun(root, "current");
+    // when
+    const result = report(current, { run: join(root, "absent") });
+    // then
+    assert.equal(result.status, "draft");
+    const reason = result.changedSheets.unavailable ?? result.changedSheets.inheritanceUnavailable;
+    assert.match(reason, /missing or invalid: .*absent/, "the reason names the run that could not be read");
+    assert.equal(reason.includes(root), false, "the report names no local directory");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
 
 test("given valid run-data masks and an unmasked defect, when the report compares native pixels, then it refuses inheritance", { skip }, () => {
   // given

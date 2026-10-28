@@ -256,7 +256,7 @@ every envelope it produced is unreadable and stays that way. The mechanism's onl
 exactly this was two dates in a tracked file, which the workflow compared against the current date
 and which nothing ever checked against a key.
 
-The standalone workflow also retains the schema-validated passive deployment record. It contains fixed route templates, scanner rule IDs and normalized observations. Raw scanner responses and authenticated evidence stay private and are not uploaded.
+The standalone workflow also retains the schema-validated passive deployment record. It contains fixed route templates, scanner rule IDs and normalized observations. Raw scanner responses and authenticated evidence stay private and are not uploaded. If the first attempt produced no record, the workflow names it in a warning. The release gate does the same for each of its normalized tool records.
 
 What remains is what a reader can act on. The manifests and summaries carry the candidate digest,
 the source commit, the target identity and the normalized outcome. GitHub artifact attestation
