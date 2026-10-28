@@ -69,6 +69,7 @@ class AuditAdminControllerTest extends AbstractIntegrationTest {
 
     private MockMvc mockMvc;
     private UserDetails administrator;
+    private UUID administratorAccountId;
     private UserDetails member;
 
     @BeforeEach
@@ -76,7 +77,7 @@ class AuditAdminControllerTest extends AbstractIntegrationTest {
         mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
 
         UUID adminPersonId = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
-        identity.createEnabledAccount(adminPersonId, "doe.jane", Set.of(Role.ADMIN));
+        administratorAccountId = identity.createEnabledAccount(adminPersonId, "doe.jane", Set.of(Role.ADMIN));
         administrator = userDetailsService.loadUserByUsername("doe.jane");
 
         UUID memberPersonId = identity.createPerson("John", "Roe", "john.roe@example.org");
@@ -372,5 +373,125 @@ class AuditAdminControllerTest extends AbstractIntegrationTest {
         assertThat(pages).as("five entries at limit 2 need at most three pages").isLessThan(MAX_PAGES);
         assertThat(collected).hasSize(5);
         assertThat(new HashSet<>(collected)).hasSize(5);
+    }
+
+    @Test
+    void givenMoreMatchesThanTheLimit_whenTheSearchIsPaged_thenTheCursorContinuesWithTheRemainingMatch()
+            throws Exception {
+        // given
+        identity.signInAs("doe.jane");
+        UUID north = facilityFixture.createCourt(7, "Centre Court North");
+        UUID south = facilityFixture.createCourt(8, "Centre Court South");
+        facilityFixture.createCourt(9, "Back Court");
+        identity.signOut();
+        String criteria = "\"query\":\"centre\",\"eventType\":\"facility.court.added\",\"from\":\""
+                + clock.instant().minusSeconds(1) + "\",\"to\":\"" + clock.instant().plusSeconds(1)
+                + "\",\"limit\":1";
+
+        // when
+        String first = search("{" + criteria + "}")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.entries", hasSize(1)))
+                .andExpect(jsonPath("$.searchIncomplete").value(false))
+                .andReturn().getResponse().getContentAsString();
+        String cursor = JsonPath.read(first, "$.nextCursor");
+        String second = search("{" + criteria + ",\"cursor\":\"" + cursor + "\"}")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.entries", hasSize(1)))
+                .andExpect(jsonPath("$.nextCursor").doesNotExist())
+                .andExpect(jsonPath("$.searchIncomplete").value(false))
+                .andReturn().getResponse().getContentAsString();
+
+        // then
+        List<String> subjects = new ArrayList<>();
+        subjects.add(JsonPath.read(first, "$.entries[0].subjectId"));
+        subjects.add(JsonPath.read(second, "$.entries[0].subjectId"));
+        assertThat(subjects).containsExactlyInAnyOrder(north.toString(), south.toString());
+    }
+
+    @Test
+    void givenACursorFromOneEntry_whenAnyFilterExcludesThatEntry_thenTheSearchRejectsTheCursor() throws Exception {
+        // given
+        UUID courtId = facilityFixture.createCourt(7, "Centre Court");
+        UUID otherCourtId = facilityFixture.createCourt(8, "Back Court");
+        String cursor = JsonPath.read(mockMvc.perform(get("/api/admin/audit")
+                        .param("subjectId", courtId.toString()).with(user(administrator)))
+                .andReturn().getResponse().getContentAsString(), "$.entries[0].id");
+        Instant occurredAt = clock.instant();
+        Map<String, String> excludingFilters = Map.of(
+                "another subject", "\"subjectId\":\"" + otherCourtId + "\"",
+                "another event type", "\"eventType\":\"facility.court.renamed\"",
+                "a start after the entry", "\"from\":\"" + occurredAt.plusSeconds(1) + "\"",
+                "an end at the entry", "\"to\":\"" + occurredAt + "\"");
+
+        // when / then
+        for (Map.Entry<String, String> filter : excludingFilters.entrySet()) {
+            String body = search("{" + filter.getValue() + ",\"cursor\":\"" + cursor + "\",\"limit\":50}")
+                    .andReturn().getResponse().getContentAsString();
+            assertThat(JsonPath.<String>read(body, "$.type")).as(filter.getKey())
+                    .isEqualTo("urn:courtside:error:audit-cursor-unknown");
+        }
+        search("{\"subjectId\":\"" + courtId + "\",\"eventType\":\"facility.court.added\",\"from\":\""
+                + occurredAt + "\",\"to\":\"" + occurredAt.plusSeconds(1) + "\",\"cursor\":\"" + cursor
+                + "\",\"limit\":50}")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.entries", hasSize(0)))
+                .andExpect(jsonPath("$.searchIncomplete").value(false));
+    }
+
+    @Test
+    void givenBlankSearchTerms_whenTheLogIsSearched_thenTheyFilterNothing() throws Exception {
+        // given
+        UUID courtId = facilityFixture.createCourt(7, "Centre Court");
+
+        // when / then
+        search("{\"query\":\"   \",\"eventType\":\" \",\"subjectId\":\"" + courtId + "\",\"limit\":50}")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.entries", hasSize(1)))
+                .andExpect(jsonPath("$.entries[0].eventType").value("facility.court.added"));
+    }
+
+    @Test
+    void givenASubjectWithoutEntries_whenTheLogIsSearched_thenTheEmptyResultIsComplete() throws Exception {
+        // when / then
+        search("{\"subjectId\":\"" + UUID.randomUUID() + "\",\"limit\":50}")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.entries", hasSize(0)))
+                .andExpect(jsonPath("$.nextCursor").doesNotExist())
+                .andExpect(jsonPath("$.searchIncomplete").value(false));
+    }
+
+    @Test
+    void givenAnExactSubjectOrActorId_whenTheLogIsSearched_thenTheEntriesNamingThatIdAreFound() throws Exception {
+        // given
+        identity.signInAs("doe.jane");
+        UUID courtId = facilityFixture.createCourt(7, "Centre Court");
+        identity.signOut();
+        facilityFixture.createCourt(8, "Back Court");
+
+        // when
+        String bySubject = search("{\"query\":\"" + courtId.toString().toUpperCase() + "\",\"limit\":50}")
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String byActor = search("{\"query\":\"" + administratorAccountId.toString().toUpperCase()
+                + "\",\"limit\":50}")
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        // then
+        assertThat(JsonPath.<List<String>>read(bySubject, "$.entries[*].subjectId"))
+                .as("a pasted subject id finds that subject's entries")
+                .containsExactly(courtId.toString());
+        assertThat(JsonPath.<List<String>>read(byActor, "$.entries[*].actorAccountId"))
+                .as("a pasted account id finds only what that account changed")
+                .isNotEmpty()
+                .containsOnly(administratorAccountId.toString());
+        assertThat(JsonPath.<List<String>>read(byActor, "$.entries[*].subjectId")).contains(courtId.toString());
+    }
+
+    private org.springframework.test.web.servlet.ResultActions search(String body) throws Exception {
+        return mockMvc.perform(post("/api/admin/audit/search").with(user(administrator)).with(csrf())
+                .contentType("application/json")
+                .content(body));
     }
 }
