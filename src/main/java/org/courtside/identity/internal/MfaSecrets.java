@@ -35,6 +35,17 @@ final class MfaSecrets {
         });
     }
 
+    void verify() {
+        Installation installation = jdbc.sql("SELECT installation_id, key_check FROM mfa_instance_key WHERE id = 1")
+                .query((rs, row) -> new Installation(rs.getObject(1, UUID.class), rs.getString(2))).optional()
+                .orElseThrow(() -> new IllegalStateException("MFA instance identity is missing from the database"));
+        MfaKeyRing keys = MfaKeyRing.open(location(installation), true);
+        if (installation.check() == null
+                || !MessageDigest.isEqual(CHECK, keys.decrypt(installation.id(), installation.check()))) {
+            throw new IllegalStateException("MFA instance key does not match the encrypted database");
+        }
+    }
+
     String encrypt(UUID account, byte[] secret) {
         return withKey(keys -> keys.encrypt(account, secret));
     }
@@ -63,9 +74,7 @@ final class MfaSecrets {
                     SELECT EXISTS (SELECT 1 FROM account_mfa
                         WHERE totp_secret IS NOT NULL OR pending_totp_secret IS NOT NULL)
                     """).query(Boolean.class).single();
-            Path location = suppliedFile == null
-                    ? root.resolve(installation.id().toString()).resolve("mfa.keys") : suppliedFile;
-            MfaKeyRing keys = MfaKeyRing.open(location, required);
+            MfaKeyRing keys = MfaKeyRing.open(location(installation), required);
             boolean matches = false;
             if (installation.check() != null) {
                 try {
@@ -81,6 +90,10 @@ final class MfaSecrets {
             }
             return operation.apply(keys);
         });
+    }
+
+    private Path location(Installation installation) {
+        return suppliedFile == null ? root.resolve(installation.id().toString()).resolve("mfa.keys") : suppliedFile;
     }
 
     private List<EncryptedSecret> encryptedSecrets() {
