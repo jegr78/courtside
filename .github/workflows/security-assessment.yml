@@ -161,6 +161,8 @@ jobs:
         run: |
           if [[ -f "build/security/$RUN_ID/assessment/attempt-1/evidence/passive-deployment.json" ]]; then
             cp -- "build/security/$RUN_ID/assessment/attempt-1/evidence/passive-deployment.json" build/security-gate/passive-deployment.json
+          else
+            echo "::warning::passive-deployment.json was not produced by the first attempt"
           fi
       - name: Remove the disposable security target
         if: always()

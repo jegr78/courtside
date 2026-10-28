@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
@@ -260,6 +262,33 @@ test("given normalized passive evidence, when uploading the assessment artifact,
   assert.match(records.with.path, /build\/security-gate\/passive-deployment\.json/);
   assert.match(scheduled, /cp -- "build\/security\/\$RUN_ID\/assessment\/attempt-1\/evidence\/passive-deployment\.json" build\/security-gate\/passive-deployment\.json/);
 });
+
+for (const present of [true, false]) {
+  test(`given a passive assessment ${present ? "that wrote" : "that stopped before"} its normalized record, when the workflow captures it, then the record is ${present ? "retained" : "named as missing"}`, () => {
+    // given
+    const directory = mkdtempSync(join(tmpdir(), "passive-record-"));
+    const runId = "run-0003";
+    const evidence = join(directory, "build/security", runId, "assessment/attempt-1/evidence");
+    mkdirSync(evidence, { recursive: true });
+    mkdirSync(join(directory, "build/security-gate"), { recursive: true });
+    if (present) writeFileSync(join(evidence, "passive-deployment.json"), JSON.stringify({ source: "passive" }));
+    const step = yaml.load(scheduled).jobs.assessment.steps.find((entry) => entry.name === "Capture the normalized passive record");
+
+    // when
+    const result = spawnSync("bash", ["-e", "-c", step.run], {
+      cwd: directory, encoding: "utf8", env: { PATH: process.env.PATH, RUN_ID: runId }
+    });
+
+    // then
+    assert.equal(result.status, 0, result.stderr);
+    if (present) {
+      assert.deepEqual(JSON.parse(readFileSync(join(directory, "build/security-gate/passive-deployment.json"), "utf8")), { source: "passive" });
+      assert.equal(result.stdout, "", "a retained record needs no notice");
+    } else {
+      assert.match(result.stdout, /^::warning::.*passive-deployment\.json/m, "the absent record is named in the run");
+    }
+  });
+}
 
 test("given the active duration contract, when the workflow chooses its job budget, then active retains the safe cleanup reserve", () => {
   // given

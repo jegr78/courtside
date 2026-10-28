@@ -343,7 +343,8 @@ jobs:
           mkdir -p build/security-gate
           for name in openapi-fuzz.json authenticated-zap.json authorization-matrix.json; do
             source="build/security/$RUN_ID/assessment/attempt-1/evidence/$name"
-            if [ -f "$source" ]; then cp "$source" "build/security-gate/$name"; fi
+            if [ -f "$source" ]; then cp "$source" "build/security-gate/$name"
+            else echo "::warning::$name was not produced by the first attempt"; fi
           done
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
