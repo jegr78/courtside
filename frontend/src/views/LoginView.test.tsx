@@ -6,6 +6,8 @@ import { ApiError, api } from "../api/client";
 import i18n from "../i18n";
 import { LoginView } from "./LoginView";
 
+afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
+
 describe("LoginView", () => {
   beforeEach(async () => {
     vi.restoreAllMocks();
@@ -260,4 +262,36 @@ it("given a security key prompt, when Escape cancels it, then leave recovery cod
   expect(get.mock.calls[0][0].signal?.aborted).toBe(true);
   expect(complete).not.toHaveBeenCalled();
   vi.unstubAllGlobals();
+});
+
+it("given a security key prompt that never answers, when the sign-in deadline expires, then say the key timed out and keep codes usable", async () => {
+  // given
+  vi.stubGlobal("isSecureContext", true);
+  vi.stubGlobal("PublicKeyCredential", class {});
+  const get = vi.fn<(options: CredentialRequestOptions) => Promise<unknown>>().mockImplementation(() => new Promise(() => {}));
+  vi.stubGlobal("navigator", { credentials: { create: vi.fn(), get } });
+  vi.spyOn(api, "webauthnLoginOptions").mockResolvedValue({ challenge: "AQ", rpId: "example.org", allowCredentials: [], userVerification: "required" });
+  render(<MemoryRouter><LoginView mfaRequired webauthnAvailable refreshSession={vi.fn()} /></MemoryRouter>);
+  vi.useFakeTimers();
+  fireEvent.click(screen.getByTestId("login-security-key"));
+  await act(() => vi.advanceTimersByTimeAsync(0));
+  // when
+  await act(() => vi.advanceTimersByTimeAsync(60_000));
+  // then
+  expect(screen.getByRole("alert")).toHaveTextContent(i18n.t("mfa.keyTimedOut"));
+  expect(screen.getByTestId("login-mfa-code")).toBeEnabled();
+  expect(get.mock.calls[0][0].signal?.aborted).toBe(true);
+});
+
+it("given a security key prompt, when the holder dismisses it, then say the request was cancelled", async () => {
+  // given
+  vi.stubGlobal("isSecureContext", true);
+  vi.stubGlobal("PublicKeyCredential", class {});
+  vi.stubGlobal("navigator", { credentials: { create: vi.fn(), get: vi.fn().mockRejectedValue(new DOMException("dismissed", "NotAllowedError")) } });
+  vi.spyOn(api, "webauthnLoginOptions").mockResolvedValue({ challenge: "AQ", rpId: "example.org", allowCredentials: [], userVerification: "required" });
+  render(<MemoryRouter><LoginView mfaRequired webauthnAvailable refreshSession={vi.fn()} /></MemoryRouter>);
+  // when
+  fireEvent.click(screen.getByTestId("login-security-key"));
+  // then
+  expect(await screen.findByRole("alert")).toHaveTextContent(i18n.t("mfa.keyCancelled"));
 });

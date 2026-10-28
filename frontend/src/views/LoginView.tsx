@@ -8,7 +8,7 @@ import { isUnauthenticated, problemMessage } from "../api/problem-message";
 import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
 import { TextField } from "../components/TextField";
-import { getSecurityKey, supportsSecurityKeys } from "../security/webauthn";
+import { getSecurityKey, securityKeyFailure, supportsSecurityKeys } from "../security/webauthn";
 import { returnSearch } from "../navigation/returnTarget";
 
 export function LoginView({ refreshSession, passwordChanged = false, mfaRequired = false, totpAvailable = true, webauthnAvailable = false }: { refreshSession: (signal?: AbortSignal) => Promise<void>; passwordChanged?: boolean; mfaRequired?: boolean; totpAvailable?: boolean; webauthnAvailable?: boolean }) {
@@ -111,9 +111,7 @@ export function LoginView({ refreshSession, passwordChanged = false, mfaRequired
       controller.signal.throwIfAborted();
       await abortable(() => refreshSession(controller.signal), controller.signal);
     } catch (failure) {
-      if (attempt.current === controller && !controller.signal.aborted) {
-        setError(failure instanceof DOMException && failure.name === "NotAllowedError" ? t("mfa.keyCancelled") : problemMessage(failure, t));
-      }
+      if (attempt.current === controller) setError(securityKeyFailure(failure, t) ?? problemMessage(failure, t));
     } finally {
       clearTimeout(deadline);
       if (attempt.current === controller) {

@@ -11,6 +11,7 @@ import { useClubConfiguration } from "../club/registry";
 import { MfaSettings } from "./MfaSettings";
 import { ReauthenticationCode } from "../components/ReauthenticationCode";
 import { reauthenticateForm } from "../security/reauthentication";
+import { securityKeyFailure } from "../security/webauthn";
 import { formatDateTime } from "../time/clubZone";
 
 const RECENT_AUTH = "urn:courtside:error:recent-authentication-required";
@@ -73,7 +74,7 @@ function AccountSecurityContent({ passwordChanged, signedOut, embedded = false, 
         setReauthenticationFailure(undefined);
         setRetry({ action, completed });
       } else {
-        setFailure(problemMessage(error, t));
+        setFailure(securityKeyFailure(error, t) ?? problemMessage(error, t));
       }
     } finally {
       if (isCurrent(version)) setPending(false);
@@ -102,7 +103,7 @@ function AccountSecurityContent({ passwordChanged, signedOut, embedded = false, 
       if (pendingAction.completed) pendingAction.completed();
       else setSessions(await api.accountSessions());
     } catch (error) {
-      if (isCurrent(version) && proofVersion.current === proof) setReauthenticationFailure(problemMessage(error, t));
+      if (isCurrent(version) && proofVersion.current === proof) setReauthenticationFailure(securityKeyFailure(error, t) ?? problemMessage(error, t));
     } finally {
       if (isCurrent(version) && proofVersion.current === proof) setPending(false);
     }

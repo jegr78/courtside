@@ -55,19 +55,12 @@ export function MfaSettings({ username, pending, run, signedOut }: {
       const preparation = AbortSignal.any([controller.signal, actorSignal, ...(proofSignal ? [proofSignal] : [])]);
       setKeyPending(true);
       setKeyPreparing(true);
-      setFailure(undefined);
       try {
         const options = await abortable(() => api.webauthnRegistrationOptions(preparation), preparation);
         const credential = await createSecurityKey(options, preparation);
         preparation.throwIfAborted();
         setKeyPreparing(false);
         result = await abortable(() => api.registerWebauthn(label.trim(), credential, actorSignal), actorSignal);
-      } catch (error) {
-        if (controller.signal.aborted || error instanceof DOMException && error.name === "NotAllowedError") {
-          if (keyAttempt.current === controller) setFailure(t("mfa.keyCancelled"));
-          throw controller.signal.aborted ? new DOMException("Security key request cancelled", "AbortError") : error;
-        }
-        throw error;
       } finally {
         if (keyAttempt.current === controller) { keyAttempt.current = undefined; setKeyPending(false); setKeyPreparing(false); }
       }

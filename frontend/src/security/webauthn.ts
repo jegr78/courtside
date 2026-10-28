@@ -1,3 +1,4 @@
+import type { TFunction } from "i18next";
 import type { components } from "../api/schema";
 import { abortable } from "../api/abortable";
 
@@ -52,4 +53,17 @@ export async function getSecurityKey(options: RequestOptions, signal: AbortSigna
   return { ...common(value), response: { authenticatorData: encode(response.authenticatorData),
     clientDataJSON: encode(response.clientDataJSON), signature: encode(response.signature),
     userHandle: response.userHandle ? encode(response.userHandle) : null } };
+}
+
+const securityKeyFailures: Record<string, string> = {
+  NotAllowedError: "mfa.keyCancelled",
+  AbortError: "mfa.keyCancelled",
+  TimeoutError: "mfa.keyTimedOut",
+  InvalidStateError: "mfa.keyAlreadyRegistered"
+};
+
+export function securityKeyFailure(failure: unknown, t: TFunction): string | undefined {
+  if (!(failure instanceof DOMException || failure instanceof Error)) return undefined;
+  const key = securityKeyFailures[failure.name];
+  return key ? t(key) : undefined;
 }

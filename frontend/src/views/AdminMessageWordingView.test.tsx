@@ -131,6 +131,23 @@ describe("AdminMessageWordingView", () => {
     expect(changing).toHaveBeenCalledTimes(1);
   });
 
+  it("given a dismissed security key proof, when it is confirmed, then the prompt says the key request was cancelled", async () => {
+    // given
+    vi.spyOn(api, "changeMessageTemplate")
+      .mockRejectedValue(new ApiError(403, { type: "urn:courtside:error:recent-authentication-required", title: "Recent authentication required", status: 403 }));
+    vi.spyOn(api, "reauthenticate").mockRejectedValue(new DOMException("dismissed", "NotAllowedError"));
+    show();
+    await screen.findByTestId("wording-body");
+    await userEvent.click(screen.getByTestId("wording-save"));
+
+    // when
+    await userEvent.type(await screen.findByTestId("admin-reauthentication-password"), "admin-password");
+    await userEvent.click(screen.getByTestId("admin-reauthentication-submit"));
+
+    // then
+    expect(await screen.findByTestId("admin-reauthentication-failure")).toHaveTextContent(i18n.t("mfa.keyCancelled"));
+  });
+
   it("given a club wording, when reset, then the shipped wording is shown again", async () => {
     // given
     vi.spyOn(api, "messageTemplates").mockResolvedValueOnce([reminder(own)]).mockResolvedValueOnce([reminder()]);
