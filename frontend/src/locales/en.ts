@@ -116,7 +116,7 @@ const en: Record<keyof typeof de, string> = {
   "identity.recovery.codeInvalid": "That code does not match. Check what you entered, or ask for a new one above.",
   "identity.recovery.codeExpired": "That code has expired. Ask for a new one above.",
   "recovery.title": "Get back in",
-  "recovery.description": "Get back in yourself, without going through anybody at the club.",
+  "recovery.description": "Reset your password or ask for your username.",
   "recovery.email": "Email address",
   "recovery.password.title": "Ask for a code",
   "recovery.password.hint": "We send a code to the address your account is registered with. Nothing about your account changes: your current password keeps working until you set a new one below.",
