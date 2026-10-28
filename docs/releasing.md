@@ -45,16 +45,22 @@ runs the release gates before it merges. The `gates-image` job builds the image 
 request's merge commit, runs the amd64 qualification on it with `tools/courtside.uat-smoke.mjs`, adds
 the booking seed and writes a deployment archive shaped like a nightly one. It hands both images to
 `release-gates.yml` as an artifact of the same run instead of through the registry. No gate job logs
-in, pushes or reads a secret; the jobs use `github.token` only to download artifacts of the same
-run, read-only. A pull request from a fork or from Dependabot therefore runs the same gates. The
+in, reads a secret or pushes to a real registry; the jobs use `github.token` only to download
+artifacts of the same run, read-only. A pull request from a fork or from Dependabot therefore runs the same gates. The
 archive records the head branch as its ref, so a fork branch whose name uses characters outside `A-Z`, `a-z`, `0-9`,
 `.`, `_`, `/` and `-` fails `gates-image` instead of running the gates.
 From that workflow the pull request runs `archive-reproducibility`, `mail`, `active-security`,
-`restore` and `upgrade`, the last from the earliest retained nightly whose migrations it still
+`restore`, `installed-upgrade` and `upgrade`, the last from the earliest retained nightly whose migrations it still
 carries. If retention deleted that nightly before the pull, `upgrade` chooses again from the tags left. A pull request that adds or changes a migration, or changes `upgrade/verify.sql`, also upgrades from every
 published origin the next release will support, so a migration that cannot run over a published
 database fails its own pull request rather than the next release. The jobs that run the image load it and refer to it by image ID; `mail` and
 `archive-reproducibility` only bind the archive and read the pinned name it records.
+`installed-upgrade` repeats the nightly qualification's installed update: the 0.1.0 launcher installs
+an instance and the candidate's launcher updates it. The launcher pulls the official
+`ghcr.io/jegr78/courtside@sha256:…` name, so `tools/installed-upgrade-gate.mjs` serves the loaded
+image under that name from a registry on `127.0.0.1:443`, which the runner trusts and resolves for that
+job only, and archives the candidate with the digest that registry serves. The nightly and the release
+candidate run the same smoke in their own qualification, so the job runs only for a pull request's image.
 
 npm advisories and the image CVE scan stay out of pull requests because they move without a change:
 a new advisory would turn an unrelated pull request red. They run at night and in the release, and

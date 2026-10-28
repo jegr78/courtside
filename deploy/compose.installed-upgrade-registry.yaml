@@ -1,0 +1,24 @@
+name: courtside-installed-upgrade-registry
+
+services:
+  registry:
+    image: registry:3.1@sha256:d4032d4cc323c1731c707931ecada07a53076eac38e3b61ae57533f170f2c6c3
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    environment:
+      REGISTRY_HTTP_ADDR: 0.0.0.0:5000
+      REGISTRY_HTTP_TLS_CERTIFICATE: /certs/registry.crt
+      REGISTRY_HTTP_TLS_KEY: /certs/registry.key
+    ports:
+      - 127.0.0.1:443:5000
+    tmpfs:
+      - /tmp
+    volumes:
+      - ${COURTSIDE_UPGRADE_REGISTRY_CERTIFICATES:?set COURTSIDE_UPGRADE_REGISTRY_CERTIFICATES}:/certs:ro
+      - images:/var/lib/registry
+
+volumes:
+  images:
