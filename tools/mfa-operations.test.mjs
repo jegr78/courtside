@@ -199,6 +199,30 @@ test("given an atomic key rotation in progress, when keys are backed up, then te
   }
 });
 
+test("given a UAT application that logs to syslog, when keys are exported, then the archive leaves through a run without a log driver", async () => {
+  // given
+  const { exportMfaKeys } = await import("./mfa-key-custody.mjs");
+  const directory = mkdtempSync(join(tmpdir(), "courtside-key-log-"));
+  const archive = join(directory, "keys.tar");
+  const plans = [];
+  const execute = (plan) => {
+    plans.push(plan.args);
+    spawnSync("tar", ["-cf", "-", "-T", "/dev/null"], { stdio: ["ignore", plan.stdout, "pipe"] });
+  };
+  try {
+    // when
+    exportMfaKeys(archive, ["compose", "-p", "courtside-uat", "-f", "deploy/compose.uat.yaml"], {}, execute);
+    // then
+    const [args] = plans;
+    const override = args.indexOf("-f", args.indexOf("deploy/compose.uat.yaml"));
+    assert.ok(override > 0 && args[override + 1].endsWith("deploy/compose.key-export.yaml"),
+      `the key export must add the log-free override after the caller's compose files: ${args.slice(0, 8).join(" ")}`);
+    assert.ok(override < args.indexOf("run"), "the override must precede the run subcommand");
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test("given a Windows-compatible operator runtime, when a key archive is verified, then validation requires only native tar", async () => {
   // given
   const { verifyMfaKeyArchive } = await import("./mfa-key-custody.mjs");

@@ -72,7 +72,9 @@ A starting instance answers `503` until it has validated its MFA keyring and war
 `COURTSIDE_WARM_UP_DEADLINE`, and reports ready afterwards even if a warm-up step failed. The
 default of 30 seconds leaves the declared 90-second start period a minute for the start itself. A
 platform that allows less time shortens the deadline so that the start and the deadline together
-stay well inside its own start period.
+stay well inside its own start period. After startup a health request reads the keyring again
+once its previous reading is 5 seconds old, so a key file that disappears or stops matching the database turns the
+instance `503`.
 
 The image declares its own health check against `/actuator/health`: every 15 seconds, a 3 second
 timeout, three retries and a start period of `90s`. A platform that runs its own probe should use

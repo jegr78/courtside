@@ -1,6 +1,7 @@
 import type { ComponentType, ReactNode } from "react";
+import { SecurityKeyFailure } from "../../security/webauthn";
 import { proofOwnerHarness } from "../../test/ProofOwner";
-import { act, render, screen } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api, ApiError, type ImportPreview, type ImportRun } from "../../api/client";
@@ -129,6 +130,27 @@ describe("ImportExecutionPanel", () => {
     expect(prove).toHaveBeenCalledWith("current-password");
     expect(executing).toHaveBeenNthCalledWith(2, "preview-1", true);
     expect(await screen.findByTestId("run-result")).toBeInTheDocument();
+  });
+
+  it("given a dismissed security key proof, when the password is confirmed, then the dialog says the key request was cancelled", async () => {
+    // given
+    const executing = vi.spyOn(api, "executeImportPreview").mockRejectedValue(new ApiError(403, {
+      type: "urn:courtside:error:recent-authentication-required",
+      title: "Recent authentication required",
+      status: 403
+    }));
+    vi.spyOn(api, "reauthenticate").mockRejectedValue(new SecurityKeyFailure("dismissed", "NotAllowedError"));
+    show(preview);
+    await userEvent.click(await screen.findByTestId("execute-preview"));
+    await userEvent.click(await screen.findByTestId("confirm-execute"));
+
+    // when
+    await userEvent.type(await screen.findByTestId("import-reauthentication-password"), "current-password");
+    await userEvent.click(screen.getByTestId("confirm-import-reauthentication"));
+
+    // then
+    expect(await within(screen.getByRole("dialog")).findByRole("alert")).toHaveTextContent(i18n.t("mfa.keyCancelled"));
+    expect(executing).toHaveBeenCalledOnce();
   });
 
   it("given a run that ends more than the source allows, when it is executed, then removals are confirmed explicitly", async () => {

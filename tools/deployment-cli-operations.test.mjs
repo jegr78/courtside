@@ -638,6 +638,25 @@ test("given included recovery material, when backup and restore-check run, then 
   });
 });
 
+test("given an application that logs to syslog, when backup exports MFA keys, then the archive leaves through a run without a log driver", () => {
+  fixture((context) => {
+    // given
+    assert.equal(initialize(context).status, 0);
+    writeFileSync(join(context.target, "config", "local.override.yaml"), "services: {}\n");
+    // when
+    const result = run(context.archive, context.target, ["backup"], context.environment);
+    // then
+    assert.equal(result.status, 0, result.stderr);
+    const exportRun = readFileSync(context.dockerLog, "utf8").split("\n")
+      .find((line) => line.includes(" run --rm --no-deps -T --entrypoint /bin/sh app -ec"));
+    assert.ok(exportRun, "backup never exported the MFA key volume");
+    assert.match(exportRun, /local\.override\.yaml -f \S+\/compose\.key-export\.yaml run /,
+      "the key export must apply the log-free override after every other compose file");
+    assert.match(readFileSync(join(context.archive, "compose.key-export.yaml"), "utf8"),
+      /app:\s+logging:\s+driver: none/, "the export override must disable the application's log driver");
+  });
+});
+
 test("given external recovery material, when backup runs, then the matching MFA key prerequisite is explicit and keys are excluded", () => {
   fixture((context) => {
     // given
@@ -650,6 +669,96 @@ test("given external recovery material, when backup runs, then the matching MFA 
     assert.ok(!existsSync(join(recovery, "mfa-keys.tar")));
     assert.match(readFileSync(join(recovery, "recovery.conf"), "utf8"), /^mfa_keys=external-required$/m);
     assert.match(readFileSync(join(recovery, "restore-instructions.txt"), "utf8"), /matching MFA key archive/);
+  });
+});
+
+test("given external recovery material without encrypted TOTP enrollments, when restore-check runs without keys, then it proves the unit", () => {
+  fixture((context) => {
+    // given
+    assert.equal(initialize(context, { recovery_material: "external-verified" }).status, 0);
+    assert.equal(run(context.archive, context.target, ["backup"], context.environment).status, 0);
+    const recovery = join(context.target, "backups", readdirSync(join(context.target, "backups"))[0]);
+    rmSync(context.dockerLog, { force: true });
+    // when
+    const result = run(context.archive, context.target, ["restore-check", "--recovery", recovery], {
+      ...context.environment, COURTSIDE_RESTORE_USERNAME: "doe.jane", COURTSIDE_RESTORE_PASSWORD: "private-restore-password"
+    });
+    // then
+    assert.equal(result.status, 0, result.stderr);
+    const calls = readFileSync(context.dockerLog, "utf8");
+    assert.match(calls, /from account_mfa where totp_secret is not null/, "the restored database was never asked for encrypted enrollments");
+    assert.doesNotMatch(calls, /-xf/, "no key archive was supplied, so none may be extracted");
+    assert.match(calls, / up -d --wait app/);
+  });
+});
+
+test("given external recovery material with encrypted TOTP enrollments, when restore-check runs without keys, then it fails naming the reason", () => {
+  fixture((context) => {
+    // given
+    assert.equal(initialize(context, { recovery_material: "external-verified" }).status, 0);
+    assert.equal(run(context.archive, context.target, ["backup"], context.environment).status, 0);
+    const recovery = join(context.target, "backups", readdirSync(join(context.target, "backups"))[0]);
+    writeFileSync(join(context.root, "docker-encrypted-totp"), "2\n");
+    rmSync(context.dockerLog, { force: true });
+    // when
+    const result = run(context.archive, context.target, ["restore-check", "--recovery", recovery], {
+      ...context.environment, COURTSIDE_RESTORE_USERNAME: "doe.jane", COURTSIDE_RESTORE_PASSWORD: "private-restore-password"
+    });
+    // then
+    assert.equal(result.status, 2);
+    assert.match(result.stderr, /2 encrypted TOTP enrollments.*--mfa-keys/);
+    const calls = readFileSync(context.dockerLog, "utf8");
+    assert.doesNotMatch(calls, / up -d --wait app/, "the application must not start without its keys");
+    assert.match(calls, /volume rm .*_db/);
+    assert.match(calls, /volume rm .*_mfa-keys/);
+  });
+});
+
+test("given external recovery material, when the operator exports MFA keys, then restore-check accepts that archive", () => {
+  fixture((context) => {
+    // given
+    assert.equal(initialize(context, { recovery_material: "external-verified" }).status, 0);
+    const vault = join(context.root, "vault");
+    mkdirSync(vault, { mode: 0o700 });
+    const archive = join(vault, "mfa-keys.tar");
+    // when
+    const exported = run(context.archive, context.target, ["mfa-export-keys", "--output", archive], context.environment);
+    // then
+    assert.equal(exported.status, 0, exported.stderr);
+    assert.equal(statSync(archive).mode & 0o777, 0o600, "the exported key archive is private");
+    assert.deepEqual(readdirSync(vault), ["mfa-keys.tar"], "no partial export remains beside the archive");
+    assert.match(readFileSync(context.dockerLog, "utf8"), /compose\.key-export\.yaml run --rm --no-deps -T --entrypoint \/bin\/sh app/);
+    assert.equal(run(context.archive, context.target, ["backup"], context.environment).status, 0);
+    const recovery = join(context.target, "backups", readdirSync(join(context.target, "backups"))[0]);
+    const restored = run(context.archive, context.target, ["restore-check", "--recovery", recovery, "--mfa-keys", archive], {
+      ...context.environment, COURTSIDE_RESTORE_USERNAME: "doe.jane", COURTSIDE_RESTORE_PASSWORD: "private-restore-password"
+    });
+    assert.equal(restored.status, 0, restored.stderr);
+  });
+});
+
+test("given an existing file or a shared directory, when the operator exports MFA keys, then nothing is written", () => {
+  fixture((context) => {
+    // given
+    assert.equal(initialize(context, { recovery_material: "external-verified" }).status, 0);
+    const vault = join(context.root, "vault");
+    mkdirSync(vault, { mode: 0o700 });
+    const existing = join(vault, "mfa-keys.tar");
+    writeFileSync(existing, "retained archive\n", { mode: 0o600 });
+    const shared = join(context.root, "shared");
+    mkdirSync(shared, { mode: 0o755 });
+    chmodSync(shared, 0o755);
+    // when
+    const overwrite = run(context.archive, context.target, ["mfa-export-keys", "--output", existing], context.environment);
+    const exposed = run(context.archive, context.target, ["mfa-export-keys", "--output", join(shared, "mfa-keys.tar")],
+      context.environment);
+    // then
+    assert.equal(overwrite.status, 2);
+    assert.match(overwrite.stderr, /already exists/);
+    assert.equal(readFileSync(existing, "utf8"), "retained archive\n");
+    assert.equal(exposed.status, 2);
+    assert.match(exposed.stderr, /mode-0700 directory/);
+    assert.deepEqual(readdirSync(shared), []);
   });
 });
 
@@ -671,6 +780,23 @@ test("given an MFA-enabled restored account, when the recovery login probe recei
     const calls = readFileSync(join(context.root, "curl.log"), "utf8");
     assert.match(calls, /--data-binary @.*mfa-proof.*\/api\/session\/mfa/);
     assert.doesNotMatch(result.stdout + result.stderr + calls, /123456|private-restore-password/);
+  });
+});
+
+test("given a restored member account without administrator role, when the login probe runs, then any authenticated account proves the recovery", () => {
+  fixture((context) => {
+    // given
+    assert.equal(initialize(context).status, 0);
+    assert.equal(run(context.archive, context.target, ["backup"], context.environment).status, 0);
+    const recovery = join(context.target, "backups", readdirSync(join(context.target, "backups"))[0]);
+    writeFileSync(join(context.root, "curl-member-role"), "member");
+    // when
+    const result = run(context.archive, context.target, ["restore-check", "--recovery", recovery], {
+      ...context.environment, COURTSIDE_RESTORE_USERNAME: "doe.jane", COURTSIDE_RESTORE_PASSWORD: "private-restore-password"
+    });
+    // then
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(readFileSync(join(context.root, "curl.log"), "utf8"), /api\/public\/courts/);
   });
 });
 

@@ -1,5 +1,6 @@
 import { afterEach, expect, it, vi } from "vitest";
-import { createSecurityKey, getSecurityKey, supportsSecurityKeys } from "./webauthn";
+import i18n from "../i18n";
+import { createSecurityKey, getSecurityKey, securityKeyFailure, supportsSecurityKeys } from "./webauthn";
 
 const bytes = (...values: number[]) => new Uint8Array(values).buffer;
 const common = { id: "-_8", rawId: bytes(251, 255), type: "public-key", authenticatorAttachment: "cross-platform", getClientExtensionResults: () => ({}) };
@@ -57,4 +58,29 @@ it.each([false, true])("given secure context is %s, when checking browser suppor
   vi.stubGlobal("navigator", { credentials: { create: vi.fn(), get: vi.fn() } });
   // when / then
   expect(supportsSecurityKeys()).toBe(secure);
+});
+
+it.each([
+  ["NotAllowedError", "mfa.keyCancelled"],
+  ["AbortError", "mfa.keyCancelled"],
+  ["TimeoutError", "mfa.keyTimedOut"],
+  ["InvalidStateError", "mfa.keyAlreadyRegistered"]
+])("given a %s from a security key request, when it is explained, then the holder reads %s", async (name, key) => {
+  // given
+  vi.stubGlobal("navigator", { credentials: { get: vi.fn().mockRejectedValue(new DOMException("refused", name)) } });
+  const failure = await getSecurityKey({ challenge: "AQI", rpId: "example.org", allowCredentials: [], userVerification: "required" },
+    new AbortController().signal).catch((error: unknown) => error);
+  // when
+  const message = securityKeyFailure(failure, i18n.t);
+  // then
+  expect(i18n.exists(key), `${key} is translated`).toBe(true);
+  expect(message).toBe(i18n.t(key));
+});
+
+it.each([new Error("unavailable"), new DOMException("offline", "NetworkError"), new DOMException("server step aborted", "AbortError"),
+  new DOMException("server step timed out", "TimeoutError"), undefined])("given %s, when it is explained as a security key outcome, then the caller keeps its own message", (failure) => {
+  // when
+  const message = securityKeyFailure(failure, i18n.t);
+  // then
+  expect(message).toBeUndefined();
 });

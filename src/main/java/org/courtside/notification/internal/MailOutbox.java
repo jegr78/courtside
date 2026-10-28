@@ -126,15 +126,15 @@ class MailOutbox {
                             ORDER BY CASE WHEN kind IN (:urgent) THEN 0 ELSE 1 END, queued_seq
                             LIMIT 1
                             FOR UPDATE SKIP LOCKED)
-                        RETURNING id, account_id, kind, message_id, parameters::text AS parameters, attempts
+                        RETURNING id, account_id, kind, message_id, parameters::text AS parameters, previous_address, attempts
                         """)
                 .param("now", Timestamp.from(now))
                 .param("leaseEnd", Timestamp.from(now.plus(LEASE)))
                 .param("urgent", URGENT)
                 .query((row, number) -> new Claimed(row.getObject("id", UUID.class),
                         row.getObject("account_id", UUID.class), row.getString("kind"),
-                        parameters(row.getString("parameters")), row.getString("message_id"),
-                        row.getInt("attempts")))
+                        parameters(row.getString("parameters")), row.getString("previous_address"),
+                        row.getString("message_id"), row.getInt("attempts")))
                 .optional());
     }
 
@@ -150,7 +150,8 @@ class MailOutbox {
             settle(claimed, record -> messages.failed(record, "AttemptsExhausted"));
             return;
         }
-        QueuedMessage message = new QueuedMessage(claimed.accountId(), kind.get(), claimed.parameters());
+        QueuedMessage message = new QueuedMessage(claimed.accountId(), kind.get(), claimed.parameters(),
+                claimed.previousAddress());
         try {
             transactions.executeWithoutResult(status -> handOverAndSettle(claimed, message));
         } catch (MessageUndeliverableException undeliverable) {
@@ -291,6 +292,10 @@ class MailOutbox {
     }
 
     record Claimed(UUID id, UUID accountId, String kind, Map<String, String> parameters,
-                           String messageId, int attempts) {
+                           String previousAddress, String messageId, int attempts) {
+
+        Claimed(UUID id, UUID accountId, String kind, Map<String, String> parameters, String messageId, int attempts) {
+            this(id, accountId, kind, parameters, null, messageId, attempts);
+        }
     }
 }

@@ -1,4 +1,5 @@
 import type { ComponentType, ReactNode } from "react";
+import { SecurityKeyFailure } from "../security/webauthn";
 import { proofOwnerHarness } from "../test/ProofOwner";
 import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -382,6 +383,26 @@ describe("AdminPersonView", () => {
     // then
     expect(await within(dialog).findByRole("alert")).toBeInTheDocument();
     expect(screen.getByRole("dialog")).toBeInTheDocument();
+  });
+
+  it("given a security key proof that times out, when the administrator proves identity, then the dialog says the key timed out", async () => {
+    // given
+    vi.spyOn(api, "changeAccountRoles").mockRejectedValue(new ApiError(403, {
+      type: "urn:courtside:error:recent-authentication-required",
+      title: "Recent authentication required", status: 403
+    }));
+    vi.spyOn(api, "reauthenticate").mockRejectedValue(new SecurityKeyFailure("Proof timed out", "TimeoutError"));
+    showPerson();
+    await userEvent.click(await screen.findByTestId("account-roles-TRAINER"));
+    await userEvent.click(screen.getByTestId("save-person"));
+    const dialog = await screen.findByRole("dialog");
+
+    // when
+    await userEvent.type(input("admin-reauthentication-password"), "admin-password");
+    await userEvent.click(within(dialog).getByTestId("admin-reauthentication-submit"));
+
+    // then
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent(i18n.t("mfa.keyTimedOut"));
   });
 
   it("keeps the dialog open when the retried action still requires recent authentication", async () => {

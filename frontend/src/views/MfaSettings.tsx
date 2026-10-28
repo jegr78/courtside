@@ -5,6 +5,7 @@ import { api, type MfaRecoveryCodeSet, type MfaStatus, type TotpEnrollment } fro
 import { problemMessage } from "../api/problem-message";
 import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
+import { Modal } from "../components/Modal";
 import { TextField } from "../components/TextField";
 import { abortable } from "../api/abortable";
 import { createSecurityKey, supportsSecurityKeys } from "../security/webauthn";
@@ -27,6 +28,7 @@ export function MfaSettings({ username, pending, run, signedOut }: {
   const [keyPending, setKeyPending] = useState(false);
   const [keyPreparing, setKeyPreparing] = useState(false);
   const [enrollment, setEnrollment] = useState<TotpEnrollment>();
+  const [removal, setRemoval] = useState<Removal>();
   useEffect(() => {
     let active = true;
     const controller = new AbortController();
@@ -55,19 +57,12 @@ export function MfaSettings({ username, pending, run, signedOut }: {
       const preparation = AbortSignal.any([controller.signal, actorSignal, ...(proofSignal ? [proofSignal] : [])]);
       setKeyPending(true);
       setKeyPreparing(true);
-      setFailure(undefined);
       try {
         const options = await abortable(() => api.webauthnRegistrationOptions(preparation), preparation);
         const credential = await createSecurityKey(options, preparation);
         preparation.throwIfAborted();
         setKeyPreparing(false);
         result = await abortable(() => api.registerWebauthn(label.trim(), credential, actorSignal), actorSignal);
-      } catch (error) {
-        if (controller.signal.aborted || error instanceof DOMException && error.name === "NotAllowedError") {
-          if (keyAttempt.current === controller) setFailure(t("mfa.keyCancelled"));
-          throw controller.signal.aborted ? new DOMException("Security key request cancelled", "AbortError") : error;
-        }
-        throw error;
       } finally {
         if (keyAttempt.current === controller) { keyAttempt.current = undefined; setKeyPending(false); setKeyPreparing(false); }
       }
@@ -87,6 +82,12 @@ export function MfaSettings({ username, pending, run, signedOut }: {
   function mutate(action: (signal: AbortSignal) => Promise<void>) {
     const signal = accountLifetime.current.signal;
     return run(async () => { await abortable(() => action(signal), signal); signal.throwIfAborted(); }, () => { if (!signal.aborted) signedOut(); });
+  }
+
+  function confirmRemoval(confirmed: Removal) {
+    setRemoval(undefined);
+    void mutate(confirmed.kind === "key" ? (signal) => api.removeWebauthn(confirmed.id, signal)
+      : confirmed.kind === "totp" ? api.removeTotp : api.disableMfa);
   }
 
   function begin() {
@@ -122,10 +123,10 @@ export function MfaSettings({ username, pending, run, signedOut }: {
       {status.enabled && <p data-testid="mfa-recovery-remaining">{t("mfa.remaining", { count: status.recoveryCodesRemaining })}</p>}
       {!enrollment && <div className="flex flex-wrap gap-3">
         <Button variant="secondary" type="button" data-testid="mfa-enroll-totp" disabled={pending} onClick={() => void begin()}>{t(status.totpEnabled ? "mfa.replaceTotp" : "mfa.enrollTotp")}</Button>
-        {status.totpEnabled && <Button variant="destructive" type="button" data-testid="mfa-remove-totp" disabled={pending} onClick={() => void mutate(api.removeTotp)}>{t("mfa.removeTotp")}</Button>}
+        {status.totpEnabled && <Button variant="destructive" type="button" data-testid="mfa-remove-totp" disabled={pending} onClick={() => setRemoval({ kind: "totp" })}>{t("mfa.removeTotp")}</Button>}
         {status.enabled && <>
           <Button variant="secondary" type="button" data-testid="mfa-replace-recovery" disabled={pending} onClick={() => void changed(api.replaceRecoveryCodes)}>{t("mfa.replaceRecovery")}</Button>
-          <Button variant="destructive" type="button" data-testid="mfa-disable" disabled={pending} onClick={() => void mutate(api.disableMfa)}>{t("mfa.disable")}</Button>
+          <Button variant="destructive" type="button" data-testid="mfa-disable" disabled={pending} onClick={() => setRemoval({ kind: "all" })}>{t("mfa.disable")}</Button>
         </>}
       </div>}
     </>}
@@ -136,7 +137,7 @@ export function MfaSettings({ username, pending, run, signedOut }: {
         <TextField id={`mfa-device-${device.id}`} name="device-label" data-testid={`mfa-device-label-${device.id}`} label={t("mfa.keyLabel")} defaultValue={device.label} maxLength={100} required disabled={pending || keyPending} />
         <div className="flex flex-wrap gap-3">
           <Button variant="secondary" type="submit" data-testid={`mfa-device-rename-${device.id}`} disabled={pending || keyPending}>{t("mfa.keyRename")}</Button>
-          <Button variant="destructive" type="button" data-testid={`mfa-device-remove-${device.id}`} disabled={pending || keyPending} onClick={() => void mutate((signal) => api.removeWebauthn(device.id, signal))}>{t("mfa.keyRemove")}</Button>
+          <Button variant="destructive" type="button" data-testid={`mfa-device-remove-${device.id}`} disabled={pending || keyPending} onClick={() => setRemoval({ kind: "key", id: device.id, label: device.label })}>{t("mfa.keyRemove")}</Button>
         </div>
       </form>)}
       {status.webauthnAvailable && supportsSecurityKeys() ? <form className="grid gap-3" onSubmit={(event) => void registerKey(event)}>
@@ -156,8 +157,26 @@ export function MfaSettings({ username, pending, run, signedOut }: {
       </div>
     </form>}
     {status?.enabled && <p className="text-muted text-sm">{t("mfa.changesSignOut")}</p>}
+    {removal && <Modal labelledBy="mfa-removal-title" closed={() => setRemoval(undefined)}>
+      <div className="grid gap-4">
+        <h2 id="mfa-removal-title" className="text-2xl font-bold">{t(removalTexts[removal.kind].title)}</h2>
+        <p>{t(removalTexts[removal.kind].explain, { label: removal.kind === "key" ? removal.label : undefined })}</p>
+        <div className="flex flex-wrap gap-3">
+          <Button variant="destructive-confirm" type="button" data-testid="mfa-confirm-removal" disabled={pending} onClick={() => confirmRemoval(removal)}>{t(removalTexts[removal.kind].confirm)}</Button>
+          <Button variant="secondary" type="button" data-testid="mfa-cancel-removal" onClick={() => setRemoval(undefined)}>{t("mfa.cancel")}</Button>
+        </div>
+      </div>
+    </Modal>}
   </section>;
 }
+
+type Removal = { kind: "all" } | { kind: "totp" } | { kind: "key"; id: string; label: string };
+
+const removalTexts = {
+  all: { title: "mfa.confirmDisableTitle", explain: "mfa.confirmDisableExplain", confirm: "mfa.disable" },
+  totp: { title: "mfa.confirmRemoveTotpTitle", explain: "mfa.confirmRemoveTotpExplain", confirm: "mfa.removeTotp" },
+  key: { title: "mfa.confirmRemoveKeyTitle", explain: "mfa.confirmRemoveKeyExplain", confirm: "mfa.keyRemove" }
+} as const;
 
 function EnrollmentQr({ uri }: { uri: string }) {
   const { t } = useTranslation();

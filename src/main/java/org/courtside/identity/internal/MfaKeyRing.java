@@ -196,7 +196,8 @@ final class MfaKeyRing {
             if ((permissions.contains(PosixFilePermission.GROUP_WRITE)
                     || permissions.contains(PosixFilePermission.OTHERS_WRITE))
                     && ((int) Files.getAttribute(current, "unix:mode") & 01000) == 0) {
-                throw failure("MFA key directory must not be writable by other users", null);
+                throw failure("MFA key directory must not be writable by other users: " + current
+                        + " is group- or world-writable without a sticky bit", null);
             }
         }
     }

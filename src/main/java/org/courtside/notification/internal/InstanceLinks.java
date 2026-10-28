@@ -33,7 +33,7 @@ class InstanceLinks implements InstanceOrigin {
     String of(QueuedMessage message) {
         String target = switch (message.kind()) {
             case ACCOUNT_WELCOME -> "/";
-            case ACCOUNT_SECURITY_CHANGED, ACCOUNT_FACTOR_GUESSING_BLOCKED -> "/account#security";
+            case ACCOUNT_SECURITY_CHANGED, ACCOUNT_FACTOR_GUESSING_BLOCKED, ACCOUNT_ADDRESS_CHANGED -> "/account#security";
             case BOOKING_CONFIRMED, BOOKING_PLAYER_RECORDED, BOOKING_PLAYER_WITHDREW, BOOKING_DISPLACED,
                  BOOKING_REMINDER, BOOKING_PARTNER_FOUND, BOOKING_PLACE_TAKEN ->
                     "/my-bookings#booking-" + message.booking();

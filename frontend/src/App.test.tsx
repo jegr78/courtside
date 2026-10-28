@@ -1666,6 +1666,28 @@ describe("App build identity", () => {
     expect(screen.queryByTestId("mfa-recovery-codes")).toBeNull();
   });
 
+  it("given replaced recovery codes, when the expected sign-out opens sign-in, then focus stays inside the codes dialog", async () => {
+    // given
+    vi.spyOn(api, "session").mockResolvedValue({ ...signedInMember, mfaEnabled: true });
+    vi.spyOn(api, "config").mockResolvedValue(club);
+    vi.spyOn(api, "source").mockRejectedValue(new Error("unavailable"));
+    vi.spyOn(api, "accountSessions").mockResolvedValue([]);
+    vi.spyOn(api, "ownMfa").mockResolvedValue({ enabled: true, totpEnabled: true, recoveryCodesRemaining: 4 });
+    vi.spyOn(api, "replaceRecoveryCodes").mockResolvedValue({ codes: ["NEW-PRIVATE-RECOVERY-CODE"] });
+    holdMemberPages();
+    render(<RoutedShell initialEntries={["/account"]}><App /></RoutedShell>);
+    // when
+    await userEvent.click(await screen.findByTestId("mfa-replace-recovery"));
+    await screen.findByTestId("login-view");
+    // then
+    const dialog = screen.getByRole("dialog");
+    expect(dialog, "the one-time codes dialog keeps focus over the sign-in form").toContainElement(document.activeElement as HTMLElement);
+    await userEvent.tab();
+    expect(dialog, "Tab cycles within the codes dialog").toContainElement(document.activeElement as HTMLElement);
+    await userEvent.tab({ shift: true });
+    expect(dialog, "Shift+Tab cycles within the codes dialog").toContainElement(document.activeElement as HTMLElement);
+  });
+
   it("given recovery codes awaiting acknowledgement, when session refresh reports another pending MFA login, then clear the codes without relying on a tab message", async () => {
     // given
     const session = vi.spyOn(api, "session").mockResolvedValue(signedInMember);

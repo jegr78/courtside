@@ -3,6 +3,7 @@ package org.courtside.member;
 import lombok.RequiredArgsConstructor;
 import org.courtside.config.ClubIdentity;
 import org.courtside.config.ClubTimeZone;
+import org.courtside.identity.AccountAddresses;
 import org.courtside.identity.AccountCredentials;
 import org.courtside.identity.AccountSessions;
 import org.courtside.identity.CredentialState;
@@ -65,6 +66,7 @@ public class RosterService {
     private final AdministratorLock administrators;
     private final AccountSessions sessions;
     private final AccountCredentials credentials;
+    private final AccountAddresses addresses;
     private final Clock clock;
     private final ClubTimeZone clubTimeZone;
     private final ClubIdentity club;
@@ -140,7 +142,7 @@ public class RosterService {
         requireAddressWhereAnAccountNeedsOne(id, address);
         Set<String> changed = changedFields(person, first, last, address);
         person.rename(first, last);
-        person.changeEmail(address);
+        addresses.change(person, address);
         withdrawIfAddressChanged(id, changed);
         if (!changed.isEmpty()) {
             events.publishEvent(new RosterEvent.PersonCorrected(person.getId(), changed));
@@ -163,7 +165,7 @@ public class RosterService {
         }
         if (email != null) {
             requireAddressWhereAnAccountNeedsOne(id, strippedAddress(email));
-            person.changeEmail(strippedAddress(email));
+            addresses.change(person, strippedAddress(email));
         }
         withdrawIfAddressChanged(id, corrected);
         if (!corrected.isEmpty()) {

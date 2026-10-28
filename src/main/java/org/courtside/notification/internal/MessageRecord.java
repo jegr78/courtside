@@ -67,8 +67,15 @@ class MessageRecord {
     @Column(nullable = false)
     private Map<String, String> parameters;
 
+    private String previousAddress;
+
     MessageRecord(UUID accountId, MessageKind kind, String messageId, Instant queuedAt,
                   Map<String, String> parameters) {
+        this(accountId, kind, messageId, queuedAt, parameters, null);
+    }
+
+    MessageRecord(UUID accountId, MessageKind kind, String messageId, Instant queuedAt,
+                  Map<String, String> parameters, String previousAddress) {
         this.id = UUID.randomUUID();
         this.accountId = accountId;
         this.kind = kind;
@@ -77,6 +84,7 @@ class MessageRecord {
         this.queuedAt = queuedAt;
         this.nextAttemptAt = queuedAt;
         this.parameters = new HashMap<>(parameters);
+        this.previousAddress = previousAddress;
     }
 
     void retryAt(Instant at, String reason) {
@@ -104,5 +112,6 @@ class MessageRecord {
         this.statusCode = statusCode;
         this.nextAttemptAt = null;
         this.parameters = new HashMap<>();
+        this.previousAddress = null;
     }
 }

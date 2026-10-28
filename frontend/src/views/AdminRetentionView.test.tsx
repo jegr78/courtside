@@ -1,4 +1,5 @@
 import type { ComponentType, ReactNode } from "react";
+import { SecurityKeyFailure } from "../security/webauthn";
 import { proofOwnerHarness } from "../test/ProofOwner";
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -194,6 +195,22 @@ describe("AdminRetentionView", () => {
     expect(reauthenticating).toHaveBeenCalledExactlyOnceWith("temporary-password");
     expect(running.mock.calls).toEqual([[PREVIEW], [PREVIEW]]);
     expect(screen.queryByTestId("retention-reauthentication-password")).toBeNull();
+  });
+
+  it("given a dismissed security key proof, when the run is confirmed, then the dialog says the key request was cancelled", async () => {
+    // given
+    await previewed();
+    vi.spyOn(api, "runRetention").mockRejectedValue(recentAuthenticationRequired);
+    vi.spyOn(api, "reauthenticate").mockRejectedValue(new SecurityKeyFailure("dismissed", "NotAllowedError"));
+    await userEvent.click(screen.getByTestId("retention-acknowledge"));
+    await userEvent.click(screen.getByTestId("retention-run"));
+
+    // when
+    await userEvent.type(await screen.findByTestId("retention-reauthentication-password"), "current-password");
+    await userEvent.click(screen.getByTestId("retention-reauthentication-submit"));
+
+    // then
+    expect(await screen.findByTestId("retention-reauthentication-failure")).toHaveTextContent(i18n.t("mfa.keyCancelled"));
   });
 
   it("given a preview that expired meanwhile, when the run starts, then the refusal is shown and the preview is no longer offered", async () => {

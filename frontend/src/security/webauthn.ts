@@ -1,3 +1,4 @@
+import type { TFunction } from "i18next";
 import type { components } from "../api/schema";
 import { abortable } from "../api/abortable";
 
@@ -22,6 +23,17 @@ function descriptor(value: Descriptor): PublicKeyCredentialDescriptor {
   return { ...value, id: decode(value.id), transports: value.transports as AuthenticatorTransport[] | undefined };
 }
 
+export class SecurityKeyFailure extends DOMException {}
+
+async function ceremony(request: () => Promise<Credential | null>, signal: AbortSignal): Promise<PublicKeyCredential> {
+  try {
+    return credential(await abortable(request, signal), signal);
+  } catch (failure) {
+    if (failure instanceof DOMException || failure instanceof Error) throw new SecurityKeyFailure(failure.message, failure.name);
+    throw failure;
+  }
+}
+
 function credential(value: Credential | null, signal: AbortSignal): PublicKeyCredential {
   signal.throwIfAborted();
   if (!value || value.type !== "public-key") throw new DOMException("Security key request cancelled", "NotAllowedError");
@@ -38,7 +50,7 @@ export async function createSecurityKey(options: CreationOptions, signal: AbortS
   const publicKey: PublicKeyCredentialCreationOptions = { ...options, challenge: decode(options.challenge),
     user: { ...options.user, id: decode(options.user.id) }, excludeCredentials: options.excludeCredentials?.map(descriptor),
     authenticatorSelection: { ...options.authenticatorSelection, userVerification: "required" } };
-  const value = credential(await abortable(() => navigator.credentials.create({ publicKey, signal }), signal), signal);
+  const value = await ceremony(() => navigator.credentials.create({ publicKey, signal }), signal);
   const response = value.response as AuthenticatorAttestationResponse;
   return { ...common(value), response: { attestationObject: encode(response.attestationObject),
     clientDataJSON: encode(response.clientDataJSON), transports: response.getTransports?.() as Descriptor["transports"] } };
@@ -47,9 +59,22 @@ export async function createSecurityKey(options: CreationOptions, signal: AbortS
 export async function getSecurityKey(options: RequestOptions, signal: AbortSignal): Promise<components["schemas"]["WebAuthnAssertionCredential"]> {
   const publicKey: PublicKeyCredentialRequestOptions = { ...options, challenge: decode(options.challenge),
     allowCredentials: options.allowCredentials.map(descriptor), userVerification: "required" };
-  const value = credential(await abortable(() => navigator.credentials.get({ publicKey, signal }), signal), signal);
+  const value = await ceremony(() => navigator.credentials.get({ publicKey, signal }), signal);
   const response = value.response as AuthenticatorAssertionResponse;
   return { ...common(value), response: { authenticatorData: encode(response.authenticatorData),
     clientDataJSON: encode(response.clientDataJSON), signature: encode(response.signature),
     userHandle: response.userHandle ? encode(response.userHandle) : null } };
+}
+
+const securityKeyFailures: Record<string, string> = {
+  NotAllowedError: "mfa.keyCancelled",
+  AbortError: "mfa.keyCancelled",
+  TimeoutError: "mfa.keyTimedOut",
+  InvalidStateError: "mfa.keyAlreadyRegistered"
+};
+
+export function securityKeyFailure(failure: unknown, t: TFunction): string | undefined {
+  if (!(failure instanceof SecurityKeyFailure)) return undefined;
+  const key = securityKeyFailures[failure.name];
+  return key ? t(key) : undefined;
 }

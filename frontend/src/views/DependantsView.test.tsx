@@ -1,4 +1,5 @@
 import type { ComponentType, ReactNode } from "react";
+import { SecurityKeyFailure } from "../security/webauthn";
 import { proofOwnerHarness } from "../test/ProofOwner";
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -141,6 +142,23 @@ describe("DependantsView", () => {
     expect(prove).toHaveBeenCalledWith("guardian-password");
     expect(request).toHaveBeenCalledTimes(2);
     expect(await screen.findByTestId("dependant-credentials-sent")).toHaveTextContent("New credentials for John Roe are on their way.");
+  });
+
+  it("given a dismissed security key proof, when the guardian proves identity, then the dialog says the key request was cancelled", async () => {
+    // given
+    vi.spyOn(api, "dependants").mockResolvedValue([john(["ACCOUNT_TASKS"])]);
+    vi.spyOn(api, "requestDependantCredentials").mockRejectedValue(refused("recent-authentication-required", 403));
+    vi.spyOn(api, "reauthenticate").mockRejectedValue(new SecurityKeyFailure("dismissed", "NotAllowedError"));
+    show();
+    await userEvent.click(await screen.findByTestId("request-dependant-credentials"));
+    const dialog = await screen.findByRole("dialog");
+
+    // when
+    await userEvent.type(document.getElementById("dependant-reauthentication-password")!, "guardian-password");
+    await userEvent.click(within(dialog).getByTestId("dependant-reauthentication-submit"));
+
+    // then
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent(i18n.t("mfa.keyCancelled"));
   });
 
   it("given the board withdrew viewing meanwhile, when the bookings are read, then the refusal is named and the dependants are read again", async () => {

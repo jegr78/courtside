@@ -837,6 +837,7 @@
         "completeWebauthnLogin"
       ],
       "backgroundEntryPoints": [
+        "AccountAddressChangeMailer#on(AccountAddressChanged)",
         "AccountSecurityMailer#on(AccountMfaChanged)",
         "AccountSecurityMailer#on(SecondFactorGuessingBlocked)",
         "ControlledRecoveryCodeMailer#on(ControlledRecoveryRequested)"
@@ -845,7 +846,8 @@
         "The password creates a roleless pending session; only a valid bound factor consumes its challenge and grants authenticated roles.",
         "First TOTP confirmation or native WebAuthn registration generates recovery codes once; later changes and regeneration revoke sessions and require a new login.",
         "A controlled rescue revokes authority and blocks ordinary credential paths while retaining factors until a mailed code and new permanent password complete redemption.",
-        "The operator may initiate rescue or correct a verified holder email through separate audited maintenance operations."
+        "The operator may initiate rescue or correct a verified holder email through separate audited maintenance operations.",
+        "Any change of a holder's email address mails a notice without the new address to the previous one."
       ],
       "alternatePaths": [
         "TOTP, native WebAuthn and single-use recovery codes may complete a pending login.",

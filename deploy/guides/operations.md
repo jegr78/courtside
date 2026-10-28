@@ -1523,8 +1523,13 @@ exact release and effective image identity, installation configuration, optional
 instructions and a checksum inventory. With local secret recovery it also contains `.env` and the
 local secret files and `mfa-keys.tar`. The archive preserves the separate `mfa-keys` volume,
 including every retained key after rotation. `recovery_material=external-verified` omits this archive
-and records `mfa_keys=external-required`. Pass the operator-owned mode-`0600` archive to
-`restore-check --mfa-keys /private/mfa-keys.tar` in that case. A full-self-hosted backup stops Stalwart once, captures `mail-config` and
+and records `mfa_keys=external-required`. Produce the archive for the external secret store with
+`/srv/courtside/current/courtside mfa-export-keys --output /private/mfa-keys.tar`. The output
+directory must be operator-owned with mode `0700`; the command writes a mode-`0600` file and never
+replaces an existing one. Export again after every key rotation. Pass that archive to
+`restore-check --mfa-keys /private/mfa-keys.tar`. Without it, `restore-check` counts the encrypted
+TOTP enrollments in the restored database and fails with that count when there are any; a unit
+without them passes and its application creates fresh keys. A full-self-hosted backup stops Stalwart once, captures `mail-config` and
 `mail-data` from that same interval, then waits for mail health before publishing the unit.
 The launcher stages the directory with `mktemp`, checks the dump with `pg_restore --list`, and
 publishes it only with `mv "$temporary" "$backup"` after every artifact is durable. Restore uses
@@ -1535,7 +1540,7 @@ custom trust mode rather than substituting the official release image.
 Retention reads and verifies only recovery units directly below the configured `backups/`
 directory. An unknown or malformed target stops pruning.
 
-Prove a recovery unit in a disposable PostgreSQL 18 target. Supply an existing administrator whose
+Prove a recovery unit in a disposable PostgreSQL 18 target. Supply an existing account whose
 persisted password and court data should survive the restore. In a private shell, read the password
 without echo into <code>COURTSIDE_RESTORE_PASSWORD</code>, export it, set
 <code>COURTSIDE_RESTORE_USERNAME</code>, and run
@@ -1543,10 +1548,9 @@ without echo into <code>COURTSIDE_RESTORE_PASSWORD</code>, export it, set
 /srv/courtside/backups/recovery-&lt;timestamp&gt;-&lt;version&gt;-&lt;id&gt;</code>. Unset the password
 variable when the check finishes.
 
-For an MFA-enabled administrator, set `COURTSIDE_RESTORE_MFA_CODE_FILE` to an operator-owned
+For an MFA-enabled account, set `COURTSIDE_RESTORE_MFA_CODE_FILE` to an operator-owned
 mode-`0600` file containing a fresh six-digit TOTP or unused recovery code. The probe posts it only
-after the password leaves the session unauthenticated. It verifies the completed session and
-administrator role. The code is read through a private JSON file and is never printed or included
+after the password leaves the session unauthenticated. It verifies the completed session. The code is read through a private JSON file and is never printed or included
 in command arguments. Remove the input file and unset its path when the check finishes. A recovery
 code is consumed only in the disposable restored database, so the original backup still contains
 its verifier.
@@ -1591,8 +1595,8 @@ key volume. An operator-provided `COURTSIDE_MFA_KEY_FILE` may be mounted outside
 root. Mount its private parent directory writable for the application user so locking and atomic
 rotation can replace the file. Included backups capture the actual configured file as `provided/mfa.keys` in the same
 archive. `restore-check` detects this mode and sets its application to that restored file inside
-its private volume. With external recovery material, preserve the same normalized archive in the
-external secret store and supply it through `--mfa-keys`. For migration to a fresh standard
+its private volume. With external recovery material, preserve the same normalized archive, as
+`courtside mfa-export-keys` writes it, in the external secret store and supply it through `--mfa-keys`. For migration to a fresh standard
 installation, restore the archive into `mfa-keys` with ownership `10001:10001`, directories at
 `0700` and files at `0600`. Set `COURTSIDE_MFA_KEY_FILE` in the new `.env` to
 `/var/lib/courtside/mfa-keys/provided/mfa.keys` before starting the matching database. Existing
@@ -1636,7 +1640,8 @@ Correct it through the audited command, then initiate recovery:
 The launcher sends the email file through standard input into a mode-`0600` file on the
 maintenance container's `/tmp` tmpfs. It checks the opened descriptor and reads only that
 descriptor after validation. The address never enters command arguments or environment
-values. Delete the host input file after the operation. Both operations record the target account
+values. Courtside tells the previous address that the account's email changed, without naming the
+new one. Delete the host input file after the operation. Both operations record the target account
 UUID in the security audit. Server access authorizes this rescue path; the product's ordinary
 administrator recovery path still requires the administrator's own MFA and fresh proof.
 

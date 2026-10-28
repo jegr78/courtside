@@ -394,11 +394,14 @@ from: a booking id, a waitlist entry id, a series id, the comma-separated ids of
 a closure kind, a cancellation reason code, the previous start and end of moved occurrences or the
 person who withdrew. They never hold rendered text, an address or a credential: a message is
 composed from the current rows when it is handed over, and a generated credential or reset code
-exists only in that transaction. `next_attempt_at` says when the row is next due, `attempts` counts
+exists only in that transaction. The one exception is `previous_address`, which only an
+`ACCOUNT_ADDRESS_CHANGED` notice fills: it is the address the account held before a change, which
+the person row no longer carries, and the notice goes there. The `notification` row never receives it. `next_attempt_at` says when the row is next due, `attempts` counts
 the claims made for it and `retries` the failed handovers that were scheduled again. On a `QUEUED`
 row, `reason` names the last failed attempt; on a settled row it names why the message failed or was
-refused. Settling a row clears both `parameters` and `next_attempt_at`, and CHECK constraints refuse
-a settled row that keeps either, and `parameters` that are anything but an object of strings.
+refused. Settling a row clears `parameters`, `previous_address` and `next_attempt_at`, and CHECK
+constraints refuse a settled row that keeps any of them, and `parameters` that are anything but an
+object of strings.
 
 A `notification` row is written with the outbox row in the same transaction, and also when no mail
 is queued because the account has no address or switched email off. Its `parameters` keep only the

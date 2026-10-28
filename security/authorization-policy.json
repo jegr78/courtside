@@ -2,9 +2,9 @@
   "schemaVersion": 1,
   "reviewedAt": "2026-10-28",
   "purpose": "This is the normative authorization policy for the shipped Courtside API. OpenAPI defines the transport shape; this policy defines who may perform each operation, which resource attributes narrow that permission, and which protected fields each projection may read or write.",
-  "openApiFieldInventorySha256": "df9c19674d6b9312b80adea2031ed69cd71263ff51cb882ccc133979695b9c72",
+  "openApiFieldInventorySha256": "afe93b1ca02fac3319844c49300cbe077bbfa3b8a6f8ae8bec2ddea36f36f8d4",
   "protectedFieldInventorySha256": "7e50ec306adc1d5975ac22e6d37452ab356c3cac585cd2679461c06ed79e59a8",
-  "productionAuthorizationSha256": "d470174826bf1629b0dde9e9fe008c80dda08f6aaf3cb1ee5158a0af141764c8",
+  "productionAuthorizationSha256": "4bfc90879f5efe7ec81edf0706c9ba6acc7da47dd919cf3f7ec7c50fec1dd621",
   "ordinaryFields": [
     "Problem.detail",
     "Problem.fieldErrors",

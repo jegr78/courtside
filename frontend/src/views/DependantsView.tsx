@@ -1,6 +1,7 @@
 import { useProofContinuation } from "../security/useProofContinuation";
 import { ReauthenticationCode } from "../components/ReauthenticationCode";
 import { reauthenticateForm } from "../security/reauthentication";
+import { securityKeyFailure } from "../security/webauthn";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
@@ -272,7 +273,7 @@ function DependantCredentials({ dependant, refused, acted }: {
       await request();
     } catch (failure) {
       if (!ownsProof()) return;
-      setProofFailure(problemMessage(failure, t));
+      setProofFailure(securityKeyFailure(failure, t) ?? problemMessage(failure, t));
     } finally {
       if (ownsProof()) setPending(false);
     }

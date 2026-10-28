@@ -43,6 +43,20 @@ nach der Anmeldung genau dorthin. Das gilt auch, wenn du vorher dein Einmalpassw
 Endet deine Sitzung, während du eine Seite offen hast, kehrst du nach der nächsten Anmeldung
 ebenfalls dorthin zurück.
 
+### Der zweite Schritt
+
+Hast du die Zwei-Faktor-Authentifizierung eingerichtet, fragt Courtside nach dem Passwort nach einem
+zweiten Nachweis. Das gilt bei jeder Anmeldung und in jedem Browser.
+
+1. Gib einen Code aus deiner Authenticator-App oder einen unbenutzten Wiederherstellungscode ein.
+2. Wähle *Anmelden*.
+
+Mit einem eingerichteten Sicherheitsschlüssel oder Passkey wählst du stattdessen
+*Sicherheitsschlüssel oder Passkey nutzen* und bestätigst die Anfrage deines Browsers. Für den
+zweiten Schritt hast du fünf Minuten und fünf Versuche. Danach beginnst du wieder mit dem Passwort.
+*Mit anderem Konto anmelden* bricht den zweiten Schritt ab. Hast du keinen deiner Faktoren mehr,
+führt *Zweiten Faktor verloren?* zur kontrollierten Wiederherstellung.
+
 Prüfe bei einer Ablehnung zuerst die Eingabe. Vielleicht sind die Zugangsdaten abgelaufen oder die
 E-Mail ist nicht angekommen. Nutze dann *Passwort oder Benutzername vergessen?*. Bei einem
 deaktivierten Konto kann nur der Vorstand helfen.
@@ -51,7 +65,7 @@ deaktivierten Konto kann nur der Vorstand helfen.
 
 ## Passwort oder Benutzername vergessen
 
-Die Wiederherstellung funktioniert ohne Anmeldung. Auf der Seite stehen drei getrennte Formulare.
+Die Wiederherstellung funktioniert ohne Anmeldung. Auf der Seite stehen vier getrennte Formulare.
 
 ### Code anfordern
 
@@ -67,7 +81,8 @@ Das bisherige Passwort bleibt gültig. Offene Sitzungen bleiben angemeldet.
 2. Lege ein neues Passwort fest.
 3. Wähle *Passwort setzen*.
 
-Danach gilt nur noch das neue Passwort. Courtside beendet alle offenen Sitzungen des Kontos. Ein
+Danach gilt nur noch das neue Passwort. Courtside beendet alle offenen Sitzungen des Kontos. Eine
+eingerichtete Zwei-Faktor-Authentifizierung bleibt bestehen. Ein
 abgelehntes Passwort verbraucht den Code nicht. Groß- und Kleinschreibung sowie Bindestriche im
 Code spielen keine Rolle. Abgelaufene Codes musst du neu anfordern.
 
@@ -80,12 +95,28 @@ Courtside antwortet immer gleich, auch wenn der Benutzername oder die Adresse un
 kann niemand über das Formular nach Konten suchen. Wenn keine E-Mail eintrifft, prüfe den
 Benutzernamen und das richtige Postfach. Danach hilft der Vorstand weiter.
 
+### Alle zweiten Faktoren verloren
+
+Hast du Authenticator-App, Sicherheitsschlüssel und Wiederherstellungscodes verloren, hilft nur der
+Verein. Wende dich an den Vorstand und lass deine Identität prüfen. Danach startet der Vorstand die
+kontrollierte Wiederherstellung. Ab diesem Moment enden alle Sitzungen deines Kontos. Anmeldung und
+die gewöhnliche Passwort-Wiederherstellung bleiben gesperrt. Courtside schickt einen befristeten Code an deine hinterlegte Adresse.
+
+1. Gib deinen Benutzernamen und den Code aus der E-Mail ein.
+2. Gib ein neues Passwort zweimal ein.
+3. Wähle *Konto wiederherstellen und Passwort setzen*.
+
+Courtside entfernt dabei alle bisherigen Faktoren und Wiederherstellungscodes. Melde dich mit dem
+neuen Passwort an und richte die Zwei-Faktor-Authentifizierung erneut ein. Ändert sich vorher deine
+E-Mail-Adresse, verliert der Code seine Gültigkeit. Der Vorstand muss die Wiederherstellung dann neu
+starten.
+
 Zu viele Versuche führen zu einer Wartezeit. Bei Anmeldung und Code-Eingabe zählt die gemeinsame
 Internetverbindung. Beim Anfordern zählt zusätzlich der eingegebene Benutzername oder die Adresse.
 Andere Personen im selben Netz können deshalb dieselbe Begrenzung erreichen. Dein bestehendes
 Passwort bleibt davon unberührt.
 
-![Die Wiederherstellungsseite mit den Formularen für Code, neues Passwort und Benutzernamen.](screenshots/de/account-recovery.png)
+![Die Wiederherstellungsseite mit den Formularen für Code, neues Passwort, Benutzernamen und verlorene zweite Faktoren.](screenshots/de/account-recovery.png)
 
 ## Das Einmalpasswort ersetzen
 
@@ -362,16 +393,65 @@ zeigt das Profil dein eigenes Konto. Ohne Verbindung zeigt Courtside keine unbes
 
 ![Das eigene Profil mit Benutzername, getrennten Namensfeldern und zugewiesenen Rollen.](screenshots/de/account-profile.png)
 
-Unter dem Profil findest du die *Kontosicherheit* mit Passwort und Sitzungen.
+Unter dem Profil findest du die *Kontosicherheit* mit Zwei-Faktor-Authentifizierung, Sitzungen und
+Passwort.
 Vorhandene direkte Links zur Kontosicherheit führen weiterhin zu diesem Abschnitt.
 
 Beim Ändern des Passworts musst du das aktuelle Passwort eingeben. Nach dem Speichern beendet
 Courtside alle Sitzungen, auch die gerade verwendete. Melde dich danach mit dem neuen Passwort an.
 
-Du kannst außerdem eine einzelne Sitzung oder alle Sitzungen beenden. Bei älteren Anmeldungen fragt
-Courtside vor dem Beenden anderer Sitzungen erneut nach deinem Passwort. Die aktuelle Sitzung
+Du kannst außerdem eine einzelne Sitzung oder alle Sitzungen beenden. Liegt deine Anmeldung mehr
+als fünf Minuten zurück, fragt Courtside vor dem Beenden anderer Sitzungen erneut nach deinem
+Passwort. Mit Zwei-Faktor-Authentifizierung kommt ein zweiter Nachweis dazu. Die aktuelle Sitzung
 kannst du ohne diese Rückfrage beenden.
 
 Fehler in deinem Namen oder Benutzernamen korrigiert der Vorstand in der Personenverwaltung.
 
-![Die Kontosicherheit mit Passwortänderung und der Liste aktiver Sitzungen.](screenshots/de/account-security.png)
+![Die Kontosicherheit mit Zwei-Faktor-Authentifizierung, Sicherheitsschlüsseln, aktiven Sitzungen und Passwortänderung.](screenshots/de/account-security.png)
+
+### Zwei-Faktor-Authentifizierung
+
+Ein zweiter Faktor schützt dein Konto, auch wenn jemand dein Passwort kennt. Die Einrichtung ist
+freiwillig. Als zweiten Faktor nutzt du eine Authenticator-App, einen Sicherheitsschlüssel oder
+einen Passkey. Liegt deine Anmeldung mehr als fünf Minuten zurück, fragt Courtside vor jeder
+Änderung erneut nach deinem Passwort. Ist bereits ein Faktor eingerichtet, brauchst du zusätzlich
+einen Code oder deinen Sicherheitsschlüssel.
+
+So richtest du eine Authenticator-App ein:
+
+1. Wähle *Authenticator-App einrichten*.
+2. Scanne den QR-Code mit der App oder gib den *Einrichtungsschlüssel* ein.
+3. Gib den aktuellen sechsstelligen Code ein und wähle *Authenticator bestätigen*.
+
+Erst die Bestätigung schaltet die App frei. *Authenticator-App ersetzen* richtet eine neue App ein.
+Die bisherige gilt, bis du die neue bestätigt hast.
+
+So fügst du einen Sicherheitsschlüssel oder Passkey hinzu:
+
+1. Gib unter *Gerätename* einen Namen ein, den du wiedererkennst.
+2. Wähle *Sicherheitsschlüssel oder Passkey hinzufügen*.
+3. Bestätige die Anfrage deines Browsers, etwa mit PIN oder Fingerabdruck.
+
+Courtside erhält dabei nur das signierte Ergebnis, nie deinen Fingerabdruck. Gerätenamen siehst nur
+du. Du kannst bis zu zwanzig Geräte anlegen, jedes umbenennen und einzeln entfernen. Sicherheitsschlüssel
+brauchen einen unterstützten Browser und eine sichere Verbindung, die dein Verein eingerichtet hat.
+Fehlt eines davon, erklärt Courtside das an dieser Stelle. Die Authenticator-App bleibt dann nutzbar.
+
+### Wiederherstellungscodes
+
+Mit dem ersten Faktor erzeugt Courtside Wiederherstellungscodes. Sie erscheinen nur ein einziges
+Mal im Dialog *Wiederherstellungscodes sichern*. Speichere sie an einem geschützten Ort außerhalb des
+Geräts, etwa in einem Passwortmanager oder auf Papier. Jeder Code ersetzt deinen zweiten Faktor
+genau einmal. Die Kontosicherheit zeigt, wie viele Codes übrig sind.
+*Neue Wiederherstellungscodes erzeugen* ersetzt alle bisherigen Codes.
+Wähle *Codes gesichert, weiter zur Anmeldung* erst, wenn du die Codes gesichert hast.
+
+### Faktoren ändern oder entfernen
+
+Jede Änderung an deinen Faktoren beendet alle Sitzungen, auch die aktuelle. Über sicherheitsrelevante
+Änderungen benachrichtigt dich Courtside per E-Mail. Die Nachricht nennt kein Gerät und keinen Code.
+*Authenticator-App entfernen*, *Gerät entfernen* und *Zwei-Faktor-Authentifizierung deaktivieren*
+fragen vorher nach einer Bestätigung. Nach dem Deaktivieren schützt nur noch dein Passwort dein Konto.
+
+Der Vorstand sieht nur, ob dein Konto einen zweiten Faktor hat. Deine Geräte, Codes und Gerätenamen
+sieht er nicht. Ein vom Vorstand zurückgesetztes Passwort lässt deine Faktoren unverändert.

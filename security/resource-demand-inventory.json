@@ -24,6 +24,7 @@
       "src/main/java/org/courtside/identity/internal/SignInFailureLog.java",
       "src/main/java/org/courtside/member/internal/RosterSecurityEventLog.java",
       "src/main/java/org/courtside/member/internal/ShippedMembershipTypeNaming.java",
+      "src/main/java/org/courtside/notification/internal/AccountAddressChangeMailer.java",
       "src/main/java/org/courtside/notification/internal/AccountSecurityMailer.java",
       "src/main/java/org/courtside/notification/internal/BookingMailer.java",
       "src/main/java/org/courtside/notification/internal/CancellationMailer.java",
@@ -563,6 +564,7 @@
       "id": "asynchronous-notifications",
       "kind": "demanding",
       "entryPoints": [
+        "AccountAddressChangeMailer#on(AccountAddressChanged)",
         "AccountSecurityMailer#on(AccountMfaChanged)",
         "AccountSecurityMailer#on(SecondFactorGuessingBlocked)",
         "BookingMailer#on(BookingConfirmed)",
@@ -602,7 +604,8 @@
         "src/main/java/org/courtside/notification/internal/MessageOutbox.java",
         "src/main/java/org/courtside/notification/internal/NotificationConfiguration.java",
         "src/main/java/org/courtside/notification/internal/ControlledRecoveryCodeMailer.java",
-        "src/main/java/org/courtside/notification/internal/AccountSecurityMailer.java"
+        "src/main/java/org/courtside/notification/internal/AccountSecurityMailer.java",
+        "src/main/java/org/courtside/notification/internal/AccountAddressChangeMailer.java"
       ],
       "evidence": [
         "src/test/java/org/courtside/booking/internal/ClosureAnnouncementExecutorCapacityTest.java#givenTheAnnouncementExecutor_whenReadingItsCapacityPolicy_thenTheQueueIsBoundedAndSaturationUsesCallerRuns",

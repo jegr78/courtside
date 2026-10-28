@@ -1,4 +1,5 @@
 import type { ComponentType, ReactNode } from "react";
+import { SecurityKeyFailure } from "../security/webauthn";
 import { proofOwnerHarness } from "../test/ProofOwner";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -129,6 +130,23 @@ describe("AdminMessageWordingView", () => {
     expect(await screen.findByTestId("admin-reauthentication-failure")).toBeInTheDocument();
     expect(screen.getByTestId("admin-reauthentication-submit")).toBeEnabled();
     expect(changing).toHaveBeenCalledTimes(1);
+  });
+
+  it("given a dismissed security key proof, when it is confirmed, then the prompt says the key request was cancelled", async () => {
+    // given
+    vi.spyOn(api, "changeMessageTemplate")
+      .mockRejectedValue(new ApiError(403, { type: "urn:courtside:error:recent-authentication-required", title: "Recent authentication required", status: 403 }));
+    vi.spyOn(api, "reauthenticate").mockRejectedValue(new SecurityKeyFailure("dismissed", "NotAllowedError"));
+    show();
+    await screen.findByTestId("wording-body");
+    await userEvent.click(screen.getByTestId("wording-save"));
+
+    // when
+    await userEvent.type(await screen.findByTestId("admin-reauthentication-password"), "admin-password");
+    await userEvent.click(screen.getByTestId("admin-reauthentication-submit"));
+
+    // then
+    expect(await screen.findByTestId("admin-reauthentication-failure")).toHaveTextContent(i18n.t("mfa.keyCancelled"));
   });
 
   it("given a club wording, when reset, then the shipped wording is shown again", async () => {

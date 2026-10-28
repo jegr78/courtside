@@ -1,6 +1,7 @@
 import { useProofContinuation } from "../security/useProofContinuation";
 import { ReauthenticationCode } from "../components/ReauthenticationCode";
 import { reauthenticateForm } from "../security/reauthentication";
+import { securityKeyFailure } from "../security/webauthn";
 import { type FormEvent, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
@@ -149,7 +150,7 @@ export function AdminRetentionView() {
       await reauthenticateForm(event.currentTarget, password);
     } catch (failure) {
       if (!ownsProof()) return;
-      setReauthenticationFailure(problemMessage(failure, t));
+      setReauthenticationFailure(securityKeyFailure(failure, t) ?? problemMessage(failure, t));
       setPending(false);
       return;
     }

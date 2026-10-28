@@ -115,7 +115,7 @@ test("given application-written state, when it is restored, then representative 
 
   // when / then
   assert.deepEqual(applicationStateTables, [
-    "booking", "booking_card", "club_config", "court", "court_allocation", "domain_event", "event_publication",
+    "account_mfa", "booking", "booking_card", "club_config", "court", "court_allocation", "domain_event", "event_publication",
     "message_record", "opening_hours", "opening_hours_version", "person", "spring_session", "user_account",
     "user_account_role"
   ]);
@@ -126,6 +126,23 @@ test("given application-written state, when it is restored, then representative 
   assert.match(runner, /compose\(project, environment, \["stop", "mail"\]\)/);
   assert.match(runner, /message_record\.queued > 0/);
   assert.doesNotMatch(runner, /name !== "queuedMessage"/);
+});
+
+test("given an encrypted TOTP enrollment, when the backup is restored, then sign-in needs the restored keys and fails without them", () => {
+  // given
+  const runner = source("./courtside.restore-smoke.mjs");
+  const enrollment = runner.indexOf("await enrollTotp(");
+
+  // when / then
+  assert.ok(enrollment > 0 && enrollment < runner.indexOf("const applicationBefore = applicationEvidence"),
+    "the backup source must hold an encrypted TOTP secret written by the application");
+  assert.match(runner, /path: "\/api\/account\/mfa\/totp", method: "POST"/);
+  assert.match(runner, /path: "\/api\/session\/mfa", method: "POST"/);
+  assert.match(runner, /encryptedTotp/, "the compared evidence must count encrypted TOTP secrets");
+  assert.match(runner, /restore without its MFA keys unexpectedly became healthy/);
+  assert.match(runner, /MFA instance key file is missing/);
+  assert.ok(runner.indexOf("restore without its MFA keys unexpectedly became healthy")
+    < runner.indexOf("importMfaKeys(applicationKeysPath"), "the keyless start must precede the key import");
 });
 
 test("given a restored application database, when the image starts, then the written logo and booking remain readable", () => {

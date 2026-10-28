@@ -355,7 +355,9 @@ receives a welcome message first; new credentials for an existing account do not
 New credentials replace an existing password and end every session for the account. Only use this
 function when the member cannot recover the account without help.
 
-Administrators can change an email address and then request new credentials. The change log records
+Administrators can change an email address and then request new credentials. Courtside then tells
+the previous address that the account's email changed, without naming the new one, so correcting a
+mistyped address also sends that notice to the mistyped mailbox. The change log records
 both actions with their time and acting account, but it records neither the address nor the
 password. Organisational controls, such as sharing responsibility between several people, remain
 the club's responsibility.

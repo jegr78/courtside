@@ -607,6 +607,29 @@ class ControlledAccountRecoveryTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenAPendingRecovery_whenMaintenanceCorrectsTheEmail_thenThePreviousAddressIsToldWithoutCodeOrNewAddress()
+            throws Exception {
+        // given
+        org.mockito.Mockito.doNothing().when(sender).send(org.mockito.ArgumentMatchers.any(jakarta.mail.internet.MimeMessage.class));
+        UUID request = recovery.initiateFromMaintenance(account, true);
+        String code = recovery.issueFor(account, request).code();
+        // when
+        recovery.correctEmailFromMaintenance(account, "john.roe@example.org", true);
+        // then
+        var mails = org.mockito.ArgumentCaptor.forClass(jakarta.mail.internet.MimeMessage.class);
+        org.mockito.Mockito.verify(sender, org.mockito.Mockito.timeout(10_000).atLeast(3)).send(mails.capture());
+        var notices = new java.util.ArrayList<jakarta.mail.internet.MimeMessage>();
+        for (var mail : mails.getAllValues()) {
+            if (mail.getAllRecipients()[0].toString().equals("jane.doe@example.org")
+                    && mail.getSubject().contains("email address")) notices.add(mail);
+        }
+        assertThat(notices).as("the previous address receives exactly one notice").hasSize(1);
+        assertThat(String.valueOf(notices.getFirst().getContent())).contains("Hello Jane")
+                .as("the notice carries neither a recovery code nor the new address")
+                .doesNotContain(code, "john.roe");
+    }
+
+    @Test
     void givenTheRosterAddressLimits_whenMaintenanceCorrectsAnEmail_thenItCannotCreateAnAddressTheBoardCannotEdit() {
         // given
         String original = accounts.findById(account).orElseThrow().getPerson().getEmail();

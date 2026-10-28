@@ -35,6 +35,19 @@ final class MfaSecrets {
         });
     }
 
+    void verify() {
+        var recorded = jdbc.sql("SELECT installation_id, key_check FROM mfa_instance_key WHERE id = 1")
+                .query((rs, row) -> new Installation(rs.getObject(1, UUID.class), rs.getString(2))).optional();
+        if (recorded.isEmpty() && !encryptedSecretsExist()) return;
+        Installation installation = recorded
+                .orElseThrow(() -> new IllegalStateException("MFA instance identity is missing from the database"));
+        MfaKeyRing keys = MfaKeyRing.open(location(installation), true);
+        if (installation.check() == null
+                || !MessageDigest.isEqual(CHECK, keys.decrypt(installation.id(), installation.check()))) {
+            throw new IllegalStateException("MFA instance key does not match the encrypted database");
+        }
+    }
+
     String encrypt(UUID account, byte[] secret) {
         return withKey(keys -> keys.encrypt(account, secret));
     }
@@ -50,6 +63,13 @@ final class MfaSecrets {
         });
     }
 
+    private boolean encryptedSecretsExist() {
+        return jdbc.sql("""
+                SELECT EXISTS (SELECT 1 FROM account_mfa
+                    WHERE totp_secret IS NOT NULL OR pending_totp_secret IS NOT NULL)
+                """).query(Boolean.class).single();
+    }
+
     private <T> T withKey(Function<MfaKeyRing, T> operation) {
         return transaction.execute(ignored -> {
             jdbc.sql("""
@@ -59,13 +79,8 @@ final class MfaSecrets {
             Installation installation = jdbc.sql("""
                     SELECT installation_id, key_check FROM mfa_instance_key WHERE id = 1 FOR UPDATE
                     """).query((rs, row) -> new Installation(rs.getObject(1, UUID.class), rs.getString(2))).single();
-            boolean required = jdbc.sql("""
-                    SELECT EXISTS (SELECT 1 FROM account_mfa
-                        WHERE totp_secret IS NOT NULL OR pending_totp_secret IS NOT NULL)
-                    """).query(Boolean.class).single();
-            Path location = suppliedFile == null
-                    ? root.resolve(installation.id().toString()).resolve("mfa.keys") : suppliedFile;
-            MfaKeyRing keys = MfaKeyRing.open(location, required);
+            boolean required = encryptedSecretsExist();
+            MfaKeyRing keys = MfaKeyRing.open(location(installation), required);
             boolean matches = false;
             if (installation.check() != null) {
                 try {
@@ -81,6 +96,10 @@ final class MfaSecrets {
             }
             return operation.apply(keys);
         });
+    }
+
+    private Path location(Installation installation) {
+        return suppliedFile == null ? root.resolve(installation.id().toString()).resolve("mfa.keys") : suppliedFile;
     }
 
     private List<EncryptedSecret> encryptedSecrets() {

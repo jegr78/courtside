@@ -743,11 +743,15 @@ current method usable until confirmation. Recovery codes appear once when genera
 holds only their verifiers. Regeneration invalidates the previous set, and concurrent redemption
 has one winner.
 
-WebAuthn supports multiple credentials with holder-private labels, individual removal and renaming.
+WebAuthn supports up to twenty credentials per account with holder-private labels, individual removal
+and renaming. A twenty-first registration is refused with a problem that names the limit.
 An account may enroll WebAuthn without TOTP. Registration and authentication require local user
 verification. Courtside receives the signed result, never biometric data. Relying-party ID and
 allowed origin come from the explicitly configured public HTTPS address, including maintained local
-HTTPS and shared UAT. Request Host headers cannot choose them. A credential is bound to its domain.
+HTTPS and shared UAT. Request Host headers cannot choose them. The relying-party ID is the
+address's host in lower-case ASCII, so its spelling in `COURTSIDE_PUBLIC_URL` does not matter.
+Browsers refuse an IP address as relying-party ID, so an address whose host is one leaves WebAuthn
+unavailable while the instance and TOTP keep working. A credential is bound to its domain.
 After a domain change, the holder signs in with a remaining method or recovery code and enrolls a
 new credential. A lost-factor account uses controlled recovery.
 
@@ -764,7 +768,8 @@ synchronized credential that consistently reports zero remains supported.
 
 Initial enrollment requires recent password proof. Later factor changes, recovery-code generation,
 disablement and sensitive actions require recent password plus one existing factor. The proof
-window remains five minutes. Security-relevant factor changes revoke existing sessions and notify
+window remains five minutes, so disabling MFA or removing a method asks the holder to confirm it
+first even within that window. Security-relevant factor changes revoke existing sessions and notify
 the holder without naming a credential or exposing a secret. Generated recovery codes remain in
 that browser's memory long enough to save them after its own session ends. External account changes
 and a different signed-in holder clear them. Administrators see only whether another account has
@@ -780,10 +785,17 @@ invalidate or refuse the code without clearing the block. The maintained operato
 a sole administrator who has lost every method. Its separately audited address-correction command
 invalidates an older rescue code and requires a new rescue request.
 
+Whenever an account holder's email address changes, through the roster, a synchronisation or that
+command, the previous address receives a notice that the account's address changed. It names
+neither the new address nor any code, so a holder whose mail was redirected learns of it at the
+address they still read. A change that only alters letter case, or a person without an account,
+sends no notice.
+
 TOTP secrets use account-bound AES-256-GCM encryption with random nonces. The instance generates its
 keyring automatically and persists it outside PostgreSQL, under a private local directory or a
 separate writable container volume. A database installation ID selects the default key location;
-a canary and encrypted state validate the matching keyring before the instance reports healthy.
+a canary and encrypted state validate the matching keyring before the instance reports healthy,
+and afterwards health reads the keyring and its canary again once the previous reading is 5 seconds old.
 An operator may supply a private key file. Rotation retains prior keys for existing ciphertext.
 A database with encrypted factors cannot start using missing or mismatched keys. Complete backup
 and restore preserve both the database and key material, and preflight validates them together

@@ -10,7 +10,7 @@ const YAML = createRequire(new URL("../frontend/package.json", import.meta.url))
 
 const roots = ["courtside", "recipe.sh", "mfa-keys.sh", ".env.example", "README.md", "container-contract.md",
   "compose.booking-seed.yaml", "compose.database-upgrade.yaml", "compose.recovery-check.yaml",
-  "examples", "guides"];
+  "compose.key-export.yaml", "examples", "guides"];
 
 export function recipeNames(deploy) {
   return readdirSync(join(deploy, "recipes")).filter((entry) => entry.endsWith(".recipe"))

@@ -16,6 +16,7 @@ class TransactionalEventListenerPhaseTest {
 
     private static final List<String> WRITES_IN_THE_COMMITTING_TRANSACTION = List.of(
             "org/courtside/audit/internal/DomainEventWriter.java",
+            "org/courtside/notification/internal/AccountAddressChangeMailer.java",
             "org/courtside/notification/internal/AccountSecurityMailer.java",
             "org/courtside/notification/internal/BookingMailer.java",
             "org/courtside/notification/internal/CancellationMailer.java",

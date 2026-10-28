@@ -164,6 +164,7 @@ test("given virtual CTAP2 keys with user verification, when a holder registers a
     await signInWithKey(page, "doe.jane");
     await reachYourAccount(page);
     await activate(page.getByTestId(`mfa-device-remove-${firstId}`));
+    await activate(page.getByRole("dialog").getByTestId("mfa-confirm-removal"));
     await expect(page.getByTestId("login-view")).toBeVisible();
     await signInWithKey(page, "doe.jane");
 

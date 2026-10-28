@@ -58,6 +58,7 @@ class MfaWebAuthnFlowTest extends AbstractIntegrationTest {
     @Autowired private PasswordEncoder passwords;
     @Autowired private MfaWebAuthnCodec codec;
     @Autowired private MfaWebAuthnCredentials credentials;
+    @Autowired private MfaWebAuthn webAuthn;
     @Autowired private JdbcClient jdbc;
     @Autowired private Clock clock;
     @Autowired private MfaTotpRepository totp;
@@ -201,6 +202,25 @@ class MfaWebAuthnFlowTest extends AbstractIntegrationTest {
                         .delete("/api/account/mfa/webauthn/credentials/{id}", "dW5rbm93bg").cookie(full).with(csrf()))
                 .andExpect(status().isNotFound()).andExpect(jsonPath("$.type").value("urn:courtside:error:mfa-resource-not-found"));
         assertThat(credentials.enabled(account)).isTrue();
+    }
+
+    @Test
+    void givenAnAccountAtTheCredentialLimit_whenTheHolderBeginsAnotherRegistration_thenTheLimitIsNamed() throws Exception {
+        // given
+        var authenticator = enroll();
+        for (int index = 2; index <= MfaWebAuthn.CREDENTIAL_LIMIT; index++) {
+            var options = codec.decode(codec.encode(webAuthn.registrationOptions(account)), PublicKeyCredentialCreationOptions.class);
+            assertThat(webAuthn.register(account, options, new WebAuthnAuthenticatorFixture().register(options, ORIGIN), "Key " + index))
+                    .as("credential %s is within the limit", index).isTrue();
+        }
+        Cookie pending = password(202);
+        Cookie full = prove(pending, authenticator, options(pending));
+        // when / then
+        mvc.perform(post("/api/account/mfa/webauthn/registration-options").cookie(full).with(csrf()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:webauthn-credential-limit-reached"))
+                .andExpect(jsonPath("$.violations[0].code").value("identity.mfa.webauthnLimitReached"))
+                .andExpect(jsonPath("$.violations[0].params.limit").value(MfaWebAuthn.CREDENTIAL_LIMIT));
     }
 
     @ParameterizedTest

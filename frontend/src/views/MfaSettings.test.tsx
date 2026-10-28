@@ -1,11 +1,12 @@
 import jsQR from "jsqr";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { api, ApiError } from "../api/client";
 import i18n from "../i18n";
 import { RecoveryCodesNotice } from "../components/RecoveryCodesNotice";
 import { clearRecoveryCodes } from "../security/recoveryCodes";
+import { MfaProofContext, WebauthnProofContext } from "../security/reauthentication";
 import { WithClubConfiguration } from "../test/ClubConfiguration";
 import { AccountSecurityView } from "./AccountSecurityView";
 
@@ -87,6 +88,7 @@ it("given MFA protects an action, when fresh proof is required, then submit pass
   show(true, signedOut);
   // when
   await userEvent.click(await screen.findByTestId("mfa-disable"));
+  await userEvent.click(screen.getByTestId("mfa-confirm-removal"));
   await userEvent.type(document.getElementById("reauthentication-password")!, "current-password");
   await userEvent.type(screen.getByTestId("reauthentication-mfa-code"), "ABCD-EFGH-IJKL-MNOP-QRST-UVWX");
   await userEvent.click(screen.getByTestId("reauthentication-submit"));
@@ -165,6 +167,7 @@ it("given an enrolled authenticator, when removing it, then end this session wit
   show(true, signedOut);
   // when
   await userEvent.click(await screen.findByTestId("mfa-remove-totp"));
+  await userEvent.click(within(screen.getByRole("dialog")).getByTestId("mfa-confirm-removal"));
   // then
   expect(remove).toHaveBeenCalledOnce();
   expect(signedOut).toHaveBeenCalledOnce();
@@ -215,6 +218,7 @@ it("given private enrolled devices, when correcting a label and removing a devic
   fireEvent.click(screen.getByTestId("mfa-device-rename-AQ"));
   await waitFor(() => expect(rename).toHaveBeenCalledWith("AQ", "Travel key", expect.any(AbortSignal)));
   fireEvent.click(screen.getByTestId("mfa-device-remove-Ag"));
+  fireEvent.click(within(await screen.findByRole("dialog")).getByTestId("mfa-confirm-removal"));
   // then
   await waitFor(() => expect(remove).toHaveBeenCalledWith("Ag", expect.any(AbortSignal)));
   expect(signedOut).toHaveBeenCalledTimes(2);
@@ -323,4 +327,129 @@ it("given proof has already submitted device enrollment, when the proof dialog c
   expect(await screen.findByTestId("mfa-recovery-codes")).toHaveTextContent("COMMITTED-RECOVERY-CODE");
   expect(signedOut).toHaveBeenCalledOnce();
   vi.unstubAllGlobals();
+});
+
+function keyRegistration(create: (options: CredentialCreationOptions) => Promise<unknown>) {
+  vi.stubGlobal("isSecureContext", true);
+  vi.stubGlobal("PublicKeyCredential", class {});
+  vi.stubGlobal("navigator", { credentials: { create, get: vi.fn() } });
+  vi.mocked(api.ownMfa).mockResolvedValue({ enabled: false, totpEnabled: false, recoveryCodesRemaining: 0, webauthnAvailable: true, devices: [] });
+  vi.spyOn(api, "webauthnRegistrationOptions").mockResolvedValue({ rp: { id: "example.org", name: "Example" }, user: { id: "AQ", name: "jane.doe", displayName: "Jane Doe" }, challenge: "Ag", pubKeyCredParams: [{ type: "public-key", alg: -7 }], authenticatorSelection: { userVerification: "required" } });
+  return vi.spyOn(api, "registerWebauthn").mockResolvedValue({ codes: ["FIRST-RECOVERY-CODE"] });
+}
+
+it.each([
+  ["NotAllowedError", "mfa.keyCancelled"],
+  ["InvalidStateError", "mfa.keyAlreadyRegistered"]
+])("given the browser answers a key registration with %s, when the holder adds a key, then exactly one alert explains it without a status retry", async (name, key) => {
+  // given
+  const register = keyRegistration(() => Promise.reject(new DOMException("refused", name)));
+  show();
+  // when
+  fireEvent.change(await screen.findByTestId("mfa-key-label"), { target: { value: "Travel key" } });
+  fireEvent.click(screen.getByTestId("mfa-add-key"));
+  // then
+  await waitFor(() => expect(screen.getByTestId("mfa-add-key")).toBeEnabled());
+  const alerts = screen.getAllByRole("alert");
+  expect(alerts, "a single alert reports the key outcome").toHaveLength(1);
+  expect(alerts[0]).toHaveTextContent(i18n.t(key));
+  expect(screen.queryByTestId("mfa-retry"), "reloading the status cannot repeat a key request").toBeNull();
+  expect(register).not.toHaveBeenCalled();
+  vi.unstubAllGlobals();
+});
+
+it("given a key registration prompt, when the holder presses cancel, then exactly one alert says it was cancelled", async () => {
+  // given
+  const register = keyRegistration((options) => new Promise((_, reject) => {
+    options.signal?.addEventListener("abort", () => reject(new DOMException("Security key request cancelled", "AbortError")));
+  }));
+  show();
+  fireEvent.change(await screen.findByTestId("mfa-key-label"), { target: { value: "Travel key" } });
+  fireEvent.click(screen.getByTestId("mfa-add-key"));
+  // when
+  fireEvent.click(await screen.findByTestId("mfa-cancel-key"));
+  // then
+  await waitFor(() => expect(screen.getByTestId("mfa-add-key")).toBeEnabled());
+  const alerts = screen.getAllByRole("alert");
+  expect(alerts, "a single alert reports the cancellation").toHaveLength(1);
+  expect(alerts[0]).toHaveTextContent(i18n.t("mfa.keyCancelled"));
+  expect(screen.queryByTestId("mfa-retry")).toBeNull();
+  expect(register).not.toHaveBeenCalled();
+  vi.unstubAllGlobals();
+});
+
+it.each([
+  ["NotAllowedError", "mfa.keyCancelled"],
+  ["TimeoutError", "mfa.keyTimedOut"]
+])("given a security key proof answered with %s, when the holder proves identity, then the proof dialog explains it", async (name, key) => {
+  // given
+  vi.stubGlobal("isSecureContext", true);
+  vi.stubGlobal("PublicKeyCredential", class {});
+  vi.stubGlobal("navigator", { credentials: { create: vi.fn(), get: vi.fn().mockRejectedValue(new DOMException("refused", name)) } });
+  vi.mocked(api.ownMfa).mockResolvedValue({ enabled: true, totpEnabled: true, recoveryCodesRemaining: 4 });
+  vi.spyOn(api, "replaceRecoveryCodes").mockRejectedValue(new ApiError(403, { type: "urn:courtside:error:recent-authentication-required", status: 403, title: "Proof required" }));
+  vi.spyOn(api, "webauthnProofOptions").mockResolvedValue({ challenge: "AQ", rpId: "example.org", allowCredentials: [], userVerification: "required" });
+  const prove = vi.spyOn(api, "reauthenticate").mockResolvedValue(undefined);
+  render(<WithClubConfiguration><MfaProofContext value><WebauthnProofContext value>
+    <AccountSecurityView username="doe.jane" mfaEnabled passwordChanged={vi.fn()} signedOut={vi.fn()} />
+  </WebauthnProofContext></MfaProofContext></WithClubConfiguration>);
+  await userEvent.click(await screen.findByTestId("mfa-replace-recovery"));
+  const dialog = await screen.findByRole("dialog");
+  await userEvent.type(document.getElementById("reauthentication-password")!, "current-password");
+  await userEvent.click(within(dialog).getByTestId("reauthentication-use-key"));
+  // when
+  await userEvent.click(within(dialog).getByTestId("reauthentication-submit"));
+  // then
+  expect(await within(dialog).findByRole("alert")).toHaveTextContent(i18n.t(key));
+  expect(prove).not.toHaveBeenCalled();
+  vi.unstubAllGlobals();
+});
+
+const removals = [
+  ["mfa-disable", "disableMfa"],
+  ["mfa-remove-totp", "removeTotp"],
+  ["mfa-device-remove-AQ", "removeWebauthn"]
+] as const;
+
+it.each(removals)("given recent proof, when the holder presses %s and cancels, then nothing is removed and no session ends", async (trigger, operation) => {
+  // given
+  vi.mocked(api.ownMfa).mockResolvedValue({ enabled: true, totpEnabled: true, recoveryCodesRemaining: 4, devices: [{ id: "AQ", label: "Travel key", createdAt: "2026-10-01T12:00:00Z", lastUsedAt: "2026-10-01T12:00:00Z" }] });
+  const remove = vi.spyOn(api, operation).mockResolvedValue(undefined);
+  const signedOut = vi.fn();
+  show(true, signedOut);
+  // when
+  await userEvent.click(await screen.findByTestId(trigger));
+  const dialog = screen.getByRole("dialog");
+  await userEvent.click(within(dialog).getByTestId("mfa-cancel-removal"));
+  // then
+  expect(remove, "pressing the button alone removes nothing").not.toHaveBeenCalled();
+  expect(signedOut).not.toHaveBeenCalled();
+  expect(screen.queryByRole("dialog")).toBeNull();
+});
+
+it.each(removals)("given recent proof, when the holder presses %s and confirms, then the protection is removed once and the session ends", async (trigger, operation) => {
+  // given
+  vi.mocked(api.ownMfa).mockResolvedValue({ enabled: true, totpEnabled: true, recoveryCodesRemaining: 4, devices: [{ id: "AQ", label: "Travel key", createdAt: "2026-10-01T12:00:00Z", lastUsedAt: "2026-10-01T12:00:00Z" }] });
+  const remove = vi.spyOn(api, operation).mockResolvedValue(undefined);
+  const signedOut = vi.fn();
+  show(true, signedOut);
+  await userEvent.click(await screen.findByTestId(trigger));
+  const dialog = screen.getByRole("dialog");
+  expect(remove, "the confirmation comes before the request").not.toHaveBeenCalled();
+  // when
+  await userEvent.click(within(dialog).getByTestId("mfa-confirm-removal"));
+  // then
+  await waitFor(() => expect(remove).toHaveBeenCalledOnce());
+  expect(signedOut).toHaveBeenCalledOnce();
+  expect(screen.queryByRole("dialog")).toBeNull();
+});
+
+it("given a security key, when its removal is asked for, then the confirmation names that key", async () => {
+  // given
+  vi.mocked(api.ownMfa).mockResolvedValue({ enabled: true, totpEnabled: false, recoveryCodesRemaining: 4, devices: [{ id: "AQ", label: "Travel key", createdAt: "2026-10-01T12:00:00Z", lastUsedAt: "2026-10-01T12:00:00Z" }] });
+  show(true);
+  // when
+  await userEvent.click(await screen.findByTestId("mfa-device-remove-AQ"));
+  // then
+  expect(screen.getByRole("dialog")).toHaveTextContent(i18n.t("mfa.confirmRemoveKeyExplain", { label: "Travel key" }));
 });

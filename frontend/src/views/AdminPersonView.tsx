@@ -1,6 +1,7 @@
 import { useProofContinuation } from "../security/useProofContinuation";
 import { ReauthenticationCode } from "../components/ReauthenticationCode";
 import { ProofOwnerContext, reauthenticateForm } from "../security/reauthentication";
+import { securityKeyFailure } from "../security/webauthn";
 import { useCallback, useContext, useEffect, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useLocation, useParams } from "react-router-dom";
@@ -183,7 +184,7 @@ export function AdminPersonView() {
     } catch (failure) {
       if (!ownsProof()) return;
       if (!proofCompleted || (failure instanceof ApiError && failure.problem?.type === RECENT_AUTH)) {
-        setReauthenticationFailure(problemMessage(failure, t));
+        setReauthenticationFailure(securityKeyFailure(failure, t) ?? problemMessage(failure, t));
       } else {
         setRetry(undefined);
         reportError(failure);

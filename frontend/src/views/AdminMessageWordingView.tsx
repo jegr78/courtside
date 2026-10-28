@@ -1,6 +1,7 @@
 import { useProofContinuation } from "../security/useProofContinuation";
 import { ReauthenticationCode } from "../components/ReauthenticationCode";
 import { reauthenticateForm } from "../security/reauthentication";
+import { securityKeyFailure } from "../security/webauthn";
 import { useEffect, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { api, ApiError, type MessageKind, type MessageTemplate, type MessageTemplateLanguage, type MessageTemplateText } from "../api/client";
@@ -120,7 +121,7 @@ export function AdminMessageWordingView() {
       await reauthenticateForm(event.currentTarget, password);
     } catch (failure) {
       if (!ownsProof()) return;
-      setReauthenticationFailure(problemMessage(failure, t));
+      setReauthenticationFailure(securityKeyFailure(failure, t) ?? problemMessage(failure, t));
       setPending(false);
       return;
     }

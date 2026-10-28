@@ -100,6 +100,8 @@ case "$*" in
   *' pg_dump '*) printf '%s\\n' 'PGDMP courtside fixture' ;;
   *' pg_restore --list'*) cat >/dev/null ;;
   *"select count(*) from pg_tables where schemaname = 'public'"*) printf '%s\\n' '0' ;;
+  *"to_regclass('public.account_mfa')"*) printf '%s\\n' 't' ;;
+  *'from account_mfa where totp_secret is not null'*) if [ -f "${join(root, "docker-encrypted-totp")}" ]; then cat "${join(root, "docker-encrypted-totp")}"; else printf '%s\\n' '0'; fi ;;
   *' tar -C /source -cf - .'*) printf '%s\\n' 'TAR courtside fixture' ;;
   *'compose ls --format json') [ ! -f "${join(root, "docker-compose-list")}" ] || cat "${join(root, "docker-compose-list")}" ;;
   *'volume ls --filter label=com.docker.compose.project='*) [ ! -f "${join(root, "docker-volumes")}" ] || cat "${join(root, "docker-volumes")}" ;;
@@ -150,7 +152,7 @@ for argument in "$@"; do
 done
 case "$*" in
   *'/api/session/mfa'*) touch "${join(root, "curl-mfa-completed")}"; printf '%s\\n' '{}' ;;
-  *'/api/session'*) if [ -f "${join(root, "curl-mfa-required")}" ] && [ ! -f "${join(root, "curl-mfa-completed")}" ]; then printf '%s\\n' '{"authenticated":false}'; else printf '%s\\n' '{"authenticated":true,"roles":["ADMIN"]}'; fi ;;
+  *'/api/session'*) if [ -f "${join(root, "curl-mfa-required")}" ] && [ ! -f "${join(root, "curl-mfa-completed")}" ]; then printf '%s\\n' '{"authenticated":false}'; elif [ -f "${join(root, "curl-member-role")}" ]; then printf '%s\\n' '{"authenticated":true,"roles":["MEMBER"]}'; else printf '%s\\n' '{"authenticated":true,"roles":["ADMIN"]}'; fi ;;
   *'/api/public/courts'*) printf '%s\\n' '[{"id":"court-1"}]' ;;
 esac
 `, { mode: 0o755 });
