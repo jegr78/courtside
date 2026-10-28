@@ -17,6 +17,10 @@ class LoginProtectionPropertiesTest {
                     "courtside.login-protection.address.max-failures=20",
                     "courtside.login-protection.address.window=1m",
                     "courtside.login-protection.address.block=1m",
+                    "courtside.login-protection.factor.max-failures=5",
+                    "courtside.login-protection.factor.block=1m",
+                    "courtside.login-protection.factor.max-block=24h",
+                    "courtside.login-protection.factor.retention=30d",
                     "courtside.login-protection.global.threshold=100",
                     "courtside.login-protection.global.window=1m");
 
@@ -34,6 +38,16 @@ class LoginProtectionPropertiesTest {
                     assertThat(context).hasFailed();
                     assertThat(context.getStartupFailure()).rootCause()
                             .hasMessageContaining("verificationConcurrency");
+                });
+    }
+
+    @Test
+    void givenNoSecondFactorFailureBudget_whenBindingConfiguration_thenStartupFailsClosed() {
+        contextRunner.withPropertyValues("courtside.login-protection.verification-concurrency=2",
+                        "courtside.login-protection.factor.max-failures=0")
+                .run(context -> {
+                    assertThat(context).hasFailed();
+                    assertThat(context.getStartupFailure()).rootCause().hasMessageContaining("maxFailures");
                 });
     }
 
