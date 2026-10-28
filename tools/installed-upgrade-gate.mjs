@@ -19,7 +19,7 @@ export const registryAddress = "127.0.0.1";
 export function withRegistryHost(hosts) {
   const lines = hosts.split("\n");
   if (lines.some((line) => line.endsWith(hostsMarker))) return hosts;
-  if (lines.some((line) => line.replace(/#.*/, "").trim().split(/\s+/).slice(1).includes(registryHost))) {
+  if (lines.some((line) => line.replace(/#.*/, "").trim().split(/\s+/).slice(1).some((name) => name === registryHost))) {
     throw new Error(`${hostsFile} already resolves ${registryHost}; the stand-in registry will not shadow it`);
   }
   const separated = hosts === "" || hosts.endsWith("\n") ? hosts : `${hosts}\n`;
@@ -55,9 +55,10 @@ function run(command, args, options = {}) {
 function issueCertificates() {
   mkdirSync(certificates, { recursive: true });
   const at = (name) => join(certificates, name);
-  run("openssl", ["req", "-x509", "-newkey", "rsa:3072", "-nodes", "-days", "1",
+  const authority = run("openssl", ["req", "-x509", "-newkey", "rsa:3072", "-nodes", "-days", "1",
     "-subj", "/CN=Courtside installed upgrade gate", "-addext", "basicConstraints=critical,CA:TRUE",
-    "-addext", "keyUsage=critical,keyCertSign", "-keyout", at("ca.key"), "-out", at("ca.crt")]);
+    "-addext", "keyUsage=critical,keyCertSign", "-keyout", at("ca.key")]).stdout;
+  writeFileSync(at("ca.crt"), authority);
   run("openssl", ["req", "-newkey", "rsa:3072", "-nodes", "-subj", `/CN=${registryHost}`,
     "-keyout", at("registry.key"), "-out", at("registry.csr")]);
   // The registry runs as root without CAP_DAC_OVERRIDE, so it cannot read a key only its owner may read.
@@ -66,7 +67,7 @@ function issueCertificates() {
   run("openssl", ["x509", "-req", "-in", at("registry.csr"), "-CA", at("ca.crt"), "-CAkey", at("ca.key"),
     "-CAcreateserial", "-days", "1", "-extfile", at("registry.ext"), "-out", at("registry.crt")]);
   rmSync(at("ca.key"));
-  return at("ca.crt");
+  return { path: at("ca.crt"), pem: authority };
 }
 
 function announcedHosts() {
@@ -81,7 +82,7 @@ function announcedHosts() {
 }
 
 function announce(authority, hosts) {
-  run("sudo", ["-n", "install", "-D", "-m", "0644", authority, join(trustDirectory, "ca.crt")]);
+  run("sudo", ["-n", "install", "-D", "-m", "0644", authority.path, join(trustDirectory, "ca.crt")]);
   run("sudo", ["-n", "tee", hostsFile], { input: hosts });
 }
 
@@ -116,7 +117,7 @@ const manifestTypes = ["application/vnd.oci.image.index.v1+json", "application/v
 function ask(authority, path, method = "GET") {
   return new Promise((settle) => {
     const probe = request({ host: registryAddress, port: 443, servername: registryHost, path, method,
-      headers: { Accept: manifestTypes.join(", ") }, ca: readFileSync(authority), timeout: 5000 }, (response) => {
+      headers: { Accept: manifestTypes.join(", ") }, ca: authority.pem, timeout: 5000 }, (response) => {
       response.resume();
       settle({ status: response.statusCode, headers: response.headers });
     });
