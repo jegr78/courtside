@@ -16,6 +16,11 @@ const configuration = resolve("deploy/Caddyfile.security-password-breach");
 function docker(args) {
   return execFileSync("docker", args, { encoding: "utf8", timeout: 15000, stdio: ["ignore", "pipe", "pipe"] }).trim();
 }
+function valuesOf(node, key) {
+  if (Array.isArray(node)) return node.flatMap((item) => valuesOf(item, key));
+  if (node === null || typeof node !== "object") return [];
+  return Object.entries(node).flatMap(([name, value]) => name === key ? [value] : valuesOf(value, key));
+}
 function probe(port, ca, path, method = "GET", servername = "password-breach", headers = {}) {
   return new Promise((resolve_, reject) => {
     const req = request({ hostname: "127.0.0.1", port, servername, ca, path, method,
@@ -41,8 +46,7 @@ test("given the pinned dependency bridge, when real HTTPS requests cross its mat
   let createdContainer = false;
   try {
     const trust = join(root, "trust");
-    createSecurityMailCertificate(trust);
-    const ca = readFileSync(join(trust, "cert.pem"));
+    const { pem: ca } = createSecurityMailCertificate(trust);
     docker(["network", "create", "--label", "org.courtside.test=password-breach", network]);
     createdNetwork = true;
     docker(["image", "inspect", image]);
@@ -81,8 +85,8 @@ test("given the pinned dependency bridge, when real HTTPS requests cross its mat
     const adapted = JSON.parse(docker(["exec", name, "caddy", "adapt", "--config", "/etc/caddy/Caddyfile"]));
     const routes = adapted.apps.http.servers.srv0.routes;
     const encoded = JSON.stringify(routes);
-    assert.match(encoded, /api\.pwnedpasswords\.com:443/);
-    assert.match(encoded, /"server_name":"api\.pwnedpasswords\.com"/);
+    assert.deepEqual(valuesOf(routes, "dial"), ["api.pwnedpasswords.com:443"], "the provider is the only upstream");
+    assert.deepEqual(valuesOf(routes, "server_name"), ["api.pwnedpasswords.com"]);
     assert.doesNotMatch(encoded, /insecure_skip_verify|tls_insecure_skip_verify/);
     assert.match(encoded, /"dial_timeout":3000000000/);
     assert.match(encoded, /"response_header_timeout":3000000000/);
