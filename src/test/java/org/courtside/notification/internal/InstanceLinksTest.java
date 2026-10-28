@@ -101,6 +101,7 @@ class InstanceLinksTest {
         expected.put(MessageKind.ACCOUNT_WELCOME, ADDRESS + "/");
         expected.put(MessageKind.ACCOUNT_SECURITY_CHANGED, ADDRESS + "/account#security");
         expected.put(MessageKind.ACCOUNT_FACTOR_GUESSING_BLOCKED, ADDRESS + "/account#security");
+        expected.put(MessageKind.ACCOUNT_ADDRESS_CHANGED, ADDRESS + "/account#security");
         expected.put(MessageKind.BOOKING_CONFIRMED, booking);
         expected.put(MessageKind.BOOKING_PLAYER_RECORDED, booking);
         expected.put(MessageKind.BOOKING_PLAYER_WITHDREW, booking);

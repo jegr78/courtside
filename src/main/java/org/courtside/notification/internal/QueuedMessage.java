@@ -11,7 +11,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
-record QueuedMessage(UUID accountId, MessageKind kind, Map<String, String> parameters) {
+record QueuedMessage(UUID accountId, MessageKind kind, Map<String, String> parameters, String previousAddress) {
 
     static final String BOOKING = "bookingId";
     static final String CLOSURE = "closure";
@@ -26,6 +26,10 @@ record QueuedMessage(UUID accountId, MessageKind kind, Map<String, String> param
 
     QueuedMessage {
         parameters = parameters == null ? Map.of() : Map.copyOf(parameters);
+    }
+
+    QueuedMessage(UUID accountId, MessageKind kind, Map<String, String> parameters) {
+        this(accountId, kind, parameters, null);
     }
 
     UUID booking() {

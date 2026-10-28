@@ -2,6 +2,7 @@ package org.courtside.identity.internal;
 
 import lombok.RequiredArgsConstructor;
 import org.courtside.config.PasswordResetTokenValidity;
+import org.courtside.identity.AccountAddresses;
 import org.courtside.identity.AccountMfaChanged;
 import org.courtside.identity.AccountSessions;
 import org.courtside.identity.ControlledRecoveryCodeIssuer;
@@ -44,6 +45,7 @@ class ControlledAccountRecovery implements ControlledRecoveryCodeIssuer {
     private final jakarta.validation.Validator validator;
     private final PasswordResetTokenValidity validity;
     private final AccountSessions sessions;
+    private final AccountAddresses addresses;
     private final SecurityEventLog security;
     private final ApplicationEventPublisher events;
     private final JdbcClient jdbc;
@@ -153,7 +155,7 @@ class ControlledAccountRecovery implements ControlledRecoveryCodeIssuer {
     void correctEmailFromMaintenance(UUID account, String email, boolean identityChecked) {
         if (!identityChecked || !validator.validate(new RecoveryEmail(email)).isEmpty()) throw new MfaProofFailedException();
         UserAccount holder = locked(account);
-        holder.getPerson().changeEmail(email);
+        addresses.change(holder.getPerson(), email);
         sessions.revoke(holder);
         jdbc.sql("DELETE FROM account_mfa_recovery WHERE account_id = :id").param("id", account).update();
         security.administrativeActionAfterCommit(account, null, SecurityEventLog.AdministrativeAction.MFA_RECOVERY_EMAIL_CORRECTED);

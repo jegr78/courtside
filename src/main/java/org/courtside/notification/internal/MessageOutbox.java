@@ -33,6 +33,18 @@ class MessageOutbox {
     // forgot to ask, and the centre holds whatever a member was told on any channel.
     @Transactional(propagation = Propagation.MANDATORY)
     public void queue(UUID accountId, MessageKind kind, Map<String, String> parameters) {
+        enqueue(accountId, kind, parameters, null);
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void queueToPreviousAddress(UUID accountId, MessageKind kind, String previousAddress) {
+        if (previousAddress == null || previousAddress.isBlank()) {
+            throw new IllegalStateException("A notice to a previous address needs that address");
+        }
+        enqueue(accountId, kind, Map.of(), previousAddress);
+    }
+
+    private void enqueue(UUID accountId, MessageKind kind, Map<String, String> parameters, String previousAddress) {
         if (!choices.wants(accountId, kind)) {
             log.info("A {} message was not queued: account {} does not want it", kind, accountId);
             return;
@@ -43,7 +55,7 @@ class MessageOutbox {
             return;
         }
         String messageId = MailDispatch.newMessageId(MailSettings.senderDomain(properties.from()));
-        records.save(new MessageRecord(accountId, kind, messageId, clock.instant(), parameters));
+        records.save(new MessageRecord(accountId, kind, messageId, clock.instant(), parameters, previousAddress));
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {

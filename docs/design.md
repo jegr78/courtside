@@ -784,6 +784,12 @@ invalidate or refuse the code without clearing the block. The maintained operato
 a sole administrator who has lost every method. Its separately audited address-correction command
 invalidates an older rescue code and requires a new rescue request.
 
+Whenever an account holder's email address changes, through the roster, a synchronisation or that
+command, the previous address receives a notice that the account's address changed. It names
+neither the new address nor any code, so a holder whose mail was redirected learns of it at the
+address they still read. A change that only alters letter case, or a person without an account,
+sends no notice.
+
 TOTP secrets use account-bound AES-256-GCM encryption with random nonces. The instance generates its
 keyring automatically and persists it outside PostgreSQL, under a private local directory or a
 separate writable container volume. A database installation ID selects the default key location;
