@@ -91,21 +91,23 @@ export function inheritSheetVerdicts(run, previous, sheets, review) {
       const changed = [];
       const added = [];
       const unchanged = [];
+      const unverifiable = {};
       for (const sheet of current.evidence.sheets) {
         const before = old.get(sheet.name);
         if (!before) { added.push(sheet.name); continue; }
         let same = false;
-        try { same = matchingSheet(run, previous, sheet, before); } catch { /* Invalid evidence requires a new reading. */ }
+        try { same = matchingSheet(run, previous, sheet, before); } catch (failure) { unverifiable[sheet.name] = failure.message; }
         if (!same) { changed.push(sheet.name); continue; }
         unchanged.push(sheet.name);
         if (!review.sheets?.[sheet.name] && trustedVerdict(audit, manual, sheet.name)) {
           inherited[sheet.name] = { verdict: "clean", by: `inherited:${previousName}` };
         }
       }
-      changes = { changed, added, unchanged: unchanged.length };
+      changes = { changed, added, unchanged: unchanged.length, unverifiable };
     } catch (failure) {
       const known = ["The previous run is the current run", "Incompatible sheet evidence", "Previous review evidence is stale"];
-      const reason = known.includes(failure.message) ? failure.message : "Previous review or screenshot evidence is missing or invalid";
+      const reason = known.includes(failure.message) ? failure.message
+        : `Previous review or screenshot evidence is missing or invalid: ${failure.message}`;
       try {
         const fallback = sheetChanges(run, previous);
         changes = fallback.unavailable ? { unavailable: reason } : { ...fallback, inheritanceUnavailable: reason };

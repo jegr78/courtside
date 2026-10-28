@@ -192,6 +192,39 @@ test("given run-data masks captured at another pixel density, when native eviden
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+test("given an invalid masking record, when the report compares native evidence, then the changed sheet keeps the reason it could not be compared", { skip }, () => {
+  // given
+  const root = mkdtempSync(join(tmpdir(), "sheet-inheritance-unverifiable-"));
+  try {
+    const previous = maskedRun(root, "previous", "time", "12:34"); reviewRun(previous);
+    const next = maskedRun(root, "current", "time", "12:35", { mutate: (record) => { record.schemaVersion = 2; return record; } });
+    const name = next.sheets.names[0];
+    // when
+    const result = report(next, previous);
+    // then
+    assert.deepEqual(result.changedSheets.changed, [name], "evidence that cannot be compared still needs a fresh reading");
+    assert.deepEqual(result.changedSheets.unverifiable, { [name]: "Invalid comparison evidence" },
+      "the report retains why the sheet could not be compared");
+    assert.match(readFileSync(join(next.run, "report", "index.html"), "utf8"), /Invalid comparison evidence/,
+      "the reader sees the reason beside the changed sheet");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("given a previous run without its review audit, when the next report compares it, then the unavailable inheritance names the missing evidence", { skip }, () => {
+  // given
+  const root = mkdtempSync(join(tmpdir(), "sheet-inheritance-missing-audit-"));
+  try {
+    const previous = makeRun(root, "previous");
+    const current = makeRun(root, "current");
+    // when
+    const result = report(current, previous);
+    // then
+    assert.equal(result.status, "draft");
+    assert.match(result.changedSheets.inheritanceUnavailable, /missing or invalid: .*sheet-review\.json/,
+      "the fallback keeps the underlying failure rather than only its category");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test("given valid run-data masks and an unmasked defect, when the report compares native pixels, then it refuses inheritance", { skip }, () => {
   // given
   const root = mkdtempSync(join(tmpdir(), "sheet-inheritance-unmasked-defect-"));
