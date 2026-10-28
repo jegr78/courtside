@@ -64,7 +64,7 @@ class MfaManagement {
     @Transactional
     Confirmation confirmTotp(String code, String address) {
         UserAccount account = currentForChange();
-        String bucket = "mfa:" + account.getId();
+        String bucket = "mfa-enrollment:" + account.getId();
         if (attempts.registerCredentialAttempt(bucket, address).isPresent()) {
             return new Confirmation(false, true, List.of());
         }

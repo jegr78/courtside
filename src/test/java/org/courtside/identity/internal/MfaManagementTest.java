@@ -125,6 +125,22 @@ class MfaManagementTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenRepeatedlyMistypedSetupCodes_whenTheHolderLaterSignsIn_thenTheyDoNotCountAgainstTheSecondFactor() throws Exception {
+        // given
+        MockHttpSession session = signIn(200);
+        setup(session);
+        // when
+        for (int attempt = 0; attempt < 6; attempt++) {
+            mvc.perform(post("/api/account/mfa/totp/confirmation").session(session).with(csrf())
+                    .contentType(MediaType.APPLICATION_JSON).content("{\"code\":\"invalid\"}"))
+                    .andExpect(status().isForbidden());
+        }
+        // then
+        assertThat(jdbc.sql("SELECT count(*) FROM login_attempt_limit WHERE scope = 'FACTOR'").query(Long.class).single())
+                .as("setup confirmations keep their own budget").isZero();
+    }
+
+    @Test
     void givenActiveMfaAndFreshFullProof_whenReplacingRecoveryCodes_thenThePreviousSetAndSessionAreInvalid() throws Exception {
         // given
         List<String> previous = activate();

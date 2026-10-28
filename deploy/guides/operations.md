@@ -1209,6 +1209,10 @@ default.
 | `COURTSIDE_LOGIN_ADDRESS_MAX_FAILURES` | `20` | Password-verification attempts allowed per login source, and independently per signed-in account and credential-proof source, within the window. The account limit prevents a stolen session from gaining a fresh budget by changing addresses; a successful proof clears that account's count but not the source's request-volume count. |
 | `COURTSIDE_LOGIN_ADDRESS_WINDOW` | `1m` | Counting window for each password-verification limit above. |
 | `COURTSIDE_LOGIN_ADDRESS_BLOCK` | `1m` | Temporary block duration after any password-verification limit above is reached. |
+| `COURTSIDE_LOGIN_FACTOR_MAX_FAILURES` | `5` | Consecutive failed second-factor proofs of one account before its sign-in, sensitive-action proof and factor checks pause. Failures count until a proof succeeds; waiting out a pause does not reset them. The first pause of a run mails the holder. |
+| `COURTSIDE_LOGIN_FACTOR_BLOCK` | `1m` | Length of the first pause. Every further run of failures doubles it. |
+| `COURTSIDE_LOGIN_FACTOR_MAX_BLOCK` | `24h` | Longest pause. |
+| `COURTSIDE_LOGIN_FACTOR_RETENTION` | `30d` | Time without a failed proof after which an account's run of failures is forgotten. |
 | `COURTSIDE_LOGIN_VERIFICATION_CONCURRENCY` | `2` | Maximum simultaneous password verifications in each of two isolated pools: sign-ins reserve this capacity independently from reauthentication and password changes, so a stalled breached-password lookup cannot consume sign-in capacity. Further attempts in the affected pool receive `429` with `Retry-After: 1` and may retry as soon as capacity is free. |
 | `COURTSIDE_LOGIN_GLOBAL_THRESHOLD` | `100` | Observed instance-wide login attempts per window before `courtside.login.distributed.thresholds` is incremented and one privacy-safe warning is written. It does not block sign-in. |
 | `COURTSIDE_LOGIN_GLOBAL_WINDOW` | `1m` | Window for the instance-wide diagnostic threshold. |

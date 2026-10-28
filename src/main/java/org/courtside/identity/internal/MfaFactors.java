@@ -57,14 +57,13 @@ class MfaFactors {
                     OR credentials_expire_at > :now) FROM user_account WHERE id = :id FOR UPDATE
                 """).param("id", account).param("now", clock.instant().atOffset(ZoneOffset.UTC))
                 .query(Boolean.class).optional().orElse(false)) return Verification.INVALID;
-        String bucket = "mfa:" + account;
-        if (attempts.registerCredentialAttempt(bucket, address).isPresent()) return Verification.LIMITED;
+        if (attempts.registerFactorAttempt(account, address).isPresent()) return Verification.LIMITED;
         if (!enabled(account) || recoveryPending(account)
                 || !proof.getAsBoolean()) {
             events.controlRefused(account, SecurityEventLog.ControlRefusal.MFA_PROOF_FAILED);
             return Verification.INVALID;
         }
-        attempts.clearCredentialAccountAttempt(bucket);
+        attempts.clearFactorAttempt(account);
         return Verification.VALID;
     }
 }

@@ -3,6 +3,7 @@ package org.courtside.notification.internal;
 import lombok.RequiredArgsConstructor;
 import org.courtside.config.ClubIdentity;
 import org.courtside.identity.AccountMfaChanged;
+import org.courtside.identity.SecondFactorGuessingBlocked;
 import org.courtside.identity.UserAccountRepository;
 import org.courtside.notification.MessageKind;
 import org.springframework.stereotype.Component;
@@ -28,9 +29,14 @@ class AccountSecurityMailer implements MessageComposer {
         outbox.queue(changed.accountId(), MessageKind.ACCOUNT_SECURITY_CHANGED, Map.of());
     }
 
+    @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT)
+    void on(SecondFactorGuessingBlocked blocked) {
+        outbox.queue(blocked.accountId(), MessageKind.ACCOUNT_FACTOR_GUESSING_BLOCKED, Map.of());
+    }
+
     @Override
     public Set<MessageKind> kinds() {
-        return Set.of(MessageKind.ACCOUNT_SECURITY_CHANGED);
+        return Set.of(MessageKind.ACCOUNT_SECURITY_CHANGED, MessageKind.ACCOUNT_FACTOR_GUESSING_BLOCKED);
     }
 
     @Override

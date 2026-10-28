@@ -58,7 +58,7 @@
       "allowedFields": ["account.id", "event.code", "event.outcome", "event.reason"],
       "allowedValues": {
         "event.reason": ["LOGIN_ADDRESS_LIMIT", "PASSWORD_VERIFICATION_ACCOUNT_LIMIT",
-          "PASSWORD_VERIFICATION_ADDRESS_LIMIT", "ACCOUNT_RECOVERY_SUBJECT_LIMIT",
+          "PASSWORD_VERIFICATION_ADDRESS_LIMIT", "SECOND_FACTOR_ACCOUNT_LIMIT", "ACCOUNT_RECOVERY_SUBJECT_LIMIT",
           "ACCOUNT_RECOVERY_ADDRESS_LIMIT", "DISTRIBUTED_LOGIN_THRESHOLD",
           "REQUEST_BUDGET"]
       }

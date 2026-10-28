@@ -261,6 +261,7 @@ class LoginAttemptFilterTest {
     private static LoginVerificationCapacity capacity(int permits) {
         return new LoginVerificationCapacity(new LoginProtectionProperties(
                 new LoginProtectionProperties.Limit(20, Duration.ofMinutes(1), Duration.ofMinutes(1)),
+                new LoginProtectionProperties.Factor(5, Duration.ofMinutes(1), Duration.ofHours(24), Duration.ofDays(30)),
                 new LoginProtectionProperties.Observation(100, Duration.ofMinutes(1)), permits));
     }
 }

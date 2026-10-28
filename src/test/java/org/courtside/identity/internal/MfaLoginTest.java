@@ -229,7 +229,7 @@ class MfaLoginTest extends AbstractIntegrationTest {
         long consumedStep = jdbc.sql("SELECT totp_last_step FROM account_mfa WHERE account_id = :id")
                 .param("id", account).query(Long.class).single();
         for (int attempt = 1; attempt <= 5; attempt++) {
-            assertThat(attempts.registerCredentialAttempt("mfa:" + account, "192.0.2." + attempt)).isEmpty();
+            assertThat(attempts.registerFactorAttempt(account, "192.0.2." + attempt)).isEmpty();
         }
 
         // when / then

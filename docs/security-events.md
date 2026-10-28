@@ -12,6 +12,7 @@ credential issuance, replacement and withdrawal, administrative security changes
 protections and concrete refusals by rate, CSRF and request-validation controls. MFA actions include
 factor activation, correction and removal, recovery-code replacement, controlled recovery and
 maintenance email correction. Failed factor and controlled-recovery proofs use typed refusal reasons.
+A pause after consecutive failed second-factor proofs triggers `SECOND_FACTOR_ACCOUNT_LIMIT` with the account.
 A known account is named only by its immutable `account.id`; an administrative actor uses `actor.account.id`. Request-bound events
 inherit the short-lived `traceId` and `spanId` from the normal logging context.
 

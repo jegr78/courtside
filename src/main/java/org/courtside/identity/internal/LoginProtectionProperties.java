@@ -13,6 +13,7 @@ import java.util.stream.Stream;
 @Validated
 @ConfigurationProperties("courtside.login-protection")
 record LoginProtectionProperties(@NotNull @Valid Limit address,
+                                 @NotNull @Valid Factor factor,
                                  @NotNull @Valid Observation global,
                                  @Min(1) int verificationConcurrency) {
 
@@ -25,6 +26,20 @@ record LoginProtectionProperties(@NotNull @Valid Limit address,
     record Limit(@Min(1) int maxFailures,
                  @NotNull @DurationMin(seconds = 1) Duration window,
                  @NotNull @DurationMin(seconds = 1) Duration block) {
+    }
+
+    record Factor(@Min(1) int maxFailures,
+                  @NotNull @DurationMin(seconds = 1) Duration block,
+                  @NotNull @DurationMin(seconds = 1) Duration maxBlock,
+                  @NotNull @DurationMin(seconds = 1) Duration retention) {
+
+        Duration blockAfter(int blocks) {
+            Duration duration = block;
+            for (int doubled = 1; doubled < blocks && duration.compareTo(maxBlock) < 0; doubled++) {
+                duration = duration.multipliedBy(2);
+            }
+            return duration.compareTo(maxBlock) > 0 ? maxBlock : duration;
+        }
     }
 
     record Observation(@Min(1) int threshold,

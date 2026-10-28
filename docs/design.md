@@ -755,7 +755,10 @@ Password verification creates an unauthenticated, roleless pending session for a
 Its database challenge binds account ID, security epoch, browser session and purpose. Challenges
 expire after five minutes and permit at most five proof attempts. Requesting fresh WebAuthn options
 does not extend the password challenge's lifetime or reset its attempt budget. Account and address
-budgets also survive a restarted login. Only a completed factor creates an authenticated session,
+budgets also survive a restarted login. Every five consecutive failed proofs of an account pause its
+second-factor checks, for one minute at first and twice as long after each further run, up to 24
+hours. Only a successful proof or 30 days without a failure reset the count. The first pause of a
+run mails the holder. Enrollment confirmations count separately. Only a completed factor creates an authenticated session,
 records sign-in and establishes recent proof. WebAuthn signature counters cannot decrease; a
 synchronized credential that consistently reports zero remains supported.
 

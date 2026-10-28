@@ -48,7 +48,7 @@ class MfaWebAuthnFlow {
         var challenge = challenges.attempt(id, account.getId(), account.getSecurityEpoch(),
                 MfaChallenges.Purpose.WEBAUTHN_REGISTRATION, session);
         if (challenge.isEmpty()) return new MfaManagement.Confirmation(false, false, List.of());
-        String bucket = "mfa:" + account.getId();
+        String bucket = "mfa-enrollment:" + account.getId();
         if (attempts.registerCredentialAttempt(bucket, address).isPresent()) {
             return new MfaManagement.Confirmation(false, true, List.of());
         }
