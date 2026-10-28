@@ -102,7 +102,8 @@ test("given an image from a pull request, when the gates run, then nothing logs 
   for (const login of logins) {
     assert.equal(login.condition, "inputs.image-source == 'registry'", `${login.name} logs in for a PR image`);
   }
-  assert.doesNotMatch(gatesSource, /push: true|docker push/, "no gate writes to a registry");
+  assert.doesNotMatch(gatesSource, /push: true|docker push/,
+    "no gate step writes to a registry; the installed upgrade pushes only to its own loopback stand-in");
 });
 
 test("given an image from a pull request, when the gates run, then the shipped launcher installs and updates it by digest", () => {
@@ -121,7 +122,7 @@ test("given an image from a pull request, when the gates run, then the shipped l
   assert.equal(checkout.with["fetch-depth"], 0, "the smoke archives the published origin's deployment from history");
   assert.equal(checkout.with.ref, "${{ inputs.source-commit }}");
   assert.equal(image.uses, "./.github/actions/gate-image");
-  assert.notEqual(image.with.load, "false", "the stand-in registry serves the loaded image");
+  assert.equal(image.with.load ?? action.inputs.load.default, "true", "the stand-in registry serves the loaded image");
   assert.equal(image.with.artifact, "${{ inputs.image-artifact }}");
   assert.match(smoke.run, /--confirm installed-upgrade-gate/);
   for (const input of ["image-digest", "booking-seed-digest", "archive-version", "archive-ref", "archive-workflow",

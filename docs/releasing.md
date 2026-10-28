@@ -55,8 +55,8 @@ carries. If retention deleted that nightly before the pull, `upgrade` chooses ag
 published origin the next release will support, so a migration that cannot run over a published
 database fails its own pull request rather than the next release. The jobs that run the image load it and refer to it by image ID; `mail` and
 `archive-reproducibility` only bind the archive and read the pinned name it records.
-`installed-upgrade` repeats the nightly qualification's installed update: the 0.1.0 launcher installs
-an instance and the candidate's launcher updates it. The launcher pulls the official
+`installed-upgrade` repeats the nightly qualification's installed update: the launcher of a 0.1.0
+nightly installs an instance on the candidate image, and the candidate's launcher updates it. The launcher pulls the official
 `ghcr.io/jegr78/courtside@sha256:…` name, so `tools/installed-upgrade-gate.mjs` serves the loaded
 image under that name from a registry on `127.0.0.1:443`, which the runner trusts and resolves for that
 job only, and archives the candidate with the digest that registry serves. The nightly and the release

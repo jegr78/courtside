@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { request } from "node:https";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -60,6 +60,8 @@ function issueCertificates() {
     "-addext", "keyUsage=critical,keyCertSign", "-keyout", at("ca.key"), "-out", at("ca.crt")]);
   run("openssl", ["req", "-newkey", "rsa:2048", "-nodes", "-subj", `/CN=${registryHost}`,
     "-keyout", at("registry.key"), "-out", at("registry.csr")]);
+  // The registry runs as root without CAP_DAC_OVERRIDE, so it cannot read a key only its owner may read.
+  chmodSync(at("registry.key"), 0o644);
   writeFileSync(at("registry.ext"), `subjectAltName=DNS:${registryHost}\nextendedKeyUsage=serverAuth\n`);
   run("openssl", ["x509", "-req", "-in", at("registry.csr"), "-CA", at("ca.crt"), "-CAkey", at("ca.key"),
     "-CAcreateserial", "-days", "1", "-extfile", at("registry.ext"), "-out", at("registry.crt")]);
@@ -68,7 +70,13 @@ function issueCertificates() {
 }
 
 function announcedHosts() {
-  if (existsSync(trustDirectory)) throw new Error(`${trustDirectory} exists; the stand-in registry will not replace it`);
+  if (run("sudo", ["-n", "true"], { allowFailure: true }).status !== 0) {
+    throw new Error("the installed upgrade gate needs passwordless sudo to trust and resolve its stand-in registry");
+  }
+  if (run("sudo", ["-n", "test", "-e", trustDirectory], { allowFailure: true }).status === 0) {
+    throw new Error(`${trustDirectory} exists; if an interrupted run of this gate left it, remove it and any `
+      + `"${hostsMarker}" line in ${hostsFile}`);
+  }
   return withRegistryHost(readFileSync(hostsFile, "utf8"));
 }
 
@@ -82,6 +90,24 @@ function withdraw() {
   run("sudo", ["-n", "rmdir", trustDirectory], { allowFailure: true });
   const hosts = readFileSync(hostsFile, "utf8");
   if (hosts !== withoutRegistryHost(hosts)) run("sudo", ["-n", "tee", hostsFile], { input: withoutRegistryHost(hosts) });
+}
+
+function cleanup(environment, deployment) {
+  const problems = [];
+  const attempt = (label, step) => {
+    try {
+      step();
+    } catch (error) {
+      problems.push(`${label}: ${error.message}`);
+    }
+  };
+  attempt("withdraw the stand-in registry", withdraw);
+  attempt("keep the registry log", () => writeFileSync(join(evidence, "registry.log"),
+    run("docker", [...compose, "logs", "--no-color", "registry"], { env: environment, allowFailure: true }).stdout ?? ""));
+  attempt("stop the registry", () => run("docker", [...compose, "down", "--volumes"], { env: environment }));
+  attempt("remove the certificates", () => rmSync(certificates, { recursive: true, force: true }));
+  if (deployment) attempt("remove the deployment", () => rmSync(deployment, { recursive: true, force: true }));
+  return problems;
 }
 
 const manifestTypes = ["application/vnd.oci.image.index.v1+json", "application/vnd.oci.image.manifest.v1+json",
@@ -141,12 +167,21 @@ function options(args) {
 async function execute() {
   const named = options(process.argv.slice(2));
   const name = `${registryHost}/${named.repository.toLowerCase()}`;
-  rmSync(evidence, { recursive: true, force: true });
-  const authority = issueCertificates();
-  const environment = { ...process.env, COURTSIDE_UPGRADE_REGISTRY_CERTIFICATES: certificates };
-  const deployment = mkdtempSync(join(tmpdir(), "courtside-installed-upgrade-gate-"));
   const hosts = announcedHosts();
+  rmSync(evidence, { recursive: true, force: true });
+  mkdirSync(evidence, { recursive: true });
+  const environment = { ...process.env, COURTSIDE_UPGRADE_REGISTRY_CERTIFICATES: certificates };
+  let deployment;
+  for (const [signal, code] of [["SIGINT", 130], ["SIGTERM", 143]]) {
+    process.once(signal, () => {
+      cleanup(environment, deployment);
+      process.exit(code);
+    });
+  }
+  let failure;
   try {
+    const authority = issueCertificates();
+    deployment = mkdtempSync(join(tmpdir(), "courtside-installed-upgrade-gate-"));
     announce(authority, hosts);
     await serve(authority, environment);
     const image = await publish(authority, named.image, name, "app");
@@ -161,13 +196,13 @@ async function execute() {
       "--recipes", "funnel", "--output", join(evidence, "archive.json")], { inherit: true });
     run(process.execPath, ["tools/installed-upgrade-smoke.mjs", "--candidate", join(deployment, "extracted"),
       "--confirm", "installed-postgresql-upgrade"], { inherit: true });
-  } finally {
-    writeFileSync(join(evidence, "registry.log"),
-      run("docker", [...compose, "logs", "--no-color", "registry"], { env: environment, allowFailure: true }).stdout ?? "");
-    run("docker", [...compose, "down", "--volumes"], { env: environment, allowFailure: true });
-    rmSync(certificates, { recursive: true, force: true });
-    withdraw();
-    rmSync(deployment, { recursive: true, force: true });
+  } catch (error) {
+    failure = error;
+  }
+  const problems = cleanup(environment, deployment);
+  if (failure || problems.length > 0) {
+    writeFileSync(join(evidence, "failure.txt"), `${[failure?.stack, ...problems].filter(Boolean).join("\n")}\n`);
+    throw failure ?? new Error(problems.join("; "));
   }
 }
 

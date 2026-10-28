@@ -41,14 +41,19 @@ test("given a hosts file that already routes ghcr.io, when the stand-in is annou
 
 test("given the registry's answer for the pushed tag, when the served reference is read, then the official name carries its digest", () => {
   // given
-  const answer = { "docker-content-digest": `sha256:${digest}`, "content-type": "application/vnd.oci.image.manifest.v1+json" };
+  const recorded = ["content-type: application/vnd.oci.image.manifest.v1+json",
+    "docker-content-digest: sha256:c26612752c78b18faacd63c7d50f4592c2e7b0f25e0e20e82bd74e465c57ab0d",
+    "docker-distribution-api-version: registry/2.0",
+    'etag: "sha256:c26612752c78b18faacd63c7d50f4592c2e7b0f25e0e20e82bd74e465c57ab0d"'];
+  const answer = Object.fromEntries(recorded.map((line) => line.split(/: (.*)/s).slice(0, 2)));
 
   // when
   const reference = servedReference("ghcr.io/example/courtside", answer);
 
   // then
-  assert.equal(reference, `ghcr.io/example/courtside@sha256:${digest}`,
-    "the launcher pulls what the registry serves, which a containerd image store may not record locally");
+  assert.equal(reference,
+    "ghcr.io/example/courtside@sha256:c26612752c78b18faacd63c7d50f4592c2e7b0f25e0e20e82bd74e465c57ab0d",
+    "registry:3.1 answered this HEAD for a pushed image whose local index digest was be2656061b53");
 });
 
 test("given a registry answer without a digest, when it is read, then the gate names what is missing", () => {

@@ -598,7 +598,7 @@ jobs:
           run-id: ${{ inputs.artifacts-run-id || github.run_id }}
           github-token: ${{ github.token }}
 
-      - name: Upgrade an installed PostgreSQL 17 release through the shipped launcher
+      - name: Upgrade an installed PostgreSQL 17 nightly through the shipped launcher
         env:
           IMAGE: ${{ inputs.image-digest }}
           BOOKING_SEED_IMAGE: ${{ inputs.booking-seed-digest }}
