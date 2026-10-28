@@ -120,7 +120,7 @@ test("given an operator key backup and a failed target restore, when the applica
   const calls = [];
   const execute = (plan) => {
     calls.push(plan);
-    if (plan.args.includes("--clean")) throw new Error("target restore interrupted");
+    if (plan.args.includes("db") && plan.args.includes("/bin/sh")) throw new Error("target restore interrupted");
   };
   try {
     // when / then
@@ -406,7 +406,7 @@ for (const change of ["a symlinked directory", "replaced files", "in place write
     const execute = (plan) => {
       if (plan.stdin !== undefined) {
         const received = readFileSync(plan.stdin);
-        if (plan.args.includes("pg_restore")) databases.push(received);
+        if (plan.args.includes("db")) databases.push(received);
         else keys.push(received);
       }
       if (plan.args.includes("down")) {
@@ -575,6 +575,33 @@ test("given private archive inspection that fails, when verification unwinds, th
       throw new Error("archive inspection interrupted");
     }), /archive inspection interrupted/);
     assert.equal(existsSync(dirname(snapshot)), false);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+
+test("given an older UAT dump, when the validated target is replaced, then schema cleanup and import share one transaction", async () => {
+  // given
+  const { restoreUatRecovery } = await import("./mfa-key-custody.mjs");
+  const directory = mkdtempSync(join(tmpdir(), "courtside-legacy-restore-plan-"));
+  const source = recoverySource(directory, "source", "legacy");
+  let replacement;
+  const execute = (plan) => {
+    if (plan.args.includes("db") && plan.stdin !== undefined && plan.args.includes("--clean")) replacement = plan;
+    if (plan.args.includes("db") && plan.args.includes("/bin/sh")) replacement = plan;
+  };
+  try {
+    // when
+    restoreUatRecovery(source, ["compose", "-p", "courtside-uat-owned-legacy"], { COURTSIDE_UAT_IMAGE: "courtside:uat-local" }, execute);
+    // then
+    assert.ok(replacement, "the validated backup must replace the target database");
+    assert.equal(replacement.args[replacement.args.indexOf("db") + 1], "/bin/sh");
+    const command = replacement.args.at(-1);
+    assert.match(command, /pg_restore[^;]+--file=/);
+    assert.match(command, /psql[^;]+--single-transaction/);
+    assert.match(command, /ON_ERROR_STOP=1/);
+    assert.match(command, /DROP SCHEMA public CASCADE; CREATE SCHEMA public;/);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }

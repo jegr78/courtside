@@ -190,6 +190,11 @@ function validateCapturedRecovery(database, keys, environment, execute) {
   }
 }
 
+export function restoreUatDatabase(input, compose, environment, execute) {
+  execute({ command: "docker", args: [...compose, "exec", "-T", "db", "/bin/sh", "-ec",
+    `umask 077; directory=$(mktemp -d); trap 'rm -rf "$directory"' EXIT; cat > "$directory/database.dump"; pg_restore --no-owner --file="$directory/database.sql" "$directory/database.dump"; psql --single-transaction --set=ON_ERROR_STOP=1 -U courtside -d courtside --command='DROP SCHEMA public CASCADE; CREATE SCHEMA public;' --file="$directory/database.sql"`], environment, stdin: input });
+}
+
 export function restoreUatRecovery(source, compose, environment, execute) {
   return privateRecovery((directory) => {
     const originalEnvironment = environment;
@@ -217,7 +222,7 @@ export function restoreUatRecovery(source, compose, environment, execute) {
       importCapturedKeys(keys, compose, environment, execute);
       const input = openSync(database, "r");
       try {
-        execute({ command: "docker", args: [...compose, "exec", "-T", "db", "pg_restore", "--clean", "--if-exists", "--no-owner", "--single-transaction", "--exit-on-error", "-U", "courtside", "-d", "courtside"], environment, stdin: input });
+        restoreUatDatabase(input, compose, environment, execute);
       } finally {
         closeSync(input);
       }
