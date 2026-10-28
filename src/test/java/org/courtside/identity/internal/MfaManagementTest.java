@@ -169,6 +169,33 @@ class MfaManagementTest extends AbstractIntegrationTest {
         mvc.perform(get("/api/account/mfa").session(signIn(200))).andExpect(jsonPath("$.enabled").value(false));
     }
 
+    @Test
+    void givenTotpAsTheOnlyFactor_whenRemovingItWithFreshProof_thenRecoveryCodesAndTheOldSessionAreRevoked() throws Exception {
+        // given
+        MockHttpSession session = complete(activate().getFirst());
+        // when
+        mvc.perform(delete("/api/account/mfa/totp").session(session).with(csrf())).andExpect(status().isNoContent());
+        // then
+        assertThat(recovery.remaining(account)).isZero();
+        assertThat(jdbc.sql("SELECT totp_secret IS NULL FROM account_mfa WHERE account_id = :id")
+                .param("id", account).query(Boolean.class).single()).isTrue();
+        mvc.perform(get("/api/session").session(session)).andExpect(jsonPath("$.authenticated").value(false));
+        mvc.perform(get("/api/account/mfa").session(signIn(200))).andExpect(jsonPath("$.enabled").value(false));
+    }
+
+    @Test
+    void givenNoEnrolledFactor_whenRemovingOrDisablingMfa_thenThePasswordSessionSurvivesAndCodesCannotBeGenerated() throws Exception {
+        // given
+        MockHttpSession session = signIn(200);
+        // when / then
+        mvc.perform(delete("/api/account/mfa/totp").session(session).with(csrf())).andExpect(status().isNoContent());
+        mvc.perform(delete("/api/account/mfa").session(session).with(csrf())).andExpect(status().isNoContent());
+        mvc.perform(get("/api/session").session(session)).andExpect(jsonPath("$.authenticated").value(true));
+        mvc.perform(post("/api/account/mfa/recovery-codes").session(session).with(csrf()))
+                .andExpect(status().isForbidden()).andExpect(jsonPath("$.type").value("urn:courtside:error:mfa-proof-failed"));
+        assertThat(recovery.remaining(account)).isZero();
+    }
+
     private List<String> activate() throws Exception {
         MockHttpSession session = signIn(200);
         byte[] secret = Base32.decode(setup(session).getSecret());

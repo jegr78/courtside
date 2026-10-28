@@ -16,6 +16,7 @@ import org.springframework.security.web.webauthn.api.ResidentKeyRequirement;
 import org.springframework.security.web.webauthn.api.UserVerificationRequirement;
 
 import java.util.Map;
+import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -75,6 +76,35 @@ class MfaWebAuthnCodecTest {
                 .isInstanceOf(MfaProofFailedException.class);
         assertThatThrownBy(() -> codec.attestation(Map.of("rawId", "malformed base64?")))
                 .isInstanceOf(MfaProofFailedException.class);
+    }
+
+    @Test
+    void givenNativeTimeoutAndExtensionOptions_whenRoundTripping_thenBrowserValuesArePreserved() {
+        // given
+        String json = "{\"challenge\":\"AQID\",\"rpId\":\"courts.example.org\",\"timeout\":45000,"
+                + "\"userVerification\":\"preferred\",\"extensions\":{\"credProps\":true}}";
+        // when
+        var options = codec.decode(json, PublicKeyCredentialRequestOptions.class);
+        var restored = codec.decode(codec.encode(options), PublicKeyCredentialRequestOptions.class);
+        // then
+        assertThat(restored.getTimeout()).isEqualTo(Duration.ofSeconds(45));
+        assertThat(restored.getUserVerification()).isEqualTo(UserVerificationRequirement.PREFERRED);
+        assertThat(codec.encode(restored)).contains("\"credProps\":true", "\"timeout\":45000");
+        assertThat(codec.decode(json.replace("preferred", "discouraged"), PublicKeyCredentialRequestOptions.class)
+                .getUserVerification()).isEqualTo(UserVerificationRequirement.DISCOURAGED);
+    }
+
+    @Test
+    void givenAbsentOrUnknownProtocolValues_whenDecoding_thenOnlyTheTypedProofFailureEscapes() {
+        // when / then
+        assertThatThrownBy(() -> codec.decode("null", PublicKeyCredentialRequestOptions.class))
+                .isInstanceOf(MfaProofFailedException.class).hasMessage("identity.mfa.proofFailed");
+        assertThatThrownBy(() -> codec.attestation(null))
+                .isInstanceOf(MfaProofFailedException.class).hasMessage("identity.mfa.proofFailed");
+        assertThatThrownBy(() -> codec.assertion(Map.of("rawId", "not valid base64?")))
+                .isInstanceOf(MfaProofFailedException.class).hasMessage("identity.mfa.proofFailed");
+        assertThatThrownBy(() -> codec.decode("{\"userVerification\":\"optional\"}", PublicKeyCredentialRequestOptions.class))
+                .isInstanceOf(MfaProofFailedException.class).hasMessage("identity.mfa.proofFailed");
     }
 
     private static PublicKeyCredentialCreationOptions creation() {

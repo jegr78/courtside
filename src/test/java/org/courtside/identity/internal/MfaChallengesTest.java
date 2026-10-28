@@ -4,6 +4,7 @@ import org.courtside.AbstractIntegrationTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.dao.InvalidDataAccessApiUsageException;
 import org.springframework.test.context.TestPropertySource;
 
 import java.time.Clock;
@@ -11,6 +12,7 @@ import java.time.ZoneOffset;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @TestPropertySource(properties = "courtside.session.concurrent-limit=2")
 class MfaChallengesTest extends AbstractIntegrationTest {
@@ -156,5 +158,58 @@ class MfaChallengesTest extends AbstractIntegrationTest {
         assertThat(challenges.attempt(first, account, 0, MfaChallenges.Purpose.LOGIN, "one")).isEmpty();
         assertThat(challenges.attempt(second, account, 0, MfaChallenges.Purpose.LOGIN, "two")).isPresent();
         assertThat(challenges.attempt(third, account, 0, MfaChallenges.Purpose.LOGIN, "three")).isPresent();
+    }
+
+    @Test
+    void givenIncompleteChallengeBindings_whenIssuing_thenNoChallengeIsPersisted() {
+        // given
+        UUID account = account();
+        // when / then
+        for (int invalid = 0; invalid < 4; invalid++) {
+            UUID owner = invalid == 0 ? null : account;
+            MfaChallenges.Purpose purpose = invalid == 1 ? null : MfaChallenges.Purpose.LOGIN;
+            String session = invalid == 2 ? null : invalid == 3 ? " " : "browser";
+            assertThatThrownBy(() -> challenges.issue(owner, 0, purpose, session, "options"))
+                    .isInstanceOf(InvalidDataAccessApiUsageException.class)
+                    .hasCauseInstanceOf(IllegalStateException.class).hasMessage("MFA challenge bindings are required");
+        }
+        assertThat(jdbc.sql("SELECT count(*) FROM mfa_challenge").query(Long.class).single()).isZero();
+    }
+
+    @Test
+    void givenBoundedChallengePayloads_whenUpdatingOptions_thenAbsentIdsAndOversizedValuesCannotReplaceThem() {
+        // given
+        UUID account = account();
+        String maximum = "x".repeat(65_536);
+        UUID id = challenges.issue(account, 0, MfaChallenges.Purpose.LOGIN, "browser", maximum).orElseThrow();
+        // when / then
+        assertThat(challenges.setPayload(id, account, 0, MfaChallenges.Purpose.LOGIN, "browser", maximum)).isTrue();
+        for (String invalid : new String[]{null, maximum + "x"}) {
+            assertThatThrownBy(() -> challenges.issue(account, 0, MfaChallenges.Purpose.LOGIN, "browser", invalid))
+                    .isInstanceOf(InvalidDataAccessApiUsageException.class).hasMessage("Invalid MFA challenge options");
+            assertThatThrownBy(() -> challenges.setPayload(id, account, 0, MfaChallenges.Purpose.LOGIN, "browser", invalid))
+                    .isInstanceOf(InvalidDataAccessApiUsageException.class).hasMessage("Invalid MFA challenge options");
+        }
+        assertThat(challenges.setPayload(null, account, 0, MfaChallenges.Purpose.LOGIN, "browser", "changed")).isFalse();
+        assertThat(challenges.setPayload(id, account, 1, MfaChallenges.Purpose.LOGIN, "browser", "changed")).isFalse();
+        assertThat(challenges.attempt(null, account, 0, MfaChallenges.Purpose.LOGIN, "browser")).isEmpty();
+        assertThat(challenges.consume(null)).isFalse();
+        assertThat(jdbc.sql("SELECT payload FROM mfa_challenge WHERE id = :id").param("id", id)
+                .query(String.class).single()).isEqualTo(maximum);
+    }
+
+    @Test
+    void givenMissingOrRecoveryBlockedAccounts_whenIssuingOrAttempting_thenNoChallengeCanAuthenticate() {
+        // given
+        UUID missing = UUID.randomUUID();
+        UUID account = account();
+        UUID id = challenges.issue(account, 0, MfaChallenges.Purpose.LOGIN, "browser", "options").orElseThrow();
+        jdbc.sql("INSERT INTO account_mfa (account_id, recovery_pending) VALUES (:id, true)").param("id", account).update();
+        // when / then
+        assertThat(challenges.issue(missing, 0, MfaChallenges.Purpose.LOGIN, "browser", "options")).isEmpty();
+        assertThat(challenges.issue(account, 0, MfaChallenges.Purpose.LOGIN, "browser", "options")).isEmpty();
+        assertThat(challenges.attempt(id, account, 0, MfaChallenges.Purpose.LOGIN, "browser")).isEmpty();
+        assertThat(jdbc.sql("SELECT attempt_count FROM mfa_challenge WHERE id = :id").param("id", id)
+                .query(Integer.class).single()).isZero();
     }
 }

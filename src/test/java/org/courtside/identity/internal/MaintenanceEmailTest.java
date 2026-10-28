@@ -106,6 +106,29 @@ class MaintenanceEmailTest {
         assertRefused(file);
     }
 
+    @Test
+    void givenAnAbsentEmptyOrOversizedPrivateFile_whenRead_thenNoMaintenanceAddressIsAccepted() throws Exception {
+        // given
+        Path file = privateFile("");
+        // when / then
+        assertRefused(null);
+        assertRefused(temporary.toRealPath().resolve("missing"));
+        assertRefused(file);
+        for (String value : new String[]{"\n", " ", "x".repeat(256)}) {
+            Files.writeString(file, value, StandardCharsets.UTF_8);
+            assertRefused(file);
+        }
+    }
+
+    @Test
+    void givenRootOrOwnerDirectories_whenTrustIsEvaluated_thenWritableDirectoriesNeedTheRootStickyBoundary() {
+        // when / then
+        assertThat(MaintenanceEmail.trustedDirectory(0, 0755, 501, -1, 0)).isTrue();
+        assertThat(MaintenanceEmail.trustedDirectory(0, 0777, 501, 501, 0700)).isFalse();
+        assertThat(MaintenanceEmail.trustedDirectory(501, 01777, 501, 501, 0700)).isFalse();
+        assertThat(MaintenanceEmail.trustedDirectory(0, 01777, 501, -1, 0)).isFalse();
+    }
+
     private Path privateFile(String value) throws Exception {
         Path file = temporary.toRealPath().resolve("email");
         Files.writeString(file, value, StandardCharsets.UTF_8);
