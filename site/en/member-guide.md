@@ -41,6 +41,19 @@ If you opened a link to a page in Courtside, such as one of your bookings, Court
 after you sign in. This also applies when you first have to replace your one-time password. If your
 session ends while a page is open, the next sign-in also takes you back there.
 
+### The second step
+
+If you set up two-factor authentication, Courtside asks for a second proof after your password. This
+applies to every sign-in in every browser.
+
+1. Enter a code from your authenticator app or an unused recovery code.
+2. Select *Sign in*.
+
+With a security key or passkey, select *Use security key or passkey* instead and confirm your
+browser's request. The second step allows five minutes and five attempts. After that, start again
+with your password. *Sign in with another account* abandons the second step. If you have none of
+your factors left, *Lost your second factor?* leads to controlled recovery.
+
 Check the values first if Courtside refuses the sign-in. Your credentials may have expired, or the
 email may not have arrived. In either case, use *Forgotten your password or username?*. Only the
 board can reactivate a deactivated account.
@@ -49,7 +62,7 @@ board can reactivate a deactivated account.
 
 ## Forgotten password or username
 
-Account recovery does not require you to sign in. The page has three separate forms.
+Account recovery does not require you to sign in. The page has four separate forms.
 
 ### Request a code
 
@@ -65,7 +78,8 @@ Your current password remains valid. Open sessions stay signed in.
 2. Choose a new password.
 3. Select *Set password*.
 
-Only the new password works afterwards. Courtside ends every open session for the account. A
+Only the new password works afterwards. Courtside ends every open session for the account.
+Two-factor authentication stays in place if you set it up. A
 rejected password does not consume the code. The code is not case-sensitive, and you may omit its
 hyphen. Request a new code if the old one has expired.
 
@@ -78,12 +92,27 @@ Courtside gives the same response when a username or address is unknown. This pr
 from using the form to search for accounts. If no email arrives, check the username and the inbox.
 Ask the board if you still cannot recover the account.
 
+### Lost every second factor
+
+If you lost your authenticator app, your security keys and your recovery codes, only the club can
+help. Contact the board and have your identity verified. The board then starts controlled recovery.
+From that moment every session of your account ends. Sign-in and ordinary password recovery stay
+blocked. Courtside sends a time-limited code to your registered address.
+
+1. Enter your username and the code from the email.
+2. Enter a new password twice.
+3. Select *Recover account and set password*.
+
+Courtside removes every previous factor and recovery code. Sign in with the new password and set up
+two-factor authentication again. If your email address changes first, the code stops working and
+the board has to start recovery again.
+
 Too many attempts cause a waiting period. Sign-in and code redemption count attempts from the
 shared internet connection. Code requests also count the submitted username or address. Other
 people on the same network can therefore reach the same limit. Your current password remains
 unaffected.
 
-![The recovery page with forms for a code, a new password and usernames.](../screenshots/en/account-recovery.png)
+![The recovery page with forms for a code, a new password, usernames and lost second factors.](../screenshots/en/account-recovery.png)
 
 ## Replacing the one-time password
 
@@ -349,16 +378,61 @@ Courtside shows no unverified account details while offline.
 
 ![Your profile with username, separate name fields and assigned roles.](../screenshots/en/account-profile.png)
 
-*Account security* follows the profile, with your password and sessions.
+*Account security* follows the profile, with two-factor authentication, sessions and your password.
 Existing direct security links still reach that section.
 
 You must enter the current password before changing it. After saving, Courtside ends every session,
 including the one you are using. Sign in with the new password.
 
-You can also end one session or all sessions. If your sign-in is no longer recent, Courtside asks
-for your password before ending other sessions. You can end the current session without that extra
-check.
+You can also end one session or all sessions. If you signed in more than five minutes ago,
+Courtside asks for your password before ending other sessions. With two-factor authentication it
+also asks for a second proof. You can end the current session without that extra check.
 
 The board can correct errors in your name or username from the people administration.
 
-![Account security with the password form and list of active sessions.](../screenshots/en/account-security.png)
+![Account security with two-factor authentication, security keys, active sessions and the password form.](../screenshots/en/account-security.png)
+
+### Two-factor authentication
+
+A second factor protects your account even when someone knows your password. Setting one up is
+voluntary. You can use an authenticator app, a security key or a passkey. If you signed in more
+than five minutes ago, Courtside asks for your password again before any change. Once a factor is
+set up, it also asks for a code or your security key.
+
+To set up an authenticator app:
+
+1. Select *Set up authenticator app*.
+2. Scan the QR code with the app or enter the *Setup key*.
+3. Enter the current six-digit code and select *Confirm authenticator*.
+
+Only the confirmation activates the app. *Replace authenticator app* sets up a new app, and the
+previous one keeps working until you confirm the new one.
+
+To add a security key or passkey:
+
+1. Enter a *Device name* you will recognise.
+2. Select *Add security key or passkey*.
+3. Confirm your browser's request, for example with a PIN or fingerprint.
+
+Courtside receives only the signed result, never your fingerprint. Only you see device names. You
+can add several devices, rename each one and remove them one by one. Security keys need a supported
+browser and a secure connection configured by your club. If either is missing, Courtside explains
+it in this place, and the authenticator app remains available.
+
+### Recovery codes
+
+Your first factor comes with recovery codes. They appear exactly once, in the *Save your recovery
+codes* dialog. Keep them somewhere secure outside the device, such as a password manager or on
+paper. Each code replaces your second factor exactly once. Account security shows how many codes
+remain. *Generate new recovery codes* replaces every previous code.
+Select *Codes saved, continue to sign-in* only after you have saved them.
+
+### Changing or removing factors
+
+Every change to your factors ends all sessions, including the current one. Courtside emails you
+about security-relevant changes. The message names no device and no code.
+*Remove authenticator app*, *Remove device* and *Disable two-factor authentication* ask you to
+confirm first. After disabling, only your password protects your account.
+
+The board sees only whether your account has a second factor. It sees none of your devices, codes
+or device names. A password the board resets leaves your factors unchanged.
