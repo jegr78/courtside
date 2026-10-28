@@ -110,13 +110,15 @@ test("a board mistypes an address, the log shows the refusal, and the correction
   const credential = credentialIn(mailed, "Einmalpasswort:");
   await lastMessageOnThePerson(page, "HANDED_OVER");
   await openTheMessageLog(page);
-  await statesInTheLog(page, ["HANDED_OVER", "REFUSED", "REFUSED"]);
+  await statesInTheLog(page, ["HANDED_OVER", "REFUSED", "REFUSED", "REFUSED"]);
+  await expect(page.locator('[data-testid="message-row"][data-kind="ACCOUNT_ADDRESS_CHANGED"]'),
+    "the notice to the mistyped address is refused too").toHaveAttribute("data-state", "REFUSED");
   await expect(page.getByTestId("admin-messages-view")).not.toContainText(credential);
 
   // when — only what went wrong is asked for
   await page.getByTestId("messages-unsettled-filter").check();
 
   // then
-  await expect(page.getByTestId("message-row")).toHaveCount(2);
+  await expect(page.getByTestId("message-row")).toHaveCount(3);
   await expect(page.getByTestId("message-row").first()).toHaveAttribute("data-state", "REFUSED");
 });
