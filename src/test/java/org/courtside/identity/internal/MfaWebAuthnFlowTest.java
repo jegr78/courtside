@@ -7,7 +7,9 @@ import org.slf4j.LoggerFactory;
 import java.util.List;
 import jakarta.servlet.http.Cookie;
 import org.courtside.AbstractIntegrationTest;
+import org.bouncycastle.util.encoders.Base32;
 import org.courtside.api.ApiMfaRecoveryCodeSet;
+import org.courtside.api.ApiTotpEnrollment;
 import org.courtside.identity.Person;
 import org.courtside.identity.PersonRepository;
 import org.courtside.identity.Role;
@@ -16,10 +18,15 @@ import org.courtside.identity.UserAccountRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.webauthn.api.PublicKeyCredentialCreationOptions;
 import org.springframework.security.web.webauthn.api.PublicKeyCredentialRequestOptions;
@@ -31,6 +38,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
@@ -38,11 +47,15 @@ import java.time.ZoneOffset;
 import java.util.Base64;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -62,6 +75,9 @@ class MfaWebAuthnFlowTest extends AbstractIntegrationTest {
     @Autowired private JdbcClient jdbc;
     @Autowired private Clock clock;
     @Autowired private MfaTotpRepository totp;
+    @Autowired private MfaRecoveryCodeRepository recovery;
+    @Autowired private LoginAttemptProtection attempts;
+    @Autowired private MfaWebAuthnFlow flow;
     private MockMvc mvc;
     private UUID account;
 
@@ -283,17 +299,263 @@ class MfaWebAuthnFlowTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.totpAvailable").value(!useKey)).andExpect(jsonPath("$.webauthnAvailable").value(useKey));
     }
 
-    private WebAuthnAuthenticatorFixture enroll() throws Exception {
+    @Test
+    void givenAnExpiredRegistrationChallenge_whenTheKeyIsSubmitted_thenNoCredentialOrRecoveryCodeIsCreated() throws Exception {
+        // given
         Cookie session = password(200);
+        var options = registrationOptions(session);
+        jdbc.sql("UPDATE mfa_challenge SET expires_at = :now WHERE account_id = :id AND purpose = 'WEBAUTHN_REGISTRATION'")
+                .param("now", clock.instant().atOffset(ZoneOffset.UTC)).param("id", account).update();
+        var authenticator = new WebAuthnAuthenticatorFixture();
+        // when / then
+        mvc.perform(post("/api/account/mfa/webauthn").cookie(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content(enrollment(authenticator.register(options, ORIGIN))))
+                .andExpect(status().isForbidden()).andExpect(jsonPath("$.type").value("urn:courtside:error:mfa-proof-failed"));
+        assertThat(credentials.findByCredentialId(authenticator.credentialId())).isNull();
+        assertThat(recovery.remaining(account)).isZero();
+    }
+
+    @Test
+    void givenAKeyAttestingAForeignOrigin_whenRegistering_thenItIsRefusedAndTheSameChallengeStillAcceptsTheRealOrigin()
+            throws Exception {
+        // given
+        Cookie session = password(200);
+        var options = registrationOptions(session);
+        var authenticator = new WebAuthnAuthenticatorFixture();
+        // when
+        mvc.perform(post("/api/account/mfa/webauthn").cookie(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content(enrollment(authenticator.register(options, "https://foreign.example.org"))))
+                .andExpect(status().isForbidden()).andExpect(jsonPath("$.type").value("urn:courtside:error:mfa-proof-failed"));
+        // then
+        assertThat(credentials.findByCredentialId(authenticator.credentialId())).isNull();
+        assertThat(recovery.remaining(account)).isZero();
+        mvc.perform(post("/api/account/mfa/webauthn").cookie(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content(enrollment(authenticator.register(options, ORIGIN))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.codes.length()").value(10));
+        assertThat(credentials.findByCredentialId(authenticator.credentialId())).isNotNull();
+    }
+
+    @Test
+    void givenTheEnrollmentBudgetSpentOnMistypedTotpCodes_whenAKeyIsRegistered_thenTheSharedLimitRefusesIt() throws Exception {
+        // given
+        Cookie session = password(200);
+        mvc.perform(post("/api/account/mfa/totp").cookie(session).with(csrf())).andExpect(status().isOk());
+        for (int attempt = 1; attempt <= 20; attempt++) {
+            mvc.perform(post("/api/account/mfa/totp/confirmation").cookie(session).with(csrf())
+                            .contentType(MediaType.APPLICATION_JSON).content("{\"code\":\"invalid\"}"))
+                    .andExpect(status().isForbidden()).andExpect(jsonPath("$.type").value("urn:courtside:error:mfa-proof-failed"));
+        }
+        var options = registrationOptions(session);
+        var authenticator = new WebAuthnAuthenticatorFixture();
+        // when / then
+        mvc.perform(post("/api/account/mfa/webauthn").cookie(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content(enrollment(authenticator.register(options, ORIGIN))))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:password-verification-rate-limited"));
+        assertThat(credentials.findByCredentialId(authenticator.credentialId())).isNull();
+        assertThat(recovery.remaining(account)).isZero();
+    }
+
+    @Test
+    void givenNoReauthenticationOptionsInTheSession_whenAKeyAssertionIsSent_thenFreshnessAndTheKeyCounterStayUnchanged()
+            throws Exception {
+        // given
+        var authenticator = enroll();
+        Cookie pending = password(202);
+        Cookie full = prove(pending, authenticator, options(pending));
+        expire(sessions, full);
+        var unbound = codec.decode(codec.encode(webAuthn.authenticationOptions(account)), PublicKeyCredentialRequestOptions.class);
+        // when / then
+        mvc.perform(post("/api/session/reauthentication").cookie(full).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"password\":\"correct-horse\",\"credential\":"
+                                + codec.encode(authenticator.assertion(unbound, ORIGIN)) + "}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:reauthentication-failed"));
+        String id = new String(Base64.getDecoder().decode(full.getValue()), StandardCharsets.UTF_8);
+        assertThat(sessions.findById(id).<Long>getAttribute("courtside.authenticated-at"))
+                .isEqualTo(clock.instant().minusSeconds(360).toEpochMilli());
+        assertThat(credentials.findByCredentialId(authenticator.credentialId()).getSignatureCount()).isEqualTo(1);
+    }
+
+    @ParameterizedTest
+    @MethodSource("unusableLabels")
+    void givenAnUnusableLabel_whenTheServiceRenamesAKey_thenItRefusesAndTheKeyKeepsItsLabel(String label) throws Exception {
+        // given
+        var authenticator = enroll();
+        String id = authenticator.credentialId().toBase64UrlString();
+        // when / then
+        asHolder(() -> assertThatThrownBy(() -> flow.rename(id, label)).isInstanceOf(MfaProofFailedException.class));
+        assertThat(credentials.findByCredentialId(authenticator.credentialId()).getLabel()).isEqualTo("Private security key");
+    }
+
+    @Test
+    void givenAnotherMembersKey_whenAHolderRenamesOrRemovesIt_thenTheKeyIsAbsentForThemAndUntouched() throws Exception {
+        // given
+        var authenticator = enroll();
+        Person john = people.save(new Person("John", "Roe", "john.roe@example.org"));
+        UserAccount other = new UserAccount(john, "roe.john", passwords.encode("another-horse"), Set.of(Role.MEMBER), "en");
+        other.enable();
+        accounts.save(other);
+        Cookie intruder = password("roe.john", "another-horse", 200);
+        String id = authenticator.credentialId().toBase64UrlString();
+        // when / then
+        mvc.perform(patch("/api/account/mfa/webauthn/credentials/{id}", id).cookie(intruder).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"label\":\"Borrowed key\"}"))
+                .andExpect(status().isNotFound()).andExpect(jsonPath("$.type").value("urn:courtside:error:mfa-resource-not-found"));
+        mvc.perform(delete("/api/account/mfa/webauthn/credentials/{id}", id).cookie(intruder).with(csrf()))
+                .andExpect(status().isNotFound()).andExpect(jsonPath("$.type").value("urn:courtside:error:mfa-resource-not-found"));
+        assertThat(credentials.findByCredentialId(authenticator.credentialId()).getLabel()).isEqualTo("Private security key");
+        mvc.perform(get("/api/session").cookie(intruder)).andExpect(jsonPath("$.authenticated").value(true));
+    }
+
+    @Test
+    void givenAKeyAndTotp_whenTheHolderRemovesTotp_thenTheKeyKeepsMfaAndTheRecoveryCodesActive() throws Exception {
+        // given
+        var authenticator = enroll();
+        byte[] secret = totp.begin(account);
+        assertThat(totp.confirm(account, TotpCodes.code(secret, clock.instant().minusSeconds(30)))).isTrue();
+        Cookie pending = password(202);
+        Cookie full = prove(pending, authenticator, options(pending));
+        // when
+        List<String> actions = credentialActions(() -> mvc.perform(delete("/api/account/mfa/totp").cookie(full).with(csrf()))
+                .andExpect(status().isNoContent()));
+        // then
+        assertThat(actions).as("a remaining key turns the removal into a method change").containsExactly("MFA_METHOD_CHANGED");
+        assertThat(totp.enabled(account)).isFalse();
+        assertThat(recovery.remaining(account)).isEqualTo(10);
+        mvc.perform(get("/api/session").cookie(full)).andExpect(jsonPath("$.authenticated").value(false));
+        password(202);
+    }
+
+    @Test
+    void givenAnEnrolledKey_whenTotpIsConfirmedAsASecondFactor_thenTheExistingRecoveryCodesStayAndNoNewOnesAreShown()
+            throws Exception {
+        // given
+        var authenticator = enroll();
+        Cookie pending = password(202);
+        Cookie full = prove(pending, authenticator, options(pending));
+        String body = mvc.perform(post("/api/account/mfa/totp").cookie(full).with(csrf()))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        byte[] secret = Base32.decode(codec.decode(body, ApiTotpEnrollment.class).getSecret());
+        List<String> held = recoveryCodeHashes();
+        // when
+        List<String> actions = credentialActions(() -> mvc.perform(post("/api/account/mfa/totp/confirmation").cookie(full)
+                        .with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"code\":\"" + TotpCodes.code(secret, clock.instant().minusSeconds(30)) + "\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.codes").isEmpty()));
+        // then
+        assertThat(actions).as("a second factor is a method change, not enabling MFA").containsExactly("MFA_METHOD_CHANGED");
+        assertThat(totp.enabled(account)).isTrue();
+        assertThat(recoveryCodeHashes()).hasSize(10).isEqualTo(held);
+    }
+
+    @Test
+    void givenARevokedPendingLogin_whenKeyOptionsAreRequested_thenNoKeyChallengeIsBound() throws Exception {
+        // given
+        enroll();
+        Cookie pending = password(202);
+        jdbc.sql("UPDATE user_account SET security_epoch = security_epoch + 1 WHERE id = :id").param("id", account).update();
+        // when / then
+        mvc.perform(post("/api/session/mfa/webauthn/options").cookie(pending).with(csrf()))
+                .andExpect(status().isForbidden()).andExpect(jsonPath("$.type").value("urn:courtside:error:mfa-proof-failed"));
+        assertThat(jdbc.sql("SELECT payload FROM mfa_challenge WHERE account_id = :id AND purpose = 'LOGIN'")
+                .param("id", account).query(String.class).single()).isEmpty();
+    }
+
+    @Test
+    void givenAPendingLoginThatNeverRequestedKeyOptions_whenAnAssertionArrives_thenTheKeyIsNotConsulted() throws Exception {
+        // given
+        var authenticator = enroll();
+        Cookie pending = password(202);
+        var unbound = codec.decode(codec.encode(webAuthn.authenticationOptions(account)), PublicKeyCredentialRequestOptions.class);
+        // when / then
+        mvc.perform(post("/api/session/mfa/webauthn").cookie(pending).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content(codec.encode(authenticator.assertion(unbound, ORIGIN))))
+                .andExpect(status().isForbidden()).andExpect(jsonPath("$.type").value("urn:courtside:error:mfa-proof-failed"));
+        assertThat(credentials.findByCredentialId(authenticator.credentialId()).getSignatureCount()).isZero();
+        mvc.perform(get("/api/session").cookie(pending)).andExpect(jsonPath("$.authenticated").value(false));
+    }
+
+    @Test
+    void givenAPendingLogin_whenTheKeyAssertsAForeignOrigin_thenSignInFailsAndCountsAsASecondFactorFailure() throws Exception {
+        // given
+        var authenticator = enroll();
+        Cookie pending = password(202);
+        var options = options(pending);
+        // when / then
+        mvc.perform(post("/api/session/mfa/webauthn").cookie(pending).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content(codec.encode(authenticator.assertion(options, "https://foreign.example.org"))))
+                .andExpect(status().isForbidden()).andExpect(jsonPath("$.type").value("urn:courtside:error:mfa-proof-failed"));
+        mvc.perform(get("/api/session").cookie(pending)).andExpect(jsonPath("$.authenticated").value(false));
+        assertThat(jdbc.sql("SELECT attempt_count FROM login_attempt_limit WHERE scope = 'FACTOR'").query(Integer.class).single())
+                .as("a refused key proof is a second-factor failure").isEqualTo(1);
+    }
+
+    @Test
+    void givenAnExhaustedSecondFactorBudget_whenAValidKeyAssertionArrives_thenSignInIsRateLimitedAndTheCounterStays()
+            throws Exception {
+        // given
+        var authenticator = enroll();
+        Cookie pending = password(202);
+        var options = options(pending);
+        for (int attempt = 1; attempt <= 5; attempt++) attempts.registerFactorFailure(account);
+        // when / then
+        mvc.perform(post("/api/session/mfa/webauthn").cookie(pending).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content(codec.encode(authenticator.assertion(options, ORIGIN))))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:password-verification-rate-limited"));
+        assertThat(credentials.findByCredentialId(authenticator.credentialId()).getSignatureCount()).isZero();
+        mvc.perform(get("/api/session").cookie(pending)).andExpect(jsonPath("$.authenticated").value(false));
+    }
+
+    private static Stream<Arguments> unusableLabels() {
+        return Stream.of(Arguments.of((Object) null), Arguments.of("   "), Arguments.of("k".repeat(101)),
+                Arguments.of("Key\u0007one"));
+    }
+
+    private List<String> recoveryCodeHashes() {
+        return jdbc.sql("SELECT code_hash FROM mfa_recovery_code WHERE account_id = :id ORDER BY code_hash")
+                .param("id", account).query(String.class).list();
+    }
+
+    private void asHolder(Runnable action) {
+        long epoch = jdbc.sql("SELECT security_epoch FROM user_account WHERE id = :id").param("id", account)
+                .query(Long.class).single();
+        var principal = new CourtsideUserDetails(account, "doe.jane", "unused", true, true, List.of("ROLE_MEMBER"), epoch);
+        var security = SecurityContextHolder.createEmptyContext();
+        security.setAuthentication(UsernamePasswordAuthenticationToken.authenticated(principal, null, principal.getAuthorities()));
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.getSession().setAttribute("courtside.authenticated-at", clock.instant().toEpochMilli());
+        var previous = RequestContextHolder.getRequestAttributes();
+        SecurityContextHolder.setContext(security);
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
+        try {
+            action.run();
+        } finally {
+            SecurityContextHolder.clearContext();
+            RequestContextHolder.setRequestAttributes(previous);
+        }
+    }
+
+    private PublicKeyCredentialCreationOptions registrationOptions(Cookie session) throws Exception {
         String json = mvc.perform(post("/api/account/mfa/webauthn/registration-options").cookie(session).with(csrf())
                         .header("Host", "untrusted.example.org"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.rp.id").value("courts.example.org"))
                 .andExpect(jsonPath("$.authenticatorSelection.userVerification").value("required"))
                 .andReturn().getResponse().getContentAsString();
-        var options = codec.decode(json, PublicKeyCredentialCreationOptions.class);
+        return codec.decode(json, PublicKeyCredentialCreationOptions.class);
+    }
+
+    private String enrollment(Object credential) {
+        return "{\"label\":\"Private security key\",\"credential\":" + codec.encode(credential) + "}";
+    }
+
+    private WebAuthnAuthenticatorFixture enroll() throws Exception {
+        Cookie session = password(200);
+        var options = registrationOptions(session);
         var authenticator = new WebAuthnAuthenticatorFixture();
         String codes = mvc.perform(post("/api/account/mfa/webauthn").cookie(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"label\":\"Private security key\",\"credential\":" + codec.encode(authenticator.register(options, ORIGIN)) + "}"))
+                        .content(enrollment(authenticator.register(options, ORIGIN))))
                 .andExpect(result -> assertThat(result.getResponse().getStatus())
                         .withFailMessage("Registration failed: %s", result.getResponse().getContentAsString()).isEqualTo(200))
                 .andReturn().getResponse().getContentAsString();
@@ -318,7 +580,11 @@ class MfaWebAuthnFlowTest extends AbstractIntegrationTest {
     }
 
     private Cookie password(int expected) throws Exception {
-        return session(mvc.perform(post("/api/session").with(csrf()).param("username", "doe.jane").param("password", "correct-horse"))
+        return password("doe.jane", "correct-horse", expected);
+    }
+
+    private Cookie password(String username, String password, int expected) throws Exception {
+        return session(mvc.perform(post("/api/session").with(csrf()).param("username", username).param("password", password))
                 .andExpect(status().is(expected)).andReturn());
     }
 
