@@ -9,13 +9,14 @@ import { join, resolve } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { localRequest, newBootstrapPassword } from "./courtside.mjs";
+import { totpCode } from "./security-mfa-fixture.mjs";
 import {
   containerIdentity, createMailCertificate, createMailCertificateDirectory
 } from "./mail-relay-certificate.mjs";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 export const applicationStateTables = [
-  "booking", "booking_card", "club_config", "court", "court_allocation", "domain_event", "event_publication",
+  "account_mfa", "booking", "booking_card", "club_config", "court", "court_allocation", "domain_event", "event_publication",
   "message_record", "opening_hours", "opening_hours_version", "person", "spring_session", "user_account",
   "user_account_role"
 ];
@@ -95,7 +96,16 @@ async function expectJson(jar, port, options, expectedStatus) {
   return JSON.parse(response.body);
 }
 
-async function logIn(jar, port, password) {
+async function freshTotpCode(mfa) {
+  while (Math.floor(Date.now() / 30_000) <= mfa.lastStep) {
+    await new Promise((resolvePromise) => setTimeout(resolvePromise, 1_000));
+  }
+  const now = Date.now();
+  mfa.lastStep = Math.floor(now / 30_000);
+  return totpCode(mfa.secret, now);
+}
+
+async function logIn(jar, port, password, mfa) {
   const session = await request(jar, port, { path: "/api/session" });
   assert.equal(session.statusCode, 200, session.body);
   const login = await request(jar, port, {
@@ -103,7 +113,35 @@ async function logIn(jar, port, password) {
     headers: mutationHeaders(jar, { "Content-Type": "application/x-www-form-urlencoded" }),
     body: `username=admin&password=${encodeURIComponent(password)}`
   });
-  assert.equal(login.statusCode, 200, login.body);
+  assert.equal(login.statusCode, mfa ? 202 : 200, login.body);
+  if (!mfa) return;
+  const pending = await expectJson(jar, port, { path: "/api/session" }, 200);
+  assert.equal(pending.authenticated, false, "an enrolled account must not finish sign-in with its password alone");
+  const proof = await request(jar, port, {
+    path: "/api/session/mfa", method: "POST",
+    headers: mutationHeaders(jar, { "Content-Type": "application/json" }),
+    body: JSON.stringify({ code: await freshTotpCode(mfa) })
+  });
+  assert.equal(proof.statusCode, 200, `the TOTP proof was refused: ${proof.body}`);
+  const completed = await expectJson(jar, port, { path: "/api/session" }, 200);
+  assert.equal(completed.authenticated, true, "the TOTP proof did not complete sign-in");
+}
+
+async function enrollTotp(jar, port, password) {
+  const enrollment = await expectJson(jar, port, {
+    path: "/api/account/mfa/totp", method: "POST", headers: mutationHeaders(jar)
+  }, 200);
+  const confirmedAt = Date.now();
+  const confirmation = await request(jar, port, {
+    path: "/api/account/mfa/totp/confirmation", method: "POST",
+    headers: mutationHeaders(jar, { "Content-Type": "application/json" }),
+    body: JSON.stringify({ code: totpCode(enrollment.secret, confirmedAt, -1) })
+  });
+  assert.equal(confirmation.statusCode, 200, `TOTP enrollment was refused: ${confirmation.body}`);
+  const mfa = { secret: enrollment.secret, lastStep: Math.floor(confirmedAt / 30_000) - 1 };
+  const signedIn = new Map();
+  await logIn(signedIn, port, password, mfa);
+  return { jar: signedIn, mfa };
 }
 
 function logoUpload(jar) {
@@ -186,9 +224,13 @@ async function populateThroughApplication(password, permanentPassword, port) {
   };
 }
 
-function applicationEvidence(project, environment) {
+function applicationEvidence(project, environment, { mfa = true } = {}) {
+  const mfaEvidence = mfa ? `'account_mfa', jsonb_build_object('rows', (SELECT count(*) FROM account_mfa),
+        'encryptedTotp', (SELECT count(*) FROM account_mfa WHERE totp_secret IS NOT NULL),
+        'lastStep', (SELECT max(totp_last_step) FROM account_mfa)),` : "";
   const output = psql(project, environment, ["-Atc", `SELECT jsonb_build_object(
     'tables', jsonb_build_object(
+      ${mfaEvidence}
       'booking', jsonb_build_object('rows', (SELECT count(*) FROM booking)),
       'booking_card', jsonb_build_object('rows', (SELECT count(*) FROM booking_card)),
       'club_config', jsonb_build_object('rows', (SELECT count(*) FROM club_config),
@@ -233,12 +275,12 @@ async function waitForApplicationWrites(project, environment) {
   throw new Error(`Application writes did not settle: ${JSON.stringify(observed)}`);
 }
 
-async function verifyRestoredApplication(password, port, { bookingId, logoDigest }) {
+async function verifyRestoredApplication(password, port, { bookingId, logoDigest }, mfa) {
   const logo = await request(new Map(), port, { path: `/api/public/config/logo?v=${logoDigest}` });
   assert.equal(logo.statusCode, 200, logo.body);
   assert.equal(logo.headers["content-type"], "image/png");
   const jar = new Map();
-  await logIn(jar, port, password);
+  await logIn(jar, port, password, mfa);
   const bookings = await request(jar, port, { path: "/api/my/bookings" });
   assert.equal(bookings.statusCode, 200, bookings.body);
   assert.match(bookings.body, new RegExp(bookingId));
@@ -343,9 +385,10 @@ function proveLegacyUatRestore(project, environment) {
     "failed legacy replacement changed the target database");
   assert.equal(psql(project, environment, ["-Atc", "SELECT to_regclass('public.account_mfa') IS NOT NULL"]).stdout.trim(), "t",
     "failed legacy replacement removed current-schema MFA tables");
+  const withoutMfa = applicationEvidence(project, environment, { mfa: false });
   replace(legacy);
-  assert.deepEqual(applicationEvidence(project, environment), { ...before,
-    sequences: before.sequences.filter((sequence) => sequence.name !== "mfa_challenge_created_seq_seq") },
+  assert.deepEqual(applicationEvidence(project, environment, { mfa: false }), { ...withoutMfa,
+    sequences: withoutMfa.sequences.filter((sequence) => sequence.name !== "mfa_challenge_created_seq_seq") },
     "legacy replacement lost the original application data");
   assert.equal(psql(project, environment, ["-Atc", "SELECT to_regclass('public.account_mfa') IS NULL"]).stdout.trim(), "t",
     "legacy replacement retained tables absent from the older dump");
@@ -398,6 +441,8 @@ async function execute() {
       applicationIdentity.session.cardId,
       pendingStartsAt,
       "application-restore-pending-publication");
+    const { mfa } = await enrollTotp(
+      applicationIdentity.session.jar, publishedPort(project, environment), permanentPassword);
     await waitForApplicationWrites(project, environment);
     compose(project, environment, ["stop", "app"]);
     const applicationBefore = applicationEvidence(project, environment);
@@ -405,6 +450,8 @@ async function execute() {
       "application evidence does not name the required tables");
     assert.ok(applicationBefore.tables.message_record.queued > 0,
       "application evidence contains no outstanding queued message");
+    assert.equal(applicationBefore.tables.account_mfa.encryptedTotp, 1,
+      "application evidence contains no encrypted TOTP secret");
     writeFileSync(join(build, "application-before.json"), `${JSON.stringify(applicationBefore, null, 2)}\n`);
     const applicationDump = compose(project, environment,
       ["exec", "-T", "db", "pg_dump", "-Fc", "--no-owner", "-U", "courtside", "courtside"],
@@ -430,10 +477,17 @@ async function execute() {
     await proveInterruptedRestore(
       project, environment, applicationDump, applicationAfter, applicationEvidence);
     compose(project, environment, ["start", "mail"]);
+    const keyless = compose(project, environment, ["up", "-d", "--wait", "app"], { allowFailure: true });
+    const keylessLogs = compose(project, environment, ["logs", "--no-color", "app"], { allowFailure: true });
+    writeFileSync(join(build, "keyless-start.txt"), `${keylessLogs.stdout}${keylessLogs.stderr}`);
+    assert.notEqual(keyless.status, 0, "restore without its MFA keys unexpectedly became healthy");
+    assert.match(`${keylessLogs.stdout}${keylessLogs.stderr}`, /MFA instance key file is missing/,
+      "the keyless start did not name the missing key material");
+    compose(project, environment, ["rm", "--stop", "--force", "app"]);
     importMfaKeys(applicationKeysPath, keyCompose, { ...process.env, ...environment }, runInteractive);
     compose(project, environment, ["up", "-d", "--wait", "app"]);
     await verifyRestoredApplication(
-      permanentPassword, publishedPort(project, environment), applicationIdentity);
+      permanentPassword, publishedPort(project, environment), applicationIdentity, mfa);
 
     compose(project, environment, ["down", "--volumes", "--remove-orphans"]);
     compose(project, environment, ["up", "-d", "--wait"]);
