@@ -15,6 +15,8 @@ import org.courtside.identity.UserAccount;
 import org.courtside.identity.UserAccountRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -145,6 +147,47 @@ class MfaManagementTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenTheSetupBudgetSpentOnMistypedCodes_whenTheRightCodeArrives_thenItIsRateLimitedAndMfaStaysDisabled()
+            throws Exception {
+        // given
+        MockHttpSession session = signIn(200);
+        byte[] secret = Base32.decode(setup(session).getSecret());
+        for (int attempt = 1; attempt <= 20; attempt++) {
+            mvc.perform(post("/api/account/mfa/totp/confirmation").session(session).with(csrf())
+                    .contentType(MediaType.APPLICATION_JSON).content("{\"code\":\"invalid\"}"))
+                    .andExpect(status().isForbidden()).andExpect(jsonPath("$.type").value("urn:courtside:error:mfa-proof-failed"));
+        }
+        // when / then
+        mvc.perform(post("/api/account/mfa/totp/confirmation").session(session).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"code\":\"" + TotpCodes.code(secret, clock.instant().minusSeconds(30)) + "\"}"))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:password-verification-rate-limited"));
+        mvc.perform(get("/api/account/mfa").session(session)).andExpect(jsonPath("$.enabled").value(false));
+        assertThat(recovery.remaining(account)).isZero();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"disabled", "password-change-required", "revoked-epoch", "recovery-pending"})
+    void givenAHolderWhoseAccountNoLongerMatchesTheSession_whenStartingTotpSetup_thenNoSetupSecretIsCreated(String state) {
+        // given
+        switch (state) {
+            case "disabled" -> jdbc.sql("UPDATE user_account SET enabled = false WHERE id = :id").param("id", account).update();
+            case "password-change-required" -> jdbc.sql("UPDATE user_account SET password_change_required = true WHERE id = :id")
+                    .param("id", account).update();
+            case "revoked-epoch" -> jdbc.sql("UPDATE user_account SET security_epoch = security_epoch + 1 WHERE id = :id")
+                    .param("id", account).update();
+            case "recovery-pending" -> jdbc.sql("INSERT INTO account_mfa (account_id, recovery_pending) VALUES (:id, true)")
+                    .param("id", account).update();
+        }
+        var principal = new CourtsideUserDetails(account, "doe.jane", "unused", true, true, List.of("ROLE_MEMBER"), 0);
+        // when / then
+        asPrincipal(principal, () -> assertThatThrownBy(management::beginTotp).isInstanceOf(MfaProofFailedException.class));
+        assertThat(jdbc.sql("SELECT count(*) FROM account_mfa WHERE account_id = :id AND pending_totp_secret IS NOT NULL")
+                .param("id", account).query(Integer.class).single()).isZero();
+    }
+
+    @Test
     void givenActiveMfaAndFreshFullProof_whenReplacingRecoveryCodes_thenThePreviousSetAndSessionAreInvalid() throws Exception {
         // given
         List<String> previous = activate();
@@ -237,6 +280,13 @@ class MfaManagementTest extends AbstractIntegrationTest {
         accounts.save(other);
         var principal = new CourtsideUserDetails(account, other.getUsername(), "unused", true, true,
                 List.of("ROLE_MEMBER"), 0);
+        // when / then
+        asPrincipal(principal, () -> assertThatThrownBy(management::beginTotp).isInstanceOf(MfaProofFailedException.class));
+        assertThat(jdbc.sql("SELECT count(*) FROM account_mfa WHERE account_id = :id")
+                .param("id", other.getId()).query(Integer.class).single()).isZero();
+    }
+
+    private void asPrincipal(CourtsideUserDetails principal, Runnable action) {
         var security = SecurityContextHolder.createEmptyContext();
         security.setAuthentication(UsernamePasswordAuthenticationToken.authenticated(principal, null, principal.getAuthorities()));
         MockHttpServletRequest request = new MockHttpServletRequest();
@@ -244,11 +294,8 @@ class MfaManagementTest extends AbstractIntegrationTest {
         var previous = RequestContextHolder.getRequestAttributes();
         SecurityContextHolder.setContext(security);
         RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
-        // when / then
         try {
-            assertThatThrownBy(management::beginTotp).isInstanceOf(MfaProofFailedException.class);
-            assertThat(jdbc.sql("SELECT count(*) FROM account_mfa WHERE account_id = :id")
-                    .param("id", other.getId()).query(Integer.class).single()).isZero();
+            action.run();
         } finally {
             SecurityContextHolder.clearContext();
             RequestContextHolder.setRequestAttributes(previous);

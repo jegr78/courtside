@@ -11,6 +11,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.ArgumentMatchers.nullable;
@@ -47,5 +48,67 @@ class AuditSearchBudgetTest {
         assertThat(result.incomplete()).isTrue();
         verify(events, times(10)).findSearchCandidates(isNull(), isNull(), isNull(), isNull(),
                 nullable(Instant.class), nullable(UUID.class), any(Limit.class));
+    }
+
+    @Test
+    void givenAFullBatchWithMoreMatchesThanTheLimit_whenSearched_thenTheScanStopsAndTheNextPageIsOffered() {
+        // given
+        DomainEventRepository events = mock(DomainEventRepository.class);
+        UserAccountRepository accounts = mock(UserAccountRepository.class);
+        List<DomainEvent> batch = java.util.stream.IntStream.range(0, 250)
+                .mapToObj(index -> new DomainEvent("test.recorded", UUID.randomUUID(), null,
+                        Instant.parse("2026-09-19T09:00:00Z").minusSeconds(index), "{}"))
+                .toList();
+        List<UUID> ids = batch.stream().map(DomainEvent::getId).toList();
+        when(events.findSearchCandidates(isNull(), isNull(), isNull(), isNull(),
+                nullable(Instant.class), nullable(UUID.class), any(Limit.class))).thenReturn(ids);
+        when(events.findAllByIdIn(any())).thenReturn(batch);
+        when(accounts.findAllById(any())).thenReturn(List.of());
+        AuditService service = new AuditService(events, accounts, List.of(), subjectIds -> Map.of(),
+                JsonMapper.builder().build());
+
+        // when
+        AuditService.SearchResult result = service.search(null, null, null, null, null, null, 50);
+
+        // then
+        assertThat(result.items()).hasSize(50);
+        assertThat(result.nextCursor()).isEqualTo(ids.get(49));
+        assertThat(result.incomplete()).as("a page that found its probe is complete").isFalse();
+        verify(events, times(1)).findSearchCandidates(isNull(), isNull(), isNull(), isNull(),
+                nullable(Instant.class), nullable(UUID.class), any(Limit.class));
+    }
+
+    @Test
+    void givenAPageSizeOutsideOneToAHundred_whenTheLogIsReadOrSearched_thenTheServiceRefusesIt() {
+        // given
+        AuditService service = new AuditService(mock(DomainEventRepository.class),
+                mock(UserAccountRepository.class), List.of(), subjectIds -> Map.of(), JsonMapper.builder().build());
+
+        // when / then
+        for (int limit : new int[]{0, 101}) {
+            assertThatThrownBy(() -> service.page(null, null, null, null, limit))
+                    .as("page size %d", limit)
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessage("Audit page size must be between 1 and 100");
+            assertThatThrownBy(() -> service.search(null, null, null, null, null, null, limit))
+                    .as("search size %d", limit)
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessage("Audit page size must be between 1 and 100");
+        }
+    }
+
+    @Test
+    void givenAnExportBatchOutsideOneToAThousand_whenChangesAreExported_thenTheServiceRefusesIt() {
+        // given
+        AuditService service = new AuditService(mock(DomainEventRepository.class),
+                mock(UserAccountRepository.class), List.of(), subjectIds -> Map.of(), JsonMapper.builder().build());
+
+        // when / then
+        for (int size : new int[]{0, 1001}) {
+            assertThatThrownBy(() -> service.changes(null, null, null, size))
+                    .as("batch size %d", size)
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessage("Audit export batch must be between 1 and 1000");
+        }
     }
 }

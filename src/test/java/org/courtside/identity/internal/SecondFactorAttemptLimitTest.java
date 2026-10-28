@@ -19,6 +19,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class SecondFactorAttemptLimitTest extends AbstractIntegrationTest {
 
@@ -119,6 +120,17 @@ class SecondFactorAttemptLimitTest extends AbstractIntegrationTest {
         // then
         assertThat(jdbc.sql("SELECT count(*) FROM login_attempt_limit WHERE scope = 'FACTOR'").query(Long.class)
                 .single()).as("a month without failures forgets the run").isZero();
+    }
+
+    @Test
+    void whenASecondFactorAttemptOrFailureArrivesWithoutItsAccount_thenItIsRefusedAndNoSharedBucketIsCreated() {
+        // when / then
+        assertThatThrownBy(() -> attempts.registerFactorAttempt(null, "192.0.2.10"))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("needs its account");
+        assertThatThrownBy(() -> attempts.registerFactorFailure(null))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("needs its account");
+        assertThat(jdbc.sql("SELECT count(*) FROM login_attempt_limit").query(Long.class).single())
+                .as("an account-less proof must not count against a bucket every such caller would share").isZero();
     }
 
     private Optional<LoginBlock> attempt() {
