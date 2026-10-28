@@ -36,6 +36,8 @@ test("given the image started without a key root variable, when it initializes k
   // then
   assert.ok(keyRoot, "the image must not fall back to a key root below its root-owned working directory");
   assert.ok(owned.includes(keyRoot), `the image key root ${keyRoot} is a directory UID 10001 owns`);
+  assert.match(dockerfile, new RegExp(`^VOLUME ${keyRoot}$`, "m"),
+    "keys written without a mounted volume must outlive the container's writable layer");
 });
 
 test("given a key archive, when the operator verifies it, then only regular instance keyrings are accepted", () => {

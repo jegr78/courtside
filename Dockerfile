@@ -11,6 +11,7 @@ RUN apt-get update \
  && install -d -m 0700 -o 10001 -g 10001 /var/lib/courtside/mfa-keys
 
 ENV COURTSIDE_MFA_KEY_ROOT=/var/lib/courtside/mfa-keys
+VOLUME /var/lib/courtside/mfa-keys
 
 WORKDIR /app
 

@@ -353,8 +353,9 @@ they name a file on the host, in the container the path it is mounted at. The
 
 The image creates `/var/lib/courtside/mfa-keys` with mode `0700`, owned by `10001:10001`, and
 sets `COURTSIDE_MFA_KEY_ROOT` to it. Every start writes or reads the instance keyring there, also
-before any account enrolls a factor, so the directory must be writable. Mount a persistent volume
-there. All maintained container deployments supply this volume. Keep it
+before any account enrolls a factor, so the directory must be writable. The image declares it a
+volume, so a container started without a mount keeps its keys in an anonymous volume that removing
+the container with its volumes destroys. Mount a named persistent volume there. All maintained container deployments supply this volume. Keep it
 when replacing the application container or image. Each database installation has its own UUID
 subdirectory and a mode-`0600` keyring. PostgreSQL contains encrypted TOTP secrets and a key-check
 value, never the encryption keys.
