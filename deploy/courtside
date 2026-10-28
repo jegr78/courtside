@@ -1210,6 +1210,23 @@ cleanup_restore_resources() {
   restore_owned_volumes=()
 }
 
+restored_encrypted_enrollments() {
+  local present count
+  present=$("${restore_compose[@]}" exec -T db psql -U courtside -d courtside -tAc \
+    "select to_regclass('public.account_mfa') is not null") || return 1
+  present=${present//[[:space:]]/}
+  if [ "$present" = f ]; then
+    printf '0\n'
+    return 0
+  fi
+  [ "$present" = t ] || return 1
+  count=$("${restore_compose[@]}" exec -T db psql -U courtside -d courtside -tAc \
+    "select count(*) from account_mfa where totp_secret is not null or pending_totp_secret is not null") || return 1
+  count=${count//[[:space:]]/}
+  [[ "$count" =~ ^[0-9]+$ ]] || return 1
+  printf '%s\n' "$count"
+}
+
 restore_mfa_keys() {
   local archive=$1 name owner
   for name in "${restore_owned_volumes[@]}"; do
@@ -1790,7 +1807,7 @@ restore_probe() {
 
 command_restore_check() {
   local requested="" requested_mfa_keys="" mfa_keys_archive="" mfa_key_mode=standard mfa_keys_state restore_environment restore_output port cookie_jar username_file password_file
-  local restore_runtime table_count failure="" recovery_source_url recovery_config_recipe helper archive mfa_code mfa_proof_file=""
+  local restore_runtime table_count encrypted_enrollments failure="" recovery_source_url recovery_config_recipe helper archive mfa_code mfa_proof_file=""
   local trusted_recovery_release trusted_manifest_sha configured_manifest_sha recovery_overlays
   local recovery_custom_repository recovery_custom_digest expected_recovery_image expected_image_trust
   while [ $# -gt 0 ]; do
@@ -1858,10 +1875,7 @@ command_restore_check() {
   mfa_keys_state=$(recovery_value "$selected_recovery/recovery.conf" mfa_keys)
   case "$mfa_keys_state" in
     included) mfa_keys_archive="$selected_recovery/mfa-keys.tar" ;;
-    external-required)
-      [ -n "$requested_mfa_keys" ] || refuse "encrypted TOTP recovery requires the matching MFA key archive via --mfa-keys"
-      mfa_keys_archive=$requested_mfa_keys
-      ;;
+    external-required) mfa_keys_archive=$requested_mfa_keys ;;
     legacy | "") ;;
     *) refuse "recovery metadata has an invalid MFA key mode" ;;
   esac
@@ -1939,6 +1953,12 @@ command_restore_check() {
   if [ -z "$failure" ] && ! "${restore_compose[@]}" exec -T db pg_restore --clean --if-exists --no-owner \
     --single-transaction --exit-on-error -U courtside -d courtside < "$selected_recovery/database.dump"; then
     failure="the PostgreSQL dump could not be restored transactionally"
+  fi
+  if [ -z "$failure" ] && [ -z "$mfa_keys_archive" ]; then
+    encrypted_enrollments=$(restored_encrypted_enrollments) \
+      || failure="the restored database could not be checked for encrypted TOTP enrollments"
+    [ -n "$failure" ] || [ "$encrypted_enrollments" = 0 ] \
+      || failure="the restored database holds $encrypted_enrollments encrypted TOTP enrollments; supply the matching MFA key archive via --mfa-keys"
   fi
   if [ -z "$failure" ] && [ -n "$mfa_keys_archive" ] && ! restore_mfa_keys "$mfa_keys_archive"; then
     failure="the MFA key archive could not be restored"

@@ -1527,7 +1527,9 @@ and records `mfa_keys=external-required`. Produce the archive for the external s
 `/srv/courtside/current/courtside mfa-export-keys --output /private/mfa-keys.tar`. The output
 directory must be operator-owned with mode `0700`; the command writes a mode-`0600` file and never
 replaces an existing one. Export again after every key rotation. Pass that archive to
-`restore-check --mfa-keys /private/mfa-keys.tar` in that case. A full-self-hosted backup stops Stalwart once, captures `mail-config` and
+`restore-check --mfa-keys /private/mfa-keys.tar`. Without it, `restore-check` counts the encrypted
+TOTP enrollments in the restored database and fails with that count when there are any; a unit
+without them passes and its application creates fresh keys. A full-self-hosted backup stops Stalwart once, captures `mail-config` and
 `mail-data` from that same interval, then waits for mail health before publishing the unit.
 The launcher stages the directory with `mktemp`, checks the dump with `pg_restore --list`, and
 publishes it only with `mv "$temporary" "$backup"` after every artifact is durable. Restore uses

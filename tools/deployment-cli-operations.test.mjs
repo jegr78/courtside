@@ -672,6 +672,48 @@ test("given external recovery material, when backup runs, then the matching MFA 
   });
 });
 
+test("given external recovery material without encrypted TOTP enrollments, when restore-check runs without keys, then it proves the unit", () => {
+  fixture((context) => {
+    // given
+    assert.equal(initialize(context, { recovery_material: "external-verified" }).status, 0);
+    assert.equal(run(context.archive, context.target, ["backup"], context.environment).status, 0);
+    const recovery = join(context.target, "backups", readdirSync(join(context.target, "backups"))[0]);
+    rmSync(context.dockerLog, { force: true });
+    // when
+    const result = run(context.archive, context.target, ["restore-check", "--recovery", recovery], {
+      ...context.environment, COURTSIDE_RESTORE_USERNAME: "doe.jane", COURTSIDE_RESTORE_PASSWORD: "private-restore-password"
+    });
+    // then
+    assert.equal(result.status, 0, result.stderr);
+    const calls = readFileSync(context.dockerLog, "utf8");
+    assert.match(calls, /from account_mfa where totp_secret is not null/, "the restored database was never asked for encrypted enrollments");
+    assert.doesNotMatch(calls, /-xf/, "no key archive was supplied, so none may be extracted");
+    assert.match(calls, / up -d --wait app/);
+  });
+});
+
+test("given external recovery material with encrypted TOTP enrollments, when restore-check runs without keys, then it fails naming the reason", () => {
+  fixture((context) => {
+    // given
+    assert.equal(initialize(context, { recovery_material: "external-verified" }).status, 0);
+    assert.equal(run(context.archive, context.target, ["backup"], context.environment).status, 0);
+    const recovery = join(context.target, "backups", readdirSync(join(context.target, "backups"))[0]);
+    writeFileSync(join(context.root, "docker-encrypted-totp"), "2\n");
+    rmSync(context.dockerLog, { force: true });
+    // when
+    const result = run(context.archive, context.target, ["restore-check", "--recovery", recovery], {
+      ...context.environment, COURTSIDE_RESTORE_USERNAME: "doe.jane", COURTSIDE_RESTORE_PASSWORD: "private-restore-password"
+    });
+    // then
+    assert.equal(result.status, 2);
+    assert.match(result.stderr, /2 encrypted TOTP enrollments.*--mfa-keys/);
+    const calls = readFileSync(context.dockerLog, "utf8");
+    assert.doesNotMatch(calls, / up -d --wait app/, "the application must not start without its keys");
+    assert.match(calls, /volume rm .*_db/);
+    assert.match(calls, /volume rm .*_mfa-keys/);
+  });
+});
+
 test("given external recovery material, when the operator exports MFA keys, then restore-check accepts that archive", () => {
   fixture((context) => {
     // given

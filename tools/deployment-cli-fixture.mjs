@@ -100,6 +100,8 @@ case "$*" in
   *' pg_dump '*) printf '%s\\n' 'PGDMP courtside fixture' ;;
   *' pg_restore --list'*) cat >/dev/null ;;
   *"select count(*) from pg_tables where schemaname = 'public'"*) printf '%s\\n' '0' ;;
+  *"to_regclass('public.account_mfa')"*) printf '%s\\n' 't' ;;
+  *'from account_mfa where totp_secret is not null'*) if [ -f "${join(root, "docker-encrypted-totp")}" ]; then cat "${join(root, "docker-encrypted-totp")}"; else printf '%s\\n' '0'; fi ;;
   *' tar -C /source -cf - .'*) printf '%s\\n' 'TAR courtside fixture' ;;
   *'compose ls --format json') [ ! -f "${join(root, "docker-compose-list")}" ] || cat "${join(root, "docker-compose-list")}" ;;
   *'volume ls --filter label=com.docker.compose.project='*) [ ! -f "${join(root, "docker-volumes")}" ] || cat "${join(root, "docker-volumes")}" ;;
