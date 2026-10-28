@@ -32,10 +32,9 @@ test("given the image started without a key root variable, when it initializes k
   const dockerfile = read("Dockerfile");
   const owned = [...dockerfile.matchAll(/install -d (?:-m \d+ )?-o 10001 -g 10001 (\S+)/g)].map((match) => match[1]);
   // when
-  const keyRoot = /^ENV COURTSIDE_MFA_KEY_ROOT=(\S+)$/m.exec(dockerfile)?.[1];
+  const keyRoot = /IMAGE_KEY_ROOT = Path\.of\("([^"]+)"\)/.exec(read("src/main/java/org/courtside/identity/internal/MfaConfiguration.java"))?.[1];
   // then
-  assert.ok(keyRoot, "the image must not fall back to a key root below its root-owned working directory");
-  assert.ok(owned.includes(keyRoot), `the image key root ${keyRoot} is a directory UID 10001 owns`);
+  assert.ok(owned.includes(keyRoot), `the preferred key root ${keyRoot} is a directory UID 10001 owns in the image`);
   assert.match(dockerfile, new RegExp(`^VOLUME ${keyRoot}$`, "m"),
     "keys written without a mounted volume must outlive the container's writable layer");
 });
