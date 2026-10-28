@@ -21,8 +21,16 @@ class LoginAttemptCleanup {
     @Transactional
     public void deleteExpiredAttempts() {
         deadlines.allowMaintenanceStatements();
-        jdbc.sql("DELETE FROM login_attempt_limit WHERE window_started_at < :cutoff")
+        jdbc.sql("DELETE FROM login_attempt_limit WHERE scope <> 'FACTOR' AND window_started_at < :cutoff")
                 .param("cutoff", clock.instant().minus(properties.retention()).atOffset(ZoneOffset.UTC))
+                .update();
+        jdbc.sql("""
+                        DELETE FROM login_attempt_limit
+                        WHERE scope = 'FACTOR' AND window_started_at < :cutoff
+                            AND (blocked_until IS NULL OR blocked_until < :now)
+                        """)
+                .param("cutoff", clock.instant().minus(properties.factor().retention()).atOffset(ZoneOffset.UTC))
+                .param("now", clock.instant().atOffset(ZoneOffset.UTC))
                 .update();
     }
 }

@@ -64,7 +64,7 @@ class MfaManagement {
     @Transactional
     Confirmation confirmTotp(String code, String address) {
         UserAccount account = currentForChange();
-        String bucket = "mfa:" + account.getId();
+        String bucket = "mfa-enrollment:" + account.getId();
         if (attempts.registerCredentialAttempt(bucket, address).isPresent()) {
             return new Confirmation(false, true, List.of());
         }
@@ -92,8 +92,10 @@ class MfaManagement {
         UserAccount account = currentForChange();
         boolean enabled = totp.enabled(account.getId());
         totp.remove(account.getId());
-        if (!factors.enabled(account.getId())) recovery.clear(account.getId());
-        if (enabled) changed(account, SecurityEventLog.CredentialChange.MFA_METHOD_CHANGED);
+        boolean remaining = factors.enabled(account.getId());
+        if (!remaining) recovery.clear(account.getId());
+        if (enabled) changed(account, remaining
+                ? SecurityEventLog.CredentialChange.MFA_METHOD_CHANGED : SecurityEventLog.CredentialChange.MFA_DISABLED);
     }
 
     @Transactional

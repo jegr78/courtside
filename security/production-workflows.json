@@ -838,6 +838,7 @@
       ],
       "backgroundEntryPoints": [
         "AccountSecurityMailer#on(AccountMfaChanged)",
+        "AccountSecurityMailer#on(SecondFactorGuessingBlocked)",
         "ControlledRecoveryCodeMailer#on(ControlledRecoveryRequested)"
       ],
       "stateTransitions": [
@@ -856,6 +857,7 @@
         "Missing, expired, consumed, wrong-session, wrong-purpose or revoked-epoch challenges cannot grant authority.",
         "Wrong native origin, RP, signature, user verification, credential owner/handle or regressing counter cannot authenticate.",
         "Expired proof, a different holder or a pending rescue refuses factor changes.",
+        "Five consecutive failed second-factor proofs pause the account's factor checks, doubling up to 24 hours, and mail the holder once per run.",
         "Missing administrator MFA, stale full proof or absent external identity confirmation refuses rescue.",
         "Wrong, expired, spent, address-mismatched or epoch-mismatched rescue codes and persistent guessing limits leave the account blocked.",
         "Plaintext setup and recovery material is never returned by administrator status or ordinary exports."

@@ -13,10 +13,19 @@ import org.springframework.security.authentication.DefaultAuthenticationEventPub
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 
 @Configuration(proxyBeanMethods = false)
 class MfaConfiguration {
+    static final Path IMAGE_KEY_ROOT = Path.of("/var/lib/courtside/mfa-keys");
+    static final Path LOCAL_KEY_ROOT = Path.of(".courtside/keys");
+
+    static Path keyRoot(String configured, Path image) {
+        if (configured != null && !configured.isBlank()) return Path.of(configured.strip());
+        return Files.isDirectory(image) ? image : LOCAL_KEY_ROOT;
+    }
+
     @Bean
     AuthenticationManager accountAuthenticationManager(CourtsideUserDetailsService users,
                                                          PasswordEncoder passwords, MfaFactors factors,
@@ -31,9 +40,9 @@ class MfaConfiguration {
 
     @Bean
     MfaSecrets mfaSecrets(JdbcClient jdbc, PlatformTransactionManager transactions,
-                          @Value("${courtside.mfa.key-root}") Path root,
+                          @Value("${courtside.mfa.key-root:}") String root,
                           @Value("${courtside.mfa.key-file:}") String suppliedFile) {
-        return new MfaSecrets(jdbc, transactions, root,
+        return new MfaSecrets(jdbc, transactions, keyRoot(root, IMAGE_KEY_ROOT),
                 suppliedFile.isBlank() ? null : Path.of(suppliedFile));
     }
 

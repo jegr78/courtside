@@ -3,7 +3,9 @@ package org.courtside.identity.internal;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.simple.JdbcClient;
+import org.courtside.identity.SecondFactorGuessingBlocked;
 import org.courtside.shared.SecurityEventLog;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,6 +19,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.HexFormat;
 import java.util.Optional;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -27,6 +30,7 @@ class LoginAttemptProtection {
     private final Clock clock;
     private final MeterRegistry meters;
     private final SecurityEventLog securityEvents;
+    private final ApplicationEventPublisher events;
 
     @Transactional
     Optional<LoginBlock> registerAttempt(String address) {
@@ -89,6 +93,38 @@ class LoginAttemptProtection {
         recordAttempt(Scope.ADDRESS, source, properties.address(),
                 SecurityEventLog.ControlTrigger.PASSWORD_VERIFICATION_ADDRESS_LIMIT);
         return Optional.empty();
+    }
+
+    @Transactional
+    Optional<LoginBlock> registerFactorAttempt(UUID accountId, String address) {
+        if (accountId == null) throw new IllegalStateException("A second-factor attempt needs its account");
+        String account = "factor-account:" + accountId;
+        String source = "credential-address:" + normalizeAddress(address);
+        lock(Scope.FACTOR, hash(account));
+        lock(Scope.ADDRESS, hash(source));
+
+        Optional<LoginBlock> retryAfter = retryAfter(Scope.FACTOR, account)
+                .or(() -> retryAfter(Scope.ADDRESS, source));
+        if (retryAfter.isPresent()) {
+            return retryAfter;
+        }
+
+        recordAttempt(Scope.ADDRESS, source, properties.address(),
+                SecurityEventLog.ControlTrigger.PASSWORD_VERIFICATION_ADDRESS_LIMIT);
+        return Optional.empty();
+    }
+
+    @Transactional
+    void registerFactorFailure(UUID accountId) {
+        if (accountId == null) throw new IllegalStateException("A second-factor failure needs its account");
+        String account = "factor-account:" + accountId;
+        lock(Scope.FACTOR, hash(account));
+        recordFactorAttempt(accountId, account);
+    }
+
+    @Transactional
+    void clearFactorAttempt(UUID accountId) {
+        clear(Scope.FACTOR, "factor-account:" + accountId);
     }
 
     @Transactional
@@ -234,6 +270,33 @@ class LoginAttemptProtection {
                 .update();
     }
 
+    // Failures count consecutively until a proof succeeds, so waiting out a block never resets the run.
+    private void recordFactorAttempt(UUID accountId, String subject) {
+        LoginProtectionProperties.Factor limit = properties.factor();
+        Instant now = clock.instant();
+        int failures = currentAttempt(Scope.FACTOR, subject).map(Attempt::attemptCount).orElse(0) + 1;
+        Instant blockedUntil = null;
+        if (failures % limit.maxFailures() == 0) {
+            blockedUntil = now.plus(limit.blockAfter(failures / limit.maxFailures()));
+            securityEvents.controlTriggered(accountId, SecurityEventLog.ControlTrigger.SECOND_FACTOR_ACCOUNT_LIMIT);
+            if (failures == limit.maxFailures()) events.publishEvent(new SecondFactorGuessingBlocked(accountId));
+        }
+        jdbc.sql("""
+                        INSERT INTO login_attempt_limit
+                            (scope, subject_hash, attempt_count, window_started_at, blocked_until)
+                        VALUES ('FACTOR', :subjectHash, :failures, :lastFailure, :blockedUntil)
+                        ON CONFLICT (scope, subject_hash) DO UPDATE
+                        SET attempt_count = EXCLUDED.attempt_count,
+                            window_started_at = EXCLUDED.window_started_at,
+                            blocked_until = EXCLUDED.blocked_until
+                        """)
+                .param("subjectHash", hash(subject))
+                .param("failures", failures)
+                .param("lastFailure", now.atOffset(ZoneOffset.UTC))
+                .param("blockedUntil", blockedUntil == null ? null : blockedUntil.atOffset(ZoneOffset.UTC))
+                .update();
+    }
+
     private void observeGlobalAttempt() {
         LoginProtectionProperties.Observation observation = properties.global();
         Instant now = clock.instant();
@@ -300,6 +363,7 @@ class LoginAttemptProtection {
     private enum Scope {
         ACCOUNT,
         ADDRESS,
+        FACTOR,
         GLOBAL
     }
 

@@ -10,6 +10,8 @@ RUN apt-get update \
  && install -d -o 10001 -g 10001 /var/lib/courtside/operational-logs \
  && install -d -m 0700 -o 10001 -g 10001 /var/lib/courtside/mfa-keys
 
+VOLUME /var/lib/courtside/mfa-keys
+
 WORKDIR /app
 
 ARG LAYERS=build/layers

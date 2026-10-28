@@ -48,7 +48,7 @@ class MfaWebAuthnFlow {
         var challenge = challenges.attempt(id, account.getId(), account.getSecurityEpoch(),
                 MfaChallenges.Purpose.WEBAUTHN_REGISTRATION, session);
         if (challenge.isEmpty()) return new MfaManagement.Confirmation(false, false, List.of());
-        String bucket = "mfa:" + account.getId();
+        String bucket = "mfa-enrollment:" + account.getId();
         if (attempts.registerCredentialAttempt(bucket, address).isPresent()) {
             return new MfaManagement.Confirmation(false, true, List.of());
         }
@@ -89,8 +89,10 @@ class MfaWebAuthnFlow {
         UserAccount account = management.currentForChange();
         var credential = ownCredential(account, id);
         credentials.delete(credential.getCredentialId());
-        if (!factors.enabled(account.getId())) recovery.clear(account.getId());
-        management.changed(account, SecurityEventLog.CredentialChange.MFA_METHOD_CHANGED);
+        boolean remaining = factors.enabled(account.getId());
+        if (!remaining) recovery.clear(account.getId());
+        management.changed(account, remaining
+                ? SecurityEventLog.CredentialChange.MFA_METHOD_CHANGED : SecurityEventLog.CredentialChange.MFA_DISABLED);
     }
 
     @Transactional

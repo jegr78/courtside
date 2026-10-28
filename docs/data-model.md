@@ -425,6 +425,9 @@ that was not running, and Courtside neither reads nor migrates it by hand.
 | `spring_session_attributes` | The serialized attributes belonging to a server-side session |
 
 The first three are rate-limit bookkeeping and all three are expired by their `window_started_at`.
+A `FACTOR` row of `login_attempt_limit` counts an account's consecutive failed second-factor proofs
+and uses that column for the last failure. It lives for 30 days after it and never while its pause
+lasts.
 They are keyed differently on purpose: a sign-in attempt is counted against a *hash* of its subject,
 because the subject is an address somebody typed, while a credential or a reset code is for an
 `account_id` that is already in the database. The two account-keyed budgets are separate so that

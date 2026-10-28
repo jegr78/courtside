@@ -53,7 +53,7 @@ server:
 
 courtside:
   mfa:
-    key-root: ${COURTSIDE_MFA_KEY_ROOT:.courtside/keys}
+    key-root: ${COURTSIDE_MFA_KEY_ROOT:}
     key-file: ${COURTSIDE_MFA_KEY_FILE:}
   source-url: ${COURTSIDE_SOURCE_URL:@project.url@}
   public-url: ${COURTSIDE_PUBLIC_URL:}
@@ -116,6 +116,11 @@ courtside:
       max-failures: ${COURTSIDE_LOGIN_ADDRESS_MAX_FAILURES:20}
       window: ${COURTSIDE_LOGIN_ADDRESS_WINDOW:1m}
       block: ${COURTSIDE_LOGIN_ADDRESS_BLOCK:1m}
+    factor:
+      max-failures: ${COURTSIDE_LOGIN_FACTOR_MAX_FAILURES:5}
+      block: ${COURTSIDE_LOGIN_FACTOR_BLOCK:1m}
+      max-block: ${COURTSIDE_LOGIN_FACTOR_MAX_BLOCK:24h}
+      retention: ${COURTSIDE_LOGIN_FACTOR_RETENTION:30d}
     global:
       threshold: ${COURTSIDE_LOGIN_GLOBAL_THRESHOLD:100}
       window: ${COURTSIDE_LOGIN_GLOBAL_WINDOW:1m}

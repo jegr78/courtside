@@ -305,6 +305,10 @@ they name a file on the host, in the container the path it is mounted at. The
 | `COURTSIDE_LOGIN_ADDRESS_BLOCK` | `1m` |
 | `COURTSIDE_LOGIN_ADDRESS_MAX_FAILURES` | `20` |
 | `COURTSIDE_LOGIN_ADDRESS_WINDOW` | `1m` |
+| `COURTSIDE_LOGIN_FACTOR_BLOCK` | `1m` |
+| `COURTSIDE_LOGIN_FACTOR_MAX_BLOCK` | `24h` |
+| `COURTSIDE_LOGIN_FACTOR_MAX_FAILURES` | `5` |
+| `COURTSIDE_LOGIN_FACTOR_RETENTION` | `30d` |
 | `COURTSIDE_LOGIN_GLOBAL_THRESHOLD` | `100` |
 | `COURTSIDE_LOGIN_GLOBAL_WINDOW` | `1m` |
 | `COURTSIDE_LOGIN_VERIFICATION_CONCURRENCY` | `2` |
@@ -331,7 +335,7 @@ they name a file on the host, in the container the path it is mounted at. The
 | `COURTSIDE_PASSWORD_RESET_MAIL_WINDOW` | `1h` |
 | `COURTSIDE_PASSWORD_TERMS_FILE` | unset |
 | `COURTSIDE_MFA_KEY_FILE` | unset |
-| `COURTSIDE_MFA_KEY_ROOT` | `.courtside/keys` |
+| `COURTSIDE_MFA_KEY_ROOT` | unset |
 | `COURTSIDE_PUBLIC_URL` | unset |
 | `COURTSIDE_SESSION_ABSOLUTE_LIFETIME` | `24h` |
 | `COURTSIDE_SESSION_CLEANUP_CRON` | `0 * * * * *` |
@@ -347,14 +351,17 @@ they name a file on the host, in the container the path it is mounted at. The
 
 ## MFA key storage
 
-The image creates `/var/lib/courtside/mfa-keys` with mode `0700`, owned by `10001:10001`.
-Mount a persistent writable volume there and set `COURTSIDE_MFA_KEY_ROOT` to that path when the
-root filesystem is read-only. All maintained container deployments supply this volume. Keep it
+The image creates `/var/lib/courtside/mfa-keys` with mode `0700`, owned by `10001:10001`. With
+`COURTSIDE_MFA_KEY_ROOT` unset, the application keeps its keys there whenever that directory exists. Every start writes or reads the instance keyring there, also
+before any account enrolls a factor, so the directory must be writable. The image declares it a
+volume, so a container started without a mount keeps its keys in an anonymous volume that removing
+the container with its volumes destroys. Mount a named persistent volume there. All maintained container deployments supply this volume. Keep it
 when replacing the application container or image. Each database installation has its own UUID
 subdirectory and a mode-`0600` keyring. PostgreSQL contains encrypted TOTP secrets and a key-check
 value, never the encryption keys.
 
-For a custom runtime, the default key root is `.courtside/keys` below the working directory.
+Outside the image, where that directory does not exist, the default key root is
+`.courtside/keys` below the working directory.
 `COURTSIDE_MFA_KEY_FILE` selects an operator-provided keyring instead. Its file must be private,
 owned by the application user, and every parent must be service-controlled. Mount its private parent directory writable in the
 application container and set the variable to the file path there. The sibling lock and atomic

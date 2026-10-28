@@ -564,6 +564,7 @@
       "kind": "demanding",
       "entryPoints": [
         "AccountSecurityMailer#on(AccountMfaChanged)",
+        "AccountSecurityMailer#on(SecondFactorGuessingBlocked)",
         "BookingMailer#on(BookingConfirmed)",
         "CancellationMailer#on(BookingCancelled)",
         "ClosureAnnouncements#on(AvailabilityChange.ClosureStored)",

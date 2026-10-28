@@ -237,3 +237,14 @@ proof. Initiating another account's controlled recovery additionally requires an
 administrator. Voluntary enrollment does not establish the blanket ASVS Level 2 authentication
 strength claim for every administrator. Reconsider this bound only if the product adopts mandatory
 administrator enrollment; the current MFA contract explicitly excludes a role-based mandate.
+
+## A known password can pause its holder's second-factor sign-in
+
+Someone who knows an account's password can submit wrong second-factor proofs for it. Every five
+consecutive failures pause that account's sign-in and sensitive-action proof, starting at one
+minute and doubling up to 24 hours, until a proof succeeds or 30 days pass without a failure. The
+holder therefore also waits out the current pause. The first pause of a run mails the holder, who
+changes the password through account recovery; the attacker can then no longer start a proof, so
+the pause stops growing. This bounds guessing to a few attempts per day after the first hours.
+Reconsider this bound if the product gains a way to prove the holder's identity that an attacker
+with the password lacks, such as a pause that a recovery code lifts.
