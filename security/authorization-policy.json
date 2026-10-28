@@ -4,7 +4,7 @@
   "purpose": "This is the normative authorization policy for the shipped Courtside API. OpenAPI defines the transport shape; this policy defines who may perform each operation, which resource attributes narrow that permission, and which protected fields each projection may read or write.",
   "openApiFieldInventorySha256": "df9c19674d6b9312b80adea2031ed69cd71263ff51cb882ccc133979695b9c72",
   "protectedFieldInventorySha256": "7e50ec306adc1d5975ac22e6d37452ab356c3cac585cd2679461c06ed79e59a8",
-  "productionAuthorizationSha256": "c766e8e4a488cc516a61ea467997f58e04df445f653b80d501881ce9b7f0fdf1",
+  "productionAuthorizationSha256": "f952c715e6b53c5011835a20b552c6ac7882567a9848ed680e1923bebef24fd0",
   "ordinaryFields": [
     "Problem.detail",
     "Problem.fieldErrors",
@@ -4276,7 +4276,7 @@
         "src/main/java/org/courtside/identity/internal/SessionStatusController.java#getSessionStatus"
       ],
       "positiveTests": [
-        "src/test/java/org/courtside/identity/AdminSurfaceTest.java#givenAnAnonymousCaller_whenCallingEveryAnonymousAllowedEndpoint_thenEveryOneOfThemSucceeds"
+        "src/test/java/org/courtside/identity/AdminSurfaceTest.java#givenAnAnonymousCaller_whenCallingEveryAnonymousAllowedEndpoint_thenEveryOneOfThemPassesAuthorization"
       ],
       "negativeTests": [
         "src/test/java/org/courtside/identity/AdminSurfaceTest.java#givenAnAnonymousCaller_whenCallingEveryAuthenticatedEndpoint_thenEveryOneOfThemIsUnauthorized"
@@ -5020,7 +5020,7 @@
     {
       "id": "mfa-controlled-rescue",
       "title": "Controlled MFA account rescue",
-      "rule": "Rescue initiation requires a currently enabled ADMIN with active MFA, fresh full proof and explicit external identity confirmation. It revokes sessions and blocks ordinary credential routes while retaining factors. Public redemption requires the single-use mailed code, matching username/current address/security epoch, unexpired state, persistent guess budget and acceptable permanent password. Only successful redemption removes factors and clears the block. Operator rescue and separately audited address correction require identity confirmation.",
+      "rule": "Rescue initiation requires a currently enabled ADMIN with active MFA, fresh full proof and explicit external identity confirmation. It revokes sessions and blocks ordinary credential routes while retaining factors. Public redemption requires the single-use mailed code, matching username/current address/security epoch, unexpired state, persistent guess budget and acceptable permanent password. Only successful redemption removes factors and clears the block. Operator rescue and separately audited address correction require identity confirmation. Ordinary credential and reset-code jobs queued before rescue must finish permanently without replacing recovered credentials or leaving a usable reset code, including delayed and retried jobs. New requests after completed rescue follow the ordinary policy.",
       "attributes": [
         "administrator",
         "recent-authentication",
@@ -5037,16 +5037,23 @@
         "src/main/java/org/courtside/identity/internal/ControlledAccountRecovery.java#redeem",
         "src/main/java/org/courtside/identity/internal/ControlledAccountRecovery.java#correctEmailFromMaintenance",
         "src/main/java/org/courtside/identity/internal/ControlledAccountRecovery.java#valid",
-        "src/main/java/org/courtside/identity/internal/RecoveryAccountGuard.java#lockAndRequireAvailable"
+        "src/main/java/org/courtside/identity/internal/RecoveryAccountGuard.java#lockAndRequireAvailable",
+        "src/main/java/org/courtside/identity/internal/AccountCredentialIssuer.java#issueFor",
+        "src/main/java/org/courtside/notification/internal/MailOutbox.java#handOverAndSettle",
+        "src/main/java/org/courtside/notification/internal/MailOutbox.java#supersededCredential"
       ],
       "positiveTests": [
         "src/test/java/org/courtside/identity/internal/ControlledAccountRecoveryTest.java#givenFreshMfaAdministrator_whenIdentityWasChecked_thenRecoveryStarts",
-        "src/test/java/org/courtside/identity/internal/ControlledAccountRecoveryTest.java#givenLostFactors_whenMaintenanceStartsRecovery_thenOldFactorsRemainAndOnlyAPasswordRedemptionRemovesThem"
+        "src/test/java/org/courtside/identity/internal/ControlledAccountRecoveryTest.java#givenLostFactors_whenMaintenanceStartsRecovery_thenOldFactorsRemainAndOnlyAPasswordRedemptionRemovesThem",
+        "src/test/java/org/courtside/identity/internal/ControlledAccountRecoveryTest.java#givenAnOldUnstartedCredentialJob_whenRecoveryCompletes_thenOnlyAnExplicitNewRequestCanIssueACredential"
       ],
       "negativeTests": [
         "src/test/java/org/courtside/identity/internal/ControlledAccountRecoveryTest.java#givenAdministratorWithoutMfa_whenRequestingRecovery_thenItIsRefused",
         "src/test/java/org/courtside/identity/internal/ControlledAccountRecoveryTest.java#givenUnconfirmedIdentity_whenMaintenanceStartsRecovery_thenNothingChanges",
-        "src/test/java/org/courtside/identity/internal/ControlledAccountRecoveryTest.java#givenAddressChangedWithoutAnEpochChange_whenOldRecoveryCodeIsRedeemed_thenItsAddressBindingRefusesIt"
+        "src/test/java/org/courtside/identity/internal/ControlledAccountRecoveryTest.java#givenAddressChangedWithoutAnEpochChange_whenOldRecoveryCodeIsRedeemed_thenItsAddressBindingRefusesIt",
+        "src/test/java/org/courtside/identity/internal/ControlledAccountRecoveryTest.java#givenAnOutboxCredentialBeingSent_whenRecoveryCompletes_thenTheJobFailsPermanentlyWithoutOverwritingThePassword",
+        "src/test/java/org/courtside/identity/internal/ControlledAccountRecoveryTest.java#givenTwoOldCredentialJobs_whenTheSecondWaitsDuringRecovery_thenNeitherCanReplaceTheRecoveryPassword",
+        "src/test/java/org/courtside/identity/internal/ControlledAccountRecoveryTest.java#givenAnOldResetCodeJobWaitingForTheAccount_whenRecoveryCommits_thenItsIssuedTokenRollsBack"
       ]
     }
   ],

@@ -28,7 +28,7 @@ class AccountRecoveryService {
     @Transactional
     void mailAResetCode(String username, String callerAddress) {
         refuseWhenLimited(username, callerAddress);
-        accounts.findByUsername(username)
+        accounts.findWithLockByUsername(username)
                 .filter(AccountRecoveryService::reachable)
                 .filter(account -> !factors.recoveryPending(account.getId()))
                 .ifPresent(this::mailACodeUnlessTheMailboxHasHadEnough);

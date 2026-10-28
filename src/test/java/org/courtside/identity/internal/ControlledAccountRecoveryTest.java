@@ -47,6 +47,14 @@ class ControlledAccountRecoveryTest extends AbstractIntegrationTest {
     @Autowired private MfaRecoveryCodeRepository codes;
     @Autowired private PasswordResetTokenService reset;
     @Autowired private AccountCredentialIssuer credentials;
+    @Autowired private org.courtside.identity.AccountCredentials credentialRequests;
+    @Autowired private AccountRecoveryService ordinaryRecovery;
+    @org.springframework.test.context.bean.override.mockito.MockitoSpyBean
+    private org.springframework.mail.javamail.JavaMailSender sender;
+    @org.springframework.test.context.bean.override.mockito.MockitoSpyBean(name = "mailOutboxExecutor")
+    private org.springframework.core.task.TaskExecutor mailExecutor;
+    @org.springframework.test.context.bean.override.mockito.MockitoSpyBean
+    private PasswordResetMailLimit resetMailLimit;
     @Autowired private JdbcClient jdbc;
     @Autowired private Clock clock;
     @Autowired private WebApplicationContext web;
@@ -119,6 +127,362 @@ class ControlledAccountRecoveryTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenCredentialMailStillBeingDelivered_whenRecoveryStarts_thenTheIssuedCredentialCannotInvalidateItsCode()
+            throws Exception {
+        // given
+        var pool = Executors.newSingleThreadExecutor();
+        var request = new java.util.concurrent.atomic.AtomicReference<UUID>();
+        try {
+            // when / then
+            assertThatThrownBy(() -> credentials.issueFor(account, clock.instant().plusSeconds(300), issued -> {
+                var started = pool.submit(() -> request.set(recovery.initiateFromMaintenance(account, true)));
+                assertThat(started).succeedsWithin(java.time.Duration.ofSeconds(2));
+            })).isInstanceOf(ResetCodeInvalidException.class);
+            assertThat(pending()).isTrue();
+            assertThat(totp.enabled(account)).isTrue();
+            assertThat(codes.remaining(account)).isEqualTo(10);
+            String code = recovery.issueFor(account, request.get()).code();
+            assertThat(recovery.redeem(username, code, "another-unusual-password", "198.51.100.2"))
+                    .isEqualTo(ControlledAccountRecovery.Redemption.ACCEPTED);
+        } finally {
+            pool.shutdown();
+            assertThat(pool.awaitTermination(5, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+        }
+    }
+
+    @Test
+    void givenCredentialMailStillBeingDelivered_whenRecoveryCompletes_thenItsNewPasswordCannotBeOverwritten()
+            throws Exception {
+        // given
+        var pool = Executors.newSingleThreadExecutor();
+        try {
+            // when / then
+            assertThatThrownBy(() -> credentials.issueFor(account, clock.instant().plusSeconds(300), issued -> {
+                var completed = pool.submit(() -> {
+                    UUID request = recovery.initiateFromMaintenance(account, true);
+                    String code = recovery.issueFor(account, request).code();
+                    assertThat(recovery.redeem(username, code, "another-unusual-password", "198.51.100.2"))
+                            .isEqualTo(ControlledAccountRecovery.Redemption.ACCEPTED);
+                });
+                assertThat(completed).succeedsWithin(java.time.Duration.ofSeconds(2));
+            })).isInstanceOf(org.courtside.shared.CredentialSupersededException.class);
+            UserAccount updated = accounts.findById(account).orElseThrow();
+            assertThat(passwords.matches("another-unusual-password", updated.getPasswordHash())).isTrue();
+            assertThat(updated.isPasswordChangeRequired()).isFalse();
+            assertThat(pending()).isFalse();
+        } finally {
+            pool.shutdown();
+            assertThat(pool.awaitTermination(5, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+        }
+    }
+
+    @Test
+    void givenAnOutboxCredentialBeingSent_whenRecoveryCompletes_thenTheJobFailsPermanentlyWithoutOverwritingThePassword()
+            throws Exception {
+        // given
+        var passes = retainDeliveryPasses();
+        var sent = new java.util.concurrent.CopyOnWriteArrayList<String>();
+        var firstCredential = new java.util.concurrent.atomic.AtomicBoolean(true);
+        try (var pool = Executors.newSingleThreadExecutor()) {
+            org.mockito.Mockito.doAnswer(invocation -> {
+                String credential = mailedCredential(invocation.getArgument(0));
+                if (credential != null) {
+                    sent.add(credential);
+                    if (firstCredential.getAndSet(false)) {
+                        assertThat(pool.submit(this::completeRecovery)).succeedsWithin(java.time.Duration.ofSeconds(2));
+                    }
+                }
+                return null;
+            }).when(sender).send(org.mockito.ArgumentMatchers.any(jakarta.mail.internet.MimeMessage.class));
+            UUID message = queueCredential();
+            // when
+            passes.getLast().run();
+            dueNow(message);
+            passes.getLast().run();
+            // then
+            assertPermanentRecoveryPassword();
+            assertThat(sent.size()).isEqualTo(1);
+            assertThat(messageState(message)).isEqualTo("FAILED");
+            assertThat(messageReason(message)).isEqualTo("CredentialSupersededByRecovery");
+            assertThat(messageCounter(message, "attempts")).isOne();
+            assertThat(messageCounter(message, "retries")).isZero();
+        }
+    }
+
+    @Test
+    void givenAnOutboxCredentialBeingSent_whenRecoveryStarts_thenTheJobFailsPermanentlyAndItsRecoveryRemainsUsable()
+            throws Exception {
+        // given
+        var passes = retainDeliveryPasses();
+        var sent = new java.util.concurrent.atomic.AtomicInteger();
+        var request = new java.util.concurrent.atomic.AtomicReference<UUID>();
+        try (var pool = Executors.newSingleThreadExecutor()) {
+            org.mockito.Mockito.doAnswer(invocation -> {
+                if (mailedCredential(invocation.getArgument(0)) != null && sent.incrementAndGet() == 1) {
+                    assertThat(pool.submit(() -> request.set(recovery.initiateFromMaintenance(account, true))))
+                            .succeedsWithin(java.time.Duration.ofSeconds(2));
+                }
+                return null;
+            }).when(sender).send(org.mockito.ArgumentMatchers.any(jakarta.mail.internet.MimeMessage.class));
+            UUID message = queueCredential();
+            // when
+            passes.getLast().run();
+            // then
+            assertThat(messageState(message)).isEqualTo("FAILED");
+            assertThat(messageReason(message)).isEqualTo("CredentialSupersededByRecovery");
+            assertThat(messageCounter(message, "retries")).isZero();
+            assertThat(sent.get()).isOne();
+            assertThat(pending()).isTrue();
+            assertThat(totp.enabled(account)).isTrue();
+            String code = recovery.issueFor(account, request.get()).code();
+            assertThat(recovery.redeem(username, code, "another-unusual-password", "198.51.100.54"))
+                    .isEqualTo(ControlledAccountRecovery.Redemption.ACCEPTED);
+        }
+    }
+
+    @Test
+    void givenACredentialWaitingForItsRetry_whenRecoveryCompletes_thenRetryCannotIssueAnotherCredential() {
+        // given
+        var passes = retainDeliveryPasses();
+        var sent = new java.util.concurrent.CopyOnWriteArrayList<String>();
+        org.mockito.Mockito.doAnswer(invocation -> {
+            String credential = mailedCredential(invocation.getArgument(0));
+            if (credential != null) {
+                sent.add(credential);
+                throw new org.springframework.mail.MailSendException("Relay unavailable");
+            }
+            return null;
+        }).when(sender).send(org.mockito.ArgumentMatchers.any(jakarta.mail.internet.MimeMessage.class));
+        UUID message = queueCredential();
+        passes.getLast().run();
+        assertThat(messageState(message)).isEqualTo("QUEUED");
+        assertThat(messageCounter(message, "retries")).isOne();
+        completeRecovery();
+        // when
+        dueNow(message);
+        passes.getLast().run();
+        // then
+        assertPermanentRecoveryPassword();
+        assertThat(sent.size()).isEqualTo(1);
+        assertThat(messageState(message)).isEqualTo("FAILED");
+        assertThat(messageReason(message)).isEqualTo("CredentialSupersededByRecovery");
+        assertThat(messageCounter(message, "attempts")).isEqualTo(2);
+        assertThat(messageCounter(message, "retries")).isOne();
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    void givenAnOldUnstartedCredentialJob_whenRecoveryCompletes_thenOnlyAnExplicitNewRequestCanIssueACredential(boolean firstCredential) {
+        // given
+        if (firstCredential) {
+            UserAccount holder = accounts.findById(account).orElseThrow();
+            holder.requirePasswordChange();
+            accounts.saveAndFlush(holder);
+        }
+        var passes = retainDeliveryPasses();
+        var sent = new java.util.concurrent.CopyOnWriteArrayList<String>();
+        org.mockito.Mockito.doAnswer(invocation -> {
+            String credential = mailedCredential(invocation.getArgument(0));
+            if (credential != null) sent.add(credential);
+            return null;
+        }).when(sender).send(org.mockito.ArgumentMatchers.any(jakarta.mail.internet.MimeMessage.class));
+        UUID old = queueCredential();
+        completeRecovery();
+        // when
+        passes.getLast().run();
+        // then
+        assertPermanentRecoveryPassword();
+        assertThat(sent.isEmpty()).isTrue();
+        assertThat(messageState(old)).isEqualTo("FAILED");
+        assertThat(messageReason(old)).isEqualTo("CredentialSupersededByRecovery");
+        // when
+        UUID fresh = queueCredential();
+        passes.getLast().run();
+        // then
+        assertThat(sent.size()).isEqualTo(1);
+        UserAccount updated = accounts.findById(account).orElseThrow();
+        assertThat(passwords.matches(sent.getFirst(), updated.getPasswordHash())).isTrue();
+        assertThat(updated.isPasswordChangeRequired()).isTrue();
+        assertThat(messageState(fresh)).isEqualTo("HANDED_OVER");
+    }
+
+    @Test
+    void givenPendingRecovery_whenAnOrdinaryCredentialIsRequested_thenNoCredentialJobCanBeQueued() {
+        // given
+        retainDeliveryPasses();
+        UUID request = recovery.initiateFromMaintenance(account, true);
+        String code = recovery.issueFor(account, request).code();
+        // when / then
+        assertThatThrownBy(() -> credentialRequests.issueTo(account)).isInstanceOf(ResetCodeInvalidException.class);
+        ordinaryRecovery.mailAResetCode(username, "198.51.100.51");
+        assertThat(jdbc.sql("SELECT count(*) FROM message_record WHERE account_id = :id AND kind IN ('CREDENTIALS_NEW_ACCOUNT', 'CREDENTIALS_PASSWORD_RESET')")
+                .param("id", account).query(Integer.class).single()).isZero();
+        assertThat(jdbc.sql("SELECT count(*) FROM message_record WHERE account_id = :id AND kind = 'ACCOUNT_PASSWORD_RESET_CODE'")
+                .param("id", account).query(Integer.class).single()).isZero();
+        assertThat(recovery.redeem(username, code, "another-unusual-password", "198.51.100.2"))
+                .isEqualTo(ControlledAccountRecovery.Redemption.ACCEPTED);
+    }
+
+    @Test
+    void givenCredentialMailBeingSent_whenTheHolderChoosesANewPassword_thenNoRetryCanOverwriteIt() throws Exception {
+        // given
+        var passes = retainDeliveryPasses();
+        var sent = new java.util.concurrent.CopyOnWriteArrayList<String>();
+        var changePassword = new java.util.concurrent.atomic.AtomicBoolean(true);
+        try (var pool = Executors.newSingleThreadExecutor()) {
+            org.mockito.Mockito.doAnswer(invocation -> {
+                String credential = mailedCredential(invocation.getArgument(0));
+                if (credential != null) {
+                    sent.add(credential);
+                    if (changePassword.getAndSet(false)) {
+                        assertThat(pool.submit(() -> {
+                            UserAccount holder = accounts.findById(account).orElseThrow();
+                            holder.replacePermanentPassword(passwords.encode("newly-chosen-password"));
+                            accounts.saveAndFlush(holder);
+                        })).succeedsWithin(java.time.Duration.ofSeconds(2));
+                    }
+                }
+                return null;
+            }).when(sender).send(org.mockito.ArgumentMatchers.any(jakarta.mail.internet.MimeMessage.class));
+            UUID message = queueCredential();
+            // when
+            passes.getLast().run();
+            dueNow(message);
+            passes.getLast().run();
+            // then
+            UserAccount updated = accounts.findById(account).orElseThrow();
+            assertThat(passwords.matches("newly-chosen-password", updated.getPasswordHash())).isTrue();
+            assertThat(updated.isPasswordChangeRequired()).isFalse();
+            assertThat(sent.size()).isEqualTo(1);
+            assertThat(messageState(message)).isEqualTo("FAILED");
+            assertThat(messageReason(message)).isEqualTo("CredentialSuperseded");
+            assertThat(messageCounter(message, "attempts")).isOne();
+            assertThat(messageCounter(message, "retries")).isZero();
+        }
+    }
+
+    @Test
+    void givenAnUnstartedOrdinaryResetCodeJob_whenRecoveryCompletes_thenItCannotIssueANewResetToken() {
+        // given
+        var passes = retainDeliveryPasses();
+        ordinaryRecovery.mailAResetCode(username, "198.51.100.52");
+        UUID message = jdbc.sql("SELECT id FROM message_record WHERE account_id = :id AND kind = 'ACCOUNT_PASSWORD_RESET_CODE'")
+                .param("id", account).query(UUID.class).single();
+        completeRecovery();
+        // when
+        passes.getLast().run();
+        // then
+        assertPermanentRecoveryPassword();
+        assertThat(messageState(message)).isEqualTo("FAILED");
+        assertThat(messageReason(message)).isEqualTo("CredentialSupersededByRecovery");
+        assertThat(jdbc.sql("SELECT count(*) FROM password_reset_token WHERE account_id = :id")
+                .param("id", account).query(Integer.class).single()).isZero();
+    }
+
+    @Test
+    void givenAnOrdinaryResetRequestBeingQueued_whenRecoveryRacesIt_thenItsJobRemainsOlderThanTheRecovery() throws Exception {
+        // given
+        var passes = retainDeliveryPasses();
+        var completed = new java.util.concurrent.atomic.AtomicReference<java.util.concurrent.Future<?>>();
+        try (var pool = Executors.newSingleThreadExecutor()) {
+            org.mockito.Mockito.doAnswer(invocation -> {
+                completed.set(pool.submit(this::completeRecovery));
+                awaitCompletionOrAccountLock(completed.get());
+                return invocation.callRealMethod();
+            }).when(resetMailLimit).recordWithinWindow(account);
+            // when
+            ordinaryRecovery.mailAResetCode(username, "198.51.100.53");
+            completed.get().get(5, java.util.concurrent.TimeUnit.SECONDS);
+            UUID message = jdbc.sql("SELECT id FROM message_record WHERE account_id = :id AND kind = 'ACCOUNT_PASSWORD_RESET_CODE'")
+                    .param("id", account).query(UUID.class).single();
+            passes.getLast().run();
+            // then
+            assertPermanentRecoveryPassword();
+            assertThat(messageState(message)).isEqualTo("FAILED");
+            assertThat(messageReason(message)).isEqualTo("CredentialSupersededByRecovery");
+            assertThat(jdbc.sql("SELECT count(*) FROM password_reset_token WHERE account_id = :id")
+                    .param("id", account).query(Integer.class).single()).isZero();
+        }
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    void givenTwoOldCredentialJobs_whenTheSecondWaitsDuringRecovery_thenNeitherCanReplaceTheRecoveryPassword(boolean firstCredential)
+            throws Exception {
+        // given
+        if (firstCredential) {
+            UserAccount holder = accounts.findById(account).orElseThrow();
+            holder.requirePasswordChange();
+            accounts.saveAndFlush(holder);
+        }
+        var passes = retainDeliveryPasses();
+        var firstSending = new java.util.concurrent.CountDownLatch(1);
+        var allowHandover = new java.util.concurrent.CountDownLatch(1);
+        var sent = new java.util.concurrent.atomic.AtomicInteger();
+        org.mockito.Mockito.doAnswer(invocation -> {
+            if (mailedCredential(invocation.getArgument(0)) != null && sent.incrementAndGet() == 1) {
+                firstSending.countDown();
+                assertThat(allowHandover.await(10, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+            }
+            return null;
+        }).when(sender).send(org.mockito.ArgumentMatchers.any(jakarta.mail.internet.MimeMessage.class));
+        UUID first = queueCredential();
+        UUID second = queueCredential();
+        Runnable delivery = passes.getLast();
+        try (var pool = Executors.newFixedThreadPool(2)) {
+            try {
+                var firstPass = pool.submit(delivery);
+                assertThat(firstSending.await(10, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+                var secondPass = pool.submit(delivery);
+                awaitCredentialMailLock();
+                // when
+                completeRecovery();
+                allowHandover.countDown();
+                firstPass.get(10, java.util.concurrent.TimeUnit.SECONDS);
+                secondPass.get(10, java.util.concurrent.TimeUnit.SECONDS);
+                // then
+                assertPermanentRecoveryPassword();
+                assertThat(sent.get()).isEqualTo(2);
+                assertThat(messageState(first)).isEqualTo("FAILED");
+                assertThat(messageState(second)).isEqualTo("FAILED");
+                assertThat(messageReason(second)).isEqualTo("CredentialSupersededByRecovery");
+                assertThat(messageCounter(second, "retries")).isZero();
+            } finally {
+                allowHandover.countDown();
+            }
+        }
+    }
+
+    @Test
+    void givenAnOldResetCodeJobWaitingForTheAccount_whenRecoveryCommits_thenItsIssuedTokenRollsBack() throws Exception {
+        // given
+        var passes = retainDeliveryPasses();
+        ordinaryRecovery.mailAResetCode(username, "198.51.100.55");
+        UUID message = jdbc.sql("SELECT id FROM message_record WHERE account_id = :id AND kind = 'ACCOUNT_PASSWORD_RESET_CODE'")
+                .param("id", account).query(UUID.class).single();
+        var delivery = new java.util.concurrent.atomic.AtomicReference<java.util.concurrent.Future<?>>();
+        var transaction = new org.springframework.transaction.support.TransactionTemplate(transactions);
+        try (var pool = Executors.newSingleThreadExecutor()) {
+            // when
+            transaction.executeWithoutResult(status -> {
+                jdbc.sql("SELECT id FROM user_account WHERE id = :id FOR UPDATE")
+                        .param("id", account).query(UUID.class).single();
+                delivery.set(pool.submit(passes.getLast()));
+                awaitAccountWait();
+                completeRecovery();
+            });
+            delivery.get().get(10, java.util.concurrent.TimeUnit.SECONDS);
+            // then
+            assertPermanentRecoveryPassword();
+            assertThat(messageState(message)).isEqualTo("FAILED");
+            assertThat(messageReason(message)).isEqualTo("CredentialSupersededByRecovery");
+            assertThat(messageCounter(message, "retries")).isZero();
+            assertThat(jdbc.sql("SELECT count(*) FROM password_reset_token WHERE account_id = :id")
+                    .param("id", account).query(Integer.class).single()).isZero();
+        }
+    }
+
+    @Test
     void givenPendingRecovery_whenThePasswordIsRejected_thenTheCodeAndFactorsRemainUsable() {
         // given
         UUID request = recovery.initiateFromMaintenance(account, true);
@@ -145,7 +509,7 @@ class ControlledAccountRecoveryTest extends AbstractIntegrationTest {
                 assertThat(recovery.redeem(username, code, "another-unusual-password", "198.51.100.4"))
                         .isEqualTo(ControlledAccountRecovery.Redemption.ACCEPTED);
                 second.set(executor.submit(() -> recovery.redeem(username, code, "different-unusual-password", "198.51.100.5")));
-                awaitBlockedRedemption();
+                awaitAccountWait();
             });
             // then
             assertThat(second.get().get(30, java.util.concurrent.TimeUnit.SECONDS))
@@ -408,13 +772,68 @@ class ControlledAccountRecoveryTest extends AbstractIntegrationTest {
         RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
     }
 
+    private List<Runnable> retainDeliveryPasses() {
+        List<Runnable> passes = new java.util.concurrent.CopyOnWriteArrayList<>();
+        org.mockito.Mockito.doAnswer(invocation -> {
+            passes.add(invocation.getArgument(0));
+            return null;
+        }).when(mailExecutor).execute(org.mockito.ArgumentMatchers.any(Runnable.class));
+        return passes;
+    }
+
+    private UUID queueCredential() {
+        credentialRequests.issueTo(account);
+        return jdbc.sql("SELECT id FROM message_record WHERE account_id = :id AND kind IN ('CREDENTIALS_NEW_ACCOUNT', 'CREDENTIALS_PASSWORD_RESET') ORDER BY queued_seq DESC LIMIT 1")
+                .param("id", account).query(UUID.class).single();
+    }
+
+    private void completeRecovery() {
+        UUID request = recovery.initiateFromMaintenance(account, true);
+        String code = recovery.issueFor(account, request).code();
+        assertThat(recovery.redeem(username, code, "another-unusual-password", "198.51.100.2"))
+                .isEqualTo(ControlledAccountRecovery.Redemption.ACCEPTED);
+    }
+
+    private void assertPermanentRecoveryPassword() {
+        UserAccount updated = accounts.findById(account).orElseThrow();
+        assertThat(passwords.matches("another-unusual-password", updated.getPasswordHash())).isTrue();
+        assertThat(updated.isPasswordChangeRequired()).isFalse();
+        assertThat(pending()).isFalse();
+    }
+
+    private static String mailedCredential(jakarta.mail.internet.MimeMessage message) throws Exception {
+        var found = java.util.regex.Pattern.compile("[A-Za-z0-9_-]{32}").matcher(String.valueOf(message.getContent()));
+        return found.find() ? found.group() : null;
+    }
+
+    private void dueNow(UUID message) {
+        jdbc.sql("UPDATE message_record SET next_attempt_at = queued_at WHERE id = :id AND state = 'QUEUED'")
+                .param("id", message).update();
+    }
+
+    private String messageState(UUID message) {
+        return jdbc.sql("SELECT state FROM message_record WHERE id = :id")
+                .param("id", message).query(String.class).single();
+    }
+
+    private String messageReason(UUID message) {
+        return jdbc.sql("SELECT reason FROM message_record WHERE id = :id")
+                .param("id", message).query(String.class).single();
+    }
+
+    private int messageCounter(UUID message, String column) {
+        if (!Set.of("attempts", "retries").contains(column)) throw new AssertionError("Unsupported counter");
+        return jdbc.sql("SELECT " + column + " FROM message_record WHERE id = :id")
+                .param("id", message).query(Integer.class).single();
+    }
+
     @AfterEach
     void clearPrincipal() {
         SecurityContextHolder.clearContext();
         RequestContextHolder.resetRequestAttributes();
     }
 
-    private void awaitBlockedRedemption() {
+    private void awaitAccountWait() {
         long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(20);
         while (System.nanoTime() < deadline) {
             jdbc.sql("SELECT pg_stat_clear_snapshot()").query().singleValue();
@@ -422,7 +841,29 @@ class ControlledAccountRecoveryTest extends AbstractIntegrationTest {
                     .query(Integer.class).single() > 0) return;
             java.util.concurrent.locks.LockSupport.parkNanos(java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(20));
         }
-        throw new AssertionError("The second redemption never waited for the first PostgreSQL transaction");
+        throw new AssertionError("The competing operation never waited for the PostgreSQL account lock");
+    }
+
+    private void awaitCredentialMailLock() {
+        long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(5);
+        while (System.nanoTime() < deadline) {
+            jdbc.sql("SELECT pg_stat_clear_snapshot()").query().singleValue();
+            if (jdbc.sql("SELECT count(*) FROM pg_locks WHERE locktype = 'advisory' AND NOT granted AND database = (SELECT oid FROM pg_database WHERE datname = current_database())")
+                    .query(Integer.class).single() > 0) return;
+            java.util.concurrent.locks.LockSupport.parkNanos(java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(20));
+        }
+        throw new AssertionError("The second credential job never waited for the first job's advisory lock");
+    }
+
+    private void awaitCompletionOrAccountLock(java.util.concurrent.Future<?> completed) {
+        long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(5);
+        while (System.nanoTime() < deadline) {
+            jdbc.sql("SELECT pg_stat_clear_snapshot()").query().singleValue();
+            if (completed.isDone() || jdbc.sql("SELECT count(*) FROM pg_stat_activity WHERE pg_backend_pid() = ANY(pg_blocking_pids(pid))")
+                    .query(Integer.class).single() > 0) return;
+            java.util.concurrent.locks.LockSupport.parkNanos(java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(20));
+        }
+        throw new AssertionError("Concurrent recovery neither completed nor waited for the request's account lock");
     }
 
     private boolean pending() {

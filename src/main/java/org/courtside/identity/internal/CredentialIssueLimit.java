@@ -24,10 +24,12 @@ class CredentialIssueLimit implements CredentialIssuing {
     private final CredentialIssueProperties properties;
     private final Clock clock;
     private final SecurityEventLog securityEvents;
+    private final RecoveryAccountGuard recoveryGuard;
 
     @Override
     @Transactional
     public void registerOrRefuse(UUID accountId) {
+        recoveryGuard.lockAndRequireAvailable(accountId);
         if (!registerWithinWindow(accountId)) {
             throw new CredentialIssueRateLimitedException(properties.maxPerWindow());
         }

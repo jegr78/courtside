@@ -894,8 +894,20 @@ left, or, for a reminder, its booking has already started by the time it is due.
 stays on the row with its reason, and the message statistics count the messages that needed a
 retry. Credential creation and handover share a transaction, so a credential the relay never
 accepted does not replace the stored one, and no plaintext credential waits in the outbox. Credential
-messages for one account are composed one after the other, so the last one sent carries the
-credential the account holds.
+issuance takes its account lock after relay handover and password encoding. It checks controlled
+recovery before handover and again under that lock, and replaces the credential only while the
+stored password hash still matches the one read before handover. A password change during handover
+fails that credential job permanently instead of retrying it against the new password.
+
+Starting controlled recovery permanently supersedes that account's older credential and ordinary
+password-reset-code jobs. The rescue message's retained queue sequence binds this boundary after
+redemption as well, so an older job's first delivery or retry cannot issue new credentials.
+Credential and ordinary reset-code requests hold the account lock through queue creation and refuse
+or silently omit requests while recovery is pending. Explicit requests after redemption remain
+allowed. Before settling a successful handover, the same transaction checks the recovery boundary
+again while the issuer still holds the account lock. A later recovery rolls back that old job's
+credential or reset-token write. The outbox continues to serialize credential messages for one
+account.
 
 Every message addressed to an account also becomes an entry in that account's notification centre,
 whether or not mail goes out. An entry stores the kind, the identifiers it concerns and when it was

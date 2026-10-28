@@ -5,6 +5,7 @@ import org.courtside.identity.AccountSessions;
 import org.courtside.identity.UserAccount;
 import org.courtside.identity.UserAccountRepository;
 import org.courtside.shared.CredentialIssuer;
+import org.courtside.shared.CredentialSupersededException;
 import org.courtside.shared.IssuedCredential;
 import org.courtside.shared.SecurityEventLog;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -33,9 +34,9 @@ class AccountCredentialIssuer implements CredentialIssuer {
     @Override
     @Transactional
     public void issueFor(UUID accountId, Instant expiresAt, Consumer<IssuedCredential> handOver) {
-        recoveryGuard.lockAndRequireAvailable(accountId);
         UserAccount account = accounts.findById(accountId).orElseThrow(() ->
                 new IllegalStateException("No account to issue a credential for"));
+        recoveryGuard.requireAvailable(accountId);
         String address = account.getPerson().getEmail();
         if (address == null || address.isBlank()) {
             throw new IllegalStateException("Account " + accountId
@@ -43,9 +44,14 @@ class AccountCredentialIssuer implements CredentialIssuer {
         }
         String credential = generated();
         String username = account.getUsername();
+        String previousHash = account.getPasswordHash();
         handOver.accept(new IssuedCredential(address, account.getPerson().getFirstName(),
                 account.getLocale(), username, credential, expiresAt));
-        accounts.issueCredential(accountId, passwordEncoder.encode(credential), expiresAt);
+        String encoded = passwordEncoder.encode(credential);
+        recoveryGuard.lockAndRequireAvailable(accountId);
+        if (accounts.issueCredential(accountId, encoded, expiresAt, previousHash) != 1) {
+            throw new CredentialSupersededException();
+        }
         sessions.endFor(username);
         securityEvents.credentialChangedAfterCommit(accountId, null,
                 SecurityEventLog.CredentialChange.TEMPORARY_CREDENTIAL_ISSUED);

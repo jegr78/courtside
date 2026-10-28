@@ -2,6 +2,7 @@ package org.courtside.notification.internal;
 
 import lombok.extern.slf4j.Slf4j;
 import org.courtside.notification.MessageKind;
+import org.courtside.shared.CredentialSupersededException;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.task.TaskExecutor;
@@ -161,7 +162,14 @@ class MailOutbox {
             if (refusal.mailboxRefused()) {
                 reportRefusal(message);
             }
+        } catch (CredentialSupersededException superseded) {
+            settle(claimed, record -> messages.failed(record, supersededCredential(claimed)
+                    ? "CredentialSupersededByRecovery" : "CredentialSuperseded"));
         } catch (RuntimeException failure) {
+            if (supersededCredential(claimed)) {
+                settle(claimed, record -> messages.failed(record, "CredentialSupersededByRecovery"));
+                return;
+            }
             String diagnosis = diagnosisOf(failure);
             if (claimed.attempts() >= ATTEMPTS) {
                 log.warn("Gave up handing over {} after {} attempts: {}", claimed.messageId(),
@@ -190,11 +198,17 @@ class MailOutbox {
         if (held.isEmpty()) {
             return;
         }
+        if (supersededCredential(claimed)) {
+            throw new MessageUndeliverableException("CredentialSupersededByRecovery");
+        }
         AtomicBoolean handedOver = new AtomicBoolean();
         composerFor(message.kind()).compose(message, mail -> {
             handover.attempt(claimed.messageId(), () -> send(mail, claimed.messageId()));
             handedOver.set(true);
         });
+        if (supersededCredential(claimed)) {
+            throw new CredentialSupersededException();
+        }
         if (handedOver.get()) {
             messages.handedOver(held.get());
             log.info("Handed over a {} message for account {}", message.kind(), message.accountId());
@@ -205,6 +219,23 @@ class MailOutbox {
 
     private void settle(Claimed claimed, Consumer<MessageRecord> outcome) {
         transactions.executeWithoutResult(status -> heldBy(claimed).ifPresent(outcome));
+    }
+
+    private boolean supersededCredential(Claimed claimed) {
+        if (!MessageKind.CREDENTIALS_NEW_ACCOUNT.name().equals(claimed.kind())
+                && !MessageKind.CREDENTIALS_PASSWORD_RESET.name().equals(claimed.kind())
+                && !MessageKind.ACCOUNT_PASSWORD_RESET_CODE.name().equals(claimed.kind())) {
+            return false;
+        }
+        return jdbc.sql("""
+                SELECT EXISTS (
+                    SELECT 1 FROM message_record credential
+                    JOIN message_record recovery ON recovery.account_id = credential.account_id
+                    WHERE credential.id = :id AND credential.account_id = :account
+                      AND recovery.kind = 'ACCOUNT_MFA_RECOVERY_CODE'
+                      AND recovery.queued_seq > credential.queued_seq)
+                """).param("id", claimed.id()).param("account", claimed.accountId())
+                .query(Boolean.class).single();
     }
 
     // A pass whose lease ran out may find its row taken over, and then it neither sends nor writes.
