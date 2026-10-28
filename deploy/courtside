@@ -1428,8 +1428,9 @@ command_mfa_export_keys() {
   staging=$(mktemp "$parent/.mfa-keys.partial.XXXXXX")
   temporary_path=$staging
   backup_mfa_keys "$staging"
-  [ ! -e "$output" ] && [ ! -L "$output" ] || refuse "$output appeared during the export; it was not replaced"
-  mv -- "$staging" "$output"
+  if ! mv -n -- "$staging" "$output" || [ -e "$staging" ]; then
+    refuse "$output appeared during the export; it was not replaced"
+  fi
   temporary_path=""
   printf 'MFA key archive written to %s\n' "$output"
 }
