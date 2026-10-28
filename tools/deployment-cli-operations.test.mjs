@@ -638,6 +638,25 @@ test("given included recovery material, when backup and restore-check run, then 
   });
 });
 
+test("given an application that logs to syslog, when backup exports MFA keys, then the archive leaves through a run without a log driver", () => {
+  fixture((context) => {
+    // given
+    assert.equal(initialize(context).status, 0);
+    writeFileSync(join(context.target, "config", "local.override.yaml"), "services: {}\n");
+    // when
+    const result = run(context.archive, context.target, ["backup"], context.environment);
+    // then
+    assert.equal(result.status, 0, result.stderr);
+    const exportRun = readFileSync(context.dockerLog, "utf8").split("\n")
+      .find((line) => line.includes(" run --rm --no-deps -T --entrypoint /bin/sh app -ec"));
+    assert.ok(exportRun, "backup never exported the MFA key volume");
+    assert.match(exportRun, /local\.override\.yaml -f \S+\/compose\.key-export\.yaml run /,
+      "the key export must apply the log-free override after every other compose file");
+    assert.match(readFileSync(join(context.archive, "compose.key-export.yaml"), "utf8"),
+      /app:\s+logging:\s+driver: none/, "the export override must disable the application's log driver");
+  });
+});
+
 test("given external recovery material, when backup runs, then the matching MFA key prerequisite is explicit and keys are excluded", () => {
   fixture((context) => {
     // given

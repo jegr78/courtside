@@ -1160,7 +1160,8 @@ command_prune() {
 
 backup_mfa_keys() {
   local destination=$1
-  "${compose[@]}" run --rm --no-deps -T --entrypoint /bin/sh app -ec '
+  "${compose[@]}" -f "$installation_directory/current/compose.key-export.yaml" \
+    run --rm --no-deps -T --entrypoint /bin/sh app -ec '
     if test -n "${COURTSIDE_MFA_KEY_FILE:-}"; then
       test -f "$COURTSIDE_MFA_KEY_FILE" && test ! -L "$COURTSIDE_MFA_KEY_FILE" \
         || { echo "MFA keyfile must be a regular file" >&2; exit 2; }
