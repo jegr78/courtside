@@ -107,6 +107,12 @@ Connect to Dev PostgreSQL with database `courtside_dev`, username `courtside`, p
 Dev delivers no mail. Its relay is `mail.invalid`, so a message such as a one-time password or a
 recovery link is retried for about half an hour and then given up as failed.
 
+Spring Boot creates its MFA keyring in the ignored `.courtside/keys` directory on first start. It
+refuses to start when any directory above the keyring is group- or world-writable without a sticky
+bit, and the error names that directory. A checkout made under `umask 002` is group-writable, so
+remove group write from the named directories with `chmod g-w <directory>`. Alternatively, point
+`COURTSIDE_MFA_KEY_ROOT` at a private directory whose parents only you can write.
+
 ## User acceptance testing
 
 Start UAT with `node tools/courtside.mjs uat`. The default command verifies the current checkout,

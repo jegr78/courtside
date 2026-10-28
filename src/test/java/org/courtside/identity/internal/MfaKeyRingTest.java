@@ -308,6 +308,21 @@ class MfaKeyRingTest {
     }
 
     @Test
+    void givenACheckoutCreatedUnderUmask002_whenOpening_thenTheRefusalNamesTheGroupWritableDirectory() throws Exception {
+        // given
+        Path checkout = temporary.resolve("checkout");
+        Files.createDirectory(checkout);
+        Files.setPosixFilePermissions(checkout, java.nio.file.attribute.PosixFilePermissions.fromString("rwxrwxr-x"));
+        Path file = checkout.resolve(".courtside/keys/mfa.keys");
+        // when / then
+        assertThatThrownBy(() -> MfaKeyRing.open(file, false))
+                .isInstanceOf(IllegalStateException.class)
+                .as("the operator must learn which directory to tighten")
+                .hasMessageContaining("MFA key directory").hasMessageContaining(checkout.toString());
+        assertThat(file).doesNotExist();
+    }
+
+    @Test
     void givenTwoOpenKeyRings_whenOneRotates_thenBothUseTheCurrentMaterial() {
         // given
         Path file = temporary.resolve("mfa.keys");
