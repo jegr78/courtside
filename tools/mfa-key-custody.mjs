@@ -114,7 +114,7 @@ function restoreEnvironmentForMode(mode, environment) {
 export function exportMfaKeys(destination, compose, environment, execute) {
   const output = openSync(destination, "wx", 0o600);
   try {
-    execute({ command: "docker", args: [...compose, "run", "--rm", "--no-deps", "-T", "--entrypoint", "/bin/sh", "app", "-ec",
+    execute({ command: "docker", args: [...compose, "-f", join(root, "deploy", "compose.key-export.yaml"), "run", "--rm", "--no-deps", "-T", "--entrypoint", "/bin/sh", "app", "-ec",
       `if test -n "\${COURTSIDE_MFA_KEY_FILE:-}"; then test -f "$COURTSIDE_MFA_KEY_FILE" && test ! -L "$COURTSIDE_MFA_KEY_FILE" || { echo 'MFA keyfile must be a regular file' >&2; exit 2; }; tar --transform='s|^[^/]*$|./provided/mfa.keys|' -C "$(dirname "$COURTSIDE_MFA_KEY_FILE")" -cf - "$(basename "$COURTSIDE_MFA_KEY_FILE")"; else tar --exclude='*.lock' --exclude='.mfa-*.keys' -C "$COURTSIDE_MFA_KEY_ROOT" -cf - .; fi`], environment, stdout: output });
   } finally {
     closeSync(output);
