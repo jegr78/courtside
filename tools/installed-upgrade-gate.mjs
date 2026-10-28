@@ -55,10 +55,10 @@ function run(command, args, options = {}) {
 function issueCertificates() {
   mkdirSync(certificates, { recursive: true });
   const at = (name) => join(certificates, name);
-  run("openssl", ["req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "1",
+  run("openssl", ["req", "-x509", "-newkey", "rsa:3072", "-nodes", "-days", "1",
     "-subj", "/CN=Courtside installed upgrade gate", "-addext", "basicConstraints=critical,CA:TRUE",
     "-addext", "keyUsage=critical,keyCertSign", "-keyout", at("ca.key"), "-out", at("ca.crt")]);
-  run("openssl", ["req", "-newkey", "rsa:2048", "-nodes", "-subj", `/CN=${registryHost}`,
+  run("openssl", ["req", "-newkey", "rsa:3072", "-nodes", "-subj", `/CN=${registryHost}`,
     "-keyout", at("registry.key"), "-out", at("registry.csr")]);
   // The registry runs as root without CAP_DAC_OVERRIDE, so it cannot read a key only its owner may read.
   chmodSync(at("registry.key"), 0o644);

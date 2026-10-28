@@ -856,6 +856,33 @@
       ]
     },
     {
+      "id": "installed-upgrade-registry-certificate",
+      "purpose": "Let one pull request's installed upgrade gate serve its unpushed image under the official ghcr.io name from a loopback registry",
+      "algorithm": "RSA-3072",
+      "implementation": "openssl",
+      "strength": {
+        "decidedBy": "repository",
+        "bits": 128,
+        "basis": "RSA-3072, the smallest modulus NIST rates at 128 bits. The certificate authority and the registry certificate are issued for one day."
+      },
+      "class": "credential-protection",
+      "owner": "repository-maintainer",
+      "storageBoundary": "The ignored build/installed-upgrade-gate/certificates directory for the life of one gate run. The authority's key is deleted as soon as it has signed the registry certificate, and the directory is removed before the run's evidence is uploaded.",
+      "permittedUse": "Making the runner's Docker daemon trust a registry on 127.0.0.1:443 that answers for ghcr.io during that one run. Nothing else trusts the authority, and the trust and hosts entries are withdrawn when the run ends.",
+      "rotation": "Each run issues its own authority and certificate.",
+      "revocation": "Not applicable: the trust entry is removed with the run, and nothing else trusts the authority.",
+      "recovery": "None is needed; a rerun issues new material.",
+      "retirement": "Replaced if a pull request's image can be served without impersonating the official registry name.",
+      "evidence": "tools/installed-upgrade-gate.test.mjs",
+      "detects": [
+        "openssl",
+        "newkey"
+      ],
+      "locations": [
+        "tools/installed-upgrade-gate.mjs"
+      ]
+    },
+    {
       "id": "security-mail-fixture-certificate",
       "purpose": "Generate the private identity for real STARTTLS mail and HTTPS password-breach forwarding inside one disposable security environment",
       "algorithm": "RSA-3072",
