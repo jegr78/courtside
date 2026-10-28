@@ -79,6 +79,15 @@ class MfaWebAuthnCredentials implements UserCredentialRepository {
                 """).param("account", account).query(Boolean.class).single();
     }
 
+    @Transactional(readOnly = true)
+    int count(UUID account) {
+        return jdbc.sql("""
+                SELECT count(*) FROM user_credentials credential
+                    JOIN user_entities holder ON holder.id = credential.user_entity_user_id
+                    WHERE holder.account_id = :account
+                """).param("account", account).query(Integer.class).single();
+    }
+
     @Transactional
     void deleteAll(UUID account) {
         if (account == null) throw new IllegalStateException("WebAuthn account is required");

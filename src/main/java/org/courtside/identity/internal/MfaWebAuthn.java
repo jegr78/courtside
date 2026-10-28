@@ -44,6 +44,7 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 class MfaWebAuthn {
+    static final int CREDENTIAL_LIMIT = 20;
     private final InstanceAddress address;
     private final ClubIdentity club;
     private final MfaWebAuthnUsers users;
@@ -60,6 +61,7 @@ class MfaWebAuthn {
     PublicKeyCredentialCreationOptions registrationOptions(UUID account) {
         URI origin = origin();
         String username = lockEligibleAccount(account).orElseThrow(MfaProofFailedException::new);
+        requireRoomForAnother(account);
         users.ensure(account);
         return operations(origin).createPublicKeyCredentialCreationOptions(
                 new ImmutablePublicKeyCredentialCreationOptionsRequest(principal(username)));
@@ -78,7 +80,9 @@ class MfaWebAuthn {
     boolean register(UUID account, PublicKeyCredentialCreationOptions options,
             PublicKeyCredential<AuthenticatorAttestationResponse> credential, String label) {
         URI origin = origin();
-        if (lockEligibleAccount(account).isEmpty() || !validLabel(label) || !validCredential(credential)
+        if (lockEligibleAccount(account).isEmpty()) return false;
+        requireRoomForAnother(account);
+        if (!validLabel(label) || !validCredential(credential)
                 || !registrationPolicy(account, options, origin)
                 || credential.getResponse().getAttestationObject() == null
                 || (credential.getResponse().getTransports() != null
@@ -135,6 +139,10 @@ class MfaWebAuthn {
                 && options.getAuthenticatorSelection() != null && UserVerificationRequirement.REQUIRED.equals(
                         options.getAuthenticatorSelection().getUserVerification())
                 && AttestationConveyancePreference.NONE.equals(options.getAttestation());
+    }
+
+    private void requireRoomForAnother(UUID account) {
+        if (credentials.count(account) >= CREDENTIAL_LIMIT) throw new WebAuthnCredentialLimitException(CREDENTIAL_LIMIT);
     }
 
     private Optional<String> lockEligibleAccount(UUID account) {

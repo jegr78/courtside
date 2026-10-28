@@ -104,6 +104,8 @@ const de = {
   "error.type.mfa-resource-not-found": "$t(identity.mfa.notFound)",
   "identity.mfa.notFound": "Dieses MFA-Gerät ist nicht mehr verfügbar. Lade die Sicherheitseinstellungen neu.",
   "identity.mfa.proofFailed": "Der zweite Faktor wurde nicht akzeptiert. Prüfe den Code oder beginne die Anmeldung erneut.",
+  "error.type.webauthn-credential-limit-reached": "$t(identity.mfa.webauthnLimitReached)",
+  "identity.mfa.webauthnLimitReached": "Dieses Konto hat schon {{limit}} Sicherheitsschlüssel und Passkeys, mehr sind nicht möglich. Entferne einen, bevor du einen neuen hinzufügst.",
   "identity.reauthentication.required": "Gib dein Passwort erneut ein, bevor du diese sicherheitsrelevante Änderung vornimmst.",
   "identity.credentials.rateLimited": "Für dieses Konto wurden zuletzt schon {{maxPerWindow}} mal Zugangsdaten angefordert. Bitte später erneut versuchen.",
   "auth.expired": "Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.",

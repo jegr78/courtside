@@ -30,6 +30,7 @@ class ProblemTypeUriTest {
     private static final List<String> KNOWN_FAILURE_SLUGS = List.of(
             "urn:courtside:error:mfa-proof-failed",
             "urn:courtside:error:mfa-resource-not-found",
+            "urn:courtside:error:webauthn-credential-limit-reached",
             "urn:courtside:error:account-address-missing",
             "urn:courtside:error:account-deactivated",
             "urn:courtside:error:account-recovery-code-expired",

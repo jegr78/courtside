@@ -743,7 +743,8 @@ current method usable until confirmation. Recovery codes appear once when genera
 holds only their verifiers. Regeneration invalidates the previous set, and concurrent redemption
 has one winner.
 
-WebAuthn supports multiple credentials with holder-private labels, individual removal and renaming.
+WebAuthn supports up to twenty credentials per account with holder-private labels, individual removal
+and renaming. A twenty-first registration is refused with a problem that names the limit.
 An account may enroll WebAuthn without TOTP. Registration and authentication require local user
 verification. Courtside receives the signed result, never biometric data. Relying-party ID and
 allowed origin come from the explicitly configured public HTTPS address, including maintained local
