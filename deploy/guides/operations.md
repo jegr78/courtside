@@ -1640,7 +1640,8 @@ Correct it through the audited command, then initiate recovery:
 The launcher sends the email file through standard input into a mode-`0600` file on the
 maintenance container's `/tmp` tmpfs. It checks the opened descriptor and reads only that
 descriptor after validation. The address never enters command arguments or environment
-values. Delete the host input file after the operation. Both operations record the target account
+values. Courtside tells the previous address that the account's email changed, without naming the
+new one. Delete the host input file after the operation. Both operations record the target account
 UUID in the security audit. Server access authorizes this rescue path; the product's ordinary
 administrator recovery path still requires the administrator's own MFA and fresh proof.
 

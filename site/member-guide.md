@@ -433,7 +433,7 @@ So fügst du einen Sicherheitsschlüssel oder Passkey hinzu:
 3. Bestätige die Anfrage deines Browsers, etwa mit PIN oder Fingerabdruck.
 
 Courtside erhält dabei nur das signierte Ergebnis, nie deinen Fingerabdruck. Gerätenamen siehst nur
-du. Du kannst mehrere Geräte anlegen, jedes umbenennen und einzeln entfernen. Sicherheitsschlüssel
+du. Du kannst bis zu zwanzig Geräte anlegen, jedes umbenennen und einzeln entfernen. Sicherheitsschlüssel
 brauchen einen unterstützten Browser und eine sichere Verbindung, die dein Verein eingerichtet hat.
 Fehlt eines davon, erklärt Courtside das an dieser Stelle. Die Authenticator-App bleibt dann nutzbar.
 

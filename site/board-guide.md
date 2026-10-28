@@ -379,7 +379,9 @@ erhält vorher eine Willkommensnachricht, neue Zugangsdaten für ein bestehendes
 Neue Zugangsdaten ersetzen ein bereits gesetztes Passwort und beenden alle Sitzungen des Kontos.
 Verwende diese Funktion nur, wenn das Mitglied sein Konto nicht selbst wiederherstellen kann.
 
-Administratoren können die E-Mail-Adresse ändern und anschließend neue Zugangsdaten anfordern. Das
+Administratoren können die E-Mail-Adresse ändern und anschließend neue Zugangsdaten anfordern.
+Courtside benachrichtigt danach die bisherige Adresse über die Änderung, ohne die neue zu nennen.
+Wer eine vertippte Adresse korrigiert, schickt diesen Hinweis also auch an das vertippte Postfach. Das
 Änderungsprotokoll hält beide Vorgänge mit Zeitpunkt und ausführendem Konto fest, aber weder die
 Adresse noch das Passwort. Organisatorische Kontrolle, etwa mehrere verantwortliche Personen,
 bleibt Aufgabe des Vereins.

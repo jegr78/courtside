@@ -415,7 +415,7 @@ To add a security key or passkey:
 3. Confirm your browser's request, for example with a PIN or fingerprint.
 
 Courtside receives only the signed result, never your fingerprint. Only you see device names. You
-can add several devices, rename each one and remove them one by one. Security keys need a supported
+can add up to twenty devices, rename each one and remove them one by one. Security keys need a supported
 browser and a secure connection configured by your club. If either is missing, Courtside explains
 it in this place, and the authenticator app remains available.
 
