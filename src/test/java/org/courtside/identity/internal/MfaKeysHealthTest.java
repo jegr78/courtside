@@ -52,6 +52,22 @@ class MfaKeysHealthTest {
     }
 
     @Test
+    void givenAValidatedInstance_whenTheKeyCheckFailsUnexpectedly_thenHealthReportsDownInsteadOfTheEarlierSuccess() throws Exception {
+        // given
+        MfaSecrets secrets = mock(MfaSecrets.class);
+        MfaKeysHealth health = health(secrets);
+        new MfaConfiguration().validateMfaKeys(secrets, health).run(new DefaultApplicationArguments());
+        assertThat(health.health().getStatus()).isEqualTo(Status.UP);
+        doThrow(new org.springframework.dao.DataAccessResourceFailureException("connection refused")).when(secrets).verify();
+        clock.addAndGet(INTERVAL.toNanos());
+        // when
+        Health result = health.health();
+        // then
+        assertThat(result.getStatus()).as("a failed check is not an earlier success").isEqualTo(Status.DOWN);
+        assertThat(result.getDetails()).containsEntry("reason", "connection refused");
+    }
+
+    @Test
     void givenAValidatedInstance_whenItsKeyMaterialIsLostAtRuntime_thenHealthReportsDownWithTheReason() throws Exception {
         // given
         MfaSecrets secrets = mock(MfaSecrets.class);

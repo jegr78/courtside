@@ -47,7 +47,7 @@ class MfaKeysHealth implements HealthIndicator {
     private Health verified() {
         try {
             secrets.verify();
-        } catch (IllegalStateException failure) {
+        } catch (RuntimeException failure) {
             String reason = failure.getMessage();
             if (!Objects.equals(reason, lostReason)) log.warn("MFA key material failed its health check: {}", reason);
             lostReason = reason;
