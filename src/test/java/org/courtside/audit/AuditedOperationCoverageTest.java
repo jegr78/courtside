@@ -21,6 +21,7 @@ class AuditedOperationCoverageTest {
     private static final String NONE = "none";
 
     private static final List<String> KNOWN_OPERATIONS = List.of(
+            "AccountAddresses#change",
             "AccountCredentials#issueTo",
             "AccountCredentials#issueToCreatedAccount",
             "ControlledAccountRecovery#issueFor",
