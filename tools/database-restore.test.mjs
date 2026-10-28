@@ -81,6 +81,20 @@ test("given the recurring restore workflow, when it runs, then evidence is retai
   assert.match(workflow, /!build\/database-restore\/\*\*\/\*\.sql/);
 });
 
+test("given the dedicated restore workflow, when preparing its image, then reach the restore proof without the full application test suites", () => {
+  // given
+  const workflow = source("../.github/workflows/backup-restore-smoke.yml");
+  const packaging = workflow.indexOf("run: ./mvnw -B package -DskipTests -Dfrontend.test.skip=true");
+  const tooling = workflow.indexOf("run: frontend/node/node tools/tool-tests.mjs");
+  const image = workflow.indexOf("name: Build the candidate image");
+  const restore = workflow.indexOf("name: Prove backup and restore");
+
+  // when / then
+  assert.ok(packaging >= 0, "the restore workflow packages the canonical frontend and backend without duplicating the full CI suites");
+  assert.ok(packaging < tooling && tooling < image && image < restore, "the tooling checks and packaged application image reach the maintained restore proof");
+  assert.doesNotMatch(workflow, /mvnw[^\n]*\bverify\b/);
+});
+
 test("given a real instance backup, when qualification creates its source, then writes go through HTTP", () => {
   // given
   const runner = source("./courtside.restore-smoke.mjs");
