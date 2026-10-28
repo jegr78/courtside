@@ -2,7 +2,9 @@ import * as crypto from "node:crypto";
 
 export function requireMfaSuccess(response, operation) {
   if (!Number.isInteger(response?.status) || response.status < 200 || response.status >= 300 || response.problemType) {
-    throw new Error(`MFA fixture ${operation} requires 2xx, received ${response?.status ?? "no response"}`);
+    const problem = typeof response?.problemType === "string"
+      && /^urn:courtside:error:[a-z0-9-]{1,80}$/.test(response.problemType) ? response.problemType : "unclassified";
+    throw new Error(`MFA fixture ${operation} requires 2xx, received ${response?.status ?? "no response"}, problem ${problem}`);
   }
   return response;
 }

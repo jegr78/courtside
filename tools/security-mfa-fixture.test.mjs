@@ -71,6 +71,31 @@ test("given generic errors and redirects, when evaluating a positive MFA proof, 
   assert.throws(() => requireMfaSuccess({ status: 200, problemType: "urn:unexpected" }, "fixture"));
 });
 
+test("given a typed unavailable MFA response, when fixture setup fails, then retain its problem identifier without response contents", () => {
+  // given
+  const problemType = "urn:courtside:error:database-lock-unavailable";
+  const response = { status: 503, problemType, body: "private recovery code", json: { detail: "private password" } };
+  // when / then
+  assert.throws(() => requireMfaSuccess(response, "POST /api/account-recovery/mfa/redemption"), (error) => {
+    assert.match(error.message, /received 503/);
+    assert.ok(error.message.includes(problemType));
+    assert.ok(!error.message.includes("private"));
+    return true;
+  });
+});
+
+for (const problemType of ["https://private.example/secret", "urn:courtside:error:bad\nprivate",
+  "urn:courtside:error:bad\n", "urn:courtside:error:bad\r\n", "urn:courtside:error:" + "x".repeat(81)]) {
+  test(`given an untrusted problem identifier of length ${problemType.length}, when an MFA fixture fails, then omit the identifier`, () => {
+    // when / then
+    assert.throws(() => requireMfaSuccess({ status: 503, problemType }, "fixture"), (error) => {
+      assert.ok(!error.message.includes(problemType));
+      assert.match(error.message, /unclassified/);
+      return true;
+    });
+  });
+}
+
 test("given a normal denied actor, when exercising an MFA operation, then keep its original client and refusal", async () => {
   // given
   const anonymous = {};
