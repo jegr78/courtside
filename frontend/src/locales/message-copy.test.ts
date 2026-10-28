@@ -1,12 +1,12 @@
-import { readFileSync } from "node:fs";
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 import { parse } from "yaml";
-import de from "../src/locales/de";
-import en from "../src/locales/en";
+import de from "./de";
+import en from "./en";
 
 for (const [language, bundle] of Object.entries({ de, en })) {
-  it(`given the API message kinds in ${language}, when their labels and summaries are resolved, then every kind has translated copy`, () => {
+  it(`given the API message kinds in ${language}, when their labels and summaries are resolved, then every kind has translated copy`, async () => {
     // given
+    const { readFileSync } = await vi.importActual<{ readFileSync: (path: string, encoding: "utf8") => string }>("node:fs");
     const contract = parse(readFileSync("../src/main/resources/api/openapi.yaml", "utf8")) as {
       components: { schemas: { MessageKind: { enum: string[] } } };
     };
