@@ -320,6 +320,7 @@ test("given the image's variables, when the contract lists them, then the set an
     ]);
     assert.ok([...collectorDefaults.values()].every(Boolean), "the collector defaults changed shape");
     for (const [name, fallback] of collectorDefaults) expected.set(name, `\`${fallback}\``);
+    for (const [, name, value] of dockerfile.matchAll(/^ENV (COURTSIDE_[A-Z0-9_]+)=(\S+)$/gm)) expected.set(name, `\`${value}\``);
     assert.ok(imageExcludes.length > 0, "the image excludes no source package");
     for (const name of all(java, /"(COURTSIDE_[A-Z0-9_]+)"/g)) {
       if (!expected.has(name)) expected.set(name, "unset");

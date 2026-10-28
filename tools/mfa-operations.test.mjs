@@ -27,6 +27,17 @@ test("given read-only application deployments, when keys are initialized, then e
   assert.match(read("Dockerfile"), /install -d -m 0700 -o 10001 -g 10001 \/var\/lib\/courtside\/mfa-keys/);
 });
 
+test("given the image started without a key root variable, when it initializes keys, then it uses the directory it creates for its own user", () => {
+  // given
+  const dockerfile = read("Dockerfile");
+  const owned = [...dockerfile.matchAll(/install -d (?:-m \d+ )?-o 10001 -g 10001 (\S+)/g)].map((match) => match[1]);
+  // when
+  const keyRoot = /^ENV COURTSIDE_MFA_KEY_ROOT=(\S+)$/m.exec(dockerfile)?.[1];
+  // then
+  assert.ok(keyRoot, "the image must not fall back to a key root below its root-owned working directory");
+  assert.ok(owned.includes(keyRoot), `the image key root ${keyRoot} is a directory UID 10001 owns`);
+});
+
 test("given a key archive, when the operator verifies it, then only regular instance keyrings are accepted", () => {
   // given
   const directory = mkdtempSync(join(tmpdir(), "courtside-key-archive-"));
