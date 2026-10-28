@@ -1523,7 +1523,10 @@ exact release and effective image identity, installation configuration, optional
 instructions and a checksum inventory. With local secret recovery it also contains `.env` and the
 local secret files and `mfa-keys.tar`. The archive preserves the separate `mfa-keys` volume,
 including every retained key after rotation. `recovery_material=external-verified` omits this archive
-and records `mfa_keys=external-required`. Pass the operator-owned mode-`0600` archive to
+and records `mfa_keys=external-required`. Produce the archive for the external secret store with
+`/srv/courtside/current/courtside mfa-export-keys --output /private/mfa-keys.tar`. The output
+directory must be operator-owned with mode `0700`; the command writes a mode-`0600` file and never
+replaces an existing one. Export again after every key rotation. Pass that archive to
 `restore-check --mfa-keys /private/mfa-keys.tar` in that case. A full-self-hosted backup stops Stalwart once, captures `mail-config` and
 `mail-data` from that same interval, then waits for mail health before publishing the unit.
 The launcher stages the directory with `mktemp`, checks the dump with `pg_restore --list`, and
@@ -1590,8 +1593,8 @@ key volume. An operator-provided `COURTSIDE_MFA_KEY_FILE` may be mounted outside
 root. Mount its private parent directory writable for the application user so locking and atomic
 rotation can replace the file. Included backups capture the actual configured file as `provided/mfa.keys` in the same
 archive. `restore-check` detects this mode and sets its application to that restored file inside
-its private volume. With external recovery material, preserve the same normalized archive in the
-external secret store and supply it through `--mfa-keys`. For migration to a fresh standard
+its private volume. With external recovery material, preserve the same normalized archive, as
+`courtside mfa-export-keys` writes it, in the external secret store and supply it through `--mfa-keys`. For migration to a fresh standard
 installation, restore the archive into `mfa-keys` with ownership `10001:10001`, directories at
 `0700` and files at `0600`. Set `COURTSIDE_MFA_KEY_FILE` in the new `.env` to
 `/var/lib/courtside/mfa-keys/provided/mfa.keys` before starting the matching database. Existing

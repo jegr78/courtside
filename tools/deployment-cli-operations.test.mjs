@@ -672,6 +672,54 @@ test("given external recovery material, when backup runs, then the matching MFA 
   });
 });
 
+test("given external recovery material, when the operator exports MFA keys, then restore-check accepts that archive", () => {
+  fixture((context) => {
+    // given
+    assert.equal(initialize(context, { recovery_material: "external-verified" }).status, 0);
+    const vault = join(context.root, "vault");
+    mkdirSync(vault, { mode: 0o700 });
+    const archive = join(vault, "mfa-keys.tar");
+    // when
+    const exported = run(context.archive, context.target, ["mfa-export-keys", "--output", archive], context.environment);
+    // then
+    assert.equal(exported.status, 0, exported.stderr);
+    assert.equal(statSync(archive).mode & 0o777, 0o600, "the exported key archive is private");
+    assert.deepEqual(readdirSync(vault), ["mfa-keys.tar"], "no partial export remains beside the archive");
+    assert.match(readFileSync(context.dockerLog, "utf8"), /compose\.key-export\.yaml run --rm --no-deps -T --entrypoint \/bin\/sh app/);
+    assert.equal(run(context.archive, context.target, ["backup"], context.environment).status, 0);
+    const recovery = join(context.target, "backups", readdirSync(join(context.target, "backups"))[0]);
+    const restored = run(context.archive, context.target, ["restore-check", "--recovery", recovery, "--mfa-keys", archive], {
+      ...context.environment, COURTSIDE_RESTORE_USERNAME: "doe.jane", COURTSIDE_RESTORE_PASSWORD: "private-restore-password"
+    });
+    assert.equal(restored.status, 0, restored.stderr);
+  });
+});
+
+test("given an existing file or a shared directory, when the operator exports MFA keys, then nothing is written", () => {
+  fixture((context) => {
+    // given
+    assert.equal(initialize(context, { recovery_material: "external-verified" }).status, 0);
+    const vault = join(context.root, "vault");
+    mkdirSync(vault, { mode: 0o700 });
+    const existing = join(vault, "mfa-keys.tar");
+    writeFileSync(existing, "retained archive\n", { mode: 0o600 });
+    const shared = join(context.root, "shared");
+    mkdirSync(shared, { mode: 0o755 });
+    chmodSync(shared, 0o755);
+    // when
+    const overwrite = run(context.archive, context.target, ["mfa-export-keys", "--output", existing], context.environment);
+    const exposed = run(context.archive, context.target, ["mfa-export-keys", "--output", join(shared, "mfa-keys.tar")],
+      context.environment);
+    // then
+    assert.equal(overwrite.status, 2);
+    assert.match(overwrite.stderr, /already exists/);
+    assert.equal(readFileSync(existing, "utf8"), "retained archive\n");
+    assert.equal(exposed.status, 2);
+    assert.match(exposed.stderr, /mode-0700 directory/);
+    assert.deepEqual(readdirSync(shared), []);
+  });
+});
+
 test("given an MFA-enabled restored account, when the recovery login probe receives a second factor, then it completes MFA without logging the code", () => {
   fixture((context) => {
     // given
