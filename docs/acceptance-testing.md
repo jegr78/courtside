@@ -407,9 +407,10 @@ the contact sheet frame. Evidence reads use regular non-symlink file descriptors
 receive the verified PNG bytes through standard input. Inheritance requires compatible membership and frame pixels, unchanged
 pixels outside masks with identical position, width, height and formatting in both the viewport
 and full-page image, and a previous
-clean verdict bound to its review and evidence. Changed layout, styling, browser language,
+clean verdict bound to its review and evidence. Changed layout, styling, browser, browser language,
 timezone or pixel density prevents masking from transferring a verdict. Missing, malformed,
-modified or legacy evidence falls back to a fresh reading. Older unchunked sheet names never
+modified or legacy evidence falls back to a fresh reading. The report names the failure beside
+each sheet it could not compare, with paths relative to the runs. Older unchunked sheet names never
 approve new chunks. Original PNGs and human verdicts remain unchanged.
 
 A previous finding-bearing verdict always requires reading again, even when the pixels match.

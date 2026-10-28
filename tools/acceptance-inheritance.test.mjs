@@ -220,8 +220,24 @@ test("given a previous run without its review audit, when the next report compar
     const result = report(current, previous);
     // then
     assert.equal(result.status, "draft");
-    assert.match(result.changedSheets.inheritanceUnavailable, /missing or invalid: .*sheet-review\.json/,
+    assert.match(result.changedSheets.inheritanceUnavailable, /missing or invalid: .*previous\/sheet-review\.json/,
       "the fallback keeps the underlying failure rather than only its category");
+    assert.equal(result.changedSheets.inheritanceUnavailable.includes(root), false, "the report names no local directory");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("given a previous run directory that does not exist, when the report compares it, then the comparison is unavailable without a local path", { skip }, () => {
+  // given
+  const root = mkdtempSync(join(tmpdir(), "sheet-inheritance-missing-run-"));
+  try {
+    const current = makeRun(root, "current");
+    // when
+    const result = report(current, { run: join(root, "absent") });
+    // then
+    assert.equal(result.status, "draft");
+    const reason = result.changedSheets.unavailable ?? result.changedSheets.inheritanceUnavailable;
+    assert.match(reason, /missing or invalid: .*absent/, "the reason names the run that could not be read");
+    assert.equal(reason.includes(root), false, "the report names no local directory");
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
