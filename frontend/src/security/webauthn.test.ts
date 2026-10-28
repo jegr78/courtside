@@ -65,9 +65,11 @@ it.each([
   ["AbortError", "mfa.keyCancelled"],
   ["TimeoutError", "mfa.keyTimedOut"],
   ["InvalidStateError", "mfa.keyAlreadyRegistered"]
-])("given a %s from a security key request, when it is explained, then the holder reads %s", (name, key) => {
+])("given a %s from a security key request, when it is explained, then the holder reads %s", async (name, key) => {
   // given
-  const failure = new DOMException("refused", name);
+  vi.stubGlobal("navigator", { credentials: { get: vi.fn().mockRejectedValue(new DOMException("refused", name)) } });
+  const failure = await getSecurityKey({ challenge: "AQI", rpId: "example.org", allowCredentials: [], userVerification: "required" },
+    new AbortController().signal).catch((error: unknown) => error);
   // when
   const message = securityKeyFailure(failure, i18n.t);
   // then
@@ -75,7 +77,8 @@ it.each([
   expect(message).toBe(i18n.t(key));
 });
 
-it.each([new Error("unavailable"), new DOMException("offline", "NetworkError"), undefined])("given %s, when it is explained as a security key outcome, then the caller keeps its own message", (failure) => {
+it.each([new Error("unavailable"), new DOMException("offline", "NetworkError"), new DOMException("server step aborted", "AbortError"),
+  new DOMException("server step timed out", "TimeoutError"), undefined])("given %s, when it is explained as a security key outcome, then the caller keeps its own message", (failure) => {
   // when
   const message = securityKeyFailure(failure, i18n.t);
   // then

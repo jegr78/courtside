@@ -111,7 +111,8 @@ export function LoginView({ refreshSession, passwordChanged = false, mfaRequired
       controller.signal.throwIfAborted();
       await abortable(() => refreshSession(controller.signal), controller.signal);
     } catch (failure) {
-      if (attempt.current === controller) setError(securityKeyFailure(failure, t) ?? problemMessage(failure, t));
+      if (attempt.current === controller) setError(securityKeyFailure(failure, t)
+        ?? (failure instanceof DOMException && failure.name === "TimeoutError" ? t("auth.timedOut") : problemMessage(failure, t)));
     } finally {
       clearTimeout(deadline);
       if (attempt.current === controller) {

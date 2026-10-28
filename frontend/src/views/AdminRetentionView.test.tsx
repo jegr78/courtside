@@ -1,4 +1,5 @@
 import type { ComponentType, ReactNode } from "react";
+import { SecurityKeyFailure } from "../security/webauthn";
 import { proofOwnerHarness } from "../test/ProofOwner";
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -200,7 +201,7 @@ describe("AdminRetentionView", () => {
     // given
     await previewed();
     vi.spyOn(api, "runRetention").mockRejectedValue(recentAuthenticationRequired);
-    vi.spyOn(api, "reauthenticate").mockRejectedValue(new DOMException("dismissed", "NotAllowedError"));
+    vi.spyOn(api, "reauthenticate").mockRejectedValue(new SecurityKeyFailure("dismissed", "NotAllowedError"));
     await userEvent.click(screen.getByTestId("retention-acknowledge"));
     await userEvent.click(screen.getByTestId("retention-run"));
 

@@ -1,4 +1,5 @@
 import type { ComponentType, ReactNode } from "react";
+import { SecurityKeyFailure } from "../security/webauthn";
 import { proofOwnerHarness } from "../test/ProofOwner";
 import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -390,7 +391,7 @@ describe("AdminPersonView", () => {
       type: "urn:courtside:error:recent-authentication-required",
       title: "Recent authentication required", status: 403
     }));
-    vi.spyOn(api, "reauthenticate").mockRejectedValue(new DOMException("Proof timed out", "TimeoutError"));
+    vi.spyOn(api, "reauthenticate").mockRejectedValue(new SecurityKeyFailure("Proof timed out", "TimeoutError"));
     showPerson();
     await userEvent.click(await screen.findByTestId("account-roles-TRAINER"));
     await userEvent.click(screen.getByTestId("save-person"));

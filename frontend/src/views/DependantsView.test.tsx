@@ -1,4 +1,5 @@
 import type { ComponentType, ReactNode } from "react";
+import { SecurityKeyFailure } from "../security/webauthn";
 import { proofOwnerHarness } from "../test/ProofOwner";
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -147,7 +148,7 @@ describe("DependantsView", () => {
     // given
     vi.spyOn(api, "dependants").mockResolvedValue([john(["ACCOUNT_TASKS"])]);
     vi.spyOn(api, "requestDependantCredentials").mockRejectedValue(refused("recent-authentication-required", 403));
-    vi.spyOn(api, "reauthenticate").mockRejectedValue(new DOMException("dismissed", "NotAllowedError"));
+    vi.spyOn(api, "reauthenticate").mockRejectedValue(new SecurityKeyFailure("dismissed", "NotAllowedError"));
     show();
     await userEvent.click(await screen.findByTestId("request-dependant-credentials"));
     const dialog = await screen.findByRole("dialog");
