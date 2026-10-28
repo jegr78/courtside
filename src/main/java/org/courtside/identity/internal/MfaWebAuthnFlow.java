@@ -89,8 +89,10 @@ class MfaWebAuthnFlow {
         UserAccount account = management.currentForChange();
         var credential = ownCredential(account, id);
         credentials.delete(credential.getCredentialId());
-        if (!factors.enabled(account.getId())) recovery.clear(account.getId());
-        management.changed(account, SecurityEventLog.CredentialChange.MFA_METHOD_CHANGED);
+        boolean remaining = factors.enabled(account.getId());
+        if (!remaining) recovery.clear(account.getId());
+        management.changed(account, remaining
+                ? SecurityEventLog.CredentialChange.MFA_METHOD_CHANGED : SecurityEventLog.CredentialChange.MFA_DISABLED);
     }
 
     @Transactional

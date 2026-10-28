@@ -1,5 +1,10 @@
 package org.courtside.identity.internal;
 
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
+import org.slf4j.LoggerFactory;
+import java.util.List;
 import jakarta.servlet.http.Cookie;
 import org.courtside.AbstractIntegrationTest;
 import org.courtside.api.ApiMfaRecoveryCodeSet;
@@ -211,10 +216,12 @@ class MfaWebAuthnFlowTest extends AbstractIntegrationTest {
         Cookie pending = password(202);
         Cookie full = prove(pending, authenticator, options(pending));
         // when
-        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+        List<String> actions = credentialActions(() -> mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
                         .delete("/api/account/mfa/webauthn/credentials/{id}", authenticator.credentialId().toBase64UrlString())
-                        .cookie(full).with(csrf())).andExpect(status().isNoContent());
+                        .cookie(full).with(csrf())).andExpect(status().isNoContent()));
         // then
+        assertThat(actions).as("only removing the last factor is recorded as disabling MFA")
+                .containsExactly(keepTotp ? "MFA_METHOD_CHANGED" : "MFA_DISABLED");
         assertThat(credentials.findByCredentialId(authenticator.credentialId())).isNull();
         assertThat(totp.enabled(account)).isEqualTo(keepTotp);
         assertThat(jdbc.sql("SELECT count(*) FROM mfa_recovery_code WHERE account_id = :id")
@@ -307,5 +314,24 @@ class MfaWebAuthnFlowTest extends AbstractIntegrationTest {
         assertThat(session).isNotNull();
         session.setAttribute("courtside.authenticated-at", clock.instant().minusSeconds(360).toEpochMilli());
         repository.save(session);
+    }
+
+    private static List<String> credentialActions(ThrowingRunnable action) throws Exception {
+        Logger log = (Logger) LoggerFactory.getLogger("org.courtside.security.events");
+        ListAppender<ILoggingEvent> recorded = new ListAppender<>();
+        recorded.start();
+        log.addAppender(recorded);
+        try {
+            action.run();
+        } finally {
+            log.detachAppender(recorded);
+        }
+        return recorded.list.stream().flatMap(event -> event.getKeyValuePairs() == null ? java.util.stream.Stream.empty()
+                        : event.getKeyValuePairs().stream())
+                .filter(pair -> pair.key.equals("event.action")).map(pair -> String.valueOf(pair.value)).toList();
+    }
+
+    private interface ThrowingRunnable {
+        void run() throws Exception;
     }
 }
