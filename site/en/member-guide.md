@@ -326,6 +326,8 @@ last opened the page online. Once that time is over, the code disappears.
 When the club changes a code or a new one starts to apply to your booking, Courtside sends the booker
 and every co-player with an account a message with the codes that apply now.
 
+![A booking's access code with the name of its access point and the time it works.](../screenshots/en/access-codes.png)
+
 ## When something under your booking changes
 
 A later configuration change may affect your booking. Examples include a deactivated court, a

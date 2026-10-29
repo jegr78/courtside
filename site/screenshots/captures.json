@@ -63,6 +63,11 @@
       "pages": { "de": "site/member-guide.md", "en": "site/en/member-guide.md" }
     },
     {
+      "name": "access-codes",
+      "surface": "access-codes",
+      "pages": { "de": "site/member-guide.md", "en": "site/en/member-guide.md" }
+    },
+    {
       "name": "series-form",
       "surface": "series-form",
       "pages": { "de": "site/member-guide.md", "en": "site/en/member-guide.md" }
