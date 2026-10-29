@@ -146,6 +146,9 @@ courtside:
       operational-log-search: { cost: 10, concurrency: 1 }
       logo-normalization: { cost: 10, concurrency: 1 }
       global-session-revocation: { cost: 5, concurrency: 1 }
+  access-control:
+    connector: ${COURTSIDE_ACCESS_CONTROL_CONNECTOR:none}
+    call-deadline: ${COURTSIDE_ACCESS_CONTROL_CALL_DEADLINE:15s}
   booking:
     series-horizon-months: 12
     reminder-sweep-interval: 5m
