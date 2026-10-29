@@ -872,7 +872,8 @@ the booking needs, read when the message is written and filled only for a recipi
 booker or a player at that moment; an `ACCESS_CODE_CHANGED` notice for anybody else fails as
 `NotInBooking`. Without a code the placeholder's line disappears,
 so such a mail reads exactly as it did before access points existed. A club's own wording that lacks
-the placeholder gets the block appended when there is one. Like a credential, the codes may not
+the placeholder gets the block when there is one: above the link when the wording ends with a line
+holding only `{instanceLink}`, at its end otherwise. Like a credential, the codes may not
 appear in a subject and stand apart from links in the body.
 
 A code that newly reaches a booking is announced as `ACCESS_CODE_CHANGED`. That happens when a board
@@ -912,7 +913,7 @@ reminder has no request to derive it from. Only an absolute `https://` address w
 or credentials is accepted, and anything else refuses startup. Without the setting, every message
 goes out without a link. A template line holding nothing but an empty link is dropped, and inside a
 sentence the link renders empty. Confirmation, participant addition and withdrawal, displacement,
-reminder and both messages about a taken open place lead to the booking on
+reminder, both messages about a taken open place and a changed access code lead to the booking on
 `/my-bookings#booking-<id>`. Cancellations, cancellations by the
 club and series messages lead to `/my-bookings`. A waitlist offer leads to its entry on
 `/my-bookings#waitlist-<id>`, where the member takes it. The welcome leads to the start page `/`. The confirmation's calendar entry carries

@@ -380,4 +380,23 @@ class MailTemplatesTest {
         assertThat(withoutCodes).as("and stays as the club wrote it when there is none")
                 .isEqualTo("Hello Jane, see you at 18:00.");
     }
+
+    @Test
+    void givenAClubWordingEndingWithTheLink_whenABookingWithCodesIsConfirmed_thenTheCodesGoAboveTheLink() {
+        // given
+        MessageTemplateOverrides overrides = mock(MessageTemplateOverrides.class);
+        when(overrides.of(MessageKind.BOOKING_CONFIRMED, "en")).thenReturn(Optional.of(
+                new MessageText("Booked", "Hello {firstName}, see you at {from}.\n\n{clubName}\n{instanceLink}")));
+        Map<String, String> withAccess = new HashMap<>(VALUES);
+        withAccess.put("accessCodes", "Access code, valid from 17:45 to 19:15:\nNorth gate: 135790");
+
+        // when
+        String body = new MailTemplates(overrides).render("booking.confirmed.body", Locale.ENGLISH, withAccess);
+
+        // then
+        assertThat(body).as("the link stays on the message's last line")
+                .isEqualTo("Hello Jane, see you at 18:00.\n\nExample Tennis Club\n\n"
+                        + "Access code, valid from 17:45 to 19:15:\nNorth gate: 135790\n\n"
+                        + "https://courts.example.org/my-bookings");
+    }
 }

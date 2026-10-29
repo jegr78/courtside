@@ -33,8 +33,8 @@ public record ChangeClubConfigurationCommand(
         AccessLagTime accessLag,
         AccessCodeLength accessCodeLength) {
 
-    // The link fields, a logo, a short name and the rule set for people holding no membership type are
-    // what a club may leave unset; an absent value anywhere else is a caller that skipped its validation.
+    // Links, logo, short name and the no-membership rule set may be unset, and an absent waitlist or access
+    // setting keeps the stored one; an absent value anywhere else is a caller that skipped its validation.
     public ChangeClubConfigurationCommand {
         requirePresent(clubName, "clubName");
         requirePresent(primaryColor, "primaryColor");

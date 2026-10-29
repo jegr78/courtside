@@ -31,6 +31,8 @@ class MailTemplates {
             ResourceBundle.Control.getNoFallbackControl(ResourceBundle.Control.FORMAT_PROPERTIES);
     private static final List<String> LINE_PLACEHOLDERS =
             List.of(InstanceLinks.PLACEHOLDER, BookingWording.ACCESS_CODES);
+    private static final Pattern TRAILING_LINK =
+            Pattern.compile("\\R[ \\t]*\\{" + InstanceLinks.PLACEHOLDER + "}[ \\t]*\\R*\\z");
     private static final Map<String, MessageKind> SUBJECTS = byKey(".subject");
     private static final Map<String, MessageKind> BODIES = byKey(".body");
 
@@ -49,7 +51,13 @@ class MailTemplates {
         String placeholder = "{" + BookingWording.ACCESS_CODES + "}";
         boolean due = BODIES.containsKey(key) && shipped.contains(placeholder) && !wording.contains(placeholder)
                 && !values.getOrDefault(BookingWording.ACCESS_CODES, "").isEmpty();
-        return due ? wording + "\n\n" + placeholder : wording;
+        if (!due) {
+            return wording;
+        }
+        Matcher link = TRAILING_LINK.matcher(wording);
+        return link.find()
+                ? wording.substring(0, link.start()) + "\n\n" + placeholder + "\n" + wording.substring(link.start())
+                : wording + "\n\n" + placeholder;
     }
 
     // A club's own wording replaces a message's subject or body; the fragments inside them stay shipped.
