@@ -392,8 +392,8 @@ fields and never a static code, `card.bookingCard.changed`, `config.club.changed
 which names the access point and the courts its code newly opens, and `card.bookingCard.accessGranted`,
 which names a card that starts granting access. A message wording has no row id of its own, so
 its entries name a subject derived from the message kind and language. The other two arrive in the course of ordinary use, because the writer records every
-event a module publishes rather than a list it keeps: `booking.booking.confirmed` and the nine
-other booking entries, and `identity.account.credentialsRequested`, which names the account a
+event a module publishes rather than a list it keeps: `booking.booking.confirmed` and the
+other entries beginning with `booking.`, and `identity.account.credentialsRequested`, which names the account a
 credential was issued for and says in `accountCreated` whether the account was opened by the same
 request. A board's request is written beside
 `roster.account.credentialsRequested`, which names the person, because the roster reaches
