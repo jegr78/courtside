@@ -88,6 +88,7 @@ const BOOKING_MODULE_SUBJECTS: Record<string, "booking" | "series" | "waitlistEn
   "booking.booking.confirmed": "booking",
   "booking.booking.displaced": "booking",
   "booking.booking.reminderDue": "booking",
+  "booking.booking.accessCodeChanged": "booking",
   "booking.booking.cancelled": "booking",
   "booking.participant.recorded": "booking",
   "booking.participant.withdrew": "booking",
