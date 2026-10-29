@@ -8,6 +8,8 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.sql.Timestamp;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -18,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.courtside.access.internal.Grants.DEADLINE;
 import static org.courtside.access.internal.Grants.DEMAND;
 import static org.courtside.access.internal.Grants.MAPPING;
+import static org.courtside.access.internal.Grants.NORTH_GATE;
 import static org.courtside.access.internal.Grants.NOW;
 import static org.courtside.access.internal.Grants.answered;
 
@@ -101,6 +104,47 @@ class AccessGrantTransitionsTest extends AbstractIntegrationTest {
         assertThat(jdbc.sql("SELECT count(*) FROM access_code WHERE grant_id IS NULL").query(Integer.class).single())
                 .as("every rejected code is held").isEqualTo(3);
         assertThat(currentCodes()).as("a retry finds a code to send").hasSize(1);
+    }
+
+    @Test
+    void givenARefusedGrantInstalledAsWanted_whenDecided_thenNoCallIsMade() {
+        // given
+        UUID grant = storedRefusedInstalledGrant(DEMAND.validUntil());
+
+        // when
+        Decision decision = inRow(grant, row -> transitions.decide(row, DEMAND, MAPPING, NOW));
+
+        // then
+        assertThat(decision.action()).isEqualTo(Action.NONE);
+    }
+
+    @Test
+    void givenARefusedGrantInstalledWithAnotherWindow_whenDecided_thenTheInstallationIsRevoked() {
+        // given
+        UUID grant = storedRefusedInstalledGrant(DEMAND.validUntil().plus(Duration.ofHours(2)));
+
+        // when
+        Decision decision = inRow(grant, row -> transitions.decide(row, DEMAND, MAPPING, NOW));
+
+        // then
+        assertThat(decision.action()).as("a refused grant leaves no broader installation at the door")
+                .isEqualTo(Action.REVOKE);
+    }
+
+    private UUID storedRefusedInstalledGrant(Instant remoteUntil) {
+        UUID grant = UUID.randomUUID();
+        jdbc.sql("""
+                        INSERT INTO access_grant (id, booking_id, wanted, want_from, want_until, want_points,
+                                                  want_mapping, remote, remote_from, remote_until, remote_points,
+                                                  remote_mapping, exposed_until, refused, next_attempt_at)
+                        VALUES (:id, :booking, true, :from, :until, ARRAY[:gate]::uuid[], :mapping, 'INSTALLED',
+                                :from, :remoteUntil, ARRAY[:gate]::uuid[], :mapping, :remoteUntil, true, :due)
+                        """)
+                .param("id", grant).param("booking", UUID.randomUUID())
+                .param("from", Timestamp.from(DEMAND.validFrom())).param("until", Timestamp.from(DEMAND.validUntil()))
+                .param("remoteUntil", Timestamp.from(remoteUntil)).param("gate", NORTH_GATE)
+                .param("mapping", MAPPING).param("due", Timestamp.from(NOW)).update();
+        return grant;
     }
 
     private String rejectOnce(AccessGrant row, Instant at) {

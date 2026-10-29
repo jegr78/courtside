@@ -28,7 +28,7 @@ class AccessGrantDecisionTest {
     private static final Instant LATER = NOW.plus(Duration.ofHours(1));
 
     @Test
-    void givenAnInstallTheSystemRefused_whenTheSameDemandIsDecidedAgain_thenNoCallIsMade() {
+    void givenAFirstInstallTheSystemRefused_whenTheSameDemandIsDecidedAgain_thenWhatMayBeAtTheDoorIsRevoked() {
         // given
         AccessGrant grant = fresh();
         SentCall call = decideAndBegin(grant, DEMAND, MAPPING, NOW);
@@ -38,8 +38,43 @@ class AccessGrantDecisionTest {
         Action action = grant.decide(DEMAND, MAPPING, LATER);
 
         // then
-        assertThat(action).as("a refused install stays failing until a retry or a demand change").isEqualTo(Action.NONE);
+        assertThat(grant.getRemote()).isEqualTo(RemoteState.MAYBE);
+        assertThat(action).as("a refused install may still have reached the door").isEqualTo(Action.REVOKE);
         assertThat(grant.isRefused()).isTrue();
+    }
+
+    @Test
+    void givenARescheduleTheSystemRefusedAfterAMove_whenDecidedAgain_thenTheOldInstallationIsRevoked() {
+        // given
+        AccessGrant grant = installed();
+        Demand moved = new Demand(DEMAND.validFrom(), DEMAND.validUntil(), Set.of(SOUTH_GATE));
+        SentCall call = decideAndBegin(grant, moved, MAPPING, LATER);
+        grant.record(call, answered(new GrantOutcome.Refused(Scope.GRANT, "group unknown")), null, LATER, DEADLINE);
+
+        // when
+        Action action = grant.decide(moved, MAPPING, LATER.plus(Duration.ofMinutes(1)));
+
+        // then
+        assertThat(action).as("the old window and door must not stay open").isEqualTo(Action.REVOKE);
+    }
+
+    @Test
+    void givenARefusedGrantWhoseRevokeWasAccepted_whenTheSameDemandIsDecidedAgain_thenNoNewInstallFollows() {
+        // given
+        AccessGrant grant = fresh();
+        grant.record(decideAndBegin(grant, DEMAND, MAPPING, NOW),
+                answered(new GrantOutcome.Refused(Scope.GRANT, "keypad full")), null, NOW, DEADLINE);
+        SentCall revoke = decideAndBegin(grant, DEMAND, MAPPING, LATER);
+        grant.record(revoke, answered(new GrantOutcome.Accepted("remote-user-1")), null, LATER, DEADLINE);
+
+        // when
+        Action action = grant.decide(DEMAND, MAPPING, LATER.plus(Duration.ofHours(1)));
+
+        // then
+        assertThat(revoke.action()).isEqualTo(Action.REVOKE);
+        assertThat(grant.getRemote()).isEqualTo(RemoteState.NONE);
+        assertThat(grant.isRefused()).as("only a retry or a demand change installs again").isTrue();
+        assertThat(action).isEqualTo(Action.NONE);
     }
 
     @Test

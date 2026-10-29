@@ -112,7 +112,9 @@ public class AccessGrant {
             return remote == RemoteState.NONE ? Action.NONE : Action.REVOKE;
         }
         if (refused) {
-            return Action.NONE;
+            boolean exposedBeyondWanted = remote == RemoteState.MAYBE
+                    || (remote == RemoteState.INSTALLED && !installedAsWanted());
+            return exposedBeyondWanted ? Action.REVOKE : Action.NONE;
         }
         if (remote != RemoteState.INSTALLED) {
             return Action.GRANT;
