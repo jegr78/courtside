@@ -132,3 +132,26 @@ test("given a SARIF directory where a file was not extracted, when the tool runs
   assert.deepEqual(JSON.parse(readFileSync(join(directory, "codeql-diagnostics.json"), "utf8")).unextracted,
     [{ language: "js", file: "src/valid.ts" }]);
 });
+
+test("given SARIF without the expected or extracted file lists, when the tool runs, then the run says it cannot name unextracted files", () => {
+  // given
+  const directory = mkdtempSync(join(tmpdir(), "codeql-diagnostics-unlisted-"));
+  mkdirSync(join(directory, "codeql"));
+  const unlisted = structuredClone(recorded);
+  const invocation = unlisted.runs[0].invocations[0];
+  invocation.toolExecutionNotifications = invocation.toolExecutionNotifications.filter((note) =>
+    !/extracted-files$/.test(note.descriptor.id));
+  writeFileSync(join(directory, "codeql", "javascript.sarif"), JSON.stringify(unlisted));
+
+  // when
+  const result = spawnSync(process.execPath, [tool, "--sarif", join(directory, "codeql"),
+    "--output", join(directory, "codeql-diagnostics.json")], { encoding: "utf8" });
+
+  // then
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /^::warning::CodeQL's SARIF lists no expected and extracted files, so unextracted files cannot be named/m,
+    "an empty comparison must not read as complete coverage");
+  const evidence = JSON.parse(readFileSync(join(directory, "codeql-diagnostics.json"), "utf8"));
+  assert.equal(evidence.notifications["js/diagnostics/extraction-errors"], 3, "the evidence counts what the SARIF carried");
+  assert.equal(evidence.notifications["js/baseline/expected-extracted-files"], undefined);
+});

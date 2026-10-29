@@ -74,13 +74,19 @@ function main() {
   }
   const problems = documents.flatMap(extractionProblems);
   const unextracted = documents.flatMap(unextractedFiles);
+  const counted = {};
+  for (const note of notifications) counted[note.descriptor?.id ?? "unknown"] = (counted[note.descriptor?.id ?? "unknown"] ?? 0) + 1;
+  const listed = (suffix) => Object.keys(counted).some((id) => id.endsWith(suffix));
+  if (notifications.length > 0 && !(listed("/baseline/expected-extracted-files") && listed("/diagnostics/successfully-extracted-files"))) {
+    process.stdout.write("::warning::CodeQL's SARIF lists no expected and extracted files, so unextracted files cannot be named\n");
+  }
   for (const problem of problems) process.stdout.write(`${annotation(problem)}\n`);
   for (const { language, file } of unextracted) {
     process.stdout.write(`${annotation({ id: `${language}/unextracted-file`, file,
       message: "CodeQL expected to extract this file and did not, so no query read it" })}\n`);
   }
   writeFileSync(option("--output"),
-    `${JSON.stringify({ schemaVersion: 1, sarif: files.sort(), problems, unextracted }, null, 2)}\n`);
+    `${JSON.stringify({ schemaVersion: 1, sarif: files.sort(), problems, unextracted, notifications: counted }, null, 2)}\n`);
   if (process.env.GITHUB_STEP_SUMMARY) {
     appendFileSync(process.env.GITHUB_STEP_SUMMARY, notifications.length === 0
       ? "CodeQL's SARIF carries no tool diagnostics.\n"
