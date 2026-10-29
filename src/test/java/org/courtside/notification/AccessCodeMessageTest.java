@@ -5,6 +5,7 @@ import org.courtside.AbstractIntegrationTest;
 import org.courtside.booking.BookingService;
 import org.courtside.booking.CreateBookingCommand;
 import org.courtside.booking.ParticipantSpec;
+import org.courtside.booking.ParticipationService;
 import org.courtside.booking.testfixture.BookingTestFixture;
 import org.courtside.card.testfixture.CardTestFixture;
 import org.courtside.facility.FacilityService;
@@ -57,6 +58,9 @@ class AccessCodeMessageTest extends AbstractIntegrationTest {
 
     @Autowired
     private BookingTestFixture bookingFixture;
+
+    @Autowired
+    private ParticipationService participations;
 
     @Autowired
     private FacilityService facilityService;
@@ -124,7 +128,7 @@ class AccessCodeMessageTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void givenBookingsAroundTheNorthGate_whenItsCodeChanges_thenOnlyTheUpcomingGrantingOnesBookerIsToldOnce()
+    void givenBookingsAroundTheNorthGate_whenItsCodeChanges_thenOnlyTheUpcomingGrantingOnesPeopleAreToldOnce()
             throws Exception {
         // given
         UUID affected = bookOnCourtTwo(janeAccount, jane, john);
@@ -152,11 +156,10 @@ class AccessCodeMessageTest extends AbstractIntegrationTest {
                         SELECT account_id, parameters::text AS parameters FROM notification
                         WHERE kind = 'ACCESS_CODE_CHANGED'
                         """).query().listOfRows();
-        assertThat(told).as("one message, to the booker of the one upcoming granting booking on the gate's courts")
-                .hasSize(1);
-        assertThat(told.getFirst().get("account_id")).isEqualTo(janeAccount);
-        assertThat(told.getFirst().get("parameters").toString()).contains(affected.toString())
-                .doesNotContain(otherCourt.toString(), cancelled.toString(), past.toString(), notGranting.toString());
+        assertThat(told).as("one message each, to the booker and the player of the one upcoming granting booking")
+                .extracting(row -> row.get("account_id")).containsExactlyInAnyOrder(janeAccount, johnAccount);
+        assertThat(told).allSatisfy(row -> assertThat(row.get("parameters").toString()).contains(affected.toString())
+                .doesNotContain(otherCourt.toString(), cancelled.toString(), past.toString(), notGranting.toString()));
         assertThat(jdbc.sql("""
                         SELECT subject_id FROM domain_event WHERE event_type = 'booking.booking.accessCodeChanged'
                         """).query(UUID.class).list())
@@ -164,6 +167,23 @@ class AccessCodeMessageTest extends AbstractIntegrationTest {
                 .containsExactly(affected);
         assertThat(lastBodyTo("jane.doe@example.org")).as("the message carries the code the gate takes now")
                 .contains("North gate: " + NEW_CODE).doesNotContain(OLD_CODE);
+    }
+
+    @Test
+    void givenAPlayerWhoLeftTheBooking_whenTheCodeChanges_thenOnlyThoseStillInItAreTold() throws Exception {
+        // given
+        UUID booking = bookOnCourtTwo(janeAccount, jane, john);
+        participations.withdraw(booking, john, johnAccount);
+        clearInvocations(sender);
+
+        // when
+        facilityService.changeAccessPoint(northGate, "North gate", courts.subList(0, 2), NEW_CODE);
+
+        // then
+        assertThat(jdbc.sql("SELECT account_id FROM notification WHERE kind = 'ACCESS_CODE_CHANGED'")
+                .query(UUID.class).list()).as("a player who left holds no code to replace")
+                .containsExactly(janeAccount);
+        assertThat(lastBodyTo("jane.doe@example.org")).contains("North gate: " + NEW_CODE);
     }
 
     @Test

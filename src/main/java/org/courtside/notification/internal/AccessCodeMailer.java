@@ -14,6 +14,7 @@ import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -25,6 +26,7 @@ import java.util.function.Consumer;
 class AccessCodeMailer implements MessageComposer {
 
     private final BookingAnnouncer bookings;
+    private final BookingAudience audience;
     private final UserAccountRepository accounts;
     private final ClubIdentity club;
     private final MailTemplates templates;
@@ -34,13 +36,14 @@ class AccessCodeMailer implements MessageComposer {
 
     @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT, fallbackExecution = true)
     void on(BookingAccessCodeChanged changed) {
-        bookings.describe(changed.bookingId())
+        List<UserAccount> told = bookings.describe(changed.bookingId())
                 .filter(booking -> booking.access() != null)
-                .flatMap(booking -> MessageRecipient.enabled(accounts.findById(booking.bookedByAccountId())))
-                .ifPresentOrElse(account -> outbox.queue(account.getId(), MessageKind.ACCESS_CODE_CHANGED,
-                                Map.of(QueuedMessage.BOOKING, changed.bookingId().toString())),
-                        () -> log.info("Booking {} holds no access code its booker can be told of",
-                                changed.bookingId()));
+                .map(audience::of).orElse(List.of());
+        if (told.isEmpty()) {
+            log.info("Booking {} holds no access code anybody in it can be told of", changed.bookingId());
+        }
+        told.forEach(account -> outbox.queue(account.getId(), MessageKind.ACCESS_CODE_CHANGED,
+                Map.of(QueuedMessage.BOOKING, changed.bookingId().toString())));
     }
 
     @Override

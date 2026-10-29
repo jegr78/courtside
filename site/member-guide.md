@@ -337,8 +337,8 @@ gilt, meist ab einer Viertelstunde vor Spielbeginn bis eine Viertelstunde nach S
 Codes stehen in der Bestätigung und in der Erinnerung. Mitspieler mit eigenem Konto sehen sie unter
 *Als Mitspieler eingetragen*. Ist die Zeit vorbei, verschwindet der Code.
 
-Ändert der Verein einen Code, schickt Courtside dem Bucher jeder betroffenen Buchung eine Nachricht
-mit dem neuen Code.
+Ändert der Verein einen Code, schickt Courtside dem Bucher und jedem Mitspieler mit eigenem Konto
+jeder betroffenen Buchung eine Nachricht mit dem neuen Code.
 
 ## Wenn sich unter deiner Buchung etwas ändert
 

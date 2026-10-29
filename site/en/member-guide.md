@@ -322,8 +322,8 @@ usually from a quarter of an hour before play until a quarter of an hour after i
 and the reminder carry the same codes. Co-players with their own account see them under *Recorded as
 a co-player*. Once that time is over, the code disappears.
 
-When the club changes a code, Courtside sends the booker of every affected booking a message with
-the new code.
+When the club changes a code, Courtside sends the booker and every co-player with an account of each
+affected booking a message with the new code.
 
 ## When something under your booking changes
 
