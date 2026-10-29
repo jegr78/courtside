@@ -8,7 +8,6 @@ import org.courtside.api.ApiBookingHours;
 import org.courtside.api.ApiViolation;
 import org.courtside.api.ApiCreateBookingRequest;
 import org.courtside.api.ApiBookingStatus;
-import org.courtside.api.ApiParticipation;
 import org.courtside.api.ApiParticipationPage;
 import org.courtside.api.ApiPersonalBookingPage;
 import org.courtside.api.ApiPersonalBookingView;
@@ -170,14 +169,9 @@ class BookingController implements BookingsApi {
     @Override
     public ResponseEntity<ApiParticipationPage> listOwnParticipations(UUID cursor, Integer limit) {
         UserAccount account = currentUser.requireAccount();
-        Map<UUID, BookingCard> cardsById = cards.allCards().stream()
-                .collect(Collectors.toMap(BookingCard::getId, card -> card));
         ParticipationPage page = participations.participations(
                 personIdOf(account), account.getId(), cursor, limit);
-        List<ApiParticipation> items = page.bookings().stream()
-                .map(booking -> toParticipation(booking, cardsById.get(booking.getCardId())))
-                .toList();
-        return ResponseEntity.ok(new ApiParticipationPage(items).nextCursor(page.nextCursor()));
+        return ResponseEntity.ok(personalBookingPages.renderParticipations(page));
     }
 
     @Override
@@ -185,19 +179,6 @@ class BookingController implements BookingsApi {
         UserAccount account = currentUser.requireAccount();
         participations.withdraw(bookingId, personIdOf(account), account.getId());
         return ResponseEntity.noContent().build();
-    }
-
-    private static ApiParticipation toParticipation(Booking booking, BookingCard card) {
-        List<CourtAllocation> allocations = booking.getAllocations();
-        CourtAllocation first = allocations.getFirst();
-        return new ApiParticipation(
-                booking.getId(),
-                allocations.stream().map(CourtAllocation::getCourtId).toList(),
-                WireTypes.toOffsetDateTime(first.getStartsAt()),
-                WireTypes.toOffsetDateTime(first.getEndsAt()),
-                card == null ? "?" : card.getLabel(),
-                card == null ? "#999999" : card.getColor(),
-                ApiBookingStatus.fromValue(booking.getStatus().name()));
     }
 
     private static UUID personIdOf(UserAccount account) {

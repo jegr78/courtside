@@ -27,7 +27,7 @@ function requested(form: FormData): AccessPointRequest {
 // A stored code keeps working after the club changes its length, so only a new one has to fit.
 function acceptable(request: AccessPointRequest, digits: number, storedCode?: string | null): boolean {
   const code = request.staticCode;
-  const codeFits = code == null || code === storedCode || (/^[0-9]+$/.test(code) && code.length === digits);
+  const codeFits = code === null || code === undefined || code === storedCode || (/^[0-9]+$/.test(code) && code.length === digits);
   return request.name !== "" && codeFits;
 }
 

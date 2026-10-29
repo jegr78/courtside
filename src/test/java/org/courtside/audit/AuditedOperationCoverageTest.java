@@ -86,6 +86,7 @@ class AuditedOperationCoverageTest {
             "ExternalReferenceService#unlink",
             "FacilityService#activeCourts",
             "FacilityService#allCourts",
+            "FacilityService#activeAccessPointsWithCodes",
             "FacilityService#allAccessPoints",
             "FacilityService#changeAccessPoint",
             "FacilityService#changeCourt",

@@ -31,6 +31,7 @@ class IllegalArgumentSurfaceTest {
             "org/courtside/config/WaitlistOfferWindow.java",
             "org/courtside/config/internal/ChangeClubConfigurationCommand.java",
             "org/courtside/dataexchange/internal/MemberNumber.java",
+            "org/courtside/shared/BookingAnnouncement.java",
             "org/courtside/shared/CodedDomainFailure.java",
             "org/courtside/shared/ProblemType.java",
             "org/courtside/shared/TimeSlot.java",

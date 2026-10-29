@@ -13,6 +13,7 @@ import org.courtside.facility.internal.OpeningHoursVersion;
 import org.courtside.facility.internal.OpeningHoursVersionRepository;
 import org.courtside.facility.internal.OpeningSchedules;
 import org.courtside.facility.internal.WeeklyOpeningHours;
+import org.courtside.shared.AccessCodeChanged;
 import org.courtside.shared.InvalidOpeningWindowException;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.shared.SqlConstraintViolation;
@@ -124,6 +125,10 @@ public class FacilityService {
         return accessPoints.findAllByOrderByNameAsc();
     }
 
+    public List<AccessPoint> activeAccessPointsWithCodes() {
+        return accessPoints.findByActiveTrueAndStaticCodeIsNotNullOrderByNameAsc();
+    }
+
     public AccessPoint requireAccessPoint(UUID accessPointId) {
         return accessPoints.findById(accessPointId)
                 .orElseThrow(() -> new AccessPointNotFoundException("No access point with id " + accessPointId));
@@ -161,6 +166,9 @@ public class FacilityService {
         if (!changedFields.isEmpty()) {
             events.publishEvent(new FacilityEvent.AccessPointChanged(
                     saved.getId(), sorted(courtsServed), changedFields));
+        }
+        if (codeChanged && staticCode != null && saved.isActive()) {
+            events.publishEvent(new AccessCodeChanged(saved.getId(), sorted(courtsServed)));
         }
         return saved;
     }

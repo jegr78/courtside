@@ -9,4 +9,6 @@ import java.util.UUID;
 public interface AccessPointRepository extends JpaRepository<AccessPoint, UUID> {
 
     List<AccessPoint> findAllByOrderByNameAsc();
+
+    List<AccessPoint> findByActiveTrueAndStaticCodeIsNotNullOrderByNameAsc();
 }

@@ -220,6 +220,7 @@
         "cancelDependantBooking"
       ],
       "backgroundEntryPoints": [
+        "AccessCodeMailer#on(BookingAccessCodeChanged)",
         "BookingMailer#on(BookingConfirmed)",
         "BookingReminderSchedule#remindWhatIsDue",
         "BookingValidationPreparation#onWebServerInitialized(ServletWebServerInitializedEvent)",
@@ -399,6 +400,7 @@
         "removeCourtClosure"
       ],
       "backgroundEntryPoints": [
+        "AccessCodeAnnouncements#on(AccessCodeChanged)",
         "ClosureAnnouncements#on(AvailabilityChange.ClosureStored)",
         "ClosureAnnouncements#on(AvailabilityChange.PeriodStored)",
         "ClosureAnnouncements#on(CardEvent.BookingCardAvailabilityChanged)",

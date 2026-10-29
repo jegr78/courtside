@@ -33,6 +33,13 @@ public final class CardTestFixture {
                 false, true, false, false).getId();
     }
 
+    public void letBookingsReceiveAccessCodes(UUID cardId, boolean grantsAccess) {
+        BookingCard card = cards.requireCard(cardId);
+        cards.changeCard(cardId, card.getLabel(), card.getColor(), card.getAllowedRoles(), card.getManagingRoles(),
+                card.getAllowedPlayerCounts(), card.isCountsAgainstLimits(), card.isGuestAllowed(),
+                card.isShowGenericOccupancy(), grantsAccess);
+    }
+
     public void deactivateBookingCard(UUID cardId) {
         cards.setCardActive(cardId, false);
     }

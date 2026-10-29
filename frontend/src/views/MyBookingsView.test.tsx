@@ -1141,3 +1141,44 @@ for (const [language, expected] of [["en", "Check in from 5:45 PM"], ["de", "17:
     expect(await screen.findByTestId("check-in-from"), `the ${language} list reads its own clock`).toHaveTextContent(expected);
   });
 }
+
+it("given a booking whose card grants access, when the member reads it, then the gate's code and its window are shown", async () => {
+  // given
+  vi.spyOn(api, "personalBookings").mockImplementation((options) => Promise.resolve(options?.view
+    ? { items: [] }
+    : { items: [{
+      id: upcomingId, courtIds: ["33333333-3333-3333-3333-333333333333"],
+      startsAt: "2026-08-12T16:00:00Z", endsAt: "2026-08-12T17:00:00Z",
+      cardLabel: "Member booking", cardColor: "#176b55", status: "CONFIRMED",
+      access: { validFrom: "2026-08-12T15:45:00Z", validUntil: "2026-08-12T17:15:00Z",
+        codes: [{ accessPointName: "North gate", code: "135790" }] }
+    }] }));
+
+  // when
+  render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} />);
+
+  // then
+  const codes = await screen.findByTestId("access-codes");
+  expect(codes).toHaveTextContent("Access code, valid from 5:45 PM to 7:15 PM");
+  expect(within(codes).getByTestId("access-code")).toHaveTextContent("North gate: 135790");
+});
+
+it("given a page opened before a window ended, when the screen's clock has passed it, then the code is no longer shown", async () => {
+  // given
+  vi.spyOn(api, "personalBookings").mockImplementation((options) => Promise.resolve(options?.view
+    ? { items: [] }
+    : { items: [{
+      id: upcomingId, courtIds: ["33333333-3333-3333-3333-333333333333"],
+      startsAt: "2026-08-12T16:00:00Z", endsAt: "2026-08-12T17:00:00Z",
+      cardLabel: "Member booking", cardColor: "#176b55", status: "CONFIRMED",
+      access: { validFrom: "2026-08-12T15:45:00Z", validUntil: "2026-08-12T16:30:00Z",
+        codes: [{ accessPointName: "North gate", code: "135790" }] }
+    }] }));
+
+  // when
+  render(<MyBookingsView now={new Date("2026-08-12T16:30:00Z")} />);
+
+  // then
+  expect(await screen.findByTestId(`booking-${upcomingId}`)).toBeInTheDocument();
+  expect(screen.queryByTestId("access-codes")).not.toBeInTheDocument();
+});

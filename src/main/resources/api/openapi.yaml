@@ -2935,6 +2935,30 @@ components:
           description: |
             True on a cancelled booking the club freed because nobody checked in by its release
             time. Absent otherwise.
+        access:
+          $ref: "#/components/schemas/AccessGrant"
+
+    AccessGrant:
+      type: object
+      description: |
+        The static codes that open the access points of a confirmed booking whose card grants
+        access, from the booking's start less the club's lead until its end plus the club's lag.
+        Present only while that window has not ended, and only to the booking's own people.
+      required: [validFrom, validUntil, codes]
+      properties:
+        validFrom: { type: string, format: date-time }
+        validUntil: { type: string, format: date-time }
+        codes:
+          type: array
+          minItems: 1
+          items: { $ref: "#/components/schemas/AccessCode" }
+
+    AccessCode:
+      type: object
+      required: [accessPointName, code]
+      properties:
+        accessPointName: { type: string }
+        code: { type: string, pattern: "^[0-9]{4,8}$" }
 
     CheckIn:
       type: object
@@ -3058,6 +3082,8 @@ components:
         cardLabel: { type: string }
         cardColor: { type: string }
         status: { $ref: "#/components/schemas/BookingStatus" }
+        access:
+          $ref: "#/components/schemas/AccessGrant"
 
     ParticipationPage:
       type: object
@@ -4038,7 +4064,7 @@ components:
              BOOKING_PLAYER_RECORDED, BOOKING_PLAYER_WITHDREW, BOOKING_DISPLACED,
              BOOKING_REMINDER, BOOKING_CANCELLED, BOOKING_CANCELLED_BY_CLUB, BOOKING_RELEASED,
              BOOKING_SERIES_CREATED, BOOKING_SERIES_CANCELLED_BY_CLUB, BOOKING_SERIES_MOVED_BY_CLUB,
-             WAITLIST_OFFER, BOOKING_PARTNER_FOUND, BOOKING_PLACE_TAKEN]
+             WAITLIST_OFFER, BOOKING_PARTNER_FOUND, BOOKING_PLACE_TAKEN, ACCESS_CODE_CHANGED]
 
     MessageTemplateLanguage:
       type: string

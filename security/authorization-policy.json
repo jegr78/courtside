@@ -2,9 +2,9 @@
   "schemaVersion": 1,
   "reviewedAt": "2026-10-28",
   "purpose": "This is the normative authorization policy for the shipped Courtside API. OpenAPI defines the transport shape; this policy defines who may perform each operation, which resource attributes narrow that permission, and which protected fields each projection may read or write.",
-  "openApiFieldInventorySha256": "b9ed384c1f81f743a8e7a3347b1ed5f766e49404bb23425e685a053ab0f9dd2f",
-  "protectedFieldInventorySha256": "ff9e0e56aa3bbd1365b3b428f46a0f6760e80dab6c56b2cfdf6aa49b421c76bc",
-  "productionAuthorizationSha256": "fb377f0a29218b53e55658f63da87dc401b6ac086896c7badb656166c6a952a4",
+  "openApiFieldInventorySha256": "7882d2c0e3c24bafb865bd82bafc48579bda95e3be2ea532fcedcb59d4cf28e5",
+  "protectedFieldInventorySha256": "ab87aebbb3355c9141843c731f3b660598accdc25b8b357438293e44cbf175f8",
+  "productionAuthorizationSha256": "056cb345b10fe6b5943068fd5557f432e4da4ef9319a8100c5c0b16923d50692",
   "ordinaryFields": [
     "Problem.detail",
     "Problem.fieldErrors",
@@ -6773,6 +6773,62 @@
       ],
       "decisions": [
         "administrator-gate"
+      ]
+    },
+    {
+      "id": "booking-access-code-read",
+      "access": "read",
+      "description": "A booking's static access codes travel only in the booker's own and a granted guardian's booking projection, and only until its validity window ends.",
+      "fields": [
+        "PersonalBooking.access"
+      ],
+      "operationIds": [
+        "listPersonalBookings",
+        "listDependantBookings"
+      ],
+      "actors": [
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN"
+      ],
+      "attributes": [
+        "booking-owner",
+        "current-account"
+      ],
+      "decisions": [
+        "booking-ownership",
+        "guardian-delegation"
+      ]
+    },
+    {
+      "id": "participation-access-code-read",
+      "access": "read",
+      "description": "A player sees a booking's static access codes only in their own participation projection, and only until its validity window ends.",
+      "fields": [
+        "Participation.access"
+      ],
+      "operationIds": [
+        "listOwnParticipations"
+      ],
+      "actors": [
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN"
+      ],
+      "attributes": [
+        "participant-person",
+        "current-account"
+      ],
+      "decisions": [
+        "booking-ownership"
       ]
     }
   ]

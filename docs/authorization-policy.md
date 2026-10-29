@@ -505,5 +505,7 @@ Negative tests: `src/test/java/org/courtside/identity/internal/ControlledAccount
 | `controlled-rescue-redemption-write-only` | never-read | `MfaRecoveryRedemption.username`, `MfaRecoveryRedemption.code`, `MfaRecoveryRedemption.password` | `redeemMfaRecovery` | `ANONYMOUS`, `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN`, `INITIAL_PASSWORD`; `mfa-current-address`, `mfa-guess-budget` |
 | `access-point-code-read` | read | `AccessPoint.staticCode` | `listAccessPoints`, `createAccessPoint`, `getAccessPoint`, `changeAccessPoint`, `setAccessPointActive` | `ADMIN`; `administrator` |
 | `access-point-code-write` | write | `AccessPointRequest.staticCode` | `createAccessPoint`, `changeAccessPoint` | `ADMIN`; `administrator` |
+| `booking-access-code-read` | read | `PersonalBooking.access` | `listPersonalBookings`, `listDependantBookings` | `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN`; `booking-owner`, `current-account` |
+| `participation-access-code-read` | read | `Participation.access` | `listOwnParticipations` | `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN`; `participant-person`, `current-account` |
 
 Every field not declared by an operation's OpenAPI request schema is rejected before the operation runs. Every field not declared by its response schema is outside that operation's projection. The rules above name the fields whose visibility or mutability is narrower than merely satisfying that schema.

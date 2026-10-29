@@ -388,7 +388,8 @@ the table holds two kinds of entry. Seven segments are the administrative surfac
 board configures: `facility.court.added` and `facility.accessPoint.changed`, which names the changed
 fields and never a static code, `card.bookingCard.changed`, `config.club.changed`,
 `rules.ruleSet.changed`, `roster.person.corrected`, `dataexchange.source.described` and
-`notification.template.changed`, each with siblings. A message wording has no row id of its own, so
+`notification.template.changed`, each with siblings, among them `facility.accessPoint.codeChanged`,
+which names the access point and its courts when a static code changes. A message wording has no row id of its own, so
 its entries name a subject derived from the message kind and language. The other two arrive in the course of ordinary use, because the writer records every
 event a module publishes rather than a list it keeps: `booking.booking.confirmed` and the nine
 other booking entries, and `identity.account.credentialsRequested`, which names the account a
@@ -407,7 +408,7 @@ A `QUEUED` row is a message waiting in the outbox. An account's first password i
 an earlier welcome for that account is still `QUEUED`. Its `parameters` hold what the message is written
 from: a booking id, a waitlist entry id, a series id, the comma-separated ids of the series occurrences a change touched,
 a closure kind, a cancellation reason code, the previous start and end of moved occurrences or the
-person who withdrew. They never hold rendered text, an address or a credential: a message is
+person who withdrew. They never hold rendered text, an address, a credential or an access code: a message is
 composed from the current rows when it is handed over, and a generated credential or reset code
 exists only in that transaction. The one exception is `previous_address`, which only an
 `ACCOUNT_ADDRESS_CHANGED` notice fills: it is the address the account held before a change, which

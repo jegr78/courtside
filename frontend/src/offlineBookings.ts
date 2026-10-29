@@ -1,4 +1,4 @@
-import type { SessionStatus } from "./api/client";
+import type { AccessGrant, SessionStatus } from "./api/client";
 
 export const PERSONAL_BOOKINGS_CACHE = "courtside-personal-bookings";
 export const PERSONAL_BOOKINGS_CONTROL_CACHE = "courtside-personal-bookings-control";
@@ -15,6 +15,13 @@ interface OfflinePage {
 export interface OfflineMemberState {
   session: SessionStatus;
   clubName?: string;
+}
+
+// A cached page outlives the window its codes were handed out for, so a code goes once its window ends.
+export function withoutEndedAccess<T extends { access?: AccessGrant }>(items: T[], now = new Date()): T[] {
+  return items.map((item) => item.access && Date.parse(item.access.validUntil) <= now.getTime()
+    ? { ...item, access: undefined }
+    : item);
 }
 
 export async function offlineMemberState(): Promise<OfflineMemberState | undefined> {

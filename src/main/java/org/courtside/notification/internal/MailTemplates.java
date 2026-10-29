@@ -6,6 +6,7 @@ import org.courtside.notification.MessageKind;
 import org.springframework.stereotype.Component;
 
 import java.util.Arrays;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.MissingResourceException;
@@ -28,9 +29,8 @@ class MailTemplates {
     private static final String BUNDLE = "mail";
     private static final ResourceBundle.Control SHIPPED_LANGUAGE_ONLY =
             ResourceBundle.Control.getNoFallbackControl(ResourceBundle.Control.FORMAT_PROPERTIES);
-    private static final String EMPTY_LINK = "[ \\t]*\\{" + InstanceLinks.PLACEHOLDER + "}[ \\t]*";
-    private static final Pattern EMPTY_LINK_LINE =
-            Pattern.compile("^" + EMPTY_LINK + "(?:\\R|$)|\\R" + EMPTY_LINK + "(?=\\R|$)");
+    private static final List<String> LINE_PLACEHOLDERS =
+            List.of(InstanceLinks.PLACEHOLDER, BookingWording.ACCESS_CODES);
     private static final Map<String, MessageKind> SUBJECTS = byKey(".subject");
     private static final Map<String, MessageKind> BODIES = byKey(".body");
 
@@ -39,8 +39,17 @@ class MailTemplates {
     String render(String key, Locale locale, Map<String, String> values) {
         String shipped = shipped(key, locale);
         return own(key, locale)
+                .map(wording -> withAccessCodes(key, shipped, wording, values))
                 .map(wording -> fillOrNull(key, wording, values))
                 .orElseGet(() -> fill(key, shipped, values));
+    }
+
+    // A club's wording written before access codes existed still has to hand them to the player.
+    private static String withAccessCodes(String key, String shipped, String wording, Map<String, String> values) {
+        String placeholder = "{" + BookingWording.ACCESS_CODES + "}";
+        boolean due = BODIES.containsKey(key) && shipped.contains(placeholder) && !wording.contains(placeholder)
+                && !values.getOrDefault(BookingWording.ACCESS_CODES, "").isEmpty();
+        return due ? wording + "\n\n" + placeholder : wording;
     }
 
     // A club's own wording replaces a message's subject or body; the fragments inside them stay shipped.
@@ -81,10 +90,13 @@ class MailTemplates {
 
     // One pass over the template, so a value that happens to read like a placeholder stays a value.
     static String fill(String key, String template, Map<String, String> values) {
-        String withoutEmptyLink = "".equals(values.get(InstanceLinks.PLACEHOLDER))
-                ? EMPTY_LINK_LINE.matcher(template).replaceAll("")
-                : template;
-        return PLACEHOLDER.matcher(withoutEmptyLink).replaceAll(match -> {
+        String withoutEmptyLines = template;
+        for (String name : LINE_PLACEHOLDERS) {
+            if ("".equals(values.get(name))) {
+                withoutEmptyLines = emptyLine(name).matcher(withoutEmptyLines).replaceAll("");
+            }
+        }
+        return PLACEHOLDER.matcher(withoutEmptyLines).replaceAll(match -> {
             String name = match.group(1);
             String value = values.get(name);
             if (value == null) {
@@ -93,6 +105,11 @@ class MailTemplates {
             }
             return Matcher.quoteReplacement(value);
         });
+    }
+
+    private static Pattern emptyLine(String name) {
+        String alone = "[ \\t]*\\{" + name + "}[ \\t]*";
+        return Pattern.compile("^" + alone + "(?:\\R|$)|\\R" + alone + "(?=\\R|$)");
     }
 
     private static Map<String, MessageKind> byKey(String part) {
