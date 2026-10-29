@@ -401,6 +401,7 @@
       ],
       "backgroundEntryPoints": [
         "AccessCodeAnnouncements#on(AccessCodeChanged)",
+        "AccessCodeAnnouncements#on(CardGrantsAccess)",
         "ClosureAnnouncements#on(AvailabilityChange.ClosureStored)",
         "ClosureAnnouncements#on(AvailabilityChange.PeriodStored)",
         "ClosureAnnouncements#on(CardEvent.BookingCardAvailabilityChanged)",

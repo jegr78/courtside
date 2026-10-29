@@ -175,6 +175,12 @@ Change name, courts and code at any time with *Edit*. An empty code field remove
 Deactivate an access point that no longer exists. The audit log records that a code changed, never
 the code itself.
 
+When a code newly reaches a booking, its booker and every co-player with an account receive a
+message with the codes that apply now. That happens when you change a code, create or reactivate an
+access point with a code, add a court to an access point with a code, or switch a booking card to
+*Bookings receive the access code*. Removing a code or a court and deactivating an access point
+send nothing.
+
 Whether a booking's players receive the code is decided by its booking card.
 
 ## Facility → Opening hours

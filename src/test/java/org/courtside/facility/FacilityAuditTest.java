@@ -326,7 +326,7 @@ class FacilityAuditTest extends AbstractIntegrationTest {
                 .containsEntry("courtIds", List.of(court.getId().toString()));
         List<String> stored = jdbc.sql("SELECT payload::text FROM domain_event WHERE subject_id = ?")
                 .param(gate.getId()).query(String.class).list();
-        assertThat(stored).as("the added, the changed and the code-changed event are all stored").hasSize(3);
+        assertThat(stored).as("the added and the changed event are stored, each with the code it handed out").hasSize(4);
         assertThat(String.join("|", stored))
                 .as("a static code is a door key and never enters the audit log")
                 .doesNotContain("135790").doesNotContain("246802");

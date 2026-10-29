@@ -186,6 +186,12 @@ Name, Plätze und Code änderst du jederzeit mit *Bearbeiten*. Ein leeres Codefe
 Einen Zugang, den es nicht mehr gibt, deaktivierst du. Im Protokoll steht, dass sich der Code
 geändert hat, aber nie der Code selbst.
 
+Erreicht ein Code eine Buchung neu, erhalten Bucher und Mitspieler mit eigenem Konto eine Nachricht
+mit den Codes, die jetzt gelten. Das geschieht, wenn du einen Code änderst, einen Zugang mit Code
+anlegst oder wieder aktivierst, einem Zugang mit Code einen Platz hinzufügst oder eine
+Buchungskarte auf *Buchungen erhalten den Zugangscode* stellst. Einen Code oder Platz entfernen und
+einen Zugang deaktivieren verschickt nichts.
+
 Ob die Bucher einer Buchung den Code erhalten, legt ihre Buchungskarte fest.
 
 ## Anlage → Öffnungszeiten

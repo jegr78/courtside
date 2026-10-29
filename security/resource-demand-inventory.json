@@ -572,6 +572,7 @@
       "kind": "demanding",
       "entryPoints": [
         "AccessCodeAnnouncements#on(AccessCodeChanged)",
+        "AccessCodeAnnouncements#on(CardGrantsAccess)",
         "AccessCodeMailer#on(BookingAccessCodeChanged)",
         "AccountAddressChangeMailer#on(AccountAddressChanged)",
         "AccountSecurityMailer#on(AccountMfaChanged)",

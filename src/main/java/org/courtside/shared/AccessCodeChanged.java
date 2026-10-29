@@ -5,7 +5,7 @@ import org.jspecify.annotations.NullMarked;
 import java.util.List;
 import java.util.UUID;
 
-// Names the courts the access point serves and never the code: the message reads the code when it is written.
+// Names the courts the code newly opens and never the code: the message reads the code when it is written.
 @NullMarked
 public record AccessCodeChanged(UUID accessPointId, List<UUID> courtIds) implements DomainEventRecord {
 

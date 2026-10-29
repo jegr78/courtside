@@ -143,6 +143,7 @@ public class FacilityService {
         }
         AccessPoint accessPoint = saveOrRejectTakenName(new AccessPoint(stored, courtsServed, staticCode));
         events.publishEvent(new FacilityEvent.AccessPointAdded(accessPoint.getId(), sorted(courtsServed)));
+        announceCode(accessPoint, courtsServed);
         return accessPoint;
     }
 
@@ -161,15 +162,15 @@ public class FacilityService {
         if (!accessPoint.getName().equals(stored)) changedFields.add("name");
         if (!accessPoint.getCourtIds().equals(courtsServed)) changedFields.add("courtIds");
         if (codeChanged) changedFields.add("staticCode");
+        Set<UUID> added = new TreeSet<>(courtsServed);
+        added.removeAll(accessPoint.getCourtIds());
         accessPoint.changeTo(stored, courtsServed, staticCode);
         AccessPoint saved = saveOrRejectTakenName(accessPoint);
         if (!changedFields.isEmpty()) {
             events.publishEvent(new FacilityEvent.AccessPointChanged(
                     saved.getId(), sorted(courtsServed), changedFields));
         }
-        if (codeChanged && staticCode != null && saved.isActive()) {
-            events.publishEvent(new AccessCodeChanged(saved.getId(), sorted(courtsServed)));
-        }
+        announceCode(saved, codeChanged ? courtsServed : added);
         return saved;
     }
 
@@ -185,7 +186,14 @@ public class FacilityService {
             accessPoint.deactivate();
         }
         events.publishEvent(new FacilityEvent.AccessPointAvailabilityChanged(accessPoint.getId(), active));
+        announceCode(accessPoint, accessPoint.getCourtIds());
         return accessPoint;
+    }
+
+    private void announceCode(AccessPoint accessPoint, Set<UUID> courtsReached) {
+        if (accessPoint.isActive() && accessPoint.getStaticCode() != null && !courtsReached.isEmpty()) {
+            events.publishEvent(new AccessCodeChanged(accessPoint.getId(), sorted(courtsReached)));
+        }
     }
 
     private static String requireAccessPointName(String name) {

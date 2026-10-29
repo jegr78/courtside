@@ -389,7 +389,8 @@ board configures: `facility.court.added` and `facility.accessPoint.changed`, whi
 fields and never a static code, `card.bookingCard.changed`, `config.club.changed`,
 `rules.ruleSet.changed`, `roster.person.corrected`, `dataexchange.source.described` and
 `notification.template.changed`, each with siblings, among them `facility.accessPoint.codeChanged`,
-which names the access point and its courts when a static code changes. A message wording has no row id of its own, so
+which names the access point and the courts its code newly opens, and `card.bookingCard.accessGranted`,
+which names a card that starts granting access. A message wording has no row id of its own, so
 its entries name a subject derived from the message kind and language. The other two arrive in the course of ordinary use, because the writer records every
 event a module publishes rather than a list it keeps: `booking.booking.confirmed` and the nine
 other booking entries, and `identity.account.credentialsRequested`, which names the account a

@@ -873,15 +873,23 @@ booker or a player at that moment; an `ACCESS_CODE_CHANGED` notice for anybody e
 `NotInBooking`. Without a code the placeholder's line disappears,
 so such a mail reads exactly as it did before access points existed. A club's own wording that lacks
 the placeholder gets the block appended when there is one. Like a credential, the codes may not
-appear in a subject and stand apart from links in the body. When a board changes an access point's
-static code, every confirmed booking on one of its courts whose card grants access, whose window
-has not ended and which already handed a code out is announced as `ACCESS_CODE_CHANGED`, once to its booker and once to
-every player with an account, the audience of the reminder. A single booking
-handed it out with its confirmation and a series occurrence only with its reminder, so an occurrence
-not yet reminded is not told and its reminder carries the current code. The notice must keep
-`{accessCodes}` and carries the code current when it is sent. The chain runs through `shared` events,
-`facility.accessPoint.codeChanged` and then `booking.booking.accessCodeChanged`, so `notification`
-gains no dependency on `facility`. Removing a code announces nothing.
+appear in a subject and stand apart from links in the body.
+
+A code that newly reaches a booking is announced as `ACCESS_CODE_CHANGED`. That happens when a board
+changes the static code of an active access point, creates an access point with a code, adds a court
+to an active access point with a code, reactivates an access point that has a code, or switches a
+card to grant access. Adding a court announces to the added court's bookings only, and switching a
+card announces to that card's bookings behind an active access point with a code only. Each covers
+every confirmed booking on those courts whose card grants access, whose window has not ended and
+which already handed a code out, once to its booker and once to every player with an account, the
+audience of the reminder. A single booking handed it out with its confirmation and a series
+occurrence only with its reminder, so an occurrence not yet reminded is not told and its reminder
+carries the current code. The notice must keep `{accessCodes}` and carries the code current when it
+is sent. Removing a code or a court, deactivating an access point, switching a card's access off and
+any change to an inactive access point or one without a code announce nothing. The chain runs
+through `shared` events, `facility.accessPoint.codeChanged` or `card.bookingCard.accessGranted` and
+then `booking.booking.accessCodeChanged`, so `notification` gains no dependency on `facility` or
+`card`.
 
 Current messages cover the welcome for a new account, generated credentials, password-reset codes, username reminders, booking
 confirmations, participant additions and withdrawals, displaced bookings, upcoming reminders,

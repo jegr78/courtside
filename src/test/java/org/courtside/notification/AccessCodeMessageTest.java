@@ -217,14 +217,176 @@ class AccessCodeMessageTest extends AbstractIntegrationTest {
         // given
         bookOnCourtTwo(janeAccount, jane, john);
 
+        long announcedBefore = codeAnnouncements();
+
         // when
         facilityService.changeAccessPoint(northGate, "North gate", courts.subList(0, 2), null);
 
         // then
-        assertThat(jdbc.sql("SELECT count(*) FROM domain_event WHERE event_type = 'facility.accessPoint.codeChanged'")
-                .query(Long.class).single()).as("a removed code is no new code to announce").isZero();
+        assertThat(codeAnnouncements()).as("a removed code is no new code to announce")
+                .isEqualTo(announcedBefore);
         assertThat(jdbc.sql("SELECT count(*) FROM message_record WHERE kind = 'ACCESS_CODE_CHANGED'")
                 .query(Long.class).single()).isZero();
+    }
+
+    @Test
+    void givenAGrantingBookingOnCourtThree_whenAnAccessPointWithACodeIsAddedForIt_thenItsPeopleAreTold() {
+        // given
+        UUID booking = bookOn(courts.get(2), MEMBER_BOOKING_CARD, janeAccount, jane, john);
+
+        // when
+        facilityService.createAccessPoint("South gate", List.of(courts.get(2)), NEW_CODE);
+
+        // then
+        assertThat(announcedBookings()).as("a code that newly opens the booking's court is announced")
+                .containsExactly(booking);
+        assertThat(toldAccounts()).containsExactlyInAnyOrder(janeAccount, johnAccount);
+    }
+
+    @Test
+    void givenAGrantingBookingOnCourtThree_whenAnAccessPointWithoutACodeIsAddedForIt_thenNobodyIsTold() {
+        // given
+        bookOn(courts.get(2), MEMBER_BOOKING_CARD, janeAccount, jane, john);
+
+        long announcedBefore = codeAnnouncements();
+
+        // when
+        facilityService.createAccessPoint("South gate", List.of(courts.get(2)), null);
+
+        // then
+        assertThat(codeAnnouncements()).as("an access point without a code hands nothing out")
+                .isEqualTo(announcedBefore);
+        assertThat(toldAccounts()).isEmpty();
+    }
+
+    @Test
+    void givenBookingsOnCourtsTwoAndThree_whenCourtThreeJoinsTheNorthGate_thenOnlyTheBookingOnCourtThreeIsTold() {
+        // given
+        bookOnCourtTwo(janeAccount, jane, john);
+        UUID onCourtThree = bookOn(courts.get(2), MEMBER_BOOKING_CARD, johnAccount, john, jane);
+
+        // when
+        facilityService.changeAccessPoint(northGate, "North gate", courts, OLD_CODE);
+
+        // then
+        assertThat(announcedBookings()).as("only the added court's bookings receive a code they did not hold")
+                .containsExactly(onCourtThree);
+        assertThat(toldAccounts()).containsExactlyInAnyOrder(janeAccount, johnAccount);
+    }
+
+    @Test
+    void givenABookingOnCourtTwo_whenCourtTwoLeavesTheNorthGate_thenNobodyIsTold() {
+        // given
+        bookOnCourtTwo(janeAccount, jane, john);
+
+        long announcedBefore = codeAnnouncements();
+
+        // when
+        facilityService.changeAccessPoint(northGate, "North gate", courts.subList(0, 1), OLD_CODE);
+
+        // then
+        assertThat(codeAnnouncements()).as("a court the gate no longer serves needs no new code")
+                .isEqualTo(announcedBefore);
+        assertThat(toldAccounts()).isEmpty();
+    }
+
+    @Test
+    void givenABookingMadeWhileTheNorthGateWasInactive_whenItIsReactivated_thenItsPeopleAreTold() {
+        // given
+        facilityService.setAccessPointActive(northGate, false);
+        UUID booking = bookOnCourtTwo(janeAccount, jane, john);
+
+        // when
+        facilityService.setAccessPointActive(northGate, true);
+
+        // then
+        assertThat(announcedBookings()).as("a reactivated gate hands its code out again").containsExactly(booking);
+        assertThat(toldAccounts()).containsExactlyInAnyOrder(janeAccount, johnAccount);
+    }
+
+    @Test
+    void givenABookingBehindTheNorthGate_whenTheGateIsDeactivated_thenNobodyIsTold() {
+        // given
+        bookOnCourtTwo(janeAccount, jane, john);
+
+        long announcedBefore = codeAnnouncements();
+
+        // when
+        facilityService.setAccessPointActive(northGate, false);
+
+        // then
+        assertThat(codeAnnouncements()).as("an inactive gate hands no code out")
+                .isEqualTo(announcedBefore);
+        assertThat(toldAccounts()).isEmpty();
+    }
+
+    @Test
+    void givenAnInactiveAccessPointWithoutACode_whenItIsReactivated_thenNobodyIsTold() {
+        // given
+        UUID southGate = facilityService.createAccessPoint("South gate", List.of(courts.get(1)), null).getId();
+        facilityService.setAccessPointActive(southGate, false);
+        bookOnCourtTwo(janeAccount, jane, john);
+
+        long announcedBefore = codeAnnouncements();
+
+        // when
+        facilityService.setAccessPointActive(southGate, true);
+
+        // then
+        assertThat(codeAnnouncements()).as("a gate without a code has nothing to hand out")
+                .isEqualTo(announcedBefore);
+        assertThat(toldAccounts()).isEmpty();
+    }
+
+    @Test
+    void givenABookingOnACardWithoutAccess_whenTheCardStartsGrantingAccess_thenOnlyThatCardsBookingIsTold() {
+        // given
+        UUID clubEvening = cards.createBookingCard("Club evening", Set.of(), Set.of(), new short[]{2});
+        UUID evening = bookOn(courts.get(1), clubEvening, johnAccount, john, jane);
+        bookOn(courts.getFirst(), MEMBER_BOOKING_CARD, janeAccount, jane, john);
+        UUID behindNoGate = bookOn(courts.get(2), clubEvening, janeAccount, jane, john);
+
+        // when
+        cards.letBookingsReceiveAccessCodes(clubEvening, true);
+
+        // then
+        assertThat(announcedBookings())
+                .as("only the card's bookings behind a gate with a code receive one, not the bookings that held it")
+                .containsExactly(evening).doesNotContain(behindNoGate);
+        assertThat(toldAccounts()).containsExactlyInAnyOrder(janeAccount, johnAccount);
+    }
+
+    @Test
+    void givenAGrantingCardWithABookingBehindTheNorthGate_whenTheCardStopsGrantingAccess_thenNobodyIsTold() {
+        // given
+        bookOnCourtTwo(janeAccount, jane, john);
+
+        // when
+        cards.letBookingsReceiveAccessCodes(MEMBER_BOOKING_CARD, false);
+
+        // then
+        assertThat(announcedBookings()).as("a card that stops granting access hands no new code out").isEmpty();
+        assertThat(toldAccounts()).isEmpty();
+    }
+
+    private List<UUID> announcedBookings() {
+        return jdbc.sql("SELECT subject_id FROM domain_event WHERE event_type = 'booking.booking.accessCodeChanged'")
+                .query(UUID.class).list();
+    }
+
+    private long codeAnnouncements() {
+        return jdbc.sql("SELECT count(*) FROM domain_event WHERE event_type = 'facility.accessPoint.codeChanged'")
+                .query(Long.class).single();
+    }
+
+    private List<UUID> toldAccounts() {
+        return jdbc.sql("SELECT account_id FROM notification WHERE kind = 'ACCESS_CODE_CHANGED'")
+                .query(UUID.class).list();
+    }
+
+    private UUID bookOn(UUID court, UUID card, UUID bookerAccount, UUID booker, UUID player) {
+        return bookings.create(new CreateBookingCommand(List.of(court), card, EVENING, bookerAccount, booker,
+                Set.of(Role.MEMBER), null, List.of(ParticipantSpec.member(player)), null));
     }
 
     private UUID bookOnCourtTwo(UUID bookerAccount, UUID booker, UUID player) {

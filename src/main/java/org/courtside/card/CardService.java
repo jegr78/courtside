@@ -5,6 +5,7 @@ import org.courtside.card.internal.ClosureCardGrantsNoAccessException;
 import org.courtside.card.internal.CardLabelTakenException;
 import org.courtside.card.internal.ParticipantCardRepository;
 import org.courtside.identity.Role;
+import org.courtside.shared.CardGrantsAccess;
 import org.courtside.shared.SqlConstraintViolation;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
@@ -107,6 +108,7 @@ public class CardService {
                 || card.isGuestAllowed() != guestAllowed
                 || card.isShowGenericOccupancy() != showGenericOccupancy
                 || card.isGrantsAccess() != grantsAccess;
+        boolean startsGrantingAccess = grantsAccess && !card.isGrantsAccess();
         card.changeTo(label, color, allowedRoles, managingRoles,
                 allowedPlayerCounts, countsAgainstLimits, guestAllowed, showGenericOccupancy, grantsAccess);
         BookingCard saved = saveOrRejectTakenLabel(card);
@@ -116,6 +118,9 @@ public class CardService {
                     boxed(saved.getAllowedPlayerCounts()), saved.isCountsAgainstLimits(),
                     saved.isGuestAllowed(), saved.isShowGenericOccupancy(), saved.isGrantsAccess(),
                     List.copyOf(changedFields)));
+        }
+        if (startsGrantingAccess) {
+            events.publishEvent(new CardGrantsAccess(saved.getId()));
         }
         return saved;
     }
