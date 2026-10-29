@@ -912,6 +912,18 @@ jobs:
           com.github.eirslett:frontend-maven-plugin:npm@npm-ci
       - name: Build security candidate
         run: ./mvnw -B clean package -DskipTests -Pjava-only
+      - id: codeql
+        uses: github/codeql-action/analyze@c16c0f3f2812ec4bb3750a5ed64873fe2ce0fbef
+        with:
+          output: build/security/codeql
+          upload: always
+          upload-database: false
+      - name: Report CodeQL extraction problems
+        if: always() && steps.codeql.outcome != 'skipped'
+        run: >
+          frontend/node/node tools/codeql-diagnostics.mjs
+          --sarif build/security/codeql
+          --output build/security/codeql-diagnostics.json
       - name: Compare security contracts and tool versions
         if: github.event_name == 'pull_request'
         run: >
@@ -948,12 +960,6 @@ jobs:
           severity: UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL
           exit-code: '0'
           skip-dirs: frontend/node_modules,frontend/node,target,build/layers,build/performance,build/restore-layers,build/uat-smoke,build/upgrade-review-layers
-      - id: codeql
-        uses: github/codeql-action/analyze@c16c0f3f2812ec4bb3750a5ed64873fe2ce0fbef
-        with:
-          output: build/security/codeql
-          upload: always
-          upload-database: false
       - name: Enforce security finding policy
         run: >
           frontend/node/node tools/security-findings.mjs
@@ -997,6 +1003,7 @@ jobs:
           name: security-evidence-${{ github.run_id }}
           path: |
             build/security/summary.json
+            build/security/codeql-diagnostics.json
             build/security-update.md
           if-no-files-found: warn
           retention-days: 14

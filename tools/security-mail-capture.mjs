@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { X509Certificate } from "node:crypto";
-import { chmodSync, mkdirSync, readFileSync } from "node:fs";
+import { chmodSync, mkdirSync, writeFileSync } from "node:fs";
 import { isAbsolute, join } from "node:path";
 
 export function securityMailTrustPlan(directory, image, user, identity, rootless = false) {
@@ -35,13 +35,14 @@ export function securityMailTrustPlan(directory, image, user, identity, rootless
 
 export function createSecurityMailCertificate(directory) {
   mkdirSync(directory, { mode: 0o700 });
-  execFileSync("openssl", ["req", "-x509", "-newkey", "rsa:3072", "-nodes", "-days", "1",
-    "-subj", "/CN=mail", "-addext", "subjectAltName=DNS:mail,DNS:password-breach", "-keyout", join(directory, "key.pem"),
-    "-out", join(directory, "cert.pem")], { stdio: ["ignore", "pipe", "pipe"], timeout: 30_000 });
+  const pem = execFileSync("openssl", ["req", "-x509", "-newkey", "rsa:3072", "-nodes", "-days", "1",
+    "-subj", "/CN=mail", "-addext", "subjectAltName=DNS:mail,DNS:password-breach", "-keyout", join(directory, "key.pem")],
+  { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], timeout: 30_000 });
+  writeFileSync(join(directory, "cert.pem"), pem);
   chmodSync(join(directory, "key.pem"), 0o600);
-  const certificate = new X509Certificate(readFileSync(join(directory, "cert.pem")));
+  const certificate = new X509Certificate(pem);
   if (!certificate.checkHost("mail") || !certificate.checkHost("password-breach") || !certificate.verify(certificate.publicKey)) {
     throw new Error("The issued security relay certificate has invalid identity");
   }
-  return { fingerprint: `sha256:${certificate.fingerprint256.replaceAll(":", "").toLowerCase()}` };
+  return { fingerprint: `sha256:${certificate.fingerprint256.replaceAll(":", "").toLowerCase()}`, pem };
 }

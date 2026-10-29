@@ -774,3 +774,34 @@ test("given the password breach runtime smoke, when the assessment starts, then 
   assert.equal(steps[smoke].if, undefined);
   assert.equal(steps[smoke]["continue-on-error"], undefined);
 });
+
+test("given the security job, when CodeQL brackets the build, then only the traced build runs inside the bracket", () => {
+  // given
+  const steps = yaml.load(build).jobs.security.steps;
+  const init = steps.findIndex((step) => String(step.uses ?? "").startsWith("github/codeql-action/init"));
+  const analyze = steps.findIndex((step) => String(step.uses ?? "").startsWith("github/codeql-action/analyze"));
+
+  // when
+  const bracketed = steps.slice(init + 1, analyze).map((step) => step.name ?? step.uses);
+
+  // then
+  assert.deepEqual(bracketed, [
+    "actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad", "./.github/actions/npm-network",
+    "Install security toolchain", "Build security candidate"
+  ], "a failure inside the bracket uploads an unsuccessful CodeQL execution and blames CodeQL for another step");
+});
+
+test("given the security job, when CodeQL has analyzed, then its extraction problems reach the run and the evidence", () => {
+  // given
+  const steps = yaml.load(build).jobs.security.steps;
+  const analyze = steps.findIndex((step) => String(step.uses ?? "").startsWith("github/codeql-action/analyze"));
+  const report = steps.findIndex((step) => /tools\/codeql-diagnostics\.mjs/.test(step.run ?? ""));
+  const removal = steps.findIndex((step) => step.name === "Remove raw security reports");
+  const upload = steps.find((step) => step.name === "Upload security evidence");
+
+  // when / then
+  assert.ok(report > analyze && report < removal, "the diagnostics are read before the raw SARIF is removed");
+  assert.match(steps[report].run, /--sarif build\/security\/codeql/);
+  assert.match(String(steps[report].if), /always\(\)/, "a failed analysis still reports what it saw");
+  assert.match(upload.with.path, /build\/security\/codeql-diagnostics\.json/);
+});
