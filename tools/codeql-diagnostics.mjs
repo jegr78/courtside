@@ -1,4 +1,6 @@
+import { spawnSync } from "node:child_process";
 import { appendFileSync, existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -26,6 +28,40 @@ export function extractionProblems(sarif) {
   return [...seen.values()];
 }
 
+function notifiedFiles(sarif, suffix) {
+  return (sarif.runs ?? []).flatMap((run) => (run.invocations ?? []).flatMap((invocation) =>
+    (invocation.toolExecutionNotifications ?? []).filter((note) => note.descriptor?.id?.endsWith(suffix))
+      .flatMap((note) => (note.locations ?? []).map((location) => ({
+        language: note.descriptor.id.split("/")[0],
+        file: location.physicalLocation?.artifactLocation?.uri
+      })))));
+}
+
+export function ignoredBy(patterns) {
+  const expressions = patterns.map((pattern) => new RegExp(`^${pattern.split("/").map((segment) => segment === "**" ? "(?:.*)"
+    : segment.replace(/[.+^${}()|[\]\\]/g, "\\$&").replaceAll("*", "[^/]*")).join("/").replaceAll("(?:.*)/", "(?:.*/)?")}$`));
+  return (file) => expressions.some((expression) => expression.test(file));
+}
+
+function configuredIgnores(path) {
+  const yaml = createRequire(new URL("../frontend/package.json", import.meta.url))("js-yaml");
+  return yaml.load(readFileSync(path, "utf8"))?.["paths-ignore"] ?? [];
+}
+
+const languageOf = (file) => /\.java$/.test(file) ? "java" : /\.(?:[cm]?[jt]s|[jt]sx)$/.test(file) ? "js" : null;
+
+export function unextractedFiles(sarif, expected = null) {
+  if (expected) {
+    const extracted = new Set(notifiedFiles(sarif, "/diagnostics/successfully-extracted-files").map(({ file }) => file));
+    return expected.filter((file) => languageOf(file) && !extracted.has(file)).map((file) => ({ language: languageOf(file), file }));
+  }
+  const key = ({ language, file }) => `${language}\u0000${file}`;
+  const extracted = new Set(notifiedFiles(sarif, "/diagnostics/successfully-extracted-files").map(key));
+  const missing = new Map(notifiedFiles(sarif, "/baseline/expected-extracted-files")
+    .filter((entry) => entry.file && !extracted.has(key(entry))).map((entry) => [key(entry), entry]));
+  return [...missing.values()];
+}
+
 const escapeData = (value) => String(value).replaceAll("%", "%25").replaceAll("\r", "%0D").replaceAll("\n", "%0A");
 const escapeProperty = (value) => escapeData(value).replaceAll(":", "%3A").replaceAll(",", "%2C");
 
@@ -39,6 +75,17 @@ function option(name) {
   const index = process.argv.indexOf(name);
   if (index < 0 || !process.argv[index + 1]) throw new Error(`Missing ${name}`);
   return process.argv[index + 1];
+}
+
+function optional(name) {
+  const index = process.argv.indexOf(name);
+  return index < 0 ? null : process.argv[index + 1];
+}
+
+function trackedFiles(repository) {
+  const listed = spawnSync("git", ["ls-files", "-z"], { cwd: repository, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+  if (listed.status !== 0) throw new Error(`git ls-files failed in ${repository}: ${listed.stderr || listed.error?.message}`);
+  return listed.stdout.split("\0").filter(Boolean);
 }
 
 function main() {
@@ -56,15 +103,34 @@ function main() {
     process.stdout.write(`::warning::CodeQL's SARIF in ${directory} carries no tool diagnostics, so extraction problems cannot be read\n`);
   }
   const problems = documents.flatMap(extractionProblems);
+  const repository = optional("--repository");
+  const config = optional("--config");
+  const ignored = ignoredBy(config ? configuredIgnores(config) : []);
+  const expected = repository ? trackedFiles(repository).filter((file) => !ignored(file)) : null;
+  const unextracted = unextractedFiles({ runs: documents.flatMap((sarif) => sarif.runs ?? []) }, expected);
+  const counted = {};
+  for (const note of notifications) counted[note.descriptor?.id ?? "unknown"] = (counted[note.descriptor?.id ?? "unknown"] ?? 0) + 1;
+  const listed = (suffix) => Object.keys(counted).some((id) => id.endsWith(suffix));
+  if (notifications.length > 0 && !((expected || listed("/baseline/expected-extracted-files"))
+    && listed("/diagnostics/successfully-extracted-files"))) {
+    process.stdout.write("::warning::CodeQL's SARIF lists no expected and extracted files, so unextracted files cannot be named\n");
+  }
   for (const problem of problems) process.stdout.write(`${annotation(problem)}\n`);
-  writeFileSync(option("--output"), `${JSON.stringify({ schemaVersion: 1, sarif: files.sort(), problems }, null, 2)}\n`);
+  for (const { language, file } of unextracted) {
+    process.stdout.write(`${annotation({ id: `${language}/unextracted-file`, file,
+      message: "CodeQL expected to extract this file and did not, so no query read it" })}\n`);
+  }
+  writeFileSync(option("--output"),
+    `${JSON.stringify({ schemaVersion: 1, sarif: files.sort(), problems, unextracted, notifications: counted }, null, 2)}\n`);
   if (process.env.GITHUB_STEP_SUMMARY) {
     appendFileSync(process.env.GITHUB_STEP_SUMMARY, notifications.length === 0
       ? "CodeQL's SARIF carries no tool diagnostics.\n"
-      : problems.length === 0 ? "CodeQL reported no extraction problem.\n"
+      : problems.length === 0 && unextracted.length === 0 ? "CodeQL reported no extraction problem.\n"
       : ["## CodeQL extraction problems", "", "| Diagnostic | File | Line | Message |", "| --- | --- | --- | --- |",
         ...problems.map((problem) => `| ${problem.id} | ${problem.file ?? ""} | ${problem.line ?? ""} | `
-          + `${problem.message.replaceAll("|", "\\|").replaceAll("\n", " ")} |`), ""].join("\n"));
+          + `${problem.message.replaceAll("|", "\\|").replaceAll("\n", " ")} |`),
+        ...unextracted.map(({ language, file }) => `| ${language}/unextracted-file | ${file} | | not extracted |`),
+        ""].join("\n"));
   }
 }
 

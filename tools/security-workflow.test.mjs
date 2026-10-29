@@ -802,6 +802,8 @@ test("given the security job, when CodeQL has analyzed, then its extraction prob
   // when / then
   assert.ok(report > analyze && report < removal, "the diagnostics are read before the raw SARIF is removed");
   assert.match(steps[report].run, /--sarif build\/security\/codeql/);
+  assert.match(steps[report].run, /--repository \./, "the hosted SARIF lists only extracted files, so git supplies the expected ones");
+  assert.match(steps[report].run, /--config \.github\/codeql\/codeql-config\.yml/, "a path CodeQL is told to ignore is not expected");
   assert.match(String(steps[report].if), /always\(\)/, "a failed analysis still reports what it saw");
   assert.match(upload.with.path, /build\/security\/codeql-diagnostics\.json/);
 });
