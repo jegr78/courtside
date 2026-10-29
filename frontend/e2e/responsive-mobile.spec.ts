@@ -1981,9 +1981,15 @@ for (const phone of landscapePhones) {
     }, { message: "the focused field is scrolled clear of the signal", timeout: 10_000 }).toBe(true);
 
     // when
-    await dialog.getByTestId("dialog-body").evaluate((body) => body.scrollTo(0, body.scrollHeight));
+    const scrolledToEnd = () => dialog.getByTestId("dialog-body").evaluate((body) => {
+      body.scrollTo(0, body.scrollHeight);
+      const visible = body.getBoundingClientRect();
+      const summary = body.querySelector('[data-testid="booking-more-summary"]')!.getBoundingClientRect();
+      return summary.top >= visible.top && summary.bottom <= visible.bottom;
+    });
 
     // then
+    await expect.poll(scrolledToEnd, { message: "scrolling to the end reaches the last control while the form still grows", timeout: 10_000 }).toBe(true);
     await expect(dialog.getByTestId("booking-more-summary"), "the last control of the form is reachable").toBeInViewport({ ratio: 1, timeout: 10_000 });
     await expect(continues, "the signal goes once nothing lies below").toBeHidden({ timeout: 10_000 });
     await expect(dialog.getByTestId("booking-submit"), "the book button stays on screen").toBeInViewport({ ratio: 1, timeout: 10_000 });
