@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import { appendFileSync, existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -35,7 +36,13 @@ function notifiedFiles(sarif, suffix) {
       })))));
 }
 
-export function unextractedFiles(sarif) {
+const languageOf = (file) => /\.java$/.test(file) ? "java" : /\.(?:[cm]?[jt]s|[jt]sx)$/.test(file) ? "js" : null;
+
+export function unextractedFiles(sarif, expected = null) {
+  if (expected) {
+    const extracted = new Set(notifiedFiles(sarif, "/diagnostics/successfully-extracted-files").map(({ file }) => file));
+    return expected.filter((file) => languageOf(file) && !extracted.has(file)).map((file) => ({ language: languageOf(file), file }));
+  }
   const key = ({ language, file }) => `${language}\u0000${file}`;
   const extracted = new Set(notifiedFiles(sarif, "/diagnostics/successfully-extracted-files").map(key));
   const missing = new Map(notifiedFiles(sarif, "/baseline/expected-extracted-files")
@@ -58,6 +65,17 @@ function option(name) {
   return process.argv[index + 1];
 }
 
+function optional(name) {
+  const index = process.argv.indexOf(name);
+  return index < 0 ? null : process.argv[index + 1];
+}
+
+function trackedFiles(repository) {
+  const listed = spawnSync("git", ["ls-files", "-z"], { cwd: repository, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+  if (listed.status !== 0) throw new Error(`git ls-files failed in ${repository}: ${listed.stderr || listed.error?.message}`);
+  return listed.stdout.split("\0").filter(Boolean);
+}
+
 function main() {
   const directory = option("--sarif");
   const files = existsSync(directory) ? readdirSync(directory).filter((name) => name.endsWith(".sarif")) : [];
@@ -73,11 +91,14 @@ function main() {
     process.stdout.write(`::warning::CodeQL's SARIF in ${directory} carries no tool diagnostics, so extraction problems cannot be read\n`);
   }
   const problems = documents.flatMap(extractionProblems);
-  const unextracted = documents.flatMap(unextractedFiles);
+  const repository = optional("--repository");
+  const expected = repository ? trackedFiles(repository) : null;
+  const unextracted = unextractedFiles({ runs: documents.flatMap((sarif) => sarif.runs ?? []) }, expected);
   const counted = {};
   for (const note of notifications) counted[note.descriptor?.id ?? "unknown"] = (counted[note.descriptor?.id ?? "unknown"] ?? 0) + 1;
   const listed = (suffix) => Object.keys(counted).some((id) => id.endsWith(suffix));
-  if (notifications.length > 0 && !(listed("/baseline/expected-extracted-files") && listed("/diagnostics/successfully-extracted-files"))) {
+  if (notifications.length > 0 && !((expected || listed("/baseline/expected-extracted-files"))
+    && listed("/diagnostics/successfully-extracted-files"))) {
     process.stdout.write("::warning::CodeQL's SARIF lists no expected and extracted files, so unextracted files cannot be named\n");
   }
   for (const problem of problems) process.stdout.write(`${annotation(problem)}\n`);

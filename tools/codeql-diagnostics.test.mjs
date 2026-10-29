@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -154,4 +154,43 @@ test("given SARIF without the expected or extracted file lists, when the tool ru
   const evidence = JSON.parse(readFileSync(join(directory, "codeql-diagnostics.json"), "utf8"));
   assert.equal(evidence.notifications["js/diagnostics/extraction-errors"], 3, "the evidence counts what the SARIF carried");
   assert.equal(evidence.notifications["js/baseline/expected-extracted-files"], undefined);
+});
+
+test("given the files git tracks, when the hosted SARIF lists only extracted files, then the tracked source it lacks is named", () => {
+  // given
+  const tracked = ["src/broken.ts", "src/valid.ts", "src/Missing.java", "README.md"];
+  const hosted = structuredClone(recorded);
+  const invocation = hosted.runs[0].invocations[0];
+  invocation.toolExecutionNotifications = invocation.toolExecutionNotifications.filter((note) =>
+    !note.descriptor.id.endsWith("/baseline/expected-extracted-files"));
+
+  // when
+  const missing = unextractedFiles(hosted, tracked);
+
+  // then
+  assert.deepEqual(missing, [{ language: "java", file: "src/Missing.java" }],
+    "the hosted SARIF carries only successfully extracted files, so git supplies what CodeQL expected");
+});
+
+test("given a repository checkout, when the tool runs with it, then a tracked source file CodeQL did not extract is named", () => {
+  // given
+  const directory = mkdtempSync(join(tmpdir(), "codeql-diagnostics-repository-"));
+  const checkout = join(directory, "checkout");
+  mkdirSync(join(checkout, "src"), { recursive: true });
+  for (const file of ["broken.ts", "valid.ts", "Skipped.java"]) writeFileSync(join(checkout, "src", file), "");
+  const git = (args) => execFileSync("git", args, { cwd: checkout, env: { ...process.env, GIT_AUTHOR_NAME: "Jane Doe",
+    GIT_AUTHOR_EMAIL: "jane@example.org", GIT_COMMITTER_NAME: "Jane Doe", GIT_COMMITTER_EMAIL: "jane@example.org" } });
+  git(["init", "-q"]);
+  git(["add", "."]);
+  mkdirSync(join(directory, "codeql"));
+  writeFileSync(join(directory, "codeql", "javascript.sarif"), JSON.stringify(recorded));
+
+  // when
+  const result = spawnSync(process.execPath, [tool, "--sarif", join(directory, "codeql"),
+    "--output", join(directory, "codeql-diagnostics.json"), "--repository", checkout], { encoding: "utf8" });
+
+  // then
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /^::warning file=src\/Skipped\.java,title=java\/unextracted-file::/m);
+  assert.doesNotMatch(result.stdout, /lists no expected and extracted files/, "git supplied the expected list");
 });
