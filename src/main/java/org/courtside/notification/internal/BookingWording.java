@@ -92,7 +92,7 @@ class BookingWording {
                 Map.of("validFrom", time(access.validFrom()), "validUntil", time(access.validUntil())));
         return access.codes().stream()
                 .map(code -> templates.render("booking.access.code", locale,
-                        Map.of("accessPoint", code.accessPointName(), "code", code.code())))
+                        Map.of("accessPoint", code.accessPointName(), "accessCode", code.code())))
                 .collect(Collectors.joining("\n", heading + "\n", ""));
     }
 
