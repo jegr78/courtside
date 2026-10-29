@@ -124,7 +124,8 @@ class AccessGrantTransitionsTest extends AbstractIntegrationTest {
     }
 
     private Instant heldUntil(String code) {
-        return jdbc.sql("SELECT until FROM access_code WHERE code = ? AND grant_id IS NULL").params(code)
-                .query(OffsetDateTime.class).single().toInstant();
+        OffsetDateTime until = jdbc.sql("SELECT until FROM access_code WHERE code = ? AND grant_id IS NULL")
+                .params(code).query((row, index) -> row.getObject(1, OffsetDateTime.class)).list().getFirst();
+        return until == null ? null : until.toInstant();
     }
 }

@@ -89,7 +89,8 @@ class AccessGrantPreCallTest {
         // given
         AccessGrant grant = fresh();
         Instant at = NOW;
-        grant.decide(DEMAND, MAPPING, at);
+        Demand allDay = new Demand(DEMAND.validFrom(), NOW.plus(Duration.ofDays(1)), DEMAND.accessPointIds());
+        grant.decide(allDay, MAPPING, at);
         List<Duration> backoffs = new ArrayList<>();
 
         // when
@@ -98,7 +99,7 @@ class AccessGrantPreCallTest {
             backoffs.add(Duration.between(at, grant.getNextAttemptAt()));
             grant.record(call, unclear(), PROBE_ANSWERS, at, DEADLINE);
             at = grant.getNextAttemptAt();
-            grant.decide(DEMAND, MAPPING, at);
+            grant.decide(allDay, MAPPING, at);
         }
 
         // then
