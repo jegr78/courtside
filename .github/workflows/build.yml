@@ -126,7 +126,7 @@ jobs:
 
   docs:
     needs: test-profile-plan
-    if: always() && (github.event_name != 'pull_request' || needs.test-profile-plan.outputs.docs == 'true')
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.test-profile-plan.outputs.docs == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -151,7 +151,7 @@ jobs:
 
   tooling:
     needs: test-profile-plan
-    if: always() && (github.event_name != 'pull_request' || needs.test-profile-plan.outputs.tooling == 'true')
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.test-profile-plan.outputs.tooling == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -207,7 +207,7 @@ jobs:
 
   clock-shift:
     needs: test-profile-plan
-    if: always() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && needs.test-profile-plan.outputs.clock_shift == 'true'))
+    if: ${{ !cancelled() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && needs.test-profile-plan.outputs.clock_shift == 'true')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -425,7 +425,7 @@ jobs:
   backend:
     name: backend-${{ strategy.job-index }}
     needs: test-profile-plan
-    if: always() && (github.event_name != 'pull_request' || needs.test-profile-plan.outputs.backend == 'true')
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.test-profile-plan.outputs.backend == 'true') }}
     strategy:
       fail-fast: false
       matrix:
@@ -485,7 +485,7 @@ jobs:
 
   backend-coverage:
     needs: [test-profile-plan, backend]
-    if: always() && (github.event_name != 'pull_request' || needs.test-profile-plan.outputs.backend == 'true') && needs.backend.result == 'success'
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.test-profile-plan.outputs.backend == 'true') && needs.backend.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -525,7 +525,7 @@ jobs:
 
   frontend:
     needs: test-profile-plan
-    if: always() && (github.event_name != 'pull_request' || needs.test-profile-plan.outputs.frontend == 'true')
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.test-profile-plan.outputs.frontend == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -581,7 +581,7 @@ jobs:
   browser_visual:
     name: browser-visual
     needs: [test-profile-plan, frontend]
-    if: always() && (github.event_name != 'pull_request' || needs.test-profile-plan.outputs.browser_visual == 'true') && needs.frontend.result == 'success'
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.test-profile-plan.outputs.browser_visual == 'true') && needs.frontend.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -624,7 +624,7 @@ jobs:
   browser:
     name: browser-${{ matrix.label }}
     needs: [test-profile-plan, frontend]
-    if: always() && (github.event_name != 'pull_request' || needs.test-profile-plan.outputs.browser == 'true') && needs.frontend.result == 'success'
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.test-profile-plan.outputs.browser == 'true') && needs.frontend.result == 'success' }}
     strategy:
       fail-fast: false
       matrix:
@@ -682,7 +682,7 @@ jobs:
 
   deployment:
     needs: [test-profile-plan, frontend]
-    if: always() && (github.event_name != 'pull_request' || needs.test-profile-plan.outputs.deployment == 'true') && needs.frontend.result == 'success'
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.test-profile-plan.outputs.deployment == 'true') && needs.frontend.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -716,7 +716,7 @@ jobs:
 
   gates-image:
     needs: test-profile-plan
-    if: always() && github.event_name == 'pull_request' && needs.test-profile-plan.outputs.gates == 'true'
+    if: ${{ !cancelled() && github.event_name == 'pull_request' && needs.test-profile-plan.outputs.gates == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -803,7 +803,7 @@ jobs:
 
   gates:
     needs: [test-profile-plan, gates-image]
-    if: always() && github.event_name == 'pull_request' && needs.test-profile-plan.outputs.gates == 'true' && needs.gates-image.result == 'success'
+    if: ${{ !cancelled() && github.event_name == 'pull_request' && needs.test-profile-plan.outputs.gates == 'true' && needs.gates-image.result == 'success' }}
     permissions:
       actions: read
       contents: read
@@ -872,7 +872,7 @@ jobs:
 
   security:
     needs: [test-profile-plan, dependency-graph]
-    if: always() && (github.event_name != 'pull_request' || needs.test-profile-plan.outputs.security == 'true')
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.test-profile-plan.outputs.security == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
