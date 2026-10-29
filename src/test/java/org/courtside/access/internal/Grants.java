@@ -3,6 +3,7 @@ package org.courtside.access.internal;
 import org.courtside.access.GrantOutcome;
 import org.courtside.access.ProbeOutcome;
 
+import java.lang.reflect.Field;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Set;
@@ -25,7 +26,22 @@ final class Grants {
     }
 
     static AccessGrant fresh() {
-        return AccessGrant.open(UUID.randomUUID(), NOW);
+        AccessGrant grant = new AccessGrant();
+        set(grant, "id", UUID.randomUUID());
+        set(grant, "bookingId", UUID.randomUUID());
+        set(grant, "remote", RemoteState.NONE);
+        set(grant, "nextAttemptAt", NOW);
+        return grant;
+    }
+
+    private static void set(AccessGrant grant, String field, Object value) {
+        try {
+            Field declared = AccessGrant.class.getDeclaredField(field);
+            declared.setAccessible(true);
+            declared.set(grant, value);
+        } catch (ReflectiveOperationException missing) {
+            throw new IllegalStateException("A fresh grant row has the field " + field, missing);
+        }
     }
 
     static CallResult answered(GrantOutcome outcome) {

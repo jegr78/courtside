@@ -94,15 +94,6 @@ public class AccessGrant {
 
     private Instant retryRequestedAt;
 
-    static AccessGrant open(UUID bookingId, Instant dbNow) {
-        AccessGrant grant = new AccessGrant();
-        grant.id = UUID.randomUUID();
-        grant.bookingId = bookingId;
-        grant.remote = RemoteState.NONE;
-        grant.nextAttemptAt = dbNow;
-        return grant;
-    }
-
     void requestRetry(Instant at) {
         retryRequestedAt = at;
     }

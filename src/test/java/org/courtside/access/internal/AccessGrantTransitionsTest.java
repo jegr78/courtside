@@ -155,8 +155,10 @@ class AccessGrantTransitionsTest extends AbstractIntegrationTest {
     }
 
     private UUID storedGrant() {
-        return new TransactionTemplate(transactions).execute(status ->
-                grants.saveAndFlush(AccessGrant.open(UUID.randomUUID(), NOW)).getId());
+        UUID grant = UUID.randomUUID();
+        jdbc.sql("INSERT INTO access_grant (id, booking_id, next_attempt_at) VALUES (?, ?, ?)")
+                .params(grant, UUID.randomUUID(), Timestamp.from(NOW)).update();
+        return grant;
     }
 
     private <T> T inRow(UUID grant, Function<AccessGrant, T> work) {
