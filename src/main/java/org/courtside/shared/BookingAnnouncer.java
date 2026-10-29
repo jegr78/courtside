@@ -1,5 +1,6 @@
 package org.courtside.shared;
 
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -22,4 +23,12 @@ public interface BookingAnnouncer {
 
     // The occurrences still confirmed, earliest first.
     List<BookingAnnouncement> describeSeries(UUID seriesId);
+
+    // Confirmed bookings whose card grants access and whose courts an active access point without a static
+    // code serves; a booking without such a demand is left out.
+    Map<UUID, AccessDemand> accessDemands(Collection<UUID> bookingIds);
+
+    // The same demands for bookings starting before one moment and valid after another, by booking id.
+    List<AccessDemand> accessDemandsStartingBefore(Instant before, Instant validAfter, UUID afterBookingId,
+                                                   int limit);
 }
