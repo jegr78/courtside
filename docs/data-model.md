@@ -102,7 +102,10 @@ its rows. Nothing deletes an access point: `active` retires it.
 deletes a grant. `remote` is
 `NONE`, `MAYBE` or `INSTALLED` (`access_grant_remote_known`). `want_points` and `remote_points` are
 arrays of access point ids rather than references, because `remote_points` records what was sent and
-must not follow a later change of the configuration.
+must not follow a later change of the configuration. A wanted grant carries its window and access
+points (`access_grant_wanted_has_demand`), an `INSTALLED` one the window and access points it was
+installed with (`access_grant_installed_has_window`), and any grant other than `NONE` an
+`exposed_until` (`access_grant_remote_exposed`). A mapping fingerprint has at most 200 characters.
 
 `access_code.code` is the primary key, so a code is drawn by inserting it and a second grant can never
 hold a code that is still in use. A draw that equals an access point's `static_code` is drawn again. It has four to eight digits (`access_code_digits`). A row with a

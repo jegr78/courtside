@@ -28,7 +28,15 @@ CREATE TABLE access_grant (
     CONSTRAINT access_grant_want_window_order CHECK (want_until > want_from),
     CONSTRAINT access_grant_remote_window_order CHECK (remote_until > remote_from),
     CONSTRAINT access_grant_last_failure_length CHECK (length(last_failure) <= 500),
-    CONSTRAINT access_grant_external_reference_length CHECK (length(external_reference) <= 200)
+    CONSTRAINT access_grant_external_reference_length CHECK (length(external_reference) <= 200),
+    CONSTRAINT access_grant_want_mapping_length CHECK (length(want_mapping) <= 200),
+    CONSTRAINT access_grant_remote_mapping_length CHECK (length(remote_mapping) <= 200),
+    CONSTRAINT access_grant_wanted_has_demand CHECK (
+        NOT wanted OR (want_from IS NOT NULL AND want_until IS NOT NULL AND want_points IS NOT NULL)),
+    CONSTRAINT access_grant_installed_has_window CHECK (
+        remote <> 'INSTALLED'
+        OR (remote_from IS NOT NULL AND remote_until IS NOT NULL AND remote_points IS NOT NULL)),
+    CONSTRAINT access_grant_remote_exposed CHECK (remote = 'NONE' OR exposed_until IS NOT NULL)
 );
 
 CREATE INDEX access_grant_open ON access_grant (id)

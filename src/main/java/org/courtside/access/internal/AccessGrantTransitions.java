@@ -1,0 +1,37 @@
+package org.courtside.access.internal;
+
+import lombok.RequiredArgsConstructor;
+import org.courtside.access.ProbeOutcome;
+import org.courtside.config.AccessPolicy;
+import org.jspecify.annotations.Nullable;
+import org.springframework.stereotype.Component;
+
+import java.time.Duration;
+import java.time.Instant;
+
+@Component
+@RequiredArgsConstructor
+class AccessGrantTransitions {
+
+    private final AccessCodes codes;
+    private final AccessPolicy policy;
+
+    Decision decide(AccessGrant grant, @Nullable Demand demand, @Nullable String mapping, Instant dbNow) {
+        Action action = grant.decide(demand, mapping, dbNow);
+        String code = codes.currentCode(grant.getId()).orElse(null);
+        if (grant.isWanted() && code == null) {
+            code = codes.draw(grant.getId(), policy.accessCodeLength());
+        }
+        return new Decision(action, code);
+    }
+
+    Recording record(AccessGrant grant, SentCall call, CallResult result, @Nullable ProbeOutcome reprobe,
+                     Instant dbNow, Duration deadline) {
+        Recording recording = grant.record(call, result, reprobe, dbNow, deadline);
+        if (recording.replaceCode()) {
+            codes.detach(grant.getId(), grant.getExposedUntil());
+            codes.draw(grant.getId(), policy.accessCodeLength());
+        }
+        return recording;
+    }
+}

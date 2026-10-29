@@ -1,6 +1,7 @@
 package org.courtside.access;
 
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 import java.time.Instant;
 
@@ -21,11 +22,12 @@ public sealed interface GrantOutcome {
     record CodeRejected() implements GrantOutcome {
     }
 
-    record RetryLater(Scope scope, Instant notBefore, String reason) implements GrantOutcome {
+    /** A null {@code notBefore} leaves the retry to the caller's backoff. */
+    record RetryLater(Scope scope, @Nullable Instant notBefore, String reason) implements GrantOutcome {
 
         public RetryLater {
-            if (scope == null || notBefore == null || reason == null) {
-                throw new IllegalArgumentException("A retry names its scope, its earliest time and its reason");
+            if (scope == null || reason == null) {
+                throw new IllegalArgumentException("A retry names its scope and its reason");
             }
         }
     }

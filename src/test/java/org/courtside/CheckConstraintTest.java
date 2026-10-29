@@ -374,7 +374,7 @@ class CheckConstraintTest extends AbstractIntegrationTest {
         UUID grant = insertAccessGrant();
 
         // when / then
-        assertConstraint(grant, "remote = 'REVOKED'", "access_grant_remote_known");
+        assertConstraint(grant, "remote = 'REVOKED', exposed_until = now()", "access_grant_remote_known");
         assertConstraint(grant, "attempts = -1", "access_grant_attempts_not_negative");
         assertConstraint(grant, "rejections = -1", "access_grant_rejections_not_negative");
         assertConstraint(grant, "want_from = now(), want_until = now()", "access_grant_want_window_order");
@@ -382,10 +382,33 @@ class CheckConstraintTest extends AbstractIntegrationTest {
                 "access_grant_remote_window_order");
         assertConstraint(grant, "last_failure = repeat('x', 501)", "access_grant_last_failure_length");
         assertConstraint(grant, "external_reference = repeat('x', 201)", "access_grant_external_reference_length");
+        assertConstraint(grant, "want_mapping = repeat('x', 201)", "access_grant_want_mapping_length");
+        assertConstraint(grant, "remote_mapping = repeat('x', 201)", "access_grant_remote_mapping_length");
         assertThatThrownBy(() -> jdbc.sql("INSERT INTO access_grant (id, booking_id) SELECT ?, booking_id"
                         + " FROM access_grant WHERE id = ?").params(UUID.randomUUID(), grant).update())
                 .isInstanceOf(DataIntegrityViolationException.class)
                 .hasMessageContaining("access_grant_one_per_booking");
+    }
+
+    @Test
+    void givenAnAccessGrant_whenAStateLacksTheColumnsItImplies_thenEachIsRejectedByItsOwnConstraint() {
+        // given
+        UUID grant = insertAccessGrant();
+        String window = "now(), now() + interval '1 hour', ARRAY[gen_random_uuid()]";
+
+        // when / then
+        assertConstraint(grant, "wanted = true", "access_grant_wanted_has_demand");
+        assertConstraint(grant, "wanted = true, (want_from, want_until) = (now(), now() + interval '1 hour')",
+                "access_grant_wanted_has_demand");
+        assertConstraint(grant, "remote = 'INSTALLED', exposed_until = now()", "access_grant_installed_has_window");
+        assertConstraint(grant, "remote = 'INSTALLED', exposed_until = now(), (remote_from, remote_until)"
+                + " = (now(), now() + interval '1 hour')", "access_grant_installed_has_window");
+        assertConstraint(grant, "remote = 'MAYBE'", "access_grant_remote_exposed");
+        assertConstraint(grant, "remote = 'INSTALLED', (remote_from, remote_until, remote_points) = (" + window + ")",
+                "access_grant_remote_exposed");
+        jdbc.sql("UPDATE access_grant SET wanted = true, (want_from, want_until, want_points) = (" + window + "),"
+                + " remote = 'INSTALLED', exposed_until = now(), (remote_from, remote_until, remote_points) = ("
+                + window + ") WHERE id = ?").params(grant).update();
     }
 
     private void assertConstraint(UUID grant, String assignment, String constraint) {

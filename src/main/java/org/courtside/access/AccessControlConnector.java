@@ -24,6 +24,6 @@ public interface AccessControlConnector {
     /** Checks reachability, authentication and the right to manage users. */
     ProbeOutcome probe();
 
-    /** A fingerprint of how these access points map onto the system, read from local configuration, never a call. */
+    /** A fingerprint of at most 200 characters for how these points map onto the system; read locally, never a call. */
     String mappingOf(Set<UUID> accessPointIds);
 }

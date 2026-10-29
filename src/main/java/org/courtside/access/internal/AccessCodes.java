@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 import java.security.SecureRandom;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.random.RandomGenerator;
 
@@ -48,6 +49,11 @@ class AccessCodes {
             }
         }
         throw new NoFreeAccessCodeException(length.digits(), DRAWS);
+    }
+
+    Optional<String> currentCode(UUID grantId) {
+        return jdbc.sql("SELECT code FROM access_code WHERE grant_id = :grant").param("grant", grantId)
+                .query(String.class).optional();
     }
 
     void detach(UUID grantId, @Nullable Instant until) {
