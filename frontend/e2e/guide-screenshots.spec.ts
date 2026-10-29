@@ -172,6 +172,15 @@ const drivers: Record<string, (page: Page, visualDate: string) => Promise<void>>
     await page.getByTestId("admin-courts-link").click();
     await expect(page.getByTestId("create-court")).toBeVisible();
   },
+  "access-points": async (page) => {
+    await page.getByTestId("admin-access-points-link").click();
+    await expect(page.getByTestId("create-access-point")).toBeEnabled();
+    await page.getByTestId("new-access-point-name").fill("North gate");
+    await page.locator('[data-testid^="new-access-point-court-"]').first().check();
+    await page.getByTestId("new-access-point-code").fill("135790");
+    await page.getByTestId("create-access-point").click();
+    await expect(page.locator('[data-testid^="access-point-name-"]')).toHaveText(["North gate"]);
+  },
   // Winter hours scheduled ahead, so the guide shows the week list and a week that has not started.
   "opening-hours": async (page) => {
     await page.getByTestId("admin-opening-hours-link").click();
@@ -391,6 +400,7 @@ test("every surface the facility is described on is captured", async ({ page, jo
 
   // when / then
   await capture(page, "courts", journeyService.visualDate);
+  await capture(page, "access-points", journeyService.visualDate);
   await capture(page, "opening-hours", journeyService.visualDate);
   await capture(page, "availability", journeyService.visualDate);
   await capture(page, "booking-card", journeyService.visualDate);

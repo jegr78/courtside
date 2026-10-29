@@ -118,6 +118,11 @@
       "pages": { "de": "site/board-guide.md", "en": "site/en/board-guide.md" }
     },
     {
+      "name": "access-points",
+      "surface": "admin-access-points-view",
+      "pages": { "de": "site/board-guide.md", "en": "site/en/board-guide.md" }
+    },
+    {
       "name": "opening-hours",
       "surface": "admin-opening-hours-view",
       "pages": { "de": "site/board-guide.md", "en": "site/en/board-guide.md" }

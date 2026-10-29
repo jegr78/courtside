@@ -192,6 +192,8 @@ anlegst oder wieder aktivierst, einem Zugang mit Code einen Platz hinzufügst od
 Buchungskarte auf *Buchungen erhalten den Zugangscode* stellst. Einen Code oder Platz entfernen und
 einen Zugang deaktivieren verschickt nichts.
 
+![Ein Zugang mit seinen Plätzen und seinem Code und das Formular für einen neuen Zugang.](screenshots/de/access-points.png)
+
 Ob die Bucher einer Buchung den Code erhalten, legt ihre Buchungskarte fest.
 
 ## Anlage → Öffnungszeiten

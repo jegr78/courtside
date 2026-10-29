@@ -181,6 +181,8 @@ access point with a code, add a court to an access point with a code, or switch 
 *Bookings receive the access code*. Removing a code or a court and deactivating an access point
 send nothing.
 
+![An access point with its courts and code and the form for a new access point.](../screenshots/en/access-points.png)
+
 Whether a booking's players receive the code is decided by its booking card.
 
 ## Facility → Opening hours
