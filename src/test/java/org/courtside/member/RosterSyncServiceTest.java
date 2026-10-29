@@ -81,7 +81,7 @@ class RosterSyncServiceTest extends AbstractIntegrationTest {
             facilityFixture.setOpeningHours(day, new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0)));
         }
         memberOnlyCardId = cards.createCard("Members only", "#B85C38",
-                Set.of(Role.MEMBER), Set.of(), new short[]{}, false, false, false).getId();
+                Set.of(Role.MEMBER), Set.of(), new short[]{}, false, false, false, false).getId();
     }
 
     @Test

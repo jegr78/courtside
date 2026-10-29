@@ -51,6 +51,27 @@ test("given a volunteer installing Courtside for their club on the evening it ar
     // then
     await expect(page.locator('[data-testid^="court-row-"]')).toHaveCount(2);
 
+    // when — the gate in front of them, with the code its keypad takes
+    await reachAdministration(page, "admin-access-points-link");
+    await expect(page.getByTestId("admin-access-points-view")).toBeVisible();
+    await writeInto(page.getByTestId("new-access-point-name"), "North gate");
+    await activate(page.locator('[data-testid^="new-access-point-court-"]').first());
+    await writeInto(page.getByTestId("new-access-point-code"), "246810");
+    await activate(page.getByTestId("create-access-point"));
+
+    // then
+    const gate = page.locator('[data-testid^="access-point-code-"]');
+    await expect(gate).toHaveCount(1);
+    await expect(gate).toHaveText("246810");
+
+    // when — a code the club typed wrongly is corrected in place
+    await activate(page.locator('[data-testid^="edit-access-point-"]').first());
+    await rewrite(page.locator('[data-testid^="access-point-"][data-testid$="-code"]'), "135790");
+    await activate(page.locator('[data-testid^="save-access-point-"]').first());
+
+    // then
+    await expect(gate).toHaveText("135790");
+
     // when — the hours it opens them, which differ from the week it was shipped with
     await reachAdministration(page, "admin-opening-hours-link");
     await expect(page.getByTestId("hours-open-MONDAY")).toBeVisible();

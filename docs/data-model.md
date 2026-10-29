@@ -65,6 +65,8 @@ a check the application ran first.
 | `opening_period` | A season or holiday, its name and its first and last day | None |
 | `opening_period_hours` | When the facility opens and closes on one weekday of a season or holiday | `opening_period` |
 | `court_closure` | Whole days on which one court is closed, with a reason | `court` |
+| `access_point` | A door or gate on the way to the courts: its name, an optional static access code, whether it is active | None |
+| `access_point_court` | Which courts an access point leads to | `access_point`, `court` |
 
 `court.number` is unique and positive, and `active` is what takes a court out of service without
 losing it. A version's `effective_from` is a date in the club's time zone and unique; the one
@@ -81,6 +83,13 @@ without a row is closed on the days the period covers, and deleting a period del
 `court_closure` follows the same date rules, and its exclusion constraint keeps the closures of one
 court apart.
 
+`access_point.name` is unique (`access_point_unique_name`), not blank (`access_point_name_not_blank`)
+and at most 60 characters. `static_code` is null or four to eight digits
+(`access_point_static_code_digits`); the exact length a new code needs comes from `club_config` and
+is checked by the application, so a stored code survives a later change of that length.
+`access_point_court` has one row per access point and court, and deleting an access point deletes
+its rows. Nothing deletes an access point: `active` retires it.
+
 ## Cards
 
 | Table | Holds | References |
@@ -96,7 +105,9 @@ rules unexpressible. `docs/design.md` argues that at length.
 
 `booking_card.allowed_player_counts` is a `smallint[]`: `{2,4}` for a member card, empty for a card
 that tracks no players at all, which is right for training and closures. `show_generic_occupancy`
-decides whether the plan renders a neutral occupancy label or the card's own.
+decides whether the plan renders a neutral occupancy label or the card's own. `grants_access`
+decides whether the card's bookings receive access codes; it defaults to false, and
+`booking_card_closure_grants_no_access` keeps it false on the closure card.
 
 The role tables replaced a single `required_role` column, because a card that only one role may use
 cannot express "trainers and youth directors". Both accept the roles `user_account_role` accepts.
@@ -293,7 +304,10 @@ app's icon, the two brand colours, an uploaded logo, the imprint, privacy and do
 the default locale, the time zone, the booking slot length,
 how long issued credentials stay valid, how many minutes a mailed reset code stays redeemable,
 how many hours before a booking the reminder goes out, and how many minutes a freed court stays
-reserved for the member whose turn it is on its waitlist, 1 to 1440 and 15 by default.
+reserved for the member whose turn it is on its waitlist, 1 to 1440 and 15 by default. Three
+columns govern access codes: `access_lead_minutes` and `access_lag_minutes`, 0 to 240 and 15 by
+default, extend a booking's time on either side, and `access_code_length`, 4 to 8 and 6 by default,
+is the number of digits a new static code has.
 
 The time zone is checked against `pg_timezone_names` by a trigger, so a typo is refused where it is
 written rather than at the next reminder. The logo is stored in the row itself, content, media type
@@ -371,7 +385,8 @@ message log; `domain_event_subject_required` refuses an empty subject for every 
 
 `domain_event.event_type` is a dotted name whose first segment says which module published it, and
 the table holds two kinds of entry. Seven segments are the administrative surfaces, one per thing a
-board configures: `facility.court.added`, `card.bookingCard.changed`, `config.club.changed`,
+board configures: `facility.court.added` and `facility.accessPoint.changed`, which names the changed
+fields and never a static code, `card.bookingCard.changed`, `config.club.changed`,
 `rules.ruleSet.changed`, `roster.person.corrected`, `dataexchange.source.described` and
 `notification.template.changed`, each with siblings. A message wording has no row id of its own, so
 its entries name a subject derived from the message kind and language. The other two arrive in the course of ordinary use, because the writer records every

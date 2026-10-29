@@ -143,7 +143,7 @@ as one application process and uses PostgreSQL 18.
 | `card` | Booking and participant card configuration |
 | `config` | Club identity, time zone, language and grid configuration |
 | `dataexchange` | Imports, exports and subject-access responses |
-| `facility` | Courts and opening hours |
+| `facility` | Courts, access points and opening hours |
 | `identity` | People, accounts, roles, credentials and sessions |
 | `member` | Membership types, memberships and roster administration |
 | `notification` | Notification centre, email creation, delivery state and preferences |
@@ -272,7 +272,10 @@ participant list and one entry in booking views.
 ### Cards and participant slots
 
 A booking card controls its name and colour, allowed player counts, guest use, whether it counts
-toward limits, booking roles and managing roles.
+toward limits, booking roles, managing roles and whether its bookings receive access codes. That
+last attribute, `grantsAccess`, is off by default and never on for the closure card: `CardService`
+refuses it with `card.closure.grantsNoAccess`, and the `booking_card_closure_grants_no_access` CHECK
+refuses it below the service.
 
 An empty booking-role set permits every authenticated member account. An empty managing-role set
 permits only the owner and administrators to manage the booking. Managing roles never inherit from
@@ -543,6 +546,22 @@ answers the same question for an entry before it is stored, and the availability
 count while the board edits an entry, saying nothing while the count is zero. Utilisation
 counts open time from the hours that governed each day and does not subtract court closures from
 capacity.
+
+Access points are the doors and gates between the players and the courts. A board names each one,
+picks the courts it leads to, several courts sharing one and one court served by several, and may
+keep the static access code its keypad accepts. A PUT replaces every field, the courts and the code
+included, and an active flag takes an access point out of use without losing it. A code is digits
+only. A new or changed code has exactly the club's access code length, which `FacilityService`
+checks where the code is stored and refuses with `facility.accessPoint.codeLength`; a code stored
+before the length changed keeps working. The admin projection under `/api/admin/access-points` is
+the only administrative response that carries a code. The audit entries of an access point name its
+id, its courts and the fields that changed, never a code, and no error message or log line carries
+one either.
+
+The configuration holds three access settings beside the deadlines: how many minutes before a
+booking starts and after it ends its access code works, 0 to 240 and 15 by default each, and the
+length of a static access code, 4 to 8 digits and 6 by default. A request that leaves one out keeps
+its stored value.
 
 Grid changes are refused when active or future bookings, or the opening hours, seasons and holidays
 in force today or scheduled after it, no longer align. Time-zone changes are refused while a confirmed booking has not

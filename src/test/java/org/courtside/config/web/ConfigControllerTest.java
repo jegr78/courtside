@@ -17,6 +17,7 @@ import org.springframework.web.context.WebApplicationContext;
 import java.time.OffsetDateTime;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
+import java.util.List;
 import java.util.UUID;
 import javax.imageio.ImageIO;
 
@@ -808,6 +809,70 @@ class ConfigControllerTest extends AbstractIntegrationTest {
                         .with(csrf()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.fieldErrors[0].field").value("newAccountCredentialHours"));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAFreshInstance_whenReadingTheAccessSettings_thenTheyAreFifteenMinutesEitherSideAndSixDigits()
+            throws Exception {
+        // when / then
+        mockMvc.perform(get("/api/admin/config"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessLeadMinutes").value(15))
+                .andExpect(jsonPath("$.accessLagMinutes").value(15))
+                .andExpect(jsonPath("$.accessCodeLength").value(6));
+        mockMvc.perform(get("/api/public/config"))
+                .andExpect(jsonPath("$.accessCodeLength").doesNotHaveJsonPath());
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAnAdmin_whenChangingTheAccessSettings_thenTheyPersistAndARequestWithoutThemKeepsThem()
+            throws Exception {
+        // given
+        mockMvc.perform(put("/api/admin/config")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(configJson("Example Tennis Club").replace("\"bookingReminderHours\": 24",
+                                "\"bookingReminderHours\": 24, \"accessLeadMinutes\": 0,"
+                                        + " \"accessLagMinutes\": 240, \"accessCodeLength\": 4"))
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessLeadMinutes").value(0));
+
+        // when
+        mockMvc.perform(put("/api/admin/config")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(configJson("Example Tennis Club"))
+                        .with(csrf()))
+                .andExpect(status().isOk());
+
+        // then
+        mockMvc.perform(get("/api/admin/config"))
+                .andExpect(jsonPath("$.accessLeadMinutes").value(0))
+                .andExpect(jsonPath("$.accessLagMinutes").value(240))
+                .andExpect(jsonPath("$.accessCodeLength").value(4));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAccessSettingsOutsideTheirRanges_whenChangingTheConfig_thenEachIsRefusedByItsField()
+            throws Exception {
+        for (String setting : List.of("\"accessLeadMinutes\": 241", "\"accessLagMinutes\": -1",
+                "\"accessCodeLength\": 3", "\"accessCodeLength\": 9")) {
+            // when / then
+            mockMvc.perform(put("/api/admin/config")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(configJson("Example Tennis Club").replace("\"bookingReminderHours\": 24",
+                                    "\"bookingReminderHours\": 24, " + setting))
+                            .with(csrf()))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.type").value("urn:courtside:error:validation-failed"))
+                    .andExpect(jsonPath("$.fieldErrors[0].field")
+                            .value(setting.substring(1, setting.indexOf('"', 1))));
+        }
+        mockMvc.perform(get("/api/admin/config"))
+                .andExpect(jsonPath("$.accessLeadMinutes").value(15))
+                .andExpect(jsonPath("$.accessCodeLength").value(6));
     }
 
     @Test

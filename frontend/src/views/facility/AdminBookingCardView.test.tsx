@@ -12,7 +12,7 @@ import { AdminBookingCardView } from "./AdminBookingCardView";
 const memberCard: BookingCard = {
   id: "card-1", label: "Member booking", color: "#b85c38", allowedRoles: ["MEMBER"],
   managingRoles: [], allowedPlayerCounts: [2, 4], tracksPlayers: true, countsAgainstLimits: true,
-  guestAllowed: true, showGenericOccupancy: false, active: true
+  guestAllowed: true, showGenericOccupancy: false, grantsAccess: false, active: true
 };
 
 function show(cardId = "card-1", counted = false, state?: unknown) {
@@ -151,7 +151,7 @@ describe("AdminBookingCardView", () => {
     expect(change).toHaveBeenCalledWith("card-1", {
       label: "Training", color: "#b85c38", allowedRoles: ["MEMBER", "TRAINER"],
       managingRoles: ["SPORT_DIRECTOR"], allowedPlayerCounts: [2, 4],
-      countsAgainstLimits: true, guestAllowed: false, showGenericOccupancy: false
+      countsAgainstLimits: true, guestAllowed: false, showGenericOccupancy: false, grantsAccess: false
     });
   });
 
@@ -336,4 +336,31 @@ describe("AdminBookingCardView", () => {
       expect(screen.getByTestId("card-counts-add")).toBeDisabled();
       expect(screen.getByTestId("card-counts-list")).toHaveTextContent(/^2 ×4 ×$/);
     });
+
+  it("given an ordinary card, when the board lets its bookings receive the access code, then the save carries the flag", async () => {
+    // given
+    const change = vi.spyOn(api, "changeAdminBookingCard").mockResolvedValue({ ...memberCard, grantsAccess: true });
+    show();
+    await screen.findByTestId("card-label");
+
+    // when
+    await userEvent.click(screen.getByTestId("card-grants-access"));
+    await userEvent.click(screen.getByTestId("save-card"));
+
+    // then
+    await waitFor(() => expect(change).toHaveBeenCalledWith("card-1", expect.objectContaining({ grantsAccess: true })));
+  });
+
+  it("given the closure card, when the page loads, then it offers no access code switch and says why", async () => {
+    // given
+    const closure = "44444444-4444-4444-4444-444444444444";
+    vi.spyOn(api, "adminBookingCards").mockResolvedValue([{ ...memberCard, id: closure, label: "Court closed" }]);
+
+    // when
+    show(closure);
+
+    // then
+    expect(await screen.findByTestId("card-grants-access-closure")).toBeInTheDocument();
+    expect(screen.queryByTestId("card-grants-access")).not.toBeInTheDocument();
+  });
 });

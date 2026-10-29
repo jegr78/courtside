@@ -290,6 +290,51 @@ class CheckConstraintTest extends AbstractIntegrationTest {
         return id;
     }
 
+    @Test
+    void givenTheClosureCard_whenItIsUpdatedToGrantAccess_thenItIsRejected() {
+        // when / then
+        assertThatThrownBy(() -> jdbc.sql("""
+                        UPDATE booking_card SET grants_access = true
+                        WHERE id = '44444444-4444-4444-4444-444444444444'
+                        """).update())
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .hasMessageContaining("booking_card_closure_grants_no_access");
+    }
+
+    @Test
+    void whenInsertingAnAccessPointWithANonDigitCode_thenItIsRejected() {
+        // when / then
+        assertThatThrownBy(() -> jdbc.sql("INSERT INTO access_point (id, name, static_code) VALUES (?, ?, ?)")
+                        .params(UUID.randomUUID(), "North gate", "12a456")
+                        .update())
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .hasMessageContaining("access_point_static_code_digits");
+    }
+
+    @Test
+    void whenInsertingAnAccessPointWithABlankName_thenItIsRejected() {
+        // when / then
+        assertThatThrownBy(() -> jdbc.sql("INSERT INTO access_point (id, name) VALUES (?, ?)")
+                        .params(UUID.randomUUID(), "   ")
+                        .update())
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .hasMessageContaining("access_point_name_not_blank");
+    }
+
+    @Test
+    void whenTheAccessSettingsLeaveTheirRanges_thenEachIsRejectedByItsOwnConstraint() {
+        // when / then
+        assertThatThrownBy(() -> jdbc.sql("UPDATE club_config SET access_lead_minutes = 241").update())
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .hasMessageContaining("club_config_access_lead_minutes_range");
+        assertThatThrownBy(() -> jdbc.sql("UPDATE club_config SET access_lag_minutes = -1").update())
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .hasMessageContaining("club_config_access_lag_minutes_range");
+        assertThatThrownBy(() -> jdbc.sql("UPDATE club_config SET access_code_length = 3").update())
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .hasMessageContaining("club_config_access_code_length_range");
+    }
+
     private UUID insertUserAccount() {
         UUID id = UUID.randomUUID();
         UUID personId = insertPerson();

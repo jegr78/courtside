@@ -16,6 +16,8 @@ export type RuleParameter = components["schemas"]["RuleParameter"];
 export type RuleDefinition = components["schemas"]["RuleDefinition"];
 export type AdminCourt = components["schemas"]["Court"];
 export type CourtRequest = components["schemas"]["CourtRequest"];
+export type AccessPoint = components["schemas"]["AccessPoint"];
+export type AccessPointRequest = components["schemas"]["AccessPointRequest"];
 export type OpeningHours = components["schemas"]["OpeningHours"];
 export type OpeningWeek = components["schemas"]["OpeningWeek"];
 export type OpeningPeriod = components["schemas"]["OpeningPeriod"];
@@ -497,6 +499,16 @@ export const api = {
     method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(court)
   }),
   setAdminCourtActive: (id: string, active: boolean) => request<AdminCourt>(`/api/admin/courts/${id}/active`, {
+    method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ active })
+  }),
+  adminAccessPoints: () => request<AccessPoint[]>("/api/admin/access-points"),
+  createAdminAccessPoint: (accessPoint: AccessPointRequest) => request<AccessPoint>("/api/admin/access-points", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(accessPoint)
+  }),
+  changeAdminAccessPoint: (id: string, accessPoint: AccessPointRequest) => request<AccessPoint>(`/api/admin/access-points/${id}`, {
+    method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(accessPoint)
+  }),
+  setAdminAccessPointActive: (id: string, active: boolean) => request<AccessPoint>(`/api/admin/access-points/${id}/active`, {
     method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ active })
   }),
   adminOpeningHours: () => request<OpeningHours[]>("/api/admin/opening-hours"),

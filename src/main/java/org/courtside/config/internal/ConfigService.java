@@ -1,6 +1,10 @@
 package org.courtside.config.internal;
 
 import lombok.RequiredArgsConstructor;
+import org.courtside.config.AccessCodeLength;
+import org.courtside.config.AccessLagTime;
+import org.courtside.config.AccessLeadTime;
+import org.courtside.config.AccessPolicy;
 import org.courtside.config.BookingGridSettings;
 import org.courtside.config.ClubIdentity;
 import org.courtside.config.CredentialValidity;
@@ -40,7 +44,7 @@ import java.time.ZoneId;
 @Transactional(readOnly = true)
 public class ConfigService implements BookingGridSettings, BookingGridCoordination, ClubTimeZone,
         CredentialValidity, PasswordResetTokenValidity, ClubIdentity, BookingReminderPolicy,
-        WaitlistOfferPolicy {
+        WaitlistOfferPolicy, AccessPolicy {
 
     private static final String RULE_SET_CONSTRAINT = "club_config_no_membership_type_rule_set";
 
@@ -105,6 +109,21 @@ public class ConfigService implements BookingGridSettings, BookingGridCoordinati
     @Override
     public WaitlistOfferWindow offerWindow() {
         return new WaitlistOfferWindow(current().waitlistOfferMinutes());
+    }
+
+    @Override
+    public AccessLeadTime accessLead() {
+        return new AccessLeadTime(current().accessLeadMinutes());
+    }
+
+    @Override
+    public AccessLagTime accessLag() {
+        return new AccessLagTime(current().accessLagMinutes());
+    }
+
+    @Override
+    public AccessCodeLength accessCodeLength() {
+        return new AccessCodeLength(current().accessCodeLength());
     }
 
     @Override
@@ -235,6 +254,18 @@ public class ConfigService implements BookingGridSettings, BookingGridCoordinati
             addIfChanged(fields, "waitlistOfferMinutes",
                     configuration.getWaitlistOfferMinutes(), command.waitlistOffer().minutes());
         }
+        if (command.accessLead() != null) {
+            addIfChanged(fields, "accessLeadMinutes",
+                    configuration.getAccessLeadMinutes(), command.accessLead().minutes());
+        }
+        if (command.accessLag() != null) {
+            addIfChanged(fields, "accessLagMinutes",
+                    configuration.getAccessLagMinutes(), command.accessLag().minutes());
+        }
+        if (command.accessCodeLength() != null) {
+            addIfChanged(fields, "accessCodeLength",
+                    configuration.getAccessCodeLength(), command.accessCodeLength().digits());
+        }
         addIfChanged(fields, "noMembershipTypeRuleSetId",
                 configuration.getNoMembershipTypeRuleSetId(), command.noMembershipTypeRuleSetId());
         return new Changes(List.copyOf(fields),
@@ -257,6 +288,15 @@ public class ConfigService implements BookingGridSettings, BookingGridCoordinati
         configuration.remindBookingsAfter(command.bookingReminder().hours());
         if (command.waitlistOffer() != null) {
             configuration.holdWaitlistOffersFor(command.waitlistOffer().minutes());
+        }
+        if (command.accessLead() != null) {
+            configuration.openAccessPointsBefore(command.accessLead().minutes());
+        }
+        if (command.accessLag() != null) {
+            configuration.keepAccessPointsOpenAfter(command.accessLag().minutes());
+        }
+        if (command.accessCodeLength() != null) {
+            configuration.requireAccessCodesOf(command.accessCodeLength().digits());
         }
         configuration.bindPeopleWithoutAMembershipTypeTo(command.noMembershipTypeRuleSetId());
     }

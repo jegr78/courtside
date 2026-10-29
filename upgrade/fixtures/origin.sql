@@ -3,6 +3,12 @@ BEGIN;
 INSERT INTO court (id, number, name, active)
 VALUES ('70000000-0000-0000-0000-000000000001', 7, 'Upgrade court', true);
 
+INSERT INTO access_point (id, name, static_code, active)
+VALUES ('70300000-0000-0000-0000-000000000001', 'Upgrade gate', '246810', true);
+
+INSERT INTO access_point_court (access_point_id, court_id)
+VALUES ('70300000-0000-0000-0000-000000000001', '70000000-0000-0000-0000-000000000001');
+
 INSERT INTO opening_period (id, kind, name, starts_on, ends_on)
 VALUES ('70100000-0000-0000-0000-000000000001', 'SEASON', 'Upgrade summer', '2025-05-01', '2025-09-30');
 

@@ -23,7 +23,7 @@ const config: AdminClubConfig = {
   clubName: "Example Tennis Club", primaryColor: "#b85c38", accentColor: "#d7e24b",
   defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30, timeZone: "Europe/Berlin",
   newAccountCredentialHours: 168, passwordResetCredentialHours: 24, passwordResetTokenMinutes: 60,
-  bookingReminderHours: 24, waitlistOfferMinutes: 15, logoUploaded: false
+  bookingReminderHours: 24, waitlistOfferMinutes: 15, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6, logoUploaded: false
 };
 const adults: MembershipType = { id: "type-1", name: "Adults", ruleSetId: "rule-set", active: true, grantsAccount: false };
 const jane: RosterEntry = {
@@ -119,7 +119,7 @@ describe("leaving an administrative page with unsaved work", () => {
     vi.spyOn(api, "adminBookingCards").mockResolvedValue([{
       id: "card-1", label: "Member booking", color: "#b85c38", allowedRoles: ["MEMBER"], managingRoles: [],
       allowedPlayerCounts: [2], tracksPlayers: true, countsAgainstLimits: true, guestAllowed: false,
-      showGenericOccupancy: false, active: true
+      showGenericOccupancy: false, grantsAccess: false, active: true
     }]);
     vi.spyOn(api, "adminParticipantCards").mockResolvedValue([{ id: "filler-1", label: "Ball machine", capacity: 1, active: true }]);
     vi.spyOn(api, "person").mockResolvedValue(jane);

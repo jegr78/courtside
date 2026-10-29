@@ -43,6 +43,7 @@ const groups: Group[] = [
     heading: "nav.adminFacility",
     destinations: [
       { to: "/admin/facility/courts", testId: "admin-courts-link", label: "nav.adminCourts" },
+      { to: "/admin/facility/access-points", testId: "admin-access-points-link", label: "nav.adminAccessPoints" },
       { to: "/admin/facility/opening-hours", testId: "admin-opening-hours-link", label: "nav.adminOpeningHours" },
       { to: "/admin/facility/booking-cards", testId: "admin-booking-cards-link", label: "nav.adminBookingCards" },
       { to: "/admin/facility/slot-fillers", testId: "admin-slot-fillers-link", label: "nav.adminSlotFillers" }

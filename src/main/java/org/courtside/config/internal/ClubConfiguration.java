@@ -79,6 +79,15 @@ public class ClubConfiguration {
     @Column(name = "waitlist_offer_minutes", nullable = false)
     private int waitlistOfferMinutes;
 
+    @Column(name = "access_lead_minutes", nullable = false)
+    private int accessLeadMinutes;
+
+    @Column(name = "access_lag_minutes", nullable = false)
+    private int accessLagMinutes;
+
+    @Column(name = "access_code_length", nullable = false)
+    private int accessCodeLength;
+
     @Column(name = "no_membership_type_rule_set_id")
     private UUID noMembershipTypeRuleSetId;
 
@@ -111,6 +120,18 @@ public class ClubConfiguration {
 
     public void holdWaitlistOffersFor(int minutes) {
         this.waitlistOfferMinutes = minutes;
+    }
+
+    public void openAccessPointsBefore(int minutes) {
+        this.accessLeadMinutes = minutes;
+    }
+
+    public void keepAccessPointsOpenAfter(int minutes) {
+        this.accessLagMinutes = minutes;
+    }
+
+    public void requireAccessCodesOf(int digits) {
+        this.accessCodeLength = digits;
     }
 
     public void bindPeopleWithoutAMembershipTypeTo(UUID ruleSetId) {

@@ -50,9 +50,9 @@ class CardControllerTest extends AbstractIntegrationTest {
     void givenRoleRestrictedAndInactiveCards_whenListingTheLegend_thenEveryActiveCardIsPublic() throws Exception {
         // given
         BookingCard restricted = cards.createCard("Trainer session", "#3a4a5c", Set.of(Role.TRAINER), Set.of(),
-                new short[0], false, false, false);
+                new short[0], false, false, false, false);
         BookingCard retired = cards.createCard("Retired card", "#c8a415", Set.of(), Set.of(),
-                new short[0], false, false, false);
+                new short[0], false, false, false, false);
         cards.setCardActive(retired.getId(), false);
 
         // when / then
@@ -71,7 +71,7 @@ class CardControllerTest extends AbstractIntegrationTest {
     void whenListingTheLegend_thenBookingRulesAreNotExposed() throws Exception {
         // given
         BookingCard card = cards.createCard("Match play", "#3a4a5c", Set.of(Role.TRAINER), Set.of(),
-                new short[] {2, 4}, true, true, true);
+                new short[] {2, 4}, true, true, true, false);
         String at = "$[?(@.id=='" + card.getId() + "')]";
 
         // when / then
@@ -87,9 +87,9 @@ class CardControllerTest extends AbstractIntegrationTest {
     void givenGenericCards_whenListingTheLegend_thenTheyBecomeOneNeutralEntry() throws Exception {
         // given
         cards.createCard("Private rehabilitation", "#123456", Set.of(Role.TRAINER), Set.of(),
-                new short[0], false, false, true);
+                new short[0], false, false, true, false);
         cards.createCard("Confidential coaching", "#654321", Set.of(Role.TRAINER), Set.of(),
-                new short[0], false, false, true);
+                new short[0], false, false, true, false);
 
         // when / then
         mockMvc.perform(get("/api/public/booking-card-legend").with(anonymous()))
@@ -119,9 +119,9 @@ class CardControllerTest extends AbstractIntegrationTest {
             throws Exception {
         // given
         BookingCard active = cards.createCard("Match play", "#3a4a5c", Set.of(), Set.of(),
-                new short[] {2, 4}, true, true, true);
+                new short[] {2, 4}, true, true, true, false);
         BookingCard retired = cards.createCard("Retired card", "#c8a415", Set.of(), Set.of(),
-                new short[0], false, false, false);
+                new short[0], false, false, false, false);
         cards.setCardActive(retired.getId(), false);
 
         // when / then
@@ -136,9 +136,9 @@ class CardControllerTest extends AbstractIntegrationTest {
             throws Exception {
         // given
         BookingCard gated = cards.createCard("Trainer session", "#3a4a5c", Set.of(Role.TRAINER), Set.of(),
-                new short[0], false, false, false);
+                new short[0], false, false, false, false);
         BookingCard open = cards.createCard("Match play", "#3a4a5c", Set.of(), Set.of(),
-                new short[] {2, 4}, true, true, true);
+                new short[] {2, 4}, true, true, true, false);
 
         // when / then
         mockMvc.perform(get("/api/public/booking-cards"))
@@ -151,7 +151,7 @@ class CardControllerTest extends AbstractIntegrationTest {
     void whenListingBookingCardsPublicly_thenOnlyMemberFacingFieldsAreExposed() throws Exception {
         // given
         BookingCard card = cards.createCard(
-                "Match play", "#3a4a5c", Set.of(), Set.of(), new short[] {2, 4}, true, true, true);
+                "Match play", "#3a4a5c", Set.of(), Set.of(), new short[] {2, 4}, true, true, true, false);
         String at = "$[?(@.id=='" + card.getId() + "')]";
 
         // when / then

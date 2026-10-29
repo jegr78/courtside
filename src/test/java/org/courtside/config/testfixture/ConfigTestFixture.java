@@ -1,6 +1,9 @@
 package org.courtside.config.testfixture;
 
 import lombok.RequiredArgsConstructor;
+import org.courtside.config.AccessCodeLength;
+import org.courtside.config.AccessLagTime;
+import org.courtside.config.AccessLeadTime;
 import org.courtside.config.BookingSlotDuration;
 import org.courtside.config.CredentialLifetime;
 import org.courtside.config.ReminderLeadTime;
@@ -36,7 +39,28 @@ public class ConfigTestFixture {
                 unchanged.documentationUrl(), unchanged.shortName(), unchanged.defaultLocale(),
                 unchanged.slotDuration(), unchanged.timeZone(), unchanged.newAccountCredential(),
                 unchanged.passwordResetCredential(), unchanged.passwordResetToken(), unchanged.bookingReminder(),
-                unchanged.noMembershipTypeRuleSetId(), new WaitlistOfferWindow(minutes)));
+                unchanged.noMembershipTypeRuleSetId(), new WaitlistOfferWindow(minutes), null, null, null));
+    }
+
+    public void requireAccessCodesOf(int digits) {
+        config.update(withAccess(null, null, new AccessCodeLength(digits)));
+    }
+
+    public void openAccessPointsAround(int leadMinutes, int lagMinutes) {
+        config.update(withAccess(new AccessLeadTime(leadMinutes), new AccessLagTime(lagMinutes), null));
+    }
+
+    private ChangeClubConfigurationCommand withAccess(AccessLeadTime lead, AccessLagTime lag,
+                                                      AccessCodeLength length) {
+        ClubConfigurationSnapshot current = config.current();
+        ChangeClubConfigurationCommand unchanged = commandFrom(current, current.bookingReminderHours(),
+                current.noMembershipTypeRuleSetId());
+        return new ChangeClubConfigurationCommand(unchanged.clubName(), unchanged.primaryColor(),
+                unchanged.accentColor(), unchanged.logoUrl(), unchanged.imprintUrl(), unchanged.privacyUrl(),
+                unchanged.documentationUrl(), unchanged.shortName(), unchanged.defaultLocale(),
+                unchanged.slotDuration(), unchanged.timeZone(), unchanged.newAccountCredential(),
+                unchanged.passwordResetCredential(), unchanged.passwordResetToken(), unchanged.bookingReminder(),
+                unchanged.noMembershipTypeRuleSetId(), null, lead, lag, length);
     }
 
     public int waitlistOfferMinutes() {
@@ -84,6 +108,6 @@ public class ConfigTestFixture {
                 new BookingSlotDuration(current.slotMinutes()), current.timeZone(),
                 new CredentialLifetime(current.newAccountCredentialHours()),
                 new CredentialLifetime(current.passwordResetCredentialHours()),
-                new ResetTokenLifetime(60), new ReminderLeadTime(reminderHours), ruleSetId, null);
+                new ResetTokenLifetime(60), new ReminderLeadTime(reminderHours), ruleSetId, null, null, null, null);
     }
 }

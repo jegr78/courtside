@@ -358,13 +358,18 @@
       "actors": [
         "ADMIN"
       ],
-      "entryPoints": "Administrative court, opening-hour, season, holiday, court-closure, booking-card, participant-card and membership-type endpoints.",
+      "entryPoints": "Administrative court, access-point, opening-hour, season, holiday, court-closure, booking-card, participant-card and membership-type endpoints.",
       "operationIds": [
         "listCourtsForAdmin",
         "createCourt",
         "getCourt",
         "changeCourt",
         "setCourtActive",
+        "listAccessPoints",
+        "createAccessPoint",
+        "getAccessPoint",
+        "changeAccessPoint",
+        "setAccessPointActive",
         "listBookingCards",
         "createBookingCard",
         "getBookingCard",

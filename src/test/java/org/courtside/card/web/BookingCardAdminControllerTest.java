@@ -4,6 +4,7 @@ import com.jayway.jsonpath.JsonPath;
 import org.courtside.AbstractIntegrationTest;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.booking.testfixture.BookingTestFixture;
+import org.courtside.card.BookingCard;
 import org.courtside.card.CardService;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.identity.Role;
@@ -412,5 +413,51 @@ class BookingCardAdminControllerTest extends AbstractIntegrationTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:validation-failed"))
                 .andExpect(jsonPath("$.fieldErrors[0].field").value("showGenericOccupancy"));
+    }
+
+    @Test
+    void givenAnOrdinaryCard_whenGrantingAccessAndWithdrawingItAgain_thenTheFlagFollowsAndDefaultsToOff()
+            throws Exception {
+        // given
+        String id = createCard("Member play", "#c8a415");
+        mockMvc.perform(get("/api/admin/booking-cards/" + id))
+                .andExpect(jsonPath("$.grantsAccess").value(false));
+
+        // when / then
+        mockMvc.perform(put("/api/admin/booking-cards/" + id)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(cardJson("Member play", true))
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.grantsAccess").value(true));
+        mockMvc.perform(put("/api/admin/booking-cards/" + id)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(cardJson("Member play", false))
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.grantsAccess").value(false));
+        assertThat(cardService.requireCard(UUID.fromString(id)).isGrantsAccess()).isFalse();
+    }
+
+    @Test
+    void givenTheClosureCard_whenABoardMakesItGrantAccess_thenTheCardRefusesItByCodeAndStaysWithout()
+            throws Exception {
+        // when / then
+        mockMvc.perform(put("/api/admin/booking-cards/" + BookingCard.COURT_CLOSED)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(cardJson(cardService.requireCard(BookingCard.COURT_CLOSED).getLabel(), true))
+                        .with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:closure-card-grants-no-access"))
+                .andExpect(jsonPath("$.violations[0].code").value("card.closure.grantsNoAccess"));
+        assertThat(cardService.requireCard(BookingCard.COURT_CLOSED).isGrantsAccess()).isFalse();
+    }
+
+    private static String cardJson(String label, boolean grantsAccess) {
+        return """
+                {"label": "%s", "color": "#c8a415",
+                 "allowedRoles": [], "allowedPlayerCounts": [], "countsAgainstLimits": false,
+                 "guestAllowed": false, "grantsAccess": %s}
+                """.formatted(label, grantsAccess);
     }
 }

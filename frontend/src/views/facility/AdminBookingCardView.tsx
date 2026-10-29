@@ -14,6 +14,7 @@ import { FacilityPage } from "./FacilityPage";
 import { useSaving } from "./useSaving";
 
 const MARK = "booking-card";
+const COURT_CLOSED = "44444444-4444-4444-4444-444444444444";
 
 function arrivedFromCardCreation(state: unknown): boolean {
   return typeof state === "object" && state !== null && "cardCreated" in state
@@ -56,7 +57,7 @@ export function AdminBookingCardView() {
       label: card.label, color: card.color, allowedRoles: card.allowedRoles,
       managingRoles: card.managingRoles, allowedPlayerCounts: card.allowedPlayerCounts,
       countsAgainstLimits: card.countsAgainstLimits, guestAllowed: card.guestAllowed,
-      showGenericOccupancy: card.showGenericOccupancy
+      showGenericOccupancy: card.showGenericOccupancy, grantsAccess: card.grantsAccess
     })));
   }
 
@@ -97,6 +98,9 @@ export function AdminBookingCardView() {
           <BookingRules>
             <Checkbox disabled={disabled} data-testid="card-counts-against-limits" label={t("admin.facility.countsAgainstLimits")} checked={card.countsAgainstLimits} changed={(countsAgainstLimits) => setCard({ ...card, countsAgainstLimits })} />
             <Checkbox disabled={disabled} data-testid="card-guest-allowed" label={t("admin.facility.guestAllowed")} checked={card.guestAllowed} changed={(guestAllowed) => setCard({ ...card, guestAllowed })} />
+            {card.id === COURT_CLOSED
+              ? <p data-testid="card-grants-access-closure" className="text-muted text-sm">{t("admin.facility.grantsAccessClosure")}</p>
+              : <Checkbox disabled={disabled} data-testid="card-grants-access" label={t("admin.facility.grantsAccess")} checked={card.grantsAccess} changed={(grantsAccess) => setCard({ ...card, grantsAccess })} />}
           </BookingRules>
         </div>
       </div>

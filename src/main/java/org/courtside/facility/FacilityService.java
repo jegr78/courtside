@@ -1,5 +1,7 @@
 package org.courtside.facility;
 
+import org.courtside.facility.internal.AccessPointNameTakenException;
+import org.courtside.facility.internal.AccessPointRepository;
 import org.courtside.facility.internal.CourtClosureRepository;
 import org.courtside.facility.internal.CourtClosureRow;
 import org.courtside.facility.internal.CourtNumberTakenException;
@@ -14,6 +16,8 @@ import org.courtside.facility.internal.WeeklyOpeningHours;
 import org.courtside.shared.InvalidOpeningWindowException;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.shared.SqlConstraintViolation;
+import org.courtside.config.AccessCodeLength;
+import org.courtside.config.AccessPolicy;
 import org.courtside.config.BookingGridSettings;
 import org.courtside.config.BookingSlotDuration;
 import org.courtside.config.BookingGridCoordination;
@@ -38,6 +42,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.UUID;
 
 @Service
@@ -48,6 +53,8 @@ public class FacilityService {
     private static final String UNIQUE_NUMBER_CONSTRAINT = "court_unique_number";
     private static final LocalDate LATEST_START = LocalDate.of(9999, 12, 31);
     private static final int AVAILABILITY_NAME_LENGTH = 80;
+    private static final String UNIQUE_ACCESS_POINT_NAME = "access_point_unique_name";
+    private static final int ACCESS_POINT_NAME_LENGTH = 60;
 
     private final CourtRepository courts;
     private final OpeningHoursRepository openingHours;
@@ -60,6 +67,8 @@ public class FacilityService {
     private final BookingGridSettings bookingGridSettings;
     private final BookingGridCoordination bookingGridCoordination;
     private final ApplicationEventPublisher events;
+    private final AccessPointRepository accessPoints;
+    private final AccessPolicy accessPolicy;
 
     public List<Court> activeCourts() {
         return courts.findByActiveTrueOrderByNumberAsc();
@@ -109,6 +118,117 @@ public class FacilityService {
         }
         events.publishEvent(new FacilityEvent.CourtAvailabilityChanged(court.getId(), active));
         return court;
+    }
+
+    public List<AccessPoint> allAccessPoints() {
+        return accessPoints.findAllByOrderByNameAsc();
+    }
+
+    public AccessPoint requireAccessPoint(UUID accessPointId) {
+        return accessPoints.findById(accessPointId)
+                .orElseThrow(() -> new AccessPointNotFoundException("No access point with id " + accessPointId));
+    }
+
+    @Transactional
+    public AccessPoint createAccessPoint(String name, Collection<UUID> courtIds, String staticCode) {
+        String stored = requireAccessPointName(name);
+        Set<UUID> courtsServed = requireCourts(courtIds);
+        if (staticCode != null) {
+            requireFittingCode(staticCode);
+        }
+        AccessPoint accessPoint = saveOrRejectTakenName(new AccessPoint(stored, courtsServed, staticCode));
+        events.publishEvent(new FacilityEvent.AccessPointAdded(accessPoint.getId(), sorted(courtsServed)));
+        return accessPoint;
+    }
+
+    /** Replaces every field. Only a new or changed code has to fit today's code length. */
+    @Transactional
+    public AccessPoint changeAccessPoint(UUID accessPointId, String name, Collection<UUID> courtIds,
+                                         String staticCode) {
+        AccessPoint accessPoint = requireAccessPoint(accessPointId);
+        String stored = requireAccessPointName(name);
+        Set<UUID> courtsServed = requireCourts(courtIds);
+        boolean codeChanged = !Objects.equals(accessPoint.getStaticCode(), staticCode);
+        if (codeChanged && staticCode != null) {
+            requireFittingCode(staticCode);
+        }
+        List<String> changedFields = new ArrayList<>();
+        if (!accessPoint.getName().equals(stored)) changedFields.add("name");
+        if (!accessPoint.getCourtIds().equals(courtsServed)) changedFields.add("courtIds");
+        if (codeChanged) changedFields.add("staticCode");
+        accessPoint.changeTo(stored, courtsServed, staticCode);
+        AccessPoint saved = saveOrRejectTakenName(accessPoint);
+        if (!changedFields.isEmpty()) {
+            events.publishEvent(new FacilityEvent.AccessPointChanged(
+                    saved.getId(), sorted(courtsServed), changedFields));
+        }
+        return saved;
+    }
+
+    @Transactional
+    public AccessPoint setAccessPointActive(UUID accessPointId, boolean active) {
+        AccessPoint accessPoint = requireAccessPoint(accessPointId);
+        if (accessPoint.isActive() == active) {
+            return accessPoint;
+        }
+        if (active) {
+            accessPoint.activate();
+        } else {
+            accessPoint.deactivate();
+        }
+        events.publishEvent(new FacilityEvent.AccessPointAvailabilityChanged(accessPoint.getId(), active));
+        return accessPoint;
+    }
+
+    private static String requireAccessPointName(String name) {
+        String trimmed = name == null ? "" : name.strip();
+        if (trimmed.isEmpty()) {
+            throw AccessPointRejectedException.nameRequired();
+        }
+        if (trimmed.length() > ACCESS_POINT_NAME_LENGTH) {
+            throw AccessPointRejectedException.nameTooLong(ACCESS_POINT_NAME_LENGTH);
+        }
+        return trimmed;
+    }
+
+    private Set<UUID> requireCourts(Collection<UUID> courtIds) {
+        if (courtIds == null) {
+            throw new IllegalStateException("An access point names the courts it serves, if only none");
+        }
+        Set<UUID> served = new TreeSet<>();
+        for (UUID courtId : courtIds) {
+            if (courtId == null) {
+                throw new CourtNotFoundException("An access point named a court without an id");
+            }
+            served.add(requireCourt(courtId).getId());
+        }
+        return served;
+    }
+
+    private void requireFittingCode(String staticCode) {
+        if (staticCode.isEmpty() || !staticCode.chars().allMatch(digit -> digit >= '0' && digit <= '9')) {
+            throw AccessPointRejectedException.codeNotDigits();
+        }
+        AccessCodeLength length = accessPolicy.accessCodeLength();
+        if (!length.fits(staticCode)) {
+            throw AccessPointRejectedException.codeLength(length.digits());
+        }
+    }
+
+    private AccessPoint saveOrRejectTakenName(AccessPoint accessPoint) {
+        try {
+            return accessPoints.saveAndFlush(accessPoint);
+        } catch (DataIntegrityViolationException e) {
+            if (SqlConstraintViolation.matches(
+                    e, SqlConstraintViolation.UNIQUE_VIOLATION, UNIQUE_ACCESS_POINT_NAME)) {
+                throw new AccessPointNameTakenException(e);
+            }
+            throw e;
+        }
+    }
+
+    private static List<UUID> sorted(Set<UUID> courtIds) {
+        return courtIds.stream().sorted().toList();
     }
 
     public OpeningSchedule openingSchedule() {

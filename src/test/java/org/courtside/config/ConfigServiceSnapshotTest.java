@@ -44,7 +44,7 @@ class ConfigServiceSnapshotTest extends AbstractIntegrationTest {
                 "Example Tennis Club", "#34584A", "#D7E24B",
                 "/logo.svg", "/imprint", "/privacy", "/docs", "ETC Example", "en",
                 new BookingSlotDuration(15), "Pacific/Auckland",
-                new CredentialLifetime(72), new CredentialLifetime(12), new ResetTokenLifetime(60), new ReminderLeadTime(24), null, null));
+                new CredentialLifetime(72), new CredentialLifetime(12), new ResetTokenLifetime(60), new ReminderLeadTime(24), null, null, null, null, null));
 
         // then
         assertThat(snapshot.getClass().isRecord()).isTrue();
@@ -79,7 +79,7 @@ class ConfigServiceSnapshotTest extends AbstractIntegrationTest {
                 "Example Tennis Club", "#34584A", "#D7E24B",
                 "/logo.svg", "/imprint", "/privacy", "/docs", "ETC Example", "en",
                 new BookingSlotDuration(15), "Pacific/Auckland",
-                new CredentialLifetime(72), new CredentialLifetime(12), new ResetTokenLifetime(60), new ReminderLeadTime(24), YOUTH_RULE_SET, null));
+                new CredentialLifetime(72), new CredentialLifetime(12), new ResetTokenLifetime(60), new ReminderLeadTime(24), YOUTH_RULE_SET, null, null, null, null));
 
         // then
         assertThat(snapshot.noMembershipTypeRuleSetId()).isEqualTo(YOUTH_RULE_SET);
@@ -107,7 +107,7 @@ class ConfigServiceSnapshotTest extends AbstractIntegrationTest {
                 "Example Tennis Club", "#34584A", "#D7E24B",
                 "/new-logo.svg", "/imprint", "/privacy", "/docs", "ETC Example", "en",
                 new BookingSlotDuration(15), "Pacific/Auckland",
-                new CredentialLifetime(72), new CredentialLifetime(12), new ResetTokenLifetime(60), new ReminderLeadTime(24), null, null));
+                new CredentialLifetime(72), new CredentialLifetime(12), new ResetTokenLifetime(60), new ReminderLeadTime(24), null, null, null, null, null));
         ClubConfigurationSnapshot deleted = config.deleteLogo();
 
         // then
@@ -123,7 +123,7 @@ class ConfigServiceSnapshotTest extends AbstractIntegrationTest {
                 "Example Tennis Club", "#34584A", "#D7E24B",
                 "/logo.svg", "/imprint", "/privacy", "/docs", "ETC Example", "en",
                 new BookingSlotDuration(15), "Pacific/Auckland",
-                new CredentialLifetime(72), new CredentialLifetime(12), new ResetTokenLifetime(60), new ReminderLeadTime(24), noMembershipTypeRuleSetId, null);
+                new CredentialLifetime(72), new CredentialLifetime(12), new ResetTokenLifetime(60), new ReminderLeadTime(24), noMembershipTypeRuleSetId, null, null, null, null);
     }
 
     private static byte[] image() {

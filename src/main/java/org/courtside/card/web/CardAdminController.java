@@ -46,7 +46,8 @@ class CardAdminController implements AdminBookingCardsApi, AdminParticipantCards
                 request.getLabel(), request.getColor(), roles(request.getAllowedRoles()),
                 roles(request.getManagingRoles()),
                 toPlayerCounts(request.getAllowedPlayerCounts()), request.getCountsAgainstLimits(),
-                request.getGuestAllowed(), Boolean.TRUE.equals(request.getShowGenericOccupancy()));
+                request.getGuestAllowed(), Boolean.TRUE.equals(request.getShowGenericOccupancy()),
+                Boolean.TRUE.equals(request.getGrantsAccess()));
         return ResponseEntity
                 .created(URI.create("/api/admin/booking-cards/" + card.getId()))
                 .body(toResponse(card));
@@ -58,7 +59,8 @@ class CardAdminController implements AdminBookingCardsApi, AdminParticipantCards
                 id, request.getLabel(), request.getColor(), roles(request.getAllowedRoles()),
                 roles(request.getManagingRoles()),
                 toPlayerCounts(request.getAllowedPlayerCounts()), request.getCountsAgainstLimits(),
-                request.getGuestAllowed(), Boolean.TRUE.equals(request.getShowGenericOccupancy()))));
+                request.getGuestAllowed(), Boolean.TRUE.equals(request.getShowGenericOccupancy()),
+                Boolean.TRUE.equals(request.getGrantsAccess()))));
     }
 
     @Override
@@ -147,7 +149,7 @@ class CardAdminController implements AdminBookingCardsApi, AdminParticipantCards
                 roleNames(card.getAllowedRoles()), roleNames(card.getManagingRoles()),
                 toPlayerCountList(card.getAllowedPlayerCounts()), card.tracksPlayers(),
                 card.isCountsAgainstLimits(), card.isGuestAllowed(), card.isShowGenericOccupancy(),
-                card.isActive());
+                card.isGrantsAccess(), card.isActive());
     }
 
     private static ApiParticipantCard toResponse(ParticipantCard card) {
