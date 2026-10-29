@@ -338,6 +338,38 @@ class AccessGrantRecordingTest {
     }
 
     @Test
+    void givenAnInstallWhoseCodeWasRejected_whenTheNextInstallIsAccepted_thenTheFailureAndTheCountsAreCleared() {
+        // given
+        AccessGrant grant = fresh();
+        grant.record(decideAndBegin(grant, DEMAND, MAPPING, NOW), answered(new GrantOutcome.CodeRejected()), null,
+                NOW, DEADLINE);
+        SentCall call = decideAndBegin(grant, DEMAND, MAPPING, NOW);
+
+        // when
+        grant.record(call, answered(new GrantOutcome.Accepted("remote-user-1")), null, NOW, DEADLINE);
+
+        // then
+        assertThat(grant.getRejections()).isZero();
+        assertThat(grant.getAttempts()).isZero();
+        assertThat(grant.getLastFailure()).isNull();
+    }
+
+    @Test
+    void givenACallSentForAnotherGrant_whenRecorded_thenTheRecordingRefusesIt() {
+        // given
+        AccessGrant grant = fresh();
+        decideAndBegin(grant, DEMAND, MAPPING, NOW);
+        SentCall foreign = decideAndBegin(fresh(), DEMAND, MAPPING, NOW);
+
+        // when / then
+        assertThatThrownBy(() -> grant.record(foreign, answered(new GrantOutcome.Accepted("remote-user-1")), null,
+                        NOW, DEADLINE))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("A call is recorded on the grant it was sent for");
+        assertThat(grant.getRemote()).isEqualTo(RemoteState.MAYBE);
+    }
+
+    @Test
     void givenALongReason_whenRecorded_thenItIsCutToWhatTheRowHolds() {
         // given
         AccessGrant grant = fresh();

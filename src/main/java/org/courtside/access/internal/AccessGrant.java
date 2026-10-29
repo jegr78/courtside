@@ -195,9 +195,6 @@ public class AccessGrant {
             return recordAnswer(call, outcome, probes, probeAnswers, dbNow, deadline);
         }
         lastFailure = UNCLEAR;
-        if (call.action().installs()) {
-            remote = RemoteState.MAYBE;
-        }
         if (probeAnswers) {
             return new Recording(new PassEffect.Continue(), false);
         }
