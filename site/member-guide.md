@@ -335,7 +335,8 @@ Liegt ein Platz hinter einer Tür mit Tastenfeld und gibt die Buchungsart Zugang
 *Meine Buchungen* bei der Buchung den Code jedes Zugangs, den du brauchst, und von wann bis wann er
 gilt, meist ab einer Viertelstunde vor Spielbeginn bis eine Viertelstunde nach Spielende. Dieselben
 Codes stehen in der Bestätigung und in der Erinnerung. Mitspieler mit eigenem Konto sehen sie unter
-*Als Mitspieler eingetragen*. Ist die Zeit vorbei, verschwindet der Code.
+*Als Mitspieler eingetragen*. In der installierten App stehen die Codes auch ohne Verbindung dort,
+so wie beim letzten Öffnen mit Verbindung. Ist die Zeit vorbei, verschwindet der Code.
 
 Ändert der Verein einen Code oder gilt für deine Buchung ein neuer, schickt Courtside dem Bucher und
 jedem Mitspieler mit eigenem Konto eine Nachricht mit den Codes, die jetzt gelten.

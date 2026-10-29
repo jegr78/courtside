@@ -411,7 +411,9 @@ that serves one of its courts, with a validity window from its start less the cl
 its end plus the access lag. The booker's own bookings, a granted guardian's view of a dependant's
 bookings and a player's own participations carry them; the managed-booking view, the public plan,
 admin views and anybody outside the booking never do. A response carries a code only while the
-window has not ended, and the web client drops a code from a cached page once its window has ended.
+window has not ended. The installed app keeps the first page of the member's upcoming bookings and of
+their participations offline, codes included, and drops a code from a cached page once its window
+has ended.
 
 ### Waitlist
 

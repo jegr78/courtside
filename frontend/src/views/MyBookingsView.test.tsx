@@ -100,7 +100,6 @@ it("given a cached personal page, when offline, then bookings remain readable wi
   expect(await screen.findByTestId(`booking-${upcomingId}`)).toHaveTextContent("Member booking");
   expect(screen.getByTestId(`booking-${upcomingId}`)).toHaveTextContent("Centre Court");
   expect(screen.getByTestId("bookings-offline-as-of")).toHaveTextContent("Available offline · As of");
-  expect(api.participations).not.toHaveBeenCalled();
   expect(api.courts).not.toHaveBeenCalled();
   expect(api.bookingGrid).not.toHaveBeenCalled();
   expect(screen.queryByTestId("personal-cancel")).not.toBeInTheDocument();
@@ -1181,4 +1180,40 @@ it("given a page opened before a window ended, when the screen's clock has passe
   // then
   expect(await screen.findByTestId(`booking-${upcomingId}`)).toBeInTheDocument();
   expect(screen.queryByTestId("access-codes")).not.toBeInTheDocument();
+});
+
+it("given cached participations, when offline, then a player still sees the gate's code without being offered to withdraw", async () => {
+  // given
+  vi.mocked(api.personalBookings).mockResolvedValue({ items: [], refreshedAt: "2026-08-11T10:30:00Z", timeZone: "Europe/Berlin",
+    courts: [{ id: "33333333-3333-3333-3333-333333333333", number: 1, name: "Centre Court" }] });
+  vi.mocked(api.participations).mockResolvedValue({ items: [{
+    id: upcomingId, courtIds: ["33333333-3333-3333-3333-333333333333"],
+    startsAt: "2026-08-12T16:00:00Z", endsAt: "2026-08-12T17:00:00Z",
+    cardLabel: "Member booking", cardColor: "#176b55", status: "CONFIRMED",
+    access: { validFrom: "2026-08-12T15:45:00Z", validUntil: "2026-08-12T17:15:00Z",
+      codes: [{ accessPointName: "North gate", code: "135790" }] }
+  }], nextCursor: seriesId });
+
+  // when
+  render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} offline />);
+
+  // then
+  const participation = await screen.findByTestId(`participation-${upcomingId}`);
+  expect(within(participation).getByTestId("access-code"), "the door is where reception is worst").toHaveTextContent("North gate: 135790");
+  expect(within(participation).queryByTestId("withdraw-participation"), "offline, nothing is changed").not.toBeInTheDocument();
+  expect(screen.queryByTestId("load-more-participations"), "offline, only the cached page is there").not.toBeInTheDocument();
+});
+
+it("given no cached participations, when offline, then no empty participation list is claimed", async () => {
+  // given
+  vi.mocked(api.personalBookings).mockResolvedValue({ items: [], refreshedAt: "2026-08-11T10:30:00Z", timeZone: "Europe/Berlin" });
+  vi.mocked(api.participations).mockRejectedValue(new TypeError("Failed to fetch"));
+
+  // when
+  render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} offline />);
+
+  // then
+  expect(await screen.findByTestId("bookings-offline-as-of")).toBeInTheDocument();
+  expect(screen.queryByTestId("participations"), "an uncached list is not an empty one").not.toBeInTheDocument();
+  expect(screen.queryByRole("alert"), "a missing cached page is not a failure").not.toBeInTheDocument();
 });

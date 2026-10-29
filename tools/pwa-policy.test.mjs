@@ -298,6 +298,9 @@ test("given the installed PWA, when its lifecycle is qualified, then bounded boo
   assert.match(pwa, /court-plan-offline/);
   assert.match(pwa, /expectNoApiResponseInCache/);
   assert.match(viteConfiguration, /pathname === "\/api\/my\/bookings"/);
+  assert.match(viteConfiguration, /pathname === "\/api\/my\/participations"/,
+    "a player's code has to be readable at the door as much as a booker's");
+  assert.match(viteConfiguration, /access: booking\.access/, "the offline copy keeps the access codes it is read for");
   assert.match(viteConfiguration, /handler: "StaleWhileRevalidate"/);
   assert.match(viteConfiguration, /handler: "NetworkOnly"/);
 });

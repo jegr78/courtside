@@ -58,6 +58,8 @@ export function MyBookingsView({ now, offline = false }: {
       const cachedTimeZone = page.timeZone;
       if (cachedTimeZone) setGrid((current) => ({ ...(current ?? offlineBookingGrid()), timeZone: cachedTimeZone }));
       if (offline) {
+        const cachedParticipations = await api.participations().catch(() => undefined);
+        setParticipations(cachedParticipations?.items ?? []);
         clearLoad();
         return;
       }
@@ -218,14 +220,14 @@ export function MyBookingsView({ now, offline = false }: {
       left={(declined) => setSuccess(t(declined ? "myWaitlist.declined" : "myWaitlist.left"))} />}
     {!offline && !loading && grid && <OpenPlacesSection courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone}
       taken={async () => { await load(); setSuccess(t("openPlaces.taken")); }} />}
-    {!offline && !loading && grid && <ParticipationSection participations={participations} courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone} reference={reference} withdrawn={async () => { await load(); setSuccess(t("participations.withdrawn")); }} nextCursor={participationsNextCursor} loadingMore={loadingMore} loadMore={loadMoreParticipations} t={t} />}
+    {!loading && grid && (!offline || participations.length > 0) && <ParticipationSection participations={participations} courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone} reference={reference} actionable={!offline} withdrawn={async () => { await load(); setSuccess(t("participations.withdrawn")); }} nextCursor={offline ? undefined : participationsNextCursor} loadingMore={loadingMore} loadMore={loadMoreParticipations} t={t} />}
     {grid && action?.kind === "cancel" && <CancelDialog booking={action.booking} seriesBookings={bookings.filter((booking) => booking.seriesId === action.booking.seriesId && booking.status === "CONFIRMED")} incompleteSeries={nextCursor !== undefined} timeZone={grid.timeZone} closed={() => setAction(undefined)} completed={async () => { setAction(undefined); await load(); setSuccess(t("booking.cancelledSuccess")); }} />}
     {grid && action?.kind === "move" && <MoveDialog booking={action.booking} courts={courts} timeZone={grid.timeZone} maxBookingMinutes={maxBookingMinutes} closed={() => setAction(undefined)} completed={async () => { setAction(undefined); await load(); setSuccess(t("booking.moved")); }} />}
   </section>;
 }
 
-function ParticipationSection({ participations, courtNames, locale, timeZone, reference, withdrawn, nextCursor, loadingMore, loadMore, t }: {
-  participations: Participation[]; courtNames: Map<string, string>; locale: string; timeZone: string; reference: Date;
+function ParticipationSection({ participations, courtNames, locale, timeZone, reference, actionable, withdrawn, nextCursor, loadingMore, loadMore, t }: {
+  participations: Participation[]; courtNames: Map<string, string>; locale: string; timeZone: string; reference: Date; actionable: boolean;
   withdrawn: () => Promise<void>; nextCursor?: string; loadingMore: boolean;
   loadMore: () => Promise<void>; t: Translate;
 }) {
@@ -264,7 +266,7 @@ function ParticipationSection({ participations, courtNames, locale, timeZone, re
             <span data-testid="booking-card-label" className="text-muted text-sm">{participation.cardLabel}</span>
             {participation.access && <AccessCodes access={participation.access} reference={reference} locale={locale} timeZone={timeZone} t={t} />}
             {participation.status === "CANCELLED" ? <span>{t("myBookings.cancelled")}</span>
-              : <div className="pt-1">
+              : actionable && <div className="pt-1">
                 <Button variant="destructive" data-testid="withdraw-participation" data-booking-id={participation.id} className="px-3 py-2" disabled={leaving === participation.id} onClick={() => void withdraw(participation.id)}>{t("participations.withdraw")}</Button>
               </div>}
           </li>)}</ul>}

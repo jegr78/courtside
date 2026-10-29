@@ -320,7 +320,8 @@ When a court lies behind a door with a keypad and the booking type hands out acc
 bookings* shows the code of each access point you need beside the booking, with the time it works,
 usually from a quarter of an hour before play until a quarter of an hour after it. The confirmation
 and the reminder carry the same codes. Co-players with their own account see them under *Recorded as
-a co-player*. Once that time is over, the code disappears.
+a co-player*. In the installed app the codes stay there without a connection, as they were when you
+last opened the page online. Once that time is over, the code disappears.
 
 When the club changes a code or a new one starts to apply to your booking, Courtside sends the booker
 and every co-player with an account a message with the codes that apply now.
