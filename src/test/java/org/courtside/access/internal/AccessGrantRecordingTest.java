@@ -122,6 +122,7 @@ class AccessGrantRecordingTest {
         assertThat(recording).as("the delivered code must stay").isEqualTo(new Recording(CONTINUE, false));
         assertThat(grant.isRefused()).isTrue();
         assertThat(grant.getRejections()).isZero();
+        assertThat(grant.getNextAttemptAt()).as("the possibly wrong installation is revoked next pass").isEqualTo(LATER);
     }
 
     @Test
@@ -188,6 +189,7 @@ class AccessGrantRecordingTest {
         // then
         assertThat(recording.effect()).isEqualTo(CONTINUE);
         assertThat(grant.isRefused()).isTrue();
+        assertThat(grant.getNextAttemptAt()).as("what may be at the door is revoked next pass").isEqualTo(NOW);
         assertThat(grant.getLastFailure()).isEqualTo("keypad full");
         assertThat(grant.getRemote()).isEqualTo(RemoteState.MAYBE);
     }
@@ -243,6 +245,7 @@ class AccessGrantRecordingTest {
         // then
         assertThat(recording.effect()).isEqualTo(CONTINUE);
         assertThat(grant.isRefused()).isTrue();
+        assertThat(grant.getNextAttemptAt()).isEqualTo(NOW);
         assertThat(grant.getAttempts()).isOne();
     }
 

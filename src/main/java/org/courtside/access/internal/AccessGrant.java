@@ -237,6 +237,7 @@ public class AccessGrant {
                     replaceCode = true;
                 } else {
                     refused = true;
+                    nextAttemptAt = dbNow;
                 }
             }
             case GrantOutcome.RetryLater(Scope _, Instant notBefore, String reason) -> {
@@ -249,6 +250,7 @@ public class AccessGrant {
                 lastFailure = truncated(reason);
                 if (call.action().installs()) {
                     refused = true;
+                    nextAttemptAt = dbNow;
                 }
             }
         }
