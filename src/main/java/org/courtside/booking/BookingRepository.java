@@ -58,10 +58,13 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
               AND c.grants_access
               AND a.court_id IN (:courtIds)
               AND a.ends_at > :endedBefore
+              AND b.id > :after
             ORDER BY b.id
+            LIMIT :limit
             """, nativeQuery = true)
     List<UUID> findGrantingAccessOnCourtsEndingAfter(@Param("courtIds") Collection<UUID> courtIds,
-                                                     @Param("endedBefore") Instant endedBefore);
+                                                     @Param("endedBefore") Instant endedBefore,
+                                                     @Param("after") UUID after, @Param("limit") int limit);
 
     @Query(value = """
             SELECT DISTINCT b.id FROM booking b
@@ -72,11 +75,14 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
               AND b.card_id = :cardId
               AND a.court_id IN (:courtIds)
               AND a.ends_at > :endedBefore
+              AND b.id > :after
             ORDER BY b.id
+            LIMIT :limit
             """, nativeQuery = true)
     List<UUID> findOfCardOnCourtsEndingAfter(@Param("cardId") UUID cardId,
                                              @Param("courtIds") Collection<UUID> courtIds,
-                                             @Param("endedBefore") Instant endedBefore);
+                                             @Param("endedBefore") Instant endedBefore,
+                                             @Param("after") UUID after, @Param("limit") int limit);
 
     // The claim is the guard: whoever changes the row from null is the one that sends, so a second
     // sweep - or a second instance - finds nothing to do.

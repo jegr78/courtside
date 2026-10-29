@@ -19,11 +19,15 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.BiFunction;
 import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor
 class AccessCodeAnnouncements {
+
+    private static final int PAGE_SIZE = 100;
+    private static final UUID FIRST = new UUID(0, 0);
 
     private final BookingRepository bookings;
     private final FacilityService facility;
@@ -39,7 +43,8 @@ class AccessCodeAnnouncements {
         if (changed.courtIds().isEmpty()) {
             return;
         }
-        announce(bookings.findGrantingAccessOnCourtsEndingAfter(changed.courtIds(), windowStillOpenAfter()));
+        announce((endedBefore, after) -> bookings.findGrantingAccessOnCourtsEndingAfter(
+                changed.courtIds(), endedBefore, after, PAGE_SIZE));
     }
 
     @Async("closureAnnouncementExecutor")
@@ -51,14 +56,18 @@ class AccessCodeAnnouncements {
         if (courtsBehindACode.isEmpty()) {
             return;
         }
-        announce(bookings.findOfCardOnCourtsEndingAfter(granted.cardId(), courtsBehindACode, windowStillOpenAfter()));
+        announce((endedBefore, after) -> bookings.findOfCardOnCourtsEndingAfter(
+                granted.cardId(), courtsBehindACode, endedBefore, after, PAGE_SIZE));
     }
 
-    private Instant windowStillOpenAfter() {
-        return clock.instant().minus(policy.accessLag().toDuration());
-    }
-
-    private void announce(List<UUID> bookingIds) {
-        bookingIds.forEach(bookingId -> events.publishEvent(new BookingAccessCodeChanged(bookingId)));
+    private void announce(BiFunction<Instant, UUID, List<UUID>> page) {
+        Instant endedBefore = clock.instant().minus(policy.accessLag().toDuration());
+        UUID after = FIRST;
+        List<UUID> bookingIds;
+        do {
+            bookingIds = page.apply(endedBefore, after);
+            bookingIds.forEach(bookingId -> events.publishEvent(new BookingAccessCodeChanged(bookingId)));
+            after = bookingIds.isEmpty() ? after : bookingIds.getLast();
+        } while (bookingIds.size() == PAGE_SIZE);
     }
 }

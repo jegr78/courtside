@@ -39,20 +39,23 @@ public class AccessGrants {
     private final Clock clock;
 
     public Map<UUID, AnnouncedAccess> of(Collection<Booking> bookings) {
-        if (bookings.isEmpty()) {
+        List<Booking> confirmed = bookings.stream()
+                .filter(booking -> booking.getStatus() == BookingStatus.CONFIRMED).toList();
+        Set<UUID> granting = confirmed.stream().map(Booking::getCardId).distinct()
+                .filter(cardId -> cards.findCard(cardId).filter(BookingCard::isGrantsAccess).isPresent())
+                .collect(Collectors.toSet());
+        if (granting.isEmpty()) {
             return Map.of();
         }
         List<AccessPoint> accessPoints = facility.activeAccessPointsWithCodes();
         if (accessPoints.isEmpty()) {
             return Map.of();
         }
-        Set<UUID> granting = cards.allCards().stream().filter(BookingCard::isGrantsAccess)
-                .map(BookingCard::getId).collect(Collectors.toSet());
         Window window = new Window(policy.accessLead().minutes(),
                 policy.accessLag().minutes(), clock.instant());
         Map<UUID, AnnouncedAccess> grants = new HashMap<>();
-        for (Booking booking : bookings) {
-            if (booking.getStatus() == BookingStatus.CONFIRMED && granting.contains(booking.getCardId())) {
+        for (Booking booking : confirmed) {
+            if (granting.contains(booking.getCardId())) {
                 window.grantFor(booking, accessPoints).ifPresent(grant -> grants.put(booking.getId(), grant));
             }
         }

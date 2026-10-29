@@ -242,6 +242,28 @@ class AccessCodeMessageTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenMoreRemindedOccurrencesThanOnePage_whenTheCodeChanges_thenEveryOneIsAnnounced() {
+        // given
+        UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
+        UUID maryAccount = identity.createEnabledAccount(mary, "major.mary", Set.of(Role.ADMIN));
+        cards.letBookingsReceiveAccessCodes(TRAINING_CARD, true);
+        for (UUID court : courts.subList(0, 2)) {
+            bookingFixture.createSeries(court, TRAINING_CARD, LocalDate.of(2026, 5, 14), LocalTime.of(18, 0), 60,
+                    60, maryAccount, mary, Set.of(Role.ADMIN));
+        }
+        int reminded = jdbc.sql("UPDATE booking SET reminded_at = :at WHERE series_id IS NOT NULL")
+                .param("at", Instant.parse("2026-05-12T09:00:00Z").atOffset(ZoneOffset.UTC)).update();
+        assertThat(reminded).as("more occurrences than one page holds").isGreaterThan(100);
+
+        // when
+        facilityService.changeAccessPoint(northGate, "North gate", courts.subList(0, 2), NEW_CODE);
+
+        // then
+        assertThat(announcedBookings()).as("the walk goes on past its first page of 100").hasSize(reminded)
+                .doesNotHaveDuplicates();
+    }
+
+    @Test
     void givenAnAccessPointWhoseCodeIsRemoved_whenSaved_thenNobodyIsToldOfACode() {
         // given
         bookOnCourtTwo(janeAccount, jane, john);
