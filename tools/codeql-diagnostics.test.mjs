@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { annotation, extractionProblems, unextractedFiles } from "./codeql-diagnostics.mjs";
+import { annotation, extractionProblems, ignoredBy, unextractedFiles } from "./codeql-diagnostics.mjs";
 
 const recorded = JSON.parse(readFileSync(new URL("./codeql-diagnostics.fixture.json", import.meta.url), "utf8"));
 const tool = new URL("./codeql-diagnostics.mjs", import.meta.url).pathname;
@@ -193,4 +193,15 @@ test("given a repository checkout, when the tool runs with it, then a tracked so
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /^::warning file=src\/Skipped\.java,title=java\/unextracted-file::/m);
   assert.doesNotMatch(result.stdout, /lists no expected and extracted files/, "git supplied the expected list");
+});
+
+test("given the CodeQL configuration's ignored paths, when tracked files are compared, then an ignored file is not expected", () => {
+  // given
+  const ignored = ignoredBy(["frontend/coverage/**/*", "site/.vitepress/**"]);
+
+  // when / then
+  assert.equal(ignored("site/.vitepress/config.mts"), true, "CodeQL skips hidden folders, so the configuration names this one");
+  assert.equal(ignored("frontend/coverage/lcov-report/sorter.js"), true);
+  assert.equal(ignored("site/guide.md.ts"), false);
+  assert.equal(ignored("frontend/src/coverage.ts"), false, "a pattern matches whole path segments, not substrings");
 });

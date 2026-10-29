@@ -924,6 +924,7 @@ jobs:
           frontend/node/node tools/codeql-diagnostics.mjs
           --sarif build/security/codeql
           --repository .
+          --config .github/codeql/codeql-config.yml
           --output build/security/codeql-diagnostics.json
       - name: Compare security contracts and tool versions
         if: github.event_name == 'pull_request'

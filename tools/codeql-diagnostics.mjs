@@ -1,5 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { appendFileSync, existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -34,6 +35,17 @@ function notifiedFiles(sarif, suffix) {
         language: note.descriptor.id.split("/")[0],
         file: location.physicalLocation?.artifactLocation?.uri
       })))));
+}
+
+export function ignoredBy(patterns) {
+  const expressions = patterns.map((pattern) => new RegExp(`^${pattern.split("/").map((segment) => segment === "**" ? "(?:.*)"
+    : segment.replace(/[.+^${}()|[\]\\]/g, "\\$&").replaceAll("*", "[^/]*")).join("/").replaceAll("(?:.*)/", "(?:.*/)?")}$`));
+  return (file) => expressions.some((expression) => expression.test(file));
+}
+
+function configuredIgnores(path) {
+  const yaml = createRequire(new URL("../frontend/package.json", import.meta.url))("js-yaml");
+  return yaml.load(readFileSync(path, "utf8"))?.["paths-ignore"] ?? [];
 }
 
 const languageOf = (file) => /\.java$/.test(file) ? "java" : /\.(?:[cm]?[jt]s|[jt]sx)$/.test(file) ? "js" : null;
@@ -92,7 +104,9 @@ function main() {
   }
   const problems = documents.flatMap(extractionProblems);
   const repository = optional("--repository");
-  const expected = repository ? trackedFiles(repository) : null;
+  const config = optional("--config");
+  const ignored = ignoredBy(config ? configuredIgnores(config) : []);
+  const expected = repository ? trackedFiles(repository).filter((file) => !ignored(file)) : null;
   const unextracted = unextractedFiles({ runs: documents.flatMap((sarif) => sarif.runs ?? []) }, expected);
   const counted = {};
   for (const note of notifications) counted[note.descriptor?.id ?? "unknown"] = (counted[note.descriptor?.id ?? "unknown"] ?? 0) + 1;
