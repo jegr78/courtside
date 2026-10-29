@@ -30,7 +30,7 @@ test("given profile classification, when the pull request runs, then selected qu
     /backend:[\s\S]+name: Verify backend[\s\S]+\.\/mvnw -B --no-transfer-progress clean verify -Pjava-only/);
   assert.match(workflow, /docs:[\s\S]+name: Verify documentation[\s\S]+node tools\/docs-check\.mjs --check/);
   assert.match(workflow,
-    /docs:\n\s+needs: test-profile-plan\n\s+if: always\(\) && \(github\.event_name != 'pull_request' \|\| needs\.test-profile-plan\.outputs\.docs == 'true'\)/);
+    /docs:\n\s+needs: test-profile-plan\n\s+if: \$\{\{ !cancelled\(\) && \(github\.event_name != 'pull_request' \|\| needs\.test-profile-plan\.outputs\.docs == 'true'\)/);
   assert.match(workflow,
     /frontend:[\s\S]+name: Verify frontend[\s\S]+npm-cli\.js run lint[\s\S]+npm-cli\.js run test:frontend[\s\S]+npm-cli\.js run build/);
   assert.doesNotMatch(workflow, /frontend:[\s\S]+name: Run browser journeys/);
@@ -72,11 +72,11 @@ test("given a selected quality job, when it does not succeed, then the aggregate
 test("given reduced profiles, when jobs are scheduled, then only their conservative job set runs", () => {
   // when / then
   assert.match(workflow,
-    /backend:\n\s+name: backend-\$\{\{ strategy\.job-index \}\}\n\s+needs: test-profile-plan\n\s+if: always\(\) && \(github\.event_name != 'pull_request' \|\| needs\.test-profile-plan\.outputs\.backend == 'true'\)/);
+    /backend:\n\s+name: backend-\$\{\{ strategy\.job-index \}\}\n\s+needs: test-profile-plan\n\s+if: \$\{\{ !cancelled\(\) && \(github\.event_name != 'pull_request' \|\| needs\.test-profile-plan\.outputs\.backend == 'true'\)/);
   assert.match(workflow,
-    /frontend:\n\s+needs: test-profile-plan\n\s+if: always\(\) && \(github\.event_name != 'pull_request' \|\| needs\.test-profile-plan\.outputs\.frontend == 'true'\)/);
+    /frontend:\n\s+needs: test-profile-plan\n\s+if: \$\{\{ !cancelled\(\) && \(github\.event_name != 'pull_request' \|\| needs\.test-profile-plan\.outputs\.frontend == 'true'\)/);
   assert.match(workflow,
-    /security:\n\s+needs: \[test-profile-plan, dependency-graph\]\n\s+if: always\(\) && \(github\.event_name != 'pull_request' \|\| needs\.test-profile-plan\.outputs\.security == 'true'\)/);
+    /security:\n\s+needs: \[test-profile-plan, dependency-graph\]\n\s+if: \$\{\{ !cancelled\(\) && \(github\.event_name != 'pull_request' \|\| needs\.test-profile-plan\.outputs\.security == 'true'\)/);
   assert.match(workflow,
     /dependency-graph:\n\s+if: github\.event_name != 'pull_request' \|\| github\.event\.pull_request\.head\.repo\.full_name == github\.repository/);
   assert.match(workflow, /dependency-graph:[\s\S]+contents: write[\s\S]+dependency-snapshot\.mjs/);
@@ -112,7 +112,7 @@ test("given an unrecognised repository variable, when selecting coverage, then a
 test("given a profile plan, when the aggregate runs, then every selected and skipped job is explained", () => {
   // when / then
   assert.match(workflow, /name: Summarize selected build results/);
-  assert.match(workflow, /if: always\(\) && github\.event_name == 'pull_request'/);
+  assert.match(workflow, /if: \$\{\{ !cancelled\(\) && github\.event_name == 'pull_request'/);
   assert.match(workflow, /not selected by the conservative profile plan/);
   assert.match(workflow, /required by the conservative profile plan/);
 });
@@ -219,5 +219,22 @@ test("given the gates and the shifted clock, when the aggregate decides, then ea
     /push\|schedule\|workflow_dispatch\)[\s\S]+?test "\$GATES_IMAGE_RESULT" = skipped\s+test "\$GATES_RESULT" = skipped\s+if \[\[ "\$EVENT_NAME" = push \]\]; then\s+test "\$CLOCK_SHIFT_RESULT" = skipped\s+else\s+test "\$CLOCK_SHIFT_RESULT" = success\s+fi/,
     "the nightly path keeps its own registry gates and runs the shifted clock");
   assert.match(workflow,
-    /clock-shift:\n\s+needs: test-profile-plan\n\s+if: always\(\) && \(github\.event_name == 'schedule' \|\| github\.event_name == 'workflow_dispatch' \|\| \(github\.event_name == 'pull_request' && needs\.test-profile-plan\.outputs\.clock_shift == 'true'\)\)/);
+    /clock-shift:\n\s+needs: test-profile-plan\n\s+if: \$\{\{ !cancelled\(\) && \(github\.event_name == 'schedule' \|\| github\.event_name == 'workflow_dispatch' \|\| \(github\.event_name == 'pull_request' && needs\.test-profile-plan\.outputs\.clock_shift == 'true'\)\)/);
+});
+
+test("given a pull request's build, when a newer push cancels it, then every job doing work stops instead of holding the concurrency group", () => {
+  // given
+  const jobConditions = [...workflow.matchAll(/^  ([a-z0-9_-]+):\n(?:(?: {4}.*)?\n)*? {4}if: (.+)$/gm)]
+    .map(([, job, condition]) => ({ job, condition }));
+  const reportingOnly = ["build", "nightly-image", "release-gates", "nightly-release-evidence"];
+
+  // when
+  const working = jobConditions.filter(({ job }) => !reportingOnly.includes(job));
+
+  // then
+  assert.ok(working.some(({ job }) => job === "gates"), "the scan must reach the gates job");
+  for (const { job, condition } of working) {
+    assert.doesNotMatch(condition, /always\(\)/,
+      `${job} uses always(), which GitHub keeps running after a cancellation; use !cancelled()`);
+  }
 });
