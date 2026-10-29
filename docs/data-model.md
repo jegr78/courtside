@@ -90,6 +90,26 @@ is checked by the application, so a stored code survives a later change of that 
 `access_point_court` has one row per access point and court, and deleting an access point deletes
 its rows. Nothing deletes an access point: `active` retires it.
 
+## Access grants
+
+| Table | Holds | References |
+|---|---|---|
+| `access_grant` | One booking's dynamic access: the demand last derived for it and what the access-control system last answered | None |
+| `access_code` | Every dynamic access code in use, whether a grant holds it or it waits for its last window to end | `access_grant` |
+
+`access_grant.booking_id` is unique (`access_grant_one_per_booking`) and carries no foreign key to
+`booking`, so the access module never constrains what the booking module does with its rows. Nothing
+deletes a grant. `remote` is
+`NONE`, `MAYBE` or `INSTALLED` (`access_grant_remote_known`). `want_points` and `remote_points` are
+arrays of access point ids rather than references, because `remote_points` records what was sent and
+must not follow a later change of the configuration.
+
+`access_code.code` is the primary key, so a code is drawn by inserting it and a second grant can never
+hold a code that is still in use. It has four to eight digits (`access_code_digits`). A row with a
+`grant_id` is that grant's current code, at most one per grant (`access_code_one_per_grant`), and carries
+no `until` (`access_code_held_only_when_detached`). A row without one is held until `until` and deleted
+afterwards, or at once when `until` is null.
+
 ## Cards
 
 | Table | Holds | References |

@@ -82,6 +82,21 @@ class EnumeratedColumnInListPatternTest {
                 .isEqualTo(expected);
     }
 
+    @Test
+    void whenReadingTheAccessGrantRemoteInList_thenItAcceptsExactlyTheRemoteStateEnumConstants()
+            throws IOException, ReflectiveOperationException {
+        // given
+        String expected = enumValuesOf("org.courtside.access.internal.RemoteState");
+
+        // when
+        String actual = latestSqlInListValues("access_grant_remote_known", "remote");
+
+        // then
+        assertThat(actual)
+                .as("access_grant_remote_known has drifted from org.courtside.access.internal.RemoteState")
+                .isEqualTo(expected);
+    }
+
     private static String enumValuesOf(String className) throws ReflectiveOperationException {
         Class<?> type = Class.forName(className);
         return Arrays.stream(type.getEnumConstants())

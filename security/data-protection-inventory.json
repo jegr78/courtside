@@ -265,7 +265,9 @@
     "mfa-ceremony": "A five-minute ceremony refuses expired proofs. Consumption removes it; a new ceremony replaces its session/purpose predecessor and deletes expired ceremonies for that account. Per-purpose limits bound remaining rows; account deletion cascades.",
     "mfa-instance-key": "The installation UUID and encrypted key check live with the instance database. Rotation retains the installation binding; removing a person does not remove instance key state.",
     "mfa-credential": "Removed by its holder, MFA disablement, successful controlled recovery or account deletion. Labels and usage metadata remain private to the holder while the credential exists.",
-    "mfa-controlled-recovery": "Replaced by a new rescue, invalidated by address correction and removed by successful redemption or account deletion. Expiry denies redemption and retains the recovery block until a new rescue completes."
+    "mfa-controlled-recovery": "Replaced by a new rescue, invalidated by address correction and removed by successful redemption or account deletion. Expiry denies redemption and retains the recovery block until a new rescue completes.",
+    "access-grant": "Kept for as long as its booking: the row is never deleted, holds what the access pass last derived and what the access-control system answered, and names a person only through the booking.",
+    "access-code": "A grant's current code is detached once no door can accept it any more and the detached row is deleted by the access pass when its hold ends, which is the latest window any install asked for."
   },
   "inMemoryState": {
     "AuditAdminController": {
@@ -484,6 +486,110 @@
     }
   },
   "storedFields": {
+    "access_code": {
+      "code": {
+        "level": "operational",
+        "lifecycle": "access-code"
+      },
+      "grant_id": {
+        "level": "operational",
+        "lifecycle": "access-code"
+      },
+      "until": {
+        "level": "operational",
+        "lifecycle": "access-code"
+      }
+    },
+    "access_grant": {
+      "attempts": {
+        "level": "operational",
+        "lifecycle": "access-grant"
+      },
+      "booking_id": {
+        "level": "operational",
+        "lifecycle": "access-grant"
+      },
+      "exposed_until": {
+        "level": "operational",
+        "lifecycle": "access-grant"
+      },
+      "external_reference": {
+        "level": "operational",
+        "lifecycle": "access-grant"
+      },
+      "first_accepted_at": {
+        "level": "operational",
+        "lifecycle": "access-grant"
+      },
+      "id": {
+        "level": "operational",
+        "lifecycle": "access-grant"
+      },
+      "last_failure": {
+        "level": "operational",
+        "lifecycle": "access-grant"
+      },
+      "last_install_sent_at": {
+        "level": "operational",
+        "lifecycle": "access-grant"
+      },
+      "next_attempt_at": {
+        "level": "operational",
+        "lifecycle": "access-grant"
+      },
+      "refused": {
+        "level": "operational",
+        "lifecycle": "access-grant"
+      },
+      "rejections": {
+        "level": "operational",
+        "lifecycle": "access-grant"
+      },
+      "remote": {
+        "level": "operational",
+        "lifecycle": "access-grant"
+      },
+      "remote_from": {
+        "level": "operational",
+        "lifecycle": "access-grant"
+      },
+      "remote_mapping": {
+        "level": "operational",
+        "lifecycle": "access-grant"
+      },
+      "remote_points": {
+        "level": "operational",
+        "lifecycle": "access-grant"
+      },
+      "remote_until": {
+        "level": "operational",
+        "lifecycle": "access-grant"
+      },
+      "retry_requested_at": {
+        "level": "operational",
+        "lifecycle": "access-grant"
+      },
+      "want_from": {
+        "level": "operational",
+        "lifecycle": "access-grant"
+      },
+      "want_mapping": {
+        "level": "operational",
+        "lifecycle": "access-grant"
+      },
+      "want_points": {
+        "level": "operational",
+        "lifecycle": "access-grant"
+      },
+      "want_until": {
+        "level": "operational",
+        "lifecycle": "access-grant"
+      },
+      "wanted": {
+        "level": "operational",
+        "lifecycle": "access-grant"
+      }
+    },
     "access_point": {
       "active": {
         "level": "operational",

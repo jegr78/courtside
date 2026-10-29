@@ -33,6 +33,18 @@ class ModularityTests {
         assertThat(allowedDependenciesOf(notification)).contains("identity");
     }
 
+    @Test
+    void givenAccessGrantsFollowBookings_whenTheDeclarationsAreRead_thenBookingDoesNotDeclareAccess() {
+        // when
+        ApplicationModule booking = declaring("booking");
+
+        // then
+        assertThat(modules.getModuleByName("access")).isPresent();
+        assertThat(allowedDependenciesOf(booking))
+                .as("booking is the core; access reacts to it and is never called by it")
+                .doesNotContain("access");
+    }
+
     private ApplicationModule declaring(String name) {
         return modules.getModuleByName(name).orElseThrow();
     }
