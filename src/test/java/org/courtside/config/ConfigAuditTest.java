@@ -64,6 +64,22 @@ class ConfigAuditTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenTheConfiguration_whenTheAccessSettingsChange_thenTheEventNamesEachChangedField() {
+        // given
+        ClubConfigurationSnapshot current = config.current();
+
+        // when
+        config.update(withAccess(current, new AccessLeadTime(30), new AccessLagTime(current.accessLagMinutes()),
+                new AccessCodeLength(4)));
+
+        // then
+        assertThat(latestPayloadOf(ConfigEvent.ClubChanged.TYPE))
+                .containsEntry("changedFields", List.of("accessLeadMinutes", "accessCodeLength"));
+        assertThat(config.accessLead()).isEqualTo(new AccessLeadTime(30));
+        assertThat(config.accessCodeLength()).isEqualTo(new AccessCodeLength(4));
+    }
+
+    @Test
     void givenTheConfiguration_whenOnlyThePrivacyLinkChanges_thenTheEventNamesTheFieldAndNoValue() {
         // given
         ClubConfigurationSnapshot current = config.current();
@@ -226,7 +242,7 @@ class ConfigAuditTest extends AbstractIntegrationTest {
                 current.timeZone(), new CredentialLifetime(current.newAccountCredentialHours()),
                 new CredentialLifetime(current.passwordResetCredentialHours()),
                 new ResetTokenLifetime(60), new ReminderLeadTime(current.bookingReminderHours()),
-                current.noMembershipTypeRuleSetId(), null);
+                current.noMembershipTypeRuleSetId(), null, null, null, null);
     }
 
     private static ChangeClubConfigurationCommand withDocumentationUrl(
@@ -238,7 +254,20 @@ class ConfigAuditTest extends AbstractIntegrationTest {
                 new CredentialLifetime(current.newAccountCredentialHours()),
                 new CredentialLifetime(current.passwordResetCredentialHours()),
                 new ResetTokenLifetime(60), new ReminderLeadTime(current.bookingReminderHours()),
-                current.noMembershipTypeRuleSetId(), null);
+                current.noMembershipTypeRuleSetId(), null, null, null, null);
+    }
+
+    private static ChangeClubConfigurationCommand withAccess(ClubConfigurationSnapshot current,
+                                                             AccessLeadTime lead, AccessLagTime lag,
+                                                             AccessCodeLength length) {
+        return new ChangeClubConfigurationCommand(current.clubName(), current.primaryColor(),
+                current.accentColor(), current.logoFallbackUrl(), current.imprintUrl(),
+                current.privacyUrl(), current.documentationUrl(), current.shortName(), current.defaultLocale(),
+                new BookingSlotDuration(current.slotMinutes()), current.timeZone(),
+                new CredentialLifetime(current.newAccountCredentialHours()),
+                new CredentialLifetime(current.passwordResetCredentialHours()),
+                new ResetTokenLifetime(60), new ReminderLeadTime(current.bookingReminderHours()),
+                current.noMembershipTypeRuleSetId(), null, lead, lag, length);
     }
 
     private static ChangeClubConfigurationCommand withShortName(
@@ -250,7 +279,7 @@ class ConfigAuditTest extends AbstractIntegrationTest {
                 new CredentialLifetime(current.newAccountCredentialHours()),
                 new CredentialLifetime(current.passwordResetCredentialHours()),
                 new ResetTokenLifetime(60), new ReminderLeadTime(current.bookingReminderHours()),
-                current.noMembershipTypeRuleSetId(), null);
+                current.noMembershipTypeRuleSetId(), null, null, null, null);
     }
 
     private static ChangeClubConfigurationCommand change(ClubConfigurationSnapshot current, String clubName,
@@ -268,6 +297,6 @@ class ConfigAuditTest extends AbstractIntegrationTest {
                 new BookingSlotDuration(minutes), timeZone,
                 new CredentialLifetime(current.newAccountCredentialHours()),
                 new CredentialLifetime(current.passwordResetCredentialHours()), new ResetTokenLifetime(60), new ReminderLeadTime(24),
-                noMembershipTypeRuleSetId, null);
+                noMembershipTypeRuleSetId, null, null, null, null);
     }
 }

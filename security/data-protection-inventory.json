@@ -484,6 +484,34 @@
     }
   },
   "storedFields": {
+    "access_point": {
+      "active": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "id": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "name": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "static_code": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      }
+    },
+    "access_point_court": {
+      "access_point_id": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "court_id": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      }
+    },
     "account_mfa": {
       "account_id": {
         "level": "pseudonymous",
@@ -664,6 +692,10 @@
         "lifecycle": "club-configuration"
       },
       "counts_against_limits": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "grants_access": {
         "level": "operational",
         "lifecycle": "club-configuration"
       },
@@ -916,6 +948,18 @@
         "lifecycle": "club-configuration"
       },
       "waitlist_offer_minutes": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "access_code_length": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "access_lag_minutes": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "access_lead_minutes": {
         "level": "operational",
         "lifecycle": "club-configuration"
       }

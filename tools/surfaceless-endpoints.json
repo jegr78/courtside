@@ -5,6 +5,7 @@
   "getAppIcon": "The browser fetches the PNG icons through the manifest and the apple-touch-icon link when it installs the app, so no view calls it.",
   "listOpeningHours": "BookingGrid already carries the opening hours and WeekView reads them from there, so a second call would fetch what the page already holds.",
   "getCourt": "The admin list already answers with every field of every one of these, active or not, so a second call would fetch what the page is already holding.",
+  "getAccessPoint": "The admin list already answers with every field of every one of these, active or not, so a second call would fetch what the page is already holding.",
   "getBookingCard": "The admin list already answers with every field of every one of these, active or not, so a second call would fetch what the page is already holding.",
   "getParticipantCard": "The admin list already answers with every field of every one of these, active or not, so a second call would fetch what the page is already holding.",
   "getRuleSet": "The admin list already answers with every field of every rule set, active or not, so a second call would fetch what the page is already holding."

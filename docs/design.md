@@ -143,7 +143,7 @@ as one application process and uses PostgreSQL 18.
 | `card` | Booking and participant card configuration |
 | `config` | Club identity, time zone, language and grid configuration |
 | `dataexchange` | Imports, exports and subject-access responses |
-| `facility` | Courts and opening hours |
+| `facility` | Courts, access points and opening hours |
 | `identity` | People, accounts, roles, credentials and sessions |
 | `member` | Membership types, memberships and roster administration |
 | `notification` | Notification centre, email creation, delivery state and preferences |
@@ -272,7 +272,10 @@ participant list and one entry in booking views.
 ### Cards and participant slots
 
 A booking card controls its name and colour, allowed player counts, guest use, whether it counts
-toward limits, booking roles and managing roles.
+toward limits, booking roles, managing roles and whether its bookings receive access codes. That
+last attribute, `grantsAccess`, is off by default and never on for the closure card: `CardService`
+refuses it with `card.closure.grantsNoAccess`, and the `booking_card_closure_grants_no_access` CHECK
+refuses it below the service.
 
 An empty booking-role set permits every authenticated member account. An empty managing-role set
 permits only the owner and administrators to manage the booking. Managing roles never inherit from
@@ -402,6 +405,15 @@ managed-booking view and the series form only on those grounds; an administrator
 
 A member recorded as a participant receives a message and may remove themselves without the
 booker's approval. Removing one participant does not cancel the booking.
+
+A confirmed booking whose card grants access carries the static codes of every active access point
+that serves one of its courts, with a validity window from its start less the club's access lead to
+its end plus the access lag. The booker's own bookings, a granted guardian's view of a dependant's
+bookings and a player's own participations carry them; the managed-booking view, the public plan,
+admin views and anybody outside the booking never do. A response carries a code only while the
+window has not ended. The installed app keeps the first page of the member's upcoming bookings and of
+their participations offline, codes included, and drops a code from a cached page once its window
+has ended.
 
 ### Waitlist
 
@@ -543,6 +555,22 @@ answers the same question for an entry before it is stored, and the availability
 count while the board edits an entry, saying nothing while the count is zero. Utilisation
 counts open time from the hours that governed each day and does not subtract court closures from
 capacity.
+
+Access points are the doors and gates between the players and the courts. A board names each one,
+picks the courts it leads to, several courts sharing one and one court served by several, and may
+keep the static access code its keypad accepts. A PUT replaces every field, the courts and the code
+included, and an active flag takes an access point out of use without losing it. A code is digits
+only. A new or changed code has exactly the club's access code length, which `FacilityService`
+checks where the code is stored and refuses with `facility.accessPoint.codeLength`; a code stored
+before the length changed keeps working. The admin projection under `/api/admin/access-points` is
+the only administrative response that carries a code. The audit entries of an access point name its
+id, its courts and the fields that changed, never a code, and no error message or log line carries
+one either.
+
+The configuration holds three access settings beside the deadlines: how many minutes before a
+booking starts and after it ends its access code works, 0 to 240 and 15 by default each, and the
+length of a static access code, 4 to 8 digits and 6 by default. A request that leaves one out keeps
+its stored value. A board edits them on the access points page.
 
 Grid changes are refused when active or future bookings, or the opening hours, seasons and holidays
 in force today or scheduled after it, no longer align. Time-zone changes are refused while a confirmed booking has not
@@ -841,9 +869,35 @@ message is composed, a stored wording is checked again with the same rules and t
 parser; a wording that fails that check or cannot be filled is skipped, and the shipped wording goes
 out instead, so no message, a security message least of all, is lost to a club's wording.
 
+The confirmation and the reminder carry `{accessCodes}`: the window and the code of each access point
+the booking needs, read when the message is written and filled only for a recipient who is still the
+booker or a player at that moment; an `ACCESS_CODE_CHANGED` notice for anybody else fails as
+`NotInBooking`. Without a code the placeholder's line disappears,
+so such a mail reads exactly as it did before access points existed. A club's own wording that lacks
+the placeholder gets the block when there is one: above the link when the wording ends with a line
+holding only `{instanceLink}`, at its end otherwise. Like a credential, the codes may not
+appear in a subject and stand apart from links in the body.
+
+A code that newly reaches a booking is announced as `ACCESS_CODE_CHANGED`. That happens when a board
+changes the static code of an active access point, creates an access point with a code, adds a court
+to an active access point with a code, reactivates an access point that has a code, or switches a
+card to grant access. Adding a court announces to the added court's bookings only, and switching a
+card announces to that card's bookings behind an active access point with a code only. Each covers
+every confirmed booking on those courts whose card grants access, whose window has not ended and
+which already handed a code out, once to its booker and once to every player with an account, the
+audience of the reminder. A single booking handed it out with its confirmation and a series
+occurrence only with its reminder, so an occurrence not yet reminded is not told and its reminder
+carries the current code. The notice must keep `{accessCodes}` and carries the code current when it
+is sent. Removing a code or a court, deactivating an access point, switching a card's access off and
+any change to an inactive access point or one without a code announce nothing. The chain runs
+through `shared` events, `facility.accessPoint.codeChanged` or `card.bookingCard.accessGranted` and
+then `booking.booking.accessCodeChanged`, so `notification` gains no dependency on `facility` or
+`card`.
+
 Current messages cover the welcome for a new account, generated credentials, password-reset codes, username reminders, booking
 confirmations, participant additions and withdrawals, displaced bookings, upcoming reminders,
-booking cancellations, bookings freed without a check-in, new series, waitlist offers and a taken open place. A series sends no confirmation per occurrence. Its holder
+booking cancellations, bookings freed without a check-in, new series, waitlist offers, a taken open place
+and a changed access code. A series sends no confirmation per occurrence. Its holder
 receives one summary naming the card, weekdays, time, courts, first and last date and the number of
 occurrences, and its centre entry leads to the first occurrence. Displacement informs people but
 does not cancel the booking.
@@ -861,7 +915,7 @@ reminder has no request to derive it from. Only an absolute `https://` address w
 or credentials is accepted, and anything else refuses startup. Without the setting, every message
 goes out without a link. A template line holding nothing but an empty link is dropped, and inside a
 sentence the link renders empty. Confirmation, participant addition and withdrawal, displacement,
-reminder and both messages about a taken open place lead to the booking on
+reminder, both messages about a taken open place and a changed access code lead to the booking on
 `/my-bookings#booking-<id>`. Cancellations, cancellations by the
 club and series messages lead to `/my-bookings`. A waitlist offer leads to its entry on
 `/my-bookings#waitlist-<id>`, where the member takes it. The welcome leads to the start page `/`. The confirmation's calendar entry carries
@@ -1051,7 +1105,7 @@ member numbers use bodies. Random internal identifiers may remain in authorized 
 their boundary is recorded in `security-risks.md`.
 
 The audit log stores identifiers, event types, actors and non-personal change descriptions. It does
-not copy names, addresses, credentials or free text. Erasing the referenced person removes the link
+not copy names, addresses, credentials, static access codes or free text. Erasing the referenced person removes the link
 without rewriting the append-only event.
 
 A board keeps two categories of record for a number of months it chooses, and a category without a

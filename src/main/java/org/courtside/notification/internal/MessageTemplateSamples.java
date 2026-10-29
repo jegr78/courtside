@@ -46,6 +46,10 @@ final class MessageTemplateSamples {
         values.put("card", german ? "Mitgliederbuchung" : "Member booking");
         values.put("closure", MailTemplates.shipped("booking.displaced.court", locale));
         values.put("reason", MailTemplates.shipped("booking.cancellationReason.WEATHER", locale));
+        values.put(BookingWording.ACCESS_CODES, MailTemplates.fill("booking.access.heading",
+                MailTemplates.shipped("booking.access.heading", locale), Map.of("validFrom", "17:45", "validUntil", "19:15"))
+                + "\n" + MailTemplates.fill("booking.access.code", MailTemplates.shipped("booking.access.code", locale),
+                Map.of("accessPoint", german ? "Nordtor" : "North gate", "accessCode", "246810")));
         values.put(InstanceLinks.PLACEHOLDER, "https://courts.example.org/my-bookings");
         return values;
     }

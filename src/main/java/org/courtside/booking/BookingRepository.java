@@ -47,6 +47,43 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
             """, nativeQuery = true)
     List<UUID> findDueForReminder(@Param("now") Instant now, @Param("leadHours") int leadHours);
 
+    // A series occurrence learns its codes from its reminder, so until that went out nobody holds one to replace.
+    @Query(value = """
+            SELECT DISTINCT b.id FROM booking b
+            JOIN court_allocation a ON a.booking_id = b.id
+            JOIN booking_card c ON c.id = b.card_id
+            WHERE b.status = 'CONFIRMED'
+              AND (b.series_id IS NULL OR b.reminded_at IS NOT NULL)
+              AND a.status = 'CONFIRMED'
+              AND c.grants_access
+              AND a.court_id IN (:courtIds)
+              AND a.ends_at > :endedBefore
+              AND b.id > :after
+            ORDER BY b.id
+            LIMIT :limit
+            """, nativeQuery = true)
+    List<UUID> findGrantingAccessOnCourtsEndingAfter(@Param("courtIds") Collection<UUID> courtIds,
+                                                     @Param("endedBefore") Instant endedBefore,
+                                                     @Param("after") UUID after, @Param("limit") int limit);
+
+    @Query(value = """
+            SELECT DISTINCT b.id FROM booking b
+            JOIN court_allocation a ON a.booking_id = b.id
+            WHERE b.status = 'CONFIRMED'
+              AND (b.series_id IS NULL OR b.reminded_at IS NOT NULL)
+              AND a.status = 'CONFIRMED'
+              AND b.card_id = :cardId
+              AND a.court_id IN (:courtIds)
+              AND a.ends_at > :endedBefore
+              AND b.id > :after
+            ORDER BY b.id
+            LIMIT :limit
+            """, nativeQuery = true)
+    List<UUID> findOfCardOnCourtsEndingAfter(@Param("cardId") UUID cardId,
+                                             @Param("courtIds") Collection<UUID> courtIds,
+                                             @Param("endedBefore") Instant endedBefore,
+                                             @Param("after") UUID after, @Param("limit") int limit);
+
     // The claim is the guard: whoever changes the row from null is the one that sends, so a second
     // sweep - or a second instance - finds nothing to do.
     @Modifying(clearAutomatically = true, flushAutomatically = true)

@@ -50,6 +50,7 @@ class SpaConfiguration {
             "/admin/message-wording",
             "/admin/facility",
             "/admin/facility/courts",
+            "/admin/facility/access-points",
             "/admin/facility/opening-hours",
             "/admin/facility/opening-hours/exceptions",
             "/admin/facility/booking-cards",

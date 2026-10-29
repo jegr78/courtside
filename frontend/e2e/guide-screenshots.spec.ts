@@ -91,6 +91,11 @@ const drivers: Record<string, (page: Page, visualDate: string) => Promise<void>>
     await expect(page.getByTestId("withdraw-open-place").first()).toBeVisible({ timeout: 10_000 });
     await page.evaluate(() => window.scrollTo(0, 0));
   },
+  "access-codes": async (page) => {
+    await page.getByTestId("my-bookings-link").click();
+    await expect(page.getByTestId("upcoming-bookings")).toBeVisible();
+    await expect(page.getByTestId("access-code")).toHaveCount(1);
+  },
   "participations": async (page) => {
     await expect(page.getByTestId("participations")).toBeVisible();
   },
@@ -171,6 +176,15 @@ const drivers: Record<string, (page: Page, visualDate: string) => Promise<void>>
   "courts": async (page) => {
     await page.getByTestId("admin-courts-link").click();
     await expect(page.getByTestId("create-court")).toBeVisible();
+  },
+  "access-points": async (page) => {
+    await page.getByTestId("admin-access-points-link").click();
+    await expect(page.getByTestId("create-access-point")).toBeEnabled();
+    await page.getByTestId("new-access-point-name").fill("North gate");
+    await page.locator('[data-testid^="new-access-point-court-"]').first().check();
+    await page.getByTestId("new-access-point-code").fill("135790");
+    await page.getByTestId("create-access-point").click();
+    await expect(page.locator('[data-testid^="access-point-name-"]')).toHaveText(["North gate"]);
   },
   // Winter hours scheduled ahead, so the guide shows the week list and a week that has not started.
   "opening-hours": async (page) => {
@@ -320,6 +334,21 @@ test("every surface a booking passes through is captured", async ({ page, journe
   await capture(page, "participations", journeyService.visualDate);
 });
 
+test("the access code a member receives with a booking is captured", async ({ page, journeyService }, info) => {
+  // given
+  await prepare(page, localeOf(info));
+  await signIn(page, "doe.jane", "court-plan-view");
+  const cardId = await bookCourtThree(page, journeyService.visualDate);
+  await signOut(page);
+  await signIn(page, "configuration-admin", "court-plan-view");
+  await grantAccessThroughNorthGate(page, cardId);
+  await signOut(page);
+  await signIn(page, "doe.jane", "court-plan-view");
+
+  // when / then
+  await capture(page, "access-codes", journeyService.visualDate);
+});
+
 test("the waitlist a member joins for a taken court is captured", async ({ page, journeyService }, info) => {
   // given
   await prepare(page, localeOf(info));
@@ -391,6 +420,7 @@ test("every surface the facility is described on is captured", async ({ page, jo
 
   // when / then
   await capture(page, "courts", journeyService.visualDate);
+  await capture(page, "access-points", journeyService.visualDate);
   await capture(page, "opening-hours", journeyService.visualDate);
   await capture(page, "availability", journeyService.visualDate);
   await capture(page, "booking-card", journeyService.visualDate);
@@ -487,6 +517,45 @@ async function signIn(page: Page, username: string, landing: string): Promise<vo
   await page.getByTestId("password").fill("temporary-password");
   await page.getByTestId("login-submit").click();
   await expect(page.getByTestId(landing)).toBeVisible();
+}
+
+async function signOut(page: Page): Promise<void> {
+  await page.getByTestId("preferences-menu").click();
+  await page.getByTestId("logout").click();
+  await expect(page.getByTestId("login-view").or(page.getByTestId("court-plan-view"))).toBeVisible();
+}
+
+// Court 3 carries no other booking of this member, so the code reaches exactly one booking.
+async function bookCourtThree(page: Page, visualDate: string): Promise<string> {
+  await selectVisualDate(page, visualDate);
+  await page.locator('[data-testid="free-slot"][data-court-number="3"][data-slot="15:00"]').click();
+  await expect(page.getByTestId("booking-dialog")).toBeVisible();
+  const cardId = await page.getByTestId("booking-card").inputValue();
+  await page.getByTestId("member-search").fill("Mary");
+  await page.getByTestId("member-match").click();
+  await page.getByTestId("booking-submit").click();
+  await expect(page.getByTestId("booking-dialog")).toHaveCount(0);
+  return cardId;
+}
+
+async function grantAccessThroughNorthGate(page: Page, cardId: string): Promise<void> {
+  await page.getByTestId("administration-link").click();
+  await page.getByTestId("admin-access-points-link").click();
+  await expect(page.getByTestId("create-access-point")).toBeEnabled();
+  const courts = await page.evaluate(async () =>
+    (await fetch("/api/admin/courts")).json() as Promise<{ id: string; number: number }[]>);
+  const courtThree = courts.find((court) => court.number === 3);
+  if (courtThree === undefined) throw new Error("The journey club has no court 3");
+  await page.getByTestId("new-access-point-name").fill("North gate");
+  await page.getByTestId(`new-access-point-court-${courtThree.id}`).check();
+  await page.getByTestId("new-access-point-code").fill("135790");
+  await page.getByTestId("create-access-point").click();
+  await expect(page.locator('[data-testid^="access-point-name-"]')).toHaveText(["North gate"]);
+  await page.getByTestId("admin-booking-cards-link").click();
+  await page.getByTestId(`card-link-${cardId}`).click();
+  await page.getByTestId("card-grants-access").check();
+  await page.getByTestId("save-card").click();
+  await expect(page.getByTestId("admin-save-success")).toBeVisible();
 }
 
 async function selectVisualDate(page: Page, date: string): Promise<void> {

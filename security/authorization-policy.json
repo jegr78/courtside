@@ -2,9 +2,9 @@
   "schemaVersion": 1,
   "reviewedAt": "2026-10-28",
   "purpose": "This is the normative authorization policy for the shipped Courtside API. OpenAPI defines the transport shape; this policy defines who may perform each operation, which resource attributes narrow that permission, and which protected fields each projection may read or write.",
-  "openApiFieldInventorySha256": "afe93b1ca02fac3319844c49300cbe077bbfa3b8a6f8ae8bec2ddea36f36f8d4",
-  "protectedFieldInventorySha256": "7e50ec306adc1d5975ac22e6d37452ab356c3cac585cd2679461c06ed79e59a8",
-  "productionAuthorizationSha256": "4bfc90879f5efe7ec81edf0706c9ba6acc7da47dd919cf3f7ec7c50fec1dd621",
+  "openApiFieldInventorySha256": "7882d2c0e3c24bafb865bd82bafc48579bda95e3be2ea532fcedcb59d4cf28e5",
+  "protectedFieldInventorySha256": "ab87aebbb3355c9141843c731f3b660598accdc25b8b357438293e44cbf175f8",
+  "productionAuthorizationSha256": "2bd3403475b0e2ca6ef6209f461181e8660d6c7185eb54ea18661b25886a68be",
   "ordinaryFields": [
     "Problem.detail",
     "Problem.fieldErrors",
@@ -166,6 +166,22 @@
     "cancelSeries:response:Violation.code",
     "cancelSeries:response:Violation.params",
     "cancelSeries:response:Violation.params.*",
+    "changeAccessPoint:parameter:$parameter.path.id",
+    "changeAccessPoint:request:AccessPointRequest.courtIds",
+    "changeAccessPoint:request:AccessPointRequest.name",
+    "changeAccessPoint:response:$response.header.Accept",
+    "changeAccessPoint:response:$response.header.Retry-After",
+    "changeAccessPoint:response:AccessPoint.active",
+    "changeAccessPoint:response:AccessPoint.courtIds",
+    "changeAccessPoint:response:AccessPoint.id",
+    "changeAccessPoint:response:AccessPoint.name",
+    "changeAccessPoint:response:FieldError.code",
+    "changeAccessPoint:response:FieldError.field",
+    "changeAccessPoint:response:FieldError.params",
+    "changeAccessPoint:response:FieldError.params.*",
+    "changeAccessPoint:response:Violation.code",
+    "changeAccessPoint:response:Violation.params",
+    "changeAccessPoint:response:Violation.params.*",
     "changeAccountLocale:parameter:$parameter.path.personId",
     "changeAccountLocale:request:AccountLocaleRequest.locale",
     "changeAccountLocale:response:$response.header.Accept",
@@ -215,6 +231,7 @@
     "changeBookingCard:request:BookingCardRequest.allowedRoles",
     "changeBookingCard:request:BookingCardRequest.color",
     "changeBookingCard:request:BookingCardRequest.countsAgainstLimits",
+    "changeBookingCard:request:BookingCardRequest.grantsAccess",
     "changeBookingCard:request:BookingCardRequest.guestAllowed",
     "changeBookingCard:request:BookingCardRequest.label",
     "changeBookingCard:request:BookingCardRequest.managingRoles",
@@ -226,6 +243,7 @@
     "changeBookingCard:response:BookingCard.allowedRoles",
     "changeBookingCard:response:BookingCard.color",
     "changeBookingCard:response:BookingCard.countsAgainstLimits",
+    "changeBookingCard:response:BookingCard.grantsAccess",
     "changeBookingCard:response:BookingCard.guestAllowed",
     "changeBookingCard:response:BookingCard.id",
     "changeBookingCard:response:BookingCard.label",
@@ -240,6 +258,9 @@
     "changeBookingCard:response:Violation.params",
     "changeBookingCard:response:Violation.params.*",
     "changeClubConfig:request:ClubConfigRequest.accentColor",
+    "changeClubConfig:request:ClubConfigRequest.accessCodeLength",
+    "changeClubConfig:request:ClubConfigRequest.accessLagMinutes",
+    "changeClubConfig:request:ClubConfigRequest.accessLeadMinutes",
     "changeClubConfig:request:ClubConfigRequest.clubName",
     "changeClubConfig:request:ClubConfigRequest.defaultLocale",
     "changeClubConfig:request:ClubConfigRequest.documentationUrl",
@@ -254,6 +275,9 @@
     "changeClubConfig:request:ClubConfigRequest.waitlistOfferMinutes",
     "changeClubConfig:response:$response.header.Accept",
     "changeClubConfig:response:$response.header.Retry-After",
+    "changeClubConfig:response:AdminClubConfig.accessCodeLength",
+    "changeClubConfig:response:AdminClubConfig.accessLagMinutes",
+    "changeClubConfig:response:AdminClubConfig.accessLeadMinutes",
     "changeClubConfig:response:AdminClubConfig.logoFallbackUrl",
     "changeClubConfig:response:AdminClubConfig.logoUploaded",
     "changeClubConfig:response:AdminClubConfig.passwordResetTokenMinutes",
@@ -626,6 +650,22 @@
     "courtImpact:response:Violation.code",
     "courtImpact:response:Violation.params",
     "courtImpact:response:Violation.params.*",
+    "createAccessPoint:request:AccessPointRequest.courtIds",
+    "createAccessPoint:request:AccessPointRequest.name",
+    "createAccessPoint:response:$response.header.Accept",
+    "createAccessPoint:response:$response.header.Location",
+    "createAccessPoint:response:$response.header.Retry-After",
+    "createAccessPoint:response:AccessPoint.active",
+    "createAccessPoint:response:AccessPoint.courtIds",
+    "createAccessPoint:response:AccessPoint.id",
+    "createAccessPoint:response:AccessPoint.name",
+    "createAccessPoint:response:FieldError.code",
+    "createAccessPoint:response:FieldError.field",
+    "createAccessPoint:response:FieldError.params",
+    "createAccessPoint:response:FieldError.params.*",
+    "createAccessPoint:response:Violation.code",
+    "createAccessPoint:response:Violation.params",
+    "createAccessPoint:response:Violation.params.*",
     "createAccount:parameter:$parameter.path.personId",
     "createAccount:response:$response.header.Accept",
     "createAccount:response:$response.header.Retry-After",
@@ -656,6 +696,7 @@
     "createBookingCard:request:BookingCardRequest.allowedRoles",
     "createBookingCard:request:BookingCardRequest.color",
     "createBookingCard:request:BookingCardRequest.countsAgainstLimits",
+    "createBookingCard:request:BookingCardRequest.grantsAccess",
     "createBookingCard:request:BookingCardRequest.guestAllowed",
     "createBookingCard:request:BookingCardRequest.label",
     "createBookingCard:request:BookingCardRequest.managingRoles",
@@ -668,6 +709,7 @@
     "createBookingCard:response:BookingCard.allowedRoles",
     "createBookingCard:response:BookingCard.color",
     "createBookingCard:response:BookingCard.countsAgainstLimits",
+    "createBookingCard:response:BookingCard.grantsAccess",
     "createBookingCard:response:BookingCard.guestAllowed",
     "createBookingCard:response:BookingCard.id",
     "createBookingCard:response:BookingCard.label",
@@ -942,6 +984,9 @@
     "createSeries:response:Violation.params",
     "createSeries:response:Violation.params.*",
     "deleteClubLogo:response:$response.header.Retry-After",
+    "deleteClubLogo:response:AdminClubConfig.accessCodeLength",
+    "deleteClubLogo:response:AdminClubConfig.accessLagMinutes",
+    "deleteClubLogo:response:AdminClubConfig.accessLeadMinutes",
     "deleteClubLogo:response:AdminClubConfig.logoFallbackUrl",
     "deleteClubLogo:response:AdminClubConfig.logoUploaded",
     "deleteClubLogo:response:AdminClubConfig.passwordResetTokenMinutes",
@@ -1172,6 +1217,19 @@
     "facilityUtilisation:response:Violation.code",
     "facilityUtilisation:response:Violation.params",
     "facilityUtilisation:response:Violation.params.*",
+    "getAccessPoint:parameter:$parameter.path.id",
+    "getAccessPoint:response:$response.header.Retry-After",
+    "getAccessPoint:response:AccessPoint.active",
+    "getAccessPoint:response:AccessPoint.courtIds",
+    "getAccessPoint:response:AccessPoint.id",
+    "getAccessPoint:response:AccessPoint.name",
+    "getAccessPoint:response:FieldError.code",
+    "getAccessPoint:response:FieldError.field",
+    "getAccessPoint:response:FieldError.params",
+    "getAccessPoint:response:FieldError.params.*",
+    "getAccessPoint:response:Violation.code",
+    "getAccessPoint:response:Violation.params",
+    "getAccessPoint:response:Violation.params.*",
     "getAdministrativeMfaStatus:parameter:$parameter.path.accountId",
     "getAdministrativeMfaStatus:response:$response.header.Retry-After",
     "getAdministrativeMfaStatus:response:FieldError.code",
@@ -1219,6 +1277,7 @@
     "getBookingCard:response:BookingCard.allowedRoles",
     "getBookingCard:response:BookingCard.color",
     "getBookingCard:response:BookingCard.countsAgainstLimits",
+    "getBookingCard:response:BookingCard.grantsAccess",
     "getBookingCard:response:BookingCard.guestAllowed",
     "getBookingCard:response:BookingCard.id",
     "getBookingCard:response:BookingCard.label",
@@ -1300,6 +1359,9 @@
     "getClubConfig:response:Violation.params",
     "getClubConfig:response:Violation.params.*",
     "getClubConfigForAdmin:response:$response.header.Retry-After",
+    "getClubConfigForAdmin:response:AdminClubConfig.accessCodeLength",
+    "getClubConfigForAdmin:response:AdminClubConfig.accessLagMinutes",
+    "getClubConfigForAdmin:response:AdminClubConfig.accessLeadMinutes",
     "getClubConfigForAdmin:response:AdminClubConfig.logoFallbackUrl",
     "getClubConfigForAdmin:response:AdminClubConfig.logoUploaded",
     "getClubConfigForAdmin:response:AdminClubConfig.passwordResetTokenMinutes",
@@ -1521,6 +1583,18 @@
     "linkExternalReference:response:Violation.code",
     "linkExternalReference:response:Violation.params",
     "linkExternalReference:response:Violation.params.*",
+    "listAccessPoints:response:$response.header.Retry-After",
+    "listAccessPoints:response:AccessPoint.active",
+    "listAccessPoints:response:AccessPoint.courtIds",
+    "listAccessPoints:response:AccessPoint.id",
+    "listAccessPoints:response:AccessPoint.name",
+    "listAccessPoints:response:FieldError.code",
+    "listAccessPoints:response:FieldError.field",
+    "listAccessPoints:response:FieldError.params",
+    "listAccessPoints:response:FieldError.params.*",
+    "listAccessPoints:response:Violation.code",
+    "listAccessPoints:response:Violation.params",
+    "listAccessPoints:response:Violation.params.*",
     "listAllocations:parameter:$parameter.query.date",
     "listAllocations:parameter:$parameter.query.from",
     "listAllocations:parameter:$parameter.query.to",
@@ -1569,6 +1643,7 @@
     "listBookingCards:response:BookingCard.allowedRoles",
     "listBookingCards:response:BookingCard.color",
     "listBookingCards:response:BookingCard.countsAgainstLimits",
+    "listBookingCards:response:BookingCard.grantsAccess",
     "listBookingCards:response:BookingCard.guestAllowed",
     "listBookingCards:response:BookingCard.id",
     "listBookingCards:response:BookingCard.label",
@@ -2924,6 +2999,21 @@
     "searchRoster:response:Violation.code",
     "searchRoster:response:Violation.params",
     "searchRoster:response:Violation.params.*",
+    "setAccessPointActive:parameter:$parameter.path.id",
+    "setAccessPointActive:request:ActiveRequest.active",
+    "setAccessPointActive:response:$response.header.Accept",
+    "setAccessPointActive:response:$response.header.Retry-After",
+    "setAccessPointActive:response:AccessPoint.active",
+    "setAccessPointActive:response:AccessPoint.courtIds",
+    "setAccessPointActive:response:AccessPoint.id",
+    "setAccessPointActive:response:AccessPoint.name",
+    "setAccessPointActive:response:FieldError.code",
+    "setAccessPointActive:response:FieldError.field",
+    "setAccessPointActive:response:FieldError.params",
+    "setAccessPointActive:response:FieldError.params.*",
+    "setAccessPointActive:response:Violation.code",
+    "setAccessPointActive:response:Violation.params",
+    "setAccessPointActive:response:Violation.params.*",
     "setAccountActive:parameter:$parameter.path.personId",
     "setAccountActive:response:$response.header.Accept",
     "setAccountActive:response:$response.header.Retry-After",
@@ -2943,6 +3033,7 @@
     "setBookingCardActive:response:BookingCard.allowedRoles",
     "setBookingCardActive:response:BookingCard.color",
     "setBookingCardActive:response:BookingCard.countsAgainstLimits",
+    "setBookingCardActive:response:BookingCard.grantsAccess",
     "setBookingCardActive:response:BookingCard.guestAllowed",
     "setBookingCardActive:response:BookingCard.id",
     "setBookingCardActive:response:BookingCard.label",
@@ -3075,6 +3166,9 @@
     "uploadClubLogo:request:$request.file",
     "uploadClubLogo:response:$response.header.Accept",
     "uploadClubLogo:response:$response.header.Retry-After",
+    "uploadClubLogo:response:AdminClubConfig.accessCodeLength",
+    "uploadClubLogo:response:AdminClubConfig.accessLagMinutes",
+    "uploadClubLogo:response:AdminClubConfig.accessLeadMinutes",
     "uploadClubLogo:response:AdminClubConfig.logoFallbackUrl",
     "uploadClubLogo:response:AdminClubConfig.logoUploaded",
     "uploadClubLogo:response:AdminClubConfig.passwordResetTokenMinutes",
@@ -3888,6 +3982,11 @@
         "getCourt",
         "changeCourt",
         "setCourtActive",
+        "listAccessPoints",
+        "createAccessPoint",
+        "getAccessPoint",
+        "changeAccessPoint",
+        "setAccessPointActive",
         "listBookingCards",
         "createBookingCard",
         "getBookingCard",
@@ -6628,6 +6727,108 @@
       "decisions": [
         "mfa-controlled-rescue",
         "credential-write-only"
+      ]
+    },
+    {
+      "id": "access-point-code-read",
+      "access": "read",
+      "description": "A static access code opens a door on its own, so only the administrative access point projection carries it.",
+      "fields": [
+        "AccessPoint.staticCode"
+      ],
+      "operationIds": [
+        "listAccessPoints",
+        "createAccessPoint",
+        "getAccessPoint",
+        "changeAccessPoint",
+        "setAccessPointActive"
+      ],
+      "actors": [
+        "ADMIN"
+      ],
+      "attributes": [
+        "administrator"
+      ],
+      "decisions": [
+        "administrator-gate",
+        "administrative-projection"
+      ]
+    },
+    {
+      "id": "access-point-code-write",
+      "access": "write",
+      "description": "Only an administrator sets or removes the static access code of an access point.",
+      "fields": [
+        "AccessPointRequest.staticCode"
+      ],
+      "operationIds": [
+        "createAccessPoint",
+        "changeAccessPoint"
+      ],
+      "actors": [
+        "ADMIN"
+      ],
+      "attributes": [
+        "administrator"
+      ],
+      "decisions": [
+        "administrator-gate"
+      ]
+    },
+    {
+      "id": "booking-access-code-read",
+      "access": "read",
+      "description": "A booking's static access codes travel only in the booker's own and a granted guardian's booking projection, and only until its validity window ends.",
+      "fields": [
+        "PersonalBooking.access"
+      ],
+      "operationIds": [
+        "listPersonalBookings",
+        "listDependantBookings"
+      ],
+      "actors": [
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN"
+      ],
+      "attributes": [
+        "booking-owner",
+        "current-account"
+      ],
+      "decisions": [
+        "booking-ownership",
+        "guardian-delegation"
+      ]
+    },
+    {
+      "id": "participation-access-code-read",
+      "access": "read",
+      "description": "A player sees a booking's static access codes only in their own participation projection, and only until its validity window ends.",
+      "fields": [
+        "Participation.access"
+      ],
+      "operationIds": [
+        "listOwnParticipations"
+      ],
+      "actors": [
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN"
+      ],
+      "attributes": [
+        "participant-person",
+        "current-account"
+      ],
+      "decisions": [
+        "booking-ownership"
       ]
     }
   ]

@@ -314,6 +314,20 @@ Keep these rules in mind:
 
 ![The series form with courts, booking type, period and weekdays.](../screenshots/en/series-form.png)
 
+## Access codes
+
+When a court lies behind a door with a keypad and the booking type hands out access codes, *My
+bookings* shows the code of each access point you need beside the booking, with the time it works,
+usually from a quarter of an hour before play until a quarter of an hour after it. The confirmation
+and the reminder carry the same codes. Co-players with their own account see them under *Recorded as
+a co-player*. In the installed app the codes stay there without a connection, as they were when you
+last opened the page online. Once that time is over, the code disappears.
+
+When the club changes a code or a new one starts to apply to your booking, Courtside sends the booker
+and every co-player with an account a message with the codes that apply now.
+
+![A booking's access code with the name of its access point and the time it works.](../screenshots/en/access-codes.png)
+
 ## When something under your booking changes
 
 A later configuration change may affect your booking. Examples include a deactivated court, a

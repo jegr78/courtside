@@ -54,7 +54,7 @@ class ReminderMailer implements MessageComposer {
         UserAccount account = MessageRecipient.required(accounts, message.accountId());
         Locale locale = MessageLanguage.of(account.getLocale(), club.defaultLocale());
         String key = MessageKind.BOOKING_REMINDER.templateKey();
-        Map<String, String> values = new HashMap<>(wording.of(booking, locale));
+        Map<String, String> values = new HashMap<>(wording.of(booking, account, locale));
         values.put("firstName", account.getPerson().getFirstName());
         values.put(InstanceLinks.PLACEHOLDER, links.of(message));
         handOver.accept(new OutgoingMail(account.getPerson().getEmail(),

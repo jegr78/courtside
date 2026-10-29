@@ -21,6 +21,9 @@ export function editable(loaded: AdminClubConfig): ClubConfigRequest {
     passwordResetTokenMinutes: loaded.passwordResetTokenMinutes,
     bookingReminderHours: loaded.bookingReminderHours,
     waitlistOfferMinutes: loaded.waitlistOfferMinutes,
+    accessLeadMinutes: loaded.accessLeadMinutes,
+    accessLagMinutes: loaded.accessLagMinutes,
+    accessCodeLength: loaded.accessCodeLength,
     noMembershipTypeRuleSetId: loaded.noMembershipTypeRuleSetId ?? null
   };
 }
@@ -32,6 +35,7 @@ export const ownedFields = {
     "documentationUrl", "defaultLocale", "timeZone", "slotMinutes"],
   deadlines: ["newAccountCredentialHours", "passwordResetCredentialHours", "passwordResetTokenMinutes", "bookingReminderHours",
     "waitlistOfferMinutes"],
+  accessSettings: ["accessLeadMinutes", "accessLagMinutes", "accessCodeLength"],
   ruleSets: ["noMembershipTypeRuleSetId"]
 } satisfies Record<string, readonly ConfigField[]>;
 

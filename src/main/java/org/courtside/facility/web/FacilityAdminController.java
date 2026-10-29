@@ -1,7 +1,10 @@
 package org.courtside.facility.web;
 
+import org.courtside.api.AdminAccessPointsApi;
 import org.courtside.api.AdminCourtsApi;
 import org.courtside.api.AdminOpeningHoursApi;
+import org.courtside.api.ApiAccessPoint;
+import org.courtside.api.ApiAccessPointRequest;
 import org.courtside.api.ApiActiveRequest;
 import org.courtside.api.ApiCourt;
 import org.courtside.api.ApiCourtClosure;
@@ -14,6 +17,7 @@ import org.courtside.api.ApiOpeningPeriodKind;
 import org.courtside.api.ApiPublicCourtClosure;
 import org.courtside.api.ApiOpeningWeek;
 import org.courtside.api.ApiSetWeeklyOpeningHoursRequest;
+import org.courtside.facility.AccessPoint;
 import org.courtside.facility.Court;
 import org.courtside.facility.CourtClosure;
 import org.courtside.facility.FacilityService;
@@ -30,13 +34,14 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.Arrays;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 @RestController
 @RequiredArgsConstructor
-class FacilityAdminController implements AdminCourtsApi, AdminOpeningHoursApi {
+class FacilityAdminController implements AdminCourtsApi, AdminOpeningHoursApi, AdminAccessPointsApi {
 
     private final FacilityService facility;
 
@@ -69,6 +74,38 @@ class FacilityAdminController implements AdminCourtsApi, AdminOpeningHoursApi {
     @Override
     public ResponseEntity<ApiCourt> getCourt(UUID id) {
         return ResponseEntity.ok(toResponse(facility.requireCourt(id)));
+    }
+
+    @Override
+    public ResponseEntity<List<ApiAccessPoint>> listAccessPoints() {
+        return ResponseEntity.ok(facility.allAccessPoints().stream()
+                .map(FacilityAdminController::toResponse)
+                .toList());
+    }
+
+    @Override
+    public ResponseEntity<ApiAccessPoint> createAccessPoint(ApiAccessPointRequest request) {
+        AccessPoint accessPoint = facility.createAccessPoint(
+                request.getName(), request.getCourtIds(), request.getStaticCode());
+        return ResponseEntity
+                .created(URI.create("/api/admin/access-points/" + accessPoint.getId()))
+                .body(toResponse(accessPoint));
+    }
+
+    @Override
+    public ResponseEntity<ApiAccessPoint> getAccessPoint(UUID id) {
+        return ResponseEntity.ok(toResponse(facility.requireAccessPoint(id)));
+    }
+
+    @Override
+    public ResponseEntity<ApiAccessPoint> changeAccessPoint(UUID id, ApiAccessPointRequest request) {
+        return ResponseEntity.ok(toResponse(facility.changeAccessPoint(
+                id, request.getName(), request.getCourtIds(), request.getStaticCode())));
+    }
+
+    @Override
+    public ResponseEntity<ApiAccessPoint> setAccessPointActive(UUID id, ApiActiveRequest request) {
+        return ResponseEntity.ok(toResponse(facility.setAccessPointActive(id, request.getActive())));
     }
 
     @Override
@@ -200,6 +237,12 @@ class FacilityAdminController implements AdminCourtsApi, AdminOpeningHoursApi {
         return new ApiOpeningHours(WireTypes.toApiDayOfWeek(day))
                 .opensAt(opensAt)
                 .closesAt(closesAt);
+    }
+
+    private static ApiAccessPoint toResponse(AccessPoint accessPoint) {
+        return new ApiAccessPoint(accessPoint.getId(), accessPoint.getName(),
+                new LinkedHashSet<>(accessPoint.getCourtIds().stream().sorted().toList()),
+                accessPoint.getStaticCode(), accessPoint.isActive());
     }
 
     private static ApiCourt toResponse(Court court) {

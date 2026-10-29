@@ -37,6 +37,9 @@ const factoryConfiguration = {
   passwordResetTokenMinutes: 60,
   bookingReminderHours: 24,
   waitlistOfferMinutes: 15,
+  accessLeadMinutes: 15,
+  accessLagMinutes: 15,
+  accessCodeLength: 6,
   logoUploaded: false,
   noMembershipTypeRuleSetId: null
 } as const;

@@ -220,6 +220,7 @@
         "cancelDependantBooking"
       ],
       "backgroundEntryPoints": [
+        "AccessCodeMailer#on(BookingAccessCodeChanged)",
         "BookingMailer#on(BookingConfirmed)",
         "BookingReminderSchedule#remindWhatIsDue",
         "BookingValidationPreparation#onWebServerInitialized(ServletWebServerInitializedEvent)",
@@ -358,13 +359,18 @@
       "actors": [
         "ADMIN"
       ],
-      "entryPoints": "Administrative court, opening-hour, season, holiday, court-closure, booking-card, participant-card and membership-type endpoints.",
+      "entryPoints": "Administrative court, access-point, opening-hour, season, holiday, court-closure, booking-card, participant-card and membership-type endpoints.",
       "operationIds": [
         "listCourtsForAdmin",
         "createCourt",
         "getCourt",
         "changeCourt",
         "setCourtActive",
+        "listAccessPoints",
+        "createAccessPoint",
+        "getAccessPoint",
+        "changeAccessPoint",
+        "setAccessPointActive",
         "listBookingCards",
         "createBookingCard",
         "getBookingCard",
@@ -394,6 +400,8 @@
         "removeCourtClosure"
       ],
       "backgroundEntryPoints": [
+        "AccessCodeAnnouncements#on(AccessCodeChanged)",
+        "AccessCodeAnnouncements#on(CardGrantsAccess)",
         "ClosureAnnouncements#on(AvailabilityChange.ClosureStored)",
         "ClosureAnnouncements#on(AvailabilityChange.PeriodStored)",
         "ClosureAnnouncements#on(CardEvent.BookingCardAvailabilityChanged)",

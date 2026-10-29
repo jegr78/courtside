@@ -1,9 +1,11 @@
 package org.courtside.card;
 
 import org.courtside.card.internal.BookingCardRepository;
+import org.courtside.card.internal.ClosureCardGrantsNoAccessException;
 import org.courtside.card.internal.CardLabelTakenException;
 import org.courtside.card.internal.ParticipantCardRepository;
 import org.courtside.identity.Role;
+import org.courtside.shared.CardGrantsAccess;
 import org.courtside.shared.SqlConstraintViolation;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
@@ -73,12 +75,13 @@ public class CardService {
     public BookingCard createCard(String label, String color, Set<Role> allowedRoles,
                                   Set<Role> managingRoles, short[] allowedPlayerCounts,
                                   boolean countsAgainstLimits, boolean guestAllowed,
-                                  boolean showGenericOccupancy) {
+                                  boolean showGenericOccupancy, boolean grantsAccess) {
         BookingCard card = saveOrRejectTakenLabel(new BookingCard(label, color, allowedRoles, managingRoles,
-                allowedPlayerCounts, countsAgainstLimits, guestAllowed, showGenericOccupancy));
+                allowedPlayerCounts, countsAgainstLimits, guestAllowed, showGenericOccupancy, grantsAccess));
         events.publishEvent(new CardEvent.BookingCardAdded(card.getId(), List.copyOf(card.getAllowedRoles()),
                 List.copyOf(card.getManagingRoles()), boxed(card.getAllowedPlayerCounts()),
-                card.isCountsAgainstLimits(), card.isGuestAllowed(), card.isShowGenericOccupancy()));
+                card.isCountsAgainstLimits(), card.isGuestAllowed(), card.isShowGenericOccupancy(),
+                card.isGrantsAccess()));
         return card;
     }
 
@@ -86,7 +89,10 @@ public class CardService {
     public BookingCard changeCard(UUID cardId, String label, String color, Set<Role> allowedRoles,
                                   Set<Role> managingRoles, short[] allowedPlayerCounts,
                                   boolean countsAgainstLimits, boolean guestAllowed,
-                                  boolean showGenericOccupancy) {
+                                  boolean showGenericOccupancy, boolean grantsAccess) {
+        if (grantsAccess && BookingCard.COURT_CLOSED.equals(cardId)) {
+            throw new ClosureCardGrantsNoAccessException();
+        }
         BookingCard card = requireCard(cardId);
         List<String> changedFields = new ArrayList<>();
         if (!Objects.equals(card.getLabel(), label)) {
@@ -100,15 +106,21 @@ public class CardService {
                 || !Arrays.equals(card.getAllowedPlayerCounts(), allowedPlayerCounts)
                 || card.isCountsAgainstLimits() != countsAgainstLimits
                 || card.isGuestAllowed() != guestAllowed
-                || card.isShowGenericOccupancy() != showGenericOccupancy;
+                || card.isShowGenericOccupancy() != showGenericOccupancy
+                || card.isGrantsAccess() != grantsAccess;
+        boolean startsGrantingAccess = grantsAccess && !card.isGrantsAccess();
         card.changeTo(label, color, allowedRoles, managingRoles,
-                allowedPlayerCounts, countsAgainstLimits, guestAllowed, showGenericOccupancy);
+                allowedPlayerCounts, countsAgainstLimits, guestAllowed, showGenericOccupancy, grantsAccess);
         BookingCard saved = saveOrRejectTakenLabel(card);
         if (!changedFields.isEmpty() || otherFieldsChanged) {
             events.publishEvent(new CardEvent.BookingCardChanged(saved.getId(),
                     List.copyOf(saved.getAllowedRoles()), List.copyOf(saved.getManagingRoles()),
                     boxed(saved.getAllowedPlayerCounts()), saved.isCountsAgainstLimits(),
-                    saved.isGuestAllowed(), saved.isShowGenericOccupancy(), List.copyOf(changedFields)));
+                    saved.isGuestAllowed(), saved.isShowGenericOccupancy(), saved.isGrantsAccess(),
+                    List.copyOf(changedFields)));
+        }
+        if (startsGrantingAccess) {
+            events.publishEvent(new CardGrantsAccess(saved.getId()));
         }
         return saved;
     }

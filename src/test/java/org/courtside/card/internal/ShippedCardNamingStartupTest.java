@@ -40,7 +40,7 @@ class ShippedCardNamingStartupTest extends AbstractIntegrationTest {
     void givenAClubUsingTheNameAShippedCardWouldTake_whenTheInstanceStarts_thenItStartsAnyway() {
         // given — the club speaks English and already uses the name its member card would take
         cards.createCard("Member booking", "#123456", Set.of(), Set.of(),
-                new short[0], false, false, false);
+                new short[0], false, false, false, false);
         configuration.speak("en");
 
         // when / then — a runner that throws closes the context, and a club could not start again

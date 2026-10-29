@@ -153,6 +153,8 @@ class SafeMethodStateInvarianceTest extends AbstractIntegrationTest {
             entry("/api/reserved-slots", read("date=" + TODAY)),
             entry("/api/managed/bookings", read()),
             entry("/api/managed/bookings/{id}", read("bookingId", "")),
+            entry("/api/admin/access-points", read()),
+            entry("/api/admin/access-points/{id}", read("accessPointId", "")),
             entry("/api/admin/courts", read()),
             entry("/api/admin/courts/{id}", read("courtId", "")),
             entry("/api/admin/booking-cards", read()),
@@ -282,6 +284,8 @@ class SafeMethodStateInvarianceTest extends AbstractIntegrationTest {
                         """.getBytes(StandardCharsets.UTF_8)), accountId).previewId();
 
         identifiers.put("courtId", courtId.toString());
+        identifiers.put("accessPointId",
+                facility.createAccessPoint("North gate", List.of(courtId), "123456").toString());
         identifiers.put("personId", personId.toString());
         identifiers.put("accountId", accountId.toString());
         identifiers.put("dependantPersonId", aDependantOf(personId).toString());

@@ -23,9 +23,9 @@ export default defineConfig({
         navigateFallback: "/index.html",
         runtimeCaching: [
           {
-            urlPattern: ({ request, url }) => request.method === "GET"
-              && url.pathname === "/api/my/bookings" && !url.searchParams.has("cursor")
-              && (url.searchParams.get("view") ?? "UPCOMING") === "UPCOMING",
+            urlPattern: ({ request, url }) => request.method === "GET" && !url.searchParams.has("cursor")
+              && ((url.pathname === "/api/my/bookings" && (url.searchParams.get("view") ?? "UPCOMING") === "UPCOMING")
+                || url.pathname === "/api/my/participations"),
             handler: "StaleWhileRevalidate",
             options: {
               cacheName: "courtside-personal-bookings",
@@ -42,7 +42,7 @@ export default defineConfig({
                   await control.put(markerUrl, new Response(state.generation as string));
                 },
                 cacheKeyWillBeUsed: ({ request }) => {
-                  const key = new URL("/api/my/bookings?limit=50", request.url);
+                  const key = new URL(`${new URL(request.url).pathname}?limit=50`, request.url);
                   return Promise.resolve(new Request(key, request));
                 },
                 cachedResponseWillBeUsed: async ({ cacheName, cachedResponse, state }) => {
@@ -83,7 +83,8 @@ export default defineConfig({
                       endsAt: booking.endsAt,
                       cardLabel: booking.cardLabel,
                       cardColor: booking.cardColor,
-                      status: booking.status
+                      status: booking.status,
+                      access: booking.access
                     })),
                     refreshedAt: page.refreshedAt,
                     timeZone: page.timeZone,

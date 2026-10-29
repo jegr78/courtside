@@ -13,14 +13,14 @@ async function cachedApiPaths(page: import("@playwright/test").Page) {
     return requests.flat().map((request) => request.url);
   });
   return cachedRequests.filter((url) => new URL(url).pathname.startsWith("/api/"))
-    .map((url) => new URL(url).pathname);
+    .map((url) => new URL(url).pathname).toSorted();
 }
 
-async function cachedPersonalBookingContract(page: import("@playwright/test").Page) {
-  return page.evaluate(async () => {
+async function cachedPersonalBookingContract(page: import("@playwright/test").Page, pathname = "/api/my/bookings") {
+  return page.evaluate(async (cachedPath) => {
     const cache = await caches.open("courtside-personal-bookings");
     const control = await caches.open("courtside-personal-bookings-control");
-    const requests = await cache.keys();
+    const requests = (await cache.keys()).filter((request) => new URL(request.url).pathname === cachedPath);
     const response = requests[0] ? await cache.match(requests[0]) : undefined;
     const marker = await control.match("/.courtside/personal-bookings-generation");
     const body: unknown = await response?.json();
@@ -39,7 +39,7 @@ async function cachedPersonalBookingContract(page: import("@playwright/test").Pa
       itemEnds: body.items.map((booking: unknown) =>
         typeof booking === "object" && booking !== null && "endsAt" in booking ? Date.parse(String(booking.endsAt)) : Number.NaN)
     };
-  });
+  }, pathname);
 }
 
 async function expectNoApiResponseInCache(page: import("@playwright/test").Page) {
@@ -69,7 +69,7 @@ for (const locale of ["de", "en"] as const) {
     await page.getByTestId("my-bookings-link").click();
     await expect(page.getByTestId("my-bookings-page")).toBeVisible();
     await expect(page.locator('[data-testid^="booking-"]').first()).toBeVisible();
-    await expect.poll(() => cachedApiPaths(page)).toEqual(["/api/my/bookings"]);
+    await expect.poll(() => cachedApiPaths(page)).toEqual(["/api/my/bookings", "/api/my/participations"]);
     await expect(page.getByTestId("club-brand-name")).toHaveText("Example Tennis Club");
     const cachedContract = await cachedPersonalBookingContract(page);
     expect(cachedContract?.requestPath).toBe("/api/my/bookings?limit=50");
@@ -96,7 +96,7 @@ for (const locale of ["de", "en"] as const) {
     await expect(page.locator('[data-testid^="booking-"]').first()).toBeVisible();
     await expect(page.getByTestId("bookings-offline-as-of")).toBeVisible();
     await expect(page.locator("html")).toHaveAttribute("lang", locale);
-    expect(await cachedApiPaths(page)).toEqual(["/api/my/bookings"]);
+    expect(await cachedApiPaths(page)).toEqual(["/api/my/bookings", "/api/my/participations"]);
 
     // when
     await page.getByTestId("court-plan-link").click();
@@ -183,14 +183,18 @@ test("logout outranks a delayed personal-booking revalidation and the cache cont
   await page.getByTestId("login-submit").click();
   await page.getByTestId("my-bookings-link").click();
   await expect(page.getByTestId("my-bookings-page")).toBeVisible();
-  await expect.poll(() => cachedApiPaths(page)).toEqual(["/api/my/bookings"]);
+  await expect.poll(() => cachedApiPaths(page)).toEqual(["/api/my/bookings", "/api/my/participations"]);
   const cachedContract = await cachedPersonalBookingContract(page);
   expect(cachedContract?.pageKeys).toEqual(["clubName", "courts", "items", "refreshedAt", "timeZone"]);
   const allowedItemKeys = new Set([
-    "cardColor", "cardLabel", "courtIds", "endsAt", "id", "seriesId", "startsAt", "status"
+    "access", "cardColor", "cardLabel", "courtIds", "endsAt", "id", "seriesId", "startsAt", "status"
   ]);
   expect(cachedContract?.itemKeys.length).toBeGreaterThan(0);
   expect(cachedContract?.itemKeys.every((keys) => keys.every((key) => allowedItemKeys.has(key)))).toBe(true);
+  const cachedParticipations = await cachedPersonalBookingContract(page, "/api/my/participations");
+  expect(cachedParticipations?.requestPath, "a player's first page is kept beside the bookings").toBe("/api/my/participations?limit=50");
+  expect(cachedParticipations?.pageKeys).toEqual(["items"]);
+  expect(cachedParticipations?.itemKeys.every((keys) => keys.every((key) => allowedItemKeys.has(key)))).toBe(true);
   let releaseRevalidation: () => void = () => undefined;
   const revalidationReleased = new Promise<void>((resolve) => { releaseRevalidation = resolve; });
   let observeRevalidation: () => void = () => undefined;

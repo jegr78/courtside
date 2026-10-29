@@ -11,7 +11,7 @@ class BookingCardPermitsTest {
 
     private static BookingCard cardAllowing(Role... allowedRoles) {
         return new BookingCard("Training", "#34584A", Set.of(allowedRoles), Set.of(),
-                new short[]{}, false, false, false);
+                new short[]{}, false, false, false, false);
     }
 
     @Test
@@ -95,7 +95,7 @@ class BookingCardPermitsTest {
     void givenACardBookableByATrainer_whenItNamesNoManagingRole_thenBookingAccessDoesNotManage() {
         // given
         BookingCard card = new BookingCard("Training", "#34584A", Set.of(Role.TRAINER), Set.of(),
-                new short[]{}, false, false, false);
+                new short[]{}, false, false, false, false);
 
         // when / then
         assertThat(card.permits(Set.of(Role.TRAINER))).isTrue();
@@ -104,6 +104,6 @@ class BookingCardPermitsTest {
 
     private static BookingCard cardManagedBy(Role... managingRoles) {
         return new BookingCard("Training", "#34584A", Set.of(), Set.of(managingRoles),
-                new short[]{}, false, false, false);
+                new short[]{}, false, false, false, false);
     }
 }

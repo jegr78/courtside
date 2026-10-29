@@ -24,7 +24,8 @@ public enum MessageKind {
     BOOKING_SERIES_MOVED_BY_CLUB("booking.seriesMovedByClub", false, false),
     WAITLIST_OFFER("waitlist.offer", false, false),
     BOOKING_PARTNER_FOUND("booking.partnerFound", true, false),
-    BOOKING_PLACE_TAKEN("booking.placeTaken", true, false);
+    BOOKING_PLACE_TAKEN("booking.placeTaken", true, false),
+    ACCESS_CODE_CHANGED("booking.accessCodeChanged", false, false);
 
     private final String templateKey;
     private final boolean declinable;

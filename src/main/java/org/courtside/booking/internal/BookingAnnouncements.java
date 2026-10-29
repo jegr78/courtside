@@ -37,6 +37,7 @@ class BookingAnnouncements implements BookingAnnouncer {
     private final BookingRepository bookings;
     private final FacilityService facility;
     private final CardService cards;
+    private final AccessGrants accessGrants;
 
     @Override
     @Transactional(readOnly = true)
@@ -44,7 +45,8 @@ class BookingAnnouncements implements BookingAnnouncer {
         return bookings.findWithAllocationsById(bookingId)
                 .flatMap(booking -> announcementOf(booking, playersOf(bookingId),
                         courtId -> announcedCourt(facility.requireCourt(courtId)),
-                        cardId -> cards.requireCard(cardId).getLabel()));
+                        cardId -> cards.requireCard(cardId).getLabel(),
+                        accessGrants.of(booking).orElse(null)));
     }
 
     @Override
@@ -65,13 +67,16 @@ class BookingAnnouncements implements BookingAnnouncer {
                 .collect(Collectors.toMap(BookingCard::getId, BookingCard::getLabel, (one, other) -> one,
                         HashMap::new));
         Map<UUID, BookingAnnouncement> described = new HashMap<>();
-        for (Booking booking : bookings.findAllByIdIn(distinct)) {
+        List<Booking> found = bookings.findAllByIdIn(distinct);
+        Map<UUID, BookingAnnouncement.AnnouncedAccess> access = accessGrants.of(found);
+        for (Booking booking : found) {
             List<UUID> playing = players.getOrDefault(booking.getId(), List.of());
             if (visibleTo(booking, playing, accountId, personId)) {
                 announcementOf(booking, playing,
                         courtId -> courts.computeIfAbsent(courtId,
                                 missing -> announcedCourt(facility.requireCourt(missing))),
-                        cardId -> cardLabels.computeIfAbsent(cardId, missing -> cards.requireCard(missing).getLabel()))
+                        cardId -> cardLabels.computeIfAbsent(cardId, missing -> cards.requireCard(missing).getLabel()),
+                        access.get(booking.getId()))
                         .ifPresent(announcement -> described.put(booking.getId(), announcement));
             }
         }
@@ -115,10 +120,12 @@ class BookingAnnouncements implements BookingAnnouncer {
                 players.computeIfAbsent((UUID) row[0], ignored -> new ArrayList<>()).add((UUID) row[1]));
         Map<UUID, BookingAnnouncement.AnnouncedCourt> courts = new HashMap<>();
         Map<UUID, String> cardLabels = new HashMap<>();
+        Map<UUID, BookingAnnouncement.AnnouncedAccess> access = accessGrants.of(occurrences);
         occurrences.forEach(booking -> announcementOf(booking, players.getOrDefault(booking.getId(), List.of()),
                 courtId -> courts.computeIfAbsent(courtId,
                         missing -> announcedCourt(facility.requireCourt(missing))),
-                cardId -> cardLabels.computeIfAbsent(cardId, missing -> cards.requireCard(missing).getLabel()))
+                cardId -> cardLabels.computeIfAbsent(cardId, missing -> cards.requireCard(missing).getLabel()),
+                access.get(booking.getId()))
                 .ifPresent(announcement -> described.put(booking.getId(), announcement)));
         return described;
     }
@@ -138,7 +145,8 @@ class BookingAnnouncements implements BookingAnnouncer {
 
     private static Optional<BookingAnnouncement> announcementOf(Booking booking, List<UUID> players,
                                                                 Function<UUID, BookingAnnouncement.AnnouncedCourt> courtOf,
-                                                                Function<UUID, String> cardLabelOf) {
+                                                                Function<UUID, String> cardLabelOf,
+                                                                BookingAnnouncement.AnnouncedAccess access) {
         List<CourtAllocation> allocations = booking.getAllocations();
         if (allocations.isEmpty() || booking.getBookedBy() == null) {
             return Optional.empty();
@@ -150,7 +158,8 @@ class BookingAnnouncements implements BookingAnnouncer {
                 allocations.stream().map(CourtAllocation::getEndsAt).max(Comparator.naturalOrder()).orElseThrow(),
                 allocations.stream().map(allocation -> courtOf.apply(allocation.getCourtId())).toList(),
                 cardLabelOf.apply(booking.getCardId()),
-                booking.getStatus() == BookingStatus.CANCELLED));
+                booking.getStatus() == BookingStatus.CANCELLED,
+                access));
     }
 
     private static BookingAnnouncement.AnnouncedCourt announcedCourt(Court court) {

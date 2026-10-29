@@ -12,7 +12,7 @@ import { AdminBookingCardsView } from "./AdminBookingCardsView";
 const memberCard: BookingCard = {
   id: "card-1", label: "Member booking", color: "#b85c38", allowedRoles: ["MEMBER"],
   managingRoles: [], allowedPlayerCounts: [2, 4], tracksPlayers: true, countsAgainstLimits: true,
-  guestAllowed: true, showGenericOccupancy: true, active: true
+  guestAllowed: true, showGenericOccupancy: true, grantsAccess: false, active: true
 };
 
 function ArrivedAtCard() {

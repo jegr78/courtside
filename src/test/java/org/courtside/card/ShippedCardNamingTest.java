@@ -54,7 +54,7 @@ class ShippedCardNamingTest extends AbstractIntegrationTest {
         BookingCard card = cards.requireCard(LEAGUE_MATCH);
         cards.changeCard(LEAGUE_MATCH, "Medenspiel", card.getColor(), card.getAllowedRoles(),
                 card.getManagingRoles(), card.getAllowedPlayerCounts(), card.isCountsAgainstLimits(),
-                card.isGuestAllowed(), card.isShowGenericOccupancy());
+                card.isGuestAllowed(), card.isShowGenericOccupancy(), false);
 
         // when
         configuration.speak("en");
@@ -68,7 +68,7 @@ class ShippedCardNamingTest extends AbstractIntegrationTest {
     void givenTheClubUsesTheNameAnotherLanguageGivesAShippedCard_whenItChangesLanguage_thenTheClubKeepsThatName() {
         // given — a card the club made, named exactly what English calls the shipped member card
         UUID own = cards.createCard("Member booking", "#123456", Set.of(), Set.of(),
-                new short[0], false, false, false).getId();
+                new short[0], false, false, false, false).getId();
 
         // when
         configuration.speak("en");

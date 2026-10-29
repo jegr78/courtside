@@ -171,6 +171,32 @@ Mitglieder mit betroffenen zukünftigen Buchungen.
 
 ![Die Platzliste mit Nummer, Name, Status und dem Formular für einen neuen Platz.](screenshots/de/courts.png)
 
+## Anlage → Zugänge
+
+Ein Zugang ist eine Tür oder ein Tor auf dem Weg zu den Plätzen. Gib ihm einen Namen und wähle die
+Plätze, zu denen er führt. Mehrere Plätze können sich einen Zugang teilen, und ein Platz kann über
+mehrere Zugänge erreichbar sein. Hat der Zugang ein Tastenfeld, trage seinen Code ein. Er besteht nur
+aus Ziffern und hat so viele Stellen, wie **Stellen eines Zugangscodes** auf derselben Seite festlegt.
+
+Unter **Zugangszeiten und Codes** legen **Zugang vor Spielbeginn** und **Zugang nach Spielende**
+fest, wie viele Minuten vor und nach einer Buchung ihr Zugangscode gilt, je 0 bis 240, vorgeschlagen
+sind 15. **Stellen eines Zugangscodes** bestimmt, wie viele Ziffern ein neuer Code hat, 4 bis 8.
+Codes, die schon gespeichert sind, gelten nach einer Änderung weiter.
+
+Name, Plätze und Code änderst du jederzeit mit *Bearbeiten*. Ein leeres Codefeld entfernt den Code.
+Einen Zugang, den es nicht mehr gibt, deaktivierst du. Im Protokoll steht, dass sich der Code
+geändert hat, aber nie der Code selbst.
+
+Erreicht ein Code eine Buchung neu, erhalten Bucher und Mitspieler mit eigenem Konto eine Nachricht
+mit den Codes, die jetzt gelten. Das geschieht, wenn du einen Code änderst, einen Zugang mit Code
+anlegst oder wieder aktivierst, einem Zugang mit Code einen Platz hinzufügst oder eine
+Buchungskarte auf *Buchungen erhalten den Zugangscode* stellst. Einen Code oder Platz entfernen und
+einen Zugang deaktivieren verschickt nichts.
+
+![Die Zugangszeiten und die Stellen eines Codes, das Formular für einen neuen Zugang und ein Zugang mit seinen Plätzen und seinem Code.](screenshots/de/access-points.png)
+
+Ob die Bucher einer Buchung den Code erhalten, legt ihre Buchungskarte fest.
+
 ## Anlage → Öffnungszeiten
 
 1. Trage für jeden geöffneten Wochentag eine Öffnungs- und eine Schließzeit ein.
@@ -238,6 +264,7 @@ Punktspiel oder Sperrung. Lege für jede benötigte Art eine Karte an.
 | **Zählt gegen Buchungslimits** | Rechnet die Buchung auf die Obergrenze offener Buchungen an |
 | **Gäste erlaubt** | Erlaubt namentlich erfasste Gäste |
 | **Neutral anzeigen** | Zeigt im öffentlichen Platzplan *Belegt* statt der Kartenbezeichnung |
+| **Buchungen erhalten den Zugangscode** | Buchungen mit dieser Karte gehören zu den Buchungen, für die der Code der Zugänge ihrer Plätze gilt. Die Karte *Platz gesperrt* bietet das nicht an |
 
 Administratoren dürfen jede Karte verwenden und verwalten. Eine Buchung mit der Karte *Platz
 gesperrt* geht einer Reservierung von der Warteliste vor. Leerst du ihre berechtigten Rollen, darf

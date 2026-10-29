@@ -43,7 +43,7 @@ class MailTemplatesTest {
             entry("last", "Tuesday, 2 June 2026"), entry("count", "3"),
             entry("reason", "Reason: the weather."), entry("previousFrom", "17:00"), entry("previousTo", "19:00"),
             entry("previousCourts", "Court 2"), entry("until", "18:15"), entry("untilDay", "Wednesday, 13 May 2026"),
-            entry("instanceLink", "https://courts.example.org/my-bookings"));
+            entry("accessCodes", ""), entry("instanceLink", "https://courts.example.org/my-bookings"));
 
     private static final String ADDRESS_LIKE = "(?i)[a-z][a-z0-9+.-]*://|\\b[\\p{L}0-9-]+\\.\\p{L}{2,}\\b";
 
@@ -336,5 +336,67 @@ class MailTemplatesTest {
     private static ResourceBundle shipped(Locale locale) {
         return ResourceBundle.getBundle("mail", locale,
                 ResourceBundle.Control.getNoFallbackControl(ResourceBundle.Control.FORMAT_PROPERTIES));
+    }
+
+    @Test
+    void givenABookingWithoutAccessCodes_whenItsConfirmationAndReminderAreRendered_thenTheyReadExactlyAsBefore() {
+        // given
+        Map<String, String> withoutAccess = new HashMap<>(VALUES);
+        withoutAccess.put("accessCodes", "");
+
+        // when
+        String confirmation = templates.render("booking.confirmed.body", Locale.ENGLISH, withoutAccess);
+        String reminder = templates.render("booking.reminder.body", Locale.GERMAN, withoutAccess);
+
+        // then
+        assertThat(confirmation).as("a club without access points receives the confirmation it always did")
+                .isEqualTo("Hello Jane,\n\nYour booking at Example Tennis Club is confirmed.\n\n"
+                        + "Wednesday, 13 May 2026\n18:00 to 19:00\nCourt: Court 1\nBooking type: Member booking\n\n"
+                        + "You can cancel the booking in Courtside.\n\nExample Tennis Club\n"
+                        + "https://courts.example.org/my-bookings");
+        assertThat(reminder).as("a club without access points receives the reminder it always did")
+                .isEqualTo("Hallo Jane,\n\nDies ist eine Erinnerung an deine Buchung bei Example Tennis Club.\n\n"
+                        + "Wednesday, 13 May 2026\n18:00 bis 19:00\nPlatz: Court 1\nBuchungsart: Member booking\n\n"
+                        + "Wenn du nicht spielen kannst, storniere die Buchung in Courtside. Dann kann ein anderes "
+                        + "Mitglied den Platz nutzen.\n\nExample Tennis Club\nhttps://courts.example.org/my-bookings");
+    }
+
+    @Test
+    void givenAClubWordingWithoutTheAccessCodes_whenABookingWithCodesIsConfirmed_thenTheCodesAreAppended() {
+        // given
+        MessageTemplateOverrides overrides = mock(MessageTemplateOverrides.class);
+        when(overrides.of(MessageKind.BOOKING_CONFIRMED, "en"))
+                .thenReturn(Optional.of(new MessageText("Booked", "Hello {firstName}, see you at {from}.")));
+        Map<String, String> withAccess = new HashMap<>(VALUES);
+        withAccess.put("accessCodes", "Access code, valid from 17:45 to 19:15:\nNorth gate: 135790");
+
+        // when
+        String body = new MailTemplates(overrides).render("booking.confirmed.body", Locale.ENGLISH, withAccess);
+        String withoutCodes = new MailTemplates(overrides).render("booking.confirmed.body", Locale.ENGLISH, VALUES);
+
+        // then
+        assertThat(body).as("a wording written before access codes still hands them over")
+                .isEqualTo("Hello Jane, see you at 18:00.\n\nAccess code, valid from 17:45 to 19:15:\nNorth gate: 135790");
+        assertThat(withoutCodes).as("and stays as the club wrote it when there is none")
+                .isEqualTo("Hello Jane, see you at 18:00.");
+    }
+
+    @Test
+    void givenAClubWordingEndingWithTheLink_whenABookingWithCodesIsConfirmed_thenTheCodesGoAboveTheLink() {
+        // given
+        MessageTemplateOverrides overrides = mock(MessageTemplateOverrides.class);
+        when(overrides.of(MessageKind.BOOKING_CONFIRMED, "en")).thenReturn(Optional.of(
+                new MessageText("Booked", "Hello {firstName}, see you at {from}.\n\n{clubName}\n{instanceLink}")));
+        Map<String, String> withAccess = new HashMap<>(VALUES);
+        withAccess.put("accessCodes", "Access code, valid from 17:45 to 19:15:\nNorth gate: 135790");
+
+        // when
+        String body = new MailTemplates(overrides).render("booking.confirmed.body", Locale.ENGLISH, withAccess);
+
+        // then
+        assertThat(body).as("the link stays on the message's last line")
+                .isEqualTo("Hello Jane, see you at 18:00.\n\nExample Tennis Club\n\n"
+                        + "Access code, valid from 17:45 to 19:15:\nNorth gate: 135790\n\n"
+                        + "https://courts.example.org/my-bookings");
     }
 }

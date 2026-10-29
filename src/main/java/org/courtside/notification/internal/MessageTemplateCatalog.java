@@ -21,10 +21,11 @@ final class MessageTemplateCatalog {
             MessageKind.CREDENTIALS_PASSWORD_RESET, Set.of("username", "credential"),
             MessageKind.ACCOUNT_PASSWORD_RESET_CODE, Set.of("username", "resetCode"),
             MessageKind.ACCOUNT_MFA_RECOVERY_CODE, Set.of("username", "resetCode"),
-            MessageKind.ACCOUNT_USERNAME_REMINDER, Set.of("username"));
+            MessageKind.ACCOUNT_USERNAME_REMINDER, Set.of("username"),
+            MessageKind.ACCESS_CODE_CHANGED, Set.of(BookingWording.ACCESS_CODES));
 
     // A subject is shown on lock screens and in message lists, so a secret never travels in one.
-    private static final Set<String> SECRET = Set.of("credential", "resetCode");
+    private static final Set<String> SECRET = Set.of("credential", "resetCode", BookingWording.ACCESS_CODES);
     private static final Pattern STANDALONE = Pattern.compile("[\"'\u00ab\u00bb\u201a\u201e\u2018\u2019\u201c\u201d()\\[\\].,;:!]*");
     private static final Pattern LINE_BREAK = Pattern.compile("[\r\n\u0085  ]");
     private static final Pattern CONTROL = Pattern.compile("\\p{Cc}");

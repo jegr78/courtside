@@ -21,6 +21,9 @@ public record ClubConfigurationSnapshot(
         int passwordResetTokenMinutes,
         int bookingReminderHours,
         int waitlistOfferMinutes,
+        int accessLeadMinutes,
+        int accessLagMinutes,
+        int accessCodeLength,
         UUID noMembershipTypeRuleSetId) {
 
     static ClubConfigurationSnapshot from(ClubConfiguration configuration) {
@@ -43,6 +46,9 @@ public record ClubConfigurationSnapshot(
                 configuration.getPasswordResetTokenMinutes(),
                 configuration.getBookingReminderHours(),
                 configuration.getWaitlistOfferMinutes(),
+                configuration.getAccessLeadMinutes(),
+                configuration.getAccessLagMinutes(),
+                configuration.getAccessCodeLength(),
                 configuration.getNoMembershipTypeRuleSetId());
     }
 

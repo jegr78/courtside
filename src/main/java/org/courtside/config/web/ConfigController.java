@@ -9,6 +9,9 @@ import org.courtside.api.ManifestApi;
 import org.courtside.api.ApiWebManifest;
 import org.courtside.api.ApiWebManifestIcon;
 import org.courtside.api.ApiWebManifestShortcut;
+import org.courtside.config.AccessCodeLength;
+import org.courtside.config.AccessLagTime;
+import org.courtside.config.AccessLeadTime;
 import org.courtside.config.BookingSlotDuration;
 import org.courtside.config.CredentialLifetime;
 import org.courtside.config.ReminderLeadTime;
@@ -74,7 +77,13 @@ class ConfigController implements ClubConfigApi, AdminConfigApi, ManifestApi {
                 new ReminderLeadTime(request.getBookingReminderHours()),
                 request.getNoMembershipTypeRuleSetId(),
                 request.getWaitlistOfferMinutes() == null
-                        ? null : new WaitlistOfferWindow(request.getWaitlistOfferMinutes())))));
+                        ? null : new WaitlistOfferWindow(request.getWaitlistOfferMinutes()),
+                request.getAccessLeadMinutes() == null
+                        ? null : new AccessLeadTime(request.getAccessLeadMinutes()),
+                request.getAccessLagMinutes() == null
+                        ? null : new AccessLagTime(request.getAccessLagMinutes()),
+                request.getAccessCodeLength() == null
+                        ? null : new AccessCodeLength(request.getAccessCodeLength())))));
     }
 
     @Override
@@ -157,7 +166,10 @@ class ConfigController implements ClubConfigApi, AdminConfigApi, ManifestApi {
                 configuration.passwordResetCredentialHours(),
                 configuration.passwordResetTokenMinutes(),
                 configuration.bookingReminderHours(),
-                configuration.waitlistOfferMinutes())
+                configuration.waitlistOfferMinutes(),
+                configuration.accessLeadMinutes(),
+                configuration.accessLagMinutes(),
+                configuration.accessCodeLength())
                 .logoUrl(configuration.logoUrl())
                 .logoFallbackUrl(configuration.logoFallbackUrl())
                 .installedAppName(configuration.effectiveShortName())

@@ -329,6 +329,20 @@ Beachte dabei:
 
 ![Das Formular für eine Terminserie mit Plätzen, Buchungsart, Zeitraum und Wochentagen.](screenshots/de/series-form.png)
 
+## Zugangscodes
+
+Liegt ein Platz hinter einer Tür mit Tastenfeld und gibt die Buchungsart Zugangscodes heraus, zeigt
+*Meine Buchungen* bei der Buchung den Code jedes Zugangs, den du brauchst, und von wann bis wann er
+gilt, meist ab einer Viertelstunde vor Spielbeginn bis eine Viertelstunde nach Spielende. Dieselben
+Codes stehen in der Bestätigung und in der Erinnerung. Mitspieler mit eigenem Konto sehen sie unter
+*Als Mitspieler eingetragen*. In der installierten App stehen die Codes auch ohne Verbindung dort,
+so wie beim letzten Öffnen mit Verbindung. Ist die Zeit vorbei, verschwindet der Code.
+
+Ändert der Verein einen Code oder gilt für deine Buchung ein neuer, schickt Courtside dem Bucher und
+jedem Mitspieler mit eigenem Konto eine Nachricht mit den Codes, die jetzt gelten.
+
+![Der Zugangscode einer Buchung mit dem Namen des Zugangs und der Zeit, in der er gilt.](screenshots/de/access-codes.png)
+
 ## Wenn sich unter deiner Buchung etwas ändert
 
 Eine spätere Änderung kann deine Buchung betreffen. Beispiele sind ein deaktivierter Platz, eine

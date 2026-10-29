@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { api, type BookingGrid, type Participation, type PersonalBooking, type PublicCourt } from "../api/client";
+import { api, type AccessGrant, type BookingGrid, type Participation, type PersonalBooking, type PublicCourt } from "../api/client";
 import { useReportedFailure } from "../failures/useReportedFailure";
 import { Alert } from "../components/Alert";
 import { LoadFailure } from "../components/LoadFailure";
@@ -58,6 +58,8 @@ export function MyBookingsView({ now, offline = false }: {
       const cachedTimeZone = page.timeZone;
       if (cachedTimeZone) setGrid((current) => ({ ...(current ?? offlineBookingGrid()), timeZone: cachedTimeZone }));
       if (offline) {
+        const cachedParticipations = await api.participations().catch(() => undefined);
+        setParticipations(cachedParticipations?.items ?? []);
         clearLoad();
         return;
       }
@@ -218,14 +220,14 @@ export function MyBookingsView({ now, offline = false }: {
       left={(declined) => setSuccess(t(declined ? "myWaitlist.declined" : "myWaitlist.left"))} />}
     {!offline && !loading && grid && <OpenPlacesSection courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone}
       taken={async () => { await load(); setSuccess(t("openPlaces.taken")); }} />}
-    {!offline && !loading && grid && <ParticipationSection participations={participations} courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone} withdrawn={async () => { await load(); setSuccess(t("participations.withdrawn")); }} nextCursor={participationsNextCursor} loadingMore={loadingMore} loadMore={loadMoreParticipations} t={t} />}
+    {!loading && grid && (!offline || participations.length > 0) && <ParticipationSection participations={participations} courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone} reference={reference} actionable={!offline} withdrawn={async () => { await load(); setSuccess(t("participations.withdrawn")); }} nextCursor={offline ? undefined : participationsNextCursor} loadingMore={loadingMore} loadMore={loadMoreParticipations} t={t} />}
     {grid && action?.kind === "cancel" && <CancelDialog booking={action.booking} seriesBookings={bookings.filter((booking) => booking.seriesId === action.booking.seriesId && booking.status === "CONFIRMED")} incompleteSeries={nextCursor !== undefined} timeZone={grid.timeZone} closed={() => setAction(undefined)} completed={async () => { setAction(undefined); await load(); setSuccess(t("booking.cancelledSuccess")); }} />}
     {grid && action?.kind === "move" && <MoveDialog booking={action.booking} courts={courts} timeZone={grid.timeZone} maxBookingMinutes={maxBookingMinutes} closed={() => setAction(undefined)} completed={async () => { setAction(undefined); await load(); setSuccess(t("booking.moved")); }} />}
   </section>;
 }
 
-function ParticipationSection({ participations, courtNames, locale, timeZone, withdrawn, nextCursor, loadingMore, loadMore, t }: {
-  participations: Participation[]; courtNames: Map<string, string>; locale: string; timeZone: string;
+function ParticipationSection({ participations, courtNames, locale, timeZone, reference, actionable, withdrawn, nextCursor, loadingMore, loadMore, t }: {
+  participations: Participation[]; courtNames: Map<string, string>; locale: string; timeZone: string; reference: Date; actionable: boolean;
   withdrawn: () => Promise<void>; nextCursor?: string; loadingMore: boolean;
   loadMore: () => Promise<void>; t: Translate;
 }) {
@@ -262,8 +264,9 @@ function ParticipationSection({ participations, courtNames, locale, timeZone, wi
               <span>{participation.courtIds.map((id) => courtNames.get(id) ?? t("myBookings.unknownCourt")).join(", ")}</span>
             </span>
             <span data-testid="booking-card-label" className="text-muted text-sm">{participation.cardLabel}</span>
+            {participation.access && <AccessCodes access={participation.access} reference={reference} locale={locale} timeZone={timeZone} t={t} />}
             {participation.status === "CANCELLED" ? <span>{t("myBookings.cancelled")}</span>
-              : <div className="pt-1">
+              : actionable && <div className="pt-1">
                 <Button variant="destructive" data-testid="withdraw-participation" data-booking-id={participation.id} className="px-3 py-2" disabled={leaving === participation.id} onClick={() => void withdraw(participation.id)}>{t("participations.withdraw")}</Button>
               </div>}
           </li>)}</ul>}
@@ -298,6 +301,7 @@ export function BookingSection({ testId, title, titleHidden = false, empty, book
           {booking.status === "CANCELLED" && <span>{t(booking.released ? "myBookings.released" : "myBookings.cancelled")}</span>}
           {booking.partnerSearch === "PUBLISHED" && <span data-testid="partner-search-published">{t("myBookings.partnerSearchPublished")}</span>}
           {booking.checkIn?.checkedIn && <span data-testid="checked-in">{t("myBookings.checkedIn")}</span>}
+          {booking.access && <AccessCodes access={booking.access} reference={reference} locale={locale} timeZone={timeZone} t={t} />}
           {booking.checkIn && !booking.checkIn.checkedIn && reference && checkInToday(booking.checkIn, reference)
             && <span data-testid="check-in-from" className="text-muted text-sm">{t("myBookings.checkInFrom", { time: formatClockTime(formatTime(booking.checkIn.opensAt, timeZone), locale) })}</span>}
           {actionable && <div className="flex flex-wrap gap-2 pt-1">
@@ -317,6 +321,21 @@ export function BookingSection({ testId, title, titleHidden = false, empty, book
         </li>)}</ul>
       </article>)}</div>}
   </section>;
+}
+
+function AccessCodes({ access, reference, locale, timeZone, t }: {
+  access: AccessGrant; reference?: Date; locale: string; timeZone: string; t: Translate;
+}) {
+  if (reference && reference.getTime() >= Date.parse(access.validUntil)) return null;
+  return <div data-testid="access-codes" className="grid gap-1 text-sm">
+    <span className="font-semibold">{t("myBookings.access", {
+      from: formatClockTime(formatTime(access.validFrom, timeZone), locale),
+      until: formatClockTime(formatTime(access.validUntil, timeZone), locale)
+    })}</span>
+    <ul className="grid gap-1">{access.codes.map((code) => <li key={code.accessPointName} data-testid="access-code">
+      {code.accessPointName}: <span className="font-mono text-base font-semibold">{code.code}</span>
+    </li>)}</ul>
+  </div>;
 }
 
 function checkInToday(checkIn: NonNullable<PersonalBooking["checkIn"]>, reference: Date) {

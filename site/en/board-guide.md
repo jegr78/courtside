@@ -160,6 +160,32 @@ past bookings and reports. Courtside notifies members whose future bookings are 
 
 ![The court list with number, name, state and the form for a new court.](../screenshots/en/courts.png)
 
+## Facility → Access points
+
+An access point is a door or gate on the way to the courts. Give it a name and choose the courts it
+leads to. Several courts may share one access point, and one court may be reached through several.
+If the access point has a keypad, enter its code. It consists of digits only and has as many digits
+as **Digits of an access code** on the same page sets.
+
+Under **Access times and codes**, **Access before play starts** and **Access after play ends** set
+how many minutes before and after a booking its access code works, 0 to 240 each, 15 suggested.
+**Digits of an access code** sets how many digits a new code has, 4 to 8. Codes already stored keep
+working after a change.
+
+Change name, courts and code at any time with *Edit*. An empty code field removes the code.
+Deactivate an access point that no longer exists. The audit log records that a code changed, never
+the code itself.
+
+When a code newly reaches a booking, its booker and every co-player with an account receive a
+message with the codes that apply now. That happens when you change a code, create or reactivate an
+access point with a code, add a court to an access point with a code, or switch a booking card to
+*Bookings receive the access code*. Removing a code or a court and deactivating an access point
+send nothing.
+
+![The access times and code digits, the form for a new access point and an access point with its courts and code.](../screenshots/en/access-points.png)
+
+Whether a booking's players receive the code is decided by its booking card.
+
 ## Facility → Opening hours
 
 1. Enter an opening and closing time for every open weekday.
@@ -222,6 +248,7 @@ or closure. Add one card for every type the club needs.
 | **Counts against booking limits** | Counts the booking towards the member's open-booking limit |
 | **Guests allowed** | Allows named guests |
 | **Show neutral occupancy** | Shows *Occupied* instead of the card label in the public plan |
+| **Bookings receive the access code** | Bookings on this card are the ones the code of their courts' access points applies to. The *Court closed* card does not offer it |
 
 Administrators may use and manage every card. A booking with the *Court closed* card goes before a
 reservation from the waitlist. If you clear its allowed roles, every signed-in person may close a

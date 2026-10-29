@@ -1,6 +1,6 @@
 import type { components } from "./schema";
 import { abortable, abortReason } from "./abortable";
-import { clearPersonalBookingsOfflineData, notifyOtherClientsOfSessionChange } from "../offlineBookings";
+import { clearPersonalBookingsOfflineData, notifyOtherClientsOfSessionChange, withoutEndedAccess } from "../offlineBookings";
 import { warnAbout } from "./failureWarning";
 
 export type SessionStatus = components["schemas"]["SessionStatus"];
@@ -16,6 +16,8 @@ export type RuleParameter = components["schemas"]["RuleParameter"];
 export type RuleDefinition = components["schemas"]["RuleDefinition"];
 export type AdminCourt = components["schemas"]["Court"];
 export type CourtRequest = components["schemas"]["CourtRequest"];
+export type AccessPoint = components["schemas"]["AccessPoint"];
+export type AccessPointRequest = components["schemas"]["AccessPointRequest"];
 export type OpeningHours = components["schemas"]["OpeningHours"];
 export type OpeningWeek = components["schemas"]["OpeningWeek"];
 export type OpeningPeriod = components["schemas"]["OpeningPeriod"];
@@ -134,6 +136,7 @@ export type BookingCreated = components["schemas"]["BookingCreated"];
 export type BookingEligibility = components["schemas"]["BookingEligibility"];
 export type BookingHours = components["schemas"]["BookingHours"];
 export type PersonalBooking = components["schemas"]["PersonalBooking"];
+export type AccessGrant = components["schemas"]["AccessGrant"];
 export type PersonalBookingPage = components["schemas"]["PersonalBookingPage"];
 export type PersonalBookingView = components["schemas"]["PersonalBookingView"];
 export type Participation = components["schemas"]["Participation"];
@@ -499,6 +502,16 @@ export const api = {
   setAdminCourtActive: (id: string, active: boolean) => request<AdminCourt>(`/api/admin/courts/${id}/active`, {
     method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ active })
   }),
+  adminAccessPoints: () => request<AccessPoint[]>("/api/admin/access-points"),
+  createAdminAccessPoint: (accessPoint: AccessPointRequest) => request<AccessPoint>("/api/admin/access-points", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(accessPoint)
+  }),
+  changeAdminAccessPoint: (id: string, accessPoint: AccessPointRequest) => request<AccessPoint>(`/api/admin/access-points/${id}`, {
+    method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(accessPoint)
+  }),
+  setAdminAccessPointActive: (id: string, active: boolean) => request<AccessPoint>(`/api/admin/access-points/${id}/active`, {
+    method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ active })
+  }),
   adminOpeningHours: () => request<OpeningHours[]>("/api/admin/opening-hours"),
   setAdminWeeklyOpeningHours: (effectiveFrom: string | undefined, days: OpeningHours[]) => request<OpeningHours[]>(
     "/api/admin/opening-hours", {
@@ -808,10 +821,10 @@ export const api = {
       ...(options.view ? { view: options.view } : {}),
       ...(options.cursor ? { cursor: options.cursor } : {})
     })}`
-  ),
+  ).then((page) => ({ ...page, items: withoutEndedAccess(page.items) })),
   participations: (cursor?: string, limit = 50) => request<ParticipationPage>(
     `/api/my/participations?${new URLSearchParams({ limit: String(limit), ...(cursor ? { cursor } : {}) })}`
-  ),
+  ).then((page) => ({ ...page, items: withoutEndedAccess(page.items) })),
   withdrawParticipation: (bookingId: string) => request<void>(
     `/api/my/participations/${bookingId}`, { method: "DELETE" }
   ),
@@ -821,7 +834,7 @@ export const api = {
       limit: String(options.limit ?? 50),
       ...(options.view ? { view: options.view } : {}),
       ...(options.cursor ? { cursor: options.cursor } : {})
-    })}`),
+    })}`).then((page) => ({ ...page, items: withoutEndedAccess(page.items) })),
   createDependantBooking: (personId: string, booking: CreateBookingRequest, idempotencyKey: string) => request<BookingCreated>(
     `/api/my/dependants/${personId}/bookings`, {
       method: "POST",

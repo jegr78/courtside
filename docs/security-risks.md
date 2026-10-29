@@ -91,6 +91,17 @@ can cause this from outside: it needs the application killed during a handover, 
 avoids by letting the outbox finish within its stop grace. The bound is one repeat per crash and
 message. Reconsider if the relay offers an idempotent submission keyed by `Message-ID`.
 
+## A cached booking page keeps an access code until the next refresh
+
+The installed app keeps the member's last bookings page and the first page of bookings they play in
+in the browser cache so both still show without a connection, and those pages hold the static access
+codes of the bookings. The client
+stops showing a code once its validity window has ended, but the cached response itself keeps it
+until the next successful refresh, sign-out or the cache's seven-day limit. Reading it needs access
+to the unlocked device or its browser profile, and it yields only the codes of that member's own
+bookings and of the bookings they play in, which the board changes at its keypad. Reconsider if access codes become per-booking
+dynamic codes, or if a club reports codes leaking from devices.
+
 ## Reset codes use an unkeyed digest
 
 An outstanding reset code is stored as SHA-256 of a short random code. Read access to a current

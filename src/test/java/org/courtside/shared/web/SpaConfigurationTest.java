@@ -111,7 +111,8 @@ class SpaConfigurationTest extends AbstractIntegrationTest {
     @ParameterizedTest
     @ValueSource(strings = {"/admin", "/admin/setup", "/admin/configuration", "/admin/deadlines",
             "/admin/rule-sets", "/admin/facility",
-            "/admin/facility/courts", "/admin/facility/opening-hours", "/admin/facility/booking-cards",
+            "/admin/facility/courts", "/admin/facility/access-points", "/admin/facility/opening-hours",
+            "/admin/facility/booking-cards",
             "/admin/facility/booking-cards/card-1",
             "/admin/facility/slot-fillers", "/admin/roster", "/admin/audit"})
     void givenAnAnonymousVisitor_whenOpeningAnAdministrationRoute_thenTheLoginCapableAppShellIsServed(String route)

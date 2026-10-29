@@ -1,6 +1,7 @@
 import { afterEach, expect, it, vi } from "vitest";
 import {
-  clearPersonalBookingsOfflineData, offlineMemberSession, offlineMemberState, PERSONAL_BOOKINGS_CACHE, PERSONAL_BOOKINGS_CONTROL_CACHE
+  clearPersonalBookingsOfflineData, offlineMemberSession, offlineMemberState, PERSONAL_BOOKINGS_CACHE, PERSONAL_BOOKINGS_CONTROL_CACHE,
+  withoutEndedAccess
 } from "./offlineBookings";
 
 afterEach(() => {
@@ -207,4 +208,25 @@ it.each([
 
   // then
   expect(clubName).toBeUndefined();
+});
+
+it("given cached bookings whose windows ended and one still open, when they are read, then only the open one keeps its code", () => {
+  // given
+  const access = (validUntil: string) => ({
+    validFrom: "2026-09-24T09:45:00Z", validUntil, codes: [{ accessPointName: "North gate", code: "135790" }]
+  });
+  const items = [
+    { id: "ended", access: access("2026-09-24T11:00:00Z") },
+    { id: "endsNow", access: access("2026-09-24T12:00:00Z") },
+    { id: "open", access: access("2026-09-24T12:30:00Z") },
+    { id: "none" }
+  ];
+
+  // when
+  const read = withoutEndedAccess(items, new Date("2026-09-24T12:00:00Z"));
+
+  // then
+  expect(read.map((item) => [item.id, item.access?.codes[0].code])).toEqual([
+    ["ended", undefined], ["endsNow", undefined], ["open", "135790"], ["none", undefined]
+  ]);
 });

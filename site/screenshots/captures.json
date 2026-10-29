@@ -63,6 +63,11 @@
       "pages": { "de": "site/member-guide.md", "en": "site/en/member-guide.md" }
     },
     {
+      "name": "access-codes",
+      "surface": "access-codes",
+      "pages": { "de": "site/member-guide.md", "en": "site/en/member-guide.md" }
+    },
+    {
       "name": "series-form",
       "surface": "series-form",
       "pages": { "de": "site/member-guide.md", "en": "site/en/member-guide.md" }
@@ -115,6 +120,11 @@
     {
       "name": "courts",
       "surface": "admin-courts-view",
+      "pages": { "de": "site/board-guide.md", "en": "site/en/board-guide.md" }
+    },
+    {
+      "name": "access-points",
+      "surface": "admin-access-points-view",
       "pages": { "de": "site/board-guide.md", "en": "site/en/board-guide.md" }
     },
     {

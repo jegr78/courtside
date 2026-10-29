@@ -8,6 +8,7 @@ import org.courtside.shared.OpeningWindow;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
+import org.springframework.jdbc.core.simple.JdbcClient;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
@@ -27,6 +28,9 @@ class FacilityAuditTest extends AbstractIntegrationTest {
 
     @Autowired
     private AuditTestFixture audit;
+
+    @Autowired
+    private JdbcClient jdbc;
 
     @Test
     void givenACourt_whenItIsCreated_thenTheLogCarriesItsNumberAndNotItsName() {
@@ -306,4 +310,56 @@ class FacilityAuditTest extends AbstractIntegrationTest {
         assertThat(audit.nameOf(court.getId())).isEqualTo("Centre Court");
     }
 
+
+    @Test
+    void givenAnAccessPoint_whenItsCodeChanges_thenTheEventNamesTheFieldAndNoStoredRowCarriesEitherCode() {
+        // given
+        Court court = facility.createCourt(7, "Centre Court");
+        AccessPoint gate = facility.createAccessPoint("North gate", List.of(court.getId()), "135790");
+
+        // when
+        facility.changeAccessPoint(gate.getId(), "North gate", List.of(court.getId()), "246802");
+
+        // then
+        assertThat(audit.latestPayload(gate.getId(), FacilityEvent.AccessPointChanged.TYPE))
+                .containsEntry("changedFields", List.of("staticCode"))
+                .containsEntry("courtIds", List.of(court.getId().toString()));
+        List<String> stored = jdbc.sql("SELECT payload::text FROM domain_event WHERE subject_id = ?")
+                .param(gate.getId()).query(String.class).list();
+        assertThat(stored).as("the added and the changed event are stored, each with the code it handed out").hasSize(4);
+        assertThat(String.join("|", stored))
+                .as("a static code is a door key and never enters the audit log")
+                .doesNotContain("135790").doesNotContain("246802");
+    }
+
+    @Test
+    void givenAnAccessPoint_whenChangedWithEveryStoredValue_thenNothingIsRecorded() {
+        // given
+        Court court = facility.createCourt(7, "Centre Court");
+        AccessPoint gate = facility.createAccessPoint("North gate", List.of(court.getId()), null);
+
+        // when
+        facility.changeAccessPoint(gate.getId(), " North gate ", List.of(court.getId()), null);
+        facility.setAccessPointActive(gate.getId(), true);
+
+        // then
+        audit.assertEventCounts(gate.getId(), FacilityEvent.class, Map.of(FacilityEvent.AccessPointAdded.TYPE, 1L));
+    }
+
+    @Test
+    void givenAnAccessPoint_whenItIsRenamedAndDeactivated_thenTheLogNamesTheFieldAndCarriesTheFlag() {
+        // given
+        AccessPoint gate = facility.createAccessPoint("North gate", List.of(), null);
+
+        // when
+        facility.changeAccessPoint(gate.getId(), "South gate", List.of(), null);
+        facility.setAccessPointActive(gate.getId(), false);
+
+        // then
+        Map<String, Object> changed = audit.latestPayload(gate.getId(), FacilityEvent.AccessPointChanged.TYPE);
+        assertThat(changed).containsEntry("changedFields", List.of("name"));
+        assertThat(changed.toString()).doesNotContain("South gate");
+        assertThat(audit.latestPayload(gate.getId(), FacilityEvent.AccessPointAvailabilityChanged.TYPE))
+                .containsEntry("active", false);
+    }
 }
