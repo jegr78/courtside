@@ -74,6 +74,7 @@ class AccessCodeVisibilityTest extends AbstractIntegrationTest {
 
     private MockMvc mockMvc;
     private List<UUID> courts;
+    private UUID southGate;
     private UUID jane;
     private UUID janeAccount;
     private UUID john;
@@ -88,7 +89,7 @@ class AccessCodeVisibilityTest extends AbstractIntegrationTest {
         courts = List.of(facility.createCourt(1, "Court 1"), facility.createCourt(2, "Court 2"),
                 facility.createCourt(3, "Court 3"), facility.createCourt(4, "Court 4"));
         facility.createAccessPoint("North gate", courts.subList(0, 2), NORTH_CODE);
-        facility.createAccessPoint("South gate", courts.subList(2, 4), SOUTH_CODE);
+        southGate = facility.createAccessPoint("South gate", courts.subList(2, 4), SOUTH_CODE);
         cards.letBookingsReceiveAccessCodes(MEMBER_BOOKING_CARD, true);
         jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
         janeAccount = identity.createEnabledAccount(jane, "doe.jane", Set.of(Role.MEMBER));
@@ -125,6 +126,21 @@ class AccessCodeVisibilityTest extends AbstractIntegrationTest {
         // then
         assertThat(codesOf(page, booking)).as("the union of both courts' access points")
                 .containsExactly(NORTH_CODE, SOUTH_CODE);
+    }
+
+    @Test
+    void givenAnInactiveSouthGate_whenTheBookerReadsABookingOnCourtsTwoAndThree_thenOnlyTheNorthCodeComes()
+            throws Exception {
+        // given
+        facility.deactivateAccessPoint(southGate);
+        UUID booking = bookingService.create(new CreateBookingCommand(courts.subList(1, 3), MEMBER_BOOKING_CARD,
+                EVENING, janeAccount, jane, Set.of(Role.MEMBER), null, List.of(ParticipantSpec.member(john)), null));
+
+        // when
+        String page = read("/api/my/bookings", "doe.jane");
+
+        // then
+        assertThat(codesOf(page, booking)).as("an inactive gate hands out no code").containsExactly(NORTH_CODE);
     }
 
     @Test

@@ -112,6 +112,35 @@ class AccessCodeMessageTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenAnInactiveNorthGate_whenABookingBehindItIsConfirmed_thenTheConfirmationCarriesNoCode()
+            throws Exception {
+        // given
+        facilityService.setAccessPointActive(northGate, false);
+
+        // when
+        bookOnCourtTwo(janeAccount, jane, john);
+
+        // then
+        assertThat(lastBodyTo("jane.doe@example.org")).as("an inactive gate hands out no code")
+                .doesNotContain(OLD_CODE).doesNotContain("North gate");
+    }
+
+    @Test
+    void givenABookingOnBothCourtsOfTheNorthGate_whenItsCodeChanges_thenEachOfItsPeopleIsToldOnce() {
+        // given
+        UUID booking = bookings.create(new CreateBookingCommand(courts.subList(0, 2), MEMBER_BOOKING_CARD, EVENING,
+                janeAccount, jane, Set.of(Role.MEMBER), null, List.of(ParticipantSpec.member(john)), null));
+
+        // when
+        facilityService.changeAccessPoint(northGate, "North gate", courts.subList(0, 2), NEW_CODE);
+
+        // then
+        assertThat(announcedBookings()).as("a booking on two courts behind one gate is one booking to tell")
+                .containsExactly(booking);
+        assertThat(toldAccounts()).containsExactlyInAnyOrder(janeAccount, johnAccount);
+    }
+
+    @Test
     void givenABookingBehindTheNorthGate_whenItsReminderGoesOut_thenThePlayerIsGivenTheCodeToo() throws Exception {
         // given
         UUID booking = bookOnCourtTwo(janeAccount, jane, john);

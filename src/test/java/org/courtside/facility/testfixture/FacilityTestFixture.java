@@ -29,6 +29,10 @@ public class FacilityTestFixture {
         return facilityService.createAccessPoint(name, courtIds, staticCode).getId();
     }
 
+    public void deactivateAccessPoint(UUID accessPointId) {
+        facilityService.setAccessPointActive(accessPointId, false);
+    }
+
     public UUID createInactiveCourt(int number, String name) {
         UUID courtId = createCourt(number, name);
         deactivateCourt(courtId);
