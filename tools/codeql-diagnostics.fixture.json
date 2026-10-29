@@ -20,6 +20,58 @@
                       "uri": "src/broken.ts",
                       "uriBaseId": "%SRCROOT%",
                       "index": 0
+                    }
+                  }
+                }
+              ],
+              "message": {
+                "text": ""
+              },
+              "level": "none",
+              "descriptor": {
+                "id": "js/diagnostics/successfully-extracted-files",
+                "index": 0
+              },
+              "properties": {
+                "formattedMessage": {
+                  "text": ""
+                }
+              }
+            },
+            {
+              "locations": [
+                {
+                  "physicalLocation": {
+                    "artifactLocation": {
+                      "uri": "src/valid.ts",
+                      "uriBaseId": "%SRCROOT%",
+                      "index": 1
+                    }
+                  }
+                }
+              ],
+              "message": {
+                "text": ""
+              },
+              "level": "none",
+              "descriptor": {
+                "id": "js/diagnostics/successfully-extracted-files",
+                "index": 0
+              },
+              "properties": {
+                "formattedMessage": {
+                  "text": ""
+                }
+              }
+            },
+            {
+              "locations": [
+                {
+                  "physicalLocation": {
+                    "artifactLocation": {
+                      "uri": "src/broken.ts",
+                      "uriBaseId": "%SRCROOT%",
+                      "index": 0
                     },
                     "region": {
                       "startLine": 1,
@@ -35,7 +87,7 @@
               "level": "error",
               "descriptor": {
                 "id": "js/diagnostics/extraction-errors",
-                "index": 0
+                "index": 1
               },
               "properties": {
                 "formattedMessage": {
@@ -66,7 +118,7 @@
               "level": "error",
               "descriptor": {
                 "id": "js/diagnostics/extraction-errors",
-                "index": 0
+                "index": 1
               },
               "properties": {
                 "formattedMessage": {
@@ -96,7 +148,7 @@
               "level": "error",
               "descriptor": {
                 "id": "js/diagnostics/extraction-errors",
-                "index": 0
+                "index": 1
               },
               "properties": {
                 "formattedMessage": {
@@ -122,7 +174,7 @@
               "level": "none",
               "descriptor": {
                 "id": "js/baseline/expected-extracted-files",
-                "index": 1
+                "index": 2
               },
               "properties": {
                 "formattedMessage": {
@@ -148,7 +200,7 @@
               "level": "none",
               "descriptor": {
                 "id": "js/baseline/expected-extracted-files",
-                "index": 1
+                "index": 2
               },
               "properties": {
                 "formattedMessage": {
@@ -163,7 +215,7 @@
               "level": "none",
               "descriptor": {
                 "id": "cli/file-coverage-baseline",
-                "index": 2
+                "index": 3
               },
               "properties": {
                 "attributes": {
@@ -182,7 +234,7 @@
               "level": "none",
               "descriptor": {
                 "id": "cli/platform",
-                "index": 3
+                "index": 4
               },
               "properties": {
                 "attributes": {
@@ -219,7 +271,7 @@
               },
               "descriptor": {
                 "id": "js/parse-error",
-                "index": 4
+                "index": 5
               },
               "properties": {
                 "visibility": {
@@ -251,7 +303,7 @@
               },
               "descriptor": {
                 "id": "js/parse-error",
-                "index": 4
+                "index": 5
               },
               "properties": {
                 "visibility": {
@@ -282,7 +334,7 @@
               },
               "descriptor": {
                 "id": "js/parse-error",
-                "index": 4
+                "index": 5
               },
               "properties": {
                 "visibility": {
@@ -341,7 +393,7 @@
               },
               "descriptor": {
                 "id": "js/parse-error",
-                "index": 4
+                "index": 5
               },
               "properties": {
                 "visibility": {

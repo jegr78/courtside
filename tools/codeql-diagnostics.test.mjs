@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { annotation, extractionProblems } from "./codeql-diagnostics.mjs";
+import { annotation, extractionProblems, unextractedFiles } from "./codeql-diagnostics.mjs";
 
 const recorded = JSON.parse(readFileSync(new URL("./codeql-diagnostics.fixture.json", import.meta.url), "utf8"));
 const tool = new URL("./codeql-diagnostics.mjs", import.meta.url).pathname;
@@ -88,4 +88,47 @@ test("given SARIF without tool diagnostics, when the tool runs, then the run say
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /^::warning::CodeQL's SARIF .* carries no tool diagnostics/m,
     "an empty diagnostic list must not read as a clean extraction");
+});
+
+test("given a run that extracted every file it expected, when coverage is compared, then no file is missing", () => {
+  // when / then
+  assert.deepEqual(unextractedFiles(recorded), [], "a file with parse errors still counts as extracted");
+});
+
+test("given a file CodeQL expected but did not extract, when coverage is compared, then that file is named", () => {
+  // given
+  const partial = structuredClone(recorded);
+  const invocation = partial.runs[0].invocations[0];
+  invocation.toolExecutionNotifications = invocation.toolExecutionNotifications.filter((note) =>
+    !(note.descriptor.id === "js/diagnostics/successfully-extracted-files"
+      && note.locations[0].physicalLocation.artifactLocation.uri === "src/valid.ts"));
+
+  // when
+  const missing = unextractedFiles(partial);
+
+  // then
+  assert.deepEqual(missing, [{ language: "js", file: "src/valid.ts" }],
+    "the recorded run minus one successful extraction is the shape of 'scanned 451 out of 452'");
+});
+
+test("given a SARIF directory where a file was not extracted, when the tool runs, then the run names that file", () => {
+  // given
+  const directory = mkdtempSync(join(tmpdir(), "codeql-diagnostics-coverage-"));
+  mkdirSync(join(directory, "codeql"));
+  const partial = structuredClone(recorded);
+  const invocation = partial.runs[0].invocations[0];
+  invocation.toolExecutionNotifications = invocation.toolExecutionNotifications.filter((note) =>
+    note.descriptor.id !== "js/diagnostics/successfully-extracted-files"
+      || note.locations[0].physicalLocation.artifactLocation.uri !== "src/valid.ts");
+  writeFileSync(join(directory, "codeql", "javascript.sarif"), JSON.stringify(partial));
+
+  // when
+  const result = spawnSync(process.execPath, [tool, "--sarif", join(directory, "codeql"),
+    "--output", join(directory, "codeql-diagnostics.json")], { encoding: "utf8" });
+
+  // then
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /^::warning file=src\/valid\.ts,title=js\/unextracted-file::CodeQL expected to extract this file and did not/m);
+  assert.deepEqual(JSON.parse(readFileSync(join(directory, "codeql-diagnostics.json"), "utf8")).unextracted,
+    [{ language: "js", file: "src/valid.ts" }]);
 });
