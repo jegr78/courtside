@@ -644,6 +644,7 @@ const en: Record<keyof typeof de, string> = {
   "admin.facility.courts": "Courts",
   "admin.facility.accessPoints": "Access points",
   "admin.facility.accessPointsHint": "An access point is a door or gate on the way to the courts. Choose the courts it leads to and, if it has a keypad, enter its code.",
+  "admin.facility.accessSettings": "Access times and codes",
   "admin.facility.newAccessPoint": "New access point",
   "admin.facility.allAccessPoints": "All access points",
   "admin.facility.noAccessPoints": "No access point yet.",

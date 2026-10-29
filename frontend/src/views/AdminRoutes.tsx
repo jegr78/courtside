@@ -48,7 +48,7 @@ export default function AdminRoutes({ configurationChanged, administrator, manag
       <Route path="facility">
         <Route index element={<Navigate to="/admin/facility/courts" replace />} />
         <Route path="courts" element={<AdminCourtsView />} />
-        <Route path="access-points" element={<AdminAccessPointsView />} />
+        <Route path="access-points" element={<AdminAccessPointsView configurationChanged={configurationChanged} />} />
         <Route path="opening-hours" element={<AdminOpeningHoursView />} />
         <Route path="opening-hours/exceptions" element={<AdminAvailabilityView />} />
         <Route path="booking-cards" element={<AdminBookingCardsView />} />

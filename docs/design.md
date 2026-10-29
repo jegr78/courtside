@@ -570,7 +570,7 @@ one either.
 The configuration holds three access settings beside the deadlines: how many minutes before a
 booking starts and after it ends its access code works, 0 to 240 and 15 by default each, and the
 length of a static access code, 4 to 8 digits and 6 by default. A request that leaves one out keeps
-its stored value.
+its stored value. A board edits them on the access points page.
 
 Grid changes are refused when active or future bookings, or the opening hours, seasons and holidays
 in force today or scheduled after it, no longer align. Time-zone changes are refused while a confirmed booking has not

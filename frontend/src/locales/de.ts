@@ -642,6 +642,7 @@ const de = {
   "admin.facility.courts": "Plätze",
   "admin.facility.accessPoints": "Zugänge",
   "admin.facility.accessPointsHint": "Ein Zugang ist eine Tür oder ein Tor auf dem Weg zu den Plätzen. Wähle die Plätze, zu denen er führt, und trage bei Bedarf den Code seines Tastenfelds ein.",
+  "admin.facility.accessSettings": "Zugangszeiten und Codes",
   "admin.facility.newAccessPoint": "Neuer Zugang",
   "admin.facility.allAccessPoints": "Alle Zugänge",
   "admin.facility.noAccessPoints": "Noch kein Zugang eingetragen.",

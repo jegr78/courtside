@@ -89,7 +89,7 @@ describe("AdminDeadlinesView", () => {
     // given
     vi.mocked(api.adminConfig)
       .mockResolvedValueOnce(stored)
-      .mockResolvedValue({ ...stored, imprintUrl: "/imprint-2", noMembershipTypeRuleSetId: "other" });
+      .mockResolvedValue({ ...stored, imprintUrl: "/imprint-2", noMembershipTypeRuleSetId: "other", accessCodeLength: 4 });
     const changing = vi.spyOn(api, "changeAdminConfig").mockResolvedValue({ ...stored, bookingReminderHours: 3, waitlistOfferMinutes: 15, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6 });
     show();
     await screen.findByTestId("booking-reminder-hours");
@@ -102,7 +102,7 @@ describe("AdminDeadlinesView", () => {
     // then
     await waitFor(() => expect(changing).toHaveBeenCalledTimes(1));
     expect(changing.mock.calls[0][0], "fields the page does not own are read again just before the write")
-      .toMatchObject({ imprintUrl: "/imprint-2", noMembershipTypeRuleSetId: "other", bookingReminderHours: 3, waitlistOfferMinutes: 15, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6 });
+      .toMatchObject({ imprintUrl: "/imprint-2", noMembershipTypeRuleSetId: "other", bookingReminderHours: 3, waitlistOfferMinutes: 15, accessCodeLength: 4 });
   });
 
   it("given the configuration cannot be read again, when the deadlines are saved, then nothing is written and the failure is shown", async () => {
@@ -123,14 +123,14 @@ describe("AdminDeadlinesView", () => {
     expect(changing, "a write built on an unread configuration could revert another page").not.toHaveBeenCalled();
   });
 
-  it("given the deadlines page, when it loads, then the club's identity and rules are not on it", async () => {
+  it("given the deadlines page, when it loads, then the club's identity, rules and access settings are not on it", async () => {
     // when
     show();
     await screen.findByTestId("new-account-credential-hours");
 
     // then
     for (const elsewhere of ["club-name", "primary-color-value", "logo-file", "time-zone", "slot-minutes",
-      "no-membership-type-rule-set", "save-club-config"]) {
+      "no-membership-type-rule-set", "save-club-config", "access-lead-minutes", "access-lag-minutes", "access-code-length"]) {
       expect(screen.queryByTestId(elsewhere), `${elsewhere} belongs to another surface`).not.toBeInTheDocument();
     }
   });
@@ -240,30 +240,5 @@ describe("AdminDeadlinesView waitlist offer window", () => {
     // then
     await waitFor(() => expect(changing).toHaveBeenCalledWith(expect.objectContaining({ waitlistOfferMinutes: 30, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6 })));
     expect(await screen.findByTestId("admin-save-success")).toHaveTextContent("The deadlines and reminders were saved.");
-  });
-
-  it("given the access settings, when the board changes all three, then the request carries the chosen values", async () => {
-    // given
-    const changing = vi.spyOn(api, "changeAdminConfig")
-      .mockResolvedValue({ ...stored, accessLeadMinutes: 30, accessLagMinutes: 0, accessCodeLength: 4 });
-    show();
-    const lead = await screen.findByTestId("access-lead-minutes");
-    expect(lead).toHaveValue(15);
-    expect(lead).toHaveAttribute("max", "240");
-    expect(screen.getByTestId("access-code-length")).toHaveAttribute("min", "4");
-    expect(screen.getByTestId("access-code-length")).toHaveAttribute("max", "8");
-
-    // when
-    await userEvent.clear(lead);
-    await userEvent.type(lead, "30");
-    await userEvent.clear(screen.getByTestId("access-lag-minutes"));
-    await userEvent.type(screen.getByTestId("access-lag-minutes"), "0");
-    await userEvent.clear(screen.getByTestId("access-code-length"));
-    await userEvent.type(screen.getByTestId("access-code-length"), "4");
-    await userEvent.click(screen.getByTestId("save-deadlines"));
-
-    // then
-    await waitFor(() => expect(changing).toHaveBeenCalledWith(
-      expect.objectContaining({ accessLeadMinutes: 30, accessLagMinutes: 0, accessCodeLength: 4 })));
   });
 });

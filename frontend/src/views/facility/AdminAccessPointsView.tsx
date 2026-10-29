@@ -1,15 +1,18 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
-import { api, type AccessPoint, type AccessPointRequest, type AdminCourt } from "../../api/client";
+import { api, type AccessPoint, type AccessPointRequest, type AdminCourt, type ClubConfig, type ClubConfigRequest } from "../../api/client";
 import { Button } from "../../components/Button";
 import { TextField } from "../../components/TextField";
 import { formString } from "../../forms/formString";
+import { SaveBar } from "../../unsaved/SaveBar";
 import { useUnsavedForm } from "../../unsaved/useUnsavedForm";
+import { ownedFields, useClubConfigForm } from "../configuration/clubConfigForm";
 import { FacilityPage } from "./FacilityPage";
 import { useSaving } from "./useSaving";
 
 const MAX_NAME = 60;
 const NEW = "access-point:new";
+const SETTINGS = "access-settings";
 
 function courtLabel(court: AdminCourt, t: (key: string, options?: Record<string, unknown>) => string) {
   return court.name ? `${t("court.number", { number: court.number })} · ${court.name}` : t("court.number", { number: court.number });
@@ -31,23 +34,25 @@ function acceptable(request: AccessPointRequest, digits: number, storedCode?: st
   return request.name !== "" && codeFits;
 }
 
-export function AdminAccessPointsView() {
+export function AdminAccessPointsView({ configurationChanged }: { configurationChanged: (config: ClubConfig) => void }) {
   const { t } = useTranslation();
   const [accessPoints, setAccessPoints] = useState<AccessPoint[]>();
   const [courts, setCourts] = useState<AdminCourt[]>();
-  const [digits, setDigits] = useState<number>();
   const [editing, setEditing] = useState<string>();
   const { error, success, pending, reportError, refuse, save } = useSaving();
+  const settings = useClubConfigForm(configurationChanged, ownedFields.accessSettings);
+  const { config: settingsConfig, loaded: settingsLoaded } = settings;
+  const digits = settings.saved?.accessCodeLength;
 
   useEffect(() => {
     void Promise.all([api.adminAccessPoints(), api.adminCourts(), api.adminConfig()])
       .then(([points, allCourts, config]) => {
         setAccessPoints(points);
         setCourts(allCourts);
-        setDigits(config.accessCodeLength);
+        settingsLoaded(config);
       })
       .catch(reportError);
-  }, [reportError]);
+  }, [reportError, settingsLoaded]);
 
   function replace(changed: AccessPoint) {
     setAccessPoints((current) => current?.map((item) => item.id === changed.id ? changed : item));
@@ -78,10 +83,18 @@ export function AdminAccessPointsView() {
     });
   }
 
-  const loaded = accessPoints !== undefined && courts !== undefined && digits !== undefined;
+  function saveSettings(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!settingsConfig) return;
+    void save(SETTINGS, async () => settings.applied(await settings.save(settingsConfig)));
+  }
+
+  const loaded = accessPoints !== undefined && courts !== undefined && digits !== undefined && settingsConfig !== undefined;
   return <FacilityPage testId="admin-access-points-view" title={t("admin.facility.accessPoints")} error={error} success={success}>
     {loaded && <>
       <p className="text-muted">{t("admin.facility.accessPointsHint")}</p>
+      <AccessSettingsForm config={settingsConfig} change={settings.change} unsaved={settings.unsaved}
+                          pending={pending.has(SETTINGS)} discard={settings.discard} onSubmit={saveSettings} />
       <AccessPointForm id={NEW} heading={t("admin.facility.newAccessPoint")} courts={courts} digits={digits}
                        disabled={pending.has(NEW)} submitLabel={t("admin.create")} submitTestId="create-access-point"
                        onSubmit={create} />
@@ -113,6 +126,36 @@ export function AdminAccessPointsView() {
       </section>
     </>}
   </FacilityPage>;
+}
+
+function AccessSettingsForm({ config, change, unsaved, pending, discard, onSubmit }: {
+  config: ClubConfigRequest;
+  change: (changed: Partial<ClubConfigRequest>) => void;
+  unsaved: boolean;
+  pending: boolean;
+  discard: () => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+}) {
+  const { t } = useTranslation();
+  return <form id="access-settings-form" noValidate onSubmit={onSubmit} aria-labelledby="access-settings" className="grid gap-4">
+    <h2 id="access-settings" className="text-2xl font-bold">{t("admin.facility.accessSettings")}</h2>
+    <div className="grid gap-5 [&>*]:min-w-0 md:grid-cols-3 md:items-start">
+      <div className="grid gap-1">
+        <TextField data-testid="access-lead-minutes" type="number" min={0} max={240} className="max-w-32" label={t("admin.config.accessLeadMinutes")} value={config.accessLeadMinutes ?? 15} onChange={(event) => change({ accessLeadMinutes: Number(event.target.value) })} />
+        <p className="text-muted text-sm">{t("admin.config.accessLeadMinutesHelp")}</p>
+      </div>
+      <div className="grid gap-1">
+        <TextField data-testid="access-lag-minutes" type="number" min={0} max={240} className="max-w-32" label={t("admin.config.accessLagMinutes")} value={config.accessLagMinutes ?? 15} onChange={(event) => change({ accessLagMinutes: Number(event.target.value) })} />
+        <p className="text-muted text-sm">{t("admin.config.accessLagMinutesHelp")}</p>
+      </div>
+      <div className="grid gap-1">
+        <TextField data-testid="access-code-length" type="number" min={4} max={8} className="max-w-32" label={t("admin.config.accessCodeLength")} value={config.accessCodeLength ?? 6} onChange={(event) => change({ accessCodeLength: Number(event.target.value) })} />
+        <p className="text-muted text-sm">{t("admin.config.accessCodeLengthHelp")}</p>
+      </div>
+    </div>
+    <SaveBar id={SETTINGS} subject={t("admin.facility.accessSettings")} saveTestId="save-access-settings" form="access-settings-form"
+             unsaved={unsaved} pending={pending} discard={discard} />
+  </form>;
 }
 
 function AccessPointSummary({ accessPoint, courts, edit }: { accessPoint: AccessPoint; courts: AdminCourt[]; edit: () => void }) {
@@ -161,7 +204,7 @@ function AccessPointForm({ id, heading, courts, digits, stored, disabled, submit
     <div className="grid gap-1">
       <TextField data-testid={`${prefix}-code`} name="staticCode" inputMode="numeric" autoComplete="off" disabled={disabled}
                  defaultValue={stored?.staticCode ?? ""} className="max-w-48 font-mono" label={t("admin.facility.staticCode")} />
-      <p className="text-muted text-sm">{t("admin.facility.staticCodeHint", { digits })}</p>
+      <p data-testid={`${prefix}-code-hint`} className="text-muted text-sm">{t("admin.facility.staticCodeHint", { digits })}</p>
     </div>
     <span className="flex flex-wrap gap-3">
       <Button variant="primary" type="submit" data-testid={submitTestId} disabled={disabled}>{submitLabel}</Button>

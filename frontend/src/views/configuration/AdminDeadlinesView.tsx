@@ -72,18 +72,6 @@ export function AdminDeadlinesView({ configurationChanged }: { configurationChan
               <TextField data-testid="waitlist-offer-minutes" type="number" min={1} max={1440} className="max-w-32" label={t("admin.config.waitlistOfferMinutes")} value={config.waitlistOfferMinutes ?? 15} onChange={(event) => change({ waitlistOfferMinutes: Number(event.target.value) })} />
               <p className="text-muted text-sm">{t("admin.config.waitlistOfferMinutesHelp")}</p>
             </div>
-            <div className="grid gap-1">
-              <TextField data-testid="access-lead-minutes" type="number" min={0} max={240} className="max-w-32" label={t("admin.config.accessLeadMinutes")} value={config.accessLeadMinutes ?? 15} onChange={(event) => change({ accessLeadMinutes: Number(event.target.value) })} />
-              <p className="text-muted text-sm">{t("admin.config.accessLeadMinutesHelp")}</p>
-            </div>
-            <div className="grid gap-1">
-              <TextField data-testid="access-lag-minutes" type="number" min={0} max={240} className="max-w-32" label={t("admin.config.accessLagMinutes")} value={config.accessLagMinutes ?? 15} onChange={(event) => change({ accessLagMinutes: Number(event.target.value) })} />
-              <p className="text-muted text-sm">{t("admin.config.accessLagMinutesHelp")}</p>
-            </div>
-            <div className="grid gap-1">
-              <TextField data-testid="access-code-length" type="number" min={4} max={8} className="max-w-32" label={t("admin.config.accessCodeLength")} value={config.accessCodeLength ?? 6} onChange={(event) => change({ accessCodeLength: Number(event.target.value) })} />
-              <p className="text-muted text-sm">{t("admin.config.accessCodeLengthHelp")}</p>
-            </div>
           </div>
           <SaveBar id="deadlines" subject={t("admin.deadlines.title")} saveTestId="save-deadlines" form="deadlines-form"
                    unsaved={unsaved} pending={pending} discard={discard} />

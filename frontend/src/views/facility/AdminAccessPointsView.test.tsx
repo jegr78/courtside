@@ -13,12 +13,33 @@ const courts = [
   { id: "court-2", number: 2, name: null, active: true }
 ];
 
+const stored: AdminClubConfig = {
+  clubName: "Example Tennis Club",
+  shortName: "Example",
+  primaryColor: "#b85c38",
+  accentColor: "#d7e24b",
+  logoUrl: "/icon.svg",
+  logoFallbackUrl: "/icon.svg",
+  imprintUrl: "/imprint",
+  privacyUrl: "/privacy",
+  defaultLocale: "en",
+  supportedLocales: ["de", "en"],
+  slotMinutes: 30,
+  timeZone: "Europe/Berlin",
+  newAccountCredentialHours: 168,
+  passwordResetCredentialHours: 24,
+  passwordResetTokenMinutes: 60,
+  bookingReminderHours: 24, waitlistOfferMinutes: 15, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6,
+  noMembershipTypeRuleSetId: "rule-set",
+  logoUploaded: false
+};
+
 const northGate: AccessPoint = { id: "gate-1", name: "North gate", courtIds: ["court-1"], staticCode: "123456", active: true };
 
-function show() {
+function show(configurationChanged = () => undefined) {
   render(<MemoryRouter><UnsavedChangesProvider>
     <UnsavedCount />
-    <AdminAccessPointsView />
+    <AdminAccessPointsView configurationChanged={configurationChanged} />
   </UnsavedChangesProvider></MemoryRouter>);
 }
 
@@ -27,7 +48,7 @@ describe("AdminAccessPointsView", () => {
     vi.restoreAllMocks();
     await i18n.changeLanguage("en");
     vi.spyOn(api, "adminCourts").mockResolvedValue(courts);
-    vi.spyOn(api, "adminConfig").mockResolvedValue({ accessCodeLength: 6 } as AdminClubConfig);
+    vi.spyOn(api, "adminConfig").mockResolvedValue(stored);
     vi.spyOn(api, "adminAccessPoints").mockResolvedValue([northGate]);
   });
 
@@ -103,7 +124,7 @@ describe("AdminAccessPointsView", () => {
 
   it("given a stored code longer than today's length, when only the name changes, then the stored code is kept", async () => {
     // given
-    vi.spyOn(api, "adminConfig").mockResolvedValue({ accessCodeLength: 4 } as AdminClubConfig);
+    vi.spyOn(api, "adminConfig").mockResolvedValue({ ...stored, accessCodeLength: 4 });
     const change = vi.spyOn(api, "changeAdminAccessPoint").mockResolvedValue({ ...northGate, name: "Main gate" });
     show();
     await userEvent.click(await screen.findByTestId("edit-access-point-gate-1"));
@@ -143,5 +164,126 @@ describe("AdminAccessPointsView", () => {
 
     // then
     expect(await screen.findByRole("alert")).toHaveTextContent("Another access point already carries that name.");
+  });
+});
+
+describe("AdminAccessPointsView access settings", () => {
+  beforeEach(async () => {
+    vi.restoreAllMocks();
+    await i18n.changeLanguage("en");
+    vi.spyOn(api, "adminCourts").mockResolvedValue(courts);
+    vi.spyOn(api, "adminConfig").mockResolvedValue(stored);
+    vi.spyOn(api, "adminAccessPoints").mockResolvedValue([northGate]);
+  });
+
+  it("given stored access settings, when the view loads, then each is shown with its limits", async () => {
+    // when
+    show();
+
+    // then
+    const lead = await screen.findByTestId("access-lead-minutes");
+    expect(lead).toHaveValue(15);
+    expect(lead).toHaveAttribute("max", "240");
+    expect(screen.getByTestId("access-lag-minutes")).toHaveValue(15);
+    expect(screen.getByTestId("access-code-length")).toHaveValue(6);
+    expect(screen.getByTestId("access-code-length")).toHaveAttribute("min", "4");
+    expect(screen.getByTestId("access-code-length")).toHaveAttribute("max", "8");
+    expect(screen.queryByTestId("save-access-settings"), "untouched settings offer no save").not.toBeInTheDocument();
+  });
+
+  it("given the board changes all three, when saving, then the request carries them and every other setting as stored", async () => {
+    // given
+    const changing = vi.spyOn(api, "changeAdminConfig")
+      .mockResolvedValue({ ...stored, accessLeadMinutes: 30, accessLagMinutes: 0, accessCodeLength: 4 });
+    const configurationChanged = vi.fn();
+    show(configurationChanged);
+    const lead = await screen.findByTestId("access-lead-minutes");
+
+    // when
+    await userEvent.clear(lead);
+    await userEvent.type(lead, "30");
+    await userEvent.clear(screen.getByTestId("access-lag-minutes"));
+    await userEvent.type(screen.getByTestId("access-lag-minutes"), "0");
+    await userEvent.clear(screen.getByTestId("access-code-length"));
+    await userEvent.type(screen.getByTestId("access-code-length"), "4");
+    await userEvent.click(screen.getByTestId("save-access-settings"));
+
+    // then
+    expect(await screen.findByTestId("admin-save-success")).toHaveTextContent("The change was saved.");
+    expect(changing).toHaveBeenCalledWith({
+      clubName: "Example Tennis Club", shortName: "Example", primaryColor: "#b85c38", accentColor: "#d7e24b",
+      logoUrl: "/icon.svg", imprintUrl: "/imprint", privacyUrl: "/privacy", documentationUrl: undefined,
+      defaultLocale: "en", slotMinutes: 30, timeZone: "Europe/Berlin",
+      newAccountCredentialHours: 168, passwordResetCredentialHours: 24, passwordResetTokenMinutes: 60,
+      bookingReminderHours: 24, waitlistOfferMinutes: 15, accessLeadMinutes: 30, accessLagMinutes: 0, accessCodeLength: 4,
+      noMembershipTypeRuleSetId: "rule-set"
+    });
+    expect(configurationChanged).toHaveBeenCalled();
+    await waitFor(() => expect(screen.getByTestId("unsaved-count")).toHaveTextContent("0"));
+  });
+
+  it("given another page saved a deadline after this one loaded, when the access settings are saved, then the newer deadline survives", async () => {
+    // given
+    vi.mocked(api.adminConfig)
+      .mockResolvedValueOnce(stored)
+      .mockResolvedValue({ ...stored, bookingReminderHours: 3 });
+    const changing = vi.spyOn(api, "changeAdminConfig").mockResolvedValue({ ...stored, bookingReminderHours: 3, accessLeadMinutes: 30 });
+    show();
+    const lead = await screen.findByTestId("access-lead-minutes");
+
+    // when
+    await userEvent.clear(lead);
+    await userEvent.type(lead, "30");
+    await userEvent.click(screen.getByTestId("save-access-settings"));
+
+    // then
+    await waitFor(() => expect(changing).toHaveBeenCalledTimes(1));
+    expect(changing.mock.calls[0][0], "fields the page does not own are read again just before the write")
+      .toMatchObject({ bookingReminderHours: 3, accessLeadMinutes: 30 });
+  });
+
+  it("given a new code length is saved, when a code is entered, then the hint and the check follow the saved length", async () => {
+    // given
+    vi.spyOn(api, "changeAdminConfig").mockResolvedValue({ ...stored, accessCodeLength: 4 });
+    const create = vi.spyOn(api, "createAdminAccessPoint")
+      .mockResolvedValue({ id: "gate-2", name: "South gate", courtIds: [], staticCode: "2468", active: true });
+    show();
+    const length = await screen.findByTestId("access-code-length");
+    await userEvent.clear(length);
+    await userEvent.type(length, "4");
+    expect(screen.getByTestId("new-access-point-code-hint"), "an unsaved length does not govern codes yet").toHaveTextContent("exactly 6 of them");
+    await userEvent.click(screen.getByTestId("save-access-settings"));
+    await screen.findByTestId("admin-save-success");
+
+    // when
+    await userEvent.type(screen.getByTestId("new-access-point-name"), "South gate");
+    await userEvent.type(screen.getByTestId("new-access-point-code"), "2468");
+    await userEvent.click(screen.getByTestId("create-access-point"));
+
+    // then
+    expect(screen.getByTestId("new-access-point-code-hint")).toHaveTextContent("exactly 4 of them");
+    await waitFor(() => expect(create).toHaveBeenCalledWith({ name: "South gate", courtIds: [], staticCode: "2468" }));
+  });
+
+  it("given the API rejects a code length, when saving, then its validation code is reported and the change stays unsaved", async () => {
+    // given
+    vi.spyOn(api, "changeAdminConfig").mockRejectedValue(new ApiError(400, {
+      type: "urn:courtside:error:validation",
+      title: "Validation failed",
+      status: 400,
+      fieldErrors: [{ field: "accessCodeLength", code: "validation.Max", params: { value: 8 } }]
+    }));
+    show();
+    const length = await screen.findByTestId("access-code-length");
+    await userEvent.clear(length);
+    await userEvent.type(length, "9");
+
+    // when
+    await userEvent.click(screen.getByTestId("save-access-settings"));
+
+    // then
+    expect(await screen.findByRole("alert")).toHaveTextContent("8");
+    expect(screen.getByTestId("unsaved-mark-access-settings"), "a refused save leaves the work unsaved").toBeVisible();
+    expect(screen.getByTestId("new-access-point-code-hint")).toHaveTextContent("exactly 6 of them");
   });
 });

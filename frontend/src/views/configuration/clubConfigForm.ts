@@ -34,7 +34,8 @@ export const ownedFields = {
   clubProfile: ["clubName", "shortName", "primaryColor", "accentColor", "logoUrl", "imprintUrl", "privacyUrl",
     "documentationUrl", "defaultLocale", "timeZone", "slotMinutes"],
   deadlines: ["newAccountCredentialHours", "passwordResetCredentialHours", "passwordResetTokenMinutes", "bookingReminderHours",
-    "waitlistOfferMinutes", "accessLeadMinutes", "accessLagMinutes", "accessCodeLength"],
+    "waitlistOfferMinutes"],
+  accessSettings: ["accessLeadMinutes", "accessLagMinutes", "accessCodeLength"],
   ruleSets: ["noMembershipTypeRuleSetId"]
 } satisfies Record<string, readonly ConfigField[]>;
 

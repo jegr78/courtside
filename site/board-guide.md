@@ -157,10 +157,6 @@ Statusleiste der installierten App übernimmt die Primärfarbe beim nächsten Ö
   bis 120 Minuten nach Beginn niemand eingecheckt hat, und gibt den Platz frei. Leer gelassen gibt
   Courtside keinen Platz frei. Bucher und Mitspieler bekommen bei einer Freigabe eine Nachricht. Eine
   Freigabe zählt nicht als Nichterscheinen.
-* **Zugang vor Spielbeginn** und **Zugang nach Spielende** legen fest, wie viele Minuten vor und nach
-  einer Buchung ihr Zugangscode gilt, je 0 bis 240, vorgeschlagen sind 15. **Stellen eines
-  Zugangscodes** bestimmt, wie viele Ziffern ein neuer Code unter *Anlage → Zugänge* hat, 4 bis 8.
-  Codes, die schon gespeichert sind, gelten nach einer Änderung weiter.
 
 ![Die Fristen für Einmalpasswörter und Codes und die Erinnerung vor einer Buchung.](screenshots/de/deadlines.png)
 
@@ -180,7 +176,12 @@ Mitglieder mit betroffenen zukünftigen Buchungen.
 Ein Zugang ist eine Tür oder ein Tor auf dem Weg zu den Plätzen. Gib ihm einen Namen und wähle die
 Plätze, zu denen er führt. Mehrere Plätze können sich einen Zugang teilen, und ein Platz kann über
 mehrere Zugänge erreichbar sein. Hat der Zugang ein Tastenfeld, trage seinen Code ein. Er besteht nur
-aus Ziffern und hat so viele Stellen, wie unter *Verein → Fristen und Erinnerungen* eingestellt ist.
+aus Ziffern und hat so viele Stellen, wie **Stellen eines Zugangscodes** auf derselben Seite festlegt.
+
+Unter **Zugangszeiten und Codes** legen **Zugang vor Spielbeginn** und **Zugang nach Spielende**
+fest, wie viele Minuten vor und nach einer Buchung ihr Zugangscode gilt, je 0 bis 240, vorgeschlagen
+sind 15. **Stellen eines Zugangscodes** bestimmt, wie viele Ziffern ein neuer Code hat, 4 bis 8.
+Codes, die schon gespeichert sind, gelten nach einer Änderung weiter.
 
 Name, Plätze und Code änderst du jederzeit mit *Bearbeiten*. Ein leeres Codefeld entfernt den Code.
 Einen Zugang, den es nicht mehr gibt, deaktivierst du. Im Protokoll steht, dass sich der Code
@@ -192,7 +193,7 @@ anlegst oder wieder aktivierst, einem Zugang mit Code einen Platz hinzufügst od
 Buchungskarte auf *Buchungen erhalten den Zugangscode* stellst. Einen Code oder Platz entfernen und
 einen Zugang deaktivieren verschickt nichts.
 
-![Ein Zugang mit seinen Plätzen und seinem Code und das Formular für einen neuen Zugang.](screenshots/de/access-points.png)
+![Die Zugangszeiten und die Stellen eines Codes, das Formular für einen neuen Zugang und ein Zugang mit seinen Plätzen und seinem Code.](screenshots/de/access-points.png)
 
 Ob die Bucher einer Buchung den Code erhalten, legt ihre Buchungskarte fest.
 
