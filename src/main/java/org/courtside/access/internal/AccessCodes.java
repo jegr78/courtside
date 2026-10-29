@@ -37,7 +37,9 @@ class AccessCodes {
         for (int draw = 0; draw < DRAWS; draw++) {
             String code = candidate(length.digits());
             int inserted = jdbc.sql("""
-                            INSERT INTO access_code (code, grant_id) VALUES (:drawn, :grant)
+                            INSERT INTO access_code (code, grant_id)
+                            SELECT :drawn, :grant
+                            WHERE NOT EXISTS (SELECT 1 FROM access_point WHERE static_code = :drawn)
                             ON CONFLICT (code) DO NOTHING
                             """)
                     .param("drawn", code).param("grant", grantId).update();

@@ -105,7 +105,7 @@ arrays of access point ids rather than references, because `remote_points` recor
 must not follow a later change of the configuration.
 
 `access_code.code` is the primary key, so a code is drawn by inserting it and a second grant can never
-hold a code that is still in use. It has four to eight digits (`access_code_digits`). A row with a
+hold a code that is still in use. A draw that equals an access point's `static_code` is drawn again. It has four to eight digits (`access_code_digits`). A row with a
 `grant_id` is that grant's current code, at most one per grant (`access_code_one_per_grant`), and carries
 no `until` (`access_code_held_only_when_detached`). A row without one is held until `until` and deleted
 afterwards, or at once when `until` is null.

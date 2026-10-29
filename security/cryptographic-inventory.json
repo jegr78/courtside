@@ -148,7 +148,7 @@
       "class": "rate-bounded-secret",
       "owner": "club-operator",
       "storageBoundary": "Drawn into access_code, stored in clear so the access-control system and the players can be given it, and sent to that system. It never enters domain_event, a log, a problem body or the administrative API.",
-      "permittedUse": "Opening the access points of one booking during its validity window. The primary key on access_code keeps a code that a door may still accept from being drawn for a second grant.",
+      "permittedUse": "Opening the access points of one booking during its validity window. The primary key on access_code keeps a code that a door may still accept from being drawn for a second grant, and a draw that equals an access point's static code is drawn again.",
       "rotation": "A code the access-control system rejects before its first acceptance is held until its exposure ends and replaced by a new draw. A move keeps the code.",
       "revocation": "Revoking the grant removes it from the access-control system; the code stays held until the latest window any install asked for has ended, even after the removal is confirmed.",
       "recovery": "None: a code is kept only while a door may accept it.",

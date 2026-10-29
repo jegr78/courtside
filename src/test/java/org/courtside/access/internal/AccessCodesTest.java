@@ -99,6 +99,22 @@ class AccessCodesTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenAnAccessPointsStaticCode_whenADrawHitsIt_thenAnotherCodeIsDrawn() {
+        // given
+        jdbc.sql("INSERT INTO access_point (id, name, static_code) VALUES (?, 'Clubhouse door', '1234')")
+                .params(UUID.randomUUID()).update();
+        UUID grant = insertGrant();
+
+        // when
+        String code = new AccessCodes(jdbc, digits("1234", "5678")).draw(grant, FOUR_DIGITS);
+
+        // then
+        assertThat(code).as("a static code is known to every member, so it never becomes one booking's code")
+                .isEqualTo("5678");
+        assertThat(codesByGrant()).containsExactlyEntriesOf(Map.of(grant, "5678"));
+    }
+
+    @Test
     void givenEveryCandidateIsTaken_whenDrawing_thenTheDrawGivesUpAfterItsBound() {
         // given
         jdbc.sql("INSERT INTO access_code (code) VALUES ('1234')").update();
