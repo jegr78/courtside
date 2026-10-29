@@ -23,6 +23,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 import java.time.DayOfWeek;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -42,6 +43,7 @@ import static org.mockito.Mockito.verify;
 class AccessCodeMessageTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_BOOKING_CARD = UUID.fromString("11111111-1111-1111-1111-111111111111");
+    private static final UUID TRAINING_CARD = UUID.fromString("22222222-2222-2222-2222-222222222222");
     private static final TimeSlot EVENING =
             new TimeSlot(Instant.parse("2026-05-12T16:00:00Z"), Instant.parse("2026-05-12T17:00:00Z"));
     private static final String OLD_CODE = "135790";
@@ -162,6 +164,32 @@ class AccessCodeMessageTest extends AbstractIntegrationTest {
                 .containsExactly(affected);
         assertThat(lastBodyTo("jane.doe@example.org")).as("the message carries the code the gate takes now")
                 .contains("North gate: " + NEW_CODE).doesNotContain(OLD_CODE);
+    }
+
+    @Test
+    void givenASeriesBehindTheNorthGate_whenItsCodeChanges_thenOnlyTheOccurrenceAlreadyRemindedIsAnnounced() {
+        // given
+        UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
+        UUID maryAccount = identity.createEnabledAccount(mary, "major.mary", Set.of(Role.ADMIN));
+        cards.letBookingsReceiveAccessCodes(TRAINING_CARD, true);
+        UUID series = bookingFixture.createSeries(courts.getFirst(), TRAINING_CARD, LocalDate.of(2026, 5, 14),
+                LocalTime.of(18, 0), 60, 4, maryAccount, mary, Set.of(Role.ADMIN));
+        UUID reminded = bookingFixture.firstOccurrenceOf(series);
+        jdbc.sql("UPDATE booking SET reminded_at = :at WHERE id = :id")
+                .param("at", Instant.parse("2026-05-12T09:00:00Z").atOffset(ZoneOffset.UTC)).param("id", reminded)
+                .update();
+
+        // when
+        facilityService.changeAccessPoint(northGate, "North gate", courts.subList(0, 2), NEW_CODE);
+
+        // then
+        assertThat(jdbc.sql("SELECT count(*) FROM notification WHERE kind = 'ACCESS_CODE_CHANGED'")
+                .query(Long.class).single())
+                .as("an occurrence learns its code from its reminder, so only the one already reminded is told")
+                .isEqualTo(1L);
+        assertThat(jdbc.sql("""
+                        SELECT subject_id FROM domain_event WHERE event_type = 'booking.booking.accessCodeChanged'
+                        """).query(UUID.class).list()).containsExactly(reminded);
     }
 
     @Test

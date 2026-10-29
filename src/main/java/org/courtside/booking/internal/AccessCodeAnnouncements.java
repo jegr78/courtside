@@ -23,7 +23,7 @@ class AccessCodeAnnouncements {
     private final ApplicationEventPublisher events;
     private final Clock clock;
 
-    // Every booking whose window is still open: a player on the court now needs the new code to come back in.
+    // A booking whose window is still open counts: a player on the court now needs the code to come back in.
     @Async("closureAnnouncementExecutor")
     @TransactionalEventListener
     @Transactional(propagation = Propagation.REQUIRES_NEW)

@@ -874,8 +874,10 @@ booker or a player at that moment; an `ACCESS_CODE_CHANGED` notice for anybody e
 so such a mail reads exactly as it did before access points existed. A club's own wording that lacks
 the placeholder gets the block appended when there is one. Like a credential, the codes may not
 appear in a subject and stand apart from links in the body. When a board changes an access point's
-static code, every confirmed booking on one of its courts whose card grants access and whose window
-has not ended is announced once to its booker as `ACCESS_CODE_CHANGED`, which must keep
+static code, every confirmed booking on one of its courts whose card grants access, whose window
+has not ended and which already handed a code out is announced once to its booker as `ACCESS_CODE_CHANGED`. A single booking
+handed it out with its confirmation and a series occurrence only with its reminder, so an occurrence
+not yet reminded is not told and its reminder carries the current code. The notice must keep
 `{accessCodes}` and carries the code current when it is sent. The chain runs through `shared` events,
 `facility.accessPoint.codeChanged` and then `booking.booking.accessCodeChanged`, so `notification`
 gains no dependency on `facility`. Removing a code announces nothing.
