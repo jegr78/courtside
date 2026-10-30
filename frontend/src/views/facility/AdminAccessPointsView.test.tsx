@@ -94,7 +94,7 @@ describe("AdminAccessPointsView", () => {
     // when
     await userEvent.type(screen.getByTestId("new-access-point-name"), "West gate");
     await userEvent.click(screen.getByTestId("new-access-point-court-court-1"));
-    await userEvent.type(screen.getByTestId("new-access-point-emergency-code"), "975310");
+    await userEvent.type(screen.getByTestId("new-access-point-emergency"), "975310");
     await userEvent.click(screen.getByTestId("create-access-point"));
 
     // then

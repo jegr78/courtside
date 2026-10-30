@@ -217,7 +217,7 @@ function AccessPointForm({ id, heading, courts, digits, stored, disabled, submit
       <p data-testid={`${prefix}-code-hint`} className="text-muted text-sm">{t("admin.facility.staticCodeHint", { digits })}</p>
     </div>
     <div className="grid gap-1">
-      <TextField data-testid={`${prefix}-emergency-code`} name="emergencyCode" inputMode="numeric" autoComplete="off" disabled={disabled}
+      <TextField data-testid={`${prefix}-emergency`} name="emergencyCode" inputMode="numeric" autoComplete="off" disabled={disabled}
                  defaultValue={stored?.emergencyCode ?? ""} className="max-w-48 font-mono" label={t("admin.facility.emergencyCode")} />
       <p className="text-muted text-sm">{t("admin.facility.emergencyCodeHint", { digits })}</p>
     </div>
