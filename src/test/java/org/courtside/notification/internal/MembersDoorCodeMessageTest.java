@@ -118,6 +118,16 @@ class MembersDoorCodeMessageTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenJaneAsACurrentMember_whenADoorIsCreatedOpenToMembers_thenOnlyJaneIsTold() {
+        // when
+        facility.createAccessPoint("Back door", List.of(), NEW_CODE, true);
+
+        // then
+        assertThat(toldAccounts()).as("a door created open to members hands its code to them")
+                .containsExactly(janeAccount);
+    }
+
+    @Test
     void givenADeactivatedClubhouseDoor_whenItIsActivatedAgain_thenEveryCurrentMemberIsTold() {
         // given
         facility.deactivateAccessPoint(clubhouseDoor);
