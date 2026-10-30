@@ -184,9 +184,9 @@ Mail listeners run before commit, like the audit listener, and store the notific
 and the outbox message in the same transaction. A committed change therefore always has its queued message, and a change whose
 message cannot be stored does not commit: the request fails and nothing of it remains. A mail
 listener never talks to the relay, so a failed handover cannot roll back a change that committed.
-The members' door code is the exception: its listener runs after commit, off the request thread, and
-queues one page of current members per transaction, so a crash in between can leave later pages
-untold.
+The members' door code is the exception: its listener runs after commit through the publication
+registry, off the request thread, and queues one page of current members per transaction. After a
+crash the walk repeats from the start, so earlier pages may be told twice and none is skipped.
 Publishing such an event outside a transaction is refused. Other after-commit listeners run through
 Spring Modulith's event publication registry, whose incomplete publications remain available after
 a restart.
