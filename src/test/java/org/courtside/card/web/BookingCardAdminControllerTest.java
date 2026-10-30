@@ -453,6 +453,73 @@ class BookingCardAdminControllerTest extends AbstractIntegrationTest {
         assertThat(cardService.requireCard(BookingCard.COURT_CLOSED).isGrantsAccess()).isFalse();
     }
 
+    @Test
+    void givenANewCard_whenItsOccupancySignalIsTurnedOffAndOnAgain_thenTheFlagFollowsAndDefaultsToOn()
+            throws Exception {
+        // given
+        String id = createCard("Member play", "#c8a415");
+        mockMvc.perform(get("/api/admin/booking-cards/" + id))
+                .andExpect(jsonPath("$.signalsOccupancy").value(true));
+
+        // when / then
+        mockMvc.perform(put("/api/admin/booking-cards/" + id)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(signalJson("Member play", false))
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.signalsOccupancy").value(false));
+        assertThat(cardService.requireCard(UUID.fromString(id)).isSignalsOccupancy()).isFalse();
+        mockMvc.perform(put("/api/admin/booking-cards/" + id)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(signalJson("Member play", true))
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.signalsOccupancy").value(true));
+    }
+
+    @Test
+    void givenTheClosureCard_whenABoardMakesItSignalOccupancy_thenTheCardRefusesItByCodeAndStaysSilent()
+            throws Exception {
+        // given
+        assertThat(cardService.requireCard(BookingCard.COURT_CLOSED).isSignalsOccupancy())
+                .as("the closure card ships without the occupancy signal").isFalse();
+
+        // when / then
+        mockMvc.perform(put("/api/admin/booking-cards/" + BookingCard.COURT_CLOSED)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(signalJson(cardService.requireCard(BookingCard.COURT_CLOSED).getLabel(), true))
+                        .with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:closure-card-signals-no-occupancy"))
+                .andExpect(jsonPath("$.violations[0].code").value("card.closure.signalsNoOccupancy"));
+        assertThat(cardService.requireCard(BookingCard.COURT_CLOSED).isSignalsOccupancy()).isFalse();
+    }
+
+    @Test
+    void givenTheClosureCard_whenAChangeLeavesTheSignalOut_thenTheChangeIsStoredAndTheCardStaysSilent()
+            throws Exception {
+        // when
+        mockMvc.perform(put("/api/admin/booking-cards/" + BookingCard.COURT_CLOSED)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(cardJson("Closed for repairs", false))
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.label").value("Closed for repairs"))
+                .andExpect(jsonPath("$.signalsOccupancy").value(false));
+
+        // then
+        assertThat(cardService.requireCard(BookingCard.COURT_CLOSED).isSignalsOccupancy())
+                .as("an absent signal keeps the card's current value").isFalse();
+    }
+
+    private static String signalJson(String label, boolean signalsOccupancy) {
+        return """
+                {"label": "%s", "color": "#c8a415",
+                 "allowedRoles": [], "allowedPlayerCounts": [], "countsAgainstLimits": false,
+                 "guestAllowed": false, "signalsOccupancy": %s}
+                """.formatted(label, signalsOccupancy);
+    }
+
     private static String cardJson(String label, boolean grantsAccess) {
         return """
                 {"label": "%s", "color": "#c8a415",

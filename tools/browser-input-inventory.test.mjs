@@ -53,6 +53,11 @@ const BOUNDARIES = {
     classification: "marks one destination as current, and never grants one",
     test: "src/components/PrimaryNavigation.test.tsx#given the court plan is open under its other address, when rendered, then it is still the current page"
   },
+  "src/views/facility/OccupancyKeySection.tsx location": {
+    value: "the origin the board's browser is on",
+    classification: "prefixes the occupancy address shown beside a newly created key, as text to copy, and is never sent anywhere",
+    test: "src/views/facility/AdminAccessPointsView.test.tsx#given no occupancy key, when the board creates one, then the key and the ready URL are shown once"
+  },
   "src/i18n.ts localStorage": {
     value: "the language a visitor chose on this device",
     classification: "resolved against the shipped locales, and dropped when it names none",

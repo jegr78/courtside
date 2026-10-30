@@ -57,7 +57,9 @@ export function validateAuthorizationPolicy(policy, {
     if (rules.length !== 1) throw new Error(`operation ${operationId} has ${rules.length} authorization rules`);
     const rule = policy.operationRules.find(({ id }) => id === rules[0]);
     const assessedActors = Object.entries(operations.get(operationId).expectations)
-      .filter(([, expected]) => expected === "allow").map(([actor]) => actor).toSorted();
+      // A key-gated operation admits every session actor; the key is checked behind that gate.
+      .filter(([, expected]) => expected === "allow" || expected === "deny-without-key")
+      .map(([actor]) => actor).toSorted();
     assertSameMembers(rule.actors.toSorted(), assessedActors,
       `${operationId} policy actors differ from the runtime authorization matrix`);
   }

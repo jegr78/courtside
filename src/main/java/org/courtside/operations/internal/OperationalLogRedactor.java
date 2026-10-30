@@ -12,6 +12,7 @@ final class OperationalLogRedactor {
             "(?i)(\\b(?:cookie|set-cookie)\\s*[:=]\\s*)[^\\r\\n]+");
     private static final Pattern REQUEST_BODY = Pattern.compile(
             "(?is)(\\b(?:request[_-]?body|body)\\s*[:=]\\s*).*$");
+    private static final Pattern QUERY_KEY = Pattern.compile("(?i)([?&]key=)[^\\s&#\"']+");
     private static final Pattern NAMED_SECRET = Pattern.compile(
             "(?i)(\\b(?:password|passwd|token|secret|csrf|session|credential|api[_-]?key)\\s*[:=]\\s*)[^\\s,;]+");
     private static final Pattern DIRECT_IDENTIFIER = Pattern.compile(
@@ -39,6 +40,7 @@ final class OperationalLogRedactor {
         redacted = AUTHORIZATION.matcher(redacted).replaceAll("$1[REDACTED]");
         redacted = COOKIE.matcher(redacted).replaceAll("$1[REDACTED]");
         redacted = REQUEST_BODY.matcher(redacted).replaceAll("$1[REDACTED]");
+        redacted = QUERY_KEY.matcher(redacted).replaceAll("$1[REDACTED]");
         redacted = NAMED_SECRET.matcher(redacted).replaceAll("$1[REDACTED]");
         redacted = DIRECT_IDENTIFIER.matcher(redacted).replaceAll("$1[REDACTED]");
         redacted = IBAN.matcher(redacted).replaceAll("[REDACTED]");

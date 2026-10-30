@@ -133,6 +133,21 @@ class OperationalLogParserTest {
     }
 
     @Test
+    void givenAProxyLineWithTheOccupancyKey_whenParsing_thenTheKeyIsRedactedAndTheRestOfTheQueryKept() {
+        // given
+        String payload = "<14>1 2026-09-19T14:01:00Z host courtside-proxy 42 - - "
+                + "GET /api/public/occupancy?key=short-key&probe=1 200";
+
+        // when
+        OperationalLogRecord record = parse(payload);
+
+        // then
+        assertThat(record.message()).as("a key too short for the opaque-token rule is still masked")
+                .doesNotContain("short-key")
+                .contains("/api/public/occupancy?key=[REDACTED]&probe=1");
+    }
+
+    @Test
     void givenARequestBodyWithDirectIdentifiers_whenParsing_thenItsValuesAreRedacted() {
         OperationalLogRecord record = parse("<14>1 2026-09-19T14:02:00Z host courtside-application 1 - - "
                 + "requestBody={\"firstName\":\"Jane\",\"lastName\":\"Doe\","

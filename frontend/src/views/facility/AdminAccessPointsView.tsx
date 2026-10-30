@@ -8,6 +8,7 @@ import { SaveBar } from "../../unsaved/SaveBar";
 import { useUnsavedForm } from "../../unsaved/useUnsavedForm";
 import { ownedFields, useClubConfigForm } from "../configuration/clubConfigForm";
 import { FacilityPage } from "./FacilityPage";
+import { OccupancyKeySection } from "./OccupancyKeySection";
 import { useSaving } from "./useSaving";
 
 const MAX_NAME = 60;
@@ -130,6 +131,7 @@ export function AdminAccessPointsView({ configurationChanged }: { configurationC
           </li>)}
         </ul>
       </section>
+      <OccupancyKeySection timeZone={settings.saved?.timeZone ?? "UTC"} pending={pending} save={save} reportError={reportError} />
     </>}
   </FacilityPage>;
 }

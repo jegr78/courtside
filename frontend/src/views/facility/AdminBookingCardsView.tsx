@@ -37,7 +37,8 @@ export function AdminBookingCardsView() {
         countsAgainstLimits: form.get("countsAgainstLimits") === "on",
         guestAllowed: form.get("guestAllowed") === "on",
         showGenericOccupancy: form.get("showGenericOccupancy") === "on",
-        grantsAccess: form.get("grantsAccess") === "on"
+        grantsAccess: form.get("grantsAccess") === "on",
+        signalsOccupancy: form.get("signalsOccupancy") === "on"
       });
       setCounts([]);
       setColor(DEFAULT_CARD_COLOR);
@@ -94,6 +95,7 @@ function CardCreateForm({ disabled, form, counts, setCounts, color, setColor, cr
         <Checkbox disabled={disabled} name="countsAgainstLimits" label={t("admin.facility.countsAgainstLimits")} />
         <Checkbox disabled={disabled} name="guestAllowed" label={t("admin.facility.guestAllowed")} />
         <Checkbox disabled={disabled} name="grantsAccess" data-testid="new-card-grants-access" label={t("admin.facility.grantsAccess")} />
+        <Checkbox disabled={disabled} name="signalsOccupancy" data-testid="new-card-signals-occupancy" defaultChecked label={t("admin.facility.signalsOccupancy")} />
       </BookingRules>
     </div>
     <Button variant="primary" data-testid="create-card" disabled={disabled} className="justify-self-start" type="submit">{t("admin.create")}</Button>

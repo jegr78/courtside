@@ -2,6 +2,7 @@ package org.courtside.card;
 
 import org.courtside.card.internal.BookingCardRepository;
 import org.courtside.card.internal.ClosureCardGrantsNoAccessException;
+import org.courtside.card.internal.ClosureCardSignalsNoOccupancyException;
 import org.courtside.card.internal.CardLabelTakenException;
 import org.courtside.card.internal.ParticipantCardRepository;
 import org.courtside.identity.Role;
@@ -75,13 +76,14 @@ public class CardService {
     public BookingCard createCard(String label, String color, Set<Role> allowedRoles,
                                   Set<Role> managingRoles, short[] allowedPlayerCounts,
                                   boolean countsAgainstLimits, boolean guestAllowed,
-                                  boolean showGenericOccupancy, boolean grantsAccess) {
+                                  boolean showGenericOccupancy, boolean grantsAccess, boolean signalsOccupancy) {
         BookingCard card = saveOrRejectTakenLabel(new BookingCard(label, color, allowedRoles, managingRoles,
-                allowedPlayerCounts, countsAgainstLimits, guestAllowed, showGenericOccupancy, grantsAccess));
+                allowedPlayerCounts, countsAgainstLimits, guestAllowed, showGenericOccupancy, grantsAccess,
+                signalsOccupancy));
         events.publishEvent(new CardEvent.BookingCardAdded(card.getId(), List.copyOf(card.getAllowedRoles()),
                 List.copyOf(card.getManagingRoles()), boxed(card.getAllowedPlayerCounts()),
                 card.isCountsAgainstLimits(), card.isGuestAllowed(), card.isShowGenericOccupancy(),
-                card.isGrantsAccess()));
+                card.isGrantsAccess(), card.isSignalsOccupancy()));
         return card;
     }
 
@@ -89,9 +91,12 @@ public class CardService {
     public BookingCard changeCard(UUID cardId, String label, String color, Set<Role> allowedRoles,
                                   Set<Role> managingRoles, short[] allowedPlayerCounts,
                                   boolean countsAgainstLimits, boolean guestAllowed,
-                                  boolean showGenericOccupancy, boolean grantsAccess) {
+                                  boolean showGenericOccupancy, boolean grantsAccess, boolean signalsOccupancy) {
         if (grantsAccess && BookingCard.COURT_CLOSED.equals(cardId)) {
             throw new ClosureCardGrantsNoAccessException();
+        }
+        if (signalsOccupancy && BookingCard.COURT_CLOSED.equals(cardId)) {
+            throw new ClosureCardSignalsNoOccupancyException();
         }
         BookingCard card = requireCard(cardId);
         List<String> changedFields = new ArrayList<>();
@@ -107,17 +112,19 @@ public class CardService {
                 || card.isCountsAgainstLimits() != countsAgainstLimits
                 || card.isGuestAllowed() != guestAllowed
                 || card.isShowGenericOccupancy() != showGenericOccupancy
-                || card.isGrantsAccess() != grantsAccess;
+                || card.isGrantsAccess() != grantsAccess
+                || card.isSignalsOccupancy() != signalsOccupancy;
         boolean startsGrantingAccess = grantsAccess && !card.isGrantsAccess();
         card.changeTo(label, color, allowedRoles, managingRoles,
-                allowedPlayerCounts, countsAgainstLimits, guestAllowed, showGenericOccupancy, grantsAccess);
+                allowedPlayerCounts, countsAgainstLimits, guestAllowed, showGenericOccupancy, grantsAccess,
+                signalsOccupancy);
         BookingCard saved = saveOrRejectTakenLabel(card);
         if (!changedFields.isEmpty() || otherFieldsChanged) {
             events.publishEvent(new CardEvent.BookingCardChanged(saved.getId(),
                     List.copyOf(saved.getAllowedRoles()), List.copyOf(saved.getManagingRoles()),
                     boxed(saved.getAllowedPlayerCounts()), saved.isCountsAgainstLimits(),
                     saved.isGuestAllowed(), saved.isShowGenericOccupancy(), saved.isGrantsAccess(),
-                    List.copyOf(changedFields)));
+                    saved.isSignalsOccupancy(), List.copyOf(changedFields)));
         }
         if (startsGrantingAccess) {
             events.publishEvent(new CardGrantsAccess(saved.getId()));

@@ -303,6 +303,26 @@ class CheckConstraintTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenTheClosureCard_whenItIsUpdatedToSignalOccupancy_thenItIsRejected() {
+        // when / then
+        assertThatThrownBy(() -> jdbc.sql("""
+                        UPDATE booking_card SET signals_occupancy = true
+                        WHERE id = '44444444-4444-4444-4444-444444444444'
+                        """).update())
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .hasMessageContaining("booking_card_closure_signals_no_occupancy");
+    }
+
+    @Test
+    void whenInsertingASecondOccupancyKeyRow_thenItIsRejected() {
+        // when / then
+        assertThatThrownBy(() -> jdbc.sql("INSERT INTO occupancy_key (id, key_hash, created_at) VALUES (2, 'x', now())")
+                        .update())
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .hasMessageContaining("occupancy_key_single_row");
+    }
+
+    @Test
     void whenInsertingAnAccessPointWithANonDigitCode_thenItIsRejected() {
         // when / then
         assertThatThrownBy(() -> jdbc.sql("INSERT INTO access_point (id, name, static_code) VALUES (?, ?, ?)")

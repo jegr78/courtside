@@ -452,6 +452,22 @@ test("given typed authorization responses, when evaluating them, then status alo
   assert.equal(evaluateOperationResult("allow", { status: 400 }).outcome, "passed");
 });
 
+test("given the occupancy poll, when generating and evaluating its cases, then no session admits it without the key", () => {
+  // given
+  const matrix = buildOperationAuthorizationMatrix(api);
+
+  // when
+  const expectations = matrix.find((entry) => entry.operationId === "getCourtOccupancy").expectations;
+
+  // then
+  assert.deepEqual(Object.values(expectations), authorizationActors.map(() => "deny-without-key"),
+    "a role or a session must not stand in for the occupancy key");
+  assert.deepEqual(evaluateOperationResult("deny-without-key", { status: 401 }),
+    { outcome: "passed", observation: "key-required" });
+  assert.equal(evaluateOperationResult("deny-without-key", { status: 200 }).outcome, "failed",
+    "an answer without the key is an admitted poll");
+});
+
 test("given session-ending operations, when executing the matrix, then their side effects cannot poison later cases",
   async () => {
   // given

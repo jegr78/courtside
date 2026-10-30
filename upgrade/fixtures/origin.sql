@@ -293,4 +293,7 @@ UPDATE club_config
 SET club_name = 'Example Tennis Club', primary_color = '#123456', accent_color = '#ABCDEF',
     default_locale = 'en', slot_minutes = 15, time_zone = 'Europe/London';
 
+INSERT INTO occupancy_key (id, key_hash, created_at)
+VALUES (1, '0000000000000000000000000000000000000000000000000000000000000000', '2025-01-01T00:00:00Z');
+
 COMMIT;

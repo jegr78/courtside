@@ -127,6 +127,22 @@ how often it is asked for or alert anybody. `access_point.emergency_code` is sto
 static code. Reconsider if a club needs the emergency path to stop working for one member, which only
 a per-booking fallback code can do, or if the audit shows the code asked for without a failing grant.
 
+## The occupancy key travels in the query string
+
+Building automation reads `GET /api/public/occupancy?key=<key>`, with the key in the URL because a
+Loxone Virtual HTTP Input sends no request headers. A URL is recorded in more places than a header:
+a reverse proxy, a router or the automation's own configuration and logs may keep it outside
+Courtside. Courtside itself masks the query value as `key=[REDACTED]` before its request logging
+reads it, its operational log redacts any `key=` value it collects, the reference `deploy/Caddyfile`
+writes no access log and the UAT proxy strips the query from what it logs. Whoever holds the key
+learns, per active court, whether it is occupied and how many minutes remain until its next
+booking, nothing about who booked or which card, and can change nothing. The reference deployment
+accepts the request over HTTPS only; Courtside itself does not require it, so a club that serves this
+path over plain HTTP behind its own proxy also exposes the key on the network. A board revokes or replaces
+the key on the access points page and the old one is refused on the next poll. Reconsider if the
+answer grows to carry anything about a person or a booking, or if a supported poller can send a
+header.
+
 ## A dynamic access code is stored in clear while a door may accept it
 
 With an access-control connector selected, `access_code.code` holds each grant's code as typed,

@@ -11,6 +11,8 @@ const inventory = JSON.parse(
 
 const METHODS = ["get", "put", "post", "delete", "patch", "options", "head", "trace"];
 const CARRIES_A_PERSON = new Set(["personal", "secret"]);
+// A Loxone Virtual HTTP Input sends no headers, so the occupancy key rides in the query; docs/security-risks.md bounds it.
+const QUERY_SECRETS = new Map([["query:key", "GET /api/public/occupancy"]]);
 
 function resolved(parameter) {
   const name = parameter.$ref?.split("/").pop();
@@ -77,7 +79,8 @@ test("given a value that names or authenticates a person, when it is classified,
   () => {
     // given
     const carried = [...classified.values()]
-      .filter((entry) => entry.in !== "header" && CARRIES_A_PERSON.has(entry.class));
+      .filter((entry) => entry.in !== "header" && CARRIES_A_PERSON.has(entry.class))
+      .filter((entry) => !QUERY_SECRETS.has(`${entry.in}:${entry.name}`));
 
     // when / then
     assert.ok(carried.length === 0,
@@ -93,11 +96,22 @@ test("given a URL parameter, when its schema is read, then it does not admit unc
     // when / then
     for (const [key, declaration] of parameters) {
       if (declaration.in !== "path" && declaration.in !== "query") continue;
+      if (QUERY_SECRETS.has(key)) continue;
       for (const schema of textShapesOf(schemaOf(declaration))) {
         const pinned = Boolean(schema.format || schema.enum || schema.pattern);
         assert.ok(pinned,
           `${key} is a string in a ${declaration.in} with no format, enum or pattern, so ${declaration.operations[0]}`
           + " accepts free text in a URL — the shape a person's name arrives in");
       }
+    }
+  });
+
+test("given a secret the policy lets travel in a query, when the contract is read, then only its one operation declares it",
+  () => {
+    // when / then
+    for (const [key, operation] of QUERY_SECRETS) {
+      assert.deepEqual(parameters.get(key)?.operations, [operation],
+        `${key} is exempt for ${operation} alone, and another operation declaring it would inherit that exemption`);
+      assert.equal(classified.get(key)?.class, "secret", `${key} is exempt because it is a secret`);
     }
   });

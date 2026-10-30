@@ -39,13 +39,15 @@ The current product includes:
 - roster, booking, audit-log, message-log and per-person data exports;
 - an in-app notification centre, localized email notifications and a message log;
 - an append-only audit log;
+- a key-protected court occupancy signal that building automation polls;
 - court-utilisation reporting and board statistics for any period;
 - a React and Vite progressive web application;
 - a multi-architecture image and four reference deployment recipes.
 
 Bookings and administrative changes require authentication. Anonymous callers may read public
-configuration and anonymised occupancy and may use the bounded account-recovery endpoints. The
-product has no anonymous booking path.
+configuration and anonymised occupancy and may use the bounded account-recovery endpoints. A caller
+holding the board's occupancy key may read the per-court occupancy signal. The product has no
+anonymous booking path.
 
 Courtside is licensed under AGPL-3.0-or-later. Each instance publishes its version, build commit and
 configured source location through `GET /api/source`.
@@ -280,10 +282,11 @@ participant list and one entry in booking views.
 ### Cards and participant slots
 
 A booking card controls its name and colour, allowed player counts, guest use, whether it counts
-toward limits, booking roles, managing roles and whether its bookings receive access codes. That
-last attribute, `grantsAccess`, is off by default and never on for the closure card: `CardService`
+toward limits, booking roles, managing roles, whether its bookings receive access codes and whether
+they signal occupancy. The access attribute, `grantsAccess`, is off by default and never on for the closure card: `CardService`
 refuses it with `card.closure.grantsNoAccess`, and the `booking_card_closure_grants_no_access` CHECK
-refuses it below the service.
+refuses it below the service. The last, `signalsOccupancy`, decides whether its bookings count as
+occupied for building automation; it is on by default and off for the closure card the same way.
 
 An empty booking-role set permits every authenticated member account. An empty managing-role set
 permits only the owner and administrators to manage the booking. Managing roles never inherit from
@@ -709,6 +712,31 @@ call's code masked and every standalone run of four to eight digits masked.
 Known limits: probe readings are kept in memory per instance. A board that types a live dynamic code
 as a gate's static code is not stopped, and both then open with that code until the grant's window
 ends.
+
+#### Court occupancy for building automation
+
+Floodlight, irrigation and similar equipment stay under the club's own building automation, which
+polls Courtside; Courtside never switches anything. `GET /api/public/occupancy?key=<key>` answers
+`200 text/plain` with two `name=value` lines per active court in the order of its number:
+`court<N>.occupied` is `1` while a confirmed booking whose card has `signalsOccupancy` runs on court
+`N`, and `court<N>.minutes` counts the whole minutes, rounded down, until the next such booking
+starts. It is `0` while the court is occupied and `1440` when nothing starts within the next 24
+hours. `N` is the court's number, so deactivating another court does not shift it. An inactive court
+is left out. Nothing else is answered: no booker, card, booking or court id.
+
+`signalsOccupancy` is on by default and never on for the closure card: `CardService` refuses it with
+`card.closure.signalsNoOccupancy`, and `booking_card_closure_signals_no_occupancy` refuses it below
+the service. A closure therefore reads `0`.
+
+The poll presents one board-managed key in the query, because a Loxone Virtual HTTP Input sets no
+request headers. `/admin/facility/access-points` creates it, shows it and the ready address once, and
+revokes it; the instance keeps only its SHA-256 and compares hashes in constant time. A new key
+replaces the old one and both changes take effect on the next poll. Without a key, with a wrong one
+or after revocation the poll answers an empty `401`, since a poller cannot parse a problem body.
+Creating and revoking are audited as `booking.occupancyKey.created` and
+`booking.occupancyKey.revoked` without a subject and without the key. The query string is masked as
+`key=[REDACTED]` before Spring's request logging sees it, and the operational log redacts any
+`key=` query value it collects.
 
 Grid changes are refused when active or future bookings, or the opening hours, seasons and holidays
 in force today or scheduled after it, no longer align. Time-zone changes are refused while a confirmed booking has not

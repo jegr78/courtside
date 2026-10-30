@@ -50,6 +50,7 @@ describe("AdminAccessPointsView", () => {
     vi.spyOn(api, "adminCourts").mockResolvedValue(courts);
     vi.spyOn(api, "adminConfig").mockResolvedValue(stored);
     vi.spyOn(api, "adminAccessPoints").mockResolvedValue([northGate]);
+    vi.spyOn(api, "occupancyKeyStatus").mockResolvedValue({ configured: false });
   });
 
   it("given a stored access point, when the view loads, then it shows its name, its courts and its code", async () => {
@@ -213,6 +214,7 @@ describe("AdminAccessPointsView access settings", () => {
     vi.spyOn(api, "adminCourts").mockResolvedValue(courts);
     vi.spyOn(api, "adminConfig").mockResolvedValue(stored);
     vi.spyOn(api, "adminAccessPoints").mockResolvedValue([northGate]);
+    vi.spyOn(api, "occupancyKeyStatus").mockResolvedValue({ configured: false });
   });
 
   it("given stored access settings, when the view loads, then each is shown with its limits", async () => {
@@ -324,5 +326,52 @@ describe("AdminAccessPointsView access settings", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("8");
     expect(screen.getByTestId("unsaved-mark-access-settings"), "a refused save leaves the work unsaved").toBeVisible();
     expect(screen.getByTestId("new-access-point-code-hint")).toHaveTextContent("exactly 6 of them");
+  });
+});
+
+describe("AdminAccessPointsView building automation", () => {
+  beforeEach(async () => {
+    vi.restoreAllMocks();
+    await i18n.changeLanguage("en");
+    vi.spyOn(api, "adminCourts").mockResolvedValue(courts);
+    vi.spyOn(api, "adminConfig").mockResolvedValue(stored);
+    vi.spyOn(api, "adminAccessPoints").mockResolvedValue([northGate]);
+    vi.spyOn(api, "occupancyKeyStatus").mockResolvedValue({ configured: false });
+  });
+
+  it("given no occupancy key, when the board creates one, then the key and the ready URL are shown once", async () => {
+    // given
+    const key = "Ab3_dE-fGhIjKlMnOpQrStUvWxYz0123456789abcde";
+    const create = vi.spyOn(api, "createOccupancyKey").mockResolvedValue({ key, createdAt: "2026-05-12T10:00:00Z" });
+    show();
+    expect(await screen.findByTestId("occupancy-key-status")).toHaveTextContent("No key");
+    expect(screen.queryByTestId("revoke-occupancy-key")).not.toBeInTheDocument();
+
+    // when
+    await userEvent.click(screen.getByTestId("create-occupancy-key"));
+
+    // then
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(await screen.findByTestId("occupancy-key-value")).toHaveValue(key);
+    expect(screen.getByTestId("occupancy-key-url")).toHaveValue(`${window.location.origin}/api/public/occupancy?key=${key}`);
+    expect(screen.getByTestId("occupancy-key-status")).toHaveTextContent("May 12, 2026, 12:00 PM");
+    expect(screen.getByTestId("revoke-occupancy-key")).toBeVisible();
+  });
+
+  it("given an occupancy key, when the board revokes it, then the status says none and no key is shown", async () => {
+    // given
+    vi.spyOn(api, "occupancyKeyStatus").mockResolvedValue({ configured: true, createdAt: "2026-05-01T08:00:00Z" });
+    const revoke = vi.spyOn(api, "revokeOccupancyKey").mockResolvedValue(undefined);
+    show();
+    expect(await screen.findByTestId("occupancy-key-status")).toHaveTextContent("May 1, 2026, 10:00 AM");
+    expect(screen.queryByTestId("occupancy-key-value")).not.toBeInTheDocument();
+
+    // when
+    await userEvent.click(screen.getByTestId("revoke-occupancy-key"));
+
+    // then
+    expect(revoke).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(screen.getByTestId("occupancy-key-status")).toHaveTextContent("No key"));
+    expect(screen.queryByTestId("revoke-occupancy-key")).not.toBeInTheDocument();
   });
 });
