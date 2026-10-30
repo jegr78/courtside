@@ -578,8 +578,8 @@ A board may open an access point with a static code to every member, for a clubh
 not tied to a court. `GET /api/my/door-codes` lists the name and code of every active access point
 open to members, and it is empty for an account that is not a current member: one whose person holds
 a membership period covering today and whose account is enabled. My bookings shows that list at its
-top, and the installed app keeps it offline beside the bookings, with no end of validity, until the
-next refresh or sign-out. The mark needs a static code: `FacilityService` refuses a mark without one,
+top. The installed app reads it from the network first and keeps the last answer beside the bookings
+for offline use, with no end of validity, until the next refresh or sign-out. The mark needs a static code: `FacilityService` refuses a mark without one,
 or clearing the code of a marked access point, with `facility.accessPoint.openToMembersNeedsCode`
 before `access_point_open_to_members_has_code` would. Such an access point may still serve courts and
 then hands its code to their bookings as any other one does.

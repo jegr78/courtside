@@ -305,15 +305,24 @@ test("given the installed PWA, when its lifecycle is qualified, then bounded boo
   assert.match(viteConfiguration, /handler: "NetworkOnly"/);
 });
 
-test("given the door codes request, when the service worker routes it, then it joins the personal bookings cache that sign-out clears", () => {
-  const route = /urlPattern: (\(\{ request, url \}\) => [\s\S]+?),\n\s+handler: "StaleWhileRevalidate",\s+options: \{\s+cacheName: "([^"]+)"/
-    .exec(viteConfiguration);
-  assert.ok(route, "the personal bookings route is the one stale-while-revalidate route");
-  const routes = new Function(`return ${route[1]}`)();
-  const routed = (path) => routes({ request: new Request(`http://localhost${path}`), url: new URL(`http://localhost${path}`) });
-  assert.equal(route[2], "courtside-personal-bookings", "sign-out deletes this cache");
-  assert.equal(routed("/api/my/door-codes"), true, "a member reads the clubhouse code at the door, offline or not");
-  assert.equal(routed("/api/admin/access-points"), false, "the board's codes never reach the offline copy");
+test("given the door codes request, when the service worker routes it, then the network answers first and the personal bookings cache only offline", () => {
+  const routeWith = (handler) => {
+    const route = new RegExp(`urlPattern: (\\(\\{ request, url \\}\\) => (?:(?!handler:)[\\s\\S])+?),\\n\\s+handler: "${handler}",\\s+options: \\{\\s+cacheName: "([^"]+)",\\s+plugins: (\\w+)`)
+      .exec(viteConfiguration);
+    assert.ok(route, `a ${handler} route keeps personal data`);
+    const routes = new Function(`return ${route[1]}`)();
+    return {
+      cache: route[2], plugins: route[3],
+      routes: (path) => routes({ request: new Request(`http://localhost${path}`), url: new URL(`http://localhost${path}`) })
+    };
+  };
+  const doorCodes = routeWith("NetworkFirst");
+  const bookings = routeWith("StaleWhileRevalidate");
+  assert.equal(doorCodes.routes("/api/my/door-codes"), true, "a member sees a changed code at once while online");
+  assert.equal(bookings.routes("/api/my/door-codes"), false, "a stale code would outlive the message announcing its successor");
+  assert.equal(doorCodes.routes("/api/admin/access-points"), false, "the board's codes never reach the offline copy");
+  assert.equal(doorCodes.cache, "courtside-personal-bookings", "sign-out deletes this cache");
+  assert.equal(doorCodes.plugins, bookings.plugins, "the same generation and seven-day age bound both");
   assert.match(viteConfiguration, /Array\.isArray\(body\) \? body\.map\(\(door[^)]*\) => \(\{\s+accessPointName: door\.accessPointName,\s+code: door\.code\s+\}\)\)/,
     "the offline copy keeps a door's name and code and nothing else");
 });
