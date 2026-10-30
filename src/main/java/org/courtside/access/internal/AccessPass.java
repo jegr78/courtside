@@ -1,0 +1,246 @@
+package org.courtside.access.internal;
+
+import lombok.extern.slf4j.Slf4j;
+import org.courtside.access.AccessControlConnector;
+import org.courtside.access.GrantOutcome;
+import org.courtside.access.ProbeOutcome;
+import org.courtside.shared.AccessDemand;
+import org.courtside.shared.BookingAnnouncer;
+import org.jspecify.annotations.Nullable;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
+
+import javax.sql.DataSource;
+import java.sql.Timestamp;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+
+/** One pass over the access grants: insert what the bookings ask for, act on open rows, release codes. */
+@Slf4j
+@Component
+@ConnectorSelected
+class AccessPass {
+
+    private static final UUID FIRST = new UUID(0, 0);
+    private static final ProbeOutcome NO_PROBE_ANSWER = new ProbeOutcome.Unreachable("The probe gave no answer");
+
+    private final DataSource dataSource;
+    private final TransactionTemplate transactions;
+    private final JdbcClient jdbc;
+    private final PassClock clock;
+    private final BookingAnnouncer announcer;
+    private final AccessGrantRepository grants;
+    private final AccessGrantTransitions transitions;
+    private final AccessCodes codes;
+    private final AccessControlConnector connector;
+    private final CallRunner calls;
+    private final ProvisioningWindow window;
+    private final Duration deadline;
+    private final int pageSize;
+
+    AccessPass(DataSource dataSource, PlatformTransactionManager transactionManager, JdbcClient jdbc, PassClock clock,
+               BookingAnnouncer announcer, AccessGrantRepository grants, AccessGrantTransitions transitions,
+               AccessCodes codes, AccessControlConnector connector, CallRunner calls, ProvisioningWindow window,
+               @Value("${courtside.access-control.call-deadline}") Duration deadline,
+               @Value("${courtside.access-control.insert-page-size}") int pageSize) {
+        this.dataSource = dataSource;
+        this.transactions = new TransactionTemplate(transactionManager);
+        this.jdbc = jdbc;
+        this.clock = clock;
+        this.announcer = announcer;
+        this.grants = grants;
+        this.transitions = transitions;
+        this.codes = codes;
+        this.connector = connector;
+        this.calls = calls;
+        this.window = window;
+        this.deadline = deadline;
+        this.pageSize = pageSize;
+    }
+
+    synchronized PassResult runPassNow() {
+        Optional<PassLock> acquired = PassLock.tryAcquire(dataSource);
+        if (acquired.isEmpty()) {
+            return new PassResult.Skipped();
+        }
+        try (PassLock lock = acquired.get()) {
+            insertDemanded();
+            PassResult result = act(lock);
+            release();
+            return result;
+        }
+    }
+
+    private void insertDemanded() {
+        Instant now = clock.now();
+        Instant before = window.endsAt(now);
+        UUID after = FIRST;
+        List<AccessDemand> page = announcer.accessDemandsStartingBefore(before, now, after, pageSize);
+        while (!page.isEmpty()) {
+            for (AccessDemand demand : page) {
+                jdbc.sql("""
+                                INSERT INTO access_grant (id, booking_id, next_attempt_at) VALUES (:id, :booking, :now)
+                                ON CONFLICT (booking_id) DO UPDATE SET next_attempt_at = :now
+                                WHERE access_grant.remote = 'NONE' AND NOT access_grant.wanted
+                                """)
+                        .param("id", UUID.randomUUID()).param("booking", demand.bookingId())
+                        .param("now", Timestamp.from(now)).update();
+            }
+            after = page.getLast().bookingId();
+            page = announcer.accessDemandsStartingBefore(before, now, after, pageSize);
+        }
+    }
+
+    private PassResult act(PassLock lock) {
+        List<UUID> open = jdbc.sql("""
+                        SELECT id FROM access_grant
+                        WHERE wanted OR remote <> 'NONE' OR next_attempt_at <= :now OR retry_requested_at IS NOT NULL
+                        ORDER BY wanted, id
+                        """)
+                .param("now", Timestamp.from(clock.now())).query(UUID.class).list();
+        boolean probed = false;
+        for (UUID grantId : open) {
+            Prepared prepared = prepare(grantId, probed);
+            if (prepared instanceof Prepared.NeedsProbe) {
+                if (!lock.stillHeld()) {
+                    return new PassResult.LockLost();
+                }
+                if (!(probe() instanceof ProbeOutcome.Answered)) {
+                    return new PassResult.Outage();
+                }
+                probed = true;
+                prepared = prepare(grantId, true);
+            }
+            switch (prepared) {
+                case Prepared.Busy busy -> {
+                    return new PassResult.Outage();
+                }
+                case Prepared.Ready(SentCall call) -> {
+                    PassResult ended = callAndRecord(lock, call);
+                    if (ended != null) {
+                        return ended;
+                    }
+                }
+                default -> {
+                }
+            }
+        }
+        return new PassResult.Completed();
+    }
+
+    private Prepared prepare(UUID grantId, boolean probed) {
+        try {
+            return transactions.execute(status -> {
+                Instant now = clock.now();
+                AccessGrant grant = grants.findLockedById(grantId).orElse(null);
+                if (grant == null) {
+                    return new Prepared.NoCall();
+                }
+                AccessDemand demanded = announcer.accessDemands(Set.of(grant.getBookingId())).get(grant.getBookingId());
+                Demand demand = demanded == null ? null
+                        : new Demand(demanded.validFrom(), demanded.validUntil(), demanded.accessPointIds());
+                String mapping = demand == null ? null : connector.mappingOf(demand.accessPointIds());
+                Decision decision = transitions.decide(grant, demand, mapping, now);
+                if (decision.action() == Action.NONE) {
+                    return new Prepared.NoCall();
+                }
+                if (!probed) {
+                    status.setRollbackOnly();
+                    return new Prepared.NeedsProbe();
+                }
+                if (calls.busy()) {
+                    status.setRollbackOnly();
+                    return new Prepared.Busy();
+                }
+                return new Prepared.Ready(grant.beginCall(decision.action(), decision.code(), now));
+            });
+        } catch (RuntimeException failed) {
+            log.warn("Access grant {} could not be decided", grantId, failed);
+            return new Prepared.NoCall();
+        }
+    }
+
+    private @Nullable PassResult callAndRecord(PassLock lock, SentCall call) {
+        if (!lock.stillHeld()) {
+            return new PassResult.LockLost();
+        }
+        CallResult result = send(call);
+        ProbeOutcome reprobe = null;
+        if (AccessGrant.needsReProbe(call.action(), result)) {
+            if (!lock.stillHeld()) {
+                return new PassResult.LockLost();
+            }
+            reprobe = probe();
+        }
+        ProbeOutcome probeResult = reprobe;
+        Instant[] recordedAt = new Instant[1];
+        Recording recording;
+        try {
+            recording = transactions.execute(status -> {
+                recordedAt[0] = clock.now();
+                AccessGrant grant = grants.findLockedById(call.grantId())
+                        .orElseThrow(() -> new IllegalStateException("A grant that was called still exists"));
+                return transitions.record(grant, call, result, probeResult, recordedAt[0], deadline);
+            });
+        } catch (RuntimeException lost) {
+            log.warn("The answer for access grant {} could not be recorded", call.grantId(), lost);
+            return null;
+        }
+        return switch (recording.effect()) {
+            case PassEffect.Continue ignored -> null;
+            case PassEffect.Outage ignored -> new PassResult.Outage();
+            case PassEffect.Hold(Instant until) -> new PassResult.Held(Duration.between(recordedAt[0], until));
+        };
+    }
+
+    private CallResult send(SentCall call) {
+        CallRunner.Result<GrantOutcome> sent = calls.run(() -> switch (call.action()) {
+            case GRANT -> connector.grant(call.instruction());
+            case RESCHEDULE -> connector.reschedule(call.instruction());
+            case REVOKE -> connector.revoke(call.reference());
+            case NONE -> throw new IllegalStateException("No call is sent for a row that needs none");
+        });
+        if (sent instanceof CallRunner.Result.Done<GrantOutcome>(GrantOutcome outcome) && outcome != null) {
+            return new CallResult.Answered(outcome);
+        }
+        return new CallResult.Unclear();
+    }
+
+    private ProbeOutcome probe() {
+        CallRunner.Result<ProbeOutcome> probed = calls.run(connector::probe);
+        if (probed instanceof CallRunner.Result.Done<ProbeOutcome>(ProbeOutcome outcome) && outcome != null) {
+            return outcome;
+        }
+        return NO_PROBE_ANSWER;
+    }
+
+    private void release() {
+        Instant now = clock.now();
+        transactions.executeWithoutResult(status -> {
+            codes.releaseSettled(now);
+            codes.deleteExpired(now);
+        });
+    }
+
+    private sealed interface Prepared {
+
+        record NoCall() implements Prepared {
+        }
+
+        record NeedsProbe() implements Prepared {
+        }
+
+        record Busy() implements Prepared {
+        }
+
+        record Ready(SentCall call) implements Prepared {
+        }
+    }
+}

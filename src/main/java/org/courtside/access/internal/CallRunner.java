@@ -38,6 +38,10 @@ final class CallRunner implements AutoCloseable {
                 .factory());
     }
 
+    boolean busy() {
+        return occupied.get();
+    }
+
     <T> Result<T> run(Callable<T> call) {
         if (!occupied.compareAndSet(false, true)) {
             return new Result.Busy<>();

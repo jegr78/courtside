@@ -1,4 +1,4 @@
 @org.springframework.modulith.ApplicationModule(
         displayName = "Access Control",
-        allowedDependencies = {"config"})
+        allowedDependencies = {"config", "rules"})
 package org.courtside.access;

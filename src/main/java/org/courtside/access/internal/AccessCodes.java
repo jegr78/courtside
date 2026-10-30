@@ -64,6 +64,27 @@ class AccessCodes {
                 .param("until", until == null ? null : Timestamp.from(until)).param("grant", grantId).update();
     }
 
+    int releaseSettled(Instant dbNow) {
+        if (dbNow == null) {
+            throw new IllegalStateException("Settled codes are released against the database's time");
+        }
+        return jdbc.sql("""
+                        WITH released AS (
+                            SELECT g.id, g.exposed_until FROM access_grant g
+                            JOIN access_code c ON c.grant_id = g.id
+                            WHERE NOT g.wanted AND g.remote = 'NONE'
+                              AND (g.exposed_until IS NULL OR g.exposed_until <= :now)
+                            FOR UPDATE OF g
+                        ), detached AS (
+                            UPDATE access_code c SET grant_id = NULL, until = r.exposed_until
+                            FROM released r WHERE c.grant_id = r.id
+                            RETURNING r.id
+                        )
+                        UPDATE access_grant g SET first_accepted_at = NULL FROM detached d WHERE g.id = d.id
+                        """)
+                .param("now", Timestamp.from(dbNow)).update();
+    }
+
     int deleteExpired(Instant dbNow) {
         if (dbNow == null) {
             throw new IllegalStateException("Expired codes are deleted against the database's time");
