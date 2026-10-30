@@ -134,14 +134,16 @@ class AccessPassSafetyTest extends AccessPassTestSupport {
 
         // when
         Instant at = START.plus(Duration.ofMinutes(1));
-        for (int pass = 0; pass < 10; pass++) {
+        Instant lastPass = at;
+        for (int pass = 0; pass < 11; pass++) {
+            lastPass = at;
             passAt(at);
             at = grantOf(booking).getNextAttemptAt();
         }
 
         // then
-        assertThat(at).isAfter(VALID_UNTIL);
-        assertThat(connector.calls(Kind.REVOKE)).hasSize(10);
+        assertThat(lastPass).as("a pass ran after the exposure ended").isAfter(VALID_UNTIL);
+        assertThat(connector.calls(Kind.REVOKE)).hasSize(11);
         assertThat(grantOf(booking).getRemote()).isEqualTo(RemoteState.INSTALLED);
         assertThat(currentCode(booking)).as("a code is never released while it may be installed").isPresent();
     }

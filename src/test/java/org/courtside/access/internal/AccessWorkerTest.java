@@ -125,13 +125,18 @@ class AccessWorkerTest {
         assertThat(started.poll(5, TimeUnit.SECONDS)).isNotNull();
 
         // when
+        long stopping = System.nanoTime();
         worker.stop();
+        Duration stopped = Duration.ofNanos(System.nanoTime() - stopping);
+        boolean threadLeft = Thread.getAllStackTraces().keySet().stream()
+                .anyMatch(thread -> thread.getName().equals("access-worker"));
         worker.signal();
 
         // then
+        assertThat(stopped).as("stopping wakes an idle worker").isLessThan(Duration.ofSeconds(5));
+        assertThat(threadLeft).isFalse();
         assertThat(worker.isRunning()).isFalse();
         assertThat(started.poll(500, TimeUnit.MILLISECONDS)).isNull();
-        assertThat(Thread.getAllStackTraces().keySet()).noneMatch(thread -> thread.getName().equals("access-worker"));
     }
 
     private AccessWorker worker(Supplier<PassResult> pass, Duration idle, Duration lockRetry) {

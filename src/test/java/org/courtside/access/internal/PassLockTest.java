@@ -26,11 +26,16 @@ class PassLockTest extends AbstractIntegrationTest {
         // when
         Optional<PassLock> whileHeld = PassLock.tryAcquire(dataSource);
         first.orElseThrow().close();
+        int heldAfterClose = jdbc.sql("""
+                        SELECT count(*) FROM pg_locks
+                        WHERE locktype = 'advisory' AND classid = 0 AND objid = ? AND objsubid = 1
+                        """).params(PassLock.KEY).query(Integer.class).single();
         Optional<PassLock> afterRelease = PassLock.tryAcquire(dataSource);
 
         // then
         assertThat(first).isPresent();
         assertThat(whileHeld).as("one pass at a time across instances").isEmpty();
+        assertThat(heldAfterClose).as("a pooled session must not keep the lock").isZero();
         assertThat(afterRelease).isPresent();
         afterRelease.orElseThrow().close();
     }
