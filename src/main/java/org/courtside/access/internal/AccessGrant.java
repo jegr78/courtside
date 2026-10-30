@@ -233,7 +233,7 @@ public class AccessGrant {
         if (connectorScope && !probeAnswers) {
             attempts--;
             nextAttemptAt = call.previousNextAttemptAt();
-            lastFailure = reasonOf(outcome);
+            lastFailure = reasonOf(outcome, call.code());
             return new Recording(effect instanceof PassEffect.Hold ? effect : new PassEffect.Outage(), false);
         }
         boolean replaceCode = false;
@@ -258,13 +258,13 @@ public class AccessGrant {
                 }
             }
             case GrantOutcome.RetryLater(Scope _, Instant notBefore, String reason) -> {
-                lastFailure = truncated(reason);
+                lastFailure = stored(reason, call.code());
                 if (notBefore != null && notBefore.isAfter(nextAttemptAt)) {
                     nextAttemptAt = notBefore;
                 }
             }
             case GrantOutcome.Refused(Scope _, String reason) -> {
-                lastFailure = truncated(reason);
+                lastFailure = stored(reason, call.code());
                 if (call.action().installs()) {
                     refused = true;
                     nextAttemptAt = dbNow;
@@ -318,16 +318,17 @@ public class AccessGrant {
         return BACKOFF.get(Math.min(attempts, BACKOFF.size()) - 1);
     }
 
-    private static String reasonOf(GrantOutcome outcome) {
+    private static String reasonOf(GrantOutcome outcome, @Nullable String code) {
         return switch (outcome) {
-            case GrantOutcome.RetryLater later -> truncated(later.reason());
-            case GrantOutcome.Refused refusal -> truncated(refusal.reason());
+            case GrantOutcome.RetryLater later -> stored(later.reason(), code);
+            case GrantOutcome.Refused refusal -> stored(refusal.reason(), code);
             default -> UNCLEAR;
         };
     }
 
-    private static String truncated(String reason) {
-        return reason.length() > MOST_FAILURE_CHARACTERS ? reason.substring(0, MOST_FAILURE_CHARACTERS) : reason;
+    private static String stored(String reason, @Nullable String code) {
+        String masked = code == null ? reason : reason.replace(code, "****");
+        return masked.length() > MOST_FAILURE_CHARACTERS ? masked.substring(0, MOST_FAILURE_CHARACTERS) : masked;
     }
 
     public Set<UUID> getWantPoints() {
