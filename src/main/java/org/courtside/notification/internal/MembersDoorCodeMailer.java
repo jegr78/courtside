@@ -39,7 +39,7 @@ class MembersDoorCodeMailer implements MessageComposer {
     private final MessageOutbox outbox;
     private final PlatformTransactionManager transactionManager;
 
-    @Async("closureAnnouncementExecutor")
+    @Async("membersDoorCodeExecutor")
     @TransactionalEventListener
     void on(FacilityEvent.MembersDoorCodeChanged changed) {
         TransactionTemplate transactions = new TransactionTemplate(transactionManager);
