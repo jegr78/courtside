@@ -12,7 +12,7 @@ import { AdminBookingCardView } from "./AdminBookingCardView";
 const memberCard: BookingCard = {
   id: "card-1", label: "Member booking", color: "#b85c38", allowedRoles: ["MEMBER"],
   managingRoles: [], allowedPlayerCounts: [2, 4], tracksPlayers: true, countsAgainstLimits: true,
-  guestAllowed: true, showGenericOccupancy: false, grantsAccess: false, active: true
+  guestAllowed: true, showGenericOccupancy: false, grantsAccess: false, signalsOccupancy: true, active: true
 };
 
 function show(cardId = "card-1", counted = false, state?: unknown) {
@@ -151,7 +151,7 @@ describe("AdminBookingCardView", () => {
     expect(change).toHaveBeenCalledWith("card-1", {
       label: "Training", color: "#b85c38", allowedRoles: ["MEMBER", "TRAINER"],
       managingRoles: ["SPORT_DIRECTOR"], allowedPlayerCounts: [2, 4],
-      countsAgainstLimits: true, guestAllowed: false, showGenericOccupancy: false, grantsAccess: false
+      countsAgainstLimits: true, guestAllowed: false, showGenericOccupancy: false, grantsAccess: false, signalsOccupancy: true
     });
   });
 
@@ -362,5 +362,36 @@ describe("AdminBookingCardView", () => {
     // then
     expect(await screen.findByTestId("card-grants-access-closure")).toBeInTheDocument();
     expect(screen.queryByTestId("card-grants-access")).not.toBeInTheDocument();
+  });
+
+  it("given an ordinary card, when the board stops its bookings signalling occupancy, then the save carries the flag", async () => {
+    // given
+    const change = vi.spyOn(api, "changeAdminBookingCard").mockResolvedValue({ ...memberCard, signalsOccupancy: false });
+    show();
+    expect(await screen.findByTestId("card-signals-occupancy")).toBeChecked();
+
+    // when
+    await userEvent.click(screen.getByTestId("card-signals-occupancy"));
+    await userEvent.click(screen.getByTestId("save-card"));
+
+    // then
+    await waitFor(() => expect(change).toHaveBeenCalledWith("card-1", expect.objectContaining({ signalsOccupancy: false })));
+  });
+
+  it("given the closure card, when the page loads, then it offers no occupancy switch and its save keeps the signal off", async () => {
+    // given
+    const closure = "44444444-4444-4444-4444-444444444444";
+    vi.spyOn(api, "adminBookingCards").mockResolvedValue([{ ...memberCard, id: closure, label: "Court closed", signalsOccupancy: false }]);
+    const change = vi.spyOn(api, "changeAdminBookingCard").mockResolvedValue({ ...memberCard, id: closure, label: "Court shut", signalsOccupancy: false });
+    show(closure);
+    await screen.findByTestId("card-signals-occupancy-closure");
+
+    // when
+    await userEvent.type(screen.getByTestId("card-label"), "x");
+    await userEvent.click(screen.getByTestId("save-card"));
+
+    // then
+    expect(screen.queryByTestId("card-signals-occupancy")).not.toBeInTheDocument();
+    await waitFor(() => expect(change).toHaveBeenCalledWith(closure, expect.objectContaining({ signalsOccupancy: false })));
   });
 });

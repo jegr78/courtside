@@ -67,6 +67,9 @@ public class BookingCard {
     @Column(name = "grants_access", nullable = false)
     private boolean grantsAccess;
 
+    @Column(name = "signals_occupancy", nullable = false)
+    private boolean signalsOccupancy;
+
     @Column(nullable = false)
     private boolean active;
 
@@ -111,7 +114,8 @@ public class BookingCard {
 
     public BookingCard(String label, String color, Set<Role> allowedRoles, Set<Role> managingRoles,
                        short[] allowedPlayerCounts, boolean countsAgainstLimits,
-                       boolean guestAllowed, boolean showGenericOccupancy, boolean grantsAccess) {
+                       boolean guestAllowed, boolean showGenericOccupancy, boolean grantsAccess,
+                       boolean signalsOccupancy) {
         this.id = UUID.randomUUID();
         this.label = label;
         this.color = color;
@@ -122,12 +126,14 @@ public class BookingCard {
         this.guestAllowed = guestAllowed;
         this.showGenericOccupancy = showGenericOccupancy;
         this.grantsAccess = grantsAccess;
+        this.signalsOccupancy = signalsOccupancy;
         this.active = true;
     }
 
     public void changeTo(String label, String color, Set<Role> allowedRoles, Set<Role> managingRoles,
                          short[] allowedPlayerCounts, boolean countsAgainstLimits,
-                         boolean guestAllowed, boolean showGenericOccupancy, boolean grantsAccess) {
+                         boolean guestAllowed, boolean showGenericOccupancy, boolean grantsAccess,
+                         boolean signalsOccupancy) {
         this.label = label;
         this.color = color;
         this.allowedRoles.clear();
@@ -139,6 +145,7 @@ public class BookingCard {
         this.guestAllowed = guestAllowed;
         this.showGenericOccupancy = showGenericOccupancy;
         this.grantsAccess = grantsAccess;
+        this.signalsOccupancy = signalsOccupancy;
     }
 
     public void activate() {

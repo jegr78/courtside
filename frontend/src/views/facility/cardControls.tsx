@@ -15,8 +15,8 @@ const roles: Role[] = ["MEMBER", "TRAINER", "SPORT_DIRECTOR", "YOUTH_DIRECTOR", 
 // The server strips MEMBER before matching a managing role.
 const managingRoleOptions: Role[] = roles.filter((role) => role !== "MEMBER");
 
-export function Checkbox({ name, label, checked, disabled, value, changed, ...props }: { name?: string; label: string; checked?: boolean; disabled?: boolean; value?: string; changed?: (checked: boolean) => void; "data-testid"?: string }) {
-  return <label className="flex items-center gap-3 font-medium"><input data-testid={props["data-testid"]} name={name} disabled={disabled} type="checkbox" value={value} checked={changed ? checked : undefined} onChange={changed ? (event) => changed(event.target.checked) : undefined} />{label}</label>;
+export function Checkbox({ name, label, checked, defaultChecked, disabled, value, changed, ...props }: { name?: string; label: string; checked?: boolean; defaultChecked?: boolean; disabled?: boolean; value?: string; changed?: (checked: boolean) => void; "data-testid"?: string }) {
+  return <label className="flex items-center gap-3 font-medium"><input data-testid={props["data-testid"]} name={name} disabled={disabled} type="checkbox" value={value} checked={changed ? checked : undefined} defaultChecked={changed ? undefined : defaultChecked} onChange={changed ? (event) => changed(event.target.checked) : undefined} />{label}</label>;
 }
 
 function RoleCheckboxes({ options, legendKey, hintKey, hintTestId, name, selected, disabled, changed, testIdPrefix }: { options: Role[]; legendKey: string; hintKey: string; hintTestId: string; name?: string; selected: Role[]; disabled?: boolean; changed?: (roles: Role[]) => void; testIdPrefix?: string }) {

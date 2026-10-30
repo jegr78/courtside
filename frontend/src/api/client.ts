@@ -34,6 +34,8 @@ export type CourtClosureImpactRequest = components["schemas"]["CourtClosureImpac
 export type DayOfWeek = components["schemas"]["DayOfWeek"];
 export type BookingCard = components["schemas"]["BookingCard"];
 export type BookingCardRequest = components["schemas"]["BookingCardRequest"];
+export type OccupancyKeyStatus = components["schemas"]["OccupancyKeyStatus"];
+export type IssuedOccupancyKey = components["schemas"]["IssuedOccupancyKey"];
 export type Role = components["schemas"]["Role"];
 export type RosterEntry = components["schemas"]["RosterEntry"];
 export type RosterPage = components["schemas"]["RosterPage"];
@@ -512,6 +514,9 @@ export const api = {
   retryAdminAccessGrant: (id: string) => request<AdminAccessGrant>(`/api/admin/access-grants/${id}/retry`, { method: "POST" }),
   probeAccessControl: () => request<void>("/api/admin/access-grants/probe", { method: "POST" }),
   adminAccessPoints: () => request<AccessPoint[]>("/api/admin/access-points"),
+  occupancyKeyStatus: () => request<OccupancyKeyStatus>("/api/admin/occupancy-key"),
+  createOccupancyKey: () => request<IssuedOccupancyKey>("/api/admin/occupancy-key", { method: "POST" }),
+  revokeOccupancyKey: () => request<void>("/api/admin/occupancy-key", { method: "DELETE" }),
   createAdminAccessPoint: (accessPoint: AccessPointRequest) => request<AccessPoint>("/api/admin/access-points", {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(accessPoint)
   }),

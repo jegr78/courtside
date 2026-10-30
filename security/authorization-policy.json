@@ -2,9 +2,9 @@
   "schemaVersion": 1,
   "reviewedAt": "2026-10-30",
   "purpose": "This is the normative authorization policy for the shipped Courtside API. OpenAPI defines the transport shape; this policy defines who may perform each operation, which resource attributes narrow that permission, and which protected fields each projection may read or write.",
-  "openApiFieldInventorySha256": "d2ba07e465cb51f22e17ff42d7081d349c78cbb52a21428247c10941d11f7b26",
+  "openApiFieldInventorySha256": "c6b58d0ac38fbfcd1e5a273fbc9a90f1533dd24b14f6f7a6187f2e21b11adb89",
   "protectedFieldInventorySha256": "df963788c76c5d8d2687a2127a69d2961341cfa78d7c298b65bc1a37bdc24cb8",
-  "productionAuthorizationSha256": "5f3be751d2c212c10e66d9eb0c1358f9101700c0c8c4fa27468c4b14380471dd",
+  "productionAuthorizationSha256": "f4d26005385caf7793417f8ac3ac5198613f8b6d64e4ca959a92f5845c46e89e",
   "ordinaryFields": [
     "Problem.detail",
     "Problem.fieldErrors",
@@ -238,6 +238,7 @@
     "changeBookingCard:request:BookingCardRequest.label",
     "changeBookingCard:request:BookingCardRequest.managingRoles",
     "changeBookingCard:request:BookingCardRequest.showGenericOccupancy",
+    "changeBookingCard:request:BookingCardRequest.signalsOccupancy",
     "changeBookingCard:response:$response.header.Accept",
     "changeBookingCard:response:$response.header.Retry-After",
     "changeBookingCard:response:BookingCard.active",
@@ -251,6 +252,7 @@
     "changeBookingCard:response:BookingCard.label",
     "changeBookingCard:response:BookingCard.managingRoles",
     "changeBookingCard:response:BookingCard.showGenericOccupancy",
+    "changeBookingCard:response:BookingCard.signalsOccupancy",
     "changeBookingCard:response:BookingCard.tracksPlayers",
     "changeBookingCard:response:FieldError.code",
     "changeBookingCard:response:FieldError.field",
@@ -705,6 +707,7 @@
     "createBookingCard:request:BookingCardRequest.label",
     "createBookingCard:request:BookingCardRequest.managingRoles",
     "createBookingCard:request:BookingCardRequest.showGenericOccupancy",
+    "createBookingCard:request:BookingCardRequest.signalsOccupancy",
     "createBookingCard:response:$response.header.Accept",
     "createBookingCard:response:$response.header.Location",
     "createBookingCard:response:$response.header.Retry-After",
@@ -719,6 +722,7 @@
     "createBookingCard:response:BookingCard.label",
     "createBookingCard:response:BookingCard.managingRoles",
     "createBookingCard:response:BookingCard.showGenericOccupancy",
+    "createBookingCard:response:BookingCard.signalsOccupancy",
     "createBookingCard:response:BookingCard.tracksPlayers",
     "createBookingCard:response:FieldError.code",
     "createBookingCard:response:FieldError.field",
@@ -898,6 +902,16 @@
     "createMembershipType:response:Violation.code",
     "createMembershipType:response:Violation.params",
     "createMembershipType:response:Violation.params.*",
+    "createOccupancyKey:response:$response.header.Retry-After",
+    "createOccupancyKey:response:FieldError.code",
+    "createOccupancyKey:response:FieldError.field",
+    "createOccupancyKey:response:FieldError.params",
+    "createOccupancyKey:response:FieldError.params.*",
+    "createOccupancyKey:response:IssuedOccupancyKey.createdAt",
+    "createOccupancyKey:response:IssuedOccupancyKey.key",
+    "createOccupancyKey:response:Violation.code",
+    "createOccupancyKey:response:Violation.params",
+    "createOccupancyKey:response:Violation.params.*",
     "createOpeningPeriod:request:CreateOpeningPeriodRequest.kind",
     "createOpeningPeriod:request:OpeningHours.closesAt",
     "createOpeningPeriod:request:OpeningHours.dayOfWeek",
@@ -1288,6 +1302,7 @@
     "getBookingCard:response:BookingCard.label",
     "getBookingCard:response:BookingCard.managingRoles",
     "getBookingCard:response:BookingCard.showGenericOccupancy",
+    "getBookingCard:response:BookingCard.signalsOccupancy",
     "getBookingCard:response:BookingCard.tracksPlayers",
     "getBookingCard:response:FieldError.code",
     "getBookingCard:response:FieldError.field",
@@ -1415,6 +1430,15 @@
     "getCourt:response:Violation.code",
     "getCourt:response:Violation.params",
     "getCourt:response:Violation.params.*",
+    "getCourtOccupancy:parameter:$parameter.query.key",
+    "getCourtOccupancy:response:$response.header.Retry-After",
+    "getCourtOccupancy:response:FieldError.code",
+    "getCourtOccupancy:response:FieldError.field",
+    "getCourtOccupancy:response:FieldError.params",
+    "getCourtOccupancy:response:FieldError.params.*",
+    "getCourtOccupancy:response:Violation.code",
+    "getCourtOccupancy:response:Violation.params",
+    "getCourtOccupancy:response:Violation.params.*",
     "getManagedAppointment:parameter:$parameter.path.id",
     "getManagedAppointment:response:$response.header.Retry-After",
     "getManagedAppointment:response:FieldError.code",
@@ -1449,6 +1473,16 @@
     "getMembershipType:response:Violation.code",
     "getMembershipType:response:Violation.params",
     "getMembershipType:response:Violation.params.*",
+    "getOccupancyKeyStatus:response:$response.header.Retry-After",
+    "getOccupancyKeyStatus:response:FieldError.code",
+    "getOccupancyKeyStatus:response:FieldError.field",
+    "getOccupancyKeyStatus:response:FieldError.params",
+    "getOccupancyKeyStatus:response:FieldError.params.*",
+    "getOccupancyKeyStatus:response:OccupancyKeyStatus.configured",
+    "getOccupancyKeyStatus:response:OccupancyKeyStatus.createdAt",
+    "getOccupancyKeyStatus:response:Violation.code",
+    "getOccupancyKeyStatus:response:Violation.params",
+    "getOccupancyKeyStatus:response:Violation.params.*",
     "getOwnMfaStatus:response:$response.header.Accept",
     "getOwnMfaStatus:response:$response.header.Retry-After",
     "getOwnMfaStatus:response:FieldError.code",
@@ -1686,6 +1720,7 @@
     "listBookingCards:response:BookingCard.label",
     "listBookingCards:response:BookingCard.managingRoles",
     "listBookingCards:response:BookingCard.showGenericOccupancy",
+    "listBookingCards:response:BookingCard.signalsOccupancy",
     "listBookingCards:response:BookingCard.tracksPlayers",
     "listBookingCards:response:FieldError.code",
     "listBookingCards:response:FieldError.field",
@@ -3000,6 +3035,14 @@
     "retryAccessGrant:response:Violation.code",
     "retryAccessGrant:response:Violation.params",
     "retryAccessGrant:response:Violation.params.*",
+    "revokeOccupancyKey:response:$response.header.Retry-After",
+    "revokeOccupancyKey:response:FieldError.code",
+    "revokeOccupancyKey:response:FieldError.field",
+    "revokeOccupancyKey:response:FieldError.params",
+    "revokeOccupancyKey:response:FieldError.params.*",
+    "revokeOccupancyKey:response:Violation.code",
+    "revokeOccupancyKey:response:Violation.params",
+    "revokeOccupancyKey:response:Violation.params.*",
     "runRetention:parameter:$parameter.path.id",
     "runRetention:response:$response.header.Retry-After",
     "runRetention:response:FieldError.code",
@@ -3135,6 +3178,7 @@
     "setBookingCardActive:response:BookingCard.label",
     "setBookingCardActive:response:BookingCard.managingRoles",
     "setBookingCardActive:response:BookingCard.showGenericOccupancy",
+    "setBookingCardActive:response:BookingCard.signalsOccupancy",
     "setBookingCardActive:response:BookingCard.tracksPlayers",
     "setBookingCardActive:response:FieldError.code",
     "setBookingCardActive:response:FieldError.field",
@@ -3596,6 +3640,10 @@
     {
       "id": "mfa-current-address",
       "description": "The rescue verifier binds the current account email address and security epoch."
+    },
+    {
+      "id": "occupancy-key",
+      "description": "The board-managed key a building-automation poller presents in the query."
     }
   ],
   "operationRules": [
@@ -4202,7 +4250,10 @@
         "addMembershipPeriod",
         "correctMembershipPeriod",
         "removeMembershipPeriod",
-        "listGuardianRelationships"
+        "listGuardianRelationships",
+        "getOccupancyKeyStatus",
+        "createOccupancyKey",
+        "revokeOccupancyKey"
       ],
       "actors": [
         "ADMIN"
@@ -4495,6 +4546,28 @@
       "decisions": [
         "permanent-account-gate",
         "emergency-code-participation"
+      ]
+    },
+    {
+      "id": "occupancy-signal",
+      "description": "Building automation polls court occupancy without an account, admitted by the board-managed occupancy key alone and answered with occupancy only.",
+      "operationIds": [
+        "getCourtOccupancy"
+      ],
+      "actors": [
+        "ANONYMOUS",
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN",
+        "INITIAL_PASSWORD"
+      ],
+      "decisions": [
+        "request-boundary",
+        "occupancy-key-gate"
       ]
     }
   ],
@@ -5336,6 +5409,26 @@
       "negativeTests": [
         "src/test/java/org/courtside/booking/web/DynamicAccessCodeTest.java#givenAnotherMembersBooking_whenAMemberOutsideItAsksForTheEmergencyCode_thenItIsRefusedWithoutTheCode",
         "src/test/java/org/courtside/booking/web/DynamicAccessCodeTest.java#givenABookingWhoseWindowHasNotOpened_whenTheBookerAsksForTheEmergencyCode_thenItIsRefusedByReason"
+      ]
+    },
+    {
+      "id": "occupancy-key-gate",
+      "title": "Occupancy key",
+      "rule": "The occupancy signal answers only a request whose key hashes to the stored SHA-256 of the current key; without one, with a wrong one or after revocation it answers an empty 401. The answer names courts by number and carries occupied and minutes values only.",
+      "attributes": [
+        "occupancy-key"
+      ],
+      "productionPaths": [
+        "src/main/java/org/courtside/booking/web/OccupancyController.java#getCourtOccupancy",
+        "src/main/java/org/courtside/booking/internal/OccupancyKeys.java#accepts"
+      ],
+      "positiveTests": [
+        "src/test/java/org/courtside/booking/web/OccupancySignalTest.java#givenOneCourtInPlayAndTheOtherBookedLater_whenPolled_thenTheAnswerHoldsOnlyTheDocumentedLines"
+      ],
+      "negativeTests": [
+        "src/test/java/org/courtside/booking/web/OccupancySignalTest.java#givenAMissingOrWrongKey_whenPolled_thenTheAnswerIsAnEmpty401",
+        "src/test/java/org/courtside/booking/web/OccupancySignalTest.java#givenARotatedKey_whenPolledWithTheOldOne_thenOnlyTheNewOneIsAnswered",
+        "src/test/java/org/courtside/booking/web/OccupancySignalTest.java#givenARevokedKey_whenPolled_thenItIsRefused"
       ]
     }
   ],

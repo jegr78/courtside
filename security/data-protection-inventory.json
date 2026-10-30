@@ -157,6 +157,11 @@
       "class": "identifier"
     },
     {
+      "name": "key",
+      "in": "query",
+      "class": "secret"
+    },
+    {
       "name": "limit",
       "in": "query",
       "class": "neutral"
@@ -826,6 +831,10 @@
         "lifecycle": "club-configuration"
       },
       "show_generic_occupancy": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "signals_occupancy": {
         "level": "operational",
         "lifecycle": "club-configuration"
       }
@@ -1770,6 +1779,20 @@
       "read_at": {
         "level": "operational",
         "lifecycle": "account-cascade"
+      }
+    },
+    "occupancy_key": {
+      "created_at": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "id": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "key_hash": {
+        "level": "secret",
+        "lifecycle": "club-configuration"
       }
     },
     "opening_hours": {

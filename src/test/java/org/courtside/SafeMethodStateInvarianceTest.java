@@ -106,6 +106,8 @@ class SafeMethodStateInvarianceTest extends AbstractIntegrationTest {
             "/api/admin/audit/search", "{\"query\":\"Miles\",\"limit\":10}",
             "/api/admin/operational-logs/search", "{}");
 
+    private static final String OCCUPANCY_KEY = "{occupancyKey}";
+
     private record Probe(String identifier, String query) {
     }
 
@@ -141,6 +143,7 @@ class SafeMethodStateInvarianceTest extends AbstractIntegrationTest {
             entry("/api/public/booking-cards", read()),
             entry("/api/public/booking-card-legend", read()),
             entry("/api/public/participant-cards", read()),
+            entry("/api/public/occupancy", read("key=" + OCCUPANCY_KEY)),
             entry("/api/bookings", read("date=" + TODAY)),
             entry("/api/booking-eligibility", read()),
             entry("/api/my/bookings", read()),
@@ -156,6 +159,7 @@ class SafeMethodStateInvarianceTest extends AbstractIntegrationTest {
             entry("/api/managed/bookings/{id}", read("bookingId", "")),
             entry("/api/admin/access-grants", read()),
             entry("/api/admin/access-points", read()),
+            entry("/api/admin/occupancy-key", read()),
             entry("/api/admin/access-points/{id}", read("accessPointId", "")),
             entry("/api/admin/courts", read()),
             entry("/api/admin/courts/{id}", read("courtId", "")),
@@ -286,6 +290,7 @@ class SafeMethodStateInvarianceTest extends AbstractIntegrationTest {
                         """.getBytes(StandardCharsets.UTF_8)), accountId).previewId();
 
         identifiers.put("courtId", courtId.toString());
+        identifiers.put("occupancyKey", bookings.issueOccupancyKey());
         identifiers.put("accessPointId",
                 facility.createAccessPoint("North gate", List.of(courtId), "123456").toString());
         identifiers.put("personId", personId.toString());
@@ -531,7 +536,8 @@ class SafeMethodStateInvarianceTest extends AbstractIntegrationTest {
                             + " probe row", path)
                     .isEmpty();
         }
-        return resolved + (probe.query().isEmpty() ? "" : "?" + probe.query());
+        String query = probe.query().replace(OCCUPANCY_KEY, identifiers.getOrDefault("occupancyKey", ""));
+        return resolved + (query.isEmpty() ? "" : "?" + query);
     }
 
     private HttpResponse<byte[]> send(String method, String uri) throws Exception {

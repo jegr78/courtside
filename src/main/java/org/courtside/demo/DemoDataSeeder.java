@@ -149,7 +149,7 @@ class DemoDataSeeder implements ApplicationRunner {
         BookingCard card = cards.requireCard(MEMBER_BOOKING_CARD);
         cards.changeCard(card.getId(), card.getLabel(), card.getColor(), card.getAllowedRoles(),
                 card.getManagingRoles(), card.getAllowedPlayerCounts(), card.isCountsAgainstLimits(),
-                card.isGuestAllowed(), card.isShowGenericOccupancy(), true);
+                card.isGuestAllowed(), card.isShowGenericOccupancy(), true, card.isSignalsOccupancy());
     }
 
     private List<Court> prepareCourts() {

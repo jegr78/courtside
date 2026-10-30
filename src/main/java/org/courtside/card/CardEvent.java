@@ -22,8 +22,8 @@ public sealed interface CardEvent extends DomainEventRecord {
 
     record BookingCardAdded(UUID cardId, List<Role> allowedRoles, List<Role> managingRoles,
                             List<Short> allowedPlayerCounts, boolean countsAgainstLimits,
-                            boolean guestAllowed, boolean showGenericOccupancy, boolean grantsAccess)
-            implements CardEvent {
+                            boolean guestAllowed, boolean showGenericOccupancy, boolean grantsAccess,
+                            boolean signalsOccupancy) implements CardEvent {
 
         static final String TYPE = "card.bookingCard.added";
 
@@ -43,7 +43,7 @@ public sealed interface CardEvent extends DomainEventRecord {
     record BookingCardChanged(UUID cardId, List<Role> allowedRoles, List<Role> managingRoles,
                               List<Short> allowedPlayerCounts, boolean countsAgainstLimits,
                               boolean guestAllowed, boolean showGenericOccupancy, boolean grantsAccess,
-                              List<String> changedFields) implements CardEvent {
+                              boolean signalsOccupancy, List<String> changedFields) implements CardEvent {
 
         static final String TYPE = "card.bookingCard.changed";
 

@@ -12,7 +12,7 @@ import { AdminBookingCardsView } from "./AdminBookingCardsView";
 const memberCard: BookingCard = {
   id: "card-1", label: "Member booking", color: "#b85c38", allowedRoles: ["MEMBER"],
   managingRoles: [], allowedPlayerCounts: [2, 4], tracksPlayers: true, countsAgainstLimits: true,
-  guestAllowed: true, showGenericOccupancy: true, grantsAccess: false, active: true
+  guestAllowed: true, showGenericOccupancy: true, grantsAccess: false, signalsOccupancy: true, active: true
 };
 
 function ArrivedAtCard() {
@@ -154,9 +154,24 @@ describe("AdminBookingCardsView", () => {
     // then
     expect(createCard).toHaveBeenCalledWith(expect.objectContaining({
       label: "Training", color: "#b85c38", allowedRoles: ["TRAINER"], managingRoles: ["TRAINER"],
-      allowedPlayerCounts: [2]
+      allowedPlayerCounts: [2], signalsOccupancy: true
     }));
     expect(await screen.findByTestId("arrived-at-card-2")).toBeVisible();
+  });
+
+  it("given a new card, when the board turns its occupancy signal off before creating it, then the request says so", async () => {
+    // given
+    const createCard = vi.spyOn(api, "createAdminBookingCard").mockResolvedValue({ ...memberCard, id: "card-2", signalsOccupancy: false });
+    show();
+    expect(await screen.findByTestId("new-card-signals-occupancy")).toBeChecked();
+
+    // when
+    await userEvent.type(screen.getByTestId("new-card-label"), "Maintenance");
+    await userEvent.click(screen.getByTestId("new-card-signals-occupancy"));
+    await userEvent.click(screen.getByTestId("create-card"));
+
+    // then
+    expect(createCard).toHaveBeenCalledWith(expect.objectContaining({ label: "Maintenance", signalsOccupancy: false }));
   });
 
   it("given booking cards cannot load, when opening the view, then the failure replaces the loading state", async () => {

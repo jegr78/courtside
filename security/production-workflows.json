@@ -139,7 +139,7 @@
         "ADMIN",
         "INITIAL_PASSWORD"
       ],
-      "entryPoints": "Public configuration, courts, opening hours, cards, participant lookup and booking-grid endpoints.",
+      "entryPoints": "Public configuration, courts, opening hours, cards, participant lookup and booking-grid endpoints, and the key-protected court occupancy signal.",
       "operationIds": [
         "listCourts",
         "listOpeningHours",
@@ -151,7 +151,8 @@
         "listBookingCardLegend",
         "listBookableCards",
         "listParticipantCards",
-        "searchParticipantMembers"
+        "searchParticipantMembers",
+        "getCourtOccupancy"
       ],
       "backgroundEntryPoints": [],
       "stateTransitions": [
@@ -163,18 +164,22 @@
       ],
       "failurePaths": [
         "Missing uploaded branding returns a typed not-found response.",
-        "Participant search and grid bounds reject invalid input without broadening the returned set."
+        "Participant search and grid bounds reject invalid input without broadening the returned set.",
+        "A missing, wrong or revoked occupancy key answers an empty 401 and reveals nothing about the courts."
       ],
       "productionPaths": [
         "src/main/java/org/courtside/config/web/ConfigController.java",
         "src/main/java/org/courtside/facility/web/CourtController.java",
         "src/main/java/org/courtside/booking/web/BookingController.java",
-        "src/main/java/org/courtside/card/web/CardController.java"
+        "src/main/java/org/courtside/card/web/CardController.java",
+        "src/main/java/org/courtside/booking/web/OccupancyController.java"
       ],
       "evidence": [
         "src/test/java/org/courtside/card/web/CardControllerTest.java#givenRoleRestrictedAndInactiveCards_whenListingTheLegend_thenEveryActiveCardIsPublic",
         "src/test/java/org/courtside/config/web/ConfigControllerTest.java#whenReadingThePublicConfig_thenItPublishesNothingOnlyABoardShouldSee",
-        "src/test/java/org/courtside/config/web/ConfigControllerTest.java#givenNoUploadedLogo_whenReadingIt_thenTheTypedNotFoundProblemIsServed"
+        "src/test/java/org/courtside/config/web/ConfigControllerTest.java#givenNoUploadedLogo_whenReadingIt_thenTheTypedNotFoundProblemIsServed",
+        "src/test/java/org/courtside/booking/web/OccupancySignalTest.java#givenOneCourtInPlayAndTheOtherBookedLater_whenPolled_thenTheAnswerHoldsOnlyTheDocumentedLines",
+        "src/test/java/org/courtside/booking/web/OccupancySignalTest.java#givenARevokedKey_whenPolled_thenItIsRefused"
       ]
     },
     {
@@ -368,7 +373,7 @@
       "actors": [
         "ADMIN"
       ],
-      "entryPoints": "Administrative court, access-point, opening-hour, season, holiday, court-closure, booking-card, participant-card and membership-type endpoints.",
+      "entryPoints": "Administrative court, access-point, opening-hour, season, holiday, court-closure, booking-card, participant-card and membership-type and occupancy-key endpoints.",
       "operationIds": [
         "listCourtsForAdmin",
         "createCourt",
@@ -406,7 +411,10 @@
         "listCourtClosures",
         "createCourtClosure",
         "changeCourtClosure",
-        "removeCourtClosure"
+        "removeCourtClosure",
+        "getOccupancyKeyStatus",
+        "createOccupancyKey",
+        "revokeOccupancyKey"
       ],
       "backgroundEntryPoints": [
         "AccessCodeAnnouncements#on(AccessCodeChanged)",
@@ -426,7 +434,8 @@
         "Administrators create and correct configuration records.",
         "Active flags retire and restore resources without deleting history.",
         "Opening-hour changes schedule a weekly version from today or a later day; earlier days keep the hours they had, and a version not yet in force can be removed.",
-        "Storing a season, holiday or court closure tells the people in each booking it newly closes, once, and leaves the booking in place."
+        "Storing a season, holiday or court closure tells the people in each booking it newly closes, once, and leaves the booking in place.",
+        "Creating an occupancy key replaces the one before it and revoking deletes it; only its SHA-256 is stored."
       ],
       "alternatePaths": [
         "Impact endpoints let the board inspect affected future bookings before a restrictive change.",
@@ -439,12 +448,15 @@
       "productionPaths": [
         "src/main/java/org/courtside/facility/FacilityService.java",
         "src/main/java/org/courtside/card/CardService.java",
-        "src/main/java/org/courtside/member/MemberService.java"
+        "src/main/java/org/courtside/member/MemberService.java",
+        "src/main/java/org/courtside/booking/web/OccupancyKeyAdminController.java"
       ],
       "evidence": [
         "src/test/java/org/courtside/config/web/ConfigControllerTest.java#givenAFutureBooking_whenChangingTheTimeZone_thenItIsRejected",
         "src/test/java/org/courtside/facility/FacilityServiceTest.java#givenAWeekScheduledForNovember_whenReadingBeforeAndAfterIt_thenEachDayKeepsItsOwnHours",
-        "src/test/java/org/courtside/notification/ClosureMessageTest.java#givenAClosureNextToTheBooking_whenItIsWidenedOverItAndThenFurther_thenEverybodyIsToldOnce"
+        "src/test/java/org/courtside/notification/ClosureMessageTest.java#givenAClosureNextToTheBooking_whenItIsWidenedOverItAndThenFurther_thenEverybodyIsToldOnce",
+        "src/test/java/org/courtside/booking/web/OccupancyKeyAdminControllerTest.java#givenAKey_whenTheBoardCreatesANewOne_thenTheOldOneStopsWorking",
+        "src/test/java/org/courtside/booking/web/OccupancyKeyAdminControllerTest.java#givenAKey_whenTheBoardRevokesIt_thenThePollIsRefusedAndTheRevocationAudited"
       ]
     },
     {

@@ -25,6 +25,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class ApiContractCoverageTest extends AbstractIntegrationTest {
 
+    // A building-automation poller cannot parse a problem body, so its refusal carries none.
+    private static final Set<String> BODILESS_REFUSALS = Set.of("GET /api/public/occupancy 401");
+
     // Read from the classpath, not from src: this is the copy that ships inside the jar, and the
     // instance is expected to be able to hand out its own contract.
     private static final String DOCUMENT = "/api/openapi.yaml";
@@ -151,7 +154,7 @@ class ApiContractCoverageTest extends AbstractIntegrationTest {
                         + " document declares answers application/problem+json with the Problem"
                         + " schema, and a declaration without that body would satisfy the rules"
                         + " above while documenting an empty shape.")
-                .isEmpty();
+                .isEqualTo(BODILESS_REFUSALS);
     }
 
     @Test

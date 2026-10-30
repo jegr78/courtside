@@ -114,6 +114,10 @@ tags:
     description: The codes of the doors open to every member.
   - name: admin-access-points
     description: Administering the doors and gates that lead to the courts.
+  - name: occupancy
+    description: Whether each court is occupied, for the club's building automation to poll.
+  - name: admin-occupancy-key
+    description: The key building automation presents when it polls the occupancy signal.
   - name: admin-access-grants
     description: Watching and retrying the access grants an access-control system installs per booking.
   - name: admin-opening-hours
@@ -1674,7 +1678,7 @@ components:
       description: |
         What kind of occupancy a booking is. Member booking, training, league match and court
         closure differ only by their card, so a new kind is a row rather than a deployment.
-      required: [id, label, color, allowedRoles, managingRoles, allowedPlayerCounts, tracksPlayers, countsAgainstLimits, guestAllowed, showGenericOccupancy, grantsAccess, active]
+      required: [id, label, color, allowedRoles, managingRoles, allowedPlayerCounts, tracksPlayers, countsAgainstLimits, guestAllowed, showGenericOccupancy, grantsAccess, signalsOccupancy, active]
       properties:
         id: { type: string, format: uuid }
         label: { type: string }
@@ -1707,6 +1711,9 @@ components:
         grantsAccess:
           type: boolean
           description: Whether bookings made with this card receive the access codes of their courts. Never true for the closure card.
+        signalsOccupancy:
+          type: boolean
+          description: Whether bookings made with this card count as occupied in the court occupancy signal. Never true for the closure card.
         active: { type: boolean }
 
     BookingCardRequest:
@@ -1748,6 +1755,10 @@ components:
           type: boolean
           default: false
           description: The closure card refuses `true`.
+        signalsOccupancy:
+          type: boolean
+          default: true
+          description: The closure card refuses `true`, so a change to it states `false`.
 
     ParticipantCard:
       type: object
@@ -3111,6 +3122,25 @@ components:
           type: array
           minItems: 1
           items: { $ref: "#/components/schemas/AccessCode" }
+
+    OccupancyKeyStatus:
+      type: object
+      required: [configured]
+      properties:
+        configured: { type: boolean }
+        createdAt:
+          type: string
+          format: date-time
+          description: When the current key was created. Absent without one.
+
+    IssuedOccupancyKey:
+      type: object
+      required: [key, createdAt]
+      properties:
+        key:
+          type: string
+          description: The new key. It is shown this once and cannot be read back.
+        createdAt: { type: string, format: date-time }
 
     AccessCode:
       type: object
@@ -6254,6 +6284,47 @@ paths:
         "429":
           $ref: "#/components/responses/RateLimited"
 
+  /api/public/occupancy:
+    get:
+      tags: [occupancy]
+      operationId: getCourtOccupancy
+      summary: Whether each active court is occupied now, and how many minutes until its next booking.
+      description: |
+        One `name=value` line per value, two per active court in the order of its number:
+        `court<N>.occupied` is `1` while a booking whose card signals occupancy runs on court `N`
+        and `0` otherwise, and `court<N>.minutes` counts the whole minutes, rounded down, until the
+        next such booking starts. It is `0` while the court is occupied and `1440` when nothing
+        starts within the next 24 hours. Nothing about who booked or which card leaves the instance.
+
+        The key travels in the query because a Loxone Virtual HTTP Input sets no request headers.
+        Building automation polls this every minute or so; an outage heals on the next poll.
+      security: []
+      parameters:
+        - name: key
+          in: query
+          required: false
+          description: The occupancy key a board created. Without one configured every poll is refused.
+          schema: { type: string }
+      responses:
+        "200":
+          description: The occupancy of every active court.
+          content:
+            text/plain:
+              schema: { type: string }
+              example: |
+                court1.occupied=1
+                court1.minutes=0
+                court2.occupied=0
+                court2.minutes=37
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          description: |
+            The key is missing, wrong or revoked, or no key is configured. The answer carries no
+            body, because the pollers this serves cannot parse one.
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
   /api/public/opening-hours:
     get:
       tags: [opening-hours]
@@ -8219,6 +8290,62 @@ paths:
           content:
             application/problem+json:
               schema: { $ref: "#/components/schemas/Problem" }
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/admin/occupancy-key:
+    get:
+      tags: [admin-occupancy-key]
+      operationId: getOccupancyKeyStatus
+      summary: Whether an occupancy key exists and since when. Never the key itself.
+      responses:
+        "200":
+          description: The status.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OccupancyKeyStatus" }
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+    post:
+      tags: [admin-occupancy-key]
+      operationId: createOccupancyKey
+      summary: Create a new occupancy key, replacing the one before it.
+      description: |
+        The answer is the only place the key ever appears; the instance keeps only its SHA-256.
+        The key it replaces is refused from the next poll on.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      responses:
+        "200":
+          description: The new key.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/IssuedOccupancyKey" }
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+    delete:
+      tags: [admin-occupancy-key]
+      operationId: revokeOccupancyKey
+      summary: Revoke the occupancy key, so every poll is refused until a new one is created.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      responses:
+        "204":
+          description: Revoked, or there was none.
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "429":
           $ref: "#/components/responses/RateLimited"
 

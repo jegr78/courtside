@@ -10,6 +10,7 @@ import org.courtside.booking.attendance.AttendancePolicy;
 import org.courtside.booking.attendance.AttendanceRelease;
 import org.courtside.booking.attendance.AttendanceService;
 import org.courtside.booking.internal.BookingReminders;
+import org.courtside.booking.internal.OccupancyKeys;
 import org.courtside.booking.series.BookingSeries;
 import org.courtside.booking.series.BookingSeriesRepository;
 import org.courtside.booking.series.CancelScope;
@@ -47,6 +48,7 @@ public class BookingTestFixture {
     private final AttendanceService attendance;
     private final AttendanceRelease release;
     private final JdbcClient jdbc;
+    private final OccupancyKeys occupancyKeys;
 
     public UUID createBookingLookingForAPartner(UUID courtId, UUID cardId, TimeSlot slot, UUID bookedBy,
                                                 UUID bookerPersonId) {
@@ -197,6 +199,10 @@ public class BookingTestFixture {
                 .param("startsAt", Timestamp.from(slot.start())).param("endsAt", Timestamp.from(slot.end()))
                 .update();
         return id;
+    }
+
+    public String issueOccupancyKey() {
+        return occupancyKeys.issue().key();
     }
 
     public void trackAttendance(Integer releaseAfterMinutes) {

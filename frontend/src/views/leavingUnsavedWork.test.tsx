@@ -119,7 +119,7 @@ describe("leaving an administrative page with unsaved work", () => {
     vi.spyOn(api, "adminBookingCards").mockResolvedValue([{
       id: "card-1", label: "Member booking", color: "#b85c38", allowedRoles: ["MEMBER"], managingRoles: [],
       allowedPlayerCounts: [2], tracksPlayers: true, countsAgainstLimits: true, guestAllowed: false,
-      showGenericOccupancy: false, grantsAccess: false, active: true
+      showGenericOccupancy: false, grantsAccess: false, signalsOccupancy: true, active: true
     }]);
     vi.spyOn(api, "adminParticipantCards").mockResolvedValue([{ id: "filler-1", label: "Ball machine", capacity: 1, active: true }]);
     vi.spyOn(api, "person").mockResolvedValue(jane);

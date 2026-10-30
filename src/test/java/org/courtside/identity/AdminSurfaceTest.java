@@ -59,6 +59,8 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
 
     private static final String BOOT_ERROR_PATH = "/error";
     private static final String INITIAL_PASSWORD_PATH = "/api/account/initial-password";
+    // Without a key the occupancy signal answers its own empty 401, which the gate's problem body tells apart.
+    private static final String OCCUPANCY_PATH = "/api/public/occupancy";
 
     // A variable missing here is checked against the catch-all UUID it was given, which proves nothing.
     private static final Map<String, String> EXPECTED_LITERAL_BY_VARIABLE = Map.of(
@@ -74,6 +76,7 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
             "/api/public/booking-card-legend",
             "/api/public/booking-grid",
             "/api/public/config",
+            "/api/public/occupancy",
             "/api/public/config/icon",
             "/api/public/config/logo",
             "/api/public/courts",
@@ -454,6 +457,10 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
                 mockMvc.perform(request)
                         .andExpect(status().isForbidden())
                         .andExpect(jsonPath("$.type").value("urn:courtside:error:mfa-proof-failed"));
+            } else if (endpoint.pattern().equals(OCCUPANCY_PATH)) {
+                mockMvc.perform(request)
+                        .andExpect(status().isUnauthorized())
+                        .andExpect(content().string(""));
             } else if (endpoint.pattern().equals("/api/public/config/logo")) {
                 mockMvc.perform(request)
                         .andExpect(status().isNotFound())
@@ -520,6 +527,10 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
             if (isAnonymousAllowed(endpoint) && MFA_PROOF_REQUIRED_ENDPOINTS.contains(endpoint.key())) {
                 result.andExpect(status().isForbidden())
                         .andExpect(jsonPath("$.type").value("urn:courtside:error:mfa-proof-failed"));
+                return null;
+            }
+            if (endpoint.pattern().equals(OCCUPANCY_PATH)) {
+                result.andExpect(status().isUnauthorized()).andExpect(content().string(""));
                 return null;
             }
             if (admitted && (response.getStatus() == HttpStatus.UNAUTHORIZED.value()

@@ -57,7 +57,8 @@ export function AdminBookingCardView() {
       label: card.label, color: card.color, allowedRoles: card.allowedRoles,
       managingRoles: card.managingRoles, allowedPlayerCounts: card.allowedPlayerCounts,
       countsAgainstLimits: card.countsAgainstLimits, guestAllowed: card.guestAllowed,
-      showGenericOccupancy: card.showGenericOccupancy, grantsAccess: card.grantsAccess
+      showGenericOccupancy: card.showGenericOccupancy, grantsAccess: card.grantsAccess,
+      signalsOccupancy: card.signalsOccupancy
     })));
   }
 
@@ -101,6 +102,9 @@ export function AdminBookingCardView() {
             {card.id === COURT_CLOSED
               ? <p data-testid="card-grants-access-closure" className="text-muted text-sm">{t("admin.facility.grantsAccessClosure")}</p>
               : <Checkbox disabled={disabled} data-testid="card-grants-access" label={t("admin.facility.grantsAccess")} checked={card.grantsAccess} changed={(grantsAccess) => setCard({ ...card, grantsAccess })} />}
+            {card.id === COURT_CLOSED
+              ? <p data-testid="card-signals-occupancy-closure" className="text-muted text-sm">{t("admin.facility.signalsOccupancyClosure")}</p>
+              : <Checkbox disabled={disabled} data-testid="card-signals-occupancy" label={t("admin.facility.signalsOccupancy")} checked={card.signalsOccupancy} changed={(signalsOccupancy) => setCard({ ...card, signalsOccupancy })} />}
           </BookingRules>
         </div>
       </div>

@@ -74,6 +74,7 @@ class ProblemTypeUriTest {
             "urn:courtside:error:access-point-not-found",
             "urn:courtside:error:access-point-rejected",
             "urn:courtside:error:closure-card-grants-no-access",
+            "urn:courtside:error:closure-card-signals-no-occupancy",
             "urn:courtside:error:card-label-taken",
             "urn:courtside:error:card-not-bookable",
             "urn:courtside:error:card-not-found",

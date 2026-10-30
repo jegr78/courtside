@@ -267,4 +267,17 @@ public interface CourtAllocationRepository extends JpaRepository<CourtAllocation
             ORDER BY a.startsAt, a.courtId
             """)
     List<CourtAllocation> findAllByBookingIdIn(@Param("bookingIds") Collection<UUID> bookingIds);
+
+    @Query("""
+            SELECT new org.courtside.booking.internal.OccupancySignal$NextStart(a.courtId, MIN(a.startsAt))
+            FROM CourtAllocation a JOIN a.booking b, BookingCard c
+            WHERE c.id = b.cardId
+              AND c.signalsOccupancy = true
+              AND b.status = org.courtside.booking.BookingStatus.CONFIRMED
+              AND a.status = org.courtside.booking.BookingStatus.CONFIRMED
+              AND a.endsAt > :now
+              AND a.startsAt < :horizon
+            GROUP BY a.courtId
+            """)
+    List<OccupancySignal.NextStart> nextSignallingStarts(@Param("now") Instant now, @Param("horizon") Instant horizon);
 }
