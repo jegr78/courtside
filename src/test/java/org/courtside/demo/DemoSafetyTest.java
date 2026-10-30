@@ -2,6 +2,7 @@ package org.courtside.demo;
 
 import org.courtside.booking.BookingRepository;
 import org.courtside.booking.BookingService;
+import org.courtside.card.CardService;
 import org.courtside.config.ClubIdentity;
 import org.courtside.facility.FacilityService;
 import org.courtside.identity.PersonRepository;
@@ -107,7 +108,7 @@ class DemoSafetyTest {
                 mock(FacilityService.class), mock(BookingService.class), mock(BookingRepository.class),
                 mock(PasswordEncoder.class), Clock.systemUTC(),
                 new DemoProperties(true, "member-password"), "admin", "admin-password",
-                () -> BERLIN, GERMAN_CLUB);
+                () -> BERLIN, GERMAN_CLUB, mock(CardService.class));
 
         // when / then
         assertThatThrownBy(() -> seeder.run(new DefaultApplicationArguments(new String[0])))

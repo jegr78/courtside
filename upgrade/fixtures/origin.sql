@@ -127,6 +127,20 @@ INSERT INTO court_allocation (id, booking_id, court_id, starts_at, ends_at, stat
     ('78000000-0000-0000-0000-000000000002', '77000000-0000-0000-0000-000000000002',
      '70000000-0000-0000-0000-000000000001', '2025-01-06T09:00:00Z', '2025-01-06T10:00:00Z', 'CONFIRMED');
 
+INSERT INTO access_grant
+    (id, booking_id, first_accepted_at, wanted, want_from, want_until, want_points, want_mapping, remote,
+     remote_from, remote_until, remote_points, remote_mapping, exposed_until, last_install_sent_at,
+     external_reference, attempts, rejections, next_attempt_at, last_failure, refused, retry_requested_at)
+VALUES ('7f500000-0000-0000-0000-000000000001', '77000000-0000-0000-0000-000000000002', '2025-01-06T08:00:00Z',
+        true, '2025-01-06T08:45:00Z', '2025-01-06T10:15:00Z', '{70300000-0000-0000-0000-000000000001}',
+        'upgrade-mapping', 'INSTALLED', '2025-01-06T08:45:00Z', '2025-01-06T10:15:00Z',
+        '{70300000-0000-0000-0000-000000000001}', 'upgrade-mapping', '2025-01-06T10:15:00Z',
+        '2025-01-06T08:00:00Z', 'upgrade-remote-user', 0, 0, '2025-01-06T09:00:00Z', NULL, false, NULL);
+
+INSERT INTO access_code (code, grant_id, until) VALUES
+    ('357913', '7f500000-0000-0000-0000-000000000001', NULL),
+    ('864209', NULL, '2025-01-05T10:15:00Z');
+
 INSERT INTO booking_attendance (booking_id, outcome, recorded_at, recorded_by)
 VALUES ('77000000-0000-0000-0000-000000000001', 'NO_SHOW', '2025-01-05T10:30:00Z',
         '72000000-0000-0000-0000-000000000001');

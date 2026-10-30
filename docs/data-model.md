@@ -90,6 +90,35 @@ is checked by the application, so a stored code survives a later change of that 
 `access_point_court` has one row per access point and court, and deleting an access point deletes
 its rows. Nothing deletes an access point: `active` retires it.
 
+## Access grants
+
+| Table | Holds | References |
+|---|---|---|
+| `access_grant` | One booking's dynamic access: the demand last derived for it and what the access-control system last answered | None |
+| `access_code` | Every dynamic access code in use, whether a grant holds it or it waits for its last window to end | `access_grant` |
+
+`access_grant.booking_id` is unique (`access_grant_one_per_booking`) and carries no foreign key to
+`booking`, so the access module never constrains what the booking module does with its rows. Nothing
+deletes a grant. `remote` is
+`NONE`, `MAYBE` or `INSTALLED` (`access_grant_remote_known`). `want_points` and `remote_points` are
+arrays of access point ids rather than references, because `remote_points` records what was sent and
+must not follow a later change of the configuration. A wanted grant carries its window and access
+points (`access_grant_wanted_has_demand`), an `INSTALLED` one the window and access points it was
+installed with (`access_grant_installed_has_window`), and any grant other than `NONE` an
+`exposed_until` (`access_grant_remote_exposed`). A mapping fingerprint has at most 200 characters.
+`exposed_until` is the latest window end any install asked for and is never lowered.
+`first_accepted_at` records when the system first accepted the current code and is cleared when the
+code is released. `attempts`, `rejections`, `refused`, `next_attempt_at` and `last_failure` hold the
+retry state; `last_failure` holds the connector's reason with the code and every standalone run of
+four to eight digits masked, at most 500 characters. `retry_requested_at` is a board's retry until
+the next pass consumes it.
+
+`access_code.code` is the primary key, so a code is drawn by inserting it and a second grant can never
+hold a code that is still in use. A draw that equals an access point's `static_code` is drawn again. It has four to eight digits (`access_code_digits`). A row with a
+`grant_id` is that grant's current code, at most one per grant (`access_code_one_per_grant`), and carries
+no `until` (`access_code_held_only_when_detached`). A row without one is held until `until` and deleted
+afterwards, or at once when `until` is null.
+
 ## Cards
 
 | Table | Holds | References |
@@ -390,7 +419,8 @@ fields and never a static code, `card.bookingCard.changed`, `config.club.changed
 `rules.ruleSet.changed`, `roster.person.corrected`, `dataexchange.source.described` and
 `notification.template.changed`, each with siblings, among them `facility.accessPoint.codeChanged`,
 which names the access point and the courts its code newly opens, and `card.bookingCard.accessGranted`,
-which names a card that starts granting access. A message wording has no row id of its own, so
+which names a card that starts granting access, and `access.grant.retryRequested`, which names the
+access grant a board sent again and its booking. A message wording has no row id of its own, so
 its entries name a subject derived from the message kind and language. The other two arrive in the course of ordinary use, because the writer records every
 event a module publishes rather than a list it keeps: `booking.booking.confirmed` and the
 other entries beginning with `booking.`, and `identity.account.credentialsRequested`, which names the account a

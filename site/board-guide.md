@@ -544,7 +544,7 @@ aktivieren und Mitgliedsrollen neu vergeben.
 
 ## Nachweise
 
-Unter **Nachweise** findest du acht Ansichten. Die *Aufbewahrung* beschreibt der nächste Abschnitt.
+Unter **Nachweise** findest du neun Ansichten. Die *Aufbewahrung* beschreibt der nächste Abschnitt.
 
 * **Statistik** zeigt beim Öffnen den letzten vollen Monat. Oben wählst du einen anderen Zeitraum:
   7 Tage, 1, 3, 6 oder 12 Monate bis heute, alles seit der ersten Buchung, das letzte Kalenderjahr
@@ -608,6 +608,22 @@ Unter **Nachweise** findest du acht Ansichten. Die *Aufbewahrung* beschreibt der
   richtet der Betrieb in seinem eigenen Monitoring ein.
 
 ![Die Betriebsübersicht mit einem Punkt in Ordnung, einem gestörten mit seinem Mailserver und einer nicht belegten Sicherung.](screenshots/de/operator-health.png)
+
+* **Zugangsberechtigungen** zeigt, welche Codes ein angebundenes Zutrittssystem pro Buchung hält.
+  Jede Buchung, deren Karte Zugang gewährt, erhält dort einen eigenen Code für die Zugänge ihrer
+  Plätze. Ein Zugang mit festem Code bekommt keine Einzelcodes je Buchung: Für ihn gilt weiter nur
+  sein fester Code. Courtside richtet den Code ein, sobald die Buchung so nah ist, wie Mitglieder im
+  Voraus buchen dürfen. Weiter entfernte Termine einer Serie folgen später. Eine Berechtigung
+  *Wartet*, ist *Eingerichtet*, *Wird entfernt* oder ist *Gescheitert*. Gescheiterte stehen oben, mit
+  der letzten Antwort des Zutrittssystems. Courtside versucht es nach einer, fünf, fünfzehn und
+  sechzig Minuten erneut. Nach dem fünften Fehlschlag oder einer Ablehnung gilt die Berechtigung als
+  gescheitert. Behebe dann die Ursache im Zutrittssystem und drücke **Erneut senden**. Ein Entfernen
+  versucht Courtside ohne Ende weiter. Über der Liste steht, was das Zutrittssystem bei der letzten
+  Prüfung geantwortet hat. **Jetzt prüfen** lässt Courtside beim nächsten Durchgang neu nachfragen.
+  Den Code selbst zeigt die Ansicht nie. Ohne angebundenes Zutrittssystem bleibt die Liste leer und
+  die Buchungen laufen wie bisher.
+
+![Die Zugangsberechtigungen mit einer gescheiterten Berechtigung, ihrem Grund und Erneut senden, und einer eingerichteten.](screenshots/de/access-grants.png)
 
 ![Die Statistik mit Zeitraumwahl, Kennzahlen zur Auslastung und ihrer Veränderung.](screenshots/de/utilisation.png)
 

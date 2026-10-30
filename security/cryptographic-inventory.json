@@ -134,6 +134,34 @@
       ]
     },
     {
+      "id": "access-grant-code",
+      "purpose": "The numeric code a booking's players type at a keypad, installed per booking in an access-control system",
+      "algorithm": "SecureRandom",
+      "parameters": {
+        "alphabetSymbols": 10
+      },
+      "implementation": "java-runtime",
+      "strength": {
+        "decidedBy": "club-operator",
+        "basis": "The board sets the club's access code length to four to eight digits, so a code holds 13 to 26 bits. What bounds guessing is the keypad's own lockout and a validity window of a few hours, not the code's length; the same length governs the static codes a board types in."
+      },
+      "class": "rate-bounded-secret",
+      "owner": "club-operator",
+      "storageBoundary": "Drawn into access_code, stored in clear so the access-control system and the players can be given it, and sent to that system. It never enters domain_event, a log, a problem body or the administrative API.",
+      "permittedUse": "Opening the access points of one booking during its validity window. The primary key on access_code keeps a code that a door may still accept from being drawn for a second grant, and a draw that equals an access point's static code is drawn again.",
+      "rotation": "A code the access-control system rejects before its first acceptance is held until its exposure ends and replaced by a new draw. A move keeps the code.",
+      "revocation": "Revoking the grant removes it from the access-control system; the code stays held until the latest window any install asked for has ended, even after the removal is confirmed.",
+      "recovery": "None: a code is kept only while a door may accept it.",
+      "retirement": "The access pass deletes the detached row once its hold has ended.",
+      "evidence": "src/test/java/org/courtside/access/internal/AccessCodesTest.java, src/test/java/org/courtside/CheckConstraintTest.java",
+      "detects": [
+        "SecureRandom"
+      ],
+      "locations": [
+        "src/main/java/org/courtside/access/internal/AccessCodes.java"
+      ]
+    },
+    {
       "id": "mfa-totp",
       "purpose": "Verify an enrolled second factor with a time-based one-time code",
       "algorithm": "HMAC-SHA-1",

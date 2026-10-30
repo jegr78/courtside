@@ -1,4 +1,6 @@
 courtside:
+  access-control:
+    connector: ${COURTSIDE_ACCESS_CONTROL_CONNECTOR:simulated}
   bootstrap-admin:
     username: ${COURTSIDE_BOOTSTRAP_ADMIN_USERNAME:admin}
     password: ${COURTSIDE_BOOTSTRAP_ADMIN_PASSWORD:courtside-admin}

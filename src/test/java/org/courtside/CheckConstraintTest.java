@@ -5,6 +5,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
+import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -333,6 +334,95 @@ class CheckConstraintTest extends AbstractIntegrationTest {
         assertThatThrownBy(() -> jdbc.sql("UPDATE club_config SET access_code_length = 3").update())
                 .isInstanceOf(DataIntegrityViolationException.class)
                 .hasMessageContaining("club_config_access_code_length_range");
+    }
+
+    @Test
+    void whenAnAccessCodeIsNotFourToEightDigits_thenItIsRejected() {
+        // when / then
+        for (String code : List.of("12a456", "123", "123456789")) {
+            assertThatThrownBy(() -> jdbc.sql("INSERT INTO access_code (code) VALUES (?)").params(code).update())
+                    .as("the code %s", code)
+                    .isInstanceOf(DataIntegrityViolationException.class)
+                    .hasMessageContaining("access_code_digits");
+        }
+    }
+
+    @Test
+    void givenAGrantsCurrentCode_whenItGetsAHoldOrASecondCode_thenEachIsRejectedByItsOwnConstraint() {
+        // given
+        UUID grant = insertAccessGrant();
+        jdbc.sql("INSERT INTO access_code (code, grant_id) VALUES ('135790', ?)").params(grant).update();
+
+        // when / then
+        assertThatThrownBy(() -> jdbc.sql("UPDATE access_code SET until = now() WHERE code = '135790'").update())
+                .as("a code a grant still holds is not on hold until a time")
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .hasMessageContaining("access_code_held_only_when_detached");
+        assertThatThrownBy(() -> jdbc.sql("INSERT INTO access_code (code, grant_id) VALUES ('246802', ?)")
+                        .params(grant).update())
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .hasMessageContaining("access_code_one_per_grant");
+        assertThatThrownBy(() -> jdbc.sql("INSERT INTO access_code (code) VALUES ('135790')").update())
+                .as("a code in use is never drawn a second time")
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .hasMessageContaining("access_code_pkey");
+    }
+
+    @Test
+    void givenAnAccessGrant_whenItsStateLeavesItsDomain_thenEachIsRejectedByItsOwnConstraint() {
+        // given
+        UUID grant = insertAccessGrant();
+
+        // when / then
+        assertConstraint(grant, "remote = 'REVOKED', exposed_until = now()", "access_grant_remote_known");
+        assertConstraint(grant, "attempts = -1", "access_grant_attempts_not_negative");
+        assertConstraint(grant, "rejections = -1", "access_grant_rejections_not_negative");
+        assertConstraint(grant, "want_from = now(), want_until = now()", "access_grant_want_window_order");
+        assertConstraint(grant, "remote_from = now(), remote_until = now() - interval '1 minute'",
+                "access_grant_remote_window_order");
+        assertConstraint(grant, "last_failure = repeat('x', 501)", "access_grant_last_failure_length");
+        assertConstraint(grant, "external_reference = repeat('x', 201)", "access_grant_external_reference_length");
+        assertConstraint(grant, "want_mapping = repeat('x', 201)", "access_grant_want_mapping_length");
+        assertConstraint(grant, "remote_mapping = repeat('x', 201)", "access_grant_remote_mapping_length");
+        assertThatThrownBy(() -> jdbc.sql("INSERT INTO access_grant (id, booking_id) SELECT ?, booking_id"
+                        + " FROM access_grant WHERE id = ?").params(UUID.randomUUID(), grant).update())
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .hasMessageContaining("access_grant_one_per_booking");
+    }
+
+    @Test
+    void givenAnAccessGrant_whenAStateLacksTheColumnsItImplies_thenEachIsRejectedByItsOwnConstraint() {
+        // given
+        UUID grant = insertAccessGrant();
+        String window = "now(), now() + interval '1 hour', ARRAY[gen_random_uuid()]";
+
+        // when / then
+        assertConstraint(grant, "wanted = true", "access_grant_wanted_has_demand");
+        assertConstraint(grant, "wanted = true, (want_from, want_until) = (now(), now() + interval '1 hour')",
+                "access_grant_wanted_has_demand");
+        assertConstraint(grant, "remote = 'INSTALLED', exposed_until = now()", "access_grant_installed_has_window");
+        assertConstraint(grant, "remote = 'INSTALLED', exposed_until = now(), (remote_from, remote_until)"
+                + " = (now(), now() + interval '1 hour')", "access_grant_installed_has_window");
+        assertConstraint(grant, "remote = 'MAYBE'", "access_grant_remote_exposed");
+        assertConstraint(grant, "remote = 'INSTALLED', (remote_from, remote_until, remote_points) = (" + window + ")",
+                "access_grant_remote_exposed");
+        jdbc.sql("UPDATE access_grant SET wanted = true, (want_from, want_until, want_points) = (" + window + "),"
+                + " remote = 'INSTALLED', exposed_until = now(), (remote_from, remote_until, remote_points) = ("
+                + window + ") WHERE id = ?").params(grant).update();
+    }
+
+    private void assertConstraint(UUID grant, String assignment, String constraint) {
+        assertThatThrownBy(() -> jdbc.sql("UPDATE access_grant SET " + assignment + " WHERE id = ?")
+                        .params(grant).update())
+                .as(assignment)
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .hasMessageContaining(constraint);
+    }
+
+    private UUID insertAccessGrant() {
+        UUID grant = UUID.randomUUID();
+        jdbc.sql("INSERT INTO access_grant (id, booking_id) VALUES (?, ?)").params(grant, UUID.randomUUID()).update();
+        return grant;
     }
 
     private UUID insertUserAccount() {

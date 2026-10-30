@@ -133,6 +133,16 @@ public class BookingTestFixture {
                 newStartTime, null, null), movedBy, roles);
     }
 
+    public void cancelWholeSeries(UUID seriesId, UUID cancelledBy, Set<Role> roles) {
+        seriesService.cancel(seriesId, firstOccurrenceOf(seriesId), CancelScope.WHOLE_SERIES, cancelledBy, roles,
+                null);
+    }
+
+    public void moveWholeSeriesToCourt(UUID seriesId, UUID courtId, UUID movedBy, Set<Role> roles) {
+        seriesService.move(new MoveRequest(seriesId, firstOccurrenceOf(seriesId), CancelScope.WHOLE_SERIES,
+                null, null, List.of(courtId)), movedBy, roles);
+    }
+
     public UUID firstOccurrenceOf(UUID seriesId) {
         return bookings.findConfirmedBySeriesOrderedByStart(seriesId).getFirst().getId();
     }

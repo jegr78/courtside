@@ -5,6 +5,8 @@ import org.courtside.booking.BookingRepository;
 import org.courtside.booking.BookingService;
 import org.courtside.booking.CreateBookingCommand;
 import org.courtside.booking.ParticipantSpec;
+import org.courtside.card.BookingCard;
+import org.courtside.card.CardService;
 import org.courtside.facility.Court;
 import org.courtside.facility.FacilityService;
 import org.courtside.identity.Person;
@@ -54,6 +56,7 @@ class DemoDataSeeder implements ApplicationRunner {
     private final UserAccountRepository accounts;
     private final MemberRepository members;
     private final FacilityService facility;
+    private final CardService cards;
     private final BookingService bookingService;
     private final BookingRepository bookings;
     private final PasswordEncoder passwordEncoder;
@@ -68,7 +71,8 @@ class DemoDataSeeder implements ApplicationRunner {
                    PasswordEncoder passwordEncoder, Clock clock, DemoProperties properties,
                    @Value("${courtside.bootstrap-admin.username}") String adminUsername,
                    @Value("${courtside.bootstrap-admin.password}") String adminPassword,
-                   ClubTimeZone timeZone, ClubIdentity club) {
+                   ClubTimeZone timeZone, ClubIdentity club, CardService cards) {
+        this.cards = cards;
         this.persons = persons;
         this.accounts = accounts;
         this.members = members;
@@ -97,6 +101,7 @@ class DemoDataSeeder implements ApplicationRunner {
         DemoMember jane = createMember("Jane", "Doe", "jane.doe@example.org", MARKER_USERNAME);
         DemoMember john = createMember("John", "Roe", "john.roe@example.org", "john.roe");
         List<Court> courts = prepareCourts();
+        gateTheCourts(courts);
         createBookings(jane, john, courts);
     }
 
@@ -137,6 +142,14 @@ class DemoDataSeeder implements ApplicationRunner {
         members.save(new Member(person.getId(), ACTIVE_MEMBERSHIP_TYPE,
                 LocalDate.now(clock.withZone(timeZone.zoneId()))));
         return new DemoMember(person, account);
+    }
+
+    private void gateTheCourts(List<Court> courts) {
+        facility.createAccessPoint("Court gate", courts.stream().map(Court::getId).toList(), null);
+        BookingCard card = cards.requireCard(MEMBER_BOOKING_CARD);
+        cards.changeCard(card.getId(), card.getLabel(), card.getColor(), card.getAllowedRoles(),
+                card.getManagingRoles(), card.getAllowedPlayerCounts(), card.isCountsAgainstLimits(),
+                card.isGuestAllowed(), card.isShowGenericOccupancy(), true);
     }
 
     private List<Court> prepareCourts() {

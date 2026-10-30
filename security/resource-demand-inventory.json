@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "reviewedAt": "2026-10-27",
+  "reviewedAt": "2026-10-30",
   "sources": {
     "openapi": "src/main/resources/api/openapi.yaml",
     "scheduledFiles": [
@@ -18,6 +18,7 @@
       "src/main/java/org/courtside/booking/internal/ClosureAnnouncements.java"
     ],
     "listenerFiles": [
+      "src/main/java/org/courtside/access/internal/AccessSignals.java",
       "src/main/java/org/courtside/audit/internal/DomainEventWriter.java",
       "src/main/java/org/courtside/booking/web/BookingValidationPreparation.java",
       "src/main/java/org/courtside/card/internal/ShippedCardNaming.java",
@@ -48,13 +49,16 @@
       "src/main/java/org/courtside/identity/internal/BootstrapAdminInitializer.java",
       "src/main/java/org/courtside/member/internal/ShippedMembershipTypeNaming.java",
       "src/main/java/org/courtside/rules/internal/ShippedRuleSetNaming.java"
+    ],
+    "lifecycleFiles": [
+      "src/main/java/org/courtside/access/internal/AccessWorker.java"
     ]
   },
   "classifications": [
     {
       "id": "ordinary-http",
       "kind": "ordinary",
-      "rationale": "These operations perform bounded single-record work or bounded page and calendar reads; their contract limits do not grow into a separate resource-demand decision. MFA administration reads two flags or changes one account state; TOTP setup encrypts one 160-bit key, recovery-code replacement generates ten verifiers and credential renaming/removal addresses one holder-owned record.",
+      "rationale": "These operations perform bounded single-record work or bounded page and calendar reads; their contract limits do not grow into a separate resource-demand decision. MFA administration reads two flags or changes one account state; TOTP setup encrypts one 160-bit key, recovery-code replacement generates ten verifiers and credential renaming/removal addresses one holder-owned record. The access-grant overview reads at most 100 grants and the probe kept in memory, a retry locks one grant row and a probe request only sets a flag and wakes the access worker; none of them calls the access-control system.",
       "entryPoints": [
         "addMembershipPeriod",
         "assignMembership",
@@ -121,6 +125,7 @@
         "initiateMfaRecovery",
         "liftNoShows",
         "linkExternalReference",
+        "listAccessGrants",
         "listAccessPoints",
         "listCourtClosures",
         "listDependantBookings",
@@ -150,6 +155,7 @@
         "logOut",
         "markOwnNotificationRead",
         "previewMessageTemplate",
+        "probeAccessControl",
         "readAuditLog",
         "readImportPreview",
         "readImportSource",
@@ -171,6 +177,7 @@
         "renameOwnWebauthnCredential",
         "replaceOwnRecoveryCodes",
         "resetMessageTemplate",
+        "retryAccessGrant",
         "setAccessPointActive",
         "setAccountActive",
         "setBookingCardActive",
@@ -664,6 +671,32 @@
       ]
     },
     {
+      "id": "access-worker",
+      "kind": "demanding",
+      "entryPoints": [
+        "AccessWorker#start"
+      ],
+      "growthDrivers": "A pass grows with the bookings inside the booking horizon that want a dynamic code and with the grants still installed or failing, and makes one remote call per grant that needs one.",
+      "inputOrDataBound": "Inserting pages through the demanded bookings 100 at a time, and a pass visits each open grant at most once. Every remote call ends within COURTSIDE_ACCESS_CONTROL_CALL_DEADLINE, 15 seconds by default, so a pass lasts at most its calls times that deadline.",
+      "concurrencyOrRateBound": "One worker thread per instance runs passes and nothing else, a PostgreSQL session advisory lock lets one instance at a time run one, and one call thread makes at most one remote call at a time. Signals during a pass collapse into one further pass; without signals it runs every 60 seconds, and an instance without the lock tries again after five seconds.",
+      "executionModel": "A SmartLifecycle starts the worker thread after the context and stops it before the DataSource; it is not started under the test profile and does not exist without a selected connector. Each grant is decided and recorded in a transaction of its own with no transaction open during the call.",
+      "failureBehavior": "A call past its deadline is abandoned as unclear and counted as applied; a call thread still occupied ends the pass as an outage, and a probe that fails or refuses for the whole connector ends it without changing a row. A failed pass is logged and the next signal or timeout starts another.",
+      "consumerTimeoutBehavior": "There is no HTTP consumer: a board's retry or probe request returns at once and only wakes the worker. Each remote call carries the configured deadline, failed grants back off 1, 5, 15 and 60 minutes, and RetryLater for the whole connector holds the worker for at most an hour.",
+      "productionPaths": [
+        "src/main/java/org/courtside/access/internal/AccessWorker.java",
+        "src/main/java/org/courtside/access/internal/AccessPass.java",
+        "src/main/java/org/courtside/access/internal/CallRunner.java",
+        "src/main/java/org/courtside/access/internal/PassLock.java"
+      ],
+      "evidence": [
+        "src/test/java/org/courtside/access/internal/CallRunnerTest.java#givenACallThatHangs_whenTheDeadlinePasses_thenItIsAbandonedAsUnclearAndInterrupted",
+        "src/test/java/org/courtside/access/internal/CallRunnerTest.java#givenACallThatIgnoresItsInterrupt_whenTheNextCallComes_thenItIsBusyAndNeverStarts",
+        "src/test/java/org/courtside/access/internal/PassLockTest.java#givenOneInstanceHoldsTheLock_whenAnotherTriesIt_thenOnlyAfterTheReleaseDoesItSucceed",
+        "src/test/java/org/courtside/access/internal/AccessWorkerTest.java#givenASignalDuringAPass_whenThePassEnds_thenTheNextPassStartsAtOnce",
+        "src/test/java/org/courtside/access/internal/AccessPassMechanicsTest.java#givenMoreBookingsThanOneInsertPage_whenThePassInsertsThem_thenEveryBookingGetsItsGrant"
+      ]
+    },
+    {
       "id": "ordinary-synchronous-listeners",
       "kind": "ordinary",
       "rationale": "Each runs on the thread of the request that published its event and writes a bounded number of rows: one audit row, one security-event row, or the ten rows an instance is shipped with, each written by primary key in a single statement. SignInFailureLog looks one account up by username and writes one security-event row; it cannot run more often than a sign-in attempt reaches the authentication manager, and LoginAttemptFilter refuses an attempt past the per-address limit before that happens. None reads a collection that grows with the club, and none calls anything outside the database.",
@@ -674,6 +707,25 @@
         "ShippedCardNaming#whenTheClubChangesItsLanguage(ConfigEvent.LocaleChanged)",
         "ShippedMembershipTypeNaming#whenTheClubChangesItsLanguage(ConfigEvent.LocaleChanged)",
         "ShippedRuleSetNaming#whenTheClubChangesItsLanguage(ConfigEvent.LocaleChanged)"
+      ]
+    },
+    {
+      "id": "ordinary-access-signals",
+      "kind": "ordinary",
+      "rationale": "Each runs after the publishing transaction has committed and only sets a flag that wakes the access worker; it reads and writes nothing and calls nothing outside the process. Signals that arrive while the worker is busy collapse into one, so a burst of events starts at most one further pass.",
+      "entryPoints": [
+        "AccessSignals#on(AccessGrantEvent.RetryRequested)",
+        "AccessSignals#on(BookingCancelled)",
+        "AccessSignals#on(BookingConfirmed)",
+        "AccessSignals#on(BookingDisplaced)",
+        "AccessSignals#on(BookingReleased)",
+        "AccessSignals#on(CardEvent.BookingCardChanged)",
+        "AccessSignals#on(FacilityEvent.AccessPointAdded)",
+        "AccessSignals#on(FacilityEvent.AccessPointAvailabilityChanged)",
+        "AccessSignals#on(FacilityEvent.AccessPointChanged)",
+        "AccessSignals#on(SeriesCancelled)",
+        "AccessSignals#on(SeriesCreated)",
+        "AccessSignals#on(SeriesMoved)"
       ]
     },
     {

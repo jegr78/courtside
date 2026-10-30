@@ -17,6 +17,10 @@ class IllegalArgumentSurfaceTest {
 
     // Value types only.
     private static final List<String> VALUE_TYPES_ALLOWED_TO_THROW = List.of(
+            "org/courtside/access/GrantInstruction.java",
+            "org/courtside/access/GrantOutcome.java",
+            "org/courtside/access/GrantReference.java",
+            "org/courtside/access/internal/Demand.java",
             "org/courtside/booking/BookingRuleCheck.java",
             "org/courtside/booking/series/MoveRequest.java",
             "org/courtside/booking/series/SeriesRule.java",
@@ -31,6 +35,7 @@ class IllegalArgumentSurfaceTest {
             "org/courtside/config/WaitlistOfferWindow.java",
             "org/courtside/config/internal/ChangeClubConfigurationCommand.java",
             "org/courtside/dataexchange/internal/MemberNumber.java",
+            "org/courtside/shared/AccessDemand.java",
             "org/courtside/shared/BookingAnnouncement.java",
             "org/courtside/shared/CodedDomainFailure.java",
             "org/courtside/shared/ProblemType.java",

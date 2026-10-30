@@ -1,4 +1,4 @@
 @org.springframework.modulith.ApplicationModule(
         displayName = "Demo Data",
-        allowedDependencies = {"booking", "config", "facility", "identity", "member", "shared"})
+        allowedDependencies = {"booking", "card", "config", "facility", "identity", "member", "shared"})
 package org.courtside.demo;

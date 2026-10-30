@@ -518,7 +518,7 @@ roles again.
 
 ## Records
 
-The **Records** area has eight views. The next section describes *Retention*.
+The **Records** area has nine views. The next section describes *Retention*.
 
 * **Statistics** opens on the last full month. At the top you choose another period: 7 days, 1, 3,
   6 or 12 months up to today, everything since the first booking, the previous calendar year or two
@@ -575,6 +575,21 @@ The **Records** area has eight views. The next section describes *Retention*.
   about a backup that is too old belongs in the operator's own monitoring.
 
 ![Operator health with healthy checks, a failing one naming its mail server and a backup without evidence.](../screenshots/en/operator-health.png)
+
+* **Access grants** shows which codes a connected access-control system holds per booking. Every
+  booking whose card grants access receives its own code there for the access points of its courts.
+  An access point with a static code gets no code per booking: only its static code opens it.
+  Courtside installs the code once the booking is as close as members may book ahead. More distant
+  dates of a series follow later. A grant is *Waiting*, *Installed*, *Being removed* or *Failing*.
+  Failing ones come first, with the access-control system's last answer. Courtside tries again after
+  one, five, fifteen and sixty minutes. After the fifth failure or a refusal the grant is failing.
+  Fix the cause in the access-control system and press **Send again**. Courtside keeps trying a
+  removal without end. Above the list you see what the access-control system answered when it was
+  last checked. **Check now** makes Courtside ask again in its next pass. The view never shows the
+  code itself. Without a connected access-control system the list stays empty and bookings work as
+  before.
+
+![Access grants with a failing grant, its reason and Send again, and an installed one.](../screenshots/en/access-grants.png)
 
 ![Statistics with the period choice and the utilisation key figures with their change.](../screenshots/en/utilisation.png)
 

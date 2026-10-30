@@ -10,11 +10,13 @@ import org.courtside.card.BookingCard;
 import org.courtside.card.CardService;
 import org.courtside.facility.Court;
 import org.courtside.facility.FacilityService;
+import org.courtside.shared.AccessDemand;
 import org.courtside.shared.BookingAnnouncement;
 import org.courtside.shared.BookingAnnouncer;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -108,6 +110,32 @@ class BookingAnnouncements implements BookingAnnouncer {
     @Transactional(readOnly = true)
     public List<BookingAnnouncement> describeSeries(UUID seriesId) {
         return List.copyOf(announcementsOf(bookings.findConfirmedBySeriesOrderedByStart(seriesId)).values());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Map<UUID, AccessDemand> accessDemands(Collection<UUID> bookingIds) {
+        if (bookingIds.isEmpty()) {
+            return Map.of();
+        }
+        return accessGrants.demandsOf(bookings.findAllByIdIn(Set.copyOf(bookingIds)));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<AccessDemand> accessDemandsStartingBefore(Instant before, Instant validAfter, UUID afterBookingId,
+                                                          int limit) {
+        Set<UUID> courts = accessGrants.dynamicallyServedCourts();
+        if (courts.isEmpty()) {
+            return List.of();
+        }
+        List<UUID> ids = bookings.findGrantingAccessOnCourtsStartingBefore(courts, before,
+                validAfter.minus(accessGrants.accessLag()), afterBookingId, limit);
+        if (ids.isEmpty()) {
+            return List.of();
+        }
+        Map<UUID, AccessDemand> demands = accessGrants.demandsOf(bookings.findAllByIdIn(Set.copyOf(ids)));
+        return ids.stream().map(demands::get).filter(Objects::nonNull).toList();
     }
 
     private SequencedMap<UUID, BookingAnnouncement> announcementsOf(List<Booking> occurrences) {

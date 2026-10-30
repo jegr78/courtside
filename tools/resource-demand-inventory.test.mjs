@@ -55,6 +55,18 @@ const synchronousListeners = () => listenerMethods().filter(({ onItsOwnThread })
 const listenerFiles = () =>
   [...new Set(synchronousListeners().map(({ path }) => path))].toSorted();
 
+const lifecycleIn = (className, source) =>
+  /\bimplements\s+[\w\s,.<>]*\bSmartLifecycle\b/.test(source) ? [`${className}#start`] : [];
+
+const lifecycleFiles = () => productionJavaFiles()
+  .filter((path) => lifecycleIn("", readFileSync(`${repository}/${path}`, "utf8")).length > 0)
+  .toSorted();
+
+const lifecycleEntryPoints = () => lifecycleFiles().flatMap((path) => {
+  const source = readFileSync(`${repository}/${path}`, "utf8");
+  return lifecycleIn(source.match(/\bclass\s+(\w+)/)?.[1], source);
+}).toSorted();
+
 const scheduledEntryPoints = () => scheduledFiles().flatMap((path) => {
   const source = readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
   const className = source.match(/\bclass\s+(\w+)/)?.[1];
@@ -91,7 +103,7 @@ const classified = (kind) => inventory.classifications
   .flatMap((entry) => entry.entryPoints);
 const productionEntryPoints = () => [
   ...operationIds(), ...scheduledEntryPoints(), ...backgroundEntryPoints(), ...listenerEntryPoints(),
-  ...startupEntryPoints()
+  ...startupEntryPoints(), ...lifecycleEntryPoints()
 ].toSorted();
 const requireExactCoverage = (actual) => assert.deepEqual(actual.toSorted(), productionEntryPoints());
 const annotationCount = (paths, annotation) => paths.reduce((count, path) =>
@@ -114,6 +126,7 @@ test("given production entry points, when classifying resource demand, then ever
   const discoveredBackgroundFiles = backgroundFiles();
   const discoveredListenerFiles = listenerFiles();
   const discoveredStartupFiles = startupFiles();
+  const discoveredLifecycleFiles = lifecycleFiles();
 
   // when
   const actual = inventory.classifications.flatMap((entry) => entry.entryPoints).toSorted();
@@ -123,6 +136,7 @@ test("given production entry points, when classifying resource demand, then ever
   assert.deepEqual(inventory.sources.backgroundFiles.toSorted(), discoveredBackgroundFiles);
   assert.deepEqual(inventory.sources.listenerFiles.toSorted(), discoveredListenerFiles);
   assert.deepEqual(inventory.sources.startupFiles.toSorted(), discoveredStartupFiles);
+  assert.deepEqual(inventory.sources.lifecycleFiles.toSorted(), discoveredLifecycleFiles);
   assert.equal(scheduledEntryPoints().length, annotationCount(discoveredScheduledFiles, "@Scheduled"));
   assert.equal(backgroundEntryPoints().length, annotationCount(discoveredBackgroundFiles, "@Async"));
   assert.equal(listenerMethods().length,
@@ -164,6 +178,26 @@ test("given listeners of both kinds in one class, when deriving them, then each 
     { entryPoint: "Mailer#whenWritten(DomainEventRecord)", onItsOwnThread: false },
     { entryPoint: "Mailer#onRefusal(AbstractAuthenticationFailureEvent)", onItsOwnThread: false }
   ]);
+});
+
+test("given a component that runs its own thread, when deriving entry points, then its start is one", () => {
+  // given
+  const worker = `
+    class AccessWorker implements SmartLifecycle {
+        public void start() {
+        }
+    }`;
+  const plain = `
+    class Lifecycle {
+        public void start() {
+        }
+    }`;
+
+  // when
+  const derived = [...lifecycleIn("AccessWorker", worker), ...lifecycleIn("Lifecycle", plain)];
+
+  // then
+  assert.deepEqual(derived, ["AccessWorker#start"], "only a SmartLifecycle starts a thread of its own");
 });
 
 test("given a demanding decision, when a required fact is removed or an unknown claim is added, then validation fails", () => {

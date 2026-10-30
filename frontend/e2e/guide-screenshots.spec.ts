@@ -281,6 +281,11 @@ const drivers: Record<string, (page: Page, visualDate: string) => Promise<void>>
     await expect(page.getByTestId("operator-check-mail"), "the example, not the live instance, is drawn").toHaveAttribute("data-state", "FAILING");
     await expect(page.getByTestId("operator-health-refresh")).toBeEnabled();
   },
+  "access-grants": async (page) => {
+    await page.context().route("**/api/admin/access-grants", (route) => route.fulfill({ json: accessGrantsExample }));
+    await page.getByTestId("admin-access-grants-link").click();
+    await expect(page.getByTestId("access-grant-example-failing"), "the example, not the live instance, is drawn").toHaveAttribute("data-status", "FAILING");
+  },
   "retention": async (page) => {
     await page.getByTestId("admin-retention-link").click();
     for (const [category, months] of [["BOOKINGS", "24"], ["FORMER_MEMBERS", "12"]]) {
@@ -301,6 +306,28 @@ const operatorHealthExample = {
   mail: { state: "FAILING", reason: "HANDOVER_FAILING", lastHandedOverAt: "2026-10-17T07:00:00Z", location: "relay.example.org:587" },
   publicOrigin: { state: "OK", reason: null, origin: "https://courts.example.org" },
   backup: { state: "UNAVAILABLE", reason: "NOT_CONFIGURED", completedAt: null, ageSeconds: null, location: null }
+};
+
+// A failing grant beside an installed one, because the simulated access-control system never fails.
+const accessGrantsExample = {
+  connector: "simulated", connected: true, total: 2,
+  probe: { reachable: true, outcome: "ANSWERED", detail: "", checkedAt: "2026-05-14T08:00:00Z" },
+  grants: [
+    {
+      id: "00000000-0000-4000-8000-000000000001", bookingId: "example-failing", status: "FAILING",
+      validFrom: "2026-05-14T15:45:00Z", validUntil: "2026-05-14T17:45:00Z",
+      startsAt: "2026-05-14T16:00:00Z", endsAt: "2026-05-14T17:30:00Z",
+      courts: [{ number: 3, name: "Court 3" }], accessPoints: ["North gate"],
+      attempts: 5, lastFailure: "The keypad holds no free user slot", nextAttemptAt: null
+    },
+    {
+      id: "00000000-0000-4000-8000-000000000002", bookingId: "example-installed", status: "INSTALLED",
+      validFrom: "2026-05-15T08:45:00Z", validUntil: "2026-05-15T10:15:00Z",
+      startsAt: "2026-05-15T09:00:00Z", endsAt: "2026-05-15T10:00:00Z",
+      courts: [{ number: 1, name: "Court 1" }, { number: 2, name: "Court 2" }], accessPoints: ["North gate", "South gate"],
+      attempts: 0, lastFailure: null, nextAttemptAt: null
+    }
+  ]
 };
 
 test("the court plan every visitor sees is captured", async ({ page, journeyService }, info) => {
@@ -468,6 +495,16 @@ test("the overview a board reads the instance's own health from is captured", as
 
   // when / then
   await capture(page, "operator-health", journeyService.visualDate);
+});
+
+test("the grants an access-control system holds per booking are captured", async ({ page, journeyService }, info) => {
+  // given
+  await prepare(page, localeOf(info));
+  await signIn(page, "configuration-admin", "court-plan-view");
+  await page.getByTestId("administration-link").click();
+
+  // when / then
+  await capture(page, "access-grants", journeyService.visualDate);
 });
 
 test("the periods a board keeps personal records for are captured", async ({ page, journeyService }, info) => {

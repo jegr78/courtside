@@ -17,8 +17,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 class RetentionPayloadFieldTest {
 
     private static final Set<String> BOOKING_REFERENCES = Set.of("bookingId", "bookingIds", "seriesId");
-    private static final Set<String> NAMES_NOBODY = Set.of("reason", "closure", "outcome", "previousStartsAt",
-            "previousEndsAt", "previousCourtIds");
+    private static final Set<String> NAMES_NOBODY = Set.of("reason", "closure", "outcome", "grantId",
+            "previousStartsAt", "previousEndsAt", "previousCourtIds");
 
     @Test
     void givenEveryEventThatNamesABookingOrSeries_whenItsFieldsAreRead_thenEachFieldNamingSomebodyIsOneTheRunStrips()

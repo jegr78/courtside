@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import type { ClubConfig } from "../api/client";
 import { AdminShell } from "../components/AdminShell";
+import { AdminAccessGrantsView } from "./AdminAccessGrantsView";
 import { AdminAuditView } from "./AdminAuditView";
 import { AdminConfigurationView } from "./AdminConfigurationView";
 import { AdminExportView } from "./AdminExportView";
@@ -66,6 +67,7 @@ export default function AdminRoutes({ configurationChanged, administrator, manag
       <Route path="audit" element={<AdminAuditView />} />
       <Route path="messages" element={<AdminMessagesView />} />
       <Route path="operational-logs" element={<AdminOperationalLogsView />} />
+      <Route path="access-grants" element={<AdminAccessGrantsView />} />
       <Route path="operator-health" element={<AdminOperatorHealthView />} />
       </>}
       <Route path="*" element={<Navigate to={administrator ? "/" : "/admin/appointments"} replace />} />

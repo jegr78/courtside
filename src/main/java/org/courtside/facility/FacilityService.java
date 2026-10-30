@@ -129,6 +129,10 @@ public class FacilityService {
         return accessPoints.findByActiveTrueAndStaticCodeIsNotNullOrderByNameAsc();
     }
 
+    public List<AccessPoint> activeAccessPointsWithoutCodes() {
+        return accessPoints.findByActiveTrueAndStaticCodeIsNullOrderByNameAsc();
+    }
+
     public AccessPoint requireAccessPoint(UUID accessPointId) {
         return accessPoints.findById(accessPointId)
                 .orElseThrow(() -> new AccessPointNotFoundException("No access point with id " + accessPointId));

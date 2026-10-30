@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "reviewedAt": "2026-10-27",
+  "reviewedAt": "2026-10-30",
   "source": "src/main/resources/api/openapi.yaml",
   "authorizationSource": "security/authorization-policy.json",
   "workflows": [
@@ -436,6 +436,59 @@
         "src/test/java/org/courtside/config/web/ConfigControllerTest.java#givenAFutureBooking_whenChangingTheTimeZone_thenItIsRejected",
         "src/test/java/org/courtside/facility/FacilityServiceTest.java#givenAWeekScheduledForNovember_whenReadingBeforeAndAfterIt_thenEachDayKeepsItsOwnHours",
         "src/test/java/org/courtside/notification/ClosureMessageTest.java#givenAClosureNextToTheBooking_whenItIsWidenedOverItAndThenFurther_thenEverybodyIsToldOnce"
+      ]
+    },
+    {
+      "id": "access-grant-administration",
+      "actors": [
+        "ADMIN"
+      ],
+      "entryPoints": "Administrative access-grant overview, retry and probe endpoints, and the access worker the booking, series, card and access-point events wake after their commit.",
+      "operationIds": [
+        "listAccessGrants",
+        "probeAccessControl",
+        "retryAccessGrant"
+      ],
+      "backgroundEntryPoints": [
+        "AccessSignals#on(AccessGrantEvent.RetryRequested)",
+        "AccessSignals#on(BookingCancelled)",
+        "AccessSignals#on(BookingConfirmed)",
+        "AccessSignals#on(BookingDisplaced)",
+        "AccessSignals#on(BookingReleased)",
+        "AccessSignals#on(CardEvent.BookingCardChanged)",
+        "AccessSignals#on(FacilityEvent.AccessPointAdded)",
+        "AccessSignals#on(FacilityEvent.AccessPointAvailabilityChanged)",
+        "AccessSignals#on(FacilityEvent.AccessPointChanged)",
+        "AccessSignals#on(SeriesCancelled)",
+        "AccessSignals#on(SeriesCreated)",
+        "AccessSignals#on(SeriesMoved)",
+        "AccessWorker#start"
+      ],
+      "stateTransitions": [
+        "With an access-control connector selected, every committed change to a booking, a series, a card or an access point wakes the access worker, which reads the bookings' demand afresh and installs, moves or revokes their dynamic codes.",
+        "A retry marks a failing grant under its row lock and wakes the worker, whose next pass clears its refusal and count.",
+        "A probe request makes the next pass probe the access-control system first and keeps the result in memory for the overview."
+      ],
+      "alternatePaths": [
+        "Without a selected connector no access worker exists, the overview says so, a probe request is refused and configuration and booking paths are unchanged.",
+        "Reading the overview never calls the access-control system."
+      ],
+      "failurePaths": [
+        "Retrying an unknown grant answers 404 and retrying a grant that is not failing answers 409, each with its own problem type and violation code.",
+        "A probe that does not answer, times out, finds the call thread occupied or is refused ends the pass as an outage and shows only its fixed class and the connector's own reason."
+      ],
+      "productionPaths": [
+        "src/main/java/org/courtside/access/internal/AccessGrantAdministration.java",
+        "src/main/java/org/courtside/access/internal/AccessSignals.java",
+        "src/main/java/org/courtside/access/internal/AccessPass.java",
+        "src/main/java/org/courtside/access/web/AccessGrantAdminController.java",
+        "src/main/java/org/courtside/access/internal/AccessWorker.java"
+      ],
+      "evidence": [
+        "src/test/java/org/courtside/access/internal/AccessSignalsTest.java#givenAnIdleWorker_whenAnAccessPointIsAddedChangedOrSwitched_thenEachStartsAPass",
+        "src/test/java/org/courtside/access/internal/AccessGrantAdminApiTest.java#givenAFailingGrant_whenTheBoardRetriesIt_thenTheRetryIsRecordedAuditedAndConsumedByTheNextPass",
+        "src/test/java/org/courtside/access/internal/AccessGrantAdminApiTest.java#givenAProbeThatThrowsWithCredentialsInItsMessage_whenTheBoardReadsTheOverview_thenOnlyItsClassShows",
+        "src/test/java/org/courtside/access/web/AccessGrantAdminWithoutConnectorTest.java#givenNoConnector_whenTheBoardAsksForAProbe_thenItIsRefusedWithItsOwnTypeAndCode"
       ]
     },
     {

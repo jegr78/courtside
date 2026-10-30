@@ -1,0 +1,114 @@
+package org.courtside.access.internal;
+
+import org.courtside.access.AccessGrantEvent;
+import org.courtside.access.GrantStatus;
+import org.courtside.facility.AccessPoint;
+import org.courtside.facility.FacilityService;
+import org.courtside.shared.BookingAnnouncement;
+import org.courtside.shared.BookingAnnouncer;
+import org.jspecify.annotations.Nullable;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Instant;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+/** What a board sees of the access grants and the two things it may ask for: a retry and a fresh probe. */
+@Service
+public class AccessGrantAdministration {
+
+    private final AccessGrantRepository grants;
+    private final ProbeReadings readings;
+    private final ObjectProvider<AccessWorker> worker;
+    private final BookingAnnouncer bookings;
+    private final FacilityService facility;
+    private final PassClock clock;
+    private final ApplicationEventPublisher events;
+    private final String connector;
+
+    AccessGrantAdministration(AccessGrantRepository grants, ProbeReadings readings, ObjectProvider<AccessWorker> worker,
+                              BookingAnnouncer bookings, FacilityService facility, PassClock clock,
+                              ApplicationEventPublisher events,
+                              @Value("${courtside.access-control.connector}") String connector) {
+        this.grants = grants;
+        this.readings = readings;
+        this.worker = worker;
+        this.bookings = bookings;
+        this.facility = facility;
+        this.clock = clock;
+        this.events = events;
+        this.connector = connector == null ? "" : connector.strip().toLowerCase(Locale.ROOT);
+    }
+
+    public Overview overview() {
+        List<AccessGrant> shown = grants.findShown();
+        return new Overview(connector, worker.getIfAvailable() != null,
+                readings.latest().map(reading -> new Probe(reading.reachable(), reading.classification(), reading.detail(),
+                        reading.checkedAt())).orElse(null),
+                views(shown), grants.countNotDone());
+    }
+
+    @Transactional
+    public GrantView retry(UUID grantId) {
+        if (worker.getIfAvailable() == null) {
+            throw new AccessControlNotConnectedException();
+        }
+        AccessGrant grant = grants.findLockedById(grantId).orElseThrow(AccessGrantNotFoundException::new);
+        if (grant.status() != GrantStatus.FAILING) {
+            throw new AccessGrantNotFailingException(grant.status());
+        }
+        grant.requestRetry(clock.now());
+        events.publishEvent(new AccessGrantEvent.RetryRequested(grant.getId(), grant.getBookingId()));
+        return views(List.of(grant)).getFirst();
+    }
+
+    public void requestProbe() {
+        AccessWorker running = worker.getIfAvailable();
+        if (running == null) {
+            throw new AccessControlNotConnectedException();
+        }
+        readings.request();
+        running.signal();
+    }
+
+    private List<GrantView> views(List<AccessGrant> shown) {
+        Map<UUID, String> names = facility.allAccessPoints().stream()
+                .collect(Collectors.toMap(AccessPoint::getId, AccessPoint::getName));
+        Map<UUID, BookingAnnouncement> described = bookings.describeAll(
+                shown.stream().map(AccessGrant::getBookingId).toList());
+        return shown.stream().map(grant -> view(grant, described.get(grant.getBookingId()), names)).toList();
+    }
+
+    private static GrantView view(AccessGrant grant, @Nullable BookingAnnouncement booking, Map<UUID, String> names) {
+        Set<UUID> points = grant.isWanted() ? grant.getWantPoints() : grant.getRemotePoints();
+        return new GrantView(grant.getId(), grant.getBookingId(), grant.status(), grant.getWantFrom(),
+                grant.getWantUntil(), booking == null ? null : booking.startsAt(),
+                booking == null ? null : booking.endsAt(),
+                booking == null ? List.of() : booking.courts(),
+                points.stream().map(names::get).filter(Objects::nonNull).sorted(Comparator.naturalOrder()).toList(),
+                grant.getAttempts(), grant.getLastFailure(), grant.getNextAttemptAt());
+    }
+
+    public record Overview(String connector, boolean connected, @Nullable Probe probe, List<GrantView> grants,
+                           long total) {
+    }
+
+    public record Probe(boolean reachable, ProbeClassification classification, String detail, Instant checkedAt) {
+    }
+
+    public record GrantView(UUID id, UUID bookingId, GrantStatus status, @Nullable Instant validFrom,
+                            @Nullable Instant validUntil, @Nullable Instant startsAt, @Nullable Instant endsAt,
+                            List<BookingAnnouncement.AnnouncedCourt> courts, List<String> accessPoints, int attempts,
+                            @Nullable String lastFailure, @Nullable Instant nextAttemptAt) {
+    }
+}
