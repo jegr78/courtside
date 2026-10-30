@@ -7,6 +7,7 @@ import org.courtside.rules.internal.RuleParameters;
 
 import java.time.LocalTime;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -15,10 +16,13 @@ public class RulesTestFixture {
 
     private final RuleAdminService rules;
 
-    private static final UUID STANDARD_RULE_SET = UUID.fromString("aaaaaaaa-0000-0000-0000-000000000001");
+    private static final List<UUID> SHIPPED_RULE_SETS = List.of(
+            UUID.fromString("aaaaaaaa-0000-0000-0000-000000000001"),
+            UUID.fromString("aaaaaaaa-0000-0000-0000-000000000002"));
 
-    public void letMembersBookDaysAhead(int maxDays) {
-        rules.setRule(STANDARD_RULE_SET, RuleType.ADVANCE_WINDOW, Map.of("maxDays", maxDays));
+    public void letEveryoneBookDaysAhead(int maxDays) {
+        SHIPPED_RULE_SETS.forEach(ruleSet -> rules.setRule(ruleSet, RuleType.ADVANCE_WINDOW,
+                Map.of("maxDays", maxDays)));
     }
 
     public UUID activeRuleSet(String name) {
