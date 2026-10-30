@@ -183,6 +183,11 @@
       "pages": { "de": "site/board-guide.md", "en": "site/en/board-guide.md" }
     },
     {
+      "name": "access-grants",
+      "surface": "admin-access-grants-view",
+      "pages": { "de": "site/board-guide.md", "en": "site/en/board-guide.md" }
+    },
+    {
       "name": "retention",
       "surface": "admin-retention-view",
       "pages": { "de": "site/board-guide.md", "en": "site/en/board-guide.md" }
