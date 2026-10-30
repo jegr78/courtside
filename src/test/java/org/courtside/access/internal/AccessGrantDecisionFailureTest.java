@@ -60,6 +60,26 @@ class AccessGrantDecisionFailureTest extends AccessPassTestSupport {
     }
 
     @Test
+    void givenAnInstalledGrantVisitedEveryPass_whenItsDecisionStartsFailing_thenItIsCountedOnlyWhenDue() {
+        // given
+        UUID booking = book(courts.get(0));
+        pass.runPassNow();
+        connector.mapping(points -> {
+            throw new IllegalStateException("group lookup failed");
+        });
+
+        // when
+        passAt(START.plus(Duration.ofMinutes(1)));
+        passAt(START.plus(Duration.ofSeconds(90)));
+        passAt(START.plus(Duration.ofSeconds(110)));
+
+        // then
+        assertThat(grantOf(booking).getAttempts()).as("a pass inside the backoff records but does not count")
+                .isOne();
+        assertThat(grantOf(booking).getNextAttemptAt()).isEqualTo(START.plus(Duration.ofMinutes(2)));
+    }
+
+    @Test
     void givenAMappingThatIsMissingOrTooLong_whenThePassDecidesTheGrants_thenEachFailureIsRecorded() {
         // given
         UUID missing = book(courts.get(0));
