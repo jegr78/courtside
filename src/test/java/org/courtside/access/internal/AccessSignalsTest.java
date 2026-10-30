@@ -31,6 +31,9 @@ class AccessSignalsTest extends AccessPassTestSupport {
     @Autowired
     private ApplicationEventPublisher events;
 
+    @Autowired
+    private AccessGrantAdministration administration;
+
     @BeforeEach
     void startTheWorker() {
         worker.start();
@@ -110,6 +113,12 @@ class AccessSignalsTest extends AccessPassTestSupport {
         // when / then
         assertThat(passStartsAfter(() -> publish(new AccessGrantEvent.RetryRequested(UUID.randomUUID(),
                 UUID.randomUUID())))).isTrue();
+    }
+
+    @Test
+    void givenAnIdleWorker_whenABoardAsksForAProbe_thenAPassStartsAtOnce() {
+        // when / then
+        assertThat(passStartsAfter(administration::requestProbe)).isTrue();
     }
 
     private boolean passStartsAfter(Runnable change) {

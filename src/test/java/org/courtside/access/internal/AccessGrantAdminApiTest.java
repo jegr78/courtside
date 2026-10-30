@@ -16,11 +16,18 @@ import org.springframework.web.context.WebApplicationContext;
 
 import java.time.Duration;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -114,6 +121,49 @@ class AccessGrantAdminApiTest extends AccessPassTestSupport {
                 + " AND subject_id = ?").params(booking).query(Integer.class).single()).isOne();
         assertThat(grantOf(booking).isRefused()).as("the next pass consumes the retry").isFalse();
         assertThat(grantOf(booking).getRetryRequestedAt()).isNull();
+    }
+
+    @Test
+    void givenAPassHoldingAFailingGrant_whenTheBoardRetriesIt_thenTheRetryWaitsAndKeepsWhatThePassWrote()
+            throws Exception {
+        // given
+        UUID booking = book(courts.get(0));
+        connector.nextInstalls(REFUSED);
+        pass.runPassNow();
+        UUID grantId = grantIdOf(booking);
+        ExecutorService board = Executors.newSingleThreadExecutor();
+        AtomicReference<Future<?>> retry = new AtomicReference<>();
+        AtomicBoolean doneWhileLocked = new AtomicBoolean();
+
+        // when
+        try {
+            inLockedRow(grantId, grant -> {
+                jdbc.sql("UPDATE access_grant SET last_failure = 'written by the pass' WHERE id = ?")
+                        .params(grantId).update();
+                retry.set(board.submit(() -> mockMvc.perform(post("/api/admin/access-grants/{id}/retry", grantId)
+                        .with(csrf()).with(user("admin").roles("ADMIN"))).andExpect(status().isOk())));
+                pause(Duration.ofMillis(500));
+                doneWhileLocked.set(retry.get().isDone());
+            });
+            retry.get().get(10, TimeUnit.SECONDS);
+        } finally {
+            board.shutdownNow();
+        }
+
+        // then
+        assertThat(doneWhileLocked).as("the retry waits for the row lock").isFalse();
+        assertThat(grantOf(booking).getLastFailure()).as("the retry does not overwrite the pass")
+                .isEqualTo("written by the pass");
+        assertThat(grantOf(booking).getRetryRequestedAt()).isNotNull();
+    }
+
+    private static void pause(Duration duration) {
+        try {
+            Thread.sleep(duration);
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            throw new AssertionError(interrupted);
+        }
     }
 
     @Test
