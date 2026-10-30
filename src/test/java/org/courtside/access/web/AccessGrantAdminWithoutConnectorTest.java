@@ -9,6 +9,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
+import java.util.UUID;
+
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -38,6 +40,15 @@ class AccessGrantAdminWithoutConnectorTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.connected").value(false))
                 .andExpect(jsonPath("$.probe").isEmpty())
                 .andExpect(jsonPath("$.grants").isEmpty());
+    }
+
+    @Test
+    void givenNoConnector_whenTheBoardRetriesAGrant_thenItIsRefusedWithItsOwnTypeAndCode() throws Exception {
+        // when / then
+        mockMvc.perform(post("/api/admin/access-grants/{id}/retry", UUID.randomUUID()).with(csrf()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:access-control-not-connected"))
+                .andExpect(jsonPath("$.violations[0].code").value("access.control.notConnected"));
     }
 
     @Test

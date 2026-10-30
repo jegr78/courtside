@@ -60,6 +60,9 @@ public class AccessGrantAdministration {
 
     @Transactional
     public GrantView retry(UUID grantId) {
+        if (worker.getIfAvailable() == null) {
+            throw new AccessControlNotConnectedException();
+        }
         AccessGrant grant = grants.findLockedById(grantId).orElseThrow(AccessGrantNotFoundException::new);
         if (grant.status() != GrantStatus.FAILING) {
             throw new AccessGrantNotFailingException(grant.status());

@@ -8039,7 +8039,8 @@ paths:
       description: |
         A `FAILING` grant gets a fresh attempt count and is sent again by the next pass, which is started at
         once. An unknown grant answers `404` with `urn:courtside:error:access-grant-not-found`; a grant that
-        is not failing answers `409` with `urn:courtside:error:access-grant-not-failing`.
+        is not failing answers `409` with `urn:courtside:error:access-grant-not-failing`. Without an
+        access-control system it answers `409` with `urn:courtside:error:access-control-not-connected`.
       security:
         - sessionCookie: []
           csrfToken: []
