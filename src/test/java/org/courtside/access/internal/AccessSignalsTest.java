@@ -58,6 +58,7 @@ class AccessSignalsTest extends AccessPassTestSupport {
     @Test
     void givenAnIdleWorker_whenASeriesIsCreatedMovedAndCancelled_thenEachStartsAPass() {
         // given
+        cards.letBookingsReceiveAccessCodes(TRAINING_CARD, true);
         UUID[] series = new UUID[1];
 
         // when / then
@@ -135,7 +136,6 @@ class AccessSignalsTest extends AccessPassTestSupport {
     }
 
     private UUID createSeries() {
-        cards.letBookingsReceiveAccessCodes(TRAINING_CARD, true);
         return bookings.createSeries(courts.get(0), TRAINING_CARD, LocalDate.of(2026, 5, 12),
                 LocalTime.of(16, 0), 60, 2, account(), person(), Set.of(Role.ADMIN));
     }
