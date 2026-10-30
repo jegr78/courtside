@@ -601,8 +601,9 @@ One worker thread runs passes and nothing else. A booking, series, card or acces
 board's retry signal it after their commit, a signal during a pass starts the next one at once, and
 it runs a pass every 60 seconds without a signal. Across instances a pass holds a PostgreSQL session
 advisory lock on a connection of its own and checks that it still holds it before every remote call;
-an instance without the lock tries again after five seconds. Every comparison in a row's transaction uses the
-database's `statement_timestamp()`. A pass has three steps:
+an instance without the lock tries again after five seconds. A row's transaction reads the
+application clock once and makes every comparison against that instant, so a fixed instant in a
+disposable run governs the pass too. A pass has three steps:
 
 1. It inserts an `access_grant` row, one per booking and never deleted, for every booking with demand
    whose start lies within the booking horizon, the longest `ADVANCE_WINDOW` of any rule set or 14 days
