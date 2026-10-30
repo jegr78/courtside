@@ -18,6 +18,7 @@
       "src/main/java/org/courtside/booking/internal/ClosureAnnouncements.java"
     ],
     "listenerFiles": [
+      "src/main/java/org/courtside/access/internal/AccessSignals.java",
       "src/main/java/org/courtside/audit/internal/DomainEventWriter.java",
       "src/main/java/org/courtside/booking/web/BookingValidationPreparation.java",
       "src/main/java/org/courtside/card/internal/ShippedCardNaming.java",
@@ -674,6 +675,24 @@
         "ShippedCardNaming#whenTheClubChangesItsLanguage(ConfigEvent.LocaleChanged)",
         "ShippedMembershipTypeNaming#whenTheClubChangesItsLanguage(ConfigEvent.LocaleChanged)",
         "ShippedRuleSetNaming#whenTheClubChangesItsLanguage(ConfigEvent.LocaleChanged)"
+      ]
+    },
+    {
+      "id": "ordinary-access-signals",
+      "kind": "ordinary",
+      "rationale": "Each runs after the publishing transaction has committed and only sets a flag that wakes the access worker; it reads and writes nothing and calls nothing outside the process. Signals that arrive while the worker is busy collapse into one, so a burst of events starts at most one further pass.",
+      "entryPoints": [
+        "AccessSignals#on(BookingCancelled)",
+        "AccessSignals#on(BookingConfirmed)",
+        "AccessSignals#on(BookingDisplaced)",
+        "AccessSignals#on(BookingReleased)",
+        "AccessSignals#on(CardEvent.BookingCardChanged)",
+        "AccessSignals#on(FacilityEvent.AccessPointAdded)",
+        "AccessSignals#on(FacilityEvent.AccessPointAvailabilityChanged)",
+        "AccessSignals#on(FacilityEvent.AccessPointChanged)",
+        "AccessSignals#on(SeriesCancelled)",
+        "AccessSignals#on(SeriesCreated)",
+        "AccessSignals#on(SeriesMoved)"
       ]
     },
     {
