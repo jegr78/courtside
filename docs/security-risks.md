@@ -102,6 +102,37 @@ to the unlocked device or its browser profile, and it yields only the codes of t
 bookings and of the bookings they play in, which the board changes at its keypad. Reconsider if access codes become per-booking
 dynamic codes, or if a club reports codes leaking from devices.
 
+## A dynamic access code is stored in clear while a door may accept it
+
+With an access-control connector selected, `access_code.code` holds each grant's code as typed,
+because Courtside sends it again after a move or a failed attempt and hands it to the booking's
+players. Reading it needs access to the database or a backup. A code is drawn when its booking enters
+the booking horizon, the longest advance window of any rule set, and stays until the latest window
+any install asked for has ended, a confirmed removal included. So the exposure is the horizon plus
+the validity window, not the hours of the booking. No event, log line, stored failure, problem body
+or administrative response carries it. Reconsider if an access-control system can accept a code
+Courtside keeps only as a digest, or if a club's horizon grows beyond a few weeks.
+
+## A code may stay valid at the door after an unclear call
+
+An install whose answer was lost, timed out or failed counts as applied, and Courtside revokes it
+once the booking no longer wants it. Until that revoke succeeds, and at the latest until the window
+end the install asked for, a door may still accept the code. A late install the system processes
+more than two call deadlines after it was sent, behind a later revoke, can also outlive that revoke
+until the same bound. Exploiting it needs the code, which only the booking's players received, and
+the bound is the booking's own window plus the club's minutes after it. Reconsider if a connector
+can confirm what the system holds, which the reconciliation of the access-control connector is meant
+to provide.
+
+## A rescheduled grant that keeps failing keeps its old window
+
+When a booking moves and the system answers the reschedule with a failure that is not a refusal,
+the grant keeps retrying while the door still holds the window it was installed with. The old window
+stays valid until a reschedule succeeds or the grant is refused, which revokes it; the board sees the
+grant as waiting and then failing after five attempts. The exposure is the booking's previous slot,
+open to the code its own players received. Reconsider if clubs report moved bookings whose players
+were let in at the old time, or if a connector can move a window atomically.
+
 ## Reset codes use an unkeyed digest
 
 An outstanding reset code is stored as SHA-256 of a short random code. Read access to a current

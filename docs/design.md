@@ -137,6 +137,7 @@ as one application process and uses PostgreSQL 18.
 
 | Module | Responsibility |
 | --- | --- |
+| `access` | Dynamic access grants per booking and the port to an access-control system |
 | `api` | OpenAPI-generated controller interfaces and transport models |
 | `audit` | Domain-event log and administrative audit view |
 | `booking` | Bookings, participants, series and court allocations |
@@ -163,7 +164,9 @@ undeclared dependencies and cycles. `shared` and generated `api` are the shared 
 `booking` depends on `rules`, `facility`, `member` and `card`. Notification and audit behavior uses
 domain events instead of reverse dependencies into the booking core. `reporting` reads booking,
 membership, account and message figures through interfaces those modules publish in their base
-packages; none of them depends on it.
+packages; none of them depends on it. `access` depends on `card`, `config`, `facility` and `rules`,
+reads bookings only through `shared.BookingAnnouncer` and reacts to their events after commit;
+`booking` does not depend on it.
 
 Controllers implement generated interfaces and translate HTTP. Services own business operations.
 Repositories persist state and do not decide policy.
@@ -571,6 +574,92 @@ The configuration holds three access settings beside the deadlines: how many min
 booking starts and after it ends its access code works, 0 to 240 and 15 by default each, and the
 length of a static access code, 4 to 8 digits and 6 by default. A request that leaves one out keeps
 its stored value. A board edits them on the access points page.
+
+#### Dynamic access grants
+
+An access-control system can install a code of its own per booking. `AccessControlConnector` is the
+port: `grant`, `reschedule`, `revoke`, `probe` and a local `mappingOf` that fingerprints how access
+points map onto the system. An install or revoke answers `Accepted` with the system's reference,
+`CodeRejected` when the code is not on the remote user, `RetryLater` with an optional moment before
+which it must not be asked again, or `Refused`; the last two carry a scope, `GRANT` for this grant or
+`CONNECTOR` for the whole connector. An exception or a call past its deadline is an unclear answer,
+and Courtside counts an unclear answer as applied. A reason a connector returns is fixed text for an
+operator and never carries a URL, a credential or a code. The deployment selects the connector with
+`COURTSIDE_ACCESS_CONTROL_CONNECTOR` and bounds each call with
+`COURTSIDE_ACCESS_CONTROL_CALL_DEADLINE`, 15 seconds by default. `none`, the default, registers no
+worker, records no grant and leaves every booking path unchanged. `simulated` accepts every call in
+memory; it serves development, the demo profile and the browser journeys.
+
+An access point with a static code is served by that code only and never by a dynamic grant. A
+booking has demand when it is confirmed, its card grants access and at least one of its courts sits
+behind an active access point without a static code; the grant covers the union of those access
+points with one code shared by everyone in the booking. Its window is the booking's start and end
+widened by the club's minutes before and after. A grant is wanted while it has demand and its window
+has not ended.
+
+One worker thread runs passes and nothing else. A booking, series, card or access point event and a
+board's retry signal it after their commit, a signal during a pass starts the next one at once, and
+it runs a pass every 60 seconds without a signal. Across instances a pass holds a PostgreSQL session
+advisory lock on a connection of its own and checks that it still holds it before every remote call;
+an instance without the lock tries again after five seconds. Every comparison in a row's transaction uses the
+database's `statement_timestamp()`. A pass has three steps:
+
+1. It inserts an `access_grant` row, one per booking and never deleted, for every booking with demand
+   whose start lies within the booking horizon, the longest `ADVANCE_WINDOW` of any rule set, and
+   whose window has not ended. A distant series occurrence waits until it enters the horizon.
+2. It reads the ids of every open row once, revocations first, and visits each at most once. In the
+   row's locked transaction it derives the demand again, draws a code when the grant is wanted and
+   has none, and decides the action: `grant` while nothing is installed for sure, `reschedule` when
+   the installation differs from what is wanted in window, access points or mapping, `revoke` when
+   the grant is no longer wanted and something may be installed, and nothing otherwise. A refused
+   grant installs nothing more and revokes an installation that is unsure or differs from what is
+   wanted, so a refused change never leaves an older window at the door. Before the first call of a
+   pass the worker probes the system, and a probe that does not answer or refuses for the whole
+   connector ends the pass as an outage without changing a row. Before an install it commits the
+   remote side as possibly installed and raises the window end the code may be exposed until, which
+   is never lowered. The call runs with no transaction open on one call thread with the deadline;
+   a call thread still occupied by an abandoned call sends nothing more and ends the pass as an
+   outage. The answer is recorded in a transaction of its own.
+3. It releases the code of every grant that is not wanted, holds nothing remote and whose exposure
+   has ended, and deletes released codes whose exposure has ended.
+
+Every code in use is a primary key in `access_code`, so a code is never drawn for another booking
+while a door may still accept it, and a draw never takes an active access point's static code. A
+code is drawn with the club's access code length from a `SecureRandom`. `CodeRejected` before the
+first acceptance holds the old code until its exposure ends and sends a new one in the next pass; the
+third rejection in a row refuses the grant. After the first acceptance the delivered code must stay,
+so a rejection refuses it. `Refused(GRANT)` refuses an install, while a refused revoke stays due,
+because a revocation never stops. `RetryLater(GRANT)` and every other counted failure wait 1, 5, 15
+and 60 minutes, then 60, or longer when the system names a later moment. A `CONNECTOR` answer probes
+again at once: when the probe fails, the row's attempt is undone and the pass ends as an outage; when
+it answers, the answer counts as the grant's own. `RetryLater(CONNECTOR)` holds the worker until the
+named moment, an hour at most. An unclear answer probes again too; a failed probe retries the row
+after a minute without counting the attempt. A revoke accepted within two call deadlines of the last
+install is sent once more after that bound, because the system may still process the install late.
+
+The admin overview labels each grant `FAILING` when it was refused or failed five counted attempts in
+a row, `REMOVING` when it is no longer wanted but may still be installed, `INSTALLED` when the system
+holds it as wanted, `WAITING` when it is wanted and not yet installed as wanted, and `DONE` otherwise.
+A grant that becomes installed for the first time publishes `access.grant.installed` and one that
+becomes failing publishes `access.grant.failing`, once per transition and naming only the booking.
+`AccessGrantQuery.grantOf` answers a booking's grant status and window, and its code only once the
+system accepted it and while the grant is wanted.
+
+`/admin/access-grants` lists up to 100 grants that are wanted, may be installed or are failing,
+failing ones first, with booking, courts, access points, window, attempts, last failure and next
+attempt, and the total. It names the selected connector and shows the last probe the worker made:
+its class, `ANSWERED`, `UNREACHABLE`, `TIMEOUT`, `CALL_THREAD_OCCUPIED` or `REFUSED`, the time and
+the connector's own reason when it gave one. Reading the overview never calls the system; a board asks
+for a fresh probe with `POST /api/admin/access-grants/probe`, which the next pass makes first and which
+answers `409 urn:courtside:error:access-control-not-connected` without a connector. A board sends a
+failing grant again with `POST /api/admin/access-grants/{id}/retry`: it marks the grant under its row
+lock, signals the worker and is audited as `access.grant.retryRequested`, and the next pass clears
+the refusal and the count; an unknown grant answers
+`404 urn:courtside:error:access-grant-not-found` and any other status `409
+urn:courtside:error:access-grant-not-failing`. A changed demand clears the refusal and the count the
+same way. No domain event, log line, stored failure, problem body or administrative response carries a
+dynamic code: connector text is stored and logged with the call's code and every standalone run of
+four to eight digits masked.
 
 Grid changes are refused when active or future bookings, or the opening hours, seasons and holidays
 in force today or scheduled after it, no longer align. Time-zone changes are refused while a confirmed booking has not

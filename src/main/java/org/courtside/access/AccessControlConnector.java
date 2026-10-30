@@ -6,7 +6,8 @@ import java.util.UUID;
 /**
  * An access-control system holding one remote user per grant, named from the grant id with {@code [a-z0-9_]}.
  * Each call ends within its configured deadline across all its requests and stops when interrupted; an exception
- * or a missed deadline is an unclear answer, which the caller counts as applied.
+ * or a missed deadline is an unclear answer, which the caller counts as applied. Every reason a connector returns
+ * is fixed, operator-readable text and never carries a URL, a credential or a code; a board reads it.
  */
 public interface AccessControlConnector {
 
