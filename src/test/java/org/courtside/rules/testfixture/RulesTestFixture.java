@@ -15,6 +15,12 @@ public class RulesTestFixture {
 
     private final RuleAdminService rules;
 
+    private static final UUID STANDARD_RULE_SET = UUID.fromString("aaaaaaaa-0000-0000-0000-000000000001");
+
+    public void letMembersBookDaysAhead(int maxDays) {
+        rules.setRule(STANDARD_RULE_SET, RuleType.ADVANCE_WINDOW, Map.of("maxDays", maxDays));
+    }
+
     public UUID activeRuleSet(String name) {
         return rules.createRuleSet(name).getId();
     }

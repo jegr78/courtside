@@ -112,6 +112,14 @@ abstract class AccessPassTestSupport extends AbstractIntegrationTest {
                 Set.of(Role.MEMBER), null, partner);
     }
 
+    UUID account() {
+        return janeAccount;
+    }
+
+    UUID person() {
+        return jane;
+    }
+
     void cancel(UUID booking) {
         bookings.cancelBooking(booking, janeAccount, Set.of(Role.ADMIN));
     }
