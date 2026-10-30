@@ -3,6 +3,7 @@ package org.courtside.notification.internal;
 import jakarta.mail.internet.MimeMessage;
 import org.courtside.AbstractIntegrationTest;
 import org.courtside.access.testfixture.AccessTestFixture;
+import org.courtside.booking.ParticipationService;
 import org.courtside.booking.testfixture.BookingTestFixture;
 import org.courtside.card.testfixture.CardTestFixture;
 import org.courtside.facility.testfixture.FacilityTestFixture;
@@ -75,6 +76,9 @@ class DynamicAccessCodeMailTest extends AbstractIntegrationTest {
 
     @Autowired
     private AccessTestFixture access;
+
+    @Autowired
+    private ParticipationService participations;
 
     @Autowired
     private JdbcClient jdbc;
@@ -185,6 +189,27 @@ class DynamicAccessCodeMailTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenAReminderQueuedForAPlayerWhoLeft_whenItIsWritten_thenOnlyTheBookerStillGetsTheBookingsCode() {
+        // given
+        UUID booking = book();
+        access.installDueGrants();
+        String code = access.installedCodeOf(booking);
+        queue(booking, "BOOKING_REMINDER");
+        queue(booking, "BOOKING_REMINDER", janeAccount);
+        participations.withdraw(booking, john, johnAccount());
+        clearInvocations(sender);
+
+        // when
+        outbox.deliverDue();
+
+        // then
+        assertThat(bodiesTo("jane.doe@example.org")).as("the booker still needs the code")
+                .anySatisfy(body -> assertThat(body).contains("North gate: " + code));
+        assertThat(bodiesTo("john.roe@example.org")).as("another member's booking hands its code to nobody")
+                .allSatisfy(body -> assertThat(body).doesNotContain(code).doesNotContain("Zugangscode"));
+    }
+
+    @Test
     void givenAGrantNotYetInstalled_whenTheReminderIsWritten_thenItSaysTheCodeIsMissingAndWhereToAsk() {
         // given
         UUID booking = book();
@@ -269,15 +294,21 @@ class DynamicAccessCodeMailTest extends AbstractIntegrationTest {
         return jdbc.sql("SELECT kind FROM message_record").query(String.class).list();
     }
 
+    private UUID johnAccount() {
+        return jdbc.sql("SELECT id FROM user_account WHERE person_id = ?").params(john).query(UUID.class).single();
+    }
+
     private void queue(UUID booking, String kind) {
-        UUID johnAccount = jdbc.sql("SELECT id FROM user_account WHERE person_id = ?").params(john)
-                .query(UUID.class).single();
+        queue(booking, kind, johnAccount());
+    }
+
+    private void queue(UUID booking, String kind, UUID accountId) {
         jdbc.sql("""
                         INSERT INTO message_record (id, account_id, kind, state, message_id, queued_at,
                                                     next_attempt_at, parameters)
                         VALUES (:id, :accountId, :kind, 'QUEUED', :messageId, :at, :at, CAST(:parameters AS jsonb))
                         """)
-                .param("id", UUID.randomUUID()).param("accountId", johnAccount).param("kind", kind)
+                .param("id", UUID.randomUUID()).param("accountId", accountId).param("kind", kind)
                 .param("messageId", "<" + UUID.randomUUID() + "@example.org>")
                 .param("at", Timestamp.from(Instant.parse("2026-05-12T10:00:00Z")))
                 .param("parameters", "{\"bookingId\": \"" + booking + "\"}")
