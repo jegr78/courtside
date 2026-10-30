@@ -204,6 +204,10 @@ class RequestEntryPointInventoryTest extends AbstractIntegrationTest {
                     new Boundary("the locale the dispatcher resolved from the Accept-Language header,"
                             + " restated as the shell's content language, which chooses a language and"
                             + " never a right", List.of("getLocale"))),
+            Map.entry("org/courtside/booking/web/OccupancyKeyQueryMask.java",
+                    new Boundary("the path and the query string of the occupancy poll, to mask its key"
+                            + " wherever the request line is logged; parameters reach the handler unchanged",
+                            List.of("getQueryString", "getRequestURI"))),
             Map.entry("org/courtside/shared/web/RefusesAmbiguity.java",
                     new Boundary("nothing of the request itself: it writes an attribute the error"
                             + " dispatch reads back", List.of())));
@@ -242,6 +246,8 @@ class RequestEntryPointInventoryTest extends AbstractIntegrationTest {
             Map.entry("OrderedRequestContextFilter", "publishes the request to the thread"),
             Map.entry("CompositeFilterChainProxy", "delegates into the security chain above"),
             Map.entry("SessionRepositoryFilter", "resolves the session cookie to a stored session"),
+            Map.entry("OccupancyKeyQueryMask",
+                    "masks the key in the query string of the occupancy poll for logging and grants nothing"),
             Map.entry("RejectsRepeatedParameters",
                     "refuses a request that names one parameter twice, before the security chain"
                             + " below reads a parameter of its own"),

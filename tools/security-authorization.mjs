@@ -118,6 +118,9 @@ function operationExpectations(path, method, security) {
     expectations.INITIAL_PASSWORD = "allow";
     return expectations;
   }
+  if (path === "/api/public/occupancy") {
+    return Object.fromEntries(authorizationActors.map((actor) => [actor, "deny-without-key"]));
+  }
   if (mfaEntryProof(path) || security.length === 0) {
     return Object.fromEntries(authorizationActors.map((actor) => [actor, "allow"]));
   }
@@ -237,6 +240,11 @@ export function evaluateOperationResult(expected, response, proofRequirement = n
       && response.problemType === "urn:courtside:error:unauthenticated";
     return { outcome: passed ? "passed" : "failed",
       observation: passed ? "typed-unauthenticated" : "unauthenticated-boundary-mismatch" };
+  }
+  if (expected === "deny-without-key") {
+    const passed = response.status === 401;
+    return { outcome: passed ? "passed" : "failed",
+      observation: passed ? "key-required" : "keyless-request-admitted" };
   }
   if (expected === "deny-forbidden") {
     const passed = response.status === 403

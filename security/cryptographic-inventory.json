@@ -1287,6 +1287,38 @@
         "src/main/java/org/courtside/shared/ServerTls.java",
         "src/main/java/org/courtside/shared/ServerTls*.java"
       ]
+    },
+    {
+      "id": "occupancy-key",
+      "purpose": "Admit a building-automation poller to the court occupancy signal without an account",
+      "algorithm": "SecureRandom",
+      "parameters": {
+        "entropyBytes": 32,
+        "encoding": "base64url-unpadded",
+        "verifier": "SHA-256"
+      },
+      "implementation": "java-runtime",
+      "strength": {
+        "decidedBy": "repository",
+        "bits": 256,
+        "basis": "Thirty-two bytes drawn from SecureRandom. The stored SHA-256 verifier needs no salt or work factor because the key itself carries the full entropy."
+      },
+      "class": "credential-protection",
+      "owner": "club-operator",
+      "storageBoundary": "Shown once to the administrator who creates it and entered into the club's building automation. The database stores only its SHA-256 verifier in occupancy_key; the key is never written to a log, an audit entry or a domain event.",
+      "permittedUse": "Reading per-court occupancy and minutes until the next booking from GET /api/public/occupancy. It grants nothing else and names nobody.",
+      "rotation": "Creating a new key replaces the verifier, and the old key is refused on the next poll.",
+      "revocation": "Revoking deletes the verifier, after which every poll is refused.",
+      "recovery": "None: a lost key is replaced, never recovered.",
+      "retirement": "A successor verifier format replaces the single row; the board creates a new key.",
+      "evidence": "src/test/java/org/courtside/booking/web/OccupancySignalTest.java, src/test/java/org/courtside/booking/web/OccupancyKeyAdminControllerTest.java",
+      "detects": [
+        "SecureRandom",
+        "MessageDigest"
+      ],
+      "locations": [
+        "src/main/java/org/courtside/booking/internal/OccupancyKeys.java"
+      ]
     }
   ]
 }

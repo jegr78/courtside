@@ -125,7 +125,8 @@
           "enum": [
             "allow",
             "deny-unauthenticated",
-            "deny-forbidden"
+            "deny-forbidden",
+            "deny-without-key"
           ]
         },
         "status": {
@@ -145,6 +146,8 @@
             "forbidden-boundary-mismatch",
             "authorization-gate-passed",
             "authorized-actor-rejected",
+            "key-required",
+            "keyless-request-admitted",
             "admission-refused",
             "required-proof-completed",
             "required-proof-not-completed"
