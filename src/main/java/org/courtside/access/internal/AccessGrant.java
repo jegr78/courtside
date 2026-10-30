@@ -226,9 +226,9 @@ public class AccessGrant {
                                    Instant dbNow, Duration deadline) {
         PassEffect effect = new PassEffect.Continue();
         if (outcome instanceof GrantOutcome.RetryLater(Scope scope, Instant notBefore, String _)
-                && scope == Scope.CONNECTOR) {
+                && scope == Scope.CONNECTOR && notBefore != null && notBefore.isAfter(dbNow)) {
             Instant longest = dbNow.plus(LONGEST_HOLD);
-            effect = new PassEffect.Hold(notBefore == null || notBefore.isAfter(longest) ? longest : notBefore);
+            effect = new PassEffect.Hold(notBefore.isAfter(longest) ? longest : notBefore);
         }
         if (connectorScope && !probeAnswers) {
             attempts--;
@@ -259,8 +259,10 @@ public class AccessGrant {
             }
             case GrantOutcome.RetryLater(Scope _, Instant notBefore, String reason) -> {
                 lastFailure = stored(reason, call.code());
-                if (notBefore != null && notBefore.isAfter(nextAttemptAt)) {
-                    nextAttemptAt = notBefore;
+                Instant bounded = notBefore == null || notBefore.isBefore(dbNow.plus(LONGEST_HOLD))
+                        ? notBefore : dbNow.plus(LONGEST_HOLD);
+                if (bounded != null && bounded.isAfter(nextAttemptAt)) {
+                    nextAttemptAt = bounded;
                 }
             }
             case GrantOutcome.Refused(Scope _, String reason) -> {

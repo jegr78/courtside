@@ -22,7 +22,10 @@ public sealed interface GrantOutcome {
     record CodeRejected() implements GrantOutcome {
     }
 
-    /** A null {@code notBefore} leaves the retry to the caller's backoff. */
+    /**
+     * {@code notBefore} is honoured for at most an hour; a null or past one leaves the retry to the caller's backoff
+     * and, for the whole connector, holds nothing.
+     */
     record RetryLater(Scope scope, @Nullable Instant notBefore, String reason) implements GrantOutcome {
 
         public RetryLater {

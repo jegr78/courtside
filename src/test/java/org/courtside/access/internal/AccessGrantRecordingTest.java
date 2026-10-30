@@ -277,7 +277,43 @@ class AccessGrantRecordingTest {
         assertThat(lateRecording.effect()).isEqualTo(new PassEffect.Hold(NOW.plus(Duration.ofHours(1))));
         assertThat(late.getAttempts()).as("a probe that fails undoes the attempt").isZero();
         assertThat(late.getNextAttemptAt()).isEqualTo(NOW);
-        assertThat(unstatedRecording.effect()).isEqualTo(new PassEffect.Hold(NOW.plus(Duration.ofHours(1))));
+        assertThat(unstatedRecording.effect()).as("no stated time holds nothing; the backoff applies")
+                .isEqualTo(new PassEffect.Continue());
+        assertThat(unstated.getNextAttemptAt()).isEqualTo(NOW.plus(Duration.ofMinutes(1)));
+    }
+
+    @Test
+    void givenRetryLaterForTheConnectorAtAPastTime_whenRecorded_thenTheWorkerIsNotHeld() {
+        // given
+        AccessGrant answering = fresh();
+        SentCall answeringCall = decideAndBegin(answering, DEMAND, MAPPING, NOW);
+        AccessGrant failing = fresh();
+        SentCall failingCall = decideAndBegin(failing, DEMAND, MAPPING, NOW);
+        GrantOutcome past = new GrantOutcome.RetryLater(Scope.CONNECTOR, NOW.minusSeconds(1), "429");
+
+        // when
+        Recording withProbe = answering.record(answeringCall, answered(past), PROBE_ANSWERS, NOW, DEADLINE);
+        Recording withoutProbe = failing.record(failingCall, answered(past), PROBE_FAILS, NOW, DEADLINE);
+
+        // then
+        assertThat(withProbe.effect()).isEqualTo(new PassEffect.Continue());
+        assertThat(withoutProbe.effect()).as("a failed probe is an outage, not a hold")
+                .isEqualTo(new PassEffect.Outage());
+    }
+
+    @Test
+    void givenRetryLaterForTheGrantAMonthAway_whenRecorded_thenItIsRetriedWithinAnHour() {
+        // given
+        AccessGrant grant = fresh();
+        SentCall call = decideAndBegin(grant, DEMAND, MAPPING, NOW);
+
+        // when
+        grant.record(call, answered(new GrantOutcome.RetryLater(Scope.GRANT, NOW.plus(Duration.ofDays(30)), "busy")),
+                null, NOW, DEADLINE);
+
+        // then
+        assertThat(grant.getNextAttemptAt()).as("a stated time is capped at an hour")
+                .isEqualTo(NOW.plus(Duration.ofHours(1)));
     }
 
     @Test
