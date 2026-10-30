@@ -42,7 +42,7 @@ class AccessGrantRecordingTest {
                 NOW.plusSeconds(2), DEADLINE);
 
         // then
-        assertThat(recording).isEqualTo(new Recording(CONTINUE, false));
+        assertThat(recording).isEqualTo(new Recording(CONTINUE, false, true, false));
         assertThat(grant.getRemote()).isEqualTo(RemoteState.INSTALLED);
         assertThat(grant.getRemoteFrom()).isEqualTo(DEMAND.validFrom());
         assertThat(grant.getRemoteUntil()).isEqualTo(DEMAND.validUntil());
@@ -119,7 +119,7 @@ class AccessGrantRecordingTest {
         Recording recording = grant.record(call, answered(new GrantOutcome.CodeRejected()), null, LATER, DEADLINE);
 
         // then
-        assertThat(recording).as("the delivered code must stay").isEqualTo(new Recording(CONTINUE, false));
+        assertThat(recording).as("the delivered code must stay").isEqualTo(new Recording(CONTINUE, false, false, true));
         assertThat(grant.isRefused()).isTrue();
         assertThat(grant.getRejections()).isZero();
         assertThat(grant.getNextAttemptAt()).as("the possibly wrong installation is revoked next pass").isEqualTo(LATER);

@@ -1,7 +1,11 @@
 package org.courtside.access.internal;
 
 import org.courtside.AbstractIntegrationTest;
+import org.courtside.access.AccessGrantQuery;
+import org.courtside.access.BookingAccessGrant;
 import org.courtside.access.GrantOutcome;
+import org.courtside.access.GrantStatus;
+import org.courtside.access.Scope;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -31,6 +35,9 @@ class AccessGrantTransitionsTest extends AbstractIntegrationTest {
 
     @Autowired
     private AccessGrantRepository grants;
+
+    @Autowired
+    private AccessGrantQuery query;
 
     @Autowired
     private JdbcClient jdbc;
@@ -145,6 +152,61 @@ class AccessGrantTransitionsTest extends AbstractIntegrationTest {
                 .param("remoteUntil", Timestamp.from(remoteUntil)).param("gate", NORTH_GATE)
                 .param("mapping", MAPPING).param("due", Timestamp.from(NOW)).update();
         return grant;
+    }
+
+    @Test
+    void givenAGrantAcceptedTwiceAndThenRefused_whenRecorded_thenEachTransitionIsStoredOnceAndNamesOnlyTheBooking() {
+        // given
+        UUID grant = storedGrant();
+        UUID booking = grants.findById(grant).orElseThrow().getBookingId();
+
+        // when
+        inRow(grant, row -> answer(row, NOW, MAPPING, new GrantOutcome.Accepted("remote-user")));
+        inRow(grant, row -> answer(row, NOW.plusSeconds(60), "north-group-v2", new GrantOutcome.Accepted("remote-user")));
+        inRow(grant, row -> answer(row, NOW.plusSeconds(120), "north-group-v3",
+                new GrantOutcome.Refused(Scope.GRANT, "keypad full")));
+
+        // then
+        assertThat(jdbc.sql("SELECT event_type FROM domain_event WHERE subject_id = ? ORDER BY occurred_at")
+                .params(booking).query(String.class).list())
+                .containsExactly("access.grant.installed", "access.grant.failing");
+        assertThat(jdbc.sql("SELECT payload::text FROM domain_event WHERE subject_id = ?").params(booking)
+                .query(String.class).list())
+                .allSatisfy(payload -> assertThat(payload).isEqualTo("{\"bookingId\": \"" + booking + "\"}"));
+    }
+
+    @Test
+    void givenAGrant_whenPlayersAskForIt_thenTheCodeIsOnlyNamedOnceADoorAcceptedItAndWhileItIsWanted() {
+        // given
+        UUID grant = storedGrant();
+        UUID booking = grants.findById(grant).orElseThrow().getBookingId();
+        SentCall call = inRow(grant, row -> {
+            Decision decision = transitions.decide(row, DEMAND, MAPPING, NOW);
+            return row.beginCall(decision.action(), decision.code(), NOW);
+        });
+        BookingAccessGrant beforeAcceptance = query.grantOf(booking).orElseThrow();
+
+        // when
+        inRow(grant, row -> transitions.record(row, call, answered(new GrantOutcome.Accepted("remote-user")), null,
+                NOW, DEADLINE));
+        BookingAccessGrant accepted = query.grantOf(booking).orElseThrow();
+        inRow(grant, row -> transitions.decide(row, null, null, NOW));
+        BookingAccessGrant cancelled = query.grantOf(booking).orElseThrow();
+
+        // then
+        assertThat(beforeAcceptance.code()).as("no door accepts it yet").isNull();
+        assertThat(accepted.code()).isEqualTo(call.instruction().code());
+        assertThat(accepted.status()).isEqualTo(GrantStatus.INSTALLED);
+        assertThat(accepted.validUntil()).isEqualTo(DEMAND.validUntil());
+        assertThat(cancelled.code()).as("a cancelled booking hands out no code").isNull();
+        assertThat(cancelled.status()).isEqualTo(GrantStatus.REMOVING);
+        assertThat(query.grantOf(UUID.randomUUID())).isEmpty();
+    }
+
+    private Recording answer(AccessGrant row, Instant at, String mapping, GrantOutcome outcome) {
+        Decision decision = transitions.decide(row, DEMAND, mapping, at);
+        SentCall call = row.beginCall(decision.action(), decision.code(), at);
+        return transitions.record(row, call, answered(outcome), null, at, DEADLINE);
     }
 
     private String rejectOnce(AccessGrant row, Instant at) {

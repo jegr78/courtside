@@ -10,6 +10,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.courtside.access.GrantOutcome;
+import org.courtside.access.GrantStatus;
 import org.courtside.access.ProbeOutcome;
 import org.courtside.access.Scope;
 import org.jspecify.annotations.Nullable;
@@ -35,6 +36,7 @@ public class AccessGrant {
     private static final Duration UNCLEAR_OUTAGE_RETRY = Duration.ofMinutes(1);
     private static final Duration LONGEST_HOLD = Duration.ofMinutes(60);
     private static final int MOST_REJECTIONS = 3;
+    private static final int FAILING_ATTEMPTS = 5;
     private static final int MOST_MAPPING_CHARACTERS = 200;
     private static final int MOST_FAILURE_CHARACTERS = 500;
     private static final String UNCLEAR = "The access-control system gave no clear answer";
@@ -98,6 +100,20 @@ public class AccessGrant {
         retryRequestedAt = at;
     }
 
+    GrantStatus status() {
+        if (failing()) {
+            return GrantStatus.FAILING;
+        }
+        if (!wanted) {
+            return remote == RemoteState.NONE ? GrantStatus.DONE : GrantStatus.REMOVING;
+        }
+        return remote == RemoteState.INSTALLED && installedAsWanted() ? GrantStatus.INSTALLED : GrantStatus.WAITING;
+    }
+
+    private boolean failing() {
+        return refused || attempts >= FAILING_ATTEMPTS;
+    }
+
     Action action() {
         if (!wanted) {
             return remote == RemoteState.NONE ? Action.NONE : Action.REVOKE;
@@ -157,10 +173,11 @@ public class AccessGrant {
             lastInstallSentAt = dbNow;
         }
         Instant previousNextAttemptAt = nextAttemptAt;
+        int previousAttempts = attempts;
         attempts++;
         nextAttemptAt = dbNow.plus(backoff(attempts));
         return new SentCall(action, id, dbNow, wantFrom, wantUntil, getWantPoints(), wantMapping,
-                action.installs() ? code : null, externalReference, previousNextAttemptAt);
+                action.installs() ? code : null, externalReference, previousNextAttemptAt, previousAttempts);
     }
 
     static boolean needsReProbe(Action action, CallResult result) {
@@ -175,6 +192,15 @@ public class AccessGrant {
 
     Recording record(SentCall call, CallResult result, @Nullable ProbeOutcome reprobe, Instant dbNow,
                      Duration deadline) {
+        boolean failingBefore = refused || call.previousAttempts() >= FAILING_ATTEMPTS;
+        boolean acceptedBefore = firstAcceptedAt != null;
+        Recording recorded = recordAnswer(call, result, reprobe, dbNow, deadline);
+        return new Recording(recorded.effect(), recorded.replaceCode(), !acceptedBefore && firstAcceptedAt != null,
+                !failingBefore && failing());
+    }
+
+    private Recording recordAnswer(SentCall call, CallResult result, @Nullable ProbeOutcome reprobe, Instant dbNow,
+                                   Duration deadline) {
         if (!id.equals(call.grantId())) {
             throw new IllegalStateException("A call is recorded on the grant it was sent for");
         }
@@ -185,7 +211,7 @@ public class AccessGrant {
         boolean probeAnswers = reprobe instanceof ProbeOutcome.Answered;
         if (result instanceof CallResult.Answered(GrantOutcome outcome)
                 && !(outcome instanceof GrantOutcome.CodeRejected && call.action() == Action.REVOKE)) {
-            return recordAnswer(call, outcome, probes, probeAnswers, dbNow, deadline);
+            return recordOutcome(call, outcome, probes, probeAnswers, dbNow, deadline);
         }
         lastFailure = UNCLEAR;
         if (probeAnswers) {
@@ -196,7 +222,7 @@ public class AccessGrant {
         return new Recording(new PassEffect.Outage(), false);
     }
 
-    private Recording recordAnswer(SentCall call, GrantOutcome outcome, boolean connectorScope, boolean probeAnswers,
+    private Recording recordOutcome(SentCall call, GrantOutcome outcome, boolean connectorScope, boolean probeAnswers,
                                    Instant dbNow, Duration deadline) {
         PassEffect effect = new PassEffect.Continue();
         if (outcome instanceof GrantOutcome.RetryLater(Scope scope, Instant notBefore, String _)

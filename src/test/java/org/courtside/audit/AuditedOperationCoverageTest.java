@@ -87,6 +87,7 @@ class AuditedOperationCoverageTest {
             "FacilityService#activeCourts",
             "FacilityService#allCourts",
             "FacilityService#activeAccessPointsWithCodes",
+            "FacilityService#activeAccessPointsWithoutCodes",
             "FacilityService#allAccessPoints",
             "FacilityService#changeAccessPoint",
             "FacilityService#changeCourt",

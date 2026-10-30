@@ -12,7 +12,7 @@ import java.util.UUID;
 record SentCall(Action action, UUID grantId, Instant sentAt, @Nullable Instant validFrom,
                 @Nullable Instant validUntil, Set<UUID> accessPointIds, @Nullable String mapping,
                 @Nullable String code, @Nullable String externalReference,
-                @Nullable Instant previousNextAttemptAt) {
+                @Nullable Instant previousNextAttemptAt, int previousAttempts) {
 
     GrantReference reference() {
         return new GrantReference(grantId, externalReference);

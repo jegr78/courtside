@@ -14,4 +14,6 @@ public interface AccessGrantRepository extends JpaRepository<AccessGrant, UUID> 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT g FROM AccessGrant g WHERE g.id = :id")
     Optional<AccessGrant> findLockedById(@Param("id") UUID id);
+
+    Optional<AccessGrant> findByBookingId(UUID bookingId);
 }
