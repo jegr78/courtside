@@ -21,7 +21,7 @@ class AccessPassSafetyTest extends AccessPassTestSupport {
     private static final Step ACCEPT_LATER = new Step.Answer(new GrantOutcome.Accepted("remote-user"));
 
     @Test
-    void givenAConnectorThatCrashesAfterThePreCallCommit_whenThePassRuns_thenTheGrantCountsAsExposed() {
+    void givenAConnectorThatThrowsAnErrorAfterThePreCallCommit_whenThePassRuns_thenTheGrantCountsAsExposed() {
         // given
         UUID booking = book(courts.get(0));
         connector.nextInstalls(new Step.Fail(new AssertionError("connector crashed")));
