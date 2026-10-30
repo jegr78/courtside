@@ -1019,8 +1019,10 @@ and its message record keeps the booking id after settling. When the grant is in
 first time, every such handed-over record of the booking is cleared and its account receives one
 `ACCESS_CODE_READY` with the current code; one written after the grant stopped being wanted fails as
 `AccessWithdrawn`. A reminder written before the code exists says that it is missing and points to
-My bookings. The mail of a series move carries the booking's own code only when the move covers one
-date, because each date has its own code. Without a code the placeholder's line disappears,
+My bookings. If the door accepts the code while that confirmation is being sent, the clearing misses
+it and the member finds the code in My bookings and the reminder instead; this is accepted. The mail
+of a series move carries the booking's own code, with any static codes beside it, only when the move
+covers one date, because each date has its own code; a code not issued yet is simply left out. Without a code the placeholder's line disappears,
 so such a mail reads exactly as it did before access points existed. A club's own wording that lacks
 the placeholder gets the block when there is one: above the link when the wording ends with a line
 holding only `{instanceLink}`, at its end otherwise. Like a credential, the codes may not

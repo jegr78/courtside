@@ -250,6 +250,27 @@ class DynamicAccessCodeMailTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenNoCodeIssuedYet_whenTheClubMovesTheSeriesOnlyDate_thenTheMoveMailSaysNothingAboutAMissingCode() {
+        // given
+        UUID board = identity.createEnabledAccount(identity.createPerson("Mary", "Major", "mary.major@example.org"),
+                "major.mary", Set.of(Role.ADMIN));
+        cards.letBookingsReceiveAccessCodes(TRAINING_CARD, true);
+        UUID series = bookings.createSeries(court, TRAINING_CARD, LocalDate.of(2026, 5, 12),
+                LocalTime.of(18, 0), 60, 1, janeAccount, jane, Set.of(Role.TRAINER));
+        outbox.deliverDue();
+        clearInvocations(sender);
+
+        // when
+        bookings.moveWholeSeries(series, LocalTime.of(19, 0), board, Set.of(Role.ADMIN));
+        outbox.deliverDue();
+
+        // then
+        assertThat(bodiesTo("jane.doe@example.org")).singleElement()
+                .satisfies(body -> assertThat(body).as("a far-off move promises no code it cannot send")
+                        .doesNotContain(MISSING));
+    }
+
+    @Test
     void givenTheWholeFlow_whenTheCodeIsMailed_thenItIsInNoAuditRowMessageParameterOrLogLine(CapturedOutput log) {
         // given
         UUID booking = book();

@@ -75,7 +75,7 @@ class BookingWording {
             block.addAll(lines);
         }
         boolean pending = dynamic != null && issued == null;
-        if (pending) {
+        if (pending && pendingKey != null) {
             block.add(templates.render(pendingKey, locale, Map.of()));
         }
         return new AccessLines(String.join("\n", block), pending);

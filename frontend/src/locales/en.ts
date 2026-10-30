@@ -660,7 +660,7 @@ const en: Record<keyof typeof de, string> = {
   "admin.facility.staticCode": "Access code",
   "admin.facility.staticCodeHint": "Digits only, exactly {{digits}} of them. Leave it empty when the access point has no code.",
   "admin.facility.emergencyCode": "Emergency code",
-  "admin.facility.emergencyCodeHint": "Only for an access point without an access code, whose codes the access-control system issues. Exactly {{digits}} digits and none of the access codes. Keep it on the keypad: a booking's people can ask for it in My bookings when their own code is missing or does not work, and the audit log shows who asked. Leave it empty for none.",
+  "admin.facility.emergencyCodeHint": "Only for an access point without an access code, whose codes the access-control system issues. Exactly {{digits}} digits and none of the access codes. Keep it on the keypad: a booking's people can ask for it in My bookings when their own code is missing or does not work, and the audit log shows who asked. Without a connected access-control system it is never offered. Leave it empty for none.",
   "admin.facility.editAccessPoint": "Edit",
   "admin.facility.accessPointSave": "Save",
   "admin.facility.accessPointCancel": "Cancel",

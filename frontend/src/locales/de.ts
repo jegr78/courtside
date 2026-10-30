@@ -658,7 +658,7 @@ const de = {
   "admin.facility.staticCode": "Zugangscode",
   "admin.facility.staticCodeHint": "Nur Ziffern, genau {{digits}} Stellen. Leer lassen, wenn der Zugang keinen Code hat.",
   "admin.facility.emergencyCode": "Notfallcode",
-  "admin.facility.emergencyCodeHint": "Nur für einen Zugang ohne Zugangscode, dessen Codes das Zutrittssystem vergibt. Genau {{digits}} Ziffern und keiner der Zugangscodes. Halte ihn am Tastenfeld bereit: Wer an einer Buchung teilnimmt, kann ihn unter Meine Buchungen abfragen, wenn der eigene Code fehlt oder nicht funktioniert, und das Protokoll zeigt, wer gefragt hat. Leer lassen, wenn es keinen gibt.",
+  "admin.facility.emergencyCodeHint": "Nur für einen Zugang ohne Zugangscode, dessen Codes das Zutrittssystem vergibt. Genau {{digits}} Ziffern und keiner der Zugangscodes. Halte ihn am Tastenfeld bereit: Wer an einer Buchung teilnimmt, kann ihn unter Meine Buchungen abfragen, wenn der eigene Code fehlt oder nicht funktioniert, und das Protokoll zeigt, wer gefragt hat. Ohne angebundenes Zutrittssystem wird er nie angeboten. Leer lassen, wenn es keinen gibt.",
   "admin.facility.editAccessPoint": "Bearbeiten",
   "admin.facility.accessPointSave": "Speichern",
   "admin.facility.accessPointCancel": "Abbrechen",

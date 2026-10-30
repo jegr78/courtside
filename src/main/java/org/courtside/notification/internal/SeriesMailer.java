@@ -119,9 +119,9 @@ class SeriesMailer implements MessageComposer {
                     bookings.describeCourts(message.previousCourts()), locale));
             // A date's own code would mislead on the other dates, so only a move of one date carries it.
             if (described.size() == 1) {
-                values.put(BookingWording.ACCESS_CODES, wording.access(described.firstEntry().getKey(),
-                        described.firstEntry().getValue(), account, locale, BookingWording.CODE_MISSING, false)
-                        .text());
+                BookingAnnouncement moved = described.firstEntry().getValue();
+                values.put(BookingWording.ACCESS_CODES, wording.access(described.firstEntry().getKey(), moved,
+                        account, locale, null, moved.dynamicAccess() != null).text());
             }
         }
         String key = message.kind().templateKey();
