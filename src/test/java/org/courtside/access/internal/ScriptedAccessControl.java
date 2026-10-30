@@ -44,6 +44,10 @@ public final class ScriptedAccessControl implements AccessControlConnector {
         record Fail(Throwable failure) implements Step {
         }
 
+        /** Throws what the function builds from the code the call carries. */
+        record FailWithCode(Function<String, RuntimeException> failure) implements Step {
+        }
+
         /** Blocks until interrupted. */
         record Hang() implements Step {
         }
@@ -193,13 +197,13 @@ public final class ScriptedAccessControl implements AccessControlConnector {
         boolean overlapped = inFlight.incrementAndGet() > 1;
         calls.add(new Call(kind, grant, Instant.now(), overlapped, code));
         try {
-            return execute(step);
+            return execute(step, code);
         } finally {
             inFlight.decrementAndGet();
         }
     }
 
-    private Object execute(Step step) {
+    private Object execute(Step step, String code) {
         return switch (step) {
             case Step.Answer(GrantOutcome outcome) -> outcome;
             case Step.Probe(ProbeOutcome outcome) -> outcome;
@@ -209,6 +213,7 @@ public final class ScriptedAccessControl implements AccessControlConnector {
                 }
                 throw (RuntimeException) failure;
             }
+            case Step.FailWithCode(Function<String, RuntimeException> failure) -> throw failure.apply(code);
             case Step.Hang() -> {
                 try {
                     Thread.sleep(Duration.ofMinutes(5));
@@ -231,7 +236,7 @@ public final class ScriptedAccessControl implements AccessControlConnector {
             }
             case Step.Then(Runnable action, Step next) -> {
                 action.run();
-                yield execute(next);
+                yield execute(next, code);
             }
         };
     }

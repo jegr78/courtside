@@ -1,5 +1,7 @@
 package org.courtside.access.internal;
 
+import org.jspecify.annotations.Nullable;
+
 import java.time.Duration;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
@@ -19,8 +21,8 @@ final class CallRunner implements AutoCloseable {
         record Done<T>(T value) implements Result<T> {
         }
 
-        /** The call threw or missed its deadline; it may have been applied. */
-        record Unclear<T>() implements Result<T> {
+        /** The call threw, or missed its deadline when the cause is null; it may have been applied. */
+        record Unclear<T>(@Nullable Throwable cause) implements Result<T> {
         }
 
         /** An earlier call still occupies the call thread, so this one was never started. */
@@ -67,13 +69,13 @@ final class CallRunner implements AutoCloseable {
             return new Result.Done<>(running.get(deadline.toNanos(), TimeUnit.NANOSECONDS));
         } catch (TimeoutException late) {
             abandon(running, started);
-            return new Result.Unclear<>();
+            return new Result.Unclear<>(null);
         } catch (ExecutionException failed) {
-            return new Result.Unclear<>();
+            return new Result.Unclear<>(failed.getCause());
         } catch (InterruptedException interrupted) {
             abandon(running, started);
             Thread.currentThread().interrupt();
-            return new Result.Unclear<>();
+            return new Result.Unclear<>(interrupted);
         }
     }
 

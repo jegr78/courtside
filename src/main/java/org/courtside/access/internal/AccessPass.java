@@ -31,6 +31,7 @@ class AccessPass {
 
     private static final UUID FIRST = new UUID(0, 0);
     private static final ProbeOutcome NO_PROBE_ANSWER = new ProbeOutcome.Unreachable("The probe gave no answer");
+    private static final String OCCUPIED = "the call thread is still occupied by an abandoned call";
 
     private final DataSource dataSource;
     private final TransactionTemplate transactions;
@@ -110,20 +111,21 @@ class AccessPass {
                         ORDER BY wanted, remote = 'NONE', id
                         """)
                 .param("now", Timestamp.from(clock.now())).query(UUID.class).list();
-        boolean probed = false;
+        boolean probedThisPass = false;
         for (UUID grantId : open) {
             if (stopping.getAsBoolean()) {
                 return new PassResult.Stopped();
             }
-            Prepared prepared = prepare(grantId, probed);
+            Prepared prepared = prepare(grantId, probedThisPass);
             if (prepared instanceof Prepared.NeedsProbe) {
                 if (!lock.stillHeld()) {
                     return new PassResult.LockLost();
                 }
-                if (!(probe() instanceof ProbeOutcome.Answered)) {
-                    return new PassResult.Outage();
+                ProbeOutcome probed = probe();
+                if (!(probed instanceof ProbeOutcome.Answered)) {
+                    return outage(probed);
                 }
-                probed = true;
+                probedThisPass = true;
                 prepared = prepare(grantId, true);
             }
             if (prepared instanceof Prepared.Ready(SentCall call)) {
@@ -192,7 +194,7 @@ class AccessPass {
         }
         return switch (recording.effect()) {
             case PassEffect.Continue ignored -> null;
-            case PassEffect.Outage ignored -> new PassResult.Outage();
+            case PassEffect.Outage ignored -> outage(probeResult);
             case PassEffect.Hold(Instant until) -> new PassResult.Held(Duration.between(recordedAt[0], until));
         };
     }
@@ -204,18 +206,49 @@ class AccessPass {
             case REVOKE -> connector.revoke(call.reference());
             case NONE -> throw new IllegalStateException("No call is sent for a row that needs none");
         });
-        if (sent instanceof CallRunner.Result.Done<GrantOutcome>(GrantOutcome outcome) && outcome != null) {
-            return new CallResult.Answered(outcome);
+        switch (sent) {
+            case CallRunner.Result.Done<GrantOutcome>(GrantOutcome outcome) when outcome != null -> {
+                return new CallResult.Answered(outcome);
+            }
+            case CallRunner.Result.Busy<GrantOutcome> busy -> log.warn("Access grant {} {} was not sent: {}",
+                    call.grantId(), call.action(), OCCUPIED);
+            case CallRunner.Result.Unclear<GrantOutcome>(Throwable cause) -> log.warn(
+                    "Access grant {} {} gave no clear answer: {}", call.grantId(), call.action(),
+                    describe(cause, call.code()));
+            default -> log.warn("Access grant {} {} gave no clear answer: it answered nothing", call.grantId(),
+                    call.action());
         }
         return new CallResult.Unclear();
     }
 
+    private String describe(@Nullable Throwable cause, @Nullable String code) {
+        if (cause == null) {
+            return "no answer within " + deadline;
+        }
+        String message = cause.getMessage() == null ? "" : cause.getMessage();
+        return cause.getClass().getName() + ": " + (code == null ? message : message.replace(code, "****"));
+    }
+
+    private PassResult outage(@Nullable ProbeOutcome probe) {
+        String reason = switch (probe) {
+            case ProbeOutcome.Unreachable(String why) -> why;
+            case ProbeOutcome.Refused(String why) -> why;
+            case null, default -> "the connector refused a call for the whole connector";
+        };
+        log.warn("The access pass ends as an outage: {}", reason);
+        return new PassResult.Outage();
+    }
+
     private ProbeOutcome probe() {
         CallRunner.Result<ProbeOutcome> probed = calls.run(connector::probe);
-        if (probed instanceof CallRunner.Result.Done<ProbeOutcome>(ProbeOutcome outcome) && outcome != null) {
-            return outcome;
-        }
-        return NO_PROBE_ANSWER;
+        return switch (probed) {
+            case CallRunner.Result.Done<ProbeOutcome>(ProbeOutcome outcome) when outcome != null -> outcome;
+            case CallRunner.Result.Busy<ProbeOutcome> busy -> new ProbeOutcome.Unreachable(
+                    "The probe was not sent: " + OCCUPIED);
+            case CallRunner.Result.Unclear<ProbeOutcome>(Throwable cause) -> new ProbeOutcome.Unreachable(
+                    "The probe gave no clear answer: " + describe(cause, null));
+            default -> NO_PROBE_ANSWER;
+        };
     }
 
     private void release() {

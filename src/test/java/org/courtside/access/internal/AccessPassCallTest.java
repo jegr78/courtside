@@ -6,6 +6,9 @@ import org.courtside.access.internal.ScriptedAccessControl.Kind;
 import org.courtside.access.internal.ScriptedAccessControl.Step;
 import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import javax.sql.DataSource;
@@ -17,6 +20,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+@ExtendWith(OutputCaptureExtension.class)
 class AccessPassCallTest extends AccessPassTestSupport {
 
     @Autowired
@@ -165,6 +169,55 @@ class AccessPassCallTest extends AccessPassTestSupport {
         // then
         assertThat(result).isEqualTo(new PassResult.Stopped());
         assertThat(connector.calls(Kind.GRANT)).as("a running call is finished, no new one starts").hasSize(1);
+    }
+
+    @Test
+    void givenAConnectorExceptionThatEchoesTheCode_whenItIsLogged_thenTheLogNamesTheFailureWithoutTheCode(
+            CapturedOutput output) {
+        // given
+        UUID booking = book(courts.get(0));
+        connector.nextInstalls(new Step.FailWithCode(code -> new IllegalStateException("keycode " + code
+                + " rejected by the controller")));
+
+        // when
+        pass.runPassNow();
+
+        // then
+        String code = connector.calls(Kind.GRANT).getFirst().code();
+        List<String> lines = output.getOut().lines().filter(line -> line.contains("gave no clear answer")).toList();
+        assertThat(lines).singleElement().asString()
+                .contains(grantIdOf(booking).toString(), "GRANT", "java.lang.IllegalStateException",
+                        "keycode **** rejected")
+                .doesNotContain(code);
+        assertThat(grantOf(booking).getLastFailure()).isEqualTo("The access-control system gave no clear answer");
+    }
+
+    @Test
+    void givenACallThreadStillOccupied_whenAPassWouldProbe_thenTheLogSaysWhyNothingWasSent(CapturedOutput output) {
+        // given
+        book(courts.get(0));
+        connector.everyInstall(new Step.Stubborn());
+        pass.runPassNow();
+
+        // when
+        passAt(START.plus(Duration.ofMinutes(5)));
+
+        // then
+        assertThat(output.getOut()).contains("the call thread is still occupied by an abandoned call");
+    }
+
+    @Test
+    void givenAProbeThatFails_whenThePassEndsAsAnOutage_thenTheLogCarriesTheProbesReason(CapturedOutput output) {
+        // given
+        book(courts.get(0));
+        connector.nextProbes(new Step.Probe(new ProbeOutcome.Unreachable("connection refused by the controller")));
+
+        // when
+        PassResult result = pass.runPassNow();
+
+        // then
+        assertThat(result).isEqualTo(new PassResult.Outage());
+        assertThat(output.getOut()).contains("The access pass ends as an outage: connection refused by the controller");
     }
 
     @Test
