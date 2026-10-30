@@ -1,7 +1,7 @@
 import { expect, test } from "../../fixtures";
 import { activate, openTheApplication, reachAdministration, signIn, walks } from "../../journey-walking";
 
-test("given a club whose gates take a code per booking, when the board checks the access-control system, then the next pass answers on the access grants page",
+test("given a connected access-control system, when the board asks for a fresh probe, then the next pass answers it on the access grants page",
   walks("session-and-own-account", "access-grant-administration"),
   async ({ page, language }) => {
     // given
