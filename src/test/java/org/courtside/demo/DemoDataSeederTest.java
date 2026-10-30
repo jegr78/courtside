@@ -5,6 +5,8 @@ import org.courtside.booking.testfixture.BookingTestFixture;
 import org.courtside.identity.Role;
 import org.courtside.identity.UserAccountRepository;
 import org.courtside.member.MemberRepository;
+import org.courtside.shared.AccessDemand;
+import org.courtside.shared.BookingAnnouncer;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.DefaultApplicationArguments;
@@ -12,10 +14,15 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.context.ActiveProfiles;
 
+import java.time.Clock;
+import java.time.Duration;
 import java.time.LocalDate;
+import java.util.List;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -47,6 +54,29 @@ class DemoDataSeederTest {
 
     @Autowired
     private JdbcClient jdbc;
+
+    @Autowired
+    private BookingAnnouncer announcer;
+
+    @Autowired
+    private Clock clock;
+
+    @Value("${courtside.access-control.connector}")
+    private String connector;
+
+    @Test
+    void givenTheSeededDemo_whenItsUpcomingBookingsAreRead_thenEachOpensTheGatedCourtsByADynamicCode() {
+        // when
+        List<AccessDemand> demands = announcer.accessDemandsStartingBefore(
+                clock.instant().plus(Duration.ofDays(400)), clock.instant(), new UUID(0, 0), 10);
+
+        // then
+        assertThat(connector).as("the demo installs grants on the simulated access-control system")
+                .isEqualTo("simulated");
+        assertThat(jdbc.sql("SELECT count(*) FROM access_point WHERE static_code IS NULL AND active")
+                .query(Long.class).single()).as("the demo gates its courts without a static code").isEqualTo(1);
+        assertThat(demands).as("next week's member booking wants a dynamic code").isNotEmpty();
+    }
 
     @Test
     void givenAFreshDemoDatabase_whenSeedingTwice_thenAdminAndFixturesExistOnlyOnce() throws Exception {
