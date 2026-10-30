@@ -43,7 +43,7 @@ class ValidationMessageCoverageTest {
                     "ImportPreviewExpiredException", "RemovalsNeedConfirmationException");
 
     private static final List<String> GET_CODE_DECLARING_SIMPLE_NAMES =
-            List.of("CodedDomainFailure", "InvalidOpeningWindowException",
+            List.of("AccessCode", "CodedDomainFailure", "InvalidOpeningWindowException",
                     "InvalidMembershipPeriodException");
 
     private static final List<Pattern> CODE_LITERAL_PATTERNS = buildCodeLiteralPatterns();

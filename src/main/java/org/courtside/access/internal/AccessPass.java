@@ -46,12 +46,13 @@ class AccessPass {
     private final ProvisioningWindow window;
     private final Duration deadline;
     private final int pageSize;
+    private final ProbeReadings readings;
 
     AccessPass(DataSource dataSource, PlatformTransactionManager transactionManager, JdbcClient jdbc, PassClock clock,
                BookingAnnouncer announcer, AccessGrantRepository grants, AccessGrantTransitions transitions,
                AccessCodes codes, AccessControlConnector connector, CallRunner calls, ProvisioningWindow window,
                @Value("${courtside.access-control.call-deadline}") Duration deadline,
-               @Value("${courtside.access-control.insert-page-size}") int pageSize) {
+               @Value("${courtside.access-control.insert-page-size}") int pageSize, ProbeReadings readings) {
         this.dataSource = dataSource;
         this.transactions = new TransactionTemplate(transactionManager);
         this.jdbc = jdbc;
@@ -65,6 +66,7 @@ class AccessPass {
         this.window = window;
         this.deadline = deadline;
         this.pageSize = pageSize;
+        this.readings = readings;
     }
 
     PassResult runPassNow() {
@@ -112,6 +114,16 @@ class AccessPass {
                         """)
                 .param("now", Timestamp.from(clock.now())).query(UUID.class).list();
         boolean probedThisPass = false;
+        if (readings.takeRequest()) {
+            if (!lock.stillHeld()) {
+                return new PassResult.LockLost();
+            }
+            ProbeOutcome requested = probe();
+            if (!(requested instanceof ProbeOutcome.Answered)) {
+                return outage(requested);
+            }
+            probedThisPass = true;
+        }
         for (UUID grantId : open) {
             if (stopping.getAsBoolean()) {
                 return new PassResult.Stopped();
@@ -240,6 +252,12 @@ class AccessPass {
     }
 
     private ProbeOutcome probe() {
+        ProbeOutcome outcome = probeOnce();
+        readings.record(outcome, clock.now());
+        return outcome;
+    }
+
+    private ProbeOutcome probeOnce() {
         CallRunner.Result<ProbeOutcome> probed = calls.run(connector::probe);
         return switch (probed) {
             case CallRunner.Result.Done<ProbeOutcome>(ProbeOutcome outcome) when outcome != null -> outcome;

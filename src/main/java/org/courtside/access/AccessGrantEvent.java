@@ -16,6 +16,17 @@ public sealed interface AccessGrantEvent extends DomainEventRecord {
         return bookingId();
     }
 
+    /** A board asked for a failing grant to be sent again. */
+    record RetryRequested(UUID grantId, UUID bookingId) implements AccessGrantEvent {
+
+        static final String TYPE = "access.grant.retryRequested";
+
+        @Override
+        public String eventType() {
+            return TYPE;
+        }
+    }
+
     /** A door accepted the grant's current code for the first time. */
     record Installed(UUID bookingId) implements AccessGrantEvent {
 

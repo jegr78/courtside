@@ -110,6 +110,8 @@ tags:
     description: Administering courts.
   - name: admin-access-points
     description: Administering the doors and gates that lead to the courts.
+  - name: admin-access-grants
+    description: Watching and retrying the access grants an access-control system installs per booking.
   - name: admin-opening-hours
     description: Administering opening hours.
   - name: admin-booking-cards
@@ -995,6 +997,106 @@ components:
           description: |
             Digits only. A new or changed code has exactly as many digits as the club's access code
             length; a stored code keeps working after that length changes. Absent or `null` removes it.
+
+    AdminAccessGrantStatus:
+      type: string
+      description: |
+        `FAILING` was refused or failed five counted attempts in a row and waits for a retry or a change of
+        its booking; `REMOVING` is no longer wanted but may still be installed; `INSTALLED` is held by the
+        access-control system as wanted; `WAITING` is wanted and not yet installed as wanted; `DONE` is
+        neither wanted nor installed.
+      enum: [FAILING, REMOVING, INSTALLED, WAITING, DONE]
+
+    AdminAccessGrantCourt:
+      type: object
+      required: [number, name]
+      properties:
+        number: { type: integer, format: int32 }
+        name: { type: string }
+
+    AdminAccessGrant:
+      type: object
+      description: One booking's access grant and what the access-control system last answered. It never carries the code.
+      required: [id, bookingId, status, validFrom, validUntil, startsAt, endsAt, courts, accessPoints, attempts,
+                 lastFailure, nextAttemptAt]
+      properties:
+        id: { type: string, format: uuid }
+        bookingId: { type: string, format: uuid }
+        status: { $ref: "#/components/schemas/AdminAccessGrantStatus" }
+        validFrom:
+          type: [string, "null"]
+          format: date-time
+          description: When the code starts opening the doors, or `null` once the booking no longer asks for access.
+        validUntil:
+          type: [string, "null"]
+          format: date-time
+          description: When the code stops opening the doors, or `null` once the booking no longer asks for access.
+        startsAt:
+          type: [string, "null"]
+          format: date-time
+          description: The booking's start, or `null` when the booking cannot be read any more.
+        endsAt:
+          type: [string, "null"]
+          format: date-time
+          description: The booking's end, or `null` when the booking cannot be read any more.
+        courts:
+          type: array
+          items: { $ref: "#/components/schemas/AdminAccessGrantCourt" }
+        accessPoints:
+          type: array
+          description: The names of the access points the grant opens or opened last, in alphabetical order.
+          items: { type: string }
+        attempts:
+          type: integer
+          format: int32
+          minimum: 0
+          description: Counted attempts since the last success, change or manual retry.
+        lastFailure:
+          type: [string, "null"]
+          description: What the access-control system answered the last time a call failed, or `null`.
+        nextAttemptAt:
+          type: [string, "null"]
+          format: date-time
+          description: When Courtside sends the grant again, or `null` when nothing is outstanding.
+
+    AccessControlProbe:
+      type: object
+      description: |
+        What the access-control system answered when Courtside last checked that it is reachable and lets
+        Courtside manage users. Only the background pass asks; reading the overview never does.
+      required: [reachable, detail, checkedAt]
+      properties:
+        reachable: { type: boolean }
+        detail:
+          type: string
+          description: What the system or its connector said, empty when it answered.
+        checkedAt: { type: string, format: date-time }
+
+    AccessGrantOverview:
+      type: object
+      required: [connector, connected, probe, grants, total]
+      properties:
+        connector:
+          type: string
+          description: The access-control system this instance is configured for, `none` without one.
+        connected:
+          type: boolean
+          description: Whether an access-control system installs grants at all.
+        probe:
+          description: The latest check of the access-control system, or `null` before the first one.
+          oneOf:
+            - $ref: "#/components/schemas/AccessControlProbe"
+            - type: "null"
+        grants:
+          type: array
+          description: |
+            At most 100 grants that are not done, failing ones first, then by the start of their validity window.
+          items: { $ref: "#/components/schemas/AdminAccessGrant" }
+        total:
+          type: integer
+          format: int64
+          minimum: 0
+          description: How many grants are not done, shown or not.
 
     LocalTime:
       type: string
@@ -7870,6 +7972,96 @@ paths:
         "429":
           $ref: "#/components/responses/RateLimited"
 
+  /api/admin/access-grants:
+    get:
+      tags: [admin-access-grants]
+      operationId: listAccessGrants
+      summary: The access grants that are not done and the latest check of the access-control system.
+      description: |
+        Lists grants that are failing, being removed, installed or waiting. Reading the overview never calls
+        the access-control system, and no response carries an access code.
+      responses:
+        "200":
+          description: The overview.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AccessGrantOverview" }
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/admin/access-grants/probe:
+    post:
+      tags: [admin-access-grants]
+      operationId: probeAccessControl
+      summary: Ask for a fresh check of the access-control system.
+      description: |
+        The background pass checks the system at the start of its next run; the overview shows the answer
+        once it has. Without an access-control system this answers `409` with
+        `urn:courtside:error:access-control-not-connected`.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      responses:
+        "202":
+          description: The check is requested.
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          description: No access-control system is connected.
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/admin/access-grants/{id}/retry:
+    post:
+      tags: [admin-access-grants]
+      operationId: retryAccessGrant
+      summary: Send a failing access grant to the access-control system again.
+      description: |
+        A `FAILING` grant gets a fresh attempt count and is sent again by the next pass, which is started at
+        once. An unknown grant answers `404` with `urn:courtside:error:access-grant-not-found`; a grant that
+        is not failing answers `409` with `urn:courtside:error:access-grant-not-failing`.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: The grant as it stands once the retry is recorded.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminAccessGrant" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          description: No such access grant.
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "409":
+          description: The access grant is not failing.
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
   /api/admin/access-points:
     get:
       tags: [admin-access-points]
@@ -11676,8 +11868,10 @@ paths:
         Entries come from two places. The administrative surfaces record what a board configures:
         `facility.court.added`, `card.bookingCard.changed`, `config.club.changed`,
         `rules.ruleSet.changed`, `roster.person.corrected`, `dataexchange.source.described` and
-        `notification.template.changed`, each with siblings. The rest is recorded outside those surfaces:
-        `booking.booking.confirmed` and the four other booking entries, and
+        `notification.template.changed`, each with siblings, and `access.grant.retryRequested`, whose
+        subject is the booking the retried grant belongs to. The rest is recorded outside those surfaces:
+        `booking.booking.confirmed` and the four other booking entries, `access.grant.installed` and
+        `access.grant.failing`, and
         `identity.account.credentialsRequested`, which names the account a credential was issued
         for. Treat `eventType` as an open set — a page may carry a name this description does not
         list.

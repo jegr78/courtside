@@ -1,6 +1,7 @@
 package org.courtside.access.internal;
 
 import lombok.RequiredArgsConstructor;
+import org.courtside.access.AccessGrantEvent;
 import org.courtside.card.CardEvent;
 import org.courtside.facility.FacilityEvent;
 import org.courtside.shared.BookingCancelled;
@@ -73,6 +74,11 @@ class AccessSignals {
 
     @TransactionalEventListener
     void on(FacilityEvent.AccessPointAvailabilityChanged switched) {
+        worker.signal();
+    }
+
+    @TransactionalEventListener
+    void on(AccessGrantEvent.RetryRequested requested) {
         worker.signal();
     }
 }
