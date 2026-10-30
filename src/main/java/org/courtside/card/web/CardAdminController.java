@@ -60,7 +60,8 @@ class CardAdminController implements AdminBookingCardsApi, AdminParticipantCards
                 roles(request.getManagingRoles()),
                 toPlayerCounts(request.getAllowedPlayerCounts()), request.getCountsAgainstLimits(),
                 request.getGuestAllowed(), Boolean.TRUE.equals(request.getShowGenericOccupancy()),
-                Boolean.TRUE.equals(request.getGrantsAccess()), !Boolean.FALSE.equals(request.getSignalsOccupancy()))));
+                Boolean.TRUE.equals(request.getGrantsAccess()), request.getSignalsOccupancy() == null
+                        ? cards.requireCard(id).isSignalsOccupancy() : request.getSignalsOccupancy())));
     }
 
     @Override

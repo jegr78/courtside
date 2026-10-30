@@ -495,6 +495,23 @@ class BookingCardAdminControllerTest extends AbstractIntegrationTest {
         assertThat(cardService.requireCard(BookingCard.COURT_CLOSED).isSignalsOccupancy()).isFalse();
     }
 
+    @Test
+    void givenTheClosureCard_whenAChangeLeavesTheSignalOut_thenTheChangeIsStoredAndTheCardStaysSilent()
+            throws Exception {
+        // when
+        mockMvc.perform(put("/api/admin/booking-cards/" + BookingCard.COURT_CLOSED)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(cardJson("Closed for repairs", false))
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.label").value("Closed for repairs"))
+                .andExpect(jsonPath("$.signalsOccupancy").value(false));
+
+        // then
+        assertThat(cardService.requireCard(BookingCard.COURT_CLOSED).isSignalsOccupancy())
+                .as("an absent signal keeps the card's current value").isFalse();
+    }
+
     private static String signalJson(String label, boolean signalsOccupancy) {
         return """
                 {"label": "%s", "color": "#c8a415",

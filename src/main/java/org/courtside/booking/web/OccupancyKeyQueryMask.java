@@ -5,6 +5,8 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletRequestWrapper;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -13,6 +15,7 @@ import java.util.regex.Pattern;
 
 // Request logging prints the query string, so the occupancy key is masked there; parameters stay as sent.
 @Component
+@Order(Ordered.HIGHEST_PRECEDENCE)
 class OccupancyKeyQueryMask extends OncePerRequestFilter {
 
     private static final String OCCUPANCY = "/api/public/occupancy";

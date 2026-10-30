@@ -1757,8 +1757,9 @@ components:
           description: The closure card refuses `true`.
         signalsOccupancy:
           type: boolean
-          default: true
-          description: The closure card refuses `true`, so a change to it states `false`.
+          description: >-
+            Absent means on when a card is created and unchanged when a card is changed. The closure
+            card refuses `true`.
 
     ParticipantCard:
       type: object
