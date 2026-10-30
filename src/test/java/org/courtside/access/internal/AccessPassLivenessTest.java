@@ -29,14 +29,17 @@ class AccessPassLivenessTest extends AccessPassTestSupport {
         for (int minute = 0; minute < 3; minute++) {
             outages.add(passAt(START.plus(Duration.ofMinutes(minute))));
         }
-        int attemptsDuringTheOutage = grantOf(booking).getAttempts();
+        AccessGrant duringTheOutage = grantOf(booking);
+        boolean codeDuringTheOutage = currentCode(booking).isPresent();
 
         // when
         passAt(START.plus(Duration.ofMinutes(3)));
 
         // then
         assertThat(outages).containsOnly(new PassResult.Outage());
-        assertThat(attemptsDuringTheOutage).as("an outage counts against no grant").isZero();
+        assertThat(duringTheOutage.getAttempts()).as("an outage counts against no grant").isZero();
+        assertThat(duringTheOutage.isWanted()).as("an outage leaves the inserted row as it was").isFalse();
+        assertThat(codeDuringTheOutage).isFalse();
         assertThat(connector.calls(Kind.GRANT)).hasSize(1);
         assertThat(grantOf(booking).getRemote()).isEqualTo(RemoteState.INSTALLED);
     }
@@ -85,6 +88,20 @@ class AccessPassLivenessTest extends AccessPassTestSupport {
         assertThat(grantOf(revoked).getRemote()).isEqualTo(RemoteState.NONE);
         assertThat(grantOf(stuck).getRemote()).isEqualTo(RemoteState.MAYBE);
         assertThat(grantOf(stuck).getAttempts()).isEqualTo(2);
+    }
+
+    @Test
+    void givenTheSystemAsksTheConnectorToWait_whenThePassRecordsIt_thenThePassHoldsTheWorkerForThatLong() {
+        // given
+        book(courts.get(0));
+        connector.nextInstalls(new Step.Answer(new GrantOutcome.RetryLater(Scope.CONNECTOR,
+                START.plus(Duration.ofMinutes(10)), "429 locked after requests without rights")));
+
+        // when
+        PassResult result = pass.runPassNow();
+
+        // then
+        assertThat(result).isEqualTo(new PassResult.Held(Duration.ofMinutes(10)));
     }
 
     @Test

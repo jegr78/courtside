@@ -102,7 +102,7 @@ class AccessPass {
         List<UUID> open = jdbc.sql("""
                         SELECT id FROM access_grant
                         WHERE wanted OR remote <> 'NONE' OR next_attempt_at <= :now OR retry_requested_at IS NOT NULL
-                        ORDER BY wanted, id
+                        ORDER BY wanted, remote = 'NONE', id
                         """)
                 .param("now", Timestamp.from(clock.now())).query(UUID.class).list();
         boolean probed = false;
@@ -118,17 +118,10 @@ class AccessPass {
                 probed = true;
                 prepared = prepare(grantId, true);
             }
-            switch (prepared) {
-                case Prepared.Busy busy -> {
-                    return new PassResult.Outage();
-                }
-                case Prepared.Ready(SentCall call) -> {
-                    PassResult ended = callAndRecord(lock, call);
-                    if (ended != null) {
-                        return ended;
-                    }
-                }
-                default -> {
+            if (prepared instanceof Prepared.Ready(SentCall call)) {
+                PassResult ended = callAndRecord(lock, call);
+                if (ended != null) {
+                    return ended;
                 }
             }
         }
@@ -154,10 +147,6 @@ class AccessPass {
                 if (!probed) {
                     status.setRollbackOnly();
                     return new Prepared.NeedsProbe();
-                }
-                if (calls.busy()) {
-                    status.setRollbackOnly();
-                    return new Prepared.Busy();
                 }
                 return new Prepared.Ready(grant.beginCall(decision.action(), decision.code(), now));
             });
@@ -235,9 +224,6 @@ class AccessPass {
         }
 
         record NeedsProbe() implements Prepared {
-        }
-
-        record Busy() implements Prepared {
         }
 
         record Ready(SentCall call) implements Prepared {

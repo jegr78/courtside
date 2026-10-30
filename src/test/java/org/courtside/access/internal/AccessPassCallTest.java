@@ -59,6 +59,36 @@ class AccessPassCallTest extends AccessPassTestSupport {
     }
 
     @Test
+    void givenThePassLosesItsLockWhileDeciding_whenItWouldProbe_thenItStopsBeforeTheProbe() {
+        // given
+        book(courts.get(0));
+        connector.whileMapping(points -> terminateThePassLockSession());
+
+        // when
+        PassResult result = pass.runPassNow();
+
+        // then
+        assertThat(result).isEqualTo(new PassResult.LockLost());
+        assertThat(connector.calls()).isEmpty();
+    }
+
+    @Test
+    void givenThePassLosesItsLockDuringACall_whenItWouldReProbe_thenItStopsBeforeTheReProbe() {
+        // given
+        book(courts.get(0));
+        connector.nextInstalls(new Step.Then(this::terminateThePassLockSession,
+                new Step.Fail(new IllegalStateException("socket reset"))));
+
+        // when
+        PassResult result = pass.runPassNow();
+
+        // then
+        assertThat(result).isEqualTo(new PassResult.LockLost());
+        assertThat(connector.calls()).extracting(ScriptedAccessControl.Call::kind)
+                .containsExactly(Kind.PROBE, Kind.GRANT);
+    }
+
+    @Test
     void givenACallThatHangs_whenItsDeadlinePasses_thenItIsAbandonedAndRecordedAsUnclear() {
         // given
         UUID booking = book(courts.get(0));

@@ -271,6 +271,8 @@ they name a file on the host, in the container the path it is mounted at. The
 
 | Variable | Default |
 |---|---|
+| `COURTSIDE_ACCESS_CONTROL_CALL_DEADLINE` | `15s` |
+| `COURTSIDE_ACCESS_CONTROL_CONNECTOR` | `none` |
 | `COURTSIDE_ADMISSION_ACCOUNT_BURST` | `200` |
 | `COURTSIDE_ADMISSION_ACCOUNT_PER_SECOND` | `20` |
 | `COURTSIDE_ADMISSION_ADDRESS_BURST` | `600` |

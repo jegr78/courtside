@@ -135,8 +135,7 @@ class BookingAnnouncements implements BookingAnnouncer {
             return List.of();
         }
         Map<UUID, AccessDemand> demands = accessGrants.demandsOf(bookings.findAllByIdIn(Set.copyOf(ids)));
-        return ids.stream().map(demands::get).filter(Objects::nonNull)
-                .filter(demand -> demand.validUntil().isAfter(validAfter)).toList();
+        return ids.stream().map(demands::get).filter(Objects::nonNull).toList();
     }
 
     private SequencedMap<UUID, BookingAnnouncement> announcementsOf(List<Booking> occurrences) {

@@ -1,8 +1,11 @@
 package org.courtside.access.internal;
 
 import org.courtside.access.GrantOutcome;
+import org.courtside.access.ProbeOutcome;
+import org.courtside.access.Scope;
 import org.courtside.access.internal.ScriptedAccessControl.Kind;
 import org.courtside.access.internal.ScriptedAccessControl.Step;
+import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataAccessException;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -37,11 +40,37 @@ class AccessPassMechanicsTest extends AccessPassTestSupport {
     }
 
     @Test
+    void givenAKnownRevocationAndANewInstall_whenTheInstallEndsThePassAsAnOutage_thenTheRevocationWasSentFirst() {
+        // given
+        UUID cancelled = book(courts.get(0));
+        pass.runPassNow();
+        cancel(cancelled);
+        connector.nextRevokes(new Step.Answer(new GrantOutcome.Refused(Scope.GRANT, "user locked")));
+        passAt(START.plus(Duration.ofMinutes(1)));
+        book(courts.get(1));
+        connector.nextInstalls(new Step.Answer(new GrantOutcome.Refused(Scope.CONNECTOR, "403 no user management")));
+        connector.nextProbes(new Step.Probe(new ProbeOutcome.Answered()),
+                new Step.Probe(new ProbeOutcome.Refused("403 no user management")));
+        int callsBefore = connector.calls().size();
+
+        // when
+        PassResult result = passAt(START.plus(Duration.ofMinutes(2)));
+
+        // then
+        assertThat(result).isEqualTo(new PassResult.Outage());
+        assertThat(connector.calls().subList(callsBefore, connector.calls().size()))
+                .extracting(ScriptedAccessControl.Call::kind)
+                .as("a revocation never waits behind an install")
+                .containsExactly(Kind.PROBE, Kind.REVOKE, Kind.GRANT, Kind.PROBE);
+        assertThat(grantOf(cancelled).getRemote()).isEqualTo(RemoteState.NONE);
+    }
+
+    @Test
     void givenMoreBookingsThanOneInsertPage_whenThePassInsertsThem_thenEveryBookingGetsItsGrant() {
         // given
         book(courts.get(0));
         book(courts.get(1));
-        book(courts.get(0), new org.courtside.shared.TimeSlot(EVENING.end(), EVENING.end().plus(Duration.ofHours(1))));
+        book(courts.get(0), new TimeSlot(EVENING.end(), EVENING.end().plus(Duration.ofHours(1))));
 
         // when
         pass.runPassNow();
