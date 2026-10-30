@@ -28,6 +28,12 @@ class AccessGrantTransitions {
         return new Decision(action, code);
     }
 
+    void decisionFailed(AccessGrant grant, String reason, Instant dbNow) {
+        if (grant.decisionFailed(reason, dbNow)) {
+            events.publishEvent(new AccessGrantEvent.Failing(grant.getBookingId()));
+        }
+    }
+
     Recording record(AccessGrant grant, SentCall call, CallResult result, @Nullable ProbeOutcome reprobe,
                      Instant dbNow, Duration deadline) {
         Recording recording = grant.record(call, result, reprobe, dbNow, deadline);

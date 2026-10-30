@@ -79,7 +79,11 @@ class AccessPass {
             return new PassResult.Skipped();
         }
         try (PassLock lock = acquired.get()) {
-            insertDemanded(stopping);
+            try {
+                insertDemanded(stopping);
+            } catch (RuntimeException failed) {
+                log.warn("The access pass could not insert the grants bookings ask for", failed);
+            }
             PassResult result = act(lock, stopping);
             release();
             return result;
@@ -97,6 +101,7 @@ class AccessPass {
                                 INSERT INTO access_grant (id, booking_id, next_attempt_at) VALUES (:id, :booking, :now)
                                 ON CONFLICT (booking_id) DO UPDATE SET next_attempt_at = :now
                                 WHERE access_grant.remote = 'NONE' AND NOT access_grant.wanted
+                                    AND access_grant.attempts = 0
                                 """)
                         .param("id", UUID.randomUUID()).param("booking", demand.bookingId())
                         .param("now", Timestamp.from(now)).update();
@@ -174,7 +179,19 @@ class AccessPass {
             });
         } catch (RuntimeException failed) {
             log.warn("Access grant {} could not be decided", grantId, failed);
+            recordDecisionFailure(grantId, failed);
             return new Prepared.NoCall();
+        }
+    }
+
+    private void recordDecisionFailure(UUID grantId, RuntimeException failed) {
+        String reason = "The grant could not be decided: "
+                + (failed.getMessage() == null ? failed.getClass().getSimpleName() : failed.getMessage());
+        try {
+            transactions.executeWithoutResult(status -> grants.findLockedById(grantId)
+                    .ifPresent(grant -> transitions.decisionFailed(grant, reason, clock.now())));
+        } catch (RuntimeException unrecorded) {
+            log.warn("The failed decision of access grant {} could not be recorded", grantId, unrecorded);
         }
     }
 

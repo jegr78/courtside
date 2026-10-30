@@ -20,14 +20,14 @@ public interface AccessGrantRepository extends JpaRepository<AccessGrant, UUID> 
 
     @Query(value = """
             SELECT * FROM access_grant
-            WHERE wanted OR remote <> 'NONE' OR refused OR attempts >= 5
+            WHERE wanted OR remote <> 'NONE' OR refused OR attempts > 0
             ORDER BY (refused OR attempts >= 5) DESC, want_from NULLS LAST, id
             LIMIT 100
             """, nativeQuery = true)
     List<AccessGrant> findShown();
 
     @Query(value = """
-            SELECT count(*) FROM access_grant WHERE wanted OR remote <> 'NONE' OR refused OR attempts >= 5
+            SELECT count(*) FROM access_grant WHERE wanted OR remote <> 'NONE' OR refused OR attempts > 0
             """, nativeQuery = true)
     long countNotDone();
 }

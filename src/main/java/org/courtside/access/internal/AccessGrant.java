@@ -104,8 +104,11 @@ public class AccessGrant {
         if (failing()) {
             return GrantStatus.FAILING;
         }
-        if (!wanted) {
-            return remote == RemoteState.NONE ? GrantStatus.DONE : GrantStatus.REMOVING;
+        if (!wanted && remote != RemoteState.NONE) {
+            return GrantStatus.REMOVING;
+        }
+        if (!wanted && attempts == 0) {
+            return GrantStatus.DONE;
         }
         return remote == RemoteState.INSTALLED && installedAsWanted() ? GrantStatus.INSTALLED : GrantStatus.WAITING;
     }
@@ -158,6 +161,16 @@ public class AccessGrant {
             return Action.NONE;
         }
         return action;
+    }
+
+    boolean decisionFailed(String reason, Instant dbNow) {
+        boolean failingBefore = failing();
+        lastFailure = stored(reason, null);
+        if (nextAttemptAt == null || !nextAttemptAt.isAfter(dbNow)) {
+            attempts++;
+            nextAttemptAt = dbNow.plus(backoff(attempts));
+        }
+        return !failingBefore && failing();
     }
 
     SentCall beginCall(Action action, @Nullable String code, Instant dbNow) {
