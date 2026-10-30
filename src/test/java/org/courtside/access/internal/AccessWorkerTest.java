@@ -2,6 +2,9 @@ package org.courtside.access.internal;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 
 import java.time.Duration;
 import java.util.List;
@@ -10,10 +13,14 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BooleanSupplier;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+@ExtendWith(OutputCaptureExtension.class)
 class AccessWorkerTest {
 
     private static final Duration LONG = Duration.ofMinutes(1);
@@ -139,10 +146,61 @@ class AccessWorkerTest {
         assertThat(started.poll(500, TimeUnit.MILLISECONDS)).isNull();
     }
 
+    @Test
+    void givenALongPass_whenTheWorkerIsStopped_thenThePassIsToldToEndBetweenRowsAndStopReturnsSoon()
+            throws Exception {
+        // given
+        CountDownLatch passRunning = new CountDownLatch(1);
+        AtomicBoolean toldToStop = new AtomicBoolean();
+        AccessWorker worker = workerStopping(stopping -> {
+            passRunning.countDown();
+            long deadline = System.nanoTime() + Duration.ofSeconds(60).toNanos();
+            while (System.nanoTime() < deadline && !stopping.getAsBoolean()) {
+                Thread.onSpinWait();
+            }
+            toldToStop.set(stopping.getAsBoolean());
+            return new PassResult.Stopped();
+        }, LONG, LONG);
+        worker.start();
+        assertThat(passRunning.await(5, TimeUnit.SECONDS)).isTrue();
+
+        // when
+        long stopping = System.nanoTime();
+        worker.stop();
+
+        // then
+        assertThat(Duration.ofNanos(System.nanoTime() - stopping)).isLessThan(Duration.ofSeconds(5));
+        assertThat(toldToStop).as("the pass learns of the stop between rows").isTrue();
+    }
+
+    @Test
+    void givenAPassThatThrowsAnError_whenTheWorkerThreadDies_thenItLeavesAnErrorInTheLog(CapturedOutput output)
+            throws Exception {
+        // given
+        AccessWorker worker = worker(() -> {
+            throw new AssertionError("connector bug");
+        }, LONG, LONG);
+
+        // when
+        worker.start();
+        assertThat(started.poll(5, TimeUnit.SECONDS)).isNotNull();
+
+        // then
+        long deadline = System.nanoTime() + Duration.ofSeconds(5).toNanos();
+        while (System.nanoTime() < deadline && !output.getOut().contains("The access worker stopped on an error")) {
+            Thread.onSpinWait();
+        }
+        assertThat(output.getOut()).contains("The access worker stopped on an error").contains("connector bug");
+    }
+
     private AccessWorker worker(Supplier<PassResult> pass, Duration idle, Duration lockRetry) {
-        AccessWorker worker = new AccessWorker(() -> {
+        return workerStopping(stopping -> pass.get(), idle, lockRetry);
+    }
+
+    private AccessWorker workerStopping(Function<BooleanSupplier, PassResult> pass, Duration idle, Duration lockRetry) {
+        AccessWorker worker = new AccessWorker(stopping -> {
             started.add(System.nanoTime());
-            return pass.get();
+            return pass.apply(stopping);
         }, idle, lockRetry, true);
         workers.add(worker);
         return worker;

@@ -20,6 +20,10 @@ sealed interface PassResult {
     record Held(Duration duration) implements PassResult {
     }
 
+    /** The worker is stopping, so the pass ended between two rows. */
+    record Stopped() implements PassResult {
+    }
+
     /** The pass lock's session was lost, so the pass stopped before its next remote call. */
     record LockLost() implements PassResult {
     }

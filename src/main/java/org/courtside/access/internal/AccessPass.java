@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.BooleanSupplier;
 
 /** One pass over the access grants: insert what the bookings ask for, act on open rows, release codes. */
 @Slf4j
@@ -65,25 +66,29 @@ class AccessPass {
         this.pageSize = pageSize;
     }
 
-    synchronized PassResult runPassNow() {
+    PassResult runPassNow() {
+        return runPassNow(() -> false);
+    }
+
+    synchronized PassResult runPassNow(BooleanSupplier stopping) {
         Optional<PassLock> acquired = PassLock.tryAcquire(dataSource);
         if (acquired.isEmpty()) {
             return new PassResult.Skipped();
         }
         try (PassLock lock = acquired.get()) {
-            insertDemanded();
-            PassResult result = act(lock);
+            insertDemanded(stopping);
+            PassResult result = act(lock, stopping);
             release();
             return result;
         }
     }
 
-    private void insertDemanded() {
+    private void insertDemanded(BooleanSupplier stopping) {
         Instant now = clock.now();
         Instant before = window.endsAt(now);
         UUID after = FIRST;
         List<AccessDemand> page = announcer.accessDemandsStartingBefore(before, now, after, pageSize);
-        while (!page.isEmpty()) {
+        while (!page.isEmpty() && !stopping.getAsBoolean()) {
             for (AccessDemand demand : page) {
                 jdbc.sql("""
                                 INSERT INTO access_grant (id, booking_id, next_attempt_at) VALUES (:id, :booking, :now)
@@ -98,7 +103,7 @@ class AccessPass {
         }
     }
 
-    private PassResult act(PassLock lock) {
+    private PassResult act(PassLock lock, BooleanSupplier stopping) {
         List<UUID> open = jdbc.sql("""
                         SELECT id FROM access_grant
                         WHERE wanted OR remote <> 'NONE' OR next_attempt_at <= :now OR retry_requested_at IS NOT NULL
@@ -107,6 +112,9 @@ class AccessPass {
                 .param("now", Timestamp.from(clock.now())).query(UUID.class).list();
         boolean probed = false;
         for (UUID grantId : open) {
+            if (stopping.getAsBoolean()) {
+                return new PassResult.Stopped();
+            }
             Prepared prepared = prepare(grantId, probed);
             if (prepared instanceof Prepared.NeedsProbe) {
                 if (!lock.stillHeld()) {

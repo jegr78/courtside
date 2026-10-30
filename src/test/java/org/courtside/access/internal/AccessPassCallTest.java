@@ -1,5 +1,6 @@
 package org.courtside.access.internal;
 
+import org.courtside.access.GrantOutcome;
 import org.courtside.access.ProbeOutcome;
 import org.courtside.access.internal.ScriptedAccessControl.Kind;
 import org.courtside.access.internal.ScriptedAccessControl.Step;
@@ -12,6 +13,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -145,6 +147,24 @@ class AccessPassCallTest extends AccessPassTestSupport {
         // then
         assertThat(connector.calls(Kind.GRANT)).hasSize(booked.size());
         assertThat(connector.calls()).noneMatch(ScriptedAccessControl.Call::overlapped);
+    }
+
+    @Test
+    void givenAPassWithManyRows_whenTheWorkerStopsDuringIt_thenThePassEndsBeforeTheNextRow() {
+        // given
+        book(courts.get(0));
+        book(courts.get(1));
+        book(courts.get(0), new TimeSlot(EVENING.end(), EVENING.end().plus(Duration.ofHours(1))));
+        AtomicBoolean stopping = new AtomicBoolean();
+        connector.everyInstall(new Step.Then(() -> stopping.set(true),
+                new Step.Answer(new GrantOutcome.Accepted("remote-user"))));
+
+        // when
+        PassResult result = pass.runPassNow(stopping::get);
+
+        // then
+        assertThat(result).isEqualTo(new PassResult.Stopped());
+        assertThat(connector.calls(Kind.GRANT)).as("a running call is finished, no new one starts").hasSize(1);
     }
 
     @Test

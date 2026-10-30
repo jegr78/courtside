@@ -10,7 +10,8 @@ import org.springframework.stereotype.Component;
 import java.time.Duration;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.function.Supplier;
+import java.util.function.BooleanSupplier;
+import java.util.function.Function;
 
 /** The one thread that runs access passes; everything else only signals it. */
 @Slf4j
@@ -22,7 +23,7 @@ class AccessWorker implements SmartLifecycle {
     private static final Duration LOCK_RETRY = Duration.ofSeconds(5);
     private static final Duration STOP_WAIT = Duration.ofSeconds(30);
 
-    private final Supplier<PassResult> pass;
+    private final Function<BooleanSupplier, PassResult> pass;
     private final Duration idle;
     private final Duration lockRetry;
     private final boolean autoStartup;
@@ -37,7 +38,8 @@ class AccessWorker implements SmartLifecycle {
         this(pass::runPassNow, IDLE, LOCK_RETRY, !environment.acceptsProfiles(Profiles.of("test")));
     }
 
-    AccessWorker(Supplier<PassResult> pass, Duration idle, Duration lockRetry, boolean autoStartup) {
+    AccessWorker(Function<BooleanSupplier, PassResult> pass, Duration idle, Duration lockRetry,
+                 boolean autoStartup) {
         this.pass = pass;
         this.idle = idle;
         this.lockRetry = lockRetry;
@@ -60,7 +62,10 @@ class AccessWorker implements SmartLifecycle {
             return;
         }
         running = true;
-        thread = Thread.ofPlatform().name("access-worker").start(this::work);
+        thread = Thread.ofPlatform().name("access-worker")
+                .uncaughtExceptionHandler((worker, failure) -> log.error("The access worker stopped on an error",
+                        failure))
+                .start(this::work);
     }
 
     @Override
@@ -97,7 +102,7 @@ class AccessWorker implements SmartLifecycle {
             clearSignal();
             PassResult result;
             try {
-                result = pass.get();
+                result = pass.apply(() -> !running);
             } catch (RuntimeException failed) {
                 log.warn("An access pass failed", failed);
                 result = new PassResult.Outage();
