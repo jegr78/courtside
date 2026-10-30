@@ -106,6 +106,18 @@ class MembersDoorCodeMessageTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenAClubhouseDoorOpenToMembers_whenOnlyItsNameAndCourtsChange_thenNoMemberIsTold() {
+        // given
+        UUID court = facility.createCourt(1, "Court 1");
+
+        // when
+        facility.changeAccessPoint(clubhouseDoor, "Clubhouse entrance", List.of(court), OLD_CODE, true);
+
+        // then
+        assertThat(toldAccounts()).as("a code the members already hold is not sent again").isEmpty();
+    }
+
+    @Test
     void givenADeactivatedClubhouseDoor_whenItIsActivatedAgain_thenEveryCurrentMemberIsTold() {
         // given
         facility.deactivateAccessPoint(clubhouseDoor);
