@@ -1,5 +1,6 @@
 package org.courtside.access.internal;
 
+import org.courtside.access.AccessGrantEvent;
 import org.courtside.identity.Role;
 import org.courtside.shared.BookingDisplaced;
 import org.courtside.shared.BookingReleased;
@@ -102,6 +103,13 @@ class AccessSignalsTest extends AccessPassTestSupport {
                 .as("its static code").isTrue();
         assertThat(passStartsAfter(() -> facility.deactivateAccessPoint(southGate))).as("deactivated").isTrue();
         assertThat(passStartsAfter(() -> facility.activateAccessPoint(southGate))).as("reactivated").isTrue();
+    }
+
+    @Test
+    void givenAnIdleWorker_whenABoardRetriesAGrant_thenAPassStartsAtOnce() {
+        // when / then
+        assertThat(passStartsAfter(() -> publish(new AccessGrantEvent.RetryRequested(UUID.randomUUID(),
+                UUID.randomUUID())))).isTrue();
     }
 
     private boolean passStartsAfter(Runnable change) {
