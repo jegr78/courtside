@@ -1064,13 +1064,24 @@ components:
       description: |
         What the access-control system answered when Courtside last checked that it is reachable and lets
         Courtside manage users. Only the background pass asks; reading the overview never does.
-      required: [reachable, detail, checkedAt]
+      required: [reachable, outcome, detail, checkedAt]
       properties:
         reachable: { type: boolean }
+        outcome: { $ref: '#/components/schemas/AccessControlProbeOutcome' }
         detail:
           type: string
-          description: What the system or its connector said, empty when it answered.
+          description: |
+            The connector's own reason when it reported the system unreachable or refusing, empty otherwise.
+            Digit runs shaped like an access code are masked.
         checkedAt: { type: string, format: date-time }
+
+    AccessControlProbeOutcome:
+      type: string
+      description: |
+        `ANSWERED` reached the system with the rights Courtside needs; `UNREACHABLE` did not reach it or the
+        call failed; `TIMEOUT` got no answer within the call deadline; `CALL_THREAD_OCCUPIED` was not sent
+        because an abandoned call still holds the call thread; `REFUSED` reached it without those rights.
+      enum: [ANSWERED, UNREACHABLE, TIMEOUT, CALL_THREAD_OCCUPIED, REFUSED]
 
     AccessGrantOverview:
       type: object

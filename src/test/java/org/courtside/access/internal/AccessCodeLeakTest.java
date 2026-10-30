@@ -88,4 +88,45 @@ class AccessCodeLeakTest extends AccessPassTestSupport {
                     .noneMatch(body -> body.contains(code));
         }
     }
+
+    @Test
+    void givenARevokeRefusedWithTheCodeInItsReason_whenThePassRecordsIt_thenNeitherRowNorLogCarriesTheCode(
+            CapturedOutput output) {
+        // given
+        UUID cancelled = book(courts.get(0));
+        pass.runPassNow();
+        String installed = connector.calls(Kind.GRANT).getFirst().code();
+        cancel(cancelled);
+        connector.nextRevokes(new Step.Answer(new GrantOutcome.Refused(Scope.GRANT,
+                "code " + installed + " unknown")));
+
+        // when
+        passAt(START.plus(Duration.ofMinutes(1)));
+
+        // then
+        assertThat(connector.calls(Kind.REVOKE)).as("the revoke was sent").hasSize(1);
+        assertThat(grantOf(cancelled).getLastFailure()).as("last_failure").isEqualTo("code **** unknown");
+        assertThat(output.getOut()).as("the log").doesNotContain(installed);
+    }
+
+    @Test
+    void givenARevokeThatThrowsWithTheCodeInItsMessage_whenThePassLogsIt_thenNeitherRowNorLogCarriesTheCode(
+            CapturedOutput output) {
+        // given
+        UUID cancelled = book(courts.get(0));
+        pass.runPassNow();
+        String installed = connector.calls(Kind.GRANT).getFirst().code();
+        cancel(cancelled);
+        connector.nextRevokes(new Step.Fail(new IllegalStateException("revoking " + installed + " failed")));
+
+        // when
+        passAt(START.plus(Duration.ofMinutes(1)));
+
+        // then
+        assertThat(connector.calls(Kind.REVOKE)).as("the revoke was sent").hasSize(1);
+        assertThat(output.getOut()).as("the log names the failure").contains("revoking **** failed")
+                .doesNotContain(installed);
+        assertThat(jdbc.sql("SELECT last_failure FROM access_grant").query(String.class).list())
+                .as("last_failure").noneMatch(failure -> failure != null && failure.contains(installed));
+    }
 }

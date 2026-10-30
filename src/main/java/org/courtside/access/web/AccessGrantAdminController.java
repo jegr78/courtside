@@ -6,6 +6,7 @@ import org.courtside.access.internal.AccessGrantAdministration.GrantView;
 import org.courtside.access.internal.AccessGrantAdministration.Overview;
 import org.courtside.api.AdminAccessGrantsApi;
 import org.courtside.api.ApiAccessControlProbe;
+import org.courtside.api.ApiAccessControlProbeOutcome;
 import org.courtside.api.ApiAccessGrantOverview;
 import org.courtside.api.ApiAdminAccessGrant;
 import org.courtside.api.ApiAdminAccessGrantCourt;
@@ -26,7 +27,9 @@ class AccessGrantAdminController implements AdminAccessGrantsApi {
     public ResponseEntity<ApiAccessGrantOverview> listAccessGrants() {
         Overview overview = administration.overview();
         ApiAccessControlProbe probe = overview.probe() == null ? null : new ApiAccessControlProbe(
-                overview.probe().reachable(), overview.probe().detail(),
+                overview.probe().reachable(),
+                ApiAccessControlProbeOutcome.valueOf(overview.probe().classification().name()),
+                overview.probe().detail(),
                 WireTypes.toOffsetDateTime(overview.probe().checkedAt()));
         return ResponseEntity.ok(new ApiAccessGrantOverview(overview.connector(), overview.connected(), probe,
                 overview.grants().stream().map(AccessGrantAdminController::toResponse).toList(), overview.total()));

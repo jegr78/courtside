@@ -226,25 +226,24 @@ class AccessPass {
                     call.grantId(), call.action(), OCCUPIED);
             case CallRunner.Result.Unclear<GrantOutcome>(Throwable cause) -> log.warn(
                     "Access grant {} {} gave no clear answer: {}", call.grantId(), call.action(),
-                    describe(cause, call.code()));
+                    describe(cause));
             default -> log.warn("Access grant {} {} gave no clear answer: it answered nothing", call.grantId(),
                     call.action());
         }
         return new CallResult.Unclear();
     }
 
-    private String describe(@Nullable Throwable cause, @Nullable String code) {
+    private String describe(@Nullable Throwable cause) {
         if (cause == null) {
             return "no answer within " + deadline;
         }
-        String message = cause.getMessage() == null ? "" : cause.getMessage();
-        return cause.getClass().getName() + ": " + (code == null ? message : message.replace(code, "****"));
+        return cause.getClass().getName() + ": " + ConnectorText.sanitized(cause.getMessage());
     }
 
     private PassResult outage(@Nullable ProbeOutcome probe) {
         String reason = switch (probe) {
-            case ProbeOutcome.Unreachable(String why) -> why;
-            case ProbeOutcome.Refused(String why) -> why;
+            case ProbeOutcome.Unreachable(String why) -> ConnectorText.sanitized(why);
+            case ProbeOutcome.Refused(String why) -> ConnectorText.sanitized(why);
             case null, default -> "the connector refused a call for the whole connector";
         };
         log.warn("The access pass ends as an outage: {}", reason);
@@ -252,20 +251,26 @@ class AccessPass {
     }
 
     private ProbeOutcome probe() {
-        ProbeOutcome outcome = probeOnce();
-        readings.record(outcome, clock.now());
-        return outcome;
-    }
-
-    private ProbeOutcome probeOnce() {
         CallRunner.Result<ProbeOutcome> probed = calls.run(connector::probe);
+        Instant checkedAt = clock.now();
         return switch (probed) {
-            case CallRunner.Result.Done<ProbeOutcome>(ProbeOutcome outcome) when outcome != null -> outcome;
-            case CallRunner.Result.Busy<ProbeOutcome> busy -> new ProbeOutcome.Unreachable(
-                    "The probe was not sent: " + OCCUPIED);
-            case CallRunner.Result.Unclear<ProbeOutcome>(Throwable cause) -> new ProbeOutcome.Unreachable(
-                    "The probe gave no clear answer: " + describe(cause, null));
-            default -> NO_PROBE_ANSWER;
+            case CallRunner.Result.Done<ProbeOutcome>(ProbeOutcome outcome) when outcome != null -> {
+                readings.record(outcome, checkedAt);
+                yield outcome;
+            }
+            case CallRunner.Result.Busy<ProbeOutcome> busy -> {
+                readings.record(ProbeClassification.CALL_THREAD_OCCUPIED, checkedAt);
+                yield new ProbeOutcome.Unreachable("The probe was not sent: " + OCCUPIED);
+            }
+            case CallRunner.Result.Unclear<ProbeOutcome>(Throwable cause) -> {
+                readings.record(cause == null ? ProbeClassification.TIMEOUT : ProbeClassification.UNREACHABLE,
+                        checkedAt);
+                yield new ProbeOutcome.Unreachable("The probe gave no clear answer: " + describe(cause));
+            }
+            default -> {
+                readings.record(ProbeClassification.UNREACHABLE, checkedAt);
+                yield NO_PROBE_ANSWER;
+            }
         };
     }
 

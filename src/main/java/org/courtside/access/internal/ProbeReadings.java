@@ -14,19 +14,31 @@ class ProbeReadings {
 
     private static final int MOST_DETAIL_CHARACTERS = 500;
 
-    record Reading(boolean reachable, String detail, Instant checkedAt) {
+    record Reading(ProbeClassification classification, String detail, Instant checkedAt) {
+
+        boolean reachable() {
+            return classification == ProbeClassification.ANSWERED;
+        }
     }
 
     private final AtomicReference<Reading> latest = new AtomicReference<>();
     private final AtomicBoolean requested = new AtomicBoolean();
 
-    void record(ProbeOutcome outcome, Instant checkedAt) {
-        String detail = switch (outcome) {
-            case ProbeOutcome.Answered answered -> "";
-            case ProbeOutcome.Unreachable(String reason) -> reason;
-            case ProbeOutcome.Refused(String reason) -> reason;
-        };
-        latest.set(new Reading(outcome instanceof ProbeOutcome.Answered,
+    void record(ProbeOutcome answer, Instant checkedAt) {
+        switch (answer) {
+            case ProbeOutcome.Answered answered -> record(ProbeClassification.ANSWERED, "", checkedAt);
+            case ProbeOutcome.Unreachable(String reason) -> record(ProbeClassification.UNREACHABLE, reason, checkedAt);
+            case ProbeOutcome.Refused(String reason) -> record(ProbeClassification.REFUSED, reason, checkedAt);
+        }
+    }
+
+    void record(ProbeClassification classification, Instant checkedAt) {
+        record(classification, "", checkedAt);
+    }
+
+    private void record(ProbeClassification classification, String reason, Instant checkedAt) {
+        String detail = ConnectorText.sanitized(reason);
+        latest.set(new Reading(classification,
                 detail.length() > MOST_DETAIL_CHARACTERS ? detail.substring(0, MOST_DETAIL_CHARACTERS) : detail,
                 checkedAt));
     }

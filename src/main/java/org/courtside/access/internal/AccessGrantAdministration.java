@@ -53,7 +53,7 @@ public class AccessGrantAdministration {
     public Overview overview() {
         List<AccessGrant> shown = grants.findShown();
         return new Overview(connector, worker.getIfAvailable() != null,
-                readings.latest().map(reading -> new Probe(reading.reachable(), reading.detail(),
+                readings.latest().map(reading -> new Probe(reading.reachable(), reading.classification(), reading.detail(),
                         reading.checkedAt())).orElse(null),
                 views(shown), grants.countNotDone());
     }
@@ -100,7 +100,7 @@ public class AccessGrantAdministration {
                            long total) {
     }
 
-    public record Probe(boolean reachable, String detail, Instant checkedAt) {
+    public record Probe(boolean reachable, ProbeClassification classification, String detail, Instant checkedAt) {
     }
 
     public record GrantView(UUID id, UUID bookingId, GrantStatus status, @Nullable Instant validFrom,

@@ -233,7 +233,7 @@ public class AccessGrant {
         if (connectorScope && !probeAnswers) {
             attempts--;
             nextAttemptAt = call.previousNextAttemptAt();
-            lastFailure = reasonOf(outcome, call.code());
+            lastFailure = reasonOf(outcome);
             return new Recording(effect instanceof PassEffect.Hold ? effect : new PassEffect.Outage(), false);
         }
         boolean replaceCode = false;
@@ -258,13 +258,13 @@ public class AccessGrant {
                 }
             }
             case GrantOutcome.RetryLater(Scope _, Instant notBefore, String reason) -> {
-                lastFailure = stored(reason, call.code());
+                lastFailure = stored(reason);
                 if (notBefore != null && notBefore.isAfter(nextAttemptAt)) {
                     nextAttemptAt = notBefore;
                 }
             }
             case GrantOutcome.Refused(Scope _, String reason) -> {
-                lastFailure = stored(reason, call.code());
+                lastFailure = stored(reason);
                 if (call.action().installs()) {
                     refused = true;
                     nextAttemptAt = dbNow;
@@ -318,16 +318,16 @@ public class AccessGrant {
         return BACKOFF.get(Math.min(attempts, BACKOFF.size()) - 1);
     }
 
-    private static String reasonOf(GrantOutcome outcome, @Nullable String code) {
+    private static String reasonOf(GrantOutcome outcome) {
         return switch (outcome) {
-            case GrantOutcome.RetryLater later -> stored(later.reason(), code);
-            case GrantOutcome.Refused refusal -> stored(refusal.reason(), code);
+            case GrantOutcome.RetryLater later -> stored(later.reason());
+            case GrantOutcome.Refused refusal -> stored(refusal.reason());
             default -> UNCLEAR;
         };
     }
 
-    private static String stored(String reason, @Nullable String code) {
-        String masked = code == null ? reason : reason.replace(code, "****");
+    private static String stored(String reason) {
+        String masked = ConnectorText.sanitized(reason);
         return masked.length() > MOST_FAILURE_CHARACTERS ? masked.substring(0, MOST_FAILURE_CHARACTERS) : masked;
     }
 

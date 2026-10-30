@@ -77,6 +77,7 @@ class AccessGrantAdminApiTest extends AccessPassTestSupport {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.total").value(3))
                 .andExpect(jsonPath("$.probe.reachable").value(true))
+                .andExpect(jsonPath("$.probe.outcome").value("ANSWERED"))
                 .andExpect(jsonPath("$.grants[0].bookingId").value(failing.toString()))
                 .andExpect(jsonPath("$.grants[0].status").value("FAILING"))
                 .andExpect(jsonPath("$.grants[0].lastFailure").value("keypad full"))
@@ -150,6 +151,40 @@ class AccessGrantAdminApiTest extends AccessPassTestSupport {
     }
 
     @Test
+    void givenAProbeThatThrowsWithCredentialsInItsMessage_whenTheBoardReadsTheOverview_thenOnlyItsClassShows()
+            throws Exception {
+        // given
+        book(courts.get(0));
+        connector.nextProbes(new Step.Fail(new IllegalStateException(
+                "GET https://user:secret@miniserver.example.org/x?token=y failed")));
+        pass.runPassNow();
+
+        // when
+        String body = mockMvc.perform(get("/api/admin/access-grants"))
+                .andExpect(jsonPath("$.probe.reachable").value(false))
+                .andExpect(jsonPath("$.probe.outcome").value("UNREACHABLE"))
+                .andExpect(jsonPath("$.probe.detail").isEmpty())
+                .andReturn().getResponse().getContentAsString();
+
+        // then
+        assertThat(body).doesNotContain("secret").doesNotContain("token").doesNotContain("miniserver");
+    }
+
+    @Test
+    void givenAProbeThatHangs_whenTheBoardReadsTheOverview_thenItShowsATimeout() throws Exception {
+        // given
+        book(courts.get(0));
+        connector.nextProbes(new Step.Hang());
+        pass.runPassNow();
+
+        // when / then
+        mockMvc.perform(get("/api/admin/access-grants"))
+                .andExpect(jsonPath("$.probe.reachable").value(false))
+                .andExpect(jsonPath("$.probe.outcome").value("TIMEOUT"))
+                .andExpect(jsonPath("$.probe.detail").isEmpty());
+    }
+
+    @Test
     void givenNothingToSend_whenTheBoardAsksForAProbe_thenTheNextPassProbesAndTheOverviewShowsTheAnswer()
             throws Exception {
         // given
@@ -165,6 +200,7 @@ class AccessGrantAdminApiTest extends AccessPassTestSupport {
         assertThat(connector.calls()).extracting(ScriptedAccessControl.Call::kind).containsExactly(Kind.PROBE);
         mockMvc.perform(get("/api/admin/access-grants"))
                 .andExpect(jsonPath("$.probe.reachable").value(false))
+                .andExpect(jsonPath("$.probe.outcome").value("REFUSED"))
                 .andExpect(jsonPath("$.probe.detail").value("403 no user management"))
                 .andExpect(jsonPath("$.probe.checkedAt").value("2026-05-12T10:01:00Z"));
     }
