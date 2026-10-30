@@ -166,7 +166,8 @@ domain events instead of reverse dependencies into the booking core. `reporting`
 membership, account and message figures through interfaces those modules publish in their base
 packages; none of them depends on it. `access` depends on `card`, `config`, `facility` and `rules`,
 reads bookings only through `shared.BookingAnnouncer` and reacts to their events after commit;
-`booking` does not depend on it.
+`booking` does not depend on it. `notification` depends on `facility` and `member` only to tell
+current members a door code, which no booking event carries.
 
 Controllers implement generated interfaces and translate HTTP. Services own business operations.
 Repositories persist state and do not decide policy.
@@ -183,6 +184,9 @@ Mail listeners run before commit, like the audit listener, and store the notific
 and the outbox message in the same transaction. A committed change therefore always has its queued message, and a change whose
 message cannot be stored does not commit: the request fails and nothing of it remains. A mail
 listener never talks to the relay, so a failed handover cannot roll back a change that committed.
+The members' door code is the exception: its listener runs after commit, off the request thread, and
+queues one page of current members per transaction, so a crash in between can leave later pages
+untold.
 Publishing such an event outside a transaction is refused. Other after-commit listeners run through
 Spring Modulith's event publication registry, whose incomplete publications remain available after
 a restart.
