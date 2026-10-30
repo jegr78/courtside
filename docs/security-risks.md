@@ -136,7 +136,9 @@ Courtside. Courtside itself masks the query value as `key=[REDACTED]` before its
 reads it, its operational log redacts any `key=` value it collects, the reference `deploy/Caddyfile`
 writes no access log and the UAT proxy strips the query from what it logs. Whoever holds the key
 learns, per active court, whether it is occupied and how many minutes remain until its next
-booking, nothing about who booked or which card, and can change nothing. A board revokes or replaces
+booking, nothing about who booked or which card, and can change nothing. The reference deployment
+accepts the request over HTTPS only; Courtside itself does not require it, so a club that serves this
+path over plain HTTP behind its own proxy also exposes the key on the network. A board revokes or replaces
 the key on the access points page and the old one is refused on the next poll. Reconsider if the
 answer grows to carry anything about a person or a booking, or if a supported poller can send a
 header.

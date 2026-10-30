@@ -218,7 +218,9 @@ Platz belegt ist und wie viele Minuten bis zur nächsten Buchung bleiben. Courts
 nichts. Unter **Gebäudesteuerung** am Ende dieser Seite legst du mit **Schlüssel anlegen** einen
 Schlüssel an. Courtside zeigt ihn und die fertige Adresse genau einmal, kopiere beides sofort. Mit
 **Neuen Schlüssel anlegen** ersetzt du ihn, mit **Schlüssel widerrufen** sperrst du jede Abfrage.
-Beides wirkt bei der nächsten Abfrage. Ohne Schlüssel weist Courtside jede Abfrage ab.
+Beides wirkt bei der nächsten Abfrage. Ohne Schlüssel weist Courtside jede Abfrage ab. Trage nach
+einem neuen Schlüssel die neue Adresse sofort in Loxone ein: Bis dahin behält Loxone den letzten Wert,
+ein belegter Platz bleibt dort also belegt.
 
 Die Adresse liefert zwei Zeilen je aktivem Platz, benannt nach seiner Platznummer:
 
@@ -233,7 +235,8 @@ court2.minutes=37
 als belegt* trägt, sonst 0. `minutes` zählt die ganzen Minuten bis zum Beginn der nächsten solchen
 Buchung, abgerundet. Während der Platz belegt ist, steht dort 0, und beginnt in den nächsten 24 Stunden
 nichts, steht dort 1440. Eine Platzsperrung gilt nie als belegt. Ein deaktivierter Platz fehlt in der
-Antwort, die Nummern der anderen bleiben.
+Antwort, die Nummern der anderen bleiben. Änderst du die Nummer eines Platzes, gehören seine Werte
+in Loxone zu einem anderen Befehl.
 
 In Loxone Config legst du dafür an:
 
@@ -241,6 +244,11 @@ In Loxone Config legst du dafür an:
    `https://courts.example.org/api/public/occupancy?key=…`, und **Abfragezyklus** 60 Sekunden;
 2. darunter je Platz und Wert einen **Virtuellen HTTP Eingang Befehl**, etwa für Platz 1 mit der
    **Befehlserkennung** `\icourt1.occupied=\i\v` und einen zweiten mit `\icourt1.minutes=\i\v`.
+
+Die Referenz-Installation nimmt Abfragen nur über HTTPS an, euer Miniserver muss dann HTTPS-Adressen
+abfragen können. Betreibt ihr Courtside hinter eurem eigenen Proxy, entscheidet ihr selbst, ob ihr
+diese Adresse auch über HTTP erreichbar macht. Der Schlüssel geht dann unverschlüsselt durchs Netz,
+verrät aber nur die Belegung.
 
 Ein Abfragezyklus von 60 Sekunden genügt. Kürzer bringt nichts, weil `minutes` sich nur einmal pro
 Minute ändert. Fällt Courtside oder das Netz aus, behält Loxone den letzten Wert, bis die nächste

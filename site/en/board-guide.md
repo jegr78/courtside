@@ -207,7 +207,9 @@ whether a court is occupied and how many minutes remain until its next booking. 
 switches anything itself. Under **Building automation** at the end of this page, **Create key**
 creates a key. Courtside shows it and the ready address exactly once, so copy both right away.
 **Create new key** replaces it and **Revoke key** refuses every request. Both take effect on the next
-request. Without a key, Courtside refuses every request.
+request. Without a key, Courtside refuses every request. After creating a new key, enter the new
+address in Loxone right away: until then Loxone keeps the last value, so an occupied court stays
+occupied there.
 
 The address answers two lines per active court, named after its court number:
 
@@ -222,7 +224,8 @@ court2.minutes=37
 automation*, otherwise 0. `minutes` counts the whole minutes until the next such booking starts,
 rounded down. While the court is occupied it reads 0, and when nothing starts within the next 24
 hours it reads 1440. A court closure never counts as occupied. A deactivated court is left out of the
-answer, and the other courts keep their numbers.
+answer, and the other courts keep their numbers. Changing a court's number moves its values to a
+different command in Loxone.
 
 In Loxone Config, create:
 
@@ -230,6 +233,10 @@ In Loxone Config, create:
    `https://courts.example.org/api/public/occupancy?key=…`, and a **Polling cycle** of 60 seconds;
 2. below it one **Virtual HTTP Input Command** per court and value, for court 1 with the **Command
    recognition** `\icourt1.occupied=\i\v` and a second one with `\icourt1.minutes=\i\v`.
+
+The reference deployment accepts requests over HTTPS only, so your Miniserver then has to poll an
+HTTPS address. If you run Courtside behind your own proxy, it is your choice whether this address is
+also reachable over plain HTTP. The key then travels unencrypted, but it reveals occupancy only.
 
 A polling cycle of 60 seconds is enough. A shorter one gains nothing, because `minutes` changes only
 once a minute. If Courtside or the network is down, Loxone keeps the last value until the next
