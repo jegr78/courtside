@@ -605,7 +605,8 @@ an instance without the lock tries again after five seconds. Every comparison in
 database's `statement_timestamp()`. A pass has three steps:
 
 1. It inserts an `access_grant` row, one per booking and never deleted, for every booking with demand
-   whose start lies within the booking horizon, the longest `ADVANCE_WINDOW` of any rule set, and
+   whose start lies within the booking horizon, the longest `ADVANCE_WINDOW` of any rule set or 14 days
+   without one, and
    whose window has not ended. A distant series occurrence waits until it enters the horizon.
 2. It reads the ids of every open row once, revocations first, and visits each at most once. In the
    row's locked transaction it derives the demand again, draws a code when the grant is wanted and

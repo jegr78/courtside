@@ -107,7 +107,8 @@ dynamic codes, or if a club reports codes leaking from devices.
 With an access-control connector selected, `access_code.code` holds each grant's code as typed,
 because Courtside sends it again after a move or a failed attempt and hands it to the booking's
 players. Reading it needs access to the database or a backup. A code is drawn when its booking enters
-the booking horizon, the longest advance window of any rule set, and stays until the latest window
+the booking horizon, the longest advance window of any rule set or 14 days when no rule set has one,
+and stays until the latest window
 any install asked for has ended, a confirmed removal included. So the exposure is the horizon plus
 the validity window, not the hours of the booking. No event, log line, stored failure, problem body
 or administrative response carries it. Reconsider if an access-control system can accept a code
