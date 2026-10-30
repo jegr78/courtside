@@ -9,10 +9,16 @@ final class ConnectorText {
 
     private static final Pattern CODE_SHAPED = Pattern.compile("(?<!\\d)\\d{4,8}(?!\\d)");
 
+    private static final String MASK = "****";
+
     private ConnectorText() {
     }
 
-    static String sanitized(@Nullable String text) {
-        return text == null ? "" : CODE_SHAPED.matcher(text).replaceAll("****");
+    static String sanitized(@Nullable String text, @Nullable String code) {
+        if (text == null) {
+            return "";
+        }
+        String withoutCode = code == null || code.isEmpty() ? text : text.replace(code, MASK);
+        return CODE_SHAPED.matcher(withoutCode).replaceAll(MASK);
     }
 }

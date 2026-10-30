@@ -15,6 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -26,6 +27,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -76,6 +78,9 @@ abstract class AccessPassTestSupport extends AbstractIntegrationTest {
     @Autowired
     CardTestFixture cards;
 
+    @Autowired
+    ProbeReadings readings;
+
     List<UUID> courts;
     UUID northGate;
     UUID southGate;
@@ -85,6 +90,7 @@ abstract class AccessPassTestSupport extends AbstractIntegrationTest {
     @BeforeEach
     void aClubWhoseGatesOpenByCode() {
         connector.reset();
+        ((AtomicReference<?>) ReflectionTestUtils.getField(readings, "latest")).set(null);
         clock.set(START);
         for (DayOfWeek day : DayOfWeek.values()) {
             facility.setOpeningHours(day, new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0)));

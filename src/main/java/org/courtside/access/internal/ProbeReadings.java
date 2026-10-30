@@ -37,7 +37,7 @@ class ProbeReadings {
     }
 
     private void record(ProbeClassification classification, String reason, Instant checkedAt) {
-        String detail = ConnectorText.sanitized(reason);
+        String detail = ConnectorText.sanitized(reason, null);
         latest.set(new Reading(classification,
                 detail.length() > MOST_DETAIL_CHARACTERS ? detail.substring(0, MOST_DETAIL_CHARACTERS) : detail,
                 checkedAt));

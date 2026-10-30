@@ -44,6 +44,10 @@ public final class ScriptedAccessControl implements AccessControlConnector {
         record Fail(Throwable failure) implements Step {
         }
 
+        /** Answers what the function builds from the code the call carries. */
+        record AnswerWithCode(Function<String, GrantOutcome> outcome) implements Step {
+        }
+
         /** Throws what the function builds from the code the call carries. */
         record FailWithCode(Function<String, RuntimeException> failure) implements Step {
         }
@@ -213,6 +217,7 @@ public final class ScriptedAccessControl implements AccessControlConnector {
                 }
                 throw (RuntimeException) failure;
             }
+            case Step.AnswerWithCode(Function<String, GrantOutcome> outcome) -> outcome.apply(code);
             case Step.FailWithCode(Function<String, RuntimeException> failure) -> throw failure.apply(code);
             case Step.Hang() -> {
                 try {

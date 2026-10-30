@@ -226,24 +226,24 @@ class AccessPass {
                     call.grantId(), call.action(), OCCUPIED);
             case CallRunner.Result.Unclear<GrantOutcome>(Throwable cause) -> log.warn(
                     "Access grant {} {} gave no clear answer: {}", call.grantId(), call.action(),
-                    describe(cause));
+                    describe(cause, call.code()));
             default -> log.warn("Access grant {} {} gave no clear answer: it answered nothing", call.grantId(),
                     call.action());
         }
         return new CallResult.Unclear();
     }
 
-    private String describe(@Nullable Throwable cause) {
+    private String describe(@Nullable Throwable cause, @Nullable String code) {
         if (cause == null) {
             return "no answer within " + deadline;
         }
-        return cause.getClass().getName() + ": " + ConnectorText.sanitized(cause.getMessage());
+        return cause.getClass().getName() + ": " + ConnectorText.sanitized(cause.getMessage(), code);
     }
 
     private PassResult outage(@Nullable ProbeOutcome probe) {
         String reason = switch (probe) {
-            case ProbeOutcome.Unreachable(String why) -> ConnectorText.sanitized(why);
-            case ProbeOutcome.Refused(String why) -> ConnectorText.sanitized(why);
+            case ProbeOutcome.Unreachable(String why) -> ConnectorText.sanitized(why, null);
+            case ProbeOutcome.Refused(String why) -> ConnectorText.sanitized(why, null);
             case null, default -> "the connector refused a call for the whole connector";
         };
         log.warn("The access pass ends as an outage: {}", reason);
@@ -265,7 +265,7 @@ class AccessPass {
             case CallRunner.Result.Unclear<ProbeOutcome>(Throwable cause) -> {
                 readings.record(cause == null ? ProbeClassification.TIMEOUT : ProbeClassification.UNREACHABLE,
                         checkedAt);
-                yield new ProbeOutcome.Unreachable("The probe gave no clear answer: " + describe(cause));
+                yield new ProbeOutcome.Unreachable("The probe gave no clear answer: " + describe(cause, null));
             }
             default -> {
                 readings.record(ProbeClassification.UNREACHABLE, checkedAt);

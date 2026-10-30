@@ -19,6 +19,7 @@ import org.springframework.web.context.WebApplicationContext;
 import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -29,6 +30,11 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 @ExtendWith(OutputCaptureExtension.class)
 @WithMockUser(username = "admin", roles = "ADMIN")
 class AccessCodeLeakTest extends AccessPassTestSupport {
+
+    private static final Pattern LOG_METADATA = Pattern.compile(
+            "\"(@timestamp|traceId|spanId)\":\"[^\"]*\"|\"pid\":\\d+");
+    private static final Pattern UUID_TEXT = Pattern.compile(
+            "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}");
 
     @Autowired
     private WebApplicationContext context;
@@ -76,8 +82,7 @@ class AccessCodeLeakTest extends AccessPassTestSupport {
         List<String> failures = jdbc.sql("SELECT last_failure FROM access_grant WHERE last_failure IS NOT NULL")
                 .query(String.class).list();
         List<String> events = jdbc.sql("SELECT payload::text FROM domain_event").query(String.class).list();
-        List<String> accessLogs = output.getOut().lines().filter(line -> line.contains("org.courtside.access"))
-                .toList();
+        List<String> accessLogs = accessLogLines(output);
         assertThat(codes).isNotEmpty();
         assertThat(failures).as("the refusal that echoed the code is stored").isNotEmpty();
         for (String code : codes) {
@@ -106,7 +111,7 @@ class AccessCodeLeakTest extends AccessPassTestSupport {
         // then
         assertThat(connector.calls(Kind.REVOKE)).as("the revoke was sent").hasSize(1);
         assertThat(grantOf(cancelled).getLastFailure()).as("last_failure").isEqualTo("code **** unknown");
-        assertThat(output.getOut()).as("the log").doesNotContain(installed);
+        assertThat(accessLogLines(output)).as("the access module's log").noneMatch(line -> line.contains(installed));
     }
 
     @Test
@@ -124,9 +129,42 @@ class AccessCodeLeakTest extends AccessPassTestSupport {
 
         // then
         assertThat(connector.calls(Kind.REVOKE)).as("the revoke was sent").hasSize(1);
-        assertThat(output.getOut()).as("the log names the failure").contains("revoking **** failed")
-                .doesNotContain(installed);
+        assertThat(accessLogLines(output)).as("the access module's log names the failure")
+                .anyMatch(line -> line.contains("revoking **** failed"))
+                .noneMatch(line -> line.contains(installed));
         assertThat(jdbc.sql("SELECT last_failure FROM access_grant").query(String.class).list())
                 .as("last_failure").noneMatch(failure -> failure != null && failure.contains(installed));
+    }
+
+    @Test
+    void givenAConnectorThatEmbedsTheCodeInALongerNumber_whenThePassRecordsAndLogsIt_thenNeitherCarriesTheCode(
+            CapturedOutput output) {
+        // given
+        UUID refused = book(courts.get(0));
+        UUID thrown = book(courts.get(1));
+        insertWithoutCalls();
+        connector.alwaysFor(grantIdOf(refused), new Step.AnswerWithCode(code -> new GrantOutcome.Refused(Scope.GRANT,
+                "ref 99" + code + "99")));
+        connector.alwaysFor(grantIdOf(thrown), new Step.FailWithCode(code -> new IllegalStateException(
+                "id=99" + code + "99 jammed")));
+
+        // when
+        pass.runPassNow();
+
+        // then
+        List<String> codes = connector.calls(Kind.GRANT).stream().map(Call::code).toList();
+        assertThat(codes).as("both installs were sent").hasSize(2);
+        assertThat(grantOf(refused).getLastFailure()).as("last_failure").isEqualTo("ref 99****99");
+        assertThat(accessLogLines(output)).as("the access module's log names the failure")
+                .anyMatch(line -> line.contains("id=99****99 jammed"));
+        for (String code : codes) {
+            assertThat(accessLogLines(output)).as("the access module's log").noneMatch(line -> line.contains(code));
+        }
+    }
+
+    private static List<String> accessLogLines(CapturedOutput output) {
+        return output.getOut().lines().filter(line -> line.contains("\"logger\":\"org.courtside.access"))
+                .map(line -> UUID_TEXT.matcher(LOG_METADATA.matcher(line).replaceAll("")).replaceAll("<id>"))
+                .toList();
     }
 }
