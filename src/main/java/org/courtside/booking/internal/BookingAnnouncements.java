@@ -48,7 +48,7 @@ class BookingAnnouncements implements BookingAnnouncer {
                 .flatMap(booking -> announcementOf(booking, playersOf(bookingId),
                         courtId -> announcedCourt(facility.requireCourt(courtId)),
                         cardId -> cards.requireCard(cardId).getLabel(),
-                        accessGrants.of(booking).orElse(null)));
+                        accessGrants.of(booking).orElse(null), accessGrants.dynamicOf(booking).orElse(null)));
     }
 
     @Override
@@ -71,6 +71,7 @@ class BookingAnnouncements implements BookingAnnouncer {
         Map<UUID, BookingAnnouncement> described = new HashMap<>();
         List<Booking> found = bookings.findAllByIdIn(distinct);
         Map<UUID, BookingAnnouncement.AnnouncedAccess> access = accessGrants.of(found);
+        Map<UUID, BookingAnnouncement.DynamicAccess> dynamic = accessGrants.dynamicOf(found);
         for (Booking booking : found) {
             List<UUID> playing = players.getOrDefault(booking.getId(), List.of());
             if (visibleTo(booking, playing, accountId, personId)) {
@@ -78,7 +79,7 @@ class BookingAnnouncements implements BookingAnnouncer {
                         courtId -> courts.computeIfAbsent(courtId,
                                 missing -> announcedCourt(facility.requireCourt(missing))),
                         cardId -> cardLabels.computeIfAbsent(cardId, missing -> cards.requireCard(missing).getLabel()),
-                        access.get(booking.getId()))
+                        access.get(booking.getId()), dynamic.get(booking.getId()))
                         .ifPresent(announcement -> described.put(booking.getId(), announcement));
             }
         }
@@ -149,11 +150,12 @@ class BookingAnnouncements implements BookingAnnouncer {
         Map<UUID, BookingAnnouncement.AnnouncedCourt> courts = new HashMap<>();
         Map<UUID, String> cardLabels = new HashMap<>();
         Map<UUID, BookingAnnouncement.AnnouncedAccess> access = accessGrants.of(occurrences);
+        Map<UUID, BookingAnnouncement.DynamicAccess> dynamic = accessGrants.dynamicOf(occurrences);
         occurrences.forEach(booking -> announcementOf(booking, players.getOrDefault(booking.getId(), List.of()),
                 courtId -> courts.computeIfAbsent(courtId,
                         missing -> announcedCourt(facility.requireCourt(missing))),
                 cardId -> cardLabels.computeIfAbsent(cardId, missing -> cards.requireCard(missing).getLabel()),
-                access.get(booking.getId()))
+                access.get(booking.getId()), dynamic.get(booking.getId()))
                 .ifPresent(announcement -> described.put(booking.getId(), announcement)));
         return described;
     }
@@ -174,7 +176,8 @@ class BookingAnnouncements implements BookingAnnouncer {
     private static Optional<BookingAnnouncement> announcementOf(Booking booking, List<UUID> players,
                                                                 Function<UUID, BookingAnnouncement.AnnouncedCourt> courtOf,
                                                                 Function<UUID, String> cardLabelOf,
-                                                                BookingAnnouncement.AnnouncedAccess access) {
+                                                                BookingAnnouncement.AnnouncedAccess access,
+                                                                BookingAnnouncement.DynamicAccess dynamicAccess) {
         List<CourtAllocation> allocations = booking.getAllocations();
         if (allocations.isEmpty() || booking.getBookedBy() == null) {
             return Optional.empty();
@@ -187,7 +190,7 @@ class BookingAnnouncements implements BookingAnnouncer {
                 allocations.stream().map(allocation -> courtOf.apply(allocation.getCourtId())).toList(),
                 cardLabelOf.apply(booking.getCardId()),
                 booking.getStatus() == BookingStatus.CANCELLED,
-                access));
+                access, dynamicAccess));
     }
 
     private static BookingAnnouncement.AnnouncedCourt announcedCourt(Court court) {

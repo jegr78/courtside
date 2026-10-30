@@ -64,6 +64,7 @@ class ProblemTypeUriTest {
             "urn:courtside:error:attendance-not-recordable",
             "urn:courtside:error:attendance-policy-invalid",
             "urn:courtside:error:check-in-closed",
+            "urn:courtside:error:emergency-code-refused",
             "urn:courtside:error:no-show-person-not-found",
             "urn:courtside:error:booking-rules-violated",
             "urn:courtside:error:access-control-not-connected",

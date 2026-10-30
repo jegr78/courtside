@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { api, type AccessCode, type AccessGrant, type BookingGrid, type Participation, type PersonalBooking, type PublicCourt } from "../api/client";
+import { api, type AccessCode, type AccessGrant, type BookingGrid, type EmergencyAccess, type Participation, type PersonalBooking, type PublicCourt } from "../api/client";
 import { useReportedFailure } from "../failures/useReportedFailure";
 import { Alert } from "../components/Alert";
 import { LoadFailure } from "../components/LoadFailure";
@@ -280,7 +280,8 @@ function ParticipationSection({ participations, courtNames, locale, timeZone, re
               <span>{participation.courtIds.map((id) => courtNames.get(id) ?? t("myBookings.unknownCourt")).join(", ")}</span>
             </span>
             <span data-testid="booking-card-label" className="text-muted text-sm">{participation.cardLabel}</span>
-            {participation.access && <AccessCodes access={participation.access} reference={reference} locale={locale} timeZone={timeZone} t={t} />}
+            {participation.access && <AccessCodes access={participation.access} reference={reference} locale={locale} timeZone={timeZone} t={t}
+              emergency={actionable && participation.status === "CONFIRMED" ? () => api.participationEmergencyCode(participation.id) : undefined} />}
             {participation.status === "CANCELLED" ? <span>{t("myBookings.cancelled")}</span>
               : actionable && <div className="pt-1">
                 <Button variant="destructive" data-testid="withdraw-participation" data-booking-id={participation.id} className="px-3 py-2" disabled={leaving === participation.id} onClick={() => void withdraw(participation.id)}>{t("participations.withdraw")}</Button>
@@ -317,7 +318,8 @@ export function BookingSection({ testId, title, titleHidden = false, empty, book
           {booking.status === "CANCELLED" && <span>{t(booking.released ? "myBookings.released" : "myBookings.cancelled")}</span>}
           {booking.partnerSearch === "PUBLISHED" && <span data-testid="partner-search-published">{t("myBookings.partnerSearchPublished")}</span>}
           {booking.checkIn?.checkedIn && <span data-testid="checked-in">{t("myBookings.checkedIn")}</span>}
-          {booking.access && <AccessCodes access={booking.access} reference={reference} locale={locale} timeZone={timeZone} t={t} />}
+          {booking.access && <AccessCodes access={booking.access} reference={reference} locale={locale} timeZone={timeZone} t={t}
+            emergency={actionable && booking.status === "CONFIRMED" ? () => api.emergencyCode(booking.id) : undefined} />}
           {booking.checkIn && !booking.checkIn.checkedIn && reference && checkInToday(booking.checkIn, reference)
             && <span data-testid="check-in-from" className="text-muted text-sm">{t("myBookings.checkInFrom", { time: formatClockTime(formatTime(booking.checkIn.opensAt, timeZone), locale) })}</span>}
           {actionable && <div className="flex flex-wrap gap-2 pt-1">
@@ -339,10 +341,24 @@ export function BookingSection({ testId, title, titleHidden = false, empty, book
   </section>;
 }
 
-function AccessCodes({ access, reference, locale, timeZone, t }: {
+function AccessCodes({ access, reference, locale, timeZone, t, emergency }: {
   access: AccessGrant; reference?: Date; locale: string; timeZone: string; t: Translate;
+  emergency?: () => Promise<EmergencyAccess>;
 }) {
+  const [emergencyCodes, setEmergencyCodes] = useState<AccessCode[]>();
+  const { message: error, report, clear } = useReportedFailure();
   if (reference && reference.getTime() >= Date.parse(access.validUntil)) return null;
+  const windowOpen = !reference || reference.getTime() >= Date.parse(access.validFrom);
+  const ask = async () => {
+    if (!emergency) return;
+    try {
+      const answer = await emergency();
+      clear();
+      setEmergencyCodes(answer.codes);
+    } catch (failure) {
+      report(failure);
+    }
+  };
   return <div data-testid="access-codes" className="grid gap-1 text-sm">
     <span className="font-semibold">{t("myBookings.access", {
       from: formatClockTime(formatTime(access.validFrom, timeZone), locale),
@@ -351,6 +367,14 @@ function AccessCodes({ access, reference, locale, timeZone, t }: {
     <ul className="grid gap-1">{access.codes.map((code) => <li key={code.accessPointName} data-testid="access-code">
       {code.accessPointName}: <span className="font-mono text-base font-semibold">{code.code}</span>
     </li>)}</ul>
+    {access.codePending && <span data-testid="access-code-pending" className="text-muted">{t("myBookings.accessPending")}</span>}
+    {emergencyCodes ? <ul className="grid gap-1">{emergencyCodes.map((code) => <li key={code.accessPointName} data-testid="emergency-code">
+      {t("myBookings.emergencyCodeFor", { accessPoint: code.accessPointName })} <span className="font-mono text-base font-semibold">{code.code}</span>
+    </li>)}</ul>
+      : emergency && access.emergencyCodeKept && windowOpen && <div className="pt-1">
+        <Button variant="secondary" data-testid="request-emergency-code" className="px-3 py-2" onClick={() => void ask()}>{t("myBookings.emergencyCode")}</Button>
+      </div>}
+    {error && <Alert>{error}</Alert>}
   </div>;
 }
 

@@ -20,19 +20,24 @@ function courtLabel(court: AdminCourt, t: (key: string, options?: Record<string,
 
 function requested(form: FormData): AccessPointRequest {
   const code = formString(form, "staticCode").trim();
+  const emergencyCode = formString(form, "emergencyCode").trim();
   return {
     name: formString(form, "name").trim(),
     courtIds: form.getAll("courtIds").map(String),
     staticCode: code === "" ? null : code,
+    emergencyCode: emergencyCode === "" ? null : emergencyCode,
     openToMembers: form.get("openToMembers") === "on"
   };
 }
 
 // A stored code keeps working after the club changes its length, so only a new one has to fit.
-function acceptable(request: AccessPointRequest, digits: number, storedCode?: string | null): boolean {
-  const code = request.staticCode;
-  const codeFits = code === null || code === undefined || code === storedCode || (/^[0-9]+$/.test(code) && code.length === digits);
-  return request.name !== "" && codeFits;
+function fits(code: string | null | undefined, digits: number, storedCode?: string | null): boolean {
+  return code === null || code === undefined || code === storedCode || (/^[0-9]+$/.test(code) && code.length === digits);
+}
+
+function acceptable(request: AccessPointRequest, digits: number, stored?: AccessPoint): boolean {
+  return request.name !== "" && fits(request.staticCode, digits, stored?.staticCode)
+    && fits(request.emergencyCode, digits, stored?.emergencyCode);
 }
 
 export function AdminAccessPointsView({ configurationChanged }: { configurationChanged: (config: ClubConfig) => void }) {
@@ -59,11 +64,11 @@ export function AdminAccessPointsView({ configurationChanged }: { configurationC
     setAccessPoints((current) => current?.map((item) => item.id === changed.id ? changed : item));
   }
 
-  function submit(key: string, storedCode: string | null | undefined, send: (request: AccessPointRequest) => Promise<void>) {
+  function submit(key: string, stored: AccessPoint | undefined, send: (request: AccessPointRequest) => Promise<void>) {
     return (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
       const request = requested(new FormData(event.currentTarget));
-      if (!acceptable(request, digits ?? 6, storedCode)) {
+      if (!acceptable(request, digits ?? 6, stored)) {
         refuse(t("admin.facility.accessPointInvalid", { digits }));
         return;
       }
@@ -109,7 +114,7 @@ export function AdminAccessPointsView({ configurationChanged }: { configurationC
                                  stored={accessPoint} disabled={pending.has(`access-point:${accessPoint.id}`)}
                                  submitLabel={t("admin.facility.accessPointSave")} submitTestId={`save-access-point-${accessPoint.id}`}
                                  cancel={() => setEditing(undefined)}
-                                 onSubmit={(_, saved) => submit(`access-point:${accessPoint.id}`, accessPoint.staticCode, async (request) => {
+                                 onSubmit={(_, saved) => submit(`access-point:${accessPoint.id}`, accessPoint, async (request) => {
                                    replace(await api.changeAdminAccessPoint(accessPoint.id, request));
                                    saved();
                                    setEditing(undefined);
@@ -166,6 +171,9 @@ function AccessPointSummary({ accessPoint, courts, edit }: { accessPoint: Access
     <h3 className="font-bold" data-testid={`access-point-name-${accessPoint.id}`}>{accessPoint.name}</h3>
     <p data-testid={`access-point-courts-${accessPoint.id}`}>{served.map((court) => courtLabel(court, t)).join(", ")}</p>
     <p data-testid={`access-point-code-${accessPoint.id}`} className="font-mono">{accessPoint.staticCode ?? t("admin.facility.noCode")}</p>
+    {accessPoint.emergencyCode && <p data-testid={`access-point-emergency-code-${accessPoint.id}`}>
+      {t("admin.facility.emergencyCode")}: <span className="font-mono">{accessPoint.emergencyCode}</span>
+    </p>}
     {accessPoint.openToMembers && <p data-testid={`access-point-open-to-members-${accessPoint.id}`}>{t("admin.facility.accessPointOpenToMembers")}</p>}
     <Button variant="secondary" type="button" className="justify-self-start" data-testid={`edit-access-point-${accessPoint.id}`} onClick={edit}>
       {t("admin.facility.editAccessPoint")}
@@ -207,6 +215,11 @@ function AccessPointForm({ id, heading, courts, digits, stored, disabled, submit
       <TextField data-testid={`${prefix}-code`} name="staticCode" inputMode="numeric" autoComplete="off" disabled={disabled}
                  defaultValue={stored?.staticCode ?? ""} className="max-w-48 font-mono" label={t("admin.facility.staticCode")} />
       <p data-testid={`${prefix}-code-hint`} className="text-muted text-sm">{t("admin.facility.staticCodeHint", { digits })}</p>
+    </div>
+    <div className="grid gap-1">
+      <TextField data-testid={`${prefix}-emergency`} name="emergencyCode" inputMode="numeric" autoComplete="off" disabled={disabled}
+                 defaultValue={stored?.emergencyCode ?? ""} className="max-w-48 font-mono" label={t("admin.facility.emergencyCode")} />
+      <p className="text-muted text-sm">{t("admin.facility.emergencyCodeHint", { digits })}</p>
     </div>
     <div className="grid gap-1">
       <label className="flex items-center gap-2">

@@ -269,6 +269,80 @@ class AccessPointAdminControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void whenCreatingAnAccessPointWithoutAStaticCodeButWithAnEmergencyCode_thenTheEmergencyCodeIsStored()
+            throws Exception {
+        // when
+        MvcResult created = create("""
+                {"name": "North gate", "courtIds": ["%s"], "emergencyCode": "975310"}
+                """.formatted(courtOne))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        // then
+        mockMvc.perform(get(created.getResponse().getHeader("Location")))
+                .andExpect(jsonPath("$.staticCode").doesNotExist())
+                .andExpect(jsonPath("$.emergencyCode").value("975310"));
+    }
+
+    @Test
+    void whenCreatingAnAccessPointWithAStaticAndAnEmergencyCode_thenTheEmergencyCodeIsRefusedByName()
+            throws Exception {
+        // when / then
+        create("""
+                {"name": "North gate", "courtIds": [], "staticCode": "123456", "emergencyCode": "975310"}
+                """)
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:access-point-rejected"))
+                .andExpect(jsonPath("$.violations[0].code")
+                        .value("facility.accessPoint.emergencyCodeNeedsDynamicCodes"))
+                .andExpect(jsonPath("$.violations[0].params.field").value("emergencyCode"));
+    }
+
+    @Test
+    void givenAStaticCodeElsewhere_whenAnEmergencyCodeRepeatsIt_thenItIsRefusedWithoutEchoingTheCode()
+            throws Exception {
+        // given
+        createdId("Clubhouse door", courtTwo, "123456");
+
+        // when / then
+        create("""
+                {"name": "North gate", "courtIds": [], "emergencyCode": "123456"}
+                """)
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:access-point-rejected"))
+                .andExpect(jsonPath("$.violations[0].code").value("facility.accessPoint.emergencyCodeCollides"))
+                .andExpect(jsonPath("$.violations[0].params.field").value("emergencyCode"))
+                .andExpect(content().string(not(containsString("123456"))));
+    }
+
+    @Test
+    void givenAnEmergencyCodeElsewhere_whenAStaticCodeRepeatsIt_thenTheStaticCodeIsRefused() throws Exception {
+        // given
+        create("""
+                {"name": "North gate", "courtIds": [], "emergencyCode": "975310"}
+                """).andExpect(status().isCreated());
+
+        // when / then
+        create("""
+                {"name": "Clubhouse door", "courtIds": [], "staticCode": "975310"}
+                """)
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.violations[0].code").value("facility.accessPoint.emergencyCodeCollides"))
+                .andExpect(jsonPath("$.violations[0].params.field").value("staticCode"));
+    }
+
+    @Test
+    void givenAnEmergencyCode_whenItIsOfTheWrongLength_thenItIsRefusedByItsField() throws Exception {
+        // when / then
+        create("""
+                {"name": "North gate", "courtIds": [], "emergencyCode": "97531"}
+                """)
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.violations[0].code").value("facility.accessPoint.codeLength"))
+                .andExpect(jsonPath("$.violations[0].params.field").value("emergencyCode"));
+    }
+
+    @Test
     void givenAnAccessPoint_whenCreatingAnotherWithTheSameName_thenItIsAConflict() throws Exception {
         // given
         createdId("North gate", courtOne, null);

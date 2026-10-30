@@ -18,4 +18,8 @@ public interface AccessPointRepository extends JpaRepository<AccessPoint, UUID> 
     List<AccessPoint> findByActiveTrueAndStaticCodeIsNullOrderByNameAsc();
 
     List<AccessPoint> findByActiveTrueAndOpenToMembersTrueAndStaticCodeIsNotNullOrderByNameAsc();
+
+    boolean existsByStaticCode(String staticCode);
+
+    boolean existsByEmergencyCodeAndIdNot(String emergencyCode, UUID id);
 }

@@ -18,7 +18,7 @@ class RetentionPayloadFieldTest {
 
     private static final Set<String> BOOKING_REFERENCES = Set.of("bookingId", "bookingIds", "seriesId");
     private static final Set<String> NAMES_NOBODY = Set.of("reason", "closure", "outcome", "grantId",
-            "previousStartsAt", "previousEndsAt", "previousCourtIds");
+            "previousStartsAt", "previousEndsAt", "previousCourtIds", "accessPointIds");
 
     @Test
     void givenEveryEventThatNamesABookingOrSeries_whenItsFieldsAreRead_thenEachFieldNamingSomebodyIsOneTheRunStrips()

@@ -9,7 +9,7 @@ import java.util.UUID;
 public record BookingAnnouncement(UUID bookedByAccountId, List<UUID> playerPersonIds,
                                   Instant startsAt, Instant endsAt,
                                   List<AnnouncedCourt> courts, String cardLabel, boolean cancelled,
-                                  @Nullable AnnouncedAccess access) {
+                                  @Nullable AnnouncedAccess access, @Nullable DynamicAccess dynamicAccess) {
 
     public BookingAnnouncement {
         playerPersonIds = List.copyOf(playerPersonIds);
@@ -34,5 +34,20 @@ public record BookingAnnouncement(UUID bookedByAccountId, List<UUID> playerPerso
     }
 
     public record AccessCode(String accessPointName, String code) {
+    }
+
+    /** Access points whose code the access-control system issues for this booking; never the code itself. */
+    public record DynamicAccess(Instant validFrom, Instant validUntil, List<String> accessPointNames,
+                                boolean emergencyCodeKept) {
+
+        public DynamicAccess {
+            if (validFrom == null || validUntil == null || !validUntil.isAfter(validFrom)) {
+                throw new IllegalArgumentException("A validity window ends after it starts");
+            }
+            if (accessPointNames == null || accessPointNames.isEmpty()) {
+                throw new IllegalArgumentException("Dynamic access names at least one access point");
+            }
+            accessPointNames = List.copyOf(accessPointNames);
+        }
     }
 }

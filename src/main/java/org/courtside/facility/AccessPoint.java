@@ -31,6 +31,9 @@ public class AccessPoint {
     @Column(name = "static_code")
     private String staticCode;
 
+    @Column(name = "emergency_code")
+    private String emergencyCode;
+
     @Column(nullable = false)
     private boolean active;
 
@@ -43,9 +46,10 @@ public class AccessPoint {
     @Column(name = "court_id", nullable = false)
     private Set<UUID> courtIds = new HashSet<>();
 
-    public AccessPoint(String name, Set<UUID> courtIds, String staticCode, boolean openToMembers) {
+    public AccessPoint(String name, Set<UUID> courtIds, String staticCode, String emergencyCode,
+                       boolean openToMembers) {
         this.id = UUID.randomUUID();
-        changeTo(name, courtIds, staticCode, openToMembers);
+        changeTo(name, courtIds, staticCode, emergencyCode, openToMembers);
         this.active = true;
     }
 
@@ -57,11 +61,13 @@ public class AccessPoint {
         return courtIds.contains(courtId);
     }
 
-    public void changeTo(String name, Set<UUID> courtIds, String staticCode, boolean openToMembers) {
+    public void changeTo(String name, Set<UUID> courtIds, String staticCode, String emergencyCode,
+                         boolean openToMembers) {
         this.name = name;
         this.courtIds.clear();
         this.courtIds.addAll(courtIds);
         this.staticCode = staticCode;
+        this.emergencyCode = emergencyCode;
         this.openToMembers = openToMembers;
     }
 

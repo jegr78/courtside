@@ -78,7 +78,7 @@ class BookingCalendarTest {
     private static BookingAnnouncement booking(String card, String court) {
         return new BookingAnnouncement(UUID.fromString("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"), List.of(),
                 Instant.parse("2026-05-13T16:00:00Z"), Instant.parse("2026-05-13T17:00:00Z"),
-                List.of(new BookingAnnouncement.AnnouncedCourt(1, court)), card, false, null);
+                List.of(new BookingAnnouncement.AnnouncedCourt(1, court)), card, false, null, null);
     }
 
     private static String content(MailAttachment attachment) {

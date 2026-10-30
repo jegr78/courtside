@@ -10,7 +10,7 @@ public class AccessPointRejectedException extends CodedDomainFailure {
 
     public static final ProblemType PROBLEM_TYPE = new ProblemType(
             "access-point-rejected", HttpStatus.BAD_REQUEST,
-            "Access point rejected", "The name or the static access code of an access point cannot be stored");
+            "Access point rejected", "The name or an access code of an access point cannot be stored");
 
     private AccessPointRejectedException(String code, Map<String, Object> params) {
         super(code, params);
@@ -25,13 +25,22 @@ public class AccessPointRejectedException extends CodedDomainFailure {
                 Map.of("field", "name", "maximum", maximum));
     }
 
-    static AccessPointRejectedException codeNotDigits() {
-        return new AccessPointRejectedException("facility.accessPoint.codeNotDigits", Map.of("field", "staticCode"));
+    static AccessPointRejectedException codeNotDigits(String field) {
+        return new AccessPointRejectedException("facility.accessPoint.codeNotDigits", Map.of("field", field));
     }
 
-    static AccessPointRejectedException codeLength(int digits) {
+    static AccessPointRejectedException codeLength(String field, int digits) {
         return new AccessPointRejectedException("facility.accessPoint.codeLength",
-                Map.of("field", "staticCode", "digits", digits));
+                Map.of("field", field, "digits", digits));
+    }
+
+    static AccessPointRejectedException emergencyCodeNeedsDynamicCodes() {
+        return new AccessPointRejectedException("facility.accessPoint.emergencyCodeNeedsDynamicCodes",
+                Map.of("field", "emergencyCode"));
+    }
+
+    static AccessPointRejectedException emergencyCodeCollides(String field) {
+        return new AccessPointRejectedException("facility.accessPoint.emergencyCodeCollides", Map.of("field", field));
     }
 
     static AccessPointRejectedException openToMembersNeedsCode() {

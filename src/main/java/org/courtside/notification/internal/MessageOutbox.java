@@ -12,6 +12,8 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
 
@@ -33,7 +35,12 @@ class MessageOutbox {
     // forgot to ask, and the centre holds whatever a member was told on any channel.
     @Transactional(propagation = Propagation.MANDATORY)
     public void queue(UUID accountId, MessageKind kind, Map<String, String> parameters) {
-        enqueue(accountId, kind, parameters, null);
+        enqueue(accountId, kind, parameters, null, Duration.ZERO);
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void queueAfter(UUID accountId, MessageKind kind, Map<String, String> parameters, Duration wait) {
+        enqueue(accountId, kind, parameters, null, wait);
     }
 
     @Transactional(propagation = Propagation.MANDATORY)
@@ -41,10 +48,11 @@ class MessageOutbox {
         if (previousAddress == null || previousAddress.isBlank()) {
             throw new IllegalStateException("A notice to a previous address needs that address");
         }
-        enqueue(accountId, kind, Map.of(), previousAddress);
+        enqueue(accountId, kind, Map.of(), previousAddress, Duration.ZERO);
     }
 
-    private void enqueue(UUID accountId, MessageKind kind, Map<String, String> parameters, String previousAddress) {
+    private void enqueue(UUID accountId, MessageKind kind, Map<String, String> parameters, String previousAddress,
+                         Duration wait) {
         if (!choices.wants(accountId, kind)) {
             log.info("A {} message was not queued: account {} does not want it", kind, accountId);
             return;
@@ -55,7 +63,8 @@ class MessageOutbox {
             return;
         }
         String messageId = MailDispatch.newMessageId(MailSettings.senderDomain(properties.from()));
-        records.save(new MessageRecord(accountId, kind, messageId, clock.instant(), parameters, previousAddress));
+        Instant now = clock.instant();
+        records.save(new MessageRecord(accountId, kind, messageId, now, now.plus(wait), parameters, previousAddress));
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {

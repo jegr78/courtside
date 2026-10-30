@@ -333,6 +333,28 @@ class CheckConstraintTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void whenInsertingAnAccessPointWithANonDigitEmergencyCode_thenItIsRejected() {
+        // when / then
+        assertThatThrownBy(() -> jdbc.sql("INSERT INTO access_point (id, name, emergency_code) VALUES (?, ?, ?)")
+                        .params(UUID.randomUUID(), "North gate", "12a456")
+                        .update())
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .hasMessageContaining("access_point_emergency_code_digits");
+    }
+
+    @Test
+    void whenInsertingAnAccessPointWithAStaticAndAnEmergencyCode_thenItIsRejected() {
+        // when / then
+        assertThatThrownBy(() -> jdbc.sql("""
+                        INSERT INTO access_point (id, name, static_code, emergency_code) VALUES (?, ?, ?, ?)
+                        """)
+                        .params(UUID.randomUUID(), "North gate", "123456", "975310")
+                        .update())
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .hasMessageContaining("access_point_emergency_code_without_static_code");
+    }
+
+    @Test
     void whenTheAccessSettingsLeaveTheirRanges_thenEachIsRejectedByItsOwnConstraint() {
         // when / then
         assertThatThrownBy(() -> jdbc.sql("UPDATE club_config SET access_lead_minutes = 241").update())

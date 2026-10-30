@@ -200,6 +200,8 @@
         "listOwnParticipations",
         "removeOwnParticipation",
         "listMembersDoorCodes",
+        "requestEmergencyCode",
+        "requestParticipationEmergencyCode",
         "listManagedAppointments",
         "getManagedAppointment",
         "previewSeries",
@@ -221,6 +223,7 @@
         "cancelDependantBooking"
       ],
       "backgroundEntryPoints": [
+        "AccessCodeMailer#on(AccessGrantEvent.Installed)",
         "AccessCodeMailer#on(BookingAccessCodeChanged)",
         "BookingMailer#on(BookingConfirmed)",
         "BookingReminderSchedule#remindWhatIsDue",
@@ -249,7 +252,8 @@
         "Joining a waitlist stores one open entry per slot and account; a freed slot is offered to the first eligible entry in the transaction that freed it, and acceptance turns the reservation into a confirmed booking.",
         "A holder publishes or withdraws a partner invitation for an own booking; an eligible member who accepts it joins the booking as a participant under the booking row lock.",
         "A booking or cancellation the rules refuse is counted with its rule codes, card and the holder's membership type, in a transaction of its own.",
-        "A guardian granted it books or cancels in a dependant's name: the dependant's account holds the booking, the dependant's rules, roles and deadline decide, and the guardian is recorded as the one who acted."
+        "A guardian granted it books or cancels in a dependant's name: the dependant's account holds the booking, the dependant's rules, roles and deadline decide, and the guardian is recorded as the one who acted.",
+        "A booker or player asks for the emergency code of the booking's dynamic access points during its window; the answer is audited without the code."
       ],
       "alternatePaths": [
         "Booking-card roles and ADMIN authority select which appointments a caller may create or manage.",
@@ -264,7 +268,8 @@
         "Concurrency and stale series state roll back rather than leave a partial calendar.",
         "A reserved court refuses every other account's booking, and another account's waitlist entry answers as absent.",
         "Another account's booking answers as absent to publish and withdraw, and an invitation the caller may not take answers as absent to acceptance.",
-        "A guardian acting for nobody they hold a running relationship to is refused as for no dependant; an action the relationship does not grant, a disabled dependant account and a booking the dependant does not hold refuse without writing."
+        "A guardian acting for nobody they hold a running relationship to is refused as for no dependant; an action the relationship does not grant, a disabled dependant account and a booking the dependant does not hold refuse without writing.",
+        "An emergency code request from outside the booking, outside its window or for access points without one is refused and records nothing."
       ],
       "productionPaths": [
         "src/main/java/org/courtside/booking/BookingService.java",
@@ -280,7 +285,8 @@
         "src/main/java/org/courtside/booking/partner/PartnerSearchSweep.java",
         "src/main/java/org/courtside/booking/web/PartnerSearchController.java",
         "src/main/java/org/courtside/booking/DependantBookings.java",
-        "src/main/java/org/courtside/member/GuardianDelegation.java"
+        "src/main/java/org/courtside/member/GuardianDelegation.java",
+        "src/main/java/org/courtside/booking/internal/EmergencyCodes.java"
       ],
       "evidence": [
         "src/test/java/org/courtside/booking/BookingServiceTest.java#givenAnExistingBooking_whenCreatingAnOverlappingOne_thenCourtUnavailableIsThrown",
@@ -291,7 +297,8 @@
         "src/test/java/org/courtside/booking/web/UsageReportControllerTest.java#givenABookingTheRulesRefuse_whenReportingThatDay_thenTheRefusalIsCountedByItsCodeAndType",
         "src/test/java/org/courtside/booking/web/DependantBookingControllerTest.java#givenAnAdministratorGuardian_whenBookingForADependantBarredFromCourts_thenTheDependantsRulesRefuseIt",
         "src/test/java/org/courtside/booking/web/DependantBookingControllerTest.java#givenADependantWhoManagesTrainings_whenTheGuardianCancelsSomebodyElsesTraining_thenTheRoleLendsNothing",
-        "src/test/java/org/courtside/booking/web/DependantBookingControllerTest.java#givenTheDependantUsedAKey_whenTheGuardianBooksWithTheSameKey_thenTheKeysNeverMeet"
+        "src/test/java/org/courtside/booking/web/DependantBookingControllerTest.java#givenTheDependantUsedAKey_whenTheGuardianBooksWithTheSameKey_thenTheKeysNeverMeet",
+        "src/test/java/org/courtside/booking/web/DynamicAccessCodeTest.java#givenAnotherMembersBooking_whenAMemberOutsideItAsksForTheEmergencyCode_thenItIsRefusedWithoutTheCode"
       ]
     },
     {

@@ -326,6 +326,20 @@ last opened the page online. Once that time is over, the code disappears.
 When the club changes a code or a new one starts to apply to your booking, Courtside sends the booker
 and every co-player with an account a message with the codes that apply now.
 
+### A booking's own code
+
+When the club has connected an access-control system, every booking gets its own code for doors
+without a static code. The confirmation then arrives a few seconds after the booking and usually
+carries it already. If the door has not accepted it yet, the confirmation says that it follows, and
+Courtside sends it to you in a separate mail as soon as it is there. Co-players find it under
+*Recorded as a co-player* and in the reminder. Until the door has accepted it, the booking says that
+it is not there yet.
+
+If the code is missing at the door or does not work, choose *Code missing or not working? Show the
+emergency code* beside the booking in *My bookings*. That works only while the booking's access code
+is valid, and only when the club keeps an emergency code for that door. The club sees who asked for
+it.
+
 ![A booking's access code with the name of its access point and the time it works.](../screenshots/en/access-codes.png)
 
 ### Door codes for every member

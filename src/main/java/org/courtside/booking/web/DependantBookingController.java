@@ -37,7 +37,7 @@ class DependantBookingController implements DependantBookingsApi {
     public ResponseEntity<ApiPersonalBookingPage> listDependantBookings(UUID personId, ApiPersonalBookingView view,
                                                                         UUID cursor, Integer limit) {
         return ResponseEntity.ok(personalBookingPages.render(dependantBookings.bookingsOf(personId,
-                PersonalBookingView.valueOf(view.getValue()), cursor, limit), view));
+                PersonalBookingView.valueOf(view.getValue()), cursor, limit), view, false));
     }
 
     @Override

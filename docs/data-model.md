@@ -65,7 +65,7 @@ a check the application ran first.
 | `opening_period` | A season or holiday, its name and its first and last day | None |
 | `opening_period_hours` | When the facility opens and closes on one weekday of a season or holiday | `opening_period` |
 | `court_closure` | Whole days on which one court is closed, with a reason | `court` |
-| `access_point` | A door or gate on the way to the courts: its name, an optional static access code, whether every member sees that code, whether it is active | None |
+| `access_point` | A door or gate on the way to the courts: its name, an optional static access code, an optional emergency code kept on its keypad, whether every member sees the static code, whether it is active | None |
 | `access_point_court` | Which courts an access point leads to | `access_point`, `court` |
 
 `court.number` is unique and positive, and `active` is what takes a court out of service without
@@ -87,7 +87,10 @@ court apart.
 and at most 60 characters. `static_code` is null or four to eight digits
 (`access_point_static_code_digits`); the exact length a new code needs comes from `club_config` and
 is checked by the application, so a stored code survives a later change of that length.
-`open_to_members` needs a static code (`access_point_open_to_members_has_code`).
+`open_to_members` needs a static code (`access_point_open_to_members_has_code`). `emergency_code` is
+null or four to eight digits (`access_point_emergency_code_digits`) and only set without a static code
+(`access_point_emergency_code_without_static_code`); that it differs from every static code is checked
+by the application.
 `access_point_court` has one row per access point and court, and deleting an access point deletes
 its rows. Nothing deletes an access point: `active` retires it.
 
@@ -115,7 +118,7 @@ four to eight digits masked, at most 500 characters. `retry_requested_at` is a b
 the next pass consumes it.
 
 `access_code.code` is the primary key, so a code is drawn by inserting it and a second grant can never
-hold a code that is still in use. A draw that equals an access point's `static_code` is drawn again. It has four to eight digits (`access_code_digits`). A row with a
+hold a code that is still in use. A draw that equals an access point's `static_code` or `emergency_code` is drawn again. It has four to eight digits (`access_code_digits`). A row with a
 `grant_id` is that grant's current code, at most one per grant (`access_code_one_per_grant`), and carries
 no `until` (`access_code_held_only_when_detached`). A row without one is held until `until` and deleted
 afterwards, or at once when `until` is null.
@@ -450,7 +453,9 @@ the claims made for it and `retries` the failed handovers that were scheduled ag
 row, `reason` names the last failed attempt; on a settled row it names why the message failed or was
 refused. Settling a row clears `parameters`, `previous_address` and `next_attempt_at`, and CHECK
 constraints refuse a settled row that keeps any of them, and `parameters` that are anything but an
-object of strings.
+object of strings. `access_code_follows` survives settling: a handed-over confirmation that said the
+booking's own code follows keeps that booking's id there until the grant is installed, when it is
+cleared and the code mail queued; a partial index serves that lookup.
 
 A `notification` row is written with the outbox row in the same transaction, and also when no mail
 is queued because the account has no address or switched email off. Its `parameters` keep only the

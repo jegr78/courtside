@@ -5,6 +5,7 @@ import org.courtside.config.ClubIdentity;
 import org.courtside.identity.UserAccount;
 import org.courtside.shared.BookingAnnouncement;
 import org.courtside.shared.CancellationReason;
+import org.courtside.shared.IssuedAccessCodes;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
@@ -12,12 +13,14 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.FormatStyle;
 import java.time.format.TextStyle;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.TreeSet;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Component
@@ -25,9 +28,12 @@ import java.util.stream.Collectors;
 class BookingWording {
 
     static final String ACCESS_CODES = "accessCodes";
+    static final String CODE_FOLLOWS = "booking.access.follows";
+    static final String CODE_MISSING = "booking.access.missing";
 
     private final ClubIdentity club;
     private final MailTemplates templates;
+    private final IssuedAccessCodes issuedCodes;
 
     Map<String, String> of(BookingAnnouncement booking, Locale locale) {
         return Map.of(
@@ -40,13 +46,44 @@ class BookingWording {
                 ACCESS_CODES, "");
     }
 
-    // A message is written after it was queued, so the codes go only to who is in the booking at that moment.
-    Map<String, String> of(BookingAnnouncement booking, UserAccount recipient, Locale locale) {
-        Map<String, String> values = new HashMap<>(of(booking, locale));
-        if (holds(booking, recipient)) {
-            values.put(ACCESS_CODES, accessCodes(booking.access(), locale));
+    record AccessLines(String text, boolean codeFollows) {
+    }
+
+    // A message is written after it was queued, so the codes go only to who is in the booking at that moment,
+    // and the booking's own code is only looked up for them.
+    AccessLines access(UUID bookingId, BookingAnnouncement booking, UserAccount recipient, Locale locale,
+                       String pendingKey, boolean withStaticCodes) {
+        if (!holds(booking, recipient)) {
+            return new AccessLines("", false);
         }
-        return values;
+        BookingAnnouncement.AnnouncedAccess fixed = withStaticCodes ? booking.access() : null;
+        BookingAnnouncement.DynamicAccess dynamic = booking.dynamicAccess();
+        List<String> lines = new ArrayList<>();
+        if (fixed != null) {
+            fixed.codes().forEach(code -> lines.add(codeLine(code.accessPointName(), code.code(), locale)));
+        }
+        String issued = dynamic == null ? null : issuedCodes.codeOf(bookingId).orElse(null);
+        if (issued != null) {
+            dynamic.accessPointNames().forEach(name -> lines.add(codeLine(name, issued, locale)));
+        }
+        List<String> block = new ArrayList<>();
+        if (!lines.isEmpty()) {
+            Instant validFrom = fixed != null ? fixed.validFrom() : dynamic.validFrom();
+            Instant validUntil = fixed != null ? fixed.validUntil() : dynamic.validUntil();
+            block.add(templates.render("booking.access.heading", locale,
+                    Map.of("validFrom", time(validFrom), "validUntil", time(validUntil))));
+            block.addAll(lines);
+        }
+        boolean pending = dynamic != null && issued == null;
+        if (pending && pendingKey != null) {
+            block.add(templates.render(pendingKey, locale, Map.of()));
+        }
+        return new AccessLines(String.join("\n", block), pending);
+    }
+
+    private String codeLine(String accessPoint, String code, Locale locale) {
+        return templates.render("booking.access.code", locale,
+                Map.of("accessPoint", accessPoint, "accessCode", code));
     }
 
     static boolean holds(BookingAnnouncement booking, UserAccount recipient) {
@@ -81,19 +118,6 @@ class BookingWording {
     String reason(Optional<CancellationReason> reason, Locale locale) {
         return templates.render("booking.cancellationReason." + reason.map(Enum::name).orElse("none"),
                 locale, Map.of());
-    }
-
-    // Empty without a grant, and an empty block takes its line with it, so such a mail reads as it always did.
-    private String accessCodes(BookingAnnouncement.AnnouncedAccess access, Locale locale) {
-        if (access == null) {
-            return "";
-        }
-        String heading = templates.render("booking.access.heading", locale,
-                Map.of("validFrom", time(access.validFrom()), "validUntil", time(access.validUntil())));
-        return access.codes().stream()
-                .map(code -> templates.render("booking.access.code", locale,
-                        Map.of("accessPoint", code.accessPointName(), "accessCode", code.code())))
-                .collect(Collectors.joining("\n", heading + "\n", ""));
     }
 
     private String courts(BookingAnnouncement booking, Locale locale) {

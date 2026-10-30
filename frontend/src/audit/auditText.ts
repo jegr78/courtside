@@ -89,6 +89,7 @@ const BOOKING_MODULE_SUBJECTS: Record<string, "booking" | "series" | "waitlistEn
   "booking.booking.displaced": "booking",
   "booking.booking.reminderDue": "booking",
   "booking.booking.accessCodeChanged": "booking",
+  "booking.emergencyCode.requested": "booking",
   "access.grant.installed": "booking",
   "access.grant.failing": "booking",
   "access.grant.retryRequested": "booking",

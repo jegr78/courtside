@@ -15,6 +15,7 @@ import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -97,9 +98,10 @@ class SeriesMailer implements MessageComposer {
 
     @Override
     public void compose(QueuedMessage message, Consumer<OutgoingMail> handOver) {
+        SequencedMap<UUID, BookingAnnouncement> described = message.kind() == MessageKind.BOOKING_SERIES_CREATED
+                ? new LinkedHashMap<>() : bookings.describeAll(message.bookings());
         List<BookingAnnouncement> occurrences = message.kind() == MessageKind.BOOKING_SERIES_CREATED
-                ? bookings.describeSeries(message.series())
-                : List.copyOf(bookings.describeAll(message.bookings()).values());
+                ? bookings.describeSeries(message.series()) : List.copyOf(described.values());
         if (occurrences.isEmpty()) {
             throw new MessageUndeliverableException(message.kind() == MessageKind.BOOKING_SERIES_CREATED
                     ? "BookingCancelled" : "BookingGone");
@@ -115,6 +117,12 @@ class SeriesMailer implements MessageComposer {
         if (message.kind() == MessageKind.BOOKING_SERIES_MOVED_BY_CLUB) {
             values.putAll(wording.previous(message.previousStartsAt(), message.previousEndsAt(),
                     bookings.describeCourts(message.previousCourts()), locale));
+            // A date's own code would mislead on the other dates, so only a move of one date carries it.
+            if (described.size() == 1) {
+                BookingAnnouncement moved = described.firstEntry().getValue();
+                values.put(BookingWording.ACCESS_CODES, wording.access(described.firstEntry().getKey(), moved,
+                        account, locale, null, moved.dynamicAccess() != null).text());
+            }
         }
         String key = message.kind().templateKey();
         handOver.accept(new OutgoingMail(account.getPerson().getEmail(),

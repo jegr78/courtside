@@ -118,6 +118,7 @@ The maintained JSON classifies every reachable OpenAPI field either as ordinary 
 | `administrative-mfa-status` | `getAdministrativeMfaStatus` | `ADMIN` | `administrator-gate`, `mfa-admin-projection` |
 | `administrative-mfa-rescue` | `initiateMfaRecovery` | `ADMIN` | `administrator-gate`, `recent-authentication`, `mfa-controlled-rescue` |
 | `public-mfa-rescue-redemption` | `redeemMfaRecovery` | `ANONYMOUS`, `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN`, `INITIAL_PASSWORD` | `request-boundary`, `credential-write-only`, `mfa-controlled-rescue` |
+| `booking-emergency-code` | `requestEmergencyCode`, `requestParticipationEmergencyCode` | `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN` | `permanent-account-gate`, `emergency-code-participation` |
 
 ## Authorization decisions
 
@@ -457,6 +458,18 @@ Positive tests: `src/test/java/org/courtside/identity/internal/ControlledAccount
 
 Negative tests: `src/test/java/org/courtside/identity/internal/ControlledAccountRecoveryTest.java#givenAdministratorWithoutMfa_whenRequestingRecovery_thenItIsRefused`, `src/test/java/org/courtside/identity/internal/ControlledAccountRecoveryTest.java#givenUnconfirmedIdentity_whenMaintenanceStartsRecovery_thenNothingChanges`, `src/test/java/org/courtside/identity/internal/ControlledAccountRecoveryTest.java#givenAddressChangedWithoutAnEpochChange_whenOldRecoveryCodeIsRedeemed_thenItsAddressBindingRefusesIt`, `src/test/java/org/courtside/identity/internal/ControlledAccountRecoveryTest.java#givenAnOutboxCredentialBeingSent_whenRecoveryCompletes_thenTheJobFailsPermanentlyWithoutOverwritingThePassword`, `src/test/java/org/courtside/identity/internal/ControlledAccountRecoveryTest.java#givenTwoOldCredentialJobs_whenTheSecondWaitsDuringRecovery_thenNeitherCanReplaceTheRecoveryPassword`, `src/test/java/org/courtside/identity/internal/ControlledAccountRecoveryTest.java#givenAnOldResetCodeJobWaitingForTheAccount_whenRecoveryCommits_thenItsIssuedTokenRollsBack`.
 
+### Emergency code for a booking's participants
+
+The emergency code derives identity from the current account and is answered only to the booking's owner or a person it names as a player, from the start of its access window to its end and only for its active access points without a static code that keep one; anybody else is refused with a violation code and nothing is recorded.
+
+Attributes: `current-account`, `booking-owner`, `participant-person`.
+
+Production: `src/main/java/org/courtside/booking/web/EmergencyCodeController.java#answer`, `src/main/java/org/courtside/booking/internal/EmergencyCodes.java#request`, `src/main/java/org/courtside/booking/internal/EmergencyCodes.java#takesPart`.
+
+Positive tests: `src/test/java/org/courtside/booking/web/DynamicAccessCodeTest.java#givenTheBookerAndThePlayerInsideTheWindow_whenTheyAskForTheEmergencyCode_thenItIsAnsweredAndAudited`.
+
+Negative tests: `src/test/java/org/courtside/booking/web/DynamicAccessCodeTest.java#givenAnotherMembersBooking_whenAMemberOutsideItAsksForTheEmergencyCode_thenItIsRefusedWithoutTheCode`, `src/test/java/org/courtside/booking/web/DynamicAccessCodeTest.java#givenABookingWhoseWindowHasNotOpened_whenTheBookerAsksForTheEmergencyCode_thenItIsRefusedByReason`.
+
 ## Protected field rules
 
 | Rule | Access | Fields | Operations | Actors and attributes |
@@ -516,10 +529,11 @@ Negative tests: `src/test/java/org/courtside/identity/internal/ControlledAccount
 | `administrative-mfa-flags-read` | read | `MfaAdministrativeStatus.enabled`, `MfaAdministrativeStatus.recoveryPending` | `getAdministrativeMfaStatus` | `ADMIN`; `administrator`, `target-account` |
 | `controlled-rescue-identity-confirmation-write` | write | `MfaRecoveryInitiation.identityChecked` | `initiateMfaRecovery` | `ADMIN`; `administrator`, `recent-authentication`, `mfa-identity-check` |
 | `controlled-rescue-redemption-write-only` | never-read | `MfaRecoveryRedemption.username`, `MfaRecoveryRedemption.code`, `MfaRecoveryRedemption.password` | `redeemMfaRecovery` | `ANONYMOUS`, `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN`, `INITIAL_PASSWORD`; `mfa-current-address`, `mfa-guess-budget` |
-| `access-point-code-read` | read | `AccessPoint.staticCode` | `listAccessPoints`, `createAccessPoint`, `getAccessPoint`, `changeAccessPoint`, `setAccessPointActive` | `ADMIN`; `administrator` |
-| `access-point-code-write` | write | `AccessPointRequest.staticCode` | `createAccessPoint`, `changeAccessPoint` | `ADMIN`; `administrator` |
+| `access-point-code-read` | read | `AccessPoint.staticCode`, `AccessPoint.emergencyCode` | `listAccessPoints`, `createAccessPoint`, `getAccessPoint`, `changeAccessPoint`, `setAccessPointActive` | `ADMIN`; `administrator` |
+| `access-point-code-write` | write | `AccessPointRequest.staticCode`, `AccessPointRequest.emergencyCode` | `createAccessPoint`, `changeAccessPoint` | `ADMIN`; `administrator` |
 | `booking-access-code-read` | read | `PersonalBooking.access` | `listPersonalBookings`, `listDependantBookings` | `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN`; `booking-owner`, `current-account` |
 | `participation-access-code-read` | read | `Participation.access` | `listOwnParticipations` | `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN`; `participant-person`, `current-account` |
 | `members-door-code-read` | read | `AccessCode.code` | `listMembersDoorCodes` | `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN`; `current-account`, `current-membership` |
+| `emergency-code-read` | read | `EmergencyAccess.codes` | `requestEmergencyCode`, `requestParticipationEmergencyCode` | `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN`; `booking-owner`, `participant-person`, `current-account` |
 
 Every field not declared by an operation's OpenAPI request schema is rejected before the operation runs. Every field not declared by its response schema is outside that operation's projection. The rules above name the fields whose visibility or mutability is narrower than merely satisfying that schema.

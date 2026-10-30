@@ -142,6 +142,7 @@ export type BookingHours = components["schemas"]["BookingHours"];
 export type PersonalBooking = components["schemas"]["PersonalBooking"];
 export type AccessGrant = components["schemas"]["AccessGrant"];
 export type AccessCode = components["schemas"]["AccessCode"];
+export type EmergencyAccess = components["schemas"]["EmergencyAccess"];
 export type PersonalBookingPage = components["schemas"]["PersonalBookingPage"];
 export type PersonalBookingView = components["schemas"]["PersonalBookingView"];
 export type Participation = components["schemas"]["Participation"];
@@ -899,6 +900,8 @@ export const api = {
     `/api/managed/bookings/${bookingId}`
   ),
   checkIn: (bookingId: string) => request<void>(`/api/my/bookings/${bookingId}/check-in`, { method: "POST" }),
+  emergencyCode: (bookingId: string) => request<EmergencyAccess>(`/api/my/bookings/${bookingId}/emergency-code`, { method: "POST" }),
+  participationEmergencyCode: (bookingId: string) => request<EmergencyAccess>(`/api/my/participations/${bookingId}/emergency-code`, { method: "POST" }),
   attendancePolicy: () => request<AttendancePolicy>("/api/admin/attendance-policy"),
   changeAttendancePolicy: (policy: AttendancePolicy) => request<AttendancePolicy>("/api/admin/attendance-policy", {
     method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(policy)

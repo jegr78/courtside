@@ -144,15 +144,13 @@ public class FacilityService {
 
     @Transactional
     public AccessPoint createAccessPoint(String name, Collection<UUID> courtIds, String staticCode,
-                                         boolean openToMembers) {
+                                         String emergencyCode, boolean openToMembers) {
         String stored = requireAccessPointName(name);
         Set<UUID> courtsServed = requireCourts(courtIds);
-        if (staticCode != null) {
-            requireFittingCode(staticCode);
-        }
+        requireCodes(null, staticCode, true, emergencyCode, true);
         requireCodeWhenOpenToMembers(staticCode, openToMembers);
         AccessPoint accessPoint = saveOrRejectTakenName(
-                new AccessPoint(stored, courtsServed, staticCode, openToMembers));
+                new AccessPoint(stored, courtsServed, staticCode, emergencyCode, openToMembers));
         events.publishEvent(new FacilityEvent.AccessPointAdded(accessPoint.getId(), sorted(courtsServed)));
         announceCode(accessPoint, courtsServed);
         announceToMembers(accessPoint);
@@ -162,24 +160,24 @@ public class FacilityService {
     /** Replaces every field. Only a new or changed code has to fit today's code length. */
     @Transactional
     public AccessPoint changeAccessPoint(UUID accessPointId, String name, Collection<UUID> courtIds,
-                                         String staticCode, boolean openToMembers) {
+                                         String staticCode, String emergencyCode, boolean openToMembers) {
         AccessPoint accessPoint = requireAccessPoint(accessPointId);
         String stored = requireAccessPointName(name);
         Set<UUID> courtsServed = requireCourts(courtIds);
         boolean codeChanged = !Objects.equals(accessPoint.getStaticCode(), staticCode);
-        if (codeChanged && staticCode != null) {
-            requireFittingCode(staticCode);
-        }
+        boolean emergencyCodeChanged = !Objects.equals(accessPoint.getEmergencyCode(), emergencyCode);
+        requireCodes(accessPointId, staticCode, codeChanged, emergencyCode, emergencyCodeChanged);
         requireCodeWhenOpenToMembers(staticCode, openToMembers);
         boolean openedToMembers = openToMembers && !accessPoint.isOpenToMembers();
         List<String> changedFields = new ArrayList<>();
         if (!accessPoint.getName().equals(stored)) changedFields.add("name");
         if (!accessPoint.getCourtIds().equals(courtsServed)) changedFields.add("courtIds");
         if (codeChanged) changedFields.add("staticCode");
+        if (emergencyCodeChanged) changedFields.add("emergencyCode");
         if (accessPoint.isOpenToMembers() != openToMembers) changedFields.add("openToMembers");
         Set<UUID> added = new TreeSet<>(courtsServed);
         added.removeAll(accessPoint.getCourtIds());
-        accessPoint.changeTo(stored, courtsServed, staticCode, openToMembers);
+        accessPoint.changeTo(stored, courtsServed, staticCode, emergencyCode, openToMembers);
         AccessPoint saved = saveOrRejectTakenName(accessPoint);
         if (!changedFields.isEmpty()) {
             events.publishEvent(new FacilityEvent.AccessPointChanged(
@@ -252,13 +250,39 @@ public class FacilityService {
         return served;
     }
 
-    private void requireFittingCode(String staticCode) {
-        if (staticCode.isEmpty() || !staticCode.chars().allMatch(digit -> digit >= '0' && digit <= '9')) {
-            throw AccessPointRejectedException.codeNotDigits();
+    private void requireCodes(UUID accessPointId, String staticCode, boolean staticCodeChanged,
+                              String emergencyCode, boolean emergencyCodeChanged) {
+        if (staticCode != null && staticCodeChanged) {
+            requireFittingCode("staticCode", staticCode);
+            if (accessPoints.existsByEmergencyCodeAndIdNot(staticCode, otherThan(accessPointId))) {
+                throw AccessPointRejectedException.emergencyCodeCollides("staticCode");
+            }
+        }
+        if (emergencyCode == null) {
+            return;
+        }
+        if (staticCode != null) {
+            throw AccessPointRejectedException.emergencyCodeNeedsDynamicCodes();
+        }
+        if (emergencyCodeChanged) {
+            requireFittingCode("emergencyCode", emergencyCode);
+            if (accessPoints.existsByStaticCode(emergencyCode)) {
+                throw AccessPointRejectedException.emergencyCodeCollides("emergencyCode");
+            }
+        }
+    }
+
+    private static UUID otherThan(UUID accessPointId) {
+        return accessPointId == null ? new UUID(0, 0) : accessPointId;
+    }
+
+    private void requireFittingCode(String field, String code) {
+        if (code.isEmpty() || !code.chars().allMatch(digit -> digit >= '0' && digit <= '9')) {
+            throw AccessPointRejectedException.codeNotDigits(field);
         }
         AccessCodeLength length = accessPolicy.accessCodeLength();
-        if (!length.fits(staticCode)) {
-            throw AccessPointRejectedException.codeLength(length.digits());
+        if (!length.fits(code)) {
+            throw AccessPointRejectedException.codeLength(field, length.digits());
         }
     }
 

@@ -26,7 +26,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -202,15 +202,18 @@ class MailOutbox {
         if (supersededCredential(claimed)) {
             throw new MessageUndeliverableException("CredentialSupersededByRecovery");
         }
-        AtomicBoolean handedOver = new AtomicBoolean();
+        AtomicReference<OutgoingMail> handedOver = new AtomicReference<>();
         composerFor(message.kind()).compose(message, mail -> {
             handover.attempt(claimed.messageId(), () -> send(mail, claimed.messageId()));
-            handedOver.set(true);
+            handedOver.set(mail);
         });
         if (supersededCredential(claimed)) {
             throw new CredentialSupersededException();
         }
-        if (handedOver.get()) {
+        if (handedOver.get() != null) {
+            if (handedOver.get().accessCodeFollows() != null) {
+                held.get().promiseAccessCodeOf(handedOver.get().accessCodeFollows());
+            }
             messages.handedOver(held.get());
             log.info("Handed over a {} message for account {}", message.kind(), message.accountId());
         } else {

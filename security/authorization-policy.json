@@ -2,9 +2,9 @@
   "schemaVersion": 1,
   "reviewedAt": "2026-10-30",
   "purpose": "This is the normative authorization policy for the shipped Courtside API. OpenAPI defines the transport shape; this policy defines who may perform each operation, which resource attributes narrow that permission, and which protected fields each projection may read or write.",
-  "openApiFieldInventorySha256": "fbb6d05319ac93edc85ce7b4e18248a62b41a23e706b19dbd60739b0406391a6",
-  "protectedFieldInventorySha256": "75fce14316169163f7081fdfbb9dd6f52ed543b2d20cbd3f551090fc1fca835a",
-  "productionAuthorizationSha256": "192f4aa496e28ffbfb00b6bc63d3336f9af90233082c2c67aa9ac0d84f385421",
+  "openApiFieldInventorySha256": "d2ba07e465cb51f22e17ff42d7081d349c78cbb52a21428247c10941d11f7b26",
+  "protectedFieldInventorySha256": "df963788c76c5d8d2687a2127a69d2961341cfa78d7c298b65bc1a37bdc24cb8",
+  "productionAuthorizationSha256": "5f3be751d2c212c10e66d9eb0c1358f9101700c0c8c4fa27468c4b14380471dd",
   "ordinaryFields": [
     "Problem.detail",
     "Problem.fieldErrors",
@@ -2931,6 +2931,24 @@
     "requestDependantCredentials:response:Violation.code",
     "requestDependantCredentials:response:Violation.params",
     "requestDependantCredentials:response:Violation.params.*",
+    "requestEmergencyCode:parameter:$parameter.path.bookingId",
+    "requestEmergencyCode:response:$response.header.Retry-After",
+    "requestEmergencyCode:response:FieldError.code",
+    "requestEmergencyCode:response:FieldError.field",
+    "requestEmergencyCode:response:FieldError.params",
+    "requestEmergencyCode:response:FieldError.params.*",
+    "requestEmergencyCode:response:Violation.code",
+    "requestEmergencyCode:response:Violation.params",
+    "requestEmergencyCode:response:Violation.params.*",
+    "requestParticipationEmergencyCode:parameter:$parameter.path.bookingId",
+    "requestParticipationEmergencyCode:response:$response.header.Retry-After",
+    "requestParticipationEmergencyCode:response:FieldError.code",
+    "requestParticipationEmergencyCode:response:FieldError.field",
+    "requestParticipationEmergencyCode:response:FieldError.params",
+    "requestParticipationEmergencyCode:response:FieldError.params.*",
+    "requestParticipationEmergencyCode:response:Violation.code",
+    "requestParticipationEmergencyCode:response:Violation.params",
+    "requestParticipationEmergencyCode:response:Violation.params.*",
     "requestPasswordReset:response:$response.header.Accept",
     "requestPasswordReset:response:$response.header.Retry-After",
     "requestPasswordReset:response:FieldError.code",
@@ -4457,6 +4475,27 @@
         "credential-write-only",
         "mfa-controlled-rescue"
       ]
+    },
+    {
+      "id": "booking-emergency-code",
+      "description": "A permanent account asks for the emergency code of a booking it holds or plays in, during the booking's window.",
+      "operationIds": [
+        "requestEmergencyCode",
+        "requestParticipationEmergencyCode"
+      ],
+      "actors": [
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN"
+      ],
+      "decisions": [
+        "permanent-account-gate",
+        "emergency-code-participation"
+      ]
     }
   ],
   "decisions": [
@@ -5275,6 +5314,28 @@
         "src/test/java/org/courtside/identity/internal/ControlledAccountRecoveryTest.java#givenAnOutboxCredentialBeingSent_whenRecoveryCompletes_thenTheJobFailsPermanentlyWithoutOverwritingThePassword",
         "src/test/java/org/courtside/identity/internal/ControlledAccountRecoveryTest.java#givenTwoOldCredentialJobs_whenTheSecondWaitsDuringRecovery_thenNeitherCanReplaceTheRecoveryPassword",
         "src/test/java/org/courtside/identity/internal/ControlledAccountRecoveryTest.java#givenAnOldResetCodeJobWaitingForTheAccount_whenRecoveryCommits_thenItsIssuedTokenRollsBack"
+      ]
+    },
+    {
+      "id": "emergency-code-participation",
+      "title": "Emergency code for a booking's participants",
+      "rule": "The emergency code derives identity from the current account and is answered only to the booking's owner or a person it names as a player, from the start of its access window to its end and only for its active access points without a static code that keep one; anybody else is refused with a violation code and nothing is recorded.",
+      "attributes": [
+        "current-account",
+        "booking-owner",
+        "participant-person"
+      ],
+      "productionPaths": [
+        "src/main/java/org/courtside/booking/web/EmergencyCodeController.java#answer",
+        "src/main/java/org/courtside/booking/internal/EmergencyCodes.java#request",
+        "src/main/java/org/courtside/booking/internal/EmergencyCodes.java#takesPart"
+      ],
+      "positiveTests": [
+        "src/test/java/org/courtside/booking/web/DynamicAccessCodeTest.java#givenTheBookerAndThePlayerInsideTheWindow_whenTheyAskForTheEmergencyCode_thenItIsAnsweredAndAudited"
+      ],
+      "negativeTests": [
+        "src/test/java/org/courtside/booking/web/DynamicAccessCodeTest.java#givenAnotherMembersBooking_whenAMemberOutsideItAsksForTheEmergencyCode_thenItIsRefusedWithoutTheCode",
+        "src/test/java/org/courtside/booking/web/DynamicAccessCodeTest.java#givenABookingWhoseWindowHasNotOpened_whenTheBookerAsksForTheEmergencyCode_thenItIsRefusedByReason"
       ]
     }
   ],
@@ -6854,9 +6915,10 @@
     {
       "id": "access-point-code-read",
       "access": "read",
-      "description": "A static access code opens a door on its own, so only the administrative access point projection carries it.",
+      "description": "A static or emergency access code opens a door on its own, so only the administrative access point projection carries it.",
       "fields": [
-        "AccessPoint.staticCode"
+        "AccessPoint.staticCode",
+        "AccessPoint.emergencyCode"
       ],
       "operationIds": [
         "listAccessPoints",
@@ -6879,9 +6941,10 @@
     {
       "id": "access-point-code-write",
       "access": "write",
-      "description": "Only an administrator sets or removes the static access code of an access point.",
+      "description": "Only an administrator sets or removes the static or emergency access code of an access point.",
       "fields": [
-        "AccessPointRequest.staticCode"
+        "AccessPointRequest.staticCode",
+        "AccessPointRequest.emergencyCode"
       ],
       "operationIds": [
         "createAccessPoint",
@@ -6900,7 +6963,7 @@
     {
       "id": "booking-access-code-read",
       "access": "read",
-      "description": "A booking's static access codes travel only in the booker's own and a granted guardian's booking projection, and only until its validity window ends.",
+      "description": "A booking's static access codes travel only in the booker's own and a granted guardian's booking projection, its own code only in the booker's own projection, and only until its validity window ends.",
       "fields": [
         "PersonalBooking.access"
       ],
@@ -6978,6 +7041,35 @@
       ],
       "decisions": [
         "members-door-code-projection"
+      ]
+    },
+    {
+      "id": "emergency-code-read",
+      "access": "read",
+      "description": "An emergency code reaches only a booking's owner or player who asks for it during the booking's window.",
+      "fields": [
+        "EmergencyAccess.codes"
+      ],
+      "operationIds": [
+        "requestEmergencyCode",
+        "requestParticipationEmergencyCode"
+      ],
+      "actors": [
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN"
+      ],
+      "attributes": [
+        "booking-owner",
+        "participant-person",
+        "current-account"
+      ],
+      "decisions": [
+        "emergency-code-participation"
       ]
     }
   ]
