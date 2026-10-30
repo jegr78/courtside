@@ -3104,12 +3104,12 @@ components:
           description: Empty only while the booking's own code is pending.
           items: { $ref: "#/components/schemas/AccessCode" }
         codePending:
-          type: boolean
+          type: [boolean, "null"]
           description: |
             True while the access-control system has not yet accepted the booking's own code.
             Absent otherwise.
         emergencyCodeKept:
-          type: boolean
+          type: [boolean, "null"]
           description: |
             True when an access point of the booking keeps an emergency code its people may ask
             for during the window. Absent otherwise.
@@ -3130,9 +3130,9 @@ components:
       properties:
         configured: { type: boolean }
         createdAt:
-          type: string
+          type: [string, "null"]
           format: date-time
-          description: When the current key was created. Absent without one.
+          description: When the current key was created, or `null` without one.
 
     IssuedOccupancyKey:
       type: object
