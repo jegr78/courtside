@@ -192,6 +192,14 @@ longer a member no longer sees the code but knows it until you change it.
 
 Whether a booking's players receive the code is decided by its booking card.
 
+An access point without a static code, whose codes a connected access-control system issues, may
+keep an **Emergency code**. Set it up permanently on the keypad. It has as many digits as an access
+code and must not equal any static code. Courtside never sends it with a booking. Bookers and
+co-players ask for it in *My bookings* when their own code is missing or does not work, and only
+while their booking's access code is valid. Every request is in the audit log with the account, the
+booking and the access point, never the code. Whoever asked for it once knows it until you change
+it. Change it from time to time, and after any misuse.
+
 ## Facility → Opening hours
 
 1. Enter an opening and closing time for every open weekday.

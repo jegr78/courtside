@@ -12,6 +12,8 @@ import org.courtside.facility.FacilityService;
 import org.courtside.shared.AccessDemand;
 import org.courtside.shared.BookingAnnouncement.AccessCode;
 import org.courtside.shared.BookingAnnouncement.AnnouncedAccess;
+import org.courtside.shared.BookingAnnouncement.DynamicAccess;
+import org.courtside.shared.IssuedAccessCodes;
 import org.springframework.stereotype.Component;
 
 import java.time.Clock;
@@ -28,8 +30,8 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
- * The static codes a booking's players need at the door: those of every active access point serving one
- * of its courts, while its card grants access and until its validity window ends.
+ * The access points a booking's players need at the door, with static codes or the booking's own code, while
+ * its card grants access and until its validity window ends.
  */
 @Component
 @RequiredArgsConstructor
@@ -38,6 +40,7 @@ public class AccessGrants {
     private final FacilityService facility;
     private final CardService cards;
     private final AccessPolicy policy;
+    private final IssuedAccessCodes issuedCodes;
     private final Clock clock;
 
     public Set<UUID> dynamicallyServedCourts() {
@@ -88,26 +91,11 @@ public class AccessGrants {
     }
 
     public Map<UUID, AnnouncedAccess> of(Collection<Booking> bookings) {
-        List<Booking> confirmed = bookings.stream()
-                .filter(booking -> booking.getStatus() == BookingStatus.CONFIRMED).toList();
-        Set<UUID> granting = confirmed.stream().map(Booking::getCardId).distinct()
-                .filter(cardId -> cards.findCard(cardId).filter(BookingCard::isGrantsAccess).isPresent())
-                .collect(Collectors.toSet());
-        if (granting.isEmpty()) {
-            return Map.of();
-        }
-        List<AccessPoint> accessPoints = facility.activeAccessPointsWithCodes();
-        if (accessPoints.isEmpty()) {
-            return Map.of();
-        }
-        Window window = new Window(policy.accessLead().minutes(),
-                policy.accessLag().minutes(), clock.instant());
         Map<UUID, AnnouncedAccess> grants = new HashMap<>();
-        for (Booking booking : confirmed) {
-            if (granting.contains(booking.getCardId())) {
-                window.grantFor(booking, accessPoints).ifPresent(grant -> grants.put(booking.getId(), grant));
-            }
-        }
+        windowsOf(bookings, facility.activeAccessPointsWithCodes()).forEach((bookingId, served) -> grants.put(
+                bookingId, new AnnouncedAccess(served.validFrom(), served.validUntil(), served.accessPoints().stream()
+                        .map(accessPoint -> new AccessCode(accessPoint.getName(), accessPoint.getStaticCode()))
+                        .toList())));
         return grants;
     }
 
@@ -115,9 +103,56 @@ public class AccessGrants {
         return Optional.ofNullable(of(List.of(booking)).get(booking.getId()));
     }
 
+    public Map<UUID, DynamicAccess> dynamicOf(Collection<Booking> bookings) {
+        if (!issuedCodes.issuesCodes()) {
+            return Map.of();
+        }
+        Map<UUID, DynamicAccess> dynamic = new HashMap<>();
+        windowsOf(bookings, facility.activeAccessPointsWithoutCodes()).forEach((bookingId, served) -> dynamic.put(
+                bookingId, new DynamicAccess(served.validFrom(), served.validUntil(),
+                        served.accessPoints().stream().map(AccessPoint::getName).toList(),
+                        served.accessPoints().stream().anyMatch(accessPoint -> accessPoint.getEmergencyCode() != null))));
+        return dynamic;
+    }
+
+    public Optional<DynamicAccess> dynamicOf(Booking booking) {
+        return Optional.ofNullable(dynamicOf(List.of(booking)).get(booking.getId()));
+    }
+
+    public Optional<ServedWindow> dynamicWindowOf(Booking booking) {
+        if (!issuedCodes.issuesCodes()) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(windowsOf(List.of(booking), facility.activeAccessPointsWithoutCodes())
+                .get(booking.getId()));
+    }
+
+    private Map<UUID, ServedWindow> windowsOf(Collection<Booking> bookings, List<AccessPoint> candidates) {
+        List<Booking> confirmed = bookings.stream()
+                .filter(booking -> booking.getStatus() == BookingStatus.CONFIRMED).toList();
+        Set<UUID> granting = confirmed.stream().map(Booking::getCardId).distinct()
+                .filter(cardId -> cards.findCard(cardId).filter(BookingCard::isGrantsAccess).isPresent())
+                .collect(Collectors.toSet());
+        if (granting.isEmpty() || candidates.isEmpty()) {
+            return Map.of();
+        }
+        Window window = new Window(policy.accessLead().minutes(),
+                policy.accessLag().minutes(), clock.instant());
+        Map<UUID, ServedWindow> windows = new HashMap<>();
+        for (Booking booking : confirmed) {
+            if (granting.contains(booking.getCardId())) {
+                window.servedBy(booking, candidates).ifPresent(served -> windows.put(booking.getId(), served));
+            }
+        }
+        return windows;
+    }
+
+    public record ServedWindow(Instant validFrom, Instant validUntil, List<AccessPoint> accessPoints) {
+    }
+
     private record Window(long leadMinutes, long lagMinutes, Instant now) {
 
-        Optional<AnnouncedAccess> grantFor(Booking booking, List<AccessPoint> accessPoints) {
+        Optional<ServedWindow> servedBy(Booking booking, List<AccessPoint> accessPoints) {
             List<CourtAllocation> allocations = booking.getAllocations();
             if (allocations.isEmpty()) {
                 return Optional.empty();
@@ -130,11 +165,10 @@ public class AccessGrants {
                 return Optional.empty();
             }
             Set<UUID> courts = allocations.stream().map(CourtAllocation::getCourtId).collect(Collectors.toSet());
-            List<AccessCode> codes = accessPoints.stream()
+            List<AccessPoint> serving = accessPoints.stream()
                     .filter(accessPoint -> courts.stream().anyMatch(accessPoint::serves))
-                    .map(accessPoint -> new AccessCode(accessPoint.getName(), accessPoint.getStaticCode()))
                     .toList();
-            return codes.isEmpty() ? Optional.empty() : Optional.of(new AnnouncedAccess(validFrom, validUntil, codes));
+            return serving.isEmpty() ? Optional.empty() : Optional.of(new ServedWindow(validFrom, validUntil, serving));
         }
     }
 }

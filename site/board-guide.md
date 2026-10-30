@@ -203,6 +203,14 @@ Code. Wer nicht mehr Mitglied ist, sieht den Code nicht mehr, kennt ihn aber, bi
 
 Ob die Bucher einer Buchung den Code erhalten, legt ihre Buchungskarte fest.
 
+Ein Zugang ohne festen Code, dessen Codes ein angebundenes Zutrittssystem vergibt, kann einen
+**Notfallcode** haben. Richte ihn am Tastenfeld dauerhaft ein. Er hat so viele Stellen wie ein
+Zugangscode und darf keinem festen Code gleichen. Courtside verschickt ihn nie mit einer Buchung.
+Bucher und Mitspieler fragen ihn in *Meine Buchungen* ab, wenn ihr eigener Code fehlt oder nicht
+funktioniert, und nur, solange der Zugangscode ihrer Buchung gilt. Jede Abfrage steht im Protokoll
+mit dem Konto, der Buchung und dem Zugang, nie mit dem Code. Wer ihn einmal abgefragt hat, kennt ihn,
+bis du ihn änderst. Ändere ihn deshalb von Zeit zu Zeit und nach einem Missbrauch.
+
 ## Anlage → Öffnungszeiten
 
 1. Trage für jeden geöffneten Wochentag eine Öffnungs- und eine Schließzeit ein.

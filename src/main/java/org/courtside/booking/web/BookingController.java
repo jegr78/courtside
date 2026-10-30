@@ -163,7 +163,7 @@ class BookingController implements BookingsApi {
         UserAccount account = currentUser.requireAccount();
         PersonalBookingPage page = bookings.personalBookings(
                 account.getId(), PersonalBookingView.valueOf(view.getValue()), cursor, limit);
-        return ResponseEntity.ok(personalBookingPages.render(page, view));
+        return ResponseEntity.ok(personalBookingPages.render(page, view, true));
     }
 
     @Override

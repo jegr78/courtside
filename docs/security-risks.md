@@ -114,6 +114,19 @@ code tells every current member the new one and nobody else. Reconsider if a clu
 stops opening for a departed member on the day the membership ends, which only a per-member dynamic
 code can do.
 
+## An emergency code is a permanent shared code
+
+An access point without a static code may keep an emergency code that the board leaves on its
+keypad for the case that a booking's own code is missing or does not work. It is one code for
+everybody: any booker or player of a booking behind that access point may ask for it in the app while
+the booking's window is open, and whoever asked once keeps knowing it, and can open the door with it,
+until the board changes it at the keypad and in Courtside. Asking needs a signed-in account that takes
+part in such a booking. The audit log records each answer with the account, the booking and the
+access point, never the code, so a board can see who learned it; Courtside does not rotate it, limit
+how often it is asked for or alert anybody. `access_point.emergency_code` is stored in clear, like a
+static code. Reconsider if a club needs the emergency path to stop working for one member, which only
+a per-booking fallback code can do, or if the audit shows the code asked for without a failing grant.
+
 ## A dynamic access code is stored in clear while a door may accept it
 
 With an access-control connector selected, `access_code.code` holds each grant's code as typed,

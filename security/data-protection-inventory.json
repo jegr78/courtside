@@ -595,6 +595,10 @@
         "level": "operational",
         "lifecycle": "club-configuration"
       },
+      "emergency_code": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
       "id": {
         "level": "operational",
         "lifecycle": "club-configuration"
@@ -1585,6 +1589,10 @@
       }
     },
     "message_record": {
+      "access_code_follows": {
+        "level": "pseudonymous",
+        "lifecycle": "account-cascade"
+      },
       "account_id": {
         "level": "pseudonymous",
         "lifecycle": "account-cascade"

@@ -69,6 +69,8 @@ class MessageRecord {
 
     private String previousAddress;
 
+    private UUID accessCodeFollows;
+
     MessageRecord(UUID accountId, MessageKind kind, String messageId, Instant queuedAt,
                   Map<String, String> parameters) {
         this(accountId, kind, messageId, queuedAt, parameters, null);
@@ -76,15 +78,24 @@ class MessageRecord {
 
     MessageRecord(UUID accountId, MessageKind kind, String messageId, Instant queuedAt,
                   Map<String, String> parameters, String previousAddress) {
+        this(accountId, kind, messageId, queuedAt, queuedAt, parameters, previousAddress);
+    }
+
+    MessageRecord(UUID accountId, MessageKind kind, String messageId, Instant queuedAt, Instant dueAt,
+                  Map<String, String> parameters, String previousAddress) {
         this.id = UUID.randomUUID();
         this.accountId = accountId;
         this.kind = kind;
         this.messageId = messageId;
         this.state = MessageState.QUEUED;
         this.queuedAt = queuedAt;
-        this.nextAttemptAt = queuedAt;
+        this.nextAttemptAt = dueAt;
         this.parameters = new HashMap<>(parameters);
         this.previousAddress = previousAddress;
+    }
+
+    void promiseAccessCodeOf(UUID bookingId) {
+        this.accessCodeFollows = bookingId;
     }
 
     void retryAt(Instant at, String reason) {

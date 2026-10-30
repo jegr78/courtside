@@ -34,7 +34,7 @@ const stored: AdminClubConfig = {
   logoUploaded: false
 };
 
-const northGate: AccessPoint = { id: "gate-1", name: "North gate", courtIds: ["court-1"], staticCode: "123456", openToMembers: false, active: true };
+const northGate: AccessPoint = { id: "gate-1", name: "North gate", courtIds: ["court-1"], staticCode: "123456", emergencyCode: null, openToMembers: false, active: true };
 
 function show(configurationChanged = () => undefined) {
   render(<MemoryRouter><UnsavedChangesProvider>
@@ -65,7 +65,7 @@ describe("AdminAccessPointsView", () => {
 
   it("given the create form, when the board names a gate with two courts and a code, then the request carries all of it", async () => {
     // given
-    const created = { id: "gate-2", name: "South gate", courtIds: ["court-1", "court-2"], staticCode: "654321", openToMembers: false, active: true };
+    const created = { id: "gate-2", name: "South gate", courtIds: ["court-1", "court-2"], staticCode: "654321", emergencyCode: null, openToMembers: false, active: true };
     const create = vi.spyOn(api, "createAdminAccessPoint").mockResolvedValue(created);
     show();
     await screen.findByTestId("new-access-point-form");
@@ -79,14 +79,33 @@ describe("AdminAccessPointsView", () => {
 
     // then
     await waitFor(() => expect(create).toHaveBeenCalledWith(
-      { name: "South gate", courtIds: ["court-1", "court-2"], staticCode: "654321", openToMembers: false }));
+      { name: "South gate", courtIds: ["court-1", "court-2"], staticCode: "654321", emergencyCode: null, openToMembers: false }));
     expect(await screen.findByTestId("access-point-gate-2")).toBeInTheDocument();
     expect(screen.getByTestId("new-access-point-name")).toHaveValue("");
   });
 
+  it("given the create form, when the board keeps an emergency code for a gate without a code, then the request and the summary carry it", async () => {
+    // given
+    const created = { id: "gate-3", name: "West gate", courtIds: ["court-1"], staticCode: null, emergencyCode: "975310", openToMembers: false, active: true };
+    const create = vi.spyOn(api, "createAdminAccessPoint").mockResolvedValue(created);
+    show();
+    await screen.findByTestId("new-access-point-form");
+
+    // when
+    await userEvent.type(screen.getByTestId("new-access-point-name"), "West gate");
+    await userEvent.click(screen.getByTestId("new-access-point-court-court-1"));
+    await userEvent.type(screen.getByTestId("new-access-point-emergency-code"), "975310");
+    await userEvent.click(screen.getByTestId("create-access-point"));
+
+    // then
+    await waitFor(() => expect(create).toHaveBeenCalledWith(
+      { name: "West gate", courtIds: ["court-1"], staticCode: null, emergencyCode: "975310", openToMembers: false }));
+    expect(await screen.findByTestId("access-point-emergency-code-gate-3")).toHaveTextContent("975310");
+  });
+
   it("given the create form, when the board opens a door with a code to every member, then the request and the summary carry the mark", async () => {
     // given
-    const created = { id: "door-1", name: "Clubhouse door", courtIds: [], staticCode: "135790", openToMembers: true, active: true };
+    const created = { id: "door-1", name: "Clubhouse door", courtIds: [], staticCode: "135790", emergencyCode: null, openToMembers: true, active: true };
     const create = vi.spyOn(api, "createAdminAccessPoint").mockResolvedValue(created);
     show();
     await screen.findByTestId("new-access-point-form");
@@ -99,7 +118,7 @@ describe("AdminAccessPointsView", () => {
 
     // then
     await waitFor(() => expect(create).toHaveBeenCalledWith(
-      { name: "Clubhouse door", courtIds: [], staticCode: "135790", openToMembers: true }));
+      { name: "Clubhouse door", courtIds: [], staticCode: "135790", emergencyCode: null, openToMembers: true }));
     expect(await screen.findByTestId("access-point-open-to-members-door-1")).toHaveTextContent("every member");
     expect(screen.queryByTestId("access-point-open-to-members-gate-1"), "a gate kept to bookings says nothing").not.toBeInTheDocument();
   });
@@ -138,7 +157,7 @@ describe("AdminAccessPointsView", () => {
 
     // then
     await waitFor(() => expect(change).toHaveBeenCalledWith("gate-1",
-      { name: "Main gate", courtIds: ["court-2"], staticCode: null, openToMembers: false }));
+      { name: "Main gate", courtIds: ["court-2"], staticCode: null, emergencyCode: null, openToMembers: false }));
     expect(await screen.findByTestId("access-point-code-gate-1")).toHaveTextContent("No code");
   });
 
@@ -266,7 +285,7 @@ describe("AdminAccessPointsView access settings", () => {
     // given
     vi.spyOn(api, "changeAdminConfig").mockResolvedValue({ ...stored, accessCodeLength: 4 });
     const create = vi.spyOn(api, "createAdminAccessPoint")
-      .mockResolvedValue({ id: "gate-2", name: "South gate", courtIds: [], staticCode: "2468", openToMembers: false, active: true });
+      .mockResolvedValue({ id: "gate-2", name: "South gate", courtIds: [], staticCode: "2468", emergencyCode: null, openToMembers: false, active: true });
     show();
     const length = await screen.findByTestId("access-code-length");
     await userEvent.clear(length);
@@ -282,7 +301,7 @@ describe("AdminAccessPointsView access settings", () => {
 
     // then
     expect(screen.getByTestId("new-access-point-code-hint")).toHaveTextContent("exactly 4 of them");
-    await waitFor(() => expect(create).toHaveBeenCalledWith({ name: "South gate", courtIds: [], staticCode: "2468", openToMembers: false }));
+    await waitFor(() => expect(create).toHaveBeenCalledWith({ name: "South gate", courtIds: [], staticCode: "2468", emergencyCode: null, openToMembers: false }));
   });
 
   it("given the API rejects a code length, when saving, then its validation code is reported and the change stays unsaved", async () => {

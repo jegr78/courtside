@@ -115,6 +115,22 @@ class AccessCodesTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenAnAccessPointsEmergencyCode_whenADrawHitsIt_thenAnotherCodeIsDrawn() {
+        // given
+        jdbc.sql("INSERT INTO access_point (id, name, emergency_code) VALUES (?, 'North gate', '1234')")
+                .params(UUID.randomUUID()).update();
+        UUID grant = insertGrant();
+
+        // when
+        String code = new AccessCodes(jdbc, digits("1234", "5678")).draw(grant, FOUR_DIGITS);
+
+        // then
+        assertThat(code).as("an emergency code stays on the keypad for everybody who asked, so no booking draws it")
+                .isEqualTo("5678");
+        assertThat(codesByGrant()).containsExactlyEntriesOf(Map.of(grant, "5678"));
+    }
+
+    @Test
     void givenEveryCandidateIsTaken_whenDrawing_thenTheDrawGivesUpAfterItsBound() {
         // given
         jdbc.sql("INSERT INTO access_code (code) VALUES ('1234')").update();

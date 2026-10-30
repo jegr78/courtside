@@ -76,7 +76,7 @@ class WaitlistAnnouncements implements WaitlistAnnouncer {
         Instant now = clock.instant();
         BookingAnnouncement slot = new BookingAnnouncement(entry.accountId(), List.of(), entry.slot().start(),
                 entry.slot().end(), List.of(new BookingAnnouncement.AnnouncedCourt(court.getNumber(), court.getName())),
-                labels.getOrDefault(entry.cardId(), ""), false, null);
+                labels.getOrDefault(entry.cardId(), ""), false, null, null);
         boolean open = entry.state() == WaitlistState.OFFERED && entry.offerExpiresAt().isAfter(now);
         return Optional.of(new Offer(entry.accountId(), slot, entry.offerExpiresAt(), open));
     }

@@ -106,6 +106,8 @@ tags:
     description: Offering the open place of a booking to other members and taking one.
   - name: attendance
     description: Checking in for one's own booking where the club records attendance.
+  - name: emergency-codes
+    description: Asking for the emergency code of a booking's door when its own code is missing.
   - name: admin-courts
     description: Administering courts.
   - name: door-codes
@@ -968,8 +970,9 @@ components:
       type: object
       description: |
         A door or gate on the way to the courts. The board names the courts it serves and may keep
-        a static access code for its keypad.
-      required: [id, name, courtIds, staticCode, openToMembers, active]
+        a static access code for its keypad, or an emergency code when the access-control system
+        issues the codes.
+      required: [id, name, courtIds, staticCode, emergencyCode, openToMembers, active]
       properties:
         id: { type: string, format: uuid }
         name: { type: string }
@@ -980,6 +983,11 @@ components:
         staticCode:
           type: [string, "null"]
           description: The code the keypad accepts, or `null` when the board keeps none.
+        emergencyCode:
+          type: [string, "null"]
+          description: |
+            The code the board keeps on the keypad of an access point without a static code, or
+            `null`. It is never sent with a booking; a participant asks for it during the booking.
         openToMembers:
           type: boolean
           description: Every current member sees the static code, with or without a booking.
@@ -1008,6 +1016,12 @@ components:
           description: |
             Shows the static code to every current member. Requires a static code; absent means
             `false`.
+        emergencyCode:
+          type: [string, "null"]
+          pattern: "^[0-9]{4,8}$"
+          description: |
+            Only without a static code. A new or changed code follows the static code's length rule
+            and differs from every static code. Absent or `null` removes it.
 
     AdminAccessGrantStatus:
       type: string
@@ -3065,13 +3079,34 @@ components:
     AccessGrant:
       type: object
       description: |
-        The static codes that open the access points of a confirmed booking whose card grants
-        access, from the booking's start less the club's lead until its end plus the club's lag.
+        The codes that open the access points of a confirmed booking whose card grants access,
+        from the booking's start less the club's lead until its end plus the club's lag: static
+        codes, and the booking's own code once the access-control system has accepted it.
         Present only while that window has not ended, and only to the booking's own people.
       required: [validFrom, validUntil, codes]
       properties:
         validFrom: { type: string, format: date-time }
         validUntil: { type: string, format: date-time }
+        codes:
+          type: array
+          description: Empty only while the booking's own code is pending.
+          items: { $ref: "#/components/schemas/AccessCode" }
+        codePending:
+          type: boolean
+          description: |
+            True while the access-control system has not yet accepted the booking's own code.
+            Absent otherwise.
+        emergencyCodeKept:
+          type: boolean
+          description: |
+            True when an access point of the booking keeps an emergency code its people may ask
+            for during the window. Absent otherwise.
+
+    EmergencyAccess:
+      type: object
+      description: The emergency codes of a booking's access points, never sent by mail.
+      required: [codes]
+      properties:
         codes:
           type: array
           minItems: 1
@@ -4189,7 +4224,7 @@ components:
              BOOKING_REMINDER, BOOKING_CANCELLED, BOOKING_CANCELLED_BY_CLUB, BOOKING_RELEASED,
              BOOKING_SERIES_CREATED, BOOKING_SERIES_CANCELLED_BY_CLUB, BOOKING_SERIES_MOVED_BY_CLUB,
              WAITLIST_OFFER, BOOKING_PARTNER_FOUND, BOOKING_PLACE_TAKEN, ACCESS_CODE_CHANGED,
-             MEMBERS_DOOR_CODE_CHANGED]
+             ACCESS_CODE_READY, MEMBERS_DOOR_CODE_CHANGED]
 
     MessageTemplateLanguage:
       type: string
@@ -7239,6 +7274,86 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/my/bookings/{bookingId}/emergency-code:
+    post:
+      tags: [emergency-codes]
+      operationId: requestEmergencyCode
+      summary: Ask for the emergency code of one's own booking.
+      description: |
+        Answers the emergency codes of the booking's access points whose codes the access-control
+        system issues. Only the booker and the booking's players may ask, only from the booking's
+        start less the club's lead until its end plus the club's lag, and every answer is recorded
+        in the audit log without the code. Anybody else, a request outside that window and a
+        booking whose access points keep no emergency code answer `409` with
+        `urn:courtside:error:emergency-code-refused` and a violation naming the reason. An unknown
+        booking answers `404`.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: bookingId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: The emergency codes.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EmergencyAccess" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/my/participations/{bookingId}/emergency-code:
+    post:
+      tags: [emergency-codes]
+      operationId: requestParticipationEmergencyCode
+      summary: Ask for the emergency code of a booking one plays in.
+      description: |
+        Answers the emergency codes of the booking's access points whose codes the access-control
+        system issues. Only the booker and the booking's players may ask, only from the booking's
+        start less the club's lead until its end plus the club's lag, and every answer is recorded
+        in the audit log without the code. Anybody else, a request outside that window and a
+        booking whose access points keep no emergency code answer `409` with
+        `urn:courtside:error:emergency-code-refused` and a violation naming the reason. An unknown
+        booking answers `404`.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: bookingId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: The emergency codes.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EmergencyAccess" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
         "429":
           $ref: "#/components/responses/RateLimited"
 

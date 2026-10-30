@@ -1192,6 +1192,51 @@ it("given a booking whose card grants access, when the member reads it, then the
   expect(within(codes).getByTestId("access-code")).toHaveTextContent("North gate: 135790");
 });
 
+it("given a pending own code inside the window, when the member asks for the emergency code, then the gate's emergency code is shown", async () => {
+  // given
+  vi.spyOn(api, "personalBookings").mockImplementation((options) => Promise.resolve(options?.view
+    ? { items: [] }
+    : { items: [{
+      id: upcomingId, courtIds: ["33333333-3333-3333-3333-333333333333"],
+      startsAt: "2026-08-12T16:00:00Z", endsAt: "2026-08-12T17:00:00Z",
+      cardLabel: "Member booking", cardColor: "#176b55", status: "CONFIRMED",
+      access: { validFrom: "2026-08-12T15:45:00Z", validUntil: "2026-08-12T17:15:00Z", codes: [],
+        codePending: true, emergencyCodeKept: true }
+    }] }));
+  const ask = vi.spyOn(api, "emergencyCode").mockResolvedValue({ codes: [{ accessPointName: "North gate", code: "975310" }] });
+  render(<MyBookingsView now={new Date("2026-08-12T15:50:00Z")} />);
+  const codes = await screen.findByTestId("access-codes");
+  expect(within(codes).getByTestId("access-code-pending"), "the member is told the own code is not there yet").toBeInTheDocument();
+
+  // when
+  await userEvent.click(within(codes).getByTestId("request-emergency-code"));
+
+  // then
+  expect(ask).toHaveBeenCalledWith(upcomingId);
+  expect(await within(codes).findByTestId("emergency-code")).toHaveTextContent("North gate: 975310");
+  expect(within(codes).queryByTestId("request-emergency-code"), "once shown, it is not asked again").not.toBeInTheDocument();
+});
+
+it("given an emergency code the club keeps, when the window has not opened yet, then it cannot be asked for", async () => {
+  // given
+  vi.spyOn(api, "personalBookings").mockImplementation((options) => Promise.resolve(options?.view
+    ? { items: [] }
+    : { items: [{
+      id: upcomingId, courtIds: ["33333333-3333-3333-3333-333333333333"],
+      startsAt: "2026-08-12T16:00:00Z", endsAt: "2026-08-12T17:00:00Z",
+      cardLabel: "Member booking", cardColor: "#176b55", status: "CONFIRMED",
+      access: { validFrom: "2026-08-12T15:45:00Z", validUntil: "2026-08-12T17:15:00Z", codes: [],
+        codePending: true, emergencyCodeKept: true }
+    }] }));
+
+  // when
+  render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} />);
+
+  // then
+  const codes = await screen.findByTestId("access-codes");
+  expect(within(codes).queryByTestId("request-emergency-code")).not.toBeInTheDocument();
+});
+
 it("given a page opened before a window ended, when the screen's clock has passed it, then the code is no longer shown", async () => {
   // given
   vi.spyOn(api, "personalBookings").mockImplementation((options) => Promise.resolve(options?.view

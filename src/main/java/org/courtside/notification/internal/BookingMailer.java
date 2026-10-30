@@ -13,6 +13,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -24,6 +25,9 @@ import java.util.function.Consumer;
 @Component
 @RequiredArgsConstructor
 class BookingMailer implements MessageComposer {
+
+    // Long enough for the access worker to install a booking's own code, so the confirmation can carry it.
+    static final Duration ACCESS_CODE_WAIT = Duration.ofSeconds(10);
 
     private final BookingAnnouncer bookings;
     private final UserAccountRepository accounts;
@@ -48,8 +52,9 @@ class BookingMailer implements MessageComposer {
                     announced.get().bookedByAccountId());
             return;
         }
-        outbox.queue(recipient.get().getId(), MessageKind.BOOKING_CONFIRMED,
-                Map.of(QueuedMessage.BOOKING, confirmed.bookingId().toString()));
+        outbox.queueAfter(recipient.get().getId(), MessageKind.BOOKING_CONFIRMED,
+                Map.of(QueuedMessage.BOOKING, confirmed.bookingId().toString()),
+                announced.get().dynamicAccess() == null ? Duration.ZERO : ACCESS_CODE_WAIT);
     }
 
     @Override
@@ -63,13 +68,17 @@ class BookingMailer implements MessageComposer {
         UserAccount account = MessageRecipient.required(accounts, message.accountId());
         Locale locale = MessageLanguage.of(account.getLocale(), club.defaultLocale());
         String key = MessageKind.BOOKING_CONFIRMED.templateKey();
-        Map<String, String> values = new HashMap<>(wording.of(booking, account, locale));
+        Map<String, String> values = new HashMap<>(wording.of(booking, locale));
+        BookingWording.AccessLines access = wording.access(message.booking(), booking, account, locale,
+                BookingWording.CODE_FOLLOWS, true);
+        values.put(BookingWording.ACCESS_CODES, access.text());
         values.put("firstName", account.getPerson().getFirstName());
         values.put(InstanceLinks.PLACEHOLDER, links.of(message));
-        handOver.accept(new OutgoingMail(account.getPerson().getEmail(),
+        OutgoingMail mail = new OutgoingMail(account.getPerson().getEmail(),
                 templates.render(key + ".subject", locale, values),
                 templates.render(key + ".body", locale, values),
                 calendar.create(message.booking(), booking, values.get("courts"),
-                        values.get(InstanceLinks.PLACEHOLDER))));
+                        values.get(InstanceLinks.PLACEHOLDER)));
+        handOver.accept(access.codeFollows() ? mail.promisingAccessCodeOf(message.booking()) : mail);
     }
 }

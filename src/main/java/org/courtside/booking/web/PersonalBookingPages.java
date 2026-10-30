@@ -27,10 +27,13 @@ import org.courtside.config.ClubIdentity;
 import org.courtside.config.ClubTimeZone;
 import org.courtside.facility.FacilityService;
 import org.courtside.shared.BookingAnnouncement.AnnouncedAccess;
+import org.courtside.shared.BookingAnnouncement.DynamicAccess;
+import org.courtside.shared.IssuedAccessCodes;
 import org.courtside.shared.WireTypes;
 import org.springframework.stereotype.Component;
 
 import java.time.Clock;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -49,8 +52,10 @@ class PersonalBookingPages {
     private final ClubIdentity club;
     private final Clock clock;
     private final AccessGrants accessGrants;
+    private final IssuedAccessCodes issuedCodes;
 
-    ApiPersonalBookingPage render(PersonalBookingPage page, ApiPersonalBookingView view) {
+    // A booking's own code goes only to its participants, so a page of somebody else's bookings carries none.
+    ApiPersonalBookingPage render(PersonalBookingPage page, ApiPersonalBookingView view, boolean ownBookings) {
         Map<UUID, BookingCard> cardsById = cards.allCards().stream()
                 .collect(Collectors.toMap(BookingCard::getId, card -> card));
         Map<UUID, PartnerSearchState> searches = partnerSearch.searchStatesOf(
@@ -64,6 +69,7 @@ class PersonalBookingPages {
                         .toList())
                 : Map.of();
         Map<UUID, AnnouncedAccess> access = accessGrants.of(page.bookings());
+        Map<UUID, DynamicAccess> dynamic = ownBookings ? accessGrants.dynamicOf(page.bookings()) : Map.of();
         Set<UUID> released = attendance.releasedAmong(page.bookings().stream()
                 .filter(booking -> booking.getStatus() == BookingStatus.CANCELLED)
                 .map(Booking::getId)
@@ -87,7 +93,8 @@ class PersonalBookingPages {
                                     ? ApiPartnerSearchState.fromValue(searches.get(booking.getId()).name()) : null)
                             .checkIn(toCheckIn(checkIns.get(booking.getId())))
                             .released(released.contains(booking.getId()) ? Boolean.TRUE : null)
-                            .access(toAccess(access.get(booking.getId())));
+                            .access(toAccess(booking.getId(), access.get(booking.getId()),
+                                    dynamic.get(booking.getId())));
                 })
                 .toList();
         List<ApiPublicCourt> courtLabels = facility.allCourts().stream()
@@ -105,6 +112,7 @@ class PersonalBookingPages {
         Map<UUID, BookingCard> cardsById = cards.allCards().stream()
                 .collect(Collectors.toMap(BookingCard::getId, card -> card));
         Map<UUID, AnnouncedAccess> access = accessGrants.of(page.bookings());
+        Map<UUID, DynamicAccess> dynamic = accessGrants.dynamicOf(page.bookings());
         List<ApiParticipation> items = page.bookings().stream()
                 .map(booking -> {
                     List<CourtAllocation> allocations = booking.getAllocations();
@@ -118,17 +126,29 @@ class PersonalBookingPages {
                             card == null ? "?" : card.getLabel(),
                             card == null ? "#999999" : card.getColor(),
                             ApiBookingStatus.fromValue(booking.getStatus().name()))
-                            .access(toAccess(access.get(booking.getId())));
+                            .access(toAccess(booking.getId(), access.get(booking.getId()),
+                                    dynamic.get(booking.getId())));
                 })
                 .toList();
         return new ApiParticipationPage(items).nextCursor(page.nextCursor());
     }
 
-    private static ApiAccessGrant toAccess(AnnouncedAccess access) {
-        return access == null ? null : new ApiAccessGrant(WireTypes.toOffsetDateTime(access.validFrom()),
-                WireTypes.toOffsetDateTime(access.validUntil()), access.codes().stream()
-                .map(code -> new ApiAccessCode(code.accessPointName(), code.code()))
-                .toList());
+    private ApiAccessGrant toAccess(UUID bookingId, AnnouncedAccess fixed, DynamicAccess dynamic) {
+        if (fixed == null && dynamic == null) {
+            return null;
+        }
+        List<ApiAccessCode> codes = new ArrayList<>(fixed == null ? List.of() : fixed.codes().stream()
+                .map(code -> new ApiAccessCode(code.accessPointName(), code.code())).toList());
+        String issued = dynamic == null ? null
+                : issuedCodes.codeOf(bookingId).orElse(null);
+        if (issued != null) {
+            dynamic.accessPointNames().forEach(name -> codes.add(new ApiAccessCode(name, issued)));
+        }
+        return new ApiAccessGrant(
+                WireTypes.toOffsetDateTime(fixed == null ? dynamic.validFrom() : fixed.validFrom()),
+                WireTypes.toOffsetDateTime(fixed == null ? dynamic.validUntil() : fixed.validUntil()), codes)
+                .codePending(dynamic != null && issued == null ? Boolean.TRUE : null)
+                .emergencyCodeKept(dynamic != null && dynamic.emergencyCodeKept() ? Boolean.TRUE : null);
     }
 
     private static ApiCheckIn toCheckIn(AttendanceService.CheckIn checkIn) {

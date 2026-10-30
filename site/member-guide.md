@@ -341,6 +341,20 @@ so wie beim letzten Öffnen mit Verbindung. Ist die Zeit vorbei, verschwindet de
 Ändert der Verein einen Code oder gilt für deine Buchung ein neuer, schickt Courtside dem Bucher und
 jedem Mitspieler mit eigenem Konto eine Nachricht mit den Codes, die jetzt gelten.
 
+### Eigener Code einer Buchung
+
+Hat der Verein ein Zutrittssystem angebunden, bekommt jede Buchung für Türen ohne festen Code einen
+eigenen Code. Die Bestätigung kommt dann einige Sekunden nach der Buchung und enthält ihn meist schon.
+Hat die Tür ihn noch nicht angenommen, steht in der Bestätigung, dass er folgt, und Courtside schickt
+ihn dir in einer eigenen Mail, sobald er da ist. Mitspieler finden ihn in *Als Mitspieler
+eingetragen* und in der Erinnerung. Bis die Tür ihn angenommen hat, steht bei der Buchung, dass er
+noch nicht da ist.
+
+Fehlt der Code an der Tür oder funktioniert er nicht, wähle in *Meine Buchungen* bei der Buchung
+*Code fehlt oder funktioniert nicht? Notfallcode anzeigen*. Das geht nur, solange der Zugangscode der
+Buchung gilt, und nur, wenn der Verein für diese Tür einen Notfallcode bereithält. Der Verein sieht,
+wer ihn abgefragt hat.
+
 ![Der Zugangscode einer Buchung mit dem Namen des Zugangs und der Zeit, in der er gilt.](screenshots/de/access-codes.png)
 
 ### Türcodes für alle Mitglieder

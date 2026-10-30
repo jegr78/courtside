@@ -166,8 +166,9 @@ domain events instead of reverse dependencies into the booking core. `reporting`
 membership, account and message figures through interfaces those modules publish in their base
 packages; none of them depends on it. `access` depends on `card`, `config`, `facility` and `rules`,
 reads bookings only through `shared.BookingAnnouncer` and reacts to their events after commit;
-`booking` does not depend on it. `notification` depends on `facility` and `member` only to tell
-current members a door code, which no booking event carries.
+`booking` does not depend on it and reads a booking's own code through `shared.IssuedAccessCodes`,
+which `access` implements. `notification` depends on `facility` and `member` only to tell current
+members a door code, which no booking event carries, and on `access` only for `access.grant.installed`.
 
 Controllers implement generated interfaces and translate HTTP. Services own business operations.
 Repositories persist state and do not decide policy.
@@ -418,7 +419,12 @@ that serves one of its courts, with a validity window from its start less the cl
 its end plus the access lag. The booker's own bookings, a granted guardian's view of a dependant's
 bookings and a player's own participations carry them; the managed-booking view, the public plan,
 admin views and anybody outside the booking never do. A response carries a code only while the
-window has not ended. The installed app keeps the first page of the member's upcoming bookings and of
+window has not ended. With an access-control system the booker's own bookings and a player's own
+participations also carry the booking's own code under each active access point without a static
+code that serves it, read from `IssuedAccessCodes` only after the page has established that the
+reader takes part; a guardian's view carries static codes only. Until a door accepted the code the
+grant says `codePending`, and `emergencyCodeKept` says that one of those access points keeps an
+emergency code. The installed app keeps the first page of the member's upcoming bookings and of
 their participations offline, codes included, and drops a code from a cached page once its window
 has ended.
 
@@ -584,6 +590,21 @@ or clearing the code of a marked access point, with `facility.accessPoint.openTo
 before `access_point_open_to_members_has_code` would. Such an access point may still serve courts and
 then hands its code to their bookings as any other one does.
 
+An access point without a static code may keep an emergency code, which the board leaves on the
+keypad for the case that a booking's own code is missing or does not work. It follows the static
+code's length rule, differs from every static code and is refused beside a static code with
+`facility.accessPoint.emergencyCodeNeedsDynamicCodes` before
+`access_point_emergency_code_without_static_code` would; a static code that equals another point's
+emergency code, or the reverse, is refused with `facility.accessPoint.emergencyCodeCollides`. No
+message carries it. `POST /api/my/bookings/{id}/emergency-code` and
+`POST /api/my/participations/{id}/emergency-code` answer the emergency codes of the booking's dynamic
+access points to its booker and players from the start of its window to its end; anybody else, a
+request outside the window and a booking without such a code answer `409
+urn:courtside:error:emergency-code-refused` with `booking.emergencyCode.notParticipant`,
+`booking.emergencyCode.outsideWindow` or `booking.emergencyCode.noneKept`. Each answer is audited as
+`booking.emergencyCode.requested` with the booking and the access points, never the code. The code
+stays valid until the board changes it.
+
 The configuration holds three access settings beside the deadlines: how many minutes before a
 booking starts and after it ends its access code works, 0 to 240 and 15 by default each, and the
 length of a static access code, 4 to 8 digits and 6 by default. A request that leaves one out keeps
@@ -645,7 +666,8 @@ disposable run governs the pass too. A pass has three steps:
    has ended, and deletes released codes whose exposure has ended.
 
 Every code in use is a primary key in `access_code`, so a code is never drawn for another booking while
-a door may still accept it, and a draw never takes the static code of any access point, active or not. A
+a door may still accept it, and a draw never takes the static or emergency code of any access point,
+active or not. A
 code is drawn with the club's access code length from a `SecureRandom`. `CodeRejected` before the first
 acceptance holds the old code until its exposure ends and sends a new one in the next pass; the third
 rejection in a row refuses the grant. After the first acceptance the delivered code must stay, so a
@@ -988,7 +1010,17 @@ out instead, so no message, a security message least of all, is lost to a club's
 The confirmation and the reminder carry `{accessCodes}`: the window and the code of each access point
 the booking needs, read when the message is written and filled only for a recipient who is still the
 booker or a player at that moment; an `ACCESS_CODE_CHANGED` notice for anybody else fails as
-`NotInBooking`. Without a code the placeholder's line disappears,
+`NotInBooking`. A booking's own code is looked up only for such a recipient.
+
+With an access-control system, a booking behind an access point without a static code queues its
+confirmation ten seconds ahead, so the worker usually installs the code first and the confirmation
+carries it. A confirmation written before a door accepted the code says that it follows instead,
+and its message record keeps the booking id after settling. When the grant is installed for the
+first time, every such handed-over record of the booking is cleared and its account receives one
+`ACCESS_CODE_READY` with the current code; one written after the grant stopped being wanted fails as
+`AccessWithdrawn`. A reminder written before the code exists says that it is missing and points to
+My bookings. The mail of a series move carries the booking's own code only when the move covers one
+date, because each date has its own code. Without a code the placeholder's line disappears,
 so such a mail reads exactly as it did before access points existed. A club's own wording that lacks
 the placeholder gets the block when there is one: above the link when the wording ends with a line
 holding only `{instanceLink}`, at its end otherwise. Like a credential, the codes may not
@@ -1021,7 +1053,7 @@ may receive the booking notice as well.
 Current messages cover the welcome for a new account, generated credentials, password-reset codes, username reminders, booking
 confirmations, participant additions and withdrawals, displaced bookings, upcoming reminders,
 booking cancellations, bookings freed without a check-in, new series, waitlist offers, a taken open place,
-a changed access code and a members' door code. A series sends no confirmation per occurrence. Its holder
+a changed access code, a booking's own access code that followed its confirmation and a members' door code. A series sends no confirmation per occurrence. Its holder
 receives one summary naming the card, weekdays, time, courts, first and last date and the number of
 occurrences, and its centre entry leads to the first occurrence. Displacement informs people but
 does not cancel the booking.
@@ -1039,7 +1071,7 @@ reminder has no request to derive it from. Only an absolute `https://` address w
 or credentials is accepted, and anything else refuses startup. Without the setting, every message
 goes out without a link. A template line holding nothing but an empty link is dropped, and inside a
 sentence the link renders empty. Confirmation, participant addition and withdrawal, displacement,
-reminder, both messages about a taken open place and a changed access code lead to the booking on
+reminder, both messages about a taken open place, a changed and a followed access code lead to the booking on
 `/my-bookings#booking-<id>`. Cancellations, cancellations by the
 club, series messages and a members' door code lead to `/my-bookings`. A waitlist offer leads to its entry on
 `/my-bookings#waitlist-<id>`, where the member takes it. The welcome leads to the start page `/`. The confirmation's calendar entry carries
