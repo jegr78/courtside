@@ -235,6 +235,23 @@ class AccessGrantAdminApiTest extends AccessPassTestSupport {
     }
 
     @Test
+    void givenACallThreadStillOccupied_whenTheBoardReadsTheOverview_thenTheProbeSaysItWasNotSent() throws Exception {
+        // given
+        book(courts.get(0));
+        connector.everyInstall(new Step.Stubborn());
+        pass.runPassNow();
+
+        // when
+        passAt(START.plus(Duration.ofMinutes(5)));
+
+        // then
+        mockMvc.perform(get("/api/admin/access-grants"))
+                .andExpect(jsonPath("$.probe.reachable").value(false))
+                .andExpect(jsonPath("$.probe.outcome").value("CALL_THREAD_OCCUPIED"))
+                .andExpect(jsonPath("$.probe.detail").isEmpty());
+    }
+
+    @Test
     void givenNothingToSend_whenTheBoardAsksForAProbe_thenTheNextPassProbesAndTheOverviewShowsTheAnswer()
             throws Exception {
         // given
