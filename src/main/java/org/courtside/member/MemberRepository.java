@@ -32,6 +32,24 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
             """)
     List<UUID> findHolderIdsOn(@Param("membershipTypeId") UUID membershipTypeId, @Param("day") LocalDate day);
 
+    @Query(nativeQuery = true, value = """
+            SELECT EXISTS (SELECT 1 FROM user_account a JOIN member m ON m.person_id = a.person_id
+                           WHERE a.id = :accountId AND a.enabled
+                             AND m.started_on <= :day AND (m.ended_on IS NULL OR m.ended_on > :day))
+            """)
+    boolean isCurrentMemberAccount(@Param("accountId") UUID accountId, @Param("day") LocalDate day);
+
+    @Query(nativeQuery = true, value = """
+            SELECT a.id FROM user_account a
+            WHERE a.enabled AND a.id > :after
+              AND EXISTS (SELECT 1 FROM member m WHERE m.person_id = a.person_id
+                          AND m.started_on <= :day AND (m.ended_on IS NULL OR m.ended_on > :day))
+            ORDER BY a.id
+            LIMIT :limit
+            """)
+    List<UUID> findCurrentMemberAccountIdsAfter(@Param("after") UUID after, @Param("day") LocalDate day,
+                                                @Param("limit") int limit);
+
     @Query("""
             SELECT new org.courtside.member.MemberParticipant(p.id, concat(p.firstName, ' ', p.lastName))
             FROM Member m, org.courtside.identity.Person p

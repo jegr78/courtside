@@ -69,7 +69,7 @@ for (const locale of ["de", "en"] as const) {
     await page.getByTestId("my-bookings-link").click();
     await expect(page.getByTestId("my-bookings-page")).toBeVisible();
     await expect(page.locator('[data-testid^="booking-"]').first()).toBeVisible();
-    await expect.poll(() => cachedApiPaths(page)).toEqual(["/api/my/bookings", "/api/my/participations"]);
+    await expect.poll(() => cachedApiPaths(page)).toEqual(["/api/my/bookings", "/api/my/door-codes", "/api/my/participations"]);
     await expect(page.getByTestId("club-brand-name")).toHaveText("Example Tennis Club");
     const cachedContract = await cachedPersonalBookingContract(page);
     expect(cachedContract?.requestPath).toBe("/api/my/bookings?limit=50");
@@ -96,7 +96,7 @@ for (const locale of ["de", "en"] as const) {
     await expect(page.locator('[data-testid^="booking-"]').first()).toBeVisible();
     await expect(page.getByTestId("bookings-offline-as-of")).toBeVisible();
     await expect(page.locator("html")).toHaveAttribute("lang", locale);
-    expect(await cachedApiPaths(page)).toEqual(["/api/my/bookings", "/api/my/participations"]);
+    expect(await cachedApiPaths(page)).toEqual(["/api/my/bookings", "/api/my/door-codes", "/api/my/participations"]);
 
     // when
     await page.getByTestId("court-plan-link").click();
@@ -183,7 +183,7 @@ test("logout outranks a delayed personal-booking revalidation and the cache cont
   await page.getByTestId("login-submit").click();
   await page.getByTestId("my-bookings-link").click();
   await expect(page.getByTestId("my-bookings-page")).toBeVisible();
-  await expect.poll(() => cachedApiPaths(page)).toEqual(["/api/my/bookings", "/api/my/participations"]);
+  await expect.poll(() => cachedApiPaths(page)).toEqual(["/api/my/bookings", "/api/my/door-codes", "/api/my/participations"]);
   const cachedContract = await cachedPersonalBookingContract(page);
   expect(cachedContract?.pageKeys).toEqual(["clubName", "courts", "items", "refreshedAt", "timeZone"]);
   const allowedItemKeys = new Set([

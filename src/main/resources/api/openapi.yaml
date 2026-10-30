@@ -108,6 +108,8 @@ tags:
     description: Checking in for one's own booking where the club records attendance.
   - name: admin-courts
     description: Administering courts.
+  - name: door-codes
+    description: The codes of the doors open to every member.
   - name: admin-access-points
     description: Administering the doors and gates that lead to the courts.
   - name: admin-access-grants
@@ -967,7 +969,7 @@ components:
       description: |
         A door or gate on the way to the courts. The board names the courts it serves and may keep
         a static access code for its keypad.
-      required: [id, name, courtIds, staticCode, active]
+      required: [id, name, courtIds, staticCode, openToMembers, active]
       properties:
         id: { type: string, format: uuid }
         name: { type: string }
@@ -978,6 +980,9 @@ components:
         staticCode:
           type: [string, "null"]
           description: The code the keypad accepts, or `null` when the board keeps none.
+        openToMembers:
+          type: boolean
+          description: Every current member sees the static code, with or without a booking.
         active: { type: boolean }
 
     AccessPointRequest:
@@ -997,6 +1002,12 @@ components:
           description: |
             Digits only. A new or changed code has exactly as many digits as the club's access code
             length; a stored code keeps working after that length changes. Absent or `null` removes it.
+        openToMembers:
+          type: boolean
+          default: false
+          description: |
+            Shows the static code to every current member. Requires a static code; absent means
+            `false`.
 
     AdminAccessGrantStatus:
       type: string
@@ -4177,7 +4188,8 @@ components:
              BOOKING_PLAYER_RECORDED, BOOKING_PLAYER_WITHDREW, BOOKING_DISPLACED,
              BOOKING_REMINDER, BOOKING_CANCELLED, BOOKING_CANCELLED_BY_CLUB, BOOKING_RELEASED,
              BOOKING_SERIES_CREATED, BOOKING_SERIES_CANCELLED_BY_CLUB, BOOKING_SERIES_MOVED_BY_CLUB,
-             WAITLIST_OFFER, BOOKING_PARTNER_FOUND, BOOKING_PLACE_TAKEN, ACCESS_CODE_CHANGED]
+             WAITLIST_OFFER, BOOKING_PARTNER_FOUND, BOOKING_PLACE_TAKEN, ACCESS_CODE_CHANGED,
+             MEMBERS_DOOR_CODE_CHANGED]
 
     MessageTemplateLanguage:
       type: string
@@ -6652,6 +6664,27 @@ paths:
                 $ref: "#/components/schemas/PersonalBookingPage"
         "400":
           $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/my/door-codes:
+    get:
+      tags: [door-codes]
+      operationId: listMembersDoorCodes
+      summary: The codes of the doors open to every member.
+      description: |
+        The static codes of the active access points open to members, by name. Empty for an account
+        whose person holds no membership period covering today.
+      responses:
+        "200":
+          description: The codes, possibly none.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/AccessCode" }
         "401":
           $ref: "#/components/responses/Unauthenticated"
         "429":

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { api, type AccessGrant, type BookingGrid, type Participation, type PersonalBooking, type PublicCourt } from "../api/client";
+import { api, type AccessCode, type AccessGrant, type BookingGrid, type Participation, type PersonalBooking, type PublicCourt } from "../api/client";
 import { useReportedFailure } from "../failures/useReportedFailure";
 import { Alert } from "../components/Alert";
 import { LoadFailure } from "../components/LoadFailure";
@@ -29,6 +29,7 @@ export function MyBookingsView({ now, offline = false }: {
   const [history, setHistory] = useState<PersonalBooking[]>([]);
   const [historyNextCursor, setHistoryNextCursor] = useState<string>();
   const [participations, setParticipations] = useState<Participation[]>([]);
+  const [doorCodes, setDoorCodes] = useState<AccessCode[]>([]);
   const [courts, setCourts] = useState<PublicCourt[]>([]);
   const [grid, setGrid] = useState<BookingGrid | undefined>(() => offline ? offlineBookingGrid() : undefined);
   const [refreshedAt, setRefreshedAt] = useState<string>();
@@ -99,6 +100,13 @@ export function MyBookingsView({ now, offline = false }: {
     target.scrollIntoView({ block: "center" });
     target.focus({ preventScroll: true });
   }, [loading]);
+
+  useEffect(() => {
+    void api.doorCodes().then(setDoorCodes).catch((failure: unknown) => {
+      warnAbout("Door codes unavailable", failure);
+      setDoorCodes([]);
+    });
+  }, []);
 
   // The bound only fills in a field's maximum, and the server holds the rule either way, so a
   // reading that fails leaves the maximum unset rather than taking the bookings down with it.
@@ -196,6 +204,14 @@ export function MyBookingsView({ now, offline = false }: {
       className="surface-raised border-structural mt-4 rounded-xl border px-4 py-3">
       {t("myBookings.offlineAsOf", { time: formatDateTime(refreshedAt, i18n.language, grid.timeZone) })}
     </p>}
+    {doorCodes.length > 0 && <section data-testid="members-door-codes" aria-labelledby="members-door-codes-title"
+      className="surface-raised border-structural mt-4 rounded-xl border px-4 py-3">
+      <h2 id="members-door-codes-title" className="text-lg font-semibold">{t("myBookings.doorCodes")}</h2>
+      <p className="text-muted text-sm">{t("myBookings.doorCodesHint")}</p>
+      <ul className="mt-2 grid gap-1">{doorCodes.map((door) => <li key={door.accessPointName} data-testid="members-door-code">
+        {door.accessPointName}: <span className="font-mono text-base font-semibold">{door.code}</span>
+      </li>)}</ul>
+    </section>}
     {loadError && <LoadFailure message={loadError} retry={() => { clearLoad(); void load(); }} />}
     {error && <Alert>{error}</Alert>}
     {success && <SuccessFeedback>{success}</SuccessFeedback>}

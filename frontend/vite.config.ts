@@ -25,7 +25,7 @@ export default defineConfig({
           {
             urlPattern: ({ request, url }) => request.method === "GET" && !url.searchParams.has("cursor")
               && ((url.pathname === "/api/my/bookings" && (url.searchParams.get("view") ?? "UPCOMING") === "UPCOMING")
-                || url.pathname === "/api/my/participations"),
+                || url.pathname === "/api/my/participations" || url.pathname === "/api/my/door-codes"),
             handler: "StaleWhileRevalidate",
             options: {
               cacheName: "courtside-personal-bookings",
@@ -63,7 +63,8 @@ export default defineConfig({
                 },
                 cacheWillUpdate: async ({ response, state }) => {
                   if (response.status !== 200) return null;
-                  const page = await response.clone().json() as {
+                  const body: unknown = await response.clone().json();
+                  const page = body as {
                     items: Array<Record<string, unknown>>;
                     refreshedAt?: string;
                     timeZone?: string;
@@ -74,7 +75,10 @@ export default defineConfig({
                   const marker = await control.match(new URL("/.courtside/personal-bookings-generation", self.location.origin).href);
                   const generation = marker ? await marker.text() : "initial";
                   if (state.generation !== generation) return null;
-                  const offlinePage = {
+                  const offlinePage = Array.isArray(body) ? body.map((door: Record<string, unknown>) => ({
+                    accessPointName: door.accessPointName,
+                    code: door.code
+                  })) : {
                     items: page.items.map((booking) => ({
                       id: booking.id,
                       seriesId: booking.seriesId,

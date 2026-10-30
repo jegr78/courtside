@@ -328,6 +328,15 @@ and every co-player with an account a message with the codes that apply now.
 
 ![A booking's access code with the name of its access point and the time it works.](../screenshots/en/access-codes.png)
 
+### Door codes for every member
+
+When the club opens a door to every member, such as the clubhouse door, its code sits at the top of
+*My bookings* under *Door codes*, with or without a booking. You see it as long as you are a member.
+In the installed app it stays there without a connection until you open the page online again or
+sign out. When the club changes the code, you receive a message with the new one.
+
+![The door codes at the top of My bookings with the name of the door and its code.](../screenshots/en/members-door-codes.png)
+
 ## When something under your booking changes
 
 A later configuration change may affect your booking. Examples include a deactivated court, a

@@ -603,6 +603,10 @@
         "level": "operational",
         "lifecycle": "club-configuration"
       },
+      "open_to_members": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
       "static_code": {
         "level": "operational",
         "lifecycle": "club-configuration"

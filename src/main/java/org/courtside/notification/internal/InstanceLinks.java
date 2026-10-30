@@ -38,7 +38,7 @@ class InstanceLinks implements InstanceOrigin {
                  BOOKING_REMINDER, BOOKING_PARTNER_FOUND, BOOKING_PLACE_TAKEN, ACCESS_CODE_CHANGED ->
                     "/my-bookings#booking-" + message.booking();
             case BOOKING_CANCELLED, BOOKING_CANCELLED_BY_CLUB, BOOKING_RELEASED, BOOKING_SERIES_CREATED,
-                 BOOKING_SERIES_CANCELLED_BY_CLUB, BOOKING_SERIES_MOVED_BY_CLUB -> "/my-bookings";
+                 BOOKING_SERIES_CANCELLED_BY_CLUB, BOOKING_SERIES_MOVED_BY_CLUB, MEMBERS_DOOR_CODE_CHANGED -> "/my-bookings";
             case WAITLIST_OFFER -> "/my-bookings#waitlist-" + message.waitlistEntry();
             case CREDENTIALS_NEW_ACCOUNT, CREDENTIALS_PASSWORD_RESET, ACCOUNT_USERNAME_REMINDER,
                  ACCOUNT_PASSWORD_RESET_CODE, ACCOUNT_MFA_RECOVERY_CODE ->

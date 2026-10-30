@@ -23,7 +23,8 @@ function requested(form: FormData): AccessPointRequest {
   return {
     name: formString(form, "name").trim(),
     courtIds: form.getAll("courtIds").map(String),
-    staticCode: code === "" ? null : code
+    staticCode: code === "" ? null : code,
+    openToMembers: form.get("openToMembers") === "on"
   };
 }
 
@@ -165,6 +166,7 @@ function AccessPointSummary({ accessPoint, courts, edit }: { accessPoint: Access
     <h3 className="font-bold" data-testid={`access-point-name-${accessPoint.id}`}>{accessPoint.name}</h3>
     <p data-testid={`access-point-courts-${accessPoint.id}`}>{served.map((court) => courtLabel(court, t)).join(", ")}</p>
     <p data-testid={`access-point-code-${accessPoint.id}`} className="font-mono">{accessPoint.staticCode ?? t("admin.facility.noCode")}</p>
+    {accessPoint.openToMembers && <p data-testid={`access-point-open-to-members-${accessPoint.id}`}>{t("admin.facility.accessPointOpenToMembers")}</p>}
     <Button variant="secondary" type="button" className="justify-self-start" data-testid={`edit-access-point-${accessPoint.id}`} onClick={edit}>
       {t("admin.facility.editAccessPoint")}
     </Button>
@@ -205,6 +207,14 @@ function AccessPointForm({ id, heading, courts, digits, stored, disabled, submit
       <TextField data-testid={`${prefix}-code`} name="staticCode" inputMode="numeric" autoComplete="off" disabled={disabled}
                  defaultValue={stored?.staticCode ?? ""} className="max-w-48 font-mono" label={t("admin.facility.staticCode")} />
       <p data-testid={`${prefix}-code-hint`} className="text-muted text-sm">{t("admin.facility.staticCodeHint", { digits })}</p>
+    </div>
+    <div className="grid gap-1">
+      <label className="flex items-center gap-2">
+        <input type="checkbox" name="openToMembers" disabled={disabled} data-testid={`${prefix}-open-to-members`}
+               defaultChecked={stored?.openToMembers} />
+        {t("admin.facility.accessPointOpenToMembers")}
+      </label>
+      <p className="text-muted text-sm">{t("admin.facility.accessPointOpenToMembersHint")}</p>
     </div>
     <span className="flex flex-wrap gap-3">
       <Button variant="primary" type="submit" data-testid={submitTestId} disabled={disabled}>{submitLabel}</Button>

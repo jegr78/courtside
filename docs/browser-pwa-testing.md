@@ -19,10 +19,10 @@ The application shell is available offline after installation. Booking, account 
 operations require the network. The precache holds the member surface and every language bundle,
 but not the administration surface: its chunk loads when an administrator opens it, and the build
 policy refuses a build whose entry or precache says otherwise. Workbox uses `NetworkOnly` for every API request except the
-member-owned `GET /api/my/bookings` and `GET /api/my/participations`, which use a seven-day
+member-owned `GET /api/my/bookings`, `GET /api/my/participations` and `GET /api/my/door-codes`, which use a seven-day
 `StaleWhileRevalidate` cache for the first page only, of the bookings' `UPCOMING` view; the history
-and every later page stay `NetworkOnly`. Both keep the bookings' access codes, so a player can read
-the code at the door. The bookings page also carries the club time zone, the court labels and the
+and every later page stay `NetworkOnly`. The booking pages keep their access codes and the door codes
+keep each door's name and code, so a player can read the code at the door. The bookings page also carries the club time zone, the court labels and the
 club's name, so the cached response is self-contained and the header can still name the club. The PWA journey inspects Cache Storage after
 authenticated activity and offline reloads. A German and an English offline launch must keep that
 member's bookings readable with the response's `refreshedAt` instant as the visible refresh time, keep

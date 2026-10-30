@@ -133,28 +133,36 @@ public class FacilityService {
         return accessPoints.findByActiveTrueAndStaticCodeIsNullOrderByNameAsc();
     }
 
+    public List<AccessPoint> membersDoorCodes() {
+        return accessPoints.findByActiveTrueAndOpenToMembersTrueAndStaticCodeIsNotNullOrderByNameAsc();
+    }
+
     public AccessPoint requireAccessPoint(UUID accessPointId) {
         return accessPoints.findById(accessPointId)
                 .orElseThrow(() -> new AccessPointNotFoundException("No access point with id " + accessPointId));
     }
 
     @Transactional
-    public AccessPoint createAccessPoint(String name, Collection<UUID> courtIds, String staticCode) {
+    public AccessPoint createAccessPoint(String name, Collection<UUID> courtIds, String staticCode,
+                                         boolean openToMembers) {
         String stored = requireAccessPointName(name);
         Set<UUID> courtsServed = requireCourts(courtIds);
         if (staticCode != null) {
             requireFittingCode(staticCode);
         }
-        AccessPoint accessPoint = saveOrRejectTakenName(new AccessPoint(stored, courtsServed, staticCode));
+        requireCodeWhenOpenToMembers(staticCode, openToMembers);
+        AccessPoint accessPoint = saveOrRejectTakenName(
+                new AccessPoint(stored, courtsServed, staticCode, openToMembers));
         events.publishEvent(new FacilityEvent.AccessPointAdded(accessPoint.getId(), sorted(courtsServed)));
         announceCode(accessPoint, courtsServed);
+        announceToMembers(accessPoint);
         return accessPoint;
     }
 
     /** Replaces every field. Only a new or changed code has to fit today's code length. */
     @Transactional
     public AccessPoint changeAccessPoint(UUID accessPointId, String name, Collection<UUID> courtIds,
-                                         String staticCode) {
+                                         String staticCode, boolean openToMembers) {
         AccessPoint accessPoint = requireAccessPoint(accessPointId);
         String stored = requireAccessPointName(name);
         Set<UUID> courtsServed = requireCourts(courtIds);
@@ -162,19 +170,25 @@ public class FacilityService {
         if (codeChanged && staticCode != null) {
             requireFittingCode(staticCode);
         }
+        requireCodeWhenOpenToMembers(staticCode, openToMembers);
+        boolean openedToMembers = openToMembers && !accessPoint.isOpenToMembers();
         List<String> changedFields = new ArrayList<>();
         if (!accessPoint.getName().equals(stored)) changedFields.add("name");
         if (!accessPoint.getCourtIds().equals(courtsServed)) changedFields.add("courtIds");
         if (codeChanged) changedFields.add("staticCode");
+        if (accessPoint.isOpenToMembers() != openToMembers) changedFields.add("openToMembers");
         Set<UUID> added = new TreeSet<>(courtsServed);
         added.removeAll(accessPoint.getCourtIds());
-        accessPoint.changeTo(stored, courtsServed, staticCode);
+        accessPoint.changeTo(stored, courtsServed, staticCode, openToMembers);
         AccessPoint saved = saveOrRejectTakenName(accessPoint);
         if (!changedFields.isEmpty()) {
             events.publishEvent(new FacilityEvent.AccessPointChanged(
                     saved.getId(), sorted(courtsServed), changedFields));
         }
         announceCode(saved, codeChanged ? courtsServed : added);
+        if (codeChanged || openedToMembers) {
+            announceToMembers(saved);
+        }
         return saved;
     }
 
@@ -191,12 +205,25 @@ public class FacilityService {
         }
         events.publishEvent(new FacilityEvent.AccessPointAvailabilityChanged(accessPoint.getId(), active));
         announceCode(accessPoint, accessPoint.getCourtIds());
+        announceToMembers(accessPoint);
         return accessPoint;
     }
 
     private void announceCode(AccessPoint accessPoint, Set<UUID> courtsReached) {
         if (accessPoint.isActive() && accessPoint.getStaticCode() != null && !courtsReached.isEmpty()) {
             events.publishEvent(new AccessCodeChanged(accessPoint.getId(), sorted(courtsReached)));
+        }
+    }
+
+    private void announceToMembers(AccessPoint accessPoint) {
+        if (accessPoint.isActive() && accessPoint.isOpenToMembers() && accessPoint.getStaticCode() != null) {
+            events.publishEvent(new FacilityEvent.MembersDoorCodeChanged(accessPoint.getId()));
+        }
+    }
+
+    private static void requireCodeWhenOpenToMembers(String staticCode, boolean openToMembers) {
+        if (openToMembers && staticCode == null) {
+            throw AccessPointRejectedException.openToMembersNeedsCode();
         }
     }
 

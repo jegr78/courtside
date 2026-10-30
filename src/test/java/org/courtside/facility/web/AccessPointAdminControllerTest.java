@@ -224,6 +224,51 @@ class AccessPointAdminControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void whenCreatingAnAccessPointWithACodeOpenToMembers_thenTheMarkIsStored() throws Exception {
+        // when
+        MvcResult created = create("""
+                {"name": "Clubhouse door", "courtIds": [], "staticCode": "123456", "openToMembers": true}
+                """)
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.openToMembers").value(true))
+                .andReturn();
+
+        // then
+        mockMvc.perform(get(created.getResponse().getHeader("Location")))
+                .andExpect(jsonPath("$.openToMembers").value(true));
+    }
+
+    @Test
+    void whenCreatingAnAccessPointOpenToMembersWithoutACode_thenItIsRefusedByName() throws Exception {
+        // when / then
+        create("""
+                {"name": "Clubhouse door", "courtIds": [], "openToMembers": true}
+                """)
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:access-point-rejected"))
+                .andExpect(jsonPath("$.violations[0].code").value("facility.accessPoint.openToMembersNeedsCode"))
+                .andExpect(jsonPath("$.violations[0].params.field").value("openToMembers"));
+    }
+
+    @Test
+    void givenAnAccessPointOpenToMembers_whenItsCodeIsCleared_thenItIsRefusedAndTheCodeStays() throws Exception {
+        // given
+        String id = JsonPath.read(create("""
+                {"name": "Clubhouse door", "courtIds": [], "staticCode": "123456", "openToMembers": true}
+                """).andReturn().getResponse().getContentAsString(), "$.id");
+
+        // when / then
+        change(id, """
+                {"name": "Clubhouse door", "courtIds": [], "openToMembers": true}
+                """)
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.violations[0].code").value("facility.accessPoint.openToMembersNeedsCode"));
+        mockMvc.perform(get("/api/admin/access-points/" + id))
+                .andExpect(jsonPath("$.staticCode").value("123456"))
+                .andExpect(jsonPath("$.openToMembers").value(true));
+    }
+
+    @Test
     void givenAnAccessPoint_whenCreatingAnotherWithTheSameName_thenItIsAConflict() throws Exception {
         // given
         createdId("North gate", courtOne, null);
