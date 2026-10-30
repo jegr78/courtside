@@ -341,6 +341,8 @@ class FacilityAuditTest extends AbstractIntegrationTest {
         facility.changeAccessPoint(door.getId(), "Clubhouse door", List.of(), "135790", true);
 
         // then
+        audit.assertEventCounts(door.getId(), FacilityEvent.class, Map.of(FacilityEvent.AccessPointAdded.TYPE, 1L,
+                FacilityEvent.AccessPointChanged.TYPE, 1L, FacilityEvent.MembersDoorCodeChanged.TYPE, 1L));
         assertThat(audit.latestPayload(door.getId(), FacilityEvent.AccessPointChanged.TYPE))
                 .containsEntry("changedFields", List.of("openToMembers"));
         assertThat(audit.latestPayload(door.getId(), FacilityEvent.MembersDoorCodeChanged.TYPE))
