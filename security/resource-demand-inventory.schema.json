@@ -25,7 +25,8 @@
         "scheduledFiles",
         "backgroundFiles",
         "listenerFiles",
-        "startupFiles"
+        "startupFiles",
+        "lifecycleFiles"
       ],
       "properties": {
         "openapi": {
@@ -59,6 +60,15 @@
           }
         },
         "listenerFiles": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^src/main/java/.+\\.java$"
+          }
+        },
+        "lifecycleFiles": {
           "type": "array",
           "minItems": 1,
           "uniqueItems": true,
