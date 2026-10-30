@@ -33,18 +33,26 @@ final class CallRunner implements AutoCloseable {
     private final AtomicBoolean occupied = new AtomicBoolean();
 
     CallRunner(Duration deadline) {
+        this(deadline, Executors.newSingleThreadExecutor(Thread.ofPlatform().name("access-control-call").daemon()
+                .factory()));
+    }
+
+    CallRunner(Duration deadline, ExecutorService thread) {
         this.deadline = deadline;
-        this.thread = Executors.newSingleThreadExecutor(Thread.ofPlatform().name("access-control-call").daemon()
-                .factory());
+        this.thread = thread;
     }
 
     <T> Result<T> run(Callable<T> call) {
         if (!occupied.compareAndSet(false, true)) {
             return new Result.Busy<>();
         }
+        AtomicBoolean started = new AtomicBoolean();
         Future<T> running;
         try {
             running = thread.submit(() -> {
+                if (!started.compareAndSet(false, true)) {
+                    return null;
+                }
                 try {
                     return call.call();
                 } finally {
@@ -58,14 +66,21 @@ final class CallRunner implements AutoCloseable {
         try {
             return new Result.Done<>(running.get(deadline.toNanos(), TimeUnit.NANOSECONDS));
         } catch (TimeoutException late) {
-            running.cancel(true);
+            abandon(running, started);
             return new Result.Unclear<>();
         } catch (ExecutionException failed) {
             return new Result.Unclear<>();
         } catch (InterruptedException interrupted) {
-            running.cancel(true);
+            abandon(running, started);
             Thread.currentThread().interrupt();
             return new Result.Unclear<>();
+        }
+    }
+
+    private void abandon(Future<?> running, AtomicBoolean started) {
+        running.cancel(true);
+        if (started.compareAndSet(false, true)) {
+            occupied.set(false);
         }
     }
 

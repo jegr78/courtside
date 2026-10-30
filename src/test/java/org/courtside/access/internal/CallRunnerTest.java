@@ -7,6 +7,8 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -103,6 +105,32 @@ class CallRunnerTest {
         assertThat(abandoned).isInstanceOf(CallRunner.Result.Unclear.class);
         assertThat(next).isInstanceOf(CallRunner.Result.Busy.class);
         assertThat(started).as("a second call never runs beside the first").hasValue(1);
+    }
+
+    @Test
+    void givenACallStillQueuedBehindASlowTask_whenItsDeadlinePasses_thenItNeverRunsAndTheThreadIsFreeAgain()
+            throws Exception {
+        // given
+        ExecutorService thread = Executors.newSingleThreadExecutor();
+        CallRunner queued = new CallRunner(DEADLINE, thread);
+        CountDownLatch releaseSlowTask = new CountDownLatch(1);
+        thread.submit(() -> releaseSlowTask.await(10, TimeUnit.SECONDS));
+        AtomicBoolean ran = new AtomicBoolean();
+
+        // when
+        CallRunner.Result<String> abandoned = queued.run(() -> {
+            ran.set(true);
+            return "late";
+        });
+        releaseSlowTask.countDown();
+        CallRunner.Result<String> next = queued.run(() -> "answered");
+
+        // then
+        assertThat(abandoned).isInstanceOf(CallRunner.Result.Unclear.class);
+        assertThat(next).as("a call cancelled before it started must not occupy the thread")
+                .isEqualTo(new CallRunner.Result.Done<>("answered"));
+        assertThat(ran).as("a cancelled call never runs late").isFalse();
+        queued.close();
     }
 
     @Test
