@@ -315,10 +315,10 @@ class FacilityAuditTest extends AbstractIntegrationTest {
     void givenAnAccessPoint_whenItsCodeChanges_thenTheEventNamesTheFieldAndNoStoredRowCarriesEitherCode() {
         // given
         Court court = facility.createCourt(7, "Centre Court");
-        AccessPoint gate = facility.createAccessPoint("North gate", List.of(court.getId()), "135790");
+        AccessPoint gate = facility.createAccessPoint("North gate", List.of(court.getId()), "135790", false);
 
         // when
-        facility.changeAccessPoint(gate.getId(), "North gate", List.of(court.getId()), "246802");
+        facility.changeAccessPoint(gate.getId(), "North gate", List.of(court.getId()), "246802", false);
 
         // then
         assertThat(audit.latestPayload(gate.getId(), FacilityEvent.AccessPointChanged.TYPE))
@@ -333,13 +333,33 @@ class FacilityAuditTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenAnAccessPointWithACode_whenItIsOpenedToMembers_thenTheLogNamesTheMarkAndNoStoredRowCarriesTheCode() {
+        // given
+        AccessPoint door = facility.createAccessPoint("Clubhouse door", List.of(), "135790", false);
+
+        // when
+        facility.changeAccessPoint(door.getId(), "Clubhouse door", List.of(), "135790", true);
+
+        // then
+        audit.assertEventCounts(door.getId(), FacilityEvent.class, Map.of(FacilityEvent.AccessPointAdded.TYPE, 1L,
+                FacilityEvent.AccessPointChanged.TYPE, 1L, FacilityEvent.MembersDoorCodeChanged.TYPE, 1L));
+        assertThat(audit.latestPayload(door.getId(), FacilityEvent.AccessPointChanged.TYPE))
+                .containsEntry("changedFields", List.of("openToMembers"));
+        assertThat(audit.latestPayload(door.getId(), FacilityEvent.MembersDoorCodeChanged.TYPE))
+                .as("the members are told which door, never its code").containsOnlyKeys("accessPointId");
+        List<String> stored = jdbc.sql("SELECT payload::text FROM domain_event WHERE subject_id = ?")
+                .param(door.getId()).query(String.class).list();
+        assertThat(String.join("|", stored)).as("a static code never enters the audit log").doesNotContain("135790");
+    }
+
+    @Test
     void givenAnAccessPoint_whenChangedWithEveryStoredValue_thenNothingIsRecorded() {
         // given
         Court court = facility.createCourt(7, "Centre Court");
-        AccessPoint gate = facility.createAccessPoint("North gate", List.of(court.getId()), null);
+        AccessPoint gate = facility.createAccessPoint("North gate", List.of(court.getId()), null, false);
 
         // when
-        facility.changeAccessPoint(gate.getId(), " North gate ", List.of(court.getId()), null);
+        facility.changeAccessPoint(gate.getId(), " North gate ", List.of(court.getId()), null, false);
         facility.setAccessPointActive(gate.getId(), true);
 
         // then
@@ -349,10 +369,10 @@ class FacilityAuditTest extends AbstractIntegrationTest {
     @Test
     void givenAnAccessPoint_whenItIsRenamedAndDeactivated_thenTheLogNamesTheFieldAndCarriesTheFlag() {
         // given
-        AccessPoint gate = facility.createAccessPoint("North gate", List.of(), null);
+        AccessPoint gate = facility.createAccessPoint("North gate", List.of(), null, false);
 
         // when
-        facility.changeAccessPoint(gate.getId(), "South gate", List.of(), null);
+        facility.changeAccessPoint(gate.getId(), "South gate", List.of(), null, false);
         facility.setAccessPointActive(gate.getId(), false);
 
         // then

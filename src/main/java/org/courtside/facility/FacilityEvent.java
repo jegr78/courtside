@@ -122,6 +122,22 @@ public sealed interface FacilityEvent extends DomainEventRecord {
 
     }
 
+    record MembersDoorCodeChanged(UUID accessPointId) implements FacilityEvent {
+
+        static final String TYPE = "facility.accessPoint.membersDoorCodeChanged";
+
+        @Override
+        public String eventType() {
+            return TYPE;
+        }
+
+        @Override
+        public UUID subjectId() {
+            return accessPointId;
+        }
+
+    }
+
     /** From {@code effectiveFrom} until the day before {@code until}; a null bound is open. */
     record OpeningHoursSet(UUID openingHoursId, int dayOfWeek, LocalTime opensAt, LocalTime closesAt,
                            UUID versionId, @Nullable LocalDate effectiveFrom, @Nullable LocalDate until)

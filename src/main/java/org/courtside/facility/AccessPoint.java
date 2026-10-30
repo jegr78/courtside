@@ -34,15 +34,18 @@ public class AccessPoint {
     @Column(nullable = false)
     private boolean active;
 
+    @Column(name = "open_to_members", nullable = false)
+    private boolean openToMembers;
+
     @Getter(AccessLevel.NONE)
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "access_point_court", joinColumns = @JoinColumn(name = "access_point_id"))
     @Column(name = "court_id", nullable = false)
     private Set<UUID> courtIds = new HashSet<>();
 
-    public AccessPoint(String name, Set<UUID> courtIds, String staticCode) {
+    public AccessPoint(String name, Set<UUID> courtIds, String staticCode, boolean openToMembers) {
         this.id = UUID.randomUUID();
-        changeTo(name, courtIds, staticCode);
+        changeTo(name, courtIds, staticCode, openToMembers);
         this.active = true;
     }
 
@@ -54,11 +57,12 @@ public class AccessPoint {
         return courtIds.contains(courtId);
     }
 
-    public void changeTo(String name, Set<UUID> courtIds, String staticCode) {
+    public void changeTo(String name, Set<UUID> courtIds, String staticCode, boolean openToMembers) {
         this.name = name;
         this.courtIds.clear();
         this.courtIds.addAll(courtIds);
         this.staticCode = staticCode;
+        this.openToMembers = openToMembers;
     }
 
     public void activate() {

@@ -145,7 +145,7 @@ class DemoDataSeeder implements ApplicationRunner {
     }
 
     private void gateTheCourts(List<Court> courts) {
-        facility.createAccessPoint("Court gate", courts.stream().map(Court::getId).toList(), null);
+        facility.createAccessPoint("Court gate", courts.stream().map(Court::getId).toList(), null, false);
         BookingCard card = cards.requireCard(MEMBER_BOOKING_CARD);
         cards.changeCard(card.getId(), card.getLabel(), card.getColor(), card.getAllowedRoles(),
                 card.getManagingRoles(), card.getAllowedPlayerCounts(), card.isCountsAgainstLimits(),

@@ -305,6 +305,28 @@ test("given the installed PWA, when its lifecycle is qualified, then bounded boo
   assert.match(viteConfiguration, /handler: "NetworkOnly"/);
 });
 
+test("given the door codes request, when the service worker routes it, then the network answers first and the personal bookings cache only offline", () => {
+  const routeWith = (handler) => {
+    const route = new RegExp(`urlPattern: (\\(\\{ request, url \\}\\) => (?:(?!handler:)[\\s\\S])+?),\\n\\s+handler: "${handler}",\\s+options: \\{\\s+cacheName: "([^"]+)",\\s+plugins: (\\w+)`)
+      .exec(viteConfiguration);
+    assert.ok(route, `a ${handler} route keeps personal data`);
+    const routes = new Function(`return ${route[1]}`)();
+    return {
+      cache: route[2], plugins: route[3],
+      routes: (path) => routes({ request: new Request(`http://localhost${path}`), url: new URL(`http://localhost${path}`) })
+    };
+  };
+  const doorCodes = routeWith("NetworkFirst");
+  const bookings = routeWith("StaleWhileRevalidate");
+  assert.equal(doorCodes.routes("/api/my/door-codes"), true, "a member sees a changed code at once while online");
+  assert.equal(bookings.routes("/api/my/door-codes"), false, "a stale code would outlive the message announcing its successor");
+  assert.equal(doorCodes.routes("/api/admin/access-points"), false, "the board's codes never reach the offline copy");
+  assert.equal(doorCodes.cache, "courtside-personal-bookings", "sign-out deletes this cache");
+  assert.equal(doorCodes.plugins, bookings.plugins, "the same generation and seven-day age bound both");
+  assert.match(viteConfiguration, /Array\.isArray\(body\) \? body\.map\(\(door[^)]*\) => \(\{\s+accessPointName: door\.accessPointName,\s+code: door\.code\s+\}\)\)/,
+    "the offline copy keeps a door's name and code and nothing else");
+});
+
 test("given the installed PWA, when checking supported engines, then Chromium and WebKit run its signed-in journey", () => {
   assert.match(playwright, /name: "webkit-pwa".*pwa-browser-compatibility\\\.spec\\\.ts/);
   assert.match(playwright, /name: "chromium"/);

@@ -323,6 +323,16 @@ class CheckConstraintTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void whenInsertingAnAccessPointOpenToMembersWithoutACode_thenItIsRejected() {
+        // when / then
+        assertThatThrownBy(() -> jdbc.sql("INSERT INTO access_point (id, name, open_to_members) VALUES (?, ?, true)")
+                        .params(UUID.randomUUID(), "Clubhouse door")
+                        .update())
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .hasMessageContaining("access_point_open_to_members_has_code");
+    }
+
+    @Test
     void whenTheAccessSettingsLeaveTheirRanges_thenEachIsRejectedByItsOwnConstraint() {
         // when / then
         assertThatThrownBy(() -> jdbc.sql("UPDATE club_config SET access_lead_minutes = 241").update())

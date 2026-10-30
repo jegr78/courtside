@@ -182,6 +182,12 @@ access point with a code, add a court to an access point with a code, or switch 
 *Bookings receive the access code*. Removing a code or a court and deactivating an access point
 send nothing.
 
+**Open to every member** shows an access point's code to every current member at the top of *My
+bookings*, with or without a booking, for example for the clubhouse door. The mark needs a code, and
+while it is set the code cannot be cleared. When you change the code, set the mark or activate the
+access point again, every current member receives a message with the code. Somebody who is no
+longer a member no longer sees the code but knows it until you change it.
+
 ![The access times and code digits, the form for a new access point and an access point with its courts and code.](../screenshots/en/access-points.png)
 
 Whether a booking's players receive the code is decided by its booking card.

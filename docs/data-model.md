@@ -65,7 +65,7 @@ a check the application ran first.
 | `opening_period` | A season or holiday, its name and its first and last day | None |
 | `opening_period_hours` | When the facility opens and closes on one weekday of a season or holiday | `opening_period` |
 | `court_closure` | Whole days on which one court is closed, with a reason | `court` |
-| `access_point` | A door or gate on the way to the courts: its name, an optional static access code, whether it is active | None |
+| `access_point` | A door or gate on the way to the courts: its name, an optional static access code, whether every member sees that code, whether it is active | None |
 | `access_point_court` | Which courts an access point leads to | `access_point`, `court` |
 
 `court.number` is unique and positive, and `active` is what takes a court out of service without
@@ -87,6 +87,7 @@ court apart.
 and at most 60 characters. `static_code` is null or four to eight digits
 (`access_point_static_code_digits`); the exact length a new code needs comes from `club_config` and
 is checked by the application, so a stored code survives a later change of that length.
+`open_to_members` needs a static code (`access_point_open_to_members_has_code`).
 `access_point_court` has one row per access point and court, and deleting an access point deletes
 its rows. Nothing deletes an access point: `active` retires it.
 
@@ -418,7 +419,8 @@ board configures: `facility.court.added` and `facility.accessPoint.changed`, whi
 fields and never a static code, `card.bookingCard.changed`, `config.club.changed`,
 `rules.ruleSet.changed`, `roster.person.corrected`, `dataexchange.source.described` and
 `notification.template.changed`, each with siblings, among them `facility.accessPoint.codeChanged`,
-which names the access point and the courts its code newly opens, and `card.bookingCard.accessGranted`,
+which names the access point and the courts its code newly opens, `facility.accessPoint.membersDoorCodeChanged`,
+which names an access point whose code every current member is told, and `card.bookingCard.accessGranted`,
 which names a card that starts granting access, and `access.grant.retryRequested`, which names the
 access grant a board sent again and its booking. A message wording has no row id of its own, so
 its entries name a subject derived from the message kind and language. The other two arrive in the course of ordinary use, because the writer records every

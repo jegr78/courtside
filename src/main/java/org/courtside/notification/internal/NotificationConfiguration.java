@@ -36,6 +36,19 @@ class NotificationConfiguration {
     }
 
     @Bean
+    @ConditionalOnMissingBean(name = "membersDoorCodeExecutor")
+    TaskExecutor membersDoorCodeExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(1);
+        executor.setMaxPoolSize(2);
+        executor.setQueueCapacity(100);
+        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
+        executor.setThreadNamePrefix("members-door-code-");
+        executor.initialize();
+        return executor;
+    }
+
+    @Bean
     JavaMailSender courtsideMailSender(MailProperties properties) {
         MailSettings.verify(properties);
         JavaMailSenderImpl sender = new JavaMailSenderImpl();

@@ -71,6 +71,19 @@ public class MemberService {
                 .or(() -> uncovered);
     }
 
+    /** A current member holds a membership period covering today and an enabled account. */
+    public boolean isCurrentMember(UUID accountId) {
+        return accountId != null && members.isCurrentMemberAccount(accountId, today());
+    }
+
+    /** The account ids of current members after {@code after}, in id order. */
+    public List<UUID> currentMemberAccountIdsAfter(UUID after, int limit) {
+        if (after == null) {
+            throw new IllegalStateException("A page of members starts after an account id");
+        }
+        return members.findCurrentMemberAccountIdsAfter(after, today(), limit);
+    }
+
     public Map<UUID, MembershipStanding> standingsOf(List<UUID> personIds) {
         LocalDate today = today();
         return members.findByPersonIdIn(personIds).stream()

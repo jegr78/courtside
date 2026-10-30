@@ -16,4 +16,6 @@ public interface AccessPointRepository extends JpaRepository<AccessPoint, UUID> 
 
     @EntityGraph(attributePaths = "courtIds")
     List<AccessPoint> findByActiveTrueAndStaticCodeIsNullOrderByNameAsc();
+
+    List<AccessPoint> findByActiveTrueAndOpenToMembersTrueAndStaticCodeIsNotNullOrderByNameAsc();
 }

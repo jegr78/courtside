@@ -22,7 +22,9 @@ policy refuses a build whose entry or precache says otherwise. Workbox uses `Net
 member-owned `GET /api/my/bookings` and `GET /api/my/participations`, which use a seven-day
 `StaleWhileRevalidate` cache for the first page only, of the bookings' `UPCOMING` view; the history
 and every later page stay `NetworkOnly`. Both keep the bookings' access codes, so a player can read
-the code at the door. The bookings page also carries the club time zone, the court labels and the
+the code at the door. `GET /api/my/door-codes` uses `NetworkFirst` in the same cache, with the same
+generation and age, so a member online sees a changed code at once and the cached copy, each door's
+name and code, answers only offline. The bookings page also carries the club time zone, the court labels and the
 club's name, so the cached response is self-contained and the header can still name the club. The PWA journey inspects Cache Storage after
 authenticated activity and offline reloads. A German and an English offline launch must keep that
 member's bookings readable with the response's `refreshedAt` instant as the visible refresh time, keep

@@ -2,9 +2,9 @@
   "schemaVersion": 1,
   "reviewedAt": "2026-10-30",
   "purpose": "This is the normative authorization policy for the shipped Courtside API. OpenAPI defines the transport shape; this policy defines who may perform each operation, which resource attributes narrow that permission, and which protected fields each projection may read or write.",
-  "openApiFieldInventorySha256": "8b0e34ab39b3467f350627fd52cde6c0e020028f6918e69ca64e4176a8023347",
-  "protectedFieldInventorySha256": "ab87aebbb3355c9141843c731f3b660598accdc25b8b357438293e44cbf175f8",
-  "productionAuthorizationSha256": "ebe5e1b54d731a4b882b499bcf67f272a4f90f60d6bc63a29896383e03f65fb1",
+  "openApiFieldInventorySha256": "fbb6d05319ac93edc85ce7b4e18248a62b41a23e706b19dbd60739b0406391a6",
+  "protectedFieldInventorySha256": "75fce14316169163f7081fdfbb9dd6f52ed543b2d20cbd3f551090fc1fca835a",
+  "productionAuthorizationSha256": "192f4aa496e28ffbfb00b6bc63d3336f9af90233082c2c67aa9ac0d84f385421",
   "ordinaryFields": [
     "Problem.detail",
     "Problem.fieldErrors",
@@ -169,12 +169,14 @@
     "changeAccessPoint:parameter:$parameter.path.id",
     "changeAccessPoint:request:AccessPointRequest.courtIds",
     "changeAccessPoint:request:AccessPointRequest.name",
+    "changeAccessPoint:request:AccessPointRequest.openToMembers",
     "changeAccessPoint:response:$response.header.Accept",
     "changeAccessPoint:response:$response.header.Retry-After",
     "changeAccessPoint:response:AccessPoint.active",
     "changeAccessPoint:response:AccessPoint.courtIds",
     "changeAccessPoint:response:AccessPoint.id",
     "changeAccessPoint:response:AccessPoint.name",
+    "changeAccessPoint:response:AccessPoint.openToMembers",
     "changeAccessPoint:response:FieldError.code",
     "changeAccessPoint:response:FieldError.field",
     "changeAccessPoint:response:FieldError.params",
@@ -652,6 +654,7 @@
     "courtImpact:response:Violation.params.*",
     "createAccessPoint:request:AccessPointRequest.courtIds",
     "createAccessPoint:request:AccessPointRequest.name",
+    "createAccessPoint:request:AccessPointRequest.openToMembers",
     "createAccessPoint:response:$response.header.Accept",
     "createAccessPoint:response:$response.header.Location",
     "createAccessPoint:response:$response.header.Retry-After",
@@ -659,6 +662,7 @@
     "createAccessPoint:response:AccessPoint.courtIds",
     "createAccessPoint:response:AccessPoint.id",
     "createAccessPoint:response:AccessPoint.name",
+    "createAccessPoint:response:AccessPoint.openToMembers",
     "createAccessPoint:response:FieldError.code",
     "createAccessPoint:response:FieldError.field",
     "createAccessPoint:response:FieldError.params",
@@ -1223,6 +1227,7 @@
     "getAccessPoint:response:AccessPoint.courtIds",
     "getAccessPoint:response:AccessPoint.id",
     "getAccessPoint:response:AccessPoint.name",
+    "getAccessPoint:response:AccessPoint.openToMembers",
     "getAccessPoint:response:FieldError.code",
     "getAccessPoint:response:FieldError.field",
     "getAccessPoint:response:FieldError.params",
@@ -1619,6 +1624,7 @@
     "listAccessPoints:response:AccessPoint.courtIds",
     "listAccessPoints:response:AccessPoint.id",
     "listAccessPoints:response:AccessPoint.name",
+    "listAccessPoints:response:AccessPoint.openToMembers",
     "listAccessPoints:response:FieldError.code",
     "listAccessPoints:response:FieldError.field",
     "listAccessPoints:response:FieldError.params",
@@ -1907,6 +1913,15 @@
     "listManagedAppointments:response:Violation.code",
     "listManagedAppointments:response:Violation.params",
     "listManagedAppointments:response:Violation.params.*",
+    "listMembersDoorCodes:response:$response.header.Retry-After",
+    "listMembersDoorCodes:response:AccessCode.accessPointName",
+    "listMembersDoorCodes:response:FieldError.code",
+    "listMembersDoorCodes:response:FieldError.field",
+    "listMembersDoorCodes:response:FieldError.params",
+    "listMembersDoorCodes:response:FieldError.params.*",
+    "listMembersDoorCodes:response:Violation.code",
+    "listMembersDoorCodes:response:Violation.params",
+    "listMembersDoorCodes:response:Violation.params.*",
     "listMembershipPeriods:parameter:$parameter.path.personId",
     "listMembershipPeriods:response:$response.header.Retry-After",
     "listMembershipPeriods:response:FieldError.code",
@@ -3069,6 +3084,7 @@
     "setAccessPointActive:response:AccessPoint.courtIds",
     "setAccessPointActive:response:AccessPoint.id",
     "setAccessPointActive:response:AccessPoint.name",
+    "setAccessPointActive:response:AccessPoint.openToMembers",
     "setAccessPointActive:response:FieldError.code",
     "setAccessPointActive:response:FieldError.field",
     "setAccessPointActive:response:FieldError.params",
@@ -3897,6 +3913,26 @@
       "decisions": [
         "permanent-account-gate",
         "booking-ownership"
+      ]
+    },
+    {
+      "id": "members-door-codes",
+      "description": "Permanent accounts read the static codes of the doors open to every member, answered only to a current member.",
+      "operationIds": [
+        "listMembersDoorCodes"
+      ],
+      "actors": [
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN"
+      ],
+      "decisions": [
+        "permanent-account-gate",
+        "members-door-code-projection"
       ]
     },
     {
@@ -5032,6 +5068,27 @@
       ],
       "negativeTests": [
         "src/test/java/org/courtside/member/web/ParticipantMemberControllerTest.java#givenNoSession_whenSearchingMembers_thenItIsUnauthenticated"
+      ]
+    },
+    {
+      "id": "members-door-code-projection",
+      "title": "Members' door code projection",
+      "rule": "The door codes derive identity from the current account and list the name and static code of each active access point open to members only when that account is enabled and its person holds a membership period covering today; anybody else receives an empty list rather than a refusal.",
+      "attributes": [
+        "current-account",
+        "current-membership"
+      ],
+      "productionPaths": [
+        "src/main/java/org/courtside/booking/web/DoorCodeController.java#listMembersDoorCodes",
+        "src/main/java/org/courtside/member/MemberService.java#isCurrentMember",
+        "src/main/java/org/courtside/facility/FacilityService.java#membersDoorCodes"
+      ],
+      "positiveTests": [
+        "src/test/java/org/courtside/booking/web/MembersDoorCodeVisibilityTest.java#givenACurrentMemberWithoutAnyBooking_whenReadingTheDoorCodes_thenOnlyTheClubhouseCodeComes"
+      ],
+      "negativeTests": [
+        "src/test/java/org/courtside/booking/web/MembersDoorCodeVisibilityTest.java#givenAFormerMember_whenReadingTheDoorCodes_thenTheListIsEmpty",
+        "src/test/java/org/courtside/booking/web/MembersDoorCodeVisibilityTest.java#givenACurrentMemberWhoseAccountIsDisabled_whenReadingTheDoorCodes_thenTheListIsEmpty"
       ]
     },
     {
@@ -6894,6 +6951,33 @@
       ],
       "decisions": [
         "booking-ownership"
+      ]
+    },
+    {
+      "id": "members-door-code-read",
+      "access": "read",
+      "description": "A door's static code reaches a member outside a booking only in the members' door code projection, and only while that member is current.",
+      "fields": [
+        "AccessCode.code"
+      ],
+      "operationIds": [
+        "listMembersDoorCodes"
+      ],
+      "actors": [
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN"
+      ],
+      "attributes": [
+        "current-account",
+        "current-membership"
+      ],
+      "decisions": [
+        "members-door-code-projection"
       ]
     }
   ]

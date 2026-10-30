@@ -193,6 +193,12 @@ anlegst oder wieder aktivierst, einem Zugang mit Code einen Platz hinzufügst od
 Buchungskarte auf *Buchungen erhalten den Zugangscode* stellst. Einen Code oder Platz entfernen und
 einen Zugang deaktivieren verschickt nichts.
 
+**Für alle Mitglieder offen** zeigt den Code eines Zugangs allen aktuellen Mitgliedern oben in
+*Meine Buchungen*, auch ohne Buchung, etwa für die Tür zum Clubhaus. Das Häkchen braucht einen Code,
+und solange es gesetzt ist, lässt sich der Code nicht leeren. Änderst du den Code, setzt du das
+Häkchen oder aktivierst du den Zugang wieder, bekommt jedes aktuelle Mitglied eine Nachricht mit dem
+Code. Wer nicht mehr Mitglied ist, sieht den Code nicht mehr, kennt ihn aber, bis du ihn änderst.
+
 ![Die Zugangszeiten und die Stellen eines Codes, das Formular für einen neuen Zugang und ein Zugang mit seinen Plätzen und seinem Code.](screenshots/de/access-points.png)
 
 Ob die Bucher einer Buchung den Code erhalten, legt ihre Buchungskarte fest.

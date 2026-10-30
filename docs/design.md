@@ -166,7 +166,8 @@ domain events instead of reverse dependencies into the booking core. `reporting`
 membership, account and message figures through interfaces those modules publish in their base
 packages; none of them depends on it. `access` depends on `card`, `config`, `facility` and `rules`,
 reads bookings only through `shared.BookingAnnouncer` and reacts to their events after commit;
-`booking` does not depend on it.
+`booking` does not depend on it. `notification` depends on `facility` and `member` only to tell
+current members a door code, which no booking event carries.
 
 Controllers implement generated interfaces and translate HTTP. Services own business operations.
 Repositories persist state and do not decide policy.
@@ -183,6 +184,9 @@ Mail listeners run before commit, like the audit listener, and store the notific
 and the outbox message in the same transaction. A committed change therefore always has its queued message, and a change whose
 message cannot be stored does not commit: the request fails and nothing of it remains. A mail
 listener never talks to the relay, so a failed handover cannot roll back a change that committed.
+The members' door code is the exception: its listener runs after commit through the publication
+registry, off the request thread, and queues one page of current members per transaction. After a
+crash the walk repeats from the start, so earlier pages may be told twice and none is skipped.
 Publishing such an event outside a transaction is refused. Other after-commit listeners run through
 Spring Modulith's event publication registry, whose incomplete publications remain available after
 a restart.
@@ -569,6 +573,16 @@ before the length changed keeps working. The admin projection under `/api/admin/
 the only administrative response that carries a code. The audit entries of an access point name its
 id, its courts and the fields that changed, never a code, and no error message or log line carries
 one either.
+
+A board may open an access point with a static code to every member, for a clubhouse door that is
+not tied to a court. `GET /api/my/door-codes` lists the name and code of every active access point
+open to members, and it is empty for an account that is not a current member: one whose person holds
+a membership period covering today and whose account is enabled. My bookings shows that list at its
+top. The installed app reads it from the network first and keeps the last answer beside the bookings
+for offline use, with no end of validity, until the next refresh or sign-out. The mark needs a static code: `FacilityService` refuses a mark without one,
+or clearing the code of a marked access point, with `facility.accessPoint.openToMembersNeedsCode`
+before `access_point_open_to_members_has_code` would. Such an access point may still serve courts and
+then hands its code to their bookings as any other one does.
 
 The configuration holds three access settings beside the deadlines: how many minutes before a
 booking starts and after it ends its access code works, 0 to 240 and 15 by default each, and the
@@ -993,13 +1007,21 @@ carries the current code. The notice must keep `{accessCodes}` and carries the c
 is sent. Removing a code or a court, deactivating an access point, switching a card's access off and
 any change to an inactive access point or one without a code announce nothing. The chain runs
 through `shared` events, `facility.accessPoint.codeChanged` or `card.bookingCard.accessGranted` and
-then `booking.booking.accessCodeChanged`, so `notification` gains no dependency on `facility` or
-`card`.
+then `booking.booking.accessCodeChanged`, so `notification` gains no dependency on `card`.
+
+An active access point open to members announces `MEMBERS_DOOR_CODE_CHANGED` to every current member
+when its code changes, when it gains the mark or is created with it, and when it is activated again.
+`facility.accessPoint.membersDoorCodeChanged` names the access point only. `notification` pages the
+current members' accounts a hundred at a time, one transaction per page, and the message carries the
+code current when it is written; one written after the access point lost its mark, its code or its
+active flag fails as `AccessWithdrawn`, and one written after the recipient stopped being a current
+member fails as `NoLongerMember`. A member who also holds a booking behind that access point
+may receive the booking notice as well.
 
 Current messages cover the welcome for a new account, generated credentials, password-reset codes, username reminders, booking
 confirmations, participant additions and withdrawals, displaced bookings, upcoming reminders,
-booking cancellations, bookings freed without a check-in, new series, waitlist offers, a taken open place
-and a changed access code. A series sends no confirmation per occurrence. Its holder
+booking cancellations, bookings freed without a check-in, new series, waitlist offers, a taken open place,
+a changed access code and a members' door code. A series sends no confirmation per occurrence. Its holder
 receives one summary naming the card, weekdays, time, courts, first and last date and the number of
 occurrences, and its centre entry leads to the first occurrence. Displacement informs people but
 does not cancel the booking.
@@ -1019,7 +1041,7 @@ goes out without a link. A template line holding nothing but an empty link is dr
 sentence the link renders empty. Confirmation, participant addition and withdrawal, displacement,
 reminder, both messages about a taken open place and a changed access code lead to the booking on
 `/my-bookings#booking-<id>`. Cancellations, cancellations by the
-club and series messages lead to `/my-bookings`. A waitlist offer leads to its entry on
+club, series messages and a members' door code lead to `/my-bookings`. A waitlist offer leads to its entry on
 `/my-bookings#waitlist-<id>`, where the member takes it. The welcome leads to the start page `/`. The confirmation's calendar entry carries
 the same link as its `URL`. The shipped messages with a generated credential, a reset code or a
 username carry neither a link nor the address, so members learn that a genuine one does not ask

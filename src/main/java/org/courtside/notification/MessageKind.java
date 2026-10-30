@@ -25,7 +25,8 @@ public enum MessageKind {
     WAITLIST_OFFER("waitlist.offer", false, false),
     BOOKING_PARTNER_FOUND("booking.partnerFound", true, false),
     BOOKING_PLACE_TAKEN("booking.placeTaken", true, false),
-    ACCESS_CODE_CHANGED("booking.accessCodeChanged", false, false);
+    ACCESS_CODE_CHANGED("booking.accessCodeChanged", false, false),
+    MEMBERS_DOOR_CODE_CHANGED("members.doorCodeChanged", false, false);
 
     private final String templateKey;
     private final boolean declinable;

@@ -41,6 +41,7 @@ beforeEach(async () => {
       status: "CONFIRMED"
     }] }));
   vi.spyOn(api, "participations").mockResolvedValue({ items: [] });
+  vi.spyOn(api, "doorCodes").mockResolvedValue([]);
   vi.spyOn(api, "waitlistEntries").mockResolvedValue([]);
   vi.spyOn(api, "openPlaces").mockResolvedValue([]);
   vi.spyOn(api, "cancelSeries").mockResolvedValue(undefined);
@@ -103,6 +104,35 @@ it("given a cached personal page, when offline, then bookings remain readable wi
   expect(api.courts).not.toHaveBeenCalled();
   expect(api.bookingGrid).not.toHaveBeenCalled();
   expect(screen.queryByTestId("personal-cancel")).not.toBeInTheDocument();
+});
+
+it("given doors open to every member, when My bookings loads, then their codes lead the page above the bookings", async () => {
+  // given
+  vi.mocked(api.doorCodes).mockResolvedValue([
+    { accessPointName: "Clubhouse door", code: "135790" },
+    { accessPointName: "Changing rooms", code: "246802" }
+  ]);
+
+  // when
+  render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} />);
+
+  // then
+  const block = await screen.findByTestId("members-door-codes");
+  expect(within(block).getByRole("heading")).toHaveTextContent("Door codes");
+  expect(within(block).getAllByTestId("members-door-code").map((code) => code.textContent))
+    .toEqual(["Clubhouse door: 135790", "Changing rooms: 246802"]);
+  const bookings = await screen.findByTestId("upcoming-bookings");
+  expect(block.compareDocumentPosition(bookings) & Node.DOCUMENT_POSITION_FOLLOWING,
+    "the door codes sit at the top of My bookings").toBeTruthy();
+});
+
+it("given no door open to members, when My bookings loads, then no door code block is shown", async () => {
+  // when
+  render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} />);
+  await screen.findByTestId(`booking-${upcomingId}`);
+
+  // then
+  expect(screen.queryByTestId("members-door-codes"), "an empty list takes no room").not.toBeInTheDocument();
 });
 
 it("given past and upcoming occurrences, when loaded, then the series is grouped in both sections", async () => {

@@ -26,11 +26,20 @@ public class FacilityTestFixture {
     }
 
     public UUID createAccessPoint(String name, List<UUID> courtIds, String staticCode) {
-        return facilityService.createAccessPoint(name, courtIds, staticCode).getId();
+        return createAccessPoint(name, courtIds, staticCode, false);
+    }
+
+    public UUID createAccessPoint(String name, List<UUID> courtIds, String staticCode, boolean openToMembers) {
+        return facilityService.createAccessPoint(name, courtIds, staticCode, openToMembers).getId();
     }
 
     public void changeAccessPoint(UUID accessPointId, String name, List<UUID> courtIds, String staticCode) {
-        facilityService.changeAccessPoint(accessPointId, name, courtIds, staticCode);
+        changeAccessPoint(accessPointId, name, courtIds, staticCode, false);
+    }
+
+    public void changeAccessPoint(UUID accessPointId, String name, List<UUID> courtIds, String staticCode,
+                                  boolean openToMembers) {
+        facilityService.changeAccessPoint(accessPointId, name, courtIds, staticCode, openToMembers);
     }
 
     public void activateAccessPoint(UUID accessPointId) {

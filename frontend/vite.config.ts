@@ -1,8 +1,95 @@
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
-import { VitePWA } from "vite-plugin-pwa";
+import { VitePWA, type VitePWAOptions } from "vite-plugin-pwa";
 import { defineConfig } from "vitest/config";
 import packageJson from "./package.json" with { type: "json" };
+
+type PersonalBookingsPlugins = NonNullable<NonNullable<NonNullable<NonNullable<
+  VitePWAOptions["workbox"]>["runtimeCaching"]>[number]["options"]>["plugins"]>;
+
+// Inline functions only: Workbox copies each plugin's source into the service worker.
+const personalBookingsPlugins: PersonalBookingsPlugins = [{
+  handlerWillStart: async ({ state }) => {
+    const control = await caches.open("courtside-personal-bookings-control");
+    const markerUrl = new URL("/.courtside/personal-bookings-generation", self.location.origin).href;
+    const marker = await control.match(markerUrl);
+    if (marker) {
+      state.generation = await marker.text();
+      return;
+    }
+    state.generation = crypto.randomUUID();
+    await control.put(markerUrl, new Response(state.generation as string));
+  },
+  cacheKeyWillBeUsed: ({ request }) => {
+    const key = new URL(`${new URL(request.url).pathname}?limit=50`, request.url);
+    return Promise.resolve(new Request(key, request));
+  },
+  cachedResponseWillBeUsed: async ({ cacheName, cachedResponse, state }) => {
+    if (!cachedResponse) return null;
+    const cachedAt = Number(cachedResponse.headers.get("x-courtside-cached-at"));
+    const age = Date.now() - cachedAt;
+    const control = await caches.open("courtside-personal-bookings-control");
+    const marker = await control.match(new URL(
+      "/.courtside/personal-bookings-generation", self.location.origin).href);
+    const generation = marker ? await marker.text() : undefined;
+    if (generation === state.generation
+      && cachedResponse.headers.get("x-courtside-cache-generation") === generation
+      && Number.isFinite(age) && age >= 0 && age <= 7 * 24 * 60 * 60 * 1_000) {
+      return cachedResponse;
+    }
+    await caches.delete(cacheName);
+    return null;
+  },
+  cacheWillUpdate: async ({ response, state }) => {
+    if (response.status !== 200) return null;
+    const body: unknown = await response.clone().json();
+    const page = body as {
+      items: Array<Record<string, unknown>>;
+      refreshedAt?: string;
+      timeZone?: string;
+      courts?: unknown[];
+      clubName?: string;
+    };
+    const control = await caches.open("courtside-personal-bookings-control");
+    const marker = await control.match(new URL("/.courtside/personal-bookings-generation", self.location.origin).href);
+    const generation = marker ? await marker.text() : "initial";
+    if (state.generation !== generation) return null;
+    const offlinePage = Array.isArray(body) ? body.map((door: Record<string, unknown>) => ({
+      accessPointName: door.accessPointName,
+      code: door.code
+    })) : {
+      items: page.items.map((booking) => ({
+        id: booking.id,
+        seriesId: booking.seriesId,
+        courtIds: booking.courtIds,
+        startsAt: booking.startsAt,
+        endsAt: booking.endsAt,
+        cardLabel: booking.cardLabel,
+        cardColor: booking.cardColor,
+        status: booking.status,
+        access: booking.access
+      })),
+      refreshedAt: page.refreshedAt,
+      timeZone: page.timeZone,
+      courts: page.courts,
+      clubName: page.clubName
+    };
+    const headers = new Headers(response.headers);
+    headers.delete("content-length");
+    headers.set("x-courtside-cached-at", String(Date.now()));
+    headers.set("x-courtside-cache-generation", String(state.generation));
+    return new Response(JSON.stringify(offlinePage), {
+      status: response.status, statusText: response.statusText, headers
+    });
+  },
+  cacheDidUpdate: async ({ cacheName, request, state }) => {
+    const control = await caches.open("courtside-personal-bookings-control");
+    const marker = await control.match(new URL("/.courtside/personal-bookings-generation", self.location.origin).href);
+    const generation = marker ? await marker.text() : "initial";
+    if (state.generation === generation) return;
+    await (await caches.open(cacheName)).delete(request);
+  }
+}];
 
 export default defineConfig({
   define: {
@@ -23,90 +110,21 @@ export default defineConfig({
         navigateFallback: "/index.html",
         runtimeCaching: [
           {
+            urlPattern: ({ request, url }) => request.method === "GET" && url.pathname === "/api/my/door-codes",
+            handler: "NetworkFirst",
+            options: {
+              cacheName: "courtside-personal-bookings",
+              plugins: personalBookingsPlugins
+            }
+          },
+          {
             urlPattern: ({ request, url }) => request.method === "GET" && !url.searchParams.has("cursor")
               && ((url.pathname === "/api/my/bookings" && (url.searchParams.get("view") ?? "UPCOMING") === "UPCOMING")
                 || url.pathname === "/api/my/participations"),
             handler: "StaleWhileRevalidate",
             options: {
               cacheName: "courtside-personal-bookings",
-              plugins: [{
-                handlerWillStart: async ({ state }) => {
-                  const control = await caches.open("courtside-personal-bookings-control");
-                  const markerUrl = new URL("/.courtside/personal-bookings-generation", self.location.origin).href;
-                  const marker = await control.match(markerUrl);
-                  if (marker) {
-                    state.generation = await marker.text();
-                    return;
-                  }
-                  state.generation = crypto.randomUUID();
-                  await control.put(markerUrl, new Response(state.generation as string));
-                },
-                cacheKeyWillBeUsed: ({ request }) => {
-                  const key = new URL(`${new URL(request.url).pathname}?limit=50`, request.url);
-                  return Promise.resolve(new Request(key, request));
-                },
-                cachedResponseWillBeUsed: async ({ cacheName, cachedResponse, state }) => {
-                  if (!cachedResponse) return null;
-                  const cachedAt = Number(cachedResponse.headers.get("x-courtside-cached-at"));
-                  const age = Date.now() - cachedAt;
-                  const control = await caches.open("courtside-personal-bookings-control");
-                  const marker = await control.match(new URL(
-                    "/.courtside/personal-bookings-generation", self.location.origin).href);
-                  const generation = marker ? await marker.text() : undefined;
-                  if (generation === state.generation
-                    && cachedResponse.headers.get("x-courtside-cache-generation") === generation
-                    && Number.isFinite(age) && age >= 0 && age <= 7 * 24 * 60 * 60 * 1_000) {
-                    return cachedResponse;
-                  }
-                  await caches.delete(cacheName);
-                  return null;
-                },
-                cacheWillUpdate: async ({ response, state }) => {
-                  if (response.status !== 200) return null;
-                  const page = await response.clone().json() as {
-                    items: Array<Record<string, unknown>>;
-                    refreshedAt?: string;
-                    timeZone?: string;
-                    courts?: unknown[];
-                    clubName?: string;
-                  };
-                  const control = await caches.open("courtside-personal-bookings-control");
-                  const marker = await control.match(new URL("/.courtside/personal-bookings-generation", self.location.origin).href);
-                  const generation = marker ? await marker.text() : "initial";
-                  if (state.generation !== generation) return null;
-                  const offlinePage = {
-                    items: page.items.map((booking) => ({
-                      id: booking.id,
-                      seriesId: booking.seriesId,
-                      courtIds: booking.courtIds,
-                      startsAt: booking.startsAt,
-                      endsAt: booking.endsAt,
-                      cardLabel: booking.cardLabel,
-                      cardColor: booking.cardColor,
-                      status: booking.status,
-                      access: booking.access
-                    })),
-                    refreshedAt: page.refreshedAt,
-                    timeZone: page.timeZone,
-                    courts: page.courts,
-                    clubName: page.clubName
-                  };
-                  const headers = new Headers(response.headers);
-                  headers.delete("content-length");
-                  headers.set("x-courtside-cached-at", String(Date.now()));
-                  headers.set("x-courtside-cache-generation", String(state.generation));
-                  return new Response(JSON.stringify(offlinePage), {
-                    status: response.status, statusText: response.statusText, headers
-                  });
-                },
-                cacheDidUpdate: async ({ cacheName, request, state }) => {
-                  const control = await caches.open("courtside-personal-bookings-control");
-                  const marker = await control.match(new URL("/.courtside/personal-bookings-generation", self.location.origin).href);
-                  const generation = marker ? await marker.text() : "initial";
-                  if (state.generation === generation) return;
-                  await (await caches.open(cacheName)).delete(request);
-                }
-              }]
+              plugins: personalBookingsPlugins
             }
           },
           {

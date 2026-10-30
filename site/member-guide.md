@@ -343,6 +343,16 @@ jedem Mitspieler mit eigenem Konto eine Nachricht mit den Codes, die jetzt gelte
 
 ![Der Zugangscode einer Buchung mit dem Namen des Zugangs und der Zeit, in der er gilt.](screenshots/de/access-codes.png)
 
+### Türcodes für alle Mitglieder
+
+Gibt der Verein eine Tür für alle Mitglieder frei, etwa die Tür zum Clubhaus, steht ihr Code ganz
+oben in *Meine Buchungen* unter *Türcodes*, auch ohne Buchung. Du siehst ihn, solange du Mitglied
+bist. In der installierten App bleibt er ohne Verbindung stehen, bis du die Seite wieder mit
+Verbindung öffnest oder dich abmeldest. Ändert der Verein den Code, bekommst du eine Nachricht mit
+dem neuen.
+
+![Die Türcodes oben in Meine Buchungen mit dem Namen der Tür und ihrem Code.](screenshots/de/members-door-codes.png)
+
 ## Wenn sich unter deiner Buchung etwas ändert
 
 Eine spätere Änderung kann deine Buchung betreffen. Beispiele sind ein deaktivierter Platz, eine

@@ -34,6 +34,11 @@ public class AccessPointRejectedException extends CodedDomainFailure {
                 Map.of("field", "staticCode", "digits", digits));
     }
 
+    static AccessPointRejectedException openToMembersNeedsCode() {
+        return new AccessPointRejectedException("facility.accessPoint.openToMembersNeedsCode",
+                Map.of("field", "openToMembers"));
+    }
+
     @Override
     public ProblemType problemType() {
         return PROBLEM_TYPE;

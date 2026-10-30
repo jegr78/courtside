@@ -102,6 +102,18 @@ to the unlocked device or its browser profile, and it yields only the codes of t
 bookings and of the bookings they play in, which the board changes at its keypad. Reconsider if access codes become per-booking
 dynamic codes, or if a club reports codes leaking from devices.
 
+## A members' door code outlives a membership
+
+Every current member reads the static code of an access point open to members in the app, with or
+without a booking. A static code cannot be withdrawn from somebody who has read it, so a member whose
+membership ends keeps knowing the code until the board changes it at its keypad. The installed app
+also keeps the last answer in the browser cache, without an end of validity, until the next
+successful refresh, sign-out or the cache's seven-day limit, so a device that stays offline keeps
+showing it. Reading the cached code needs the unlocked device or its browser profile. Changing the
+code tells every current member the new one and nobody else. Reconsider if a club needs a door that
+stops opening for a departed member on the day the membership ends, which only a per-member dynamic
+code can do.
+
 ## A dynamic access code is stored in clear while a door may accept it
 
 With an access-control connector selected, `access_code.code` holds each grant's code as typed,

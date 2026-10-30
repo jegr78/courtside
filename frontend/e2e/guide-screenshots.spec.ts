@@ -96,6 +96,10 @@ const drivers: Record<string, (page: Page, visualDate: string) => Promise<void>>
     await expect(page.getByTestId("upcoming-bookings")).toBeVisible();
     await expect(page.getByTestId("access-code")).toHaveCount(1);
   },
+  "members-door-codes": async (page) => {
+    await page.getByTestId("my-bookings-link").click();
+    await expect(page.getByTestId("members-door-code")).toHaveCount(1);
+  },
   "participations": async (page) => {
     await expect(page.getByTestId("participations")).toBeVisible();
   },
@@ -376,6 +380,18 @@ test("the access code a member receives with a booking is captured", async ({ pa
   await capture(page, "access-codes", journeyService.visualDate);
 });
 
+test("the door code every member sees is captured", async ({ page, journeyService }, info) => {
+  // given
+  await prepare(page, localeOf(info));
+  await signIn(page, "configuration-admin", "court-plan-view");
+  await openClubhouseDoorToMembers(page);
+  await signOut(page);
+  await signIn(page, "doe.jane", "court-plan-view");
+
+  // when / then
+  await capture(page, "members-door-codes", journeyService.visualDate);
+});
+
 test("the waitlist a member joins for a taken court is captured", async ({ page, journeyService }, info) => {
   // given
   await prepare(page, localeOf(info));
@@ -593,6 +609,17 @@ async function grantAccessThroughNorthGate(page: Page, cardId: string): Promise<
   await page.getByTestId("card-grants-access").check();
   await page.getByTestId("save-card").click();
   await expect(page.getByTestId("admin-save-success")).toBeVisible();
+}
+
+async function openClubhouseDoorToMembers(page: Page): Promise<void> {
+  await page.getByTestId("administration-link").click();
+  await page.getByTestId("admin-access-points-link").click();
+  await expect(page.getByTestId("create-access-point")).toBeEnabled();
+  await page.getByTestId("new-access-point-name").fill("Clubhouse door");
+  await page.getByTestId("new-access-point-code").fill("246802");
+  await page.getByTestId("new-access-point-open-to-members").check();
+  await page.getByTestId("create-access-point").click();
+  await expect(page.locator('[data-testid^="access-point-open-to-members-"]')).toHaveCount(1);
 }
 
 async function selectVisualDate(page: Page, date: string): Promise<void> {

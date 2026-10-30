@@ -96,6 +96,7 @@ The maintained JSON classifies every reachable OpenAPI field either as ordinary 
 | `authenticated-member-directory` | `searchParticipantMembers` | `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN` | `permanent-account-gate`, `member-directory-projection` |
 | `booking-create-and-preview` | `createBooking`, `getBookingEligibility`, `previewSeries`, `createSeries` | `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN` | `permanent-account-gate`, `booking-card-eligibility` |
 | `own-booking-and-participation` | `cancelBooking`, `listPersonalBookings`, `listOwnParticipations`, `removeOwnParticipation`, `checkIn` | `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN` | `permanent-account-gate`, `booking-ownership` |
+| `members-door-codes` | `listMembersDoorCodes` | `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN` | `permanent-account-gate`, `members-door-code-projection` |
 | `guardian-account-tasks` | `requestDependantCredentials` | `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN` | `permanent-account-gate`, `guardian-delegation`, `recent-authentication` |
 | `guardian-acting-for-dependant` | `listDependants`, `listDependantBookings`, `createDependantBooking`, `cancelDependantBooking`, `listDependantNotifications` | `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN` | `permanent-account-gate`, `guardian-delegation` |
 | `own-waitlist` | `listOwnWaitlistEntries`, `joinWaitlist`, `leaveWaitlist`, `acceptWaitlistOffer` | `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN` | `permanent-account-gate`, `booking-card-eligibility`, `waitlist-ownership` |
@@ -372,6 +373,18 @@ Positive tests: `src/test/java/org/courtside/member/web/ParticipantMemberControl
 
 Negative tests: `src/test/java/org/courtside/member/web/ParticipantMemberControllerTest.java#givenNoSession_whenSearchingMembers_thenItIsUnauthenticated`.
 
+### Members' door code projection
+
+The door codes derive identity from the current account and list the name and static code of each active access point open to members only when that account is enabled and its person holds a membership period covering today; anybody else receives an empty list rather than a refusal.
+
+Attributes: `current-account`, `current-membership`.
+
+Production: `src/main/java/org/courtside/booking/web/DoorCodeController.java#listMembersDoorCodes`, `src/main/java/org/courtside/member/MemberService.java#isCurrentMember`, `src/main/java/org/courtside/facility/FacilityService.java#membersDoorCodes`.
+
+Positive tests: `src/test/java/org/courtside/booking/web/MembersDoorCodeVisibilityTest.java#givenACurrentMemberWithoutAnyBooking_whenReadingTheDoorCodes_thenOnlyTheClubhouseCodeComes`.
+
+Negative tests: `src/test/java/org/courtside/booking/web/MembersDoorCodeVisibilityTest.java#givenAFormerMember_whenReadingTheDoorCodes_thenTheListIsEmpty`, `src/test/java/org/courtside/booking/web/MembersDoorCodeVisibilityTest.java#givenACurrentMemberWhoseAccountIsDisabled_whenReadingTheDoorCodes_thenTheListIsEmpty`.
+
 ### Administrative response projection
 
 Administrative DTOs may expose the documented roster and operational fields to ADMIN only; credentials remain absent and subject access omits other people's booking data.
@@ -507,5 +520,6 @@ Negative tests: `src/test/java/org/courtside/identity/internal/ControlledAccount
 | `access-point-code-write` | write | `AccessPointRequest.staticCode` | `createAccessPoint`, `changeAccessPoint` | `ADMIN`; `administrator` |
 | `booking-access-code-read` | read | `PersonalBooking.access` | `listPersonalBookings`, `listDependantBookings` | `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN`; `booking-owner`, `current-account` |
 | `participation-access-code-read` | read | `Participation.access` | `listOwnParticipations` | `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN`; `participant-person`, `current-account` |
+| `members-door-code-read` | read | `AccessCode.code` | `listMembersDoorCodes` | `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN`; `current-account`, `current-membership` |
 
 Every field not declared by an operation's OpenAPI request schema is rejected before the operation runs. Every field not declared by its response schema is outside that operation's projection. The rules above name the fields whose visibility or mutability is narrower than merely satisfying that schema.

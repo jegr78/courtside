@@ -116,6 +116,7 @@ class InstanceLinksTest {
         expected.put(MessageKind.BOOKING_SERIES_CREATED, bookings);
         expected.put(MessageKind.BOOKING_SERIES_CANCELLED_BY_CLUB, bookings);
         expected.put(MessageKind.BOOKING_SERIES_MOVED_BY_CLUB, bookings);
+        expected.put(MessageKind.MEMBERS_DOOR_CODE_CHANGED, bookings);
         expected.put(MessageKind.WAITLIST_OFFER, ADDRESS + "/my-bookings#waitlist-" + ENTRY);
 
         // when

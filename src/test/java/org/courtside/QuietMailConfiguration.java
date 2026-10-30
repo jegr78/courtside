@@ -33,4 +33,9 @@ class QuietMailConfiguration {
     TaskExecutor closureAnnouncementExecutor() {
         return new SyncTaskExecutor();
     }
+
+    @Bean
+    TaskExecutor membersDoorCodeExecutor() {
+        return new SyncTaskExecutor();
+    }
 }
