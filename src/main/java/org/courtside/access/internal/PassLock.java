@@ -58,8 +58,9 @@ final class PassLock implements AutoCloseable {
     public void close() {
         try {
             answers(connection, "SELECT pg_advisory_unlock(" + KEY + ")");
-        } catch (SQLException lost) {
-            closeQuietly(connection);
+        } catch (SQLException unreleased) {
+            log.warn("The access pass lock could not be released; its session is aborted", unreleased);
+            abortQuietly(connection);
             return;
         }
         closeQuietly(connection);
@@ -68,6 +69,14 @@ final class PassLock implements AutoCloseable {
     private static boolean answers(Connection connection, String query) throws SQLException {
         try (Statement statement = connection.createStatement(); ResultSet result = statement.executeQuery(query)) {
             return result.next() && result.getBoolean(1);
+        }
+    }
+
+    private static void abortQuietly(Connection connection) {
+        try {
+            connection.abort(Runnable::run);
+        } catch (SQLException alreadyGone) {
+            log.debug("The access pass lock's connection could not be aborted", alreadyGone);
         }
     }
 
