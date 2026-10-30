@@ -606,9 +606,9 @@ application clock once and makes every comparison against that instant, so a fix
 disposable run governs the pass too. A pass has three steps:
 
 1. It inserts an `access_grant` row, one per booking and never deleted, for every booking with demand
-   whose start lies within the booking horizon, the longest `ADVANCE_WINDOW` of any rule set or 14 days
-   without one, and
-   whose window has not ended. A distant series occurrence waits until it enters the horizon.
+   whose start lies within the booking horizon, the longest `ADVANCE_WINDOW` of any rule set or 14
+   days without one, and whose window has not ended. A distant series occurrence waits until it
+   enters the horizon. A failure in this step is logged and the pass still acts and releases.
 2. It reads the ids of every open row once, revocations first, and visits each at most once. In the
    row's locked transaction it derives the demand again, draws a code when the grant is wanted and
    has none, and decides the action: `grant` while nothing is installed for sure, `reschedule` when
@@ -619,25 +619,31 @@ disposable run governs the pass too. A pass has three steps:
    pass the worker probes the system, and a probe that does not answer or refuses for the whole
    connector ends the pass as an outage without changing a row. Before an install it commits the
    remote side as possibly installed and raises the window end the code may be exposed until, which
-   is never lowered. The call runs with no transaction open on one call thread with the deadline;
-   a call thread still occupied by an abandoned call sends nothing more and ends the pass as an
-   outage. The answer is recorded in a transaction of its own.
+   is never lowered. The call runs with no transaction open on one call thread with the deadline.
+   When an abandoned call still occupies that thread, the attempt is already committed: it is
+   recorded as unclear, the re-probe finds the thread occupied too, so the attempt is undone, the row
+   is retried after a minute and the pass ends as an outage. The answer is recorded in a transaction
+   of its own. A decision that fails, a mapping that throws, is missing or exceeds 200 characters, or
+   a draw that finds no free code, is recorded on the row in a transaction of its own as a counted
+   attempt with backoff and its sanitized reason, and the overview lists the row while it has
+   attempts.
 3. It releases the code of every grant that is not wanted, holds nothing remote and whose exposure
    has ended, and deletes released codes whose exposure has ended.
 
-Every code in use is a primary key in `access_code`, so a code is never drawn for another booking
-while a door may still accept it, and a draw never takes an active access point's static code. A
-code is drawn with the club's access code length from a `SecureRandom`. `CodeRejected` before the
-first acceptance holds the old code until its exposure ends and sends a new one in the next pass; the
-third rejection in a row refuses the grant. After the first acceptance the delivered code must stay,
-so a rejection refuses it. `Refused(GRANT)` refuses an install, while a refused revoke stays due,
-because a revocation never stops. `RetryLater(GRANT)` and every other counted failure wait 1, 5, 15
-and 60 minutes, then 60, or longer when the system names a later moment. A `CONNECTOR` answer probes
-again at once: when the probe fails, the row's attempt is undone and the pass ends as an outage; when
-it answers, the answer counts as the grant's own. `RetryLater(CONNECTOR)` holds the worker until the
-named moment, an hour at most. An unclear answer probes again too; a failed probe retries the row
-after a minute without counting the attempt. A revoke accepted within two call deadlines of the last
-install is sent once more after that bound, because the system may still process the install late.
+Every code in use is a primary key in `access_code`, so a code is never drawn for another booking while
+a door may still accept it, and a draw never takes the static code of any access point, active or not. A
+code is drawn with the club's access code length from a `SecureRandom`. `CodeRejected` before the first
+acceptance holds the old code until its exposure ends and sends a new one in the next pass; the third
+rejection in a row refuses the grant. After the first acceptance the delivered code must stay, so a
+rejection refuses it. `Refused(GRANT)` refuses an install, while a refused revoke stays due, because a
+revocation never stops. `RetryLater(GRANT)` and every other counted failure wait 1, 5, 15 and 60
+minutes, then 60, or until a moment the system names, an hour ahead at most. A `CONNECTOR` answer probes
+again at once: when the probe fails, the row's attempt is undone and the pass ends as an outage; when it
+answers, the answer counts as the grant's own. `RetryLater(CONNECTOR)` with a moment still ahead holds
+the worker until then, an hour at most; without one, or with one already past, it holds nothing and the
+backoff applies. An unclear answer probes again too; a failed probe retries the row after a minute
+without counting the attempt. A revoke accepted within two call deadlines of the last install is sent
+once more after that bound, because the system may still process the install late.
 
 The admin overview labels each grant `FAILING` when it was refused or failed five counted attempts in
 a row, `REMOVING` when it is no longer wanted but may still be installed, `INSTALLED` when the system
@@ -653,15 +659,20 @@ attempt, and the total. It names the selected connector and shows the last probe
 its class, `ANSWERED`, `UNREACHABLE`, `TIMEOUT`, `CALL_THREAD_OCCUPIED` or `REFUSED`, the time and
 the connector's own reason when it gave one. Reading the overview never calls the system; a board asks
 for a fresh probe with `POST /api/admin/access-grants/probe`, which the next pass makes first and which
-answers `409 urn:courtside:error:access-control-not-connected` without a connector. A board sends a
+answers `409 urn:courtside:error:access-control-not-connected` without a connector, as a retry
+does. A board sends a
 failing grant again with `POST /api/admin/access-grants/{id}/retry`: it marks the grant under its row
 lock, signals the worker and is audited as `access.grant.retryRequested`, and the next pass clears
 the refusal and the count; an unknown grant answers
 `404 urn:courtside:error:access-grant-not-found` and any other status `409
 urn:courtside:error:access-grant-not-failing`. A changed demand clears the refusal and the count the
 same way. No domain event, log line, stored failure, problem body or administrative response carries a
-dynamic code: connector text is stored and logged with the call's code and every standalone run of
-four to eight digits masked.
+dynamic code: connector text is stored and logged with URLs reduced to scheme, host and path, the
+call's code masked and every standalone run of four to eight digits masked.
+
+Known limits: probe readings are kept in memory per instance. A board that types a live dynamic code
+as a gate's static code is not stopped, and both then open with that code until the grant's window
+ends.
 
 Grid changes are refused when active or future bookings, or the opening hours, seasons and holidays
 in force today or scheduled after it, no longer align. Time-zone changes are refused while a confirmed booking has not
