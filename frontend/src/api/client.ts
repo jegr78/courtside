@@ -16,6 +16,10 @@ export type RuleParameter = components["schemas"]["RuleParameter"];
 export type RuleDefinition = components["schemas"]["RuleDefinition"];
 export type AdminCourt = components["schemas"]["Court"];
 export type CourtRequest = components["schemas"]["CourtRequest"];
+export type AccessGrantOverview = components["schemas"]["AccessGrantOverview"];
+export type AdminAccessGrant = components["schemas"]["AdminAccessGrant"];
+export type AdminAccessGrantStatus = components["schemas"]["AdminAccessGrantStatus"];
+export type AccessControlProbeOutcome = components["schemas"]["AccessControlProbeOutcome"];
 export type AccessPoint = components["schemas"]["AccessPoint"];
 export type AccessPointRequest = components["schemas"]["AccessPointRequest"];
 export type OpeningHours = components["schemas"]["OpeningHours"];
@@ -502,6 +506,9 @@ export const api = {
   setAdminCourtActive: (id: string, active: boolean) => request<AdminCourt>(`/api/admin/courts/${id}/active`, {
     method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ active })
   }),
+  adminAccessGrants: () => request<AccessGrantOverview>("/api/admin/access-grants"),
+  retryAdminAccessGrant: (id: string) => request<AdminAccessGrant>(`/api/admin/access-grants/${id}/retry`, { method: "POST" }),
+  probeAccessControl: () => request<void>("/api/admin/access-grants/probe", { method: "POST" }),
   adminAccessPoints: () => request<AccessPoint[]>("/api/admin/access-points"),
   createAdminAccessPoint: (accessPoint: AccessPointRequest) => request<AccessPoint>("/api/admin/access-points", {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(accessPoint)

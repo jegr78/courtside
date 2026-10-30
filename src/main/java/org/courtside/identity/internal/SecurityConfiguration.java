@@ -180,6 +180,7 @@ public class SecurityConfiguration {
                                 "/admin/audit",
                                 "/admin/messages",
                                 "/admin/operational-logs",
+                                "/admin/access-grants",
                                 "/admin/operator-health",
                                 "/index.html",
                                 "/assets/**", "/font-licenses.txt", "/icon.svg",

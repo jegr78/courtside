@@ -69,6 +69,7 @@ const groups: Group[] = [
       { to: "/admin/audit", testId: "admin-audit-link", label: "nav.adminAudit" },
       { to: "/admin/messages", testId: "admin-messages-link", label: "nav.adminMessages" },
       { to: "/admin/operational-logs", testId: "admin-operational-logs-link", label: "nav.adminOperationalLogs" },
+      { to: "/admin/access-grants", testId: "admin-access-grants-link", label: "nav.adminAccessGrants" },
       { to: "/admin/operator-health", testId: "admin-operator-health-link", label: "nav.adminOperatorHealth" }
     ]
   }
