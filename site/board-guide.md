@@ -211,6 +211,54 @@ funktioniert, und nur, solange der Zugangscode ihrer Buchung gilt. Jede Abfrage 
 mit dem Konto, der Buchung und dem Zugang, nie mit dem Code. Wer ihn einmal abgefragt hat, kennt ihn,
 bis du ihn änderst. Ändere ihn deshalb von Zeit zu Zeit und nach einem Missbrauch.
 
+### Gebäudesteuerung
+
+Flutlicht und Bewässerung bleiben in eurer Gebäudesteuerung. Sie fragt Courtside regelmäßig, ob ein
+Platz belegt ist und wie viele Minuten bis zur nächsten Buchung bleiben. Courtside schaltet selbst
+nichts. Unter **Gebäudesteuerung** am Ende dieser Seite legst du mit **Schlüssel anlegen** einen
+Schlüssel an. Courtside zeigt ihn und die fertige Adresse genau einmal, kopiere beides sofort. Mit
+**Neuen Schlüssel anlegen** ersetzt du ihn, mit **Schlüssel widerrufen** sperrst du jede Abfrage.
+Beides wirkt bei der nächsten Abfrage. Ohne Schlüssel weist Courtside jede Abfrage ab.
+
+Die Adresse liefert zwei Zeilen je aktivem Platz, benannt nach seiner Platznummer:
+
+```
+court1.occupied=1
+court1.minutes=0
+court2.occupied=0
+court2.minutes=37
+```
+
+`occupied` ist 1, solange eine Buchung läuft, deren Karte *Buchungen gelten für die Gebäudesteuerung
+als belegt* trägt, sonst 0. `minutes` zählt die ganzen Minuten bis zum Beginn der nächsten solchen
+Buchung, abgerundet. Während der Platz belegt ist, steht dort 0, und beginnt in den nächsten 24 Stunden
+nichts, steht dort 1440. Eine Platzsperrung gilt nie als belegt. Ein deaktivierter Platz fehlt in der
+Antwort, die Nummern der anderen bleiben.
+
+In Loxone Config legst du dafür an:
+
+1. einen **Virtuellen HTTP Eingang** mit der Adresse aus Courtside als **URL**, zum Beispiel
+   `https://courts.example.org/api/public/occupancy?key=…`, und **Abfragezyklus** 60 Sekunden;
+2. darunter je Platz und Wert einen **Virtuellen HTTP Eingang Befehl**, etwa für Platz 1 mit der
+   **Befehlserkennung** `\icourt1.occupied=\i\v` und einen zweiten mit `\icourt1.minutes=\i\v`.
+
+Ein Abfragezyklus von 60 Sekunden genügt. Kürzer bringt nichts, weil `minutes` sich nur einmal pro
+Minute ändert. Fällt Courtside oder das Netz aus, behält Loxone den letzten Wert, bis die nächste
+Abfrage wieder antwortet.
+
+Was die Werte auslösen, entscheidet ihr in Loxone:
+
+- **Flutlicht**: an, solange ein Platz belegt ist oder seine Minuten höchstens eure Vorlaufzeit
+  betragen, etwa 10, und es dunkel genug ist, zum Beispiel über einen Helligkeitssensor oder die
+  Dämmerung.
+- **Bewässerung** je Platz oder Platzpaar: gesperrt, solange einer der Plätze belegt ist oder seine
+  Minuten kleiner sind als Laufzeit plus Trockenzeit. Meldet der Loxone Wetterdienst Regen, fällt der
+  Lauf aus.
+
+Wer den Schlüssel kennt, erfährt nur Belegung und Minuten je Platz, nie wer gebucht hat oder mit
+welcher Karte. Der Schlüssel steht in der Adresse und kann deshalb im Protokoll eines Routers oder
+Proxys auftauchen. Ersetze ihn, wenn er in falsche Hände geraten ist.
+
 ## Anlage → Öffnungszeiten
 
 1. Trage für jeden geöffneten Wochentag eine Öffnungs- und eine Schließzeit ein.
@@ -279,6 +327,7 @@ Punktspiel oder Sperrung. Lege für jede benötigte Art eine Karte an.
 | **Gäste erlaubt** | Erlaubt namentlich erfasste Gäste |
 | **Neutral anzeigen** | Zeigt im öffentlichen Platzplan *Belegt* statt der Kartenbezeichnung |
 | **Buchungen erhalten den Zugangscode** | Buchungen mit dieser Karte gehören zu den Buchungen, für die der Code der Zugänge ihrer Plätze gilt. Die Karte *Platz gesperrt* bietet das nicht an |
+| **Buchungen gelten für die Gebäudesteuerung als belegt** | Buchungen mit dieser Karte melden ihren Platz der Gebäudesteuerung als belegt, siehe *Gebäudesteuerung* unter *Zugänge*. Neue Karten tragen es, die Karte *Platz gesperrt* bietet es nicht an |
 
 Administratoren dürfen jede Karte verwenden und verwalten. Eine Buchung mit der Karte *Platz
 gesperrt* geht einer Reservierung von der Warteliste vor. Leerst du ihre berechtigten Rollen, darf

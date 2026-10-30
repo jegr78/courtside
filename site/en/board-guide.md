@@ -200,6 +200,53 @@ while their booking's access code is valid. Every request is in the audit log wi
 booking and the access point, never the code. Whoever asked for it once knows it until you change
 it. Change it from time to time, and after any misuse.
 
+### Building automation
+
+Floodlight and irrigation stay with your building automation. It asks Courtside at regular intervals
+whether a court is occupied and how many minutes remain until its next booking. Courtside never
+switches anything itself. Under **Building automation** at the end of this page, **Create key**
+creates a key. Courtside shows it and the ready address exactly once, so copy both right away.
+**Create new key** replaces it and **Revoke key** refuses every request. Both take effect on the next
+request. Without a key, Courtside refuses every request.
+
+The address answers two lines per active court, named after its court number:
+
+```
+court1.occupied=1
+court1.minutes=0
+court2.occupied=0
+court2.minutes=37
+```
+
+`occupied` is 1 while a booking runs whose card carries *Bookings count as occupied for building
+automation*, otherwise 0. `minutes` counts the whole minutes until the next such booking starts,
+rounded down. While the court is occupied it reads 0, and when nothing starts within the next 24
+hours it reads 1440. A court closure never counts as occupied. A deactivated court is left out of the
+answer, and the other courts keep their numbers.
+
+In Loxone Config, create:
+
+1. one **Virtual HTTP Input** with the address from Courtside as its **URL**, for example
+   `https://courts.example.org/api/public/occupancy?key=…`, and a **Polling cycle** of 60 seconds;
+2. below it one **Virtual HTTP Input Command** per court and value, for court 1 with the **Command
+   recognition** `\icourt1.occupied=\i\v` and a second one with `\icourt1.minutes=\i\v`.
+
+A polling cycle of 60 seconds is enough. A shorter one gains nothing, because `minutes` changes only
+once a minute. If Courtside or the network is down, Loxone keeps the last value until the next
+request is answered again.
+
+What the values trigger is up to you in Loxone:
+
+- **Floodlight**: on while a court is occupied or its minutes are at most your lead time, say 10, and
+  it is dark enough, for example from a brightness sensor or the twilight.
+- **Irrigation** per court or pair of courts: blocked while one of the courts is occupied or its
+  minutes are fewer than run time plus drying time. If the Loxone weather service reports rain, the
+  run is skipped.
+
+Whoever knows the key learns only occupancy and minutes per court, never who booked or with which
+card. The key is part of the address and can therefore show up in the log of a router or proxy.
+Replace it if it has reached the wrong hands.
+
 ## Facility → Opening hours
 
 1. Enter an opening and closing time for every open weekday.
@@ -263,6 +310,7 @@ or closure. Add one card for every type the club needs.
 | **Guests allowed** | Allows named guests |
 | **Show neutral occupancy** | Shows *Occupied* instead of the card label in the public plan |
 | **Bookings receive the access code** | Bookings on this card are the ones the code of their courts' access points applies to. The *Court closed* card does not offer it |
+| **Bookings count as occupied for building automation** | Bookings on this card report their court as occupied to the building automation, see *Building automation* under *Access points*. New cards carry it, the *Court closed* card does not offer it |
 
 Administrators may use and manage every card. A booking with the *Court closed* card goes before a
 reservation from the waitlist. If you clear its allowed roles, every signed-in person may close a

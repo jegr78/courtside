@@ -123,6 +123,16 @@ hold a code that is still in use. A draw that equals an access point's `static_c
 no `until` (`access_code_held_only_when_detached`). A row without one is held until `until` and deleted
 afterwards, or at once when `until` is null.
 
+## Building automation
+
+| Table | Holds | References |
+|---|---|---|
+| `occupancy_key` | The one key building automation presents when it polls the occupancy signal, as its SHA-256 and when it was created | None |
+
+`occupancy_key` holds at most one row (`occupancy_key_single_row` keeps `id` at 1). `key_hash` is
+the hex SHA-256 of a key of 32 random bytes; the key itself is stored nowhere. Creating a key
+replaces the row, revoking deletes it, and without a row every poll is refused.
+
 ## Cards
 
 | Table | Holds | References |
@@ -140,7 +150,9 @@ rules unexpressible. `docs/design.md` argues that at length.
 that tracks no players at all, which is right for training and closures. `show_generic_occupancy`
 decides whether the plan renders a neutral occupancy label or the card's own. `grants_access`
 decides whether the card's bookings receive access codes; it defaults to false, and
-`booking_card_closure_grants_no_access` keeps it false on the closure card.
+`booking_card_closure_grants_no_access` keeps it false on the closure card. `signals_occupancy`
+decides whether the card's bookings count as occupied in the occupancy signal; it defaults to true,
+and `booking_card_closure_signals_no_occupancy` keeps it false on the closure card.
 
 The role tables replaced a single `required_role` column, because a card that only one role may use
 cannot express "trainers and youth directors". Both accept the roles `user_account_role` accepts.
@@ -413,8 +425,10 @@ own rows with it. `domain_event` keeps its entries, which then name an identifie
 | `event_publication` | Spring Modulith's transactional outbox for events between modules | None |
 
 `domain_event.subject_id` names the entity an entry concerns. It is empty only for an activity about
-the whole instance, `dataexchange.log.exported`, which records an export of the audit log or the
-message log; `domain_event_subject_required` refuses an empty subject for every other event type.
+the whole instance: `dataexchange.log.exported`, which records an export of the audit log or the
+message log, and `booking.occupancyKey.created` and `booking.occupancyKey.revoked`, which record a
+board creating or revoking the occupancy key and never carry the key.
+`domain_event_subject_required` refuses an empty subject for every other event type.
 
 `domain_event.event_type` is a dotted name whose first segment says which module published it, and
 the table holds two kinds of entry. Seven segments are the administrative surfaces, one per thing a
