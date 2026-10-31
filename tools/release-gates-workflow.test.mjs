@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
+import { fileURLToPath } from "node:url";
 
 const require = createRequire(new URL("../frontend/package.json", import.meta.url));
 const yaml = require("js-yaml");
@@ -14,6 +15,56 @@ const gates = yaml.load(gatesSource);
 const action = yaml.load(read(".github/actions/gate-image/action.yml"));
 const build = yaml.load(read(".github/workflows/build.yml"));
 const digest = `sha256:${"a".repeat(64)}`;
+
+for (const source of ["registry", "artifact"]) {
+  for (const matching of [true, false]) {
+    test(`given ${source} transition evidence with matching=${matching}, when the mail gate runs, then only its own candidate can pass`, () => {
+      // given
+      const root = mkdtempSync(join(tmpdir(), "mail-gate-binding-"));
+      const image = source === "artifact" ? digest : `ghcr.io/example/courtside@${digest}`;
+      const servedImage = `ghcr.io/example/courtside@sha256:${"b".repeat(64)}`;
+      const expected = source === "artifact" ? servedImage : image;
+      const bin = join(root, "bin");
+      mkdirSync(bin);
+      mkdirSync(join(root, "runner"));
+      mkdirSync(join(root, "build", "deployment-mail"), { recursive: true });
+      writeFileSync(join(root, "build", "deployment-mail", "archive.json"), JSON.stringify({ archive: { version: "0.4.0-nightly.7" } }));
+      symlinkSync(fileURLToPath(new URL(".", import.meta.url)), join(root, "tools"), "dir");
+      const quote = (value) => `'${value.replaceAll("'", "'\\''")}'`;
+      writeFileSync(join(bin, "node"), `#!/bin/sh
+case "$1" in
+  tools/stalwart-store-transition-smoke.mjs|tools/installed-upgrade-gate.mjs)
+    printf '%s\\n' "$*" > calls.log
+    exec ${quote(process.execPath)} --input-type=module - <<'JS'
+import { mkdirSync, writeFileSync } from 'node:fs';
+mkdirSync('build/stalwart-store-transition', {recursive:true});
+writeFileSync('build/stalwart-store-transition/result.json', JSON.stringify({status:'passed',runtimeImage:process.env.REPORTED_IMAGE,candidateRevision:process.env.SOURCE_COMMIT}));
+mkdirSync('build/installed-upgrade-gate', {recursive:true});
+writeFileSync('build/installed-upgrade-gate/image-binding.json', JSON.stringify({sourceImage:process.env.IMAGE,servedImage:process.env.SERVED_IMAGE,revision:process.env.SOURCE_COMMIT}));
+JS
+    ;;
+  *) exec ${quote(process.execPath)} "$@" ;;
+esac
+`, { mode: 0o755 });
+      const step = gates.jobs.mail.steps.find((entry) => entry.id === "transition");
+      try {
+        // when
+        const result = spawnSync("bash", ["-e", "-c", step.run], { cwd: root, encoding: "utf8", env: {
+          ...process.env, PATH: `${bin}:${process.env.PATH}`, IMAGE_SOURCE: source, IMAGE: image,
+          SERVED_IMAGE: servedImage, REPORTED_IMAGE: matching ? expected : `ghcr.io/example/courtside@sha256:${"c".repeat(64)}`,
+          BOOKING_SEED_IMAGE: `sha256:${"d".repeat(64)}`, VERSION: "0.4.0-nightly.7", SOURCE_COMMIT: "f".repeat(40),
+          ARCHIVE_REF: "refs/heads/feat/mail", ARCHIVE_WORKFLOW: "nightly-image.yml", GITHUB_REPOSITORY: "example/courtside",
+          RUNNER_TEMP: join(root, "runner")
+        } });
+        // then
+        assert.equal(result.status === 0, matching, result.stderr);
+        const calls = readFileSync(join(root, "calls.log"), "utf8");
+        if (source === "registry") assert.match(calls, /stalwart-store-transition-smoke\.mjs --candidate .*courtside-deployment-0\.4\.0-nightly\.7/);
+        else assert.match(calls, /installed-upgrade-gate\.mjs .*--journey stalwart-store-transition/);
+      } finally { rmSync(root, { recursive: true, force: true }); }
+    });
+  }
+}
 
 function stepsUsing(job, uses) {
   return (gates.jobs[job].steps ?? []).filter((step) => String(step.uses ?? "").startsWith(uses));
@@ -187,7 +238,7 @@ test("given an image source, when a job needs the image at runtime, then it uses
 
 test("given jobs that only bind the archive, when they resolve the image, then they read its pinned name without loading", () => {
   // when / then
-  for (const job of ["mail", "archive-reproducibility"]) {
+  for (const job of ["archive-reproducibility"]) {
     const resolved = stepsUsing(job, "./.github/actions/gate-image");
     assert.deepEqual(resolved.map((step) => step.id).sort(), ["booking-seed", "image"], `${job} resolves both images`);
     for (const step of resolved) assert.equal(step.with.load, "false", `${job} never needs the image bytes`);
@@ -199,6 +250,20 @@ test("given jobs that only bind the archive, when they resolve the image, then t
     assert.ok(gates.jobs[job].steps.some((step) =>
       step.env?.BOOKING_SEED_IMAGE === "${{ steps.booking-seed.outputs.pinned }}"), `${job} binds the booking seed`);
   }
+});
+
+test("given the mail transition needs artifact image bytes, when the job resolves them, then it loads the shared image bundle", () => {
+  // given
+  const app = stepsUsing("mail", "./.github/actions/gate-image").find((step) => step.id === "image");
+  const seed = stepsUsing("mail", "./.github/actions/gate-image").find((step) => step.id === "booking-seed");
+  const transition = gates.jobs.mail.steps.find((step) => step.id === "transition");
+  // then
+  assert.equal(app.with.load ?? action.inputs.load.default, "true");
+  assert.equal(app.with.artifact, "${{ inputs.image-artifact }}");
+  assert.equal(app.with["run-id"], "${{ inputs.artifacts-run-id || github.run_id }}");
+  assert.equal(seed.with.load, "false", "the first load already carries both images");
+  assert.equal(transition.env.IMAGE, "${{ steps.image.outputs.reference }}");
+  assert.equal(transition.env.BOOKING_SEED_IMAGE, "${{ steps.booking-seed.outputs.reference }}");
 });
 
 test("given a registry image, when the gate image is resolved, then every use names the registry digest", () => {

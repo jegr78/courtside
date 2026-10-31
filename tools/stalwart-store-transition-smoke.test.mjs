@@ -82,3 +82,21 @@ test("given the published runtime baseline, when qualification resolves it, then
   assert.throws(() => pinnedRuntimeImage(["ghcr.io/jegr78/courtside:nightly"]), /digest/);
   assert.throws(() => pinnedRuntimeImage([`registry.example.org/courtside@sha256:${"a".repeat(64)}`]), /digest/);
 });
+
+test("given a manual branch nightly, when its archive is qualified, then its image and revision remain bound", () => {
+  candidate((root) => {
+    // given
+    const path = join(root, "manifest.json");
+    const manifest = JSON.parse(readFileSync(path));
+    manifest.version = "0.4.0-nightly.7";
+    manifest.signer = "https://github.com/jegr78/courtside/.github/workflows/nightly-image.yml@refs/heads/feat/mail-transition";
+    writeFileSync(path, JSON.stringify(manifest));
+    // when
+    const actual = validateTransitionCandidate(root);
+    // then
+    assert.equal(actual.image, manifest.image);
+    assert.equal(actual.revision, manifest.revision);
+    writeFileSync(path, JSON.stringify({ ...manifest, signer: manifest.signer.replace("jegr78/courtside", "example/courtside") }));
+    assert.throws(() => validateTransitionCandidate(root), /identity/);
+  });
+});

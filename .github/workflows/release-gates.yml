@@ -192,7 +192,9 @@ jobs:
           source: ${{ inputs.image-source }}
           digest: ${{ inputs.image-digest }}
           repository: ${{ github.repository }}
-          load: 'false'
+          artifact: ${{ inputs.image-artifact }}
+          run-id: ${{ inputs.artifacts-run-id || github.run_id }}
+          github-token: ${{ github.token }}
       - id: booking-seed
         uses: ./.github/actions/gate-image
         with:
@@ -226,9 +228,44 @@ jobs:
         env:
           COURTSIDE_MAIL_SMOKE_LOGS: build/deployment-mail/server-logs
       - id: transition
-        name: Exercise the historical mail store transition and matching restores
+        name: Exercise the candidate mail store transition and matching restores
         continue-on-error: true
-        run: node tools/stalwart-store-transition-smoke.mjs
+        env:
+          IMAGE_SOURCE: ${{ inputs.image-source }}
+          IMAGE: ${{ steps.image.outputs.reference }}
+          BOOKING_SEED_IMAGE: ${{ steps.booking-seed.outputs.reference }}
+          VERSION: ${{ inputs.archive-version }}
+          ARCHIVE_REF: ${{ inputs.archive-ref }}
+          ARCHIVE_WORKFLOW: ${{ inputs.archive-workflow }}
+          SOURCE_COMMIT: ${{ inputs.source-commit }}
+        run: |
+          if [ "$IMAGE_SOURCE" = registry ]; then
+            version=$(jq -er '.archive.version' build/deployment-mail/archive.json)
+            candidate="$RUNNER_TEMP/courtside-mail-deployment/courtside-deployment-$version"
+            node tools/stalwart-store-transition-smoke.mjs --candidate "$candidate"
+          elif [ "$IMAGE_SOURCE" = artifact ]; then
+            node tools/installed-upgrade-gate.mjs --image "$IMAGE" --booking-seed-image "$BOOKING_SEED_IMAGE" \
+              --repository "$GITHUB_REPOSITORY" --version "$VERSION" --revision "$SOURCE_COMMIT" \
+              --ref "$ARCHIVE_REF" --workflow "$ARCHIVE_WORKFLOW" --confirm installed-upgrade-gate \
+              --journey stalwart-store-transition
+          else
+            echo 'Unknown transition image source' >&2
+            exit 2
+          fi
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          import { readFileSync } from 'node:fs';
+          import { verifyTransitionBinding } from './tools/installed-upgrade-gate.mjs';
+          let image = process.env.IMAGE;
+          if (process.env.IMAGE_SOURCE === 'artifact') {
+            const binding = JSON.parse(readFileSync('build/installed-upgrade-gate/image-binding.json'));
+            assert.equal(binding.sourceImage, image);
+            assert.equal(binding.revision, process.env.SOURCE_COMMIT);
+            image = binding.servedImage;
+          }
+          verifyTransitionBinding(JSON.parse(readFileSync('build/stalwart-store-transition/result.json')),
+            { image, revision: process.env.SOURCE_COMMIT });
+          JS
       - name: Record the Stalwart result
         if: always()
         env:
@@ -259,7 +296,9 @@ jobs:
         if: always()
         with:
           name: deployment-mail-qualification
-          path: build/deployment-mail
+          path: |
+            build/deployment-mail
+            build/installed-upgrade-gate
           retention-days: 14
           if-no-files-found: error
       - name: Enforce the Stalwart journey

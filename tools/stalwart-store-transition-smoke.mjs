@@ -23,9 +23,13 @@ export function validateTransitionCandidate(root) {
   const nightly = /^[0-9]+\.[0-9]+\.[0-9]+-nightly\.[1-9][0-9]*$/.test(manifest.version ?? "");
   const signer = `https://github.com/jegr78/courtside/.github/workflows/${nightly
     ? "nightly-image.yml@refs/heads/main" : `release.yml@refs/tags/v${manifest.version}`}`;
+  const branchSigner = "https://github.com/jegr78/courtside/.github/workflows/nightly-image.yml@refs/heads/";
+  const manualNightly = nightly && typeof manifest.signer === "string" && manifest.signer.startsWith(branchSigner)
+    && /^[A-Za-z0-9][A-Za-z0-9_./-]*$/.test(manifest.signer.slice(branchSigner.length))
+    && !manifest.signer.slice(branchSigner.length).includes("..");
   if (manifest.schema !== 1 || !/^ghcr\.io\/jegr78\/courtside@sha256:[a-f0-9]{64}$/.test(manifest.image ?? "")
     || !/^[0-9]+\.[0-9]+\.[0-9]+(?:-[A-Za-z0-9.-]+)?$/.test(manifest.version ?? "")
-    || !/^[a-f0-9]{40}$/.test(manifest.revision ?? "") || manifest.signer !== signer) {
+    || !/^[a-f0-9]{40}$/.test(manifest.revision ?? "") || (manifest.signer !== signer && !manualNightly)) {
     throw new Error("transition qualification requires a Courtside candidate identity");
   }
   if (!manifest.files?.courtside) throw new Error("candidate archive has no launcher inventory");
@@ -380,6 +384,7 @@ exec ${quote(executable("docker"))} "$@"
       sourceImage: YAML.parse(readFileSync(join(source, "compose.stalwart.yaml"), "utf8")).services.mail.image,
       targetImage: YAML.parse(readFileSync(join(candidate, "compose.stalwart.yaml"), "utf8")).services.mail.image,
       runtimeImage: image, head: run("git", ["rev-parse", "HEAD"]).stdout.trim(),
+      candidateRevision: JSON.parse(readFileSync(join(candidate, "manifest.json"))).revision,
       runtimeBaseline: supplied ? "supplied-candidate" : runtimeBaseline,
       networkFixtureOnly: true, preserved: ["booking", "allocation", "account", "persistent-key-files"],
       interruptedActivationResumed: true, restoredApplicationUnits: units.length,
