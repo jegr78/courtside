@@ -19,6 +19,10 @@ const runtimeBaseline = "ghcr.io/jegr78/courtside:nightly";
 const hash = (content) => createHash("sha256").update(content).digest("hex");
 
 export function validateTransitionCandidate(root) {
+  if (!lstatSync(root).isDirectory()) throw new Error("candidate root must be a directory without symlinks");
+  if (!lstatSync(join(root, "manifest.json")).isFile()) {
+    throw new Error("candidate manifest must be a regular file without symlinks");
+  }
   const manifest = JSON.parse(readFileSync(join(root, "manifest.json")));
   const nightly = /^[0-9]+\.[0-9]+\.[0-9]+-nightly\.[1-9][0-9]*$/.test(manifest.version ?? "");
   const signer = `https://github.com/jegr78/courtside/.github/workflows/${nightly

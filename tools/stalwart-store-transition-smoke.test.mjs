@@ -46,6 +46,34 @@ test("given a symlinked candidate file, when transition qualification starts, th
   });
 });
 
+test("given a symlinked candidate root, when transition qualification starts, then it refuses before copying", () => {
+  candidate((root) => {
+    // given
+    const parent = mkdtempSync(join(tmpdir(), "courtside-transition-alias-"));
+    const alias = join(parent, "candidate");
+    symlinkSync(root, alias);
+    try {
+      // when / then
+      assert.throws(() => validateTransitionCandidate(alias), /directory|symlink/);
+    } finally { rmSync(parent, { recursive: true, force: true }); }
+  });
+});
+
+test("given a symlinked candidate manifest, when transition qualification starts, then it refuses before adapting", () => {
+  candidate((root) => {
+    // given
+    const parent = mkdtempSync(join(tmpdir(), "courtside-transition-manifest-"));
+    const manifest = join(parent, "manifest.json");
+    writeFileSync(manifest, readFileSync(join(root, "manifest.json")));
+    rmSync(join(root, "manifest.json"));
+    symlinkSync(manifest, join(root, "manifest.json"));
+    try {
+      // when / then
+      assert.throws(() => validateTransitionCandidate(root), /regular|symlink/);
+    } finally { rmSync(parent, { recursive: true, force: true }); }
+  });
+});
+
 test("given foreign or unlabelled volumes, when qualification cleans up, then it retains them", () => {
   // when / then
   assert.equal(canRemoveQualificationVolume("mail-data", {}, "courtside-transition-test"), false);
