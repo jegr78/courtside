@@ -281,7 +281,7 @@ jobs:
           run-id: ${{ inputs.artifacts-run-id || github.run_id }}
           github-token: ${{ github.token }}
       - if: inputs.image-source == 'registry'
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -500,7 +500,7 @@ jobs:
           github-token: ${{ github.token }}
 
       - if: inputs.image-source == 'registry'
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -547,7 +547,7 @@ jobs:
           github-token: ${{ github.token }}
 
       - if: inputs.image-source == 'registry'
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
