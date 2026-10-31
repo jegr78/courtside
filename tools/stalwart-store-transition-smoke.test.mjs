@@ -96,7 +96,7 @@ test("given a manual branch nightly, when its archive is qualified, then its ima
     // then
     assert.equal(actual.image, manifest.image);
     assert.equal(actual.revision, manifest.revision);
-    writeFileSync(path, JSON.stringify({ ...manifest, signer: manifest.signer.replace("jegr78/courtside", "example/courtside") }));
+    writeFileSync(path, JSON.stringify({ ...manifest, signer: manifest.signer.replace("jegr78/courtside", "sample/courtside") }));
     assert.throws(() => validateTransitionCandidate(root), /identity/);
   });
 });
