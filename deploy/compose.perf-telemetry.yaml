@@ -31,7 +31,7 @@ services:
     cpus: 1.0
     mem_limit: 2g
     memswap_limit: 2g
-    image: prom/prometheus:v3.15.0@sha256:efd719c99d83b060d9daefdcf00360461adf279f45ef5391f8d111892118753e
+    image: prom/prometheus:v3.15.1@sha256:fa3302279710be2f21a8301ec17a8b4f2301fd829bd113839b3b6b02b6f191a2
     read_only: true
     security_opt:
       - no-new-privileges:true
@@ -61,7 +61,7 @@ services:
     mem_limit: 512m
     tmpfs:
       - /tmp:size=256m,mode=1777
-    image: grafana/grafana:13.2.4@sha256:dbbc38ea21103cefb50396340cd88afec779c7e070b0a7bf5a75b4ce46651d3f
+    image: grafana/grafana:13.3.0@sha256:488984b716c0862639f91a698adbe2862677a5a07bad42da5f03f3030883b205
     read_only: true
     security_opt:
       - no-new-privileges:true

@@ -1,6 +1,6 @@
 services:
   db:
-    image: postgres:18-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873
+    image: postgres:18-alpine@sha256:10a5c69a83035ab5239f5620d708520e8b28f5aa1f2b20143e6024532edadfb5
     pull_policy: never
     environment:
       POSTGRES_DB: courtside_security
@@ -130,7 +130,7 @@ services:
       org.courtside.security.instance-fingerprint: ${COURTSIDE_SECURITY_INSTANCE_FINGERPRINT:?required}
 
   mail:
-    image: axllent/mailpit:v1.31@sha256:23fe39e81bde596a918000b3135c0f85dc8bb4c9ea6be274b051143f3e300387
+    image: axllent/mailpit:v1.32@sha256:0790692be935ea4420d085694f7985b1f692ca6a8771ab0e0bd8ba75ac180498
     pull_policy: never
     user: ${COURTSIDE_SECURITY_MAIL_USER:?required}
     read_only: true
@@ -255,7 +255,7 @@ services:
 
   scanner-gateway:
     profiles: [assessment]
-    image: zaproxy/zap-stable:2.17.0@sha256:5ccfff9a411743ab2615136a2edd7416bec9ce41572fa94e935df38c14adb2b6
+    image: zaproxy/zap-stable:2.17.0@sha256:030d3df57735dacbb83464854758e674dd9ad01d79d12a129a8e58b1fd384238
     pull_policy: never
     command: ["python3", "/opt/courtside/security-request-gateway.py"]
     read_only: true
@@ -295,7 +295,7 @@ services:
 
   zap:
     profiles: [assessment]
-    image: zaproxy/zap-stable:2.17.0@sha256:5ccfff9a411743ab2615136a2edd7416bec9ce41572fa94e935df38c14adb2b6
+    image: zaproxy/zap-stable:2.17.0@sha256:030d3df57735dacbb83464854758e674dd9ad01d79d12a129a8e58b1fd384238
     pull_policy: never
     read_only: true
     tmpfs:
@@ -319,7 +319,7 @@ services:
 
   schemathesis:
     profiles: [assessment]
-    image: schemathesis/schemathesis:v4.32.2@sha256:d6d1e1e33718e449006c0c486aa36f6f36c6666e10fc27ea1223430232920ad2
+    image: schemathesis/schemathesis:v4.32.7@sha256:4ad0d12f128fa206fa3bbf708e0eee9624bba16838f3eded94a40ea2d6eb80bf
     pull_policy: never
     entrypoint: ["tail", "-f", "/dev/null"]
     read_only: true
@@ -348,7 +348,7 @@ services:
 
   k6-abuse:
     profiles: [assessment]
-    image: grafana/k6:2.3.0@sha256:9c2dee7f8ed74d317e4027c06a10f169b625638189de8d4555d0b3486a5aeb34
+    image: grafana/k6:2.3.0@sha256:2dd4756ec6e14e62778916e1eb850108e4b499304c02df56760fa0bdb0fba0b8
     pull_policy: never
     entrypoint: ["tail", "-f", "/dev/null"]
     read_only: true
