@@ -273,8 +273,8 @@ it by itself. You set this up once, and Courtside then checks the connection whe
 In Loxone Config you set up:
 
 1. a user group for Courtside with the group right **User management**. Do not give it **Full
-   access**. From this group right Courtside receives the rights to manage users and to change
-   their codes.
+   access**. Courtside needs the right to manage users and the right to change their codes, and
+   checks both. If one is missing, the **Login** check reports a missing right.
 2. a technical user with a password of its own that belongs to this group only. It is not an
    administrator.
 3. one normal group per door or keypad that holds the permission for that access point in the

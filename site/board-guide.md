@@ -287,8 +287,8 @@ Einrichtung machst du einmal, danach prüft Courtside die Verbindung, wenn du es
 In Loxone Config richtest du ein:
 
 1. eine Benutzergruppe für Courtside mit dem Gruppenrecht **Benutzerverwaltung**. Gib ihr keinen
-   **Vollzugriff**. Aus diesem Gruppenrecht erhält Courtside das Recht, Benutzer zu verwalten und
-   ihre Codes zu ändern.
+   **Vollzugriff**. Courtside braucht das Recht, Benutzer zu verwalten, und das Recht, ihre Codes zu
+   ändern, und prüft beide. Fehlt eines, meldet die Prüfung **Anmeldung** ein fehlendes Recht.
 2. einen technischen Benutzer mit eigenem Passwort, der nur in dieser Gruppe ist. Er ist kein
    Administrator.
 3. je Tür oder Tastenfeld eine normale Gruppe, die in den Rechten dieses Tastenfelds die
