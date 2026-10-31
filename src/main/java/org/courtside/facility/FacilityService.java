@@ -144,6 +144,23 @@ public class FacilityService {
 
     @Transactional
     public AccessPoint createAccessPoint(String name, Collection<UUID> courtIds, String staticCode,
+                                         String emergencyCode, boolean openToMembers, String loxoneGroup) {
+        return createAccessPoint(name, courtIds, staticCode, emergencyCode, openToMembers);
+    }
+
+    @Transactional
+    public AccessPoint changeAccessPoint(UUID accessPointId, String name, Collection<UUID> courtIds,
+                                         String staticCode, String emergencyCode, boolean openToMembers,
+                                         String loxoneGroup) {
+        return changeAccessPoint(accessPointId, name, courtIds, staticCode, emergencyCode, openToMembers);
+    }
+
+    public Optional<String> loxoneGroupOf(UUID accessPointId) {
+        return Optional.empty();
+    }
+
+    @Transactional
+    public AccessPoint createAccessPoint(String name, Collection<UUID> courtIds, String staticCode,
                                          String emergencyCode, boolean openToMembers) {
         String stored = requireAccessPointName(name);
         Set<UUID> courtsServed = requireCourts(courtIds);

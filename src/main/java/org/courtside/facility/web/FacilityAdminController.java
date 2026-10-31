@@ -87,7 +87,7 @@ class FacilityAdminController implements AdminCourtsApi, AdminOpeningHoursApi, A
     public ResponseEntity<ApiAccessPoint> createAccessPoint(ApiAccessPointRequest request) {
         AccessPoint accessPoint = facility.createAccessPoint(
                 request.getName(), request.getCourtIds(), request.getStaticCode(),
-                request.getEmergencyCode(), Boolean.TRUE.equals(request.getOpenToMembers()));
+                request.getEmergencyCode(), Boolean.TRUE.equals(request.getOpenToMembers()), request.getLoxoneGroup());
         return ResponseEntity
                 .created(URI.create("/api/admin/access-points/" + accessPoint.getId()))
                 .body(toResponse(accessPoint));
@@ -102,7 +102,8 @@ class FacilityAdminController implements AdminCourtsApi, AdminOpeningHoursApi, A
     public ResponseEntity<ApiAccessPoint> changeAccessPoint(UUID id, ApiAccessPointRequest request) {
         return ResponseEntity.ok(toResponse(facility.changeAccessPoint(
                 id, request.getName(), request.getCourtIds(), request.getStaticCode(),
-                request.getEmergencyCode(), Boolean.TRUE.equals(request.getOpenToMembers()))));
+                request.getEmergencyCode(), Boolean.TRUE.equals(request.getOpenToMembers()),
+                request.getLoxoneGroup())));
     }
 
     @Override
@@ -245,7 +246,7 @@ class FacilityAdminController implements AdminCourtsApi, AdminOpeningHoursApi, A
         return new ApiAccessPoint(accessPoint.getId(), accessPoint.getName(),
                 new LinkedHashSet<>(accessPoint.getCourtIds().stream().sorted().toList()),
                 accessPoint.getStaticCode(), accessPoint.getEmergencyCode(), accessPoint.isOpenToMembers(),
-                accessPoint.isActive());
+                accessPoint.getLoxoneGroup(), accessPoint.isActive());
     }
 
     private static ApiCourt toResponse(Court court) {

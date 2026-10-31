@@ -33,6 +33,16 @@ public class FacilityTestFixture {
         return facilityService.createAccessPoint(name, courtIds, staticCode, null, openToMembers).getId();
     }
 
+    public UUID createAccessPointWithLoxoneGroup(String name, String loxoneGroup) {
+        return facilityService.createAccessPoint(name, List.of(), null, null, false, loxoneGroup).getId();
+    }
+
+    public void mapLoxoneGroup(UUID accessPointId, String loxoneGroup) {
+        var stored = facilityService.requireAccessPoint(accessPointId);
+        facilityService.changeAccessPoint(accessPointId, stored.getName(), List.copyOf(stored.getCourtIds()),
+                stored.getStaticCode(), stored.getEmergencyCode(), stored.isOpenToMembers(), loxoneGroup);
+    }
+
     public UUID createAccessPointWithEmergencyCode(String name, List<UUID> courtIds, String emergencyCode) {
         return facilityService.createAccessPoint(name, courtIds, null, emergencyCode, false).getId();
     }

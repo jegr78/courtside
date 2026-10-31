@@ -976,7 +976,7 @@ components:
         A door or gate on the way to the courts. The board names the courts it serves and may keep
         a static access code for its keypad, or an emergency code when the access-control system
         issues the codes.
-      required: [id, name, courtIds, staticCode, emergencyCode, openToMembers, active]
+      required: [id, name, courtIds, staticCode, emergencyCode, openToMembers, loxoneGroup, active]
       properties:
         id: { type: string, format: uuid }
         name: { type: string }
@@ -995,6 +995,11 @@ components:
         openToMembers:
           type: boolean
           description: Every current member sees the static code, with or without a booking.
+        loxoneGroup:
+          type: [string, "null"]
+          description: |
+            The uuid of the Loxone user group a booking's user joins for this access point, or `null`
+            without one.
         active: { type: boolean }
 
     AccessPointRequest:
@@ -1026,6 +1031,11 @@ components:
           description: |
             Only without a static code. A new or changed code follows the static code's length rule
             and differs from every static code. Absent or `null` removes it.
+        loxoneGroup:
+          type: [string, "null"]
+          description: |
+            The uuid of a normal Loxone user group, as `GET /api/admin/access-control/groups` lists them.
+            Absent or `null` removes it.
 
     AdminAccessGrantStatus:
       type: string
