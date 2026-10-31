@@ -336,6 +336,20 @@ class LoxoneConnectionCheckTest extends LoxoneTestSupport {
     }
 
     @Test
+    void givenAProbeNamedUserWithAMalformedUuid_whenChecked_thenTheProbeUserFailsAndNothingIsChanged() {
+        // given
+        simulator.addUser(LEFTOVER, "not-a-loxone-uuid", false);
+
+        // when
+        List<ConnectionCheckRun.Checked> checked = checked(connector);
+
+        // then
+        assertThat(result(checked, "probe-user")).as("a user the connector cannot address safely stays untouched")
+                .isEqualTo(CheckResult.failed("access.check.probeUser.leftoverProtected", Map.of()));
+        assertThat(simulator.requests()).noneMatch(LoxoneSimulator.Request::mutating);
+    }
+
+    @Test
     void givenAMiniserverRefusingTheProbeUser_whenChecked_thenItFailsAsNotCreated() {
         // given
         simulator.force("addoredituser", 500);

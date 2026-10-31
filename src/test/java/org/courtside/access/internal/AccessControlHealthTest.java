@@ -15,6 +15,9 @@ import java.time.Instant;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.not;
+import static org.hamcrest.Matchers.containsString;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.hamcrest.Matchers.hasItem;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -81,6 +84,19 @@ class AccessControlHealthTest extends AccessPassTestSupport {
                 .andExpect(jsonPath("$.components.accessControl.details.classification").value("TIMEOUT"))
                 .andExpect(jsonPath("$.components.accessControl.details.checkedAt").value("2026-05-12T09:58:00Z"));
         assertThat(connector.calls()).as("reading the health never calls the access-control system").isEmpty();
+    }
+
+    @Test
+    @WithMockUser(username = "doe.jane", roles = "MEMBER")
+    void givenAMember_whenAskingForTheAccessControlHealth_thenItIsForbiddenAndShowsNoDetail() throws Exception {
+        // given
+        readings.record(ProbeClassification.TIMEOUT, CHECKED_AT);
+
+        // when / then
+        mockMvc.perform(get("/actuator/health/access-control"))
+                .andExpect(status().isForbidden())
+                .andExpect(content().string(not(containsString("accessControl"))))
+                .andExpect(content().string(not(containsString("TIMEOUT"))));
     }
 
     @Test
