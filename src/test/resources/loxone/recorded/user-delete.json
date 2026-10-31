@@ -8,7 +8,7 @@
   "response" : {
     "LL" : {
       "control" : "dev/sps/getuserlist2",
-      "value" : "[{\"name\":\"<name-2>\",\"uniqueUserId\":\"\",\"uuid\":\"<loxone-uuid-3>\",\"isAdmin\":false,\"userState\":4,\"<key-3>\":false,\"validUntil\":\"<time-7>\",\"expirationAction\":1,\"validFrom\":\"<time-6>\"},{\"name\":\"<name-3>\",\"uniqueUserId\":\"\",\"uuid\":\"<loxone-uuid-4>\",\"isAdmin\":false,\"userState\":4,\"<key-3>\":false,\"validUntil\":\"<time-7>\",\"expirationAction\":1,\"validFrom\":\"<time-6>\"}]",
+      "value" : "[{\"name\":\"<name-2>\",\"uniqueUserId\":\"\",\"uuid\":\"<loxone-uuid-3>\",\"isAdmin\":false,\"userState\":4,\"<key-3>\":false,\"validUntil\":\"<time-7>\",\"expirationAction\":1,\"validFrom\":\"<time-6>\"},{\"name\":\"<name-3>\",\"uniqueUserId\":\"\",\"uuid\":\"<loxone-uuid-4>\",\"isAdmin\":false,\"userState\":4,\"<key-3>\":false,\"validUntil\":\"<time-9>\",\"expirationAction\":1,\"validFrom\":\"<time-5>\"}]",
       "Code" : "200"
     }
   }

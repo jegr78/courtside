@@ -107,7 +107,7 @@ final class RecordedFixtures {
     }
 
     /** Where a replay answers differently from a recording, named by step and key path and never by value. */
-    static List<String> differences(Path recorded, Path replayed, Set<String> stale) {
+    static List<String> differences(Path recorded, Path replayed) {
         List<String> found = new ArrayList<>();
         try (Stream<Path> files = Files.list(recorded)) {
             for (Path file : files.filter(path -> path.toString().endsWith(".json")).sorted().toList()) {
@@ -127,15 +127,7 @@ final class RecordedFixtures {
                 JsonNode got = renumbered(canonical(actual, null));
                 for (int index = 0; index < expected.size(); index++) {
                     String where = step + " $[" + index + "]";
-                    List<String> differing = new ArrayList<>();
-                    compare(where, wanted.get(index), got.get(index), differing);
-                    if (stale.contains(step + "[" + index + "]")) {
-                        if (differing.isEmpty()) {
-                            found.add(where + " is listed as stale but matches; remove it from the list");
-                        }
-                    } else {
-                        found.addAll(differing);
-                    }
+                    compare(where, wanted.get(index), got.get(index), found);
                 }
             }
         } catch (IOException unreadable) {

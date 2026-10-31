@@ -591,7 +591,7 @@ final class LoxoneSimulator implements AutoCloseable {
                     yield Answer.header(401);
                 }
                 tokens.remove(killed);
-                yield Answer.of(200);
+                yield new Answer(200, JSON.createObjectNode(), false);
             }
             default -> Answer.of(404);
         };

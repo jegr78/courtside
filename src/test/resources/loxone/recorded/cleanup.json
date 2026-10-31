@@ -18,6 +18,12 @@
     "arguments" : [ "<token-2>", "<secret-2>" ],
     "query" : { }
   },
-  "status" : 401,
-  "response" : "<html-1>"
+  "status" : 200,
+  "response" : {
+    "LL" : {
+      "control" : "dev/sys/killtoken/<token-2>/<secret-2>",
+      "value" : { },
+      "code" : "200"
+    }
+  }
 } ]

@@ -11,7 +11,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Stream;
 
@@ -22,7 +21,6 @@ class LoxoneRecordedFixtureTest extends LoxoneTestSupport {
 
     private static final String DEVICE_CODE = "73519246";
     // The fixture holds killtoken sent without its token, which the Miniserver answered 401; re-record to drop these.
-    private static final Set<String> STALE = Set.of("connection-check[2]", "cleanup[1]");
     private static final List<String> STEPS = List.of("probe", "connection-check", "getip", "api-key", "local-time",
             "user-create", "user-code", "user-duplicate", "user-read", "user-delete", "user-list", "cleanup");
 
@@ -88,7 +86,7 @@ class LoxoneRecordedFixtureTest extends LoxoneTestSupport {
         recorder.write(target);
 
         // then
-        assertThat(RecordedFixtures.differences(RecordedFixtures.RECORDED, target, STALE))
+        assertThat(RecordedFixtures.differences(RecordedFixtures.RECORDED, target))
                 .as("the simulator answers each recorded step as the Miniserver did").isEmpty();
     }
 
@@ -106,7 +104,7 @@ class LoxoneRecordedFixtureTest extends LoxoneTestSupport {
         Files.writeString(apiKey, Files.readString(apiKey).replace("'version':'17.0.3.31'", "'version':'17.0.3.30'"));
 
         // when
-        List<String> differences = RecordedFixtures.differences(RecordedFixtures.RECORDED, copy, Set.of());
+        List<String> differences = RecordedFixtures.differences(RecordedFixtures.RECORDED, copy);
 
         // then
         assertThat(differences).containsExactly("api-key $[0].response.LL.value.(single-quoted).version differs");
