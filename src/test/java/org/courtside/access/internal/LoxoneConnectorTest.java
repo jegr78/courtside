@@ -285,7 +285,16 @@ class LoxoneConnectorTest extends LoxoneTestSupport {
         assertThatThrownBy(() -> bounded.grant(instruction(grantId)))
                 .isInstanceOf(LoxoneFailure.class)
                 .hasMessage("no answer to getuserlist2 within the call deadline");
-        assertThat(Duration.ofNanos(System.nanoTime() - started)).isLessThan(Duration.ofMillis(1_800));
+        assertThat(Duration.ofNanos(System.nanoTime() - started))
+                .as("the connector gives up before the call runner abandons it").isLessThan(Duration.ofSeconds(1));
+    }
+
+    @Test
+    void givenACallDeadline_whenASessionStarts_thenItKeepsAMarginOfAtMostATenthOrAQuarterSecond() {
+        // then
+        assertThat(LoxoneClient.budget(Duration.ofSeconds(15))).isEqualTo(Duration.ofMillis(14_750));
+        assertThat(LoxoneClient.budget(Duration.ofSeconds(1))).isEqualTo(Duration.ofMillis(900));
+        assertThat(LoxoneClient.budget(Duration.ofMillis(500))).isEqualTo(Duration.ofMillis(450));
     }
 
     @Test

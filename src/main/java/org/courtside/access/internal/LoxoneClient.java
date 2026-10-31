@@ -35,6 +35,7 @@ final class LoxoneClient implements AutoCloseable {
     private static final int APP_AND_USER_MANAGEMENT = 0x4 | USER_MANAGEMENT;
     private static final Duration RENEWAL_MARGIN = Duration.ofHours(1);
     private static final Duration LOCK = Duration.ofMinutes(5);
+    private static final Duration MOST_MARGIN = Duration.ofMillis(250);
     private static final int MOST_REPLY_BYTES = 4 * 1024 * 1024;
     private static final String SPS = "/jdev/sps/";
     private static final String SYS = "/jdev/sys/";
@@ -99,11 +100,17 @@ final class LoxoneClient implements AutoCloseable {
                 .build();
     }
 
+    /** The call deadline less a margin, so the connector ends a call before the call runner abandons it. */
+    static Duration budget(Duration callDeadline) {
+        Duration tenth = callDeadline.dividedBy(10);
+        return callDeadline.minus(tenth.compareTo(MOST_MARGIN) < 0 ? tenth : MOST_MARGIN);
+    }
+
     Session session() {
         if (closed) {
             throw new LoxoneFailure("the connector is closed");
         }
-        return new Session(System.nanoTime() + settings.callDeadline().toNanos());
+        return new Session(System.nanoTime() + budget(settings.callDeadline()).toNanos());
     }
 
     /** One port call: every request it sends shares the call's deadline. */
