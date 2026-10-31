@@ -49,7 +49,7 @@ export function AdminAccessPointsView({ configurationChanged }: { configurationC
   const { t } = useTranslation();
   const [accessPoints, setAccessPoints] = useState<AccessPoint[]>();
   const [courts, setCourts] = useState<AdminCourt[]>();
-  const [groups, setGroups] = useState<RemoteGroup[]>();
+  const [groups, setGroups] = useState<AccessControlGroups>();
   const [editing, setEditing] = useState<string>();
   const { error, success, pending, reportError, refuse, save } = useSaving();
   const settings = useClubConfigForm(configurationChanged, ownedFields.accessSettings);
@@ -61,7 +61,7 @@ export function AdminAccessPointsView({ configurationChanged }: { configurationC
       .then(([points, allCourts, config, listed]) => {
         setAccessPoints(points);
         setCourts(allCourts);
-        setGroups(listed.groups);
+        setGroups(listed);
         settingsLoaded(config);
       })
       .catch(reportError);
@@ -194,7 +194,7 @@ function AccessPointForm({ id, heading, courts, groups, digits, stored, disabled
   id: string;
   heading: string;
   courts: AdminCourt[];
-  groups: RemoteGroup[];
+  groups: AccessControlGroups;
   digits: number;
   stored?: AccessPoint;
   disabled: boolean;
@@ -250,13 +250,17 @@ function AccessPointForm({ id, heading, courts, groups, digits, stored, disabled
 }
 
 // Without a list the stored group still travels with every save, because a change replaces every field.
-function LoxoneGroupField({ prefix, groups, stored, disabled }: {
+function LoxoneGroupField({ prefix, groups: offered, stored, disabled }: {
   prefix: string;
-  groups: RemoteGroup[];
+  groups: AccessControlGroups;
   stored: string | null;
   disabled: boolean;
 }) {
   const { t } = useTranslation();
+  const groups: RemoteGroup[] = offered.groups;
+  if (!offered.listsGroups) {
+    return <input type="hidden" name="loxoneGroup" value={stored ?? ""} />;
+  }
   if (groups.length === 0) {
     return <div className="grid gap-1">
       <input type="hidden" name="loxoneGroup" value={stored ?? ""} />

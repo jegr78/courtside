@@ -179,6 +179,11 @@ class LoxoneAccessControl implements AccessControlConnector, AutoCloseable {
     }
 
     @Override
+    public boolean listsGroups() {
+        return true;
+    }
+
+    @Override
     public List<RemoteGroup> groups() {
         return groups;
     }

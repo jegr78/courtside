@@ -65,9 +65,10 @@ public class AccessGrantAdministration {
     /** The groups the last answered probe read, without calling the system; empty and untimed without any. */
     public Groups groups() {
         AccessControlConnector connector = connectors.getIfAvailable();
-        List<RemoteGroup> listed = connector == null ? List.of() : connector.groups();
-        return listed.isEmpty() ? new Groups(List.of(), null)
-                : new Groups(listed, readings.answeredAt().orElse(null));
+        boolean offered = connector != null && connector.listsGroups();
+        List<RemoteGroup> listed = offered ? connector.groups() : List.of();
+        return listed.isEmpty() ? new Groups(offered, List.of(), null)
+                : new Groups(true, listed, readings.answeredAt().orElse(null));
     }
 
     @Transactional
@@ -115,7 +116,7 @@ public class AccessGrantAdministration {
                            long total) {
     }
 
-    public record Groups(List<RemoteGroup> groups, @Nullable Instant readAt) {
+    public record Groups(boolean offered, List<RemoteGroup> groups, @Nullable Instant readAt) {
     }
 
     public record Probe(boolean reachable, ProbeClassification classification, String detail, Instant checkedAt) {
