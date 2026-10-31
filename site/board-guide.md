@@ -211,6 +211,16 @@ funktioniert, und nur, solange der Zugangscode ihrer Buchung gilt. Jede Abfrage 
 mit dem Konto, der Buchung und dem Zugang, nie mit dem Code. Wer ihn einmal abgefragt hat, kennt ihn,
 bis du ihn änderst. Ändere ihn deshalb von Zeit zu Zeit und nach einem Missbrauch.
 
+Ist ein Loxone Miniserver als Zutrittssystem angebunden, wählst du für jeden Zugang ohne festen Code
+eine **Loxone-Gruppe**. Der Miniserver-Benutzer einer Buchung tritt dieser Gruppe bei, die Gruppe
+entscheidet also, welche Tür sein Code öffnet. Die Auswahl zeigt die Gruppen, die Courtside bei der
+letzten Prüfung des Miniservers gelesen hat. Ist sie leer, steht an ihrer Stelle ein Hinweis. Drücke
+dann unter *Zugangsberechtigungen* auf **Jetzt prüfen**, nach der Prüfung erscheinen die Gruppen. Eine
+gespeicherte Gruppe, die der Miniserver nicht mehr kennt, steht als *Unbekannte Gruppe* in der
+Auswahl. Wähle dann eine andere oder entferne sie. Ein Zugang ohne Gruppe öffnet sich mit keinem
+Buchungscode. Seine Berechtigungen scheitern mit dem Grund *access point has no Loxone group*, bis du
+eine Gruppe wählst.
+
 ### Gebäudesteuerung
 
 Flutlicht und Bewässerung bleiben in eurer Gebäudesteuerung. Sie fragt Courtside regelmäßig, ob ein

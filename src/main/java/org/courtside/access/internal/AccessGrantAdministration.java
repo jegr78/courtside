@@ -1,7 +1,9 @@
 package org.courtside.access.internal;
 
+import org.courtside.access.AccessControlConnector;
 import org.courtside.access.AccessGrantEvent;
 import org.courtside.access.GrantStatus;
+import org.courtside.access.RemoteGroup;
 import org.courtside.facility.AccessPoint;
 import org.courtside.facility.FacilityService;
 import org.courtside.shared.BookingAnnouncement;
@@ -30,6 +32,7 @@ public class AccessGrantAdministration {
     private final AccessGrantRepository grants;
     private final ProbeReadings readings;
     private final ObjectProvider<AccessWorker> worker;
+    private final ObjectProvider<AccessControlConnector> connectors;
     private final BookingAnnouncer bookings;
     private final FacilityService facility;
     private final PassClock clock;
@@ -37,12 +40,13 @@ public class AccessGrantAdministration {
     private final String connector;
 
     AccessGrantAdministration(AccessGrantRepository grants, ProbeReadings readings, ObjectProvider<AccessWorker> worker,
-                              BookingAnnouncer bookings, FacilityService facility, PassClock clock,
-                              ApplicationEventPublisher events,
+                              ObjectProvider<AccessControlConnector> connectors, BookingAnnouncer bookings,
+                              FacilityService facility, PassClock clock, ApplicationEventPublisher events,
                               @Value("${courtside.access-control.connector}") String connector) {
         this.grants = grants;
         this.readings = readings;
         this.worker = worker;
+        this.connectors = connectors;
         this.bookings = bookings;
         this.facility = facility;
         this.clock = clock;
@@ -56,6 +60,15 @@ public class AccessGrantAdministration {
                 readings.latest().map(reading -> new Probe(reading.reachable(), reading.classification(), reading.detail(),
                         reading.checkedAt())).orElse(null),
                 views(shown), grants.countNotDone());
+    }
+
+    /** The groups the last answered probe read, without calling the system; empty and untimed without any. */
+    public Groups groups() {
+        AccessControlConnector connector = connectors.getIfAvailable();
+        boolean offered = connector != null && connector.listsGroups();
+        List<RemoteGroup> listed = offered ? connector.groups() : List.of();
+        return listed.isEmpty() ? new Groups(offered, List.of(), null)
+                : new Groups(true, listed, readings.answeredAt().orElse(null));
     }
 
     @Transactional
@@ -101,6 +114,9 @@ public class AccessGrantAdministration {
 
     public record Overview(String connector, boolean connected, @Nullable Probe probe, List<GrantView> grants,
                            long total) {
+    }
+
+    public record Groups(boolean offered, List<RemoteGroup> groups, @Nullable Instant readAt) {
     }
 
     public record Probe(boolean reachable, ProbeClassification classification, String detail, Instant checkedAt) {

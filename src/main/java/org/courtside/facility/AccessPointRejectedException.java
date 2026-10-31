@@ -43,6 +43,11 @@ public class AccessPointRejectedException extends CodedDomainFailure {
         return new AccessPointRejectedException("facility.accessPoint.emergencyCodeCollides", Map.of("field", field));
     }
 
+    static AccessPointRejectedException loxoneGroupMalformed() {
+        return new AccessPointRejectedException("facility.accessPoint.loxoneGroupMalformed",
+                Map.of("field", "loxoneGroup"));
+    }
+
     static AccessPointRejectedException openToMembersNeedsCode() {
         return new AccessPointRejectedException("facility.accessPoint.openToMembersNeedsCode",
                 Map.of("field", "openToMembers"));

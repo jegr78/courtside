@@ -519,6 +519,69 @@
       ]
     },
     {
+      "id": "loxone-token-login",
+      "purpose": "Prove the technical user's password to a Loxone Miniserver when acquiring a token for user management",
+      "algorithm": "HMAC-SHA-256",
+      "parameters": {
+        "passwordHash": "SHA-256 of password:salt, uppercase hex",
+        "key": "one-time hex key from getkey2",
+        "variant": "HMAC-SHA-1 over a SHA-1 password hash when a Miniserver names SHA1 in getkey2",
+        "encoding": "lowercase hex HMAC"
+      },
+      "implementation": "java-runtime",
+      "strength": {
+        "decidedBy": "loxone",
+        "basis": "The Miniserver's token protocol names the hash algorithm and issues the one-time key; Courtside follows it. The exchange runs inside verified HTTPS, so the hash never leaves an authenticated channel, and the password itself is never sent."
+      },
+      "class": "credential-protection",
+      "owner": "club-operator",
+      "storageBoundary": "The password comes from the deployment environment and stays in application memory. The salted hash and the HMAC exist only for one getjwt request; the issued token is held in memory and killed on shutdown.",
+      "permittedUse": "The Loxone getkey2/getjwt token login only. SHA-1 appears only when a Miniserver names it, and neither digest is used as a general hash or signature.",
+      "rotation": "Changing the technical user's password on the Miniserver and in the deployment environment; a restart acquires a new token.",
+      "revocation": "killtoken on shutdown; disabling the technical user or removing its user-management right on the Miniserver ends every token.",
+      "recovery": "Restore the password in the deployment environment; the next call acquires a new token.",
+      "retirement": "Remove with the Loxone connector, or follow the Miniserver when it names a successor algorithm.",
+      "evidence": "src/test/java/org/courtside/access/internal/LoxoneLoginTest.java",
+      "detects": [
+        "javax.crypto",
+        "MessageDigest"
+      ],
+      "locations": [
+        "src/main/java/org/courtside/access/internal/LoxoneLogin.java"
+      ]
+    },
+    {
+      "id": "loxone-mapping-fingerprint",
+      "purpose": "Bound the fingerprint of an access point's Loxone group mapping to the port's 200 characters",
+      "algorithm": "SHA-256",
+      "parameters": {
+        "outputBytes": 32,
+        "encoding": "lowercase hex",
+        "appliesAbove": "200 characters of plain mapping"
+      },
+      "implementation": "java-runtime",
+      "strength": {
+        "decidedBy": "repository",
+        "bits": 128,
+        "basis": "Collision resistance of SHA-256 over sorted group uuids, so two different mappings do not share a fingerprint. Nothing secret is hashed."
+      },
+      "class": "identifier",
+      "owner": "club-operator",
+      "storageBoundary": "Stored as the grant's mapping fingerprint in PostgreSQL; its input is configuration a board can read.",
+      "permittedUse": "Detecting a changed access point mapping. It never authenticates anything.",
+      "rotation": "Not applicable: no key exists.",
+      "revocation": "Not applicable: the fingerprint is recomputed from the current mapping.",
+      "recovery": "None is needed; it is recomputed on read.",
+      "retirement": "A successor may replace it; a changed fingerprint only reinstalls grants once.",
+      "evidence": "src/test/java/org/courtside/access/internal/LoxoneConnectorTest.java",
+      "detects": [
+        "MessageDigest"
+      ],
+      "locations": [
+        "src/main/java/org/courtside/access/internal/LoxoneAccessControl.java"
+      ]
+    },
+    {
       "id": "account-session-revocation-handle",
       "purpose": "Let an account select one stored session for revocation without exposing its bearer session identifier",
       "algorithm": "SHA-256",

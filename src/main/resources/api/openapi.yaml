@@ -976,7 +976,7 @@ components:
         A door or gate on the way to the courts. The board names the courts it serves and may keep
         a static access code for its keypad, or an emergency code when the access-control system
         issues the codes.
-      required: [id, name, courtIds, staticCode, emergencyCode, openToMembers, active]
+      required: [id, name, courtIds, staticCode, emergencyCode, openToMembers, loxoneGroup, active]
       properties:
         id: { type: string, format: uuid }
         name: { type: string }
@@ -995,6 +995,11 @@ components:
         openToMembers:
           type: boolean
           description: Every current member sees the static code, with or without a booking.
+        loxoneGroup:
+          type: [string, "null"]
+          description: |
+            The uuid of the Loxone user group a booking's user joins for this access point, or `null`
+            without one.
         active: { type: boolean }
 
     AccessPointRequest:
@@ -1026,6 +1031,37 @@ components:
           description: |
             Only without a static code. A new or changed code follows the static code's length rule
             and differs from every static code. Absent or `null` removes it.
+        loxoneGroup:
+          type: [string, "null"]
+          pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{16}$"
+          description: |
+            The uuid of a normal Loxone user group, as `GET /api/admin/access-control/groups` lists them.
+            Absent or `null` removes it.
+
+    AccessControlGroup:
+      type: object
+      description: A group on the access-control system.
+      required: [id, name]
+      properties:
+        id:
+          type: string
+          description: The system's own id of the group, for a Loxone Miniserver its uuid.
+        name: { type: string }
+
+    AccessControlGroups:
+      type: object
+      required: [listsGroups, groups, readAt]
+      properties:
+        listsGroups:
+          type: boolean
+          description: Whether the connected system offers groups to map an access point onto at all.
+        groups:
+          type: array
+          items: { $ref: "#/components/schemas/AccessControlGroup" }
+        readAt:
+          type: [string, "null"]
+          format: date-time
+          description: When the check that read these groups ran, or `null` without any.
 
     AdminAccessGrantStatus:
       type: string
@@ -8217,6 +8253,28 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/AccessGrantOverview" }
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/admin/access-control/groups:
+    get:
+      tags: [admin-access-grants]
+      operationId: listAccessControlGroups
+      summary: The groups of the access-control system a board can map an access point onto.
+      description: |
+        The normal groups the last successful check of the access-control system read. Reading them never
+        calls the system. The list is empty and `readAt` is `null` before a check has read any groups or
+        when the connected system has none to offer; `listsGroups` says whether it ever offers any.
+      responses:
+        "200":
+          description: The groups.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AccessControlGroups" }
         "401":
           $ref: "#/components/responses/Unauthenticated"
         "403":

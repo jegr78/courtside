@@ -11,6 +11,7 @@ import org.springframework.web.context.WebApplicationContext;
 
 import java.util.UUID;
 
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -40,6 +41,16 @@ class AccessGrantAdminWithoutConnectorTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.connected").value(false))
                 .andExpect(jsonPath("$.probe").isEmpty())
                 .andExpect(jsonPath("$.grants").isEmpty());
+    }
+
+    @Test
+    void givenNoConnector_whenTheBoardReadsTheGroups_thenNoListIsOffered() throws Exception {
+        // when / then
+        mockMvc.perform(get("/api/admin/access-control/groups"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.listsGroups").value(false))
+                .andExpect(jsonPath("$.groups.length()").value(0))
+                .andExpect(jsonPath("$.readAt").value(nullValue()));
     }
 
     @Test

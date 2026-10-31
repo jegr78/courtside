@@ -81,6 +81,9 @@ abstract class AccessPassTestSupport extends AbstractIntegrationTest {
     @Autowired
     ProbeReadings readings;
 
+    @Autowired
+    AccessReconciliation reconciliation;
+
     List<UUID> courts;
     UUID northGate;
     UUID southGate;
@@ -91,6 +94,8 @@ abstract class AccessPassTestSupport extends AbstractIntegrationTest {
     void aClubWhoseGatesOpenByCode() {
         connector.reset();
         ((AtomicReference<?>) ReflectionTestUtils.getField(readings, "latest")).set(null);
+        ((AtomicReference<?>) ReflectionTestUtils.getField(readings, "answeredAt")).set(null);
+        ((AtomicReference<?>) ReflectionTestUtils.getField(reconciliation, "lastRunAt")).set(null);
         clock.set(START);
         for (DayOfWeek day : DayOfWeek.values()) {
             facility.setOpeningHours(day, new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0)));

@@ -19,6 +19,7 @@ import org.springframework.web.context.WebApplicationContext;
 import java.util.UUID;
 
 import static org.hamcrest.Matchers.containsInAnyOrder;
+import static org.hamcrest.Matchers.nullValue;
 import static org.hamcrest.Matchers.emptyIterable;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.containsString;
@@ -353,6 +354,38 @@ class AccessPointAdminControllerTest extends AbstractIntegrationTest {
                 """)
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:access-point-name-taken"));
+    }
+
+    @Test
+    void givenALoxoneGroup_whenCreatingAndClearingIt_thenTheAccessPointCarriesItUntilNull() throws Exception {
+        // given
+        String id = JsonPath.read(create("""
+                {"name": "North gate", "courtIds": [], "loxoneGroup": "0f1e2d3c-4b5a-6978-8796a5b4c3d2e1f0"}
+                """).andExpect(status().isCreated())
+                .andExpect(jsonPath("$.loxoneGroup").value("0f1e2d3c-4b5a-6978-8796a5b4c3d2e1f0"))
+                .andReturn().getResponse().getContentAsString(), "$.id");
+
+        // when
+        change(id, """
+                {"name": "North gate", "courtIds": [], "loxoneGroup": null}
+                """).andExpect(status().isOk());
+
+        // then
+        mockMvc.perform(get("/api/admin/access-points/" + id))
+                .andExpect(jsonPath("$.loxoneGroup").value(nullValue()));
+    }
+
+    @Test
+    void givenAMalformedLoxoneGroup_whenCreatingAnAccessPoint_thenTheFieldIsRefusedBeforeTheDatabase() throws Exception {
+        // when / then
+        create("""
+                {"name": "North gate", "courtIds": [], "loxoneGroup": "0F1E2D3C-4B5A-6978-8796A5B4C3D2E1F0"}
+                """)
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:validation-failed"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("loxoneGroup"))
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.Pattern"));
+        mockMvc.perform(get("/api/admin/access-points")).andExpect(jsonPath("$.length()").value(0));
     }
 
     @Test

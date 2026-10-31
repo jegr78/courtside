@@ -22,11 +22,15 @@ class ProbeReadings {
     }
 
     private final AtomicReference<Reading> latest = new AtomicReference<>();
+    private final AtomicReference<Instant> answeredAt = new AtomicReference<>();
     private final AtomicBoolean requested = new AtomicBoolean();
 
     void record(ProbeOutcome answer, Instant checkedAt) {
         switch (answer) {
-            case ProbeOutcome.Answered answered -> record(ProbeClassification.ANSWERED, "", checkedAt);
+            case ProbeOutcome.Answered answered -> {
+                answeredAt.set(checkedAt);
+                record(ProbeClassification.ANSWERED, "", checkedAt);
+            }
             case ProbeOutcome.Unreachable(String reason) -> record(ProbeClassification.UNREACHABLE, reason, checkedAt);
             case ProbeOutcome.Refused(String reason) -> record(ProbeClassification.REFUSED, reason, checkedAt);
         }
@@ -41,6 +45,10 @@ class ProbeReadings {
         latest.set(new Reading(classification,
                 detail.length() > MOST_DETAIL_CHARACTERS ? detail.substring(0, MOST_DETAIL_CHARACTERS) : detail,
                 checkedAt));
+    }
+
+    Optional<Instant> answeredAt() {
+        return Optional.ofNullable(answeredAt.get());
     }
 
     Optional<Reading> latest() {

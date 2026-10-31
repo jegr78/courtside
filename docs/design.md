@@ -628,6 +628,23 @@ operator and never carries a URL, a credential or a code. The deployment selects
 worker, records no grant and leaves every booking path unchanged. `simulated` accepts every call in
 memory; it serves development, the demo profile and the browser journeys.
 
+`loxone` manages a Loxone Miniserver over HTTPS: the user-management web services and a token with
+the user-management right from `getkey2` and `getjwt`. It reaches the Miniserver by serial through the
+`getip` answer of `connect.loxonecloud.com`, accepted only under a Loxone relay domain, or at a fixed
+`https://` URL. A failed request forgets the relay address, and the next call asks for it again. Each
+grant is one timespan user named `courtside_` plus the grant id's hex digits, with deletion at its
+end, the code and the Loxone groups of its access points. Its window is sent in the Miniserver's wall
+time of the club zone. That is an assumption until a door has confirmed it, and
+`docs/security-risks.md` describes the effect if the Miniserver counts in UTC. A board picks each
+access point's group from the normal groups the last successful probe read; the connector refuses any
+other group, and a grant whose access point has none. It changes or deletes only users of that name
+that are not administrators, counts a change only on the Miniserver's own reply, and a revoke answers
+`Accepted` only after a listing finds none left. The Miniserver's lock after requests without rights
+holds every request for five minutes. Once an hour, at the end of a completed pass, a connector that
+lists its users is compared with the rows: a listed grant that is removed here and no longer wanted or
+refused is revoked again, an installed grant it no longer lists is installed again while wanted, and a
+listed id without a row is left alone.
+
 An access point with a static code is served by that code only and never by a dynamic grant. A
 booking has demand when it is confirmed, its card grants access and at least one of its courts sits
 behind an active access point without a static code; the grant covers the union of those access

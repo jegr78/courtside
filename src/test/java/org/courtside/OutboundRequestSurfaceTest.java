@@ -19,9 +19,10 @@ class OutboundRequestSurfaceTest {
             "WebClient.create", "WebClient.builder", "new RestTemplate", ".openConnection(",
             "new Socket(", "SocketChannel.open");
 
-    // The breach endpoint, whose destination is configuration and never a request, and the start-up
-    // warm-up, which reaches nothing but this instance's own port on the loopback address.
+    // The breach endpoint and the Miniserver, whose destinations are deployment configuration and never a
+    // request, and the start-up warm-up, which reaches nothing but this instance's own loopback port.
     private static final List<String> CALLS_OUT = List.of(
+            "org/courtside/access/internal/LoxoneClient.java",
             "org/courtside/identity/internal/HaveIBeenPwnedPasswordLookup.java",
             "org/courtside/shared/internal/LoopbackReadStep.java");
 

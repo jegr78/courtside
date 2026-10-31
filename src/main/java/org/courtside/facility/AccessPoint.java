@@ -40,6 +40,9 @@ public class AccessPoint {
     @Column(name = "open_to_members", nullable = false)
     private boolean openToMembers;
 
+    @Column(name = "loxone_group")
+    private String loxoneGroup;
+
     @Getter(AccessLevel.NONE)
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "access_point_court", joinColumns = @JoinColumn(name = "access_point_id"))
@@ -69,6 +72,10 @@ public class AccessPoint {
         this.staticCode = staticCode;
         this.emergencyCode = emergencyCode;
         this.openToMembers = openToMembers;
+    }
+
+    public void mapLoxoneGroup(String loxoneGroup) {
+        this.loxoneGroup = loxoneGroup;
     }
 
     public void activate() {

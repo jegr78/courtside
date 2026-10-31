@@ -315,10 +315,11 @@ class FacilityAuditTest extends AbstractIntegrationTest {
     void givenAnAccessPoint_whenItsCodeChanges_thenTheEventNamesTheFieldAndNoStoredRowCarriesEitherCode() {
         // given
         Court court = facility.createCourt(7, "Centre Court");
-        AccessPoint gate = facility.createAccessPoint("North gate", List.of(court.getId()), "135790", null, false);
+        AccessPoint gate = facility.createAccessPoint("North gate", List.of(court.getId()), "135790",
+                null, false, null);
 
         // when
-        facility.changeAccessPoint(gate.getId(), "North gate", List.of(court.getId()), "246802", null, false);
+        facility.changeAccessPoint(gate.getId(), "North gate", List.of(court.getId()), "246802", null, false, null);
 
         // then
         assertThat(audit.latestPayload(gate.getId(), FacilityEvent.AccessPointChanged.TYPE))
@@ -335,10 +336,10 @@ class FacilityAuditTest extends AbstractIntegrationTest {
     @Test
     void givenAnAccessPointWithACode_whenItIsOpenedToMembers_thenTheLogNamesTheMarkAndNoStoredRowCarriesTheCode() {
         // given
-        AccessPoint door = facility.createAccessPoint("Clubhouse door", List.of(), "135790", null, false);
+        AccessPoint door = facility.createAccessPoint("Clubhouse door", List.of(), "135790", null, false, null);
 
         // when
-        facility.changeAccessPoint(door.getId(), "Clubhouse door", List.of(), "135790", null, true);
+        facility.changeAccessPoint(door.getId(), "Clubhouse door", List.of(), "135790", null, true, null);
 
         // then
         audit.assertEventCounts(door.getId(), FacilityEvent.class, Map.of(FacilityEvent.AccessPointAdded.TYPE, 1L,
@@ -356,10 +357,10 @@ class FacilityAuditTest extends AbstractIntegrationTest {
     void givenAnAccessPoint_whenChangedWithEveryStoredValue_thenNothingIsRecorded() {
         // given
         Court court = facility.createCourt(7, "Centre Court");
-        AccessPoint gate = facility.createAccessPoint("North gate", List.of(court.getId()), null, null, false);
+        AccessPoint gate = facility.createAccessPoint("North gate", List.of(court.getId()), null, null, false, null);
 
         // when
-        facility.changeAccessPoint(gate.getId(), " North gate ", List.of(court.getId()), null, null, false);
+        facility.changeAccessPoint(gate.getId(), " North gate ", List.of(court.getId()), null, null, false, null);
         facility.setAccessPointActive(gate.getId(), true);
 
         // then
@@ -369,10 +370,10 @@ class FacilityAuditTest extends AbstractIntegrationTest {
     @Test
     void givenAnAccessPoint_whenItIsRenamedAndDeactivated_thenTheLogNamesTheFieldAndCarriesTheFlag() {
         // given
-        AccessPoint gate = facility.createAccessPoint("North gate", List.of(), null, null, false);
+        AccessPoint gate = facility.createAccessPoint("North gate", List.of(), null, null, false, null);
 
         // when
-        facility.changeAccessPoint(gate.getId(), "South gate", List.of(), null, null, false);
+        facility.changeAccessPoint(gate.getId(), "South gate", List.of(), null, null, false, null);
         facility.setAccessPointActive(gate.getId(), false);
 
         // then

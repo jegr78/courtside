@@ -5,6 +5,8 @@ import org.courtside.access.internal.AccessGrantAdministration;
 import org.courtside.access.internal.AccessGrantAdministration.GrantView;
 import org.courtside.access.internal.AccessGrantAdministration.Overview;
 import org.courtside.api.AdminAccessGrantsApi;
+import org.courtside.api.ApiAccessControlGroup;
+import org.courtside.api.ApiAccessControlGroups;
 import org.courtside.api.ApiAccessControlProbe;
 import org.courtside.api.ApiAccessControlProbeOutcome;
 import org.courtside.api.ApiAccessGrantOverview;
@@ -33,6 +35,14 @@ class AccessGrantAdminController implements AdminAccessGrantsApi {
                 WireTypes.toOffsetDateTime(overview.probe().checkedAt()));
         return ResponseEntity.ok(new ApiAccessGrantOverview(overview.connector(), overview.connected(), probe,
                 overview.grants().stream().map(AccessGrantAdminController::toResponse).toList(), overview.total()));
+    }
+
+    @Override
+    public ResponseEntity<ApiAccessControlGroups> listAccessControlGroups() {
+        AccessGrantAdministration.Groups groups = administration.groups();
+        return ResponseEntity.ok(new ApiAccessControlGroups(groups.offered(),
+                groups.groups().stream().map(group -> new ApiAccessControlGroup(group.id(), group.name())).toList(),
+                WireTypes.toOffsetDateTime(groups.readAt())));
     }
 
     @Override

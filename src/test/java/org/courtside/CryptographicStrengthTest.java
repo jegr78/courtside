@@ -77,12 +77,13 @@ class CryptographicStrengthTest {
             "caddy", "postgresql-jdbc");
 
     private static final Set<String> DECIDERS = Set.of("repository", "spring-security", "sigstore",
-            "stalwart", "caddy", "club-operator", "have-i-been-pwned");
+            "stalwart", "caddy", "club-operator", "have-i-been-pwned", "loxone");
 
     // What each implementation this test can start actually computes, proved by the probes below
     // rather than asserted here.
     private static final Map<String, Set<String>> EXERCISED = Map.of(
-            "java-runtime", Set.of("SHA-256", "SHA-1", "SecureRandom", "UUIDv4", "HMAC-SHA-1", "AES-256-GCM"),
+            "java-runtime", Set.of("SHA-256", "SHA-1", "SecureRandom", "UUIDv4", "HMAC-SHA-1", "HMAC-SHA-256",
+                    "AES-256-GCM"),
             "bouncy-castle", Set.of("argon2id"),
             "spring-security", Set.of("platform-provided", "WebAuthn-COSE"));
 
@@ -222,6 +223,11 @@ class CryptographicStrengthTest {
         assertThat(encrypted).hasSize(plaintext.length + 16);
         assertThat(java.util.HexFormat.of().formatHex(mac.doFinal("Hi There".getBytes(StandardCharsets.US_ASCII))))
                 .isEqualTo("b617318655057264e28bc0b6fb378c8ef146be00");
+        Mac sha256 = Mac.getInstance("HmacSHA256");
+        sha256.init(new SecretKeySpec(hmacKey, "HmacSHA256"));
+        assertThat(sha256.getProvider().getClass().getModule().getName()).isEqualTo(RUNTIME_MODULE);
+        assertThat(java.util.HexFormat.of().formatHex(sha256.doFinal("Hi There".getBytes(StandardCharsets.US_ASCII))))
+                .isEqualTo("b0344c61d8db38535ca8afceaf0bf12b881dc200c9833da726e9376c2e32cff7");
         assertThat(options.getRp().getId()).isEqualTo("courts.example.org");
         assertThat(options.getChallenge().getBytes()).isNotEmpty();
         assertThat(options.getPubKeyCredParams()).isNotEmpty().allSatisfy(parameter -> {

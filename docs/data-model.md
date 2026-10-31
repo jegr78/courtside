@@ -65,7 +65,7 @@ a check the application ran first.
 | `opening_period` | A season or holiday, its name and its first and last day | None |
 | `opening_period_hours` | When the facility opens and closes on one weekday of a season or holiday | `opening_period` |
 | `court_closure` | Whole days on which one court is closed, with a reason | `court` |
-| `access_point` | A door or gate on the way to the courts: its name, an optional static access code, an optional emergency code kept on its keypad, whether every member sees the static code, whether it is active | None |
+| `access_point` | A door or gate on the way to the courts: its name, an optional static access code, an optional emergency code kept on its keypad, whether every member sees the static code, the optional Loxone user group a booking's user joins for it, whether it is active | None |
 | `access_point_court` | Which courts an access point leads to | `access_point`, `court` |
 
 `court.number` is unique and positive, and `active` is what takes a court out of service without
@@ -91,6 +91,8 @@ is checked by the application, so a stored code survives a later change of that 
 null or four to eight digits (`access_point_emergency_code_digits`) and only set without a static code
 (`access_point_emergency_code_without_static_code`); that it differs from every static code is checked
 by the application.
+`loxone_group` is null or a Loxone uuid of the shape `8-4-4-16` lowercase hex digits
+(`access_point_loxone_group_shape`).
 `access_point_court` has one row per access point and court, and deleting an access point deletes
 its rows. Nothing deletes an access point: `active` retires it.
 

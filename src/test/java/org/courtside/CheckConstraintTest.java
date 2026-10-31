@@ -26,6 +26,16 @@ class CheckConstraintTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void whenInsertingAnAccessPointWithAMalformedLoxoneGroup_thenItIsRejected() {
+        // when / then
+        assertThatThrownBy(() -> jdbc.sql("INSERT INTO access_point (id, name, loxone_group) VALUES (?, ?, ?)")
+                        .params(UUID.randomUUID(), "North gate", "0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0")
+                        .update())
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .hasMessageContaining("access_point_loxone_group_shape");
+    }
+
+    @Test
     void whenInsertingABookingCardWithABlankLabel_thenItIsRejected() {
         // when / then
         assertThatThrownBy(() -> insertBookingCard("   ", "#c8a415"))

@@ -126,6 +126,7 @@
         "initiateMfaRecovery",
         "liftNoShows",
         "linkExternalReference",
+        "listAccessControlGroups",
         "listAccessGrants",
         "listAccessPoints",
         "listCourtClosures",

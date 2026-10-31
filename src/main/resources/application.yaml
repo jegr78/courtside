@@ -149,6 +149,11 @@ courtside:
   access-control:
     connector: ${COURTSIDE_ACCESS_CONTROL_CONNECTOR:none}
     call-deadline: ${COURTSIDE_ACCESS_CONTROL_CALL_DEADLINE:15s}
+    loxone:
+      serial: ${COURTSIDE_ACCESS_CONTROL_LOXONE_SERIAL:}
+      url: ${COURTSIDE_ACCESS_CONTROL_LOXONE_URL:}
+      user: ${COURTSIDE_ACCESS_CONTROL_LOXONE_USER:}
+      password: ${COURTSIDE_ACCESS_CONTROL_LOXONE_PASSWORD:}
     insert-page-size: 100
   booking:
     series-horizon-months: 12
