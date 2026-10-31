@@ -2517,13 +2517,32 @@ if (import.meta.url === invokedPath) {
 }
 
 
+function securityMailCommandOperation(args) {
+  if (args[0] === "image") return "image-inspect";
+  if (args[0] === "inspect") return "container-inspect";
+  if (args[0] === "network") return "network-inspect";
+  if (args[0] === "exec") {
+    for (const [program, operation] of [["psql", "outbox-query"], ["curl", "http-request"], ["python3", "receipt-decode"]]) {
+      if (args.includes(program)) return operation;
+    }
+  }
+  return "native-command";
+}
+
 export function securityMfaObservationOptions({ runId, identity, control, context, environment },
     runtime = { project: createSecurityMfaOutboxProjector, run: runOwnedProcess }) {
-  const command = (args, limits) => {
+  const command = async (args, limits) => {
     control.beforeRequest();
-    return runtime.run("docker", args, { ...limits, stopFile: context.stopFile,
-      timeoutMilliseconds: Math.min(limits.timeoutMilliseconds, control.remainingMilliseconds()),
-      environment: { ...process.env, ...environment } });
+    const timeoutMilliseconds = Math.min(limits.timeoutMilliseconds, control.remainingMilliseconds());
+    const started = performance.now();
+    try {
+      return await runtime.run("docker", args, { ...limits, stopFile: context.stopFile, timeoutMilliseconds,
+        environment: { ...process.env, ...environment } });
+    } catch (failure) {
+      if (!Error.isError(failure) || !/^Owned security process exceeded its duration limit:/.test(failure.message)) throw failure;
+      throw new Error(`MFA mail command timed out: operation=${securityMailCommandOperation(args)}`
+        + ` elapsed-ms=${Math.round(performance.now() - started)} limit-ms=${timeoutMilliseconds}`);
+    }
   };
   return { runId, identity: { seedFingerprint: identity.seedFingerprint, instanceFingerprint: identity.instanceFingerprint }, control,
     projectOutbox: runtime.project({ runId, identity, command }), command };
