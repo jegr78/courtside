@@ -226,6 +226,10 @@ class LoxoneRecorderTest {
                 {"LL":{"control":"dev/sys/getjwt/a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4/courtside/2084/%s/Courtside",\
                 "value":{"tokenRights":2084},"Code":"200"}}
                 """.formatted(CLIENT_UUID).strip().getBytes(StandardCharsets.UTF_8));
+        shortUser.request("getuser", List.of(), Map.of());
+        shortUser.response("getuser", 500, """
+                {"LL":{"control":"jdev/sps/getuser/Example","value":"","Code":"500"}}
+                """.strip().getBytes(StandardCharsets.UTF_8));
 
         // when
         shortUser.write(target);
@@ -234,6 +238,8 @@ class LoxoneRecorderTest {
         assertThat(recorded("login").at("/0/response/LL/control").asString())
                 .as("the command stays, every later segment is a placeholder")
                 .matches("dev/sys/getjwt(/<[a-z0-9-]+-[0-9]+>){5}");
+        assertThat(recorded("login").at("/1/response/LL/control").asString())
+                .as("a word no pattern knows becomes a placeholder too").matches("jdev/sps/getuser/<segment-[0-9]+>");
     }
 
     @Test
