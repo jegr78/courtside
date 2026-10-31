@@ -50,7 +50,6 @@ final class LoxoneRecorder implements LoxoneClient.Tap {
     private static final Pattern HEX = Pattern.compile("\\p{XDigit}{8,}");
     private static final Pattern JWT = Pattern.compile("eyJ\\S+");
     private static final Pattern TOKEN = Pattern.compile("(?=.*[0-9])(?=.*[A-Za-z])[A-Za-z0-9+/_=.-]{16,}");
-    private static final Pattern KEY = Pattern.compile("[A-Za-z][A-Za-z0-9_]*");
     private static final Pattern UPPER = Pattern.compile(".*[A-F].*");
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final JsonNodeFactory NODES = JsonNodeFactory.instance;
@@ -180,7 +179,9 @@ final class LoxoneRecorder implements LoxoneClient.Tap {
         if (node.isObject()) {
             ObjectNode scrubbed = NODES.objectNode();
             node.properties().forEach(field -> {
-                String name = KEY.matcher(field.getKey()).matches() ? field.getKey() : text(field.getKey(), null);
+                String name = RecordedFixtures.allowedKey(field.getKey()) ? field.getKey()
+                        : placeholder(spellings.contains(field.getKey().toLowerCase(Locale.ROOT)) ? "secret" : "key",
+                        field.getKey());
                 scrubbed.set(name, node(field.getValue(), key, field.getKey()));
             });
             return scrubbed;
@@ -192,8 +193,9 @@ final class LoxoneRecorder implements LoxoneClient.Tap {
                     .forEach(entry -> scrubbed.add(node(entry, parentKey, key)));
             return scrubbed;
         }
-        if (node.isNumber() && key != null && RecordedFixtures.TIME_KEYS.contains(key)) {
-            return NODES.stringNode(placeholder("time", node.toString()));
+        if (node.isNumber() && (key == null || !RecordedFixtures.NUMERIC_KEYS.contains(key))) {
+            boolean time = key != null && RecordedFixtures.TIME_KEYS.contains(key);
+            return NODES.stringNode(placeholder(time ? "time" : "number", node.toString()));
         }
         if (node.isString()) {
             String value = node.asString();

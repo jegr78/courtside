@@ -75,11 +75,14 @@ class LoxoneRecorderTest {
                 {"url":"https://192-0-2-10.504f94a00000.dyndns.example.org:7443"}
                 """);
         exchange("getuser", List.of(LOXONE_UUID), Map.of(), 200, """
-                {"LL":{"control":"jdev/sps/getuser/%s","value":{"uuid":"%s","owner":"%s",\
-                "lastEdit":"2026-11-02 10:00:00",\
-                "validFrom":547210000,"keycodes":[{"code":"4826"}],"ip":"192.0.2.10","address":"192-0-2-10",\
-                "mac":"50:4F:94:A0:00:01","version":"14.2.5.16","host":"miniserver.example.org"},"Code":"200"}}
+                {"LL":{"control":"jdev/sps/getuser/%s","value":{"uuid":"%s","usergroups":["%s"],\
+                "lastEdit":"2026-11-02 10:00:00","validFrom":547210000,"userState":4,\
+                "keycodes":[{"code":"4826"}]},"Code":"200"}}
                 """.formatted(LOXONE_UUID, LOXONE_UUID, CLIENT_UUID));
+        exchange("apiKey", List.of(), Map.of(), 200, """
+                {"LL":{"control":"dev/cfg/apiKey","value":{"version":"14.2.5.16","snr":"50:4F:94:A0:00:01",\
+                "url":["192.0.2.10","192-0-2-10","miniserver.example.org",31]},"Code":"200"}}
+                """);
 
         // when
         recorder.write(target);
@@ -101,7 +104,7 @@ class LoxoneRecorderTest {
                 .matches("https://<host-[0-9]+>:<port-[0-9]+>");
         JsonNode user = formats.at("/2/response/LL/value");
         assertThat(user.get("uuid").asString()).as("a Loxone uuid").matches("<loxone-uuid-[0-9]+>");
-        assertThat(user.get("owner").asString()).as("the same value gets the same placeholder in every step")
+        assertThat(user.at("/usergroups/0").asString()).as("the same value gets the same placeholder in every step")
                 .isEqualTo(formats.at("/0/request/arguments/3").asString());
         assertThat(formats.at("/2/request/arguments/0").asString()).as("the same uuid in request and answer")
                 .isEqualTo(user.get("uuid").asString());
@@ -109,22 +112,24 @@ class LoxoneRecorderTest {
                 .isEqualTo("jdev/sps/getuser/" + user.get("uuid").asString());
         assertThat(user.get("lastEdit").asString()).as("a time as text").matches("<time-[0-9]+>");
         assertThat(user.get("validFrom").asString()).as("a time in Loxone seconds").matches("<time-[0-9]+>");
+        assertThat(user.get("userState").asInt()).as("an allowlisted number is kept").isEqualTo(4);
         assertThat(user.at("/keycodes/0/code").asString()).as("a keycode").matches("<digits4-[0-9]+>");
-        assertThat(user.get("ip").asString()).as("an address").matches("<ip-[0-9]+>");
-        assertThat(user.get("address").asString()).as("an address with dashes").matches("<dashed-ip-[0-9]+>");
-        assertThat(user.get("mac").asString()).as("a MAC").matches("<mac-[0-9]+>");
-        assertThat(user.get("version").asString()).as("a version is kept").isEqualTo("14.2.5.16");
-        assertThat(user.get("host").asString()).as("a host").matches("<host-[0-9]+>");
+        JsonNode api = formats.at("/3/response/LL/value");
+        assertThat(api.get("version").asString()).as("a version is kept").isEqualTo("14.2.5.16");
+        assertThat(api.get("snr").asString()).as("a MAC").matches("<mac-[0-9]+>");
+        assertThat(api.at("/url/0").asString()).as("an address").matches("<ip-[0-9]+>");
+        assertThat(api.at("/url/1").asString()).as("an address with dashes").matches("<dashed-ip-[0-9]+>");
+        assertThat(api.at("/url/2").asString()).as("a host").matches("<host-[0-9]+>");
+        assertThat(api.at("/url/3").asString()).as("a number under a key outside the numeric allowlist")
+                .matches("<number-[0-9]+>");
     }
 
     static Stream<Arguments> secretSpellings() {
         return Stream.of(
                 Arguments.of("{\"LL\":{\"value\":{\"description\":\"Door at 504f94a00000\"}}}", List.of(),
                         "$[0].response.LL.value.description", "504f94a00000"),
-                Arguments.of("{\"LL\":{\"value\":{\"note\":\"Miniserver 50:4f:94:a0:00:00 online\"}}}", List.of(),
-                        "$[0].response.LL.value.note", "50:4f:94:a0:00:00"),
-                Arguments.of("{\"LL\":{\"value\":{\"COURTSIDE-SERVICE-door\":1}}}", List.of(),
-                        "$[0].response.LL.value has a key", "courtside-service"),
+                Arguments.of("{\"LL\":{\"value\":{\"name\":\"Miniserver 50:4f:94:a0:00:00 online\"}}}", List.of(),
+                        "$[0].response.LL.value.name", "50:4f:94:a0:00:00"),
                 Arguments.of("{\"LL\":{\"Code\":\"200\"}}", List.of("Pass=EXAMPLE-SERVICE-PASSWORD"),
                         "$[0].request.arguments[0]", "example-service-password"));
     }
@@ -149,16 +154,37 @@ class LoxoneRecorderTest {
     }
 
     @Test
-    void givenAnUnknownStringUnderAnUnknownKey_whenRecorded_thenTheRunFailsNamingWhereButNotTheValue() {
+    void givenKeysOutsideTheProtocol_whenRecorded_thenEachBecomesAPlaceholder() throws IOException {
+        // given
+        recorder.step("keys");
+        exchange("getuser", List.of(), Map.of(), 200, """
+                {"LL":{"control":"jdev/sps/getuser","value":{"doorName":"%s","COURTSIDE-SERVICE":7},"Code":"200"}}
+                """.formatted(CLIENT_UUID));
+
+        // when
+        recorder.write(target);
+
+        // then
+        JsonNode value = recorded("keys").at("/0/response/LL/value");
+        assertThat(value.propertyNames()).as("every key outside the protocol becomes a placeholder")
+                .allSatisfy(key -> assertThat(key).matches("<(key|secret)-[0-9]+>"));
+        assertThat(value.valueStream().map(JsonNode::asString)).as("their values are scrubbed as well")
+                .allSatisfy(scrubbed -> assertThat(scrubbed).matches("<(uuid|number)-[0-9]+>"));
+        assertThat(Files.readString(target.resolve("keys.json")).toLowerCase(Locale.ROOT))
+                .as("no raw key survives").doesNotContain("doorname", USER);
+    }
+
+    @Test
+    void givenAnUnknownStringUnderAProtocolKey_whenRecorded_thenTheRunFailsNamingWhereButNotTheValue() {
         // given
         recorder.step("unknown");
         exchange("getuser", List.of(), Map.of(), 200,
-                "{\"LL\":{\"control\":\"jdev/sps/getuser\",\"value\":{\"motto\":\"Game, set, match\"},"
+                "{\"LL\":{\"control\":\"jdev/sps/getuser\",\"value\":{\"name\":\"Game, set, match\"},"
                         + "\"Code\":\"200\"}}");
 
         // when / then
         assertThatThrownBy(() -> recorder.write(target)).isInstanceOf(AssertionError.class)
-                .hasMessageContaining("unknown $[0].response.LL.value.motto holds a string that is neither")
+                .hasMessageContaining("unknown $[0].response.LL.value.name holds a string that is neither")
                 .hasMessageNotContaining("Game");
     }
 

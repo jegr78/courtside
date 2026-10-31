@@ -30,10 +30,18 @@ final class RecordedFixtures {
     static final Set<String> VOCABULARY = Set.of("https", "http", "jdev", "dev", "sps", "sys", "cfg", "getkey2",
             "getjwt", "killtoken", "getuserlist2", "getgrouplist", "addoredituser", "deleteuser",
             "updateuseraccesscode", "getuser", "getip", "apiKey", "date", "time", "Courtside");
-    static final Set<String> TIME_KEYS = Set.of("validFrom", "validUntil", "expiration", "lastEdit", "date", "time");
+    static final Set<String> KEYS = Set.of("request", "command", "arguments", "query", "status", "response", "LL",
+            "control", "value", "Code", "code", "key", "salt", "hashAlg", "token", "validUntil", "tokenRights",
+            "unsecurePass", "uuid", "name", "description", "userState", "isAdmin", "changePassword",
+            "expirationAction", "validFrom", "lastEdit", "usergroups", "keycodes", "type", "userRights", "url",
+            "version", "snr", "isInTrust", "local", "httpsStatus", "date", "time", "error");
+    static final Set<String> TIME_KEYS = Set.of("validFrom", "validUntil", "lastEdit", "date", "time");
+    static final Set<String> NUMERIC_KEYS = Set.of("status", "Code", "code", "tokenRights", "userState", "isAdmin",
+            "expirationAction", "type", "userRights", "httpsStatus");
 
-    private static final Pattern KEY = Pattern.compile("[A-Za-z][A-Za-z0-9_]*");
+    private static final String REDACTED = "<redacted>";
     private static final Pattern WORD = Pattern.compile("[A-Za-z0-9]+");
+    private static final Pattern SEPARATORS = Pattern.compile("[A-Za-z0-9/:._ -]*");
     private static final Pattern HEX12 = Pattern.compile("[0-9A-Fa-f]{12}");
     private static final Map<String, Pattern> KEPT = Map.of(
             "hashAlg", Pattern.compile("SHA1|SHA256"),
@@ -130,18 +138,18 @@ final class RecordedFixtures {
         if (node.isObject()) {
             node.properties().forEach(field -> {
                 String name = field.getKey();
-                if (KEY.matcher(name).matches() || PLACEHOLDER.matcher(name).matches()) {
+                if (allowedKey(name)) {
                     walk(where, path + "." + name, key, name, field.getValue(), found);
                 } else {
-                    found.add(where + " " + path + " has a key that is neither a placeholder nor a known name");
+                    found.add(where + " " + path + "." + REDACTED + " has a key outside the protocol keys");
                 }
             });
         } else if (node.isArray()) {
             for (int index = 0; index < node.size(); index++) {
                 walk(where, path + "[" + index + "]", parentKey, key, node.get(index), found);
             }
-        } else if (node.isNumber() && key != null && TIME_KEYS.contains(key)) {
-            found.add(where + " " + path + " holds a time that is not a placeholder");
+        } else if (node.isNumber() && (key == null || !NUMERIC_KEYS.contains(key))) {
+            found.add(where + " " + path + " holds a number outside the numeric keys");
         } else if (node.isString()) {
             String value = node.asString();
             Optional<JsonNode> inner = embedded(value);
@@ -153,8 +161,16 @@ final class RecordedFixtures {
         }
     }
 
+    static boolean allowedKey(String name) {
+        return KEYS.contains(name) || PLACEHOLDER.matcher(name).matches();
+    }
+
     private static boolean known(String value) {
-        Matcher words = WORD.matcher(PLACEHOLDER.matcher(value).replaceAll("/"));
+        String residue = PLACEHOLDER.matcher(value).replaceAll("/");
+        if (!SEPARATORS.matcher(residue).matches()) {
+            return false;
+        }
+        Matcher words = WORD.matcher(residue);
         while (words.find()) {
             if (!VOCABULARY.contains(words.group())) {
                 return false;
@@ -167,10 +183,13 @@ final class RecordedFixtures {
                                 List<String> found) {
         if (node.isObject()) {
             node.properties().forEach(field -> {
-                if (carries(field.getKey(), spellings)) {
-                    found.add(where + " " + path + " has a key that carries a configured secret");
+                String name = field.getKey();
+                if (carries(name, spellings)) {
+                    found.add(where + " " + path + "." + REDACTED + " has a key that carries a configured secret");
+                } else {
+                    secrets(where, path + "." + (allowedKey(name) ? name : REDACTED), field.getValue(), spellings,
+                            found);
                 }
-                secrets(where, path + "." + field.getKey(), field.getValue(), spellings, found);
             });
         } else if (node.isArray()) {
             for (int index = 0; index < node.size(); index++) {
