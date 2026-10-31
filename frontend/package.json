@@ -10,7 +10,8 @@
     "glob": "13.0.6",
     "@redocly/openapi-core": {
       "js-yaml": "4.3.2"
-    }
+    },
+    "minimatch": "11.0.3"
   },
   "allowScripts": {
     "cpu-features": false,
