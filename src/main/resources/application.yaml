@@ -212,6 +212,9 @@ management:
         mail:
           include: mailRelay
           show-details: always
+        access-control:
+          include: accessControl
+          show-details: always
 
 logging:
   level:

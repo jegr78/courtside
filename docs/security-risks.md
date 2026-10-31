@@ -186,8 +186,8 @@ systems while bookings are live, or if a revoke-all operation for the old connec
 
 ## The Loxone technical user can change every non-admin Miniserver user
 
-The Loxone connector signs in as one Miniserver user with the user-management right, because
-creating and deleting a timespan user per booking needs it. That right reaches every non-admin user
+The Loxone connector signs in as one Miniserver user with the user-management right and the right
+to change codes, because creating a timespan user with a code per booking and deleting it needs them. That right reaches every non-admin user
 on the Miniserver, not only the `courtside_` users Courtside creates: whoever holds the token or the
 password can change codes, groups and validity of every resident or member account the Miniserver
 keeps. Using it needs the password from the deployment environment or a token taken from a running
@@ -219,19 +219,6 @@ found" and the board sees it failing. A group added since then is missing until 
 No access is needed beyond the board's own; the exposure is a stale choice, not a widened one,
 because the connector checks every assigned group against the same list before it sends anything.
 Reconsider when the list is stored with the time it was read or refreshed on a board's request.
-
-## The Loxone time base is an assumption until a door has confirmed it
-
-A Miniserver user's validity is sent as seconds since 2009-01-01 00:00 without a zone. Courtside
-assumes the Miniserver's local wall time in the club's configured zone. If the Miniserver counts in
-UTC instead, every booking's window at the door shifts by the zone's offset, one or two hours in
-Central Europe: a code then opens that much too early or too late and closes that much early or
-late. Nobody needs access to cause it; it follows from the assumption.
-
-The bound is the access window's minutes before and after a booking, which absorb part of the
-shift, and the emergency code a member can ask for where the club keeps one on that keypad. The
-acceptance on a real Miniserver checks a window at a door. Reconsider, and correct the conversion,
-as soon as that check has run.
 
 ## Reset codes use an unkeyed digest
 

@@ -1,6 +1,7 @@
 package org.courtside.access;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -38,6 +39,12 @@ public interface AccessControlConnector {
     /** The groups a board may map an access point onto, as the last successful probe read them; read locally. */
     default List<RemoteGroup> groups() {
         return List.of();
+    }
+
+    /** The checks a board can ask for, in order, given the active access points that receive a grant per booking. */
+    default List<ConnectionCheck> connectionChecks(Map<UUID, String> grantedAccessPoints) {
+        return List.of(new ConnectionCheck("connector", List.of(),
+                () -> CheckResult.skipped("access.check.connector.notOffered", Map.of())));
     }
 
     /** The grant ids of every remote user this system lists; empty when the system cannot list them. */

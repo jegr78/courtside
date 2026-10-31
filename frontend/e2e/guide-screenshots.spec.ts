@@ -287,8 +287,10 @@ const drivers: Record<string, (page: Page, visualDate: string) => Promise<void>>
   },
   "access-grants": async (page) => {
     await page.context().route("**/api/admin/access-grants", (route) => route.fulfill({ json: accessGrantsExample }));
+    await page.context().route("**/api/admin/access-control/check", (route) => route.fulfill({ json: connectionCheckExample }));
     await page.getByTestId("admin-access-grants-link").click();
     await expect(page.getByTestId("access-grant-example-failing"), "the example, not the live instance, is drawn").toHaveAttribute("data-status", "FAILING");
+    await expect(page.getByTestId("access-check-keypad")).toHaveAttribute("data-outcome", "MANUAL");
   },
   "retention": async (page) => {
     await page.getByTestId("admin-retention-link").click();
@@ -313,8 +315,19 @@ const operatorHealthExample = {
 };
 
 // A failing grant beside an installed one, because the simulated access-control system never fails.
+const connectionCheckExample = {
+  checkedAt: "2026-05-14T08:00:00Z",
+  checks: [
+    { check: "miniserver", outcome: "PASSED", code: "access.check.miniserver.reached", params: { version: "16.1.10.3", minimum: "14.2.5.16" } },
+    { check: "login", outcome: "PASSED", code: "access.check.login.accepted", params: {} },
+    { check: "groups", outcome: "PASSED", code: "access.check.groups.mapped", params: { accessPoints: "North gate, South gate" } },
+    { check: "probe-user", outcome: "PASSED", code: "access.check.probeUser.passed", params: {} },
+    { check: "keypad", outcome: "MANUAL", code: "access.check.keypad.manual", params: {} }
+  ]
+};
+
 const accessGrantsExample = {
-  connector: "simulated", connected: true, total: 2,
+  connector: "loxone", connected: true, total: 2,
   probe: { reachable: true, outcome: "ANSWERED", detail: "", checkedAt: "2026-05-14T08:00:00Z" },
   grants: [
     {

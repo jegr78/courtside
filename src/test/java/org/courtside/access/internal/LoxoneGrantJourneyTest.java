@@ -3,7 +3,6 @@ package org.courtside.access.internal;
 import org.courtside.AbstractIntegrationTest;
 import org.courtside.card.testfixture.CardTestFixture;
 import org.courtside.booking.testfixture.BookingTestFixture;
-import org.courtside.config.ClubTimeZone;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
@@ -51,18 +50,15 @@ class LoxoneGrantJourneyTest extends AbstractIntegrationTest {
     static class Miniserver {
 
         @Bean(destroyMethod = "close")
-        LoxoneSimulator loxoneSimulator(ClubTimeZone zone) throws IOException {
-            return new LoxoneSimulator(Clock.systemUTC(), zone.zoneId());
+        LoxoneSimulator loxoneSimulator() throws IOException {
+            return new LoxoneSimulator(Clock.systemUTC());
         }
 
         @Bean
         @Primary
-        LoxoneAccessControl loxoneAccessControl(LoxoneSimulator simulator, LoxoneGroupMapping groups,
-                                                ClubTimeZone zone) {
-            LoxoneSettings simulated = simulator.settingsByUrl(Duration.ofSeconds(10));
-            return new LoxoneAccessControl(new LoxoneSettings(simulated.address(), simulated.user(),
-                    simulated.password(), zone, simulated.callDeadline()), groups, LoxoneSimulator.clientTrust(),
-                    Clock.systemUTC());
+        LoxoneAccessControl loxoneAccessControl(LoxoneSimulator simulator, LoxoneGroupMapping groups) {
+            return new LoxoneAccessControl(simulator.settingsByUrl(Duration.ofSeconds(10)), groups,
+                    LoxoneSimulator.clientTrust(), Clock.systemUTC());
         }
     }
 

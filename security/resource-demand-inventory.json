@@ -59,7 +59,7 @@
     {
       "id": "ordinary-http",
       "kind": "ordinary",
-      "rationale": "These operations perform bounded single-record work or bounded page and calendar reads; their contract limits do not grow into a separate resource-demand decision. MFA administration reads two flags or changes one account state; TOTP setup encrypts one 160-bit key, recovery-code replacement generates ten verifiers and credential renaming/removal addresses one holder-owned record. The access-grant overview reads at most 100 grants and the probe kept in memory, a retry locks one grant row and a probe request only sets a flag and wakes the access worker; none of them calls the access-control system. The occupancy signal reads one key row and one grouped query over the next 24 hours of allocations, answering at most two lines per active court; the occupancy-key administration reads, replaces or deletes that one row.",
+      "rationale": "These operations perform bounded single-record work or bounded page and calendar reads; their contract limits do not grow into a separate resource-demand decision. MFA administration reads two flags or changes one account state; TOTP setup encrypts one 160-bit key, recovery-code replacement generates ten verifiers and credential renaming/removal addresses one holder-owned record. The access-grant overview reads at most 100 grants and the probe kept in memory, a retry locks one grant row and a connection-check request only sets two flags and wakes the access worker, and reading the latest connection check reads it from memory; none of them calls the access-control system. The occupancy signal reads one key row and one grouped query over the next 24 hours of allocations, answering at most two lines per active court; the occupancy-key administration reads, replaces or deletes that one row.",
       "entryPoints": [
         "addMembershipPeriod",
         "assignMembership",
@@ -82,6 +82,7 @@
         "changeParticipantCard",
         "changePerson",
         "changeRuleSet",
+        "checkAccessControl",
         "checkIn",
         "chooseOwnMessageChannels",
         "chooseOwnMessages",
@@ -158,7 +159,7 @@
         "logOut",
         "markOwnNotificationRead",
         "previewMessageTemplate",
-        "probeAccessControl",
+        "readAccessControlCheck",
         "readAuditLog",
         "readImportPreview",
         "readImportSource",

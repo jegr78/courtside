@@ -1,0 +1,15 @@
+[ {
+  "request" : {
+    "command" : "apiKey",
+    "arguments" : [ ],
+    "query" : { }
+  },
+  "status" : 200,
+  "response" : {
+    "LL" : {
+      "control" : "dev/cfg/apiKey",
+      "value" : "{'snr':'<secret-4>','version':'17.0.3.31','key':'<digits80-7>','isInTrust':false,'local':false,'certTLD':'<text-1>','httpsStatus':1}",
+      "Code" : "200"
+    }
+  }
+} ]

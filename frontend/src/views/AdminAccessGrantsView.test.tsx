@@ -1,7 +1,9 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { api, ApiError, type AccessGrantOverview, type AdminAccessGrant, type ClubConfig } from "../api/client";
+import {
+  api, ApiError, type AccessControlCheck, type AccessGrantOverview, type AdminAccessGrant, type ClubConfig
+} from "../api/client";
 import i18n from "../i18n";
 import { WithClubConfiguration } from "../test/ClubConfiguration";
 import { AdminAccessGrantsView } from "./AdminAccessGrantsView";
@@ -35,9 +37,21 @@ function show() {
   render(<WithClubConfiguration club={club}><AdminAccessGrantsView /></WithClubConfiguration>);
 }
 
+const checked: AccessControlCheck = {
+  checkedAt: "2026-05-12T10:05:00Z",
+  checks: [
+    { check: "miniserver", outcome: "FAILED", code: "access.check.version.tooOld",
+      params: { version: "14.2.5.9", minimum: "14.2.5.16" } },
+    { check: "login", outcome: "FAILED", code: "access.check.login.refused", params: {} },
+    { check: "groups", outcome: "SKIPPED", code: "access.check.skipped", params: { requires: "login" } },
+    { check: "keypad", outcome: "MANUAL", code: "access.check.keypad.manual", params: {} }
+  ]
+};
+
 describe("AdminAccessGrantsView", () => {
   beforeEach(async () => {
     vi.restoreAllMocks();
+    vi.spyOn(api, "adminAccessControlCheck").mockResolvedValue({ checkedAt: null, checks: [] });
     await i18n.changeLanguage("en");
   });
 
@@ -142,19 +156,96 @@ describe("AdminAccessGrantsView", () => {
     expect(screen.getByTestId("access-grants-probe-detail")).toHaveTextContent("403 no user management");
   });
 
-  it("given no probe since the start, when the board asks for one, then it is requested and the board learns when it runs", async () => {
+  it("given no connection check yet, when the board asks for one, then it is requested and the board learns when it runs", async () => {
     // given
     vi.spyOn(api, "adminAccessGrants").mockResolvedValue(overview([], { probe: null }));
-    const probe = vi.spyOn(api, "probeAccessControl").mockResolvedValue(undefined);
+    const requested = vi.spyOn(api, "checkAccessControl").mockResolvedValue(undefined);
     show();
     expect(await screen.findByTestId("access-grants-probe")).toHaveAttribute("data-outcome", "none");
+    expect(screen.queryByTestId("access-grants-check"), "no result before the first check").toBeNull();
 
     // when
-    await userEvent.click(screen.getByTestId("access-grants-probe-now"));
+    await userEvent.click(screen.getByTestId("access-grants-check-now"));
 
     // then
-    expect(probe).toHaveBeenCalledTimes(1);
-    expect(await screen.findByTestId("access-grants-probe-requested")).toHaveTextContent("next pass");
+    expect(requested).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId("access-grants-check-now")).toHaveTextContent("Check connection");
+    expect(await screen.findByTestId("access-grants-check-requested")).toHaveTextContent("next pass");
+  });
+
+  it("given a stored connection check, when the page opens, then each check shows its outcome and translated message", async () => {
+    // given
+    vi.spyOn(api, "adminAccessGrants").mockResolvedValue(overview([]));
+    vi.spyOn(api, "adminAccessControlCheck").mockResolvedValue(checked);
+
+    // when
+    show();
+
+    // then
+    const results = await screen.findByTestId("access-grants-check");
+    expect(within(results).getAllByRole("listitem"), "one entry per check, in the order it ran")
+      .toHaveLength(checked.checks.length);
+    const miniserver = screen.getByTestId("access-check-miniserver");
+    expect(miniserver, "a failed check is marked as failed").toHaveAttribute("data-outcome", "FAILED");
+    expect(miniserver).toHaveTextContent("Miniserver: failed");
+    expect(within(miniserver).getByTestId("access-check-message"))
+      .toHaveTextContent("Version 14.2.5.9 is too old, at least 14.2.5.16 is needed.");
+    expect(within(screen.getByTestId("access-check-groups")).getByTestId("access-check-message"),
+      "a skipped check names the check it waits for in the board's language")
+      .toHaveTextContent("Runs only once Login has passed.");
+    const keypad = screen.getByTestId("access-check-keypad");
+    expect(keypad).toHaveAttribute("data-outcome", "MANUAL");
+    expect(within(keypad).getByTestId("access-check-message")).toHaveTextContent("door checklist");
+  });
+
+  it("given a stored connection check and the German default, when the page opens, then the messages are German", async () => {
+    // given
+    await i18n.changeLanguage("de");
+    vi.spyOn(api, "adminAccessGrants").mockResolvedValue(overview([]));
+    vi.spyOn(api, "adminAccessControlCheck").mockResolvedValue(checked);
+
+    // when
+    show();
+
+    // then
+    expect(await screen.findByTestId("access-grants-check-now")).toHaveTextContent("Verbindung prüfen");
+    expect(within(screen.getByTestId("access-check-login")).getByTestId("access-check-message"))
+      .toHaveTextContent("Der Miniserver lehnt Benutzername oder Passwort des technischen Benutzers ab.");
+    expect(screen.getByTestId("access-check-groups")).toHaveTextContent("Gruppen: übersprungen");
+    expect(screen.getByTestId("access-check-miniserver")).toHaveTextContent("Miniserver: fehlgeschlagen");
+  });
+
+  it("given a check the view does not know, when the page opens, then its name and code still show", async () => {
+    // given
+    vi.spyOn(api, "adminAccessGrants").mockResolvedValue(overview([]));
+    vi.spyOn(api, "adminAccessControlCheck").mockResolvedValue({ checkedAt: "2026-05-12T10:05:00Z", checks: [
+      { check: "future", outcome: "PASSED", code: "access.check.future.fine", params: {} }
+    ] });
+
+    // when
+    show();
+
+    // then
+    const future = await screen.findByTestId("access-check-future");
+    expect(future).toHaveTextContent("future: passed");
+    expect(within(future).getByTestId("access-check-message")).toHaveTextContent("access.check.future.fine");
+  });
+
+  it("given a refused request, when the board asks for a connection check, then the problem is shown", async () => {
+    // given
+    vi.spyOn(api, "adminAccessGrants").mockResolvedValue(overview([]));
+    vi.spyOn(api, "checkAccessControl").mockRejectedValue(new ApiError(409, {
+      type: "urn:courtside:error:access-control-not-connected", title: "Access control not connected", status: 409,
+      violations: [{ code: "access.control.notConnected", params: {} }]
+    }));
+    show();
+
+    // when
+    await userEvent.click(await screen.findByTestId("access-grants-check-now"));
+
+    // then
+    expect(await screen.findByTestId("access-grants-problem")).toHaveTextContent("No access-control system is connected");
+    expect(screen.queryByTestId("access-grants-check-requested")).toBeNull();
   });
 
   it("given no access-control system, when the page opens, then it says that bookings receive no individual codes", async () => {
@@ -167,7 +258,7 @@ describe("AdminAccessGrantsView", () => {
     // then
     expect(await screen.findByTestId("access-grants-connector"))
       .toHaveTextContent("No access-control system is connected");
-    expect(screen.queryByTestId("access-grants-probe-now"), "nothing to probe without a system").toBeNull();
+    expect(screen.queryByTestId("access-grants-check-now"), "nothing to check without a system").toBeNull();
     expect(screen.getByTestId("access-grants-empty")).toBeInTheDocument();
   });
 });

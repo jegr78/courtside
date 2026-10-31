@@ -203,7 +203,7 @@ it. Change it from time to time, and after any misuse.
 When a Loxone Miniserver is the connected access-control system, you pick a **Loxone group** for each
 access point without a static code. A booking's Miniserver user joins that group, so the group
 decides which door its code opens. The choice lists the groups Courtside read when it last checked
-the Miniserver. When it is empty, a hint takes its place. Press **Check now** under *Access grants*
+the Miniserver. When it is empty, a hint takes its place. Press **Check connection** under *Access grants*
 then, and the groups appear after the check. A stored group the Miniserver no longer knows shows as
 *Unknown group* in the choice. Pick another one or remove it. An access point without a group opens
 for no booking code. Its grants fail with the reason *access point has no Loxone group* until you pick
@@ -262,6 +262,72 @@ What the values trigger is up to you in Loxone:
 Whoever knows the key learns only occupancy and minutes per court, never who booked or with which
 card. The key is part of the address and can therefore show up in the log of a router or proxy.
 Replace it if it has reached the wrong hands.
+
+## Connecting a Loxone Miniserver
+
+When a Loxone Miniserver is the access-control system, Courtside creates one user on the Miniserver
+for every booking with an access code. It is valid only within the booking's window, carries its
+code and belongs to the group of its access point. At the end of the window the Miniserver deletes
+it by itself. You set this up once, and Courtside then checks the connection whenever you ask.
+
+In Loxone Config you set up:
+
+1. a user group for Courtside with the group right **User management**. Do not give it **Full
+   access**. Courtside needs the right to manage users and the right to change their codes, and
+   checks both. If one is missing, the **Login** check reports a missing right.
+2. a technical user with a password of its own that belongs to this group only. It is not an
+   administrator.
+3. one normal group per door or keypad that holds the permission for that access point in the
+   keypad's rights. You pick this group in Courtside under *Facility → Access points* as its
+   **Loxone group**.
+4. no keypad permission for the group **All**. Otherwise every code the Miniserver knows opens there.
+
+Your operator sets in the instance's environment: `COURTSIDE_ACCESS_CONTROL_CONNECTOR=loxone`, the
+Miniserver's serial number in `COURTSIDE_ACCESS_CONTROL_LOXONE_SERIAL` or a fixed address in
+`COURTSIDE_ACCESS_CONTROL_LOXONE_URL`, and the technical user's name and password in
+`COURTSIDE_ACCESS_CONTROL_LOXONE_USER` and `COURTSIDE_ACCESS_CONTROL_LOXONE_PASSWORD`. The connection
+applies after the instance restarts.
+
+Then press **Check connection** under *Records → Access grants*. In its next pass Courtside checks
+five points and reads the groups again. Reload the page a moment later, and each point is listed
+with its outcome below the button:
+
+* **Miniserver**: Courtside reaches the Miniserver through Loxone Cloud or the fixed address, its
+  certificate is valid and its version is at least 14.2.5.16.
+* **Login**: The technical user logs in and may manage users and change codes.
+* **Groups**: Every active access point without a static code has a Loxone group, and the
+  Miniserver knows it as a normal group. The message names every access point where that fails.
+* **Test user**: Courtside creates a user without a group and without a code for two minutes, reads
+  it back and deletes it again. If it stays behind, the Miniserver deletes it after two minutes.
+* **Keypad** always reads *check at the door*. The Miniserver's interface does not show whether a
+  keypad accepts a code. You check that with the door acceptance.
+
+Courtside checks the groups and the test user only after a successful login; otherwise they read
+*skipped*.
+
+![Access grants with Check connection, the five checks of a Miniserver, a failing grant with its reason and an installed one.](../screenshots/en/access-grants.png)
+
+### Door acceptance
+
+Run the door acceptance after the setup and after every change to groups or keypads. You need a
+booking whose card grants access, on a court behind the access point. You find its code under
+*My bookings*.
+
+1. The time in the Loxone app matches the clock in the clubhouse, and the booking's user shows the
+   same window in the app as Courtside does under *Access grants*.
+2. Before the window the keypad refuses the code, within the window it opens, afterwards it refuses
+   the code again.
+3. After a cancellation the keypad refuses the code within a minute.
+4. When you move the booking to a court behind another access point, the code opens the new access
+   point and no longer the old one.
+5. The static code of an access point with a static code still opens as before.
+6. Building control: the **Virtual HTTP Input Command** for `occupied` reads 1 while a booking runs
+   whose card counts as occupied, and 0 otherwise. The command for `minutes` counts down to the next
+   such booking. A court closure reads 0. After **Revoke key** Loxone keeps the last value, because
+   Courtside refuses every poll.
+
+The keypad's permission cannot be read through the interface. Courtside therefore never checks it
+itself, and points 2 to 5 are its only evidence.
 
 ## Facility → Opening hours
 
@@ -663,11 +729,9 @@ The **Records** area has nine views. The next section describes *Retention*.
   one, five, fifteen and sixty minutes. After the fifth failure or a refusal the grant is failing.
   Fix the cause in the access-control system and press **Send again**. Courtside keeps trying a
   removal without end. Above the list you see what the access-control system answered when it was
-  last checked. **Check now** makes Courtside ask again in its next pass. The view never shows the
-  code itself. Without a connected access-control system the list stays empty and bookings work as
-  before.
-
-![Access grants with a failing grant, its reason and Send again, and an installed one.](../screenshots/en/access-grants.png)
+  last checked. **Check connection** checks the connection step by step, as *Connecting a Loxone
+  Miniserver* describes. The view never shows the code itself. Without a connected access-control
+  system the list stays empty and bookings work as before.
 
 ![Statistics with the period choice and the utilisation key figures with their change.](../screenshots/en/utilisation.png)
 

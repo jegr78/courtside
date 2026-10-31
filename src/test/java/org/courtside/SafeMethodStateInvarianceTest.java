@@ -159,6 +159,7 @@ class SafeMethodStateInvarianceTest extends AbstractIntegrationTest {
             entry("/api/managed/bookings/{id}", read("bookingId", "")),
             entry("/api/admin/access-grants", read()),
             entry("/api/admin/access-control/groups", read()),
+            entry("/api/admin/access-control/check", read()),
             entry("/api/admin/access-points", read()),
             entry("/api/admin/occupancy-key", read()),
             entry("/api/admin/access-points/{id}", read("accessPointId", "")),
@@ -208,7 +209,8 @@ class SafeMethodStateInvarianceTest extends AbstractIntegrationTest {
             entry("/actuator/health", read()),
             entry("/actuator/health/liveness", read()),
             entry("/actuator/health/readiness", read()),
-            entry("/actuator/health/mail", read()));
+            entry("/actuator/health/mail", read()),
+            entry("/actuator/health/access-control", read()));
 
     @LocalServerPort
     private int port;

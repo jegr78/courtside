@@ -1,6 +1,7 @@
 package org.courtside.access.internal;
 
 import org.courtside.access.AccessControlConnector;
+import org.courtside.access.ConnectionCheck;
 import org.courtside.access.GrantInstruction;
 import org.courtside.access.GrantOutcome;
 import org.courtside.access.GrantReference;
@@ -22,6 +23,7 @@ import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
@@ -35,7 +37,7 @@ class LoxoneAccessControl implements AccessControlConnector, AutoCloseable {
     static final String NAME = "loxone";
 
     private static final Pattern OWNED = Pattern.compile("courtside_([0-9a-f]{32})");
-    private static final Pattern LOXONE_UUID = Pattern.compile("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{16}");
+    static final Pattern LOXONE_UUID = Pattern.compile("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{16}");
     private static final int TIMESPAN = 4;
     private static final int DELETE_ON_EXPIRY = 1;
     private static final int NORMAL_GROUP = 0;
@@ -44,13 +46,19 @@ class LoxoneAccessControl implements AccessControlConnector, AutoCloseable {
     private final LoxoneSettings settings;
     private final LoxoneGroupMapping mapping;
     private final LoxoneClient client;
+    private final LoxoneConnectionChecks checks;
     private final ObjectMapper json = new ObjectMapper();
     private volatile List<RemoteGroup> groups = List.of();
 
     LoxoneAccessControl(LoxoneSettings settings, LoxoneGroupMapping mapping, SSLContext ssl, Clock clock) {
+        this(settings, mapping, new LoxoneClient(settings, ssl, clock), clock);
+    }
+
+    LoxoneAccessControl(LoxoneSettings settings, LoxoneGroupMapping mapping, LoxoneClient client, Clock clock) {
         this.settings = settings;
         this.mapping = mapping;
-        this.client = new LoxoneClient(settings, ssl, clock);
+        this.client = client;
+        this.checks = new LoxoneConnectionChecks(this, client, settings, mapping, clock);
     }
 
     @Override
@@ -146,24 +154,35 @@ class LoxoneAccessControl implements AccessControlConnector, AutoCloseable {
             LoxoneClient.Session session = client.session();
             session.authenticate();
             listing(session);
-            LoxoneClient.Reply read = session.sps("getgrouplist");
-            if (read.code() != 200 || read.value() == null || !read.value().isArray()) {
-                throw new LoxoneFailure("getgrouplist answered " + read.code());
-            }
-            List<RemoteGroup> normal = new ArrayList<>();
-            for (JsonNode group : read.value()) {
-                String uuid = group.path("uuid").asString("");
-                if (group.path("type").asInt(-1) == NORMAL_GROUP && LOXONE_UUID.matcher(uuid).matches()) {
-                    normal.add(new RemoteGroup(uuid, group.path("name").asString("")));
-                }
-            }
-            groups = List.copyOf(normal);
+            readGroups(session);
             return new ProbeOutcome.Answered();
         } catch (LoxoneClient.Refusal refusal) {
             return new ProbeOutcome.Refused(refusal.reason());
         } catch (LoxoneClient.Unreachable unreachable) {
             return new ProbeOutcome.Unreachable(unreachable.getMessage());
         }
+    }
+
+    /** Reads the normal groups and keeps them as the ones a board may map an access point onto. */
+    List<RemoteGroup> readGroups(LoxoneClient.Session session) {
+        LoxoneClient.Reply read = session.sps("getgrouplist");
+        if (read.code() != 200 || read.value() == null || !read.value().isArray()) {
+            throw new LoxoneFailure("getgrouplist answered " + read.code());
+        }
+        List<RemoteGroup> normal = new ArrayList<>();
+        for (JsonNode group : read.value()) {
+            String uuid = group.path("uuid").asString("");
+            if (group.path("type").asInt(-1) == NORMAL_GROUP && LOXONE_UUID.matcher(uuid).matches()) {
+                normal.add(new RemoteGroup(uuid, group.path("name").asString("")));
+            }
+        }
+        groups = List.copyOf(normal);
+        return groups;
+    }
+
+    @Override
+    public List<ConnectionCheck> connectionChecks(Map<UUID, String> grantedAccessPoints) {
+        return checks.all(grantedAccessPoints);
     }
 
     @Override
@@ -237,7 +256,7 @@ class LoxoneAccessControl implements AccessControlConnector, AutoCloseable {
         return Optional.of(List.copyOf(assigned));
     }
 
-    private List<String> usersNamed(LoxoneClient.Session session, String name) {
+    private static List<String> usersNamed(LoxoneClient.Session session, String name) {
         return named(listing(session), name);
     }
 
@@ -257,7 +276,7 @@ class LoxoneAccessControl implements AccessControlConnector, AutoCloseable {
         return named;
     }
 
-    private JsonNode listing(LoxoneClient.Session session) {
+    static JsonNode listing(LoxoneClient.Session session) {
         LoxoneClient.Reply listed = session.sps("getuserlist2");
         if (listed.code() != 200 || listed.value() == null || !listed.value().isArray()) {
             throw new LoxoneFailure("getuserlist2 answered " + listed.code());
@@ -272,7 +291,7 @@ class LoxoneAccessControl implements AccessControlConnector, AutoCloseable {
         return listed.contains(externalReference) ? externalReference : listed.getFirst();
     }
 
-    private void delete(LoxoneClient.Session session, String uuid) {
+    static void delete(LoxoneClient.Session session, String uuid) {
         int answered = session.changing("deleteuser", uuid).code();
         if (answered != 200) {
             throw new LoxoneFailure("deleteuser answered " + answered);
@@ -286,8 +305,8 @@ class LoxoneAccessControl implements AccessControlConnector, AutoCloseable {
         }
         user.put("name", name);
         user.put("userState", TIMESPAN);
-        user.put("validFrom", LoxoneTime.from(instruction.validFrom(), settings.zone().zoneId()));
-        user.put("validUntil", LoxoneTime.until(instruction.validUntil(), settings.zone().zoneId()));
+        user.put("validFrom", LoxoneTime.from(instruction.validFrom()));
+        user.put("validUntil", LoxoneTime.until(instruction.validUntil()));
         user.put("expirationAction", DELETE_ON_EXPIRY);
         user.put("changePassword", false);
         ArrayNode usergroups = user.putArray("usergroups");

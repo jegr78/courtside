@@ -63,7 +63,7 @@ define.
 ## Health
 
 `GET /actuator/health` answers without authentication. When the instance is up it returns `200`
-with the body `{"groups":["liveness","mail","readiness"],"status":"UP"}`, which names the probe
+with the body `{"groups":["access-control","liveness","mail","readiness"],"status":"UP"}`, which names the probe
 groups and carries no components. It returns `503` when a check fails. With the database
 unreachable, the `503` takes about 30 seconds to arrive, because it waits for a database connection
 first.

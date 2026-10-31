@@ -5,6 +5,9 @@ import org.courtside.access.internal.AccessGrantAdministration;
 import org.courtside.access.internal.AccessGrantAdministration.GrantView;
 import org.courtside.access.internal.AccessGrantAdministration.Overview;
 import org.courtside.api.AdminAccessGrantsApi;
+import org.courtside.api.ApiAccessControlCheck;
+import org.courtside.api.ApiAccessControlCheckOutcome;
+import org.courtside.api.ApiAccessControlCheckResult;
 import org.courtside.api.ApiAccessControlGroup;
 import org.courtside.api.ApiAccessControlGroups;
 import org.courtside.api.ApiAccessControlProbe;
@@ -46,9 +49,18 @@ class AccessGrantAdminController implements AdminAccessGrantsApi {
     }
 
     @Override
-    public ResponseEntity<Void> probeAccessControl() {
-        administration.requestProbe();
+    public ResponseEntity<Void> checkAccessControl() {
+        administration.requestConnectionCheck();
         return ResponseEntity.accepted().build();
+    }
+
+    @Override
+    public ResponseEntity<ApiAccessControlCheck> readAccessControlCheck() {
+        AccessGrantAdministration.ConnectionCheckView check = administration.connectionCheck();
+        return ResponseEntity.ok(new ApiAccessControlCheck(WireTypes.toOffsetDateTime(check.checkedAt()),
+                check.checks().stream().map(entry -> new ApiAccessControlCheckResult(entry.check(),
+                        ApiAccessControlCheckOutcome.valueOf(entry.outcome().name()), entry.code(),
+                        entry.parameters())).toList()));
     }
 
     @Override

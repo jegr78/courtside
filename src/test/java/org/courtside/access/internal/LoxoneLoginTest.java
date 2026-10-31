@@ -129,14 +129,15 @@ class LoxoneLoginTest extends LoxoneTestSupport {
     }
 
     @Test
-    void whenATokenIsAcquired_thenItAsksForAppAndUserManagementWithAStableClientUuid() {
+    void whenATokenIsAcquired_thenItAsksForAppChangeCodesAndUserManagementWithAStableClientUuid() {
         // when
         connector.probe();
         connectorFor(simulator.settingsByUrl(DEADLINE)).probe();
 
         // then
-        assertThat(simulator.permissions()).as("permission 4 (app) plus 0x800 (user management)")
-                .containsExactly(2052, 2052);
+        assertThat(simulator.permissions())
+                .as("permission 4 (app), 0x20 (change codes) and 0x800 (user management)")
+                .containsExactly(2084, 2084);
         assertThat(simulator.clientUuids()).hasSize(2).allMatch(uuid -> uuid.equals(simulator.clientUuids()
                 .getFirst())).allMatch(uuid -> uuid.matches("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{16}"));
         assertThat(LoxoneLogin.clientUuid(new LoxoneAddress.Fixed(URI.create("https://other.example.org"))))
@@ -195,7 +196,7 @@ class LoxoneLoginTest extends LoxoneTestSupport {
         // given
         LoxoneSettings settings = simulator.settingsByUrl(DEADLINE);
         LoxoneAccessControl wrong = connectorFor(new LoxoneSettings(settings.address(), settings.user(),
-                "wrong-example-password", settings.zone(), settings.callDeadline()));
+                "wrong-example-password", settings.callDeadline()));
 
         // when
         ProbeOutcome probed = wrong.probe();
@@ -217,9 +218,9 @@ class LoxoneLoginTest extends LoxoneTestSupport {
         GrantOutcome granted = connector.grant(instruction(UUID.randomUUID()));
 
         // then
-        assertThat(probed).isEqualTo(new ProbeOutcome.Refused("token lacks the user-management right"));
+        assertThat(probed).isEqualTo(new ProbeOutcome.Refused("token lacks the user-management or code-change right"));
         assertThat(granted).isEqualTo(new GrantOutcome.Refused(Scope.CONNECTOR,
-                "token lacks the user-management right"));
+                "token lacks the user-management or code-change right"));
         assertThat(simulator.refusalsForMissingRights()).as("a request without the right counts towards the lock")
                 .isZero();
     }

@@ -1,0 +1,15 @@
+[ {
+  "request" : {
+    "command" : "updateuseraccesscode",
+    "arguments" : [ "<loxone-uuid-3>", "<secret-5>" ],
+    "query" : { }
+  },
+  "status" : 200,
+  "response" : {
+    "LL" : {
+      "control" : "dev/sps/updateuseraccesscode/<loxone-uuid-3>/<secret-5>",
+      "value" : "",
+      "Code" : "200"
+    }
+  }
+} ]

@@ -9,7 +9,6 @@ import org.springframework.context.annotation.Import;
 import java.net.URI;
 import java.time.Clock;
 import java.time.Duration;
-import java.time.ZoneId;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -34,7 +33,7 @@ class LoxoneGroupMappingTest extends AbstractIntegrationTest {
         UUID gate = facility.createAccessPointWithLoxoneGroup("North gate", GROUP);
         LoxoneAccessControl connector = new LoxoneAccessControl(new LoxoneSettings(
                 new LoxoneAddress.Fixed(URI.create("https://miniserver.example.org")), "courtside",
-                "example-password", () -> ZoneId.of("Europe/Berlin"), Duration.ofSeconds(1)), groups,
+                "example-password", Duration.ofSeconds(1)), groups,
                 LoxoneSimulator.clientTrust(), Clock.systemUTC());
         String before = connector.mappingOf(Set.of(gate));
 

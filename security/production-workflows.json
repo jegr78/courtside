@@ -464,11 +464,12 @@
       "actors": [
         "ADMIN"
       ],
-      "entryPoints": "Administrative access-grant overview, retry and probe endpoints, the access-control group list, and the access worker the booking, series, card and access-point events wake after their commit.",
+      "entryPoints": "Administrative access-grant overview, retry and connection-check endpoints, the access-control group list, and the access worker the booking, series, card and access-point events wake after their commit.",
       "operationIds": [
+        "checkAccessControl",
         "listAccessControlGroups",
         "listAccessGrants",
-        "probeAccessControl",
+        "readAccessControlCheck",
         "retryAccessGrant"
       ],
       "backgroundEntryPoints": [
@@ -492,7 +493,7 @@
         "A probe request makes the next pass probe the access-control system first and keeps the result in memory for the overview."
       ],
       "alternatePaths": [
-        "Without a selected connector no access worker exists, the overview says so, a probe request is refused and configuration and booking paths are unchanged.",
+        "Without a selected connector no access worker exists, the overview says so, a connection-check request is refused and configuration and booking paths are unchanged.",
         "Reading the overview never calls the access-control system."
       ],
       "failurePaths": [
@@ -510,7 +511,7 @@
         "src/test/java/org/courtside/access/internal/AccessSignalsTest.java#givenAnIdleWorker_whenAnAccessPointIsAddedChangedOrSwitched_thenEachStartsAPass",
         "src/test/java/org/courtside/access/internal/AccessGrantAdminApiTest.java#givenAFailingGrant_whenTheBoardRetriesIt_thenTheRetryIsRecordedAuditedAndConsumedByTheNextPass",
         "src/test/java/org/courtside/access/internal/AccessGrantAdminApiTest.java#givenAProbeThatThrowsWithCredentialsInItsMessage_whenTheBoardReadsTheOverview_thenOnlyItsClassShows",
-        "src/test/java/org/courtside/access/web/AccessGrantAdminWithoutConnectorTest.java#givenNoConnector_whenTheBoardAsksForAProbe_thenItIsRefusedWithItsOwnTypeAndCode"
+        "src/test/java/org/courtside/access/web/AccessGrantAdminWithoutConnectorTest.java#givenNoConnector_whenTheBoardAsksForAConnectionCheck_thenItIsRefusedWithItsOwnTypeAndCode"
       ]
     },
     {

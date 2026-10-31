@@ -1,7 +1,6 @@
 package org.courtside.access.internal;
 
 import org.courtside.access.AccessControlConnector;
-import org.courtside.config.ClubTimeZone;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -28,10 +27,10 @@ class AccessControlConfiguration {
     AccessControlConnector accessControlConnector(@Value("${courtside.access-control.connector}") String connector,
                                                   @Value("${courtside.environment:}") String designation,
                                                   @Value("${courtside.access-control.call-deadline}") Duration deadline,
-                                                  Environment environment, ClubTimeZone zone,
+                                                  Environment environment,
                                                   LoxoneGroupMapping groups, Clock clock) {
         return select(connector, designation, environment,
-                new LoxoneWiring(zone, groups, clock, deadline, AccessControlConfiguration::defaultTls));
+                new LoxoneWiring(groups, clock, deadline, AccessControlConfiguration::defaultTls));
     }
 
     @Bean(destroyMethod = "close")
@@ -39,7 +38,7 @@ class AccessControlConfiguration {
         return new CallRunner(deadline);
     }
 
-    record LoxoneWiring(ClubTimeZone zone, LoxoneGroupMapping groups, Clock clock, Duration callDeadline,
+    record LoxoneWiring(LoxoneGroupMapping groups, Clock clock, Duration callDeadline,
                         Supplier<SSLContext> tls) {
     }
 
@@ -84,7 +83,7 @@ class AccessControlConfiguration {
             throw new IllegalStateException("COURTSIDE_ACCESS_CONTROL_CONNECTOR=loxone needs "
                     + "COURTSIDE_ACCESS_CONTROL_LOXONE_SERIAL or COURTSIDE_ACCESS_CONTROL_LOXONE_URL");
         }
-        return new LoxoneSettings(address, user, password, loxone.zone(), loxone.callDeadline());
+        return new LoxoneSettings(address, user, password, loxone.callDeadline());
     }
 
     private static URI httpsUrl(String url) {

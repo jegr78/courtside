@@ -95,6 +95,7 @@ const BOOKING_MODULE_SUBJECTS: Record<string, "booking" | "series" | "waitlistEn
   "access.grant.installed": "booking",
   "access.grant.failing": "booking",
   "access.grant.retryRequested": "booking",
+  "access.control.checkRequested": "named",
   "booking.booking.cancelled": "booking",
   "booking.participant.recorded": "booking",
   "booking.participant.withdrew": "booking",

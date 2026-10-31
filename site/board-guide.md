@@ -215,7 +215,7 @@ Ist ein Loxone Miniserver als Zutrittssystem angebunden, wählst du für jeden Z
 eine **Loxone-Gruppe**. Der Miniserver-Benutzer einer Buchung tritt dieser Gruppe bei, die Gruppe
 entscheidet also, welche Tür sein Code öffnet. Die Auswahl zeigt die Gruppen, die Courtside bei der
 letzten Prüfung des Miniservers gelesen hat. Ist sie leer, steht an ihrer Stelle ein Hinweis. Drücke
-dann unter *Zugangsberechtigungen* auf **Jetzt prüfen**, nach der Prüfung erscheinen die Gruppen. Eine
+dann unter *Zugangsberechtigungen* auf **Verbindung prüfen**, nach der Prüfung erscheinen die Gruppen. Eine
 gespeicherte Gruppe, die der Miniserver nicht mehr kennt, steht als *Unbekannte Gruppe* in der
 Auswahl. Wähle dann eine andere oder entferne sie. Ein Zugang ohne Gruppe öffnet sich mit keinem
 Buchungscode. Seine Berechtigungen scheitern mit dem Grund *access point has no Loxone group*, bis du
@@ -276,6 +276,74 @@ Was die Werte auslösen, entscheidet ihr in Loxone:
 Wer den Schlüssel kennt, erfährt nur Belegung und Minuten je Platz, nie wer gebucht hat oder mit
 welcher Karte. Der Schlüssel steht in der Adresse und kann deshalb im Protokoll eines Routers oder
 Proxys auftauchen. Ersetze ihn, wenn er in falsche Hände geraten ist.
+
+## Loxone Miniserver anbinden
+
+Ist ein Loxone Miniserver das Zutrittssystem, legt Courtside für jede Buchung mit Zugangscode einen
+eigenen Benutzer auf dem Miniserver an. Er gilt nur im Zeitfenster der Buchung, trägt ihren Code und
+gehört zur Gruppe ihres Zugangs. Am Ende des Fensters löscht der Miniserver ihn selbst. Die
+Einrichtung machst du einmal, danach prüft Courtside die Verbindung, wenn du es verlangst.
+
+In Loxone Config richtest du ein:
+
+1. eine Benutzergruppe für Courtside mit dem Gruppenrecht **Benutzerverwaltung**. Gib ihr keinen
+   **Vollzugriff**. Courtside braucht das Recht, Benutzer zu verwalten, und das Recht, ihre Codes zu
+   ändern, und prüft beide. Fehlt eines, meldet die Prüfung **Anmeldung** ein fehlendes Recht.
+2. einen technischen Benutzer mit eigenem Passwort, der nur in dieser Gruppe ist. Er ist kein
+   Administrator.
+3. je Tür oder Tastenfeld eine normale Gruppe, die in den Rechten dieses Tastenfelds die
+   Berechtigung für den Zugang hat. Diese Gruppe wählst du in Courtside unter *Anlage → Zugänge* als
+   **Loxone-Gruppe**.
+4. keine Tastenfeld-Berechtigung für die Gruppe **Alle**. Sonst öffnet dort jeder Code, den der
+   Miniserver kennt.
+
+Dein Betrieb trägt in die Umgebung der Instanz ein: `COURTSIDE_ACCESS_CONTROL_CONNECTOR=loxone`,
+die Seriennummer des Miniservers in `COURTSIDE_ACCESS_CONTROL_LOXONE_SERIAL` oder eine feste
+Adresse in `COURTSIDE_ACCESS_CONTROL_LOXONE_URL`, dazu Benutzername und Passwort des technischen
+Benutzers in `COURTSIDE_ACCESS_CONTROL_LOXONE_USER` und `COURTSIDE_ACCESS_CONTROL_LOXONE_PASSWORD`.
+Nach einem Neustart der Instanz gilt die Verbindung.
+
+Drücke dann unter *Nachweise → Zugangsberechtigungen* auf **Verbindung prüfen**. Courtside prüft
+beim nächsten Durchgang fünf Punkte und liest dabei die Gruppen neu. Lade die Seite kurz danach neu,
+dann steht jeder Punkt mit seinem Ergebnis unter dem Knopf:
+
+* **Miniserver**: Courtside erreicht den Miniserver über die Loxone Cloud oder die feste Adresse, sein
+  Zertifikat ist gültig und seine Version ist mindestens 14.2.5.16.
+* **Anmeldung**: Der technische Benutzer meldet sich an und darf Benutzer verwalten und Codes ändern.
+* **Gruppen**: Jeder aktive Zugang ohne festen Code hat eine Loxone-Gruppe, und der Miniserver
+  kennt sie als normale Gruppe. Die Meldung nennt jeden Zugang, bei dem das nicht stimmt.
+* **Testbenutzer**: Courtside legt einen Benutzer ohne Gruppe und ohne Code für zwei Minuten an,
+  liest ihn zurück und löscht ihn wieder. Bleibt er hängen, löscht der Miniserver ihn nach zwei
+  Minuten selbst.
+* **Tastatur** steht immer auf *vor Ort prüfen*. Ob ein Tastenfeld einen Code annimmt, zeigt die
+  Schnittstelle des Miniservers nicht. Das prüfst du mit der Abnahme an der Tür.
+
+Gruppen und Testbenutzer prüft Courtside nur nach einer erfolgreichen Anmeldung, sonst stehen sie auf
+*übersprungen*.
+
+![Die Zugangsberechtigungen mit Verbindung prüfen, den fünf Prüfungen eines Miniservers, einer gescheiterten Berechtigung mit ihrem Grund und einer eingerichteten.](screenshots/de/access-grants.png)
+
+### Abnahme an der Tür
+
+Mach die Abnahme nach der Einrichtung und nach jeder Änderung an Gruppen oder Tastenfeldern. Du
+brauchst dafür eine Buchung, deren Karte Zugang gewährt, auf einem Platz hinter dem Zugang. Den
+Code der Buchung siehst du unter *Meine Buchungen*.
+
+1. Die Uhrzeit in der Loxone App stimmt mit der Uhr im Clubhaus überein, und der Benutzer der
+   Buchung zeigt in der App dasselbe Zeitfenster wie Courtside unter *Zugangsberechtigungen*.
+2. Vor dem Zeitfenster weist das Tastenfeld den Code ab, im Zeitfenster öffnet er, danach weist es
+   ihn wieder ab.
+3. Nach einer Stornierung weist das Tastenfeld den Code innerhalb einer Minute ab.
+4. Verschiebst du die Buchung auf einen Platz hinter einem anderen Zugang, öffnet der Code den
+   neuen Zugang und nicht mehr den alten.
+5. Der feste Code eines Zugangs mit festem Code öffnet weiter wie vorher.
+6. Die Gebäudesteuerung: Der **Virtuelle HTTP Eingang Befehl** für `occupied` zeigt 1, solange eine
+   Buchung läuft, deren Karte als belegt gilt, und sonst 0. Der Befehl für `minutes` zählt bis zur
+   nächsten solchen Buchung herunter. Eine Platzsperrung zeigt 0. Nach **Schlüssel widerrufen**
+   behält Loxone den letzten Wert, weil Courtside jede Abfrage abweist.
+
+Die Berechtigung des Tastenfelds lässt sich über die Schnittstelle nicht lesen. Deshalb prüft
+Courtside sie nie selbst, und die Punkte 2 bis 5 sind ihr einziger Nachweis.
 
 ## Anlage → Öffnungszeiten
 
@@ -700,11 +768,9 @@ Unter **Nachweise** findest du neun Ansichten. Die *Aufbewahrung* beschreibt der
   sechzig Minuten erneut. Nach dem fünften Fehlschlag oder einer Ablehnung gilt die Berechtigung als
   gescheitert. Behebe dann die Ursache im Zutrittssystem und drücke **Erneut senden**. Ein Entfernen
   versucht Courtside ohne Ende weiter. Über der Liste steht, was das Zutrittssystem bei der letzten
-  Prüfung geantwortet hat. **Jetzt prüfen** lässt Courtside beim nächsten Durchgang neu nachfragen.
-  Den Code selbst zeigt die Ansicht nie. Ohne angebundenes Zutrittssystem bleibt die Liste leer und
-  die Buchungen laufen wie bisher.
-
-![Die Zugangsberechtigungen mit einer gescheiterten Berechtigung, ihrem Grund und Erneut senden, und einer eingerichteten.](screenshots/de/access-grants.png)
+  Prüfung geantwortet hat. **Verbindung prüfen** prüft die Verbindung Schritt für Schritt, wie
+  *Loxone Miniserver anbinden* es beschreibt. Den Code selbst zeigt die Ansicht nie. Ohne
+  angebundenes Zutrittssystem bleibt die Liste leer und die Buchungen laufen wie bisher.
 
 ![Die Statistik mit Zeitraumwahl, Kennzahlen zur Auslastung und ihrer Veränderung.](screenshots/de/utilisation.png)
 

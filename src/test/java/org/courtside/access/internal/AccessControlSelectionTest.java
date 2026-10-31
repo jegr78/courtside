@@ -1,7 +1,6 @@
 package org.courtside.access.internal;
 
 import org.courtside.access.AccessControlConnector;
-import org.courtside.config.ClubTimeZone;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.convert.ApplicationConversionService;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
@@ -12,7 +11,6 @@ import java.net.URI;
 import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
 import java.time.Duration;
-import java.time.ZoneId;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -22,7 +20,7 @@ class AccessControlSelectionTest {
 
     private static final String SECRET = "example-loxone-secret";
     private static final AccessControlConfiguration.LoxoneWiring WIRING = new AccessControlConfiguration.LoxoneWiring(
-            () -> ZoneId.of("Europe/Berlin"), accessPoint -> Optional.empty(), Clock.systemUTC(), Duration.ofSeconds(15),
+            accessPoint -> Optional.empty(), Clock.systemUTC(), Duration.ofSeconds(15),
             AccessControlSelectionTest::tls);
 
     @Test
@@ -139,7 +137,6 @@ class AccessControlSelectionTest {
                 .withProperty("courtside.access-control.loxone.url", "https://miniserver.example.org");
         context.setEnvironment(environment);
         context.getBeanFactory().setConversionService(ApplicationConversionService.getSharedInstance());
-        context.registerBean(ClubTimeZone.class, () -> () -> ZoneId.of("Europe/Berlin"));
         context.registerBean(LoxoneGroupMapping.class, () -> accessPoint -> Optional.empty());
         context.registerBean(Clock.class, Clock::systemUTC);
         context.register(AccessControlConfiguration.class);

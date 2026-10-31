@@ -1,6 +1,7 @@
 package org.courtside.access.internal;
 
 import org.courtside.access.AccessControlConnector;
+import org.courtside.access.ConnectionCheck;
 import org.courtside.access.GrantInstruction;
 import org.courtside.access.GrantOutcome;
 import org.courtside.access.GrantReference;
@@ -80,6 +81,9 @@ public final class ScriptedAccessControl implements AccessControlConnector {
     private volatile Consumer<Set<UUID>> mappingHook;
     private volatile CountDownLatch stubbornRelease;
     private volatile Supplier<Optional<Set<UUID>>> listing;
+    private volatile List<ConnectionCheck> checks;
+    private volatile RuntimeException checksFailure;
+    private volatile Map<UUID, String> checkedAccessPoints;
 
     private List<RemoteGroup> groups = List.of();
     private boolean listsGroups;
@@ -90,6 +94,9 @@ public final class ScriptedAccessControl implements AccessControlConnector {
 
     public synchronized void reset() {
         listing = null;
+        checks = null;
+        checksFailure = null;
+        checkedAccessPoints = null;
         groups = List.of();
         listsGroups = false;
         calls.clear();
@@ -196,6 +203,29 @@ public final class ScriptedAccessControl implements AccessControlConnector {
         }
         calls.add(new Call(Kind.LIST, null, Instant.now(), inFlight.get() > 0, null));
         return listed.get();
+    }
+
+    public void checks(ConnectionCheck... offered) {
+        checks = List.of(offered);
+    }
+
+    public void failsListingChecks(RuntimeException failure) {
+        checksFailure = failure;
+    }
+
+    public Map<UUID, String> checkedAccessPoints() {
+        return checkedAccessPoints;
+    }
+
+    @Override
+    public List<ConnectionCheck> connectionChecks(Map<UUID, String> grantedAccessPoints) {
+        checkedAccessPoints = Map.copyOf(grantedAccessPoints);
+        RuntimeException failure = checksFailure;
+        if (failure != null) {
+            throw failure;
+        }
+        List<ConnectionCheck> offered = checks;
+        return offered == null ? AccessControlConnector.super.connectionChecks(grantedAccessPoints) : offered;
     }
 
     public synchronized void listsGroups(boolean lists) {

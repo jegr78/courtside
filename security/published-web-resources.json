@@ -94,6 +94,7 @@
       ],
       "reviewedValues": {
         "groups": [
+          "access-control",
           "liveness",
           "mail",
           "readiness"

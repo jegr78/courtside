@@ -48,13 +48,14 @@ class AccessPass {
     private final int pageSize;
     private final ProbeReadings readings;
     private final AccessReconciliation reconciliation;
+    private final ConnectionCheckRun checks;
 
     AccessPass(DataSource dataSource, PlatformTransactionManager transactionManager, JdbcClient jdbc, PassClock clock,
                BookingAnnouncer announcer, AccessGrantRepository grants, AccessGrantTransitions transitions,
                AccessCodes codes, AccessControlConnector connector, CallRunner calls, ProvisioningWindow window,
                @Value("${courtside.access-control.call-deadline}") Duration deadline,
                @Value("${courtside.access-control.insert-page-size}") int pageSize, ProbeReadings readings,
-               AccessReconciliation reconciliation) {
+               AccessReconciliation reconciliation, ConnectionCheckRun checks) {
         this.dataSource = dataSource;
         this.transactions = new TransactionTemplate(transactionManager);
         this.jdbc = jdbc;
@@ -70,6 +71,7 @@ class AccessPass {
         this.pageSize = pageSize;
         this.readings = readings;
         this.reconciliation = reconciliation;
+        this.checks = checks;
     }
 
     PassResult runPassNow() {
@@ -118,6 +120,7 @@ class AccessPass {
     }
 
     private PassResult act(PassLock lock, BooleanSupplier stopping) {
+        checks.runIfRequested(() -> !stopping.getAsBoolean() && lock.stillHeld());
         List<UUID> open = jdbc.sql("""
                         SELECT id FROM access_grant
                         WHERE wanted OR remote <> 'NONE' OR next_attempt_at <= :now OR retry_requested_at IS NOT NULL

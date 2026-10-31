@@ -9,7 +9,6 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.IOException;
 import java.net.URI;
-import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
 
@@ -168,7 +167,7 @@ class LoxoneAddressTest extends LoxoneTestSupport {
         int relayPort = simulator.url().getPort();
         LoxoneAccessControl confined = connectorFor(simulator.settingsBySerial(DEADLINE,
                 List.of(new LoxoneAddress.Relay("localhost", relayPort, relayPort))));
-        try (LoxoneSimulator foreign = new LoxoneSimulator(clock, ZoneId.of("Europe/Berlin"))) {
+        try (LoxoneSimulator foreign = new LoxoneSimulator(clock)) {
             simulator.resolveTo(foreign.url());
 
             // when / then

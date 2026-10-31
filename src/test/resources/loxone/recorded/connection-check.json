@@ -1,0 +1,163 @@
+[ {
+  "request" : {
+    "command" : "getip",
+    "arguments" : [ ],
+    "query" : {
+      "snr" : "<secret-1>"
+    }
+  },
+  "status" : 200,
+  "response" : {
+    "url" : "https://<host-1>:<port-1>"
+  }
+}, {
+  "request" : {
+    "command" : "apiKey",
+    "arguments" : [ ],
+    "query" : { }
+  },
+  "status" : 200,
+  "response" : {
+    "LL" : {
+      "control" : "dev/cfg/apiKey",
+      "value" : "{'snr':'<secret-4>','version':'17.0.3.31','key':'<digits80-3>','isInTrust':false,'local':false,'certTLD':'<text-1>','httpsStatus':1}",
+      "Code" : "200"
+    }
+  }
+}, {
+  "request" : {
+    "command" : "killtoken",
+    "arguments" : [ "<token-1>", "<secret-2>" ],
+    "query" : { }
+  },
+  "status" : 200,
+  "response" : {
+    "LL" : {
+      "control" : "dev/sys/killtoken/<token-1>/<secret-2>",
+      "value" : { },
+      "code" : "200"
+    }
+  }
+}, {
+  "request" : {
+    "command" : "getkey2",
+    "arguments" : [ "<secret-2>" ],
+    "query" : { }
+  },
+  "status" : 200,
+  "response" : {
+    "LL" : {
+      "control" : "dev/sys/getkey2/<secret-2>",
+      "code" : "200",
+      "value" : {
+        "key" : "<digits80-4>",
+        "salt" : "<hex70-upper-1>",
+        "hashAlg" : "SHA256"
+      }
+    }
+  }
+}, {
+  "request" : {
+    "command" : "getjwt",
+    "arguments" : [ "<hex64-2>", "<secret-2>", "<digits4-1>", "<loxone-uuid-1>", "<secret-3>" ],
+    "query" : { }
+  },
+  "status" : 200,
+  "response" : {
+    "LL" : {
+      "control" : "dev/sys/getjwt/<hex64-2>/<secret-2>/<digits4-1>/<loxone-uuid-1>/<secret-3>",
+      "value" : {
+        "token" : "<token-2>",
+        "key" : "<digits80-5>",
+        "validUntil" : "<time-2>",
+        "tokenRights" : 3748,
+        "unsecurePass" : false
+      },
+      "code" : "200"
+    }
+  }
+}, {
+  "request" : {
+    "command" : "getgrouplist",
+    "arguments" : [ ],
+    "query" : { }
+  },
+  "status" : 200,
+  "response" : {
+    "LL" : {
+      "control" : "dev/sps/getgrouplist",
+      "value" : "[]",
+      "Code" : "200"
+    }
+  }
+}, {
+  "request" : {
+    "command" : "getuserlist2",
+    "arguments" : [ ],
+    "query" : { }
+  },
+  "status" : 200,
+  "response" : {
+    "LL" : {
+      "control" : "dev/sps/getuserlist2",
+      "value" : "[]",
+      "Code" : "200"
+    }
+  }
+}, {
+  "request" : {
+    "command" : "addoredituser",
+    "arguments" : [ "{\"name\":\"<name-1>\",\"userState\":4,\"validFrom\":\"<time-3>\",\"validUntil\":\"<time-4>\",\"expirationAction\":1,\"changePassword\":false,\"usergroups\":[]}" ],
+    "query" : { }
+  },
+  "status" : 200,
+  "response" : {
+    "LL" : {
+      "control" : "dev/sps/addoredituser/<json-1>",
+      "value" : "{\"name\":\"<name-1>\",\"desc\":\"\",\"uuid\":\"<loxone-uuid-2>\",\"userid\":\"\",\"<key-1>\":\"\",\"firstName\":\"\",\"lastName\":\"\",\"email\":\"\",\"phone\":\"\",\"uniqueUserId\":\"\",\"company\":\"\",\"department\":\"\",\"personalno\":\"\",\"title\":\"\",\"debitor\":\"\",\"customField1\":\"\",\"customField2\":\"\",\"customField3\":\"\",\"customField4\":\"\",\"customField5\":\"\",\"lastEdit\":\"<time-5>\",\"userState\":4,\"validUntil\":\"<time-4>\",\"expirationAction\":1,\"validFrom\":\"<time-3>\",\"isAdmin\":false,\"changePassword\":false,\"masterAdmin\":false,\"userRights\":16384,\"scorePWD\":\"<number-1>\",\"scoreVisuPWD\":\"<number-1>\",\"trustMember\":\"\",\"usergroups\":[],\"<key-2>\":\"<number-2>\",\"nfcTags\":[],\"keycodes\":[],\"customFields\":[\"<text-2>\",\"<text-3>\",\"<text-4>\",\"<text-5>\",\"<text-6>\"]}",
+      "Code" : "200"
+    }
+  }
+}, {
+  "request" : {
+    "command" : "getuser",
+    "arguments" : [ "<loxone-uuid-2>" ],
+    "query" : { }
+  },
+  "status" : 200,
+  "response" : {
+    "LL" : {
+      "control" : "dev/sps/getuser/<loxone-uuid-2>",
+      "value" : "{\"name\":\"<name-1>\",\"desc\":\"\",\"uuid\":\"<loxone-uuid-2>\",\"userid\":\"\",\"<key-1>\":\"\",\"firstName\":\"\",\"lastName\":\"\",\"email\":\"\",\"phone\":\"\",\"uniqueUserId\":\"\",\"company\":\"\",\"department\":\"\",\"personalno\":\"\",\"title\":\"\",\"debitor\":\"\",\"customField1\":\"\",\"customField2\":\"\",\"customField3\":\"\",\"customField4\":\"\",\"customField5\":\"\",\"lastEdit\":\"<time-5>\",\"userState\":4,\"validUntil\":\"<time-4>\",\"expirationAction\":1,\"validFrom\":\"<time-3>\",\"isAdmin\":false,\"changePassword\":false,\"masterAdmin\":false,\"userRights\":16384,\"scorePWD\":\"<number-1>\",\"scoreVisuPWD\":\"<number-1>\",\"trustMember\":\"\",\"usergroups\":[],\"<key-2>\":\"<number-2>\",\"nfcTags\":[],\"keycodes\":[],\"customFields\":[\"<text-2>\",\"<text-3>\",\"<text-4>\",\"<text-5>\",\"<text-6>\"]}",
+      "Code" : "200"
+    }
+  }
+}, {
+  "request" : {
+    "command" : "deleteuser",
+    "arguments" : [ "<loxone-uuid-2>" ],
+    "query" : { }
+  },
+  "status" : 200,
+  "response" : {
+    "LL" : {
+      "control" : "dev/sps/deleteuser/<loxone-uuid-2>",
+      "value" : "",
+      "Code" : "200"
+    }
+  }
+}, {
+  "request" : {
+    "command" : "getuserlist2",
+    "arguments" : [ ],
+    "query" : { }
+  },
+  "status" : 200,
+  "response" : {
+    "LL" : {
+      "control" : "dev/sps/getuserlist2",
+      "value" : "[]",
+      "Code" : "200"
+    }
+  }
+} ]
