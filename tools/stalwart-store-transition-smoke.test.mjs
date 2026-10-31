@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
-import { validateTransitionCandidate, canRemoveQualificationVolume } from "./stalwart-store-transition-smoke.mjs";
+import { validateTransitionCandidate, canRemoveQualificationVolume, pinnedRuntimeImage } from "./stalwart-store-transition-smoke.mjs";
 
 function candidate(use) {
   const root = mkdtempSync(join(tmpdir(), "courtside-transition-input-"));
@@ -73,4 +73,12 @@ test("given a candidate signer names another release, when qualification starts,
     // when / then
     assert.throws(() => validateTransitionCandidate(root), /identity/);
   });
+});
+
+test("given the published runtime baseline, when qualification resolves it, then both fixtures use one exact digest", () => {
+  // when / then
+  const image = `ghcr.io/jegr78/courtside@sha256:${"a".repeat(64)}`;
+  assert.equal(pinnedRuntimeImage(["ghcr.io/jegr78/courtside:nightly", image]), image);
+  assert.throws(() => pinnedRuntimeImage(["ghcr.io/jegr78/courtside:nightly"]), /digest/);
+  assert.throws(() => pinnedRuntimeImage([`registry.example.org/courtside@sha256:${"a".repeat(64)}`]), /digest/);
 });

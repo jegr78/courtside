@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { chmodSync, cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync,
   readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
@@ -15,7 +15,7 @@ import { archiveEntries, executable, manifestOf } from "./deployment-archive.mjs
 const repository = fileURLToPath(new URL("..", import.meta.url));
 const YAML = createRequire(new URL("../frontend/package.json", import.meta.url))("yaml");
 const sourceRevision = "89d8961e93e301a019f22c48dd455b09ce09fef1";
-const runtimeImage = "ghcr.io/jegr78/courtside@sha256:34da21a2b9a30ee48640d4bd6fa591e28d16771dcb1b359408f8604a26fcf26f";
+const runtimeBaseline = "ghcr.io/jegr78/courtside:nightly";
 const hash = (content) => createHash("sha256").update(content).digest("hex");
 
 export function validateTransitionCandidate(root) {
@@ -47,6 +47,12 @@ export function validateTransitionCandidate(root) {
 
 export function canRemoveQualificationVolume(name, labels, project) {
   return name.startsWith(`${project}_`) && labels?.["com.docker.compose.project"] === project;
+}
+
+export function pinnedRuntimeImage(references) {
+  const image = references?.find((reference) => /^ghcr\.io\/jegr78\/courtside@sha256:[a-f0-9]{64}$/.test(reference));
+  if (!image) throw new Error("published runtime baseline has no Courtside image digest");
+  return image;
 }
 
 function run(command, args, options = {}) {
@@ -190,6 +196,12 @@ async function execute() {
   }
   const supplied = args.length ? resolve(args[1]) : undefined;
   const suppliedManifest = supplied ? validateTransitionCandidate(supplied) : undefined;
+  let image = suppliedManifest?.image;
+  if (!image) {
+    run("docker", ["pull", runtimeBaseline]);
+    image = pinnedRuntimeImage(JSON.parse(run("docker", ["image", "inspect", runtimeBaseline]).stdout)[0].RepoDigests);
+  }
+  process.stdout.write(`Runtime application image: ${image}\n`);
   const scratch = mkdtempSync(join(tmpdir(), "courtside-stalwart-transition-"));
   chmodSync(scratch, 0o700);
   const project = `courtside-transition-${randomBytes(8).toString("hex")}`;
@@ -200,7 +212,6 @@ async function execute() {
   const candidate = join(scratch, "candidate");
   const evidence = join(repository, "build", "stalwart-store-transition");
   rmSync(join(evidence, "result.json"), { force: true });
-  const image = suppliedManifest?.image ?? runtimeImage;
   let stage = "fixtures";
   let passed = false;
   const restoredContainers = [];
@@ -262,17 +273,10 @@ SELECT '77000000-0000-0000-0000-000000000001', '11111111-1111-1111-1111-11111111
 INSERT INTO court_allocation (id, booking_id, court_id, starts_at, ends_at, status)
 VALUES ('78000000-0000-0000-0000-000000000001', '77000000-0000-0000-0000-000000000001', '70000000-0000-0000-0000-000000000001', '2025-01-05T09:00:00Z', '2025-01-05T10:00:00Z', 'CONFIRMED');
 UPDATE user_account SET password_change_required=false WHERE username='admin';`);
-    const snapshotSql = "SELECT jsonb_build_object('booking',(SELECT to_jsonb(b) FROM booking b WHERE id='77000000-0000-0000-0000-000000000001'),'allocation',(SELECT to_jsonb(a) FROM court_allocation a WHERE id='78000000-0000-0000-0000-000000000001'),'account',(SELECT to_jsonb(u) FROM user_account u WHERE username='admin'))::text;";
+    const snapshotSql = "SELECT jsonb_build_object('booking',(SELECT to_jsonb(b) FROM booking b WHERE id='77000000-0000-0000-0000-000000000001'),'allocation',(SELECT to_jsonb(a) FROM court_allocation a WHERE id='78000000-0000-0000-0000-000000000001'),'account',(SELECT to_jsonb(u) FROM user_account u WHERE username='admin'),'instance',(SELECT to_jsonb(i) FROM mfa_instance_key i WHERE id=1))::text;";
     const before = psql(snapshotSql);
+    assert.ok(JSON.parse(before).instance?.key_check, "the source must hold its actual MFA key check");
     const keyHashes = () => compose(join(installation, "current"), ["run", "--rm", "--no-deps", "-T", "--entrypoint", "sh", "app", "-ec", "find /var/lib/courtside/mfa-keys -type f -exec sha256sum {} +"]).stdout;
-    if (!keyHashes().trim()) {
-      const instance = randomUUID();
-      const active = randomUUID();
-      const helper = YAML.parse(readFileSync(join(source, "compose.stalwart.yaml"), "utf8")).services["mail-plan"].image;
-      run("docker", ["run", "--rm", "-i", "--network", "none", "-v", `${project}_mfa-keys:/keys`, helper, "sh", "-ec",
-        `umask 077; mkdir /keys/${instance}; cat > /keys/${instance}/mfa.keys; chown -R 10001:10001 /keys`],
-      { input: `format=1\nactive=${active}\nkey.${active}=${randomBytes(32).toString("base64url")}\n` });
-    }
     const keys = keyHashes();
     assert.match(keys, /^[a-f0-9]{64}\s+.*\/mfa\.keys/m, "the source must contain persistent key material");
     stage = "transition preflight";
@@ -376,6 +380,7 @@ exec ${quote(executable("docker"))} "$@"
       sourceImage: YAML.parse(readFileSync(join(source, "compose.stalwart.yaml"), "utf8")).services.mail.image,
       targetImage: YAML.parse(readFileSync(join(candidate, "compose.stalwart.yaml"), "utf8")).services.mail.image,
       runtimeImage: image, head: run("git", ["rev-parse", "HEAD"]).stdout.trim(),
+      runtimeBaseline: supplied ? "supplied-candidate" : runtimeBaseline,
       networkFixtureOnly: true, preserved: ["booking", "allocation", "account", "persistent-key-files"],
       interruptedActivationResumed: true, restoredApplicationUnits: units.length,
       restoredMailStores: units.length, controlledMessages: 1 }, null, 2)}\n`);
