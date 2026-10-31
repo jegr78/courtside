@@ -7,7 +7,6 @@ import tools.jackson.databind.node.ObjectNode;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -112,13 +111,12 @@ final class LoxoneDeviceContract {
     private String create() {
         String name = "courtside_device_" + UUID.randomUUID().toString().replace("-", "").substring(0, 16);
         guard.issue(name);
-        ZoneId zone = settings.zone().zoneId();
         Instant now = clock.instant();
         ObjectNode user = JSON.createObjectNode();
         user.put("name", name);
         user.put("userState", 4);
-        user.put("validFrom", LoxoneTime.from(now, zone));
-        user.put("validUntil", LoxoneTime.until(now.plus(WINDOW), zone));
+        user.put("validFrom", LoxoneTime.from(now));
+        user.put("validUntil", LoxoneTime.until(now.plus(WINDOW)));
         user.put("expirationAction", 1);
         user.put("changePassword", false);
         user.putArray("usergroups");

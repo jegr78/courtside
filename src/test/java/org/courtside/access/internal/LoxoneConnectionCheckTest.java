@@ -173,7 +173,7 @@ class LoxoneConnectionCheckTest extends LoxoneTestSupport {
         // given
         LoxoneSettings right = simulator.settingsByUrl(DEADLINE);
         LoxoneAccessControl wrong = connectorFor(new LoxoneSettings(right.address(), right.user(),
-                "not-the-password", right.zone(), DEADLINE));
+                "not-the-password", DEADLINE));
 
         // when
         List<ConnectionCheckRun.Checked> checked = checked(wrong);

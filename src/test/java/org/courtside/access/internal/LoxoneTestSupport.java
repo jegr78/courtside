@@ -11,7 +11,6 @@ import org.junit.jupiter.api.BeforeEach;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -25,7 +24,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 abstract class LoxoneTestSupport {
 
-    static final ZoneId CLUB = ZoneId.of("Europe/Berlin");
     static final Duration DEADLINE = Duration.ofSeconds(10);
     static final UUID COURT_ONE = UUID.fromString("00000000-0000-0000-0000-00000000c001");
     static final UUID COURT_TWO = UUID.fromString("00000000-0000-0000-0000-00000000c002");
@@ -41,7 +39,7 @@ abstract class LoxoneTestSupport {
 
     @BeforeEach
     void startSimulator() throws IOException {
-        simulator = new LoxoneSimulator(clock, CLUB);
+        simulator = new LoxoneSimulator(clock);
         mapping.put(COURT_ONE, simulator.groupUuid("Court 1"));
         mapping.put(COURT_TWO, simulator.groupUuid("Court 2"));
         connector = ready(connectorFor(simulator.settingsByUrl(DEADLINE)));

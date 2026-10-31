@@ -9,7 +9,6 @@ import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Duration;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -38,9 +37,7 @@ class LoxoneDeviceContractTest {
         }
         LoxoneAddress address = serial.isEmpty() ? new LoxoneAddress.Fixed(URI.create(url))
                 : LoxoneAddress.Serial.throughLoxoneCloud(serial.toUpperCase(Locale.ROOT));
-        String zone = optional("ZONE");
-        ZoneId clubZone = ZoneId.of(zone.isEmpty() ? "Europe/Berlin" : zone);
-        LoxoneSettings settings = new LoxoneSettings(address, user, password, () -> clubZone, DEADLINE);
+        LoxoneSettings settings = new LoxoneSettings(address, user, password, DEADLINE);
         String code = String.valueOf(10_000_000 + new SecureRandom().nextInt(90_000_000));
         List<String> secrets = new ArrayList<>(List.of(user, password, code));
         secrets.add(serial.isEmpty() ? URI.create(url).getHost() : serial);

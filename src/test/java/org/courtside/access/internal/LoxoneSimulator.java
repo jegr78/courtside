@@ -29,7 +29,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
-import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -59,7 +59,7 @@ final class LoxoneSimulator implements AutoCloseable {
 
     private static final Set<String> MUTATING = Set.of("addoredituser", "deleteuser", "updateuseraccesscode",
             "assignusertogroup", "removeuserfromgroup", "createuser");
-    private static final LocalDateTime EPOCH = LocalDateTime.of(2009, 1, 1, 0, 0);
+    private static final Instant EPOCH = Instant.parse("2009-01-01T00:00:00Z");
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final SecureRandom RANDOM = new SecureRandom();
 
@@ -113,7 +113,6 @@ final class LoxoneSimulator implements AutoCloseable {
     private final UUID foreignGrantId = UUID.randomUUID();
     private final UUID adminGrantId = UUID.randomUUID();
     private final Clock clock;
-    private final ZoneId zone;
     private final ExecutorService handlers = Executors.newVirtualThreadPerTaskExecutor();
     private final CountDownLatch released = new CountDownLatch(1);
     private final List<Request> requests = new CopyOnWriteArrayList<>();
@@ -151,9 +150,8 @@ final class LoxoneSimulator implements AutoCloseable {
     private String version = "14.2.5.16";
     private final Set<String> omittedOnReadBack = new HashSet<>();
 
-    LoxoneSimulator(Clock clock, ZoneId zone) throws IOException {
+    LoxoneSimulator(Clock clock) throws IOException {
         this.clock = clock;
-        this.zone = zone;
         Credentials issued = credentials();
         this.cloud = served(issued.server(), this::cloud);
         this.miniserver = served(issued.server(), this::miniserver);
@@ -251,7 +249,7 @@ final class LoxoneSimulator implements AutoCloseable {
     }
 
     LoxoneSettings settingsByUrl(Duration deadline) {
-        return new LoxoneSettings(new LoxoneAddress.Fixed(url()), USER, PASSWORD, () -> zone, deadline);
+        return new LoxoneSettings(new LoxoneAddress.Fixed(url()), USER, PASSWORD, deadline);
     }
 
     LoxoneSettings settingsBySerial(Duration deadline) {
@@ -259,7 +257,7 @@ final class LoxoneSimulator implements AutoCloseable {
     }
 
     LoxoneSettings settingsBySerial(Duration deadline, List<LoxoneAddress.Relay> relays) {
-        return new LoxoneSettings(new LoxoneAddress.Serial(SERIAL, resolver(), relays), USER, PASSWORD, () -> zone,
+        return new LoxoneSettings(new LoxoneAddress.Serial(SERIAL, resolver(), relays), USER, PASSWORD,
                 deadline);
     }
 
@@ -445,7 +443,7 @@ final class LoxoneSimulator implements AutoCloseable {
     }
 
     long loxoneSeconds(Instant instant) {
-        return Duration.between(EPOCH, LocalDateTime.ofInstant(instant, zone)).getSeconds();
+        return Duration.between(EPOCH, instant).getSeconds();
     }
 
     private void cloud(HttpExchange exchange) throws IOException {
@@ -578,9 +576,9 @@ final class LoxoneSimulator implements AutoCloseable {
             }
             case "getjwt" -> jwt(arguments);
             case "date" -> new Answer(200, JSON.getNodeFactory().stringNode(
-                    LocalDateTime.ofInstant(clock.instant(), zone).toLocalDate().toString()), false);
+                    LocalDateTime.ofInstant(clock.instant(), ZoneOffset.UTC).toLocalDate().toString()), false);
             case "time" -> new Answer(200, JSON.getNodeFactory().stringNode(
-                    DateTimeFormatter.ofPattern("HH:mm:ss").format(LocalDateTime.ofInstant(clock.instant(), zone))),
+                    DateTimeFormatter.ofPattern("HH:mm:ss").format(LocalDateTime.ofInstant(clock.instant(), ZoneOffset.UTC))),
                     false);
             case "killtoken" -> {
                 tokens.remove(arguments.isEmpty() ? "" : arguments.getFirst());

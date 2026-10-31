@@ -220,19 +220,6 @@ No access is needed beyond the board's own; the exposure is a stale choice, not 
 because the connector checks every assigned group against the same list before it sends anything.
 Reconsider when the list is stored with the time it was read or refreshed on a board's request.
 
-## The Loxone time base is an assumption until a door has confirmed it
-
-A Miniserver user's validity is sent as seconds since 2009-01-01 00:00 without a zone. Courtside
-assumes the Miniserver's local wall time in the club's configured zone. If the Miniserver counts in
-UTC instead, every booking's window at the door shifts by the zone's offset, one or two hours in
-Central Europe: a code then opens that much too early or too late and closes that much early or
-late. Nobody needs access to cause it; it follows from the assumption.
-
-The bound is the access window's minutes before and after a booking, which absorb part of the
-shift, and the emergency code a member can ask for where the club keeps one on that keypad. The
-acceptance on a real Miniserver checks a window at a door. Reconsider, and correct the conversion,
-as soon as that check has run.
-
 ## Reset codes use an unkeyed digest
 
 An outstanding reset code is stored as SHA-256 of a short random code. Read access to a current

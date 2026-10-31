@@ -196,7 +196,7 @@ class LoxoneLoginTest extends LoxoneTestSupport {
         // given
         LoxoneSettings settings = simulator.settingsByUrl(DEADLINE);
         LoxoneAccessControl wrong = connectorFor(new LoxoneSettings(settings.address(), settings.user(),
-                "wrong-example-password", settings.zone(), settings.callDeadline()));
+                "wrong-example-password", settings.callDeadline()));
 
         // when
         ProbeOutcome probed = wrong.probe();

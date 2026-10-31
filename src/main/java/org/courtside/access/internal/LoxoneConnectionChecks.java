@@ -11,7 +11,6 @@ import tools.jackson.databind.node.ObjectNode;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -151,10 +150,9 @@ final class LoxoneConnectionChecks {
                 LoxoneAccessControl.delete(session, uuid);
             }
         }
-        ZoneId zone = settings.zone().zoneId();
         Instant now = clock.instant();
-        Map<String, Long> window = Map.of("validFrom", LoxoneTime.from(now, zone),
-                "validUntil", LoxoneTime.until(now.plus(PROBE_WINDOW), zone), "expirationAction", 1L);
+        Map<String, Long> window = Map.of("validFrom", LoxoneTime.from(now),
+                "validUntil", LoxoneTime.until(now.plus(PROBE_WINDOW)), "expirationAction", 1L);
         LoxoneClient.Reply created = session.changing("addoredituser", probe(window));
         String uuid = created.value() == null ? "" : created.value().path("uuid").asString("");
         if (created.code() != 200 || !LoxoneAccessControl.LOXONE_UUID.matcher(uuid).matches()) {

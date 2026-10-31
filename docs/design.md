@@ -634,9 +634,9 @@ Miniserver refuses `updateuseraccesscode` to a token without 0x20. It reaches th
 `getip` answer of `connect.loxonecloud.com`, accepted only under a Loxone relay domain, or at a fixed
 `https://` URL. A failed request forgets the relay address, and the next call asks for it again. Each
 grant is one timespan user named `courtside_` plus the grant id's hex digits, with deletion at its
-end, the code and the Loxone groups of its access points. Its window is sent in the Miniserver's wall
-time of the club zone. That is an assumption until a door has confirmed it, and
-`docs/security-risks.md` describes the effect if the Miniserver counts in UTC. A board picks each
+end, the code and the Loxone groups of its access points. Its window is sent as seconds since
+2009-01-01T00:00:00Z, which the Miniserver reads in UTC and its app shows in local time; the token's
+`validUntil` is read on the same base. A board picks each
 access point's group from the normal groups the last successful probe read; the connector refuses any
 other group, and a grant whose access point has none. It changes or deletes only users of that name
 that are not administrators, counts a change only on the Miniserver's own reply, and a revoke answers

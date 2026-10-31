@@ -305,8 +305,8 @@ class LoxoneAccessControl implements AccessControlConnector, AutoCloseable {
         }
         user.put("name", name);
         user.put("userState", TIMESPAN);
-        user.put("validFrom", LoxoneTime.from(instruction.validFrom(), settings.zone().zoneId()));
-        user.put("validUntil", LoxoneTime.until(instruction.validUntil(), settings.zone().zoneId()));
+        user.put("validFrom", LoxoneTime.from(instruction.validFrom()));
+        user.put("validUntil", LoxoneTime.until(instruction.validUntil()));
         user.put("expirationAction", DELETE_ON_EXPIRY);
         user.put("changePassword", false);
         ArrayNode usergroups = user.putArray("usergroups");
