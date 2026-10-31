@@ -25,6 +25,9 @@ class LoxoneAddressTest extends LoxoneTestSupport {
 
     @Test
     void givenASerial_whenCallsFollow_thenTheAddressIsResolvedOnceAndCached() {
+        // given
+        bySerial.probe();
+
         // when
         GrantOutcome first = bySerial.grant(instruction(UUID.randomUUID()));
         GrantOutcome second = bySerial.grant(instruction(UUID.randomUUID()));
@@ -39,6 +42,7 @@ class LoxoneAddressTest extends LoxoneTestSupport {
     void givenARelayMove_whenTheOldHostRefusesConnections_thenTheAddressIsResolvedAgainAndTheCallSucceeds()
             throws IOException {
         // given
+        bySerial.probe();
         bySerial.grant(instruction(UUID.randomUUID()));
         simulator.moveRelay();
 
@@ -77,8 +81,10 @@ class LoxoneAddressTest extends LoxoneTestSupport {
     }
 
     @Test
-    void givenAMiniserverWithoutARelayConnection_whenACallIsMade_thenItIsAnUnclearAnswer() {
+    void givenAMiniserverWithoutARelayConnection_whenACallIsMade_thenItIsAnUnclearAnswer() throws IOException {
         // given
+        ready(bySerial);
+        simulator.moveRelay();
         simulator.force("getip", 504);
 
         // when / then
@@ -118,7 +124,7 @@ class LoxoneAddressTest extends LoxoneTestSupport {
             simulator.resolveTo(foreign.url());
 
             // when / then
-            assertThatThrownBy(() -> confined.grant(instruction(UUID.randomUUID())))
+            assertThatThrownBy(confined::probe)
                     .isInstanceOf(LoxoneFailure.class)
                     .hasMessage("getip answered an address outside Loxone's relays");
             assertThat(foreign.requests()).as("neither the login hash nor a token leaves for that host").isEmpty();

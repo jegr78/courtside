@@ -5,6 +5,7 @@ import org.courtside.access.GrantInstruction;
 import org.courtside.access.GrantOutcome;
 import org.courtside.access.GrantReference;
 import org.courtside.access.ProbeOutcome;
+import org.courtside.access.RemoteGroup;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
@@ -77,11 +78,14 @@ public final class ScriptedAccessControl implements AccessControlConnector {
     private volatile Consumer<Set<UUID>> mappingHook;
     private volatile CountDownLatch stubbornRelease;
 
+    private List<RemoteGroup> groups = List.of();
+
     public ScriptedAccessControl() {
         reset();
     }
 
     public synchronized void reset() {
+        groups = List.of();
         calls.clear();
         alwaysForGrant.clear();
         installs.clear();
@@ -161,6 +165,15 @@ public final class ScriptedAccessControl implements AccessControlConnector {
         UUID grant = reference.grantId();
         return (GrantOutcome) perform(Kind.REVOKE, grant, null,
                 stepFor(grant, revokes, defaultRevoke, new Step.Answer(new GrantOutcome.Accepted("remote-" + grant))));
+    }
+
+    public synchronized void groups(List<RemoteGroup> listed) {
+        groups = List.copyOf(listed);
+    }
+
+    @Override
+    public synchronized List<RemoteGroup> groups() {
+        return groups;
     }
 
     @Override

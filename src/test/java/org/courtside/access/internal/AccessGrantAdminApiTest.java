@@ -1,7 +1,9 @@
 package org.courtside.access.internal;
 
+import com.jayway.jsonpath.JsonPath;
 import org.courtside.access.GrantOutcome;
 import org.courtside.access.ProbeOutcome;
+import org.courtside.access.RemoteGroup;
 import org.courtside.access.Scope;
 import org.courtside.access.internal.ScriptedAccessControl.Kind;
 import org.courtside.access.internal.ScriptedAccessControl.Step;
@@ -15,6 +17,8 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 import java.time.Duration;
+import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -26,6 +30,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -198,6 +203,43 @@ class AccessGrantAdminApiTest extends AccessPassTestSupport {
         mockMvc.perform(post("/api/admin/access-grants/{id}/retry", UUID.randomUUID()).with(csrf()))
                 .andExpect(status().isForbidden());
         mockMvc.perform(post("/api/admin/access-grants/probe").with(csrf())).andExpect(status().isForbidden());
+        mockMvc.perform(get("/api/admin/access-control/groups")).andExpect(status().isForbidden());
+    }
+
+    @Test
+    void givenNoProbeHasReadGroups_whenTheBoardReadsTheGroups_thenTheListIsEmptyWithoutATime() throws Exception {
+        // when / then
+        mockMvc.perform(get("/api/admin/access-control/groups"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.groups.length()").value(0))
+                .andExpect(jsonPath("$.readAt").value(nullValue()));
+        assertThat(connector.calls()).as("reading the groups never calls the access-control system").isEmpty();
+    }
+
+    @Test
+    void givenAProbeThatReadGroups_whenALaterProbeFails_thenTheGroupsKeepTheTimeTheyWereRead() throws Exception {
+        // given
+        connector.groups(List.of(new RemoteGroup("0f1e2d3c-4b5a-6978-8796a5b4c3d2e1f0", "Court 1")));
+        Instant read = START.plus(Duration.ofMinutes(1));
+        clock.set(read);
+        mockMvc.perform(post("/api/admin/access-grants/probe").with(csrf())).andExpect(status().isAccepted());
+        pass.runPassNow();
+        connector.nextProbes(new Step.Probe(new ProbeOutcome.Unreachable("connection refused")));
+        clock.set(read.plus(Duration.ofMinutes(1)));
+        mockMvc.perform(post("/api/admin/access-grants/probe").with(csrf())).andExpect(status().isAccepted());
+        pass.runPassNow();
+
+        // when
+        String body = mockMvc.perform(get("/api/admin/access-control/groups"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.groups[0].id").value("0f1e2d3c-4b5a-6978-8796a5b4c3d2e1f0"))
+                .andExpect(jsonPath("$.groups[0].name").value("Court 1"))
+                .andReturn().getResponse().getContentAsString();
+
+        // then
+        assertThat(connector.calls(Kind.PROBE)).hasSize(2);
+        assertThat(Instant.parse(JsonPath.read(body, "$.readAt")))
+                .as("a failing probe keeps the groups and the time they were read").isEqualTo(read);
     }
 
     @Test

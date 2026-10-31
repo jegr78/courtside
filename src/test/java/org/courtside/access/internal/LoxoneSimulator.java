@@ -347,6 +347,10 @@ final class LoxoneSimulator implements AutoCloseable {
         return Set.copyOf(tokens.keySet());
     }
 
+    synchronized int refusalsForMissingRights() {
+        return refusals;
+    }
+
     synchronized List<String> clientUuids() {
         return List.copyOf(clientUuids);
     }

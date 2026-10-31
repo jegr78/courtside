@@ -1038,6 +1038,28 @@ components:
             The uuid of a normal Loxone user group, as `GET /api/admin/access-control/groups` lists them.
             Absent or `null` removes it.
 
+    AccessControlGroup:
+      type: object
+      description: A group on the access-control system.
+      required: [id, name]
+      properties:
+        id:
+          type: string
+          description: The system's own id of the group, for a Loxone Miniserver its uuid.
+        name: { type: string }
+
+    AccessControlGroups:
+      type: object
+      required: [groups, readAt]
+      properties:
+        groups:
+          type: array
+          items: { $ref: "#/components/schemas/AccessControlGroup" }
+        readAt:
+          type: [string, "null"]
+          format: date-time
+          description: When the check that read these groups ran, or `null` without any.
+
     AdminAccessGrantStatus:
       type: string
       description: |
@@ -8228,6 +8250,28 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/AccessGrantOverview" }
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/admin/access-control/groups:
+    get:
+      tags: [admin-access-grants]
+      operationId: listAccessControlGroups
+      summary: The groups of the access-control system a board can map an access point onto.
+      description: |
+        The normal groups the last successful check of the access-control system read. Reading them never
+        calls the system. The list is empty and `readAt` is `null` before a check has read any groups or
+        when the connected system has none to offer.
+      responses:
+        "200":
+          description: The groups.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AccessControlGroups" }
         "401":
           $ref: "#/components/responses/Unauthenticated"
         "403":

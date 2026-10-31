@@ -41,10 +41,11 @@ class LoxoneLoginTest extends LoxoneTestSupport {
         simulator.hashWith("SHA1");
 
         // when
-        ProbeOutcome probed = connector.probe();
+        ProbeOutcome probed = connectorFor(simulator.settingsByUrl(DEADLINE)).probe();
 
         // then
         assertThat(probed).isEqualTo(new ProbeOutcome.Answered());
+        assertThat(simulator.count("getjwt")).isEqualTo(1);
     }
 
     @Test
@@ -67,18 +68,17 @@ class LoxoneLoginTest extends LoxoneTestSupport {
     @Test
     void givenAValidToken_whenCallsFollow_thenItIsReusedUntilAnHourBeforeItsEnd() {
         // given
-        simulator.issueTokensFor(Duration.ofDays(20));
         installed(UUID.randomUUID());
         installed(UUID.randomUUID());
-        long acquiredOnce = simulator.count("getjwt");
+        long acquiredAgain = simulator.count("getjwt");
 
         // when
         clock.advance(Duration.ofDays(20).minusMinutes(30));
         installed(UUID.randomUUID());
 
         // then
-        assertThat(acquiredOnce).as("two calls share one token").isEqualTo(1);
-        assertThat(simulator.count("getjwt")).as("a token within an hour of its end is replaced").isEqualTo(2);
+        assertThat(acquiredAgain).as("both calls use the token the probe acquired").isZero();
+        assertThat(simulator.count("getjwt")).as("a token within an hour of its end is replaced").isEqualTo(1);
     }
 
     @Test
@@ -92,7 +92,7 @@ class LoxoneLoginTest extends LoxoneTestSupport {
 
         // then
         assertThat(outcome).isInstanceOf(GrantOutcome.Accepted.class);
-        assertThat(simulator.count("getjwt")).isEqualTo(2);
+        assertThat(simulator.count("getjwt")).isEqualTo(1);
     }
 
     @Test
@@ -106,40 +106,41 @@ class LoxoneLoginTest extends LoxoneTestSupport {
         // then
         assertThat(outcome).isEqualTo(new GrantOutcome.Refused(Scope.CONNECTOR,
                 "Miniserver refused the token for getuserlist2 (401)"));
-        assertThat(simulator.count("getjwt")).as("one renewal inside the call, not more").isEqualTo(2);
+        assertThat(simulator.count("getjwt")).as("one renewal inside the call, not more").isEqualTo(1);
         assertThat(simulator.count("getuserlist2")).isEqualTo(2);
     }
 
     @Test
-    void givenAWrongPassword_whenACallIsMade_thenTheConnectorIsRefused() {
+    void givenAWrongPassword_whenProbed_thenTheConnectorIsRefused() {
         // given
         LoxoneSettings settings = simulator.settingsByUrl(DEADLINE);
         LoxoneAccessControl wrong = connectorFor(new LoxoneSettings(settings.address(), settings.user(),
                 "wrong-example-password", settings.zone(), settings.callDeadline()));
 
         // when
-        GrantOutcome outcome = wrong.grant(instruction(UUID.randomUUID()));
+        ProbeOutcome probed = wrong.probe();
 
         // then
-        assertThat(outcome).isEqualTo(new GrantOutcome.Refused(Scope.CONNECTOR,
+        assertThat(probed).isEqualTo(new ProbeOutcome.Refused(
                 "Miniserver refused the login of the technical user (getjwt 401)"));
         assertThat(simulator.count("getuserlist2")).isZero();
     }
 
     @Test
-    void givenATokenWithoutUserManagement_whenProbed_thenTheProbeIsRefusedBeforeAnyUserRequest() {
+    void givenATokenWithoutUserManagement_whenProbedOrRenewed_thenItIsRefusedBeforeAnyRequestNeedingTheRight() {
         // given
         simulator.withholdUserManagement();
 
         // when
-        ProbeOutcome probed = connector.probe();
+        ProbeOutcome probed = connectorFor(simulator.settingsByUrl(DEADLINE)).probe();
+        simulator.expireTokens();
         GrantOutcome granted = connector.grant(instruction(UUID.randomUUID()));
 
         // then
         assertThat(probed).isEqualTo(new ProbeOutcome.Refused("token lacks the user-management right"));
         assertThat(granted).isEqualTo(new GrantOutcome.Refused(Scope.CONNECTOR,
                 "token lacks the user-management right"));
-        assertThat(simulator.count("getuserlist2")).as("a request without the right counts towards the lock")
+        assertThat(simulator.refusalsForMissingRights()).as("a request without the right counts towards the lock")
                 .isZero();
     }
 
@@ -157,16 +158,15 @@ class LoxoneLoginTest extends LoxoneTestSupport {
     }
 
     @Test
-    void givenADisabledTechnicalUser_whenACallIsMade_thenTheConnectorIsRefused() {
+    void givenADisabledTechnicalUser_whenProbed_thenTheConnectorIsRefused() {
         // given
         simulator.force("getjwt", 423);
 
         // when
-        GrantOutcome outcome = connector.grant(instruction(UUID.randomUUID()));
+        ProbeOutcome probed = connectorFor(simulator.settingsByUrl(DEADLINE)).probe();
 
         // then
-        assertThat(outcome).isEqualTo(new GrantOutcome.Refused(Scope.CONNECTOR,
-                "Miniserver disabled the technical user (getjwt 423)"));
+        assertThat(probed).isEqualTo(new ProbeOutcome.Refused("Miniserver disabled the technical user (getjwt 423)"));
     }
 
     @Test

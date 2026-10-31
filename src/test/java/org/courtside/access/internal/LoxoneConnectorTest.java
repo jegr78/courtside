@@ -210,6 +210,32 @@ class LoxoneConnectorTest extends LoxoneTestSupport {
     }
 
     @Test
+    void givenAnAdminGroupMapped_whenGranted_thenTheGrantIsRefusedWithoutARequest() {
+        // given
+        mapping.put(COURT_ONE, simulator.groupUuid("Administrators"));
+
+        // when
+        GrantOutcome outcome = connector.grant(instruction(grantId));
+
+        // then
+        assertThat(outcome).isEqualTo(new GrantOutcome.Refused(Scope.GRANT, "Loxone group is not a normal group"));
+        assertThat(simulator.requests()).isEmpty();
+    }
+
+    @Test
+    void givenAConnectorThatHasReadNoGroups_whenGranted_thenTheGrantIsRefusedWithoutARequest() {
+        // given
+        LoxoneAccessControl unprobed = connectorFor(simulator.settingsByUrl(DEADLINE));
+
+        // when
+        GrantOutcome outcome = unprobed.grant(instruction(grantId));
+
+        // then
+        assertThat(outcome).isEqualTo(new GrantOutcome.Refused(Scope.GRANT, "Loxone group is not a normal group"));
+        assertThat(simulator.requests()).isEmpty();
+    }
+
+    @Test
     void givenAnAccessPointWithoutAGroup_whenGranted_thenTheGrantIsRefusedWithoutARequest() {
         // given
         mapping.remove(COURT_TWO);
@@ -225,7 +251,7 @@ class LoxoneConnectorTest extends LoxoneTestSupport {
     @Test
     void givenAHangingRequest_whenGranted_thenTheCallEndsWithinItsDeadline() {
         // given
-        LoxoneAccessControl bounded = connectorFor(simulator.settingsByUrl(Duration.ofSeconds(1)));
+        LoxoneAccessControl bounded = ready(connectorFor(simulator.settingsByUrl(Duration.ofSeconds(1))));
         simulator.hang("getuserlist2");
         long started = System.nanoTime();
 

@@ -22,6 +22,7 @@ class ProbeReadings {
     }
 
     private final AtomicReference<Reading> latest = new AtomicReference<>();
+    private final AtomicReference<Instant> answeredAt = new AtomicReference<>();
     private final AtomicBoolean requested = new AtomicBoolean();
 
     void record(ProbeOutcome answer, Instant checkedAt) {

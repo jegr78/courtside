@@ -3,6 +3,7 @@ package org.courtside.access.internal;
 import org.courtside.access.GrantInstruction;
 import org.courtside.access.GrantOutcome;
 import org.courtside.access.GrantReference;
+import org.courtside.access.ProbeOutcome;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -43,7 +44,14 @@ abstract class LoxoneTestSupport {
         simulator = new LoxoneSimulator(clock, CLUB);
         mapping.put(COURT_ONE, simulator.groupUuid("Court 1"));
         mapping.put(COURT_TWO, simulator.groupUuid("Court 2"));
-        connector = connectorFor(simulator.settingsByUrl(DEADLINE));
+        connector = ready(connectorFor(simulator.settingsByUrl(DEADLINE)));
+    }
+
+    LoxoneAccessControl ready(LoxoneAccessControl probed) {
+        assertThat(probed.probe()).as("the pass probes before its first call, which reads the normal groups")
+                .isEqualTo(new ProbeOutcome.Answered());
+        simulator.forgetRequests();
+        return probed;
     }
 
     @AfterEach

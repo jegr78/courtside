@@ -5,6 +5,7 @@ import org.courtside.access.internal.AccessGrantAdministration;
 import org.courtside.access.internal.AccessGrantAdministration.GrantView;
 import org.courtside.access.internal.AccessGrantAdministration.Overview;
 import org.courtside.api.AdminAccessGrantsApi;
+import org.courtside.api.ApiAccessControlGroups;
 import org.courtside.api.ApiAccessControlProbe;
 import org.courtside.api.ApiAccessControlProbeOutcome;
 import org.courtside.api.ApiAccessGrantOverview;
@@ -15,6 +16,7 @@ import org.courtside.shared.WireTypes;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -33,6 +35,11 @@ class AccessGrantAdminController implements AdminAccessGrantsApi {
                 WireTypes.toOffsetDateTime(overview.probe().checkedAt()));
         return ResponseEntity.ok(new ApiAccessGrantOverview(overview.connector(), overview.connected(), probe,
                 overview.grants().stream().map(AccessGrantAdminController::toResponse).toList(), overview.total()));
+    }
+
+    @Override
+    public ResponseEntity<ApiAccessControlGroups> listAccessControlGroups() {
+        return ResponseEntity.ok(new ApiAccessControlGroups(List.of(), null));
     }
 
     @Override
