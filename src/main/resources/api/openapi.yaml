@@ -1050,8 +1050,11 @@ components:
 
     AccessControlGroups:
       type: object
-      required: [groups, readAt]
+      required: [listsGroups, groups, readAt]
       properties:
+        listsGroups:
+          type: boolean
+          description: Whether the connected system offers groups to map an access point onto at all.
         groups:
           type: array
           items: { $ref: "#/components/schemas/AccessControlGroup" }
@@ -8265,7 +8268,7 @@ paths:
       description: |
         The normal groups the last successful check of the access-control system read. Reading them never
         calls the system. The list is empty and `readAt` is `null` before a check has read any groups or
-        when the connected system has none to offer.
+        when the connected system has none to offer; `listsGroups` says whether it ever offers any.
       responses:
         "200":
           description: The groups.

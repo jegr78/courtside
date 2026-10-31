@@ -51,7 +51,7 @@ describe("AdminAccessPointsView", () => {
     vi.spyOn(api, "adminConfig").mockResolvedValue(stored);
     vi.spyOn(api, "adminAccessPoints").mockResolvedValue([northGate]);
     vi.spyOn(api, "occupancyKeyStatus").mockResolvedValue({ configured: false });
-    vi.spyOn(api, "adminAccessControlGroups").mockResolvedValue({ groups: [], readAt: null });
+    vi.spyOn(api, "adminAccessControlGroups").mockResolvedValue({ listsGroups: false, groups: [], readAt: null });
   });
 
   it("given a stored access point, when the view loads, then it shows its name, its courts and its code", async () => {
@@ -216,7 +216,7 @@ describe("AdminAccessPointsView access settings", () => {
     vi.spyOn(api, "adminConfig").mockResolvedValue(stored);
     vi.spyOn(api, "adminAccessPoints").mockResolvedValue([northGate]);
     vi.spyOn(api, "occupancyKeyStatus").mockResolvedValue({ configured: false });
-    vi.spyOn(api, "adminAccessControlGroups").mockResolvedValue({ groups: [], readAt: null });
+    vi.spyOn(api, "adminAccessControlGroups").mockResolvedValue({ listsGroups: false, groups: [], readAt: null });
   });
 
   it("given stored access settings, when the view loads, then each is shown with its limits", async () => {
@@ -339,7 +339,7 @@ describe("AdminAccessPointsView building automation", () => {
     vi.spyOn(api, "adminConfig").mockResolvedValue(stored);
     vi.spyOn(api, "adminAccessPoints").mockResolvedValue([northGate]);
     vi.spyOn(api, "occupancyKeyStatus").mockResolvedValue({ configured: false });
-    vi.spyOn(api, "adminAccessControlGroups").mockResolvedValue({ groups: [], readAt: null });
+    vi.spyOn(api, "adminAccessControlGroups").mockResolvedValue({ listsGroups: false, groups: [], readAt: null });
   });
 
   it("given no occupancy key, when the board creates one, then the key and the ready URL are shown once", async () => {
@@ -387,12 +387,12 @@ describe("AdminAccessPointsView Loxone group", () => {
     vi.spyOn(api, "adminConfig").mockResolvedValue(stored);
     vi.spyOn(api, "adminAccessPoints").mockResolvedValue([northGate]);
     vi.spyOn(api, "occupancyKeyStatus").mockResolvedValue({ configured: false });
-    vi.spyOn(api, "adminAccessControlGroups").mockResolvedValue({ groups: [], readAt: null });
+    vi.spyOn(api, "adminAccessControlGroups").mockResolvedValue({ listsGroups: false, groups: [], readAt: null });
   });
 
   it("given the groups of the access-control system, when the board picks one for a gate, then the change carries its uuid", async () => {
     // given
-    vi.spyOn(api, "adminAccessControlGroups").mockResolvedValue({ groups: [
+    vi.spyOn(api, "adminAccessControlGroups").mockResolvedValue({ listsGroups: true, groups: [
       { id: "0f1e2d3c-4b5a-6978-8796a5b4c3d2e1f0", name: "Court 1" },
       { id: "1a2b3c4d-5e6f-7081-92a3b4c5d6e7f809", name: "Court 2" }
     ], readAt: "2026-05-12T10:01:00Z" });
@@ -415,7 +415,7 @@ describe("AdminAccessPointsView Loxone group", () => {
   it("given a stored group the list no longer holds, when the board edits the gate, then it shows as unknown and can be removed", async () => {
     // given
     vi.spyOn(api, "adminAccessPoints").mockResolvedValue([{ ...northGate, loxoneGroup: "9f8e7d6c-5b4a-3928-1706f5e4d3c2b1a0" }]);
-    vi.spyOn(api, "adminAccessControlGroups").mockResolvedValue({ groups: [
+    vi.spyOn(api, "adminAccessControlGroups").mockResolvedValue({ listsGroups: true, groups: [
       { id: "0f1e2d3c-4b5a-6978-8796a5b4c3d2e1f0", name: "Court 1" }
     ], readAt: "2026-05-12T10:01:00Z" });
     const change = vi.spyOn(api, "changeAdminAccessPoint").mockResolvedValue(northGate);
@@ -435,6 +435,7 @@ describe("AdminAccessPointsView Loxone group", () => {
 
   it("given no groups to list and a stored group, when the board only renames the gate, then the field is hidden and the stored group is sent unchanged", async () => {
     // given
+    vi.spyOn(api, "adminAccessControlGroups").mockResolvedValue({ listsGroups: true, groups: [], readAt: null });
     vi.spyOn(api, "adminAccessPoints").mockResolvedValue([{ ...northGate, loxoneGroup: "9f8e7d6c-5b4a-3928-1706f5e4d3c2b1a0" }]);
     const change = vi.spyOn(api, "changeAdminAccessPoint").mockResolvedValue({ ...northGate, name: "Main gate" });
     show();
@@ -453,5 +454,26 @@ describe("AdminAccessPointsView Loxone group", () => {
     await waitFor(() => expect(change).toHaveBeenCalledWith("gate-1",
       { name: "Main gate", courtIds: ["court-1"], staticCode: "123456", emergencyCode: null, openToMembers: false,
         loxoneGroup: "9f8e7d6c-5b4a-3928-1706f5e4d3c2b1a0" }));
+  });
+
+  it("given a system without groups and a stored group, when the board only renames the gate, then neither field nor hint shows and the stored group is sent unchanged", async () => {
+    // given
+    vi.spyOn(api, "adminAccessPoints").mockResolvedValue([{ ...northGate, loxoneGroup: "9f8e7d6c-5b4a-3928-1706f5e4d3c2b1a0" }]);
+    const change = vi.spyOn(api, "changeAdminAccessPoint").mockResolvedValue({ ...northGate, name: "Main gate" });
+    show();
+    await userEvent.click(await screen.findByTestId("edit-access-point-gate-1"));
+
+    // when
+    const field = screen.queryByTestId("access-point-gate-1-loxone-group");
+    const hint = screen.queryByTestId("access-point-gate-1-loxone-group-hint");
+    await userEvent.clear(screen.getByTestId("access-point-gate-1-name"));
+    await userEvent.type(screen.getByTestId("access-point-gate-1-name"), "Main gate");
+    await userEvent.click(screen.getByTestId("save-access-point-gate-1"));
+
+    // then
+    expect(field, "a system without groups shows no field").toBeNull();
+    expect(hint, "a system without groups needs no hint about them").toBeNull();
+    await waitFor(() => expect(change).toHaveBeenCalledWith("gate-1",
+      expect.objectContaining({ name: "Main gate", loxoneGroup: "9f8e7d6c-5b4a-3928-1706f5e4d3c2b1a0" })));
   });
 });

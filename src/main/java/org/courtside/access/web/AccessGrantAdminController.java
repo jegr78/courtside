@@ -40,7 +40,7 @@ class AccessGrantAdminController implements AdminAccessGrantsApi {
     @Override
     public ResponseEntity<ApiAccessControlGroups> listAccessControlGroups() {
         AccessGrantAdministration.Groups groups = administration.groups();
-        return ResponseEntity.ok(new ApiAccessControlGroups(
+        return ResponseEntity.ok(new ApiAccessControlGroups(false,
                 groups.groups().stream().map(group -> new ApiAccessControlGroup(group.id(), group.name())).toList(),
                 WireTypes.toOffsetDateTime(groups.readAt())));
     }

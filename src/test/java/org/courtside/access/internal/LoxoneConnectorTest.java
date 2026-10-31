@@ -360,6 +360,7 @@ class LoxoneConnectorTest extends LoxoneTestSupport {
         ProbeOutcome probed = connector.probe();
 
         // then
+        assertThat(connector.listsGroups()).as("a Miniserver offers groups to map onto").isTrue();
         assertThat(probed).isEqualTo(new ProbeOutcome.Answered());
         assertThat(connector.groups()).containsExactly(
                 new RemoteGroup(simulator.groupUuid("Members"), "Members"),

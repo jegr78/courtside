@@ -30,6 +30,11 @@ public interface AccessControlConnector {
     /** A fingerprint of at most 200 characters for how these points map onto the system; read locally, never a call. */
     String mappingOf(Set<UUID> accessPointIds);
 
+    /** Whether a board maps access points onto groups of this system at all. */
+    default boolean listsGroups() {
+        return false;
+    }
+
     /** The groups a board may map an access point onto, as the last successful probe read them; read locally. */
     default List<RemoteGroup> groups() {
         return List.of();

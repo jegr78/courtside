@@ -79,6 +79,7 @@ public final class ScriptedAccessControl implements AccessControlConnector {
     private volatile CountDownLatch stubbornRelease;
 
     private List<RemoteGroup> groups = List.of();
+    private boolean listsGroups;
 
     public ScriptedAccessControl() {
         reset();
@@ -86,6 +87,7 @@ public final class ScriptedAccessControl implements AccessControlConnector {
 
     public synchronized void reset() {
         groups = List.of();
+        listsGroups = false;
         calls.clear();
         alwaysForGrant.clear();
         installs.clear();
@@ -169,6 +171,15 @@ public final class ScriptedAccessControl implements AccessControlConnector {
 
     public synchronized void groups(List<RemoteGroup> listed) {
         groups = List.copyOf(listed);
+    }
+
+    public synchronized void listsGroups(boolean lists) {
+        listsGroups = lists;
+    }
+
+    @Override
+    public synchronized boolean listsGroups() {
+        return listsGroups;
     }
 
     @Override

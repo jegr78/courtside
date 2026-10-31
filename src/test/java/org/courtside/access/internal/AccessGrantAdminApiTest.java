@@ -211,6 +211,7 @@ class AccessGrantAdminApiTest extends AccessPassTestSupport {
         // when / then
         mockMvc.perform(get("/api/admin/access-control/groups"))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.listsGroups").value(false))
                 .andExpect(jsonPath("$.groups.length()").value(0))
                 .andExpect(jsonPath("$.readAt").value(nullValue()));
         assertThat(connector.calls()).as("reading the groups never calls the access-control system").isEmpty();
@@ -219,6 +220,7 @@ class AccessGrantAdminApiTest extends AccessPassTestSupport {
     @Test
     void givenAProbeThatReadGroups_whenALaterProbeFails_thenTheGroupsKeepTheTimeTheyWereRead() throws Exception {
         // given
+        connector.listsGroups(true);
         connector.groups(List.of(new RemoteGroup("0f1e2d3c-4b5a-6978-8796a5b4c3d2e1f0", "Court 1")));
         Instant read = START.plus(Duration.ofMinutes(1));
         clock.set(read);
@@ -232,6 +234,7 @@ class AccessGrantAdminApiTest extends AccessPassTestSupport {
         // when
         String body = mockMvc.perform(get("/api/admin/access-control/groups"))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.listsGroups").value(true))
                 .andExpect(jsonPath("$.groups[0].id").value("0f1e2d3c-4b5a-6978-8796a5b4c3d2e1f0"))
                 .andExpect(jsonPath("$.groups[0].name").value("Court 1"))
                 .andReturn().getResponse().getContentAsString();
