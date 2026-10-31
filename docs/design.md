@@ -646,9 +646,12 @@ lists its users is compared with the rows: a listed grant that is removed here a
 refused is revoked again, an installed grant it no longer lists is installed again while wanted, and a
 listed id without a row is left alone.
 
-A board's connection check runs at the start of the next pass, before the grants, and never ends the
-pass. Each check is its own call with its own deadline, skipped when a check it requires did not pass,
-and a check the call runner abandons is a timeout for that check alone. A result carries the check's
+A board's connection check runs at the start of the next pass, before the grants. Each check is its
+own call with its own deadline, skipped when a check it requires did not pass, and a check the call
+runner abandons is a timeout for that check alone. A failing check does not end the pass; a check that
+keeps running past its deadline occupies the call thread like any abandoned call, so the pass's next
+call is not sent and the pass ends as an outage. The pass runs a check only while it still holds its
+lock and is not stopping; a run cut short keeps no result and stays requested for the next pass. A result carries the check's
 name, `PASSED`, `FAILED`, `SKIPPED` or `MANUAL`, an i18n code and string parameters; an exception from
 a check becomes `access.check.failed` without its text. A connector without checks of its own answers
 one `connector` result, `SKIPPED`. The Loxone connector checks, in this order: `miniserver` resolves

@@ -79,8 +79,9 @@ class AccessConnectionCheckTest extends AccessPassTestSupport {
         administration.requestConnectionCheck();
 
         // when
+        PassResult result;
         try {
-            pass.runPassNow();
+            result = pass.runPassNow();
         } finally {
             release.countDown();
         }
@@ -88,6 +89,29 @@ class AccessConnectionCheckTest extends AccessPassTestSupport {
         // then
         assertThat(administration.connectionCheck().checks()).extracting(AccessGrantAdministration.CheckView::code)
                 .containsExactly("access.check.timeout", "access.check.callThreadOccupied");
+        assertThat(result).as("the occupied call thread leaves the requested probe unsent, as after any abandoned call")
+                .isEqualTo(new PassResult.Outage());
+    }
+
+    @Test
+    void givenALastCheckThatHangs_whenThePassProbesAfterIt_thenTheProbeWaitsForTheThreadAndTheGrantIsInstalled() {
+        // given
+        connector.checks(new ConnectionCheck("hanging", List.of(), () -> {
+            sleepInterruptibly(Duration.ofMinutes(5));
+            return FINE;
+        }));
+        UUID booking = book(courts.get(0));
+        administration.requestConnectionCheck();
+
+        // when
+        PassResult result = pass.runPassNow();
+
+        // then
+        assertThat(result).isEqualTo(new PassResult.Completed());
+        assertThat(connector.calls(Kind.PROBE)).as("the requested probe is sent, not refused as occupied")
+                .hasSize(1);
+        assertThat(readings.latest().orElseThrow().classification()).isEqualTo(ProbeClassification.ANSWERED);
+        assertThat(grantOf(booking).status()).isEqualTo(GrantStatus.INSTALLED);
     }
 
     @Test

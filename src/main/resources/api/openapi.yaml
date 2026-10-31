@@ -8351,8 +8351,9 @@ paths:
       summary: Ask for a connection check of the access-control system.
       description: |
         The background pass runs each check at the start of its next run, each as its own call with its own
-        deadline, and probes the system as well, which reloads its groups. A failing check never holds up the
-        grants. Without an access-control system this answers `409` with
+        deadline, and probes the system as well, which reloads its groups. A failing check does not hold up the
+        grants; one that keeps running past its deadline occupies the system's call thread like any abandoned
+        call. Without an access-control system this answers `409` with
         `urn:courtside:error:access-control-not-connected`.
       security:
         - sessionCookie: []
