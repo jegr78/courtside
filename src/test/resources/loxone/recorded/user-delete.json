@@ -1,0 +1,43 @@
+[ {
+  "request" : {
+    "command" : "getuserlist2",
+    "arguments" : [ ],
+    "query" : { }
+  },
+  "status" : 200,
+  "response" : {
+    "LL" : {
+      "control" : "dev/sps/getuserlist2",
+      "value" : "[{\"name\":\"<name-2>\",\"uniqueUserId\":\"\",\"uuid\":\"<loxone-uuid-3>\",\"isAdmin\":false,\"userState\":4,\"<key-3>\":false,\"validUntil\":\"<time-7>\",\"expirationAction\":1,\"validFrom\":\"<time-6>\"},{\"name\":\"<name-3>\",\"uniqueUserId\":\"\",\"uuid\":\"<loxone-uuid-4>\",\"isAdmin\":false,\"userState\":4,\"<key-3>\":false,\"validUntil\":\"<time-7>\",\"expirationAction\":1,\"validFrom\":\"<time-6>\"}]",
+      "Code" : "200"
+    }
+  }
+}, {
+  "request" : {
+    "command" : "deleteuser",
+    "arguments" : [ "<loxone-uuid-3>" ],
+    "query" : { }
+  },
+  "status" : 200,
+  "response" : {
+    "LL" : {
+      "control" : "dev/sps/deleteuser/<loxone-uuid-3>",
+      "value" : "",
+      "Code" : "200"
+    }
+  }
+}, {
+  "request" : {
+    "command" : "deleteuser",
+    "arguments" : [ "<loxone-uuid-4>" ],
+    "query" : { }
+  },
+  "status" : 200,
+  "response" : {
+    "LL" : {
+      "control" : "dev/sps/deleteuser/<loxone-uuid-4>",
+      "value" : "",
+      "Code" : "200"
+    }
+  }
+} ]

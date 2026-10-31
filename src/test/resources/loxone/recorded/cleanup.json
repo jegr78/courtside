@@ -1,0 +1,23 @@
+[ {
+  "request" : {
+    "command" : "getuserlist2",
+    "arguments" : [ ],
+    "query" : { }
+  },
+  "status" : 200,
+  "response" : {
+    "LL" : {
+      "control" : "dev/sps/getuserlist2",
+      "value" : "[]",
+      "Code" : "200"
+    }
+  }
+}, {
+  "request" : {
+    "command" : "killtoken",
+    "arguments" : [ "<token-2>", "<secret-2>" ],
+    "query" : { }
+  },
+  "status" : 401,
+  "response" : "<html-1>"
+} ]

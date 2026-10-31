@@ -1,0 +1,79 @@
+[ {
+  "request" : {
+    "command" : "getip",
+    "arguments" : [ ],
+    "query" : {
+      "snr" : "<secret-1>"
+    }
+  },
+  "status" : 200,
+  "response" : {
+    "url" : "https://<host-1>:<port-1>"
+  }
+}, {
+  "request" : {
+    "command" : "getkey2",
+    "arguments" : [ "<secret-2>" ],
+    "query" : { }
+  },
+  "status" : 200,
+  "response" : {
+    "LL" : {
+      "control" : "dev/sys/getkey2/<secret-2>",
+      "code" : "200",
+      "value" : {
+        "key" : "<digits80-1>",
+        "salt" : "<hex70-upper-1>",
+        "hashAlg" : "SHA256"
+      }
+    }
+  }
+}, {
+  "request" : {
+    "command" : "getjwt",
+    "arguments" : [ "<hex64-1>", "<secret-2>", "<digits4-1>", "<loxone-uuid-1>", "<secret-3>" ],
+    "query" : { }
+  },
+  "status" : 200,
+  "response" : {
+    "LL" : {
+      "control" : "dev/sys/getjwt/<hex64-1>/<secret-2>/<digits4-1>/<loxone-uuid-1>/<secret-3>",
+      "value" : {
+        "token" : "<token-1>",
+        "key" : "<digits80-2>",
+        "validUntil" : "<time-1>",
+        "tokenRights" : 3748,
+        "unsecurePass" : false
+      },
+      "code" : "200"
+    }
+  }
+}, {
+  "request" : {
+    "command" : "getuserlist2",
+    "arguments" : [ ],
+    "query" : { }
+  },
+  "status" : 200,
+  "response" : {
+    "LL" : {
+      "control" : "dev/sps/getuserlist2",
+      "value" : "[]",
+      "Code" : "200"
+    }
+  }
+}, {
+  "request" : {
+    "command" : "getgrouplist",
+    "arguments" : [ ],
+    "query" : { }
+  },
+  "status" : 200,
+  "response" : {
+    "LL" : {
+      "control" : "dev/sps/getgrouplist",
+      "value" : "[]",
+      "Code" : "200"
+    }
+  }
+} ]

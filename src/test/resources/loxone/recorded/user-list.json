@@ -1,0 +1,15 @@
+[ {
+  "request" : {
+    "command" : "getuserlist2",
+    "arguments" : [ ],
+    "query" : { }
+  },
+  "status" : 200,
+  "response" : {
+    "LL" : {
+      "control" : "dev/sps/getuserlist2",
+      "value" : "[]",
+      "Code" : "200"
+    }
+  }
+} ]

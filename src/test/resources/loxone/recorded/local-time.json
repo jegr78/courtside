@@ -1,0 +1,29 @@
+[ {
+  "request" : {
+    "command" : "date",
+    "arguments" : [ ],
+    "query" : { }
+  },
+  "status" : 200,
+  "response" : {
+    "LL" : {
+      "control" : "dev/sys/date",
+      "value" : "",
+      "Code" : "403"
+    }
+  }
+}, {
+  "request" : {
+    "command" : "time",
+    "arguments" : [ ],
+    "query" : { }
+  },
+  "status" : 200,
+  "response" : {
+    "LL" : {
+      "control" : "dev/sys/time",
+      "value" : "",
+      "Code" : "403"
+    }
+  }
+} ]

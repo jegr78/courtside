@@ -1,0 +1,15 @@
+[ {
+  "request" : {
+    "command" : "getuser",
+    "arguments" : [ "<loxone-uuid-3>" ],
+    "query" : { }
+  },
+  "status" : 200,
+  "response" : {
+    "LL" : {
+      "control" : "dev/sps/getuser/<loxone-uuid-3>",
+      "value" : "{\"name\":\"<name-2>\",\"desc\":\"\",\"uuid\":\"<loxone-uuid-3>\",\"userid\":\"\",\"<key-1>\":\"\",\"firstName\":\"\",\"lastName\":\"\",\"email\":\"\",\"phone\":\"\",\"uniqueUserId\":\"\",\"company\":\"\",\"department\":\"\",\"personalno\":\"\",\"title\":\"\",\"debitor\":\"\",\"customField1\":\"\",\"customField2\":\"\",\"customField3\":\"\",\"customField4\":\"\",\"customField5\":\"\",\"lastEdit\":\"<time-8>\",\"userState\":4,\"validUntil\":\"<time-7>\",\"expirationAction\":1,\"validFrom\":\"<time-6>\",\"isAdmin\":false,\"changePassword\":false,\"masterAdmin\":false,\"userRights\":16384,\"scorePWD\":\"<number-1>\",\"scoreVisuPWD\":\"<number-1>\",\"trustMember\":\"\",\"usergroups\":[],\"<key-2>\":\"<number-2>\",\"nfcTags\":[],\"keycodes\":[{\"code\":\"<hex40-upper-1>\"}],\"customFields\":[\"<text-2>\",\"<text-3>\",\"<text-4>\",\"<text-5>\",\"<text-6>\"]}",
+      "Code" : "200"
+    }
+  }
+} ]
