@@ -7,6 +7,22 @@ import test from "node:test";
 import { executable } from "./deployment-archive.mjs";
 import { deploy, digest, fixture, answers, run, initialize } from "./deployment-cli-fixture.mjs";
 
+test("given selected mail stores, when reconfiguration changes the domain, then it retains the store pair", () => {
+  fixture((context) => {
+    // given
+    assert.equal(initialize(context, { recipe: "full-self-hosted", mail_relay_host: "" }).status, 0);
+    const file = join(context.target, "config", ".env");
+    const pair = 'COURTSIDE_MAIL_CONFIG_VOLUME="example-club_mail-config-stalwart1-test"\nCOURTSIDE_MAIL_DATA_VOLUME="example-club_mail-data-stalwart1-test"\n';
+    writeFileSync(file, readFileSync(file, "utf8") + pair);
+    // when
+    const result = run(context.archive, context.target,
+      ["reconfigure", "--answers", answers(context.root, { recipe: "full-self-hosted", mail_relay_host: "", domain: "courts.other.example.org" }), "--yes"], context.environment);
+    // then
+    assert.equal(result.status, 0, result.stderr);
+    assert.ok(readFileSync(file, "utf8").includes(pair));
+  });
+});
+
 test("given an existing Compose project, when adopt analyses it, then analysis is read-only and ambiguity is refused", () => {
   fixture((context) => {
     // given

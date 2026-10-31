@@ -827,11 +827,38 @@ load_configuration() {
   manifest_digest=${config_image##*@sha256:}
   manifest_sha256=$config_release_manifest_sha256
   validate_answers false
+  if [ "$config_recipe" = full-self-hosted ]; then
+    resolve_mail_store_volumes "$installation_directory/config/.env"
+  fi
   if [ "$config_recipe" != existing-infrastructure ]; then
     bundled_database_material=$(environment_value "$installation_directory/config/.env" POSTGRES_PASSWORD)
     [[ "$bundled_database_material" =~ ^[0-9a-f]{48}$ ]] \
       || refuse "bundled PostgreSQL password must be a generated 48-character hexadecimal value"
   fi
+}
+
+resolve_mail_store_volumes() {
+  local file=$1 project=${2:-$config_project} config_suffix data_suffix
+  selected_mail_config_volume=$(environment_value "$file" COURTSIDE_MAIL_CONFIG_VOLUME)
+  selected_mail_data_volume=$(environment_value "$file" COURTSIDE_MAIL_DATA_VOLUME)
+  if [ -z "$selected_mail_config_volume" ] && [ -z "$selected_mail_data_volume" ]; then
+    selected_mail_config_volume="${project}_mail-config"
+    selected_mail_data_volume="${project}_mail-data"
+  fi
+  case "$selected_mail_config_volume" in
+    "${project}_mail-config" | "${project}_mail-config-"*) ;;
+    *) refuse "mail store configuration volume is not owned by this project" ;;
+  esac
+  case "$selected_mail_data_volume" in
+    "${project}_mail-data" | "${project}_mail-data-"*) ;;
+    *) refuse "mail store data volume is not owned by this project" ;;
+  esac
+  [[ "$selected_mail_config_volume" =~ ^[a-zA-Z0-9][a-zA-Z0-9_.-]*$ ]] \
+    && [[ "$selected_mail_data_volume" =~ ^[a-zA-Z0-9][a-zA-Z0-9_.-]*$ ]] \
+    || refuse "mail store names contain unsafe characters"
+  config_suffix=${selected_mail_config_volume#"${project}_mail-config"}
+  data_suffix=${selected_mail_data_volume#"${project}_mail-data"}
+  [ "$config_suffix" = "$data_suffix" ] || refuse "mail store selection must identify one matching pair"
 }
 
 validate_installed_release() {
@@ -1042,7 +1069,7 @@ database_backup() {
 }
 
 backup_mail_stores() {
-  local root=$1 helper volume failed=false marker marker_staging
+  local root=$1 helper volume selected failed=false marker marker_staging
   [ "$config_recipe" = full-self-hosted ] || return 0
   helper=$(sed -n 's/^[[:space:]]*image: \(alpine:3@sha256:[0-9a-f]\{64\}\)$/\1/p' \
     "$installation_directory/current/compose.stalwart.yaml" | head -n 1)
@@ -1059,8 +1086,9 @@ backup_mail_stores() {
   mail_restart_compose=("${compose[@]}")
   "${compose[@]}" stop mail
   for volume in mail-config mail-data; do
+    if [ "$volume" = mail-config ]; then selected=$selected_mail_config_volume; else selected=$selected_mail_data_volume; fi
     if ! "${docker_command[@]}" run --rm --network none \
-      --volume "${config_project}_$volume:/source:ro" "$helper" tar -C /source -cf - . \
+      --volume "$selected:/source:ro" "$helper" tar -C /source -cf - . \
       > "$root/$volume.tar"; then
       failed=true
       break

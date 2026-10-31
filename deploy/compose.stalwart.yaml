@@ -232,6 +232,8 @@ networks:
 
 volumes:
   mail-config:
+    name: ${COURTSIDE_MAIL_CONFIG_VOLUME:-${COMPOSE_PROJECT_NAME}_mail-config}
   mail-data:
+    name: ${COURTSIDE_MAIL_DATA_VOLUME:-${COMPOSE_PROJECT_NAME}_mail-data}
   mail-tls:
   mail-plan:

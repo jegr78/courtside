@@ -8,6 +8,47 @@ import test from "node:test";
 import { executable } from "./deployment-archive.mjs";
 import { writeRecoveryChecksums, fixture, releaseArchive, run, initialize } from "./deployment-cli-fixture.mjs";
 
+test("given explicitly selected mail stores, when backup runs, then it captures the selected pair", () => {
+  fixture((context) => {
+    // given
+    assert.equal(initialize(context, { recipe: "full-self-hosted", mail_relay_host: "" }).status, 0);
+    const file = join(context.target, "config", ".env");
+    writeFileSync(file, `${readFileSync(file, "utf8")}COURTSIDE_MAIL_CONFIG_VOLUME="example-club_mail-config-stalwart1-test"\nCOURTSIDE_MAIL_DATA_VOLUME="example-club_mail-data-stalwart1-test"\n`);
+    writeFileSync(context.dockerLog, "");
+    // when
+    const result = run(context.archive, context.target, ["backup"], context.environment);
+    // then
+    assert.equal(result.status, 0, result.stderr);
+    const calls = readFileSync(context.dockerLog, "utf8");
+    assert.match(calls, /example-club_mail-config-stalwart1-test:\/source:ro/);
+    assert.match(calls, /example-club_mail-data-stalwart1-test:\/source:ro/);
+    assert.doesNotMatch(calls, /example-club_mail-(config|data):\/source/);
+  });
+});
+
+for (const values of [
+  'COURTSIDE_MAIL_CONFIG_VOLUME="example-club_mail-config-test"\n',
+  'COURTSIDE_MAIL_CONFIG_VOLUME="foreign_config"\nCOURTSIDE_MAIL_DATA_VOLUME="foreign_data"\n',
+  'COURTSIDE_MAIL_CONFIG_VOLUME="example-club_mail-config-a"\nCOURTSIDE_MAIL_DATA_VOLUME="example-club_mail-data-b"\n',
+  'COURTSIDE_MAIL_CONFIG_VOLUME="example-club_mail-config-../bad"\nCOURTSIDE_MAIL_DATA_VOLUME="example-club_mail-data-../bad"\n',
+]) {
+  test(`given an unsafe mail store pair ${JSON.stringify(values)}, when up runs, then it refuses before Docker`, () => {
+    fixture((context) => {
+      // given
+      assert.equal(initialize(context, { recipe: "full-self-hosted", mail_relay_host: "" }).status, 0);
+      const file = join(context.target, "config", ".env");
+      writeFileSync(file, readFileSync(file, "utf8") + values);
+      writeFileSync(context.dockerLog, "");
+      // when
+      const result = run(context.archive, context.target, ["up"], context.environment);
+      // then
+      assert.equal(result.status, 2, result.stderr);
+      assert.match(result.stderr, /mail store/);
+      assert.equal(readFileSync(context.dockerLog, "utf8"), "");
+    });
+  });
+}
+
 test("given a running installation, when status and diagnose run, then operational states are separate and private data stays out", () => {
   fixture((context) => {
     // given
