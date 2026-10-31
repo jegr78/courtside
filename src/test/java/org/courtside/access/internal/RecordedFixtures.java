@@ -36,8 +36,9 @@ final class RecordedFixtures {
             "expirationAction", "validFrom", "lastEdit", "usergroups", "keycodes", "type", "userRights", "url",
             "version", "snr", "isInTrust", "local", "httpsStatus", "date", "time", "error");
     static final Set<String> TIME_KEYS = Set.of("validFrom", "validUntil", "lastEdit", "date", "time");
-    static final Set<String> NUMERIC_KEYS = Set.of("status", "Code", "code", "tokenRights", "userState", "isAdmin",
+    private static final Set<String> VALUE_NUMBERS = Set.of("tokenRights", "userState", "isAdmin",
             "expirationAction", "type", "userRights", "httpsStatus");
+    private static final Set<String> VALUE_PARENTS = Set.of("value", "arguments");
 
     private static final String REDACTED = "<redacted>";
     private static final Pattern WORD = Pattern.compile("[A-Za-z0-9]+");
@@ -148,7 +149,7 @@ final class RecordedFixtures {
             for (int index = 0; index < node.size(); index++) {
                 walk(where, path + "[" + index + "]", parentKey, key, node.get(index), found);
             }
-        } else if (node.isNumber() && (key == null || !NUMERIC_KEYS.contains(key))) {
+        } else if (node.isNumber() && !keptNumber(parentKey, key)) {
             found.add(where + " " + path + " holds a number outside the numeric keys");
         } else if (node.isString()) {
             String value = node.asString();
@@ -159,6 +160,17 @@ final class RecordedFixtures {
                 found.add(where + " " + path + " holds a string that is neither a placeholder nor a known value");
             }
         }
+    }
+
+    /** Whether a number under {@code key}, in an object under {@code parentKey}, is a protocol number kept as is. */
+    static boolean keptNumber(@Nullable String parentKey, @Nullable String key) {
+        if ("Code".equals(key) || "code".equals(key)) {
+            return "LL".equals(parentKey);
+        }
+        if ("status".equals(key)) {
+            return parentKey == null;
+        }
+        return key != null && VALUE_NUMBERS.contains(key) && parentKey != null && VALUE_PARENTS.contains(parentKey);
     }
 
     static boolean allowedKey(String name) {

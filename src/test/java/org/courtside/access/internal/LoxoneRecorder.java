@@ -150,7 +150,7 @@ final class LoxoneRecorder implements LoxoneClient.Tap {
         request.put("command", RecordedFixtures.kept(null, "command", exchange.command) ? exchange.command
                 : text(exchange.command, null));
         ArrayNode arguments = request.putArray("arguments");
-        exchange.arguments.forEach(argument -> arguments.add(text(argument, null)));
+        exchange.arguments.forEach(argument -> arguments.add(text(argument, "arguments")));
         ObjectNode query = request.putObject("query");
         exchange.query.entrySet().stream().sorted(Map.Entry.comparingByKey())
                 .forEach(parameter -> query.put(parameter.getKey(), text(parameter.getValue(), parameter.getKey())));
@@ -193,7 +193,7 @@ final class LoxoneRecorder implements LoxoneClient.Tap {
                     .forEach(entry -> scrubbed.add(node(entry, parentKey, key)));
             return scrubbed;
         }
-        if (node.isNumber() && (key == null || !RecordedFixtures.NUMERIC_KEYS.contains(key))) {
+        if (node.isNumber() && !RecordedFixtures.keptNumber(parentKey, key)) {
             boolean time = key != null && RecordedFixtures.TIME_KEYS.contains(key);
             return NODES.stringNode(placeholder(time ? "time" : "number", node.toString()));
         }

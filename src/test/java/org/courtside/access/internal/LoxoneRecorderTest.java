@@ -154,6 +154,43 @@ class LoxoneRecorderTest {
     }
 
     @Test
+    void givenANumericCodeOutsideTheEnvelope_whenRecorded_thenOnlyTheEnvelopeCodeStaysANumber() throws IOException {
+        // given
+        recorder.step("numeric-code");
+        exchange("getuser", List.of(), Map.of(), 200, """
+                {"LL":{"control":"jdev/sps/getuser","value":{"keycodes":[{"code":4826}]},"Code":200}}
+                """);
+
+        // when
+        recorder.write(target);
+
+        // then
+        JsonNode envelope = recorded("numeric-code").at("/0/response/LL");
+        assertThat(envelope.at("/value/keycodes/0/code").asString()).as("a door code stored as a number")
+                .matches("<number-[0-9]+>");
+        assertThat(envelope.get("Code").asInt()).as("the envelope's status stays a number").isEqualTo(200);
+    }
+
+    @Test
+    void givenAUserSentAsJson_whenRecorded_thenItsProtocolNumbersStayAndItsTimesBecomePlaceholders()
+            throws IOException {
+        // given
+        recorder.created(CREATED);
+        recorder.step("create");
+        exchange("addoredituser", List.of("{\"name\":\"" + CREATED + "\",\"userState\":4,\"validFrom\":547210000,"
+                + "\"expirationAction\":1}"), Map.of(), 200, "{\"LL\":{\"Code\":\"200\"}}");
+
+        // when
+        recorder.write(target);
+
+        // then
+        JsonNode sent = JSON.readTree(recorded("create").at("/0/request/arguments/0").asString());
+        assertThat(sent.toString()).as("the user's state and expiration action stay, its name and time do not")
+                .matches("\\{\"name\":\"<name-[0-9]+>\",\"userState\":4,\"validFrom\":\"<time-[0-9]+>\","
+                        + "\"expirationAction\":1}");
+    }
+
+    @Test
     void givenKeysOutsideTheProtocol_whenRecorded_thenEachBecomesAPlaceholder() throws IOException {
         // given
         recorder.step("keys");

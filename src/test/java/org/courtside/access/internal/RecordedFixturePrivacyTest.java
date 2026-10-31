@@ -41,7 +41,9 @@ class RecordedFixturePrivacyTest {
                 Arguments.of("{\"LL\":{\"doorName\":\"\"}}",
                         "planted $.LL.<redacted> has a key", "doorname"),
                 Arguments.of("{\"LL\":{\"value\":42}}",
-                        "planted $.LL.value holds a number", "42"));
+                        "planted $.LL.value holds a number", "42"),
+                Arguments.of("{\"LL\":{\"value\":{\"keycodes\":[{\"code\":4826}]}}}",
+                        "planted $.LL.value.keycodes[0].code holds a number", "4826"));
     }
 
     @ParameterizedTest
