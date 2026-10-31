@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { api, type AccessGrantOverview, type AdminAccessGrant, type AdminAccessGrantStatus } from "../api/client";
+import {
+  api, type AccessControlCheck, type AccessControlCheckOutcome, type AccessControlCheckResult, type AccessGrantOverview,
+  type AdminAccessGrant, type AdminAccessGrantStatus
+} from "../api/client";
 import { problemMessage } from "../api/problem-message";
 import { useClubConfiguration } from "../club/registry";
 import { Alert } from "../components/Alert";
@@ -14,14 +17,19 @@ const tones: Record<AdminAccessGrantStatus, AlertTone> = {
   FAILING: "error", REMOVING: "warning", INSTALLED: "success", WAITING: "warning", DONE: "success"
 };
 
+const checkTones: Record<AccessControlCheckOutcome, AlertTone> = {
+  PASSED: "success", FAILED: "error", SKIPPED: "warning", MANUAL: "warning"
+};
+
 export function AdminAccessGrantsView() {
   const { t, i18n } = useTranslation();
   const language = i18n.resolvedLanguage ?? i18n.language;
   const { club, error: clubError, load: loadClub } = useClubConfiguration();
   const [overview, setOverview] = useState<AccessGrantOverview>();
+  const [check, setCheck] = useState<AccessControlCheck>();
   const [error, setError] = useState<string>();
   const [retrying, setRetrying] = useState<string>();
-  const [probeRequested, setProbeRequested] = useState(false);
+  const [checkRequested, setCheckRequested] = useState(false);
   const [attempt, reload] = useRetry();
 
   const reportError = useCallback((failure: unknown) => setError(problemMessage(failure, t)), [t]);
@@ -30,10 +38,11 @@ export function AdminAccessGrantsView() {
 
   useEffect(() => {
     let active = true;
-    void api.adminAccessGrants()
-      .then((result) => {
+    void Promise.all([api.adminAccessGrants(), api.adminAccessControlCheck()])
+      .then(([result, checked]) => {
         if (!active) return;
         setOverview(result);
+        setCheck(checked);
         setError(undefined);
       })
       .catch((failure: unknown) => { if (active) reportErrorRef.current(failure); });
@@ -57,14 +66,24 @@ export function AdminAccessGrantsView() {
     }
   }
 
-  async function requestProbe() {
+  async function requestCheck() {
     try {
-      await api.probeAccessControl();
+      await api.checkAccessControl();
       setError(undefined);
-      setProbeRequested(true);
+      setCheckRequested(true);
     } catch (failure: unknown) {
       reportError(failure);
     }
+  }
+
+  function checkName(name: string): string {
+    return t(`accessGrants.check.name.${name}`, { defaultValue: name });
+  }
+
+  function checkMessage(result: AccessControlCheckResult): string {
+    const params: Record<string, string> = { ...result.params };
+    if (params.requires) params.requires = params.requires.split(", ").map(checkName).join(", ");
+    return t(result.code, { ...params, defaultValue: result.code });
   }
 
   const problem = error ?? clubError;
@@ -74,7 +93,7 @@ export function AdminAccessGrantsView() {
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <h1 className="text-3xl font-bold">{t("accessGrants.title")}</h1>
         <Button variant="secondary" data-testid="access-grants-refresh" type="button"
-          onClick={() => { setProbeRequested(false); reload(); }}>{t("accessGrants.refresh")}</Button>
+          onClick={() => { setCheckRequested(false); reload(); }}>{t("accessGrants.refresh")}</Button>
       </div>
       <p className="text-muted">{t("accessGrants.introduction")}</p>
     </div>
@@ -98,12 +117,25 @@ export function AdminAccessGrantsView() {
             </div>
             : <p data-testid="access-grants-probe" data-outcome="none" className="text-muted">{t("accessGrants.probe.none")}</p>}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-            <Button variant="secondary" data-testid="access-grants-probe-now" type="button"
-              onClick={() => void requestProbe()}>{t("accessGrants.probeNow")}</Button>
-            {probeRequested && <p role="status" data-testid="access-grants-probe-requested" className="text-muted">
-              {t("accessGrants.probeRequested")}
+            <Button variant="secondary" data-testid="access-grants-check-now" type="button"
+              onClick={() => void requestCheck()}>{t("accessGrants.checkNow")}</Button>
+            {checkRequested && <p role="status" data-testid="access-grants-check-requested" className="text-muted">
+              {t("accessGrants.checkRequested")}
             </p>}
           </div>
+          {check?.checkedAt && <div data-testid="access-grants-check" className="grid gap-2">
+            <p className="font-semibold">{t("accessGrants.check.checkedAt", { time: time(check.checkedAt) })}</p>
+            <ul className="grid gap-2" aria-label={t("accessGrants.check.title")}>
+              {check.checks.map((result) => <li key={result.check} data-testid={`access-check-${result.check}`}
+                data-outcome={result.outcome}
+                className={`grid gap-1 rounded-xl border-2 px-4 py-2 ${noticeColours(checkTones[result.outcome])}`}>
+                <p className="font-semibold">
+                  {checkName(result.check)}: {t(`accessGrants.check.outcome.${result.outcome}`)}
+                </p>
+                <p data-testid="access-check-message" className="[overflow-wrap:anywhere]">{checkMessage(result)}</p>
+              </li>)}
+            </ul>
+          </div>}
         </div>}
         {overview.grants.length === 0
           ? <p data-testid="access-grants-empty" className="text-muted">{t("accessGrants.empty")}</p>
