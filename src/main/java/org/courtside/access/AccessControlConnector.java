@@ -1,5 +1,7 @@
 package org.courtside.access;
 
+import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -27,4 +29,14 @@ public interface AccessControlConnector {
 
     /** A fingerprint of at most 200 characters for how these points map onto the system; read locally, never a call. */
     String mappingOf(Set<UUID> accessPointIds);
+
+    /** The groups a board may map an access point onto, as the last successful probe read them; read locally. */
+    default List<RemoteGroup> groups() {
+        return List.of();
+    }
+
+    /** The grant ids of every remote user this system lists; empty when the system cannot list them. */
+    default Optional<Set<UUID>> remoteGrantIds() {
+        return Optional.empty();
+    }
 }
