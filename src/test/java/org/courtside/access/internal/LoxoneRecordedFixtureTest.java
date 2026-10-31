@@ -20,7 +20,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class LoxoneRecordedFixtureTest extends LoxoneTestSupport {
 
     private static final String DEVICE_CODE = "73519246";
-    // The fixture holds killtoken sent without its token, which the Miniserver answered 401; re-record to drop these.
     private static final List<String> STEPS = List.of("probe", "connection-check", "getip", "api-key", "local-time",
             "user-create", "user-code", "user-duplicate", "user-read", "user-delete", "user-list", "cleanup");
 
