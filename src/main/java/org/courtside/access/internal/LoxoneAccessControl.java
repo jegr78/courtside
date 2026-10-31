@@ -202,7 +202,7 @@ class LoxoneAccessControl implements AccessControlConnector, AutoCloseable {
     }
 
     boolean closed() {
-        return false;
+        return client.closed();
     }
 
     static String nameOf(UUID grantId) {

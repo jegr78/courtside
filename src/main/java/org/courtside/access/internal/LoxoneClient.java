@@ -83,6 +83,7 @@ final class LoxoneClient implements AutoCloseable {
     private volatile @Nullable String token;
     private volatile Instant renewAt = Instant.MIN;
     private volatile @Nullable Instant lockedUntil;
+    private volatile boolean closed;
 
     LoxoneClient(LoxoneSettings settings, SSLContext ssl, Clock clock) {
         this.settings = settings;
@@ -96,6 +97,9 @@ final class LoxoneClient implements AutoCloseable {
     }
 
     Session session() {
+        if (closed) {
+            throw new LoxoneFailure("the connector is closed");
+        }
         return new Session(System.nanoTime() + settings.callDeadline().toNanos());
     }
 
@@ -386,6 +390,10 @@ final class LoxoneClient implements AutoCloseable {
         return encoded.toString();
     }
 
+    boolean closed() {
+        return closed;
+    }
+
     @Override
     public void close() {
         String current = token;
@@ -397,6 +405,7 @@ final class LoxoneClient implements AutoCloseable {
                 // Shutdown proceeds; the token expires on the Miniserver by itself.
             }
         }
+        closed = true;
         http.shutdownNow();
     }
 }
