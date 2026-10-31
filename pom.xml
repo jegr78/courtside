@@ -5,7 +5,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>4.1.1</version>
+        <version>4.1.2</version>
         <relativePath/>
     </parent>
 
@@ -31,7 +31,7 @@
         <!-- Maven 3.10 dates every artifact 1980 by default; an empty value keeps the real build time. -->
         <project.build.outputTimestamp/>
         <maven-antrun-plugin.version>3.2.0</maven-antrun-plugin.version>
-        <spring-modulith.version>2.1.1</spring-modulith.version>
+        <spring-modulith.version>2.1.2</spring-modulith.version>
         <tomcat.version>11.0.25</tomcat.version>
         <jackson-bom.version>3.1.7</jackson-bom.version>
         <opentelemetry.version>1.67.0</opentelemetry.version>
