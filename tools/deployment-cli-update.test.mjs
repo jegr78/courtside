@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { existsSync, readFileSync, realpathSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
@@ -389,3 +390,52 @@ test("given configuration from before recovery material was explicit, when updat
     assert.ok(existsSync(join(recovery, "configuration", ".env")));
   });
 });
+
+function mailVersion(archive, tag) {
+  const compose = join(archive, "compose.stalwart.yaml");
+  writeFileSync(compose, readFileSync(compose, "utf8")
+    .replace(/stalwartlabs\/stalwart:[^@\s]+@sha256:/, `stalwartlabs/stalwart:${tag}@sha256:`));
+  const manifest = join(archive, "manifest.json");
+  const body = JSON.parse(readFileSync(manifest, "utf8"));
+  body.files["compose.stalwart.yaml"] = createHash("sha256").update(readFileSync(compose)).digest("hex");
+  writeFileSync(manifest, `${JSON.stringify(body, null, 2)}\n`);
+}
+
+for (const previous of ["v0.16.27", "unknown"]) {
+  test(`given managed mail stores at ${previous}, when a Stalwart 1 update is requested, then refuse before backup or release selection`, () => {
+    fixture((context) => {
+      // given
+      mailVersion(context.archive, previous);
+      assert.equal(initialize(context, { recipe: "full-self-hosted", mail_relay_host: "" }).status, 0);
+      const next = releaseArchive(context.root, "0.1.1");
+      writeFileSync(context.dockerLog, "");
+      const configuration = readFileSync(join(context.target, "config", "installation.conf"), "utf8");
+      const selected = realpathSync(join(context.target, "current"));
+      // when
+      const result = run(next, context.target, ["update", "--archive", next, "--yes"], context.environment);
+      // then
+      assert.equal(result.status, 2, result.stderr);
+      assert.match(result.stderr, /Stalwart.*store.*migration/);
+      assert.equal(readFileSync(context.dockerLog, "utf8"), "");
+      assert.equal(realpathSync(join(context.target, "current")), selected);
+      assert.equal(readFileSync(join(context.target, "config", "installation.conf"), "utf8"), configuration);
+      assert.deepEqual(readdirSync(join(context.target, "backups")), []);
+      assert.equal(existsSync(join(context.target, "releases", "0.1.1")), false);
+    });
+  });
+}
+
+for (const recipe of ["full-self-hosted", "standard"]) {
+  test(`given ${recipe} on compatible mail stores, when an exact release is updated, then preserve the supported update path`, () => {
+    fixture((context) => {
+      // given
+      assert.equal(initialize(context, { recipe, ...(recipe === "full-self-hosted" ? { mail_relay_host: "" } : {}) }).status, 0);
+      const next = releaseArchive(context.root, "0.1.1");
+      // when
+      const result = run(next, context.target, ["update", "--archive", next, "--yes"], context.environment);
+      // then
+      assert.equal(result.status, 0, result.stderr);
+      assert.equal(realpathSync(join(context.target, "current")), realpathSync(join(context.target, "releases", "0.1.1")));
+    });
+  });
+}

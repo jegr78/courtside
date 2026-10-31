@@ -238,10 +238,10 @@ repository identity that can trigger the same pipeline without a personal token.
 
 ## Stalwart fetches its administration interface outside the pinned image
 
-The pinned Stalwart image downloads WebUI v1.0.11 from GitHub on first start. The release URL fixes
-its version but no content digest binds the asset. An attacker who replaces that upstream asset
-could change the administration interface. Stalwart rejects bundles declaring a major version above
-1. The administration port is bound to loopback for setup and recovery. Closing the remaining gap
+The pinned Stalwart image downloads WebUI v2 from GitHub on first start. The release URL follows a
+moving major-version tag and no content digest binds the asset. An attacker who replaces that upstream asset
+could change the administration interface. Stalwart requires bundles declaring major version 2 and a compatible minimum server version.
+The administration port is bound to loopback for setup and recovery. Closing the remaining gap
 requires a maintained image or vendored interface. Reconsider when Stalwart verifies the bundle
 against a digest supplied by its pinned image.
 

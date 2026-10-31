@@ -23,7 +23,7 @@ test("given a restore qualification, when resources are inspected, then each run
   assert.match(compose, /127\.0\.0\.1::8080/);
   assert.match(compose, /read_only: true/);
   assert.match(compose, /no-new-privileges:true/);
-  assert.match(compose, /axllent\/mailpit:v1\.31@sha256:/);
+  assert.match(compose, /axllent\/mailpit:v1\.32@sha256:/);
   assert.match(compose, /--smtp-require-starttls/);
   assert.match(compose, /COURTSIDE_RESTORE_MAIL_CERT_DIR/);
   assert.match(compose, /COURTSIDE_MAIL_RELAY_HOST: mail/);

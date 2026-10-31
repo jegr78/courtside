@@ -1,1 +1,1 @@
-{"@type": "update", "object": "Bootstrap", "value": {"defaultDomain": "{{domain}}", "generateDkimKeys": true, "requestTlsCertificate": false, "serverHostname": "{{hostname}}"}}
+{"@type": "update", "object": "Bootstrap", "value": {"defaultDomain": "{{domain}}", "generateDkimKeys": true, "requestTlsCertificate": false, "defaultHostname": "{{hostname}}"}}

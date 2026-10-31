@@ -84,9 +84,9 @@ test("given the pinned Mailpit source, when reading the API contract, then bind 
   // given / when
   const source = securityMailObservationSource;
   // then
-  assert.equal(source.version, "1.31.6");
-  assert.equal(source.commit, "a028b01f4a24b4b36bdad95b8e09e070ebf2bad4");
-  assert.equal(source.imageDigest, "sha256:23fe39e81bde596a918000b3135c0f85dc8bb4c9ea6be274b051143f3e300387");
+  assert.equal(source.version, "1.32.0");
+  assert.equal(source.commit, "ce798cfd781ef07b321427fc5082b3eebdcae460");
+  assert.equal(source.imageDigest, "sha256:0790692be935ea4420d085694f7985b1f692ca6a8771ab0e0bd8ba75ac180498");
   assert.ok(readFileSync(new URL("../deploy/compose.security.yaml", import.meta.url), "utf8")
     .includes(`${source.image}@${source.imageDigest}`));
 });

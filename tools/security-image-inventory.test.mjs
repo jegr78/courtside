@@ -54,7 +54,7 @@ test("given infrastructure sharing an inactive scanner image, when resolving saf
   // given
   const directory = mkdtempSync(join(tmpdir(), "security-images-"));
   const compose = join(directory, "compose.yaml");
-  const image = "grafana/k6:2.3.0@sha256:9c2dee7f8ed74d317e4027c06a10f169b625638189de8d4555d0b3486a5aeb34";
+  const image = "grafana/k6:2.3.0@sha256:2dd4756ec6e14e62778916e1eb850108e4b499304c02df56760fa0bdb0fba0b8";
   writeFileSync(compose, `services:\n  runtime:\n    image: "${image}"\n  scanner:\n    profiles: [assessment]\n    image: "${image}"\n`);
   // when / then
   assert.ok(assessmentImages("safe", { compose }).includes(image));

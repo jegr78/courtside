@@ -548,15 +548,15 @@ test("given the reference mail server, when its runtime WebUI dependency is revi
   assert.notEqual(reviewed, replaced,
     "an overlay image replacement must invalidate the reviewed WebUI dependency");
   assert.equal(boundary.allowedTarget,
-    "Stalwart's built-in WebUI v1.0.11 release URL on github.com and objects.githubusercontent.com over HTTPS.");
+    "Stalwart's built-in WebUI v2 major-release URL on github.com and objects.githubusercontent.com over HTTPS.");
   assert.match(boundary.dependencyFailureBehavior, /first download.*unavailable.*continue/i);
-  assert.match(boundary.operationalAssumption, /releases\/download\/v1\.0\.11\/webui\.zip/);
-  assert.match(boundary.softwareControls.join(" "), /reject WebUI major versions above 1/);
+  assert.match(boundary.operationalAssumption, /releases\/download\/v2\/webui\.zip/);
+  assert.match(boundary.softwareControls.join(" "), /require WebUI major version 2/);
   assert.ok(boundary.operationalAssumption,
     "the pinned third-party server's unpinned runtime bundle must not look Courtside-controlled");
   assert.match(deploymentDocumentation, /web interface is not pinned/i);
   const risks = readFileSync(new URL("../docs/security-risks.md", import.meta.url), "utf8");
-  assert.match(risks, /WebUI v1\.0\.11/);
+  assert.match(risks, /WebUI v2/);
   assert.doesNotMatch(risks, /interface from the latest GitHub release/);
 });
 

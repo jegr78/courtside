@@ -20,6 +20,21 @@ administration port. After configuration, run:
 The check covers the local certificate, relay authentication, DNS records and a controlled SMTP
 peer. Public reputation and third-party acceptance remain outside Courtside's control.
 
+## Upgrading older mail stores
+
+Stalwart 1.0 uses a different store format from 0.16. The Courtside launcher refuses an automatic
+update across Stalwart major versions before creating a backup, selecting a release or stopping
+services. Use the launcher from the target archive, as described in the operations guide. Existing
+full-self-hosted installations must stay on their current release. There is currently no
+launcher-managed upgrade path for these installations, even after an external store migration. The
+launcher compares release pins and cannot certify a migrated store. A fresh installation uses the
+new format directly.
+
+Follow the [Stalwart migration guide](https://stalw.art/docs/migration/upgrade-0-16/quick-guide/)
+with separate target stores and retain the original stores and a complete recovery unit. Courtside
+does not automate or certify this migration. Do not bypass the launcher by starting the new image
+against existing volumes or changing the installed release's image pin.
+
 ## DNS and delivery
 
 Publish MX, SPF, DKIM and DMARC records for the configured mail domain. Forward and reverse DNS must
