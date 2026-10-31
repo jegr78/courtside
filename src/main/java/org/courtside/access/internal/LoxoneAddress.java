@@ -2,6 +2,7 @@ package org.courtside.access.internal;
 
 import java.net.URI;
 import java.util.List;
+import java.util.Locale;
 
 /** Where the Miniserver is reached: through the Loxone Cloud resolver by serial, or at a fixed HTTPS address. */
 sealed interface LoxoneAddress {
@@ -22,7 +23,19 @@ sealed interface LoxoneAddress {
         }
 
         boolean admits(URI address) {
-            return true;
+            String scheme = address.getScheme();
+            String host = address.getHost();
+            if (scheme == null || !scheme.equalsIgnoreCase("https") || host == null
+                    || address.getRawUserInfo() != null) {
+                return false;
+            }
+            String named = host.toLowerCase(Locale.ROOT);
+            int port = address.getPort() == -1 ? 443 : address.getPort();
+            return relays.stream().anyMatch(relay -> {
+                String domain = relay.domain().toLowerCase(Locale.ROOT);
+                return (named.equals(domain) || named.endsWith("." + domain))
+                        && port >= relay.lowestPort() && port <= relay.highestPort();
+            });
         }
     }
 

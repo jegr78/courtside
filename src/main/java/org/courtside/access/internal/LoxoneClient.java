@@ -254,11 +254,16 @@ final class LoxoneClient implements AutoCloseable {
             throw new LoxoneFailure("getip answered no readable address");
         }
         String address = url.asString().strip();
+        URI resolved;
         try {
-            return origin(new URI(address.contains("://") ? address : "https://" + address), "getip");
+            resolved = new URI(address.contains("://") ? address : "https://" + address);
         } catch (URISyntaxException malformed) {
             throw new LoxoneFailure("getip answered no readable address");
         }
+        if (!serial.admits(resolved)) {
+            throw new LoxoneFailure("getip answered an address outside Loxone's relays");
+        }
+        return origin(resolved, "getip");
     }
 
     private static URI origin(URI url, String source) {
@@ -307,7 +312,8 @@ final class LoxoneClient implements AutoCloseable {
             if (refusedConnection(cause)) {
                 throw new Disconnected(command);
             }
-            throw new LoxoneFailure(command + " failed: " + (cause == null ? "unknown" : cause.getClass().getSimpleName()));
+            String kind = cause == null ? "unknown" : cause.getClass().getSimpleName();
+            throw new LoxoneFailure(command + " failed: " + kind);
         }
     }
 

@@ -13,7 +13,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class LoxoneLoginTest extends LoxoneTestSupport {
 
-    private static final String KEY = "34314135433345394432463030423737313845363443323941423544303346314538433637413230";
+    private static final String KEY =
+            "34314135433345394432463030423737313845363443323941423544303346314538433637413230";
     private static final String SALT = "3f9a12c4be7d0516";
 
     @Test

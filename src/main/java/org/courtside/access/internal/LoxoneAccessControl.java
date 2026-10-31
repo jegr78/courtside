@@ -115,8 +115,12 @@ class LoxoneAccessControl implements AccessControlConnector, AutoCloseable {
         String name = nameOf(reference.grantId());
         try {
             LoxoneClient.Session session = client.session();
-            for (String uuid : usersNamed(session, name)) {
+            List<String> named = usersNamed(session, name);
+            for (String uuid : named) {
                 delete(session, uuid);
+            }
+            if (!named.isEmpty() && !usersNamed(session, name).isEmpty()) {
+                throw new LoxoneFailure("getuserlist2 still lists a user of this grant after deleteuser");
             }
             String external = reference.externalReference();
             return new GrantOutcome.Accepted(external == null || external.isBlank() ? name : external);
@@ -214,10 +218,13 @@ class LoxoneAccessControl implements AccessControlConnector, AutoCloseable {
         for (JsonNode user : listing(session)) {
             String listedName = user.path("name").asString("");
             String uuid = user.path("uuid").asString("");
-            if (!user.path("isAdmin").asBoolean(true) && OWNED.matcher(listedName).matches()
-                    && listedName.equals(name) && LOXONE_UUID.matcher(uuid).matches()) {
-                named.add(uuid);
+            if (!listedName.equals(name) || !OWNED.matcher(listedName).matches()) {
+                continue;
             }
+            if (user.path("isAdmin").asBoolean(true) || !LOXONE_UUID.matcher(uuid).matches()) {
+                throw new LoxoneFailure("getuserlist2 lists a user of this grant the connector may not change");
+            }
+            named.add(uuid);
         }
         return named;
     }

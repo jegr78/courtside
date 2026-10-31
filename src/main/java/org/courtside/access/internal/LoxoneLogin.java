@@ -44,7 +44,8 @@ final class LoxoneLogin {
 
     static String clientUuid(LoxoneAddress address) {
         String identity = switch (address) {
-            case LoxoneAddress.Serial(String serial, var resolver, var relays) -> "serial:" + serial.toUpperCase(Locale.ROOT);
+            case LoxoneAddress.Serial(String serial, var resolver, var relays) ->
+                    "serial:" + serial.toUpperCase(Locale.ROOT);
             case LoxoneAddress.Fixed(var url) -> "url:" + url;
         };
         String hex = UUID.nameUUIDFromBytes(("courtside:" + identity).getBytes(StandardCharsets.UTF_8)).toString()
