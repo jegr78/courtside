@@ -310,7 +310,7 @@ final class LoxoneClient implements AutoCloseable {
 
     private void kill(Session session, String spent) {
         try {
-            send(session, SYS, "killtoken", List.of(spent, settings.user()), null);
+            send(session, SYS, "killtoken", List.of(spent, settings.user()), spent);
         } catch (RuntimeException bestEffort) {
             // An unkilled token only expires on its own; the refusal that follows is the answer.
         }
@@ -545,7 +545,7 @@ final class LoxoneClient implements AutoCloseable {
         token = null;
         if (current != null && base != null) {
             try {
-                send(session(), SYS, "killtoken", List.of(current, settings.user()), null);
+                send(session(), SYS, "killtoken", List.of(current, settings.user()), current);
             } catch (RuntimeException bestEffort) {
                 // Shutdown proceeds; the token expires on the Miniserver by itself.
             }

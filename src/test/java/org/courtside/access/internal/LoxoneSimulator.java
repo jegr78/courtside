@@ -511,7 +511,7 @@ final class LoxoneSimulator implements AutoCloseable {
         Answer answer;
         synchronized (this) {
             answer = switch (prefix) {
-                case "/jdev/sys/" -> system(command, arguments);
+                case "/jdev/sys/" -> system(command, arguments, query);
                 case "/jdev/cfg/" -> configuration(command);
                 default -> sps(command, arguments, query);
             };
@@ -557,7 +557,7 @@ final class LoxoneSimulator implements AutoCloseable {
         }
     }
 
-    private Answer system(String command, List<String> arguments) {
+    private Answer system(String command, List<String> arguments, Map<String, String> query) {
         Integer code = forced.get(command);
         if (code != null) {
             return Answer.header(code);
@@ -581,7 +581,11 @@ final class LoxoneSimulator implements AutoCloseable {
                     DateTimeFormatter.ofPattern("HH:mm:ss").format(LocalDateTime.ofInstant(clock.instant(), ZoneOffset.UTC))),
                     false);
             case "killtoken" -> {
-                tokens.remove(arguments.isEmpty() ? "" : arguments.getFirst());
+                String killed = arguments.isEmpty() ? "" : arguments.getFirst();
+                if (!killed.equals(query.get("autht")) || !tokens.containsKey(killed)) {
+                    yield Answer.header(401);
+                }
+                tokens.remove(killed);
                 yield Answer.of(200);
             }
             default -> Answer.of(404);
