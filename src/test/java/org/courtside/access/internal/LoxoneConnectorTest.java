@@ -68,7 +68,7 @@ class LoxoneConnectorTest extends LoxoneTestSupport {
         // given
         String uuid = installed(grantId);
         clock.advance(Duration.ofHours(5));
-        GrantInstruction moved = instruction(grantId, uuid, CODE, Set.of(COURT_TWO));
+        GrantInstruction moved = instruction(grantId, uuid, codeOf(grantId), Set.of(COURT_TWO));
 
         // when
         GrantOutcome outcome = connector.reschedule(moved);
@@ -81,7 +81,7 @@ class LoxoneConnectorTest extends LoxoneTestSupport {
         assertThat(user.validFrom).isEqualTo(simulator.loxoneSeconds(moved.validFrom()));
         assertThat(user.validUntil).isEqualTo(simulator.loxoneSeconds(moved.validUntil()));
         assertThat(user.groups).containsExactly(simulator.groupUuid("Court 2"));
-        assertThat(user.code).isEqualTo(CODE);
+        assertThat(user.code).isEqualTo(codeOf(grantId));
     }
 
     @Test

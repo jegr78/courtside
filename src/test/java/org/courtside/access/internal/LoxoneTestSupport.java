@@ -18,6 +18,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -31,6 +32,8 @@ abstract class LoxoneTestSupport {
 
     final AdjustableClock clock = new AdjustableClock(Instant.parse("2026-11-02T09:00:00Z"));
     final Map<UUID, String> mapping = new ConcurrentHashMap<>();
+    private final Map<UUID, String> codes = new ConcurrentHashMap<>();
+    private final AtomicInteger nextCode = new AtomicInteger(Integer.parseInt(CODE));
     private final List<LoxoneAccessControl> opened = new CopyOnWriteArrayList<>();
     LoxoneSimulator simulator;
     LoxoneAccessControl connector;
@@ -60,7 +63,11 @@ abstract class LoxoneTestSupport {
     }
 
     GrantInstruction instruction(UUID grantId) {
-        return instruction(grantId, null, CODE, Set.of(COURT_ONE));
+        return instruction(grantId, null, codeOf(grantId), Set.of(COURT_ONE));
+    }
+
+    String codeOf(UUID grantId) {
+        return codes.computeIfAbsent(grantId, id -> String.valueOf(nextCode.getAndIncrement()));
     }
 
     GrantInstruction instruction(UUID grantId, @Nullable String externalReference, String code,
