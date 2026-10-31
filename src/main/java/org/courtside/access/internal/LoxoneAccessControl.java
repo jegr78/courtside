@@ -59,6 +59,11 @@ class LoxoneAccessControl implements AccessControlConnector, AutoCloseable {
         if (assigned.isEmpty()) {
             return new GrantOutcome.Refused(Scope.GRANT, "access point has no Loxone group");
         }
+        Set<String> normal = new HashSet<>();
+        groups.forEach(group -> normal.add(group.id()));
+        if (normal.isEmpty() || !normal.containsAll(assigned.get())) {
+            return new GrantOutcome.Refused(Scope.GRANT, "Loxone group is not a normal group");
+        }
         String name = nameOf(instruction.reference().grantId());
         try {
             LoxoneClient.Session session = client.session();

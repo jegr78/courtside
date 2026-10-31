@@ -628,6 +628,17 @@ operator and never carries a URL, a credential or a code. The deployment selects
 worker, records no grant and leaves every booking path unchanged. `simulated` accepts every call in
 memory; it serves development, the demo profile and the browser journeys.
 
+`loxone` manages a Loxone Miniserver over HTTPS: the user-management web services and a token with
+the user-management right from `getkey2` and `getjwt`. It reaches the Miniserver by serial through the
+`getip` answer of `connect.loxonecloud.com`, accepted only under a Loxone relay domain, or at a fixed
+`https://` URL. Each grant is one timespan user named `courtside_` plus the grant id's hex digits,
+with its window in the Miniserver's wall time of the club zone, deletion at its end, the code and the
+Loxone groups of its access points. A board picks each access point's group from the normal groups the
+last successful probe read; the connector refuses any other group, and a grant whose access point has
+none. It changes or deletes only users of that name that are not administrators, and a revoke answers
+`Accepted` only after a listing finds none left. The Miniserver's lock after requests without rights
+holds every request for five minutes.
+
 An access point with a static code is served by that code only and never by a dynamic grant. A
 booking has demand when it is confirmed, its card grants access and at least one of its courts sits
 behind an active access point without a static code; the grant covers the union of those access
