@@ -74,7 +74,7 @@ class LoxoneAccessControl implements AccessControlConnector, AutoCloseable {
                     delete(session, surplus);
                 }
             }
-            LoxoneClient.Reply edited = session.sps("addoredituser", user(instruction, name, kept, assigned.get()));
+            LoxoneClient.Reply edited = session.changing("addoredituser", user(instruction, name, kept, assigned.get()));
             switch (edited.code()) {
                 case 200 -> {
                 }
@@ -97,11 +97,11 @@ class LoxoneAccessControl implements AccessControlConnector, AutoCloseable {
     }
 
     private GrantOutcome code(LoxoneClient.Session session, String uuid, GrantInstruction instruction) {
-        int answered = session.sps("updateuseraccesscode", uuid, instruction.code()).code();
+        int answered = session.changing("updateuseraccesscode", uuid, instruction.code()).code();
         return switch (answered) {
             case 200 -> new GrantOutcome.Accepted(uuid);
             case 201 -> {
-                int cleared = session.sps("updateuseraccesscode", uuid, "").code();
+                int cleared = session.changing("updateuseraccesscode", uuid, "").code();
                 if (cleared != 200) {
                     throw failure("updateuseraccesscode could not clear a code another user holds (" + cleared + ")",
                             instruction);
@@ -263,7 +263,7 @@ class LoxoneAccessControl implements AccessControlConnector, AutoCloseable {
     }
 
     private void delete(LoxoneClient.Session session, String uuid) {
-        int answered = session.sps("deleteuser", uuid).code();
+        int answered = session.changing("deleteuser", uuid).code();
         if (answered != 200) {
             throw new LoxoneFailure("deleteuser answered " + answered);
         }

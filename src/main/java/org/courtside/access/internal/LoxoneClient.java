@@ -132,6 +132,15 @@ final class LoxoneClient implements AutoCloseable {
             return refused(command, reply);
         }
 
+        /** A request that changes the Miniserver; only a code from its own reply counts as an answer. */
+        Reply changing(String command, String... arguments) {
+            Reply reply = sps(command, arguments);
+            if (!reply.enveloped()) {
+                throw new LoxoneFailure(command + " answered without a Miniserver reply (" + reply.code() + ")");
+            }
+            return reply;
+        }
+
         private Duration remaining(String command) {
             if (Thread.currentThread().isInterrupted()) {
                 throw new LoxoneFailure("interrupted before " + command);

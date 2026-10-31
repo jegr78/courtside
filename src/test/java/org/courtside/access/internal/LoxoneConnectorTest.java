@@ -295,6 +295,29 @@ class LoxoneConnectorTest extends LoxoneTestSupport {
     }
 
     @Test
+    void givenABarePageInsteadOfAMiniserverReply_whenACodeIsSet_thenItIsAnUnclearAnswer() {
+        // given
+        simulator.answerBare("updateuseraccesscode", 200);
+
+        // when / then
+        assertThatThrownBy(() -> connector.grant(instruction(grantId)))
+                .isInstanceOf(LoxoneFailure.class)
+                .hasMessage("updateuseraccesscode answered without a Miniserver reply (200)");
+    }
+
+    @Test
+    void givenABarePageInsteadOfAMiniserverReply_whenAUserIsDeleted_thenItIsAnUnclearAnswer() {
+        // given
+        String uuid = installed(grantId);
+        simulator.answerBare("deleteuser", 200);
+
+        // when / then
+        assertThatThrownBy(() -> connector.revoke(new GrantReference(grantId, uuid)))
+                .isInstanceOf(LoxoneFailure.class)
+                .hasMessage("deleteuser answered without a Miniserver reply (200)");
+    }
+
+    @Test
     void givenAnUndocumentedCode_whenGranted_thenItIsAnUnclearAnswer() {
         // given
         simulator.force("updateuseraccesscode", 406);
