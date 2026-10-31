@@ -635,6 +635,30 @@ test("given a target volume belongs to another attempt, when it is allocated, th
   });
 });
 
+test("given a completed mail transition, when a backup and patch update run, then they retain the selected stores", () => {
+  fixture((context) => {
+    // given
+    const next = legacyMail(context);
+    assert.equal(run(next, context.target, ["update", "--archive", next,
+      "--mail-store-transition", "reinitialize", "--yes"], context.environment).status, 0);
+    const file = join(context.target, "config", ".env");
+    const pair = readFileSync(file, "utf8").match(/^COURTSIDE_MAIL_(CONFIG|DATA)_VOLUME=.*$/gm);
+    assert.equal(pair.length, 2);
+    const patch = releaseArchive(context.root, "0.1.2");
+    writeFileSync(context.dockerLog, "");
+    // when
+    const backup = run(next, context.target, ["backup"], context.environment);
+    const update = run(patch, context.target, ["update", "--archive", patch, "--yes"], context.environment);
+    // then
+    assert.equal(backup.status, 0, backup.stderr);
+    assert.equal(update.status, 0, update.stderr);
+    assert.deepEqual(readFileSync(file, "utf8").match(/^COURTSIDE_MAIL_(CONFIG|DATA)_VOLUME=.*$/gm), pair);
+    const calls = readFileSync(context.dockerLog, "utf8");
+    for (const line of pair) assert.ok(calls.includes(`${line.split('"')[1]}:/source:ro`));
+    assert.doesNotMatch(calls, /example-club_mail-(config|data):\/source:ro/);
+  });
+});
+
 for (const previous of ["v0.16.27", "unknown"]) {
   test(`given managed mail stores at ${previous}, when a Stalwart 1 update is requested, then refuse before backup or release selection`, () => {
     fixture((context) => {

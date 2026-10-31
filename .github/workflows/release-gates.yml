@@ -183,6 +183,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ inputs.source-commit }}
+          fetch-depth: 0
           persist-credentials: false
       - uses: ./.github/actions/tool-dependencies
       - id: image
@@ -224,10 +225,15 @@ jobs:
         run: node tools/courtside.mail-smoke.mjs
         env:
           COURTSIDE_MAIL_SMOKE_LOGS: build/deployment-mail/server-logs
+      - id: transition
+        name: Exercise the historical mail store transition and matching restores
+        continue-on-error: true
+        run: node tools/stalwart-store-transition-smoke.mjs
       - name: Record the Stalwart result
         if: always()
         env:
           JOURNEY_OUTCOME: ${{ steps.journey.outcome }}
+          TRANSITION_OUTCOME: ${{ steps.transition.outcome }}
           IMAGE: ${{ steps.image.outputs.pinned }}
         run: |
           jq -n \
@@ -236,13 +242,19 @@ jobs:
             --arg docker "$(docker version --format '{{.Server.Version}}')" \
             --arg compose "$(docker compose version --short)" \
             --arg journey "$JOURNEY_OUTCOME" \
+            --arg transition "$TRANSITION_OUTCOME" \
             '{schemaVersion: 1, recipe: "full-self-hosted", image: $image,
               platform: {os: "ubuntu-latest", architecture: $architecture},
               tools: {docker: $docker, compose: $compose},
               results: [{id: "stalwart-controlled-peers", ownership: "courtside",
-                outcome: (if $journey == "success" then "passed" else "failed" end)}],
-              outcome: (if $journey == "success" then "passed" else "failed" end)}' \
+                outcome: (if $journey == "success" then "passed" else "failed" end)},
+                {id: "stalwart-store-transition", ownership: "courtside",
+                outcome: (if $transition == "success" then "passed" else "failed" end)}],
+              outcome: (if $journey == "success" and $transition == "success" then "passed" else "failed" end)}' \
             > build/deployment-mail/result.json
+          if [ -f build/stalwart-store-transition/result.json ]; then
+            cp build/stalwart-store-transition/result.json build/deployment-mail/store-transition.json
+          fi
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
@@ -254,7 +266,10 @@ jobs:
         if: always()
         env:
           JOURNEY_OUTCOME: ${{ steps.journey.outcome }}
-        run: test "$JOURNEY_OUTCOME" = success
+          TRANSITION_OUTCOME: ${{ steps.transition.outcome }}
+        run: |
+          test "$JOURNEY_OUTCOME" = success
+          test "$TRANSITION_OUTCOME" = success
 
   active-security:
     runs-on: ubuntu-latest

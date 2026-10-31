@@ -284,6 +284,8 @@ const refused = [
   ["a plural name", "x.yaml", "API_KEYS: abc"],
   ["a space-separated directive", "Caddyfile", "api_token abc123"],
   ["a lowercase key", "x.yaml", "password: hunter2"],
+  ["an environment-looking literal in config", "x.env", "PASSWORD=process.env.MAIL_PASSWORD"],
+  ["a quoted environment-looking literal in code", "x.mjs", 'const password = "process.env.MAIL_PASSWORD";'],
   ["an RSA private key", "tls.key", "-----BEGIN RSA PRIVATE KEY-----"],
   ["a PGP private key", "x.asc", "-----BEGIN PGP PRIVATE KEY BLOCK-----"],
   ["an environment file somebody filled in", ".env", "POSTGRES_PASSWORD=hunter2"],

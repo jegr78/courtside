@@ -22,18 +22,63 @@ peer. Public reputation and third-party acceptance remain outside Courtside's co
 
 ## Upgrading older mail stores
 
-Stalwart 1.0 uses a different store format from 0.16. The Courtside launcher refuses an automatic
-update across Stalwart major versions before creating a backup, selecting a release or stopping
-services. Use the launcher from the target archive, as described in the operations guide. Existing
-full-self-hosted installations must stay on their current release. There is currently no
-launcher-managed upgrade path for these installations, even after an external store migration. The
-launcher compares release pins and cannot certify a migrated store. A fresh installation uses the
-new format directly.
+Stalwart 1.0 uses a different store format from 0.16. A fresh installation uses the new format
+directly. An existing installation using the pinned 0.16.27 image can explicitly initialize new
+stores when updating to a verified release using 1.0.x. This path serves development and test
+installations that do not need to carry their mail state into the new server.
 
-Follow the [Stalwart migration guide](https://stalw.art/docs/migration/upgrade-0-16/quick-guide/)
-with separate target stores and retain the original stores and a complete recovery unit. Courtside
-does not automate or certify this migration. Do not bypass the launcher by starting the new image
-against existing volumes or changing the installed release's image pin.
+Reinitialization does not copy messages, queued deliveries, manually created accounts or settings.
+It retains the original configuration and data volumes and a complete pre-update recovery unit.
+Courtside's database, bookings, persistent keys and Caddy certificate store remain in place.
+
+Use the launcher from the verified target archive:
+
+```sh
+candidate=/srv/courtside/candidate/courtside-deployment-<version>
+"$candidate/courtside" --directory /srv/courtside update-check --archive "$candidate" \
+  --mail-store-transition reinitialize
+"$candidate/courtside" --directory /srv/courtside update --archive "$candidate" \
+  --mail-store-transition reinitialize --yes
+```
+
+The preview names the exact images, retained stores and target naming pattern. `--yes` without the
+transition option never authorizes this operation. Unknown image identities, other incompatible
+transitions, deployment overlays and local overrides are refused before backup or downtime.
+
+The update stops application submission before its backup, allocates a separate store pair and
+applies the shipped bootstrap and base plans with the existing managed credentials. It removes
+temporary recovery access, verifies the certificate reloader and checks the sender's authentication
+over verified STARTTLS before starting the updated application. Local readiness does not establish
+public delivery. Read the new DKIM selector and public key through the loopback administration UI,
+publish the required DNS records and run `mail-check`. Verify external delivery with a controlled
+recipient after those records are available.
+
+The launcher records `COURTSIDE_MAIL_CONFIG_VOLUME` and `COURTSIDE_MAIL_DATA_VOLUME` together in
+the private `.env`. Backups, reconfiguration and later updates use that same pair. Installations
+without these values retain their original project volume names. Do not edit one name independently
+or point a 1.0 image at an old store.
+
+### Interrupted transitions
+
+An unfinished transition blocks ordinary lifecycle commands. Rerun the same candidate's `update`
+command with the same archive and explicit transition option. If the original release is still
+selected, the launcher restarts it and retains the interrupted target before preparing a new
+attempt. If the target release is selected, it verifies the recorded volume ownership and resumes
+activation of that same pair. A failed activation retains the recovery unit. Do not switch the
+`current` symlink back after application schema migrations; recover the complete earlier unit.
+
+Private journals and attempt logs live in `.courtside-mail-transition` while active and in
+`backups/mail-transition-<attempt>` afterwards. They contain credentials and must not be published.
+The associated original recovery unit is exempt from automatic retention while its journal remains.
+Neither a retry nor normal backup pruning deletes the retained mail volumes.
+
+### Preserving mail contents
+
+If existing mail contents or manual settings must remain in the active server, reinitialization is
+unsuitable. The [Stalwart migration guide](https://stalw.art/docs/migration/upgrade-0-16/quick-guide/)
+describes a separate data-preserving migration with `stalwart-migrate`, new target stores and a
+verified final copy after stopping 0.16. Courtside does not currently automate or certify that path.
+Do not bypass the launcher by changing the installed release's image pin.
 
 ## DNS and delivery
 

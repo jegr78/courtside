@@ -47,6 +47,12 @@ For bundled PostgreSQL, the launcher writes `COURTSIDE_DATABASE_VOLUME` itself. 
 keeps a PostgreSQL 18 cluster bound to the volume the launcher created or migrated; operators do not
 set or change it independently.
 
+For self-hosted mail, an incompatible 0.16.27 to 1.0.x update requires an explicit transition.
+The launcher can initialize separate stores while retaining the originals and the recovery unit.
+It does not copy legacy mail contents. Read the [Stalwart transition procedure](guides/stalwart.md#upgrading-older-mail-stores)
+before selecting this path. New mail-volume names, when present, belong to the launcher and remain
+paired across backups and later updates.
+
 After installation, use the installed launcher for ordinary lifecycle commands. Updates use the
 launcher from the verified candidate archive as the operations handbook describes:
 
