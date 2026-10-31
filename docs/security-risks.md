@@ -184,6 +184,55 @@ the switch needs operator access to the deployment's environment. The bound is t
 install asked for, the booking's end plus the club's minutes after it. Reconsider if clubs switch
 systems while bookings are live, or if a revoke-all operation for the old connector is approved.
 
+## The Loxone technical user can change every non-admin Miniserver user
+
+The Loxone connector signs in as one Miniserver user with the user-management right, because
+creating and deleting a timespan user per booking needs it. That right reaches every non-admin user
+on the Miniserver, not only the `courtside_` users Courtside creates: whoever holds the token or the
+password can change codes, groups and validity of every resident or member account the Miniserver
+keeps. Using it needs the password from the deployment environment or a token taken from a running
+instance's memory or its traffic to the Miniserver, which runs over verified HTTPS.
+
+The connector itself edits and deletes only users whose listed name has the `courtside_` shape and
+that are not administrators, refuses any group outside the normal groups its last probe read, and a
+user manager cannot touch admin users or admin groups at all. Reconsider when Loxone offers a right
+that is limited to the users or groups one client created.
+
+## The Loxone password sits in the deployment environment
+
+`COURTSIDE_ACCESS_CONTROL_LOXONE_PASSWORD` is read from the environment like the mail password.
+Anyone who can read the container's environment, the `.env` file or the process environment of the
+running container can read it and sign in to the Miniserver as the technical user. It never appears in a
+log, a startup message, an API response or `last_failure`, and actuator exposes only health.
+
+The bound is the deployment's own access control for the host and its secrets. Reconsider when the
+reference deployment moves the other credentials into file-based secrets; this one follows them.
+
+## The Loxone group list is per instance and as old as the last probe
+
+A board picks an access point's group from the normal groups the last successful probe read. The
+list lives in the instance's memory, so after a restart it is empty until the next probe, and a
+second instance behind the same database may show a different age. A group removed on the Miniserver
+after that probe can still be picked; the connector then refuses the grant with "Loxone group not
+found" and the board sees it failing. A group added since then is missing until the next probe.
+
+No access is needed beyond the board's own; the exposure is a stale choice, not a widened one,
+because the connector checks every assigned group against the same list before it sends anything.
+Reconsider when the list is stored with the time it was read or refreshed on a board's request.
+
+## The Loxone time base is an assumption until a door has confirmed it
+
+A Miniserver user's validity is sent as seconds since 2009-01-01 00:00 without a zone. Courtside
+assumes the Miniserver's local wall time in the club's configured zone. If the Miniserver counts in
+UTC instead, every booking's window at the door shifts by the zone's offset, one or two hours in
+Central Europe: a code then opens that much too early or too late and closes that much early or
+late. Nobody needs access to cause it; it follows from the assumption.
+
+The bound is the access window's minutes before and after a booking, which absorb part of the
+shift, and the emergency code a member can ask for where the club keeps one on that keypad. The
+acceptance on a real Miniserver checks a window at a door. Reconsider, and correct the conversion,
+as soon as that check has run.
+
 ## Reset codes use an unkeyed digest
 
 An outstanding reset code is stored as SHA-256 of a short random code. Read access to a current
