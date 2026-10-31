@@ -26,6 +26,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /** Records what the tap sees per step and writes it scrubbed, only once nothing but placeholders survived. */
@@ -216,7 +217,8 @@ final class LoxoneRecorder implements LoxoneClient.Tap {
         }
         Optional<JsonNode> inner = RecordedFixtures.embedded(value);
         if (inner.isPresent()) {
-            return JSON.writeValueAsString(node(inner.get(), null, key));
+            JsonNode scrubbed = node(inner.get(), null, key);
+            return RecordedFixtures.strict(value) ? JSON.writeValueAsString(scrubbed) : singleQuoted(scrubbed);
         }
         if ("control".equals(key) || REQUEST_LINE.matcher(value).matches()) {
             return line(value);
@@ -288,6 +290,22 @@ final class LoxoneRecorder implements LoxoneClient.Tap {
             }
         }
         return String.join("/", segments);
+    }
+
+    private static String singleQuoted(JsonNode node) {
+        if (node.isObject()) {
+            return node.properties().stream()
+                    .map(field -> quoted(field.getKey()) + ":" + singleQuoted(field.getValue()))
+                    .collect(Collectors.joining(",", "{", "}"));
+        }
+        if (node.isArray()) {
+            return node.valueStream().map(LoxoneRecorder::singleQuoted).collect(Collectors.joining(",", "[", "]"));
+        }
+        return node.isString() ? quoted(node.asString()) : node.toString();
+    }
+
+    private static String quoted(String text) {
+        return "'" + text.replace("\\", "\\\\").replace("'", "\\'") + "'";
     }
 
     private String placeholder(String kind, String value) {

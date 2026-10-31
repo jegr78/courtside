@@ -84,6 +84,15 @@ final class RecordedFixtures {
         return Optional.empty();
     }
 
+    static boolean strict(String text) {
+        try {
+            STRICT.readTree(text.strip());
+            return true;
+        } catch (JacksonException notJson) {
+            return false;
+        }
+    }
+
     /** Every place under {@code directory} that holds a value no placeholder replaced; none when it is absent. */
     static List<String> violations(Path directory) {
         if (!Files.isDirectory(directory)) {
