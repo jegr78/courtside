@@ -82,6 +82,7 @@ public final class ScriptedAccessControl implements AccessControlConnector {
     private volatile CountDownLatch stubbornRelease;
     private volatile Supplier<Optional<Set<UUID>>> listing;
     private volatile List<ConnectionCheck> checks;
+    private volatile RuntimeException checksFailure;
     private volatile Map<UUID, String> checkedAccessPoints;
 
     private List<RemoteGroup> groups = List.of();
@@ -94,6 +95,7 @@ public final class ScriptedAccessControl implements AccessControlConnector {
     public synchronized void reset() {
         listing = null;
         checks = null;
+        checksFailure = null;
         checkedAccessPoints = null;
         groups = List.of();
         listsGroups = false;
@@ -207,6 +209,10 @@ public final class ScriptedAccessControl implements AccessControlConnector {
         checks = List.of(offered);
     }
 
+    public void failsListingChecks(RuntimeException failure) {
+        checksFailure = failure;
+    }
+
     public Map<UUID, String> checkedAccessPoints() {
         return checkedAccessPoints;
     }
@@ -214,6 +220,10 @@ public final class ScriptedAccessControl implements AccessControlConnector {
     @Override
     public List<ConnectionCheck> connectionChecks(Map<UUID, String> grantedAccessPoints) {
         checkedAccessPoints = Map.copyOf(grantedAccessPoints);
+        RuntimeException failure = checksFailure;
+        if (failure != null) {
+            throw failure;
+        }
         List<ConnectionCheck> offered = checks;
         return offered == null ? AccessControlConnector.super.connectionChecks(grantedAccessPoints) : offered;
     }

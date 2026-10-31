@@ -53,7 +53,10 @@ class ConnectionCheckRun {
             }
             readings.record(clock.now(), run(connector.connectionChecks(granted), calls));
         } catch (RuntimeException failed) {
-            log.warn("The connection check could not run: {}", failed.getClass().getName());
+            log.warn("The connection check could not start: {}: {}", failed.getClass().getName(),
+                    ConnectorText.sanitized(failed.getMessage(), null));
+            readings.record(clock.now(), List.of(new Checked("connector",
+                    CheckResult.failed("access.check.failed", Map.of()))));
         }
     }
 

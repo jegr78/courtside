@@ -123,6 +123,25 @@ class AccessConnectionCheckTest extends AccessPassTestSupport {
     }
 
     @Test
+    void givenAConnectorThatCannotListItsChecks_whenChecked_thenTheBoardReadsAFailureAndTheGrantIsInstalled() {
+        // given
+        connector.failsListingChecks(new IllegalStateException("no checks today"));
+        UUID booking = book(courts.get(0));
+        administration.requestConnectionCheck();
+
+        // when
+        PassResult result = pass.runPassNow();
+
+        // then
+        assertThat(result).isEqualTo(new PassResult.Completed());
+        assertThat(grantOf(booking).status()).isEqualTo(GrantStatus.INSTALLED);
+        assertThat(administration.connectionCheck().checks()).as("a check that could not start still reports")
+                .extracting(AccessGrantAdministration.CheckView::check, AccessGrantAdministration.CheckView::outcome,
+                        AccessGrantAdministration.CheckView::code)
+                .containsExactly(tuple("connector", CheckOutcome.FAILED, "access.check.failed"));
+    }
+
+    @Test
     void givenNoRequest_whenThePassRuns_thenNoCheckRuns() {
         // given
         connector.checks(new ConnectionCheck("fine", List.of(), () -> FINE));
