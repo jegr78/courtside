@@ -38,11 +38,11 @@ final class RecordedFixtures {
             "masterAdmin", "scorePWD", "scoreVisuPWD", "trustMember", "expiration", "nfcTags", "id", "customFields",
             "customField1", "customField2", "customField3", "customField4", "customField5", "firstName", "lastName",
             "firstname", "lastname", "email", "phone", "uniqueUserId", "company", "department", "personalno",
-            "title", "debitor", "disabledBySource");
+            "title", "debitor", "disabledBySource", "certTLD");
     static final Set<String> FREE_TEXT = Set.of("key", "desc", "description", "userid", "trustMember", "id",
             "customFields", "customField1", "customField2", "customField3", "customField4", "customField5",
             "firstName", "lastName", "firstname", "lastname", "email", "phone", "uniqueUserId", "company",
-            "department", "personalno", "title", "debitor");
+            "department", "personalno", "title", "debitor", "certTLD");
     static final Set<String> TIME_KEYS = Set.of("validFrom", "validUntil", "lastEdit", "date", "time");
     private static final Set<String> VALUE_NUMBERS = Set.of("tokenRights", "userState", "isAdmin",
             "expirationAction", "type", "userRights", "httpsStatus");

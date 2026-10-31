@@ -162,8 +162,8 @@ class LoxoneRecorderTest {
         recorder.step("api-key");
         exchange("apiKey", List.of(), Map.of(), 200, """
                 {"LL":{"control":"dev/cfg/apiKey","value":"{'snr': '50:4F:94:A0:00:00', 'version':'14.2.5.16', \
-                'key':'9f86d081884c7d659a2feaa0c55ad015a3bf4f1b', 'isInTrust':0, 'local':false, 'httpsStatus':1}",\
-                "Code":"200"}}
+                'key':'9f86d081884c7d659a2feaa0c55ad015a3bf4f1b', 'isInTrust':0, 'local':false, 'httpsStatus':1, \
+                'certTLD':'dns.example.org'}","Code":"200"}}
                 """);
 
         // when
@@ -174,7 +174,7 @@ class LoxoneRecorderTest {
         assertThat(value.isString()).as("the value stays a string, as the Miniserver sent it").isTrue();
         assertThat(value.asString()).as("in the single-quoted form it arrived in")
                 .matches("\\{'snr':'<secret-[0-9]+>','version':'14\\.2\\.5\\.16','key':'<hex40-[0-9]+>',"
-                        + "'isInTrust':'<number-[0-9]+>','local':false,'httpsStatus':1}");
+                        + "'isInTrust':'<number-[0-9]+>','local':false,'httpsStatus':1,'certTLD':'<host-[0-9]+>'}");
         assertThat(Files.readString(target.resolve("api-key.json")).toLowerCase(Locale.ROOT))
                 .as("the serial inside the string is gone").doesNotContain("50:4f:94:a0:00:00");
         assertThat(RecordedFixtures.violations(target)).as("the written form passes the fixture check").isEmpty();
