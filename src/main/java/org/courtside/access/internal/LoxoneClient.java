@@ -36,7 +36,7 @@ final class LoxoneClient implements AutoCloseable {
 
     static final int CHANGE_CODES = 0x20;
 
-    private static final int APP_AND_USER_MANAGEMENT = 0x4 | CHANGE_CODES | USER_MANAGEMENT;
+    private static final int REQUESTED_RIGHTS = 0x4 | CHANGE_CODES | USER_MANAGEMENT;
     private static final Duration RENEWAL_MARGIN = Duration.ofHours(1);
     private static final Duration LOCK = Duration.ofMinutes(5);
     private static final Duration MOST_MARGIN = Duration.ofMillis(250);
@@ -259,7 +259,7 @@ final class LoxoneClient implements AutoCloseable {
         String hash = LoxoneLogin.hash(user, settings.password(), text(key, "key", "getkey2"),
                 text(key, "salt", "getkey2"), text(key, "hashAlg", "getkey2"));
         Reply jwt = login("getjwt", send(session, SYS, "getjwt",
-                List.of(hash, user, String.valueOf(APP_AND_USER_MANAGEMENT), clientUuid, "Courtside"), null));
+                List.of(hash, user, String.valueOf(REQUESTED_RIGHTS), clientUuid, "Courtside"), null));
         String issued = text(jwt, "token", "getjwt");
         JsonNode value = jwt.value();
         if (value == null || !value.path("validUntil").isNumber() || !value.path("tokenRights").isNumber()) {

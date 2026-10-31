@@ -206,7 +206,7 @@ class LoxoneConnectionCheckTest extends LoxoneTestSupport {
     @Test
     void givenATokenWithoutTheRightToChangeCodes_whenChecked_thenTheLoginFailsOnTheMissingRight() {
         // given
-        simulator.withholdChangePassword();
+        simulator.withholdChangeCodes();
 
         // when
         List<ConnectionCheckRun.Checked> checked = checked(connector);
