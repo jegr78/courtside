@@ -200,6 +200,15 @@ while their booking's access code is valid. Every request is in the audit log wi
 booking and the access point, never the code. Whoever asked for it once knows it until you change
 it. Change it from time to time, and after any misuse.
 
+When a Loxone Miniserver is the connected access-control system, you pick a **Loxone group** for each
+access point without a static code. A booking's Miniserver user joins that group, so the group
+decides which door its code opens. The choice lists the groups Courtside read when it last checked
+the Miniserver. When it is empty, a hint takes its place. Press **Check now** under *Access grants*
+then, and the groups appear after the check. A stored group the Miniserver no longer knows shows as
+*Unknown group* in the choice. Pick another one or remove it. An access point without a group opens
+for no booking code. Its grants fail with the reason *access point has no Loxone group* until you pick
+a group.
+
 ### Building automation
 
 Floodlight and irrigation stay with your building automation. It asks Courtside at regular intervals
