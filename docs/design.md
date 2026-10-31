@@ -651,10 +651,12 @@ own call with its own deadline, skipped when a check it requires did not pass, a
 runner abandons is a timeout for that check alone. A failing check does not end the pass; a check that
 keeps running past its deadline occupies the call thread like any abandoned call, so the pass's next
 call is not sent and the pass ends as an outage. The pass runs a check only while it still holds its
-lock and is not stopping; a run cut short keeps no result and stays requested for the next pass. A result carries the check's
-name, `PASSED`, `FAILED`, `SKIPPED` or `MANUAL`, an i18n code and string parameters; an exception from
-a check becomes `access.check.failed` without its text. A connector without checks of its own answers
-one `connector` result, `SKIPPED`. The Loxone connector checks, in this order: `miniserver` resolves
+lock and is not stopping; a run cut short keeps no result and stays requested for the next pass. A
+result carries the check's name, `PASSED`, `FAILED`, `SKIPPED` or `MANUAL`, an i18n code and string parameters. A Loxone check
+that the Miniserver refuses reports `access.check.refused`, and one without a clear answer
+`access.check.unclear`, each with the connector's fixed, sanitized text as `reason`; any other
+exception from a check becomes `access.check.failed` without its text. A connector without checks of
+its own answers one `connector` result, `SKIPPED`. The Loxone connector checks, in this order: `miniserver` resolves
 the serial afresh through `getip`, reaches `jdev/cfg/apiKey` over verified TLS in one call and reads
 the config version from its answer, which must be at least 14.2.5.16, comparing each segment as a
 number; `login` kills the cached token and logs in again with both rights; `groups`
