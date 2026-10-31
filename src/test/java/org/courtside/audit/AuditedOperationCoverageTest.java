@@ -25,7 +25,6 @@ class AuditedOperationCoverageTest {
             "AccessGrantAdministration#groups",
             "AccessGrantAdministration#overview",
             "AccessGrantAdministration#requestConnectionCheck",
-            "AccessGrantAdministration#requestProbe",
             "AccessGrantAdministration#retry",
             "AccountAddresses#change",
             "AccountCredentials#issueTo",

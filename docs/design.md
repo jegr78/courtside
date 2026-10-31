@@ -735,8 +735,7 @@ the connector's own reason when it gave one. Reading the overview never calls th
 "Verbindung prüfen" asks for a connection check with `POST /api/admin/access-control/check`, which
 also requests a probe and so reloads the groups, and lists each check of the latest one from
 `GET /api/admin/access-control/check`, whose `checkedAt` is `null` and list empty before the first.
-`POST /api/admin/access-grants/probe` asks for a probe alone, which the next pass makes first. Both
-requests answer `409 urn:courtside:error:access-control-not-connected` without a connector, as a
+Without a connector the request answers `409 urn:courtside:error:access-control-not-connected`, as a
 retry does. A board sends a
 failing grant again with `POST /api/admin/access-grants/{id}/retry`: it marks the grant under its row
 lock, signals the worker and is audited as `access.grant.retryRequested`, and the next pass clears

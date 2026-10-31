@@ -8324,33 +8324,6 @@ paths:
         "429":
           $ref: "#/components/responses/RateLimited"
 
-  /api/admin/access-grants/probe:
-    post:
-      tags: [admin-access-grants]
-      operationId: probeAccessControl
-      summary: Ask for a fresh check of the access-control system.
-      description: |
-        The background pass checks the system at the start of its next run; the overview shows the answer
-        once it has. Without an access-control system this answers `409` with
-        `urn:courtside:error:access-control-not-connected`.
-      security:
-        - sessionCookie: []
-          csrfToken: []
-      responses:
-        "202":
-          description: The check is requested.
-        "401":
-          $ref: "#/components/responses/Unauthenticated"
-        "403":
-          $ref: "#/components/responses/Forbidden"
-        "409":
-          description: No access-control system is connected.
-          content:
-            application/problem+json:
-              schema: { $ref: "#/components/schemas/Problem" }
-        "429":
-          $ref: "#/components/responses/RateLimited"
-
   /api/admin/access-control/check:
     get:
       tags: [admin-access-grants]

@@ -79,13 +79,4 @@ class AccessGrantAdminWithoutConnectorTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.checkedAt").value(nullValue()))
                 .andExpect(jsonPath("$.checks.length()").value(0));
     }
-
-    @Test
-    void givenNoConnector_whenTheBoardAsksForAProbe_thenItIsRefusedWithItsOwnTypeAndCode() throws Exception {
-        // when / then
-        mockMvc.perform(post("/api/admin/access-grants/probe").with(csrf()))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.type").value("urn:courtside:error:access-control-not-connected"))
-                .andExpect(jsonPath("$.violations[0].code").value("access.control.notConnected"));
-    }
 }

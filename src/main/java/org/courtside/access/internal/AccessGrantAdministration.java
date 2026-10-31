@@ -26,7 +26,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-/** What a board sees of the access grants and what it may ask for: a retry, a fresh probe and a connection check. */
+/** What a board sees of the access grants and what it may ask for: a retry and a connection check. */
 @Service
 public class AccessGrantAdministration {
 
@@ -87,15 +87,6 @@ public class AccessGrantAdministration {
         grant.requestRetry(clock.now());
         events.publishEvent(new AccessGrantEvent.RetryRequested(grant.getId(), grant.getBookingId()));
         return views(List.of(grant)).getFirst();
-    }
-
-    public void requestProbe() {
-        AccessWorker running = worker.getIfAvailable();
-        if (running == null) {
-            throw new AccessControlNotConnectedException();
-        }
-        readings.request();
-        running.signal();
     }
 
     /** Asks the next pass for a connection check, which also probes and so reloads the groups. */

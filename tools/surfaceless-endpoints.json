@@ -9,6 +9,5 @@
   "getBookingCard": "The admin list already answers with every field of every one of these, active or not, so a second call would fetch what the page is already holding.",
   "getParticipantCard": "The admin list already answers with every field of every one of these, active or not, so a second call would fetch what the page is already holding.",
   "getRuleSet": "The admin list already answers with every field of every rule set, active or not, so a second call would fetch what the page is already holding.",
-  "probeAccessControl": "The board's connection check requests a probe as well, so the page asks for that check and never for a bare probe.",
   "getCourtOccupancy": "Building automation polls this with the occupancy key; the board's page creates the key and shows the address, and no view reads occupancy through it."
 }

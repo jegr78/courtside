@@ -49,12 +49,6 @@ class AccessGrantAdminController implements AdminAccessGrantsApi {
     }
 
     @Override
-    public ResponseEntity<Void> probeAccessControl() {
-        administration.requestProbe();
-        return ResponseEntity.accepted().build();
-    }
-
-    @Override
     public ResponseEntity<Void> checkAccessControl() {
         administration.requestConnectionCheck();
         return ResponseEntity.accepted().build();
