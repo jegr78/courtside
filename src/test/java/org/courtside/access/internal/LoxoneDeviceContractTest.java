@@ -62,6 +62,7 @@ class LoxoneDeviceContractTest {
         // then
         observed.checks().forEach(checked -> System.out.println("check " + checked.check() + ": "
                 + checked.result().outcome() + " " + checked.result().code() + " " + checked.result().parameters()));
+        System.out.println("jdev/sys/date answered " + observed.date() + ", jdev/sys/time answered " + observed.time());
         System.out.println("updateuseraccesscode answered " + observed.code() + ", for a code another user holds "
                 + observed.duplicateCode());
         assertThat(observed.leftOver()).as("the run lists none of its own users at its end").isEmpty();

@@ -19,7 +19,8 @@ final class LoxoneDeviceContract {
     private static final Duration WINDOW = Duration.ofMinutes(10);
     private static final ObjectMapper JSON = new ObjectMapper();
 
-    record Observed(List<ConnectionCheckRun.Checked> checks, int code, int duplicateCode, List<String> leftOver) {
+    record Observed(List<ConnectionCheckRun.Checked> checks, int date, int time, int code, int duplicateCode,
+                    List<String> leftOver) {
     }
 
     private final LoxoneAccessControl connector;
@@ -74,8 +75,8 @@ final class LoxoneDeviceContract {
         client.session().configuration("apiKey");
         recorder.step("local-time");
         LoxoneClient.Session time = client.session();
-        time.system("date");
-        time.system("time");
+        int date = answered(time, "date");
+        int clock = answered(time, "time");
         recorder.step("user-create");
         String first = create();
         recorder.step("user-code");
@@ -94,7 +95,18 @@ final class LoxoneDeviceContract {
         LoxoneAccessControl.delete(deleting, first);
         LoxoneAccessControl.delete(deleting, second);
         recorder.step("user-list");
-        return new Observed(checks, code, duplicateCode, ownListed());
+        return new Observed(checks, date, clock, code, duplicateCode, ownListed());
+    }
+
+    private static int answered(LoxoneClient.Session session, String command) {
+        try {
+            return session.system(command).code();
+        } catch (LoxoneClient.Refusal refusal) {
+            if (refusal.kind() != LoxoneClient.Refusal.Kind.DENIED) {
+                throw refusal;
+            }
+            return 403;
+        }
     }
 
     private String create() {
