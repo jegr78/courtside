@@ -76,12 +76,16 @@ class MfaLoginTest extends AbstractIntegrationTest {
         // given
         byte[] secret = enroll();
         MockHttpSession pending = pending();
+        String pendingId = pending.getId();
         // when
-        MockHttpSession full = (MockHttpSession) mvc.perform(post("/api/session/mfa").session(pending).with(csrf())
+        MockHttpSession full = (MockHttpSession) mvc.perform(post("/api/session/mfa").session(pending).with(request -> {
+                            request.setRequestedSessionId(pendingId);
+                            return request;
+                        }).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON).content("{\"code\":\"" + TotpCodes.code(secret, clock.instant()) + "\"}"))
                 .andExpect(status().isOk()).andReturn().getRequest().getSession(false);
         // then
-        assertThat(full.getId()).isNotEqualTo(pending.getId());
+        assertThat(full.getId()).isNotEqualTo(pendingId);
         mvc.perform(get("/api/session").session(full)).andExpect(status().isOk())
                 .andExpect(jsonPath("$.authenticated").value(true)).andExpect(jsonPath("$.username").value("doe.jane"))
                 .andExpect(jsonPath("$.mfaEnabled").value(true));
