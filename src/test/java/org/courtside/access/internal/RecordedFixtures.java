@@ -220,8 +220,10 @@ final class RecordedFixtures {
             }
             spellings.add(secret.toLowerCase(Locale.ROOT));
             if (HEX12.matcher(secret).matches()) {
-                spellings.add(HexFormat.ofDelimiter(":").formatHex(HexFormat.of().parseHex(secret))
-                        .toLowerCase(Locale.ROOT));
+                for (String delimiter : List.of(":", "-")) {
+                    spellings.add(HexFormat.ofDelimiter(delimiter).formatHex(HexFormat.of().parseHex(secret))
+                            .toLowerCase(Locale.ROOT));
+                }
             }
         }
         return spellings;

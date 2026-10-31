@@ -130,6 +130,8 @@ class LoxoneRecorderTest {
                         "$[0].response.LL.value.description", "504f94a00000"),
                 Arguments.of("{\"LL\":{\"value\":{\"name\":\"Miniserver 50:4f:94:a0:00:00 online\"}}}", List.of(),
                         "$[0].response.LL.value.name", "50:4f:94:a0:00:00"),
+                Arguments.of("{\"LL\":{\"value\":{\"name\":\"Miniserver 50-4F-94-A0-00-00 online\"}}}", List.of(),
+                        "$[0].response.LL.value.name", "50-4f-94-a0-00-00"),
                 Arguments.of("{\"LL\":{\"Code\":\"200\"}}", List.of("Pass=EXAMPLE-SERVICE-PASSWORD"),
                         "$[0].request.arguments[0]", "example-service-password"));
     }
