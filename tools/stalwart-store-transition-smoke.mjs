@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
 import { createHash, randomBytes } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { chmodSync, cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync,
+import { chmodSync, closeSync, constants, cpSync, existsSync, fstatSync, lstatSync, mkdirSync, mkdtempSync, openSync, readFileSync,
   readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { createConnection } from "node:net";
 import { tmpdir } from "node:os";
-import { delimiter, join, resolve } from "node:path";
+import { delimiter, dirname, join, resolve } from "node:path";
 import { connect as connectTls } from "node:tls";
 import { fileURLToPath } from "node:url";
 
@@ -18,12 +18,25 @@ const sourceRevision = "89d8961e93e301a019f22c48dd455b09ce09fef1";
 const runtimeBaseline = "ghcr.io/jegr78/courtside:nightly";
 const hash = (content) => createHash("sha256").update(content).digest("hex");
 
-export function validateTransitionCandidate(root) {
-  if (!lstatSync(root).isDirectory()) throw new Error("candidate root must be a directory without symlinks");
-  if (!lstatSync(join(root, "manifest.json")).isFile()) {
-    throw new Error("candidate manifest must be a regular file without symlinks");
+function candidateFile(path) {
+  let descriptor;
+  try {
+    descriptor = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+    const status = fstatSync(descriptor);
+    if (!status.isFile()) throw new Error("candidate entries must be regular files without symlinks");
+    return { content: readFileSync(descriptor), mode: status.mode & 0o111 ? 0o755 : 0o644 };
+  } catch (error) {
+    if (error.code === "ELOOP") throw new Error("candidate entries must be regular files without symlinks", { cause: error });
+    throw error;
+  } finally {
+    if (descriptor !== undefined) closeSync(descriptor);
   }
-  const manifest = JSON.parse(readFileSync(join(root, "manifest.json")));
+}
+
+export function snapshotTransitionCandidate(root) {
+  if (!lstatSync(root).isDirectory()) throw new Error("candidate root must be a directory without symlinks");
+  const manifestContent = candidateFile(join(root, "manifest.json")).content;
+  const manifest = JSON.parse(manifestContent);
   const nightly = /^[0-9]+\.[0-9]+\.[0-9]+-nightly\.[1-9][0-9]*$/.test(manifest.version ?? "");
   const signer = `https://github.com/jegr78/courtside/.github/workflows/${nightly
     ? "nightly-image.yml@refs/heads/main" : `release.yml@refs/tags/v${manifest.version}`}`;
@@ -37,20 +50,35 @@ export function validateTransitionCandidate(root) {
     throw new Error("transition qualification requires a Courtside candidate identity");
   }
   if (!manifest.files?.courtside) throw new Error("candidate archive has no launcher inventory");
+  const entries = [];
   for (const [path, expected] of Object.entries(manifest.files)) {
     if (!/^[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)*$/.test(path) || path.split("/").includes("..")) {
       throw new Error("candidate inventory contains an unsafe path");
     }
     const absolute = join(root, path);
-    if (!lstatSync(absolute).isFile()) throw new Error("candidate inventory must contain regular files without symlinks");
     if (!realpathSync(absolute).startsWith(`${realpathSync(root)}/`)) throw new Error("candidate inventory leaves its archive root");
-    if (hash(readFileSync(absolute)) !== expected) throw new Error("candidate archive integrity failed");
+    const entry = candidateFile(absolute);
+    if (hash(entry.content) !== expected) throw new Error("candidate archive integrity failed");
+    entries.push({ path, ...entry });
   }
   const actualFiles = filesBelow(root).filter((path) => path !== "manifest.json");
   if (actualFiles.length !== Object.keys(manifest.files).length || actualFiles.some((path) => !manifest.files[path])) {
     throw new Error("candidate inventory contains undeclared files");
   }
-  return manifest;
+  return { manifest, manifestContent, entries };
+}
+
+export function validateTransitionCandidate(root) {
+  return snapshotTransitionCandidate(root).manifest;
+}
+
+export function materializeTransitionCandidate(snapshot, destination) {
+  mkdirSync(destination, { mode: 0o700 });
+  for (const { path, content, mode } of snapshot.entries) {
+    mkdirSync(dirname(join(destination, path)), { recursive: true, mode: 0o755 });
+    writeFileSync(join(destination, path), content, { mode, flag: "wx" });
+  }
+  writeFileSync(join(destination, "manifest.json"), snapshot.manifestContent, { mode: 0o644, flag: "wx" });
 }
 
 export function canRemoveQualificationVolume(name, labels, project) {
@@ -203,7 +231,8 @@ async function execute() {
     throw new Error("usage: stalwart-store-transition-smoke.mjs [--candidate <deployment directory>]");
   }
   const supplied = args.length ? resolve(args[1]) : undefined;
-  const suppliedManifest = supplied ? validateTransitionCandidate(supplied) : undefined;
+  const suppliedSnapshot = supplied ? snapshotTransitionCandidate(supplied) : undefined;
+  const suppliedManifest = suppliedSnapshot?.manifest;
   let image = suppliedManifest?.image;
   if (!image) {
     run("docker", ["pull", runtimeBaseline]);
@@ -240,7 +269,8 @@ async function execute() {
     mkdirSync(join(scratch, "historical"));
     const historical = run("git", ["archive", "--format=tar", sourceRevision, "deploy"], { binary: true });
     run("tar", ["-xf", "-", "-C", join(scratch, "historical")], { input: historical.stdout });
-    cpSync(supplied ?? join(repository, "deploy"), candidate, { recursive: true });
+    if (suppliedSnapshot) materializeTransitionCandidate(suppliedSnapshot, candidate);
+    else cpSync(join(repository, "deploy"), candidate, { recursive: true });
     const immutable = ["courtside", "mail-store-transition.sh", "mail-ready.mjs", "mail-certificate-peer.mjs", "mail/base.ndjson", "mail/bootstrap.ndjson"];
     const originalHashes = Object.fromEntries(immutable.map((file) => [file, hash(readFileSync(join(candidate, file)))]));
     adaptNetwork(source, authorityFile);

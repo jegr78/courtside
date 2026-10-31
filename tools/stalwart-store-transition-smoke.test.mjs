@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { lstatSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
-import { validateTransitionCandidate, canRemoveQualificationVolume, pinnedRuntimeImage } from "./stalwart-store-transition-smoke.mjs";
+import { validateTransitionCandidate, snapshotTransitionCandidate, materializeTransitionCandidate, canRemoveQualificationVolume, pinnedRuntimeImage } from "./stalwart-store-transition-smoke.mjs";
 
 function candidate(use) {
   const root = mkdtempSync(join(tmpdir(), "courtside-transition-input-"));
@@ -126,5 +126,50 @@ test("given a manual branch nightly, when its archive is qualified, then its ima
     assert.equal(actual.revision, manifest.revision);
     writeFileSync(path, JSON.stringify({ ...manifest, signer: manifest.signer.replace("jegr78/courtside", "sample/courtside") }));
     assert.throws(() => validateTransitionCandidate(root), /identity/);
+  });
+});
+
+test("given a validated candidate snapshot, when its source files and manifest change, then materialization retains only the validated bytes", () => {
+  candidate((root) => {
+    // given
+    const original = readFileSync(join(root, "courtside"), "utf8");
+    const snapshot = snapshotTransitionCandidate(root);
+    const parent = mkdtempSync(join(tmpdir(), "courtside-transition-snapshot-"));
+    const destination = join(parent, "candidate");
+    writeFileSync(join(root, "courtside"), "changed executable\n");
+    const changed = JSON.parse(readFileSync(join(root, "manifest.json")));
+    changed.files.courtside = createHash("sha256").update("changed executable\n").digest("hex");
+    writeFileSync(join(root, "manifest.json"), JSON.stringify(changed));
+    try {
+      // when
+      materializeTransitionCandidate(snapshot, destination);
+      // then
+      assert.equal(readFileSync(join(destination, "courtside"), "utf8"), original);
+      assert.deepEqual(validateTransitionCandidate(destination), snapshot.manifest);
+    } finally { rmSync(parent, { recursive: true, force: true }); }
+  });
+});
+
+test("given a validated candidate snapshot, when source entries become external symlinks, then the private candidate contains regular validated files", () => {
+  candidate((root) => {
+    // given
+    const snapshot = snapshotTransitionCandidate(root);
+    const parent = mkdtempSync(join(tmpdir(), "courtside-transition-snapshot-links-"));
+    const outside = join(parent, "outside.json");
+    writeFileSync(outside, readFileSync(join(root, "manifest.json")));
+    for (const path of ["courtside", "manifest.json"]) {
+      rmSync(join(root, path));
+      symlinkSync(outside, join(root, path));
+    }
+    const destination = join(parent, "candidate");
+    try {
+      // when
+      materializeTransitionCandidate(snapshot, destination);
+      // then
+      assert.equal(lstatSync(join(destination, "manifest.json")).isSymbolicLink(), false);
+      assert.equal(lstatSync(join(destination, "courtside")).isSymbolicLink(), false);
+      assert.deepEqual(validateTransitionCandidate(destination), snapshot.manifest);
+      assert.deepEqual(JSON.parse(readFileSync(outside)), snapshot.manifest);
+    } finally { rmSync(parent, { recursive: true, force: true }); }
   });
 });
