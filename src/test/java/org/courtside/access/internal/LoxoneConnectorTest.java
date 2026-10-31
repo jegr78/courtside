@@ -236,6 +236,32 @@ class LoxoneConnectorTest extends LoxoneTestSupport {
     }
 
     @Test
+    void givenAMiniserverAnsweringACreateWithAnotherUser_whenGranted_thenNothingIsDeletedAndTheAnswerIsUnclear() {
+        // given
+        simulator.answerEditsWithTheMember();
+
+        // when / then
+        assertThatThrownBy(() -> connector.grant(instruction(grantId)))
+                .isInstanceOf(LoxoneFailure.class)
+                .hasMessage("addoredituser answered a user it did not create or edit");
+        assertThat(simulator.count("deleteuser")).isZero();
+    }
+
+    @Test
+    void givenAMiniserverAnsweringAnEditWithAnotherUser_whenRescheduled_thenNothingIsDeletedAndTheAnswerIsUnclear() {
+        // given
+        String uuid = installed(grantId);
+        simulator.answerEditsWithTheMember();
+
+        // when / then
+        assertThatThrownBy(() -> connector.reschedule(instruction(grantId, uuid, codeOf(grantId), Set.of(COURT_ONE))))
+                .isInstanceOf(LoxoneFailure.class)
+                .hasMessage("addoredituser answered a user it did not create or edit");
+        assertThat(simulator.count("deleteuser")).isZero();
+        assertThat(simulator.usersNamed(name)).extracting(user -> user.uuid).containsExactly(uuid);
+    }
+
+    @Test
     void givenAnAccessPointWithoutAGroup_whenGranted_thenTheGrantIsRefusedWithoutARequest() {
         // given
         mapping.remove(COURT_TWO);

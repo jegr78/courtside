@@ -67,7 +67,10 @@ class LoxoneAccessControl implements AccessControlConnector, AutoCloseable {
         String name = nameOf(instruction.reference().grantId());
         try {
             LoxoneClient.Session session = client.session();
-            List<String> listed = usersNamed(session, name);
+            JsonNode everyone = listing(session);
+            List<String> listed = named(everyone, name);
+            Set<String> existing = new HashSet<>();
+            everyone.forEach(user -> existing.add(user.path("uuid").asString("")));
             String kept = kept(listed, instruction.reference().externalReference());
             for (String surplus : listed) {
                 if (!surplus.equals(kept)) {
@@ -79,14 +82,16 @@ class LoxoneAccessControl implements AccessControlConnector, AutoCloseable {
                 case 200 -> {
                 }
                 case 404 -> {
-                    return new GrantOutcome.Refused(Scope.GRANT, kept == null
-                            ? "Loxone group not found" : "Loxone group or user not found");
+                    return new GrantOutcome.Refused(Scope.GRANT, "Loxone group not found");
                 }
                 case 400 -> throw failure("addoredituser answered 400: the user name is taken", instruction);
                 default -> throw failure("addoredituser answered " + edited.code(), instruction);
             }
             String uuid = uuidOf(edited.value());
-            if (edited.value() == null || !name.equals(edited.value().path("name").asString(""))) {
+            if (kept == null ? existing.contains(uuid) : !uuid.equals(kept)) {
+                throw failure("addoredituser answered a user it did not create or edit", instruction);
+            }
+            if (!name.equals(edited.value().path("name").asString(""))) {
                 delete(session, uuid);
                 return new GrantOutcome.Refused(Scope.CONNECTOR, "Miniserver changed the user name");
             }
@@ -232,8 +237,12 @@ class LoxoneAccessControl implements AccessControlConnector, AutoCloseable {
     }
 
     private List<String> usersNamed(LoxoneClient.Session session, String name) {
+        return named(listing(session), name);
+    }
+
+    private static List<String> named(JsonNode listing, String name) {
         List<String> named = new ArrayList<>();
-        for (JsonNode user : listing(session)) {
+        for (JsonNode user : listing) {
             String listedName = user.path("name").asString("");
             String uuid = user.path("uuid").asString("");
             if (!listedName.equals(name) || !OWNED.matcher(listedName).matches()) {
