@@ -121,7 +121,7 @@ final class LoxoneClient implements AutoCloseable {
         }
     }
 
-    /** Sees each request, without the token and the user, and each answer as it arrived. */
+    /** Sees each request, without the authentication query, and each answer as it arrived. */
     interface Tap {
 
         void request(String command, List<String> arguments, Map<String, String> query);
