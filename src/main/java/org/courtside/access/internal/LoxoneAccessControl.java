@@ -51,9 +51,13 @@ class LoxoneAccessControl implements AccessControlConnector, AutoCloseable {
     private volatile List<RemoteGroup> groups = List.of();
 
     LoxoneAccessControl(LoxoneSettings settings, LoxoneGroupMapping mapping, SSLContext ssl, Clock clock) {
+        this(settings, mapping, new LoxoneClient(settings, ssl, clock), clock);
+    }
+
+    LoxoneAccessControl(LoxoneSettings settings, LoxoneGroupMapping mapping, LoxoneClient client, Clock clock) {
         this.settings = settings;
         this.mapping = mapping;
-        this.client = new LoxoneClient(settings, ssl, clock);
+        this.client = client;
         this.checks = new LoxoneConnectionChecks(this, client, settings, mapping, clock);
     }
 

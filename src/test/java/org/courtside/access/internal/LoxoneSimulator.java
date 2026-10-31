@@ -30,6 +30,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -570,6 +571,11 @@ final class LoxoneSimulator implements AutoCloseable {
                 yield new Answer(200, value, false);
             }
             case "getjwt" -> jwt(arguments);
+            case "date" -> new Answer(200, JSON.getNodeFactory().stringNode(
+                    LocalDateTime.ofInstant(clock.instant(), zone).toLocalDate().toString()), false);
+            case "time" -> new Answer(200, JSON.getNodeFactory().stringNode(
+                    DateTimeFormatter.ofPattern("HH:mm:ss").format(LocalDateTime.ofInstant(clock.instant(), zone))),
+                    false);
             case "killtoken" -> {
                 tokens.remove(arguments.isEmpty() ? "" : arguments.getFirst());
                 yield Answer.of(200);

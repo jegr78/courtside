@@ -42,12 +42,17 @@ final class LoxoneLogin {
     }
 
     static String clientUuid(LoxoneAddress address) {
+        return clientUuid("courtside", address);
+    }
+
+    /** A stable client uuid per namespace, so a token under another namespace never displaces this instance's. */
+    static String clientUuid(String namespace, LoxoneAddress address) {
         String identity = switch (address) {
             case LoxoneAddress.Serial(String serial, var resolver, var relays) ->
                     "serial:" + serial.toUpperCase(Locale.ROOT);
             case LoxoneAddress.Fixed(var url) -> "url:" + url;
         };
-        String hex = UUID.nameUUIDFromBytes(("courtside:" + identity).getBytes(StandardCharsets.UTF_8)).toString()
+        String hex = UUID.nameUUIDFromBytes((namespace + ":" + identity).getBytes(StandardCharsets.UTF_8)).toString()
                 .replace("-", "");
         return hex.substring(0, 8) + "-" + hex.substring(8, 12) + "-" + hex.substring(12, 16) + "-" + hex.substring(16);
     }

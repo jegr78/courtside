@@ -147,9 +147,13 @@ final class LoxoneClient implements AutoCloseable {
     private volatile @Nullable Tap tap;
 
     LoxoneClient(LoxoneSettings settings, SSLContext ssl, Clock clock) {
+        this(settings, ssl, clock, LoxoneLogin.clientUuid(settings.address()));
+    }
+
+    LoxoneClient(LoxoneSettings settings, SSLContext ssl, Clock clock, String clientUuid) {
         this.settings = settings;
         this.clock = clock;
-        this.clientUuid = LoxoneLogin.clientUuid(settings.address());
+        this.clientUuid = clientUuid;
         this.http = HttpClient.newBuilder()
                 .sslContext(ssl)
                 .connectTimeout(settings.callDeadline())
@@ -199,11 +203,20 @@ final class LoxoneClient implements AutoCloseable {
         }
 
         Reply sps(String command, String... arguments) {
+            return authorized(SPS, command, arguments);
+        }
+
+        /** A system request sent with the token. */
+        Reply system(String command) {
+            return authorized(SYS, command);
+        }
+
+        private Reply authorized(String prefix, String command, String... arguments) {
             String current = token(this);
-            Reply reply = send(this, SPS, command, List.of(arguments), current);
+            Reply reply = send(this, prefix, command, List.of(arguments), current);
             if (reply.code() == 401) {
                 drop(current);
-                reply = send(this, SPS, command, List.of(arguments), token(this));
+                reply = send(this, prefix, command, List.of(arguments), token(this));
                 if (reply.code() == 401) {
                     throw new Refusal(Refusal.Kind.TOKEN, "Miniserver refused the token for " + command + " (401)",
                             null);
