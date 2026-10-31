@@ -19,6 +19,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.OptionalInt;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -322,7 +323,6 @@ final class LoxoneClient implements AutoCloseable {
         Duration remaining = session.remaining(command);
         HttpRequest request = HttpRequest.newBuilder(target)
                 .timeout(remaining)
-                .header("User-Agent", "Courtside access control")
                 .GET()
                 .build();
         CompletableFuture<HttpResponse<byte[]>> exchange = http.sendAsync(request,
@@ -383,7 +383,8 @@ final class LoxoneClient implements AutoCloseable {
     }
 
     private static OptionalInt code(JsonNode envelope) {
-        JsonNode code = envelope.has("Code") ? envelope.get("Code") : envelope.get("code");
+        JsonNode code = envelope.properties().stream().filter(field -> field.getKey().equalsIgnoreCase("Code"))
+                .map(Map.Entry::getValue).findFirst().orElse(null);
         if (code == null) {
             return OptionalInt.empty();
         }

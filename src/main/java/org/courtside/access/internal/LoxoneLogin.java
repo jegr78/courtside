@@ -30,7 +30,6 @@ final class LoxoneLogin {
             String digestName = algorithm.equals("SHA1") ? "SHA-1" : "SHA-256";
             String macName = algorithm.equals("SHA1") ? "HmacSHA1" : "HmacSHA256";
             // SHA-1 is what older Miniservers name in getkey2; the protocol, not this code, chooses it.
-            // codeql[java/potentially-weak-cryptographic-algorithm]
             MessageDigest digest = MessageDigest.getInstance(digestName);
             String passwordHash = HexFormat.of().withUpperCase().formatHex(
                     digest.digest((password + ":" + salt).getBytes(StandardCharsets.UTF_8)));
