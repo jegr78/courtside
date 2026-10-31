@@ -47,12 +47,14 @@ class AccessPass {
     private final Duration deadline;
     private final int pageSize;
     private final ProbeReadings readings;
+    private final AccessReconciliation reconciliation;
 
     AccessPass(DataSource dataSource, PlatformTransactionManager transactionManager, JdbcClient jdbc, PassClock clock,
                BookingAnnouncer announcer, AccessGrantRepository grants, AccessGrantTransitions transitions,
                AccessCodes codes, AccessControlConnector connector, CallRunner calls, ProvisioningWindow window,
                @Value("${courtside.access-control.call-deadline}") Duration deadline,
-               @Value("${courtside.access-control.insert-page-size}") int pageSize, ProbeReadings readings) {
+               @Value("${courtside.access-control.insert-page-size}") int pageSize, ProbeReadings readings,
+               AccessReconciliation reconciliation) {
         this.dataSource = dataSource;
         this.transactions = new TransactionTemplate(transactionManager);
         this.jdbc = jdbc;
@@ -67,6 +69,7 @@ class AccessPass {
         this.deadline = deadline;
         this.pageSize = pageSize;
         this.readings = readings;
+        this.reconciliation = reconciliation;
     }
 
     PassResult runPassNow() {
@@ -86,6 +89,9 @@ class AccessPass {
             }
             PassResult result = act(lock, stopping);
             release();
+            if (result instanceof PassResult.Completed && !stopping.getAsBoolean()) {
+                reconciliation.runIfDue(lock);
+            }
             return result;
         }
     }

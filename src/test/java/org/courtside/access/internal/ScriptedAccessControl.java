@@ -16,6 +16,7 @@ import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -25,11 +26,12 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 /** A connector whose every answer a test chooses, and which records each call it receives. */
 public final class ScriptedAccessControl implements AccessControlConnector {
 
-    public enum Kind { GRANT, RESCHEDULE, REVOKE, PROBE }
+    public enum Kind { GRANT, RESCHEDULE, REVOKE, PROBE, LIST }
 
     public record Call(Kind kind, UUID grantId, Instant at, boolean overlapped, String code) {
     }
@@ -77,6 +79,7 @@ public final class ScriptedAccessControl implements AccessControlConnector {
     private volatile Function<Set<UUID>, String> mapping;
     private volatile Consumer<Set<UUID>> mappingHook;
     private volatile CountDownLatch stubbornRelease;
+    private volatile Supplier<Optional<Set<UUID>>> listing;
 
     private List<RemoteGroup> groups = List.of();
     private boolean listsGroups;
@@ -86,6 +89,7 @@ public final class ScriptedAccessControl implements AccessControlConnector {
     }
 
     public synchronized void reset() {
+        listing = null;
         groups = List.of();
         listsGroups = false;
         calls.clear();
@@ -171,6 +175,27 @@ public final class ScriptedAccessControl implements AccessControlConnector {
 
     public synchronized void groups(List<RemoteGroup> listed) {
         groups = List.copyOf(listed);
+    }
+
+    public void lists(Set<UUID> grantIds) {
+        Set<UUID> listed = Set.copyOf(grantIds);
+        listing = () -> Optional.of(listed);
+    }
+
+    public void failsListing(RuntimeException failure) {
+        listing = () -> {
+            throw failure;
+        };
+    }
+
+    @Override
+    public Optional<Set<UUID>> remoteGrantIds() {
+        Supplier<Optional<Set<UUID>>> listed = listing;
+        if (listed == null) {
+            return Optional.empty();
+        }
+        calls.add(new Call(Kind.LIST, null, Instant.now(), inFlight.get() > 0, null));
+        return listed.get();
     }
 
     public synchronized void listsGroups(boolean lists) {
