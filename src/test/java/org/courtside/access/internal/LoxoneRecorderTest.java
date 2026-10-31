@@ -126,8 +126,8 @@ class LoxoneRecorderTest {
 
     static Stream<Arguments> secretSpellings() {
         return Stream.of(
-                Arguments.of("{\"LL\":{\"value\":{\"description\":\"Door at 504f94a00000\"}}}", List.of(),
-                        "$[0].response.LL.value.description", "504f94a00000"),
+                Arguments.of("{\"LL\":{\"value\":{\"error\":\"Door at 504f94a00000\"}}}", List.of(),
+                        "$[0].response.LL.value.error", "504f94a00000"),
                 Arguments.of("{\"LL\":{\"value\":{\"name\":\"Miniserver 50:4f:94:a0:00:00 online\"}}}", List.of(),
                         "$[0].response.LL.value.name", "50:4f:94:a0:00:00"),
                 Arguments.of("{\"LL\":{\"value\":{\"name\":\"Miniserver 50-4F-94-A0-00-00 online\"}}}", List.of(),
@@ -178,6 +178,106 @@ class LoxoneRecorderTest {
         assertThat(Files.readString(target.resolve("api-key.json")).toLowerCase(Locale.ROOT))
                 .as("the serial inside the string is gone").doesNotContain("50:4f:94:a0:00:00");
         assertThat(RecordedFixtures.violations(target)).as("the written form passes the fixture check").isEmpty();
+    }
+
+    @Test
+    void givenAnUnknownFieldNameHoldingAString_whenRecorded_thenTheRunFailsNamingTheFieldButNotItsValue() {
+        // given
+        recorder.step("unknown-field");
+        exchange("apiKey", List.of(), Map.of(), 200, """
+                {"LL":{"control":"dev/cfg/apiKey","value":"{'version':'14.2.5.16', 'cloudLabel':'Clubhouse North'}",\
+                "Code":"200"}}
+                """);
+
+        // when / then
+        assertThatThrownBy(() -> recorder.write(target)).isInstanceOf(AssertionError.class)
+                .hasMessageContaining("unknown-field $[0].response.LL.value(json).cloudLabel holds a string")
+                .hasMessageNotContaining("Clubhouse");
+    }
+
+    @Test
+    void givenKeysShapedLikeAUuidOrAPersonsName_whenTheRunFails_thenTheMessageKeepsThemHidden() {
+        // given
+        recorder.step("hidden-keys");
+        exchange("getuser", List.of(), Map.of(), 200, """
+                {"LL":{"control":"jdev/sps/getuser","value":{"%s":"Clubhouse North","jane.doe":"Court side"},\
+                "Code":"200"}}
+                """.formatted(LOXONE_UUID));
+
+        // when
+        AssertionError refused = catchThrowableOfType(AssertionError.class, () -> recorder.write(target));
+
+        // then
+        assertThat(refused).as("unknown strings refuse the recording").isNotNull();
+        assertThat(refused.getMessage()).as("a key outside the name shape stays a placeholder")
+                .contains("LL.value.<key-").doesNotContain(LOXONE_UUID).doesNotContain("jane.doe")
+                .doesNotContain("Clubhouse");
+    }
+
+    @Test
+    void givenAControlEchoingTheLoginWithAUserInsideAProtocolWord_whenRecorded_thenEverySegmentAfterTheCommandIsScrubbed()
+            throws IOException {
+        // given
+        LoxoneRecorder shortUser = new LoxoneRecorder(List.of(SERIAL, "courtside", PASSWORD));
+        shortUser.step("login");
+        shortUser.request("getjwt", List.of("a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4", "courtside", "2084",
+                CLIENT_UUID, "Courtside"), Map.of());
+        shortUser.response("getjwt", 200, """
+                {"LL":{"control":"dev/sys/getjwt/a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4/courtside/2084/%s/Courtside",\
+                "value":{"tokenRights":2084},"Code":"200"}}
+                """.formatted(CLIENT_UUID).strip().getBytes(StandardCharsets.UTF_8));
+
+        // when
+        shortUser.write(target);
+
+        // then
+        assertThat(recorded("login").at("/0/response/LL/control").asString())
+                .as("the command stays, every later segment is a placeholder")
+                .matches("dev/sys/getjwt(/<[a-z0-9-]+-[0-9]+>){5}");
+    }
+
+    @Test
+    void givenAUserWithFreeTextFields_whenRecorded_thenEachBecomesAPlaceholderAndAnEmptyOneStaysEmpty()
+            throws IOException {
+        // given
+        recorder.created(CREATED);
+        recorder.step("user-fields");
+        exchange("getuser", List.of(), Map.of(), 200, """
+                {"LL":{"control":"jdev/sps/getuser","value":{"name":"%s","firstName":"Jane","lastName":"Doe",\
+                "email":"jane.doe@example.org","phone":"","company":"Example Tennis Club","desc":"Front desk",\
+                "customFields":["Custom Field 1","Custom Field 2","Custom Field 3","Custom Field 4","Custom Field 5"],\
+                "customField1":"Locker 12","masterAdmin":false,"scorePWD":2},"Code":"200"}}
+                """.formatted(CREATED));
+
+        // when
+        recorder.write(target);
+
+        // then
+        JsonNode user = recorded("user-fields").at("/0/response/LL/value");
+        for (String field : List.of("firstName", "lastName", "email", "company", "desc", "customField1")) {
+            assertThat(user.get(field).asString()).as(field).matches("<[a-z0-9-]+-[0-9]+>");
+        }
+        assertThat(user.get("phone").asString()).as("an empty field stays empty").isEmpty();
+        assertThat(user.get("customFields").valueStream().map(JsonNode::asString))
+                .allSatisfy(label -> assertThat(label).matches("<text-[0-9]+>"));
+        assertThat(Files.readString(target.resolve("user-fields.json")))
+                .doesNotContain("Jane", "Doe", "example.org", "Custom Field", "Locker", "Front desk");
+    }
+
+    @Test
+    void givenAnApiKeyWhoseKeyIsNotHex_whenRecorded_thenTheKeyIsStillAPlaceholder() throws IOException {
+        // given
+        recorder.step("api-key-text");
+        exchange("apiKey", List.of(), Map.of(), 200, """
+                {"LL":{"control":"dev/cfg/apiKey","value":"{'version':'14.2.5.16', 'key':'Ab-Cd'}","Code":"200"}}
+                """);
+
+        // when
+        recorder.write(target);
+
+        // then
+        assertThat(recorded("api-key-text").at("/0/response/LL/value").asString())
+                .matches("\\{'version':'14\\.2\\.5\\.16','key':'<text-[0-9]+>'}");
     }
 
     @Test

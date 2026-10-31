@@ -57,14 +57,15 @@ class LoxoneDeviceContractTest {
                 clock)) {
             observed = new LoxoneDeviceContract(device, client, settings, clock, recorder, guard, code).run();
         }
-        recorder.write(RecordedFixtures.RECORDED);
-
-        // then
         observed.checks().forEach(checked -> System.out.println("check " + checked.check() + ": "
                 + checked.result().outcome() + " " + checked.result().code() + " " + checked.result().parameters()));
         System.out.println("jdev/sys/date answered " + observed.date() + ", jdev/sys/time answered " + observed.time());
         System.out.println("updateuseraccesscode answered " + observed.code() + ", for a code another user holds "
                 + observed.duplicateCode());
+        System.out.println("own users still listed: " + observed.leftOver().size());
+        recorder.write(RecordedFixtures.RECORDED);
+
+        // then
         assertThat(observed.leftOver()).as("the run lists none of its own users at its end").isEmpty();
     }
 

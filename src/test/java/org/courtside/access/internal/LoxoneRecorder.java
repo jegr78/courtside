@@ -52,6 +52,9 @@ final class LoxoneRecorder implements LoxoneClient.Tap {
     private static final Pattern JWT = Pattern.compile("eyJ\\S+");
     private static final Pattern TOKEN = Pattern.compile("(?=.*[0-9])(?=.*[A-Za-z])[A-Za-z0-9+/_=.-]{16,}");
     private static final Pattern UPPER = Pattern.compile(".*[A-F].*");
+    private static final Pattern FIELD_NAME = Pattern.compile("[A-Za-z][A-Za-z0-9_]{0,39}");
+    private static final Pattern KEY_PLACEHOLDER = Pattern.compile("<key-[0-9]+>");
+    private static final Set<String> PREFIXES = Set.of("", "https", "http", "jdev", "dev", "sps", "sys", "cfg");
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final JsonNodeFactory NODES = JsonNodeFactory.instance;
 
@@ -131,7 +134,7 @@ final class LoxoneRecorder implements LoxoneClient.Tap {
         violations.addAll(RecordedFixtures.violations(staging));
         try {
             if (!violations.isEmpty()) {
-                throw new AssertionError("the recording was not written: " + String.join("; ", violations));
+                throw new AssertionError("the recording was not written: " + readable(String.join("; ", violations)));
             }
             Files.createDirectories(recorded);
             try (Stream<Path> files = Files.list(staging)) {
@@ -200,7 +203,13 @@ final class LoxoneRecorder implements LoxoneClient.Tap {
         }
         if (node.isString()) {
             String value = node.asString();
-            return NODES.stringNode(RecordedFixtures.kept(parentKey, key, value) ? value : text(value, key));
+            if (RecordedFixtures.kept(parentKey, key, value)) {
+                return NODES.stringNode(value);
+            }
+            String scrubbed = text(value, key);
+            boolean freeText = key != null && RecordedFixtures.FREE_TEXT.contains(key);
+            return NODES.stringNode(freeText && scrubbed.equals(value) && !value.isEmpty()
+                    ? placeholder("text", value) : scrubbed);
         }
         return node;
     }
@@ -279,14 +288,18 @@ final class LoxoneRecorder implements LoxoneClient.Tap {
         int query = requestLine.indexOf('?');
         String path = query < 0 ? requestLine : requestLine.substring(0, query);
         List<String> segments = new ArrayList<>();
+        boolean afterCommand = false;
         for (String raw : path.split("/", -1)) {
             String segment = URLDecoder.decode(raw.replace("+", "%2B"), StandardCharsets.UTF_8);
-            if (segment.isEmpty() || RecordedFixtures.VOCABULARY.contains(segment)) {
+            if (!afterCommand && (segment.isEmpty() || RecordedFixtures.VOCABULARY.contains(segment))) {
                 segments.add(segment);
+                afterCommand = !PREFIXES.contains(segment);
             } else if (RecordedFixtures.embedded(segment).isPresent()) {
                 segments.add(placeholder("json", segment));
             } else {
-                segments.add(text(segment, null));
+                String scrubbed = text(segment, null);
+                segments.add(afterCommand && scrubbed.equals(segment) && !segment.isEmpty()
+                        ? placeholder("segment", segment) : scrubbed);
             }
         }
         return String.join("/", segments);
@@ -306,6 +319,19 @@ final class LoxoneRecorder implements LoxoneClient.Tap {
 
     private static String quoted(String text) {
         return "'" + text.replace("\\", "\\\\").replace("'", "\\'") + "'";
+    }
+
+    /** Names a field placeholder by its key when the key is shaped like a protocol field name. */
+    private String readable(String message) {
+        Map<String, String> keys = new HashMap<>();
+        placeholders.forEach((value, placeholder) -> {
+            if (KEY_PLACEHOLDER.matcher(placeholder).matches() && FIELD_NAME.matcher(value).matches()
+                    && !RecordedFixtures.carries(value, spellings)) {
+                keys.put(placeholder, value);
+            }
+        });
+        return KEY_PLACEHOLDER.matcher(message).replaceAll(found -> Matcher.quoteReplacement(
+                keys.getOrDefault(found.group(), found.group())));
     }
 
     private String placeholder(String kind, String value) {
