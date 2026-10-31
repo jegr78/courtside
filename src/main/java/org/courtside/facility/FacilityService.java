@@ -45,6 +45,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 @Service
 @RequiredArgsConstructor
@@ -56,6 +57,8 @@ public class FacilityService {
     private static final int AVAILABILITY_NAME_LENGTH = 80;
     private static final String UNIQUE_ACCESS_POINT_NAME = "access_point_unique_name";
     private static final int ACCESS_POINT_NAME_LENGTH = 60;
+    private static final Pattern LOXONE_GROUP = Pattern.compile(
+            "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{16}");
 
     private final CourtRepository courts;
     private final OpeningHoursRepository openingHours;
@@ -144,40 +147,44 @@ public class FacilityService {
 
     @Transactional
     public AccessPoint createAccessPoint(String name, Collection<UUID> courtIds, String staticCode,
-                                         String emergencyCode, boolean openToMembers, String loxoneGroup) {
-        return createAccessPoint(name, courtIds, staticCode, emergencyCode, openToMembers);
-    }
-
-    @Transactional
-    public AccessPoint changeAccessPoint(UUID accessPointId, String name, Collection<UUID> courtIds,
-                                         String staticCode, String emergencyCode, boolean openToMembers,
-                                         String loxoneGroup) {
-        return changeAccessPoint(accessPointId, name, courtIds, staticCode, emergencyCode, openToMembers);
-    }
-
-    public Optional<String> loxoneGroupOf(UUID accessPointId) {
-        return Optional.empty();
+                                         String emergencyCode, boolean openToMembers) {
+        return createAccessPoint(name, courtIds, staticCode, emergencyCode, openToMembers, null);
     }
 
     @Transactional
     public AccessPoint createAccessPoint(String name, Collection<UUID> courtIds, String staticCode,
-                                         String emergencyCode, boolean openToMembers) {
+                                         String emergencyCode, boolean openToMembers, String loxoneGroup) {
         String stored = requireAccessPointName(name);
         Set<UUID> courtsServed = requireCourts(courtIds);
         requireCodes(null, staticCode, true, emergencyCode, true);
         requireCodeWhenOpenToMembers(staticCode, openToMembers);
-        AccessPoint accessPoint = saveOrRejectTakenName(
-                new AccessPoint(stored, courtsServed, staticCode, emergencyCode, openToMembers));
+        String group = requireLoxoneGroup(loxoneGroup);
+        AccessPoint created = new AccessPoint(stored, courtsServed, staticCode, emergencyCode, openToMembers);
+        created.mapLoxoneGroup(group);
+        AccessPoint accessPoint = saveOrRejectTakenName(created);
         events.publishEvent(new FacilityEvent.AccessPointAdded(accessPoint.getId(), sorted(courtsServed)));
         announceCode(accessPoint, courtsServed);
         announceToMembers(accessPoint);
         return accessPoint;
     }
 
-    /** Replaces every field. Only a new or changed code has to fit today's code length. */
+    public Optional<String> loxoneGroupOf(UUID accessPointId) {
+        return accessPoints.findById(accessPointId).map(AccessPoint::getLoxoneGroup);
+    }
+
+    /** Replaces every field but the Loxone group, which stays as stored. */
     @Transactional
     public AccessPoint changeAccessPoint(UUID accessPointId, String name, Collection<UUID> courtIds,
                                          String staticCode, String emergencyCode, boolean openToMembers) {
+        return changeAccessPoint(accessPointId, name, courtIds, staticCode, emergencyCode, openToMembers,
+                requireAccessPoint(accessPointId).getLoxoneGroup());
+    }
+
+    /** Replaces every field. Only a new or changed code has to fit today's code length. */
+    @Transactional
+    public AccessPoint changeAccessPoint(UUID accessPointId, String name, Collection<UUID> courtIds,
+                                         String staticCode, String emergencyCode, boolean openToMembers,
+                                         String loxoneGroup) {
         AccessPoint accessPoint = requireAccessPoint(accessPointId);
         String stored = requireAccessPointName(name);
         Set<UUID> courtsServed = requireCourts(courtIds);
@@ -186,15 +193,18 @@ public class FacilityService {
         requireCodes(accessPointId, staticCode, codeChanged, emergencyCode, emergencyCodeChanged);
         requireCodeWhenOpenToMembers(staticCode, openToMembers);
         boolean openedToMembers = openToMembers && !accessPoint.isOpenToMembers();
+        String group = requireLoxoneGroup(loxoneGroup);
         List<String> changedFields = new ArrayList<>();
         if (!accessPoint.getName().equals(stored)) changedFields.add("name");
         if (!accessPoint.getCourtIds().equals(courtsServed)) changedFields.add("courtIds");
         if (codeChanged) changedFields.add("staticCode");
         if (emergencyCodeChanged) changedFields.add("emergencyCode");
         if (accessPoint.isOpenToMembers() != openToMembers) changedFields.add("openToMembers");
+        if (!Objects.equals(accessPoint.getLoxoneGroup(), group)) changedFields.add("loxoneGroup");
         Set<UUID> added = new TreeSet<>(courtsServed);
         added.removeAll(accessPoint.getCourtIds());
         accessPoint.changeTo(stored, courtsServed, staticCode, emergencyCode, openToMembers);
+        accessPoint.mapLoxoneGroup(group);
         AccessPoint saved = saveOrRejectTakenName(accessPoint);
         if (!changedFields.isEmpty()) {
             events.publishEvent(new FacilityEvent.AccessPointChanged(
@@ -234,6 +244,16 @@ public class FacilityService {
         if (accessPoint.isActive() && accessPoint.isOpenToMembers() && accessPoint.getStaticCode() != null) {
             events.publishEvent(new FacilityEvent.MembersDoorCodeChanged(accessPoint.getId()));
         }
+    }
+
+    private static String requireLoxoneGroup(String loxoneGroup) {
+        if (loxoneGroup == null || loxoneGroup.isBlank()) {
+            return null;
+        }
+        if (!LOXONE_GROUP.matcher(loxoneGroup).matches()) {
+            throw AccessPointRejectedException.loxoneGroupMalformed();
+        }
+        return loxoneGroup;
     }
 
     private static void requireCodeWhenOpenToMembers(String staticCode, boolean openToMembers) {

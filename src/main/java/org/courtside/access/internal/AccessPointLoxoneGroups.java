@@ -16,6 +16,6 @@ class AccessPointLoxoneGroups implements LoxoneGroupMapping {
 
     @Override
     public Optional<String> groupOf(UUID accessPointId) {
-        return Optional.empty();
+        return facility.loxoneGroupOf(accessPointId);
     }
 }

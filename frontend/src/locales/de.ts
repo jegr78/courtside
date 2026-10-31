@@ -374,6 +374,7 @@ const de = {
   "facility.accessPoint.nameTooLong": "Ein Name hat höchstens {{maximum}} Zeichen.",
   "facility.accessPoint.codeNotDigits": "Ein Zugangscode besteht nur aus Ziffern.",
   "facility.accessPoint.codeLength": "Ein neuer Zugangscode hat genau {{digits}} Ziffern.",
+  "facility.accessPoint.loxoneGroupMalformed": "Eine Loxone-Gruppe ist die UUID einer Gruppe auf dem Miniserver.",
   "facility.accessPoint.openToMembersNeedsCode": "Eine Tür für alle Mitglieder braucht einen Zugangscode.",
   "facility.accessPoint.emergencyCodeNeedsDynamicCodes": "Nur ein Zugang ohne Zugangscode hat einen Notfallcode.",
   "facility.accessPoint.emergencyCodeCollides": "Ein Notfallcode unterscheidet sich von jedem Zugangscode.",

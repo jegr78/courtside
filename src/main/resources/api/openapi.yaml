@@ -1033,6 +1033,7 @@ components:
             and differs from every static code. Absent or `null` removes it.
         loxoneGroup:
           type: [string, "null"]
+          pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{16}$"
           description: |
             The uuid of a normal Loxone user group, as `GET /api/admin/access-control/groups` lists them.
             Absent or `null` removes it.

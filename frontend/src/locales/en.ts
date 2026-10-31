@@ -376,6 +376,7 @@ const en: Record<keyof typeof de, string> = {
   "facility.accessPoint.nameTooLong": "A name has at most {{maximum}} characters.",
   "facility.accessPoint.codeNotDigits": "An access code consists of digits only.",
   "facility.accessPoint.codeLength": "A new access code has exactly {{digits}} digits.",
+  "facility.accessPoint.loxoneGroupMalformed": "A Loxone group is the uuid of a group on the Miniserver.",
   "facility.accessPoint.openToMembersNeedsCode": "A door open to every member needs an access code.",
   "facility.accessPoint.emergencyCodeNeedsDynamicCodes": "Only an access point without an access code keeps an emergency code.",
   "facility.accessPoint.emergencyCodeCollides": "An emergency code differs from every access code.",
