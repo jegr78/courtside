@@ -9,7 +9,7 @@ import { join, resolve } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { localRequest, newBootstrapPassword } from "./courtside.mjs";
-import { totpCode } from "./security-mfa-fixture.mjs";
+import { steadyTotpCode } from "./security-mfa-fixture.mjs";
 import {
   containerIdentity, createMailCertificate, createMailCertificateDirectory
 } from "./mail-relay-certificate.mjs";
@@ -100,9 +100,13 @@ async function freshTotpCode(mfa) {
   while (Math.floor(Date.now() / 30_000) <= mfa.lastStep) {
     await new Promise((resolvePromise) => setTimeout(resolvePromise, 1_000));
   }
-  const now = Date.now();
-  mfa.lastStep = Math.floor(now / 30_000);
-  return totpCode(mfa.secret, now);
+  const code = await steadyTotpCode(mfa.secret, Date.now, pause);
+  mfa.lastStep = Math.floor(Date.now() / 30_000);
+  return code;
+}
+
+function pause(milliseconds) {
+  return new Promise((resolvePromise) => setTimeout(resolvePromise, milliseconds));
 }
 
 async function logIn(jar, port, password, mfa) {
@@ -131,11 +135,12 @@ async function enrollTotp(jar, port, password) {
   const enrollment = await expectJson(jar, port, {
     path: "/api/account/mfa/totp", method: "POST", headers: mutationHeaders(jar)
   }, 200);
+  const code = await steadyTotpCode(enrollment.secret, Date.now, pause, -1);
   const confirmedAt = Date.now();
   const confirmation = await request(jar, port, {
     path: "/api/account/mfa/totp/confirmation", method: "POST",
     headers: mutationHeaders(jar, { "Content-Type": "application/json" }),
-    body: JSON.stringify({ code: totpCode(enrollment.secret, confirmedAt, -1) })
+    body: JSON.stringify({ code })
   });
   assert.equal(confirmation.statusCode, 200, `TOTP enrollment was refused: ${confirmation.body}`);
   const mfa = { secret: enrollment.secret, lastStep: Math.floor(confirmedAt / 30_000) - 1 };

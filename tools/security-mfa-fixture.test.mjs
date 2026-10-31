@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import * as crypto from "node:crypto";
 import { test } from "node:test";
-import { createMfaFixture, createWebauthnAuthenticator, mfaFixtureFirstAttemptRequests, mfaFixtureMaxRequestsPerExercise, mfaFixtureRequestLimit, requireMfaSuccess, totpCode } from "./security-mfa-fixture.mjs";
+import { createMfaFixture, createWebauthnAuthenticator, mfaFixtureFirstAttemptRequests, mfaFixtureMaxRequestsPerExercise, mfaFixtureRequestLimit, requireMfaSuccess, steadyTotpCode, totpCode } from "./security-mfa-fixture.mjs";
 
 test("given the RFC6238 secret, when calculating the first reference timestep, then produce its six digit SHA1 code", () => {
   // given
@@ -10,6 +10,30 @@ test("given the RFC6238 secret, when calculating the first reference timestep, t
   assert.equal(totpCode(secret, 59_000), "287082");
   assert.equal(totpCode(secret, 89_000, -1), "287082");
   assert.throws(() => totpCode("INVALID!", 59_000));
+});
+
+test("given a clock within five seconds of a TOTP step boundary, when a code is drawn, then it waits for the next step so the server still accepts it", async () => {
+  // given
+  const secret = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ";
+  let clock = 59_000;
+  const waits = [];
+  const sleep = async (milliseconds) => { waits.push(milliseconds); clock += milliseconds; };
+  // when
+  const code = await steadyTotpCode(secret, () => clock, sleep, -1);
+  // then
+  assert.deepEqual(waits, [1_050], "the draw waits past the boundary instead of racing it");
+  assert.equal(code, totpCode(secret, 60_050, -1), "the code belongs to the step the request will arrive in");
+});
+
+test("given a clock well inside a TOTP step, when a code is drawn, then it is drawn at once", async () => {
+  // given
+  const secret = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ";
+  const waits = [];
+  // when
+  const code = await steadyTotpCode(secret, () => 40_000, async (milliseconds) => { waits.push(milliseconds); }, -1);
+  // then
+  assert.deepEqual(waits, [], "no wait far from the boundary");
+  assert.equal(code, totpCode(secret, 40_000, -1));
 });
 
 test("given a virtual fixture authenticator, when registering and asserting, then bind the UV signature to the challenge origin RP and increasing counter", () => {
@@ -179,7 +203,7 @@ function unitProtocol({ sessionRoles } = {}) {
   const ok = (json, status = 200) => ({ status, ...(json === undefined ? {} : { json }) });
   const configuration = {
     makeClient: () => ({}), clients: { ADMIN: { administrator: true } }, sharedPassword: original,
-    origin: "https://courtside.example", now: () => 59_000,
+    origin: "https://courtside.example", now: () => 59_000, sleep: async () => {},
     beginMailScope: async () => async () => {},
     readRecoveryCode: async (username, { excludedCodes, after }) => {
       assert.ok(Number.isFinite(after));
