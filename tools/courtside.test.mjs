@@ -2267,3 +2267,47 @@ test("given an owned authorization control, when its MFA mail callbacks run, the
   assert.equal(calls[1][2].outputLimitBytes, 32768);
   assert.equal(calls[2][2].outputLimitBytes, 100);
 });
+
+for (const [args, operation] of [
+  [["image", "inspect", "private-value"], "image-inspect"],
+  [["inspect", "private-value"], "container-inspect"],
+  [["network", "inspect", "private-value"], "network-inspect"],
+  [["exec", "private-value", "psql"], "outbox-query"],
+  [["exec", "private-value", "curl"], "http-request"],
+  [["exec", "private-value", "python3"], "receipt-decode"],
+]) {
+  test(`given an owned MFA ${operation}, when its native command times out, then identify the operation without exposing private input or output`, async () => {
+    // given
+    const module = await import("./courtside.mjs");
+    const calls = [];
+    const options = module.securityMfaObservationOptions({ runId: "run-0001", identity: {},
+      context: { stopFile: "/private/STOP" }, environment: {},
+      control: { beforeRequest() {}, remainingMilliseconds: () => 47 } }, {
+      project: () => async () => {},
+      run: async (...invocation) => {
+        calls.push(invocation);
+        throw new Error("Owned security process exceeded its duration limit: private-value recovery-code");
+      }
+    });
+    // when / then
+    await assert.rejects(options.command(args, { timeoutMilliseconds: 10000 }), (error) => {
+      assert.match(error.message, new RegExp(`^MFA mail command timed out: operation=${operation} elapsed-ms=[0-9]+ limit-ms=47$`));
+      assert.doesNotMatch(error.message, /private-value|recovery-code/);
+      return true;
+    });
+    assert.equal(calls[0][2].timeoutMilliseconds, 47);
+  });
+}
+
+test("given a native MFA command failure, when it is not a timeout, then preserve the original failure", async () => {
+  // given
+  const module = await import("./courtside.mjs");
+  const failure = new Error("mail-image-untrusted");
+  const options = module.securityMfaObservationOptions({ runId: "run-0001", identity: {},
+    context: { stopFile: "/private/STOP" }, environment: {},
+    control: { beforeRequest() {}, remainingMilliseconds: () => 47 } }, {
+    project: () => async () => {}, run: async () => { throw failure; }
+  });
+  // when / then
+  await assert.rejects(options.command(["inspect", "owned"], { timeoutMilliseconds: 10000 }), error => error === failure);
+});
