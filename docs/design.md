@@ -656,8 +656,7 @@ the serial afresh through `getip`, reaches `jdev/cfg/apiKey` over verified TLS i
 the config version from its answer, which must be at least 14.2.5.16, comparing each segment as a
 number; `login` kills the cached token and logs in again with both rights; `groups`
 reloads the normal groups and needs one mapped and present for every active access point without a
-static code; `clock` is `SKIPPED` until the device recording settles where the Miniserver's local time
-can be read; `probe-user` deletes leftover users named `courtside_probe_` plus 16 hex digits that are
+static code; `probe-user` deletes leftover users named `courtside_probe_` plus 16 hex digits that are
 not administrators, creates one without group or code as a timespan user from now for two minutes with
 deletion at its end, reads its window and expiry action back through `getuser`, deletes it and finds
 none listed; `keypad` is `MANUAL`, because the API does not show whether a keypad accepts a code.

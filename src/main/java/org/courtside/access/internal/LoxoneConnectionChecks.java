@@ -52,8 +52,6 @@ final class LoxoneConnectionChecks {
                 new ConnectionCheck("miniserver", List.of(), guarded(this::miniserver)),
                 new ConnectionCheck("login", List.of(), guarded(this::login)),
                 new ConnectionCheck("groups", LOGIN, guarded(() -> groups(granted))),
-                new ConnectionCheck("clock", List.of(), () -> CheckResult.skipped("access.check.clock.notSettled",
-                        Map.of())),
                 new ConnectionCheck("probe-user", LOGIN, guarded(this::probeUser)),
                 new ConnectionCheck("keypad", List.of(), () -> CheckResult.manual("access.check.keypad.manual")));
     }

@@ -1164,8 +1164,8 @@ components:
         check:
           type: string
           description: |
-            The check's name. A Loxone Miniserver reports `miniserver`, `login`, `groups`, `clock`, `probe-user`
-            and `keypad`, in that order; a system without checks of its own reports `connector`.
+            The check's name. A Loxone Miniserver reports `miniserver`, `login`, `groups`, `probe-user` and
+            `keypad`, in that order; a system without checks of its own reports `connector`.
         outcome: { $ref: "#/components/schemas/AccessControlCheckOutcome" }
         code:
           type: string

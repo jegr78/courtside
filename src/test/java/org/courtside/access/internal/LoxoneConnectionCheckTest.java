@@ -29,24 +29,21 @@ class LoxoneConnectionCheckTest extends LoxoneTestSupport {
     private final Map<UUID, String> granted = Map.of(COURT_ONE, "North gate", COURT_TWO, "South gate");
 
     @Test
-    void givenAHealthyMiniserver_whenChecked_thenSixChecksReportInOrderWithTheKeypadManualAndTheClockUnsettled() {
+    void givenAHealthyMiniserver_whenChecked_thenFiveChecksReportInOrderWithTheKeypadManual() {
         // when
         List<ConnectionCheckRun.Checked> checked = checked(connector);
 
         // then
         assertThat(checked).extracting(ConnectionCheckRun.Checked::check)
-                .containsExactly("miniserver", "login", "groups", "clock", "probe-user", "keypad");
+                .containsExactly("miniserver", "login", "groups", "probe-user", "keypad");
         assertThat(checked).extracting(entry -> entry.result().outcome()).containsExactly(CheckOutcome.PASSED,
-                CheckOutcome.PASSED, CheckOutcome.PASSED, CheckOutcome.SKIPPED, CheckOutcome.PASSED,
-                CheckOutcome.MANUAL);
+                CheckOutcome.PASSED, CheckOutcome.PASSED, CheckOutcome.PASSED, CheckOutcome.MANUAL);
         assertThat(result(checked, "miniserver")).isEqualTo(CheckResult.passed("access.check.miniserver.reached",
                 Map.of("version", "14.2.5.16", "minimum", "14.2.5.16")));
         assertThat(simulator.count("apiKey")).as("address and version come from one apiKey call").isEqualTo(1);
         assertThat(result(checked, "login")).isEqualTo(CheckResult.passed("access.check.login.accepted", Map.of()));
         assertThat(result(checked, "groups")).isEqualTo(CheckResult.passed("access.check.groups.mapped",
                 Map.of("accessPoints", "North gate, South gate")));
-        assertThat(result(checked, "clock")).as("the clock waits for its source to be settled")
-                .isEqualTo(CheckResult.skipped("access.check.clock.notSettled", Map.of()));
         assertThat(result(checked, "probe-user")).isEqualTo(CheckResult.passed("access.check.probeUser.passed",
                 Map.of()));
         assertThat(result(checked, "keypad")).isEqualTo(CheckResult.manual("access.check.keypad.manual"));
