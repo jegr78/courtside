@@ -72,6 +72,14 @@ final class LoxoneClient implements AutoCloseable {
         }
     }
 
+    /** Sees each request, without the token and the user, and each answer as it arrived. */
+    interface Tap {
+
+        void request(String command, List<String> arguments, Map<String, String> query);
+
+        void response(String command, int status, byte[] body);
+    }
+
     private static final class Disconnected extends LoxoneFailure {
 
         Disconnected(String command) {
@@ -89,6 +97,7 @@ final class LoxoneClient implements AutoCloseable {
     private volatile Instant renewAt = Instant.MIN;
     private volatile @Nullable Instant lockedUntil;
     private volatile boolean closed;
+    private volatile @Nullable Tap tap;
 
     LoxoneClient(LoxoneSettings settings, SSLContext ssl, Clock clock) {
         this.settings = settings;
@@ -235,6 +244,10 @@ final class LoxoneClient implements AutoCloseable {
             throw new Refusal(LOCKED, locked);
         }
         URI origin = base(session);
+        Tap observer = tap;
+        if (observer != null) {
+            observer.request(command, arguments, Map.of());
+        }
         Reply reply;
         try {
             reply = reply(transmit(session, command, target(origin, prefix, command, arguments, authentication)));
@@ -269,6 +282,10 @@ final class LoxoneClient implements AutoCloseable {
 
     private URI resolve(Session session, LoxoneAddress.Serial serial) {
         URI lookup = URI.create(origin(serial.resolver(), "the resolver") + "/getip?snr=" + encoded(serial.serial()));
+        Tap observer = tap;
+        if (observer != null) {
+            observer.request("getip", List.of(), Map.of("snr", serial.serial()));
+        }
         HttpResponse<byte[]> response = transmit(session, "getip", lookup);
         int status = response.statusCode();
         if (status == 400 || status == 404 || status == 504) {
@@ -328,7 +345,12 @@ final class LoxoneClient implements AutoCloseable {
         CompletableFuture<HttpResponse<byte[]>> exchange = http.sendAsync(request,
                 HttpResponse.BodyHandlers.limiting(HttpResponse.BodyHandlers.ofByteArray(), MOST_REPLY_BYTES));
         try {
-            return exchange.get(remaining.toNanos(), TimeUnit.NANOSECONDS);
+            HttpResponse<byte[]> response = exchange.get(remaining.toNanos(), TimeUnit.NANOSECONDS);
+            Tap observer = tap;
+            if (observer != null) {
+                observer.response(command, response.statusCode(), response.body());
+            }
+            return response;
         } catch (TimeoutException late) {
             exchange.cancel(true);
             throw new LoxoneFailure("no answer to " + command + " within the call deadline");
@@ -417,6 +439,10 @@ final class LoxoneClient implements AutoCloseable {
             }
         }
         return encoded.toString();
+    }
+
+    void tap(@Nullable Tap observer) {
+        tap = observer;
     }
 
     boolean closed() {
