@@ -637,7 +637,10 @@ Loxone groups of its access points. A board picks each access point's group from
 last successful probe read; the connector refuses any other group, and a grant whose access point has
 none. It changes or deletes only users of that name that are not administrators, and a revoke answers
 `Accepted` only after a listing finds none left. The Miniserver's lock after requests without rights
-holds every request for five minutes.
+holds every request for five minutes. Once an hour, at the end of a completed pass, a connector that
+lists its users is compared with the rows: a listed grant that is no longer wanted and removed here is
+revoked again, an installed grant it no longer lists is installed again while wanted, and a listed id
+without a row is left alone.
 
 An access point with a static code is served by that code only and never by a dynamic grant. A
 booking has demand when it is confirmed, its card grants access and at least one of its courts sits

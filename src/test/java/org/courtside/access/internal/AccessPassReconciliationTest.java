@@ -19,8 +19,10 @@ class AccessPassReconciliationTest extends AccessPassTestSupport {
     void givenAListedGrantNoLongerWantedAndRemovedHere_whenReconciled_thenItIsRevokedAgain() {
         // given
         UUID booking = book(courts.get(0));
+        UUID unlisted = book(courts.get(1));
         pass.runPassNow();
         cancel(booking);
+        cancel(unlisted);
         passAt(START.plus(Duration.ofMinutes(1)));
         UUID grantId = grantIdOf(booking);
         assertThat(remoteOf(grantId)).as("the revoke has removed the grant here").isEqualTo("NONE");
@@ -33,7 +35,10 @@ class AccessPassReconciliationTest extends AccessPassTestSupport {
 
         // then
         assertThat(marked).as("a user the system still lists may be installed").isEqualTo("MAYBE");
-        assertThat(connector.calls(Kind.REVOKE)).as("the next pass revokes it once more").hasSize(2);
+        assertThat(remoteOf(grantIdOf(unlisted))).as("a removed grant the system does not list stays removed")
+                .isEqualTo("NONE");
+        assertThat(connector.calls(Kind.REVOKE)).as("the next pass revokes only the listed one once more")
+                .hasSize(3);
         assertThat(remoteOf(grantId)).isEqualTo("NONE");
     }
 
@@ -53,6 +58,7 @@ class AccessPassReconciliationTest extends AccessPassTestSupport {
         assertThat(jdbc.sql("SELECT count(*) FROM access_grant WHERE id = ?").params(foreign).query(Integer.class)
                 .single()).as("a user without a row belongs to another Courtside and stays alone").isZero();
         assertThat(connector.calls(Kind.REVOKE)).isEmpty();
+        assertThat(connector.calls(Kind.GRANT)).as("a listed installed grant is not sent again").hasSize(1);
         assertThat(remoteOf(grantIdOf(booking))).isEqualTo("INSTALLED");
     }
 
