@@ -650,9 +650,9 @@ pass. Each check is its own call with its own deadline, skipped when a check it 
 and a check the call runner abandons is a timeout for that check alone. A result carries the check's
 name, `PASSED`, `FAILED`, `SKIPPED` or `MANUAL`, an i18n code and string parameters; an exception from
 a check becomes `access.check.failed` without its text. A connector without checks of its own answers
-one `connector` result, `SKIPPED`. The Loxone connector checks, in this order: `address` resolves the
-serial afresh through `getip` and reaches the Miniserver's `jdev/cfg/apiKey` over verified TLS;
-`version` reads the config version from that answer and needs 14.2.5.16, comparing each segment as a
+one `connector` result, `SKIPPED`. The Loxone connector checks, in this order: `miniserver` resolves
+the serial afresh through `getip`, reaches `jdev/cfg/apiKey` over verified TLS in one call and reads
+the config version from its answer, which must be at least 14.2.5.16, comparing each segment as a
 number; `login` kills the cached token and logs in again with the user-management right; `groups`
 reloads the normal groups and needs one mapped and present for every active access point without a
 static code; `clock` is `SKIPPED` until the device recording settles where the Miniserver's local time

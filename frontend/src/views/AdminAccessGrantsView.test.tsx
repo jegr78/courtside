@@ -40,8 +40,7 @@ function show() {
 const checked: AccessControlCheck = {
   checkedAt: "2026-05-12T10:05:00Z",
   checks: [
-    { check: "address", outcome: "PASSED", code: "access.check.address.reached", params: {} },
-    { check: "version", outcome: "FAILED", code: "access.check.version.tooOld",
+    { check: "miniserver", outcome: "FAILED", code: "access.check.version.tooOld",
       params: { version: "14.2.5.9", minimum: "14.2.5.16" } },
     { check: "login", outcome: "FAILED", code: "access.check.login.refused", params: {} },
     { check: "groups", outcome: "SKIPPED", code: "access.check.skipped", params: { requires: "login" } },
@@ -186,10 +185,10 @@ describe("AdminAccessGrantsView", () => {
     const results = await screen.findByTestId("access-grants-check");
     expect(within(results).getAllByRole("listitem"), "one entry per check, in the order it ran")
       .toHaveLength(checked.checks.length);
-    const version = screen.getByTestId("access-check-version");
-    expect(version, "a failed check is marked as failed").toHaveAttribute("data-outcome", "FAILED");
-    expect(version).toHaveTextContent("Version: failed");
-    expect(within(version).getByTestId("access-check-message"))
+    const miniserver = screen.getByTestId("access-check-miniserver");
+    expect(miniserver, "a failed check is marked as failed").toHaveAttribute("data-outcome", "FAILED");
+    expect(miniserver).toHaveTextContent("Miniserver: failed");
+    expect(within(miniserver).getByTestId("access-check-message"))
       .toHaveTextContent("Version 14.2.5.9 is too old, at least 14.2.5.16 is needed.");
     expect(within(screen.getByTestId("access-check-groups")).getByTestId("access-check-message"),
       "a skipped check names the check it waits for in the board's language")
@@ -213,6 +212,7 @@ describe("AdminAccessGrantsView", () => {
     expect(within(screen.getByTestId("access-check-login")).getByTestId("access-check-message"))
       .toHaveTextContent("Der Miniserver lehnt Benutzername oder Passwort des technischen Benutzers ab.");
     expect(screen.getByTestId("access-check-groups")).toHaveTextContent("Gruppen: übersprungen");
+    expect(screen.getByTestId("access-check-miniserver")).toHaveTextContent("Miniserver: fehlgeschlagen");
   });
 
   it("given a check the view does not know, when the page opens, then its name and code still show", async () => {

@@ -49,8 +49,7 @@ final class LoxoneConnectionChecks {
 
     List<ConnectionCheck> all(Map<UUID, String> granted) {
         return List.of(
-                new ConnectionCheck("address", List.of(), guarded(this::address)),
-                new ConnectionCheck("version", List.of(), guarded(this::version)),
+                new ConnectionCheck("miniserver", List.of(), guarded(this::miniserver)),
                 new ConnectionCheck("login", List.of(), guarded(this::login)),
                 new ConnectionCheck("groups", LOGIN, guarded(() -> groups(granted))),
                 new ConnectionCheck("clock", List.of(), () -> CheckResult.skipped("access.check.clock.notSettled",
@@ -75,7 +74,7 @@ final class LoxoneConnectionChecks {
         };
     }
 
-    private CheckResult address() {
+    private CheckResult miniserver() {
         LoxoneClient.Session session = client.session();
         client.forgetAddress();
         LoxoneClient.Reply answered;
@@ -91,11 +90,6 @@ final class LoxoneConnectionChecks {
             return CheckResult.failed("access.check.address.noMiniserver",
                     Map.of("status", String.valueOf(answered.code())));
         }
-        return CheckResult.passed("access.check.address.reached", Map.of());
-    }
-
-    private CheckResult version() {
-        LoxoneClient.Reply answered = client.session().configuration("apiKey");
         Optional<LoxoneVersion> found = answered.code() == 200 ? LoxoneVersion.of(answered.value()) : Optional.empty();
         if (found.isEmpty()) {
             return CheckResult.failed("access.check.version.unreadable", Map.of());
@@ -103,7 +97,7 @@ final class LoxoneConnectionChecks {
         Map<String, String> parameters = Map.of("version", found.get().toString(),
                 "minimum", LoxoneVersion.MINIMUM.toString());
         return found.get().atLeast(LoxoneVersion.MINIMUM)
-                ? CheckResult.passed("access.check.version.supported", parameters)
+                ? CheckResult.passed("access.check.miniserver.reached", parameters)
                 : CheckResult.failed("access.check.version.tooOld", parameters);
     }
 

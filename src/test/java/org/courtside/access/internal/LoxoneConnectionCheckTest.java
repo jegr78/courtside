@@ -29,19 +29,19 @@ class LoxoneConnectionCheckTest extends LoxoneTestSupport {
     private final Map<UUID, String> granted = Map.of(COURT_ONE, "North gate", COURT_TWO, "South gate");
 
     @Test
-    void givenAHealthyMiniserver_whenChecked_thenSevenChecksReportInOrderWithTheKeypadManualAndTheClockUnsettled() {
+    void givenAHealthyMiniserver_whenChecked_thenSixChecksReportInOrderWithTheKeypadManualAndTheClockUnsettled() {
         // when
         List<ConnectionCheckRun.Checked> checked = checked(connector);
 
         // then
         assertThat(checked).extracting(ConnectionCheckRun.Checked::check)
-                .containsExactly("address", "version", "login", "groups", "clock", "probe-user", "keypad");
+                .containsExactly("miniserver", "login", "groups", "clock", "probe-user", "keypad");
         assertThat(checked).extracting(entry -> entry.result().outcome()).containsExactly(CheckOutcome.PASSED,
-                CheckOutcome.PASSED, CheckOutcome.PASSED, CheckOutcome.PASSED, CheckOutcome.SKIPPED,
-                CheckOutcome.PASSED, CheckOutcome.MANUAL);
-        assertThat(result(checked, "address")).isEqualTo(CheckResult.passed("access.check.address.reached", Map.of()));
-        assertThat(result(checked, "version")).isEqualTo(CheckResult.passed("access.check.version.supported",
+                CheckOutcome.PASSED, CheckOutcome.PASSED, CheckOutcome.SKIPPED, CheckOutcome.PASSED,
+                CheckOutcome.MANUAL);
+        assertThat(result(checked, "miniserver")).isEqualTo(CheckResult.passed("access.check.miniserver.reached",
                 Map.of("version", "14.2.5.16", "minimum", "14.2.5.16")));
+        assertThat(simulator.count("apiKey")).as("address and version come from one apiKey call").isEqualTo(1);
         assertThat(result(checked, "login")).isEqualTo(CheckResult.passed("access.check.login.accepted", Map.of()));
         assertThat(result(checked, "groups")).isEqualTo(CheckResult.passed("access.check.groups.mapped",
                 Map.of("accessPoints", "North gate, South gate")));
@@ -61,7 +61,7 @@ class LoxoneConnectionCheckTest extends LoxoneTestSupport {
         List<ConnectionCheckRun.Checked> checked = checked(bySerial);
 
         // then
-        assertThat(result(checked, "address")).isEqualTo(CheckResult.passed("access.check.address.reached", Map.of()));
+        assertThat(result(checked, "miniserver").outcome()).isEqualTo(CheckOutcome.PASSED);
         assertThat(simulator.count("getip")).as("the cached relay is forgotten so getip really runs").isEqualTo(1);
     }
 
@@ -75,7 +75,7 @@ class LoxoneConnectionCheckTest extends LoxoneTestSupport {
         List<ConnectionCheckRun.Checked> checked = checked(bySerial);
 
         // then
-        assertThat(result(checked, "address")).isEqualTo(CheckResult.failed("access.check.address.unresolved",
+        assertThat(result(checked, "miniserver")).isEqualTo(CheckResult.failed("access.check.address.unresolved",
                 Map.of("status", "404")));
     }
 
@@ -89,7 +89,7 @@ class LoxoneConnectionCheckTest extends LoxoneTestSupport {
         List<ConnectionCheckRun.Checked> checked = checked(bySerial);
 
         // then
-        assertThat(result(checked, "address")).isEqualTo(CheckResult.failed("access.check.address.outsideRelays",
+        assertThat(result(checked, "miniserver")).isEqualTo(CheckResult.failed("access.check.address.outsideRelays",
                 Map.of()));
         assertThat(simulator.requests()).as("nothing reaches a host outside the relays")
                 .allSatisfy(request -> assertThat(request.server()).isEqualTo("cloud"));
@@ -108,7 +108,7 @@ class LoxoneConnectionCheckTest extends LoxoneTestSupport {
             List<ConnectionCheckRun.Checked> checked = checked(untrusting);
 
             // then
-            assertThat(result(checked, "address")).as("TLS verification refuses the certificate on either path")
+            assertThat(result(checked, "miniserver")).as("TLS verification refuses the certificate on either path")
                     .isEqualTo(CheckResult.failed("access.check.certificateRefused", Map.of()));
         }
     }
@@ -122,13 +122,13 @@ class LoxoneConnectionCheckTest extends LoxoneTestSupport {
         List<ConnectionCheckRun.Checked> checked = checked(connector);
 
         // then
-        assertThat(result(checked, "address")).isEqualTo(CheckResult.failed("access.check.address.noMiniserver",
+        assertThat(result(checked, "miniserver")).isEqualTo(CheckResult.failed("access.check.address.noMiniserver",
                 Map.of("status", "502")));
     }
 
     @ParameterizedTest
-    @CsvSource({"14.2.5.9, FAILED, access.check.version.tooOld", "14.10.0.1, PASSED, access.check.version.supported",
-            "13.9.9.99, FAILED, access.check.version.tooOld", "15.0, PASSED, access.check.version.supported"})
+    @CsvSource({"14.2.5.9, FAILED, access.check.version.tooOld", "14.10.0.1, PASSED, access.check.miniserver.reached",
+            "13.9.9.99, FAILED, access.check.version.tooOld", "15.0, PASSED, access.check.miniserver.reached"})
     void givenAMiniserverVersion_whenChecked_thenItIsComparedNumericallyWithTheMinimum(String version,
                                                                                        CheckOutcome outcome,
                                                                                        String code) {
@@ -139,7 +139,7 @@ class LoxoneConnectionCheckTest extends LoxoneTestSupport {
         List<ConnectionCheckRun.Checked> checked = checked(connector);
 
         // then
-        assertThat(result(checked, "version")).isEqualTo(new CheckResult(outcome, code,
+        assertThat(result(checked, "miniserver")).isEqualTo(new CheckResult(outcome, code,
                 Map.of("version", version, "minimum", "14.2.5.16")));
     }
 
@@ -153,7 +153,7 @@ class LoxoneConnectionCheckTest extends LoxoneTestSupport {
         List<ConnectionCheckRun.Checked> checked = checked(connector);
 
         // then
-        assertThat(result(checked, "version")).isEqualTo(CheckResult.failed("access.check.version.unreadable",
+        assertThat(result(checked, "miniserver")).isEqualTo(CheckResult.failed("access.check.version.unreadable",
                 Map.of()));
     }
 
@@ -187,7 +187,7 @@ class LoxoneConnectionCheckTest extends LoxoneTestSupport {
                 .isEqualTo(CheckResult.skipped("access.check.skipped", Map.of("requires", "login")));
         assertThat(result(checked, "probe-user")).as("no login, no probe user")
                 .isEqualTo(CheckResult.skipped("access.check.skipped", Map.of("requires", "login")));
-        assertThat(result(checked, "address").outcome()).as("checks without a login still run")
+        assertThat(result(checked, "miniserver").outcome()).as("checks without a login still run")
                 .isEqualTo(CheckOutcome.PASSED);
         assertThat(simulator.commands()).doesNotContain("addoredituser", "getgrouplist");
     }
