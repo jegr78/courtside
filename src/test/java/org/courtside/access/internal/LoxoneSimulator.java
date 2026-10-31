@@ -870,8 +870,8 @@ final class LoxoneSimulator implements AutoCloseable {
 
     private static String hashed(String code) {
         try {
-            return HexFormat.of().withUpperCase().formatHex(MessageDigest.getInstance("SHA-1")
-                    .digest(code.getBytes(StandardCharsets.UTF_8)));
+            return HexFormat.of().withUpperCase().formatHex(Arrays.copyOf(MessageDigest.getInstance("SHA-256")
+                    .digest(code.getBytes(StandardCharsets.UTF_8)), 20));
         } catch (Exception unavailable) {
             throw new IllegalStateException("the simulator could not hash a code", unavailable);
         }
