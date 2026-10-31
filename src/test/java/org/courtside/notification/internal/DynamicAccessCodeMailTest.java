@@ -1,5 +1,9 @@
 package org.courtside.notification.internal;
 
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.classic.spi.ThrowableProxyUtil;
+import ch.qos.logback.core.read.ListAppender;
 import jakarta.mail.internet.MimeMessage;
 import org.courtside.AbstractIntegrationTest;
 import org.courtside.access.testfixture.AccessTestFixture;
@@ -13,10 +17,8 @@ import org.courtside.shared.OpeningWindow;
 import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.system.CapturedOutput;
-import org.springframework.boot.test.system.OutputCaptureExtension;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Import;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -43,7 +45,6 @@ import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.verify;
 
-@ExtendWith(OutputCaptureExtension.class)
 @TestPropertySource(properties = "courtside.access-control.connector=simulated")
 @Import({FacilityTestFixture.class, IdentityTestFixture.class, CardTestFixture.class, BookingTestFixture.class,
         AccessTestFixture.class})
@@ -271,27 +272,48 @@ class DynamicAccessCodeMailTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void givenTheWholeFlow_whenTheCodeIsMailed_thenItIsInNoAuditRowMessageParameterOrLogLine(CapturedOutput log) {
+    void givenTheWholeFlow_whenTheCodeIsMailed_thenItIsInNoAuditRowMessageParameterOrLogLine() {
         // given
-        UUID booking = book();
-        letTheWaitPass();
-        outbox.deliverDue();
+        Logger root = (Logger) LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME);
+        ListAppender<ILoggingEvent> recorded = new ListAppender<>();
+        recorded.start();
+        root.addAppender(recorded);
+        try {
+            UUID booking = book();
+            letTheWaitPass();
+            outbox.deliverDue();
 
-        // when
-        access.installDueGrants();
-        String code = access.installedCodeOf(booking);
-        queue(booking, "BOOKING_REMINDER");
-        List<String> parametersWhileQueued = jdbc.sql("SELECT parameters::text FROM message_record")
-                .query(String.class).list();
-        outbox.deliverDue();
+            // when
+            access.installDueGrants();
+            String code = access.installedCodeOf(booking);
+            queue(booking, "BOOKING_REMINDER");
+            List<String> parametersWhileQueued = jdbc.sql("SELECT parameters::text FROM message_record")
+                    .query(String.class).list();
+            outbox.deliverDue();
 
-        // then
-        assertThat(bodiesTo("jane.doe@example.org")).as("the code did travel by mail")
-                .anySatisfy(body -> assertThat(body).contains(code));
-        assertThat(jdbc.sql("SELECT payload::text FROM domain_event").query(String.class).list())
-                .noneMatch(payload -> payload.contains(code));
-        assertThat(parametersWhileQueued).noneMatch(parameters -> parameters.contains(code));
-        assertThat(log.getAll()).as("no log line names the code").doesNotContain(code);
+            // then
+            assertThat(bodiesTo("jane.doe@example.org")).as("the code did travel by mail")
+                    .anySatisfy(body -> assertThat(body).contains(code));
+            assertThat(jdbc.sql("SELECT payload::text FROM domain_event").query(String.class).list())
+                    .noneMatch(payload -> payload.contains(code));
+            assertThat(parametersWhileQueued).noneMatch(parameters -> parameters.contains(code));
+            assertThat(recorded.list).isNotEmpty();
+            assertThat(recorded.list).as("no log message, diagnostic context or exception names the code")
+                    .allSatisfy(event -> {
+                        assertThat(event.getFormattedMessage()).doesNotContain(code);
+                        assertThat(event.getMDCPropertyMap().values()).noneMatch(value -> value.contains(code));
+                        if (event.getKeyValuePairs() != null) {
+                            assertThat(event.getKeyValuePairs())
+                                    .noneMatch(pair -> String.valueOf(pair.value).contains(code));
+                        }
+                        if (event.getThrowableProxy() != null) {
+                            assertThat(ThrowableProxyUtil.asString(event.getThrowableProxy())).doesNotContain(code);
+                        }
+                    });
+        } finally {
+            root.detachAppender(recorded);
+            recorded.stop();
+        }
     }
 
     private UUID book() {
