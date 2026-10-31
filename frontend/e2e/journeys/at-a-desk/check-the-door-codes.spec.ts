@@ -1,7 +1,7 @@
 import { expect, test } from "../../fixtures";
 import { activate, openTheApplication, reachAdministration, signIn, walks } from "../../journey-walking";
 
-test("given a connected access-control system, when the board asks for a fresh probe, then the next pass answers it on the access grants page",
+test("given a connected access-control system, when the board asks for a connection check, then the next pass answers it on the access grants page",
   walks("session-and-own-account", "access-grant-administration"),
   async ({ page, language }) => {
     // given
@@ -17,13 +17,14 @@ test("given a connected access-control system, when the board asks for a fresh p
     await expect(page.getByTestId("admin-access-grants-view")).toBeVisible();
     await expect(page.getByTestId("access-grants-connector")).toContainText("simulated");
 
-    // when — the board asks for a fresh check
-    await activate(page.getByTestId("access-grants-probe-now"));
+    // when — the board asks for a connection check
+    await activate(page.getByTestId("access-grants-check-now"));
 
-    // then — the worker's next pass answers it
-    await expect(page.getByTestId("access-grants-probe-requested")).toBeVisible();
+    // then — the worker's next pass runs it and probes again
+    await expect(page.getByTestId("access-grants-check-requested")).toBeVisible();
     await expect(async () => {
       await activate(page.getByTestId("access-grants-refresh"));
+      await expect(page.getByTestId("access-check-connector")).toHaveAttribute("data-outcome", "SKIPPED", { timeout: 1_000 });
       await expect(page.getByTestId("access-grants-probe")).toHaveAttribute("data-outcome", "ANSWERED", { timeout: 1_000 });
     }).toPass({ timeout: 30_000 });
   });
