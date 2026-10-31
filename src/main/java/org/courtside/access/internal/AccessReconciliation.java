@@ -68,7 +68,7 @@ class AccessReconciliation {
             int orphaned = jdbc.sql("""
                             UPDATE access_grant
                             SET remote = 'MAYBE', next_attempt_at = :now, exposed_until = coalesce(exposed_until, :now)
-                            WHERE remote = 'NONE' AND NOT wanted AND id = ANY(:ids)
+                            WHERE remote = 'NONE' AND (NOT wanted OR refused) AND id = ANY(:ids)
                             """)
                     .param("now", now).param("ids", ids).update();
             int missing = jdbc.sql("""
