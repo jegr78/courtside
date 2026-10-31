@@ -546,9 +546,9 @@ plan is rendered, and the rendered copy lives in a volume rather than in the rep
 Two things about the mail container are worth knowing regardless:
 
 - The web interface is not pinned by digest. Stalwart fetches the administration bundle from
-  `https://github.com/stalwartlabs/webui/releases/download/v1.0.11/webui.zip` at runtime. It maps
-  an existing `latest` bundle URL to this release and rejects bundles declaring a major version
-  above 1. The bundle controls mail administration. Its integrity depends on TLS to GitHub and
+  `https://github.com/stalwartlabs/webui/releases/download/v2/webui.zip` at runtime. This moving
+  major-release tag can change independently of the image. Stalwart requires WebUI major version 2
+  and a compatible minimum server version. The bundle controls mail administration. Its integrity depends on TLS to GitHub and
   the upstream release asset. Courtside supplies no separate checksum.
 - **One ACME client, two names.** Caddy is still the only thing here that talks to a certificate
   authority, and it now issues for `COURTSIDE_MAIL_HOSTNAME` as well as `COURTSIDE_DOMAIN`. The
@@ -1738,7 +1738,7 @@ so `docker compose pull` alone will never change them. That is deliberate: a clu
 reverse proxy and its mail server should not change without anyone deciding they should. It also
 means the digests do not update themselves. Dependabot opens a pull request against this repository
 when one of them gets a new patch release; a maintainer bumping the digest here is how it reaches
-your instance, take the updated Compose files and run `docker compose up -d` to apply it.
+your instance, use the verified release archive and the launcher update command to apply it.
 Until then, you can raise it yourself: look up the current tag's digest with
 `docker buildx imagetools inspect postgres:18-alpine` (or any of the others) and replace the
 `@sha256:…` suffix in the Compose file that names it.

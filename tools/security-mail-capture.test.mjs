@@ -96,7 +96,7 @@ test("given the security mail sink, when reading its deployment, then keep relay
   // when
   const sink = compose.services.mail;
   // then
-  assert.match(sink?.image ?? "", /^axllent\/mailpit:v1\.31@sha256:[a-f0-9]{64}$/);
+  assert.match(sink?.image ?? "", /^axllent\/mailpit:v1\.32@sha256:[a-f0-9]{64}$/);
   assert.equal(sink.ports, undefined);
   assert.deepEqual(sink.networks, ["backend"]);
   assert.equal(sink.read_only, true);

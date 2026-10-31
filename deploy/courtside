@@ -2196,6 +2196,21 @@ rollback_database_major_update() {
   refuse "release $failed_release did not become healthy; restored release $installed_release with its original PostgreSQL 17 volume"
 }
 
+require_compatible_mail_stores() {
+  local archive=$1 installed_major target_major
+  [ "$config_recipe" = full-self-hosted ] || return 0
+  installed_major=$(sed -n \
+    's/^[[:space:]]*image: stalwartlabs\/stalwart:v\([0-9][0-9]*\)\.[0-9][0-9]*\.[0-9][0-9]*@sha256:[0-9a-f]\{64\}$/\1/p' \
+    "$installation_directory/current/compose.stalwart.yaml")
+  target_major=$(sed -n \
+    's/^[[:space:]]*image: stalwartlabs\/stalwart:v\([0-9][0-9]*\)\.[0-9][0-9]*\.[0-9][0-9]*@sha256:[0-9a-f]\{64\}$/\1/p' \
+    "$archive/compose.stalwart.yaml")
+  [[ "$installed_major" =~ ^[0-9]+$ ]] && [[ "$target_major" =~ ^[0-9]+$ ]] \
+    || refuse "Stalwart store compatibility is unknown; review the store migration in guides/stalwart.md"
+  [ "$installed_major" = "$target_major" ] \
+    || refuse "Stalwart store migration across major versions is not supported by this launcher; see guides/stalwart.md"
+}
+
 command_update() {
   local archive="" confirmed=false installed_release target_release target_revision target_image target_digest
   local target_manifest_sha transaction old_compose database_major_update target_database_volume
@@ -2221,6 +2236,7 @@ command_update() {
   target_digest=$manifest_digest
   target_manifest_sha=$manifest_sha256
   [ -f "$archive/README.md" ] || refuse "release archive has no upgrade notes"
+  require_compatible_mail_stores "$archive"
   prepare_database_major_update "$archive"
   printf 'Plan: update %s to exact release %s in %s\n' "$installed_release" "$target_release" "$installation_directory"
   printf 'Upgrade notes: %s/README.md\n' "$archive"

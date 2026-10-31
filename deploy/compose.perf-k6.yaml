@@ -3,7 +3,7 @@ name: courtside-perf-k6
 # The runner starts these with docker run; they live here so their digests are watched for updates.
 services:
   k6:
-    image: grafana/k6:2.3.0@sha256:9c2dee7f8ed74d317e4027c06a10f169b625638189de8d4555d0b3486a5aeb34
+    image: grafana/k6:2.3.0@sha256:2dd4756ec6e14e62778916e1eb850108e4b499304c02df56760fa0bdb0fba0b8
 
   k6-browser:
-    image: grafana/k6:2.3.0-with-browser@sha256:fd3bc5d244f87e7d05152ede97b99813a381a83b639a4e43e1939b56460544ee
+    image: grafana/k6:2.3.0-with-browser@sha256:8663335c8c1c5a40dd51823ef980c584761a4a084a2297fca29a29ee495c6bc1

@@ -1262,7 +1262,9 @@ Verified TLS to PostgreSQL and between Caddy and the application is optional har
 fails closed on inconsistent certificates, keys, authorities or transport settings. The standard
 single-host installation remains supported without these optional components.
 
-The self-hosted mail recipe uses Stalwart. The application requires STARTTLS and validates its relay
+The self-hosted mail recipe uses Stalwart. Automatic updates refuse a Stalwart major-version change
+before mutating the installation because existing mail stores require a separate migration.
+The application requires STARTTLS and validates its relay
 certificate by default. An operator may explicitly disable issuer and hostname verification for a
 relay whose certificate the container cannot validate; the
 [`operations guide`](../deploy/guides/operations.md) states what that permits. Other recipes use an
