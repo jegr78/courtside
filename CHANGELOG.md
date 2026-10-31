@@ -1,7 +1,6 @@
 # Changelog
 
-## [0.4.0-rc.1](https://github.com/jegr78/courtside/compare/v0.3.0...v0.4.0-rc.1) (2026-10-31)
-
+## 0.4.0 (2026-10-31)
 
 ### Features
 
@@ -15,7 +14,6 @@
 * show a members' door code to every member independent of bookings ([#1795](https://github.com/jegr78/courtside/issues/1795)) ([9c2d7b7](https://github.com/jegr78/courtside/commit/9c2d7b762311b60a0623f2bde13b04a45cdf5bca))
 * show the active account with profile and security ([#1776](https://github.com/jegr78/courtside/issues/1776)) ([2d12a85](https://github.com/jegr78/courtside/commit/2d12a8527c4a7fd7be1a6bf68b5b43163561c371))
 
-
 ### Bug fixes
 
 * bump org.jacoco:jacoco-maven-plugin from 0.8.15 to 0.8.16 ([#1799](https://github.com/jegr78/courtside/issues/1799)) ([1bb87df](https://github.com/jegr78/courtside/commit/1bb87df91c2b8786483f546f51350e3c3fa63079))
@@ -26,7 +24,6 @@
 * defer observed navigation layout until the next frame ([#1778](https://github.com/jegr78/courtside/issues/1778)) ([6f45a9e](https://github.com/jegr78/courtside/commit/6f45a9ef38f87c12c6ef5cc9b1efd7fe8d3bf094))
 * harden the MFA key root and second-factor guessing ([#1782](https://github.com/jegr78/courtside/issues/1782)) ([4948d8b](https://github.com/jegr78/courtside/commit/4948d8b7b9963738b6fd109ac81124fba76ac612))
 * resolve the open security alerts and keep CodeQL failures visible ([#1788](https://github.com/jegr78/courtside/issues/1788)) ([3d4ea17](https://github.com/jegr78/courtside/commit/3d4ea179385d789cc656574ac734a0fea67be541))
-
 
 ### Chores
 
