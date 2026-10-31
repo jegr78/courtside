@@ -121,6 +121,12 @@ class AccessSignalsTest extends AccessPassTestSupport {
         assertThat(passStartsAfter(administration::requestProbe)).isTrue();
     }
 
+    @Test
+    void givenAnIdleWorker_whenABoardAsksForAConnectionCheck_thenAPassStartsAtOnce() {
+        // when / then
+        assertThat(passStartsAfter(administration::requestConnectionCheck)).isTrue();
+    }
+
     private boolean passStartsAfter(Runnable change) {
         long before = quietReads();
         change.run();

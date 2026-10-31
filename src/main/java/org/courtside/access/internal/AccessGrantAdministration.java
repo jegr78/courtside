@@ -2,6 +2,7 @@ package org.courtside.access.internal;
 
 import org.courtside.access.AccessControlConnector;
 import org.courtside.access.AccessGrantEvent;
+import org.courtside.access.CheckOutcome;
 import org.courtside.access.GrantStatus;
 import org.courtside.access.RemoteGroup;
 import org.courtside.facility.AccessPoint;
@@ -25,12 +26,13 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-/** What a board sees of the access grants and the two things it may ask for: a retry and a fresh probe. */
+/** What a board sees of the access grants and what it may ask for: a retry, a fresh probe and a connection check. */
 @Service
 public class AccessGrantAdministration {
 
     private final AccessGrantRepository grants;
     private final ProbeReadings readings;
+    private final ConnectionCheckReadings checks;
     private final ObjectProvider<AccessWorker> worker;
     private final ObjectProvider<AccessControlConnector> connectors;
     private final BookingAnnouncer bookings;
@@ -39,12 +41,14 @@ public class AccessGrantAdministration {
     private final ApplicationEventPublisher events;
     private final String connector;
 
-    AccessGrantAdministration(AccessGrantRepository grants, ProbeReadings readings, ObjectProvider<AccessWorker> worker,
+    AccessGrantAdministration(AccessGrantRepository grants, ProbeReadings readings, ConnectionCheckReadings checks,
+                              ObjectProvider<AccessWorker> worker,
                               ObjectProvider<AccessControlConnector> connectors, BookingAnnouncer bookings,
                               FacilityService facility, PassClock clock, ApplicationEventPublisher events,
                               @Value("${courtside.access-control.connector}") String connector) {
         this.grants = grants;
         this.readings = readings;
+        this.checks = checks;
         this.worker = worker;
         this.connectors = connectors;
         this.bookings = bookings;
@@ -94,6 +98,25 @@ public class AccessGrantAdministration {
         running.signal();
     }
 
+    /** Asks the next pass for a connection check, which also probes and so reloads the groups. */
+    public void requestConnectionCheck() {
+        AccessWorker running = worker.getIfAvailable();
+        if (running == null) {
+            throw new AccessControlNotConnectedException();
+        }
+        checks.request();
+        readings.request();
+        running.signal();
+    }
+
+    /** The latest connection check, without calling the system; empty and untimed before the first one. */
+    public ConnectionCheckView connectionCheck() {
+        return checks.latest().map(report -> new ConnectionCheckView(report.checkedAt(), report.checks().stream()
+                        .map(entry -> new CheckView(entry.check(), entry.result().outcome(), entry.result().code(),
+                                entry.result().parameters())).toList()))
+                .orElse(new ConnectionCheckView(null, List.of()));
+    }
+
     private List<GrantView> views(List<AccessGrant> shown) {
         Map<UUID, String> names = facility.allAccessPoints().stream()
                 .collect(Collectors.toMap(AccessPoint::getId, AccessPoint::getName));
@@ -117,6 +140,12 @@ public class AccessGrantAdministration {
     }
 
     public record Groups(boolean offered, List<RemoteGroup> groups, @Nullable Instant readAt) {
+    }
+
+    public record ConnectionCheckView(@Nullable Instant checkedAt, List<CheckView> checks) {
+    }
+
+    public record CheckView(String check, CheckOutcome outcome, String code, Map<String, String> parameters) {
     }
 
     public record Probe(boolean reachable, ProbeClassification classification, String detail, Instant checkedAt) {

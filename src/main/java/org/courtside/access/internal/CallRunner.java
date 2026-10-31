@@ -12,6 +12,7 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.LockSupport;
 
 /** Runs one remote call at a time on its own thread, bounded by the connector's deadline. */
 final class CallRunner implements AutoCloseable {
@@ -29,6 +30,8 @@ final class CallRunner implements AutoCloseable {
         record Busy<T>() implements Result<T> {
         }
     }
+
+    private static final Duration IDLE_POLL = Duration.ofMillis(10);
 
     private final Duration deadline;
     private final ExecutorService thread;
@@ -76,6 +79,14 @@ final class CallRunner implements AutoCloseable {
             abandon(running, started);
             Thread.currentThread().interrupt();
             return new Result.Unclear<>(interrupted);
+        }
+    }
+
+    /** Waits at most this long for an abandoned call to give the call thread back. */
+    void awaitIdle(Duration most) {
+        long end = System.nanoTime() + most.toNanos();
+        while (occupied.get() && System.nanoTime() < end && !Thread.currentThread().isInterrupted()) {
+            LockSupport.parkNanos(IDLE_POLL.toNanos());
         }
     }
 

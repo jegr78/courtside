@@ -1148,6 +1148,48 @@ components:
         because an abandoned call still holds the call thread; `REFUSED` reached it without those rights.
       enum: [ANSWERED, UNREACHABLE, TIMEOUT, CALL_THREAD_OCCUPIED, REFUSED]
 
+    AccessControlCheckOutcome:
+      type: string
+      description: |
+        `PASSED` found what Courtside needs; `FAILED` did not, and `code` says why; `SKIPPED` did not run, because a
+        check it requires failed or because it cannot run yet; `MANUAL` cannot be seen through the system's interface
+        and is checked by a person at the door.
+      enum: [PASSED, FAILED, SKIPPED, MANUAL]
+
+    AccessControlCheckResult:
+      type: object
+      description: What one check of the connection found.
+      required: [check, outcome, code, params]
+      properties:
+        check:
+          type: string
+          description: |
+            The check's name. A Loxone Miniserver reports `address`, `version`, `login`, `groups`, `clock`,
+            `probe-user` and `keypad`, in that order; a system without checks of its own reports `connector`.
+        outcome: { $ref: "#/components/schemas/AccessControlCheckOutcome" }
+        code:
+          type: string
+          description: The message key the board's view translates, such as `access.check.version.tooOld`.
+        params:
+          type: object
+          description: |
+            The values the message names, such as `version`, `minimum`, `accessPoints`, `field`, `status` or the
+            connector's `reason`. None carries a credential, a token or an access code.
+          additionalProperties: { type: string }
+
+    AccessControlCheck:
+      type: object
+      required: [checkedAt, checks]
+      properties:
+        checkedAt:
+          type: [string, "null"]
+          format: date-time
+          description: When the latest connection check ran, or `null` before the first one.
+        checks:
+          type: array
+          description: Each check of the latest connection check in the order it ran, empty before the first one.
+          items: { $ref: "#/components/schemas/AccessControlCheckResult" }
+
     AccessGrantOverview:
       type: object
       required: [connector, connected, probe, grants, total]
@@ -8290,6 +8332,54 @@ paths:
       description: |
         The background pass checks the system at the start of its next run; the overview shows the answer
         once it has. Without an access-control system this answers `409` with
+        `urn:courtside:error:access-control-not-connected`.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      responses:
+        "202":
+          description: The check is requested.
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          description: No access-control system is connected.
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/admin/access-control/check:
+    get:
+      tags: [admin-access-grants]
+      operationId: readAccessControlCheck
+      summary: The latest connection check of the access-control system.
+      description: |
+        What each check found when the background pass last ran a connection check. Reading it never calls the
+        system. Before the first check, and without an access-control system, `checkedAt` is `null` and the list
+        is empty.
+      responses:
+        "200":
+          description: The latest connection check.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AccessControlCheck" }
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+    post:
+      tags: [admin-access-grants]
+      operationId: checkAccessControl
+      summary: Ask for a connection check of the access-control system.
+      description: |
+        The background pass runs each check at the start of its next run, each as its own call with its own
+        deadline, and probes the system as well, which reloads its groups. A failing check never holds up the
+        grants. Without an access-control system this answers `409` with
         `urn:courtside:error:access-control-not-connected`.
       security:
         - sessionCookie: []

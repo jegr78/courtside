@@ -9,6 +9,7 @@ import org.courtside.facility.AccessPoint;
 import org.courtside.facility.FacilityService;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -23,6 +24,8 @@ class ConnectionCheckRun {
 
     record Checked(String check, CheckResult result) {
     }
+
+    private static final Duration FREED_WITHIN = Duration.ofSeconds(1);
 
     private final AccessControlConnector connector;
     private final CallRunner calls;
@@ -69,6 +72,7 @@ class ConnectionCheckRun {
     }
 
     private static CheckResult called(ConnectionCheck check, CallRunner calls) {
+        calls.awaitIdle(FREED_WITHIN);
         return switch (calls.run(() -> check.run().get())) {
             case CallRunner.Result.Done<CheckResult>(CheckResult result) when result != null -> result;
             case CallRunner.Result.Busy<CheckResult> busy ->

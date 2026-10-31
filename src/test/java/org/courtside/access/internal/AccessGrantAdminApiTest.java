@@ -197,13 +197,15 @@ class AccessGrantAdminApiTest extends AccessPassTestSupport {
 
     @Test
     @WithMockUser(username = "member", roles = "MEMBER")
-    void givenAMember_whenTheyReadOrRetryAccessGrants_thenTheyAreForbidden() throws Exception {
+    void givenAMember_whenTheyReadRetryProbeOrCheckAccessControl_thenTheyAreForbidden() throws Exception {
         // when / then
         mockMvc.perform(get("/api/admin/access-grants")).andExpect(status().isForbidden());
         mockMvc.perform(post("/api/admin/access-grants/{id}/retry", UUID.randomUUID()).with(csrf()))
                 .andExpect(status().isForbidden());
         mockMvc.perform(post("/api/admin/access-grants/probe").with(csrf())).andExpect(status().isForbidden());
         mockMvc.perform(get("/api/admin/access-control/groups")).andExpect(status().isForbidden());
+        mockMvc.perform(get("/api/admin/access-control/check")).andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/admin/access-control/check").with(csrf())).andExpect(status().isForbidden());
     }
 
     @Test
