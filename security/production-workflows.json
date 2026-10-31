@@ -464,11 +464,13 @@
       "actors": [
         "ADMIN"
       ],
-      "entryPoints": "Administrative access-grant overview, retry and probe endpoints, the access-control group list, and the access worker the booking, series, card and access-point events wake after their commit.",
+      "entryPoints": "Administrative access-grant overview, retry, probe and connection-check endpoints, the access-control group list, and the access worker the booking, series, card and access-point events wake after their commit.",
       "operationIds": [
+        "checkAccessControl",
         "listAccessControlGroups",
         "listAccessGrants",
         "probeAccessControl",
+        "readAccessControlCheck",
         "retryAccessGrant"
       ],
       "backgroundEntryPoints": [

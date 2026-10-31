@@ -8,14 +8,12 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -32,7 +30,6 @@ final class LoxoneConnectionChecks {
     private static final List<String> LOGIN = List.of("login");
     private static final Duration PROBE_WINDOW = Duration.ofMinutes(2);
     private static final List<String> READ_BACK = List.of("validFrom", "validUntil", "expirationAction");
-    private static final SecureRandom RANDOM = new SecureRandom();
 
     private final LoxoneAccessControl connector;
     private final LoxoneClient client;
@@ -190,7 +187,7 @@ final class LoxoneConnectionChecks {
 
     private String probe(Map<String, Long> window) {
         ObjectNode user = json.createObjectNode();
-        user.put("name", "courtside_probe_" + HexFormat.of().formatHex(randomBytes()));
+        user.put("name", "courtside_probe_" + UUID.randomUUID().toString().replace("-", "").substring(0, 16));
         user.put("userState", 4);
         READ_BACK.forEach(field -> user.put(field, window.get(field)));
         user.put("changePassword", false);
@@ -206,11 +203,5 @@ final class LoxoneConnectionChecks {
         }
         return READ_BACK.stream().filter(field -> !user.path(field).isNumber()
                 || user.path(field).asLong() != window.get(field)).findFirst().orElse(null);
-    }
-
-    private static byte[] randomBytes() {
-        byte[] bytes = new byte[8];
-        RANDOM.nextBytes(bytes);
-        return bytes;
     }
 }
