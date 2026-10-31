@@ -12,7 +12,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import java.util.regex.Pattern;
 
-/** Stops a device run before any request that could touch a group or a user the run does not own. */
+/** Stops a device run before it touches a group or a user it did not create, except a leftover non-admin probe user. */
 final class DeviceGuard implements LoxoneClient.Tap {
 
     static final Pattern OWN = Pattern.compile("courtside_device_[0-9a-f]{16}");
