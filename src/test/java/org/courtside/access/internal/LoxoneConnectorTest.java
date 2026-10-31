@@ -376,13 +376,40 @@ class LoxoneConnectorTest extends LoxoneTestSupport {
     }
 
     @Test
-    void givenTheGrantIdOfAnAdmin_whenRevoked_thenTheAdminIsNotDeleted() {
-        // when
-        GrantOutcome outcome = connector.revoke(new GrantReference(simulator.adminGrantId(), null));
-
-        // then
-        assertThat(outcome).isInstanceOf(GrantOutcome.Accepted.class);
+    void givenAnAdminNamedLikeTheGrant_whenRevoked_thenItIsAnUnclearAnswerAndNothingIsDeleted() {
+        // when / then
+        assertThatThrownBy(() -> connector.revoke(new GrantReference(simulator.adminGrantId(), null)))
+                .isInstanceOf(LoxoneFailure.class)
+                .hasMessage("getuserlist2 lists a user of this grant the connector may not change");
         assertThat(simulator.count("deleteuser")).isZero();
+    }
+
+    @Test
+    void givenAUserOfTheGrantWithAMalformedUuid_whenRevokedOrGranted_thenEachIsAnUnclearAnswerAndNothingChanges() {
+        // given
+        simulator.addUser(name, "not-a-loxone-uuid", false);
+
+        // when / then
+        assertThatThrownBy(() -> connector.revoke(new GrantReference(grantId, null)))
+                .isInstanceOf(LoxoneFailure.class)
+                .hasMessage("getuserlist2 lists a user of this grant the connector may not change");
+        assertThatThrownBy(() -> connector.grant(instruction(grantId)))
+                .isInstanceOf(LoxoneFailure.class)
+                .hasMessage("getuserlist2 lists a user of this grant the connector may not change");
+        assertThat(simulator.commands()).doesNotContain("deleteuser", "addoredituser", "updateuseraccesscode");
+        assertThat(simulator.usersNamed(name)).hasSize(1);
+    }
+
+    @Test
+    void givenADeletionTheMiniserverDidNotApply_whenRevoked_thenItIsAnUnclearAnswer() {
+        // given
+        String uuid = installed(grantId);
+        simulator.ignoreDeletes();
+
+        // when / then
+        assertThatThrownBy(() -> connector.revoke(new GrantReference(grantId, uuid)))
+                .isInstanceOf(LoxoneFailure.class)
+                .hasMessage("getuserlist2 still lists a user of this grant after deleteuser");
     }
 
     private static Throwable catchFailure(Runnable call) {

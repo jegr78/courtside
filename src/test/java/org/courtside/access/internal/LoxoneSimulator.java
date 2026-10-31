@@ -133,6 +133,8 @@ final class LoxoneSimulator implements AutoCloseable {
     private boolean vanishBeforeCode;
     private boolean failCodeClearing;
     private boolean nameTakenOnCreate;
+    private boolean ignoreDeletes;
+    private @Nullable URI resolvedTo;
     private @Nullable String hanging;
     private int refusals;
     private @Nullable Instant lockedUntil;
@@ -241,7 +243,20 @@ final class LoxoneSimulator implements AutoCloseable {
     }
 
     LoxoneSettings settingsBySerial(Duration deadline) {
-        return new LoxoneSettings(new LoxoneAddress.Serial(SERIAL, resolver()), USER, PASSWORD, zone, deadline);
+        return settingsBySerial(deadline, List.of(new LoxoneAddress.Relay("localhost", 1, 65_535)));
+    }
+
+    LoxoneSettings settingsBySerial(Duration deadline, List<LoxoneAddress.Relay> relays) {
+        return new LoxoneSettings(new LoxoneAddress.Serial(SERIAL, resolver(), relays), USER, PASSWORD, zone,
+                deadline);
+    }
+
+    synchronized void resolveTo(URI address) {
+        resolvedTo = address;
+    }
+
+    synchronized void ignoreDeletes() {
+        ignoreDeletes = true;
     }
 
     synchronized void moveRelay() throws IOException {
@@ -302,6 +317,12 @@ final class LoxoneSimulator implements AutoCloseable {
     synchronized User addUser(String name, @Nullable String code) {
         User user = add(name, false);
         user.code = code;
+        return user;
+    }
+
+    synchronized User addUser(String name, String uuid, boolean admin) {
+        User user = new User(uuid, name, admin);
+        users.put(uuid, user);
         return user;
     }
 
@@ -381,7 +402,7 @@ final class LoxoneSimulator implements AutoCloseable {
         URI target;
         synchronized (this) {
             code = forced.get("getip");
-            target = url();
+            target = resolvedTo == null ? url() : resolvedTo;
         }
         if (code != null) {
             respond(exchange, code, "{\"error\":\"simulated\",\"code\":" + code + "}");
@@ -662,7 +683,9 @@ final class LoxoneSimulator implements AutoCloseable {
         if (user.admin) {
             return Answer.of(403);
         }
-        users.remove(user.uuid);
+        if (!ignoreDeletes) {
+            users.remove(user.uuid);
+        }
         return Answer.of(200);
     }
 

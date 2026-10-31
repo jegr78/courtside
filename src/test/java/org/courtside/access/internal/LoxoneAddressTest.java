@@ -6,6 +6,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.net.URI;
+import java.time.ZoneId;
+import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -83,5 +86,43 @@ class LoxoneAddressTest extends LoxoneTestSupport {
                 .isInstanceOf(LoxoneFailure.class)
                 .hasMessage("Loxone Cloud found no address for the Miniserver (getip 504)");
         assertThat(simulator.count("getuserlist2")).isZero();
+    }
+
+    @Test
+    void givenLoxonesRelays_whenAResolvedAddressIsChecked_thenOnlyHttpsHostsUnderARelayDomainInItsPortsAreAdmitted() {
+        // given
+        LoxoneAddress.Serial cloud = LoxoneAddress.Serial.throughLoxoneCloud(LoxoneSimulator.SERIAL);
+
+        // then
+        assertThat(cloud.admits(URI.create("https://eu-1.remcov3.loxonecloud.com:31234"))).isTrue();
+        assertThat(cloud.admits(URI.create("https://192-168-1-47.504F94A0EE01.dyndns.loxonecloud.com:443")))
+                .isTrue();
+        assertThat(cloud.admits(URI.create("https://eu-1.remcov3.loxonecloud.com:49001")))
+                .as("a remote connect relay listens on 20000 to 49000").isFalse();
+        assertThat(cloud.admits(URI.create("https://eu-1.remcov3.loxonecloud.com")))
+                .as("the default port 443 is outside the relay range").isFalse();
+        assertThat(cloud.admits(URI.create("https://evilremcov3.loxonecloud.com:31234")))
+                .as("the domain is bounded by a label").isFalse();
+        assertThat(cloud.admits(URI.create("https://eu-1.remcov3.loxonecloud.com.example.org:31234"))).isFalse();
+        assertThat(cloud.admits(URI.create("http://eu-1.remcov3.loxonecloud.com:31234"))).isFalse();
+        assertThat(cloud.admits(URI.create("https://miniserver.example.org:31234"))).isFalse();
+    }
+
+    @Test
+    void givenAResolverNamingAHostOutsideTheRelays_whenACallIsMade_thenNoRequestReachesThatHost() throws IOException {
+        // given
+        int relayPort = simulator.url().getPort();
+        LoxoneAccessControl confined = connectorFor(simulator.settingsBySerial(DEADLINE,
+                List.of(new LoxoneAddress.Relay("localhost", relayPort, relayPort))));
+        try (LoxoneSimulator foreign = new LoxoneSimulator(clock, ZoneId.of("Europe/Berlin"))) {
+            simulator.resolveTo(foreign.url());
+
+            // when / then
+            assertThatThrownBy(() -> confined.grant(instruction(UUID.randomUUID())))
+                    .isInstanceOf(LoxoneFailure.class)
+                    .hasMessage("getip answered an address outside Loxone's relays");
+            assertThat(foreign.requests()).as("neither the login hash nor a token leaves for that host").isEmpty();
+            assertThat(simulator.commands()).containsExactly("getip");
+        }
     }
 }
