@@ -55,6 +55,7 @@ final class LoxoneSimulator implements AutoCloseable {
     static final String PASSWORD = "example-service-password";
     static final String SERIAL = "504F94A0EE01";
     static final int USER_MANAGEMENT = 0x800;
+    static final int CHANGE_PASSWORD = 0x20;
 
     private static final Set<String> MUTATING = Set.of("addoredituser", "deleteuser", "updateuseraccesscode",
             "assignusertogroup", "removeuserfromgroup", "createuser");
@@ -131,6 +132,7 @@ final class LoxoneSimulator implements AutoCloseable {
     private String hashAlgorithm = "SHA256";
     private Duration tokenLifetime = Duration.ofDays(20);
     private boolean withoutUserManagement;
+    private boolean withoutChangePassword;
     private boolean refuseEveryToken;
     private boolean renameUsers;
     private boolean vanishBeforeCode;
@@ -320,6 +322,10 @@ final class LoxoneSimulator implements AutoCloseable {
 
     synchronized void withholdUserManagement() {
         withoutUserManagement = true;
+    }
+
+    synchronized void withholdChangePassword() {
+        withoutChangePassword = true;
     }
 
     synchronized void expireTokens() {
@@ -605,6 +611,7 @@ final class LoxoneSimulator implements AutoCloseable {
         permissions.add(permission);
         clientUuids.add(arguments.get(3));
         int rights = withoutUserManagement ? permission & ~USER_MANAGEMENT : permission;
+        rights = withoutChangePassword ? rights & ~CHANGE_PASSWORD : rights;
         String token = "eyJ" + HexFormat.of().formatHex(randomBytes(24));
         long validUntil = loxoneSeconds(clock.instant().plus(tokenLifetime));
         tokens.put(token, new Token(token, USER, validUntil, rights));
@@ -659,7 +666,8 @@ final class LoxoneSimulator implements AutoCloseable {
             case "getuser" -> readUser(arguments);
             case "addoredituser" -> addOrEdit(arguments);
             case "deleteuser" -> delete(arguments);
-            case "updateuseraccesscode" -> accessCode(arguments);
+            case "updateuseraccesscode" -> (token.rights() & CHANGE_PASSWORD) == 0 ? Answer.of(403)
+                    : accessCode(arguments);
             default -> Answer.of(404);
         };
     }

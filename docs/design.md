@@ -629,7 +629,8 @@ worker, records no grant and leaves every booking path unchanged. `simulated` ac
 memory; it serves development, the demo profile and the browser journeys.
 
 `loxone` manages a Loxone Miniserver over HTTPS: the user-management web services and a token with
-the user-management right from `getkey2` and `getjwt`. It reaches the Miniserver by serial through the
+the user-management right (0x800) and the right to change codes (0x20) from `getkey2` and `getjwt`; the
+Miniserver refuses `updateuseraccesscode` to a token without 0x20. It reaches the Miniserver by serial through the
 `getip` answer of `connect.loxonecloud.com`, accepted only under a Loxone relay domain, or at a fixed
 `https://` URL. A failed request forgets the relay address, and the next call asks for it again. Each
 grant is one timespan user named `courtside_` plus the grant id's hex digits, with deletion at its
@@ -653,7 +654,7 @@ a check becomes `access.check.failed` without its text. A connector without chec
 one `connector` result, `SKIPPED`. The Loxone connector checks, in this order: `miniserver` resolves
 the serial afresh through `getip`, reaches `jdev/cfg/apiKey` over verified TLS in one call and reads
 the config version from its answer, which must be at least 14.2.5.16, comparing each segment as a
-number; `login` kills the cached token and logs in again with the user-management right; `groups`
+number; `login` kills the cached token and logs in again with both rights; `groups`
 reloads the normal groups and needs one mapped and present for every active access point without a
 static code; `clock` is `SKIPPED` until the device recording settles where the Miniserver's local time
 can be read; `probe-user` deletes leftover users named `courtside_probe_` plus 16 hex digits that are

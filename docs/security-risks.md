@@ -186,8 +186,8 @@ systems while bookings are live, or if a revoke-all operation for the old connec
 
 ## The Loxone technical user can change every non-admin Miniserver user
 
-The Loxone connector signs in as one Miniserver user with the user-management right, because
-creating and deleting a timespan user per booking needs it. That right reaches every non-admin user
+The Loxone connector signs in as one Miniserver user with the user-management right and the right
+to change codes, because creating a timespan user with a code per booking and deleting it needs them. That right reaches every non-admin user
 on the Miniserver, not only the `courtside_` users Courtside creates: whoever holds the token or the
 password can change codes, groups and validity of every resident or member account the Miniserver
 keeps. Using it needs the password from the deployment environment or a token taken from a running

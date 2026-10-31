@@ -207,6 +207,19 @@ class LoxoneConnectionCheckTest extends LoxoneTestSupport {
     }
 
     @Test
+    void givenATokenWithoutTheRightToChangeCodes_whenChecked_thenTheLoginFailsOnTheMissingRight() {
+        // given
+        simulator.withholdChangePassword();
+
+        // when
+        List<ConnectionCheckRun.Checked> checked = checked(connector);
+
+        // then
+        assertThat(result(checked, "login")).isEqualTo(CheckResult.failed("access.check.login.missingRight",
+                Map.of()));
+    }
+
+    @Test
     void givenALockedMiniserver_whenChecked_thenTheLoginFailsOnTheLock() {
         // given
         simulator.force("getkey2", 429);

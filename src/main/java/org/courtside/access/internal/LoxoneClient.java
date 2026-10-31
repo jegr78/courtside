@@ -34,7 +34,9 @@ final class LoxoneClient implements AutoCloseable {
     static final int USER_MANAGEMENT = 0x800;
     static final String LOCKED = "Miniserver lock after requests without rights";
 
-    private static final int APP_AND_USER_MANAGEMENT = 0x4 | USER_MANAGEMENT;
+    static final int CHANGE_CODES = 0x20;
+
+    private static final int APP_AND_USER_MANAGEMENT = 0x4 | CHANGE_CODES | USER_MANAGEMENT;
     private static final Duration RENEWAL_MARGIN = Duration.ofHours(1);
     private static final Duration LOCK = Duration.ofMinutes(5);
     private static final Duration MOST_MARGIN = Duration.ofMillis(250);
@@ -263,9 +265,9 @@ final class LoxoneClient implements AutoCloseable {
         if (value == null || !value.path("validUntil").isNumber() || !value.path("tokenRights").isNumber()) {
             throw new LoxoneFailure("getjwt answered without a lifespan or rights");
         }
-        if ((value.path("tokenRights").asLong() & USER_MANAGEMENT) == 0) {
+        if ((value.path("tokenRights").asLong() & (USER_MANAGEMENT | CHANGE_CODES)) != (USER_MANAGEMENT | CHANGE_CODES)) {
             kill(session, issued);
-            throw new Refusal(Refusal.Kind.RIGHT, "token lacks the user-management right", null);
+            throw new Refusal(Refusal.Kind.RIGHT, "token lacks the user-management or code-change right", null);
         }
         renewAt = LoxoneTime.instant(value.path("validUntil").asLong(), settings.zone().zoneId()).minus(RENEWAL_MARGIN);
         token = issued;
