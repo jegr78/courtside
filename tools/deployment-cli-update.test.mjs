@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync, realpathSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
+import { executable } from "./deployment-archive.mjs";
 
 import { fixture, releaseArchive, usePostgres17, useLegacyPostgres18, run, initialize,
   makeInstalledManifestLegacy } from "./deployment-cli-fixture.mjs";
@@ -408,6 +409,42 @@ function legacyMail(context) {
   assert.equal(initialized.status, 0, initialized.stderr);
   writeFileSync(context.dockerLog, "");
   return releaseArchive(context.root, "0.1.1");
+}
+
+for (const boundary of ["state", "phase.partial", "target.env"]) {
+  test(`given interruption while staging ${boundary}, when the original release starts, then no incomplete journal blocks recovery`, () => {
+    fixture((context) => {
+      // given
+      const next = legacyMail(context);
+      const nativeChmod = executable("chmod");
+      const fault = join(context.root, "interrupt-journal");
+      writeFileSync(fault, "once");
+      writeFileSync(join(context.root, "bin", "chmod"), `#!/bin/sh
+"${nativeChmod}" "$@" || exit $?
+case "$*" in
+  *'/${boundary}')
+    if [ -f '${fault}' ]; then
+      rm '${fault}'
+      kill -KILL "$PPID"
+      exit 137
+    fi
+    ;;
+esac
+`, { mode: 0o755 });
+      // when
+      const interrupted = run(next, context.target, ["update", "--archive", next,
+        "--mail-store-transition", "reinitialize", "--yes"], context.environment);
+      assert.ok(interrupted.signal === "SIGKILL" || interrupted.status === 137);
+      const activeJournal = existsSync(join(context.target, ".courtside-mail-transition"));
+      const recovered = run(next, context.target, ["up"], context.environment);
+      // then
+      assert.equal(activeJournal, false, "only a complete journal may become active");
+      assert.equal(recovered.status, 0, recovered.stderr);
+      assert.match(readFileSync(join(context.target, "config", "installation.conf"), "utf8"), /^release=0\.1\.0$/m);
+      assert.ok(!readdirSync(context.target).some((name) => name.startsWith(".mail-transition.partial.")));
+      assert.doesNotMatch(readFileSync(context.dockerLog, "utf8"), /volume create .*mail-(config|data)-stalwart1/);
+    });
+  });
 }
 
 test("given activation failed after store selection, when update is retried, then the journal resumes the same selected pair", () => {

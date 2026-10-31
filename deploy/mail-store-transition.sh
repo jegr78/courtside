@@ -82,12 +82,13 @@ reserve_mail_transition_stores() {
 }
 
 begin_mail_store_transition() {
-  local archive=$1 digest=$2
+  local archive=$1 digest=$2 published="$installation_directory/.courtside-mail-transition"
   mail_owner=$(random_secret)
   target_mail_config_volume="${config_project}_mail-config-stalwart1-$mail_owner"
   target_mail_data_volume="${config_project}_mail-data-stalwart1-$mail_owner"
-  mail_journal="$installation_directory/.courtside-mail-transition"
-  mkdir "$mail_journal"
+  [ ! -e "$published" ] && [ ! -L "$published" ] || refuse "mail transition journal already exists"
+  mail_journal=$(mktemp -d "$installation_directory/.mail-transition.partial.XXXXXX")
+  temporary_path=$mail_journal
   chmod 700 "$mail_journal"
   {
     printf 'source_release=%s\ntarget_release=%s\nmanifest_sha=%s\nowner=%s\nrecovery=%s\n' \
@@ -100,6 +101,9 @@ begin_mail_store_transition() {
   environment_line COURTSIDE_MAIL_RECOVERY_ADMIN \
     "admin:$(environment_value "$mail_journal/target.env" COURTSIDE_MAIL_SETUP_PASSWORD)" >> "$mail_journal/setup.env"
   chmod 600 "$mail_journal/setup.env"
+  mv "$mail_journal" "$published"
+  mail_journal=$published
+  temporary_path=""
   reserve_mail_transition_stores
   mail_candidate_compose=("${docker_command[@]}" compose --project-name "$config_project" \
     --project-directory "$archive" --env-file "$mail_journal/setup.env")

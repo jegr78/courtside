@@ -60,7 +60,9 @@ or point a 1.0 image at an old store.
 
 ### Interrupted transitions
 
-An unfinished transition blocks ordinary lifecycle commands. Rerun the same candidate's `update`
+An interrupted transition with a committed journal blocks ordinary lifecycle commands. An
+interruption before journal publication leaves the original release selected; `up` can restart it.
+Rerun the same candidate's `update`
 command with the same archive and explicit transition option. If the original release is still
 selected, the launcher restarts it and retains the interrupted target before preparing a new
 attempt. If the target release is selected, it verifies the recorded volume ownership and resumes
