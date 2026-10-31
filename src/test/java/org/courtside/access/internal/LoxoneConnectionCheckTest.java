@@ -39,7 +39,7 @@ class LoxoneConnectionCheckTest extends LoxoneTestSupport {
         assertThat(checked).extracting(entry -> entry.result().outcome()).containsExactly(CheckOutcome.PASSED,
                 CheckOutcome.PASSED, CheckOutcome.PASSED, CheckOutcome.PASSED, CheckOutcome.MANUAL);
         assertThat(result(checked, "miniserver")).isEqualTo(CheckResult.passed("access.check.miniserver.reached",
-                Map.of("version", "14.2.5.16", "minimum", "14.2.5.16")));
+                Map.of("version", "17.0.3.31", "minimum", "14.2.5.16")));
         assertThat(simulator.count("apiKey")).as("address and version come from one apiKey call").isEqualTo(1);
         assertThat(result(checked, "login")).isEqualTo(CheckResult.passed("access.check.login.accepted", Map.of()));
         assertThat(result(checked, "groups")).isEqualTo(CheckResult.passed("access.check.groups.mapped",

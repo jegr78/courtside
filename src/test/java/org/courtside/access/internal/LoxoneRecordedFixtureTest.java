@@ -11,6 +11,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Stream;
 
@@ -20,6 +21,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class LoxoneRecordedFixtureTest extends LoxoneTestSupport {
 
     private static final String DEVICE_CODE = "73519246";
+    // The fixture holds killtoken sent without its token, which the Miniserver answered 401; re-record to drop these.
+    private static final Set<String> STALE = Set.of("connection-check[2]", "cleanup[1]");
     private static final List<String> STEPS = List.of("probe", "connection-check", "getip", "api-key", "local-time",
             "user-create", "user-code", "user-duplicate", "user-read", "user-delete", "user-list", "cleanup");
 
@@ -75,6 +78,39 @@ class LoxoneRecordedFixtureTest extends LoxoneTestSupport {
         assertThat(simulator.requests()).filteredOn(LoxoneSimulator.Request::mutating)
                 .allSatisfy(request -> assertThat(request.command())
                         .isIn("addoredituser", "deleteuser", "updateuseraccesscode"));
+    }
+
+    @Test
+    void givenTheRecordedDeviceRun_whenTheSameStepsRunAgainstTheSimulator_thenEveryStepAnswersAlike() {
+        // when
+        contract().run();
+        device.close();
+        recorder.write(target);
+
+        // then
+        assertThat(RecordedFixtures.differences(RecordedFixtures.RECORDED, target, STALE))
+                .as("the simulator answers each recorded step as the Miniserver did").isEmpty();
+    }
+
+    @Test
+    void givenAPlantedDifferenceInACopyOfTheRecording_whenCompared_thenTheStepAndKeyPathAreNamedButNotTheValue()
+            throws IOException {
+        // given
+        Path copy = Files.createDirectories(target.resolve("copy"));
+        try (Stream<Path> files = Files.list(RecordedFixtures.RECORDED)) {
+            for (Path file : files.toList()) {
+                Files.copy(file, copy.resolve(file.getFileName()));
+            }
+        }
+        Path apiKey = copy.resolve("api-key.json");
+        Files.writeString(apiKey, Files.readString(apiKey).replace("'version':'17.0.3.31'", "'version':'17.0.3.30'"));
+
+        // when
+        List<String> differences = RecordedFixtures.differences(RecordedFixtures.RECORDED, copy, Set.of());
+
+        // then
+        assertThat(differences).containsExactly("api-key $[0].response.LL.value.(single-quoted).version differs");
+        assertThat(String.join(" ", differences)).doesNotContain("17.0.3");
     }
 
     @Test

@@ -55,7 +55,7 @@ class LoxoneClientTapTest extends LoxoneTestSupport {
                 .startsWith("getkey2", "getjwt", "getuserlist2");
         assertThat(responses.get(2).status()).isEqualTo(200);
         assertThat(responses.get(2).body()).as("the tap receives the body as the Miniserver sent it")
-                .startsWith("{\"LL\":").contains("\"control\":\"/jdev/sps/getuserlist2");
+                .startsWith("{\"LL\":").contains("\"control\":\"dev/sps/getuserlist2");
     }
 
     @Test

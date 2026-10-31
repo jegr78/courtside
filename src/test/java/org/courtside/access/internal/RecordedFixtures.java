@@ -6,18 +6,22 @@ import tools.jackson.core.json.JsonReadFeature;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.ArrayNode;
+import tools.jackson.databind.node.ObjectNode;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -27,6 +31,7 @@ final class RecordedFixtures {
 
     static final Path RECORDED = Path.of("src/test/resources/loxone/recorded");
     static final Pattern PLACEHOLDER = Pattern.compile("<[a-z][a-z0-9-]*-[0-9]+>");
+    private static final Pattern NUMBERED = Pattern.compile("<([a-z][a-z0-9-]*)-[0-9]+>");
     static final Set<String> VOCABULARY = Set.of("https", "http", "jdev", "dev", "sps", "sys", "cfg", "getkey2",
             "getjwt", "killtoken", "getuserlist2", "getgrouplist", "addoredituser", "deleteuser",
             "updateuseraccesscode", "getuser", "getip", "apiKey", "date", "time", "Courtside");
@@ -98,6 +103,140 @@ final class RecordedFixtures {
             return true;
         } catch (JacksonException notJson) {
             return false;
+        }
+    }
+
+    /** Where a replay answers differently from a recording, named by step and key path and never by value. */
+    static List<String> differences(Path recorded, Path replayed, Set<String> stale) {
+        List<String> found = new ArrayList<>();
+        try (Stream<Path> files = Files.list(recorded)) {
+            for (Path file : files.filter(path -> path.toString().endsWith(".json")).sorted().toList()) {
+                String step = file.getFileName().toString().replaceFirst("\\.json$", "");
+                Path other = replayed.resolve(file.getFileName());
+                if (!Files.exists(other)) {
+                    found.add(step + " was not replayed");
+                    continue;
+                }
+                JsonNode expected = STRICT.readTree(file.toFile());
+                JsonNode actual = STRICT.readTree(other.toFile());
+                if (expected.size() != actual.size()) {
+                    found.add(step + " has " + actual.size() + " exchanges instead of " + expected.size());
+                    continue;
+                }
+                JsonNode wanted = renumbered(canonical(expected, null));
+                JsonNode got = renumbered(canonical(actual, null));
+                for (int index = 0; index < expected.size(); index++) {
+                    String where = step + " $[" + index + "]";
+                    List<String> differing = new ArrayList<>();
+                    compare(where, wanted.get(index), got.get(index), differing);
+                    if (stale.contains(step + "[" + index + "]")) {
+                        if (differing.isEmpty()) {
+                            found.add(where + " is listed as stale but matches; remove it from the list");
+                        }
+                    } else {
+                        found.addAll(differing);
+                    }
+                }
+            }
+        } catch (IOException unreadable) {
+            throw new UncheckedIOException(unreadable);
+        }
+        return found;
+    }
+
+    private static JsonNode canonical(JsonNode node, @Nullable String key) {
+        if (node.isObject()) {
+            ObjectNode sorted = STRICT.createObjectNode();
+            node.propertyNames().stream().sorted().forEach(name -> {
+                if (PLACEHOLDER.matcher(name).matches()) {
+                    return;
+                }
+                JsonNode value = node.get(name);
+                if ("request".equals(name)) {
+                    sorted.set(name, STRICT.createObjectNode().set("command", value.path("command")));
+                } else if ("control".equals(name) && value.isString()) {
+                    sorted.put(name, upToCommand(value.asString()));
+                } else {
+                    sorted.set(name, canonical(value, name));
+                }
+            });
+            return sorted;
+        }
+        if (node.isArray()) {
+            ArrayNode copy = STRICT.createArrayNode();
+            node.forEach(entry -> copy.add(canonical(entry, key)));
+            return copy;
+        }
+        if (node.isString()) {
+            Optional<JsonNode> inner = embedded(node.asString());
+            if (inner.isPresent()) {
+                ObjectNode wrapped = STRICT.createObjectNode();
+                wrapped.set(strict(node.asString()) ? "(json)" : "(single-quoted)", canonical(inner.get(), key));
+                return wrapped;
+            }
+        }
+        return node;
+    }
+
+    private static String upToCommand(String control) {
+        List<String> kept = new ArrayList<>();
+        for (String segment : control.split("/", -1)) {
+            kept.add(segment);
+            if (VOCABULARY.contains(segment) && !Set.of("https", "http", "jdev", "dev", "sps", "sys", "cfg")
+                    .contains(segment)) {
+                break;
+            }
+        }
+        return String.join("/", kept);
+    }
+
+    private static JsonNode renumbered(JsonNode node) {
+        Map<String, String> seen = new HashMap<>();
+        Map<String, Integer> counters = new HashMap<>();
+        return renumbered(node, seen, counters);
+    }
+
+    private static JsonNode renumbered(JsonNode node, Map<String, String> seen, Map<String, Integer> counters) {
+        if (node.isObject()) {
+            ObjectNode copy = STRICT.createObjectNode();
+            node.properties().forEach(field -> copy.set(field.getKey(), renumbered(field.getValue(), seen, counters)));
+            return copy;
+        }
+        if (node.isArray()) {
+            ArrayNode copy = STRICT.createArrayNode();
+            node.forEach(entry -> copy.add(renumbered(entry, seen, counters)));
+            return copy;
+        }
+        if (!node.isString()) {
+            return node;
+        }
+        Matcher placeholders = NUMBERED.matcher(node.asString());
+        return STRICT.getNodeFactory().stringNode(placeholders.replaceAll(found -> {
+            String kind = found.group(1);
+            if (kind.equals("time")) {
+                return "<time>";
+            }
+            return seen.computeIfAbsent(found.group(),
+                    any -> "<" + kind + "-" + counters.merge(kind, 1, Integer::sum) + ">");
+        }));
+    }
+
+    private static void compare(String path, @Nullable JsonNode expected, @Nullable JsonNode actual,
+                                List<String> found) {
+        if (expected == null || actual == null) {
+            found.add(path + (expected == null ? " is not in the recording" : " is missing from the replay"));
+            return;
+        }
+        if (expected.isObject() && actual.isObject()) {
+            Set<String> names = new TreeSet<>(expected.propertyNames());
+            names.addAll(actual.propertyNames());
+            names.forEach(name -> compare(path + "." + name, expected.get(name), actual.get(name), found));
+        } else if (expected.isArray() && actual.isArray() && expected.size() == actual.size()) {
+            for (int index = 0; index < expected.size(); index++) {
+                compare(path + "[" + index + "]", expected.get(index), actual.get(index), found);
+            }
+        } else if (!expected.equals(actual)) {
+            found.add(path + " differs");
         }
     }
 
