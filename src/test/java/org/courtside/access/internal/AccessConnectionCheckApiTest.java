@@ -79,6 +79,17 @@ class AccessConnectionCheckApiTest extends AccessPassTestSupport {
     }
 
     @Test
+    void givenABoard_whenItAsksForAConnectionCheck_thenTheRequestIsAuditedForTheWholeInstance() throws Exception {
+        // when
+        mockMvc.perform(post("/api/admin/access-control/check").with(csrf())).andExpect(status().isAccepted());
+
+        // then
+        assertThat(jdbc.sql("SELECT count(*) FROM domain_event WHERE event_type = 'access.control.checkRequested'"
+                + " AND subject_id IS NULL").query(Integer.class).single())
+                .as("the request creates and deletes a Miniserver user, so it is audited like a retry").isOne();
+    }
+
+    @Test
     void givenACheckThrowingWithCredentialsTokenAndCode_whenTheBoardReadsIt_thenNoneOfThemShows() throws Exception {
         // given
         connector.checks(new ConnectionCheck("login", List.of(), () -> {

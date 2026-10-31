@@ -12278,8 +12278,9 @@ paths:
         Entries come from two places. The administrative surfaces record what a board configures:
         `facility.court.added`, `card.bookingCard.changed`, `config.club.changed`,
         `rules.ruleSet.changed`, `roster.person.corrected`, `dataexchange.source.described` and
-        `notification.template.changed`, each with siblings, and `access.grant.retryRequested`, whose
-        subject is the booking the retried grant belongs to. The rest is recorded outside those surfaces:
+        `notification.template.changed`, each with siblings, `access.grant.retryRequested`, whose
+        subject is the booking the retried grant belongs to, and `access.control.checkRequested` without a
+        subject. The rest is recorded outside those surfaces:
         `booking.booking.confirmed` and the four other booking entries, `access.grant.installed` and
         `access.grant.failing`, and
         `identity.account.credentialsRequested`, which names the account a credential was issued

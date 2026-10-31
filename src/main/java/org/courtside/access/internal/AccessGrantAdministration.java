@@ -90,11 +90,13 @@ public class AccessGrantAdministration {
     }
 
     /** Asks the next pass for a connection check, which also probes and so reloads the groups. */
+    @Transactional
     public void requestConnectionCheck() {
         AccessWorker running = worker.getIfAvailable();
         if (running == null) {
             throw new AccessControlNotConnectedException();
         }
+        events.publishEvent(new AccessControlEvent.CheckRequested());
         checks.request();
         readings.request();
         running.signal();
