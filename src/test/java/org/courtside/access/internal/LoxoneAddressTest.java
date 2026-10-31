@@ -13,6 +13,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowable;
 
 class LoxoneAddressTest extends LoxoneTestSupport {
 
@@ -39,7 +40,7 @@ class LoxoneAddressTest extends LoxoneTestSupport {
     }
 
     @Test
-    void givenARelayMove_whenTheOldHostRefusesConnections_thenTheAddressIsResolvedAgainAndTheCallSucceeds()
+    void givenARelayMove_whenTheOldHostRefusesConnections_thenTheNextCallResolvesTheAddressAgain()
             throws IOException {
         // given
         bySerial.probe();
@@ -47,10 +48,32 @@ class LoxoneAddressTest extends LoxoneTestSupport {
         simulator.moveRelay();
 
         // when
-        GrantOutcome outcome = bySerial.grant(instruction(UUID.randomUUID()));
+        Throwable failed = catchThrowable(() -> bySerial.grant(instruction(UUID.randomUUID())));
+        GrantOutcome next = bySerial.grant(instruction(UUID.randomUUID()));
 
         // then
-        assertThat(outcome).isInstanceOf(GrantOutcome.Accepted.class);
+        assertThat(failed).as("a failed call is not repeated inside itself").isInstanceOf(LoxoneFailure.class)
+                .hasMessage("could not connect for getuserlist2");
+        assertThat(next).isInstanceOf(GrantOutcome.Accepted.class);
+        assertThat(simulator.count("getip")).isEqualTo(2);
+    }
+
+    @Test
+    void givenARelayAnsweringAnErrorPage_whenACallFails_thenTheNextCallGoesToTheNewAddress() throws IOException {
+        // given
+        bySerial.probe();
+        simulator.moveRelayLeavingAnErrorPage();
+
+        // when
+        Throwable failed = catchThrowable(() -> bySerial.grant(instruction(UUID.randomUUID())));
+        long atTheBrokenRelay = simulator.countAtTheBrokenRelay();
+        GrantOutcome next = bySerial.grant(instruction(UUID.randomUUID()));
+
+        // then
+        assertThat(failed).isInstanceOf(LoxoneFailure.class).hasMessage("getuserlist2 answered 502");
+        assertThat(next).as("the next call resolves the relay again").isInstanceOf(GrantOutcome.Accepted.class);
+        assertThat(simulator.countAtTheBrokenRelay()).as("nothing more reaches the old relay")
+                .isEqualTo(atTheBrokenRelay);
         assertThat(simulator.count("getip")).isEqualTo(2);
     }
 
@@ -86,6 +109,7 @@ class LoxoneAddressTest extends LoxoneTestSupport {
         ready(bySerial);
         simulator.moveRelay();
         simulator.force("getip", 504);
+        catchThrowable(() -> bySerial.grant(instruction(UUID.randomUUID())));
 
         // when / then
         assertThatThrownBy(() -> bySerial.grant(instruction(UUID.randomUUID())))

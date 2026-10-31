@@ -20,6 +20,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
 import java.util.OptionalInt;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -37,8 +38,10 @@ final class LoxoneClient implements AutoCloseable {
     private static final int MOST_REPLY_BYTES = 4 * 1024 * 1024;
     private static final String SPS = "/jdev/sps/";
     private static final String SYS = "/jdev/sys/";
+    private static final Set<Integer> HEADER_ANSWERS = Set.of(401, 403, 423, 429);
 
-    record Reply(int code, @Nullable JsonNode value) {
+    /** {@code enveloped} is false for an answer that carried no Miniserver reply, only an HTTP status. */
+    record Reply(int code, @Nullable JsonNode value, boolean enveloped) {
     }
 
     /** The Miniserver refused the whole connector; a non-null {@code notBefore} is its lock. */
@@ -214,14 +217,23 @@ final class LoxoneClient implements AutoCloseable {
         if (locked != null && clock.instant().isBefore(locked)) {
             throw new Refusal(LOCKED, locked);
         }
+        URI origin = base(session);
+        Reply reply;
         try {
-            return reply(transmit(session, command, target(base(session), prefix, command, arguments, authentication)));
-        } catch (Disconnected moved) {
-            if (!(settings.address() instanceof LoxoneAddress.Serial)) {
-                throw moved;
-            }
+            reply = reply(transmit(session, command, target(origin, prefix, command, arguments, authentication)));
+        } catch (LoxoneFailure failed) {
+            forgetRelay();
+            throw failed;
+        }
+        if (!reply.enveloped() && !HEADER_ANSWERS.contains(reply.code())) {
+            forgetRelay();
+        }
+        return reply;
+    }
+
+    private void forgetRelay() {
+        if (settings.address() instanceof LoxoneAddress.Serial) {
             base = null;
-            return reply(transmit(session, command, target(base(session), prefix, command, arguments, authentication)));
         }
     }
 
@@ -335,10 +347,10 @@ final class LoxoneClient implements AutoCloseable {
         try {
             envelope = json.readTree(response.body()).path("LL");
         } catch (JacksonException unparseable) {
-            return new Reply(response.statusCode(), null);
+            return new Reply(response.statusCode(), null, false);
         }
         if (!envelope.isObject()) {
-            return new Reply(response.statusCode(), null);
+            return new Reply(response.statusCode(), null, false);
         }
         JsonNode value = envelope.get("value");
         if (value != null && value.isString()) {
@@ -351,7 +363,7 @@ final class LoxoneClient implements AutoCloseable {
                 }
             }
         }
-        return new Reply(code(envelope).orElse(response.statusCode()), value);
+        return new Reply(code(envelope).orElse(response.statusCode()), value, true);
     }
 
     private static OptionalInt code(JsonNode envelope) {

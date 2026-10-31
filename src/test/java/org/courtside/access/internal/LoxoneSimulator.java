@@ -134,6 +134,9 @@ final class LoxoneSimulator implements AutoCloseable {
     private boolean failCodeClearing;
     private boolean nameTakenOnCreate;
     private boolean ignoreDeletes;
+    private boolean answerAsMember;
+    private int brokenPort = -1;
+    private final Map<String, Integer> bare = new HashMap<>();
     private @Nullable URI resolvedTo;
     private @Nullable String hanging;
     private int refusals;
@@ -257,6 +260,24 @@ final class LoxoneSimulator implements AutoCloseable {
 
     synchronized void ignoreDeletes() {
         ignoreDeletes = true;
+    }
+
+    synchronized void moveRelayLeavingAnErrorPage() throws IOException {
+        HttpsServer next = served(credentials().server(), this::miniserver);
+        brokenPort = current().getAddress().getPort();
+        moved = next;
+    }
+
+    synchronized void answerBare(String command, int status) {
+        bare.put(command, status);
+    }
+
+    synchronized void answerEditsWithTheMember() {
+        answerAsMember = true;
+    }
+
+    long countAtTheBrokenRelay() {
+        return requests.stream().filter(request -> request.server().equals("broken relay")).count();
     }
 
     synchronized void moveRelay() throws IOException {
@@ -419,6 +440,13 @@ final class LoxoneSimulator implements AutoCloseable {
 
     private void miniserver(HttpExchange exchange) throws IOException {
         URI uri = exchange.getRequestURI();
+        synchronized (this) {
+            if (exchange.getLocalAddress().getPort() == brokenPort) {
+                requests.add(new Request("broken relay", uri.getPath(), List.of(), false));
+                respond(exchange, 502, "<html><body>502 Bad Gateway</body></html>");
+                return;
+            }
+        }
         String raw = uri.getRawPath();
         String control = uri.toString();
         Map<String, String> query = query(uri.getRawQuery());
@@ -434,6 +462,14 @@ final class LoxoneSimulator implements AutoCloseable {
         boolean authenticated = query.containsKey("autht");
         requests.add(new Request("miniserver", command, arguments, authenticated));
         awaitIfHanging(command);
+        Integer bareStatus;
+        synchronized (this) {
+            bareStatus = bare.get(command);
+        }
+        if (bareStatus != null) {
+            respond(exchange, bareStatus, "<html><body>" + bareStatus + "</body></html>");
+            return;
+        }
         Answer answer;
         synchronized (this) {
             answer = prefix.equals("/jdev/sys/") ? system(command, arguments) : sps(command, arguments, query);
@@ -658,6 +694,11 @@ final class LoxoneSimulator implements AutoCloseable {
         user.changePassword = json.path("changePassword").asBoolean(user.changePassword);
         if (assigned != null) {
             user.groups = assigned;
+        }
+        if (answerAsMember) {
+            User member = users.values().stream().filter(other -> other.name.equals("jane.doe")).findFirst()
+                    .orElseThrow();
+            return new Answer(200, serialized(member), false);
         }
         return new Answer(200, serialized(user), false);
     }
