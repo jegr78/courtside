@@ -137,6 +137,8 @@ final class LoxoneSimulator implements AutoCloseable {
     private boolean answerAsMember;
     private int brokenPort = -1;
     private final Map<String, Integer> bare = new HashMap<>();
+    private final Map<String, String> rawAnswers = new HashMap<>();
+    private @Nullable String cloudBody;
     private @Nullable URI resolvedTo;
     private @Nullable String hanging;
     private int refusals;
@@ -266,6 +268,14 @@ final class LoxoneSimulator implements AutoCloseable {
         HttpsServer next = served(credentials().server(), this::miniserver);
         brokenPort = current().getAddress().getPort();
         moved = next;
+    }
+
+    synchronized void answerRaw(String command, String body) {
+        rawAnswers.put(command, body);
+    }
+
+    synchronized void resolveWithBody(String body) {
+        cloudBody = body;
     }
 
     synchronized void answerBare(String command, int status) {
@@ -425,11 +435,15 @@ final class LoxoneSimulator implements AutoCloseable {
                 false));
         Integer code;
         URI target;
+        String body;
         synchronized (this) {
             code = forced.get("getip");
             target = resolvedTo == null ? url() : resolvedTo;
+            body = cloudBody;
         }
-        if (code != null) {
+        if (body != null) {
+            respond(exchange, 200, body);
+        } else if (code != null) {
             respond(exchange, code, "{\"error\":\"simulated\",\"code\":" + code + "}");
         } else if (!uri.getPath().equals("/getip") || !("snr=" + SERIAL).equals(uri.getQuery())) {
             respond(exchange, 404, "{\"error\":\"No relay found\"}");
@@ -463,8 +477,14 @@ final class LoxoneSimulator implements AutoCloseable {
         requests.add(new Request("miniserver", command, arguments, authenticated));
         awaitIfHanging(command);
         Integer bareStatus;
+        String rawBody;
         synchronized (this) {
             bareStatus = bare.get(command);
+            rawBody = rawAnswers.get(command);
+        }
+        if (rawBody != null) {
+            respond(exchange, 200, rawBody);
+            return;
         }
         if (bareStatus != null) {
             respond(exchange, bareStatus, "<html><body>" + bareStatus + "</body></html>");

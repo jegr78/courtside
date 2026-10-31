@@ -4,6 +4,8 @@ import org.courtside.access.GrantOutcome;
 import org.courtside.access.ProbeOutcome;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.IOException;
 import java.net.URI;
@@ -101,6 +103,28 @@ class LoxoneAddressTest extends LoxoneTestSupport {
         // then
         assertThat(probed).isEqualTo(new ProbeOutcome.Unreachable(
                 "Loxone Cloud found no address for the Miniserver (getip 504)"));
+    }
+
+    @Test
+    void givenACloudFailure_whenProbed_thenTheStatusIsNamedAndNoMiniserverIsAsked() {
+        // given
+        simulator.force("getip", 500);
+
+        // when / then
+        assertThatThrownBy(bySerial::probe).isInstanceOf(LoxoneFailure.class).hasMessage("getip answered 500");
+        assertThat(simulator.commands()).containsExactly("getip");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"<html>maintenance</html>", "{\"url\":\"\"}", "{\"url\":\"https://bad host:1\"}"})
+    void givenAnUnreadableCloudAnswer_whenProbed_thenNoMiniserverIsAsked(String body) {
+        // given
+        simulator.resolveWithBody(body);
+
+        // when / then
+        assertThatThrownBy(bySerial::probe).isInstanceOf(LoxoneFailure.class)
+                .hasMessage("getip answered no readable address");
+        assertThat(simulator.commands()).containsExactly("getip");
     }
 
     @Test

@@ -10,6 +10,7 @@ import java.time.Duration;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class LoxoneLoginTest extends LoxoneTestSupport {
 
@@ -33,6 +34,85 @@ class LoxoneLoginTest extends LoxoneTestSupport {
 
         // then
         assertThat(hash).isEqualTo("54234c3dd05cc1850399ce341752b0038aa3be39");
+    }
+
+    @Test
+    void givenAnUnknownAlgorithmOrAMalformedKey_whenTheLoginIsHashed_thenNoHashIsMade() {
+        // when / then
+        assertThatThrownBy(() -> LoxoneLogin.hash(LoxoneSimulator.USER, LoxoneSimulator.PASSWORD, KEY, SALT, "MD5"))
+                .isInstanceOf(LoxoneFailure.class)
+                .hasMessage("getkey2 named a hash algorithm the connector does not know");
+        assertThatThrownBy(() -> LoxoneLogin.hash(LoxoneSimulator.USER, LoxoneSimulator.PASSWORD, "zz", SALT, "SHA256"))
+                .isInstanceOf(LoxoneFailure.class)
+                .hasMessage("getkey2 answered a key that is not hex");
+    }
+
+    @Test
+    void givenAKeyAnswerWithoutACodeOrASalt_whenProbed_thenTheMissingFieldIsNamed() {
+        // given
+        simulator.forgetRequests();
+        simulator.answerRaw("getkey2", "{\"LL\":{\"control\":\"getkey2\",\"value\":{\"key\":\"00\"}}}");
+
+        // when / then
+        assertThatThrownBy(connectorFor(simulator.settingsByUrl(DEADLINE))::probe).isInstanceOf(LoxoneFailure.class)
+                .hasMessage("getkey2 answered without salt");
+        assertThat(simulator.count("getjwt")).isZero();
+    }
+
+    @Test
+    void givenAKeyAnswerWhoseValueIsBrokenJson_whenProbed_thenTheMissingKeyIsNamed() {
+        // given
+        simulator.forgetRequests();
+        simulator.answerRaw("getkey2", "{\"LL\":{\"control\":\"getkey2\",\"value\":\"{key\",\"code\":200}}");
+
+        // when / then
+        assertThatThrownBy(connectorFor(simulator.settingsByUrl(DEADLINE))::probe).isInstanceOf(LoxoneFailure.class)
+                .hasMessage("getkey2 answered without key");
+    }
+
+    @Test
+    void givenAnUndocumentedLoginCode_whenProbed_thenTheCodeIsNamed() {
+        // given
+        simulator.forgetRequests();
+        simulator.answerRaw("getkey2", "{\"LL\":{\"control\":\"getkey2\",\"value\":\"\",\"Code\":\"500\"}}");
+
+        // when / then
+        assertThatThrownBy(connectorFor(simulator.settingsByUrl(DEADLINE))::probe).isInstanceOf(LoxoneFailure.class)
+                .hasMessage("getkey2 answered 500");
+    }
+
+    @Test
+    void givenATokenAnswerWithoutALifespan_whenProbed_thenNoTokenIsKept() {
+        // given
+        simulator.forgetRequests();
+        simulator.answerRaw("getjwt", "{\"LL\":{\"control\":\"getjwt\",\"value\":{\"token\":\"eyJx\"},"
+                + "\"Code\":\"200\"}}");
+
+        // when / then
+        assertThatThrownBy(connectorFor(simulator.settingsByUrl(DEADLINE))::probe).isInstanceOf(LoxoneFailure.class)
+                .hasMessage("getjwt answered without a lifespan or rights");
+        assertThat(simulator.count("getuserlist2")).isZero();
+    }
+
+    @Test
+    void whenTheSettingsArePrinted_thenThePasswordIsLeftOut() {
+        // when
+        String printed = simulator.settingsByUrl(DEADLINE).toString();
+
+        // then
+        assertThat(printed).contains(LoxoneSimulator.USER).doesNotContain(LoxoneSimulator.PASSWORD);
+    }
+
+    @Test
+    void givenAClosedConnector_whenProbed_thenNoRequestLeaves() {
+        // given
+        LoxoneAccessControl closed = connectorFor(simulator.settingsByUrl(DEADLINE));
+        closed.close();
+        simulator.forgetRequests();
+
+        // when / then
+        assertThatThrownBy(closed::probe).isInstanceOf(LoxoneFailure.class).hasMessage("the connector is closed");
+        assertThat(simulator.requests()).isEmpty();
     }
 
     @Test
