@@ -33,6 +33,7 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -44,6 +45,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.stream.Stream;
 
 /** A Miniserver and the Loxone Cloud resolver over HTTPS, stateful enough to hold users, groups and tokens. */
 final class LoxoneSimulator implements AutoCloseable {
@@ -143,6 +145,8 @@ final class LoxoneSimulator implements AutoCloseable {
     private @Nullable String hanging;
     private int refusals;
     private @Nullable Instant lockedUntil;
+    private String version = "14.2.5.16";
+    private final Set<String> omittedOnReadBack = new HashSet<>();
 
     LoxoneSimulator(Clock clock, ZoneId zone) throws IOException {
         this.clock = clock;
@@ -341,6 +345,14 @@ final class LoxoneSimulator implements AutoCloseable {
         nameTakenOnCreate = true;
     }
 
+    synchronized void version(String configVersion) {
+        version = configVersion;
+    }
+
+    synchronized void omitOnReadBack(String field) {
+        omittedOnReadBack.add(field);
+    }
+
     synchronized void hang(String command) {
         hanging = command;
     }
@@ -464,7 +476,8 @@ final class LoxoneSimulator implements AutoCloseable {
         String raw = uri.getRawPath();
         String control = uri.toString();
         Map<String, String> query = query(uri.getRawQuery());
-        String prefix = raw.startsWith("/jdev/sps/") ? "/jdev/sps/" : raw.startsWith("/jdev/sys/") ? "/jdev/sys/" : "";
+        String prefix = Stream.of("/jdev/sps/", "/jdev/sys/", "/jdev/cfg/").filter(raw::startsWith).findFirst()
+                .orElse("");
         if (prefix.isEmpty()) {
             respond(exchange, 404, "not found");
             return;
@@ -492,7 +505,11 @@ final class LoxoneSimulator implements AutoCloseable {
         }
         Answer answer;
         synchronized (this) {
-            answer = prefix.equals("/jdev/sys/") ? system(command, arguments) : sps(command, arguments, query);
+            answer = switch (prefix) {
+                case "/jdev/sys/" -> system(command, arguments);
+                case "/jdev/cfg/" -> configuration(command);
+                default -> sps(command, arguments, query);
+            };
         }
         if (answer.headerOnly()) {
             respond(exchange, answer.code(), "<html>" + answer.code() + " " + control + "</html>");
@@ -500,7 +517,7 @@ final class LoxoneSimulator implements AutoCloseable {
         }
         ObjectNode envelope = JSON.createObjectNode();
         ObjectNode ll = envelope.putObject("LL");
-        ll.put("control", control);
+        ll.put("control", prefix.equals("/jdev/cfg/") ? control.substring(2) : control);
         if (answer.value() != null) {
             ll.set("value", answer.value());
         } else {
@@ -559,6 +576,16 @@ final class LoxoneSimulator implements AutoCloseable {
             }
             default -> Answer.of(404);
         };
+    }
+
+    private Answer configuration(String command) {
+        if (!command.equals("apiKey")) {
+            return Answer.of(404);
+        }
+        String value = "{'snr': '" + HexFormat.ofDelimiter(":").withUpperCase().formatHex(HexFormat.of()
+                .parseHex(SERIAL)) + "', 'version':'" + version + "', 'key':'" + HexFormat.of().formatHex(
+                randomBytes(20)) + "', 'isInTrust':0, 'local':false, 'httpsStatus':1}";
+        return new Answer(200, JSON.getNodeFactory().stringNode(value), false);
     }
 
     private Answer jwt(List<String> arguments) {
@@ -623,6 +650,7 @@ final class LoxoneSimulator implements AutoCloseable {
         return switch (command) {
             case "getuserlist2" -> userList();
             case "getgrouplist" -> groupList();
+            case "getuser" -> readUser(arguments);
             case "addoredituser" -> addOrEdit(arguments);
             case "deleteuser" -> delete(arguments);
             case "updateuseraccesscode" -> accessCode(arguments);
@@ -721,6 +749,16 @@ final class LoxoneSimulator implements AutoCloseable {
             return new Answer(200, serialized(member), false);
         }
         return new Answer(200, serialized(user), false);
+    }
+
+    private Answer readUser(List<String> arguments) {
+        User user = arguments.size() == 1 ? users.get(arguments.getFirst()) : null;
+        if (user == null) {
+            return Answer.of(500);
+        }
+        ObjectNode read = serialized(user);
+        omittedOnReadBack.forEach(read::remove);
+        return new Answer(200, read, false);
     }
 
     private ObjectNode serialized(User user) {

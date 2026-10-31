@@ -6,6 +6,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLHandshakeException;
 import java.net.ConnectException;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -40,6 +41,7 @@ final class LoxoneClient implements AutoCloseable {
     private static final int MOST_REPLY_BYTES = 4 * 1024 * 1024;
     private static final String SPS = "/jdev/sps/";
     private static final String SYS = "/jdev/sys/";
+    private static final String CFG = "/jdev/cfg/";
     private static final Set<Integer> HEADER_ANSWERS = Set.of(401, 403, 423, 429);
 
     /** {@code enveloped} is false for an answer that carried no Miniserver reply, only an HTTP status. */
@@ -49,11 +51,19 @@ final class LoxoneClient implements AutoCloseable {
     /** The Miniserver refused the whole connector; a non-null {@code notBefore} is its lock. */
     static final class Refusal extends RuntimeException {
 
+        enum Kind { CREDENTIALS, TOKEN, RIGHT, DENIED, DISABLED, LOCKED }
+
+        private final Kind kind;
         private final @Nullable Instant notBefore;
 
-        Refusal(String reason, @Nullable Instant notBefore) {
+        Refusal(Kind kind, String reason, @Nullable Instant notBefore) {
             super(ConnectorText.sanitized(reason, null), null, false, false);
+            this.kind = kind;
             this.notBefore = notBefore;
+        }
+
+        Kind kind() {
+            return kind;
         }
 
         String reason() {
@@ -65,10 +75,47 @@ final class LoxoneClient implements AutoCloseable {
         }
     }
 
-    static final class Unreachable extends LoxoneFailure {
+    static class Unreachable extends LoxoneFailure {
 
         Unreachable(String message) {
             super(message);
+        }
+    }
+
+    /** Loxone Cloud knows no address for the serial. */
+    static final class Unresolved extends Unreachable {
+
+        private final int status;
+
+        Unresolved(int status) {
+            super("Loxone Cloud found no address for the Miniserver (getip " + status + ")");
+            this.status = status;
+        }
+
+        int status() {
+            return status;
+        }
+    }
+
+    static final class OutsideRelays extends LoxoneFailure {
+
+        OutsideRelays() {
+            super("getip answered an address outside Loxone's relays");
+        }
+    }
+
+    /** TLS refused the peer, most often because its certificate does not verify. */
+    static final class Untrusted extends LoxoneFailure {
+
+        Untrusted(String command) {
+            super("TLS refused the certificate for " + command);
+        }
+    }
+
+    static final class Late extends LoxoneFailure {
+
+        Late(String command) {
+            super("no answer to " + command + " within the call deadline");
         }
     }
 
@@ -136,6 +183,21 @@ final class LoxoneClient implements AutoCloseable {
             token(this);
         }
 
+        /** Drops and kills the cached token, then logs in afresh. */
+        void login() {
+            String spent = token;
+            token = null;
+            if (spent != null) {
+                kill(this, spent);
+            }
+            token(this);
+        }
+
+        /** A configuration request, sent without a token. */
+        Reply configuration(String command) {
+            return refused(command, send(this, CFG, command, List.of(), null));
+        }
+
         Reply sps(String command, String... arguments) {
             String current = token(this);
             Reply reply = send(this, SPS, command, List.of(arguments), current);
@@ -143,7 +205,8 @@ final class LoxoneClient implements AutoCloseable {
                 drop(current);
                 reply = send(this, SPS, command, List.of(arguments), token(this));
                 if (reply.code() == 401) {
-                    throw new Refusal("Miniserver refused the token for " + command + " (401)", null);
+                    throw new Refusal(Refusal.Kind.TOKEN, "Miniserver refused the token for " + command + " (401)",
+                            null);
                 }
             }
             return refused(command, reply);
@@ -164,7 +227,7 @@ final class LoxoneClient implements AutoCloseable {
             }
             long left = deadline - System.nanoTime();
             if (left <= 0) {
-                throw new LoxoneFailure("no answer to " + command + " within the call deadline");
+                throw new Late(command);
             }
             return Duration.ofNanos(left);
         }
@@ -189,7 +252,7 @@ final class LoxoneClient implements AutoCloseable {
         }
         if ((value.path("tokenRights").asLong() & USER_MANAGEMENT) == 0) {
             kill(session, issued);
-            throw new Refusal("token lacks the user-management right", null);
+            throw new Refusal(Refusal.Kind.RIGHT, "token lacks the user-management right", null);
         }
         renewAt = LoxoneTime.instant(value.path("validUntil").asLong(), settings.zone().zoneId()).minus(RENEWAL_MARGIN);
         token = issued;
@@ -199,8 +262,8 @@ final class LoxoneClient implements AutoCloseable {
     private Reply login(String command, Reply reply) {
         return switch (reply.code()) {
             case 200 -> reply;
-            case 401 -> throw new Refusal("Miniserver refused the login of the technical user (" + command + " 401)",
-                    null);
+            case 401 -> throw new Refusal(Refusal.Kind.CREDENTIALS,
+                    "Miniserver refused the login of the technical user (" + command + " 401)", null);
             case 400 -> throw new LoxoneFailure(command + " answered 400: the Miniserver may require command "
                     + "encryption");
             default -> {
@@ -212,12 +275,13 @@ final class LoxoneClient implements AutoCloseable {
 
     private Reply refused(String command, Reply reply) {
         return switch (reply.code()) {
-            case 403 -> throw new Refusal("Miniserver denied " + command + " (403)", null);
-            case 423 -> throw new Refusal("Miniserver disabled the technical user (" + command + " 423)", null);
+            case 403 -> throw new Refusal(Refusal.Kind.DENIED, "Miniserver denied " + command + " (403)", null);
+            case 423 -> throw new Refusal(Refusal.Kind.DISABLED,
+                    "Miniserver disabled the technical user (" + command + " 423)", null);
             case 429 -> {
                 Instant until = clock.instant().plus(LOCK);
                 lockedUntil = until;
-                throw new Refusal(LOCKED, until);
+                throw new Refusal(Refusal.Kind.LOCKED, LOCKED, until);
             }
             default -> reply;
         };
@@ -241,7 +305,7 @@ final class LoxoneClient implements AutoCloseable {
                        @Nullable String authentication) {
         Instant locked = lockedUntil;
         if (locked != null && clock.instant().isBefore(locked)) {
-            throw new Refusal(LOCKED, locked);
+            throw new Refusal(Refusal.Kind.LOCKED, LOCKED, locked);
         }
         URI origin = base(session);
         Tap observer = tap;
@@ -289,7 +353,7 @@ final class LoxoneClient implements AutoCloseable {
         HttpResponse<byte[]> response = transmit(session, "getip", lookup);
         int status = response.statusCode();
         if (status == 400 || status == 404 || status == 504) {
-            throw new Unreachable("Loxone Cloud found no address for the Miniserver (getip " + status + ")");
+            throw new Unresolved(status);
         }
         if (status != 200) {
             throw new LoxoneFailure("getip answered " + status);
@@ -311,7 +375,7 @@ final class LoxoneClient implements AutoCloseable {
             throw new LoxoneFailure("getip answered no readable address");
         }
         if (!serial.admits(resolved)) {
-            throw new LoxoneFailure("getip answered an address outside Loxone's relays");
+            throw new OutsideRelays();
         }
         return origin(resolved, "getip");
     }
@@ -353,7 +417,7 @@ final class LoxoneClient implements AutoCloseable {
             return response;
         } catch (TimeoutException late) {
             exchange.cancel(true);
-            throw new LoxoneFailure("no answer to " + command + " within the call deadline");
+            throw new Late(command);
         } catch (InterruptedException interrupted) {
             exchange.cancel(true);
             Thread.currentThread().interrupt();
@@ -361,10 +425,13 @@ final class LoxoneClient implements AutoCloseable {
         } catch (ExecutionException failed) {
             Throwable cause = failed.getCause();
             if (cause instanceof HttpTimeoutException) {
-                throw new LoxoneFailure("no answer to " + command + " within the call deadline");
+                throw new Late(command);
             }
             if (refusedConnection(cause)) {
                 throw new Disconnected(command);
+            }
+            if (causedBy(cause, SSLHandshakeException.class)) {
+                throw new Untrusted(command);
             }
             String kind = cause == null ? "unknown" : cause.getClass().getSimpleName();
             throw new LoxoneFailure(command + " failed: " + kind);
@@ -372,8 +439,12 @@ final class LoxoneClient implements AutoCloseable {
     }
 
     private static boolean refusedConnection(@Nullable Throwable cause) {
+        return causedBy(cause, ConnectException.class);
+    }
+
+    private static boolean causedBy(@Nullable Throwable cause, Class<? extends Throwable> kind) {
         for (Throwable step = cause; step != null; step = step.getCause()) {
-            if (step instanceof ConnectException) {
+            if (kind.isInstance(step)) {
                 return true;
             }
         }
@@ -439,6 +510,10 @@ final class LoxoneClient implements AutoCloseable {
             }
         }
         return encoded.toString();
+    }
+
+    void forgetAddress() {
+        forgetRelay();
     }
 
     void tap(@Nullable Tap observer) {
