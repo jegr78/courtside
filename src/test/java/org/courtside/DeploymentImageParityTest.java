@@ -54,6 +54,24 @@ class DeploymentImageParityTest {
     }
 
     @Test
+    void givenTheLegacyMailSource_whenClassifyingPins_thenOnlyTheReviewedTransitionPreconditionIsExcluded() {
+        // given
+        Path transition = DEPLOY.resolve("mail-store-transition.sh");
+        Pin legacy = new Pin("stalwartlabs/stalwart", "v0.16.27",
+                "c429b311c93db5606598abc1c68225a85a6953183848ae01bee9c6a98885836c");
+
+        // when / then
+        assertThat(isLegacyMailSource(transition, legacy)).isTrue();
+        assertThat(isLegacyMailSource(DEPLOY.resolve("compose.stalwart.yaml"), legacy)).isFalse();
+        assertThat(isLegacyMailSource(transition, new Pin(legacy.repository(), "v0.16.28", legacy.digest())))
+                .isFalse();
+        assertThat(isLegacyMailSource(transition, new Pin(legacy.repository(), legacy.tag(), "a".repeat(64))))
+                .isFalse();
+        assertThat(isLegacyMailSource(transition, new Pin("example/stalwart", legacy.tag(), legacy.digest())))
+                .isFalse();
+    }
+
+    @Test
     void whenTheDeploymentNamesAnImage_thenEveryFileUnderItAgreesOnOneVersionAndDigest() throws Exception {
         // when
         Map<String, Set<String>> digestsByReference = new TreeMap<>();
@@ -85,7 +103,7 @@ class DeploymentImageParityTest {
     @Test
     void whenAFileOutsideTheDeploymentPinsADeployedImage_thenItIsTheDeployedPin() throws Exception {
         // given
-        List<Pin> deployed = deploymentPins();
+        List<Pin> deployed = deploymentPins(true);
         Set<String> repositories = new TreeSet<>();
         Set<String> pins = new TreeSet<>();
         deployed.forEach(pin -> {
@@ -112,8 +130,6 @@ class DeploymentImageParityTest {
                 .isEmpty();
     }
 
-    // A second literal cannot be updated by whatever bumps the first, so everything that needs one of
-    // these images reads it out of the deployment, and this is what keeps that the only copy.
     @ParameterizedTest
     @ValueSource(strings = {"postgres", "caddy", "axllent/mailpit"})
     void whenAnythingElseNamesAnImage_thenItReadsTheDeploymentRatherThanRepeatingIt(String image) throws Exception {
@@ -167,10 +183,14 @@ class DeploymentImageParityTest {
     }
 
     private static List<Pin> deploymentPins() throws IOException {
+        return deploymentPins(false);
+    }
+
+    private static List<Pin> deploymentPins(boolean includeLegacySource) throws IOException {
         List<Pin> pins = new ArrayList<>();
         for (Path file : sources()) {
             if (file.startsWith(DEPLOY)) {
-                pins.addAll(pinsIn(file));
+                pins.addAll(pinsIn(file).stream().filter(pin -> includeLegacySource || !isLegacyMailSource(file, pin)).toList());
             }
         }
         return pins;
@@ -200,6 +220,13 @@ class DeploymentImageParityTest {
             }
         }
         return unread;
+    }
+
+    private static boolean isLegacyMailSource(Path file, Pin pin) {
+        return file.equals(DEPLOY.resolve("mail-store-transition.sh"))
+                && pin.repository().equals("stalwartlabs/stalwart")
+                && "v0.16.27".equals(pin.tag())
+                && pin.digest().equals("c429b311c93db5606598abc1c68225a85a6953183848ae01bee9c6a98885836c");
     }
 
     private static boolean isRecoveryApplicationImage(Path file, String image) {

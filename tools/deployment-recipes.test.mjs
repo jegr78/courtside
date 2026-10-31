@@ -74,7 +74,7 @@ const recipes = {
     files: ["compose.yaml", "compose.caddy.yaml", "compose.caddy-public.yaml", "compose.stalwart.yaml"],
     environment: { ...common, ...bundledDatabase, ...caddy, ...stalwart },
     services: { app: "", db: "", "log-collector": "", proxy: "", mail: "mail", "mail-certificate": "mail", "mail-reload": "mail",
-      "mail-plan": "mail-setup", "mail-bootstrap": "mail-setup", "mail-configure": "mail-setup", "mail-check": "mail-check" },
+      "mail-plan": "mail-setup", "mail-bootstrap": "mail-setup", "mail-configure": "mail-setup", "mail-ready": "mail-setup", "mail-check": "mail-check" },
     required: "COURTSIDE_MAIL_HOSTNAME",
   },
   "existing-infrastructure": {
@@ -132,6 +132,21 @@ function rendered(files, environment) {
   assert.equal(result.status, 0, `Compose refused ${files.join(" + ")}: ${result.error}`);
   return result.model;
 }
+
+test("given a selected mail store pair, when Compose renders, then the mail service uses those persistent stores", () => {
+  // given
+  const recipe = recipes["full-self-hosted"];
+  const environment = { ...recipe.environment,
+    COURTSIDE_MAIL_CONFIG_VOLUME: "courtside_mail-config-stalwart1-test",
+    COURTSIDE_MAIL_DATA_VOLUME: "courtside_mail-data-stalwart1-test" };
+  // when
+  const model = rendered(recipe.files, environment);
+  // then
+  assert.equal(model.volumes["mail-config"].name, environment.COURTSIDE_MAIL_CONFIG_VOLUME);
+  assert.equal(model.volumes["mail-data"].name, environment.COURTSIDE_MAIL_DATA_VOLUME);
+  assert.equal(model.services.mail.volumes.find((volume) => volume.target === "/etc/stalwart").source, "mail-config");
+  assert.equal(model.services.mail.volumes.find((volume) => volume.target === "/var/lib/stalwart").source, "mail-data");
+});
 
 function recipeCopy(recipeName, content) {
   const scratch = mkdtempSync(join(tmpdir(), "courtside-recipe-schema-"));

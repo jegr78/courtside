@@ -16,6 +16,20 @@ const compose = ["compose", "-f", join(repository, "deploy", "compose.installed-
 
 export const registryAddress = "127.0.0.1";
 
+export function gateJourney(name = "installed-postgresql-upgrade", candidate) {
+  if (name === "installed-postgresql-upgrade") return { name, recipe: "funnel",
+    arguments: ["tools/installed-upgrade-smoke.mjs", "--candidate", candidate, "--confirm", "installed-postgresql-upgrade"] };
+  if (name === "stalwart-store-transition") return { name, recipe: "full-self-hosted",
+    arguments: ["tools/stalwart-store-transition-smoke.mjs", "--candidate", candidate] };
+  throw new Error(`unknown installed upgrade journey ${name}`);
+}
+
+export function verifyTransitionBinding(report, expected) {
+  if (report?.status !== "passed") throw new Error("Stalwart transition did not pass");
+  if (report.runtimeImage !== expected.image) throw new Error("Stalwart transition runtime image differs from the candidate");
+  if (report.candidateRevision !== expected.revision) throw new Error("Stalwart transition revision differs from the candidate");
+}
+
 export function withRegistryHost(hosts) {
   const lines = hosts.split("\n");
   if (lines.some((line) => line.endsWith(hostsMarker))) return hosts;
@@ -167,6 +181,7 @@ function options(args) {
 
 async function execute() {
   const named = options(process.argv.slice(2));
+  gateJourney(named.journey, "");
   const name = `${registryHost}/${named.repository.toLowerCase()}`;
   const hosts = announcedHosts();
   rmSync(evidence, { recursive: true, force: true });
@@ -187,16 +202,25 @@ async function execute() {
     await serve(authority, environment);
     const image = await publish(authority, named.image, name, "app");
     const bookingSeedImage = await publish(authority, named["booking-seed-image"], name, "booking-seed");
+    writeFileSync(join(evidence, "image-binding.json"), `${JSON.stringify({
+      sourceImage: named.image, sourceBookingSeedImage: named["booking-seed-image"],
+      servedImage: image, servedBookingSeedImage: bookingSeedImage, revision: named.revision,
+    }, null, 2)}\n`);
     const output = join(evidence, "archive");
     mkdirSync(output, { recursive: true });
     run(process.execPath, archiveArguments({ image, bookingSeedImage, version: named.version, revision: named.revision,
       repository: named.repository, workflow: named.workflow, ref: named.ref, output }), { inherit: true });
     const archive = join(output, `courtside-deployment-${named.version}.zip`);
+    const candidate = join(deployment, "extracted", `courtside-deployment-${named.version}`);
+    const journey = gateJourney(named.journey, candidate);
     run(process.execPath, ["tools/deployment-qualification.mjs", "--inspect-archive", "--archive", archive,
       "--destination", join(deployment, "extracted"), "--image", image, "--booking-seed-image", bookingSeedImage,
-      "--recipes", "funnel", "--output", join(evidence, "archive.json")], { inherit: true });
-    run(process.execPath, ["tools/installed-upgrade-smoke.mjs", "--candidate", join(deployment, "extracted"),
-      "--confirm", "installed-postgresql-upgrade"], { inherit: true });
+      "--recipes", journey.recipe, "--output", join(evidence, "archive.json")], { inherit: true });
+    run(process.execPath, journey.arguments, { inherit: true });
+    if (journey.name === "stalwart-store-transition") {
+      const report = JSON.parse(readFileSync(join(repository, "build", "stalwart-store-transition", "result.json")));
+      verifyTransitionBinding(report, { image, revision: named.revision });
+    }
   } catch (error) {
     failure = error;
   }

@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync, realpathSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, readFileSync, realpathSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
+import { executable } from "./deployment-archive.mjs";
 
 import { fixture, releaseArchive, usePostgres17, useLegacyPostgres18, run, initialize,
   makeInstalledManifestLegacy } from "./deployment-cli-fixture.mjs";
@@ -394,12 +395,306 @@ test("given configuration from before recovery material was explicit, when updat
 function mailVersion(archive, tag) {
   const compose = join(archive, "compose.stalwart.yaml");
   writeFileSync(compose, readFileSync(compose, "utf8")
-    .replace(/stalwartlabs\/stalwart:[^@\s]+@sha256:/, `stalwartlabs/stalwart:${tag}@sha256:`));
+    .replace(/stalwartlabs\/stalwart:[^@\s]+@sha256:[a-f0-9]{64}/,
+      `stalwartlabs/stalwart:${tag}@sha256:${tag === "v0.16.27" ? "c429b311c93db5606598abc1c68225a85a6953183848ae01bee9c6a98885836c" : "baafeacd6cbde77acdd94af49972d41c6709e54a376df48e18a9fe3f445eb3d5"}`));
   const manifest = join(archive, "manifest.json");
   const body = JSON.parse(readFileSync(manifest, "utf8"));
   body.files["compose.stalwart.yaml"] = createHash("sha256").update(readFileSync(compose)).digest("hex");
   writeFileSync(manifest, `${JSON.stringify(body, null, 2)}\n`);
 }
+
+function legacyMail(context) {
+  mailVersion(context.archive, "v0.16.27");
+  const initialized = initialize(context, { recipe: "full-self-hosted", mail_relay_host: "" });
+  assert.equal(initialized.status, 0, initialized.stderr);
+  writeFileSync(context.dockerLog, "");
+  return releaseArchive(context.root, "0.1.1");
+}
+
+for (const boundary of ["state", "phase.partial", "target.env"]) {
+  test(`given interruption while staging ${boundary}, when the original release starts, then no incomplete journal blocks recovery`, () => {
+    fixture((context) => {
+      // given
+      const next = legacyMail(context);
+      const nativeChmod = executable("chmod");
+      const fault = join(context.root, "interrupt-journal");
+      writeFileSync(fault, "once");
+      writeFileSync(join(context.root, "bin", "chmod"), `#!/bin/sh
+"${nativeChmod}" "$@" || exit $?
+case "$*" in
+  *'/${boundary}')
+    if [ -f '${fault}' ]; then
+      rm '${fault}'
+      kill -KILL "$PPID"
+      exit 137
+    fi
+    ;;
+esac
+`, { mode: 0o755 });
+      // when
+      const interrupted = run(next, context.target, ["update", "--archive", next,
+        "--mail-store-transition", "reinitialize", "--yes"], context.environment);
+      assert.ok(interrupted.signal === "SIGKILL" || interrupted.status === 137);
+      const activeJournal = existsSync(join(context.target, ".courtside-mail-transition"));
+      const recovered = run(next, context.target, ["up"], context.environment);
+      // then
+      assert.equal(activeJournal, false, "only a complete journal may become active");
+      assert.equal(recovered.status, 0, recovered.stderr);
+      assert.match(readFileSync(join(context.target, "config", "installation.conf"), "utf8"), /^release=0\.1\.0$/m);
+      assert.ok(!readdirSync(context.target).some((name) => name.startsWith(".mail-transition.partial.")));
+      assert.doesNotMatch(readFileSync(context.dockerLog, "utf8"), /volume create .*mail-(config|data)-stalwart1/);
+    });
+  });
+}
+
+test("given activation failed after store selection, when update is retried, then the journal resumes the same selected pair", () => {
+  fixture((context) => {
+    // given
+    const next = legacyMail(context);
+    writeFileSync(join(context.root, "docker-fail-mail-activation"), "once");
+    const args = ["update", "--archive", next, "--mail-store-transition", "reinitialize", "--yes"];
+    const failed = run(next, context.target, args, context.environment);
+    assert.equal(failed.status, 2, failed.stderr);
+    assert.match(readFileSync(join(context.target, "config", "installation.conf"), "utf8"), /^release=0\.1\.1$/m);
+    const selected = readFileSync(join(context.target, "config", ".env"), "utf8");
+    writeFileSync(context.dockerLog, "");
+    // when
+    const blocked = run(next, context.target, ["up"], context.environment);
+    const result = run(next, context.target, args, context.environment);
+    // then
+    assert.equal(blocked.status, 2);
+    assert.match(blocked.stderr, /interrupted mail transition/);
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(readFileSync(join(context.target, "config", ".env"), "utf8"), selected);
+    assert.equal(existsSync(join(context.target, ".courtside-mail-transition")), false);
+    const calls = readFileSync(context.dockerLog, "utf8");
+    assert.doesNotMatch(calls, /volume create|run --rm mail-bootstrap/);
+    assert.match(calls, /run --rm --no-deps mail-ready/);
+  });
+});
+
+test("given a target volume acquired a foreign owner, when activation is retried, then no service starts", () => {
+  fixture((context) => {
+    // given
+    const next = legacyMail(context);
+    const args = ["update", "--archive", next, "--mail-store-transition", "reinitialize", "--yes"];
+    writeFileSync(join(context.root, "docker-fail-mail-activation"), "once");
+    assert.equal(run(next, context.target, args, context.environment).status, 2);
+    writeFileSync(join(context.root, "docker-foreign-mail-owner"), "foreign");
+    writeFileSync(context.dockerLog, "");
+    // when
+    const result = run(next, context.target, args, context.environment);
+    // then
+    assert.equal(result.status, 2, result.stderr);
+    assert.match(result.stderr, /ownership/);
+    assert.doesNotMatch(readFileSync(context.dockerLog, "utf8"), / up | stop |volume rm/);
+  });
+});
+
+test("given a partially configured target, when update is retried, then it retains the old attempt and allocates separate stores", () => {
+  fixture((context) => {
+    // given
+    const next = legacyMail(context);
+    const args = ["update", "--archive", next, "--mail-store-transition", "reinitialize", "--yes"];
+    writeFileSync(join(context.root, "docker-fail-match"), "run --rm mail-configure");
+    assert.equal(run(next, context.target, args, context.environment).status, 2);
+    const oldTarget = readFileSync(join(context.target, ".courtside-mail-transition", "target.env"), "utf8");
+    rmSync(join(context.root, "docker-fail-match"));
+    writeFileSync(context.dockerLog, "");
+    // when
+    const result = run(next, context.target, args, context.environment);
+    // then
+    assert.equal(result.status, 0, result.stderr);
+    const selected = readFileSync(join(context.target, "config", ".env"), "utf8");
+    assert.notEqual(selected.match(/^COURTSIDE_MAIL_CONFIG_VOLUME=.*$/m)?.[0], oldTarget.match(/^COURTSIDE_MAIL_CONFIG_VOLUME=.*$/m)?.[0]);
+    assert.doesNotMatch(readFileSync(context.dockerLog, "utf8"), /volume rm|down --volumes/);
+    assert.equal(readdirSync(join(context.target, "backups")).filter((name) => name.startsWith("mail-transition-")).length, 2);
+  });
+});
+
+test("given legacy mail, when an explicit transition is previewed, then exact consequences are reported without mutation", () => {
+  fixture((context) => {
+    // given
+    const next = legacyMail(context);
+    const file = join(context.target, "config", ".env");
+    const before = readFileSync(file, "utf8");
+    // when
+    const result = run(next, context.target,
+      ["update-check", "--archive", next, "--mail-store-transition", "reinitialize"], context.environment);
+    // then
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /mail_transition=reinitialize/);
+    assert.match(result.stdout, /v0\.16\.27@sha256:[a-f0-9]{64}/);
+    assert.match(result.stdout, /v1\.0\.0@sha256:[a-f0-9]{64}/);
+    assert.match(result.stdout, /not copied/);
+    assert.match(result.stdout, /DKIM.*DNS/);
+    assert.equal(readFileSync(file, "utf8"), before);
+    assert.deepEqual(readdirSync(join(context.target, "backups")), []);
+    assert.equal(readFileSync(context.dockerLog, "utf8"), "");
+    assert.equal(existsSync(join(context.target, "releases", "0.1.1")), false);
+  });
+});
+
+test("given legacy mail and explicit opt-in, when the update succeeds, then new stores are configured before the app starts", () => {
+  fixture((context) => {
+    // given
+    const next = legacyMail(context);
+    // when
+    const result = run(next, context.target,
+      ["update", "--archive", next, "--mail-store-transition", "reinitialize", "--yes"], context.environment);
+    // then
+    assert.equal(result.status, 0, result.stderr);
+    const environment = readFileSync(join(context.target, "config", ".env"), "utf8");
+    assert.match(environment, /^COURTSIDE_MAIL_CONFIG_VOLUME="example-club_mail-config-stalwart1-[a-f0-9]+"$/m);
+    assert.match(environment, /^COURTSIDE_MAIL_DATA_VOLUME="example-club_mail-data-stalwart1-[a-f0-9]+"$/m);
+    assert.doesNotMatch(environment, /^COURTSIDE_MAIL_RECOVERY_(ADMIN|MODE)=.+$/m);
+    assert.equal(realpathSync(join(context.target, "current")), realpathSync(join(context.target, "releases", "0.1.1")));
+    const calls = readFileSync(context.dockerLog, "utf8");
+    assert.match(calls, /run --rm mail-bootstrap/);
+    assert.match(calls, /run --rm mail-configure/);
+    assert.match(calls, /run --rm --no-deps mail-ready/);
+    assert.ok(calls.indexOf("stop app") < calls.indexOf("run --rm mail-bootstrap"));
+    assert.ok(calls.indexOf("run --rm --no-deps mail-ready") < calls.lastIndexOf("up -d --wait"));
+    assert.doesNotMatch(calls, /volume rm example-club_mail-(config|data)(\s|$)|down --volumes/);
+    assert.equal(existsSync(join(context.target, ".courtside-mail-transition")), false);
+    assert.equal(readdirSync(join(context.target, "backups")).filter((name) => name.startsWith("recovery-")).length, 1);
+  });
+});
+
+for (const failure of ["run --rm mail-bootstrap", "run --rm mail-configure", "run --rm --no-deps mail-ready"]) {
+  test(`given a mail transition failure at ${failure}, when update exits, then source selection and recovery remain intact`, () => {
+    fixture((context) => {
+      // given
+      const next = legacyMail(context);
+      writeFileSync(join(context.root, "docker-fail-match"), failure);
+      const before = readFileSync(join(context.target, "config", ".env"), "utf8");
+      // when
+      const result = run(next, context.target,
+        ["update", "--archive", next, "--mail-store-transition", "reinitialize", "--yes"], context.environment);
+      // then
+      assert.equal(result.status, 2, result.stderr);
+      assert.match(result.stderr, /mail transition.*recovery/i);
+      assert.equal(readFileSync(join(context.target, "config", ".env"), "utf8"), before);
+      assert.match(readFileSync(join(context.target, "config", "installation.conf"), "utf8"), /^release=0\.1\.0$/m);
+      const calls = readFileSync(context.dockerLog, "utf8");
+      assert.doesNotMatch(calls, /volume rm example-club_mail-|down --volumes/);
+      assert.equal(existsSync(join(context.target, ".courtside-mail-transition")), true);
+    });
+  });
+}
+
+test("given a local override, when mail reinitialization is requested, then refuse before backup or Docker", () => {
+  fixture((context) => {
+    // given
+    const next = legacyMail(context);
+    writeFileSync(join(context.target, "config", "local.override.yaml"), "services: {}\n");
+    // when
+    const result = run(next, context.target,
+      ["update", "--archive", next, "--mail-store-transition", "reinitialize", "--yes"], context.environment);
+    // then
+    assert.equal(result.status, 2);
+    assert.match(result.stderr, /mail.*override/);
+    assert.equal(readFileSync(context.dockerLog, "utf8"), "");
+    assert.deepEqual(readdirSync(join(context.target, "backups")), []);
+  });
+});
+
+test("given simultaneous PostgreSQL and mail transitions, when the database restore fails, then source configuration remains selected", () => {
+  fixture((context) => {
+    // given
+    usePostgres17(context.archive);
+    const next = legacyMail(context);
+    const before = readFileSync(join(context.target, "config", ".env"), "utf8");
+    writeFileSync(join(context.root, "docker-fail-match"), "pg_restore --no-owner --single-transaction");
+    // when
+    const result = run(next, context.target,
+      ["update", "--archive", next, "--mail-store-transition", "reinitialize", "--yes"], context.environment);
+    // then
+    assert.equal(result.status, 2, result.stderr);
+    assert.match(result.stderr, /PostgreSQL 18 migration failed before release selection/);
+    assert.equal(readFileSync(join(context.target, "config", ".env"), "utf8"), before);
+    assert.match(readFileSync(join(context.target, "config", "installation.conf"), "utf8"), /^release=0\.1\.0$/m);
+    assert.doesNotMatch(readFileSync(context.dockerLog, "utf8"), /volume rm example-club_mail-/);
+    assert.equal(existsSync(join(context.target, ".courtside-mail-transition")), true);
+  });
+});
+
+test("given successful PostgreSQL and mail preparation, when activation fails, then neither selected target is reverted independently", () => {
+  fixture((context) => {
+    // given
+    usePostgres17(context.archive);
+    const next = legacyMail(context);
+    writeFileSync(join(context.root, "docker-fail-mail-activation"), "once");
+    // when
+    const result = run(next, context.target,
+      ["update", "--archive", next, "--mail-store-transition", "reinitialize", "--yes"], context.environment);
+    // then
+    assert.equal(result.status, 2, result.stderr);
+    const selected = readFileSync(join(context.target, "config", ".env"), "utf8");
+    assert.match(selected, /^COURTSIDE_DATABASE_VOLUME="example-club_db-pg18-0\.1\.1"$/m);
+    assert.match(selected, /^COURTSIDE_MAIL_CONFIG_VOLUME="example-club_mail-config-stalwart1-[a-f0-9]+"$/m);
+    assert.match(readFileSync(join(context.target, "config", "installation.conf"), "utf8"), /^release=0\.1\.1$/m);
+    assert.doesNotMatch(readFileSync(context.dockerLog, "utf8"), /volume rm example-club_(db-pg18|mail-)/);
+  });
+});
+
+test("given an unsupported source image, when reinitialization is requested, then it refuses before backup", () => {
+  fixture((context) => {
+    // given
+    mailVersion(context.archive, "v0.16.26");
+    assert.equal(initialize(context, { recipe: "full-self-hosted", mail_relay_host: "" }).status, 0);
+    const next = releaseArchive(context.root, "0.1.1");
+    writeFileSync(context.dockerLog, "");
+    // when
+    const result = run(next, context.target, ["update", "--archive", next,
+      "--mail-store-transition", "reinitialize", "--yes"], context.environment);
+    // then
+    assert.equal(result.status, 2);
+    assert.match(result.stderr, /unsupported Stalwart store migration/);
+    assert.equal(readFileSync(context.dockerLog, "utf8"), "");
+    assert.deepEqual(readdirSync(join(context.target, "backups")), []);
+  });
+});
+
+test("given a target volume belongs to another attempt, when it is allocated, then target setup never starts", () => {
+  fixture((context) => {
+    // given
+    const next = legacyMail(context);
+    writeFileSync(join(context.root, "docker-foreign-mail-owner"), "foreign");
+    // when
+    const result = run(next, context.target, ["update", "--archive", next,
+      "--mail-store-transition", "reinitialize", "--yes"], context.environment);
+    // then
+    assert.equal(result.status, 2);
+    assert.match(result.stderr, /belongs to another attempt/);
+    assert.doesNotMatch(readFileSync(context.dockerLog, "utf8"), /run --rm mail-bootstrap|volume rm example-club_mail-/);
+    assert.match(readFileSync(join(context.target, "config", "installation.conf"), "utf8"), /^release=0\.1\.0$/m);
+  });
+});
+
+test("given a completed mail transition, when a backup and patch update run, then they retain the selected stores", () => {
+  fixture((context) => {
+    // given
+    const next = legacyMail(context);
+    assert.equal(run(next, context.target, ["update", "--archive", next,
+      "--mail-store-transition", "reinitialize", "--yes"], context.environment).status, 0);
+    const file = join(context.target, "config", ".env");
+    const pair = readFileSync(file, "utf8").match(/^COURTSIDE_MAIL_(CONFIG|DATA)_VOLUME=.*$/gm);
+    assert.equal(pair.length, 2);
+    const patch = releaseArchive(context.root, "0.1.2");
+    writeFileSync(context.dockerLog, "");
+    // when
+    const backup = run(next, context.target, ["backup"], context.environment);
+    const update = run(patch, context.target, ["update", "--archive", patch, "--yes"], context.environment);
+    // then
+    assert.equal(backup.status, 0, backup.stderr);
+    assert.equal(update.status, 0, update.stderr);
+    assert.deepEqual(readFileSync(file, "utf8").match(/^COURTSIDE_MAIL_(CONFIG|DATA)_VOLUME=.*$/gm), pair);
+    const calls = readFileSync(context.dockerLog, "utf8");
+    for (const line of pair) assert.ok(calls.includes(`${line.split('"')[1]}:/source:ro`));
+    assert.doesNotMatch(calls, /example-club_mail-(config|data):\/source:ro/);
+  });
+});
 
 for (const previous of ["v0.16.27", "unknown"]) {
   test(`given managed mail stores at ${previous}, when a Stalwart 1 update is requested, then refuse before backup or release selection`, () => {
@@ -439,3 +734,54 @@ for (const recipe of ["full-self-hosted", "standard"]) {
     });
   });
 }
+
+test("given a private installation, when update stages a verified release after backup, then restricted container identities can read public bind material", () => {
+  fixture((context) => {
+    // given
+    assert.equal(initialize(context).status, 0);
+    const next = releaseArchive(context.root, "0.1.1");
+
+    // when
+    const result = run(next, context.target, ["update", "--archive", next, "--yes"], context.environment);
+    const release = join(context.target, "releases", "0.1.1");
+    const directory = statSync(join(release, "mail")).mode & 0o777;
+    const renderer = statSync(join(release, "mail", "render.sh")).mode & 0o777;
+    const readiness = statSync(join(release, "mail-ready.mjs")).mode & 0o777;
+
+    // then
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(directory, 0o555, "the bind-mounted directory must admit a different container identity");
+    assert.equal(renderer & 0o444, 0o444, "the renderer must be readable without DAC override");
+    assert.equal(readiness & 0o444, 0o444, "the unprivileged readiness identity must read its program");
+    assert.equal((directory | renderer | readiness) & 0o222, 0, "release material must remain immutable");
+    assert.equal(statSync(context.target).mode & 0o777, 0o700);
+    assert.equal(statSync(join(context.target, "releases")).mode & 0o777, 0o700);
+    assert.equal(statSync(join(context.target, "config", ".env")).mode & 0o777, 0o600);
+  });
+});
+
+test("given an owner-only staged target, when update retries, then verified container bind material becomes readable", () => {
+  fixture((context) => {
+    // given
+    assert.equal(initialize(context).status, 0);
+    const next = releaseArchive(context.root, "0.1.1");
+    const failure = join(context.root, "docker-fail-match");
+    writeFileSync(failure, "image pull");
+    assert.equal(run(next, context.target, ["update", "--archive", next, "--yes"], context.environment).status, 2);
+    const release = join(context.target, "releases", "0.1.1");
+    chmodSync(join(release, "mail"), 0o500);
+    chmodSync(join(release, "mail", "render.sh"), 0o500);
+    chmodSync(join(release, "mail-ready.mjs"), 0o400);
+    rmSync(failure);
+
+    // when
+    const result = run(next, context.target, ["update", "--archive", next, "--yes"], context.environment);
+
+    // then
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(statSync(join(release, "mail")).mode & 0o777, 0o555);
+    assert.equal(statSync(join(release, "mail", "render.sh")).mode & 0o444, 0o444);
+    assert.equal(statSync(join(release, "mail-ready.mjs")).mode & 0o777, 0o444);
+    assert.equal(statSync(join(context.target, "config", ".env")).mode & 0o777, 0o600);
+  });
+});

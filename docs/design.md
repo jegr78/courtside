@@ -1279,8 +1279,13 @@ Verified TLS to PostgreSQL and between Caddy and the application is optional har
 fails closed on inconsistent certificates, keys, authorities or transport settings. The standard
 single-host installation remains supported without these optional components.
 
-The self-hosted mail recipe uses Stalwart. Automatic updates refuse a Stalwart major-version change
-before mutating the installation because existing mail stores require a separate migration.
+The self-hosted mail recipe uses Stalwart. An update from the pinned 0.16.27 image to 1.0.x can
+explicitly initialize a new store pair while retaining the originals and a complete recovery unit.
+It does not carry old mail state into the new server. Without that explicit option, incompatible
+store transitions are refused before mutation. The launcher configures the new stores and verifies
+sender authentication over STARTTLS and certificate reload before starting the application. Backup,
+reconfiguration and subsequent updates use the same persisted store pair. An interrupted transition
+retains a journal and blocks ordinary lifecycle commands until update recovery completes.
 The application requires STARTTLS and validates its relay
 certificate by default. An operator may explicitly disable issuer and hostname verification for a
 relay whose certificate the container cannot validate; the

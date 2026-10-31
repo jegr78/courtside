@@ -39,13 +39,21 @@ sudo install -d -m 0700 -o "$USER" /srv/courtside
 ```
 
 `init` validates the answers, prints the plan and asks for an exact confirmation before it writes
-anything. It separates read-only releases from mutable configuration, secrets and backups. For an
+anything. It separates read-only releases from mutable configuration, secrets and backups. Verified
+public release files remain readable by restricted container identities, while the installation and
+releases parent directories stay owner-only. For an
 unattended install, use the answer-file example in the selected recipe guide and pass secrets only
 through the process environment.
 
 For bundled PostgreSQL, the launcher writes `COURTSIDE_DATABASE_VOLUME` itself. The explicit name
 keeps a PostgreSQL 18 cluster bound to the volume the launcher created or migrated; operators do not
 set or change it independently.
+
+For self-hosted mail, an incompatible 0.16.27 to 1.0.x update requires an explicit transition.
+The launcher can initialize separate stores while retaining the originals and the recovery unit.
+It does not copy legacy mail contents. Read the [Stalwart transition procedure](guides/stalwart.md#upgrading-older-mail-stores)
+before selecting this path. New mail-volume names, when present, belong to the launcher and remain
+paired across backups and later updates.
 
 After installation, use the installed launcher for ordinary lifecycle commands. Updates use the
 launcher from the verified candidate archive as the operations handbook describes:

@@ -35,6 +35,8 @@ declare -a database_upgrade_compose=()
 database_target_volume_cleanup=""
 mail_restart_required=false
 declare -a mail_restart_compose=()
+mail_source_resume_required=false
+declare -a mail_source_compose=()
 
 refuse() {
   printf 'courtside: %s\n' "$1" >&2
@@ -43,7 +45,7 @@ refuse() {
 
 prepare_executables() {
   local original_path=$PATH safe_path="" directory name resolved
-  local required="mkdir chmod rm rmdir sed head tail mktemp cp mv ln grep stat find awk tr date df id readlink env sort wc"
+  local required="mkdir chmod rm rmdir sed head tail mktemp cp mv ln grep stat find awk tr date df id readlink env sort wc sleep"
   IFS=':' read -r -a path_directories <<< "$original_path"
   for directory in "${path_directories[@]}"; do
     case "$directory" in
@@ -91,6 +93,9 @@ prepare_executables
 
 cleanup() {
   local result=$?
+  if [ "$mail_source_resume_required" = true ] && [ "${#mail_source_compose[@]}" -gt 0 ]; then
+    "${mail_source_compose[@]}" up -d --wait mail app >/dev/null 2>&1 || true
+  fi
   if [ "$restore_cleanup_active" = true ] || [ "${#restore_owned_volumes[@]}" -gt 0 ]; then
     cleanup_restore_resources >/dev/null 2>&1 || true
   fi
@@ -210,6 +215,11 @@ acquire_lock() {
   chmod 700 "$installation_directory"
   cleanup_abandoned_staging
   recover_configuration_transaction
+  if [ -e "$installation_directory/.courtside-mail-transition" ] \
+    || [ -L "$installation_directory/.courtside-mail-transition" ]; then
+    [ "${command:-}" = update ] \
+      || refuse "an interrupted mail transition requires update recovery with the same candidate archive"
+  fi
   if [ -e "$installation_directory/.courtside-rotation" ] \
     && [ "${command:-}" != rotate-secret ]; then
     refuse "an interrupted secret rotation requires rotate-secret recovery before other commands"
@@ -223,6 +233,7 @@ cleanup_abandoned_staging() {
     "$installation_directory"/.rotation.partial.* \
     "$installation_directory"/.rotation.complete.* \
     "$installation_directory"/.mail-marker.partial.* \
+    "$installation_directory"/.mail-transition.partial.* \
     "$installation_directory"/releases/.*.partial.* \
     "$installation_directory"/config/.*.transaction.* \
     "$installation_directory"/config/.env.partial.* \
@@ -689,6 +700,7 @@ publish_release() {
       refuse "release integrity check failed: $problem"
     fi
   fi
+  chmod -R a+rX "$release_directory"
   manifest_version=$expected_version
   manifest_revision=$expected_revision
   manifest_image=$expected_image
@@ -827,11 +839,38 @@ load_configuration() {
   manifest_digest=${config_image##*@sha256:}
   manifest_sha256=$config_release_manifest_sha256
   validate_answers false
+  if [ "$config_recipe" = full-self-hosted ]; then
+    resolve_mail_store_volumes "$installation_directory/config/.env"
+  fi
   if [ "$config_recipe" != existing-infrastructure ]; then
     bundled_database_material=$(environment_value "$installation_directory/config/.env" POSTGRES_PASSWORD)
     [[ "$bundled_database_material" =~ ^[0-9a-f]{48}$ ]] \
       || refuse "bundled PostgreSQL password must be a generated 48-character hexadecimal value"
   fi
+}
+
+resolve_mail_store_volumes() {
+  local file=$1 project=${2:-$config_project} config_suffix data_suffix
+  selected_mail_config_volume=$(environment_value "$file" COURTSIDE_MAIL_CONFIG_VOLUME)
+  selected_mail_data_volume=$(environment_value "$file" COURTSIDE_MAIL_DATA_VOLUME)
+  if [ -z "$selected_mail_config_volume" ] && [ -z "$selected_mail_data_volume" ]; then
+    selected_mail_config_volume="${project}_mail-config"
+    selected_mail_data_volume="${project}_mail-data"
+  fi
+  case "$selected_mail_config_volume" in
+    "${project}_mail-config" | "${project}_mail-config-"*) ;;
+    *) refuse "mail store configuration volume is not owned by this project" ;;
+  esac
+  case "$selected_mail_data_volume" in
+    "${project}_mail-data" | "${project}_mail-data-"*) ;;
+    *) refuse "mail store data volume is not owned by this project" ;;
+  esac
+  [[ "$selected_mail_config_volume" =~ ^[a-zA-Z0-9][a-zA-Z0-9_.-]*$ ]] \
+    && [[ "$selected_mail_data_volume" =~ ^[a-zA-Z0-9][a-zA-Z0-9_.-]*$ ]] \
+    || refuse "mail store names contain unsafe characters"
+  config_suffix=${selected_mail_config_volume#"${project}_mail-config"}
+  data_suffix=${selected_mail_data_volume#"${project}_mail-data"}
+  [ "$config_suffix" = "$data_suffix" ] || refuse "mail store selection must identify one matching pair"
 }
 
 validate_installed_release() {
@@ -1042,7 +1081,7 @@ database_backup() {
 }
 
 backup_mail_stores() {
-  local root=$1 helper volume failed=false marker marker_staging
+  local root=$1 helper volume selected failed=false marker marker_staging
   [ "$config_recipe" = full-self-hosted ] || return 0
   helper=$(sed -n 's/^[[:space:]]*image: \(alpine:3@sha256:[0-9a-f]\{64\}\)$/\1/p' \
     "$installation_directory/current/compose.stalwart.yaml" | head -n 1)
@@ -1059,8 +1098,9 @@ backup_mail_stores() {
   mail_restart_compose=("${compose[@]}")
   "${compose[@]}" stop mail
   for volume in mail-config mail-data; do
+    if [ "$volume" = mail-config ]; then selected=$selected_mail_config_volume; else selected=$selected_mail_data_volume; fi
     if ! "${docker_command[@]}" run --rm --network none \
-      --volume "${config_project}_$volume:/source:ro" "$helper" tar -C /source -cf - . \
+      --volume "$selected:/source:ro" "$helper" tar -C /source -cf - . \
       > "$root/$volume.tar"; then
       failed=true
       break
@@ -1081,7 +1121,8 @@ prune_recovery_units() {
   local units=()
   for path in "$installation_directory"/backups/recovery-*; do
     [[ "${path##*/}" =~ ^recovery-[0-9]{8}T[0-9]{6}Z-[0-9A-Za-z.+-]+-[0-9]+$ ]] && [ -d "$path" ] \
-      && [ ! -L "$path" ] && units+=("$path")
+      && [ ! -L "$path" ] || continue
+    if ! retained_mail_recovery "$path"; then units+=("$path"); fi
   done
   [ "${#units[@]}" -gt 0 ] || return 0
   while [ "${#units[@]}" -gt "$retain" ]; do
@@ -2031,7 +2072,7 @@ version_is_newer() {
 }
 
 write_updated_environment() {
-  local destination=$1 digest=$2 database_volume=${3:-} line found_database_volume=false
+  local destination=$1 digest=$2 database_volume=${3:-} mail_config=${4:-} mail_data=${5:-} line found_database_volume=false
   while IFS= read -r line || [ -n "$line" ]; do
     case "$line" in
       COURTSIDE_IMAGE_DIGEST=*) environment_line COURTSIDE_IMAGE_DIGEST "$digest" ;;
@@ -2043,20 +2084,29 @@ write_updated_environment() {
           printf '%s\n' "$line"
         fi
         ;;
+      COURTSIDE_MAIL_CONFIG_VOLUME=* | COURTSIDE_MAIL_DATA_VOLUME=* \
+        | COURTSIDE_MAIL_RECOVERY_ADMIN=* | COURTSIDE_MAIL_RECOVERY_MODE=*)
+        [ -n "$mail_config" ] || printf '%s\n' "$line"
+        ;;
       *) printf '%s\n' "$line" ;;
     esac
   done < "$installation_directory/config/.env" > "$destination"
   if [ -n "$database_volume" ] && [ "$found_database_volume" = false ]; then
     environment_line COURTSIDE_DATABASE_VOLUME "$database_volume" >> "$destination"
   fi
+  if [ -n "$mail_config" ]; then
+    environment_line COURTSIDE_MAIL_CONFIG_VOLUME "$mail_config" >> "$destination"
+    environment_line COURTSIDE_MAIL_DATA_VOLUME "$mail_data" >> "$destination"
+  fi
   chmod 600 "$destination"
 }
 
 command_update_check() {
-  local archive=""
+  local archive="" mail_mode=""
   while [ $# -gt 0 ]; do
     case "$1" in
       --archive) [ $# -ge 2 ] || refuse "--archive needs a directory"; archive=$2; shift 2 ;;
+      --mail-store-transition) [ $# -ge 2 ] || refuse "--mail-store-transition needs a mode"; mail_mode=$2; shift 2 ;;
       *) refuse "unknown update-check option $1" ;;
     esac
   done
@@ -2069,6 +2119,8 @@ command_update_check() {
   [ -d "$archive" ] && [ ! -L "$archive" ] || refuse "$archive is not a release archive"
   read_manifest "$archive/manifest.json"
   verify_release "$archive" false || refuse "release archive integrity check failed"
+  prepare_mail_store_transition "$archive" "$mail_mode"
+  print_mail_store_transition
   if version_is_newer "$manifest_version" "$config_release"; then
     printf 'installed_release=%s\ncandidate_release=%s\nupdate=available\n' "$config_release" "$manifest_version"
   else
@@ -2196,27 +2248,13 @@ rollback_database_major_update() {
   refuse "release $failed_release did not become healthy; restored release $installed_release with its original PostgreSQL 17 volume"
 }
 
-require_compatible_mail_stores() {
-  local archive=$1 installed_major target_major
-  [ "$config_recipe" = full-self-hosted ] || return 0
-  installed_major=$(sed -n \
-    's/^[[:space:]]*image: stalwartlabs\/stalwart:v\([0-9][0-9]*\)\.[0-9][0-9]*\.[0-9][0-9]*@sha256:[0-9a-f]\{64\}$/\1/p' \
-    "$installation_directory/current/compose.stalwart.yaml")
-  target_major=$(sed -n \
-    's/^[[:space:]]*image: stalwartlabs\/stalwart:v\([0-9][0-9]*\)\.[0-9][0-9]*\.[0-9][0-9]*@sha256:[0-9a-f]\{64\}$/\1/p' \
-    "$archive/compose.stalwart.yaml")
-  [[ "$installed_major" =~ ^[0-9]+$ ]] && [[ "$target_major" =~ ^[0-9]+$ ]] \
-    || refuse "Stalwart store compatibility is unknown; review the store migration in guides/stalwart.md"
-  [ "$installed_major" = "$target_major" ] \
-    || refuse "Stalwart store migration across major versions is not supported by this launcher; see guides/stalwart.md"
-}
-
 command_update() {
   local archive="" confirmed=false installed_release target_release target_revision target_image target_digest
-  local target_manifest_sha transaction old_compose database_major_update target_database_volume
+  local target_manifest_sha transaction old_compose database_major_update target_database_volume mail_mode=""
   while [ $# -gt 0 ]; do
     case "$1" in
       --archive) [ $# -ge 2 ] || refuse "--archive needs a directory"; archive=$2; shift 2 ;;
+      --mail-store-transition) [ $# -ge 2 ] || refuse "--mail-store-transition needs a mode"; mail_mode=$2; shift 2 ;;
       --yes) confirmed=true; shift ;;
       *) refuse "unknown update option $1" ;;
     esac
@@ -2228,6 +2266,10 @@ command_update() {
   installed_release=$config_release
   read_manifest "$archive/manifest.json"
   if ! verify_release "$archive" false; then refuse "release archive integrity check failed"; fi
+  if [ -e "$installation_directory/.courtside-mail-transition" ]; then
+    if resume_mail_store_transition "$archive" "$mail_mode" "$confirmed"; then return 0; fi
+    read_manifest "$archive/manifest.json"
+  fi
   version_is_newer "$manifest_version" "$installed_release" \
     || refuse "update requires a release newer than $installed_release; downgrade needs a complete recovery-unit restore"
   target_release=$manifest_version
@@ -2236,11 +2278,18 @@ command_update() {
   target_digest=$manifest_digest
   target_manifest_sha=$manifest_sha256
   [ -f "$archive/README.md" ] || refuse "release archive has no upgrade notes"
-  require_compatible_mail_stores "$archive"
+  prepare_mail_store_transition "$archive" "$mail_mode"
   prepare_database_major_update "$archive"
+  print_mail_store_transition
   printf 'Plan: update %s to exact release %s in %s\n' "$installed_release" "$target_release" "$installation_directory"
   printf 'Upgrade notes: %s/README.md\n' "$archive"
   confirm "$confirmed"
+  if [ "$mail_transition" = true ]; then
+    compose_command
+    mail_source_compose=("${compose[@]}")
+    mail_source_resume_required=true
+    "${compose[@]}" stop app || refuse "mail transition could not stop application submission"
+  fi
   create_backup 7
   manifest_version=$target_release
   manifest_revision=$target_revision
@@ -2250,6 +2299,13 @@ command_update() {
   publish_release "$archive"
   if ! "${docker_command[@]}" image pull "$target_image"; then
     refuse "update pull failed; recovery unit $created_recovery is ready and database rollback was not attempted"
+  fi
+  if [ "$mail_transition" = true ]; then
+    compose_command
+    begin_mail_store_transition "$installation_directory/releases/$target_release" "$target_digest"
+    if ! configure_mail_transition_target > "$mail_journal/setup.log" 2>&1; then
+      refuse "mail transition preparation failed; recovery unit $created_recovery is ready; retry update with the same archive and explicit opt-in"
+    fi
   fi
   if [ "$database_major_update" = true ]; then
     restore_database_major_target "$installation_directory/releases/$target_release"
@@ -2267,7 +2323,13 @@ command_update() {
   transaction=$(mktemp -d "$installation_directory/.transaction.partial.XXXXXX")
   temporary_path=$transaction
   chmod 700 "$transaction"
-  write_updated_environment "$transaction/.env" "$target_digest" "$target_database_volume"
+  if [ "$mail_transition" = true ]; then
+    write_updated_environment "$transaction/.env" "$target_digest" "$target_database_volume" "$target_mail_config_volume" "$target_mail_data_volume"
+    mail_transition_phase activating
+    mail_source_resume_required=false
+  else
+    write_updated_environment "$transaction/.env" "$target_digest" "$target_database_volume"
+  fi
   write_installation_configuration "$transaction/installation.conf"
   printf '%s\n' "$target_release" > "$transaction/current-release"
   chmod 600 "$transaction/current-release"
@@ -2276,11 +2338,12 @@ command_update() {
   database_target_volume_cleanup=""
   apply_configuration_transaction
   if ! compose_command || ! "${compose[@]}" up -d --wait; then
-    if [ "$database_major_update" = true ]; then
+    if [ "$database_major_update" = true ] && [ "$mail_transition" = false ]; then
       rollback_database_major_update "$installed_release" "$target_release"
     fi
     refuse "release $target_release did not become healthy; recovery unit $created_recovery is ready and database rollback was not attempted"
   fi
+  if [ "$mail_transition" = true ]; then retire_mail_transition; fi
   printf 'Updated from %s to %s after recovery unit %s\n' \
     "$installed_release" "$target_release" "$created_recovery"
 }
@@ -3096,6 +3159,8 @@ command_uninstall() {
     fi
   fi
 }
+
+source "$script_directory/mail-store-transition.sh"
 
 while [ $# -gt 0 ]; do
   case "$1" in

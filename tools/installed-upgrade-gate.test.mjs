@@ -2,11 +2,32 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { test } from "node:test";
-import { archiveArguments, registryAddress, servedReference, withRegistryHost, withoutRegistryHost }
+import { archiveArguments, gateJourney, verifyTransitionBinding, registryAddress, servedReference, withRegistryHost, withoutRegistryHost }
   from "./installed-upgrade-gate.mjs";
 
 const yaml = createRequire(new URL("../frontend/package.json", import.meta.url))("js-yaml");
 const digest = "a".repeat(64);
+
+test("given a Stalwart artifact gate, when its journey is selected, then it uses the bound candidate and full mail recipe", () => {
+  // when
+  const journey = gateJourney("stalwart-store-transition", "/tmp/candidate");
+  // then
+  assert.equal(journey.recipe, "full-self-hosted");
+  assert.deepEqual(journey.arguments, ["tools/stalwart-store-transition-smoke.mjs", "--candidate", "/tmp/candidate"]);
+  assert.equal(gateJourney(undefined, "/tmp/candidate").recipe, "funnel");
+  assert.throws(() => gateJourney("../../bin/sh", "/tmp/candidate"), /unknown.*journey/);
+});
+
+test("given another runtime image, when the transition evidence is bound, then the candidate cannot inherit its result", () => {
+  // given
+  const expected = { image: `ghcr.io/jegr78/courtside@sha256:${digest}`, revision: "f".repeat(40) };
+  const report = { status: "passed", runtimeImage: expected.image, candidateRevision: expected.revision };
+  // when / then
+  assert.doesNotThrow(() => verifyTransitionBinding(report, expected));
+  assert.throws(() => verifyTransitionBinding({ ...report, runtimeImage: `ghcr.io/jegr78/courtside@sha256:${"b".repeat(64)}` }, expected), /runtime image/);
+  assert.throws(() => verifyTransitionBinding({ ...report, candidateRevision: "e".repeat(40) }, expected), /revision/);
+  assert.throws(() => verifyTransitionBinding({ ...report, status: "failed" }, expected), /did not pass/);
+});
 
 test("given a hosts file, when the stand-in registry is announced, then ghcr.io resolves to loopback exactly once", () => {
   // given

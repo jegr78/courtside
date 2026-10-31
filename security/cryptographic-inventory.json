@@ -907,7 +907,8 @@
         "openssl"
       ],
       "locations": [
-        "deploy/courtside"
+        "deploy/courtside",
+        "deploy/mail-store-transition.sh"
       ]
     },
     {
@@ -1184,7 +1185,8 @@
         "tls internal"
       ],
       "locations": [
-        "deploy/Caddyfile*"
+        "deploy/Caddyfile*",
+        "tools/stalwart-store-transition-smoke.mjs"
       ]
     },
     {
@@ -1247,6 +1249,9 @@
         "deploy/compose.stalwart.yaml",
         "deploy/courtside",
         "deploy/mail-check.sh",
+        "deploy/mail-store-transition.sh",
+        "tools/deployment-cli-update.test.mjs",
+        "tools/stalwart-store-transition-smoke.mjs",
         "tools/deployment-qualification.mjs",
         "tools/deployment-archive.test.mjs",
         "tools/deployment-recipes.test.mjs",

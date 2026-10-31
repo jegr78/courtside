@@ -183,6 +183,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ inputs.source-commit }}
+          fetch-depth: 0
           persist-credentials: false
       - uses: ./.github/actions/tool-dependencies
       - id: image
@@ -191,7 +192,9 @@ jobs:
           source: ${{ inputs.image-source }}
           digest: ${{ inputs.image-digest }}
           repository: ${{ github.repository }}
-          load: 'false'
+          artifact: ${{ inputs.image-artifact }}
+          run-id: ${{ inputs.artifacts-run-id || github.run_id }}
+          github-token: ${{ github.token }}
       - id: booking-seed
         uses: ./.github/actions/gate-image
         with:
@@ -224,10 +227,50 @@ jobs:
         run: node tools/courtside.mail-smoke.mjs
         env:
           COURTSIDE_MAIL_SMOKE_LOGS: build/deployment-mail/server-logs
+      - id: transition
+        name: Exercise the candidate mail store transition and matching restores
+        continue-on-error: true
+        env:
+          IMAGE_SOURCE: ${{ inputs.image-source }}
+          IMAGE: ${{ steps.image.outputs.reference }}
+          BOOKING_SEED_IMAGE: ${{ steps.booking-seed.outputs.reference }}
+          VERSION: ${{ inputs.archive-version }}
+          ARCHIVE_REF: ${{ inputs.archive-ref }}
+          ARCHIVE_WORKFLOW: ${{ inputs.archive-workflow }}
+          SOURCE_COMMIT: ${{ inputs.source-commit }}
+        run: |
+          if [ "$IMAGE_SOURCE" = registry ]; then
+            version=$(jq -er '.archive.version' build/deployment-mail/archive.json)
+            candidate="$RUNNER_TEMP/courtside-mail-deployment/courtside-deployment-$version"
+            node tools/stalwart-store-transition-smoke.mjs --candidate "$candidate"
+          elif [ "$IMAGE_SOURCE" = artifact ]; then
+            node tools/installed-upgrade-gate.mjs --image "$IMAGE" --booking-seed-image "$BOOKING_SEED_IMAGE" \
+              --repository "$GITHUB_REPOSITORY" --version "$VERSION" --revision "$SOURCE_COMMIT" \
+              --ref "$ARCHIVE_REF" --workflow "$ARCHIVE_WORKFLOW" --confirm installed-upgrade-gate \
+              --journey stalwart-store-transition
+          else
+            echo 'Unknown transition image source' >&2
+            exit 2
+          fi
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          import { readFileSync } from 'node:fs';
+          import { verifyTransitionBinding } from './tools/installed-upgrade-gate.mjs';
+          let image = process.env.IMAGE;
+          if (process.env.IMAGE_SOURCE === 'artifact') {
+            const binding = JSON.parse(readFileSync('build/installed-upgrade-gate/image-binding.json'));
+            assert.equal(binding.sourceImage, image);
+            assert.equal(binding.revision, process.env.SOURCE_COMMIT);
+            image = binding.servedImage;
+          }
+          verifyTransitionBinding(JSON.parse(readFileSync('build/stalwart-store-transition/result.json')),
+            { image, revision: process.env.SOURCE_COMMIT });
+          JS
       - name: Record the Stalwart result
         if: always()
         env:
           JOURNEY_OUTCOME: ${{ steps.journey.outcome }}
+          TRANSITION_OUTCOME: ${{ steps.transition.outcome }}
           IMAGE: ${{ steps.image.outputs.pinned }}
         run: |
           jq -n \
@@ -236,25 +279,36 @@ jobs:
             --arg docker "$(docker version --format '{{.Server.Version}}')" \
             --arg compose "$(docker compose version --short)" \
             --arg journey "$JOURNEY_OUTCOME" \
+            --arg transition "$TRANSITION_OUTCOME" \
             '{schemaVersion: 1, recipe: "full-self-hosted", image: $image,
               platform: {os: "ubuntu-latest", architecture: $architecture},
               tools: {docker: $docker, compose: $compose},
               results: [{id: "stalwart-controlled-peers", ownership: "courtside",
-                outcome: (if $journey == "success" then "passed" else "failed" end)}],
-              outcome: (if $journey == "success" then "passed" else "failed" end)}' \
+                outcome: (if $journey == "success" then "passed" else "failed" end)},
+                {id: "stalwart-store-transition", ownership: "courtside",
+                outcome: (if $transition == "success" then "passed" else "failed" end)}],
+              outcome: (if $journey == "success" and $transition == "success" then "passed" else "failed" end)}' \
             > build/deployment-mail/result.json
+          if [ -f build/stalwart-store-transition/result.json ]; then
+            cp build/stalwart-store-transition/result.json build/deployment-mail/store-transition.json
+          fi
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
           name: deployment-mail-qualification
-          path: build/deployment-mail
+          path: |
+            build/deployment-mail
+            build/installed-upgrade-gate
           retention-days: 14
           if-no-files-found: error
       - name: Enforce the Stalwart journey
         if: always()
         env:
           JOURNEY_OUTCOME: ${{ steps.journey.outcome }}
-        run: test "$JOURNEY_OUTCOME" = success
+          TRANSITION_OUTCOME: ${{ steps.transition.outcome }}
+        run: |
+          test "$JOURNEY_OUTCOME" = success
+          test "$TRANSITION_OUTCOME" = success
 
   active-security:
     runs-on: ubuntu-latest

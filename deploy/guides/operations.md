@@ -1172,6 +1172,8 @@ default.
 | `COURTSIDE_MAIL_DOMAIN` | *required* | The domain Courtside sends from, and with the mail server the domain SPF, DKIM and DMARC are published for. |
 | `COURTSIDE_MAIL_HOSTNAME` | *required with the mail server* | The mail server's own name. Its forward and reverse DNS must agree, and Caddy obtains a certificate for it, so it must point at this host. Only `full-self-hosted` reads it: `compose.stalwart.yaml` adds the site block in `Caddyfile.stalwart` to the proxy, and a recipe without the mail server never asks Caddy for this name. |
 | `COURTSIDE_MAIL_DKIM_SELECTOR` | *required with the mail server* | The selector of the DKIM key the setup wizard generated, as it appears in the admin interface. |
+| `COURTSIDE_MAIL_CONFIG_VOLUME` | *generated for a mail store transition* | Selected Stalwart configuration volume. Without an explicit pair, Compose uses the project's original `mail-config` volume. The launcher changes this value together with the data volume. |
+| `COURTSIDE_MAIL_DATA_VOLUME` | *generated for a mail store transition* | Selected Stalwart data volume. Without an explicit pair, Compose uses the project's original `mail-data` volume. Backups and later updates retain the same selection. Do not edit either name independently. |
 | `COURTSIDE_MAIL_ADMIN_PASSWORD` | *required with the mail server* | Password for the club's mail administrator, written into the account by `mail-configure`. |
 | `COURTSIDE_MAIL_SETUP_PASSWORD` | *required with the mail server* | Password the setup commands authenticate with while the server still has no accounts. Pair it with `COURTSIDE_MAIL_RECOVERY_ADMIN`. It must not start with `_`, `$` or `{`: the mail server reads such a value as a password hash and rejects every login, and `courtside doctor` reports it. |
 | `COURTSIDE_MAIL_ADMIN_USERNAME` | `postmaster` | Local part of the mail administrator's address. |
@@ -1501,6 +1503,15 @@ directory. Only a complete isolated restore is selected. If the new release then
 check, the launcher atomically restores the prior configuration and release, starts PostgreSQL 17
 on its untouched volume and reports the rollback. The new target volume is removed only after that
 old installation is healthy again.
+
+A full-self-hosted installation using Stalwart 0.16.27 can explicitly initialize fresh mail stores
+when updating to 1.0.x. This requires `--mail-store-transition reinitialize`; `--yes` alone is
+insufficient. It retains the old stores and recovery unit, configures new stores and checks local
+TLS and sender authentication before application startup. It does not copy old mail state and
+requires new DKIM DNS records. Follow the [Stalwart procedure](stalwart.md#upgrading-older-mail-stores),
+including its interrupted-update recovery instructions. When a PostgreSQL major update accompanies
+this mail transition, a failure retains the selected transaction and complete recovery unit instead
+of automatically reverting the database independently of the mail stores.
 
 An update within one PostgreSQL major recreates neither the database volume nor the
 `operational-logs` volume. Existing club data and retained diagnostic records therefore remain in
