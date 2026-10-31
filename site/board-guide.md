@@ -215,7 +215,7 @@ Ist ein Loxone Miniserver als Zutrittssystem angebunden, wählst du für jeden Z
 eine **Loxone-Gruppe**. Der Miniserver-Benutzer einer Buchung tritt dieser Gruppe bei, die Gruppe
 entscheidet also, welche Tür sein Code öffnet. Die Auswahl zeigt die Gruppen, die Courtside bei der
 letzten Prüfung des Miniservers gelesen hat. Ist sie leer, steht an ihrer Stelle ein Hinweis. Drücke
-dann unter *Zugangsberechtigungen* auf **Jetzt prüfen**, nach der Prüfung erscheinen die Gruppen. Eine
+dann unter *Zugangsberechtigungen* auf **Verbindung prüfen**, nach der Prüfung erscheinen die Gruppen. Eine
 gespeicherte Gruppe, die der Miniserver nicht mehr kennt, steht als *Unbekannte Gruppe* in der
 Auswahl. Wähle dann eine andere oder entferne sie. Ein Zugang ohne Gruppe öffnet sich mit keinem
 Buchungscode. Seine Berechtigungen scheitern mit dem Grund *access point has no Loxone group*, bis du
@@ -700,8 +700,9 @@ Unter **Nachweise** findest du neun Ansichten. Die *Aufbewahrung* beschreibt der
   sechzig Minuten erneut. Nach dem fünften Fehlschlag oder einer Ablehnung gilt die Berechtigung als
   gescheitert. Behebe dann die Ursache im Zutrittssystem und drücke **Erneut senden**. Ein Entfernen
   versucht Courtside ohne Ende weiter. Über der Liste steht, was das Zutrittssystem bei der letzten
-  Prüfung geantwortet hat. **Jetzt prüfen** lässt Courtside beim nächsten Durchgang neu nachfragen.
-  Den Code selbst zeigt die Ansicht nie. Ohne angebundenes Zutrittssystem bleibt die Liste leer und
+  Prüfung geantwortet hat. **Verbindung prüfen** lässt Courtside beim nächsten Durchgang die
+  Verbindung Schritt für Schritt prüfen. Nach dem Neuladen steht jede Prüfung mit ihrem Ergebnis
+  darunter, die Tastatur prüfst du selbst an der Tür. Den Code selbst zeigt die Ansicht nie. Ohne angebundenes Zutrittssystem bleibt die Liste leer und
   die Buchungen laufen wie bisher.
 
 ![Die Zugangsberechtigungen mit einer gescheiterten Berechtigung, ihrem Grund und Erneut senden, und einer eingerichteten.](screenshots/de/access-grants.png)

@@ -616,8 +616,8 @@ its stored value. A board edits them on the access points page.
 #### Dynamic access grants
 
 An access-control system can install a code of its own per booking. `AccessControlConnector` is the
-port: `grant`, `reschedule`, `revoke`, `probe` and a local `mappingOf` that fingerprints how access
-points map onto the system. An install or revoke answers `Accepted` with the system's reference,
+port: `grant`, `reschedule`, `revoke`, `probe`, the board's `connectionChecks` and a local `mappingOf`
+that fingerprints how access points map onto the system. An install or revoke answers `Accepted` with the system's reference,
 `CodeRejected` when the code is not on the remote user, `RetryLater` with an optional moment before
 which it must not be asked again, or `Refused`; the last two carry a scope, `GRANT` for this grant or
 `CONNECTOR` for the whole connector. An exception or a call past its deadline is an unclear answer,
@@ -644,6 +644,24 @@ holds every request for five minutes. Once an hour, at the end of a completed pa
 lists its users is compared with the rows: a listed grant that is removed here and no longer wanted or
 refused is revoked again, an installed grant it no longer lists is installed again while wanted, and a
 listed id without a row is left alone.
+
+A board's connection check runs at the start of the next pass, before the grants, and never ends the
+pass. Each check is its own call with its own deadline, skipped when a check it requires did not pass,
+and a check the call runner abandons is a timeout for that check alone. A result carries the check's
+name, `PASSED`, `FAILED`, `SKIPPED` or `MANUAL`, an i18n code and string parameters; an exception from
+a check becomes `access.check.failed` without its text. A connector without checks of its own answers
+one `connector` result, `SKIPPED`. The Loxone connector checks, in this order: `address` resolves the
+serial afresh through `getip` and reaches the Miniserver's `jdev/cfg/apiKey` over verified TLS;
+`version` reads the config version from that answer and needs 14.2.5.16, comparing each segment as a
+number; `login` kills the cached token and logs in again with the user-management right; `groups`
+reloads the normal groups and needs one mapped and present for every active access point without a
+static code; `clock` is `SKIPPED` until the device recording settles where the Miniserver's local time
+can be read; `probe-user` deletes leftover users named `courtside_probe_` plus 16 hex digits that are
+not administrators, creates one without group or code as a timespan user from now for two minutes with
+deletion at its end, reads its window and expiry action back through `getuser`, deletes it and finds
+none listed; `keypad` is `MANUAL`, because the API does not show whether a keypad accepts a code.
+`groups` and `probe-user` need `login`. The probe user's name never matches the grant pattern, so
+neither a grant call nor the reconciliation counts it.
 
 An access point with a static code is served by that code only and never by a dynamic grant. A
 booking has demand when it is confirmed, its card grants access and at least one of its courts sits
@@ -713,10 +731,13 @@ system accepted it and while the grant is wanted.
 failing ones first, with booking, courts, access points, window, attempts, last failure and next
 attempt, and the total. It names the selected connector and shows the last probe the worker made:
 its class, `ANSWERED`, `UNREACHABLE`, `TIMEOUT`, `CALL_THREAD_OCCUPIED` or `REFUSED`, the time and
-the connector's own reason when it gave one. Reading the overview never calls the system; a board asks
-for a fresh probe with `POST /api/admin/access-grants/probe`, which the next pass makes first and which
-answers `409 urn:courtside:error:access-control-not-connected` without a connector, as a retry
-does. A board sends a
+the connector's own reason when it gave one. Reading the overview never calls the system. The page's
+"Verbindung prüfen" asks for a connection check with `POST /api/admin/access-control/check`, which
+also requests a probe and so reloads the groups, and lists each check of the latest one from
+`GET /api/admin/access-control/check`, whose `checkedAt` is `null` and list empty before the first.
+`POST /api/admin/access-grants/probe` asks for a probe alone, which the next pass makes first. Both
+requests answer `409 urn:courtside:error:access-control-not-connected` without a connector, as a
+retry does. A board sends a
 failing grant again with `POST /api/admin/access-grants/{id}/retry`: it marks the grant under its row
 lock, signals the worker and is audited as `access.grant.retryRequested`, and the next pass clears
 the refusal and the count; an unknown grant answers
@@ -726,9 +747,9 @@ same way. No domain event, log line, stored failure, problem body or administrat
 dynamic code: connector text is stored and logged with URLs reduced to scheme, host and path, the
 call's code masked and every standalone run of four to eight digits masked.
 
-Known limits: probe readings are kept in memory per instance. A board that types a live dynamic code
-as a gate's static code is not stopped, and both then open with that code until the grant's window
-ends.
+Known limits: probe readings and the latest connection check are kept in memory per instance. A
+board that types a live dynamic code as a gate's static code is not stopped, and both then open with
+that code until the grant's window ends.
 
 #### Court occupancy for building automation
 

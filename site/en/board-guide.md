@@ -203,7 +203,7 @@ it. Change it from time to time, and after any misuse.
 When a Loxone Miniserver is the connected access-control system, you pick a **Loxone group** for each
 access point without a static code. A booking's Miniserver user joins that group, so the group
 decides which door its code opens. The choice lists the groups Courtside read when it last checked
-the Miniserver. When it is empty, a hint takes its place. Press **Check now** under *Access grants*
+the Miniserver. When it is empty, a hint takes its place. Press **Check connection** under *Access grants*
 then, and the groups appear after the check. A stored group the Miniserver no longer knows shows as
 *Unknown group* in the choice. Pick another one or remove it. An access point without a group opens
 for no booking code. Its grants fail with the reason *access point has no Loxone group* until you pick
@@ -663,8 +663,9 @@ The **Records** area has nine views. The next section describes *Retention*.
   one, five, fifteen and sixty minutes. After the fifth failure or a refusal the grant is failing.
   Fix the cause in the access-control system and press **Send again**. Courtside keeps trying a
   removal without end. Above the list you see what the access-control system answered when it was
-  last checked. **Check now** makes Courtside ask again in its next pass. The view never shows the
-  code itself. Without a connected access-control system the list stays empty and bookings work as
+  last checked. **Check connection** makes Courtside check the connection step by step in its next
+  pass. After a reload each check is listed below with its outcome, and you check the keypad
+  yourself at the door. The view never shows the code itself. Without a connected access-control system the list stays empty and bookings work as
   before.
 
 ![Access grants with a failing grant, its reason and Send again, and an installed one.](../screenshots/en/access-grants.png)
