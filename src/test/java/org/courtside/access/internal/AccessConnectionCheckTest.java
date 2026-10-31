@@ -14,6 +14,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
@@ -139,6 +140,65 @@ class AccessConnectionCheckTest extends AccessPassTestSupport {
                 .extracting(AccessGrantAdministration.CheckView::check, AccessGrantAdministration.CheckView::outcome,
                         AccessGrantAdministration.CheckView::code)
                 .containsExactly(tuple("connector", CheckOutcome.FAILED, "access.check.failed"));
+    }
+
+    @Test
+    void givenThePassLosesItsLockDuringACheck_whenTheNextCheckWouldRun_thenItStopsKeepsNoReportAndStaysRequested() {
+        // given
+        AtomicBoolean secondRan = new AtomicBoolean();
+        connector.checks(
+                new ConnectionCheck("first", List.of(), () -> {
+                    terminateThePassLockSession();
+                    return FINE;
+                }),
+                new ConnectionCheck("second", List.of(), () -> {
+                    secondRan.set(true);
+                    return FINE;
+                }));
+        administration.requestConnectionCheck();
+
+        // when
+        PassResult result = pass.runPassNow();
+
+        // then
+        assertThat(result).isEqualTo(new PassResult.LockLost());
+        assertThat(secondRan).as("no check runs once the lock is gone").isFalse();
+        assertThat(administration.connectionCheck().checkedAt()).as("a cut-short run keeps no report").isNull();
+        assertThat(checkReadings.takeRequest()).as("the next pass that holds the lock runs it").isTrue();
+    }
+
+    @Test
+    void givenThePassIsStoppingDuringACheck_whenTheNextCheckWouldRun_thenItStopsKeepsNoReportAndStaysRequested() {
+        // given
+        AtomicBoolean stopping = new AtomicBoolean();
+        AtomicBoolean secondRan = new AtomicBoolean();
+        connector.checks(
+                new ConnectionCheck("first", List.of(), () -> {
+                    stopping.set(true);
+                    return FINE;
+                }),
+                new ConnectionCheck("second", List.of(), () -> {
+                    secondRan.set(true);
+                    return FINE;
+                }));
+        book(courts.get(0));
+        administration.requestConnectionCheck();
+
+        // when
+        PassResult result = pass.runPassNow(stopping::get);
+
+        // then
+        assertThat(result).isEqualTo(new PassResult.Stopped());
+        assertThat(secondRan).as("no check runs once the worker stops").isFalse();
+        assertThat(administration.connectionCheck().checkedAt()).as("a cut-short run keeps no report").isNull();
+        assertThat(checkReadings.takeRequest()).as("the next pass runs it").isTrue();
+    }
+
+    private void terminateThePassLockSession() {
+        jdbc.sql("""
+                        SELECT pg_terminate_backend(pid) FROM pg_locks
+                        WHERE locktype = 'advisory' AND classid = 0 AND objid = ? AND objsubid = 1
+                        """).params(PassLock.KEY).query().listOfRows();
     }
 
     @Test

@@ -120,7 +120,7 @@ class AccessPass {
     }
 
     private PassResult act(PassLock lock, BooleanSupplier stopping) {
-        checks.runIfRequested();
+        checks.runIfRequested(() -> !stopping.getAsBoolean() && lock.stillHeld());
         List<UUID> open = jdbc.sql("""
                         SELECT id FROM access_grant
                         WHERE wanted OR remote <> 'NONE' OR next_attempt_at <= :now OR retry_requested_at IS NOT NULL

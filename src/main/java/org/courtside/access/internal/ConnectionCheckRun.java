@@ -14,7 +14,9 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
+import java.util.function.BooleanSupplier;
 
 /** Runs a board's requested connection check, each check as its own call, and keeps what each one found. */
 @Slf4j
@@ -42,7 +44,8 @@ class ConnectionCheckRun {
         this.readings = readings;
     }
 
-    void runIfRequested() {
+    /** Runs a requested check while {@code proceed} holds; a run it cuts short records nothing and stays requested. */
+    void runIfRequested(BooleanSupplier proceed) {
         if (!readings.takeRequest()) {
             return;
         }
@@ -51,7 +54,12 @@ class ConnectionCheckRun {
             for (AccessPoint accessPoint : facility.activeAccessPointsWithoutCodes()) {
                 granted.put(accessPoint.getId(), accessPoint.getName());
             }
-            readings.record(clock.now(), run(connector.connectionChecks(granted), calls));
+            Optional<List<Checked>> checked = run(connector.connectionChecks(granted), calls, proceed);
+            if (checked.isEmpty()) {
+                readings.request();
+                return;
+            }
+            readings.record(clock.now(), checked.get());
         } catch (RuntimeException failed) {
             log.warn("The connection check could not start: {}: {}", failed.getClass().getName(),
                     ConnectorText.sanitized(failed.getMessage(), null));
@@ -61,9 +69,17 @@ class ConnectionCheckRun {
     }
 
     static List<Checked> run(List<ConnectionCheck> checks, CallRunner calls) {
+        return run(checks, calls, () -> true).orElseThrow();
+    }
+
+    private static Optional<List<Checked>> run(List<ConnectionCheck> checks, CallRunner calls,
+                                               BooleanSupplier proceed) {
         Map<String, CheckOutcome> outcomes = new LinkedHashMap<>();
         List<Checked> checked = new ArrayList<>();
         for (ConnectionCheck check : checks) {
+            if (!proceed.getAsBoolean()) {
+                return Optional.empty();
+            }
             List<String> unmet = check.requires().stream()
                     .filter(required -> outcomes.get(required) != CheckOutcome.PASSED).toList();
             CheckResult result = unmet.isEmpty() ? called(check, calls)
@@ -71,7 +87,7 @@ class ConnectionCheckRun {
             outcomes.put(check.name(), result.outcome());
             checked.add(new Checked(check.name(), result));
         }
-        return List.copyOf(checked);
+        return Optional.of(List.copyOf(checked));
     }
 
     private static CheckResult called(ConnectionCheck check, CallRunner calls) {
