@@ -40,8 +40,8 @@ public class AccessGrantAdministration {
     private final String connector;
 
     AccessGrantAdministration(AccessGrantRepository grants, ProbeReadings readings, ObjectProvider<AccessWorker> worker,
-                              ObjectProvider<AccessControlConnector> connectors, BookingAnnouncer bookings, FacilityService facility, PassClock clock,
-                              ApplicationEventPublisher events,
+                              ObjectProvider<AccessControlConnector> connectors, BookingAnnouncer bookings,
+                              FacilityService facility, PassClock clock, ApplicationEventPublisher events,
                               @Value("${courtside.access-control.connector}") String connector) {
         this.grants = grants;
         this.readings = readings;

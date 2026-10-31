@@ -77,7 +77,8 @@ class LoxoneAccessControl implements AccessControlConnector, AutoCloseable {
                     delete(session, surplus);
                 }
             }
-            LoxoneClient.Reply edited = session.changing("addoredituser", user(instruction, name, kept, assigned.get()));
+            LoxoneClient.Reply edited = session.changing("addoredituser",
+                    user(instruction, name, kept, assigned.get()));
             switch (edited.code()) {
                 case 200 -> {
                 }
