@@ -270,6 +270,19 @@ class LoxoneConnectionCheckTest extends LoxoneTestSupport {
     }
 
     @Test
+    void givenAMappedGroupThatIsNoLoxoneUuid_whenChecked_thenTheGroupsFailItAsMissingNotUnmapped() {
+        // given
+        mapping.put(COURT_TWO, "court-two-group");
+
+        // when
+        List<ConnectionCheckRun.Checked> checked = checked(connector);
+
+        // then
+        assertThat(result(checked, "groups")).as("a mapped value the Miniserver cannot hold names no group there")
+                .isEqualTo(CheckResult.failed("access.check.groups.missing", Map.of("accessPoints", "South gate")));
+    }
+
+    @Test
     void givenNoAccessPointReceivingGrants_whenChecked_thenTheGroupsNeedNothing() {
         // when
         List<ConnectionCheckRun.Checked> checked = checked(connector, Map.of(), DEADLINE);

@@ -121,8 +121,7 @@ final class LoxoneConnectionChecks {
         List<String> unmapped = new ArrayList<>();
         List<String> missing = new ArrayList<>();
         granted.entrySet().stream().sorted(Map.Entry.comparingByValue()).forEach(accessPoint -> {
-            Optional<String> group = mapping.groupOf(accessPoint.getKey())
-                    .filter(uuid -> LoxoneAccessControl.LOXONE_UUID.matcher(uuid).matches());
+            Optional<String> group = mapping.groupOf(accessPoint.getKey()).filter(mapped -> !mapped.isBlank());
             if (group.isEmpty()) {
                 unmapped.add(accessPoint.getValue());
             } else if (!normal.contains(group.get())) {
