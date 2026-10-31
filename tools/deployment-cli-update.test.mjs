@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync, realpathSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, readFileSync, realpathSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
 import { executable } from "./deployment-archive.mjs";
@@ -734,3 +734,54 @@ for (const recipe of ["full-self-hosted", "standard"]) {
     });
   });
 }
+
+test("given a private installation, when update stages a verified release after backup, then restricted container identities can read public bind material", () => {
+  fixture((context) => {
+    // given
+    assert.equal(initialize(context).status, 0);
+    const next = releaseArchive(context.root, "0.1.1");
+
+    // when
+    const result = run(next, context.target, ["update", "--archive", next, "--yes"], context.environment);
+    const release = join(context.target, "releases", "0.1.1");
+    const directory = statSync(join(release, "mail")).mode & 0o777;
+    const renderer = statSync(join(release, "mail", "render.sh")).mode & 0o777;
+    const readiness = statSync(join(release, "mail-ready.mjs")).mode & 0o777;
+
+    // then
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(directory, 0o555, "the bind-mounted directory must admit a different container identity");
+    assert.equal(renderer & 0o444, 0o444, "the renderer must be readable without DAC override");
+    assert.equal(readiness & 0o444, 0o444, "the unprivileged readiness identity must read its program");
+    assert.equal((directory | renderer | readiness) & 0o222, 0, "release material must remain immutable");
+    assert.equal(statSync(context.target).mode & 0o777, 0o700);
+    assert.equal(statSync(join(context.target, "releases")).mode & 0o777, 0o700);
+    assert.equal(statSync(join(context.target, "config", ".env")).mode & 0o777, 0o600);
+  });
+});
+
+test("given an owner-only staged target, when update retries, then verified container bind material becomes readable", () => {
+  fixture((context) => {
+    // given
+    assert.equal(initialize(context).status, 0);
+    const next = releaseArchive(context.root, "0.1.1");
+    const failure = join(context.root, "docker-fail-match");
+    writeFileSync(failure, "image pull");
+    assert.equal(run(next, context.target, ["update", "--archive", next, "--yes"], context.environment).status, 2);
+    const release = join(context.target, "releases", "0.1.1");
+    chmodSync(join(release, "mail"), 0o500);
+    chmodSync(join(release, "mail", "render.sh"), 0o500);
+    chmodSync(join(release, "mail-ready.mjs"), 0o400);
+    rmSync(failure);
+
+    // when
+    const result = run(next, context.target, ["update", "--archive", next, "--yes"], context.environment);
+
+    // then
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(statSync(join(release, "mail")).mode & 0o777, 0o555);
+    assert.equal(statSync(join(release, "mail", "render.sh")).mode & 0o444, 0o444);
+    assert.equal(statSync(join(release, "mail-ready.mjs")).mode & 0o777, 0o444);
+    assert.equal(statSync(join(context.target, "config", ".env")).mode & 0o777, 0o600);
+  });
+});

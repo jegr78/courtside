@@ -700,6 +700,7 @@ publish_release() {
       refuse "release integrity check failed: $problem"
     fi
   fi
+  chmod -R a+rX "$release_directory"
   manifest_version=$expected_version
   manifest_revision=$expected_revision
   manifest_image=$expected_image

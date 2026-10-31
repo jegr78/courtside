@@ -39,7 +39,9 @@ sudo install -d -m 0700 -o "$USER" /srv/courtside
 ```
 
 `init` validates the answers, prints the plan and asks for an exact confirmation before it writes
-anything. It separates read-only releases from mutable configuration, secrets and backups. For an
+anything. It separates read-only releases from mutable configuration, secrets and backups. Verified
+public release files remain readable by restricted container identities, while the installation and
+releases parent directories stay owner-only. For an
 unattended install, use the answer-file example in the selected recipe guide and pass secrets only
 through the process environment.
 
