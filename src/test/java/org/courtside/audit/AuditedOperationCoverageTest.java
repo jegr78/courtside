@@ -21,6 +21,7 @@ class AuditedOperationCoverageTest {
     private static final String NONE = "none";
 
     private static final List<String> KNOWN_OPERATIONS = List.of(
+            "AccessGrantAdministration#groups",
             "AccessGrantAdministration#overview",
             "AccessGrantAdministration#requestProbe",
             "AccessGrantAdministration#retry",
@@ -113,6 +114,7 @@ class AuditedOperationCoverageTest {
             "FacilityService#requireBookableCourts",
             "FacilityService#requireCourt",
             "FacilityService#scheduleOpeningHours",
+            "FacilityService#loxoneGroupOf",
             "FacilityService#requireAccessPoint",
             "FacilityService#setAccessPointActive",
             "FacilityService#setCourtActive",

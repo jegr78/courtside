@@ -132,7 +132,7 @@ class AccessCodeMessageTest extends AbstractIntegrationTest {
                 janeAccount, jane, Set.of(Role.MEMBER), null, List.of(ParticipantSpec.member(john)), null));
 
         // when
-        facilityService.changeAccessPoint(northGate, "North gate", courts.subList(0, 2), NEW_CODE, null, false);
+        facilityService.changeAccessPoint(northGate, "North gate", courts.subList(0, 2), NEW_CODE, null, false, null);
 
         // then
         assertThat(announcedBookings()).as("a booking on two courts behind one gate is one booking to tell")
@@ -178,7 +178,7 @@ class AccessCodeMessageTest extends AbstractIntegrationTest {
         clearInvocations(sender);
 
         // when
-        facilityService.changeAccessPoint(northGate, "North gate", courts.subList(0, 2), NEW_CODE, null, false);
+        facilityService.changeAccessPoint(northGate, "North gate", courts.subList(0, 2), NEW_CODE, null, false, null);
 
         // then
         List<Map<String, Object>> told = jdbc.sql("""
@@ -206,7 +206,7 @@ class AccessCodeMessageTest extends AbstractIntegrationTest {
         clearInvocations(sender);
 
         // when
-        facilityService.changeAccessPoint(northGate, "North gate", courts.subList(0, 2), NEW_CODE, null, false);
+        facilityService.changeAccessPoint(northGate, "North gate", courts.subList(0, 2), NEW_CODE, null, false, null);
 
         // then
         assertThat(jdbc.sql("SELECT account_id FROM notification WHERE kind = 'ACCESS_CODE_CHANGED'")
@@ -229,7 +229,7 @@ class AccessCodeMessageTest extends AbstractIntegrationTest {
                 .update();
 
         // when
-        facilityService.changeAccessPoint(northGate, "North gate", courts.subList(0, 2), NEW_CODE, null, false);
+        facilityService.changeAccessPoint(northGate, "North gate", courts.subList(0, 2), NEW_CODE, null, false, null);
 
         // then
         assertThat(jdbc.sql("SELECT count(*) FROM notification WHERE kind = 'ACCESS_CODE_CHANGED'")
@@ -256,7 +256,7 @@ class AccessCodeMessageTest extends AbstractIntegrationTest {
         assertThat(reminded).as("more occurrences than one page holds").isGreaterThan(100);
 
         // when
-        facilityService.changeAccessPoint(northGate, "North gate", courts.subList(0, 2), NEW_CODE, null, false);
+        facilityService.changeAccessPoint(northGate, "North gate", courts.subList(0, 2), NEW_CODE, null, false, null);
 
         // then
         assertThat(announcedBookings()).as("the walk goes on past its first page of 100").hasSize(reminded)
@@ -271,7 +271,7 @@ class AccessCodeMessageTest extends AbstractIntegrationTest {
         long announcedBefore = codeAnnouncements();
 
         // when
-        facilityService.changeAccessPoint(northGate, "North gate", courts.subList(0, 2), null, null, false);
+        facilityService.changeAccessPoint(northGate, "North gate", courts.subList(0, 2), null, null, false, null);
 
         // then
         assertThat(codeAnnouncements()).as("a removed code is no new code to announce")
@@ -286,7 +286,7 @@ class AccessCodeMessageTest extends AbstractIntegrationTest {
         UUID booking = bookOn(courts.get(2), MEMBER_BOOKING_CARD, janeAccount, jane, john);
 
         // when
-        facilityService.createAccessPoint("South gate", List.of(courts.get(2)), NEW_CODE, null, false);
+        facilityService.createAccessPoint("South gate", List.of(courts.get(2)), NEW_CODE, null, false, null);
 
         // then
         assertThat(announcedBookings()).as("a code that newly opens the booking's court is announced")
@@ -302,7 +302,7 @@ class AccessCodeMessageTest extends AbstractIntegrationTest {
         long announcedBefore = codeAnnouncements();
 
         // when
-        facilityService.createAccessPoint("South gate", List.of(courts.get(2)), null, null, false);
+        facilityService.createAccessPoint("South gate", List.of(courts.get(2)), null, null, false, null);
 
         // then
         assertThat(codeAnnouncements()).as("an access point without a code hands nothing out")
@@ -317,7 +317,7 @@ class AccessCodeMessageTest extends AbstractIntegrationTest {
         UUID onCourtThree = bookOn(courts.get(2), MEMBER_BOOKING_CARD, johnAccount, john, jane);
 
         // when
-        facilityService.changeAccessPoint(northGate, "North gate", courts, OLD_CODE, null, false);
+        facilityService.changeAccessPoint(northGate, "North gate", courts, OLD_CODE, null, false, null);
 
         // then
         assertThat(announcedBookings()).as("only the added court's bookings receive a code they did not hold")
@@ -333,7 +333,7 @@ class AccessCodeMessageTest extends AbstractIntegrationTest {
         long announcedBefore = codeAnnouncements();
 
         // when
-        facilityService.changeAccessPoint(northGate, "North gate", courts.subList(0, 1), OLD_CODE, null, false);
+        facilityService.changeAccessPoint(northGate, "North gate", courts.subList(0, 1), OLD_CODE, null, false, null);
 
         // then
         assertThat(codeAnnouncements()).as("a court the gate no longer serves needs no new code")
@@ -374,7 +374,8 @@ class AccessCodeMessageTest extends AbstractIntegrationTest {
     @Test
     void givenAnInactiveAccessPointWithoutACode_whenItIsReactivated_thenNobodyIsTold() {
         // given
-        UUID southGate = facilityService.createAccessPoint("South gate", List.of(courts.get(1)), null, null, false).getId();
+        UUID southGate = facilityService.createAccessPoint("South gate", List.of(courts.get(1)),
+                null, null, false, null).getId();
         facilityService.setAccessPointActive(southGate, false);
         bookOnCourtTwo(janeAccount, jane, john);
 

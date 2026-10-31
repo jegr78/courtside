@@ -147,12 +147,6 @@ public class FacilityService {
 
     @Transactional
     public AccessPoint createAccessPoint(String name, Collection<UUID> courtIds, String staticCode,
-                                         String emergencyCode, boolean openToMembers) {
-        return createAccessPoint(name, courtIds, staticCode, emergencyCode, openToMembers, null);
-    }
-
-    @Transactional
-    public AccessPoint createAccessPoint(String name, Collection<UUID> courtIds, String staticCode,
                                          String emergencyCode, boolean openToMembers, String loxoneGroup) {
         String stored = requireAccessPointName(name);
         Set<UUID> courtsServed = requireCourts(courtIds);
@@ -170,14 +164,6 @@ public class FacilityService {
 
     public Optional<String> loxoneGroupOf(UUID accessPointId) {
         return accessPoints.findById(accessPointId).map(AccessPoint::getLoxoneGroup);
-    }
-
-    /** Replaces every field but the Loxone group, which stays as stored. */
-    @Transactional
-    public AccessPoint changeAccessPoint(UUID accessPointId, String name, Collection<UUID> courtIds,
-                                         String staticCode, String emergencyCode, boolean openToMembers) {
-        return changeAccessPoint(accessPointId, name, courtIds, staticCode, emergencyCode, openToMembers,
-                requireAccessPoint(accessPointId).getLoxoneGroup());
     }
 
     /** Replaces every field. Only a new or changed code has to fit today's code length. */

@@ -46,18 +46,4 @@ class AccessPointLoxoneGroupTest extends AbstractIntegrationTest {
                 .containsEntry("changedFields", List.of("loxoneGroup"));
         assertThat(facility.loxoneGroupOf(gate)).contains(OTHER_GROUP);
     }
-
-    @Test
-    void givenAMappedAccessPoint_whenAChangeLeavesTheGroupOut_thenTheGroupStays() {
-        // given
-        UUID gate = facility.createAccessPoint("North gate", List.of(), null, null, false, GROUP).getId();
-
-        // when
-        facility.changeAccessPoint(gate, "South gate", List.of(), null, null, false);
-
-        // then
-        assertThat(facility.loxoneGroupOf(gate)).as("a caller that does not know about groups keeps the mapping")
-                .contains(GROUP);
-        assertThat(facility.loxoneGroupOf(UUID.randomUUID())).isEmpty();
-    }
 }

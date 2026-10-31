@@ -30,7 +30,7 @@ public class FacilityTestFixture {
     }
 
     public UUID createAccessPoint(String name, List<UUID> courtIds, String staticCode, boolean openToMembers) {
-        return facilityService.createAccessPoint(name, courtIds, staticCode, null, openToMembers).getId();
+        return facilityService.createAccessPoint(name, courtIds, staticCode, null, openToMembers, null).getId();
     }
 
     public UUID createAccessPointWithLoxoneGroup(String name, String loxoneGroup) {
@@ -44,7 +44,7 @@ public class FacilityTestFixture {
     }
 
     public UUID createAccessPointWithEmergencyCode(String name, List<UUID> courtIds, String emergencyCode) {
-        return facilityService.createAccessPoint(name, courtIds, null, emergencyCode, false).getId();
+        return facilityService.createAccessPoint(name, courtIds, null, emergencyCode, false, null).getId();
     }
 
     public void changeAccessPoint(UUID accessPointId, String name, List<UUID> courtIds, String staticCode) {
@@ -53,7 +53,8 @@ public class FacilityTestFixture {
 
     public void changeAccessPoint(UUID accessPointId, String name, List<UUID> courtIds, String staticCode,
                                   boolean openToMembers) {
-        facilityService.changeAccessPoint(accessPointId, name, courtIds, staticCode, null, openToMembers);
+        facilityService.changeAccessPoint(accessPointId, name, courtIds, staticCode, null, openToMembers,
+                facilityService.requireAccessPoint(accessPointId).getLoxoneGroup());
     }
 
     public void activateAccessPoint(UUID accessPointId) {
