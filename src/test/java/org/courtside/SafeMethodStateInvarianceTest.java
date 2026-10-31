@@ -208,7 +208,8 @@ class SafeMethodStateInvarianceTest extends AbstractIntegrationTest {
             entry("/actuator/health", read()),
             entry("/actuator/health/liveness", read()),
             entry("/actuator/health/readiness", read()),
-            entry("/actuator/health/mail", read()));
+            entry("/actuator/health/mail", read()),
+            entry("/actuator/health/access-control", read()));
 
     @LocalServerPort
     private int port;

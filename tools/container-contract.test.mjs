@@ -174,7 +174,7 @@ test("given the image's health check, when the contract describes health, then i
     const endpoint = /^  endpoint:\n {4}health:\n(?<body>(?: {6}.*\n)+)/m.exec(properties)?.groups.body ?? "";
     const groups = [
       ...(/probes:\n\s+enabled: true/.test(endpoint) ? ["liveness", "readiness"] : []),
-      ...all(/ {6}group:\n(?<groups>(?: {8}.*\n)+)/.exec(endpoint)?.groups.groups ?? "", /^ {8}(\w+):$/gm),
+      ...all(/ {6}group:\n(?<groups>(?: {8}.*\n)+)/.exec(endpoint)?.groups.groups ?? "", /^ {8}([\w-]+):$/gm),
     ].sort();
     const body = JSON.stringify({ ...(groups.length ? { groups } : {}), status: "UP" });
 

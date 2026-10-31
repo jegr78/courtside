@@ -1354,7 +1354,10 @@ the operator still owns durable storage, external access and the longer retentio
 ## Operations and observability
 
 The image exposes `/actuator/health`. Mail health is available to administrators at
-`/actuator/health/mail`. Other management endpoints are not public by default.
+`/actuator/health/mail`, and the access-control connector with its last probe reading at
+`/actuator/health/access-control`. That indicator never contacts the access-control system and always
+reports `UP`, so an unreachable Miniserver never changes the status the container health check reads.
+Other management endpoints are not public by default.
 
 Structured ECS logs go to standard output. Metrics and traces can use OTLP when the operator enables
 their separate endpoints. Courtside requires no monitoring backend.
