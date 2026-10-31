@@ -1,6 +1,9 @@
 package org.courtside.access.internal;
 
+import org.courtside.access.GrantOutcome;
+import org.courtside.access.Scope;
 import org.courtside.access.internal.ScriptedAccessControl.Kind;
+import org.courtside.access.internal.ScriptedAccessControl.Step;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.boot.test.system.CapturedOutput;
@@ -40,6 +43,30 @@ class AccessPassReconciliationTest extends AccessPassTestSupport {
         assertThat(connector.calls(Kind.REVOKE)).as("the next pass revokes only the listed one once more")
                 .hasSize(3);
         assertThat(remoteOf(grantId)).isEqualTo("NONE");
+    }
+
+    @Test
+    void givenAListedGrantStillWantedButRefused_whenReconciled_thenItIsRevokedAndStaysRefused() {
+        // given
+        connector.nextInstalls(new Step.Answer(new GrantOutcome.Refused(Scope.GRANT, "keypad full")));
+        UUID booking = book(courts.get(0));
+        pass.runPassNow();
+        passAt(START.plus(Duration.ofMinutes(1)));
+        UUID grantId = grantIdOf(booking);
+        assertThat(remoteOf(grantId)).as("the refused install has been revoked here").isEqualTo("NONE");
+        int revokesBefore = connector.calls(Kind.REVOKE).size();
+        connector.lists(Set.of(grantId));
+
+        // when
+        passAt(START.plus(Duration.ofHours(2)));
+        passAt(START.plus(Duration.ofHours(2).plusMinutes(1)));
+
+        // then
+        assertThat(connector.calls(Kind.REVOKE)).as("a user a refused grant left behind is revoked again")
+                .hasSize(revokesBefore + 1);
+        assertThat(connector.calls(Kind.GRANT)).as("a refused grant is not installed again").hasSize(1);
+        assertThat(jdbc.sql("SELECT refused FROM access_grant WHERE id = ?").params(grantId).query(Boolean.class)
+                .single()).as("the refusal waits for the board").isTrue();
     }
 
     @Test
