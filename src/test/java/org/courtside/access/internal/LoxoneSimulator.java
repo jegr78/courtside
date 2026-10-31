@@ -239,7 +239,7 @@ final class LoxoneSimulator implements AutoCloseable {
     }
 
     LoxoneSettings settingsByUrl(Duration deadline) {
-        return new LoxoneSettings(new LoxoneAddress.Fixed(url()), USER, PASSWORD, zone, deadline);
+        return new LoxoneSettings(new LoxoneAddress.Fixed(url()), USER, PASSWORD, () -> zone, deadline);
     }
 
     LoxoneSettings settingsBySerial(Duration deadline) {
@@ -247,7 +247,7 @@ final class LoxoneSimulator implements AutoCloseable {
     }
 
     LoxoneSettings settingsBySerial(Duration deadline, List<LoxoneAddress.Relay> relays) {
-        return new LoxoneSettings(new LoxoneAddress.Serial(SERIAL, resolver(), relays), USER, PASSWORD, zone,
+        return new LoxoneSettings(new LoxoneAddress.Serial(SERIAL, resolver(), relays), USER, PASSWORD, () -> zone,
                 deadline);
     }
 

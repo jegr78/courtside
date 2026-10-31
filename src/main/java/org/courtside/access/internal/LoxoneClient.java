@@ -158,7 +158,7 @@ final class LoxoneClient implements AutoCloseable {
             kill(session, issued);
             throw new Refusal("token lacks the user-management right", null);
         }
-        renewAt = LoxoneTime.instant(value.path("validUntil").asLong(), settings.zone()).minus(RENEWAL_MARGIN);
+        renewAt = LoxoneTime.instant(value.path("validUntil").asLong(), settings.zone().zoneId()).minus(RENEWAL_MARGIN);
         token = issued;
         return issued;
     }
