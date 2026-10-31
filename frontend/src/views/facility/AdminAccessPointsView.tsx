@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
-import { api, type AccessPoint, type AccessPointRequest, type AdminCourt, type ClubConfig, type ClubConfigRequest } from "../../api/client";
+import { api, type AccessControlGroups, type AccessPoint, type AccessPointRequest, type AdminCourt, type ClubConfig, type ClubConfigRequest } from "../../api/client";
 import { Button } from "../../components/Button";
 import { TextField } from "../../components/TextField";
 import { formString } from "../../forms/formString";
@@ -15,6 +15,8 @@ const MAX_NAME = 60;
 const NEW = "access-point:new";
 const SETTINGS = "access-settings";
 
+type RemoteGroup = AccessControlGroups["groups"][number];
+
 function courtLabel(court: AdminCourt, t: (key: string, options?: Record<string, unknown>) => string) {
   return court.name ? `${t("court.number", { number: court.number })} · ${court.name}` : t("court.number", { number: court.number });
 }
@@ -22,12 +24,14 @@ function courtLabel(court: AdminCourt, t: (key: string, options?: Record<string,
 function requested(form: FormData): AccessPointRequest {
   const code = formString(form, "staticCode").trim();
   const emergencyCode = formString(form, "emergencyCode").trim();
+  const loxoneGroup = formString(form, "loxoneGroup").trim();
   return {
     name: formString(form, "name").trim(),
     courtIds: form.getAll("courtIds").map(String),
     staticCode: code === "" ? null : code,
     emergencyCode: emergencyCode === "" ? null : emergencyCode,
-    openToMembers: form.get("openToMembers") === "on"
+    openToMembers: form.get("openToMembers") === "on",
+    loxoneGroup: loxoneGroup === "" ? null : loxoneGroup
   };
 }
 
@@ -45,6 +49,7 @@ export function AdminAccessPointsView({ configurationChanged }: { configurationC
   const { t } = useTranslation();
   const [accessPoints, setAccessPoints] = useState<AccessPoint[]>();
   const [courts, setCourts] = useState<AdminCourt[]>();
+  const [groups, setGroups] = useState<RemoteGroup[]>();
   const [editing, setEditing] = useState<string>();
   const { error, success, pending, reportError, refuse, save } = useSaving();
   const settings = useClubConfigForm(configurationChanged, ownedFields.accessSettings);
@@ -52,10 +57,11 @@ export function AdminAccessPointsView({ configurationChanged }: { configurationC
   const digits = settings.saved?.accessCodeLength;
 
   useEffect(() => {
-    void Promise.all([api.adminAccessPoints(), api.adminCourts(), api.adminConfig()])
-      .then(([points, allCourts, config]) => {
+    void Promise.all([api.adminAccessPoints(), api.adminCourts(), api.adminConfig(), api.adminAccessControlGroups()])
+      .then(([points, allCourts, config, listed]) => {
         setAccessPoints(points);
         setCourts(allCourts);
+        setGroups(listed.groups);
         settingsLoaded(config);
       })
       .catch(reportError);
@@ -96,13 +102,14 @@ export function AdminAccessPointsView({ configurationChanged }: { configurationC
     void save(SETTINGS, async () => settings.applied(await settings.save(settingsConfig)));
   }
 
-  const loaded = accessPoints !== undefined && courts !== undefined && digits !== undefined && settingsConfig !== undefined;
+  const loaded = accessPoints !== undefined && courts !== undefined && groups !== undefined && digits !== undefined
+    && settingsConfig !== undefined;
   return <FacilityPage testId="admin-access-points-view" title={t("admin.facility.accessPoints")} error={error} success={success}>
     {loaded && <>
       <p className="text-muted">{t("admin.facility.accessPointsHint")}</p>
       <AccessSettingsForm config={settingsConfig} change={settings.change} unsaved={settings.unsaved}
                           pending={pending.has(SETTINGS)} discard={settings.discard} onSubmit={saveSettings} />
-      <AccessPointForm id={NEW} heading={t("admin.facility.newAccessPoint")} courts={courts} digits={digits}
+      <AccessPointForm id={NEW} heading={t("admin.facility.newAccessPoint")} courts={courts} groups={groups} digits={digits}
                        disabled={pending.has(NEW)} submitLabel={t("admin.create")} submitTestId="create-access-point"
                        onSubmit={create} />
       <section className="grid gap-3" aria-labelledby="all-access-points">
@@ -111,7 +118,7 @@ export function AdminAccessPointsView({ configurationChanged }: { configurationC
         <ul className="grid gap-3">
           {accessPoints.map((accessPoint) => <li key={accessPoint.id} data-testid={`access-point-${accessPoint.id}`} className="grid gap-3 rounded-xl border p-4">
             {editing === accessPoint.id
-              ? <AccessPointForm id={`access-point:${accessPoint.id}`} heading={accessPoint.name} courts={courts} digits={digits}
+              ? <AccessPointForm id={`access-point:${accessPoint.id}`} heading={accessPoint.name} courts={courts} groups={groups} digits={digits}
                                  stored={accessPoint} disabled={pending.has(`access-point:${accessPoint.id}`)}
                                  submitLabel={t("admin.facility.accessPointSave")} submitTestId={`save-access-point-${accessPoint.id}`}
                                  cancel={() => setEditing(undefined)}
@@ -183,10 +190,11 @@ function AccessPointSummary({ accessPoint, courts, edit }: { accessPoint: Access
   </div>;
 }
 
-function AccessPointForm({ id, heading, courts, digits, stored, disabled, submitLabel, submitTestId, cancel, onSubmit }: {
+function AccessPointForm({ id, heading, courts, groups, digits, stored, disabled, submitLabel, submitTestId, cancel, onSubmit }: {
   id: string;
   heading: string;
   courts: AdminCourt[];
+  groups: RemoteGroup[];
   digits: number;
   stored?: AccessPoint;
   disabled: boolean;
@@ -231,6 +239,7 @@ function AccessPointForm({ id, heading, courts, digits, stored, disabled, submit
       </label>
       <p className="text-muted text-sm">{t("admin.facility.accessPointOpenToMembersHint")}</p>
     </div>
+    <LoxoneGroupField prefix={prefix} groups={groups} stored={stored?.loxoneGroup ?? null} disabled={disabled} />
     <span className="flex flex-wrap gap-3">
       <Button variant="primary" type="submit" data-testid={submitTestId} disabled={disabled}>{submitLabel}</Button>
       {cancel && <Button variant="secondary" type="button" data-testid={`${prefix}-cancel`} onClick={() => { unsaved.saved(); cancel(); }}>
@@ -238,4 +247,33 @@ function AccessPointForm({ id, heading, courts, digits, stored, disabled, submit
       </Button>}
     </span>
   </form>;
+}
+
+// Without a list the stored group still travels with every save, because a change replaces every field.
+function LoxoneGroupField({ prefix, groups, stored, disabled }: {
+  prefix: string;
+  groups: RemoteGroup[];
+  stored: string | null;
+  disabled: boolean;
+}) {
+  const { t } = useTranslation();
+  if (groups.length === 0) {
+    return <div className="grid gap-1">
+      <input type="hidden" name="loxoneGroup" value={stored ?? ""} />
+      <p data-testid={`${prefix}-loxone-group-hint`} className="text-muted text-sm">{t("admin.facility.loxoneGroupMissing")}</p>
+    </div>;
+  }
+  const unknown = stored !== null && !groups.some((group) => group.id === stored);
+  return <div className="grid gap-1">
+    <label className="grid gap-1">
+      <span className="font-medium">{t("admin.facility.loxoneGroup")}</span>
+      <select name="loxoneGroup" data-testid={`${prefix}-loxone-group`} defaultValue={stored ?? ""} disabled={disabled}
+              className="form-control w-full min-w-0 max-w-md rounded-lg border px-3 py-2">
+        <option value="">{t("admin.facility.loxoneGroupNone")}</option>
+        {unknown && <option value={stored ?? ""} data-testid={`${prefix}-loxone-group-unknown`}>{t("admin.facility.loxoneGroupUnknown")}</option>}
+        {groups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}
+      </select>
+    </label>
+    <p className="text-muted text-sm">{t("admin.facility.loxoneGroupHint")}</p>
+  </div>;
 }
