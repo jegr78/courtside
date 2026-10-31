@@ -8,7 +8,7 @@ import { crc32 } from "node:zlib";
 
 const YAML = createRequire(new URL("../frontend/package.json", import.meta.url))("yaml");
 
-const roots = ["courtside", "recipe.sh", "mfa-keys.sh", ".env.example", "README.md", "container-contract.md",
+const roots = ["courtside", "recipe.sh", "mfa-keys.sh", "mail-store-transition.sh", ".env.example", "README.md", "container-contract.md",
   "compose.booking-seed.yaml", "compose.database-upgrade.yaml", "compose.recovery-check.yaml",
   "compose.key-export.yaml", "examples", "guides"];
 
@@ -193,6 +193,7 @@ export function refuseSecrets(entries) {
     const rules = name.startsWith("Caddyfile") ? [assignment, directive] : [assignment];
     for (const rule of rules) {
       for (const [, assigned, value] of text.matchAll(rule)) {
+        if (entry.path.endsWith(".mjs") && /^process\.env\.[A-Z_][A-Z0-9_]*;?$/.test(value)) continue;
         if (!carriesNothing(assigned, value)) {
           throw new Error(`${entry.path} assigns a credential: ${assigned}`);
         }

@@ -1,12 +1,33 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { chmodSync, cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync,
-  utimesSync, writeFileSync } from "node:fs";
+  realpathSync, utimesSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
 
 import { executable } from "./deployment-archive.mjs";
 import { writeRecoveryChecksums, fixture, releaseArchive, run, initialize } from "./deployment-cli-fixture.mjs";
+
+test("given a retained mail transition recovery unit, when backups are pruned, then its original release remains recoverable", () => {
+  fixture((context) => {
+    // given
+    assert.equal(initialize(context).status, 0);
+    assert.equal(run(context.archive, context.target, ["backup"], context.environment).status, 0);
+    const backups = join(context.target, "backups");
+    const original = join(backups, readdirSync(backups)[0]);
+    const history = join(backups, "mail-transition-test");
+    mkdirSync(history, { mode: 0o700 });
+    writeFileSync(join(history, "state"), `recovery=${realpathSync(original)}\n`, { mode: 0o600 });
+    const newer = original.replace(/-[0-9]+$/, "-999999");
+    cpSync(original, newer, { recursive: true });
+    // when
+    const result = run(context.archive, context.target, ["prune", "--retain", "1"], context.environment);
+    // then
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(existsSync(original), true, "the original mail store format needs its complete recovery unit");
+    assert.equal(existsSync(newer), true, result.stdout);
+  });
+});
 
 test("given explicitly selected mail stores, when backup runs, then it captures the selected pair", () => {
   fixture((context) => {

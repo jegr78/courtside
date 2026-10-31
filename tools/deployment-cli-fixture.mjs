@@ -76,6 +76,9 @@ if [ -f "${join(root, "docker-fail-target-health")}" ]; then
     *' up -d --wait'*) rm -f "${join(root, "docker-fail-target-health")}"; exit 9 ;;
   esac
 fi
+if [ -f "${join(root, "docker-fail-mail-activation")}" ]; then
+  case "$*" in *' up -d --wait') rm -f "${join(root, "docker-fail-mail-activation")}"; exit 9 ;; esac
+fi
 case "$*" in
   *' config --hash '*)
     if [ -f "${join(root, "docker-mutate-adoption-source")}" ]; then
@@ -109,13 +112,15 @@ case "$*" in
     name=''; owner=''
     for argument in "$@"; do
       name=$argument
-      case "$argument" in org.courtside.restore-owner=*) owner=\${argument#*=} ;; esac
+      case "$argument" in org.courtside.restore-owner=*|org.courtside.mail-transition-owner=*) owner=\${argument#*=} ;; esac
     done
     case "$name" in *_mfa-keys) [ ! -f "${root}/docker-race-restore-keys" ] || owner=foreign ;; esac
     printf '%s\\n' "$owner" > "${root}/restore-owner-$name"
     printf '%s\\n' "$name"
     ;;
   *'volume inspect '*'org.courtside.restore-owner'*) cat "${root}/restore-owner-$3" ;;
+  *'volume inspect '*'org.courtside.mail-transition-owner'*)
+    if [ -f "${root}/docker-foreign-mail-owner" ]; then echo foreign; else cat "${root}/restore-owner-$3"; fi ;;
   *'volume rm '*restore-check-*) rm -f "${root}/restore-owner-$3" ;;
   *'volume inspect '*'--format'*) if [ -f "${join(root, "docker-volume-labels")}" ]; then cat "${join(root, "docker-volume-labels")}"; else printf '%s\n' 'example-club|db'; fi ;;
   *'volume inspect '*'_mfa-keys') [ -f "${join(root, "docker-mfa-volume-exists")}" ] && exit 0 || exit 1 ;;

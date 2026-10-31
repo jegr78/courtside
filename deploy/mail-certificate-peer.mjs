@@ -91,6 +91,16 @@ export async function verifyServedCertificate(options) {
       if (!timingSafeEqual(Buffer.from(actual, "hex"), Buffer.from(options.expected, "hex"))) {
         throw new Error("the served leaf fingerprint does not match the published certificate");
       }
+      if (options.username !== undefined) {
+        if (!options.password || /[\r\n\0]/.test(options.username + options.password)) {
+          throw new Error("mail readiness requires valid sender credentials");
+        }
+        secure.write("EHLO courtside-mail-ready\r\n");
+        await readReply(secure, "250");
+        const encodedLogin = Buffer.from(`\0${options.username}\0${options.password}`).toString("base64");
+        secure.write(`AUTH PLAIN ${encodedLogin}\r\n`);
+        await readReply(secure, "235");
+      }
       return actual;
     } finally {
       secure.destroy();

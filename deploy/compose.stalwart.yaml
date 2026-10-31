@@ -125,6 +125,29 @@ services:
       retries: 3
       start_period: 60s
 
+  mail-ready:
+    image: node:26-alpine@sha256:0b36e8c136b94cd4fcf02188228e76c31ad5872eef3fec8cbd2eee500cfd9e80
+    profiles: [mail-setup]
+    logging: *logging
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    user: "1500:1500"
+    read_only: true
+    environment:
+      COURTSIDE_MAIL_HOSTNAME: ${COURTSIDE_MAIL_HOSTNAME:?set COURTSIDE_MAIL_HOSTNAME in .env}
+      COURTSIDE_MAIL_DOMAIN: ${COURTSIDE_MAIL_DOMAIN:?set COURTSIDE_MAIL_DOMAIN in .env}
+      COURTSIDE_MAIL_SENDER_USERNAME: ${COURTSIDE_MAIL_SENDER_USERNAME:-courtside}
+      COURTSIDE_MAIL_PASSWORD: ${COURTSIDE_MAIL_PASSWORD:?set COURTSIDE_MAIL_PASSWORD in .env}
+    networks:
+      - mail-admin
+    volumes:
+      - ./mail-ready.mjs:/mail-ready.mjs:ro
+      - ./mail-certificate-peer.mjs:/mail-certificate-peer.mjs:ro
+      - mail-tls:/tls:ro
+    entrypoint: ["node", "/mail-ready.mjs"]
+
   mail-plan:
     image: alpine:3@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a
     profiles: [mail-setup]

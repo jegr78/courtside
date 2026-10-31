@@ -34,7 +34,7 @@ function certificates() {
   };
 }
 
-async function smtpServer(identity, greeting = "220 mail.example.test ESMTP\r\n") {
+async function smtpServer(identity, greeting = "220 mail.example.test ESMTP\r\n", auth = "235 Authenticated\r\n") {
   const context = createSecureContext({ cert: identity.certificate, key: identity.key });
   const server = createServer((socket) => {
     socket.write(greeting);
@@ -47,7 +47,11 @@ async function smtpServer(identity, greeting = "220 mail.example.test ESMTP\r\n"
       } else if (buffered.includes("STARTTLS")) {
         buffered = "";
         socket.write("220 Ready to start TLS\r\n", () => {
-          new TLSSocket(socket, { isServer: true, secureContext: context });
+          const secure = new TLSSocket(socket, { isServer: true, secureContext: context });
+          secure.on("data", (data) => {
+            if (data.toString().startsWith("EHLO")) secure.write("250 AUTH PLAIN\r\n");
+            else if (data.toString().startsWith("AUTH PLAIN ")) secure.write(auth);
+          });
         });
       }
     });
@@ -55,6 +59,30 @@ async function smtpServer(identity, greeting = "220 mail.example.test ESMTP\r\n"
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   return server;
 }
+
+test("given valid SMTP credentials, when readiness verifies TLS, then it also authenticates the sender", async (context) => {
+  // given
+  const identity = certificates();
+  const server = await smtpServer(identity, undefined, "535 Invalid credentials\r\n");
+  context.after(() => server.close());
+  // when / then
+  await assert.rejects(verifyServedCertificate({ hostname: "mail.example.test", host: "127.0.0.1",
+    port: server.address().port, authority: identity.ca, expected: identity.fingerprint,
+    username: "courtside@example.org", password: "private-placeholder" }), /535 instead of 235/);
+});
+
+test("given accepted SMTP credentials, when readiness verifies TLS, then the sender can authenticate", async (context) => {
+  // given
+  const identity = certificates();
+  const server = await smtpServer(identity);
+  context.after(() => server.close());
+  // when
+  const actual = await verifyServedCertificate({ hostname: "mail.example.test", host: "127.0.0.1",
+    port: server.address().port, authority: identity.ca, expected: identity.fingerprint,
+    username: "courtside@example.org", password: "private-placeholder" });
+  // then
+  assert.equal(actual, identity.fingerprint);
+});
 
 test("given a trusted listener serving the published leaf, when it is verified, then its fingerprint is returned",
   async (context) => {

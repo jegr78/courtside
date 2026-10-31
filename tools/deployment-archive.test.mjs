@@ -254,6 +254,7 @@ const carried = [
   ["a plain shell reference", "x.sh", "password=$MAIL_PASSWORD"],
   ["a reference that falls back to another", "x.yaml", "PASSWORD: ${OUTER:-${INNER:?set it}}"],
   ["a value the shell computes", "x.sh", `credential="$(printf '%s' "$u:$p" | base64)"`],
+  ["a JavaScript runtime environment value", "x.mjs", "const password = process.env.MAIL_PASSWORD;"],
   ["a Compose reset", "x.yaml", "POSTGRES_PASSWORD: !reset null"],
   ["a variable naming a key file", "x.yaml", "APP_TLS_KEY: /etc/courtside/tls/server.key"],
   ["a database URL without a password", "x.env", "URL=jdbc:postgresql://db.example.org:5432/x"],
