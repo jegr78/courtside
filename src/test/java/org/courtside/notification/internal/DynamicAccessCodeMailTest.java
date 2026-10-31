@@ -297,10 +297,15 @@ class DynamicAccessCodeMailTest extends AbstractIntegrationTest {
             assertThat(jdbc.sql("SELECT payload::text FROM domain_event").query(String.class).list())
                     .noneMatch(payload -> payload.contains(code));
             assertThat(parametersWhileQueued).noneMatch(parameters -> parameters.contains(code));
+            assertThat(recorded.list).isNotEmpty();
             assertThat(recorded.list).as("no log message, diagnostic context or exception names the code")
                     .allSatisfy(event -> {
                         assertThat(event.getFormattedMessage()).doesNotContain(code);
                         assertThat(event.getMDCPropertyMap().values()).noneMatch(value -> value.contains(code));
+                        if (event.getKeyValuePairs() != null) {
+                            assertThat(event.getKeyValuePairs())
+                                    .noneMatch(pair -> String.valueOf(pair.value).contains(code));
+                        }
                         if (event.getThrowableProxy() != null) {
                             assertThat(ThrowableProxyUtil.asString(event.getThrowableProxy())).doesNotContain(code);
                         }
