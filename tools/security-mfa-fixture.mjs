@@ -31,6 +31,13 @@ export function totpCode(secret, instant = Date.now(), offset = 0) {
   return String((digest.readUInt32BE(position) & 0x7fffffff) % 1_000_000).padStart(6, "0");
 }
 
+export async function steadyTotpCode(secret, now, sleep, offset = 0) {
+  const left = 30_000 - (Number(now()) % 30_000);
+  // A code drawn in a step's last seconds can reach the server one step later, outside its window.
+  if (left < 5_000) await sleep(left + 50);
+  return totpCode(secret, now(), offset);
+}
+
 function cbor(value) {
   function head(major, length) {
     if (length < 24) return Buffer.from([(major << 5) | length]);
@@ -137,7 +144,8 @@ const actorNames = {
 };
 const jsonHeaders = { "content-type": "application/json" };
 
-export function createMfaFixture({ request, makeClient, clients, sharedPassword, origin, resetLoginAttempts, readRecoveryCode, beginMailScope, now = Date.now }) {
+export function createMfaFixture({ request, makeClient, clients, sharedPassword, origin, resetLoginAttempts, readRecoveryCode, beginMailScope, now = Date.now,
+  sleep = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)) }) {
   trustedOrigin(origin);
   if (typeof beginMailScope !== "function") throw new Error("MFA fixtures require a bounded mail scope");
   if (typeof request !== "function" || typeof makeClient !== "function" || typeof sharedPassword !== "string") throw new Error("Incomplete MFA fixture configuration");
@@ -182,7 +190,7 @@ export function createMfaFixture({ request, makeClient, clients, sharedPassword,
     await login(account);
     const options = json(await successful(account.client, "POST", "/api/account/mfa/totp"));
     account.secret = options.secret;
-    const result = await successful(account.client, "POST", "/api/account/mfa/totp/confirmation", { code: totpCode(account.secret, now(), -1) });
+    const result = await successful(account.client, "POST", "/api/account/mfa/totp/confirmation", { code: await steadyTotpCode(account.secret, now, sleep, -1) });
     account.codes = [...json(result).codes];
     await login(account);
   }
@@ -285,14 +293,14 @@ export function createMfaFixture({ request, makeClient, clients, sharedPassword,
           const options = await successful(account.client, "POST", "/api/account/mfa/totp");
           if (id === "beginTotpEnrollment") response = options;
           else {
-            response = await send(account.client, "POST", "/api/account/mfa/totp/confirmation", { code: totpCode(json(options).secret, now(), -1) });
+            response = await send(account.client, "POST", "/api/account/mfa/totp/confirmation", { code: await steadyTotpCode(json(options).secret, now, sleep, -1) });
             requireMfaSuccess(response, id); account.codes = [...json(response).codes];
           }
         } else if (id === "getOwnMfaStatus") {
           await login(account); response = await send(account.client, "GET", "/api/account/mfa");
         } else if (["disableOwnMfa", "removeOwnTotp", "replaceOwnRecoveryCodes", "completeMfaLogin"].includes(id)) {
           await enrollTotp(account);
-          if (id === "completeMfaLogin") { await login(account, true); response = await send(account.client, "POST", "/api/session/mfa", { code: totpCode(account.secret, now()) }); }
+          if (id === "completeMfaLogin") { await login(account, true); response = await send(account.client, "POST", "/api/session/mfa", { code: await steadyTotpCode(account.secret, now, sleep) }); }
           else if (id === "replaceOwnRecoveryCodes") { response = await send(account.client, "POST", "/api/account/mfa/recovery-codes"); requireMfaSuccess(response, id); account.codes = [...json(response).codes]; }
           else response = await send(account.client, "DELETE", id === "removeOwnTotp" ? "/api/account/mfa/totp" : "/api/account/mfa");
         } else throw new Error(`Unsupported MFA fixture operation ${id}`);
