@@ -598,13 +598,16 @@ keypad for the case that a booking's own code is missing or does not work. It fo
 code's length rule, differs from every static code and is refused beside a static code with
 `facility.accessPoint.emergencyCodeNeedsDynamicCodes` before
 `access_point_emergency_code_without_static_code` would; a static code that equals another point's
-emergency code, or the reverse, is refused with `facility.accessPoint.emergencyCodeCollides`. No
-message carries it. `POST /api/my/bookings/{id}/emergency-code` and
+emergency code, or the reverse, is refused with `facility.accessPoint.emergencyCodeCollides`. A new
+static or emergency code that equals a dynamic code a door may still accept, drawn or released and not
+yet expired in `access_code`, is refused with `facility.accessPoint.codeIssued`, which the access
+module answers through the facility port `DynamicAccessCodes`. No message carries it. `POST /api/my/bookings/{id}/emergency-code` and
 `POST /api/my/participations/{id}/emergency-code` answer the emergency codes of the booking's dynamic
 access points to its booker and players from the start of its window to its end; anybody else, a
-request outside the window and a booking without such a code answer `409
+request outside the window, a cancelled booking and a booking without such a code answer `409
 urn:courtside:error:emergency-code-refused` with `booking.emergencyCode.notParticipant`,
-`booking.emergencyCode.outsideWindow` or `booking.emergencyCode.noneKept`. Each answer is audited as
+`booking.emergencyCode.outsideWindow`, `booking.emergencyCode.cancelled` or
+`booking.emergencyCode.noneKept`. Each answer is audited as
 `booking.emergencyCode.requested` with the booking and the access points, never the code. The code
 stays valid until the board changes it.
 
@@ -631,7 +634,8 @@ memory; it serves development, the demo profile and the browser journeys.
 `loxone` manages a Loxone Miniserver over HTTPS: the user-management web services and a token with
 the user-management right (0x800) and the right to change codes (0x20) from `getkey2` and `getjwt`; the
 Miniserver refuses `updateuseraccesscode` to a token without 0x20. It reaches the Miniserver by serial through the
-`getip` answer of `connect.loxonecloud.com`, accepted only under a Loxone relay domain, or at a fixed
+`getip` answer of `connect.loxonecloud.com`, accepted only under `remcov3.loxonecloud.com` on ports
+20000 to 49000 or under `dyndns.loxonecloud.com` on any port, or at a fixed
 `https://` URL. A failed request forgets the relay address, and the next call asks for it again. Each
 grant is one timespan user named `courtside_` plus the grant id's hex digits, with deletion at its
 end, the code and the Loxone groups of its access points. Its window is sent as seconds since
@@ -687,7 +691,8 @@ disposable run governs the pass too. A pass has three steps:
    whose start lies within the booking horizon, the longest `ADVANCE_WINDOW` of any rule set or 14
    days without one, and whose window has not ended. A distant series occurrence waits until it
    enters the horizon. A failure in this step is logged and the pass still acts and releases.
-2. It reads the ids of every open row once, revocations first, and visits each at most once. In the
+2. It reads the ids of every open row once, rows that may hold something remote first and among them
+   those no longer wanted, and visits each at most once. In the
    row's locked transaction it derives the demand again, draws a code when the grant is wanted and
    has none, and decides the action: `grant` while nothing is installed for sure, `reschedule` when
    the installation differs from what is wanted in window, access points or mapping, `revoke` when

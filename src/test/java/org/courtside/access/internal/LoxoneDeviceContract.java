@@ -1,5 +1,6 @@
 package org.courtside.access.internal;
 
+import org.jspecify.annotations.Nullable;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
@@ -8,6 +9,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -16,9 +18,11 @@ import java.util.UUID;
 final class LoxoneDeviceContract {
 
     private static final Duration WINDOW = Duration.ofMinutes(10);
+    private static final Duration SHIFT = Duration.ofMinutes(5);
     private static final ObjectMapper JSON = new ObjectMapper();
 
-    record Observed(List<ConnectionCheckRun.Checked> checks, int date, int time, int code, int duplicateCode,
+    record Observed(List<ConnectionCheckRun.Checked> checks, int date, int time, int code, int edit,
+                    int resentCode, int duplicateCode, int clearedCode, int clearedRead, int clearedKeycodes,
                     List<String> leftOver) {
     }
 
@@ -29,6 +33,7 @@ final class LoxoneDeviceContract {
     private final LoxoneRecorder recorder;
     private final DeviceGuard guard;
     private final String accessCode;
+    private final Map<String, String> names = new HashMap<>();
 
     LoxoneDeviceContract(LoxoneAccessControl connector, LoxoneClient client, LoxoneSettings settings, Clock clock,
                          LoxoneRecorder recorder, DeviceGuard guard, String accessCode) {
@@ -80,9 +85,19 @@ final class LoxoneDeviceContract {
         String first = create();
         recorder.step("user-code");
         int code = client.session().changing("updateuseraccesscode", first, accessCode).code();
+        recorder.step("user-edit");
+        int edit = edit(first);
+        recorder.step("user-code-again");
+        int resentCode = client.session().changing("updateuseraccesscode", first, accessCode).code();
         recorder.step("user-duplicate");
         String second = create();
         int duplicateCode = client.session().changing("updateuseraccesscode", second, accessCode).code();
+        recorder.step("user-duplicate-clear");
+        LoxoneClient.Session clearing = client.session();
+        int clearedCode = clearing.changing("updateuseraccesscode", second, "").code();
+        LoxoneClient.Reply cleared = clearing.sps("getuser", second);
+        int clearedKeycodes = cleared.value() != null && cleared.value().path("keycodes").isArray()
+                ? cleared.value().path("keycodes").size() : -1;
         recorder.step("user-read");
         LoxoneClient.Reply read = client.session().sps("getuser", first);
         if (read.code() != 200) {
@@ -94,7 +109,8 @@ final class LoxoneDeviceContract {
         LoxoneAccessControl.delete(deleting, first);
         LoxoneAccessControl.delete(deleting, second);
         recorder.step("user-list");
-        return new Observed(checks, date, clock, code, duplicateCode, ownListed());
+        return new Observed(checks, date, clock, code, edit, resentCode, duplicateCode, clearedCode, cleared.code(),
+                clearedKeycodes, ownListed());
     }
 
     private static int answered(LoxoneClient.Session session, String command) {
@@ -111,23 +127,41 @@ final class LoxoneDeviceContract {
     private String create() {
         String name = "courtside_device_" + UUID.randomUUID().toString().replace("-", "").substring(0, 16);
         guard.issue(name);
-        Instant now = clock.instant();
-        ObjectNode user = JSON.createObjectNode();
-        user.put("name", name);
-        user.put("userState", 4);
-        user.put("validFrom", LoxoneTime.from(now));
-        user.put("validUntil", LoxoneTime.until(now.plus(WINDOW)));
-        user.put("expirationAction", 1);
-        user.put("changePassword", false);
-        user.putArray("usergroups");
-        LoxoneClient.Reply created = client.session().changing("addoredituser", user.toString());
+        LoxoneClient.Reply created = client.session().changing("addoredituser",
+                user(null, name, clock.instant()).toString());
         JsonNode value = created.value();
         String uuid = value == null ? "" : value.path("uuid").asString("");
         if (created.code() != 200 || !name.equals(value == null ? "" : value.path("name").asString(""))
                 || !LoxoneAccessControl.LOXONE_UUID.matcher(uuid).matches()) {
             throw new AssertionError("addoredituser answered " + created.code() + " without the user it was asked for");
         }
+        names.put(uuid, name);
         return uuid;
+    }
+
+    private int edit(String uuid) {
+        LoxoneClient.Reply edited = client.session().changing("addoredituser",
+                user(uuid, names.get(uuid), clock.instant().plus(SHIFT)).toString());
+        JsonNode value = edited.value();
+        if (edited.code() == 200 && (value == null || !uuid.equals(value.path("uuid").asString("")))) {
+            throw new AssertionError("addoredituser answered 200 for another user than the one it edited");
+        }
+        return edited.code();
+    }
+
+    private static ObjectNode user(@Nullable String uuid, String name, Instant from) {
+        ObjectNode user = JSON.createObjectNode();
+        if (uuid != null) {
+            user.put("uuid", uuid);
+        }
+        user.put("name", name);
+        user.put("userState", 4);
+        user.put("validFrom", LoxoneTime.from(from));
+        user.put("validUntil", LoxoneTime.until(from.plus(WINDOW)));
+        user.put("expirationAction", 1);
+        user.put("changePassword", false);
+        user.putArray("usergroups");
+        return user;
     }
 
     private List<String> ownListed() {

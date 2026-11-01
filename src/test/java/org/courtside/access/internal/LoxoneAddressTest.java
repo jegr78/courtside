@@ -79,6 +79,28 @@ class LoxoneAddressTest extends LoxoneTestSupport {
     }
 
     @Test
+    void givenAReplyOverFourMebibytes_whenACallReadsIt_thenItIsUnclearCarriesNoBodyAndTheRelayIsResolvedAgain() {
+        // given
+        bySerial.probe();
+        String marker = "oversized-reply-text";
+        simulator.answerRaw("getuserlist2", "{\"LL\":{\"Code\":\"200\",\"value\":\"" + marker.repeat(220_000)
+                + "\"}}");
+
+        // when
+        Throwable failed = catchThrowable(() -> bySerial.grant(instruction(UUID.randomUUID())));
+        simulator.answerNormally("getuserlist2");
+        GrantOutcome next = bySerial.grant(instruction(UUID.randomUUID()));
+
+        // then
+        assertThat(failed).as("a reply beyond the bound is an unclear answer").isInstanceOf(LoxoneFailure.class)
+                .hasMessageStartingWith("getuserlist2 failed: ");
+        assertThat(failed.getMessage()).doesNotContain(marker);
+        assertThat(next).isInstanceOf(GrantOutcome.Accepted.class);
+        assertThat(simulator.count("getip")).as("the relay is forgotten after a reply it could not read")
+                .isEqualTo(2);
+    }
+
+    @Test
     void givenNoRelayForTheSerial_whenProbed_thenTheMiniserverIsUnreachable() {
         // given
         simulator.force("getip", 404);

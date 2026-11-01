@@ -41,8 +41,8 @@ final class LoxoneLogin {
         }
     }
 
-    static String clientUuid(LoxoneAddress address) {
-        return clientUuid("courtside", address);
+    static String clientUuid(LoxoneAddress address, String instance) {
+        return clientUuid(instance == null || instance.isEmpty() ? "courtside" : "courtside@" + instance, address);
     }
 
     /** A stable client uuid per namespace, so a token under another namespace never displaces this instance's. */

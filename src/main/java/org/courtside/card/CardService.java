@@ -87,18 +87,22 @@ public class CardService {
         return card;
     }
 
+    /** A null {@code requestedSignalsOccupancy} keeps the stored value. */
     @Transactional
     public BookingCard changeCard(UUID cardId, String label, String color, Set<Role> allowedRoles,
                                   Set<Role> managingRoles, short[] allowedPlayerCounts,
                                   boolean countsAgainstLimits, boolean guestAllowed,
-                                  boolean showGenericOccupancy, boolean grantsAccess, boolean signalsOccupancy) {
+                                  boolean showGenericOccupancy, boolean grantsAccess,
+                                  Boolean requestedSignalsOccupancy) {
         if (grantsAccess && BookingCard.COURT_CLOSED.equals(cardId)) {
             throw new ClosureCardGrantsNoAccessException();
         }
+        BookingCard card = requireCard(cardId);
+        boolean signalsOccupancy = requestedSignalsOccupancy == null ? card.isSignalsOccupancy()
+                : requestedSignalsOccupancy;
         if (signalsOccupancy && BookingCard.COURT_CLOSED.equals(cardId)) {
             throw new ClosureCardSignalsNoOccupancyException();
         }
-        BookingCard card = requireCard(cardId);
         List<String> changedFields = new ArrayList<>();
         if (!Objects.equals(card.getLabel(), label)) {
             changedFields.add("label");

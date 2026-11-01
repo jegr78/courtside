@@ -94,13 +94,17 @@ message. Reconsider if the relay offers an idempotent submission keyed by `Messa
 ## A cached booking page keeps an access code until the next refresh
 
 The installed app keeps the member's last bookings page and the first page of bookings they play in
-in the browser cache so both still show without a connection, and those pages hold the static access
-codes of the bookings. The client
-stops showing a code once its validity window has ended, but the cached response itself keeps it
-until the next successful refresh, sign-out or the cache's seven-day limit. Reading it needs access
-to the unlocked device or its browser profile, and it yields only the codes of that member's own
-bookings and of the bookings they play in, which the board changes at its keypad. Reconsider if access codes become per-booking
-dynamic codes, or if a club reports codes leaking from devices.
+in the browser cache so both still show without a connection. Those pages hold the static access
+codes of the bookings and, with an access-control connector selected, each booking's own dynamic
+code once a door accepted it. The client stops showing a code once its validity window has ended,
+but the cached response itself keeps it until the next successful refresh, sign-out or the cache's
+seven-day limit. Reading it needs access to the unlocked device or its browser profile, and it
+yields only the codes of that member's own bookings and of the bookings they play in. A static code
+stays valid until the board changes it at its keypad. A dynamic code opens the door only within its
+booking's window: the Miniserver deletes its user when the window ends, Courtside deletes it earlier
+when the booking is cancelled, and a moved booking takes its code along to the new window. After that the cached number is worth no more than a
+guessed one, even if a later booking draws the same digits. Reconsider if a club reports codes
+leaking from devices, or if a dynamic code ever stays valid beyond its booking's window.
 
 ## A members' door code outlives a membership
 
@@ -124,7 +128,10 @@ until the board changes it at the keypad and in Courtside. Asking needs a signed
 part in such a booking. The audit log records each answer with the account, the booking and the
 access point, never the code, so a board can see who learned it; Courtside does not rotate it, limit
 how often it is asked for or alert anybody. `access_point.emergency_code` is stored in clear, like a
-static code. Reconsider if a club needs the emergency path to stop working for one member, which only
+static code. Courtside refuses an emergency or static code that equals a dynamic code a door may
+still accept, so a board member who enters codes on the access points page learns that a number is
+issued to some booking, though not to which one; trying numbers that way needs the admin role and one
+request per number. Reconsider if a club needs the emergency path to stop working for one member, which only
 a per-booking fallback code can do, or if the audit shows the code asked for without a failing grant.
 
 ## The occupancy key travels in the query string
@@ -147,12 +154,17 @@ header.
 
 With an access-control connector selected, `access_code.code` holds each grant's code as typed,
 because Courtside sends it again after a move or a failed attempt and hands it to the booking's
-players. Reading it needs access to the database or a backup. A code is drawn when its booking enters
-the booking horizon, the longest advance window of any rule set or 14 days when no rule set has one,
-and stays until the latest window any install asked for has ended, a confirmed removal included. So the exposure is the horizon plus
-the validity window, not the hours of the booking. No event, log line, stored failure, problem body
-or administrative response carries it. Reconsider if an access-control system can accept a code
-Courtside keeps only as a digest, or if a club's horizon grows beyond a few weeks.
+players. Reading it there needs access to the database or a backup. A code is drawn when its booking
+enters the booking horizon, the longest advance window of any rule set or 14 days when no rule set
+has one, and stays until the latest window any install asked for has ended, a confirmed removal
+included. So the exposure in the database is the horizon plus the validity window, not the hours of
+the booking. Once a door accepted it, the code also leaves the database: the booking page of its
+booker and players shows it, the installed app caches that page as the previous entry describes, and
+a booking mail sent after the install carries it. Those copies sit with the people who take part in
+the booking and lose their worth when the window ends and the Miniserver deletes the user. No event,
+log line, stored failure, problem body or administrative response carries it. Reconsider if an
+access-control system can accept a code Courtside keeps only as a digest, or if a club's horizon
+grows beyond a few weeks.
 
 ## A code may stay valid at the door after an unclear call
 

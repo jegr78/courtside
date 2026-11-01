@@ -1,0 +1,29 @@
+[ {
+  "request" : {
+    "command" : "updateuseraccesscode",
+    "arguments" : [ "<loxone-uuid-4>", "" ],
+    "query" : { }
+  },
+  "status" : 200,
+  "response" : {
+    "LL" : {
+      "control" : "dev/sps/updateuseraccesscode/<loxone-uuid-4>/",
+      "value" : "",
+      "Code" : "200"
+    }
+  }
+}, {
+  "request" : {
+    "command" : "getuser",
+    "arguments" : [ "<loxone-uuid-4>" ],
+    "query" : { }
+  },
+  "status" : 200,
+  "response" : {
+    "LL" : {
+      "control" : "dev/sps/getuser/<loxone-uuid-4>",
+      "value" : "{\"name\":\"<name-3>\",\"desc\":\"\",\"uuid\":\"<loxone-uuid-4>\",\"userid\":\"\",\"<key-1>\":\"\",\"firstName\":\"\",\"lastName\":\"\",\"email\":\"\",\"phone\":\"\",\"uniqueUserId\":\"\",\"company\":\"\",\"department\":\"\",\"personalno\":\"\",\"title\":\"\",\"debitor\":\"\",\"customField1\":\"\",\"customField2\":\"\",\"customField3\":\"\",\"customField4\":\"\",\"customField5\":\"\",\"lastEdit\":\"<time-12>\",\"userState\":4,\"validUntil\":\"<time-11>\",\"expirationAction\":1,\"validFrom\":\"<time-7>\",\"isAdmin\":false,\"changePassword\":false,\"masterAdmin\":false,\"userRights\":16384,\"scorePWD\":\"<number-1>\",\"scoreVisuPWD\":\"<number-1>\",\"trustMember\":\"\",\"usergroups\":[],\"<key-2>\":\"<number-2>\",\"nfcTags\":[],\"keycodes\":[],\"customFields\":[\"<text-2>\",\"<text-3>\",\"<text-4>\",\"<text-5>\",\"<text-6>\"]}",
+      "Code" : "200"
+    }
+  }
+} ]

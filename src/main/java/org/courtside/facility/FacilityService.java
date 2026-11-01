@@ -73,6 +73,7 @@ public class FacilityService {
     private final ApplicationEventPublisher events;
     private final AccessPointRepository accessPoints;
     private final AccessPolicy accessPolicy;
+    private final DynamicAccessCodes dynamicCodes;
 
     public List<Court> activeCourts() {
         return courts.findByActiveTrueOrderByNumberAsc();
@@ -280,6 +281,7 @@ public class FacilityService {
             if (accessPoints.existsByEmergencyCodeAndIdNot(staticCode, otherThan(accessPointId))) {
                 throw AccessPointRejectedException.emergencyCodeCollides("staticCode");
             }
+            requireNotIssued("staticCode", staticCode);
         }
         if (emergencyCode == null) {
             return;
@@ -292,6 +294,13 @@ public class FacilityService {
             if (accessPoints.existsByStaticCode(emergencyCode)) {
                 throw AccessPointRejectedException.emergencyCodeCollides("emergencyCode");
             }
+            requireNotIssued("emergencyCode", emergencyCode);
+        }
+    }
+
+    private void requireNotIssued(String field, String code) {
+        if (dynamicCodes.holds(code)) {
+            throw AccessPointRejectedException.codeIssued(field);
         }
     }
 

@@ -149,7 +149,7 @@ final class LoxoneClient implements AutoCloseable {
     private volatile @Nullable Tap tap;
 
     LoxoneClient(LoxoneSettings settings, SSLContext ssl, Clock clock) {
-        this(settings, ssl, clock, LoxoneLogin.clientUuid(settings.address()));
+        this(settings, ssl, clock, LoxoneLogin.clientUuid(settings.address(), settings.instance()));
     }
 
     LoxoneClient(LoxoneSettings settings, SSLContext ssl, Clock clock, String clientUuid) {
@@ -271,6 +271,9 @@ final class LoxoneClient implements AutoCloseable {
         }
         renewAt = LoxoneTime.instant(value.path("validUntil").asLong()).minus(RENEWAL_MARGIN);
         token = issued;
+        if (current != null && !current.equals(issued)) {
+            kill(session, current);
+        }
         return issued;
     }
 
@@ -525,6 +528,10 @@ final class LoxoneClient implements AutoCloseable {
             }
         }
         return encoded.toString();
+    }
+
+    String clientUuid() {
+        return clientUuid;
     }
 
     void forgetAddress() {

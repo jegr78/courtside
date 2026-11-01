@@ -21,7 +21,8 @@ class LoxoneRecordedFixtureTest extends LoxoneTestSupport {
 
     private static final String DEVICE_CODE = "73519246";
     private static final List<String> STEPS = List.of("probe", "connection-check", "getip", "api-key", "local-time",
-            "user-create", "user-code", "user-duplicate", "user-read", "user-delete", "user-list", "cleanup");
+            "user-create", "user-code", "user-edit", "user-code-again", "user-duplicate", "user-duplicate-clear",
+            "user-read", "user-delete", "user-list", "cleanup");
 
     @TempDir
     Path target;
@@ -66,12 +67,18 @@ class LoxoneRecordedFixtureTest extends LoxoneTestSupport {
         assertThat(observed.leftOver()).as("the run lists none of its own users at its end").isEmpty();
         assertThat(ownUsersOnTheSimulator()).isEmpty();
         assertThat(observed.code()).isEqualTo(200);
+        assertThat(observed.edit()).as("the simulator edits its own user by uuid").isEqualTo(200);
+        assertThat(observed.resentCode()).as("the simulator accepts a code again from the user holding it")
+                .isEqualTo(200);
+        assertThat(observed.clearedCode()).as("the simulator clears a code after its 201").isEqualTo(200);
+        assertThat(observed.clearedRead()).isEqualTo(200);
+        assertThat(observed.clearedKeycodes()).as("the cleared user holds no code").isZero();
         assertThat(observed.duplicateCode()).as("the simulator answers a code another user holds with 201")
                 .isEqualTo(201);
         assertThat(observed.checks()).extracting(ConnectionCheckRun.Checked::check).contains("miniserver", "login");
         assertThat(observed.checks().getFirst().result().outcome()).isEqualTo(CheckOutcome.PASSED);
         assertThat(simulator.clientUuids()).as("the run never takes the production instance's token")
-                .doesNotContain(LoxoneLogin.clientUuid(settings.address()));
+                .doesNotContain(LoxoneLogin.clientUuid(settings.address(), settings.instance()));
         assertThat(simulator.requests()).filteredOn(LoxoneSimulator.Request::mutating)
                 .allSatisfy(request -> assertThat(request.command())
                         .isIn("addoredituser", "deleteuser", "updateuseraccesscode"));
@@ -87,6 +94,16 @@ class LoxoneRecordedFixtureTest extends LoxoneTestSupport {
         // then
         assertThat(RecordedFixtures.differences(RecordedFixtures.RECORDED, target))
                 .as("the simulator answers each recorded step as the Miniserver did").isEmpty();
+    }
+
+    @Test
+    void givenTheRecording_whenItsStepsAreListed_thenEveryStepIsRecorded() {
+        // when
+        List<String> missing = STEPS.stream()
+                .filter(step -> !Files.exists(RecordedFixtures.RECORDED.resolve(step + ".json"))).toList();
+
+        // then
+        assertThat(missing).as("every step of the device run has a recording").isEmpty();
     }
 
     @Test

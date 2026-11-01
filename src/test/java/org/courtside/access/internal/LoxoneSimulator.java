@@ -284,6 +284,10 @@ final class LoxoneSimulator implements AutoCloseable {
         rawAnswers.put(command, body);
     }
 
+    synchronized void answerNormally(String command) {
+        rawAnswers.remove(command);
+    }
+
     synchronized void resolveWithBody(String body) {
         cloudBody = body;
     }

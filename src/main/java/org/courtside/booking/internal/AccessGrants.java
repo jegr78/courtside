@@ -49,40 +49,11 @@ public class AccessGrants {
     }
 
     public Map<UUID, AccessDemand> demandsOf(Collection<Booking> bookings) {
-        List<Booking> confirmed = bookings.stream()
-                .filter(booking -> booking.getStatus() == BookingStatus.CONFIRMED).toList();
-        Set<UUID> granting = confirmed.stream().map(Booking::getCardId).distinct()
-                .filter(cardId -> cards.findCard(cardId).filter(BookingCard::isGrantsAccess).isPresent())
-                .collect(Collectors.toSet());
-        if (granting.isEmpty()) {
-            return Map.of();
-        }
-        List<AccessPoint> accessPoints = facility.activeAccessPointsWithoutCodes();
-        if (accessPoints.isEmpty()) {
-            return Map.of();
-        }
-        Duration lead = Duration.ofMinutes(policy.accessLead().minutes());
-        Duration lag = Duration.ofMinutes(policy.accessLag().minutes());
         Map<UUID, AccessDemand> demands = new HashMap<>();
-        for (Booking booking : confirmed) {
-            List<CourtAllocation> allocations = booking.getAllocations();
-            if (!granting.contains(booking.getCardId()) || allocations.isEmpty()) {
-                continue;
-            }
-            Set<UUID> courts = allocations.stream().map(CourtAllocation::getCourtId).collect(Collectors.toSet());
-            Set<UUID> served = accessPoints.stream()
-                    .filter(accessPoint -> courts.stream().anyMatch(accessPoint::serves))
-                    .map(AccessPoint::getId).collect(Collectors.toSet());
-            if (served.isEmpty()) {
-                continue;
-            }
-            Instant startsAt = allocations.stream().map(CourtAllocation::getStartsAt)
-                    .min(Comparator.naturalOrder()).orElseThrow();
-            Instant endsAt = allocations.stream().map(CourtAllocation::getEndsAt)
-                    .max(Comparator.naturalOrder()).orElseThrow();
-            demands.put(booking.getId(), new AccessDemand(booking.getId(), startsAt, startsAt.minus(lead),
-                    endsAt.plus(lag), served));
-        }
+        servedBy(bookings, facility.activeAccessPointsWithoutCodes()).forEach((bookingId, served) ->
+                demands.put(bookingId, new AccessDemand(bookingId, served.startsAt(), served.validFrom(),
+                        served.validUntil(), served.accessPoints().stream().map(AccessPoint::getId)
+                                .collect(Collectors.toSet()))));
         return demands;
     }
 
@@ -128,6 +99,19 @@ public class AccessGrants {
     }
 
     private Map<UUID, ServedWindow> windowsOf(Collection<Booking> bookings, List<AccessPoint> candidates) {
+        Instant now = clock.instant();
+        Map<UUID, ServedWindow> windows = new HashMap<>();
+        servedBy(bookings, candidates).forEach((bookingId, served) -> {
+            if (now.isBefore(served.validUntil())) {
+                windows.put(bookingId, new ServedWindow(served.validFrom(), served.validUntil(),
+                        served.accessPoints()));
+            }
+        });
+        return windows;
+    }
+
+    /** The window and serving access points of every confirmed booking whose card grants access, ended or not. */
+    private Map<UUID, Served> servedBy(Collection<Booking> bookings, List<AccessPoint> candidates) {
         List<Booking> confirmed = bookings.stream()
                 .filter(booking -> booking.getStatus() == BookingStatus.CONFIRMED).toList();
         Set<UUID> granting = confirmed.stream().map(Booking::getCardId).distinct()
@@ -136,39 +120,32 @@ public class AccessGrants {
         if (granting.isEmpty() || candidates.isEmpty()) {
             return Map.of();
         }
-        Window window = new Window(policy.accessLead().minutes(),
-                policy.accessLag().minutes(), clock.instant());
-        Map<UUID, ServedWindow> windows = new HashMap<>();
+        Duration lead = Duration.ofMinutes(policy.accessLead().minutes());
+        Duration lag = Duration.ofMinutes(policy.accessLag().minutes());
+        Map<UUID, Served> served = new HashMap<>();
         for (Booking booking : confirmed) {
-            if (granting.contains(booking.getCardId())) {
-                window.servedBy(booking, candidates).ifPresent(served -> windows.put(booking.getId(), served));
+            List<CourtAllocation> allocations = booking.getAllocations();
+            if (!granting.contains(booking.getCardId()) || allocations.isEmpty()) {
+                continue;
             }
+            Set<UUID> courts = allocations.stream().map(CourtAllocation::getCourtId).collect(Collectors.toSet());
+            List<AccessPoint> serving = candidates.stream()
+                    .filter(accessPoint -> courts.stream().anyMatch(accessPoint::serves)).toList();
+            if (serving.isEmpty()) {
+                continue;
+            }
+            Instant startsAt = allocations.stream().map(CourtAllocation::getStartsAt)
+                    .min(Comparator.naturalOrder()).orElseThrow();
+            Instant endsAt = allocations.stream().map(CourtAllocation::getEndsAt)
+                    .max(Comparator.naturalOrder()).orElseThrow();
+            served.put(booking.getId(), new Served(startsAt, startsAt.minus(lead), endsAt.plus(lag), serving));
         }
-        return windows;
+        return served;
     }
 
     public record ServedWindow(Instant validFrom, Instant validUntil, List<AccessPoint> accessPoints) {
     }
 
-    private record Window(long leadMinutes, long lagMinutes, Instant now) {
-
-        Optional<ServedWindow> servedBy(Booking booking, List<AccessPoint> accessPoints) {
-            List<CourtAllocation> allocations = booking.getAllocations();
-            if (allocations.isEmpty()) {
-                return Optional.empty();
-            }
-            Instant validFrom = allocations.stream().map(CourtAllocation::getStartsAt)
-                    .min(Comparator.naturalOrder()).orElseThrow().minusSeconds(leadMinutes * 60);
-            Instant validUntil = allocations.stream().map(CourtAllocation::getEndsAt)
-                    .max(Comparator.naturalOrder()).orElseThrow().plusSeconds(lagMinutes * 60);
-            if (!now.isBefore(validUntil)) {
-                return Optional.empty();
-            }
-            Set<UUID> courts = allocations.stream().map(CourtAllocation::getCourtId).collect(Collectors.toSet());
-            List<AccessPoint> serving = accessPoints.stream()
-                    .filter(accessPoint -> courts.stream().anyMatch(accessPoint::serves))
-                    .toList();
-            return serving.isEmpty() ? Optional.empty() : Optional.of(new ServedWindow(validFrom, validUntil, serving));
-        }
+    private record Served(Instant startsAt, Instant validFrom, Instant validUntil, List<AccessPoint> accessPoints) {
     }
 }

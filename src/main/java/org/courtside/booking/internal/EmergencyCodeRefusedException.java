@@ -24,6 +24,10 @@ public class EmergencyCodeRefusedException extends CodedDomainFailure {
         return new EmergencyCodeRefusedException("booking.emergencyCode.outsideWindow");
     }
 
+    static EmergencyCodeRefusedException cancelled() {
+        return new EmergencyCodeRefusedException("booking.emergencyCode.cancelled");
+    }
+
     static EmergencyCodeRefusedException noneKept() {
         return new EmergencyCodeRefusedException("booking.emergencyCode.noneKept");
     }

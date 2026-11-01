@@ -50,6 +50,23 @@ class AccessCodesTest extends AbstractIntegrationTest {
     private PlatformTransactionManager transactions;
 
     @Test
+    void givenADrawnAReleasedAndAnExpiredCode_whenAskedWhichAreHeld_thenOnlyTheExpiredOneIsFree() {
+        // given
+        String drawn = new AccessCodes(jdbc, digits("1357")).draw(insertGrant(), FOUR_DIGITS);
+        Instant now = Instant.now();
+        jdbc.sql("INSERT INTO access_code (code, until) VALUES ('2468', :until), ('3579', :ended)")
+                .param("until", Timestamp.from(now.plus(Duration.ofHours(1))))
+                .param("ended", Timestamp.from(now.minus(Duration.ofHours(1)))).update();
+
+        // when / then
+        assertThat(codes.holds(drawn)).as("a drawn code may still be installed").isTrue();
+        assertThat(codes.holds("2468")).as("a released code a door may accept until its end").isTrue();
+        assertThat(codes.holds("3579")).as("an expired code no door accepts").isFalse();
+        assertThat(codes.holds("9999")).isFalse();
+        assertThatThrownBy(() -> codes.holds(null)).isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
     void givenTwoDrawsRacingForTheSameCode_whenTheFirstCommits_thenTheSecondRedrawsAndBothHoldDifferentCodes()
             throws Exception {
         // given

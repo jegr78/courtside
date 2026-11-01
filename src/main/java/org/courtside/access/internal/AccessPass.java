@@ -124,7 +124,7 @@ class AccessPass {
         List<UUID> open = jdbc.sql("""
                         SELECT id FROM access_grant
                         WHERE wanted OR remote <> 'NONE' OR next_attempt_at <= :now OR retry_requested_at IS NOT NULL
-                        ORDER BY wanted, remote = 'NONE', id
+                        ORDER BY remote = 'NONE', wanted, id
                         """)
                 .param("now", Timestamp.from(clock.now())).query(UUID.class).list();
         boolean probedThisPass = false;
@@ -289,8 +289,8 @@ class AccessPass {
                 yield new ProbeOutcome.Unreachable("The probe was not sent: " + OCCUPIED);
             }
             case CallRunner.Result.Unclear<ProbeOutcome>(Throwable cause) -> {
-                readings.record(cause == null ? ProbeClassification.TIMEOUT : ProbeClassification.UNREACHABLE,
-                        checkedAt);
+                readings.record(cause == null || cause instanceof LoxoneClient.Late ? ProbeClassification.TIMEOUT
+                        : ProbeClassification.UNREACHABLE, checkedAt);
                 yield new ProbeOutcome.Unreachable("The probe gave no clear answer: " + describe(cause, null));
             }
             default -> {
