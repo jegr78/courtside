@@ -486,6 +486,10 @@ validate_answers() {
     [ -n "$answer_bootstrap_display_name" ] && [[ "$answer_bootstrap_display_name" != *$'\n'* ]] \
       && [[ "$answer_bootstrap_display_name" != *$'\r'* ]] \
       || refuse "bootstrap_display_name is invalid"
+    local display_name=$answer_bootstrap_display_name
+    display_name=${display_name#"${display_name%%[![:space:]]*}"}
+    display_name=${display_name%"${display_name##*[![:space:]]}"}
+    [[ "$display_name" == *" "* ]] || refuse "bootstrap_display_name must contain a first and last name"
   fi
   [[ "$answer_source_url" =~ ^https?://[^/@:]+(:[0-9]+)?(/.*)?$ ]] \
     || refuse "source_url must be an absolute HTTP or HTTPS URL without credentials"
