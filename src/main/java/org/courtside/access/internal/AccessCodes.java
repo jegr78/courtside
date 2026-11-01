@@ -60,9 +60,9 @@ class AccessCodes implements DynamicAccessCodes {
         }
         return jdbc.sql("""
                         SELECT EXISTS (SELECT 1 FROM access_code
-                                       WHERE code = :code AND (grant_id IS NOT NULL OR until > now()))
+                                       WHERE code = :held AND (grant_id IS NOT NULL OR until > now()))
                         """)
-                .param("code", code).query(Boolean.class).single();
+                .param("held", code).query(Boolean.class).single();
     }
 
     Optional<String> currentCode(UUID grantId) {
