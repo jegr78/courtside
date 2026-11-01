@@ -261,7 +261,7 @@ abandon_mail_store_transition() {
     || refuse "cannot abandon the mail transition once release $config_release is selected; resume it with update --mail-store-transition reinitialize --yes or restore recovery unit $mail_transition_recovery"
   printf 'Plan: abandon the mail transition to %s and restart release %s with its selected mail stores\n' \
     "$mail_transition_target" "$config_release"
-  printf 'retained_mail_config=%s\nretained_mail_data=%s\nretained_recovery=%s\n' \
+  printf 'attempt_mail_config=%s\nattempt_mail_data=%s\nretained_recovery=%s\n' \
     "$mail_transition_config" "$mail_transition_data" "$mail_transition_recovery"
   confirm "$confirmed"
   restore_mail_transition_source

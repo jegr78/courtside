@@ -517,6 +517,9 @@ test("given a failed mail preparation, when the transition is abandoned, then th
       ["update", "--mail-store-transition", "abandon", "--yes"], context.environment);
     // then
     assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /^attempt_mail_config=example-club_mail-config-stalwart1-[a-f0-9]{48}$/m,
+      "the plan must label the abandoned stores as the attempt's, not as the retained source");
+    assert.doesNotMatch(result.stdout, /^retained_mail_config=/m);
     assert.equal(existsSync(join(context.target, ".courtside-mail-transition")), false);
     assert.equal(readdirSync(join(context.target, "backups")).filter((name) => name.startsWith("mail-transition-")).length, 1);
     assert.equal(readFileSync(join(context.target, "config", ".env"), "utf8"), before);
