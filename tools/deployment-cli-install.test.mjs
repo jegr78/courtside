@@ -109,6 +109,35 @@ test("given invalid answer data, when init plans it, then it refuses before publ
   });
 });
 
+test("given a display name the application would refuse at startup, when init plans it, then it refuses before publishing state", () => {
+  for (const displayName of ["Administrator", "  Administrator  ", "   "]) {
+    fixture((context) => {
+      // when
+      const result = initialize(context, { bootstrap_display_name: displayName });
+
+      // then
+      assert.equal(result.status, 2, `init accepted the display name "${displayName}"`);
+      assert.match(result.stderr, /bootstrap_display_name must contain a first and last name/);
+      assert.ok(!existsSync(join(context.target, "current")));
+      assert.ok(!existsSync(join(context.target, "config", "installation.conf")));
+    });
+  }
+});
+
+test("given a display name the application accepts, when init plans it, then it installs and keeps the name", () => {
+  for (const displayName of ["Jane Doe", "Mary Anne Major", "  Jane Doe  "]) {
+    fixture((context) => {
+      // when
+      const result = initialize(context, { bootstrap_display_name: displayName });
+
+      // then
+      assert.equal(result.status, 0, `init refused the display name "${displayName}": ${result.stderr}`);
+      assert.ok(readFileSync(join(context.target, "config", ".env"), "utf8")
+        .includes(`COURTSIDE_BOOTSTRAP_ADMIN_DISPLAY_NAME="${displayName}"`));
+    });
+  }
+});
+
 test("given an answer file containing a secret or an unknown key, when init reads it, then it names and refuses it", () => {
   fixture((context) => {
     // given
