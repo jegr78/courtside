@@ -11,6 +11,23 @@ retained_mail_recovery() {
   return 1
 }
 
+report_mail_transition_histories() {
+  local history owner recovery config data store_use
+  for history in "$installation_directory"/backups/mail-transition-*; do
+    [ -d "$history" ] && [ ! -L "$history" ] && [ -f "$history/state" ] && [ ! -L "$history/state" ] || continue
+    owner=$(recovery_value "$history/state" owner)
+    [[ "$owner" =~ ^[a-f0-9]{48}$ ]] || continue
+    recovery=$(recovery_value "$history/state" recovery)
+    [[ "$recovery" =~ ^[A-Za-z0-9._/-]+$ ]] || recovery=unknown
+    config="${config_project}_mail-config-stalwart1-$owner"
+    data="${config_project}_mail-data-stalwart1-$owner"
+    store_use=unused
+    [ "$config" != "$selected_mail_config_volume" ] || store_use=selected
+    printf 'Kept mail transition history %s: stores %s %s (%s), recovery unit %s\n' \
+      "$history" "$config" "$data" "$store_use" "$recovery"
+  done
+}
+
 prepare_mail_store_transition() {
   local archive=$1 mode=$2 source_major target_major key value
   mail_transition=false

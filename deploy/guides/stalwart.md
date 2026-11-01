@@ -90,6 +90,20 @@ Private journals and attempt logs live in `.courtside-mail-transition` while act
 The associated original recovery unit is exempt from automatic retention while its journal remains.
 Neither a retry nor normal backup pruning deletes the retained mail volumes.
 
+`prune` lists every retained history with its store pair, whether that pair is `selected` or
+`unused`, and the recovery unit it holds. It removes none of them. To reclaim an unused attempt,
+check that `.env` does not name its stores, then remove them and the history yourself:
+
+```sh
+docker volume rm <project>_mail-config-stalwart1-<attempt> <project>_mail-data-stalwart1-<attempt>
+rm -rf /srv/courtside/backups/mail-transition-<attempt>
+```
+
+Removing a history returns its recovery unit to normal `prune` retention. After a completed
+transition the original `<project>_mail-config` and `<project>_mail-data` volumes also remain;
+`docker volume ls --filter label=com.docker.compose.project=<project>` shows them. The pre-update
+recovery unit holds a copy of both, so keep the volumes only as long as that unit is not enough.
+
 ### Preserving mail contents
 
 If existing mail contents or manual settings must remain in the active server, reinitialization is

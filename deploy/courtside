@@ -1196,6 +1196,7 @@ command_prune() {
   dropped_recovery_units=""
   prune_recovery_units "$retain" "$dry_run"
   prune_releases "$dry_run"
+  [ "$config_recipe" != full-self-hosted ] || report_mail_transition_histories
   [ "$pruned" -gt 0 ] || printf 'Nothing to remove\n'
 }
 

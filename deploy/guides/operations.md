@@ -127,7 +127,9 @@ no longer needed. It keeps the newest `--retain` recovery units, seven by defaul
 removes the older ones it wrote itself; a unit you copied or renamed is yours and stays. It keeps the
 current release, the release the last update replaced, and every release a remaining unit names,
 because `restore-check` trusts only the installed release a unit names. Every other installed release
-goes. `--dry-run` lists what prune would remove and removes none of it:
+goes. On `full-self-hosted` it also lists each retained mail transition history with its stores
+and recovery unit; it never removes one, and the [Stalwart guide](stalwart.md#interrupted-transitions)
+says how to. `--dry-run` lists what prune would remove and removes none of it:
 
 ```sh
 /srv/courtside/current/courtside prune --retain 3 --dry-run

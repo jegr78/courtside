@@ -603,6 +603,35 @@ test("given a partially configured target, when update is retried, then it retai
   });
 });
 
+test("given retained mail transition histories, when prune runs, then it lists their stores and removes none", () => {
+  fixture((context) => {
+    // given
+    const next = legacyMail(context);
+    const args = ["update", "--archive", next, "--mail-store-transition", "reinitialize", "--yes"];
+    writeFileSync(join(context.root, "docker-fail-match"), "run --rm mail-configure");
+    assert.equal(run(next, context.target, args, context.environment).status, 2);
+    rmSync(join(context.root, "docker-fail-match"));
+    assert.equal(run(next, context.target, args, context.environment).status, 0);
+    const histories = readdirSync(join(context.target, "backups")).filter((name) => name.startsWith("mail-transition-"));
+    const selected = readFileSync(join(context.target, "config", ".env"), "utf8").match(/^COURTSIDE_MAIL_CONFIG_VOLUME="(.*)"$/m)[1];
+    writeFileSync(context.dockerLog, "");
+    // when
+    const dryRun = run(next, context.target, ["prune", "--dry-run"], context.environment);
+    const pruned = run(next, context.target, ["prune"], context.environment);
+    // then
+    assert.equal(dryRun.status, 0, dryRun.stderr);
+    assert.equal(pruned.status, 0, pruned.stderr);
+    for (const history of histories) {
+      const owner = history.slice("mail-transition-".length);
+      assert.match(dryRun.stdout, new RegExp(`Kept mail transition history .*${history}: stores example-club_mail-config-stalwart1-${owner} example-club_mail-data-stalwart1-${owner} \\((selected|unused)\\)`));
+      assert.ok(existsSync(join(context.target, "backups", history)), "prune must keep every mail transition history");
+    }
+    assert.match(dryRun.stdout, new RegExp(`${selected} \\S+ \\(selected\\)`));
+    assert.match(dryRun.stdout, /\(unused\)/);
+    assert.doesNotMatch(readFileSync(context.dockerLog, "utf8"), /volume rm/);
+  });
+});
+
 test("given legacy mail, when an explicit transition is previewed, then exact consequences are reported without mutation", () => {
   fixture((context) => {
     // given
