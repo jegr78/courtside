@@ -66,6 +66,17 @@ for argument in "$@"; do
   fi
   previous=$argument
 done
+if [ -f "${join(root, "docker-echo-mail-secrets")}" ]; then
+  case "$*" in
+    *'run --rm mail-configure'*)
+      previous=''
+      for argument in "$@"; do
+        [ "$previous" != '--env-file' ] || sed -n 's/^COURTSIDE_MAIL_[A-Z_]*PASSWORD=//p' "$argument"
+        previous=$argument
+      done
+      ;;
+  esac
+fi
 if [ -f "${join(root, "docker-fail-match")}" ]; then
   failure=$(cat "${join(root, "docker-fail-match")}")
   case "$*" in *"$failure"*) exit 9 ;; esac

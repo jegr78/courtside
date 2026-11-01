@@ -98,6 +98,8 @@ finish the transition or restore the complete recovery unit.
 
 Private journals and attempt logs live in `.courtside-mail-transition` while active and in
 `backups/mail-transition-<attempt>` afterwards. They contain credentials and must not be published.
+The launcher replaces the managed mail passwords in `bootstrap.log` and `setup.log` with
+`[REDACTED]`; `setup.env` and `target.env` still hold them.
 The associated original recovery unit is exempt from automatic retention while its journal remains.
 Neither a retry nor normal backup pruning deletes the retained mail volumes.
 

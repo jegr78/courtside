@@ -2311,8 +2311,10 @@ command_update() {
     compose_command
     begin_mail_store_transition "$installation_directory/releases/$target_release" "$target_digest"
     if ! configure_mail_transition_target > "$mail_journal/setup.log" 2>&1; then
+      redact_mail_transition_logs
       refuse "mail transition preparation failed; recovery unit $created_recovery is ready; retry update with the same archive and explicit opt-in"
     fi
+    redact_mail_transition_logs
   fi
   if [ "$database_major_update" = true ]; then
     restore_database_major_target "$installation_directory/releases/$target_release"

@@ -161,6 +161,21 @@ configure_mail_transition_target() {
   "${mail_candidate_compose[@]}" --profile mail-setup run --rm --no-deps mail-ready || return 1
 }
 
+redact_mail_transition_logs() {
+  local log key value content
+  for log in "$mail_journal/bootstrap.log" "$mail_journal/setup.log"; do
+    [ -f "$log" ] && [ ! -L "$log" ] || continue
+    content=$(< "$log")
+    for key in COURTSIDE_MAIL_PASSWORD COURTSIDE_MAIL_SETUP_PASSWORD COURTSIDE_MAIL_ADMIN_PASSWORD COURTSIDE_MAIL_RELOAD_PASSWORD; do
+      value=$(environment_value "$mail_journal/target.env" "$key")
+      [ -z "$value" ] || content=${content//"$value"/[REDACTED]}
+    done
+    printf '%s\n' "$content" > "$log.partial"
+    chmod 600 "$log.partial"
+    mv "$log.partial" "$log"
+  done
+}
+
 retire_mail_transition() {
   local destination="$installation_directory/backups/mail-transition-$mail_owner"
   [ ! -e "$destination" ] && [ ! -L "$destination" ] || refuse "mail transition history already exists"
