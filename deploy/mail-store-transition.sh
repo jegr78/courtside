@@ -50,11 +50,11 @@ prepare_mail_store_transition() {
     read_manifest "$archive/manifest.json"
     return 0
   fi
-  [ "$mode" = reinitialize ] \
-    || refuse "Stalwart store migration requires explicit --mail-store-transition reinitialize; see guides/stalwart.md"
   [ "$mail_source_image" = stalwartlabs/stalwart:v0.16.27@sha256:c429b311c93db5606598abc1c68225a85a6953183848ae01bee9c6a98885836c ] \
     && [[ "$mail_target_image" =~ ^stalwartlabs/stalwart:v1\.0\.[0-9]+@sha256:[0-9a-f]{64}$ ]] \
-    || refuse "unsupported Stalwart store migration; only the pinned 0.16.27 to 1.0.x transition is supported"
+    || refuse "unsupported Stalwart store migration; only the pinned 0.16.27 to 1.0.x transition is supported; an installation on an older Stalwart must update to Courtside 0.3.0 first"
+  [ "$mode" = reinitialize ] \
+    || refuse "Stalwart store migration requires explicit --mail-store-transition reinitialize; see guides/stalwart.md"
   [ ! -e "$installation_directory/config/local.override.yaml" ] \
     || refuse "mail store transition is unavailable with a local override"
   [ -z "$config_overlays" ] || refuse "mail store transition is unavailable with deployment overlays"

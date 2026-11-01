@@ -403,8 +403,8 @@ function mailVersion(archive, tag) {
   writeFileSync(manifest, `${JSON.stringify(body, null, 2)}\n`);
 }
 
-function legacyMail(context) {
-  mailVersion(context.archive, "v0.16.27");
+function legacyMail(context, tag = "v0.16.27") {
+  mailVersion(context.archive, tag);
   const initialized = initialize(context, { recipe: "full-self-hosted", mail_relay_host: "" });
   assert.equal(initialized.status, 0, initialized.stderr);
   writeFileSync(context.dockerLog, "");
@@ -702,6 +702,22 @@ for (const failure of ["run --rm mail-bootstrap", "run --rm mail-configure", "ru
         /--env-file \S+\/config\/\.env .*up -d --wait mail mail-certificate mail-reload/,
         "the source must restart with its certificate reloader");
       assert.equal(existsSync(join(context.target, ".courtside-mail-transition")), true);
+    });
+  });
+}
+
+for (const options of [[], ["--mail-store-transition", "reinitialize"]]) {
+  test(`given Stalwart from before 0.16.27, when update runs with ${options.length ? "" : "no "}transition option, then refuse with the route through 0.3.0`, () => {
+    fixture((context) => {
+      // given
+      const next = legacyMail(context, "v0.16.26");
+      // when
+      const result = run(next, context.target, ["update", "--archive", next, ...options, "--yes"], context.environment);
+      // then
+      assert.equal(result.status, 2);
+      assert.match(result.stderr, /only the pinned 0\.16\.27 .*update to Courtside 0\.3\.0 first/);
+      assert.equal(readFileSync(context.dockerLog, "utf8"), "");
+      assert.deepEqual(readdirSync(join(context.target, "backups")), []);
     });
   });
 }

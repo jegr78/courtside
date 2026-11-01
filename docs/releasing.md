@@ -582,6 +582,19 @@ helps nobody at 22:00.
 The first public release has no upgrade origin, so its release body says that directly instead of
 turning development-time breaking markers into upgrade instructions.
 
+An operator step that changes no published surface carries no footer, so nothing collects it. Such a
+step is listed below for its release, and whoever publishes that release adds it to the body under
+*Upgrade notes* with `gh release edit`. Remove an entry once its release is published.
+
+**0.4.0.** For `full-self-hosted` installations:
+
+> Courtside 0.4.0 ships Stalwart 1.0, which cannot read the 0.16 mail stores. Update with
+> `--mail-store-transition reinitialize`, which starts fresh mail stores: old messages, queued
+> deliveries, manually created accounts and settings are not copied, and the new DKIM key needs new
+> DNS records. The launcher supports this only from Stalwart 0.16.27, so an installation on Courtside
+> 0.1.0 or 0.2.0 updates to 0.3.0 first. `deploy/guides/stalwart.md` describes the procedure and how
+> to abandon an interrupted attempt.
+
 The `upgrade` gate executes the origins the release resolved from the published release history, so
 a release that breaks one of those is refused, but only those. The same job runs every night from a
 retained dated nightly, so its mechanics are proven before the first release that has an origin needs
