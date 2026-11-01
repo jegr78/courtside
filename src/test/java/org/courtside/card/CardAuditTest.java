@@ -55,6 +55,22 @@ class CardAuditTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenACardThatSignalsNoOccupancy_whenAChangeLeavesTheFlagOut_thenTheStoredValueIsKept() {
+        // given
+        BookingCard card = cards.createCard("Team", "#112233", Set.of(Role.MEMBER),
+                Set.of(), new short[]{2}, false, false, false, false, false);
+
+        // when
+        BookingCard changed = cards.changeCard(card.getId(), "Squad", "#112233", Set.of(Role.MEMBER),
+                Set.of(), new short[]{2}, false, false, false, false, null);
+
+        // then
+        assertThat(changed.isSignalsOccupancy()).as("an absent flag keeps the stored one").isFalse();
+        assertThat(audit.latestPayload(card.getId(), CardEvent.BookingCardChanged.TYPE))
+                .containsEntry("signalsOccupancy", false);
+    }
+
+    @Test
     void givenABookingCard_whenItStopsSignallingOccupancy_thenTheChangeIsRecordedWithTheFlag() {
         // given
         BookingCard card = cards.createCard("Team", "#112233", Set.of(Role.MEMBER),
