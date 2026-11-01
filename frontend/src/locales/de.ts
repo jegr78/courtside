@@ -59,7 +59,7 @@ const de = {
   "mfa.qrLabel": "QR-Code zur Authenticator-Einrichtung",
   "mfa.confirmTotp": "Authenticator bestätigen",
   "mfa.cancel": "Abbrechen",
-  "mfa.changesSignOut": "Änderungen beenden alle Sitzungen. Neue Wiederherstellungscodes ersetzen die bisherigen Codes.",
+  "mfa.changesSignOut": "Eine Methode hinzufügen oder entfernen und neue Wiederherstellungscodes erzeugen beendet alle Sitzungen. Einen Schlüssel umbenennen beendet keine. Neue Wiederherstellungscodes ersetzen die bisherigen Codes.",
   "mfa.recoveryTitle": "Wiederherstellungscodes sichern",
   "mfa.recoveryHint": "Diese Codes erscheinen nur jetzt. Sichere sie an einem geschützten Ort außerhalb dieses Geräts. Jeder Code ersetzt einmal deinen zweiten Faktor. Alle Sitzungen wurden beendet. Melde dich nach dem Sichern erneut an.",
   "mfa.codesSaved": "Codes gesichert, weiter zur Anmeldung",

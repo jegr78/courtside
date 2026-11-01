@@ -405,6 +405,30 @@ class MfaWebAuthnFlowTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenASignedInHolder_whenRenamingTheirKey_thenTheSessionSurvivesAndOnlyTheRenameIsRecorded() throws Exception {
+        // given
+        var authenticator = enroll();
+        Cookie pending = password(202);
+        Cookie full = prove(pending, authenticator, options(pending));
+        String id = authenticator.credentialId().toBase64UrlString();
+        int notices = securityNotices();
+        // when
+        List<String> actions = credentialActions(() -> mvc.perform(patch("/api/account/mfa/webauthn/credentials/{id}", id)
+                        .cookie(full).with(csrf()).contentType(MediaType.APPLICATION_JSON).content("{\"label\":\"Travel key\"}"))
+                .andExpect(status().is2xxSuccessful()));
+        // then
+        assertThat(actions).as("a rename is audited as its own action").containsExactly("MFA_METHOD_RENAMED");
+        assertThat(credentials.findByCredentialId(authenticator.credentialId()).getLabel()).isEqualTo("Travel key");
+        mvc.perform(get("/api/session").cookie(full)).andExpect(jsonPath("$.authenticated").value(true));
+        assertThat(securityNotices()).as("a rename mails nobody").isEqualTo(notices);
+    }
+
+    private int securityNotices() {
+        return jdbc.sql("SELECT count(*) FROM notification WHERE account_id = :id AND kind = 'ACCOUNT_SECURITY_CHANGED'")
+                .param("id", account).query(Integer.class).single();
+    }
+
+    @Test
     void givenAnotherMembersKey_whenAHolderRenamesOrRemovesIt_thenTheKeyIsAbsentForThemAndUntouched() throws Exception {
         // given
         var authenticator = enroll();

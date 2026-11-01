@@ -61,7 +61,7 @@ const en: Record<keyof typeof de, string> = {
   "mfa.qrLabel": "Authenticator setup QR code",
   "mfa.confirmTotp": "Confirm authenticator",
   "mfa.cancel": "Cancel",
-  "mfa.changesSignOut": "Changes end all sessions. New recovery codes replace the previous codes.",
+  "mfa.changesSignOut": "Adding or removing a method and generating new recovery codes end all sessions. Renaming a key does not. New recovery codes replace the previous codes.",
   "mfa.recoveryTitle": "Save your recovery codes",
   "mfa.recoveryHint": "These codes are shown only now. Save them somewhere secure outside this device. Each code replaces your second factor once. All sessions have ended. Sign in again after saving them.",
   "mfa.codesSaved": "Codes saved, continue to sign-in",

@@ -1013,7 +1013,8 @@ Initial enrollment requires recent password proof. Later factor changes, recover
 disablement and sensitive actions require recent password plus one existing factor. The proof
 window remains five minutes, so disabling MFA or removing a method asks the holder to confirm it
 first even within that window. Security-relevant factor changes revoke existing sessions and notify
-the holder without naming a credential or exposing a secret. Generated recovery codes remain in
+the holder without naming a credential or exposing a secret. Renaming a key changes only its
+holder-private label, so it is audited but ends no session and sends no notice. Generated recovery codes remain in
 that browser's memory long enough to save them after its own session ends. External account changes
 and a different signed-in holder clear them. Administrators see only whether another account has
 MFA and whether controlled recovery blocks it.

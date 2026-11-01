@@ -486,8 +486,9 @@ Wähle *Codes gesichert, weiter zur Anmeldung* erst, wenn du die Codes gesichert
 
 ### Faktoren ändern oder entfernen
 
-Jede Änderung an deinen Faktoren beendet alle Sitzungen, auch die aktuelle. Über sicherheitsrelevante
-Änderungen benachrichtigt dich Courtside per E-Mail. Die Nachricht nennt kein Gerät und keinen Code.
+Jede Änderung an deinen Faktoren beendet alle Sitzungen, auch die aktuelle. Ein Gerät umbenennen
+ändert nur seinen Namen, deine Sitzungen bleiben bestehen. Über sicherheitsrelevante Änderungen
+benachrichtigt dich Courtside per E-Mail. Die Nachricht nennt kein Gerät und keinen Code.
 *Authenticator-App entfernen*, *Gerät entfernen* und *Zwei-Faktor-Authentifizierung deaktivieren*
 fragen vorher nach einer Bestätigung. Nach dem Deaktivieren schützt nur noch dein Passwort dein Konto.
 
