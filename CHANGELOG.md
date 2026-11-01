@@ -1,7 +1,6 @@
 # Changelog
 
-## [0.4.0-rc.1](https://github.com/jegr78/courtside/compare/v0.3.0...v0.4.0-rc.1) (2026-11-01)
-
+## 0.4.0 (2026-11-01)
 
 ### Features
 
@@ -16,7 +15,6 @@
 * show the active account with profile and security ([#1776](https://github.com/jegr78/courtside/issues/1776)) ([2d12a85](https://github.com/jegr78/courtside/commit/2d12a8527c4a7fd7be1a6bf68b5b43163561c371))
 * verify a Loxone connection during setup and against a recorded device run ([#1808](https://github.com/jegr78/courtside/issues/1808)) ([81fb548](https://github.com/jegr78/courtside/commit/81fb548f850976e64758f34da39650c0846ba44a))
 
-
 ### Bug fixes
 
 * bump org.jacoco:jacoco-maven-plugin from 0.8.15 to 0.8.16 ([#1799](https://github.com/jegr78/courtside/issues/1799)) ([1bb87df](https://github.com/jegr78/courtside/commit/1bb87df91c2b8786483f546f51350e3c3fa63079))
@@ -28,7 +26,6 @@
 * harden the MFA key root and second-factor guessing ([#1782](https://github.com/jegr78/courtside/issues/1782)) ([4948d8b](https://github.com/jegr78/courtside/commit/4948d8b7b9963738b6fd109ac81124fba76ac612))
 * pass the access-control settings through the reference deployment ([#1810](https://github.com/jegr78/courtside/issues/1810)) ([287374a](https://github.com/jegr78/courtside/commit/287374a7eb2d37c808658c5f0acd029d9320958f))
 * resolve the open security alerts and keep CodeQL failures visible ([#1788](https://github.com/jegr78/courtside/issues/1788)) ([3d4ea17](https://github.com/jegr78/courtside/commit/3d4ea179385d789cc656574ac734a0fea67be541))
-
 
 ### Chores
 
