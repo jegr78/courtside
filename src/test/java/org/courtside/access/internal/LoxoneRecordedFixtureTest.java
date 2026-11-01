@@ -11,6 +11,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Stream;
 
@@ -21,7 +22,9 @@ class LoxoneRecordedFixtureTest extends LoxoneTestSupport {
 
     private static final String DEVICE_CODE = "73519246";
     private static final List<String> STEPS = List.of("probe", "connection-check", "getip", "api-key", "local-time",
-            "user-create", "user-code", "user-duplicate", "user-read", "user-delete", "user-list", "cleanup");
+            "user-create", "user-code", "user-edit", "user-code-again", "user-duplicate", "user-duplicate-clear",
+            "user-read", "user-delete", "user-list", "cleanup");
+    private static final Set<String> UNRECORDED = Set.of("user-edit", "user-code-again", "user-duplicate-clear");
 
     @TempDir
     Path target;
@@ -66,6 +69,12 @@ class LoxoneRecordedFixtureTest extends LoxoneTestSupport {
         assertThat(observed.leftOver()).as("the run lists none of its own users at its end").isEmpty();
         assertThat(ownUsersOnTheSimulator()).isEmpty();
         assertThat(observed.code()).isEqualTo(200);
+        assertThat(observed.edit()).as("the simulator edits its own user by uuid").isEqualTo(200);
+        assertThat(observed.resentCode()).as("the simulator accepts a code again from the user holding it")
+                .isEqualTo(200);
+        assertThat(observed.clearedCode()).as("the simulator clears a code after its 201").isEqualTo(200);
+        assertThat(observed.clearedRead()).isEqualTo(200);
+        assertThat(observed.clearedKeycodes()).as("the cleared user holds no code").isZero();
         assertThat(observed.duplicateCode()).as("the simulator answers a code another user holds with 201")
                 .isEqualTo(201);
         assertThat(observed.checks()).extracting(ConnectionCheckRun.Checked::check).contains("miniserver", "login");
@@ -87,6 +96,17 @@ class LoxoneRecordedFixtureTest extends LoxoneTestSupport {
         // then
         assertThat(RecordedFixtures.differences(RecordedFixtures.RECORDED, target))
                 .as("the simulator answers each recorded step as the Miniserver did").isEmpty();
+    }
+
+    @Test
+    void givenTheRecording_whenItsStepsAreListed_thenOnlyTheStepsAwaitingTheNextDeviceRunAreMissing() {
+        // when
+        List<String> missing = STEPS.stream()
+                .filter(step -> !Files.exists(RecordedFixtures.RECORDED.resolve(step + ".json"))).toList();
+
+        // then
+        assertThat(missing).as("a step the device run has since recorded leaves UNRECORDED, and every other step "
+                + "is recorded").containsExactlyInAnyOrderElementsOf(UNRECORDED);
     }
 
     @Test

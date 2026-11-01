@@ -59,6 +59,11 @@ class LoxoneDeviceContractTest {
         System.out.println("jdev/sys/date answered " + observed.date() + ", jdev/sys/time answered " + observed.time());
         System.out.println("updateuseraccesscode answered " + observed.code() + ", for a code another user holds "
                 + observed.duplicateCode());
+        System.out.println("addoredituser on its own user by uuid answered " + observed.edit()
+                + ", updateuseraccesscode re-sending the code that user holds answered " + observed.resentCode());
+        System.out.println("updateuseraccesscode clearing the code after " + observed.duplicateCode() + " answered "
+                + observed.clearedCode() + ", getuser then answered " + observed.clearedRead() + " with "
+                + observed.clearedKeycodes() + " keycodes");
         System.out.println("own users still listed: " + observed.leftOver().size());
         recorder.write(RecordedFixtures.RECORDED);
 
