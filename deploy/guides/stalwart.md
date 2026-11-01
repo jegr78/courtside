@@ -62,12 +62,27 @@ or point a 1.0 image at an old store.
 
 An interrupted transition with a committed journal blocks ordinary lifecycle commands. An
 interruption before journal publication leaves the original release selected; `up` can restart it.
-Rerun the same candidate's `update`
-command with the same archive and explicit transition option. If the original release is still
-selected, the launcher restarts it and retains the interrupted target before preparing a new
-attempt. If the target release is selected, it verifies the recorded volume ownership and resumes
-activation of that same pair. A failed activation retains the recovery unit. Do not switch the
-`current` symlink back after application schema migrations; recover the complete earlier unit.
+While the journal still records preparation and the original release is selected, `backup`,
+`restore-check`, `diagnose`, `doctor` and `status` keep working, and `status` reports
+`mail_transition=preparing`. Every other command stays refused until one of two exits is taken.
+
+To retry, rerun the same candidate's `update` command with the same archive and explicit transition
+option. If the original release is still selected, the launcher restarts it and retains the
+interrupted target before preparing a new attempt. If the target release is selected, it verifies
+the recorded volume ownership and resumes activation of that same pair. A failed activation retains
+the recovery unit. Do not switch the `current` symlink back after application schema migrations;
+recover the complete earlier unit.
+
+To stay on the original release, abandon the attempt:
+
+```sh
+"$candidate/courtside" --directory /srv/courtside update --mail-store-transition abandon --yes
+```
+
+Abandoning needs no archive. It restarts the original mail server and the application, moves the
+journal to `backups/mail-transition-<attempt>` and stops there. It retains the attempt's stores and
+the recovery unit. Once the target release is selected, abandoning is refused:
+finish the transition or restore the complete recovery unit.
 
 Private journals and attempt logs live in `.courtside-mail-transition` while active and in
 `backups/mail-transition-<attempt>` afterwards. They contain credentials and must not be published.

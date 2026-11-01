@@ -1532,7 +1532,9 @@ when updating to 1.0.x. This requires `--mail-store-transition reinitialize`; `-
 insufficient. It retains the old stores and recovery unit, configures new stores and checks local
 TLS and sender authentication before application startup. It does not copy old mail state and
 requires new DKIM DNS records. Follow the [Stalwart procedure](stalwart.md#upgrading-older-mail-stores),
-including its interrupted-update recovery instructions. When a PostgreSQL major update accompanies
+including its interrupted-update recovery instructions. An interrupted preparation keeps `backup`,
+`restore-check`, `diagnose`, `doctor` and `status` working; `update --mail-store-transition abandon
+--yes` returns to the original release without starting a new attempt. When a PostgreSQL major update accompanies
 this mail transition, a failure retains the selected transaction and complete recovery unit instead
 of automatically reverting the database independently of the mail stores.
 

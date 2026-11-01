@@ -150,45 +150,89 @@ retire_mail_transition() {
   mv "$mail_journal" "$destination"
 }
 
-resume_mail_store_transition() {
-  local archive=$1 mode=$2 confirmed=$3 source target digest phase recovery config data
+mail_transition_allows() {
+  local journal="$installation_directory/.courtside-mail-transition" file installed
+  contains_word "backup restore-check diagnose doctor status" "$1" || return 1
+  [ -d "$journal" ] && [ ! -L "$journal" ] || return 1
+  for file in state phase; do
+    [ -f "$journal/$file" ] && [ ! -L "$journal/$file" ] || return 1
+  done
+  [ "$(sed -n '1p' "$journal/phase")" = preparing ] || return 1
+  installed=$(recovery_value "$installation_directory/config/installation.conf" release)
+  [ -n "$installed" ] && [ "$(recovery_value "$journal/state" source_release)" = "$installed" ]
+}
+
+start_mail_transition_source() {
+  "$@" --profile mail up -d --wait mail && "$@" up -d app
+}
+
+read_mail_transition_journal() {
+  local file
   mail_journal="$installation_directory/.courtside-mail-transition"
   [ -d "$mail_journal" ] && [ ! -L "$mail_journal" ] \
     && [ "$(path_mode "$mail_journal")" = 700 ] && [ "$(path_owner "$mail_journal")" = "$(id -u)" ] \
     || refuse "mail transition journal must be an operator-owned private directory"
-  local file
   for file in state phase target.env; do
     [ -f "$mail_journal/$file" ] && [ ! -L "$mail_journal/$file" ] \
       && [ "$(path_mode "$mail_journal/$file")" = 600 ] && [ "$(path_owner "$mail_journal/$file")" = "$(id -u)" ] \
       || refuse "mail transition journal contains unsafe state"
   done
-  [ "$mode" = reinitialize ] && [ "$confirmed" = true ] \
-    || refuse "interrupted mail transition requires update --mail-store-transition reinitialize --yes with the same archive"
-  source=$(recovery_value "$mail_journal/state" source_release)
-  target=$(recovery_value "$mail_journal/state" target_release)
-  digest=$(recovery_value "$mail_journal/state" manifest_sha)
+  mail_transition_source=$(recovery_value "$mail_journal/state" source_release)
+  mail_transition_target=$(recovery_value "$mail_journal/state" target_release)
+  mail_transition_digest=$(recovery_value "$mail_journal/state" manifest_sha)
   mail_owner=$(recovery_value "$mail_journal/state" owner)
-  recovery=$(recovery_value "$mail_journal/state" recovery)
-  phase=$(< "$mail_journal/phase")
-  [[ "$source" =~ ^[0-9A-Za-z.+-]+$ ]] && [[ "$mail_owner" =~ ^[a-f0-9]{48}$ ]] \
-    && [ "$target" = "$manifest_version" ] && [ "$digest" = "$manifest_sha256" ] \
-    && contains_word "preparing activating" "$phase" \
-    || refuse "mail transition journal does not match this target archive"
-  case "$recovery" in "$installation_directory"/backups/recovery-*) ;; *) refuse "mail transition recovery path is invalid" ;; esac
-  verify_recovery_unit "$recovery"
+  mail_transition_recovery=$(recovery_value "$mail_journal/state" recovery)
+  mail_transition_state=$(< "$mail_journal/phase")
+  [[ "$mail_transition_source" =~ ^[0-9A-Za-z.+-]+$ ]] && [[ "$mail_transition_target" =~ ^[0-9A-Za-z.+-]+$ ]] \
+    && [[ "$mail_owner" =~ ^[a-f0-9]{48}$ ]] && contains_word "preparing activating" "$mail_transition_state" \
+    || refuse "mail transition journal is malformed"
+  case "$mail_transition_recovery" in
+    "$installation_directory"/backups/recovery-*) ;;
+    *) refuse "mail transition recovery path is invalid" ;;
+  esac
+  verify_recovery_unit "$mail_transition_recovery"
   validate_environment_file "$mail_journal/target.env"
   resolve_mail_store_volumes "$mail_journal/target.env"
-  config="${config_project}_mail-config-stalwart1-$mail_owner"
-  data="${config_project}_mail-data-stalwart1-$mail_owner"
-  [ "$selected_mail_config_volume" = "$config" ] && [ "$selected_mail_data_volume" = "$data" ] \
+  mail_transition_config="${config_project}_mail-config-stalwart1-$mail_owner"
+  mail_transition_data="${config_project}_mail-data-stalwart1-$mail_owner"
+  [ "$selected_mail_config_volume" = "$mail_transition_config" ] && [ "$selected_mail_data_volume" = "$mail_transition_data" ] \
     || refuse "mail transition journal does not identify its owned store pair"
-  if [ "$config_release" = "$source" ]; then
-    compose_command
-    "${compose[@]}" --profile mail up -d --wait mail \
-      || refuse "mail transition source restart failed; recovery unit $recovery is ready"
-    "${compose[@]}" up -d app \
-      || refuse "mail transition source application restart failed; recovery unit $recovery is ready"
-    retire_mail_transition
+}
+
+restore_mail_transition_source() {
+  compose_command
+  start_mail_transition_source "${compose[@]}" \
+    || refuse "mail transition source restart failed; recovery unit $mail_transition_recovery is ready"
+  retire_mail_transition
+}
+
+abandon_mail_store_transition() {
+  local confirmed=$1 journal="$installation_directory/.courtside-mail-transition"
+  [ -e "$journal" ] || [ -L "$journal" ] || refuse "no interrupted mail transition to abandon"
+  read_mail_transition_journal
+  [ "$config_release" = "$mail_transition_source" ] \
+    || refuse "cannot abandon the mail transition once release $config_release is selected; resume it with update --mail-store-transition reinitialize --yes or restore recovery unit $mail_transition_recovery"
+  printf 'Plan: abandon the mail transition to %s and restart release %s with its selected mail stores\n' \
+    "$mail_transition_target" "$config_release"
+  printf 'retained_mail_config=%s\nretained_mail_data=%s\nretained_recovery=%s\n' \
+    "$mail_transition_config" "$mail_transition_data" "$mail_transition_recovery"
+  confirm "$confirmed"
+  restore_mail_transition_source
+  printf 'Abandoned the mail transition. Release %s remains selected; history is in %s.\n' \
+    "$config_release" "$installation_directory/backups/mail-transition-$mail_owner"
+}
+
+resume_mail_store_transition() {
+  local archive=$1 mode=$2 confirmed=$3
+  [ "$mode" = reinitialize ] && [ "$confirmed" = true ] \
+    || refuse "interrupted mail transition requires update --mail-store-transition reinitialize --yes with the same archive, or update --mail-store-transition abandon"
+  read_mail_transition_journal
+  [ "$mail_transition_target" = "$manifest_version" ] && [ "$mail_transition_digest" = "$manifest_sha256" ] \
+    || refuse "mail transition journal does not match this target archive"
+  local target=$mail_transition_target phase=$mail_transition_state recovery=$mail_transition_recovery
+  local config=$mail_transition_config data=$mail_transition_data
+  if [ "$config_release" = "$mail_transition_source" ]; then
+    restore_mail_transition_source
     printf 'Retained the interrupted target stores. Preparing a new attempt from the original release.\n'
     return 1
   fi

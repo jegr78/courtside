@@ -473,6 +473,95 @@ test("given activation failed after store selection, when update is retried, the
   });
 });
 
+function failedPreparation(context) {
+  const next = legacyMail(context);
+  writeFileSync(join(context.root, "docker-fail-match"), "run --rm mail-configure");
+  const failed = run(next, context.target, ["update", "--archive", next,
+    "--mail-store-transition", "reinitialize", "--yes"], context.environment);
+  assert.equal(failed.status, 2, failed.stderr);
+  rmSync(join(context.root, "docker-fail-match"));
+  writeFileSync(context.dockerLog, "");
+  return next;
+}
+
+test("given a failed mail preparation, when routine commands run, then backup, restore-check and status still work", () => {
+  fixture((context) => {
+    // given
+    const next = failedPreparation(context);
+    const journal = join(context.target, ".courtside-mail-transition");
+    const recovery = readFileSync(join(journal, "state"), "utf8").match(/^recovery=(.*)$/m)[1];
+    // when
+    const backup = run(next, context.target, ["backup"], context.environment);
+    const restore = run(next, context.target, ["restore-check", "--recovery", recovery], {
+      ...context.environment, COURTSIDE_RESTORE_USERNAME: "doe.jane", COURTSIDE_RESTORE_PASSWORD: "restore-private-value" });
+    const status = run(next, context.target, ["status"], context.environment);
+    const up = run(next, context.target, ["up"], context.environment);
+    // then
+    assert.equal(backup.status, 0, backup.stderr);
+    assert.equal(restore.status, 0, restore.stderr);
+    assert.equal(status.status, 0, status.stderr);
+    assert.match(status.stdout, /^mail_transition=preparing$/m, "status must name the interrupted transition");
+    assert.equal(up.status, 2, "up must stay refused while the journal is active");
+    assert.ok(existsSync(join(journal, "state")), "routine commands must not retire the journal");
+    assert.ok(existsSync(recovery), "a backup must not prune the journal's recovery unit");
+  });
+});
+
+test("given a failed mail preparation, when the transition is abandoned, then the source runs and no new attempt starts", () => {
+  fixture((context) => {
+    // given
+    const next = failedPreparation(context);
+    const before = readFileSync(join(context.target, "config", ".env"), "utf8");
+    // when
+    const result = run(next, context.target,
+      ["update", "--mail-store-transition", "abandon", "--yes"], context.environment);
+    // then
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(existsSync(join(context.target, ".courtside-mail-transition")), false);
+    assert.equal(readdirSync(join(context.target, "backups")).filter((name) => name.startsWith("mail-transition-")).length, 1);
+    assert.equal(readFileSync(join(context.target, "config", ".env"), "utf8"), before);
+    assert.match(readFileSync(join(context.target, "config", "installation.conf"), "utf8"), /^release=0\.1\.0$/m);
+    const calls = readFileSync(context.dockerLog, "utf8");
+    assert.match(calls, /up -d --wait mail/);
+    assert.match(calls, /up -d app/);
+    assert.doesNotMatch(calls, /volume create|run --rm mail-bootstrap|volume rm|down --volumes/);
+    assert.equal(run(context.archive, context.target, ["backup"], context.environment).status, 0);
+  });
+});
+
+test("given the target release is selected, when the transition is abandoned, then refuse and point at recovery", () => {
+  fixture((context) => {
+    // given
+    const next = legacyMail(context);
+    writeFileSync(join(context.root, "docker-fail-mail-activation"), "once");
+    assert.equal(run(next, context.target, ["update", "--archive", next,
+      "--mail-store-transition", "reinitialize", "--yes"], context.environment).status, 2);
+    writeFileSync(context.dockerLog, "");
+    // when
+    const result = run(next, context.target,
+      ["update", "--mail-store-transition", "abandon", "--yes"], context.environment);
+    // then
+    assert.equal(result.status, 2);
+    assert.match(result.stderr, /abandon.*recovery unit/);
+    assert.equal(existsSync(join(context.target, ".courtside-mail-transition")), true);
+    assert.equal(readFileSync(context.dockerLog, "utf8"), "");
+  });
+});
+
+test("given no interrupted mail transition, when abandon is requested, then refuse without Docker", () => {
+  fixture((context) => {
+    // given
+    legacyMail(context);
+    // when
+    const result = run(context.archive, context.target,
+      ["update", "--mail-store-transition", "abandon", "--yes"], context.environment);
+    // then
+    assert.equal(result.status, 2);
+    assert.match(result.stderr, /no interrupted mail transition/);
+    assert.equal(readFileSync(context.dockerLog, "utf8"), "");
+  });
+});
+
 test("given a target volume acquired a foreign owner, when activation is retried, then no service starts", () => {
   fixture((context) => {
     // given

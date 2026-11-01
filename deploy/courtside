@@ -94,7 +94,7 @@ prepare_executables
 cleanup() {
   local result=$?
   if [ "$mail_source_resume_required" = true ] && [ "${#mail_source_compose[@]}" -gt 0 ]; then
-    "${mail_source_compose[@]}" up -d --wait mail app >/dev/null 2>&1 || true
+    start_mail_transition_source "${mail_source_compose[@]}" >/dev/null 2>&1 || true
   fi
   if [ "$restore_cleanup_active" = true ] || [ "${#restore_owned_volumes[@]}" -gt 0 ]; then
     cleanup_restore_resources >/dev/null 2>&1 || true
@@ -217,8 +217,8 @@ acquire_lock() {
   recover_configuration_transaction
   if [ -e "$installation_directory/.courtside-mail-transition" ] \
     || [ -L "$installation_directory/.courtside-mail-transition" ]; then
-    [ "${command:-}" = update ] \
-      || refuse "an interrupted mail transition requires update recovery with the same candidate archive"
+    [ "${command:-}" = update ] || mail_transition_allows "${command:-}" \
+      || refuse "an interrupted mail transition requires update recovery with the same candidate archive or update --mail-store-transition abandon"
   fi
   if [ -e "$installation_directory/.courtside-rotation" ] \
     && [ "${command:-}" != rotate-secret ]; then
@@ -2259,6 +2259,12 @@ command_update() {
       *) refuse "unknown update option $1" ;;
     esac
   done
+  if [ "$mail_mode" = abandon ]; then
+    acquire_lock
+    load_configuration
+    abandon_mail_store_transition "$confirmed"
+    return 0
+  fi
   [ -n "$archive" ] || refuse "update requires --archive with one exact release"
   [ -d "$archive" ] && [ ! -L "$archive" ] || refuse "$archive is not a release archive"
   acquire_lock
@@ -3027,6 +3033,13 @@ command_status() {
     printf 'mail_handover=unavailable\n'
   else
     printf 'mail_handover=external\n'
+  fi
+  if [ -e "$installation_directory/.courtside-mail-transition" ]; then
+    case "$(sed -n '1p' "$installation_directory/.courtside-mail-transition/phase" 2>/dev/null)" in
+      preparing) printf 'mail_transition=preparing\n' ;;
+      activating) printf 'mail_transition=activating\n' ;;
+      *) printf 'mail_transition=unknown\n' ;;
+    esac
   fi
   printf 'backup_age_seconds=%s\n' "$(latest_backup_age)"
   printf 'free_storage_kib=%s\n' "$(df -Pk "$installation_directory" | awk 'NR == 2 { print $4 }')"
