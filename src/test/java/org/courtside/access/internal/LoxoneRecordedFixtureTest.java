@@ -11,7 +11,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Stream;
 
@@ -24,7 +23,6 @@ class LoxoneRecordedFixtureTest extends LoxoneTestSupport {
     private static final List<String> STEPS = List.of("probe", "connection-check", "getip", "api-key", "local-time",
             "user-create", "user-code", "user-edit", "user-code-again", "user-duplicate", "user-duplicate-clear",
             "user-read", "user-delete", "user-list", "cleanup");
-    private static final Set<String> UNRECORDED = Set.of("user-edit", "user-code-again", "user-duplicate-clear");
 
     @TempDir
     Path target;
@@ -99,14 +97,13 @@ class LoxoneRecordedFixtureTest extends LoxoneTestSupport {
     }
 
     @Test
-    void givenTheRecording_whenItsStepsAreListed_thenOnlyTheStepsAwaitingTheNextDeviceRunAreMissing() {
+    void givenTheRecording_whenItsStepsAreListed_thenEveryStepIsRecorded() {
         // when
         List<String> missing = STEPS.stream()
                 .filter(step -> !Files.exists(RecordedFixtures.RECORDED.resolve(step + ".json"))).toList();
 
         // then
-        assertThat(missing).as("a step the device run has since recorded leaves UNRECORDED, and every other step "
-                + "is recorded").containsExactlyInAnyOrderElementsOf(UNRECORDED);
+        assertThat(missing).as("every step of the device run has a recording").isEmpty();
     }
 
     @Test

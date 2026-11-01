@@ -1,0 +1,15 @@
+[ {
+  "request" : {
+    "command" : "addoredituser",
+    "arguments" : [ "{\"uuid\":\"<loxone-uuid-3>\",\"name\":\"<name-2>\",\"userState\":4,\"validFrom\":\"<time-8>\",\"validUntil\":\"<time-9>\",\"expirationAction\":1,\"changePassword\":false,\"usergroups\":[]}" ],
+    "query" : { }
+  },
+  "status" : 200,
+  "response" : {
+    "LL" : {
+      "control" : "dev/sps/addoredituser/<json-3>",
+      "value" : "{\"name\":\"<name-2>\",\"desc\":\"\",\"uuid\":\"<loxone-uuid-3>\",\"userid\":\"\",\"<key-1>\":\"\",\"firstName\":\"\",\"lastName\":\"\",\"email\":\"\",\"phone\":\"\",\"uniqueUserId\":\"\",\"company\":\"\",\"department\":\"\",\"personalno\":\"\",\"title\":\"\",\"debitor\":\"\",\"customField1\":\"\",\"customField2\":\"\",\"customField3\":\"\",\"customField4\":\"\",\"customField5\":\"\",\"lastEdit\":\"<time-10>\",\"userState\":4,\"validUntil\":\"<time-9>\",\"expirationAction\":1,\"validFrom\":\"<time-8>\",\"isAdmin\":false,\"changePassword\":false,\"masterAdmin\":false,\"userRights\":16384,\"scorePWD\":\"<number-1>\",\"scoreVisuPWD\":\"<number-1>\",\"trustMember\":\"\",\"usergroups\":[],\"<key-2>\":\"<number-2>\",\"nfcTags\":[],\"keycodes\":[{\"code\":\"<hex40-upper-1>\"}],\"customFields\":[\"<text-2>\",\"<text-3>\",\"<text-4>\",\"<text-5>\",\"<text-6>\"]}",
+      "Code" : "200"
+    }
+  }
+} ]
