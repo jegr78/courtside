@@ -4,7 +4,7 @@
   "purpose": "This is the normative authorization policy for the shipped Courtside API. OpenAPI defines the transport shape; this policy defines who may perform each operation, which resource attributes narrow that permission, and which protected fields each projection may read or write.",
   "openApiFieldInventorySha256": "9109d25bd734171dce2ea1d7a2b55d336314998319427c47790991cd1892efcd",
   "protectedFieldInventorySha256": "df963788c76c5d8d2687a2127a69d2961341cfa78d7c298b65bc1a37bdc24cb8",
-  "productionAuthorizationSha256": "a1cea07b29686d1d4f3dc8adbede96ffd18bf2cf15198fcb0b830941534bc9e9",
+  "productionAuthorizationSha256": "a38b713c4ce5be45699aeffe347af08e64e3d981121166f51e6a4c231028286a",
   "ordinaryFields": [
     "Problem.detail",
     "Problem.fieldErrors",
@@ -5429,7 +5429,7 @@
     {
       "id": "emergency-code-participation",
       "title": "Emergency code for a booking's participants",
-      "rule": "The emergency code derives identity from the current account and is answered only to the booking's owner or a person it names as a player, from the start of its access window to its end and only for its active access points without a static code that keep one; anybody else is refused with a violation code and nothing is recorded.",
+      "rule": "The emergency code derives identity from the current account and is answered only to the booking's owner or a person it names as a player, only while the booking is confirmed, from the start of its access window to its end and only for its active access points without a static code that keep one; anybody else, a cancelled booking and an ended window are refused with a violation code and nothing is recorded.",
       "attributes": [
         "current-account",
         "booking-owner",
@@ -5445,7 +5445,9 @@
       ],
       "negativeTests": [
         "src/test/java/org/courtside/booking/web/DynamicAccessCodeTest.java#givenAnotherMembersBooking_whenAMemberOutsideItAsksForTheEmergencyCode_thenItIsRefusedWithoutTheCode",
-        "src/test/java/org/courtside/booking/web/DynamicAccessCodeTest.java#givenABookingWhoseWindowHasNotOpened_whenTheBookerAsksForTheEmergencyCode_thenItIsRefusedByReason"
+        "src/test/java/org/courtside/booking/web/DynamicAccessCodeTest.java#givenABookingWhoseWindowHasNotOpened_whenTheBookerAsksForTheEmergencyCode_thenItIsRefusedByReason",
+        "src/test/java/org/courtside/booking/web/DynamicAccessCodeTest.java#givenABookingWhoseWindowHasEnded_whenTheBookerAsksForTheEmergencyCode_thenItIsRefusedAsOutsideTheWindow",
+        "src/test/java/org/courtside/booking/web/DynamicAccessCodeTest.java#givenACancelledBookingInsideItsWindow_whenTheBookerAsksForTheEmergencyCode_thenItIsRefusedAsCancelled"
       ]
     },
     {

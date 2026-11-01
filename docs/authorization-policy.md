@@ -462,7 +462,7 @@ Negative tests: `src/test/java/org/courtside/identity/internal/ControlledAccount
 
 ### Emergency code for a booking's participants
 
-The emergency code derives identity from the current account and is answered only to the booking's owner or a person it names as a player, from the start of its access window to its end and only for its active access points without a static code that keep one; anybody else is refused with a violation code and nothing is recorded.
+The emergency code derives identity from the current account and is answered only to the booking's owner or a person it names as a player, only while the booking is confirmed, from the start of its access window to its end and only for its active access points without a static code that keep one; anybody else, a cancelled booking and an ended window are refused with a violation code and nothing is recorded.
 
 Attributes: `current-account`, `booking-owner`, `participant-person`.
 
@@ -470,7 +470,7 @@ Production: `src/main/java/org/courtside/booking/web/EmergencyCodeController.jav
 
 Positive tests: `src/test/java/org/courtside/booking/web/DynamicAccessCodeTest.java#givenTheBookerAndThePlayerInsideTheWindow_whenTheyAskForTheEmergencyCode_thenItIsAnsweredAndAudited`.
 
-Negative tests: `src/test/java/org/courtside/booking/web/DynamicAccessCodeTest.java#givenAnotherMembersBooking_whenAMemberOutsideItAsksForTheEmergencyCode_thenItIsRefusedWithoutTheCode`, `src/test/java/org/courtside/booking/web/DynamicAccessCodeTest.java#givenABookingWhoseWindowHasNotOpened_whenTheBookerAsksForTheEmergencyCode_thenItIsRefusedByReason`.
+Negative tests: `src/test/java/org/courtside/booking/web/DynamicAccessCodeTest.java#givenAnotherMembersBooking_whenAMemberOutsideItAsksForTheEmergencyCode_thenItIsRefusedWithoutTheCode`, `src/test/java/org/courtside/booking/web/DynamicAccessCodeTest.java#givenABookingWhoseWindowHasNotOpened_whenTheBookerAsksForTheEmergencyCode_thenItIsRefusedByReason`, `src/test/java/org/courtside/booking/web/DynamicAccessCodeTest.java#givenABookingWhoseWindowHasEnded_whenTheBookerAsksForTheEmergencyCode_thenItIsRefusedAsOutsideTheWindow`, `src/test/java/org/courtside/booking/web/DynamicAccessCodeTest.java#givenACancelledBookingInsideItsWindow_whenTheBookerAsksForTheEmergencyCode_thenItIsRefusedAsCancelled`.
 
 ### Occupancy key
 
