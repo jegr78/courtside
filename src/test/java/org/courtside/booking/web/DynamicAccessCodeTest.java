@@ -229,6 +229,39 @@ class DynamicAccessCodeTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenABookingWhoseWindowHasEnded_whenTheBookerAsksForTheEmergencyCode_thenItIsRefusedAsOutsideTheWindow()
+            throws Exception {
+        // given
+        UUID booking = bookings.insertBookingThatHasStarted(court, MEMBER_BOOKING_CARD, new TimeSlot(
+                Instant.parse("2026-05-12T08:00:00Z"), Instant.parse("2026-05-12T09:00:00Z")), janeAccount);
+
+        // when / then
+        ask("/api/my/bookings/" + booking + "/emergency-code", "doe.jane")
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.type").value(REFUSED))
+                .andExpect(jsonPath("$.violations[0].code").value("booking.emergencyCode.outsideWindow"));
+        assertThat(audit.eventsAbout(booking, "booking.emergencyCode.requested")).isEmpty();
+    }
+
+    @Test
+    void givenACancelledBookingInsideItsWindow_whenTheBookerAsksForTheEmergencyCode_thenItIsRefusedAsCancelled()
+            throws Exception {
+        // given
+        config.openAccessPointsAround(240, 15);
+        UUID booking = book(AFTERNOON);
+        bookings.cancelBooking(booking, janeAccount, Set.of(Role.MEMBER));
+
+        // when / then
+        String answer = ask("/api/my/bookings/" + booking + "/emergency-code", "doe.jane")
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.type").value(REFUSED))
+                .andExpect(jsonPath("$.violations[0].code").value("booking.emergencyCode.cancelled"))
+                .andReturn().getResponse().getContentAsString();
+        assertThat(answer).doesNotContain(EMERGENCY_CODE);
+        assertThat(audit.eventsAbout(booking, "booking.emergencyCode.requested")).isEmpty();
+    }
+
+    @Test
     void givenAnotherMembersBooking_whenAMemberOutsideItAsksForTheEmergencyCode_thenItIsRefusedWithoutTheCode()
             throws Exception {
         // given

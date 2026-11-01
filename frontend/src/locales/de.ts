@@ -2148,6 +2148,7 @@ const de = {
   "booking.emergencyCode.notParticipant": "Nur wer an einer Buchung teilnimmt, kann ihren Notfallcode abfragen.",
   "booking.emergencyCode.outsideWindow": "Den Notfallcode gibt es nur, solange der Zugangscode der Buchung gilt.",
   "booking.emergencyCode.noneKept": "Der Verein hält für die Türen dieser Buchung keinen Notfallcode bereit.",
+  "booking.emergencyCode.cancelled": "Diese Buchung ist storniert und hat deshalb keinen Notfallcode.",
   "attendance.policy.releaseNeedsAttendance": "Eine Freigabezeit braucht die Anwesenheitserfassung.",
   "attendance.policy.releaseOutOfRange": "Die Freigabezeit liegt zwischen {{minimum}} und {{maximum}} Minuten.",
   "audit.event.booking.attendance.recorded": "Anwesenheit erfasst: {{outcome}}",

@@ -604,9 +604,10 @@ yet expired in `access_code`, is refused with `facility.accessPoint.codeIssued`,
 module answers through the facility port `DynamicAccessCodes`. No message carries it. `POST /api/my/bookings/{id}/emergency-code` and
 `POST /api/my/participations/{id}/emergency-code` answer the emergency codes of the booking's dynamic
 access points to its booker and players from the start of its window to its end; anybody else, a
-request outside the window and a booking without such a code answer `409
+request outside the window, a cancelled booking and a booking without such a code answer `409
 urn:courtside:error:emergency-code-refused` with `booking.emergencyCode.notParticipant`,
-`booking.emergencyCode.outsideWindow` or `booking.emergencyCode.noneKept`. Each answer is audited as
+`booking.emergencyCode.outsideWindow`, `booking.emergencyCode.cancelled` or
+`booking.emergencyCode.noneKept`. Each answer is audited as
 `booking.emergencyCode.requested` with the booking and the access points, never the code. The code
 stays valid until the board changes it.
 

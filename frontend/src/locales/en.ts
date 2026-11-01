@@ -2150,6 +2150,7 @@ const en: Record<keyof typeof de, string> = {
   "booking.emergencyCode.notParticipant": "Only the people of a booking can ask for its emergency code.",
   "booking.emergencyCode.outsideWindow": "The emergency code is available only while the booking's access code is valid.",
   "booking.emergencyCode.noneKept": "The club keeps no emergency code for this booking's doors.",
+  "booking.emergencyCode.cancelled": "This booking is cancelled, so it has no emergency code.",
   "attendance.policy.releaseNeedsAttendance": "A release time needs attendance to be recorded.",
   "attendance.policy.releaseOutOfRange": "The release time lies between {{minimum}} and {{maximum}} minutes.",
   "audit.event.booking.attendance.recorded": "Attendance recorded: {{outcome}}",

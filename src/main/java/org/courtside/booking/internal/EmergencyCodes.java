@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.courtside.booking.Booking;
 import org.courtside.booking.BookingParticipant;
 import org.courtside.booking.BookingRepository;
+import org.courtside.booking.BookingStatus;
 import org.courtside.booking.CourtAllocation;
 import org.courtside.facility.AccessPoint;
 import org.courtside.shared.BookingAnnouncement.AccessCode;
@@ -36,6 +37,9 @@ public class EmergencyCodes {
                 .orElseThrow(() -> new BookingNotFoundException("No booking with id " + bookingId));
         if (!takesPart(booking, accountId, personId)) {
             throw EmergencyCodeRefusedException.notParticipant();
+        }
+        if (booking.getStatus() != BookingStatus.CONFIRMED) {
+            throw EmergencyCodeRefusedException.cancelled();
         }
         Instant now = clock.instant();
         if (booking.getAllocations().stream().map(CourtAllocation::getEndsAt)
