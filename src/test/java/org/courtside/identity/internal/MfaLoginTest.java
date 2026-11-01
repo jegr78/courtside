@@ -201,6 +201,30 @@ class MfaLoginTest extends AbstractIntegrationTest {
         assertThat(session.getAttribute("courtside.authenticated-at")).isEqualTo(previous);
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"", ",\"code\":\"   \""})
+    void givenAStaleTabWithoutASecondFactor_whenReauthenticationIsRepeated_thenNoFactorFailureIsCounted(String code)
+            throws Exception {
+        // given
+        MockHttpSession session = full(enroll());
+        session.setAttribute("courtside.authenticated-at", clock.instant().minusSeconds(360).toEpochMilli());
+        // when
+        for (int attempt = 1; attempt <= 5; attempt++) {
+            String address = "192.0.2." + attempt;
+            mvc.perform(post("/api/session/reauthentication").session(session).with(csrf())
+                            .with(request -> { request.setRemoteAddr(address); return request; })
+                            .contentType(MediaType.APPLICATION_JSON).content("{\"password\":\"correct-horse\"" + code + "}"))
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.type").value("urn:courtside:error:reauthentication-failed"));
+        }
+        // then
+        assertThat(jdbc.sql("SELECT count(*) FROM login_attempt_limit WHERE scope = 'FACTOR'").query(Long.class).single())
+                .as("a request without any second factor is not a failed proof").isZero();
+        assertThat(jdbc.sql("""
+                SELECT count(*) FROM notification WHERE account_id = :id AND kind = 'ACCOUNT_FACTOR_GUESSING_BLOCKED'
+                """).param("id", account).query(Long.class).single()).as("the holder is not told a factor was guessed").isZero();
+    }
+
     @Test
     void givenAnMfaSession_whenPasswordAndAnotherTotpStepAreRepeated_thenFreshProofRenewsTheSession() throws Exception {
         // given

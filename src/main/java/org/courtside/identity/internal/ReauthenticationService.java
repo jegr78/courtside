@@ -26,10 +26,10 @@ class ReauthenticationService {
     @Transactional(noRollbackFor = {ReauthenticationFailedException.class, PasswordVerificationRateLimitedException.class})
     void reauthenticate(String password, String code, ApiWebAuthnAssertionCredential credential) {
         UserAccount account = management.currentHolderForUpdate();
-        if (password == null) throw passwordRefused(account);
+        if (password == null) throw refused(account);
         if (account.getPasswordHash() == null
                 || !passwordEncoder.matches(password, account.getPasswordHash())) {
-            throw passwordRefused(account);
+            throw refused(account);
         }
         if (factors.enabled(account.getId())) {
             MfaFactors.Verification result = verifySecondFactor(account, code, credential);
@@ -41,14 +41,16 @@ class ReauthenticationService {
 
     private MfaFactors.Verification verifySecondFactor(UserAccount account, String code,
                                                       ApiWebAuthnAssertionCredential credential) {
+        boolean noCode = code == null || code.isBlank();
+        if (credential == null && noCode) throw refused(account);
         if (credential == null) {
             return factors.verify(account.getId(), code, request.getRemoteAddr());
         }
-        if (code != null && !code.isBlank()) throw new ReauthenticationFailedException();
+        if (!noCode) throw new ReauthenticationFailedException();
         return webAuthn.verifyReauthentication(account, codec.assertion(credential), request.getRemoteAddr());
     }
 
-    private ReauthenticationFailedException passwordRefused(UserAccount account) {
+    private ReauthenticationFailedException refused(UserAccount account) {
         securityEvents.controlRefused(account.getId(), SecurityEventLog.ControlRefusal.REAUTHENTICATION_FAILED);
         return new ReauthenticationFailedException();
     }
