@@ -35,13 +35,13 @@ class PermanentPasswordService {
                 && (!account.getId().equals(user.accountId()) || account.getSecurityEpoch() != user.securityEpoch())) {
             throw new ReauthenticationFailedException();
         }
+        if (factors.enabled(account.getId())) recent.requireRecent();
         if (currentPassword == null || account.getPasswordHash() == null
                 || !passwordEncoder.matches(currentPassword, account.getPasswordHash())) {
             securityEvents.controlRefused(account.getId(),
                     SecurityEventLog.ControlRefusal.REAUTHENTICATION_FAILED);
             throw new ReauthenticationFailedException();
         }
-        if (factors.enabled(account.getId())) recent.requireRecent();
         policy.requireUnguessable(replacement, account);
         account.replacePermanentPassword(passwordEncoder.encode(replacement));
         sessions.endFor(account.getUsername());
