@@ -4,9 +4,13 @@ import com.jayway.jsonpath.JsonPath;
 import org.courtside.AbstractIntegrationTest;
 import org.courtside.access.testfixture.AccessTestFixture;
 import org.courtside.audit.testfixture.AuditTestFixture;
+import org.courtside.booking.BookingRepository;
+import org.courtside.booking.internal.AccessGrants;
 import org.courtside.booking.testfixture.BookingTestFixture;
+import org.courtside.shared.AccessDemand;
 import org.courtside.card.testfixture.CardTestFixture;
 import org.courtside.config.testfixture.ConfigTestFixture;
+import org.courtside.facility.AccessPoint;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
@@ -26,6 +30,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.context.WebApplicationContext;
 
 import java.time.DayOfWeek;
@@ -88,6 +94,15 @@ class DynamicAccessCodeTest extends AbstractIntegrationTest {
 
     @Autowired
     private JdbcClient jdbc;
+
+    @Autowired
+    private AccessGrants accessGrants;
+
+    @Autowired
+    private BookingRepository bookingRepository;
+
+    @Autowired
+    private PlatformTransactionManager transactions;
 
     private MockMvc mockMvc;
     private UUID court;
@@ -226,6 +241,28 @@ class DynamicAccessCodeTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.type").value(REFUSED))
                 .andExpect(jsonPath("$.violations[0].code").value("booking.emergencyCode.outsideWindow"));
         assertThat(audit.eventsAbout(booking, "booking.emergencyCode.requested")).isEmpty();
+    }
+
+    @Test
+    void givenABookingBehindADynamicDoor_whenItsDemandAndItsShownWindowAreDerived_thenTheyAgreeOnWindowAndDoors() {
+        // given
+        config.openAccessPointsAround(30, 15);
+        UUID booked = book(EVENING);
+        TransactionTemplate reading = new TransactionTemplate(transactions);
+
+        // when
+        AccessDemand demand = reading.execute(status -> accessGrants.demandsOf(
+                List.of(bookingRepository.findById(booked).orElseThrow())).get(booked));
+        AccessGrants.ServedWindow shown = reading.execute(status -> accessGrants.dynamicWindowOf(
+                bookingRepository.findById(booked).orElseThrow()).orElseThrow());
+
+        // then
+        assertThat(demand.validFrom()).isEqualTo(Instant.parse("2026-05-12T15:30:00Z")).isEqualTo(shown.validFrom());
+        assertThat(demand.validUntil()).isEqualTo(Instant.parse("2026-05-12T17:15:00Z"))
+                .isEqualTo(shown.validUntil());
+        assertThat(demand.accessPointIds()).as("the door and the page name the same access points")
+                .containsExactlyInAnyOrderElementsOf(shown.accessPoints().stream()
+                        .map(AccessPoint::getId).toList());
     }
 
     @Test
