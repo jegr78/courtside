@@ -594,6 +594,8 @@ test("given a partially configured target, when update is retried, then it retai
     const result = run(next, context.target, args, context.environment);
     // then
     assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /^retained_mail_config=example-club_mail-config$/m, "the retry plan must name the source stores");
+    assert.match(result.stdout, /^retained_mail_data=example-club_mail-data$/m);
     const selected = readFileSync(join(context.target, "config", ".env"), "utf8");
     assert.notEqual(selected.match(/^COURTSIDE_MAIL_CONFIG_VOLUME=.*$/m)?.[0], oldTarget.match(/^COURTSIDE_MAIL_CONFIG_VOLUME=.*$/m)?.[0]);
     assert.doesNotMatch(readFileSync(context.dockerLog, "utf8"), /volume rm|down --volumes/);
