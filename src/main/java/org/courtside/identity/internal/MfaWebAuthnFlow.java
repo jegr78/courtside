@@ -80,7 +80,7 @@ class MfaWebAuthnFlow {
         if (challenge.isEmpty()) return MfaFactors.Verification.INVALID;
         var result = factors.verifyWebAuthn(account.getId(),
                 codec.decode(challenge.get().payload(), PublicKeyCredentialRequestOptions.class), credential, address);
-        if (result == MfaFactors.Verification.VALID && !challenges.consume(id)) throw new MfaProofFailedException();
+        if (result.valid() && !challenges.consume(id)) throw new MfaProofFailedException();
         return result;
     }
 

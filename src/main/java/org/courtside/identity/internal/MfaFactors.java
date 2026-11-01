@@ -26,7 +26,10 @@ class MfaFactors {
     private final MfaWebAuthn webAuthn;
     private final Clock clock;
 
-    enum Verification { VALID, INVALID, LIMITED }
+    record Verification(boolean valid, LoginBlock limit) {
+        static final Verification VALID = new Verification(true, null);
+        static final Verification INVALID = new Verification(false, null);
+    }
 
     @Transactional(readOnly = true)
     boolean enabled(UUID account) {
@@ -57,7 +60,8 @@ class MfaFactors {
                     OR credentials_expire_at > :now) FROM user_account WHERE id = :id FOR UPDATE
                 """).param("id", account).param("now", clock.instant().atOffset(ZoneOffset.UTC))
                 .query(Boolean.class).optional().orElse(false)) return Verification.INVALID;
-        if (attempts.registerFactorAttempt(account, address).isPresent()) return Verification.LIMITED;
+        var block = attempts.registerFactorAttempt(account, address);
+        if (block.isPresent()) return new Verification(false, block.get());
         boolean available = enabled(account) && !recoveryPending(account);
         if (!available || !proof.getAsBoolean()) {
             if (available) attempts.registerFactorFailure(account);

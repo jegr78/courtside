@@ -28,7 +28,7 @@ class SessionMfaController implements SessionMfaApi {
             throw new MfaProofFailedException();
         }
         MfaLogin.Result result = login.complete(pending, challenge, session.getId(), proof.getCode(), request.getRemoteAddr());
-        if (result.limited()) throw new PasswordVerificationRateLimitedException();
+        if (result.limit() != null) throw new SecondFactorRateLimitedException(result.limit());
         if (result.authentication() == null) throw new MfaProofFailedException();
         authentication.complete(result.authentication(), request, response);
         return ResponseEntity.ok().build();

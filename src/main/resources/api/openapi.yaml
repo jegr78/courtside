@@ -5309,6 +5309,10 @@ paths:
       description: |
         The pending browser session binds the account and its expiring challenge. A successful
         proof replaces the session identifier and grants the account's current privileges.
+
+        While the account's second-factor checks are paused after repeated failed proofs, the
+        answer is `429` with `urn:courtside:error:second-factor-rate-limited`, the remaining pause
+        in `Retry-After` and the same pause in whole minutes as the violation's `minutes`.
       security:
         - csrfToken: []
       requestBody:
@@ -5356,6 +5360,11 @@ paths:
 
         An account still marked for an initial password change is refused here. Nothing the proof
         unlocks is reachable in that state, so the proof is not either.
+
+        For an MFA-enabled account, a request with neither a code nor a credential is refused
+        without counting as a failed second-factor proof. While the account's second-factor checks
+        are paused, the answer is `429` with `urn:courtside:error:second-factor-rate-limited` and
+        `Retry-After`.
 
         A successful proof replaces the session and answers with a new session cookie. The
         identifier that was presented stops authorizing immediately, so a client that manages
@@ -6055,6 +6064,9 @@ paths:
       - session-webauthn
       operationId: completeWebauthnLogin
       summary: Complete a pending password login with a verified enrolled authenticator.
+      description: |
+        While the account's second-factor checks are paused after repeated failed proofs, the
+        answer is `429` with `urn:courtside:error:second-factor-rate-limited` and `Retry-After`.
       security:
       - csrfToken: []
       responses:

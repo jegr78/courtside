@@ -36,6 +36,7 @@ import static org.springframework.security.test.web.servlet.setup.SecurityMockMv
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -163,7 +164,10 @@ class MfaLoginTest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"code\":\"" + TotpCodes.code(secret, clock.instant()) + "\"}"))
                 .andExpect(status().isTooManyRequests())
-                .andExpect(jsonPath("$.type").value("urn:courtside:error:password-verification-rate-limited"));
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:second-factor-rate-limited"))
+                .andExpect(header().string("Retry-After", "60"))
+                .andExpect(jsonPath("$.violations[0].code").value("identity.mfa.rateLimited"))
+                .andExpect(jsonPath("$.violations[0].params.minutes").value(1));
     }
 
     @Test
@@ -291,7 +295,10 @@ class MfaLoginTest extends AbstractIntegrationTest {
                         .content("{\"password\":\"correct-horse\",\"code\":\""
                                 + TotpCodes.code(secret, clock.instant().plusSeconds(30)) + "\"}"))
                 .andExpect(status().isTooManyRequests())
-                .andExpect(jsonPath("$.type").value("urn:courtside:error:password-verification-rate-limited"));
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:second-factor-rate-limited"))
+                .andExpect(header().string("Retry-After", "60"))
+                .andExpect(jsonPath("$.violations[0].code").value("identity.mfa.rateLimited"))
+                .andExpect(jsonPath("$.violations[0].params.minutes").value(1));
         assertThat(session.getAttribute("courtside.authenticated-at")).isEqualTo(previous);
         assertThat(jdbc.sql("SELECT totp_last_step FROM account_mfa WHERE account_id = :id")
                 .param("id", account).query(Long.class).single()).isEqualTo(consumedStep);

@@ -57,6 +57,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -509,7 +510,10 @@ class MfaWebAuthnFlowTest extends AbstractIntegrationTest {
         mvc.perform(post("/api/session/mfa/webauthn").cookie(pending).with(csrf()).contentType(MediaType.APPLICATION_JSON)
                         .content(codec.encode(authenticator.assertion(options, ORIGIN))))
                 .andExpect(status().isTooManyRequests())
-                .andExpect(jsonPath("$.type").value("urn:courtside:error:password-verification-rate-limited"));
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:second-factor-rate-limited"))
+                .andExpect(header().string("Retry-After", "60"))
+                .andExpect(jsonPath("$.violations[0].code").value("identity.mfa.rateLimited"))
+                .andExpect(jsonPath("$.violations[0].params.minutes").value(1));
         assertThat(credentials.findByCredentialId(authenticator.credentialId()).getSignatureCount()).isZero();
         mvc.perform(get("/api/session").cookie(pending)).andExpect(jsonPath("$.authenticated").value(false));
     }

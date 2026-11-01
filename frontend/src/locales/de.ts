@@ -114,6 +114,8 @@ const de = {
   "identity.mfa.proofFailed": "Der zweite Faktor wurde nicht akzeptiert. Prüfe den Code oder beginne die Anmeldung erneut.",
   "error.type.webauthn-credential-limit-reached": "$t(identity.mfa.webauthnLimitReached)",
   "identity.mfa.webauthnLimitReached": "Dieses Konto hat schon {{limit}} Sicherheitsschlüssel und Passkeys, mehr sind nicht möglich. Entferne einen, bevor du einen neuen hinzufügst.",
+  "error.type.second-factor-rate-limited": "Zu viele fehlgeschlagene Prüfungen des zweiten Faktors. Versuche es später erneut.",
+  "identity.mfa.rateLimited": "Zu viele fehlgeschlagene Prüfungen des zweiten Faktors. Die Prüfung ist für {{minutes}} Min. pausiert.",
   "identity.reauthentication.required": "Gib dein Passwort erneut ein, bevor du diese sicherheitsrelevante Änderung vornimmst.",
   "identity.credentials.rateLimited": "Für dieses Konto wurden zuletzt schon {{maxPerWindow}} mal Zugangsdaten angefordert. Bitte später erneut versuchen.",
   "auth.expired": "Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.",

@@ -23,7 +23,7 @@ class ReauthenticationService {
     private final MfaFactors factors;
     private final HttpServletRequest request;
 
-    @Transactional(noRollbackFor = {ReauthenticationFailedException.class, PasswordVerificationRateLimitedException.class})
+    @Transactional(noRollbackFor = {ReauthenticationFailedException.class, SecondFactorRateLimitedException.class})
     void reauthenticate(String password, String code, ApiWebAuthnAssertionCredential credential) {
         UserAccount account = management.currentHolderForUpdate();
         if (password == null) throw refused(account);
@@ -33,8 +33,8 @@ class ReauthenticationService {
         }
         if (factors.enabled(account.getId())) {
             MfaFactors.Verification result = verifySecondFactor(account, code, credential);
-            if (result == MfaFactors.Verification.LIMITED) throw new PasswordVerificationRateLimitedException();
-            if (result != MfaFactors.Verification.VALID) throw new ReauthenticationFailedException();
+            if (result.limit() != null) throw new SecondFactorRateLimitedException(result.limit());
+            if (!result.valid()) throw new ReauthenticationFailedException();
         }
         recentAuthentication.renew();
     }
