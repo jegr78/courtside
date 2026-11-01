@@ -77,6 +77,13 @@ the mail tools and the backend. The Stalwart journey starts no application image
 mail stack and its certificate handling, not the notification code that talks to the relay; that
 code is covered by the backend tests and by the restore journey, which sends a message.
 
+The Stalwart store transition, in `mail smoke` and in the release `mail` gate, starts its source from
+`deploy/` at `89d8961e`, not from the `v0.3.0` archive, and runs the candidate image on both sides.
+That source differs from `v0.3.0` by the MFA key volume and the launcher, so the transition from a
+published 0.3.0 installation, with its `mfa_keys=legacy` recovery units and its own image, is not
+qualified. Closing the gap needs a second source run from the `v0.3.0` tag's `deploy/` with the
+0.3.0 image and `mfa_keys=legacy` assertions, dispatched once before anything relies on it.
+
 ## What the nightly rehearses
 
 A release confirms what the night before already proved; it does not discover it. A scheduled or

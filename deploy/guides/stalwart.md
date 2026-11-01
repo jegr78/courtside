@@ -62,6 +62,13 @@ the private `.env`. Backups, reconfiguration and later updates use that same pai
 without these values retain their original project volume names. Do not edit one name independently
 or point a 1.0 image at an old store.
 
+The automated qualification of this path does not start from a published 0.3.0 installation. It
+installs the `deploy/` directory of a development commit after 0.3.0 and runs the candidate
+application image on it. That source already carries the persistent MFA key volume, which 0.3.0
+lacks, so its recovery units never record `mfa_keys=legacy`. An update from a real 0.3.0
+installation therefore takes a combination no automated run exercises. Keep the pre-update
+recovery unit until the updated instance has served members.
+
 ### Interrupted transitions
 
 An interrupted transition with a committed journal blocks ordinary lifecycle commands. An
