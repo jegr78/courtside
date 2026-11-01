@@ -296,6 +296,7 @@ test("given two members on the same slot, when both submit, then the second is r
   const first = await openAs(browser, "memberB");
   const second = await openAs(browser, "memberC");
   const ids: string[] = [];
+  const takenIds: string[] = [];
   try {
     await openSlot(first, slot);
     await openSlot(second, slot);
@@ -307,7 +308,7 @@ test("given two members on the same slot, when both submit, then the second is r
     // then
     expect(won.status, "product: the first submission is accepted").toBeLessThan(300);
     const lost = await submitBooking(second, "memberC");
-    if (lost.id) ids.push(lost.id);
+    if (lost.id) takenIds.push(lost.id);
     expect(lost.status, "product: the second submission is refused").toBeGreaterThanOrEqual(400);
     await expect(second.getByTestId("booking-dialog").getByRole("alert"), "product: the refusal gives a reason").toBeVisible();
     await capture(second, "conflict", { expectedStatuses: [409, 422, 400] });
@@ -358,7 +359,7 @@ test("given two members on the same slot, when both submit, then the second is r
       expect(answer.status(), "product: taking the offer books the slot").toBeLessThan(300);
       const booked = (await answer.json()).id as string;
       recordCreated({ kind: "booking", id: booked, by: "memberC", project: projectName() });
-      ids.push(booked);
+      takenIds.push(booked);
       await expect(offered, "product: the entry turns into a booking").toHaveAttribute("data-state", "BOOKED");
     });
     await step("memberC", "offer mail", async () => {
@@ -366,7 +367,9 @@ test("given two members on the same slot, when both submit, then the second is r
     });
   } finally {
     await leaveWaitlist("memberC", [slot]).catch(() => undefined);
-    await cancelQuietly(first, ids); await first.context().close(); await second.context().close();
+    // Each booking is cancelled by its booker; another member's cancellation is refused and logged as a denial.
+    await cancelQuietly(first, ids); await cancelQuietly(second, takenIds);
+    await first.context().close(); await second.context().close();
   }
 });
 

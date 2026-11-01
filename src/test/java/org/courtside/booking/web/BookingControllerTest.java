@@ -24,6 +24,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
+import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.courtside.shared.CancellationReason;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -938,16 +942,27 @@ class BookingControllerTest extends AbstractIntegrationTest {
             throws Exception {
         // given
         UUID id = bookingOf("doe.jane");
+        ListAppender<ILoggingEvent> events = new ListAppender<>();
+        Logger securityEvents = (Logger) LoggerFactory.getLogger("org.courtside.security.events");
+        events.start();
+        securityEvents.addAppender(events);
 
         // when
-        mockMvc.perform(delete("/api/bookings/{id}", id).with(csrf()))
-                .andExpect(status().isNotFound())
-                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
-                .andExpect(jsonPath("$.type").value("urn:courtside:error:booking-not-found"));
+        try {
+            mockMvc.perform(delete("/api/bookings/{id}", id).with(csrf()))
+                    .andExpect(status().isNotFound())
+                    .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                    .andExpect(jsonPath("$.type").value("urn:courtside:error:booking-not-found"));
+        } finally {
+            securityEvents.detachAppender(events);
+        }
 
         // then
         assertThat(bookings.findById(id).orElseThrow().getStatus())
                 .isEqualTo(BookingStatus.CONFIRMED);
+        assertThat(events.list.stream().filter(event -> event.getKeyValuePairs().stream().anyMatch(pair ->
+                "event.code".equals(pair.key) && "courtside.authorization.denied".equals(pair.value))).count())
+                .as("the hidden refusal stays visible as exactly one authorization denial").isEqualTo(1);
     }
 
     @Test
