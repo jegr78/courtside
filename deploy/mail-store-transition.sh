@@ -121,6 +121,7 @@ begin_mail_store_transition() {
   mv "$mail_journal" "$published"
   mail_journal=$published
   temporary_path=""
+  load_mail_transition_secret_forms
   reserve_mail_transition_stores
   mail_candidate_compose=("${docker_command[@]}" compose --project-name "$config_project" \
     --project-directory "$archive" --env-file "$mail_journal/setup.env")
@@ -143,7 +144,8 @@ configure_mail_transition_target() {
   "${compose[@]}" stop app mail-reload || return 1
   "${mail_candidate_compose[@]}" --profile mail up -d --no-deps mail || return 1
   wait_mail_transition_admin Bootstrap || return 1
-  if ! "${mail_candidate_compose[@]}" --profile mail-setup run --rm mail-bootstrap > "$mail_journal/bootstrap.log" 2>&1; then
+  if ! "${mail_candidate_compose[@]}" --profile mail-setup run --rm mail-bootstrap 2>&1 \
+    | redact_mail_transition_output > "$mail_journal/bootstrap.log"; then
     grep -q 'authentication failed (HTTP 401)' "$mail_journal/bootstrap.log" \
       && "${mail_candidate_compose[@]}" exec -T mail sh -c 'test -s /etc/stalwart/config.json' || return 1
   fi
@@ -161,18 +163,31 @@ configure_mail_transition_target() {
   "${mail_candidate_compose[@]}" --profile mail-setup run --rm --no-deps mail-ready || return 1
 }
 
-redact_mail_transition_logs() {
-  local log key value content
-  for log in "$mail_journal/bootstrap.log" "$mail_journal/setup.log"; do
-    [ -f "$log" ] && [ ! -L "$log" ] || continue
-    content=$(< "$log")
-    for key in COURTSIDE_MAIL_PASSWORD COURTSIDE_MAIL_SETUP_PASSWORD COURTSIDE_MAIL_ADMIN_PASSWORD COURTSIDE_MAIL_RELOAD_PASSWORD; do
-      value=$(environment_value "$mail_journal/target.env" "$key")
-      [ -z "$value" ] || content=${content//"$value"/[REDACTED]}
-    done
-    printf '%s\n' "$content" > "$log.partial"
-    chmod 600 "$log.partial"
-    mv "$log.partial" "$log"
+load_mail_transition_secret_forms() {
+  local key value escaped setup
+  local -a forms=()
+  for key in COURTSIDE_MAIL_PASSWORD COURTSIDE_MAIL_SETUP_PASSWORD COURTSIDE_MAIL_ADMIN_PASSWORD COURTSIDE_MAIL_RELOAD_PASSWORD; do
+    value=$(environment_value "$mail_journal/target.env" "$key")
+    [ -n "$value" ] || continue
+    escaped=${value//\\/\\\\}
+    escaped=${escaped//\"/\\\"}
+    forms+=("$value" "$escaped")
+  done
+  setup=$(environment_value "$mail_journal/target.env" COURTSIDE_MAIL_SETUP_PASSWORD)
+  [ -z "$setup" ] || forms+=("$(printf 'admin:%s' "$setup" | "$openssl_path" base64 -A)")
+  mail_transition_secret_forms=()
+  [ "${#forms[@]}" -gt 0 ] || return 0
+  while IFS= read -r value; do
+    [ -z "$value" ] || mail_transition_secret_forms+=("$value")
+  done < <(printf '%s\n' "${forms[@]}" | awk '{ print length($0) " " $0 }' | sort -k1,1rn \
+    | awk '{ sub(/^[0-9]+ /, ""); print }')
+}
+
+redact_mail_transition_output() {
+  local line form
+  while IFS= read -r line || [ -n "$line" ]; do
+    for form in "${mail_transition_secret_forms[@]}"; do line=${line//"$form"/[REDACTED]}; done
+    printf '%s\n' "$line"
   done
 }
 

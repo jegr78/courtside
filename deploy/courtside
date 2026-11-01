@@ -37,6 +37,7 @@ mail_restart_required=false
 declare -a mail_restart_compose=()
 mail_source_resume_required=false
 declare -a mail_source_compose=()
+declare -a mail_transition_secret_forms=()
 
 refuse() {
   printf 'courtside: %s\n' "$1" >&2
@@ -2310,11 +2311,9 @@ command_update() {
   if [ "$mail_transition" = true ]; then
     compose_command
     begin_mail_store_transition "$installation_directory/releases/$target_release" "$target_digest"
-    if ! configure_mail_transition_target > "$mail_journal/setup.log" 2>&1; then
-      redact_mail_transition_logs
+    if ! configure_mail_transition_target 2>&1 | redact_mail_transition_output > "$mail_journal/setup.log"; then
       refuse "mail transition preparation failed; recovery unit $created_recovery is ready; retry update with the same archive and explicit opt-in"
     fi
-    redact_mail_transition_logs
   fi
   if [ "$database_major_update" = true ]; then
     restore_database_major_target "$installation_directory/releases/$target_release"

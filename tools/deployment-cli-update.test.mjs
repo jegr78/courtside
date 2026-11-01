@@ -722,25 +722,44 @@ for (const options of [[], ["--mail-store-transition", "reinitialize"]]) {
   });
 }
 
-test("given Stalwart tooling echoes credentials, when a mail transition fails, then its attempt logs carry none of them", () => {
-  fixture((context) => {
-    // given
-    const next = legacyMail(context);
-    writeFileSync(join(context.root, "docker-echo-mail-secrets"), "");
-    writeFileSync(join(context.root, "docker-fail-match"), "run --rm --no-deps mail-ready");
-    const environment = readFileSync(join(context.target, "config", ".env"), "utf8");
-    const secrets = ["COURTSIDE_MAIL_PASSWORD", "COURTSIDE_MAIL_SETUP_PASSWORD", "COURTSIDE_MAIL_ADMIN_PASSWORD",
-      "COURTSIDE_MAIL_RELOAD_PASSWORD"].map((key) => environment.match(new RegExp(`^${key}="(.*)"$`, "m"))[1]);
-    // when
-    const result = run(next, context.target,
-      ["update", "--archive", next, "--mail-store-transition", "reinitialize", "--yes"], context.environment);
-    // then
-    assert.equal(result.status, 2, result.stderr);
-    const log = readFileSync(join(context.target, ".courtside-mail-transition", "setup.log"), "utf8");
-    for (const secret of secrets) assert.ok(!log.includes(secret), "setup.log must not carry a managed mail credential");
-    assert.match(log, /\[REDACTED\]/, "the fixture must have echoed a credential into the log");
+function echoedMailCredentials(context) {
+  const file = join(context.target, "config", ".env");
+  const keys = ["COURTSIDE_MAIL_PASSWORD", "COURTSIDE_MAIL_SETUP_PASSWORD", "COURTSIDE_MAIL_ADMIN_PASSWORD",
+    "COURTSIDE_MAIL_RELOAD_PASSWORD"];
+  const decoded = keys.map((key, index) => `Jane"Doe\\${index}-${createHash("sha256").update(key).digest("hex").slice(0, 16)}`);
+  const escaped = decoded.map((value) => value.replaceAll("\\", "\\\\").replaceAll('"', '\\"'));
+  let environment = readFileSync(file, "utf8");
+  keys.forEach((key, index) => {
+    environment = environment.replace(new RegExp(`^${key}=.*$`, "m"), () => `${key}="${escaped[index]}"`);
   });
-});
+  writeFileSync(file, environment);
+  const header = Buffer.from(`admin:${decoded[1]}`).toString("base64");
+  writeFileSync(join(context.root, "docker-echo-mail-secrets"),
+    `${decoded.join("\n")}\n{"secret": "${escaped.join('", "secret": "')}"}\nAuthorization: Basic ${header}\n`);
+  return [...decoded, ...escaped, header];
+}
+
+for (const interruption of ["failure", "kill"]) {
+  test(`given Stalwart tooling echoes credentials, when a mail transition ends by ${interruption}, then no attempt log carries any form of them`, () => {
+    fixture((context) => {
+      // given
+      const next = legacyMail(context);
+      const forms = echoedMailCredentials(context);
+      if (interruption === "kill") writeFileSync(join(context.root, "docker-kill-after-echo"), join(context.target, ".courtside.lock", "owner"));
+      else writeFileSync(join(context.root, "docker-fail-match"), "run --rm --no-deps mail-ready");
+      // when
+      const result = run(next, context.target,
+        ["update", "--archive", next, "--mail-store-transition", "reinitialize", "--yes"], context.environment);
+      // then
+      assert.ok(interruption === "kill" ? result.signal === "SIGKILL" : result.status === 2, result.stderr);
+      for (const name of ["bootstrap.log", "setup.log"]) {
+        const log = readFileSync(join(context.target, ".courtside-mail-transition", name), "utf8");
+        for (const form of forms) assert.ok(!log.includes(form), `${name} must not carry a mail credential form`);
+        assert.match(log, /\[REDACTED\]/, `the fixture must have echoed credentials into ${name}`);
+      }
+    });
+  });
+}
 
 test("given a local override, when mail reinitialization is requested, then refuse before backup or Docker", () => {
   fixture((context) => {

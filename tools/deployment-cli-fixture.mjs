@@ -68,12 +68,15 @@ for argument in "$@"; do
 done
 if [ -f "${join(root, "docker-echo-mail-secrets")}" ]; then
   case "$*" in
-    *'run --rm mail-configure'*)
-      previous=''
-      for argument in "$@"; do
-        [ "$previous" != '--env-file' ] || sed -n 's/^COURTSIDE_MAIL_[A-Z_]*PASSWORD=//p' "$argument"
-        previous=$argument
-      done
+    *'run --rm mail-bootstrap'* | *'run --rm mail-configure'*)
+      cat "${join(root, "docker-echo-mail-secrets")}"
+      case "$*" in *'run --rm mail-configure'*)
+        if [ -f "${join(root, "docker-kill-after-echo")}" ]; then
+          kill -KILL "$(cat "$(cat "${join(root, "docker-kill-after-echo")}")")"
+          exit 9
+        fi
+        ;;
+      esac
       ;;
   esac
 fi
