@@ -66,6 +66,20 @@ for argument in "$@"; do
   fi
   previous=$argument
 done
+if [ -f "${join(root, "docker-echo-mail-secrets")}" ]; then
+  case "$*" in
+    *'run --rm mail-bootstrap'* | *'run --rm mail-configure'*)
+      cat "${join(root, "docker-echo-mail-secrets")}"
+      case "$*" in *'run --rm mail-configure'*)
+        if [ -f "${join(root, "docker-kill-after-echo")}" ]; then
+          kill -KILL "$(cat "$(cat "${join(root, "docker-kill-after-echo")}")")"
+          exit 9
+        fi
+        ;;
+      esac
+      ;;
+  esac
+fi
 if [ -f "${join(root, "docker-fail-match")}" ]; then
   failure=$(cat "${join(root, "docker-fail-match")}")
   case "$*" in *"$failure"*) exit 9 ;; esac

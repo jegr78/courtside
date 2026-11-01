@@ -27,6 +27,10 @@ directly. An existing installation using the pinned 0.16.27 image can explicitly
 stores when updating to a verified release using 1.0.x. This path serves development and test
 installations that do not need to carry their mail state into the new server.
 
+Only 0.16.27 is accepted as the source, and Courtside 0.3.0 is the release that ships it. Courtside
+0.1.0 and 0.2.0 run Stalwart 0.16.24 and 0.16.26, and the 1.0 launcher refuses both. Update such an
+installation to 0.3.0 with that release's own archive first, then follow this procedure.
+
 Reinitialization does not copy messages, queued deliveries, manually created accounts or settings.
 It retains the original configuration and data volumes and a complete pre-update recovery unit.
 Courtside's database, bookings, persistent keys and Caddy certificate store remain in place.
@@ -58,21 +62,61 @@ the private `.env`. Backups, reconfiguration and later updates use that same pai
 without these values retain their original project volume names. Do not edit one name independently
 or point a 1.0 image at an old store.
 
+The automated qualification of this path does not start from a published 0.3.0 installation. It
+installs the `deploy/` directory of a development commit after 0.3.0 and runs the candidate
+application image on it. That source already carries the persistent MFA key volume, which 0.3.0
+lacks, so its recovery units never record `mfa_keys=legacy`. An update from a real 0.3.0
+installation therefore takes a combination no automated run exercises. Keep the pre-update
+recovery unit until the updated instance has served members.
+
 ### Interrupted transitions
 
 An interrupted transition with a committed journal blocks ordinary lifecycle commands. An
 interruption before journal publication leaves the original release selected; `up` can restart it.
-Rerun the same candidate's `update`
-command with the same archive and explicit transition option. If the original release is still
-selected, the launcher restarts it and retains the interrupted target before preparing a new
-attempt. If the target release is selected, it verifies the recorded volume ownership and resumes
-activation of that same pair. A failed activation retains the recovery unit. Do not switch the
-`current` symlink back after application schema migrations; recover the complete earlier unit.
+While the journal still records preparation and the original release is selected, `backup`,
+`restore-check`, `diagnose`, `doctor` and `status` keep working, and `status` reports
+`mail_transition=preparing`. Every other command stays refused until one of two exits is taken.
+
+To retry, rerun the same candidate's `update` command with the same archive and explicit transition
+option. If the original release is still selected, the launcher restarts it and retains the
+interrupted target before preparing a new attempt. If the target release is selected, it verifies
+the recorded volume ownership and resumes activation of that same pair. A failed activation retains
+the recovery unit. Do not switch the `current` symlink back after application schema migrations;
+recover the complete earlier unit.
+
+To stay on the original release, abandon the attempt:
+
+```sh
+"$candidate/courtside" --directory /srv/courtside update --mail-store-transition abandon --yes
+```
+
+Abandoning needs no archive. It restarts the original mail server, its certificate reloader and the
+application, moves the
+journal to `backups/mail-transition-<attempt>` and stops there. It retains the attempt's stores and
+the recovery unit. Once the target release is selected, abandoning is refused:
+finish the transition or restore the complete recovery unit.
 
 Private journals and attempt logs live in `.courtside-mail-transition` while active and in
 `backups/mail-transition-<attempt>` afterwards. They contain credentials and must not be published.
+The launcher writes `bootstrap.log` and `setup.log` through a filter that replaces each managed
+mail password, its JSON-escaped form and the setup credential's Basic authorization value with
+`[REDACTED]` before a line reaches the disk. `setup.env` and `target.env` still hold the passwords.
 The associated original recovery unit is exempt from automatic retention while its journal remains.
 Neither a retry nor normal backup pruning deletes the retained mail volumes.
+
+`prune` lists every retained history with its store pair, whether that pair is `selected` or
+`unused`, and the recovery unit it holds. It removes none of them. To reclaim an unused attempt,
+check that `.env` does not name its stores, then remove them and the history yourself:
+
+```sh
+docker volume rm <project>_mail-config-stalwart1-<attempt> <project>_mail-data-stalwart1-<attempt>
+rm -rf /srv/courtside/backups/mail-transition-<attempt>
+```
+
+Removing a history returns its recovery unit to normal `prune` retention. After a completed
+transition the original `<project>_mail-config` and `<project>_mail-data` volumes also remain;
+`docker volume ls --filter label=com.docker.compose.project=<project>` shows them. The pre-update
+recovery unit holds a copy of both, so keep the volumes only as long as that unit is not enough.
 
 ### Preserving mail contents
 

@@ -292,6 +292,9 @@ jobs:
           if [ -f build/stalwart-store-transition/result.json ]; then
             cp build/stalwart-store-transition/result.json build/deployment-mail/store-transition.json
           fi
+          if [ -f build/stalwart-store-transition/failure.json ]; then
+            cp build/stalwart-store-transition/failure.json build/deployment-mail/store-transition-failure.json
+          fi
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:

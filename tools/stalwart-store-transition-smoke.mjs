@@ -91,11 +91,38 @@ export function pinnedRuntimeImage(references) {
   return image;
 }
 
+const secretKey = /PASSWORD|SECRET|TOKEN|RECOVERY_ADMIN/;
+
+export function qualificationSecrets(installation) {
+  const read = (path) => { try { return readFileSync(path, "utf8"); } catch { return ""; } };
+  const listed = (path) => { try { return readdirSync(path).map((name) => join(path, name)); } catch { return []; } };
+  const journals = [join(installation, ".courtside-mail-transition"),
+    ...listed(join(installation, "backups")).filter((path) => path.includes("/mail-transition-"))];
+  const environments = [join(installation, "config", ".env"),
+    ...journals.flatMap((journal) => ["setup.env", "target.env"].map((name) => join(journal, name)))];
+  const values = environments.flatMap((path) => read(path).split("\n").flatMap((line) => {
+    const match = /^([A-Z0-9_]+)="?(.*?)"?$/.exec(line);
+    return match && secretKey.test(match[1]) && match[2] ? [match[2]] : [];
+  }));
+  const files = listed(join(installation, "secrets")).map((path) => read(path).trim());
+  return [...new Set([...values, ...files].filter(Boolean))].sort((left, right) => right.length - left.length);
+}
+
+export function transitionFailureEvidence({ stage, error, mailLog = "", secrets = [] }) {
+  const redact = (value) => secrets.reduce((text, secret) => text.split(secret).join("[REDACTED]"), String(value ?? ""));
+  const tail = (value, lines) => value.split("\n").slice(-lines).join("\n");
+  return { schemaVersion: 1, status: "failed", stage, message: redact(error?.message ?? error),
+    exit: { status: error?.status ?? null, signal: error?.signal ?? null },
+    detail: tail(redact(error?.detail ?? ""), 80), mailLogTail: tail(redact(mailLog), 200) };
+}
+
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, { cwd: repository, encoding: options.binary ? undefined : "utf8",
     maxBuffer: 64 * 1024 * 1024, timeout: 180_000, ...options });
   if ((result.error || result.status !== 0) && !options.allowFailure) {
     const error = new Error(`${command} ${args[0]} failed`);
+    error.status = result.status;
+    error.signal = result.signal;
     error.detail = `${result.error?.message ?? ""}\n${result.stdout?.toString() ?? ""}\n${result.stderr?.toString() ?? ""}`;
     throw error;
   }
@@ -248,7 +275,7 @@ async function execute() {
   const source = join(scratch, "historical", "deploy");
   const candidate = join(scratch, "candidate");
   const evidence = join(repository, "build", "stalwart-store-transition");
-  rmSync(join(evidence, "result.json"), { force: true });
+  for (const name of ["result.json", "failure.json"]) rmSync(join(evidence, name), { force: true });
   let stage = "fixtures";
   let passed = false;
   const restoredContainers = [];
@@ -426,11 +453,16 @@ exec ${quote(executable("docker"))} "$@"
     passed = true;
     process.stdout.write("Stalwart transition, controlled delivery and both real mail restores passed.\n");
   } catch (error) {
+    let mailLog = "";
     if (existsSync(join(installation, "config", ".env"))) {
       const logs = compose(candidate, ["--profile", "*", "logs", "--no-color", "mail"], { allowFailure: true });
-      writeFileSync(join(scratch, "mail.log"), `${logs.stdout}${logs.stderr}`, { mode: 0o600 });
+      mailLog = `${logs.stdout}${logs.stderr}`;
+      writeFileSync(join(scratch, "mail.log"), mailLog, { mode: 0o600 });
     }
     writeFileSync(join(scratch, "failure.txt"), `${stage}\n${error.stack}\n${error.detail ?? ""}`, { mode: 0o600 });
+    mkdirSync(evidence, { recursive: true });
+    writeFileSync(join(evidence, "failure.json"), `${JSON.stringify(transitionFailureEvidence({ stage, error, mailLog,
+      secrets: qualificationSecrets(installation) }), null, 2)}\n`);
     process.stderr.write(`Stalwart transition failed during ${stage}. Private evidence: ${scratch}\n`);
     throw new Error(`Stalwart transition qualification failed during ${stage}`);
   } finally {

@@ -1,11 +1,14 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { lstatSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
-import { validateTransitionCandidate, snapshotTransitionCandidate, materializeTransitionCandidate, canRemoveQualificationVolume, pinnedRuntimeImage } from "./stalwart-store-transition-smoke.mjs";
+import { validateTransitionCandidate, snapshotTransitionCandidate, materializeTransitionCandidate, canRemoveQualificationVolume, pinnedRuntimeImage,
+  qualificationSecrets, transitionFailureEvidence } from "./stalwart-store-transition-smoke.mjs";
+
+const workflow = readFileSync(new URL("../.github/workflows/mail-smoke.yml", import.meta.url), "utf8");
 
 function candidate(use) {
   const root = mkdtempSync(join(tmpdir(), "courtside-transition-input-"));
@@ -172,4 +175,44 @@ test("given a validated candidate snapshot, when source entries become external 
       assert.deepEqual(JSON.parse(readFileSync(outside)), snapshot.manifest);
     } finally { rmSync(parent, { recursive: true, force: true }); }
   });
+});
+
+test("given a failed qualification, when its evidence is written, then every installation secret is redacted", () => {
+  // given
+  const installation = mkdtempSync(join(tmpdir(), "courtside-transition-secrets-"));
+  const mailPassword = "a1".repeat(24);
+  const setupPassword = "b2".repeat(24);
+  const bootstrapPassword = "Bootstrap-Private-Value";
+  try {
+    mkdirSync(join(installation, "config"));
+    mkdirSync(join(installation, "secrets"));
+    mkdirSync(join(installation, ".courtside-mail-transition"));
+    writeFileSync(join(installation, "config", ".env"), `COURTSIDE_DOMAIN="courts.example.org"\nCOURTSIDE_MAIL_PASSWORD="${mailPassword}"\n`);
+    writeFileSync(join(installation, ".courtside-mail-transition", "setup.env"),
+      `COURTSIDE_MAIL_SETUP_PASSWORD="${setupPassword}"\nCOURTSIDE_MAIL_RECOVERY_ADMIN="admin:${setupPassword}"\n`);
+    writeFileSync(join(installation, "secrets", "bootstrap-admin-password"), `${bootstrapPassword}\n`);
+    const error = Object.assign(new Error(`docker compose failed for ${mailPassword}`),
+      { status: 9, signal: null, detail: `STALWART_PASSWORD=${setupPassword}\nbootstrap ${bootstrapPassword}` });
+    const mailLog = `${"line\n".repeat(400)}auth admin:${setupPassword} for courts.example.org\n`;
+    // when
+    const evidence = transitionFailureEvidence({ stage: "transition preflight", error, mailLog,
+      secrets: qualificationSecrets(installation) });
+    // then
+    const text = JSON.stringify(evidence);
+    for (const secret of [mailPassword, setupPassword, bootstrapPassword]) {
+      assert.ok(!text.includes(secret), "failure evidence must not carry an installation secret");
+    }
+    assert.equal(evidence.stage, "transition preflight");
+    assert.deepEqual(evidence.exit, { status: 9, signal: null });
+    assert.match(evidence.message, /docker compose failed for \[REDACTED\]/);
+    assert.ok(evidence.mailLogTail.includes("for courts.example.org"), "non-secret context must survive redaction");
+    assert.ok(evidence.mailLogTail.split("\n").length <= 200, "the mail log must be bounded to its tail");
+    assert.equal(text.includes("COURTSIDE_DOMAIN"), false, "no environment file content may be copied");
+  } finally { rmSync(installation, { recursive: true, force: true }); }
+});
+
+test("given the scheduled transition smoke, when it finishes either way, then its JSON evidence is uploaded", () => {
+  // when / then
+  assert.match(workflow, /if: always\(\)\n\s+uses: actions\/upload-artifact@[a-f0-9]{40}[^\n]*\n\s+with:\n\s+name: stalwart-store-transition\n\s+path: build\/stalwart-store-transition\/\*\.json/,
+    "a failed transition must still upload failure.json");
 });
