@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import java.net.URI;
 import java.time.Duration;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -187,6 +188,22 @@ class LoxoneLoginTest extends LoxoneTestSupport {
         // then
         assertThat(acquiredAgain).as("both calls use the token the probe acquired").isZero();
         assertThat(simulator.count("getjwt")).as("a token within an hour of its end is replaced").isEqualTo(1);
+    }
+
+    @Test
+    void givenATokenDueForRenewal_whenTheNextCallRenewsIt_thenTheOldTokenIsKilledWithItself() {
+        // given
+        installed(UUID.randomUUID());
+        Set<String> before = simulator.issuedTokens();
+        clock.advance(Duration.ofDays(20).minusMinutes(30));
+
+        // when
+        installed(UUID.randomUUID());
+
+        // then
+        assertThat(simulator.count("killtoken")).as("renewal kills the token it replaces").isEqualTo(1);
+        assertThat(simulator.issuedTokens()).as("only the renewed token stays on the Miniserver").hasSize(1)
+                .doesNotContainAnyElementsOf(before);
     }
 
     @Test

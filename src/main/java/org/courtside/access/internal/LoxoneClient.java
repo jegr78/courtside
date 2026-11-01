@@ -271,6 +271,9 @@ final class LoxoneClient implements AutoCloseable {
         }
         renewAt = LoxoneTime.instant(value.path("validUntil").asLong()).minus(RENEWAL_MARGIN);
         token = issued;
+        if (current != null && !current.equals(issued)) {
+            kill(session, current);
+        }
         return issued;
     }
 
