@@ -1,5 +1,36 @@
 # Changelog
 
+## 0.4.0 (2026-11-01)
+
+### Features
+
+* add a recoverable Stalwart store transition ([#1805](https://github.com/jegr78/courtside/issues/1805)) ([6cc8c35](https://github.com/jegr78/courtside/commit/6cc8c35f28fa7ff393828d5665d5b31c541f2465))
+* add voluntary TOTP and WebAuthn account security ([#1779](https://github.com/jegr78/courtside/issues/1779)) ([78d9c6a](https://github.com/jegr78/courtside/commit/78d9c6a441168d16d59af78c920726966c3b1a89))
+* deliver a booking's own access code by mail with an emergency code fallback ([#1796](https://github.com/jegr78/courtside/issues/1796)) ([e08f8bb](https://github.com/jegr78/courtside/commit/e08f8bbb0e4cd2259ba68c8fd6184bc331c4ce33))
+* distribute static access codes per access point to a booking's players ([#1792](https://github.com/jegr78/courtside/issues/1792)) ([0d62584](https://github.com/jegr78/courtside/commit/0d6258487f66854c980769217f095312494cdaad))
+* expose a pollable court occupancy signal for building automation ([#1797](https://github.com/jegr78/courtside/issues/1797)) ([16b22c3](https://github.com/jegr78/courtside/commit/16b22c3fc2df5674fe5a1fff7799ba68c3647952))
+* install a door code per booking on the access-control system ([#1794](https://github.com/jegr78/courtside/issues/1794)) ([e80f77d](https://github.com/jegr78/courtside/commit/e80f77d6798fcade804ebd7212a18b1deecd8400))
+* install dynamic access grants on a Loxone Miniserver ([#1803](https://github.com/jegr78/courtside/issues/1803)) ([88bfca2](https://github.com/jegr78/courtside/commit/88bfca2144ed812a5bc6a2aeb1c29d590d15a738))
+* show a members' door code to every member independent of bookings ([#1795](https://github.com/jegr78/courtside/issues/1795)) ([9c2d7b7](https://github.com/jegr78/courtside/commit/9c2d7b762311b60a0623f2bde13b04a45cdf5bca))
+* show the active account with profile and security ([#1776](https://github.com/jegr78/courtside/issues/1776)) ([2d12a85](https://github.com/jegr78/courtside/commit/2d12a8527c4a7fd7be1a6bf68b5b43163561c371))
+* verify a Loxone connection during setup and against a recorded device run ([#1808](https://github.com/jegr78/courtside/issues/1808)) ([81fb548](https://github.com/jegr78/courtside/commit/81fb548f850976e64758f34da39650c0846ba44a))
+
+### Bug fixes
+
+* bump org.jacoco:jacoco-maven-plugin from 0.8.15 to 0.8.16 ([#1799](https://github.com/jegr78/courtside/issues/1799)) ([1bb87df](https://github.com/jegr78/courtside/commit/1bb87df91c2b8786483f546f51350e3c3fa63079))
+* bump the deployment-images group in /deploy with 10 updates ([#1802](https://github.com/jegr78/courtside/issues/1802)) ([24dd7f8](https://github.com/jegr78/courtside/commit/24dd7f885cc0091cba5ca0c448bc59899d0a6e2b))
+* bump the frontend-minor-and-patch group in /frontend with 5 updates ([#1800](https://github.com/jegr78/courtside/issues/1800)) ([89d8961](https://github.com/jegr78/courtside/commit/89d8961e93e301a019f22c48dd455b09ce09fef1))
+* bump the spring group across 1 directory with 2 updates ([#1798](https://github.com/jegr78/courtside/issues/1798)) ([3c46a37](https://github.com/jegr78/courtside/commit/3c46a374c96d9bd20aa05b2ffd1a33852c6ba9c8))
+* complete MFA recovery, address notices and security key feedback ([#1783](https://github.com/jegr78/courtside/issues/1783)) ([49cdac6](https://github.com/jegr78/courtside/commit/49cdac63434a467787a16f19a05a409367466149))
+* defer observed navigation layout until the next frame ([#1778](https://github.com/jegr78/courtside/issues/1778)) ([6f45a9e](https://github.com/jegr78/courtside/commit/6f45a9ef38f87c12c6ef5cc9b1efd7fe8d3bf094))
+* harden the MFA key root and second-factor guessing ([#1782](https://github.com/jegr78/courtside/issues/1782)) ([4948d8b](https://github.com/jegr78/courtside/commit/4948d8b7b9963738b6fd109ac81124fba76ac612))
+* pass the access-control settings through the reference deployment ([#1810](https://github.com/jegr78/courtside/issues/1810)) ([287374a](https://github.com/jegr78/courtside/commit/287374a7eb2d37c808658c5f0acd029d9320958f))
+* resolve the open security alerts and keep CodeQL failures visible ([#1788](https://github.com/jegr78/courtside/issues/1788)) ([3d4ea17](https://github.com/jegr78/courtside/commit/3d4ea179385d789cc656574ac734a0fea67be541))
+
+### Chores
+
+* open the 0.4.0 candidate line ([#1771](https://github.com/jegr78/courtside/issues/1771)) ([01d3456](https://github.com/jegr78/courtside/commit/01d345673547988cbe25acc9c193cb29de954071))
+
 ## 0.3.0 (2026-10-26)
 
 ### Features
