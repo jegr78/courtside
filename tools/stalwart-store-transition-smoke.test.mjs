@@ -205,7 +205,7 @@ test("given a failed qualification, when its evidence is written, then every ins
     assert.equal(evidence.stage, "transition preflight");
     assert.deepEqual(evidence.exit, { status: 9, signal: null });
     assert.match(evidence.message, /docker compose failed for \[REDACTED\]/);
-    assert.match(evidence.mailLogTail, /courts\.example\.org/, "non-secret context must survive redaction");
+    assert.ok(evidence.mailLogTail.includes("for courts.example.org"), "non-secret context must survive redaction");
     assert.ok(evidence.mailLogTail.split("\n").length <= 200, "the mail log must be bounded to its tail");
     assert.equal(text.includes("COURTSIDE_DOMAIN"), false, "no environment file content may be copied");
   } finally { rmSync(installation, { recursive: true, force: true }); }
