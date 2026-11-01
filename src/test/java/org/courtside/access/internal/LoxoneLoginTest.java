@@ -252,6 +252,29 @@ class LoxoneLoginTest extends LoxoneTestSupport {
     }
 
     @Test
+    void givenAGroupWithoutTheWebsiteRight_whenProbed_thenTheRefusalNamesTheMissingRight() {
+        // given
+        simulator.answerRaw("getjwt", "{\"LL\":{\"control\":\"getjwt\",\"value\":\"\",\"Code\":\"412\"}}");
+
+        // when
+        ProbeOutcome probed = connectorFor(simulator.settingsByUrl(DEADLINE)).probe();
+
+        // then
+        assertThat(probed).isEqualTo(new ProbeOutcome.Refused(
+                "Miniserver refused a token for the technical user (getjwt 412)"));
+    }
+
+    @Test
+    void givenA412BeforeTheToken_whenProbed_thenNoRightIsBlamedAndTheCodeIsNamed() {
+        // given
+        simulator.answerRaw("getkey2", "{\"LL\":{\"control\":\"getkey2\",\"value\":\"\",\"Code\":\"412\"}}");
+
+        // when / then
+        assertThatThrownBy(connectorFor(simulator.settingsByUrl(DEADLINE))::probe).isInstanceOf(LoxoneFailure.class)
+                .hasMessage("getkey2 answered 412");
+    }
+
+    @Test
     void givenATokenWithoutUserManagement_whenProbedOrRenewed_thenItIsRefusedBeforeAnyRequestNeedingTheRight() {
         // given
         simulator.withholdUserManagement();

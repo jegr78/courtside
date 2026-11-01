@@ -272,9 +272,11 @@ it by itself. You set this up once, and Courtside then checks the connection whe
 
 In Loxone Config you set up:
 
-1. a user group for Courtside with the group right **User management**. Do not give it **Full
-   access**. Courtside needs the right to manage users and the right to change their codes, and
-   checks both. If one is missing, the **Login** check reports a missing right.
+1. a user group for Courtside with the group rights **Manage users and permissions** and
+   **Website/Apps**. Do not give it **Full access** or a permission for any keypad. Without
+   **Website/Apps** the Miniserver issues no token. Courtside also needs the right to manage users
+   and the right to change their codes, and checks both. If one of these rights is missing, the
+   **Login** check reports it.
 2. a technical user with a password of its own that belongs to this group only. It is not an
    administrator.
 3. one normal group per door or keypad that holds the permission for that access point in the

@@ -286,9 +286,11 @@ Einrichtung machst du einmal, danach prüft Courtside die Verbindung, wenn du es
 
 In Loxone Config richtest du ein:
 
-1. eine Benutzergruppe für Courtside mit dem Gruppenrecht **Benutzerverwaltung**. Gib ihr keinen
-   **Vollzugriff**. Courtside braucht das Recht, Benutzer zu verwalten, und das Recht, ihre Codes zu
-   ändern, und prüft beide. Fehlt eines, meldet die Prüfung **Anmeldung** ein fehlendes Recht.
+1. eine Benutzergruppe für Courtside mit den Gruppenrechten **Benutzer und Berechtigungen verwalten**
+   und **Webseite/Apps**. Gib ihr keinen **Vollzugriff** und keine Berechtigung für ein Tastenfeld.
+   Ohne **Webseite/Apps** gibt der Miniserver kein Token aus. Courtside braucht außerdem das Recht,
+   Benutzer zu verwalten, und das Recht, ihre Codes zu ändern, und prüft beide. Fehlt eines dieser
+   Rechte, meldet die Prüfung **Anmeldung** das fehlende Recht.
 2. einen technischen Benutzer mit eigenem Passwort, der nur in dieser Gruppe ist. Er ist kein
    Administrator.
 3. je Tür oder Tastenfeld eine normale Gruppe, die in den Rechten dieses Tastenfelds die

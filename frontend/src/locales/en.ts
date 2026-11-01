@@ -1827,6 +1827,7 @@ const en: Record<keyof typeof de, string> = {
   "access.check.version.unreadable": "The Miniserver names no readable version.",
   "access.check.login.accepted": "The technical user logs in and may manage users and their codes.",
   "access.check.login.refused": "The Miniserver refuses the technical user's name or password.",
+  "access.check.login.missingAppRight": "The Miniserver issues no token to the technical user. Give its group the group right Website/Apps.",
   "access.check.login.missingRight": "The technical user logs in but may not manage users or their codes.",
   "access.check.login.locked": "The Miniserver blocks requests for a few minutes after too many refused attempts.",
   "access.check.groups.mapped": "Every access point has a normal group on the Miniserver: {{accessPoints}}.",

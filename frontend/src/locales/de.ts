@@ -1825,6 +1825,7 @@ const de = {
   "access.check.version.unreadable": "Der Miniserver nennt keine lesbare Version.",
   "access.check.login.accepted": "Der technische Benutzer meldet sich an und darf Benutzer und ihre Codes verwalten.",
   "access.check.login.refused": "Der Miniserver lehnt Benutzername oder Passwort des technischen Benutzers ab.",
+  "access.check.login.missingAppRight": "Der Miniserver gibt dem technischen Benutzer kein Token. Gib seiner Gruppe das Gruppenrecht Webseite/Apps.",
   "access.check.login.missingRight": "Der technische Benutzer meldet sich an, darf aber keine Benutzer oder Codes verwalten.",
   "access.check.login.locked": "Der Miniserver sperrt Anfragen nach zu vielen abgelehnten Versuchen für einige Minuten.",
   "access.check.groups.mapped": "Jeder Zugang hat eine normale Gruppe auf dem Miniserver: {{accessPoints}}.",

@@ -105,6 +105,7 @@ final class LoxoneConnectionChecks {
             return switch (refusal.kind()) {
                 case CREDENTIALS -> CheckResult.failed("access.check.login.refused", Map.of());
                 case RIGHT -> CheckResult.failed("access.check.login.missingRight", Map.of());
+                case APP_RIGHT -> CheckResult.failed("access.check.login.missingAppRight", Map.of());
                 case LOCKED -> CheckResult.failed("access.check.login.locked", Map.of());
                 default -> throw refusal;
             };

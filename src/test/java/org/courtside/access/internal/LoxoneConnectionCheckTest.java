@@ -217,6 +217,20 @@ class LoxoneConnectionCheckTest extends LoxoneTestSupport {
     }
 
     @Test
+    void givenAGroupWithoutTheWebsiteRight_whenChecked_thenTheLoginNamesThatRightAndSkipsTheRest() {
+        // given
+        simulator.answerRaw("getjwt", "{\"LL\":{\"control\":\"getjwt\",\"value\":\"\",\"Code\":\"412\"}}");
+
+        // when
+        List<ConnectionCheckRun.Checked> checked = checked(connector);
+
+        // then
+        assertThat(result(checked, "login")).isEqualTo(CheckResult.failed("access.check.login.missingAppRight",
+                Map.of()));
+        assertThat(result(checked, "groups").outcome()).isEqualTo(CheckOutcome.SKIPPED);
+    }
+
+    @Test
     void givenALockedMiniserver_whenChecked_thenTheLoginFailsOnTheLock() {
         // given
         simulator.force("getkey2", 429);
