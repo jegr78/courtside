@@ -1,17 +1,5 @@
 # Changelog
 
-## [0.4.0-rc.2](https://github.com/jegr78/courtside/compare/v0.4.0-rc.1...v0.4.0-rc.2) (2026-11-01)
-
-
-### Bug fixes
-
-* close MFA review gaps in password change, factor pauses and recovery ([#1816](https://github.com/jegr78/courtside/issues/1816)) ([847c66a](https://github.com/jegr78/courtside/commit/847c66a0431c7d37577132b38e6951831f47a080))
-* harden access grants and the Loxone connector after the release review ([#1815](https://github.com/jegr78/courtside/issues/1815)) ([339ac4e](https://github.com/jegr78/courtside/commit/339ac4ef4d7af7f43d24dce2f3c545413a264ecb))
-* keep a member's navigation scroll across a window resize ([#1811](https://github.com/jegr78/courtside/issues/1811)) ([c146ab1](https://github.com/jegr78/courtside/commit/c146ab1e75477b5f4b8488f4af5a0d59edc1e2b9))
-* keep backups and recovery available after a failed mail store transition ([#1813](https://github.com/jegr78/courtside/issues/1813)) ([0a3b4ae](https://github.com/jegr78/courtside/commit/0a3b4aef7a4902ea02f9ed5c94a920eeba605219))
-* name the Website/Apps right when a Miniserver refuses the token ([#1817](https://github.com/jegr78/courtside/issues/1817)) ([13b1d45](https://github.com/jegr78/courtside/commit/13b1d452a7aef3621072d7c9adb8a647961d9e77))
-* refuse a bootstrap display name at init that the application rejects ([#1814](https://github.com/jegr78/courtside/issues/1814)) ([d7de065](https://github.com/jegr78/courtside/commit/d7de0654f1eeaf3fb3b7832403e7ba454a26a3a3))
-
 ## 0.4.0 (2026-11-01)
 
 ### Features
@@ -29,6 +17,12 @@
 
 ### Bug fixes
 
+* close MFA review gaps in password change, factor pauses and recovery ([#1816](https://github.com/jegr78/courtside/issues/1816)) ([847c66a](https://github.com/jegr78/courtside/commit/847c66a0431c7d37577132b38e6951831f47a080))
+* harden access grants and the Loxone connector after the release review ([#1815](https://github.com/jegr78/courtside/issues/1815)) ([339ac4e](https://github.com/jegr78/courtside/commit/339ac4ef4d7af7f43d24dce2f3c545413a264ecb))
+* keep a member's navigation scroll across a window resize ([#1811](https://github.com/jegr78/courtside/issues/1811)) ([c146ab1](https://github.com/jegr78/courtside/commit/c146ab1e75477b5f4b8488f4af5a0d59edc1e2b9))
+* keep backups and recovery available after a failed mail store transition ([#1813](https://github.com/jegr78/courtside/issues/1813)) ([0a3b4ae](https://github.com/jegr78/courtside/commit/0a3b4aef7a4902ea02f9ed5c94a920eeba605219))
+* name the Website/Apps right when a Miniserver refuses the token ([#1817](https://github.com/jegr78/courtside/issues/1817)) ([13b1d45](https://github.com/jegr78/courtside/commit/13b1d452a7aef3621072d7c9adb8a647961d9e77))
+* refuse a bootstrap display name at init that the application rejects ([#1814](https://github.com/jegr78/courtside/issues/1814)) ([d7de065](https://github.com/jegr78/courtside/commit/d7de0654f1eeaf3fb3b7832403e7ba454a26a3a3))
 * bump org.jacoco:jacoco-maven-plugin from 0.8.15 to 0.8.16 ([#1799](https://github.com/jegr78/courtside/issues/1799)) ([1bb87df](https://github.com/jegr78/courtside/commit/1bb87df91c2b8786483f546f51350e3c3fa63079))
 * bump the deployment-images group in /deploy with 10 updates ([#1802](https://github.com/jegr78/courtside/issues/1802)) ([24dd7f8](https://github.com/jegr78/courtside/commit/24dd7f885cc0091cba5ca0c448bc59899d0a6e2b))
 * bump the frontend-minor-and-patch group in /frontend with 5 updates ([#1800](https://github.com/jegr78/courtside/issues/1800)) ([89d8961](https://github.com/jegr78/courtside/commit/89d8961e93e301a019f22c48dd455b09ce09fef1))
