@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
@@ -371,11 +371,59 @@ describe("AdminAccessPointsView building automation", () => {
 
     // when
     await userEvent.click(screen.getByTestId("revoke-occupancy-key"));
+    expect(revoke).not.toHaveBeenCalled();
+    await userEvent.click(within(screen.getByRole("dialog")).getByTestId("confirm-occupancy-key"));
 
     // then
     expect(revoke).toHaveBeenCalledTimes(1);
     await waitFor(() => expect(screen.getByTestId("occupancy-key-status")).toHaveTextContent("No key"));
     expect(screen.queryByTestId("revoke-occupancy-key")).not.toBeInTheDocument();
+  });
+});
+
+describe("AdminAccessPointsView occupancy key confirmation", () => {
+  beforeEach(async () => {
+    vi.restoreAllMocks();
+    await i18n.changeLanguage("en");
+    vi.spyOn(api, "adminCourts").mockResolvedValue(courts);
+    vi.spyOn(api, "adminConfig").mockResolvedValue(stored);
+    vi.spyOn(api, "adminAccessPoints").mockResolvedValue([northGate]);
+    vi.spyOn(api, "occupancyKeyStatus").mockResolvedValue({ configured: true, createdAt: "2026-05-01T08:00:00Z" });
+    vi.spyOn(api, "adminAccessControlGroups").mockResolvedValue({ listsGroups: false, groups: [], readAt: null });
+  });
+
+  it("given an occupancy key, when the board asks for a new one and cancels, then the old key stays", async () => {
+    // given
+    const create = vi.spyOn(api, "createOccupancyKey").mockResolvedValue({ key: "x".repeat(43), createdAt: "2026-05-12T10:00:00Z" });
+    show();
+    await screen.findByTestId("occupancy-key-status");
+
+    // when
+    await userEvent.click(screen.getByTestId("create-occupancy-key"));
+    await userEvent.click(within(screen.getByRole("dialog")).getByTestId("cancel-occupancy-key"));
+
+    // then
+    expect(create).not.toHaveBeenCalled();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByTestId("occupancy-key-status")).toHaveTextContent("May 1, 2026, 10:00 AM");
+  });
+
+  it("given an occupancy key, when the board confirms a new one, then the new key replaces it", async () => {
+    // given
+    const key = "Ab3_dE-fGhIjKlMnOpQrStUvWxYz0123456789abcde";
+    const create = vi.spyOn(api, "createOccupancyKey").mockResolvedValue({ key, createdAt: "2026-05-12T10:00:00Z" });
+    show();
+    await screen.findByTestId("occupancy-key-status");
+
+    // when
+    await userEvent.click(screen.getByTestId("create-occupancy-key"));
+    expect(create).not.toHaveBeenCalled();
+    await userEvent.click(within(screen.getByRole("dialog")).getByTestId("confirm-occupancy-key"));
+
+    // then
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(await screen.findByTestId("occupancy-key-value")).toHaveValue(key);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 });
 
