@@ -203,6 +203,28 @@ launcher neither backs up nor removes this external directory; remove it explici
 synthetic acceptance deployment has been retired. The messages are readable at
 `http://127.0.0.1:${COURTSIDE_ACCEPTANCE_MAIL_PORT}/`.
 
+### A second instance on the same host
+
+A test instance that tries a candidate against the club's real door can run beside an acceptance
+instance on one host. Install it under its own operating-system user with its own rootless Docker,
+so projects, volumes and networks stay apart, and keep it running after logout with
+`loginctl enable-linger`. Only host ports are shared. Give it its own `COURTSIDE_PORT`,
+`COURTSIDE_OPERATIONAL_LOG_PORT` and `COURTSIDE_ACCEPTANCE_MAIL_PORT` in `.env`, in quoted
+`KEY="value"` form, and its own Mailpit certificate directory, because the first one is mode 0700
+and owned by the other user.
+
+Behind Tailscale Funnel the node has one serve configuration for every user. Publish the second
+instance on another Funnel port, for example
+`sudo tailscale funnel --bg --https=10000 http://127.0.0.1:<COURTSIDE_PORT>`, and set
+`COURTSIDE_PUBLIC_URL="https://<node>.ts.net:10000"`. WebAuthn checks that exact origin, and mail
+links use it. `tailscale funnel reset` removes every entry on the node, the other instance's
+included. Both instances share the host name, so a browser keeps one session and one set of passkeys
+for both. Use a separate browser profile per instance.
+
+With an access-control system connected, the instance installs real codes: create its occupancy
+key through the Funnel address so the Miniserver gets that address, and never run `seed-bookings`
+there, because seeded bookings could install codes on the real door.
+
 ### Sample booking history on an acceptance installation
 
 An installed UAT can add repeatable booking history without a repository checkout, Java, Maven,
