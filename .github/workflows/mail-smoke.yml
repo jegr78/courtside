@@ -24,11 +24,11 @@ jobs:
       - uses: ./.github/actions/tool-dependencies
       - name: Qualify the legacy Stalwart store transition and both recovery units
         run: node tools/stalwart-store-transition-smoke.mjs
-      - if: success()
+      - if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: stalwart-store-transition
-          path: build/stalwart-store-transition/result.json
+          path: build/stalwart-store-transition/*.json
           retention-days: 14
           if-no-files-found: error
 

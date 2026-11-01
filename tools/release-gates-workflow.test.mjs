@@ -66,6 +66,18 @@ esac
   }
 }
 
+test("given a failed store transition, when the mail gate records its result, then the redacted failure evidence is retained", () => {
+  // given
+  const step = gates.jobs.mail.steps.find((entry) => entry.name === "Record the Stalwart result");
+  const upload = gates.jobs.mail.steps.find((entry) => entry.with?.name === "deployment-mail-qualification");
+  // when / then
+  assert.equal(step.if, "always()");
+  assert.match(step.run, /cp build\/stalwart-store-transition\/failure\.json build\/deployment-mail\//,
+    "the retained mail artifact must carry the transition's failure.json");
+  assert.equal(upload.if, "always()");
+  assert.match(upload.with.path, /^\s*build\/deployment-mail\s*$/m);
+});
+
 function stepsUsing(job, uses) {
   return (gates.jobs[job].steps ?? []).filter((step) => String(step.uses ?? "").startsWith(uses));
 }
