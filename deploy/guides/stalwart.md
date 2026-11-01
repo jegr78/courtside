@@ -79,7 +79,8 @@ To stay on the original release, abandon the attempt:
 "$candidate/courtside" --directory /srv/courtside update --mail-store-transition abandon --yes
 ```
 
-Abandoning needs no archive. It restarts the original mail server and the application, moves the
+Abandoning needs no archive. It restarts the original mail server, its certificate reloader and the
+application, moves the
 journal to `backups/mail-transition-<attempt>` and stops there. It retains the attempt's stores and
 the recovery unit. Once the target release is selected, abandoning is refused:
 finish the transition or restore the complete recovery unit.

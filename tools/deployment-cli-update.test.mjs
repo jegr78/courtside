@@ -522,7 +522,7 @@ test("given a failed mail preparation, when the transition is abandoned, then th
     assert.equal(readFileSync(join(context.target, "config", ".env"), "utf8"), before);
     assert.match(readFileSync(join(context.target, "config", "installation.conf"), "utf8"), /^release=0\.1\.0$/m);
     const calls = readFileSync(context.dockerLog, "utf8");
-    assert.match(calls, /up -d --wait mail/);
+    assert.match(calls, /up -d --wait mail mail-certificate mail-reload/, "abandon must restart the certificate reloader");
     assert.match(calls, /up -d app/);
     assert.doesNotMatch(calls, /volume create|run --rm mail-bootstrap|volume rm|down --volumes/);
     assert.equal(run(context.archive, context.target, ["backup"], context.environment).status, 0);
@@ -667,6 +667,9 @@ for (const failure of ["run --rm mail-bootstrap", "run --rm mail-configure", "ru
       assert.match(readFileSync(join(context.target, "config", "installation.conf"), "utf8"), /^release=0\.1\.0$/m);
       const calls = readFileSync(context.dockerLog, "utf8");
       assert.doesNotMatch(calls, /volume rm example-club_mail-|down --volumes/);
+      assert.match(calls.slice(calls.lastIndexOf(failure)),
+        /--env-file \S+\/config\/\.env .*up -d --wait mail mail-certificate mail-reload/,
+        "the source must restart with its certificate reloader");
       assert.equal(existsSync(join(context.target, ".courtside-mail-transition")), true);
     });
   });

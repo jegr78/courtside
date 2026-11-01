@@ -163,7 +163,7 @@ mail_transition_allows() {
 }
 
 start_mail_transition_source() {
-  "$@" --profile mail up -d --wait mail && "$@" up -d app
+  "$@" --profile mail up -d --wait mail mail-certificate mail-reload && "$@" up -d app
 }
 
 read_mail_transition_journal() {
