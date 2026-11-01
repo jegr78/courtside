@@ -226,7 +226,9 @@ for both. Use a separate browser profile per instance.
 
 With an access-control system connected, the instance installs real codes: create its occupancy
 key through the Funnel address so the Miniserver gets that address, and never run `seed-bookings`
-there, because seeded bookings could install codes on the real door.
+there, because seeded bookings could install codes on the real door. Each instance signs in to the
+Miniserver under a client id derived from its `COURTSIDE_PUBLIC_URL`, so the two keep separate
+tokens only while their public addresses differ.
 
 ### Sample booking history on an acceptance installation
 

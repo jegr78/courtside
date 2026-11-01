@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 
 import java.net.URI;
 import java.time.Duration;
+import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -140,10 +141,36 @@ class LoxoneLoginTest extends LoxoneTestSupport {
                 .containsExactly(2084, 2084);
         assertThat(simulator.clientUuids()).hasSize(2).allMatch(uuid -> uuid.equals(simulator.clientUuids()
                 .getFirst())).allMatch(uuid -> uuid.matches("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{16}"));
-        assertThat(LoxoneLogin.clientUuid(new LoxoneAddress.Fixed(URI.create("https://other.example.org"))))
+        assertThat(LoxoneLogin.clientUuid(new LoxoneAddress.Fixed(URI.create("https://other.example.org")), ""))
                 .as("another address is another client")
                 .isNotEqualTo(simulator.clientUuids().getFirst())
                 .matches("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{16}");
+    }
+
+    @Test
+    void givenTwoInstancesOfOneMiniserver_whenEachAcquiresATokenTwice_thenEachKeepsItsOwnClientUuid() {
+        // given
+        LoxoneSettings url = simulator.settingsByUrl(DEADLINE);
+        LoxoneSettings production = new LoxoneSettings(url.address(), url.user(), url.password(), DEADLINE,
+                "https://courts.example.org");
+        LoxoneSettings trial = new LoxoneSettings(url.address(), url.user(), url.password(), DEADLINE,
+                "https://courts.example.org:10000");
+
+        int before = simulator.clientUuids().size();
+
+        // when
+        connectorFor(production).probe();
+        connectorFor(production).probe();
+        connectorFor(trial).probe();
+
+        // then
+        List<String> uuids = simulator.clientUuids().subList(before, before + 3);
+        assertThat(uuids.get(1)).as("one instance asks under the same client uuid after a restart")
+                .isEqualTo(uuids.getFirst());
+        assertThat(uuids.get(2)).as("a second instance on the same Miniserver is another client")
+                .isNotEqualTo(uuids.getFirst());
+        assertThat(LoxoneLogin.clientUuid("courtside-device-contract", url.address()))
+                .as("the device run keeps its own namespace").isNotIn(uuids);
     }
 
     @Test

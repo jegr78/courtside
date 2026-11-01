@@ -80,7 +80,7 @@ class LoxoneRecordedFixtureTest extends LoxoneTestSupport {
         assertThat(observed.checks()).extracting(ConnectionCheckRun.Checked::check).contains("miniserver", "login");
         assertThat(observed.checks().getFirst().result().outcome()).isEqualTo(CheckOutcome.PASSED);
         assertThat(simulator.clientUuids()).as("the run never takes the production instance's token")
-                .doesNotContain(LoxoneLogin.clientUuid(settings.address()));
+                .doesNotContain(LoxoneLogin.clientUuid(settings.address(), settings.instance()));
         assertThat(simulator.requests()).filteredOn(LoxoneSimulator.Request::mutating)
                 .allSatisfy(request -> assertThat(request.command())
                         .isIn("addoredituser", "deleteuser", "updateuseraccesscode"));

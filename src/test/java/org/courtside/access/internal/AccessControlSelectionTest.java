@@ -1,6 +1,7 @@
 package org.courtside.access.internal;
 
 import org.courtside.access.AccessControlConnector;
+import org.courtside.shared.InstanceAddress;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.convert.ApplicationConversionService;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
@@ -21,7 +22,7 @@ class AccessControlSelectionTest {
     private static final String SECRET = "example-loxone-secret";
     private static final AccessControlConfiguration.LoxoneWiring WIRING = new AccessControlConfiguration.LoxoneWiring(
             accessPoint -> Optional.empty(), Clock.systemUTC(), Duration.ofSeconds(15),
-            AccessControlSelectionTest::tls);
+            AccessControlSelectionTest::tls, "");
 
     @Test
     void givenTheSimulatedConnectorInProduction_whenItIsChosen_thenStartupFails() {
@@ -139,6 +140,7 @@ class AccessControlSelectionTest {
         context.getBeanFactory().setConversionService(ApplicationConversionService.getSharedInstance());
         context.registerBean(LoxoneGroupMapping.class, () -> accessPoint -> Optional.empty());
         context.registerBean(Clock.class, Clock::systemUTC);
+        context.registerBean(InstanceAddress.class, () -> new InstanceAddress(""));
         context.register(AccessControlConfiguration.class);
         context.refresh();
         LoxoneAccessControl connector = (LoxoneAccessControl) context.getBean(AccessControlConnector.class);
@@ -148,6 +150,25 @@ class AccessControlSelectionTest {
 
         // then
         assertThat(connector.closed()).as("closing the context closes the connector").isTrue();
+    }
+
+    @Test
+    void givenThisInstancesPublicAddress_whenLoxoneIsChosen_thenItsClientUuidIsBoundToThatAddress() {
+        // given
+        MockEnvironment environment = loxone().withProperty("courtside.access-control.loxone.url",
+                "https://miniserver.example.org");
+        AccessControlConfiguration.LoxoneWiring trial = new AccessControlConfiguration.LoxoneWiring(
+                accessPoint -> Optional.empty(), Clock.systemUTC(), Duration.ofSeconds(15),
+                AccessControlSelectionTest::tls, "https://trial.example.org");
+
+        // when
+        LoxoneAccessControl selected = (LoxoneAccessControl) AccessControlConfiguration.select("loxone",
+                "PRODUCTION", environment, trial);
+
+        // then
+        assertThat(selected.clientUuid()).isEqualTo(LoxoneLogin.clientUuid(
+                new LoxoneAddress.Fixed(URI.create("https://miniserver.example.org")), "https://trial.example.org"));
+        selected.close();
     }
 
     private static MockEnvironment loxone() {
