@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readdirSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
@@ -116,9 +116,7 @@ test("given the application's settings, when the reference deployment starts it,
     const composeDefaults = new Map([...compose.matchAll(/\$\{(COURTSIDE_[A-Z0-9_]+):-([^}]*)\}/g)]
       .map((match) => [match[1], match[2]]));
     const interpolated = named(compose, /\$\{(COURTSIDE_[A-Z0-9_]+)/g);
-    const fixedByAComposeFile = named(readdirSync(fileURLToPath(new URL("../deploy", import.meta.url)))
-      .filter((file) => /^compose[\w.-]*\.yaml$/.test(file)).map(deploymentFile).join("\n"),
-    /^\s+(COURTSIDE_[A-Z0-9_]+):/gm);
+    const fixedByAComposeFile = named(compose, /^\s+(COURTSIDE_[A-Z0-9_]+):/gm);
 
     // when
     const unpassed = [...applicationDefaults.keys()]
