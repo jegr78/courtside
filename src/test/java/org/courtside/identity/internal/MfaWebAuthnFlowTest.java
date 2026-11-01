@@ -393,6 +393,18 @@ class MfaWebAuthnFlowTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenAUsableLabel_whenTheServiceRenamesAKeyAsTheHolder_thenTheKeyCarriesIt() throws Exception {
+        // given
+        var authenticator = enroll();
+        String id = authenticator.credentialId().toBase64UrlString();
+        // when
+        asHolder(() -> flow.rename(id, "Travel key"));
+        // then
+        assertThat(credentials.findByCredentialId(authenticator.credentialId()).getLabel())
+                .as("the holder context reaches the label guard, so the refusals above are the label's").isEqualTo("Travel key");
+    }
+
+    @Test
     void givenAnotherMembersKey_whenAHolderRenamesOrRemovesIt_thenTheKeyIsAbsentForThemAndUntouched() throws Exception {
         // given
         var authenticator = enroll();
