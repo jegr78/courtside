@@ -1171,6 +1171,26 @@ for (const [language, expected] of [["en", "Check in from 5:45 PM"], ["de", "17:
   });
 }
 
+for (const [now, shown] of [["2026-11-01T20:10:00Z", true], ["2026-10-26T15:00:00Z", false]] as const) {
+  it(`given a check-in that opens on the next morning, when the list is read at ${now}, then the hint ${shown ? "is" : "is not"} shown`, async () => {
+    // given
+    await i18n.changeLanguage("de");
+    vi.mocked(api.personalBookings).mockResolvedValue({ items: [{
+      id: upcomingId, courtIds: ["33333333-3333-3333-3333-333333333333"],
+      startsAt: "2026-11-02T09:00:00Z", endsAt: "2026-11-02T10:00:00Z",
+      cardLabel: "Member booking", cardColor: "#176b55", status: "CONFIRMED",
+      checkIn: { opensAt: "2026-11-02T08:45:00Z", closesAt: "2026-11-02T10:00:00Z", checkedIn: false }
+    }], timeZone: "Europe/Berlin" });
+
+    // when
+    render(<MyBookingsView now={new Date(now)} />);
+
+    // then
+    expect(await screen.findByTestId("personal-cancel")).toBeVisible();
+    expect(screen.queryByTestId("check-in-from") !== null, "the hint announces a check-in that opens within the next 24 hours, whatever the day").toBe(shown);
+  });
+}
+
 it("given a booking whose card grants access, when the member reads it, then the gate's code and its window are shown", async () => {
   // given
   vi.spyOn(api, "personalBookings").mockImplementation((options) => Promise.resolve(options?.view

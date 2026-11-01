@@ -320,7 +320,7 @@ export function BookingSection({ testId, title, titleHidden = false, empty, book
           {booking.checkIn?.checkedIn && <span data-testid="checked-in">{t("myBookings.checkedIn")}</span>}
           {booking.access && <AccessCodes access={booking.access} reference={reference} locale={locale} timeZone={timeZone} t={t}
             emergency={actionable && booking.status === "CONFIRMED" ? () => api.emergencyCode(booking.id) : undefined} />}
-          {booking.checkIn && !booking.checkIn.checkedIn && reference && checkInToday(booking.checkIn, reference)
+          {booking.checkIn && !booking.checkIn.checkedIn && reference && checkInWithinDay(booking.checkIn, reference)
             && <span data-testid="check-in-from" className="text-muted text-sm">{t("myBookings.checkInFrom", { time: formatClockTime(formatTime(booking.checkIn.opensAt, timeZone), locale) })}</span>}
           {actionable && <div className="flex flex-wrap gap-2 pt-1">
             {booking.status === "CONFIRMED" && <>
@@ -378,7 +378,7 @@ function AccessCodes({ access, reference, locale, timeZone, t, emergency }: {
   </div>;
 }
 
-function checkInToday(checkIn: NonNullable<PersonalBooking["checkIn"]>, reference: Date) {
+function checkInWithinDay(checkIn: NonNullable<PersonalBooking["checkIn"]>, reference: Date) {
   const opensIn = Date.parse(checkIn.opensAt) - reference.getTime();
   return opensIn > 0 && opensIn < 24 * 60 * 60 * 1000;
 }
