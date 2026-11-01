@@ -1006,8 +1006,8 @@ budgets also survive a restarted login. Every five consecutive failed proofs of 
 second-factor checks, for one minute at first and twice as long after each further run, up to 24
 hours. Only a successful proof or 30 days without a failure reset the count. The first pause of a
 run mails the holder. Enrollment confirmations count separately. Only a completed factor creates an authenticated session,
-records sign-in and establishes recent proof. WebAuthn signature counters cannot decrease; a
-synchronized credential that consistently reports zero remains supported.
+records sign-in and establishes recent proof. A non-zero WebAuthn signature counter must
+increase with every assertion; a synchronized credential that consistently reports zero remains supported.
 
 Initial enrollment requires recent password proof. Later factor changes, recovery-code generation,
 disablement and sensitive actions require recent password plus one existing factor. The proof
