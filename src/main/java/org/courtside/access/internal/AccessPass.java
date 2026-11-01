@@ -289,8 +289,8 @@ class AccessPass {
                 yield new ProbeOutcome.Unreachable("The probe was not sent: " + OCCUPIED);
             }
             case CallRunner.Result.Unclear<ProbeOutcome>(Throwable cause) -> {
-                readings.record(cause == null ? ProbeClassification.TIMEOUT : ProbeClassification.UNREACHABLE,
-                        checkedAt);
+                readings.record(cause == null || cause instanceof LoxoneClient.Late ? ProbeClassification.TIMEOUT
+                        : ProbeClassification.UNREACHABLE, checkedAt);
                 yield new ProbeOutcome.Unreachable("The probe gave no clear answer: " + describe(cause, null));
             }
             default -> {

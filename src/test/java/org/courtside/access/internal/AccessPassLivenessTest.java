@@ -45,6 +45,36 @@ class AccessPassLivenessTest extends AccessPassTestSupport {
     }
 
     @Test
+    void givenAProbeThatEndsAtTheConnectorsOwnDeadline_whenThePassRuns_thenTheReadingIsATimeout() {
+        // given
+        book(courts.get(0));
+        connector.nextProbes(new Step.Fail(new LoxoneClient.Late("getuserlist2")));
+
+        // when
+        PassResult result = pass.runPassNow();
+
+        // then
+        assertThat(result).isEqualTo(new PassResult.Outage());
+        assertThat(readings.latest()).get().extracting(ProbeReadings.Reading::classification)
+                .as("a call the connector ended at its deadline is a timeout, not an unreachable system")
+                .isEqualTo(ProbeClassification.TIMEOUT);
+    }
+
+    @Test
+    void givenAProbeThatFailsOtherwise_whenThePassRuns_thenTheReadingIsUnreachable() {
+        // given
+        book(courts.get(0));
+        connector.nextProbes(new Step.Fail(new LoxoneFailure("getuserlist2 failed: IOException")));
+
+        // when
+        pass.runPassNow();
+
+        // then
+        assertThat(readings.latest()).get().extracting(ProbeReadings.Reading::classification)
+                .isEqualTo(ProbeClassification.UNREACHABLE);
+    }
+
+    @Test
     void givenAConnectorThatLostItsRight_whenItRegainsIt_thenEveryGrantProceedsWithoutPerGrantAction() {
         // given
         UUID first = book(courts.get(0));
