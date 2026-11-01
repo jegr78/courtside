@@ -53,7 +53,7 @@ final class LoxoneClient implements AutoCloseable {
     /** The Miniserver refused the whole connector; a non-null {@code notBefore} is its lock. */
     static final class Refusal extends RuntimeException {
 
-        enum Kind { CREDENTIALS, TOKEN, RIGHT, DENIED, DISABLED, LOCKED }
+        enum Kind { CREDENTIALS, TOKEN, RIGHT, APP_RIGHT, DENIED, DISABLED, LOCKED }
 
         private final Kind kind;
         private final @Nullable Instant notBefore;
@@ -282,6 +282,13 @@ final class LoxoneClient implements AutoCloseable {
             case 200 -> reply;
             case 401 -> throw new Refusal(Refusal.Kind.CREDENTIALS,
                     "Miniserver refused the login of the technical user (" + command + " 401)", null);
+            case 412 -> {
+                if ("getjwt".equals(command)) {
+                    throw new Refusal(Refusal.Kind.APP_RIGHT,
+                            "Miniserver refused a token for the technical user (getjwt 412)", null);
+                }
+                throw new LoxoneFailure(command + " answered 412");
+            }
             case 400 -> throw new LoxoneFailure(command + " answered 400: the Miniserver may require command "
                     + "encryption");
             default -> {

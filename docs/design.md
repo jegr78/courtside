@@ -633,7 +633,8 @@ memory; it serves development, the demo profile and the browser journeys.
 
 `loxone` manages a Loxone Miniserver over HTTPS: the user-management web services and a token with
 the user-management right (0x800) and the right to change codes (0x20) from `getkey2` and `getjwt`; the
-Miniserver refuses `updateuseraccesscode` to a token without 0x20. It reaches the Miniserver by serial through the
+Miniserver answers `getjwt` with 412 for a user whose groups lack the website and apps right, and refuses
+`updateuseraccesscode` to a token without 0x20. It reaches the Miniserver by serial through the
 `getip` answer of `connect.loxonecloud.com`, accepted only under `remcov3.loxonecloud.com` on ports
 20000 to 49000 or under `dyndns.loxonecloud.com` on any port, or at a fixed
 `https://` URL. A failed request forgets the relay address, and the next call asks for it again. Each
