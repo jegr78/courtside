@@ -24,6 +24,15 @@ class AccountSecurityMaintenanceTest {
     }
 
     @Test
+    void givenNoAccountId_whenARecoveryCommandIsParsed_thenTheErrorNamesTheMissingArgument() {
+        // given / when / then
+        assertThatThrownBy(() -> AccountSecurityMaintenance.command(new String[]{
+                "--courtside.maintenance.action=mfa-recover", "--courtside.maintenance.identity-checked=true"}))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("Account recovery requires --courtside.maintenance.account-id");
+    }
+
+    @Test
     void givenMissingOrMalformedArguments_whenParsed_thenTheErrorContainsNoInput() {
         // given / when / then
         assertThatThrownBy(() -> AccountSecurityMaintenance.command(new String[]{

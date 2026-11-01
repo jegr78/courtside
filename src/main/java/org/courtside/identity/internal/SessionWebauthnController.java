@@ -33,7 +33,7 @@ class SessionWebauthnController implements SessionWebauthnApi {
     public ResponseEntity<Void> completeWebauthnLogin(ApiWebAuthnAssertionCredential credential) {
         var result = login.completeWebAuthn(pending(), challenge(), request.getSession(false).getId(),
                 codec.assertion(credential), request.getRemoteAddr());
-        if (result.limited()) throw new PasswordVerificationRateLimitedException();
+        if (result.limit() != null) throw new SecondFactorRateLimitedException(result.limit());
         if (result.authentication() == null) throw new MfaProofFailedException();
         authentication.complete(result.authentication(), request, response);
         return ResponseEntity.ok().build();

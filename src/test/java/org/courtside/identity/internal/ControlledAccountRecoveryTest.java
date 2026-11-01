@@ -540,6 +540,20 @@ class ControlledAccountRecoveryTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenAPasswordOnlyAccount_whenMaintenanceStartsRecovery_thenItIsRefusedWithoutBlockingTheAccount() {
+        // given
+        Person john = people.save(new Person("John", "Roe", "john.roe@example.org"));
+        UserAccount plain = new UserAccount(john, "roe.john", passwords.encode("another-password"), Set.of(Role.MEMBER), "en");
+        plain.enable();
+        UUID id = accounts.save(plain).getId();
+        long epoch = accounts.findById(id).orElseThrow().getSecurityEpoch();
+        // when / then
+        assertThatThrownBy(() -> recovery.initiateFromMaintenance(id, true))
+                .isInstanceOf(MfaRecoveryNotApplicableException.class);
+        assertThat(accounts.findById(id).orElseThrow().getSecurityEpoch()).as("no session is revoked").isEqualTo(epoch);
+    }
+
+    @Test
     void givenFreshMfaAdministrator_whenIdentityWasChecked_thenRecoveryStarts() {
         // given
         authenticate(accounts.findById(account).orElseThrow(), 0);

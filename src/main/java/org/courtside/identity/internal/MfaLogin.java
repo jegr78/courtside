@@ -38,12 +38,10 @@ class MfaLogin {
         if (challenges.attempt(challenge, identity.account(), identity.epoch(),
                 MfaChallenges.Purpose.LOGIN, session).isEmpty()) {
             events.controlRefused(identity.account(), SecurityEventLog.ControlRefusal.MFA_PROOF_FAILED);
-            return new Result(null, false);
+            return new Result(null, null);
         }
         MfaFactors.Verification verified = factors.verify(identity.account(), code, address);
-        if (verified != MfaFactors.Verification.VALID) {
-            return new Result(null, verified == MfaFactors.Verification.LIMITED);
-        }
+        if (!verified.valid()) return new Result(null, verified.limit());
         return finish(pending, challenge);
     }
 
@@ -61,10 +59,13 @@ class MfaLogin {
                            PublicKeyCredential<AuthenticatorAssertionResponse> credential, String address) {
         var identity = pending.getPrincipal();
         var challenge = challenges.attempt(id, identity.account(), identity.epoch(), MfaChallenges.Purpose.LOGIN, session);
-        if (challenge.isEmpty() || challenge.get().payload().isEmpty()) return new Result(null, false);
+        if (challenge.isEmpty() || challenge.get().payload().isEmpty()) {
+            events.controlRefused(identity.account(), SecurityEventLog.ControlRefusal.MFA_PROOF_FAILED);
+            return new Result(null, null);
+        }
         var verified = factors.verifyWebAuthn(identity.account(),
                 codec.decode(challenge.get().payload(), PublicKeyCredentialRequestOptions.class), credential, address);
-        if (verified != MfaFactors.Verification.VALID) return new Result(null, verified == MfaFactors.Verification.LIMITED);
+        if (!verified.valid()) return new Result(null, verified.limit());
         return finish(pending, id);
     }
 
@@ -75,8 +76,8 @@ class MfaLogin {
         if (!user.accountId().equals(identity.account()) || !user.isEnabled() || !user.isCredentialsNonExpired()
                 || user.securityEpoch() != identity.epoch() || !challenges.consume(challenge)) throw new MfaProofFailedException();
         user.eraseCredentials();
-        return new Result(UsernamePasswordAuthenticationToken.authenticated(user, null, user.getAuthorities()), false);
+        return new Result(UsernamePasswordAuthenticationToken.authenticated(user, null, user.getAuthorities()), null);
     }
 
-    record Result(Authentication authentication, boolean limited) { }
+    record Result(Authentication authentication, LoginBlock limit) { }
 }

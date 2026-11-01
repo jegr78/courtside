@@ -36,10 +36,12 @@ public interface AccountSecurityMaintenance {
         if (!"true".equals(value(args, "identity-checked"))) {
             throw new IllegalStateException("Account recovery requires --courtside.maintenance.identity-checked=true");
         }
+        String accountId = value(args, "account-id");
+        if (accountId == null) throw new IllegalStateException("Account recovery requires --courtside.maintenance.account-id");
         UUID account;
         try {
-            account = UUID.fromString(value(args, "account-id"));
-        } catch (IllegalArgumentException | NullPointerException invalid) {
+            account = UUID.fromString(accountId);
+        } catch (IllegalArgumentException invalid) {
             throw new IllegalStateException("Account recovery requires a valid --courtside.maintenance.account-id");
         }
         String emailFile = value(args, "email-file");

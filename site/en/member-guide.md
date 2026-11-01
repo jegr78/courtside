@@ -466,8 +466,8 @@ Select *Codes saved, continue to sign-in* only after you have saved them.
 
 ### Changing or removing factors
 
-Every change to your factors ends all sessions, including the current one. Courtside emails you
-about security-relevant changes. The message names no device and no code.
+Every change to your factors ends all sessions, including the current one. Renaming a device only
+changes its name and keeps your sessions. Courtside emails you about security-relevant changes. The message names no device and no code.
 *Remove authenticator app*, *Remove device* and *Disable two-factor authentication* ask you to
 confirm first. After disabling, only your password protects your account.
 

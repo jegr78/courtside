@@ -1,5 +1,8 @@
 package org.courtside.identity.internal;
 
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import org.courtside.AbstractIntegrationTest;
 import org.courtside.identity.Person;
 import org.courtside.identity.PersonRepository;
@@ -8,6 +11,9 @@ import org.courtside.identity.UserAccount;
 import org.courtside.identity.UserAccountRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -19,8 +25,10 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 import java.time.Clock;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -28,6 +36,7 @@ import static org.springframework.security.test.web.servlet.setup.SecurityMockMv
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -155,7 +164,10 @@ class MfaLoginTest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"code\":\"" + TotpCodes.code(secret, clock.instant()) + "\"}"))
                 .andExpect(status().isTooManyRequests())
-                .andExpect(jsonPath("$.type").value("urn:courtside:error:password-verification-rate-limited"));
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:second-factor-rate-limited"))
+                .andExpect(header().string("Retry-After", "60"))
+                .andExpect(jsonPath("$.violations[0].code").value("identity.mfa.rateLimited"))
+                .andExpect(jsonPath("$.violations[0].params.minutes").value(1));
     }
 
     @Test
@@ -191,6 +203,30 @@ class MfaLoginTest extends AbstractIntegrationTest {
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:reauthentication-failed"));
         assertThat(session.getAttribute("courtside.authenticated-at")).isEqualTo(previous);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", ",\"code\":\"   \""})
+    void givenAStaleTabWithoutASecondFactor_whenReauthenticationIsRepeated_thenNoFactorFailureIsCounted(String code)
+            throws Exception {
+        // given
+        MockHttpSession session = full(enroll());
+        session.setAttribute("courtside.authenticated-at", clock.instant().minusSeconds(360).toEpochMilli());
+        // when
+        for (int attempt = 1; attempt <= 5; attempt++) {
+            String address = "192.0.2." + attempt;
+            mvc.perform(post("/api/session/reauthentication").session(session).with(csrf())
+                            .with(request -> { request.setRemoteAddr(address); return request; })
+                            .contentType(MediaType.APPLICATION_JSON).content("{\"password\":\"correct-horse\"" + code + "}"))
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.type").value("urn:courtside:error:reauthentication-failed"));
+        }
+        // then
+        assertThat(jdbc.sql("SELECT count(*) FROM login_attempt_limit WHERE scope = 'FACTOR'").query(Long.class).single())
+                .as("a request without any second factor is not a failed proof").isZero();
+        assertThat(jdbc.sql("""
+                SELECT count(*) FROM notification WHERE account_id = :id AND kind = 'ACCOUNT_FACTOR_GUESSING_BLOCKED'
+                """).param("id", account).query(Long.class).single()).as("the holder is not told a factor was guessed").isZero();
     }
 
     @Test
@@ -259,7 +295,10 @@ class MfaLoginTest extends AbstractIntegrationTest {
                         .content("{\"password\":\"correct-horse\",\"code\":\""
                                 + TotpCodes.code(secret, clock.instant().plusSeconds(30)) + "\"}"))
                 .andExpect(status().isTooManyRequests())
-                .andExpect(jsonPath("$.type").value("urn:courtside:error:password-verification-rate-limited"));
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:second-factor-rate-limited"))
+                .andExpect(header().string("Retry-After", "60"))
+                .andExpect(jsonPath("$.violations[0].code").value("identity.mfa.rateLimited"))
+                .andExpect(jsonPath("$.violations[0].params.minutes").value(1));
         assertThat(session.getAttribute("courtside.authenticated-at")).isEqualTo(previous);
         assertThat(jdbc.sql("SELECT totp_last_step FROM account_mfa WHERE account_id = :id")
                 .param("id", account).query(Long.class).single()).isEqualTo(consumedStep);
@@ -272,17 +311,41 @@ class MfaLoginTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk()).andReturn().getRequest().getSession(false);
     }
 
-    @Test
-    void givenMfaAndExpiredFullProof_whenChangingThePasswordWithOnlyItsCurrentValue_thenThePasswordStaysUnchanged() throws Exception {
+    @ParameterizedTest
+    @ValueSource(strings = {"correct-horse", "guessed-horse"})
+    void givenMfaAndExpiredFullProof_whenChangingThePasswordWithAnyCurrentValue_thenTheAnswerDoesNotRevealWhetherItMatched(
+            String currentPassword) throws Exception {
         // given
         MockHttpSession session = full(enroll());
         session.setAttribute("courtside.authenticated-at", clock.instant().minusSeconds(360).toEpochMilli());
-        // when / then
-        mvc.perform(put("/api/account/password").session(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"currentPassword\":\"correct-horse\",\"newPassword\":\"durable-pine-forest-2026\"}"))
+        // when
+        List<String> reasons = refusalReasons(() -> mvc.perform(put("/api/account/password").session(session).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"currentPassword\":\"" + currentPassword + "\",\"newPassword\":\"durable-pine-forest-2026\"}"))
                 .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.type").value("urn:courtside:error:recent-authentication-required"));
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:recent-authentication-required")));
+        // then
+        assertThat(reasons).as("an expired proof is refused before the password is compared").doesNotContain("REAUTHENTICATION_FAILED");
         assertThat(passwords.matches("correct-horse", accounts.findById(account).orElseThrow().getPasswordHash())).isTrue();
+    }
+
+    private static List<String> refusalReasons(ThrowingRunnable action) throws Exception {
+        Logger log = (Logger) LoggerFactory.getLogger("org.courtside.security.events");
+        ListAppender<ILoggingEvent> recorded = new ListAppender<>();
+        recorded.start();
+        log.addAppender(recorded);
+        try {
+            action.run();
+        } finally {
+            log.detachAppender(recorded);
+        }
+        return recorded.list.stream().flatMap(event -> event.getKeyValuePairs() == null ? Stream.empty()
+                        : event.getKeyValuePairs().stream())
+                .filter(pair -> pair.key.equals("event.reason")).map(pair -> String.valueOf(pair.value)).toList();
+    }
+
+    private interface ThrowingRunnable {
+        void run() throws Exception;
     }
 
     private byte[] enroll() {

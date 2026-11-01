@@ -57,6 +57,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -115,10 +116,13 @@ class MfaWebAuthnFlowTest extends AbstractIntegrationTest {
         var options = options(pending);
         jdbc.sql("UPDATE mfa_challenge SET expires_at = :now WHERE account_id = :id")
                 .param("now", clock.instant().atOffset(ZoneOffset.UTC)).param("id", account).update();
-        // when / then
-        mvc.perform(post("/api/session/mfa/webauthn").cookie(pending).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+        // when
+        List<String> reasons = securityEventValues("event.reason", () -> mvc.perform(post("/api/session/mfa/webauthn")
+                        .cookie(pending).with(csrf()).contentType(MediaType.APPLICATION_JSON)
                         .content(codec.encode(authenticator.assertion(options, ORIGIN))))
-                .andExpect(status().isForbidden()).andExpect(jsonPath("$.type").value("urn:courtside:error:mfa-proof-failed"));
+                .andExpect(status().isForbidden()).andExpect(jsonPath("$.type").value("urn:courtside:error:mfa-proof-failed")));
+        // then
+        assertThat(reasons).as("a key proof against an expired challenge is audited").containsExactly("MFA_PROOF_FAILED");
         assertThat(credentials.findByCredentialId(authenticator.credentialId()).getSignatureCount()).isZero();
     }
 
@@ -389,6 +393,42 @@ class MfaWebAuthnFlowTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenAUsableLabel_whenTheServiceRenamesAKeyAsTheHolder_thenTheKeyCarriesIt() throws Exception {
+        // given
+        var authenticator = enroll();
+        String id = authenticator.credentialId().toBase64UrlString();
+        // when
+        asHolder(() -> flow.rename(id, "Travel key"));
+        // then
+        assertThat(credentials.findByCredentialId(authenticator.credentialId()).getLabel())
+                .as("the holder context reaches the label guard, so the refusals above are the label's").isEqualTo("Travel key");
+    }
+
+    @Test
+    void givenASignedInHolder_whenRenamingTheirKey_thenTheSessionSurvivesAndOnlyTheRenameIsRecorded() throws Exception {
+        // given
+        var authenticator = enroll();
+        Cookie pending = password(202);
+        Cookie full = prove(pending, authenticator, options(pending));
+        String id = authenticator.credentialId().toBase64UrlString();
+        int notices = securityNotices();
+        // when
+        List<String> actions = credentialActions(() -> mvc.perform(patch("/api/account/mfa/webauthn/credentials/{id}", id)
+                        .cookie(full).with(csrf()).contentType(MediaType.APPLICATION_JSON).content("{\"label\":\"Travel key\"}"))
+                .andExpect(status().is2xxSuccessful()));
+        // then
+        assertThat(actions).as("a rename is audited as its own action").containsExactly("MFA_METHOD_RENAMED");
+        assertThat(credentials.findByCredentialId(authenticator.credentialId()).getLabel()).isEqualTo("Travel key");
+        mvc.perform(get("/api/session").cookie(full)).andExpect(jsonPath("$.authenticated").value(true));
+        assertThat(securityNotices()).as("a rename mails nobody").isEqualTo(notices);
+    }
+
+    private int securityNotices() {
+        return jdbc.sql("SELECT count(*) FROM notification WHERE account_id = :id AND kind = 'ACCOUNT_SECURITY_CHANGED'")
+                .param("id", account).query(Integer.class).single();
+    }
+
+    @Test
     void givenAnotherMembersKey_whenAHolderRenamesOrRemovesIt_thenTheKeyIsAbsentForThemAndUntouched() throws Exception {
         // given
         var authenticator = enroll();
@@ -468,10 +508,13 @@ class MfaWebAuthnFlowTest extends AbstractIntegrationTest {
         var authenticator = enroll();
         Cookie pending = password(202);
         var unbound = codec.decode(codec.encode(webAuthn.authenticationOptions(account)), PublicKeyCredentialRequestOptions.class);
-        // when / then
-        mvc.perform(post("/api/session/mfa/webauthn").cookie(pending).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+        // when
+        List<String> reasons = securityEventValues("event.reason", () -> mvc.perform(post("/api/session/mfa/webauthn")
+                        .cookie(pending).with(csrf()).contentType(MediaType.APPLICATION_JSON)
                         .content(codec.encode(authenticator.assertion(unbound, ORIGIN))))
-                .andExpect(status().isForbidden()).andExpect(jsonPath("$.type").value("urn:courtside:error:mfa-proof-failed"));
+                .andExpect(status().isForbidden()).andExpect(jsonPath("$.type").value("urn:courtside:error:mfa-proof-failed")));
+        // then
+        assertThat(reasons).as("a key proof against a challenge without options is audited").containsExactly("MFA_PROOF_FAILED");
         assertThat(credentials.findByCredentialId(authenticator.credentialId()).getSignatureCount()).isZero();
         mvc.perform(get("/api/session").cookie(pending)).andExpect(jsonPath("$.authenticated").value(false));
     }
@@ -503,7 +546,10 @@ class MfaWebAuthnFlowTest extends AbstractIntegrationTest {
         mvc.perform(post("/api/session/mfa/webauthn").cookie(pending).with(csrf()).contentType(MediaType.APPLICATION_JSON)
                         .content(codec.encode(authenticator.assertion(options, ORIGIN))))
                 .andExpect(status().isTooManyRequests())
-                .andExpect(jsonPath("$.type").value("urn:courtside:error:password-verification-rate-limited"));
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:second-factor-rate-limited"))
+                .andExpect(header().string("Retry-After", "60"))
+                .andExpect(jsonPath("$.violations[0].code").value("identity.mfa.rateLimited"))
+                .andExpect(jsonPath("$.violations[0].params.minutes").value(1));
         assertThat(credentials.findByCredentialId(authenticator.credentialId()).getSignatureCount()).isZero();
         mvc.perform(get("/api/session").cookie(pending)).andExpect(jsonPath("$.authenticated").value(false));
     }
@@ -603,6 +649,10 @@ class MfaWebAuthnFlowTest extends AbstractIntegrationTest {
     }
 
     private static List<String> credentialActions(ThrowingRunnable action) throws Exception {
+        return securityEventValues("event.action", action);
+    }
+
+    private static List<String> securityEventValues(String key, ThrowingRunnable action) throws Exception {
         Logger log = (Logger) LoggerFactory.getLogger("org.courtside.security.events");
         ListAppender<ILoggingEvent> recorded = new ListAppender<>();
         recorded.start();
@@ -614,7 +664,7 @@ class MfaWebAuthnFlowTest extends AbstractIntegrationTest {
         }
         return recorded.list.stream().flatMap(event -> event.getKeyValuePairs() == null ? java.util.stream.Stream.empty()
                         : event.getKeyValuePairs().stream())
-                .filter(pair -> pair.key.equals("event.action")).map(pair -> String.valueOf(pair.value)).toList();
+                .filter(pair -> pair.key.equals(key)).map(pair -> String.valueOf(pair.value)).toList();
     }
 
     private interface ThrowingRunnable {

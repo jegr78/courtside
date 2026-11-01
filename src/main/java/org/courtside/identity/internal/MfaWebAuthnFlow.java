@@ -30,6 +30,7 @@ class MfaWebAuthnFlow {
     private final MfaWebAuthnCredentials credentials;
     private final MfaRecoveryCodeRepository recovery;
     private final LoginAttemptProtection attempts;
+    private final SecurityEventLog securityEvents;
     private final HttpServletRequest request;
 
     @Transactional
@@ -80,7 +81,7 @@ class MfaWebAuthnFlow {
         if (challenge.isEmpty()) return MfaFactors.Verification.INVALID;
         var result = factors.verifyWebAuthn(account.getId(),
                 codec.decode(challenge.get().payload(), PublicKeyCredentialRequestOptions.class), credential, address);
-        if (result == MfaFactors.Verification.VALID && !challenges.consume(id)) throw new MfaProofFailedException();
+        if (result.valid() && !challenges.consume(id)) throw new MfaProofFailedException();
         return result;
     }
 
@@ -102,7 +103,8 @@ class MfaWebAuthnFlow {
             throw new MfaProofFailedException();
         }
         credentials.save(ImmutableCredentialRecord.fromCredentialRecord(ownCredential(account, id)).label(label).build());
-        management.changed(account, SecurityEventLog.CredentialChange.MFA_METHOD_CHANGED);
+        securityEvents.credentialChangedAfterCommit(account.getId(), account.getId(),
+                SecurityEventLog.CredentialChange.MFA_METHOD_RENAMED);
     }
 
     private org.springframework.security.web.webauthn.api.CredentialRecord ownCredential(UserAccount account, String id) {

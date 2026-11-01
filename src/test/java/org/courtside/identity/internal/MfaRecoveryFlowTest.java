@@ -96,6 +96,43 @@ class MfaRecoveryFlowTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenAPasswordOnlyAccount_whenAnAdministratorRequestsRecovery_thenItIsRefusedAndTheHolderStaysSignedIn()
+            throws Exception {
+        // given
+        UUID plain = holder("major.mary", "mary.major@example.org", Role.MEMBER);
+        MockHttpSession holderSession = (MockHttpSession) mvc.perform(post("/api/session").with(csrf())
+                        .param("username", "major.mary").param("password", "previous-password"))
+                .andExpect(status().isOk()).andReturn().getRequest().getSession(false);
+        MockHttpSession session = signIn("doe.jane", adminCodes.getFirst());
+        // when / then
+        mvc.perform(post("/api/admin/accounts/{id}/mfa-recovery", plain).session(session).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"identityChecked\":true}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:mfa-recovery-not-applicable"))
+                .andExpect(jsonPath("$.violations[0].code").value("identity.mfa.recoveryNotApplicable"));
+        mvc.perform(get("/api/session").session(holderSession)).andExpect(jsonPath("$.authenticated").value(true));
+        assertThat(jdbc.sql("SELECT count(*) FROM account_mfa WHERE account_id = :id AND recovery_pending")
+                .param("id", plain).query(Integer.class).single()).as("a password-only account is not blocked").isZero();
+        mvc.perform(post("/api/session").with(csrf()).param("username", "major.mary").param("password", "previous-password"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void givenAPendingRecovery_whenAnAdministratorRequestsItAgain_thenANewRecoveryReplacesIt() throws Exception {
+        // given
+        MockHttpSession session = signIn("doe.jane", adminCodes.getFirst());
+        UUID first = recovery.initiateFromMaintenance(target, true);
+        // when
+        mvc.perform(post("/api/admin/accounts/{id}/mfa-recovery", target).session(session).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"identityChecked\":true}"))
+                .andExpect(status().isAccepted());
+        // then
+        assertThat(jdbc.sql("SELECT recovery_id FROM account_mfa_recovery WHERE account_id = :id")
+                .param("id", target).query(UUID.class).single()).as("the repeated request replaces the pending one")
+                .isNotEqualTo(first);
+    }
+
+    @Test
     void givenAMember_whenReadingAnotherAccountsMfaStatus_thenThePrivateAccountRouteIsRefused() throws Exception {
         // given
         String code = codesFor(target);
