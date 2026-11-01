@@ -5490,7 +5490,9 @@ paths:
       operationId: initiateMfaRecovery
       summary: Block an account and mail a controlled recovery code after an identity check.
       description: Requires an enabled MFA administrator with fresh password and factor proof. Existing methods remain
-        until successful redemption.
+        until successful redemption. An account with no second factor and no pending recovery is refused with `409`
+        and `urn:courtside:error:mfa-recovery-not-applicable`, and nothing about it changes; ordinary password recovery
+        applies to it.
       security:
       - sessionCookie: []
         csrfToken: []
@@ -5512,6 +5514,8 @@ paths:
           description: The account is blocked and a recovery message is queued.
         '400':
           $ref: '#/components/responses/Invalid'
+        '409':
+          $ref: '#/components/responses/Conflict'
         '401':
           $ref: '#/components/responses/Unauthenticated'
         '403':

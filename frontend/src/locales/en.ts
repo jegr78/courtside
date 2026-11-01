@@ -118,6 +118,8 @@ const en: Record<keyof typeof de, string> = {
   "identity.mfa.webauthnLimitReached": "This account already has {{limit}} security keys and passkeys, the most it may hold. Remove one before adding another.",
   "error.type.second-factor-rate-limited": "Too many failed second-factor proofs. Try again later.",
   "identity.mfa.rateLimited": "Too many failed second-factor proofs. Second-factor checks are paused for {{minutes}} min.",
+  "error.type.mfa-recovery-not-applicable": "$t(identity.mfa.recoveryNotApplicable)",
+  "identity.mfa.recoveryNotApplicable": "This account has no second factor. Use ordinary password recovery instead.",
   "identity.reauthentication.required": "Enter your password again before making this security-sensitive change.",
   "identity.credentials.rateLimited": "Credentials were requested for this account {{maxPerWindow}} times within the current limit. Try again later.",
   "auth.expired": "Your session has expired. Please sign in again.",

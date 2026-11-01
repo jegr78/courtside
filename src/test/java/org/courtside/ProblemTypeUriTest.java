@@ -32,6 +32,7 @@ class ProblemTypeUriTest {
             "urn:courtside:error:mfa-resource-not-found",
             "urn:courtside:error:webauthn-credential-limit-reached",
             "urn:courtside:error:second-factor-rate-limited",
+            "urn:courtside:error:mfa-recovery-not-applicable",
             "urn:courtside:error:account-address-missing",
             "urn:courtside:error:account-deactivated",
             "urn:courtside:error:account-recovery-code-expired",

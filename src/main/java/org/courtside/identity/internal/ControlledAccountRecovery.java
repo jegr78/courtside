@@ -80,6 +80,7 @@ class ControlledAccountRecovery implements ControlledRecoveryCodeIssuer {
         UserAccount holder = locked(target);
         String address = holder.getPerson().getEmail();
         if (!holder.isEnabled() || address == null || address.isBlank()) throw new MfaProofFailedException();
+        if (!factors.enabled(target) && !factors.recoveryPending(target)) throw new MfaRecoveryNotApplicableException();
         UUID recoveryId = UUID.randomUUID();
         sessions.revoke(holder);
         accounts.saveAndFlush(holder);

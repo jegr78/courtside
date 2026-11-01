@@ -1020,6 +1020,8 @@ MFA and whether controlled recovery blocks it.
 
 Ordinary password recovery and administrative credential issuance preserve enrolled factors. A
 controlled rescue requires a fresh MFA-authenticated administrator and an explicit identity check.
+It applies only to an account with an enrolled factor or a pending rescue; a password-only account
+is refused unchanged and uses ordinary password recovery.
 It immediately revokes sessions and blocks login, ordinary password recovery and issued credentials.
 Existing factors remain until the holder redeems the single-use code mailed to the account's
 current address together with a new permanent password. Redemption removes all factors, recovery

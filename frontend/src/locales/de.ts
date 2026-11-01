@@ -116,6 +116,8 @@ const de = {
   "identity.mfa.webauthnLimitReached": "Dieses Konto hat schon {{limit}} Sicherheitsschlüssel und Passkeys, mehr sind nicht möglich. Entferne einen, bevor du einen neuen hinzufügst.",
   "error.type.second-factor-rate-limited": "Zu viele fehlgeschlagene Prüfungen des zweiten Faktors. Versuche es später erneut.",
   "identity.mfa.rateLimited": "Zu viele fehlgeschlagene Prüfungen des zweiten Faktors. Die Prüfung ist für {{minutes}} Min. pausiert.",
+  "error.type.mfa-recovery-not-applicable": "$t(identity.mfa.recoveryNotApplicable)",
+  "identity.mfa.recoveryNotApplicable": "Dieses Konto hat keinen zweiten Faktor. Nutze stattdessen die normale Passwort-Wiederherstellung.",
   "identity.reauthentication.required": "Gib dein Passwort erneut ein, bevor du diese sicherheitsrelevante Änderung vornimmst.",
   "identity.credentials.rateLimited": "Für dieses Konto wurden zuletzt schon {{maxPerWindow}} mal Zugangsdaten angefordert. Bitte später erneut versuchen.",
   "auth.expired": "Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.",
