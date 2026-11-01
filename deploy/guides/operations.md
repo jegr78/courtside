@@ -210,8 +210,9 @@ instance on one host. Install it under its own operating-system user with its ow
 so projects, volumes and networks stay apart, and keep it running after logout with
 `loginctl enable-linger`. Only host ports are shared. Give it its own `COURTSIDE_PORT`,
 `COURTSIDE_OPERATIONAL_LOG_PORT` and `COURTSIDE_ACCEPTANCE_MAIL_PORT` in `.env`, in quoted
-`KEY="value"` form, and its own Mailpit certificate directory, because the first one is mode 0700
-and owned by the other user.
+`KEY="value"` form, and its own Mailpit certificate directory in
+`COURTSIDE_ACCEPTANCE_MAIL_CERTIFICATES`, because the first one is mode 0700 and owned by the other
+user.
 
 Behind Tailscale Funnel the node has one serve configuration for every user. Publish the second
 instance on another Funnel port, for example
