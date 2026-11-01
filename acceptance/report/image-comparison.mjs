@@ -26,7 +26,7 @@ function comparison(source, evidence) {
     || typeof capture.locale !== "string" || !capture.locale || capture.locale.length > 128
     || typeof capture.timeZone !== "string" || !capture.timeZone || capture.timeZone.length > 128
     || !finite(capture.scrollX) || !finite(capture.scrollY)
-    || !Array.isArray(record.masks) || record.masks.length === 0 || record.masks.length > 500) throw new Error("Invalid comparison evidence");
+    || !Array.isArray(record.masks) || record.masks.length > 500) throw new Error("Invalid comparison evidence");
   const keys = new Set();
   let area = 0;
   for (const mask of record.masks) {
@@ -55,6 +55,7 @@ export function matchingImages(source, evidence, previous, oldEvidence) {
   if (imageSignature(source) === imageSignature(previous)) return true;
   const now = comparison(source, evidence);
   const before = comparison(previous, oldEvidence);
+  if (now.masks.length === 0 || before.masks.length === 0) return false;
   if (JSON.stringify(now.capture) !== JSON.stringify(before.capture) || now.masks.length !== before.masks.length) return false;
   const rectangles = [];
   for (const [index, mask] of now.masks.entries()) {
