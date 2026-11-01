@@ -61,7 +61,10 @@ class MfaLogin {
                            PublicKeyCredential<AuthenticatorAssertionResponse> credential, String address) {
         var identity = pending.getPrincipal();
         var challenge = challenges.attempt(id, identity.account(), identity.epoch(), MfaChallenges.Purpose.LOGIN, session);
-        if (challenge.isEmpty() || challenge.get().payload().isEmpty()) return new Result(null, false);
+        if (challenge.isEmpty() || challenge.get().payload().isEmpty()) {
+            events.controlRefused(identity.account(), SecurityEventLog.ControlRefusal.MFA_PROOF_FAILED);
+            return new Result(null, false);
+        }
         var verified = factors.verifyWebAuthn(identity.account(),
                 codec.decode(challenge.get().payload(), PublicKeyCredentialRequestOptions.class), credential, address);
         if (verified != MfaFactors.Verification.VALID) return new Result(null, verified == MfaFactors.Verification.LIMITED);

@@ -115,10 +115,13 @@ class MfaWebAuthnFlowTest extends AbstractIntegrationTest {
         var options = options(pending);
         jdbc.sql("UPDATE mfa_challenge SET expires_at = :now WHERE account_id = :id")
                 .param("now", clock.instant().atOffset(ZoneOffset.UTC)).param("id", account).update();
-        // when / then
-        mvc.perform(post("/api/session/mfa/webauthn").cookie(pending).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+        // when
+        List<String> reasons = securityEventValues("event.reason", () -> mvc.perform(post("/api/session/mfa/webauthn")
+                        .cookie(pending).with(csrf()).contentType(MediaType.APPLICATION_JSON)
                         .content(codec.encode(authenticator.assertion(options, ORIGIN))))
-                .andExpect(status().isForbidden()).andExpect(jsonPath("$.type").value("urn:courtside:error:mfa-proof-failed"));
+                .andExpect(status().isForbidden()).andExpect(jsonPath("$.type").value("urn:courtside:error:mfa-proof-failed")));
+        // then
+        assertThat(reasons).as("a key proof against an expired challenge is audited").containsExactly("MFA_PROOF_FAILED");
         assertThat(credentials.findByCredentialId(authenticator.credentialId()).getSignatureCount()).isZero();
     }
 
@@ -468,10 +471,13 @@ class MfaWebAuthnFlowTest extends AbstractIntegrationTest {
         var authenticator = enroll();
         Cookie pending = password(202);
         var unbound = codec.decode(codec.encode(webAuthn.authenticationOptions(account)), PublicKeyCredentialRequestOptions.class);
-        // when / then
-        mvc.perform(post("/api/session/mfa/webauthn").cookie(pending).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+        // when
+        List<String> reasons = securityEventValues("event.reason", () -> mvc.perform(post("/api/session/mfa/webauthn")
+                        .cookie(pending).with(csrf()).contentType(MediaType.APPLICATION_JSON)
                         .content(codec.encode(authenticator.assertion(unbound, ORIGIN))))
-                .andExpect(status().isForbidden()).andExpect(jsonPath("$.type").value("urn:courtside:error:mfa-proof-failed"));
+                .andExpect(status().isForbidden()).andExpect(jsonPath("$.type").value("urn:courtside:error:mfa-proof-failed")));
+        // then
+        assertThat(reasons).as("a key proof against a challenge without options is audited").containsExactly("MFA_PROOF_FAILED");
         assertThat(credentials.findByCredentialId(authenticator.credentialId()).getSignatureCount()).isZero();
         mvc.perform(get("/api/session").cookie(pending)).andExpect(jsonPath("$.authenticated").value(false));
     }
@@ -603,6 +609,10 @@ class MfaWebAuthnFlowTest extends AbstractIntegrationTest {
     }
 
     private static List<String> credentialActions(ThrowingRunnable action) throws Exception {
+        return securityEventValues("event.action", action);
+    }
+
+    private static List<String> securityEventValues(String key, ThrowingRunnable action) throws Exception {
         Logger log = (Logger) LoggerFactory.getLogger("org.courtside.security.events");
         ListAppender<ILoggingEvent> recorded = new ListAppender<>();
         recorded.start();
@@ -614,7 +624,7 @@ class MfaWebAuthnFlowTest extends AbstractIntegrationTest {
         }
         return recorded.list.stream().flatMap(event -> event.getKeyValuePairs() == null ? java.util.stream.Stream.empty()
                         : event.getKeyValuePairs().stream())
-                .filter(pair -> pair.key.equals("event.action")).map(pair -> String.valueOf(pair.value)).toList();
+                .filter(pair -> pair.key.equals(key)).map(pair -> String.valueOf(pair.value)).toList();
     }
 
     private interface ThrowingRunnable {
