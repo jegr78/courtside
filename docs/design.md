@@ -687,7 +687,8 @@ disposable run governs the pass too. A pass has three steps:
    whose start lies within the booking horizon, the longest `ADVANCE_WINDOW` of any rule set or 14
    days without one, and whose window has not ended. A distant series occurrence waits until it
    enters the horizon. A failure in this step is logged and the pass still acts and releases.
-2. It reads the ids of every open row once, revocations first, and visits each at most once. In the
+2. It reads the ids of every open row once, rows that may hold something remote first and among them
+   those no longer wanted, and visits each at most once. In the
    row's locked transaction it derives the demand again, draws a code when the grant is wanted and
    has none, and decides the action: `grant` while nothing is installed for sure, `reschedule` when
    the installation differs from what is wanted in window, access points or mapping, `revoke` when

@@ -1,6 +1,7 @@
 package org.courtside.access.internal;
 
 import org.courtside.access.GrantOutcome;
+import org.courtside.access.Scope;
 import org.courtside.access.internal.ScriptedAccessControl.Call;
 import org.courtside.access.internal.ScriptedAccessControl.Kind;
 import org.courtside.access.internal.ScriptedAccessControl.Step;
@@ -50,17 +51,22 @@ class AccessPassDemandTest extends AccessPassTestSupport {
     @Test
     void givenABookingCancelledAfterThePassReadItsRows_whenItsRowIsVisited_thenItIsRevokedInThatPass() {
         // given
-        UUID cancelled = book(courts.get(0));
+        UUID pending = book(courts.get(0));
+        UUID cancelled = book(courts.get(1));
         pass.runPassNow();
-        book(courts.get(1));
-        connector.nextInstalls(new Step.Then(() -> cancel(cancelled),
+        cancel(pending);
+        connector.nextRevokes(new Step.Answer(new GrantOutcome.Refused(Scope.GRANT, "user locked")));
+        passAt(LATER);
+        connector.nextRevokes(new Step.Then(() -> cancel(cancelled),
                 new Step.Answer(new GrantOutcome.Accepted("remote-user"))));
 
         // when
-        passAt(LATER);
+        passAt(LATER.plus(Duration.ofMinutes(1)));
 
         // then
-        assertThat(connector.calls(Kind.REVOKE)).extracting(Call::grantId).containsExactly(grantIdOf(cancelled));
+        assertThat(connector.calls(Kind.REVOKE)).extracting(Call::grantId)
+                .as("the pending revoke runs first and cancels the other booking during its call")
+                .containsExactly(grantIdOf(pending), grantIdOf(pending), grantIdOf(cancelled));
         assertThat(grantOf(cancelled).getRemote()).isEqualTo(RemoteState.NONE);
     }
 

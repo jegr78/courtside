@@ -66,6 +66,26 @@ class AccessPassMechanicsTest extends AccessPassTestSupport {
     }
 
     @Test
+    void givenAnInstalledGrantWhoseBookingWasJustCancelled_whenANewBookingArrivesInTheSamePass_thenItsRevokeRunsFirst() {
+        // given
+        UUID cancelled = book(courts.get(0));
+        pass.runPassNow();
+        cancel(cancelled);
+        book(courts.get(1));
+        int callsBefore = connector.calls().size();
+
+        // when
+        passAt(START.plus(Duration.ofMinutes(1)));
+
+        // then
+        assertThat(connector.calls().subList(callsBefore, connector.calls().size()))
+                .extracting(ScriptedAccessControl.Call::kind)
+                .as("a cancellation's revoke never waits behind new installs")
+                .containsExactly(Kind.PROBE, Kind.REVOKE, Kind.GRANT);
+        assertThat(grantOf(cancelled).getRemote()).isEqualTo(RemoteState.NONE);
+    }
+
+    @Test
     void givenMoreBookingsThanOneInsertPage_whenThePassInsertsThem_thenEveryBookingGetsItsGrant() {
         // given
         book(courts.get(0));
