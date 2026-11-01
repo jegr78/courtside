@@ -155,17 +155,19 @@ it("given an administrative page shorter than the window, when it is shown, then
 });
 
 it.each([
-  [50, 80, 50],
-  [150, 180, 100]
-])("given an active entry at %s pixels, when navigation resizes, then the frame scrolls only as far as needed", async (top, bottom, expected) => {
+  [3, 3 * 32],
+  [8, 6 * 32]
+])("given the frame placed for a later entry, when entry %s becomes active and navigation resizes, then the frame scrolls only as far as needed", async (index, expected) => {
   // given
   show("/admin/facility");
   const body = screen.getByTestId("admin-navigation-scroll");
-  const active = screen.getByTestId("admin-courts-link");
-  active.setAttribute("aria-current", "page");
-  vi.spyOn(body, "getBoundingClientRect").mockReturnValue({ top: 100, bottom: 300 } as DOMRect);
-  vi.spyOn(active, "getBoundingClientRect").mockReturnValue({ top, bottom } as DOMRect);
-  body.scrollTop = 100;
+  const entries = [...body.querySelectorAll<HTMLElement>("a, p")];
+  entries[11].setAttribute("aria-current", "page");
+  layOut(body, { top: 100, height: 200 }, entries.length * 32);
+  await act(() => window.dispatchEvent(new Event("resize")));
+  expect(body.scrollTop).toBe(6 * 32);
+  entries[11].removeAttribute("aria-current");
+  entries[index].setAttribute("aria-current", "page");
   // when
   await act(() => window.dispatchEvent(new Event("resize")));
   // then
@@ -295,4 +297,21 @@ it("given navigation following its active entry, when growing content clamps its
     vi.unstubAllGlobals();
     vi.useRealTimers();
   }
+});
+
+it("given navigation following its active entry, when the window resizes before the member's scroll event arrives, then layout keeps that position", () => {
+  // given
+  show("/admin/facility");
+  const body = screen.getByTestId("admin-navigation-scroll");
+  const entries = [...body.querySelectorAll<HTMLElement>("a, p")];
+  entries[11].setAttribute("aria-current", "page");
+  layOut(body, { top: 100, height: 200 }, entries.length * 32);
+  act(() => { window.dispatchEvent(new Event("resize")); });
+  expect(body.scrollTop).toBeGreaterThan(0);
+  // when
+  body.scrollTop = 0;
+  act(() => { window.dispatchEvent(new Event("resize")); });
+  // then
+  expect(body.scrollTop, "a window resize must not undo scrolling before the scroll event is delivered").toBe(0);
+  expect(screen.queryByTestId("admin-sidebar-precedes")).not.toBeInTheDocument();
 });

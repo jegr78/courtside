@@ -241,6 +241,23 @@ test("given a previous run directory that does not exist, when the report compar
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+test("given a page without run-data masks, when its pixels change, then the sheet is listed as changed without a comparison failure", { skip }, () => {
+  // given
+  const root = mkdtempSync(join(tmpdir(), "sheet-inheritance-no-masks-"));
+  const unmasked = (record) => { record.masks = []; return record; };
+  try {
+    const previous = maskedRun(root, "previous", "time", "12:34", { mutate: unmasked }); reviewRun(previous);
+    const next = maskedRun(root, "current", "time", "12:35", { mutate: unmasked });
+    const name = next.sheets.names[0];
+    // when
+    const result = report(next, previous);
+    // then
+    assert.equal(result.status, "draft", "changed pixels without masks still need a fresh reading");
+    assert.deepEqual(result.changedSheets.changed, [name], "the sheet is reported as changed");
+    assert.deepEqual(result.changedSheets.unverifiable, {}, "a page without run data is comparable evidence, not invalid evidence");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test("given valid run-data masks and an unmasked defect, when the report compares native pixels, then it refuses inheritance", { skip }, () => {
   // given
   const root = mkdtempSync(join(tmpdir(), "sheet-inheritance-unmasked-defect-"));

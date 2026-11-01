@@ -47,11 +47,11 @@ export function useScrollContinuation(active = true, destination?: string) {
     laidOut.current = resized;
     layout();
     const disconnect = observeResize(resized, [body.current, body.current?.parentElement ?? null, content.current]);
-    window.addEventListener("resize", layout);
+    window.addEventListener("resize", resized);
     return () => {
       laidOut.current = undefined;
       disconnect();
-      window.removeEventListener("resize", layout);
+      window.removeEventListener("resize", resized);
     };
   }, [active, destination, measure]);
 

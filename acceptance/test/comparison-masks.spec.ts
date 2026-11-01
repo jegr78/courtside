@@ -8,6 +8,7 @@ type MaskRectangle = { x: number; y: number; width: number; height: number };
 
 const font = readFileSync(new URL("../../frontend/node_modules/@fontsource-variable/geist-mono/files/geist-mono-latin-wght-normal.woff2", import.meta.url)).toString("base64");
 const appStyles = readFileSync(new URL("../../frontend/src/styles.css", import.meta.url), "utf8");
+const fixtures: Record<string, string> = { chromium: "desktop", "chromium-comparison-dense": "phone", "webkit-comparison": "webkit", "firefox-comparison": "firefox" };
 const body = readFileSync(new URL("./fixtures/comparison/page.html", import.meta.url), "utf8")
   .replace("__FONT__", font).replace("__APP_STYLES__", appStyles);
 
@@ -21,6 +22,7 @@ test("given native screenshots with five kinds of run data, when capture records
     await document.fonts.ready;
   });
   const records = [];
+  const produced: [string, Buffer][] = [];
   // when
   for (const label of ["previous", "current"]) {
     if (label === "current") await page.evaluate(() => {
@@ -79,12 +81,18 @@ test("given native screenshots with five kinds of run data, when capture records
         expect(evidence.masks.filter((mask: { kind: string; rects: MaskRectangle[] }) => mask.kind === "count").some((mask: { rects: MaskRectangle[] }) => mask.rects.some((rect) => rect.y >= figure!.y && rect.y < figure!.y + figure!.height)), "usage metrics keep their bounded changing-number mask").toBe(true);
       }
       if (suffix === "-full") expect(evidence.masks.filter((mask: { key: string }) => mask.key.includes("/localized-input:")), "application text date and time fields produce bounded masks beside styled checkboxes").toHaveLength(2);
-      copyFileSync(source, info.outputPath(`${label}${suffix}.png`));
-      copyFileSync(source.replace(/\.png$/, ".comparison.json"), info.outputPath(`${label}${suffix}.comparison.json`));
+      for (const extension of [".png", ".comparison.json"]) {
+        copyFileSync(source.replace(/\.png$/, extension), info.outputPath(`${label}${suffix}${extension}`));
+        produced.push([`${label}${suffix}${extension}`, readFileSync(source.replace(/\.png$/, extension))]);
+      }
     }
     records.push(record);
   }
   expect(records[0].capture).toEqual(records[1].capture);
+  for (const [name, bytes] of produced) {
+    const committed = readFileSync(new URL(`./fixtures/comparison/${fixtures[info.project.name]}/${name}`, import.meta.url));
+    expect(bytes.equals(committed), `the committed ${fixtures[info.project.name]}/${name} fixture is this producer's current output`).toBe(true);
+  }
 });
 
 test("given clipped date text and a fixed unread count, when comparison geometry is collected, then clipped pixels and uncertain full-page positions remain unmasked", async ({ page }) => {
