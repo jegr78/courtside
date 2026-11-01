@@ -725,6 +725,8 @@ test("given successful PostgreSQL and mail preparation, when activation fails, t
     const selected = readFileSync(join(context.target, "config", ".env"), "utf8");
     assert.match(selected, /^COURTSIDE_DATABASE_VOLUME="example-club_db-pg18-0\.1\.1"$/m);
     assert.match(selected, /^COURTSIDE_MAIL_CONFIG_VOLUME="example-club_mail-config-stalwart1-[a-f0-9]+"$/m);
+    assert.match(readFileSync(join(context.target, ".courtside-mail-transition", "target.env"), "utf8"),
+      /^COURTSIDE_DATABASE_VOLUME="example-club_db-pg18-0\.1\.1"$/m, "the mail candidate must render the target database volume");
     assert.match(readFileSync(join(context.target, "config", "installation.conf"), "utf8"), /^release=0\.1\.1$/m);
     assert.doesNotMatch(readFileSync(context.dockerLog, "utf8"), /volume rm example-club_(db-pg18|mail-)/);
   });

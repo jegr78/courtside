@@ -96,7 +96,7 @@ begin_mail_store_transition() {
   } > "$mail_journal/state"
   chmod 600 "$mail_journal/state"
   mail_transition_phase preparing
-  write_updated_environment "$mail_journal/target.env" "$digest" "" "$target_mail_config_volume" "$target_mail_data_volume"
+  write_updated_environment "$mail_journal/target.env" "$digest" "$target_database_volume" "$target_mail_config_volume" "$target_mail_data_volume"
   cp "$mail_journal/target.env" "$mail_journal/setup.env"
   environment_line COURTSIDE_MAIL_RECOVERY_ADMIN \
     "admin:$(environment_value "$mail_journal/target.env" COURTSIDE_MAIL_SETUP_PASSWORD)" >> "$mail_journal/setup.env"
