@@ -107,6 +107,31 @@ test("given the reference deployment, when a variable is read, then it is docume
     }
   });
 
+test("given the application's settings, when the reference deployment starts it, then Compose passes each with the same default",
+  () => {
+    // given
+    const developmentOnly = new Set(["COURTSIDE_CLOCK_FIXED_INSTANT", "COURTSIDE_PASSWORD_BREACH_ENDPOINT"]);
+    const applicationDefaults = new Map([...properties.matchAll(/\$\{(COURTSIDE_[A-Z0-9_]+):([^}]*)\}/g)]
+      .map((match) => [match[1], match[2]]));
+    const composeDefaults = new Map([...compose.matchAll(/\$\{(COURTSIDE_[A-Z0-9_]+):-([^}]*)\}/g)]
+      .map((match) => [match[1], match[2]]));
+    const interpolated = named(compose, /\$\{(COURTSIDE_[A-Z0-9_]+)/g);
+    const fixedByAComposeFile = named(compose, /^\s+(COURTSIDE_[A-Z0-9_]+):/gm);
+
+    // when
+    const unpassed = [...applicationDefaults.keys()]
+      .filter((variable) => !developmentOnly.has(variable) && !interpolated.has(variable)
+        && !fixedByAComposeFile.has(variable));
+    const diverging = [...applicationDefaults].filter(([variable, fallback]) => composeDefaults.has(variable)
+      && fallback !== "" && !fallback.startsWith("@") && composeDefaults.get(variable) !== fallback)
+      .map(([variable]) => variable);
+
+    // then
+    assert.deepEqual(unpassed, [], "application.yaml reads these and no operator-facing Compose file passes them, "
+      + "so a club cannot set them from .env");
+    assert.deepEqual(diverging, [], "Compose overrides these application defaults, so a club that leaves them out of .env gets another value");
+  });
+
 test("given a certificate container, when it announces a state, then the documentation explains it",
   () => {
     // given / when / then
