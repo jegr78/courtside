@@ -120,7 +120,9 @@ export function sheetSection(sheets, changes) {
   if (!sheets) return "";
   const comparison = !changes ? ""
     : changes.unavailable ? `<p>Comparison with the previous run unavailable: ${esc(changes.unavailable)}.</p>`
-      : `<p>Against the previous run: ${changes.changed.length} changed, ${changes.added.length} new, ${changes.unchanged} unchanged. Changed sheets and previous findings need a fresh reading.</p>
+      : `<p>${changes.unmasked
+        ? `Compared unmasked with the previous run, which lacks sheet evidence: ${changes.changed.length} differing in at least one pixel, run data included, ${changes.added.length} new, ${changes.unchanged} identical. This marks sheets for a fresh reading and is no evidence of how much changed.`
+        : `Against the previous run: ${changes.changed.length} changed, ${changes.added.length} new, ${changes.unchanged} unchanged. Changed sheets and previous findings need a fresh reading.`}</p>
 ${changes.changed.length ? `<details><summary>Changed sheets</summary><ul>${changes.changed.map((name) => `<li><code>${esc(name)}</code>${changes.unverifiable?.[name] ? ` not comparable: ${esc(changes.unverifiable[name])}` : ""}</li>`).join("")}</ul></details>` : ""}
 ${changes.added.length ? `<details><summary>New sheets</summary><ul>${names(changes.added)}</ul></details>` : ""}`;
   return `<section><h2>Contact sheet review</h2>

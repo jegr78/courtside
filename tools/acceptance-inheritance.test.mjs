@@ -402,6 +402,24 @@ test("given clean images but no compatible predecessor manifest, when the report
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+test("given a predecessor without sheet evidence and differing run data, when reported, then the unmasked comparison is not presented as the amount of change", { skip }, () => {
+  // given
+  const root = mkdtempSync(join(tmpdir(), "sheet-inheritance-unmasked-"));
+  try {
+    const previous = makeRun(root, "previous", { runText: "Run 20300311T090000Z" }); reviewRun(previous);
+    const current = makeRun(root, "current", { runText: "Run 20300318T090000Z" });
+    rmSync(join(previous.run, "sheet-evidence.json"));
+    // when
+    const result = report(current, previous);
+    // then
+    assert.deepEqual(result.changedSheets.changed, current.sheets.names, "the whole-sheet signature counts run data as a change");
+    const html = readFileSync(join(current.run, "report", "index.html"), "utf8");
+    assert.match(html, /Compared unmasked with the previous run, which lacks sheet evidence: 1 differing in at least one pixel, run data included/);
+    assert.match(html, /no evidence of how much changed/);
+    assert.doesNotMatch(html, /Against the previous run:/, "an unmasked comparison does not use the masked comparison's wording");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test("given a report compares itself, when it has no manual verdict, then its own pixels cannot create inherited approval", { skip }, () => {
   // given
   const root = mkdtempSync(join(tmpdir(), "sheet-inheritance-self-"));

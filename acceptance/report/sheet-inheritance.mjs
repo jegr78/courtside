@@ -117,7 +117,7 @@ export function inheritSheetVerdicts(run, previous, sheets, review) {
         : `Previous review or screenshot evidence is missing or invalid: ${withinRuns(failure.message, run, previous)}`;
       try {
         const fallback = sheetChanges(run, previous);
-        changes = fallback.unavailable ? { unavailable: reason } : { ...fallback, inheritanceUnavailable: reason };
+        changes = fallback.unavailable ? { unavailable: reason } : { ...fallback, unmasked: true, inheritanceUnavailable: reason };
       } catch { changes = { unavailable: reason }; }
     }
   }
