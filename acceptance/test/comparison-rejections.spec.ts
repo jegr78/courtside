@@ -58,6 +58,7 @@ for (const fixture of cases) {
     });
     const images: Buffer[] = [];
     const records: { masks: unknown[] }[] = [];
+    const produced: [string, Buffer][] = [];
     // when
     for (const label of ["previous", "current"] as const) {
       if (label === "current") {
@@ -72,6 +73,7 @@ for (const fixture of cases) {
       for (const suffix of ["", "-full"]) for (const extension of [".png", ".comparison.json"]) {
         const source = metric.shot.replace(/\.png$/, `${suffix}${extension}`);
         copyFileSync(source, info.outputPath(`${fixture.key}-${label}${suffix}${extension}`));
+        produced.push([`${label}${suffix}${extension}`, readFileSync(source)]);
         if (extension === ".comparison.json") records.push(JSON.parse(readFileSync(source, "utf8")));
       }
       images.push(readFileSync(metric.shot));
@@ -79,6 +81,10 @@ for (const fixture of cases) {
     // then
     await expect(page.getByTestId("rejection-value")).toHaveText(fixture.current);
     expect(images[0].equals(images[1]), "the native pair includes the actual changed text or badge pixels").toBe(false);
+    for (const [name, bytes] of produced) {
+      const committed = readFileSync(new URL(`./fixtures/comparison/rejections/${fixture.key}/${name}`, import.meta.url));
+      expect(bytes.equals(committed), `the committed rejections/${fixture.key}/${name} fixture is this producer's current output`).toBe(true);
+    }
     if (["overlay", "welcome", "pseudo", "numeric-label", "date-label", "numeric-heading", "statistics-label", "unscoped-date"].includes(fixture.key)) for (const record of records) {
       expect(record.masks, "static welcome text and partially covered dates remain unmasked in both image modes").toHaveLength(0);
     }

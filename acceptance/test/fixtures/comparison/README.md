@@ -6,6 +6,7 @@ The previous and current pages differ only in a formatted date, time, unread cou
 checked checkbox/radio controls. Static labels and the raw ISO timestamp stay unchanged. `tools/acceptance-inheritance.test.mjs` passes these exact producer bytes through contact sheet generation, pixel comparison and report rendering.
 
 To regenerate them, run only `comparison-masks.spec.ts` in the pinned browser image with projects `chromium`, `chromium-comparison-dense`, `webkit-comparison` and `firefox-comparison`. Copy each project's `previous` and `current` viewport/full-page PNGs and `.comparison.json` files from its test output into the matching fixture directory. Keep image bytes and metadata together. Comparison records use protocol version 3.
+Both specs compare every committed PNG and comparison record byte for byte with the producer's fresh output. After a producer change the self-test fails on the stale files, and the fresh ones are already in its test output to copy here before the rerun.
 
 The `comparison-rejections.spec.ts` Chromium cases generate the `rejections/` pairs. They preserve
 changed adjacent static text, overlays, ordinary welcome text, date formatting, ancestor backgrounds
