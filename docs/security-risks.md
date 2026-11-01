@@ -128,7 +128,10 @@ until the board changes it at the keypad and in Courtside. Asking needs a signed
 part in such a booking. The audit log records each answer with the account, the booking and the
 access point, never the code, so a board can see who learned it; Courtside does not rotate it, limit
 how often it is asked for or alert anybody. `access_point.emergency_code` is stored in clear, like a
-static code. Reconsider if a club needs the emergency path to stop working for one member, which only
+static code. Courtside refuses an emergency or static code that equals a dynamic code a door may
+still accept, so a board member who enters codes on the access points page learns that a number is
+issued to some booking, though not to which one; trying numbers that way needs the admin role and one
+request per number. Reconsider if a club needs the emergency path to stop working for one member, which only
 a per-booking fallback code can do, or if the audit shows the code asked for without a failing grant.
 
 ## The occupancy key travels in the query string

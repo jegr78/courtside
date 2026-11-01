@@ -1,6 +1,7 @@
 package org.courtside.access.internal;
 
 import org.courtside.config.AccessCodeLength;
+import org.courtside.facility.DynamicAccessCodes;
 import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -14,7 +15,7 @@ import java.util.UUID;
 import java.util.random.RandomGenerator;
 
 @Component
-class AccessCodes {
+class AccessCodes implements DynamicAccessCodes {
 
     static final int DRAWS = 20;
 
@@ -50,6 +51,18 @@ class AccessCodes {
             }
         }
         throw new NoFreeAccessCodeException(length.digits(), DRAWS);
+    }
+
+    @Override
+    public boolean holds(String code) {
+        if (code == null) {
+            throw new IllegalStateException("A held code is looked up by its digits");
+        }
+        return jdbc.sql("""
+                        SELECT EXISTS (SELECT 1 FROM access_code
+                                       WHERE code = :code AND (grant_id IS NOT NULL OR until > now()))
+                        """)
+                .param("code", code).query(Boolean.class).single();
     }
 
     Optional<String> currentCode(UUID grantId) {

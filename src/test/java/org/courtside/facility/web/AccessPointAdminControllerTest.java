@@ -2,6 +2,7 @@ package org.courtside.facility.web;
 
 import com.jayway.jsonpath.JsonPath;
 import org.courtside.AbstractIntegrationTest;
+import org.courtside.access.testfixture.AccessTestFixture;
 import org.courtside.config.testfixture.ConfigTestFixture;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.junit.jupiter.api.BeforeEach;
@@ -16,6 +17,8 @@ import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 
 import static org.hamcrest.Matchers.containsInAnyOrder;
@@ -33,7 +36,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WithMockUser(username = "admin", roles = "ADMIN")
-@Import({FacilityTestFixture.class, ConfigTestFixture.class})
+@Import({FacilityTestFixture.class, ConfigTestFixture.class, AccessTestFixture.class})
 class AccessPointAdminControllerTest extends AbstractIntegrationTest {
 
     @Autowired
@@ -44,6 +47,9 @@ class AccessPointAdminControllerTest extends AbstractIntegrationTest {
 
     @Autowired
     private ConfigTestFixture config;
+
+    @Autowired
+    private AccessTestFixture access;
 
     private MockMvc mockMvc;
     private UUID courtOne;
@@ -329,6 +335,38 @@ class AccessPointAdminControllerTest extends AbstractIntegrationTest {
                 """)
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.violations[0].code").value("facility.accessPoint.emergencyCodeCollides"))
+                .andExpect(jsonPath("$.violations[0].params.field").value("staticCode"));
+    }
+
+    @Test
+    void givenADynamicCodeADoorMayStillAccept_whenAnEmergencyCodeRepeatsIt_thenItIsRefusedWithoutEchoingTheCode()
+            throws Exception {
+        // given
+        access.holdReleasedCode("975310", Instant.now().plus(1, ChronoUnit.HOURS));
+
+        // when / then
+        create("""
+                {"name": "North gate", "courtIds": [], "emergencyCode": "975310"}
+                """)
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:access-point-rejected"))
+                .andExpect(jsonPath("$.violations[0].code").value("facility.accessPoint.codeIssued"))
+                .andExpect(jsonPath("$.violations[0].params.field").value("emergencyCode"))
+                .andExpect(content().string(not(containsString("975310"))));
+    }
+
+    @Test
+    void givenADynamicCodeADoorMayStillAccept_whenAChangedStaticCodeRepeatsIt_thenItIsRefused() throws Exception {
+        // given
+        String id = createdId("Clubhouse door", courtTwo, "123456");
+        access.holdReleasedCode("246802", Instant.now().plus(1, ChronoUnit.HOURS));
+
+        // when / then
+        change(id, """
+                {"name": "Clubhouse door", "courtIds": ["%s"], "staticCode": "246802"}
+                """.formatted(courtTwo))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.violations[0].code").value("facility.accessPoint.codeIssued"))
                 .andExpect(jsonPath("$.violations[0].params.field").value("staticCode"));
     }
 

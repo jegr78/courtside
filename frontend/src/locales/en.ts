@@ -380,6 +380,7 @@ const en: Record<keyof typeof de, string> = {
   "facility.accessPoint.openToMembersNeedsCode": "A door open to every member needs an access code.",
   "facility.accessPoint.emergencyCodeNeedsDynamicCodes": "Only an access point without an access code keeps an emergency code.",
   "facility.accessPoint.emergencyCodeCollides": "An emergency code differs from every access code.",
+  "facility.accessPoint.codeIssued": "This code is currently issued to a booking. Choose another one.",
   "access.grant.notFound": "This access grant no longer exists. Reload the page.",
   "access.grant.notFailing": "Only a failing access grant can be sent again. Reload the page to see its state.",
   "access.control.notConnected": "No access-control system is connected, so there is nothing to check.",

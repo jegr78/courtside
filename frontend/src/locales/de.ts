@@ -378,6 +378,7 @@ const de = {
   "facility.accessPoint.openToMembersNeedsCode": "Eine Tür für alle Mitglieder braucht einen Zugangscode.",
   "facility.accessPoint.emergencyCodeNeedsDynamicCodes": "Nur ein Zugang ohne Zugangscode hat einen Notfallcode.",
   "facility.accessPoint.emergencyCodeCollides": "Ein Notfallcode unterscheidet sich von jedem Zugangscode.",
+  "facility.accessPoint.codeIssued": "Dieser Code ist gerade einer Buchung zugeteilt. Wähle einen anderen.",
   "access.grant.notFound": "Diese Zugangsberechtigung gibt es nicht mehr. Lade die Seite neu.",
   "access.grant.notFailing": "Nur eine gescheiterte Zugangsberechtigung lässt sich erneut senden. Lade die Seite neu, um ihren Stand zu sehen.",
   "access.control.notConnected": "Kein Zutrittssystem ist angebunden, deshalb gibt es nichts zu prüfen.",

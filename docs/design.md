@@ -598,8 +598,10 @@ keypad for the case that a booking's own code is missing or does not work. It fo
 code's length rule, differs from every static code and is refused beside a static code with
 `facility.accessPoint.emergencyCodeNeedsDynamicCodes` before
 `access_point_emergency_code_without_static_code` would; a static code that equals another point's
-emergency code, or the reverse, is refused with `facility.accessPoint.emergencyCodeCollides`. No
-message carries it. `POST /api/my/bookings/{id}/emergency-code` and
+emergency code, or the reverse, is refused with `facility.accessPoint.emergencyCodeCollides`. A new
+static or emergency code that equals a dynamic code a door may still accept, drawn or released and not
+yet expired in `access_code`, is refused with `facility.accessPoint.codeIssued`, which the access
+module answers through the facility port `DynamicAccessCodes`. No message carries it. `POST /api/my/bookings/{id}/emergency-code` and
 `POST /api/my/participations/{id}/emergency-code` answer the emergency codes of the booking's dynamic
 access points to its booker and players from the start of its window to its end; anybody else, a
 request outside the window and a booking without such a code answer `409
