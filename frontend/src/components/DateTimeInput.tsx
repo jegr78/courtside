@@ -18,6 +18,7 @@ export function DateTimeInput({ type, value, defaultValue, emptyHint, onValueCha
   const hintId = useId();
   const formatId = useId();
   const errorId = useId();
+  const fieldId = useId();
   const input = useRef<HTMLInputElement>(null);
   const [flagged, setFlagged] = useState(false);
   const initial = String(value ?? defaultValue ?? "");
@@ -78,7 +79,7 @@ export function DateTimeInput({ type, value, defaultValue, emptyHint, onValueCha
   const testId = props["data-testid"];
   return <span className="grid min-w-0 gap-1">
     <span className="date-time-field">
-      <input {...props} ref={input} type="text"
+      <input {...props} id={props.id ?? fieldId} ref={input} type="text"
         autoCapitalize="off" spellCheck={false} value={state.draft} placeholder={example}
         data-date-time-type={type} data-empty={empty ? "true" : undefined} {...{ [UNPARSED]: unparsed ? "true" : undefined }}
         aria-invalid={shown || undefined}
