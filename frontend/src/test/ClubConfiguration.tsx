@@ -13,5 +13,5 @@ const exampleClub: ClubConfig = {
 };
 
 export function WithClubConfiguration({ club = exampleClub, children }: { club?: ClubConfig; children: ReactNode }) {
-  return <ClubConfigurationContext value={{ club, changed: () => undefined, load: () => undefined }}>{children}</ClubConfigurationContext>;
+  return <ClubConfigurationContext value={{ club, changed: () => undefined, load: () => undefined, refresh: () => undefined }}>{children}</ClubConfigurationContext>;
 }

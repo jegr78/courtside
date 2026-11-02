@@ -28,6 +28,13 @@ export function ClubConfigurationProvider({ children }: { children: ReactNode })
       });
   }, []);
 
+  // An administration page reports the stored logo, while the header reads the server's smaller variant.
+  const refresh = useCallback(() => {
+    void api.config()
+      .then((value) => setClub((current) => current ? { ...current, logoUrl: value.logoUrl } : value))
+      .catch(() => undefined);
+  }, []);
+
   const changed = useCallback((value: ClubConfig) => {
     held.current = true;
     setClub(value);
@@ -37,6 +44,6 @@ export function ClubConfigurationProvider({ children }: { children: ReactNode })
   // The failure is kept rather than its message, so a reader who switches language is answered in
   // the one they switched to.
   const error = failure ? problemMessage(failure.thrown, t) : undefined;
-  const configuration = useMemo(() => ({ club, error, changed, load }), [club, error, changed, load]);
+  const configuration = useMemo(() => ({ club, error, changed, load, refresh }), [club, error, changed, load, refresh]);
   return <ClubConfigurationContext value={configuration}>{children}</ClubConfigurationContext>;
 }

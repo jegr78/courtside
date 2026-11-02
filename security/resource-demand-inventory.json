@@ -116,6 +116,7 @@
         "getClubConfig",
         "getClubConfigForAdmin",
         "getClubLogo",
+        "getClubLogoForHeader",
         "getCourt",
         "getManagedAppointment",
         "getMembershipType",
