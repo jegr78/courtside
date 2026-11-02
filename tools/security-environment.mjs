@@ -902,6 +902,25 @@ export function remainingScannerRequestBudget(limit, consumed) {
   return limit - consumed;
 }
 
+// Every role together finishes in about two minutes, so one call past four has stalled.
+export const ZAP_SCAN_LIMIT_MILLISECONDS = 240_000;
+
+export class ZapScanStalled extends Error {}
+
+export async function scanWithOneRestart({ label, prepare, scan, discard, report = console.error }) {
+  for (let attempt = 1; ; attempt += 1) {
+    await prepare();
+    try {
+      return await scan();
+    } catch (failure) {
+      if (attempt > 1 || !(failure instanceof ZapScanStalled)) throw failure;
+      report(`ZAP ${label} returned nothing within ${ZAP_SCAN_LIMIT_MILLISECONDS / 1000} s; `
+        + "discarding its container and starting it once more");
+      await discard();
+    }
+  }
+}
+
 export async function runAuthenticatedZap(plan, stopFile, limits, renderPlan, renderRetestPlan) {
   const environment = { ...mergeSecurityProcessEnvironment(readSecurityEnvironment(plan.runId)),
     COURTSIDE_SECURITY_MAX_REQUESTS: String(limits.maxRequests),
@@ -917,12 +936,23 @@ export async function runAuthenticatedZap(plan, stopFile, limits, renderPlan, re
     if (existsSync(stopFile)) throw new Error("Emergency stop requested");
     const remaining = deadline - Date.now();
     if (remaining <= 0) throw new Error("Owned security process exceeded its duration limit");
-    return runOwnedProcess("docker", args, {
-      timeoutMilliseconds: remaining, stopFile, environment,
-      acceptedExitCodes: options.acceptedExitCodes ?? [0], input: options.input,
-      outputLimitBytes: options.outputLimitBytes ?? 1024 * 1024
-    });
+    const limit = Math.min(remaining, options.timeoutMilliseconds ?? remaining);
+    try {
+      return await runOwnedProcess("docker", args, {
+        timeoutMilliseconds: limit, stopFile, environment,
+        acceptedExitCodes: options.acceptedExitCodes ?? [0], input: options.input,
+        outputLimitBytes: options.outputLimitBytes ?? 1024 * 1024
+      });
+    } catch (failure) {
+      if (limit < remaining && /^Owned security process exceeded its duration limit/.test(failure.message)) {
+        throw new ZapScanStalled(failure.message);
+      }
+      throw failure;
+    }
   };
+  const zapScan = (name) => command(["exec", name, "zap.sh", "-cmd", "-autorun", "/tmp/courtside-plan.yaml"], {
+    acceptedExitCodes: [0, 2], outputLimitBytes: 4 * 1024 * 1024, timeoutMilliseconds: ZAP_SCAN_LIMIT_MILLISECONDS
+  });
   const containers = [];
   const reports = [];
   const executedPlans = [];
@@ -934,20 +964,24 @@ export async function runAuthenticatedZap(plan, stopFile, limits, renderPlan, re
     for (const role of Object.keys(limits.sessions)) {
       const name = `courtside-security-zap-${plan.runId}-${limits.attempt}-${role.toLowerCase().replaceAll("_", "-")}`;
       containers.push(name);
-      await command([...securityComposeArgs(plan.runId), "--profile", "assessment", "run", "-d", "--no-deps",
-        "--name", name, "zap", "tail", "-f", "/dev/null"]);
-      const runtime = JSON.parse((await command(["inspect", name, "--format", "{{json .}}"])).stdout);
-      if (!scannerRuntimeHardened(runtime, {
-        memory: 1024 * 1024 * 1024, nanoCpus: 2_000_000_000, pids: 256,
-        networks: [`${securityProject(plan.runId)}_scanner-client`]
-      })) throw new Error("Authenticated ZAP runtime controls are incomplete");
       const rendered = renderPlan(role, limits.sessions[role]);
       executedPlans.push({ role, plan: rendered.replaceAll(limits.sessions[role], limits.planSessionPlaceholder) });
-      await command(["exec", "-i", name, "sh", "-c", "umask 077; cat > /tmp/courtside-plan.yaml"], {
-        input: rendered
-      });
-      const zap = await command(["exec", name, "zap.sh", "-cmd", "-autorun", "/tmp/courtside-plan.yaml"], {
-        acceptedExitCodes: [0, 2], outputLimitBytes: 4 * 1024 * 1024
+      const zap = await scanWithOneRestart({
+        label: role,
+        prepare: async () => {
+          await command([...securityComposeArgs(plan.runId), "--profile", "assessment", "run", "-d", "--no-deps",
+            "--name", name, "zap", "tail", "-f", "/dev/null"]);
+          const runtime = JSON.parse((await command(["inspect", name, "--format", "{{json .}}"])).stdout);
+          if (!scannerRuntimeHardened(runtime, {
+            memory: 1024 * 1024 * 1024, nanoCpus: 2_000_000_000, pids: 256,
+            networks: [`${securityProject(plan.runId)}_scanner-client`]
+          })) throw new Error("Authenticated ZAP runtime controls are incomplete");
+          await command(["exec", "-i", name, "sh", "-c", "umask 077; cat > /tmp/courtside-plan.yaml"], {
+            input: rendered
+          });
+        },
+        scan: () => zapScan(name),
+        discard: () => command(["rm", "-f", name])
       });
       if (zap.code !== 0) {
         throw new Error(`ZAP assessment failed: ${authenticatedZapDiagnostic(
@@ -979,21 +1013,27 @@ export async function runAuthenticatedZap(plan, stopFile, limits, renderPlan, re
     const fixedAt = new Date().toISOString();
     const retestName = `courtside-security-zap-${plan.runId}-${limits.attempt}-canary-retest`;
     containers.push(retestName);
-    await command([...securityComposeArgs(plan.runId), "--profile", "assessment", "run", "-d", "--no-deps",
-      "--name", retestName, "zap", "tail", "-f", "/dev/null"]);
-    const retestRuntime = JSON.parse((await command(["inspect", retestName, "--format", "{{json .}}"])).stdout);
-    const retestScannerHardened = scannerRuntimeHardened(retestRuntime, {
-      memory: 1024 * 1024 * 1024, nanoCpus: 2_000_000_000, pids: 256,
-      networks: [`${securityProject(plan.runId)}_scanner-client`]
-    });
     const retestPlan = renderRetestPlan();
     executedPlans.push({ role: "CANARY_RETEST", plan: retestPlan });
-    await command(["exec", "-i", retestName, "sh", "-c", "umask 077; cat > /tmp/courtside-plan.yaml"], {
-      input: retestPlan
-    });
-    const retestStartedAt = new Date().toISOString();
-    const retestZap = await command(["exec", retestName, "zap.sh", "-cmd", "-autorun", "/tmp/courtside-plan.yaml"], {
-      acceptedExitCodes: [0, 2], outputLimitBytes: 4 * 1024 * 1024
+    let retestScannerHardened = false;
+    let retestStartedAt;
+    const retestZap = await scanWithOneRestart({
+      label: "CANARY_RETEST",
+      prepare: async () => {
+        await command([...securityComposeArgs(plan.runId), "--profile", "assessment", "run", "-d", "--no-deps",
+          "--name", retestName, "zap", "tail", "-f", "/dev/null"]);
+        const retestRuntime = JSON.parse((await command(["inspect", retestName, "--format", "{{json .}}"])).stdout);
+        retestScannerHardened = scannerRuntimeHardened(retestRuntime, {
+          memory: 1024 * 1024 * 1024, nanoCpus: 2_000_000_000, pids: 256,
+          networks: [`${securityProject(plan.runId)}_scanner-client`]
+        });
+        await command(["exec", "-i", retestName, "sh", "-c", "umask 077; cat > /tmp/courtside-plan.yaml"], {
+          input: retestPlan
+        });
+        retestStartedAt = new Date().toISOString();
+      },
+      scan: () => zapScan(retestName),
+      discard: () => command(["rm", "-f", retestName])
     });
     if (retestZap.code !== 0) {
       throw new Error(`ZAP canary remediation retest failed: ${authenticatedZapDiagnostic(

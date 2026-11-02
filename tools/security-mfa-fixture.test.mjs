@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import * as crypto from "node:crypto";
 import { test } from "node:test";
-import { createMfaFixture, createWebauthnAuthenticator, mfaFixtureFirstAttemptRequests, mfaFixtureMaxRequestsPerExercise, mfaFixtureRequestLimit, requireMfaSuccess, steadyTotpCode, totpCode } from "./security-mfa-fixture.mjs";
+import { createMfaFixture, createWebauthnAuthenticator, mfaFixtureFirstAttemptRequests, mfaFixtureMaxRequestsPerExercise, mfaFixtureRequestLimit, requireMfaSuccess, retryOnceWhenBreachCheckUnavailable, steadyTotpCode, totpCode } from "./security-mfa-fixture.mjs";
 
 test("given the RFC6238 secret, when calculating the first reference timestep, then produce its six digit SHA1 code", () => {
   // given
@@ -416,4 +416,43 @@ test("given failed MFA account cleanup, when its fixture aborts, then retain the
   // when / then
   await assert.rejects(createMfaFixture(protocol.configuration).exercise({ operationId: "getOwnMfaStatus", expectations: { MEMBER: "allow" } }, "MEMBER", {}), /requires 2xx/);
   assert.equal(finished, false);
+});
+
+test("given a password step the breach service could not check, when it is sent, then it is asked once more and the retry is reported", async () => {
+  // given
+  const answers = [{ status: 503, problemType: "urn:courtside:error:password-breach-check-unavailable" }, { status: 204 }];
+  const reports = [];
+
+  // when
+  const response = await retryOnceWhenBreachCheckUnavailable(async () => answers.shift(), "PUT /api/account/password",
+    (line) => reports.push(line));
+
+  // then
+  assert.equal(response.status, 204, "the second answer is the one the fixture checks");
+  assert.equal(reports.length, 1, "the retry is named in the log");
+});
+
+test("given the breach service stays unavailable, when a password step is sent, then the second refusal is returned and nothing else is tried", async () => {
+  // given
+  const refusal = { status: 503, problemType: "urn:courtside:error:password-breach-check-unavailable" };
+  let sent = 0;
+
+  // when
+  const response = await retryOnceWhenBreachCheckUnavailable(async () => { sent += 1; return refusal; }, "PUT /api/account/password", () => {});
+
+  // then
+  assert.equal(sent, 2, "one retry and no more");
+  assert.throws(() => requireMfaSuccess(response, "PUT /api/account/password"), /password-breach-check-unavailable/,
+    "the fixture still fails and names the cause");
+});
+
+test("given any other refusal, when a step is sent, then it is not repeated", async () => {
+  // given
+  let sent = 0;
+
+  // when
+  await retryOnceWhenBreachCheckUnavailable(async () => { sent += 1; return { status: 503 }; }, "GET /api/session", () => {});
+
+  // then
+  assert.equal(sent, 1, "only the breach service outage is asked again");
 });
