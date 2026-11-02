@@ -79,6 +79,7 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
             "/api/public/occupancy",
             "/api/public/config/icon",
             "/api/public/config/logo",
+            "/api/public/config/logo/header",
             "/api/public/courts",
             "/api/public/opening-hours",
             "/api/reserved-slots",
@@ -461,7 +462,8 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
                 mockMvc.perform(request)
                         .andExpect(status().isUnauthorized())
                         .andExpect(content().string(""));
-            } else if (endpoint.pattern().equals("/api/public/config/logo")) {
+            } else if (endpoint.pattern().equals("/api/public/config/logo")
+                    || endpoint.pattern().equals("/api/public/config/logo/header")) {
                 mockMvc.perform(request)
                         .andExpect(status().isNotFound())
                         .andExpect(jsonPath("$.type").value("urn:courtside:error:club-logo-not-found"));

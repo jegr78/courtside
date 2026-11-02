@@ -6509,6 +6509,36 @@ paths:
         "429":
           $ref: "#/components/responses/RateLimited"
 
+  /api/public/config/logo/header:
+    get:
+      tags: [club-config]
+      operationId: getClubLogoForHeader
+      summary: The uploaded logo as a PNG of at most 160 pixels on its longest side.
+      description: |
+        Scaled from the uploaded logo with its aspect ratio and transparency kept, and never
+        enlarged. The public configuration names it as the club's logo. A matching version is
+        immutable; any other version is answered with the current variant and no caching.
+      security: []
+      parameters:
+        - name: v
+          in: query
+          schema: { type: string, pattern: "^[0-9a-f]{64}$" }
+          description: The variant version the public configuration names.
+      responses:
+        "200":
+          description: The header variant of the uploaded logo.
+          headers:
+            ETag: { schema: { type: string } }
+            Cache-Control: { schema: { type: string } }
+          content:
+            image/png: { schema: { type: string, format: binary } }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
   /api/public/config/icon:
     get:
       tags: [manifest]

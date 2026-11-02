@@ -60,6 +60,14 @@ final class AppIconRenderer {
         return png(icon);
     }
 
+    static byte[] fitted(BufferedImage logo, int longestSide) {
+        int longest = Math.max(logo.getWidth(), logo.getHeight());
+        int target = Math.min(longestSide, longest);
+        int width = Math.max(1, (int) Math.round((double) logo.getWidth() * target / longest));
+        int height = Math.max(1, (int) Math.round((double) logo.getHeight() * target / longest));
+        return png(scaled(logo, width, height));
+    }
+
     private static void drawMark(Graphics2D graphics, double offset, double side) {
         Graphics2D mark = (Graphics2D) graphics.create();
         mark.translate(offset, offset);
