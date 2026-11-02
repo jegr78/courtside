@@ -373,3 +373,19 @@ it("given a parent that ignores empty values, when a draft is edited and externa
   // then
   expect(field).toHaveValue("");
 });
+
+it("given a field without an id, when it renders, then the field the member types into still carries one for autofill", () => {
+  // when
+  render(<DateTimeInput data-testid="week-date" type="date" aria-label="Pick a date" value="2026-11-02" onValueChange={() => {}} />);
+
+  // then
+  expect(screen.getByTestId("week-date").id, "the visible field has an id").not.toBe("");
+});
+
+it("given a field with an id of its own, when it renders, then that id is kept", () => {
+  // when
+  render(<DateTimeInput data-testid="starts" id="series-starts" type="date" aria-label="Starts" value="2026-11-02" onValueChange={() => {}} />);
+
+  // then
+  expect(screen.getByTestId("starts").id, "a label pointing at the field still finds it").toBe("series-starts");
+});
