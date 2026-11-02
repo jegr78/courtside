@@ -9,6 +9,15 @@ export function requireMfaSuccess(response, operation) {
   return response;
 }
 
+const breachCheckUnavailable = "urn:courtside:error:password-breach-check-unavailable";
+
+export async function retryOnceWhenBreachCheckUnavailable(send, operation, report = console.error) {
+  const response = await send();
+  if (response?.status !== 503 || response.problemType !== breachCheckUnavailable) return response;
+  report(`MFA fixture ${operation} found the password breach service unavailable; asking it once more`);
+  return send();
+}
+
 export function totpCode(secret, instant = Date.now(), offset = 0) {
   const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
   if (typeof secret !== "string" || !/^[A-Z2-7]+=*$/.test(secret) || !Number.isFinite(Number(instant)) || !Number.isInteger(offset)) {
@@ -153,7 +162,10 @@ export function createMfaFixture({ request, makeClient, clients, sharedPassword,
   async function send(client, method, path, body) {
     return request(client, { method, path, headers: body === undefined ? {} : jsonHeaders, ...(body === undefined ? {} : { body: JSON.stringify(body) }) }, { csrf: method !== "GET" });
   }
-  async function successful(client, method, path, body) { return requireMfaSuccess(await send(client, method, path, body), `${method} ${path}`); }
+  async function successful(client, method, path, body) {
+    const operation = `${method} ${path}`;
+    return requireMfaSuccess(await retryOnceWhenBreachCheckUnavailable(() => send(client, method, path, body), operation), operation);
+  }
   function json(response) {
     const value = response.json ?? (typeof response.body === "string" && response.body ? JSON.parse(response.body) : undefined);
     if (!value || typeof value !== "object") throw new Error("MFA fixture expected a structured response");
