@@ -232,7 +232,7 @@ Candidates are opened and closed with one line of configuration, not with a hand
 
 A published candidate is walked on the UAT instance with the acceptance harness described in
 [acceptance-testing.md](acceptance-testing.md). Its release summary, with every finding assessed, is
-posted on the release parent before the line graduates.
+posted on the release pull request before the line graduates.
 
 Every candidate is a checkpoint on the same release line. Release Please proposes the changes
 since the preceding candidate; the release-please workflow then folds those entries into the single

@@ -437,7 +437,8 @@ appear under rejected suspicions, harness gaps under their own heading.
 Each report also writes `release-summary.md`: the version, the run, the passed, failed and skipped
 cells, and every finding with its assessment and issue. It contains no username, email address,
 full name of anybody on the roster, instance host or image; a summary that would is refused. Post
-it on the release parent or the release pull request.
+it on the release pull request. The summary does not say who read the contact sheets or how, so
+the post adds that whenever a verdict did not come from a full reading.
 
 Full reports and screenshots are never committed. The `report/` directory may be shared
 privately. The rest of the run directory stays on the operator's machine: Playwright traces in
