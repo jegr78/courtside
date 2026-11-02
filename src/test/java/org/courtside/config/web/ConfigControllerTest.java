@@ -106,7 +106,7 @@ class ConfigControllerTest extends AbstractIntegrationTest {
         mockMvc.perform(get("/api/public/config"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.logoUrl").value(org.hamcrest.Matchers.matchesPattern(
-                        "^/api/public/config/logo\\?v=[0-9a-f]{64}$")));
+                        "^/api/public/config/logo/header\\?v=[0-9a-f]{64}$")));
         mockMvc.perform(get("/manifest.webmanifest"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.icons[0].src").value(org.hamcrest.Matchers.matchesPattern(

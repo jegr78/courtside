@@ -7,6 +7,7 @@ public record ClubConfigurationSnapshot(
         String primaryColor,
         String accentColor,
         String logoUrl,
+        String headerLogoUrl,
         String logoFallbackUrl,
         boolean logoUploaded,
         String imprintUrl,
@@ -32,6 +33,7 @@ public record ClubConfigurationSnapshot(
                 configuration.getPrimaryColor(),
                 configuration.getAccentColor(),
                 effectiveLogoUrl(configuration),
+                headerLogoUrl(configuration),
                 configuration.getLogoUrl(),
                 configuration.getLogoDigest() != null,
                 configuration.getImprintUrl(),
@@ -60,5 +62,10 @@ public record ClubConfigurationSnapshot(
         String digest = configuration.getLogoDigest();
         return digest == null ? configuration.getLogoUrl()
                 : "/api/public/config/logo?v=" + digest;
+    }
+
+    private static String headerLogoUrl(ClubConfiguration configuration) {
+        String digest = configuration.getLogoDigest();
+        return digest == null ? configuration.getLogoUrl() : HeaderLogoService.url(digest);
     }
 }

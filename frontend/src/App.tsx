@@ -165,7 +165,7 @@ const STARTUP_SESSION_DEADLINE_MS = 5_000;
 export function App() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { club, changed: configurationChanged, load: loadClub } = useClubConfiguration();
+  const { club, changed: configurationChanged, load: loadClub, refresh: refreshClub } = useClubConfiguration();
   const [session, setSession] = useState<SessionStatus>();
   const [source, setSource] = useState<SourceOffer>();
   const [identityStatus, setIdentityStatus] = useState<"loading" | "available" | "unavailable">("loading");
@@ -313,7 +313,10 @@ export function App() {
       {session
         ? <AppRoutes session={session} refreshSession={refreshSession} passwordChanged={passwordChanged}
           initialPasswordChanged={initialPasswordChanged} signedOut={signOut}
-          configurationChanged={configurationChanged} offline={offline} />
+          configurationChanged={(changed) => {
+            configurationChanged(changed);
+            refreshClub();
+          }} offline={offline} />
         : <p role="status">{t("status.loading")}</p>}
       </div>
     </main>

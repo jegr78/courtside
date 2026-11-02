@@ -126,6 +126,7 @@ class AuditedOperationCoverageTest {
             "FacilityUtilisationService#report",
             "InstalledAppService#icon",
             "InstalledAppService#manifest",
+            "HeaderLogoService#variant",
             "GlobalSessionAdministration#endAll",
             "ImpactService#ofClosingWeekday",
             "ImpactService#ofCourtClosure",

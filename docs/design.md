@@ -515,7 +515,10 @@ an absent override uses the published Courtside documentation on GitHub Pages. T
 configurable target a club can redirect but not remove, because a member who cannot reach any
 documentation has no way to learn what the product does.
 The PWA manifest and the browser tab icon use the same identity: the club logo, or the Courtside
-mark while none is set. Logo URLs are root-relative or HTTPS. Remote logos disclose the visitor's
+mark while none is set. For an uploaded logo the public configuration names
+`/api/public/config/logo/header`, a PNG scaled to at most 160 pixels on its longest side with its
+aspect ratio and transparency kept and never enlarged, so the header and tab icon do not load the
+original. The manifest keeps the original with its dimensions. Logo URLs are root-relative or HTTPS. Remote logos disclose the visitor's
 address and Courtside origin to their host, so club-hosted images are preferred.
 
 An installed instance carries the club rather than the product. `/api/public/config/icon` serves PNG

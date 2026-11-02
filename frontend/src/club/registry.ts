@@ -6,6 +6,7 @@ export type ClubConfiguration = {
   error?: string;
   changed: (club: ClubConfig) => void;
   load: () => void;
+  refresh: () => void;
 };
 
 export const ClubConfigurationContext = createContext<ClubConfiguration | undefined>(undefined);

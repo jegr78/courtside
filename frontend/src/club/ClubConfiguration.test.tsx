@@ -25,6 +25,16 @@ function Saver() {
   return <button data-testid="report-change" type="button" onClick={() => changed({ ...club, timeZone: "Europe/Berlin" })}>save</button>;
 }
 
+function Logo() {
+  const { club: held } = useClubConfiguration();
+  return held?.logoUrl ? <p data-testid="logo">{held.logoUrl}</p> : null;
+}
+
+function Refresher() {
+  const { refresh } = useClubConfiguration();
+  return <button data-testid="refresh" type="button" onClick={() => refresh()}>refresh</button>;
+}
+
 function show(children: ReactNode) {
   return render(<ClubConfigurationProvider>{children}</ClubConfigurationProvider>);
 }
@@ -60,6 +70,22 @@ describe("ClubConfiguration", () => {
     // then
     expect(screen.getByTestId("first")).toHaveTextContent("Europe/Berlin");
     expect(asked).toHaveBeenCalledTimes(1);
+  });
+
+  it("given a change an administration page reported, when the club is refreshed, then the URLs only the server derives replace the reported ones", async () => {
+    // given
+    const asked = vi.spyOn(api, "config").mockResolvedValue(club);
+    show(<><Logo /><Saver /><Refresher /></>);
+    await waitFor(() => expect(asked).toHaveBeenCalledTimes(1));
+    await userEvent.click(screen.getByTestId("report-change"));
+    asked.mockResolvedValue({ ...club, logoUrl: "/api/public/config/logo/header?v=variant" });
+
+    // when
+    await userEvent.click(screen.getByTestId("refresh"));
+
+    // then
+    expect(await screen.findByTestId("logo")).toHaveTextContent("/api/public/config/logo/header?v=variant");
+    expect(asked, "a refresh reads the public configuration again").toHaveBeenCalledTimes(2);
   });
 
   it("given a club nobody can read, when a view needs it, then the failure is reported rather than a substitute time zone", async () => {

@@ -21,6 +21,7 @@ import org.courtside.config.internal.AppIcon;
 import org.courtside.config.internal.ChangeClubConfigurationCommand;
 import org.courtside.config.internal.InstalledAppManifest;
 import org.courtside.config.internal.InstalledAppService;
+import org.courtside.config.internal.HeaderLogoService;
 import org.courtside.config.internal.ClubLogo;
 import org.courtside.config.internal.ClubLogoNotFoundException;
 import org.courtside.config.internal.ClubConfigurationSnapshot;
@@ -45,6 +46,7 @@ class ConfigController implements ClubConfigApi, AdminConfigApi, ManifestApi {
 
     private final ConfigService config;
     private final InstalledAppService installedApp;
+    private final HeaderLogoService headerLogo;
     private final SupportedLanguages languages;
     private final ConfigRequestValidator requestValidator;
 
@@ -101,6 +103,18 @@ class ConfigController implements ClubConfigApi, AdminConfigApi, ManifestApi {
     }
 
     @Override
+    public ResponseEntity<Resource> getClubLogoForHeader(String version) {
+        AppIcon variant = headerLogo.variant();
+        return ResponseEntity.ok()
+                .contentType(MediaType.IMAGE_PNG)
+                .cacheControl(variant.version().equals(version)
+                        ? CacheControl.maxAge(Duration.ofDays(365)).cachePublic().immutable()
+                        : CacheControl.noCache())
+                .eTag('"' + variant.version() + '"')
+                .body(new ByteArrayResource(variant.content()));
+    }
+
+    @Override
     public ResponseEntity<ApiAdminClubConfig> uploadClubLogo(MultipartFile file) {
         try {
             return ResponseEntity.ok(toAdminResponse(config.uploadLogo(file.getBytes())));
@@ -148,7 +162,7 @@ class ConfigController implements ClubConfigApi, AdminConfigApi, ManifestApi {
                 configuration.accentColor(), configuration.defaultLocale(),
                 languages.tags(),
                 configuration.slotMinutes(), configuration.timeZone())
-                .logoUrl(configuration.logoUrl())
+                .logoUrl(configuration.headerLogoUrl())
                 .imprintUrl(configuration.imprintUrl())
                 .privacyUrl(configuration.privacyUrl())
                 .documentationUrl(configuration.documentationUrl())

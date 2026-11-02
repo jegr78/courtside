@@ -231,7 +231,7 @@ describe("AccountSecurityView", () => {
     vi.spyOn(api, "accountSessions").mockResolvedValue([current]);
 
     // when
-    render(<ClubConfigurationContext value={{ error, load: vi.fn(), changed: vi.fn() }}><AccountSecurityView passwordChanged={vi.fn()} signedOut={vi.fn()} /></ClubConfigurationContext>);
+    render(<ClubConfigurationContext value={{ error, load: vi.fn(), changed: vi.fn(), refresh: vi.fn() }}><AccountSecurityView passwordChanged={vi.fn()} signedOut={vi.fn()} /></ClubConfigurationContext>);
     const view = await renderedSecurityView();
 
     // then
@@ -247,7 +247,7 @@ describe("AccountSecurityView", () => {
     const load = vi.fn();
     const changed = vi.fn();
     await i18n.changeLanguage("de");
-    const rendered = render(<ClubConfigurationContext value={{ error: "Configuration unavailable", load, changed }}><AccountSecurityView passwordChanged={vi.fn()} signedOut={vi.fn()} /></ClubConfigurationContext>);
+    const rendered = render(<ClubConfigurationContext value={{ error: "Configuration unavailable", load, changed, refresh: vi.fn() }}><AccountSecurityView passwordChanged={vi.fn()} signedOut={vi.fn()} /></ClubConfigurationContext>);
     await renderedSecurityView();
     expect(screen.getByTestId("load-failure")).toHaveTextContent("Configuration unavailable");
     expect(screen.getByTestId("end-current-session")).toBeEnabled();
@@ -256,7 +256,7 @@ describe("AccountSecurityView", () => {
     // when
     await userEvent.click(screen.getByTestId("retry-load"));
     expect(load).toHaveBeenCalledTimes(initialLoads + 1);
-    rendered.rerender(<ClubConfigurationContext value={{ club: { clubName: "Example Tennis Club", primaryColor: "#000000", accentColor: "#ffffff", defaultLocale: "de", supportedLocales: ["de", "en"], slotMinutes: 60, timeZone: "Europe/Berlin" }, load, changed }}><AccountSecurityView passwordChanged={vi.fn()} signedOut={vi.fn()} /></ClubConfigurationContext>);
+    rendered.rerender(<ClubConfigurationContext value={{ club: { clubName: "Example Tennis Club", primaryColor: "#000000", accentColor: "#ffffff", defaultLocale: "de", supportedLocales: ["de", "en"], slotMinutes: 60, timeZone: "Europe/Berlin" }, load, changed, refresh: vi.fn() }}><AccountSecurityView passwordChanged={vi.fn()} signedOut={vi.fn()} /></ClubConfigurationContext>);
 
     // then
     expect(screen.queryByTestId("load-failure")).toBeNull();
