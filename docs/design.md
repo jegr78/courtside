@@ -154,8 +154,9 @@ as one application process and uses PostgreSQL 18.
 | `rules` | Rule-set administration and rule evaluation |
 | `shared` | Shared domain events and cross-cutting value types |
 
-The `demo`, `performance` and `securityassessment` modules contain fixtures for disposable
-environments. Packaging places them in a separate artifact. The production image rejects them.
+The `demo`, `loxonesimulator`, `performance`, `securityassessment` and `uatseed` modules contain
+fixtures for disposable environments. Packaging places them in a separate artifact. The
+production image rejects them.
 
 ### Module boundaries
 

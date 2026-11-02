@@ -4,6 +4,7 @@ import org.courtside.access.GrantInstruction;
 import org.courtside.access.GrantOutcome;
 import org.courtside.access.GrantReference;
 import org.courtside.access.ProbeOutcome;
+import org.courtside.loxonesimulator.LoxoneSimulator;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -39,10 +40,22 @@ abstract class LoxoneTestSupport {
 
     @BeforeEach
     void startSimulator() throws IOException {
-        simulator = new LoxoneSimulator(clock);
+        simulator = SimulatedMiniserver.started(clock);
         mapping.put(COURT_ONE, simulator.groupUuid("Court 1"));
         mapping.put(COURT_TWO, simulator.groupUuid("Court 2"));
-        connector = ready(connectorFor(simulator.settingsByUrl(DEADLINE)));
+        connector = ready(connectorFor(settingsByUrl(DEADLINE)));
+    }
+
+    LoxoneSettings settingsByUrl(Duration deadline) {
+        return SimulatedMiniserver.settingsByUrl(simulator, deadline);
+    }
+
+    LoxoneSettings settingsBySerial(Duration deadline) {
+        return SimulatedMiniserver.settingsBySerial(simulator, deadline);
+    }
+
+    LoxoneSettings settingsBySerial(Duration deadline, List<LoxoneAddress.Relay> relays) {
+        return SimulatedMiniserver.settingsBySerial(simulator, deadline, relays);
     }
 
     LoxoneAccessControl ready(LoxoneAccessControl probed) {
@@ -63,7 +76,7 @@ abstract class LoxoneTestSupport {
 
     LoxoneAccessControl connectorFor(LoxoneSettings settings) {
         LoxoneAccessControl created = new LoxoneAccessControl(settings,
-                accessPoint -> Optional.ofNullable(mapping.get(accessPoint)), LoxoneSimulator.clientTrust(), clock);
+                accessPoint -> Optional.ofNullable(mapping.get(accessPoint)), SimulatedMiniserver.clientTrust(), clock);
         opened.add(created);
         return created;
     }

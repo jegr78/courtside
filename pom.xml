@@ -310,6 +310,7 @@
                                     <filtering>false</filtering>
                                     <includes>
                                         <include>org/courtside/demo/**</include>
+                                        <include>org/courtside/loxonesimulator/**</include>
                                         <include>org/courtside/performance/**</include>
                                         <include>org/courtside/securityassessment/**</include>
                                         <include>org/courtside/uatseed/**</include>
@@ -353,6 +354,7 @@
                         <configuration>
                             <excludes>
                                 <exclude>org/courtside/demo/**</exclude>
+                                <exclude>org/courtside/loxonesimulator/**</exclude>
                                 <exclude>org/courtside/performance/**</exclude>
                                 <exclude>org/courtside/securityassessment/**</exclude>
                                 <exclude>org/courtside/uatseed/**</exclude>

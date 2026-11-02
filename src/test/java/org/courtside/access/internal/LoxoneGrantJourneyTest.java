@@ -6,6 +6,7 @@ import org.courtside.booking.testfixture.BookingTestFixture;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
+import org.courtside.loxonesimulator.LoxoneSimulator;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.Test;
@@ -51,14 +52,14 @@ class LoxoneGrantJourneyTest extends AbstractIntegrationTest {
 
         @Bean(destroyMethod = "close")
         LoxoneSimulator loxoneSimulator() throws IOException {
-            return new LoxoneSimulator(Clock.systemUTC());
+            return SimulatedMiniserver.started(Clock.systemUTC());
         }
 
         @Bean
         @Primary
         LoxoneAccessControl loxoneAccessControl(LoxoneSimulator simulator, LoxoneGroupMapping groups) {
-            return new LoxoneAccessControl(simulator.settingsByUrl(Duration.ofSeconds(10)), groups,
-                    LoxoneSimulator.clientTrust(), Clock.systemUTC());
+            return new LoxoneAccessControl(SimulatedMiniserver.settingsByUrl(simulator, Duration.ofSeconds(10)), groups,
+                    SimulatedMiniserver.clientTrust(), Clock.systemUTC());
         }
     }
 

@@ -74,6 +74,8 @@
       "src/main/java/org/courtside/identity/internal/ProblemDetailAccessDeniedHandler.java",
       "src/main/java/org/courtside/identity/internal/ProblemDetailAuthenticationEntryPoint.java",
       "src/main/java/org/courtside/identity/internal/SecurityConfiguration.java",
+      "src/main/java/org/courtside/loxonesimulator/LoxoneSimulator.java",
+      "src/main/java/org/courtside/loxonesimulator/LoxoneSimulatorServer.java",
       "src/main/java/org/courtside/member/web/MembershipTypeAdminController.java",
       "src/main/java/org/courtside/member/web/RosterAdminController.java",
       "src/main/java/org/courtside/notification/internal/InstanceLinks.java",

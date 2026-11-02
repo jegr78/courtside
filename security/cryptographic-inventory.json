@@ -551,6 +551,41 @@
       ]
     },
     {
+      "id": "loxone-simulator-device",
+      "purpose": "Answer the Loxone token login and list keypad codes the way a Miniserver does, inside the disposable simulator for tests and acceptance instances",
+      "algorithm": "HMAC-SHA-256",
+      "parameters": {
+        "passwordHash": "SHA-256 of password:salt, uppercase hex",
+        "key": "random one-time hex key per getkey2",
+        "variant": "HMAC-SHA-1 over a SHA-1 password hash when a test selects SHA1",
+        "codeDigest": "first 20 bytes of SHA-256 of a keypad code, as the Miniserver lists keycodes",
+        "randomness": "SecureRandom draws the one-time keys, the salt, tokens and user identifiers"
+      },
+      "implementation": "java-runtime",
+      "strength": {
+        "decidedBy": "loxone",
+        "basis": "The simulator mirrors the Miniserver's token protocol so that the connector's login can be exercised. It protects nothing: its password is a fixed example value and its codes open no door."
+      },
+      "class": "credential-protection",
+      "owner": "repository-maintainer",
+      "storageBoundary": "Only in the simulator's memory, inside the separately packaged fixtures image. The application image rejects the package.",
+      "permittedUse": "Simulating a Miniserver for tests and acceptance instances. Never in a production instance, and never as a general hash or signature.",
+      "rotation": "Not applicable: the password is a fixed example value and each login draws a new one-time key.",
+      "revocation": "killtoken, a failure selection or a restart drops every token.",
+      "recovery": "Restart the simulator; nothing it holds needs recovery.",
+      "retirement": "Follows the Loxone connector's token login.",
+      "evidence": "src/test/java/org/courtside/access/internal/LoxoneLoginTest.java",
+      "detects": [
+        "javax.crypto",
+        "MessageDigest",
+        "SecureRandom",
+        "randomBytes"
+      ],
+      "locations": [
+        "src/main/java/org/courtside/loxonesimulator/LoxoneSimulator.java"
+      ]
+    },
+    {
       "id": "loxone-mapping-fingerprint",
       "purpose": "Bound the fingerprint of an access point's Loxone group mapping to the port's 200 characters",
       "algorithm": "SHA-256",

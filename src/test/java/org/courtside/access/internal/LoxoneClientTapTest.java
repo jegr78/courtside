@@ -1,5 +1,6 @@
 package org.courtside.access.internal;
 
+import org.courtside.loxonesimulator.LoxoneSimulator;
 import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
@@ -35,7 +36,7 @@ class LoxoneClientTapTest extends LoxoneTestSupport {
     @Test
     void givenATap_whenAnAuthenticatedRequestIsSent_thenItSeesEveryRequestAndAnswerWithoutTheToken() {
         // given
-        try (LoxoneClient client = new LoxoneClient(simulator.settingsByUrl(DEADLINE), LoxoneSimulator.clientTrust(),
+        try (LoxoneClient client = new LoxoneClient(settingsByUrl(DEADLINE), SimulatedMiniserver.clientTrust(),
                 clock)) {
             client.tap(tap);
 
@@ -61,8 +62,8 @@ class LoxoneClientTapTest extends LoxoneTestSupport {
     @Test
     void givenATap_whenTheAddressIsResolvedBySerial_thenGetipIsSeenWithItsSerial() {
         // given
-        try (LoxoneClient client = new LoxoneClient(simulator.settingsBySerial(DEADLINE),
-                LoxoneSimulator.clientTrust(), clock)) {
+        try (LoxoneClient client = new LoxoneClient(settingsBySerial(DEADLINE),
+                SimulatedMiniserver.clientTrust(), clock)) {
             client.tap(tap);
 
             // when

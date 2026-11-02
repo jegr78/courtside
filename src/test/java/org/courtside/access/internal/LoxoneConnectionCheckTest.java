@@ -3,6 +3,7 @@ package org.courtside.access.internal;
 import org.courtside.access.CheckOutcome;
 import org.courtside.access.CheckResult;
 import org.courtside.access.RemoteGroup;
+import org.courtside.loxonesimulator.LoxoneSimulator;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -52,7 +53,7 @@ class LoxoneConnectionCheckTest extends LoxoneTestSupport {
     @Test
     void givenASerial_whenTheAddressIsChecked_thenTheCloudIsAskedAfreshAndTheMiniserverReached() {
         // given
-        LoxoneAccessControl bySerial = ready(connectorFor(simulator.settingsBySerial(DEADLINE)));
+        LoxoneAccessControl bySerial = ready(connectorFor(settingsBySerial(DEADLINE)));
 
         // when
         List<ConnectionCheckRun.Checked> checked = checked(bySerial);
@@ -65,7 +66,7 @@ class LoxoneConnectionCheckTest extends LoxoneTestSupport {
     @Test
     void givenASerialTheCloudKnowsNoRelayFor_whenChecked_thenTheAddressFailsAsUnresolved() {
         // given
-        LoxoneAccessControl bySerial = ready(connectorFor(simulator.settingsBySerial(DEADLINE)));
+        LoxoneAccessControl bySerial = ready(connectorFor(settingsBySerial(DEADLINE)));
         simulator.force("getip", 404);
 
         // when
@@ -79,7 +80,7 @@ class LoxoneConnectionCheckTest extends LoxoneTestSupport {
     @Test
     void givenAResolverNamingAHostOutsideTheRelays_whenChecked_thenTheAddressFailsAndTheHostIsNeverAsked() {
         // given
-        LoxoneAccessControl bySerial = connectorFor(simulator.settingsBySerial(DEADLINE,
+        LoxoneAccessControl bySerial = connectorFor(settingsBySerial(DEADLINE,
                 List.of(new LoxoneAddress.Relay("dyndns.loxonecloud.com", 1, 65_535))));
 
         // when
@@ -97,7 +98,7 @@ class LoxoneConnectionCheckTest extends LoxoneTestSupport {
     void givenATrustStoreWithoutTheMiniserversCertificate_whenChecked_thenTheAddressFailsAsCertificateRefused(
             boolean bySerial) throws NoSuchAlgorithmException {
         // given
-        LoxoneSettings settings = bySerial ? simulator.settingsBySerial(DEADLINE) : simulator.settingsByUrl(DEADLINE);
+        LoxoneSettings settings = bySerial ? settingsBySerial(DEADLINE) : settingsByUrl(DEADLINE);
         try (LoxoneAccessControl untrusting = new LoxoneAccessControl(settings,
                 accessPoint -> Optional.ofNullable(mapping.get(accessPoint)), SSLContext.getDefault(), clock)) {
 
@@ -171,7 +172,7 @@ class LoxoneConnectionCheckTest extends LoxoneTestSupport {
     @Test
     void givenAWrongPassword_whenChecked_thenTheLoginIsRefusedAndTheChecksNeedingItAreSkipped() {
         // given
-        LoxoneSettings right = simulator.settingsByUrl(DEADLINE);
+        LoxoneSettings right = settingsByUrl(DEADLINE);
         LoxoneAccessControl wrong = connectorFor(new LoxoneSettings(right.address(), right.user(),
                 "not-the-password", DEADLINE));
 
@@ -453,7 +454,7 @@ class LoxoneConnectionCheckTest extends LoxoneTestSupport {
     void givenAHangingGroupList_whenChecked_thenOnlyTheGroupsTimeOutAndTheLaterChecksStillReport() {
         // given
         Duration brief = Duration.ofSeconds(1);
-        LoxoneAccessControl hurried = ready(connectorFor(simulator.settingsByUrl(brief)));
+        LoxoneAccessControl hurried = ready(connectorFor(settingsByUrl(brief)));
         simulator.hang("getgrouplist");
 
         // when

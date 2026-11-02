@@ -1,13 +1,9 @@
-package org.courtside.access.internal;
+package org.courtside.loxonesimulator;
 
 import com.sun.net.httpserver.HttpExchange;
-import com.sun.net.httpserver.HttpsConfigurator;
+import com.sun.net.httpserver.HttpServer;
 import com.sun.net.httpserver.HttpsServer;
-import org.courtside.TestCertificate;
 import org.jspecify.annotations.Nullable;
-import org.springframework.boot.ssl.SslBundle;
-import org.springframework.boot.ssl.pem.PemSslStoreBundle;
-import org.springframework.boot.ssl.pem.PemSslStoreDetails;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ArrayNode;
@@ -15,11 +11,8 @@ import tools.jackson.databind.node.ObjectNode;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
-import javax.net.ssl.SSLContext;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
@@ -48,14 +41,14 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.stream.Stream;
 
-/** A Miniserver and the Loxone Cloud resolver over HTTPS, stateful enough to hold users, groups and tokens. */
-final class LoxoneSimulator implements AutoCloseable {
+/** A Miniserver and the Loxone Cloud resolver, stateful enough to hold users, groups and tokens. */
+public final class LoxoneSimulator implements AutoCloseable {
 
-    static final String USER = "courtside-service";
-    static final String PASSWORD = "example-service-password";
-    static final String SERIAL = "504F94A0EE01";
-    static final int USER_MANAGEMENT = 0x800;
-    static final int CHANGE_CODES = 0x20;
+    public static final String USER = "courtside-service";
+    public static final String PASSWORD = "example-service-password";
+    public static final String SERIAL = "504F94A0EE01";
+    public static final int USER_MANAGEMENT = 0x800;
+    public static final int CHANGE_CODES = 0x20;
 
     private static final Set<String> MUTATING = Set.of("addoredituser", "deleteuser", "updateuseraccesscode",
             "assignusertogroup", "removeuserfromgroup", "createuser");
@@ -68,34 +61,34 @@ final class LoxoneSimulator implements AutoCloseable {
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final SecureRandom RANDOM = new SecureRandom();
 
-    record Request(String server, String command, List<String> arguments, boolean authenticated) {
+    public record Request(String server, String command, List<String> arguments, boolean authenticated) {
 
-        boolean mutating() {
+        public boolean mutating() {
             return MUTATING.contains(command);
         }
 
-        boolean names(String text) {
+        public boolean names(String text) {
             return arguments.stream().anyMatch(argument -> argument.contains(text));
         }
     }
 
-    record Group(String uuid, String name, int type) {
+    public record Group(String uuid, String name, int type) {
     }
 
-    record Token(String token, String user, long validUntil, int rights) {
+    public record Token(String token, String user, long validUntil, int rights) {
     }
 
-    static final class User {
-        final String uuid;
-        String name;
-        final boolean admin;
-        int userState;
-        long validFrom;
-        long validUntil;
-        int expirationAction;
-        boolean changePassword = true;
-        List<String> groups = new ArrayList<>();
-        @Nullable String code;
+    public static final class User {
+        public final String uuid;
+        public String name;
+        public final boolean admin;
+        public int userState;
+        public long validFrom;
+        public long validUntil;
+        public int expirationAction;
+        public boolean changePassword = true;
+        public List<String> groups = new ArrayList<>();
+        public @Nullable String code;
 
         User(String uuid, String name, boolean admin) {
             this.uuid = uuid;
@@ -110,14 +103,19 @@ final class LoxoneSimulator implements AutoCloseable {
         }
     }
 
-    private static @Nullable Credentials credentials;
+    /** Where each of the simulator's listeners is opened; the simulator starts what it is handed. */
+    @FunctionalInterface
+    public interface Listeners {
 
-    private record Credentials(SSLContext server, SSLContext client) {
+        HttpServer open(Listener listener) throws IOException;
     }
+
+    public enum Listener { MINISERVER, CLOUD }
 
     private final UUID foreignGrantId = UUID.randomUUID();
     private final UUID adminGrantId = UUID.randomUUID();
     private final Clock clock;
+    private final Listeners listeners;
     private final ExecutorService handlers = Executors.newVirtualThreadPerTaskExecutor();
     private final CountDownLatch released = new CountDownLatch(1);
     private final List<Request> requests = new CopyOnWriteArrayList<>();
@@ -129,9 +127,9 @@ final class LoxoneSimulator implements AutoCloseable {
     private final List<String> clientUuids = new ArrayList<>();
     private final List<Integer> permissions = new ArrayList<>();
     private final String salt = HexFormat.of().withUpperCase().formatHex(randomBytes(35));
-    private final HttpsServer cloud;
-    private HttpsServer miniserver;
-    private @Nullable HttpsServer moved;
+    private final HttpServer cloud;
+    private HttpServer miniserver;
+    private @Nullable HttpServer moved;
     private @Nullable String pendingKey;
     private String hashAlgorithm = "SHA256";
     private Duration tokenLifetime = Duration.ofDays(20);
@@ -144,6 +142,10 @@ final class LoxoneSimulator implements AutoCloseable {
     private boolean nameTakenOnCreate;
     private boolean ignoreDeletes;
     private boolean answerAsMember;
+    private boolean groupsUnknown;
+    private boolean offline;
+    private volatile boolean recording = true;
+    private Failure failure = Failure.NONE;
     private int brokenPort = -1;
     private final Map<String, Integer> bare = new HashMap<>();
     private final Map<String, String> rawAnswers = new HashMap<>();
@@ -155,11 +157,17 @@ final class LoxoneSimulator implements AutoCloseable {
     private String version = "17.0.3.31";
     private final Set<String> omittedOnReadBack = new HashSet<>();
 
-    LoxoneSimulator(Clock clock) throws IOException {
+    public LoxoneSimulator(Clock clock, Listeners listeners) throws IOException {
         this.clock = clock;
-        Credentials issued = credentials();
-        this.cloud = served(issued.server(), this::cloud);
-        this.miniserver = served(issued.server(), this::miniserver);
+        this.listeners = listeners;
+        this.cloud = served(Listener.CLOUD, this::cloud);
+        try {
+            this.miniserver = served(Listener.MINISERVER, this::miniserver);
+        } catch (IOException | RuntimeException refused) {
+            cloud.stop(0);
+            handlers.shutdownNow();
+            throw refused;
+        }
         seed();
     }
 
@@ -186,46 +194,20 @@ final class LoxoneSimulator implements AutoCloseable {
         users.values().forEach(user -> foreignStates.put(user.uuid, user.state()));
     }
 
-    UUID foreignGrantId() {
+    public UUID foreignGrantId() {
         return foreignGrantId;
     }
 
-    UUID adminGrantId() {
+    public UUID adminGrantId() {
         return adminGrantId;
     }
 
-    static String nameOf(UUID grantId) {
+    public static String nameOf(UUID grantId) {
         return "courtside_" + grantId.toString().replace("-", "");
     }
 
-    static SSLContext clientTrust() {
-        try {
-            return credentials().client();
-        } catch (IOException unavailable) {
-            throw new IllegalStateException("the simulator certificate could not be issued", unavailable);
-        }
-    }
-
-    private static synchronized Credentials credentials() throws IOException {
-        if (credentials == null) {
-            try {
-                TestCertificate issued = TestCertificate.issuedFor("localhost");
-                SSLContext server = SslBundle.of(new PemSslStoreBundle(
-                        PemSslStoreDetails.forCertificate(issued.certificate()).withPrivateKey(issued.key()),
-                        null)).createSslContext();
-                SSLContext client = SslBundle.of(new PemSslStoreBundle(null,
-                        PemSslStoreDetails.forCertificate(issued.authority()))).createSslContext();
-                credentials = new Credentials(server, client);
-            } catch (Exception failed) {
-                throw new IOException("the simulator certificate could not be issued", failed);
-            }
-        }
-        return credentials;
-    }
-
-    private HttpsServer served(SSLContext context, Handler handler) throws IOException {
-        HttpsServer server = HttpsServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
-        server.setHttpsConfigurator(new HttpsConfigurator(context));
+    private HttpServer served(Listener listener, Handler handler) throws IOException {
+        HttpServer server = listeners.open(listener);
         server.setExecutor(handlers);
         server.createContext("/", exchange -> {
             try (exchange) {
@@ -241,202 +223,232 @@ final class LoxoneSimulator implements AutoCloseable {
         void handle(HttpExchange exchange) throws IOException;
     }
 
-    URI url() {
-        return URI.create("https://localhost:" + current().getAddress().getPort());
+    public URI url() {
+        return address(current());
     }
 
-    URI resolver() {
-        return URI.create("https://localhost:" + cloud.getAddress().getPort());
+    public URI resolver() {
+        return address(cloud);
     }
 
-    private synchronized HttpsServer current() {
+    private static URI address(HttpServer server) {
+        return URI.create((server instanceof HttpsServer ? "https" : "http") + "://localhost:"
+                + server.getAddress().getPort());
+    }
+
+    private synchronized HttpServer current() {
         return moved == null ? miniserver : moved;
     }
 
-    LoxoneSettings settingsByUrl(Duration deadline) {
-        return new LoxoneSettings(new LoxoneAddress.Fixed(url()), USER, PASSWORD, deadline);
-    }
-
-    LoxoneSettings settingsBySerial(Duration deadline) {
-        return settingsBySerial(deadline, List.of(new LoxoneAddress.Relay("localhost", 1, 65_535)));
-    }
-
-    LoxoneSettings settingsBySerial(Duration deadline, List<LoxoneAddress.Relay> relays) {
-        return new LoxoneSettings(new LoxoneAddress.Serial(SERIAL, resolver(), relays), USER, PASSWORD,
-                deadline);
-    }
-
-    synchronized void resolveTo(URI address) {
+    public synchronized void resolveTo(URI address) {
         resolvedTo = address;
     }
 
-    synchronized void ignoreDeletes() {
+    public synchronized void ignoreDeletes() {
         ignoreDeletes = true;
     }
 
-    synchronized void moveRelayLeavingAnErrorPage() throws IOException {
-        HttpsServer next = served(credentials().server(), this::miniserver);
+    public synchronized void moveRelayLeavingAnErrorPage() throws IOException {
+        HttpServer next = served(Listener.MINISERVER, this::miniserver);
         brokenPort = current().getAddress().getPort();
         moved = next;
     }
 
-    synchronized void answerRaw(String command, String body) {
+    public synchronized void answerRaw(String command, String body) {
         rawAnswers.put(command, body);
     }
 
-    synchronized void answerNormally(String command) {
+    public synchronized void answerNormally(String command) {
         rawAnswers.remove(command);
     }
 
-    synchronized void resolveWithBody(String body) {
+    public synchronized void resolveWithBody(String body) {
         cloudBody = body;
     }
 
-    synchronized void answerBare(String command, int status) {
+    public synchronized void answerBare(String command, int status) {
         bare.put(command, status);
     }
 
-    synchronized void answerEditsWithTheMember() {
+    public synchronized void answerEditsWithTheMember() {
         answerAsMember = true;
     }
 
-    long countAtTheBrokenRelay() {
+    public long countAtTheBrokenRelay() {
         return requests.stream().filter(request -> request.server().equals("broken relay")).count();
     }
 
-    synchronized void moveRelay() throws IOException {
-        HttpsServer next = served(credentials().server(), this::miniserver);
-        HttpsServer previous = current();
+    public synchronized void moveRelay() throws IOException {
+        HttpServer next = served(Listener.MINISERVER, this::miniserver);
+        HttpServer previous = current();
         moved = next;
         previous.stop(0);
     }
 
-    synchronized void force(String command, int code) {
+    /** Replaces whatever failure was selected before; {@link Failure#NONE} leaves a healthy device. */
+    public synchronized void fail(Failure selected) {
+        forced.clear();
+        withoutUserManagement = false;
+        refuseEveryToken = false;
+        groupsUnknown = false;
+        offline = false;
+        refusals = 0;
+        lockedUntil = null;
+        tokens.clear();
+        switch (selected) {
+            case NONE -> { }
+            case WRONG_CREDENTIALS -> forced.put("getjwt", 401);
+            case MISSING_RIGHT -> withoutUserManagement = true;
+            case LOCKED_USER -> forced.put("getkey2", 429);
+            case DISABLED_USER -> forced.put("getkey2", 423);
+            case REFUSED_TOKEN -> refuseEveryToken = true;
+            case UNKNOWN_GROUP -> groupsUnknown = true;
+            case OFFLINE -> offline = true;
+        }
+        failure = selected;
+    }
+
+    public synchronized Failure failure() {
+        return failure;
+    }
+
+    public void stopRecording() {
+        recording = false;
+        requests.clear();
+    }
+
+    private void record(Request request) {
+        if (recording) {
+            requests.add(request);
+        }
+    }
+
+    public synchronized void force(String command, int code) {
         forced.put(command, code);
     }
 
-    synchronized void release(String command) {
+    public synchronized void release(String command) {
         forced.remove(command);
     }
 
-    synchronized void hashWith(String algorithm) {
+    public synchronized void hashWith(String algorithm) {
         hashAlgorithm = algorithm;
     }
 
-    synchronized void issueTokensFor(Duration lifetime) {
+    public synchronized void issueTokensFor(Duration lifetime) {
         tokenLifetime = lifetime;
     }
 
-    synchronized void withholdUserManagement() {
+    public synchronized void withholdUserManagement() {
         withoutUserManagement = true;
     }
 
-    synchronized void withholdChangeCodes() {
+    public synchronized void withholdChangeCodes() {
         withoutChangeCodes = true;
     }
 
-    synchronized void expireTokens() {
+    public synchronized void expireTokens() {
         tokens.clear();
     }
 
-    synchronized void refuseEveryToken() {
+    public synchronized void refuseEveryToken() {
         refuseEveryToken = true;
     }
 
-    synchronized void renameUsers() {
+    public synchronized void renameUsers() {
         renameUsers = true;
     }
 
-    synchronized void vanishBeforeCode() {
+    public synchronized void vanishBeforeCode() {
         vanishBeforeCode = true;
     }
 
-    synchronized void failCodeClearing() {
+    public synchronized void failCodeClearing() {
         failCodeClearing = true;
     }
 
-    synchronized void takeNameOnCreate() {
+    public synchronized void takeNameOnCreate() {
         nameTakenOnCreate = true;
     }
 
-    synchronized void version(String configVersion) {
+    public synchronized void version(String configVersion) {
         version = configVersion;
     }
 
-    synchronized void omitOnReadBack(String field) {
+    public synchronized void omitOnReadBack(String field) {
         omittedOnReadBack.add(field);
     }
 
-    synchronized void hang(String command) {
+    public synchronized void hang(String command) {
         hanging = command;
     }
 
-    synchronized User addUser(String name, @Nullable String code) {
+    public synchronized User addUser(String name, @Nullable String code) {
         User user = add(name, false);
         user.code = code;
         return user;
     }
 
-    synchronized User addUser(String name, String uuid, boolean admin) {
+    public synchronized User addUser(String name, String uuid, boolean admin) {
         User user = new User(uuid, name, admin);
         users.put(uuid, user);
         return user;
     }
 
-    synchronized void removeGroup(String name) {
+    public synchronized void removeGroup(String name) {
         groups.remove(groupUuid(name));
     }
 
-    synchronized String groupUuid(String name) {
+    public synchronized String groupUuid(String name) {
         return groups.values().stream().filter(group -> group.name().equals(name)).map(Group::uuid)
                 .findFirst().orElseThrow(() -> new IllegalStateException("no simulated group " + name));
     }
 
-    synchronized List<User> usersNamed(String name) {
+    public synchronized List<User> usersNamed(String name) {
         return users.values().stream().filter(user -> user.name.equals(name)).toList();
     }
 
-    synchronized Optional<User> user(String uuid) {
+    public synchronized Optional<User> user(String uuid) {
         return Optional.ofNullable(users.get(uuid));
     }
 
-    synchronized Set<String> issuedTokens() {
+    public synchronized Set<String> issuedTokens() {
         return Set.copyOf(tokens.keySet());
     }
 
-    synchronized int refusalsForMissingRights() {
+    public synchronized int refusalsForMissingRights() {
         return refusals;
     }
 
-    synchronized List<String> clientUuids() {
+    public synchronized List<String> clientUuids() {
         return List.copyOf(clientUuids);
     }
 
-    synchronized List<Integer> permissions() {
+    public synchronized List<Integer> permissions() {
         return List.copyOf(permissions);
     }
 
-    synchronized String salt() {
+    public synchronized String salt() {
         return salt;
     }
 
-    List<Request> requests() {
+    public List<Request> requests() {
         return List.copyOf(requests);
     }
 
-    List<String> commands() {
+    public List<String> commands() {
         return requests.stream().map(Request::command).toList();
     }
 
-    long count(String command) {
+    public long count(String command) {
         return requests.stream().filter(request -> request.command().equals(command)).count();
     }
 
-    void forgetRequests() {
+    public void forgetRequests() {
         requests.clear();
     }
 
-    synchronized List<String> untouchedForeignUsersViolations() {
+    public synchronized List<String> untouchedForeignUsersViolations() {
         List<String> violations = new ArrayList<>();
         foreignStates.forEach((uuid, state) -> {
             User now = users.get(uuid);
@@ -451,13 +463,13 @@ final class LoxoneSimulator implements AutoCloseable {
         return violations;
     }
 
-    long loxoneSeconds(Instant instant) {
+    public long loxoneSeconds(Instant instant) {
         return Duration.between(EPOCH, instant).getSeconds();
     }
 
     private void cloud(HttpExchange exchange) throws IOException {
         URI uri = exchange.getRequestURI();
-        requests.add(new Request("cloud", uri.getPath().replace("/", ""), List.of(String.valueOf(uri.getQuery())),
+        record(new Request("cloud", uri.getPath().replace("/", ""), List.of(String.valueOf(uri.getQuery())),
                 false));
         Integer code;
         URI target;
@@ -481,8 +493,8 @@ final class LoxoneSimulator implements AutoCloseable {
     private void miniserver(HttpExchange exchange) throws IOException {
         URI uri = exchange.getRequestURI();
         synchronized (this) {
-            if (exchange.getLocalAddress().getPort() == brokenPort) {
-                requests.add(new Request("broken relay", uri.getPath(), List.of(), false));
+            if (offline || exchange.getLocalAddress().getPort() == brokenPort) {
+                record(new Request(offline ? "offline" : "broken relay", uri.getPath(), List.of(), false));
                 respond(exchange, 502, "<html><body>502 Bad Gateway</body></html>");
                 return;
             }
@@ -501,7 +513,7 @@ final class LoxoneSimulator implements AutoCloseable {
         String command = segments.getFirst();
         List<String> arguments = segments.subList(1, segments.size());
         boolean authenticated = query.containsKey("autht");
-        requests.add(new Request("miniserver", command, arguments, authenticated));
+        record(new Request("miniserver", command, arguments, authenticated));
         awaitIfHanging(command);
         Integer bareStatus;
         String rawBody;
@@ -619,8 +631,10 @@ final class LoxoneSimulator implements AutoCloseable {
             return Answer.header(401);
         }
         int permission = Integer.parseInt(arguments.get(2));
-        permissions.add(permission);
-        clientUuids.add(arguments.get(3));
+        if (recording) {
+            permissions.add(permission);
+            clientUuids.add(arguments.get(3));
+        }
         int rights = withoutUserManagement ? GRANTED_RIGHTS & ~USER_MANAGEMENT : GRANTED_RIGHTS;
         rights = withoutChangeCodes ? rights & ~CHANGE_CODES : rights;
         String token = "eyJ" + HexFormat.of().formatHex(randomBytes(24));
@@ -701,7 +715,7 @@ final class LoxoneSimulator implements AutoCloseable {
 
     private Answer groupList() {
         ArrayNode list = JSON.createArrayNode();
-        groups.values().forEach(group -> {
+        groups.values().stream().filter(this::known).forEach(group -> {
             ObjectNode entry = list.addObject();
             entry.put("name", group.name());
             entry.put("description", group.name());
@@ -748,7 +762,7 @@ final class LoxoneSimulator implements AutoCloseable {
             assigned = new ArrayList<>();
             for (JsonNode group : json.get("usergroups")) {
                 Group known = groups.get(group.asString());
-                if (known == null) {
+                if (known == null || !known(known)) {
                     return Answer.of(404);
                 }
                 if (known.type() == 1 || known.type() == 4) {
@@ -857,8 +871,13 @@ final class LoxoneSimulator implements AutoCloseable {
         return Answer.of(heldElsewhere ? 201 : 200);
     }
 
+    private boolean known(Group group) {
+        return !groupsUnknown || group.type() != 0;
+    }
+
     private void group(String name, int type) {
-        String uuid = loxoneUuid();
+        String uuid = format(UUID.nameUUIDFromBytes(name.getBytes(StandardCharsets.UTF_8)).toString()
+                .replace("-", ""));
         groups.put(uuid, new Group(uuid, name, type));
     }
 
@@ -882,7 +901,10 @@ final class LoxoneSimulator implements AutoCloseable {
     }
 
     private static String loxoneUuid() {
-        String hex = HexFormat.of().formatHex(randomBytes(16));
+        return format(HexFormat.of().formatHex(randomBytes(16)));
+    }
+
+    private static String format(String hex) {
         return hex.substring(0, 8) + "-" + hex.substring(8, 12) + "-" + hex.substring(12, 16) + "-"
                 + hex.substring(16);
     }
