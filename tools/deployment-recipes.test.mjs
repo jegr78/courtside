@@ -633,6 +633,62 @@ test("given acceptance with Mailpit, when it is rendered, then its messages are 
     && Object.keys(service.networks ?? {}).includes("acceptance-mail-console")).map(([name]) => name), []);
 });
 
+const loxoneSimulator = {
+  COURTSIDE_LOXONE_SIMULATOR_IMAGE: `ghcr.io/jegr78/courtside@sha256:${"c".repeat(64)}`,
+  COURTSIDE_ACCESS_CONTROL_CONNECTOR: "loxone",
+  COURTSIDE_ACCESS_CONTROL_LOXONE_URL: "https://loxone-miniserver",
+  COURTSIDE_ACCESS_CONTROL_LOXONE_SERIAL: "",
+  COURTSIDE_ACCESS_CONTROL_LOXONE_USER: "courtside-service",
+  COURTSIDE_ACCESS_CONTROL_LOXONE_PASSWORD: "example-service-password",
+};
+const simulatorServices = ["loxone-simulator", "loxone-miniserver", "loxone-trust"];
+
+function simulatorModel() {
+  return rendered([...resolved("files", "standard", "--synthetic-mail"), "compose.loxone-simulator.yaml"],
+    { ...recipes.standard.environment, ...syntheticMail, ...loxoneSimulator });
+}
+
+test("given acceptance with the Loxone simulator, when it is rendered, then the application trusts the simulated "
+  + "Miniserver and reaches it only on the internal network", () => {
+  // when
+  const model = simulatorModel();
+
+  // then
+  const app = model.services.app;
+  assert.equal(app.environment.COURTSIDE_ACCESS_CONTROL_CONNECTOR, "loxone",
+    "the launcher's process environment did not reach the application through compose.yaml");
+  assert.equal(app.environment.COURTSIDE_ACCESS_CONTROL_LOXONE_URL, "https://loxone-miniserver");
+  assert.equal(app.environment.COURTSIDE_ACCESS_CONTROL_LOXONE_USER, "courtside-service");
+  assert.match(app.environment.JAVA_TOOL_OPTIONS,
+    /^-Djavax\.net\.ssl\.trustStore=\/var\/lib\/courtside\/loxone-trust\/\w+\.p12 -Djavax\.net\.ssl\.trustStoreType=PKCS12$/);
+  assert.deepEqual(app.volumes.filter((volume) => volume.source === "loxone-trust")
+    .map(({ type, target, read_only: readOnly }) => ({ type, target, readOnly })),
+  [{ type: "volume", target: "/var/lib/courtside/loxone-trust", readOnly: true }]);
+  assert.ok(Object.keys(app.networks).includes("loxone"), "the application is not on the simulator's network");
+  assert.equal(model.networks.loxone.internal, true);
+  assert.equal(app.depends_on["loxone-trust"]?.condition, "service_completed_successfully");
+  assert.equal(app.depends_on.db?.condition, "service_healthy", "the component replaced the database dependency");
+  assert.equal(model.services["loxone-simulator"].image, loxoneSimulator.COURTSIDE_LOXONE_SIMULATOR_IMAGE);
+  assert.equal(model.services["loxone-trust"].image, loxoneSimulator.COURTSIDE_LOXONE_SIMULATOR_IMAGE);
+});
+
+test("given acceptance with the Loxone simulator, when its services are read, then none publishes a port and each "
+  + "runs read-only without capabilities it does not need", () => {
+  // when
+  const model = simulatorModel();
+
+  // then
+  for (const name of simulatorServices) {
+    const service = model.services[name];
+    assert.deepEqual(service.ports ?? [], [], `${name} publishes a port`);
+    assert.equal(service.read_only, true, `${name} has a writable root`);
+    assert.deepEqual(service.cap_drop, ["ALL"], `${name} keeps its default capabilities`);
+    assert.ok(service.security_opt.includes("no-new-privileges:true"), `${name} may gain privileges`);
+    assert.deepEqual(Object.keys(service.networks ?? {}).filter((network) => model.networks[network]?.internal !== true),
+      [], `${name} joins a network that leaves the host`);
+  }
+});
+
 test("given every recipe model, when a service publishes a port, then Docker has a network to publish it on", () => {
   const models = Object.entries(recipes).map(([name, recipe]) => [name, rendered(resolved("files", name), recipe.environment)]);
   models.push(["standard with synthetic mail", rendered(resolved("files", "standard", "--synthetic-mail"),

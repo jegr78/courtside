@@ -1,0 +1,13 @@
+{
+	skip_install_trust
+	auto_https disable_redirects
+}
+
+https://loxone-miniserver {
+	tls internal
+	header {
+		-Server
+		-Via
+	}
+	reverse_proxy loxone-simulator:8080
+}

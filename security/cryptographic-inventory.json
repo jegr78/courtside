@@ -1116,6 +1116,32 @@
       ]
     },
     {
+      "id": "loxone-simulator-trust",
+      "purpose": "Let the application verify the simulated Miniserver of an acceptance instance over HTTPS while it keeps trusting the public certificate authorities",
+      "algorithm": "TLS",
+      "implementation": "caddy",
+      "strength": {
+        "decidedBy": "caddy",
+        "basis": "Caddy's internal authority chooses the key of its root and of the certificate it serves for loxone-miniserver, and negotiates the suite with the application. This repository selects neither."
+      },
+      "class": "transport",
+      "owner": "repository-maintainer",
+      "storageBoundary": "Caddy keeps its root and intermediate keys in the component's loxone-caddy-data volume. A one-shot container without a network mounts that authority directory read-only, so it can read both keys, copies the runtime's default CA anchors and adds the root certificate without a key into a PKCS12 store in the loxone-trust volume, which the application mounts read-only. The store holds certificates only and carries no password or integrity key.",
+      "permittedUse": "Setting javax.net.ssl.trustStore for the application of an acceptance instance that runs the Loxone simulator. Certificate and hostname verification stay unchanged. The launcher refuses the component unless the instance is UAT, and a production instance never mounts the store.",
+      "rotation": "The one-shot container rebuilds the store on every start. A new root after a reset of the Caddy volume reaches the application only after its restart, because the JVM reads the store when it starts.",
+      "revocation": "Deselect the simulator and restart the application; nothing outside the instance trusts this root.",
+      "recovery": "A failed import stops the application from starting rather than enabling unverified TLS. Remove the component's volumes and start again for a new authority.",
+      "retirement": "Follows the Loxone simulator component.",
+      "evidence": "tools/deployment-recipes.test.mjs",
+      "detects": [
+        "keystore",
+        "truststore"
+      ],
+      "locations": [
+        "deploy/compose.loxone-simulator.yaml"
+      ]
+    },
+    {
       "id": "certificate-pinning",
       "purpose": "Recognise one expected certificate by its digest instead of trusting whoever a certificate authority vouched for",
       "algorithm": "SHA-256",

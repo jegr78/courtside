@@ -6,7 +6,128 @@ import { join } from "node:path";
 import test from "node:test";
 
 import { executable } from "./deployment-archive.mjs";
-import { writeRecoveryChecksums, fixture, releaseArchive, run, initialize } from "./deployment-cli-fixture.mjs";
+import { writeRecoveryChecksums, fixture, releaseArchive, run, initialize, makeInstalledManifestLegacy }
+  from "./deployment-cli-fixture.mjs";
+
+const simulatorEnvironment = [
+  `environment COURTSIDE_ACCESS_CONTROL_CONNECTOR=loxone`,
+  `environment COURTSIDE_ACCESS_CONTROL_LOXONE_PASSWORD=example-service-password`,
+  `environment COURTSIDE_ACCESS_CONTROL_LOXONE_SERIAL=`,
+  `environment COURTSIDE_ACCESS_CONTROL_LOXONE_URL=https://loxone-miniserver`,
+  `environment COURTSIDE_ACCESS_CONTROL_LOXONE_USER=courtside-service`,
+  `environment COURTSIDE_LOXONE_SIMULATOR_IMAGE=ghcr.io/jegr78/courtside@sha256:${"b".repeat(64)}`,
+];
+
+function appendEnvironment(target, line) {
+  const file = join(target, "config", ".env");
+  writeFileSync(file, `${readFileSync(file, "utf8")}${line}\n`);
+}
+
+test("given a synthetic-mail installation that selects the Loxone simulator, when it starts, then Compose adds the "
+  + "component last and receives the connector settings from the launcher", () => {
+  fixture((context) => {
+    // given
+    assert.equal(initialize(context, { synthetic_mail: "true", loxone_simulator: "true" }).status, 0);
+
+    // when
+    const started = run(context.archive, context.target, ["up"], context.environment);
+
+    // then
+    assert.equal(started.status, 0, started.stderr);
+    assert.match(readFileSync(join(context.target, "config", "installation.conf"), "utf8"), /^loxone_simulator=true$/m);
+    const lines = readFileSync(context.dockerLog, "utf8").split("\n");
+    const up = lines.findIndex((line) => line.endsWith(" up -d"));
+    assert.match(lines[up], / -f \S+\/compose\.mailpit\.yaml -f \S+\/compose\.loxone-simulator\.yaml up -d$/,
+      "the simulator component is not the last Compose file");
+    assert.deepEqual(lines.slice(up + 1, up + 1 + simulatorEnvironment.length), simulatorEnvironment);
+    assert.doesNotMatch(readFileSync(join(context.target, "config", ".env"), "utf8"), /LOXONE/,
+      "the simulator settings leaked into .env, whose image keys are closed");
+  });
+});
+
+test("given an installation configuration without the simulator setting, when it starts, then it runs without the "
+  + "simulator", () => {
+  fixture((context) => {
+    // given
+    assert.equal(initialize(context, { synthetic_mail: "true" }).status, 0);
+    const configuration = join(context.target, "config", "installation.conf");
+    assert.match(readFileSync(configuration, "utf8"), /^loxone_simulator=false$/m);
+    writeFileSync(configuration, readFileSync(configuration, "utf8").replace(/^loxone_simulator=.*\n/m, ""));
+
+    // when
+    const started = run(context.archive, context.target, ["up"], context.environment);
+
+    // then
+    assert.equal(started.status, 0, started.stderr);
+    const invocation = readFileSync(context.dockerLog, "utf8");
+    assert.doesNotMatch(invocation, /compose\.loxone-simulator\.yaml/);
+    assert.doesNotMatch(invocation, /^environment /m);
+  });
+});
+
+test("given the simulator setting, when it is not true or false, then the answers are refused", () => {
+  fixture((context) => {
+    // when
+    const refused = initialize(context, { synthetic_mail: "true", loxone_simulator: "yes" });
+
+    // then
+    assert.equal(refused.status, 2);
+    assert.match(refused.stderr, /loxone_simulator must be true or false/);
+  });
+});
+
+test("given the simulator selected, when the instance is neither synthetic-mail nor UAT or its release has no "
+  + "booking-seed image, then no Compose command runs", () => {
+  fixture((context) => {
+    // given
+    assert.equal(initialize(context, { loxone_simulator: "true" }).status, 0);
+
+    // when
+    const production = run(context.archive, context.target, ["up"], context.environment);
+    appendEnvironment(context.target, 'COURTSIDE_ENVIRONMENT="UAT"');
+    const acceptance = run(context.archive, context.target, ["up"], context.environment);
+    makeInstalledManifestLegacy(context.target);
+    const legacy = run(context.archive, context.target, ["up"], context.environment);
+
+    // then
+    assert.equal(production.status, 2);
+    assert.match(production.stderr, /loxone_simulator is only available when COURTSIDE_ENVIRONMENT is UAT/);
+    assert.equal(acceptance.status, 0, acceptance.stderr);
+    assert.equal(legacy.status, 2);
+    assert.match(legacy.stderr, /loxone_simulator needs a release that provides a booking-seed image/);
+    assert.equal((readFileSync(context.dockerLog, "utf8").match(/ up -d$/gm) ?? []).length, 1,
+      "a refused selection still started Compose");
+  });
+});
+
+test("given the simulator selected or not, when a failure is chosen, then only the selecting installation reaches "
+  + "the simulator's control port", () => {
+  fixture((context) => {
+    // given
+    assert.equal(initialize(context, { synthetic_mail: "true" }).status, 0);
+    const configuration = join(context.target, "config", "installation.conf");
+
+    // when
+    const unselected = run(context.archive, context.target, ["loxone-failure", "offline"], context.environment);
+    writeFileSync(configuration, readFileSync(configuration, "utf8")
+      .replace(/^loxone_simulator=false$/m, "loxone_simulator=true"));
+    const malformed = run(context.archive, context.target, ["loxone-failure", "offline;reboot"], context.environment);
+    const missing = run(context.archive, context.target, ["loxone-failure"], context.environment);
+    const selected = run(context.archive, context.target, ["loxone-failure", "offline"], context.environment);
+
+    // then
+    assert.equal(unselected.status, 2);
+    assert.match(unselected.stderr, /loxone-failure needs loxone_simulator=true/);
+    assert.equal(malformed.status, 2);
+    assert.match(malformed.stderr, /loxone-failure needs one failure name/);
+    assert.equal(missing.status, 2);
+    assert.match(missing.stderr, /loxone-failure needs one failure name/);
+    assert.equal(selected.status, 0, selected.stderr);
+    const exec = readFileSync(context.dockerLog, "utf8").split("\n").filter((line) => line.includes(" exec "));
+    assert.equal(exec.length, 1, "a refused failure name still reached the simulator");
+    assert.match(exec[0], /-f \S+\/compose\.loxone-simulator\.yaml exec -T loxone-simulator curl -fsS -X PUT --data offline http:\/\/127\.0\.0\.1:8081\/failure$/);
+  });
+});
 
 test("given a retained mail transition recovery unit, when backups are pruned, then its original release remains recoverable", () => {
   fixture((context) => {
@@ -926,4 +1047,19 @@ test("given a key volume appears during restore reservation, when its owner diff
     assert.equal(retained.length, 1);
     assert.equal(readFileSync(join(context.root, retained[0]), "utf8"), "foreign\n");
   });
+});
+
+test("given the simulator's own account, when the launcher signs the connector in, then it uses that account", () => {
+  // given
+  const simulator = readFileSync(new URL(
+    "../src/main/java/org/courtside/loxonesimulator/LoxoneSimulator.java", import.meta.url), "utf8");
+  const constant = (name) => new RegExp(`static final String ${name} = "([^"]+)";`).exec(simulator)?.[1];
+
+  // when
+  const launcher = /^readonly loxone_simulator_account=(\S+)$/m
+    .exec(readFileSync(new URL("../deploy/courtside", import.meta.url), "utf8"))?.[1];
+
+  // then
+  assert.equal(launcher, `${constant("USER")}:${constant("PASSWORD")}`,
+    "the launcher would sign the connector in with an account the simulator refuses");
 });

@@ -50,7 +50,8 @@ public class ReferenceDeploymentSecurityTest {
             "x-forwarded-host", "x-forwarded-port", "x-forwarded-prefix", "x-forwarded-proto",
             "x-forwarded-ssl");
     private static final Map<String, Boolean> APPLICATION_UPSTREAMS = Map.of(
-            "app:8080", true, "host.docker.internal:8080", true, "api-ui:8080", false);
+            "app:8080", true, "host.docker.internal:8080", true, "api-ui:8080", false,
+            "loxone-simulator:8080", false);
     private static final List<String> TLS_MODES = List.of("plaintext", "serve");
     private static final String CLIENT_HEADER_PLACEHOLDER = "{http.request.header.";
     private static final Pattern CADDY_IMAGE = Pattern.compile(
@@ -86,13 +87,15 @@ public class ReferenceDeploymentSecurityTest {
             "image: courtside:uat-booking-seed-local";
     private static final String INSTALLED_BOOKING_SEED_IMAGE =
             "image: ${COURTSIDE_BOOKING_SEED_IMAGE:?set COURTSIDE_BOOKING_SEED_IMAGE}";
+    private static final String LOXONE_SIMULATOR_IMAGE =
+            "image: ${COURTSIDE_LOXONE_SIMULATOR_IMAGE:?set COURTSIDE_LOXONE_SIMULATOR_IMAGE}";
     private static final String FIXTURE_IMAGE_BASE = "FROM ${BASE_IMAGE}";
     private static final Set<String> OWN_IMAGE_REFERENCES =
             Set.of(GHCR_RELEASE_IMAGE, CUSTOM_IMAGE, UAT_LOCAL_IMAGE_ALIAS, PERF_LOCAL_IMAGE_ALIAS,
                     UPGRADE_CANDIDATE_IMAGE_ALIAS, RESTORE_CANDIDATE_IMAGE_ALIAS,
                     SECURITY_CANDIDATE_IMAGE_ALIAS, SECURITY_FIXTURES_IMAGE_ALIAS,
                     UAT_BOOKING_SEED_LOCAL_IMAGE, INSTALLED_BOOKING_SEED_IMAGE,
-                    FIXTURE_IMAGE_BASE);
+                    LOXONE_SIMULATOR_IMAGE, FIXTURE_IMAGE_BASE);
 
     @Test
     void whenReadingImageSources_thenEveryThirdPartyImageIsPinnedByDigest() throws IOException {

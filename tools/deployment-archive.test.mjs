@@ -415,6 +415,16 @@ test("given the archive, when a club follows its own first step, then the file t
     "the guide says to copy .env.example, and the archive does not carry it");
 });
 
+test("given an acceptance instance that selects the Loxone simulator, when the archive is derived, then it carries "
+  + "the component and the proxy configuration it mounts", () => {
+  // when
+  const paths = archiveEntries(deploy).map((entry) => entry.path);
+
+  // then
+  assert.deepEqual(["compose.loxone-simulator.yaml", "Caddyfile.loxone-simulator"]
+    .filter((path) => !paths.includes(path)), [], "the launcher appends a component the archive does not carry");
+});
+
 test("given the overlays the deployment declares, when the archive is derived, then it carries each", () => {
   const model = YAML.parse(readFileSync(join(deploy, "compose.yaml"), "utf8"), { logLevel: "silent" });
 
