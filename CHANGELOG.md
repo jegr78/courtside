@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.4.0-rc.3](https://github.com/jegr78/courtside/compare/v0.4.0-rc.2...v0.4.0-rc.3) (2026-11-03)
+
+
+### Features
+
+* run the Loxone simulator beside an acceptance instance ([#1835](https://github.com/jegr78/courtside/issues/1835)) ([71df959](https://github.com/jegr78/courtside/commit/71df959f4697f7ce4aa42f3342f115e7ec8518b6))
+* serve the club logo to the header as a 160-pixel variant ([#1827](https://github.com/jegr78/courtside/issues/1827)) ([80598c9](https://github.com/jegr78/courtside/commit/80598c9cd3a2d087d8f37145b1d2f54d212d0009))
+
+
+### Bug fixes
+
+* give the date field an id and the page the standard capable tag ([#1828](https://github.com/jegr78/courtside/issues/1828)) ([1089fc0](https://github.com/jegr78/courtside/commit/1089fc07ce549d04e8bc9cca24452a948d349b43))
+
+
+### Documentation
+
+* post the acceptance summary on the release pull request ([#1825](https://github.com/jegr78/courtside/issues/1825)) ([210e6ea](https://github.com/jegr78/courtside/commit/210e6eaea4337a7fd259b697a40650ce134d74d9))
+
 ## 0.4.0 (2026-11-01)
 
 ### Features
