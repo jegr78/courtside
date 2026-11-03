@@ -30,12 +30,12 @@ export function validateReview(review) {
   return review;
 }
 
-const sheetVerdict = (name, entry, keys) => {
+const sheetVerdict = (name, entry, keys, produced) => {
   const verdict = entry?.verdict;
   if (verdict !== "clean" && !(Array.isArray(verdict) && verdict.length > 0 && verdict.every((key) => typeof key === "string")))
     throw new Error(`review sheet ${name}: verdict must be "clean" or the keys of the findings it shows`);
   if (typeof entry.by !== "string" || entry.by.trim() === "") throw new Error(`review sheet ${name}: by names who reviewed it`);
-  const unknown = verdict === "clean" ? [] : verdict.filter((key) => !keys.has(key));
+  const unknown = verdict === "clean" || !produced ? [] : verdict.filter((key) => !keys.has(key));
   if (unknown.length) throw new Error(`review sheet ${name}: names findings this run does not hold: ${unknown.join(", ")}`);
 };
 
@@ -49,8 +49,8 @@ function reviewersOf(names, verdicts) {
 
 function reviewSheets(sheets, verdicts, keys, scope) {
   if (!sheets) return null;
-  for (const [name, entry] of Object.entries(verdicts)) sheetVerdict(name, entry, keys);
   const names = [...sheets.names].sort();
+  for (const [name, entry] of Object.entries(verdicts)) sheetVerdict(name, entry, keys, names.includes(name));
   const inScope = scope ? names.filter((name) => scope.sheets.some((entry) => matches(entry, name))) : names;
   const reviewed = inScope.filter((name) => verdicts[name]);
   return {
@@ -59,7 +59,8 @@ function reviewSheets(sheets, verdicts, keys, scope) {
     unreviewed: inScope.filter((name) => !verdicts[name]),
     outsideScope: names.filter((name) => !inScope.includes(name)),
     reviewers: reviewersOf(reviewed, verdicts),
-    scope: scope ? { basis: scope.basis, stale: scope.sheets.filter((entry) => !names.some((name) => matches(entry, name))) } : null,
+    scope: scope ? { basis: scope.basis,
+      stale: sheets.unavailable ? [] : scope.sheets.filter((entry) => !names.some((name) => matches(entry, name))) } : null,
     stale: Object.keys(verdicts).filter((name) => !names.includes(name)).sort(),
     unavailable: sheets.unavailable ?? null
   };

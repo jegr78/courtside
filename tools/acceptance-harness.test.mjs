@@ -898,6 +898,87 @@ test("given a scope basis or a reviewer that names a person from the roster, whe
   assert.throws(() => summarised(scoped(verdicts, { basis: "Surfaces Jane Doe asked for", sheets: ["admin--overview--*", "admin--usage--desktop--01"] })), /person/);
   assert.throws(() => summarised(scoped({ ...verdicts, "admin--usage--desktop--01": { verdict: "clean", by: "Richard" } }), terms), /person/,
     "a reviewer's name is review text and checked like a reason");
+  assert.throws(() => summarised(scoped(verdicts, { basis: "Changelog", sheets: ["admin--overview--*", "admin--usage--desktop--01", "Richard*"] }), terms), /person/,
+    "a stale scope entry is review text and checked like a reason");
+});
+
+const inScopeVerdicts = { "admin--overview--desktop--01": clean, "admin--overview--portrait--01": clean, "admin--usage--desktop--01": clean };
+
+test("given every sheet in the scope judged and one scope entry matching no sheet, when summarised, then the draft line names that entry", () => {
+  // when
+  const summary = summarised(scoped(inScopeVerdicts, { basis: "Changelog", sheets: ["admin--overview--*", "admin--usage--desktop--01", "admin--audit--*"] }));
+  // then
+  assert.match(summary, /\nDraft: 1 scope entry matches no sheet \(`admin--audit--\*`\)\.\n/);
+});
+
+test("given two scope entries matching no sheet, when summarised, then the draft line counts and names both", () => {
+  // when
+  const summary = summarised(scoped(inScopeVerdicts, { basis: "Changelog", sheets: ["admin--overview--*", "admin--usage--desktop--01", "admin--audit--*", "admin--gone"] }));
+  // then
+  assert.match(summary, /\nDraft: 2 scope entries match no sheet \(`admin--audit--\*`, `admin--gone`\)\.\n/);
+});
+
+test("given a scope and no contact sheets, when the report is applied and summarised, then only the unavailability is named and no scope entry is stale", () => {
+  // given
+  const unavailable = { names: [], unavailable: "ImageMagick not found on PATH" };
+  // when
+  const applied = applyReview(sheetFindings(), scoped(inScopeVerdicts), unavailable);
+  const html = sheetSection(applied.sheets);
+  const summary = releaseSummary({ version: "1.2.3", runId: "r", harnessCommit: "c", cells: { passed: 1, failed: 0, skipped: 0 },
+    reviewed: { ...applied, findings: reviewed.findings }, forbidden });
+  // then
+  assert.equal(applied.status, "draft");
+  assert.deepEqual(applied.sheets.scope.stale, [], "without sheets no entry can be judged stale");
+  assert.match(html, /No contact sheets to review: ImageMagick not found on PATH\./);
+  assert.doesNotMatch(html, /Scope entries/);
+  assert.match(summary, /\nDraft: No contact sheets to review: ImageMagick not found on PATH\.\n/);
+  assert.doesNotMatch(summary, /Scope entries/);
+});
+
+test("given a run whose only open point is a stale scope entry, when the report renders, then its head and summary name the reason", () => {
+  // given
+  const root = mkdtempSync(join(tmpdir(), "courtside-scope-report-"));
+  writeFileSync(join(root, "review.json"), JSON.stringify({ assessments: {}, manual: [], sheets: inScopeVerdicts,
+    scope: { basis: "Changelog", sheets: ["admin--overview--*", "admin--usage--desktop--01", "admin--audit--*"] } }));
+  try {
+    // when
+    const result = renderReport(root, valid(), { harnessCommit: "a".repeat(40), sheets: produced });
+    // then
+    assert.equal(result.status, "draft");
+    assert.ok(readFileSync(join(root, "report/index.html"), "utf8").includes('<p class="lede">Draft: 1 scope entry matches no sheet (`admin--audit--*`).</p>'),
+      "the report head names why it is a draft");
+    assert.match(readFileSync(join(root, "release-summary.md"), "utf8"), /\nDraft: 1 scope entry matches no sheet \(`admin--audit--\*`\)\.\n/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("given a run without screenshots, when the report renders, then it stays a draft and its head and summary say why", () => {
+  // given
+  const root = mkdtempSync(join(tmpdir(), "courtside-no-shots-"));
+  try {
+    const sheets = contactSheets(root);
+    // when
+    const result = renderReport(root, valid(), { harnessCommit: "a".repeat(40), sheets });
+    // then
+    assert.equal(sheets.skipped, "no screenshots", "the runner's output keeps naming the skip");
+    assert.equal(result.status, "draft", "a run that captured nothing has not been reviewed");
+    assert.ok(readFileSync(join(root, "report/index.html"), "utf8").includes('<p class="lede">Draft: No contact sheets to review: the run produced no screenshots.</p>'));
+    assert.match(readFileSync(join(root, "release-summary.md"), "utf8"), /\nDraft: No contact sheets to review: the run produced no screenshots\.\n/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("given a verdict for a sheet the run did not produce that names an unknown finding, when applied, then it is listed stale instead of stopping the report", () => {
+  // given
+  const review = { assessments: assessed, manual: [], sheets: { ...inScopeVerdicts, "memberA--plan--desktop--01": clean,
+    "admin--gone--desktop--01": { verdict: ["axe:from-an-earlier-run"], by: "reviewer" } } };
+  // when
+  const applied = applyReview(sheetFindings(), review, produced);
+  // then
+  assert.deepEqual(applied.sheets.stale, ["admin--gone--desktop--01"]);
+  assert.equal(applied.status, "final", "a stale verdict does not keep the report a draft");
+  assert.throws(() => applyReview(sheetFindings(), { ...review, sheets: { "admin--gone--desktop--01": { verdict: "fine", by: "reviewer" } } }, produced), /verdict/,
+    "a stale verdict still has to be well formed");
+  assert.throws(() => applyReview(sheetFindings(), { ...review, sheets: { "admin--usage--desktop--01": { verdict: ["axe:from-an-earlier-run"], by: "reviewer" } } }, produced),
+    /axe:from-an-earlier-run/, "a produced sheet may name only findings this run holds");
 });
 
 test("given a reason that names a username, an address, a host, a person or an image, when summarised, then each is refused without echoing it", () => {
@@ -1055,7 +1136,7 @@ test("given a load that falls below the limit, when waited for, then it returns,
   await assert.rejects(waitForLoad({ limit: 5.5, loadavg: () => [9], sleep: async () => {}, deadlineMs: 3, now: (() => { let t = 0; return () => (t += 1); })() }), /load stayed above 5.5/);
 });
 
-import { findFont } from "../acceptance/report/sheets.mjs";
+import { contactSheets, findFont } from "../acceptance/report/sheets.mjs";
 
 test("given font directories, when a font for the sheet labels is looked up, then a TrueType file is found and a missing directory is skipped", () => {
   // given

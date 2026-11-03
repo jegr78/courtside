@@ -410,10 +410,12 @@ verdict. Sheets outside the scope are listed under their own heading as outside 
 They never count as read, even when `sheets` holds a verdict for one, and they never keep the
 report a draft. Without a `scope` every sheet is in it, so a report never becomes final because a
 scope was left out. A report with any finding left unassessed or any sheet in the scope without a
-verdict is a draft and names what is open, and so is a run whose sheets could not be made or
-whose scope has a stale entry.
-Assessments for keys and verdicts for sheets the run did not produce are listed as stale, and
-neither blocks a final report. Findings assessed as capture artefacts appear under rejected
+verdict is a draft and names what is open, and so is a run whose scope has a stale entry. A run
+that produced no screenshots, or whose sheets could not be made, is a draft that names the reason;
+it lists no scope entry as stale, because there was nothing to match. Assessments for keys and
+verdicts for sheets the run did not produce are listed as stale, and neither blocks a final
+report. Such a verdict must still be well formed, but the findings it names are not checked
+against this run. Findings assessed as capture artefacts appear under rejected
 suspicions, harness gaps under their own heading.
 
 ## Release summary

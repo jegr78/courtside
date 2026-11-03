@@ -39,7 +39,7 @@ export function contactSheets(run) {
   const root = join(run, "shots");
   const directory = join(run, "sheets");
   rmSync(directory, { recursive: true, force: true });
-  if (!existsSync(root)) return { sheets: 0, names: [], entries: [], skipped: "no screenshots" };
+  if (!existsSync(root)) return { sheets: 0, names: [], entries: [], skipped: "no screenshots", unavailable: "the run produced no screenshots" };
   if (!tool) return { sheets: 0, names: [], entries: [], skipped: "ImageMagick not found on PATH", unavailable: "ImageMagick not found on PATH" };
   const surfaces = new Map();
   for (const path of walk(root).filter((candidate) => candidate.endsWith(".png") && !candidate.endsWith("-full.png") && !candidate.includes("/mail/"))) {

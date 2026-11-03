@@ -38,10 +38,15 @@ const inScopeTotal = (sheets) => sheets.reviewed.length + sheets.unreviewed.leng
 export function sheetStatus(sheets) {
   if (!sheets) return null;
   if (sheets.unavailable) return `No contact sheets to review: ${sheets.unavailable}.`;
-  if (!sheets.unreviewed.length) return null;
-  return sheets.scope
-    ? `${sheets.unreviewed.length} of ${inScopeTotal(sheets)} contact sheet(s) in the review scope without a verdict (${keys(sheets.unreviewed)}).`
-    : `${sheets.unreviewed.length} of ${sheets.total} contact sheet(s) without a verdict (${keys(sheets.unreviewed)}).`;
+  const stale = sheets.scope?.stale ?? [];
+  const open = [
+    !sheets.unreviewed.length ? null : sheets.scope
+      ? `${sheets.unreviewed.length} of ${inScopeTotal(sheets)} contact sheet(s) in the review scope without a verdict (${keys(sheets.unreviewed)}).`
+      : `${sheets.unreviewed.length} of ${sheets.total} contact sheet(s) without a verdict (${keys(sheets.unreviewed)}).`,
+    !stale.length ? null : stale.length === 1 ? `1 scope entry matches no sheet (${keys(stale)}).`
+      : `${stale.length} scope entries match no sheet (${keys(stale)}).`
+  ].filter(Boolean);
+  return open.length ? open.join(" ") : null;
 }
 
 function statusLine(reviewed) {
@@ -84,6 +89,7 @@ export function releaseSummary({ version, runId, harnessCommit, cells, reviewed,
     ""
   ].join("\n");
   const written = [...reviewed.findings.flatMap((finding) => finding.review ? [finding.review.reason, finding.review.followUp] : []),
-    reviewed.sheets?.scope?.basis ?? "", ...(reviewed.sheets?.reviewers ?? []).map((reviewer) => reviewer.by)].join("\n");
+    reviewed.sheets?.scope?.basis ?? "", ...(reviewed.sheets?.scope?.stale ?? []),
+    ...(reviewed.sheets?.reviewers ?? []).map((reviewer) => reviewer.by)].join("\n");
   return assertPrivacySafe(markdown, forbidden, written);
 }
