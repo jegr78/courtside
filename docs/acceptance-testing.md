@@ -402,8 +402,8 @@ run does not.
 That suite and the guide captures in `frontend/e2e/guide-screenshots.spec.ts` hold a reviewed
 baseline for each page and dialog the contact sheets show, in at least one state: the court
 plan signed out and signed in, the booking, waitlist, cancellation and move dialogs with a refusal,
-personal bookings with an open place and a waitlist offer, messages with a notification and a saved choice, the
-dependants page, the preferences menu, the account page, sign-in with a refused password, the
+personal bookings with an open place and a waitlist offer, messages with a notification and a
+saved choice, the dependants page, the preferences menu, the account page, sign-in with a refused password, the
 password reset, every administration page, and the administration states the journeys pass
 through: unsaved settings, an opening-hours impact, a season or closure list, a retention preview,
 an import preview and its refusal, a person with a guardian, managed appointments with their

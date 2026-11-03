@@ -283,10 +283,11 @@ animations, caret rendering, and dynamic-field masks. Each assertion captures th
 rather than the whole page, so a change to one surface cannot move a neighbour's baseline: the
 series-preview and booking dialogs are captured as dialogs, not as dialogs over the page behind
 them. Build identity needs no mask, the footer carrying it sits outside every captured surface. It
-covers each page and dialog an acceptance contact sheet shows, in at least one state: the court plan for a visitor and a member, the booking, waitlist, validation, cancellation
-and move dialogs, personal bookings with an open place and a waitlist offer, the dependants page,
-messages with a notification and the notification choices, the preferences menu, the account page, sign-in with its refusal, the
-password reset, and every administration page together with the states a board passes through
+covers each page and dialog an acceptance contact sheet shows, in at least one state: the court
+plan for a visitor and a member, the booking, waitlist, validation, cancellation and move dialogs,
+personal bookings with an open place and a waitlist offer, the dependants page, messages with a
+notification and the notification choices, the preferences menu, the account page, sign-in with its
+refusal, the password reset, and every administration page together with the states a board passes through
 there: unsaved settings, an opening-hours impact, a retention preview, an import preview and its
 refusal, a person with a guardian, a managed appointment and a series preview.
 
