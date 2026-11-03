@@ -4,6 +4,8 @@
 
 ### Features
 
+* run the Loxone simulator beside an acceptance instance ([#1835](https://github.com/jegr78/courtside/issues/1835)) ([71df959](https://github.com/jegr78/courtside/commit/71df959f4697f7ce4aa42f3342f115e7ec8518b6))
+* serve the club logo to the header as a 160-pixel variant ([#1827](https://github.com/jegr78/courtside/issues/1827)) ([80598c9](https://github.com/jegr78/courtside/commit/80598c9cd3a2d087d8f37145b1d2f54d212d0009))
 * add a recoverable Stalwart store transition ([#1805](https://github.com/jegr78/courtside/issues/1805)) ([6cc8c35](https://github.com/jegr78/courtside/commit/6cc8c35f28fa7ff393828d5665d5b31c541f2465))
 * add voluntary TOTP and WebAuthn account security ([#1779](https://github.com/jegr78/courtside/issues/1779)) ([78d9c6a](https://github.com/jegr78/courtside/commit/78d9c6a441168d16d59af78c920726966c3b1a89))
 * deliver a booking's own access code by mail with an emergency code fallback ([#1796](https://github.com/jegr78/courtside/issues/1796)) ([e08f8bb](https://github.com/jegr78/courtside/commit/e08f8bbb0e4cd2259ba68c8fd6184bc331c4ce33))
@@ -17,6 +19,7 @@
 
 ### Bug fixes
 
+* give the date field an id and the page the standard capable tag ([#1828](https://github.com/jegr78/courtside/issues/1828)) ([1089fc0](https://github.com/jegr78/courtside/commit/1089fc07ce549d04e8bc9cca24452a948d349b43))
 * close MFA review gaps in password change, factor pauses and recovery ([#1816](https://github.com/jegr78/courtside/issues/1816)) ([847c66a](https://github.com/jegr78/courtside/commit/847c66a0431c7d37577132b38e6951831f47a080))
 * harden access grants and the Loxone connector after the release review ([#1815](https://github.com/jegr78/courtside/issues/1815)) ([339ac4e](https://github.com/jegr78/courtside/commit/339ac4ef4d7af7f43d24dce2f3c545413a264ecb))
 * keep a member's navigation scroll across a window resize ([#1811](https://github.com/jegr78/courtside/issues/1811)) ([c146ab1](https://github.com/jegr78/courtside/commit/c146ab1e75477b5f4b8488f4af5a0d59edc1e2b9))
@@ -32,6 +35,10 @@
 * harden the MFA key root and second-factor guessing ([#1782](https://github.com/jegr78/courtside/issues/1782)) ([4948d8b](https://github.com/jegr78/courtside/commit/4948d8b7b9963738b6fd109ac81124fba76ac612))
 * pass the access-control settings through the reference deployment ([#1810](https://github.com/jegr78/courtside/issues/1810)) ([287374a](https://github.com/jegr78/courtside/commit/287374a7eb2d37c808658c5f0acd029d9320958f))
 * resolve the open security alerts and keep CodeQL failures visible ([#1788](https://github.com/jegr78/courtside/issues/1788)) ([3d4ea17](https://github.com/jegr78/courtside/commit/3d4ea179385d789cc656574ac734a0fea67be541))
+
+### Documentation
+
+* post the acceptance summary on the release pull request ([#1825](https://github.com/jegr78/courtside/issues/1825)) ([210e6ea](https://github.com/jegr78/courtside/commit/210e6eaea4337a7fd259b697a40650ce134d74d9))
 
 ### Chores
 
