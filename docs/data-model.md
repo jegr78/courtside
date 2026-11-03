@@ -377,10 +377,15 @@ again when a message is composed, so a row that no longer passes falls back to t
 | `import_column_mapping` | Which column header carries which canonical field, for a source read by header | `import_source` |
 | `import_column_position` | Which numbered column carries which canonical field, for a source read by position | `import_source` |
 | `import_type_mapping` | Which value in the file means which membership type | `import_source`, `membership_type` |
+| `import_left_out_category` | Which category values mark a row as not in the roster | `import_source` |
 | `import_owned_field` | Which fields the file owns, and may therefore overwrite | `import_source` |
 | `import_external_reference` | The link between a number in the file and a person here | `import_source`, `person` |
 | `import_preview` | What a file would change, with the hash of the file it was taken from | `import_source` |
 | `import_run` | What a preview actually did, counted by kind of change | `import_source`, `import_preview` |
+
+A category value sits in `import_type_mapping` or `import_left_out_category`, never in both; the
+application refuses a source that names one value in both. A preview keeps only the number of
+rows each left-out value removed, never the rows themselves.
 
 A run points at the preview it executed and `import_run_one_per_preview` allows only one, so a
 preview a board has read cannot be applied twice. Both carry the file hash, so a run that executed

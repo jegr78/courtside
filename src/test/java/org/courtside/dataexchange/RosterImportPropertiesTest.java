@@ -41,7 +41,7 @@ class RosterImportPropertiesTest {
                     List<String[]> people = peopleOf(rowCount, shape);
                     CsvSnapshot snapshot = SnapshotParser.parse(
                             rendered(people, separator).getBytes(encoding),
-                            columns(), encoding, separator);
+                            columns(), encoding, separator, Set.of());
                     return snapshot.errors().isEmpty() && carries(snapshot, people);
                 });
     }
@@ -175,7 +175,7 @@ class RosterImportPropertiesTest {
             values.put(CanonicalField.LAST_NAME, "Roe");
             rows.add(new CsvSnapshot.SnapshotRow(index + 1, "M" + index, values));
         }
-        return new CsvSnapshot(rows, List.of(), List.of());
+        return new CsvSnapshot(rows, List.of(), List.of(), Map.of());
     }
 
     // Every held name differs from the file's, so a matched number is always a change and never

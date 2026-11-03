@@ -83,6 +83,11 @@ public class ImportSource {
     private Map<String, UUID> membershipTypes = new HashMap<>();
 
     @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "import_left_out_category", joinColumns = @JoinColumn(name = "source_id"))
+    @Column(name = "source_value", nullable = false)
+    private Set<String> leftOutCategories = new HashSet<>();
+
+    @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "import_owned_field", joinColumns = @JoinColumn(name = "source_id"))
     @Enumerated(EnumType.STRING)
     @Column(name = "canonical_field", nullable = false)
@@ -95,7 +100,8 @@ public class ImportSource {
 
     public void changeTo(String sourceKey, String displayName, String separator, String encoding,
                          ColumnLayout layout,
-                         Map<String, UUID> membershipTypes, UUID defaultMembershipTypeId,
+                         Map<String, UUID> membershipTypes, Set<String> leftOutCategories,
+                         UUID defaultMembershipTypeId,
                          Set<CanonicalField> ownedFields, int removalWarningPercent) {
         this.sourceKey = sourceKey;
         this.displayName = displayName;
@@ -111,6 +117,8 @@ public class ImportSource {
         this.positions.putAll(layout.positions());
         this.membershipTypes.clear();
         this.membershipTypes.putAll(membershipTypes);
+        this.leftOutCategories.clear();
+        this.leftOutCategories.addAll(leftOutCategories);
         this.ownedFields.clear();
         this.ownedFields.addAll(ownedFields);
     }

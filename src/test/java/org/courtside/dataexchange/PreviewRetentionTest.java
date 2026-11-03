@@ -16,6 +16,7 @@ import org.springframework.context.annotation.Import;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Duration;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -72,7 +73,7 @@ class PreviewRetentionTest extends AbstractIntegrationTest {
                         "First name", CanonicalField.FIRST_NAME,
                         "Last name", CanonicalField.LAST_NAME,
                         "Email", CanonicalField.EMAIL)),
-                Map.of(), MEMBERSHIP_TYPE_ID,
+                Map.of(), List.of(), MEMBERSHIP_TYPE_ID,
                 Set.of(CanonicalField.FIRST_NAME, CanonicalField.LAST_NAME), 10).sourceId();
         UUID admin = identity.createPerson("Richard", "Miles", "richard.miles@example.org");
         account = identity.createAccount(admin, "admin", Set.of(Role.ADMIN));

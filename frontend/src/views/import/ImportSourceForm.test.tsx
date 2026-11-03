@@ -18,6 +18,7 @@ const existing: ImportSource = {
   displayName: "Membership system", separator: ";", encoding: "UTF-8",
   columns: { "Member number": "EXTERNAL_ID", "First name": "FIRST_NAME", "Last name": "LAST_NAME" },
   membershipTypes: {},
+  leftOutCategories: [],
   defaultMembershipTypeId: "type-1",
   ownedFields: [],
   removalWarningPercent: 10, columnMode: "HEADER", positions: [], columnCount: null
@@ -69,7 +70,7 @@ describe("ImportSourceForm", () => {
     // then
     const select = screen.getByTestId("category-Youth");
     expect([...select.querySelectorAll("option")].map((option) => option.value))
-      .toEqual(["", "type-1", "type-2", "type-3"]);
+      .toEqual(["", "type-1", "type-2", "type-3", "not-in-roster"]);
     expect(select.querySelector("option[value='type-3']")).toHaveTextContent("Youth (no longer offered)");
   });
 
@@ -170,6 +171,53 @@ describe("ImportSourceForm", () => {
     // then
     expect(save).toHaveBeenCalledWith(expect.objectContaining({
       membershipTypes: { passive: "type-2" }
+    }));
+  });
+
+  it("given a category read from the sample, when it is marked as not in the roster, then it is sent as left out and not mapped", async () => {
+    // given
+    const save = vi.fn().mockResolvedValue(existing);
+    show(existing, save);
+    await userEvent.upload(screen.getByTestId("source-file"),
+      file("Member number;First name;Last name;Status\n1;Jane;Doe;active\n2;John;Roe;resigned\n3;Mary;Major;deceased\n"));
+    await screen.findByTestId("column-MEMBERSHIP_TYPE");
+    await userEvent.selectOptions(screen.getByTestId("column-MEMBERSHIP_TYPE"), "Status");
+    await screen.findByTestId("category-resigned");
+
+    // when
+    await userEvent.selectOptions(screen.getByTestId("category-active"), "type-1");
+    await userEvent.selectOptions(screen.getByTestId("category-resigned"), "not-in-roster");
+    await userEvent.selectOptions(screen.getByTestId("category-deceased"), "not-in-roster");
+    await userEvent.click(screen.getByTestId("save-source"));
+
+    // then
+    expect(save).toHaveBeenCalledWith(expect.objectContaining({
+      membershipTypes: { active: "type-1" },
+      leftOutCategories: ["deceased", "resigned"]
+    }));
+  });
+
+  it("given a source that leaves a category out, when it opens without a file, then the choice shows and can be taken back", async () => {
+    // given
+    const save = vi.fn().mockResolvedValue(existing);
+    show({
+      ...existing,
+      columns: { ...existing.columns, Status: "MEMBERSHIP_TYPE" },
+      membershipTypes: { active: "type-1" },
+      leftOutCategories: ["resigned"]
+    }, save);
+    const resigned = await screen.findByTestId("category-resigned");
+    expect(resigned, "the stored choice is what the select holds").toHaveValue("not-in-roster");
+    expect(screen.getByTestId("unsaved-count")).toHaveTextContent("0");
+
+    // when
+    await userEvent.selectOptions(resigned, "type-2");
+    await userEvent.click(screen.getByTestId("save-source"));
+
+    // then
+    expect(save).toHaveBeenCalledWith(expect.objectContaining({
+      membershipTypes: { active: "type-1", resigned: "type-2" },
+      leftOutCategories: []
     }));
   });
 

@@ -13,6 +13,7 @@ const preview: ImportPreview = {
   fileHash: "a1b2c3d4e5f6",
   rowCount: 3,
   ignoredColumns: [],
+  leftOutRows: {},
   changes: [
     { kind: "CREATE", rowNumber: 1, externalId: "4711", personId: null, personName: null, values: { FIRST_NAME: "Jane", LAST_NAME: "Doe" }, account: "CREATE" },
     { kind: "UPDATE", rowNumber: 2, externalId: "4712", personId: "person-2", personName: "John Roe", values: { EMAIL: "john.roe@example.org" }, account: "NO_ADDRESS" },
@@ -270,6 +271,22 @@ describe("ImportPreviewPanel", () => {
 
     // then
     expect(screen.getByTestId("preview-ignored-columns")).toHaveTextContent("IBAN");
+  });
+
+  it("given rows the source leaves out, when the preview is read, then each category says how many and nobody is named", () => {
+    // given / when
+    show({ ...preview, leftOutRows: { resigned: 2, deceased: 1 } });
+
+    // then
+    expect(screen.getByTestId("preview-left-out")).toHaveTextContent("deceased: 1, resigned: 2");
+  });
+
+  it("given a file without left-out rows, when the preview is read, then nothing is said about them", () => {
+    // given / when
+    show(preview);
+
+    // then
+    expect(screen.queryByTestId("preview-left-out")).not.toBeInTheDocument();
   });
 
   it("given a refused file, when another file is chosen, then the refusal no longer stands beside it", async () => {

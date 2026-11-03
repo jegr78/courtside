@@ -26,6 +26,11 @@ function unmappedColumns(preview: ImportPreview, columnMode: ImportSource["colum
     .map((column) => columnMode === "POSITION" ? t("admin.import.columnNumber", { position: column }) : column).join(", ");
 }
 
+function leftOutCounts(preview: ImportPreview): string {
+  return Object.entries(preview.leftOutRows).sort(([left], [right]) => left.localeCompare(right))
+    .map(([value, count]) => `${value}: ${count}`).join(", ");
+}
+
 export function ImportPreviewPanel({ sourceId, sourceEncoding, columnMode, preview, disabled, previewed, reportError }: {
   sourceId: string;
   sourceEncoding: string;
@@ -132,6 +137,9 @@ export function ImportPreviewPanel({ sourceId, sourceEncoding, columnMode, previ
       <p data-testid="preview-accounts">{t("admin.import.accounts", { count: accountsOpenedBy(preview) })}</p>
       {preview.ignoredColumns.length > 0 && <p data-testid="preview-ignored-columns">
         {t("admin.import.unmapped", { columns: unmappedColumns(preview, columnMode, t) })}
+      </p>}
+      {Object.keys(preview.leftOutRows).length > 0 && <p data-testid="preview-left-out">
+        {t("admin.import.leftOut", { counts: leftOutCounts(preview) })}
       </p>}
 
       <Section testId="changes" heading={t("admin.import.changes", { shown: preview.changes.length })}>

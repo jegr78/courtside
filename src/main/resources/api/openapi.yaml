@@ -2093,8 +2093,8 @@ components:
     ImportSource:
       type: object
       required: [id, sourceKey, displayName, separator, encoding, columnMode, columns, positions,
-                 columnCount, membershipTypes, defaultMembershipTypeId, ownedFields,
-                 removalWarningPercent]
+                 columnCount, membershipTypes, leftOutCategories, defaultMembershipTypeId,
+                 ownedFields, removalWarningPercent]
       properties:
         id: { type: string, format: uuid }
         sourceKey: { type: string }
@@ -2140,6 +2140,11 @@ components:
         membershipTypes:
           type: object
           additionalProperties: { type: string, format: uuid }
+        leftOutCategories:
+          type: array
+          uniqueItems: true
+          description: The category values whose rows are not in the roster, in ascending order.
+          items: { type: string }
         defaultMembershipTypeId: { type: string, format: uuid }
         ownedFields:
           type: array
@@ -2153,9 +2158,10 @@ components:
         Every part of a source is given here and every part may be given again — this request is
         what a correction uses as much as a first description.
 
-        `membershipTypes` and `ownedFields` may be omitted, and the source then holds neither: no
-        exported category maps to a type, and the source owns no field. `ImportSource` reports both
-        as empty rather than absent, which is why it requires what this does not.
+        `membershipTypes`, `leftOutCategories` and `ownedFields` may be omitted, and the source then
+        holds none of them: no exported category maps to a type or is left out, and the source owns
+        no field. `ImportSource` reports them as empty rather than absent, which is why it requires
+        what this does not.
 
         `columnMode` omitted means `HEADER`. A source read by header gives `columns` and leaves
         `positions` and `columnCount` out; a source read by position gives `positions` and
@@ -2266,6 +2272,20 @@ components:
           propertyNames: { minLength: 1, maxLength: 120, pattern: ".*\\S.*" }
           maxProperties: 200
           additionalProperties: { type: string, format: uuid }
+        leftOutCategories:
+          type: array
+          maxItems: 200
+          description: |
+            Values of the category column whose rows are not in the roster: former or deceased
+            members in a full export, for instance. A row carrying one counts as absent from the
+            snapshot. It is not read beyond that cell, never stored, and only counted in the
+            preview, so a full snapshot ends the membership of somebody whose row now carries it.
+
+            A value is either mapped in `membershipTypes` or left out here, never both; a value
+            named in both is refused. Values are stored without their surrounding whitespace, and
+            two that differ only in it are refused as one value given twice. A value that is
+            neither mapped nor left out still stops the snapshot.
+          items: { type: string, minLength: 1, maxLength: 120, pattern: ".*\\S.*" }
         defaultMembershipTypeId:
           type: string
           format: uuid
@@ -2460,9 +2480,9 @@ components:
 
     ImportPreview:
       type: object
-      required: [previewId, sourceId, mode, fileName, fileHash, rowCount, ignoredColumns, changes,
-                 rowErrors, possibleDuplicates, sharedAddresses, removals, needsConfirmation,
-                 superseded, createdAt, expiresAt]
+      required: [previewId, sourceId, mode, fileName, fileHash, rowCount, ignoredColumns,
+                 leftOutRows, changes, rowErrors, possibleDuplicates, sharedAddresses, removals,
+                 needsConfirmation, superseded, createdAt, expiresAt]
       properties:
         previewId: { type: string, format: uuid }
         sourceId: { type: string, format: uuid }
@@ -2482,6 +2502,13 @@ components:
             Headers the file carries and this source's mapping does not name. They are skipped and
             listed rather than silently dropped: a column left out by a typo in the mapping looks
             exactly like a column the club never wanted.
+        leftOutRows:
+          type: object
+          description: |
+            For each category value the source leaves out, how many rows of the file carried it.
+            Those rows are counted and nothing else: no name, member number or row number of them
+            is kept. A value no row carried is absent, and `rowCount` does not include them.
+          additionalProperties: { type: integer, minimum: 1 }
         changes:
           type: array
           items: { $ref: "#/components/schemas/ImportPersonChange" }

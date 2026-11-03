@@ -11,6 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -92,7 +93,7 @@ class PositionalImportSourceTest extends AbstractIntegrationTest {
     void givenAPositionalLayoutWithoutAColumnCount_whenCreatingTheSource_thenItIsRefused() {
         // when / then
         assertThatThrownBy(() -> sources.create("headerless-system", "Headerless system", ";", "UTF-8",
-                new ColumnLayout(ColumnMode.POSITION, Map.of(), POSITIONS, null), Map.of(), ACTIVE_TYPE,
+                new ColumnLayout(ColumnMode.POSITION, Map.of(), POSITIONS, null), Map.of(), List.of(), ACTIVE_TYPE,
                 Set.of(), 10))
                 .isInstanceOf(ImportSourceInvalidException.class)
                 .extracting("code").isEqualTo("import.source.columnCount.outOfRange");
@@ -110,7 +111,7 @@ class PositionalImportSourceTest extends AbstractIntegrationTest {
     void givenHeadersSentWithAPositionalLayout_whenCreatingTheSource_thenItIsRefusedRatherThanIgnored() {
         // when / then
         assertThatThrownBy(() -> sources.create("headerless-system", "Headerless system", ";", "UTF-8",
-                new ColumnLayout(ColumnMode.POSITION, HEADERS, POSITIONS, 5), Map.of(), ACTIVE_TYPE,
+                new ColumnLayout(ColumnMode.POSITION, HEADERS, POSITIONS, 5), Map.of(), List.of(), ACTIVE_TYPE,
                 Set.of(), 10))
                 .isInstanceOf(ImportSourceInvalidException.class)
                 .extracting("code").isEqualTo("import.source.columns.unexpected");
@@ -120,7 +121,7 @@ class PositionalImportSourceTest extends AbstractIntegrationTest {
     void givenPositionsSentWithAHeaderLayout_whenCreatingTheSource_thenItIsRefusedRatherThanIgnored() {
         // when / then
         assertThatThrownBy(() -> sources.create("roster-system", "Membership system", ",", "UTF-8",
-                new ColumnLayout(ColumnMode.HEADER, HEADERS, POSITIONS, null), Map.of(), ACTIVE_TYPE,
+                new ColumnLayout(ColumnMode.HEADER, HEADERS, POSITIONS, null), Map.of(), List.of(), ACTIVE_TYPE,
                 Set.of(), 10))
                 .isInstanceOf(ImportSourceInvalidException.class)
                 .extracting("code").isEqualTo("import.source.positions.unexpected");
@@ -130,11 +131,11 @@ class PositionalImportSourceTest extends AbstractIntegrationTest {
     void givenAHeaderSource_whenItIsSwitchedToPositionsWithoutConfirmation_thenNothingChanges() {
         // given
         UUID id = sources.create("roster-system", "Membership system", ";", "UTF-8",
-                ColumnLayout.headers(HEADERS), Map.of(), ACTIVE_TYPE, Set.of(), 10).sourceId();
+                ColumnLayout.headers(HEADERS), Map.of(), List.of(), ACTIVE_TYPE, Set.of(), 10).sourceId();
 
         // when / then
         assertThatThrownBy(() -> sources.change(id, "roster-system", "Membership system", ";", "UTF-8",
-                ColumnLayout.positions(POSITIONS, 5), Map.of(), ACTIVE_TYPE, Set.of(), 10, false))
+                ColumnLayout.positions(POSITIONS, 5), Map.of(), List.of(), ACTIVE_TYPE, Set.of(), 10, false))
                 .isInstanceOf(ImportSourceInvalidException.class)
                 .satisfies(failure -> {
                     ImportSourceInvalidException refused = (ImportSourceInvalidException) failure;
@@ -149,11 +150,11 @@ class PositionalImportSourceTest extends AbstractIntegrationTest {
     void givenAHeaderSource_whenItIsSwitchedToPositionsWithConfirmation_thenTheNextSnapshotIsReadByPosition() {
         // given
         UUID id = sources.create("roster-system", "Membership system", ";", "UTF-8",
-                ColumnLayout.headers(HEADERS), Map.of(), ACTIVE_TYPE, Set.of(), 10).sourceId();
+                ColumnLayout.headers(HEADERS), Map.of(), List.of(), ACTIVE_TYPE, Set.of(), 10).sourceId();
 
         // when
         sources.change(id, "roster-system", "Membership system", ";", "UTF-8",
-                ColumnLayout.positions(POSITIONS, 5), Map.of(), ACTIVE_TYPE, Set.of(), 10, true);
+                ColumnLayout.positions(POSITIONS, 5), Map.of(), List.of(), ACTIVE_TYPE, Set.of(), 10, true);
 
         // then
         PreviewSummary preview = preview(id, "4711;Jane;Doe;jane.doe@example.org;A\n");
@@ -194,7 +195,7 @@ class PositionalImportSourceTest extends AbstractIntegrationTest {
 
     private SourceConfiguration positional(Map<Integer, CanonicalField> positions, int columnCount) {
         return sources.create("headerless-system", "Headerless system", ";", "UTF-8",
-                ColumnLayout.positions(positions, columnCount), Map.of(), ACTIVE_TYPE, Set.of(), 10);
+                ColumnLayout.positions(positions, columnCount), Map.of(), List.of(), ACTIVE_TYPE, Set.of(), 10);
     }
 
     private PreviewSummary preview(UUID sourceId, String content) {

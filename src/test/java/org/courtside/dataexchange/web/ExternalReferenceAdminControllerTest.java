@@ -19,6 +19,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 import java.net.URI;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -63,7 +64,7 @@ class ExternalReferenceAdminControllerTest extends AbstractIntegrationTest {
                         "First name", CanonicalField.FIRST_NAME,
                         "Last name", CanonicalField.LAST_NAME,
                         "Email", CanonicalField.EMAIL)),
-                Map.of(), ACTIVE_TYPE, Set.of(), 10).sourceId();
+                Map.of(), List.of(), ACTIVE_TYPE, Set.of(), 10).sourceId();
     }
 
     @Test
@@ -245,7 +246,7 @@ class ExternalReferenceAdminControllerTest extends AbstractIntegrationTest {
                         "First name", CanonicalField.FIRST_NAME,
                         "Last name", CanonicalField.LAST_NAME,
                         "Email", CanonicalField.EMAIL)),
-                Map.of(), ACTIVE_TYPE, Set.of(), 10).sourceId();
+                Map.of(), List.of(), ACTIVE_TYPE, Set.of(), 10).sourceId();
 
         // when / then
         mockMvc.perform(delete("/api/admin/import/sources/{sourceId}/references/{referenceId}",

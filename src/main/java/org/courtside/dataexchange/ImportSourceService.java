@@ -20,6 +20,7 @@ import java.util.Collection;
 import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -80,15 +81,17 @@ public class ImportSourceService {
     public SourceConfiguration create(String sourceKey, String displayName, String separator,
                                       String encoding, ColumnLayout layout,
                                       Map<String, UUID> membershipTypes,
+                                      Collection<String> leftOutCategories,
                                       UUID defaultMembershipTypeId,
                                       Set<CanonicalField> ownedFields, int removalWarningPercent) {
         ColumnLayout storedLayout = usableLayout(layout);
         Map<String, UUID> storedTypes = strippedMembershipTypes(membershipTypes);
+        Set<String> storedLeftOut = usableLeftOutCategories(leftOutCategories, storedTypes);
         requireUsable(storedTypes, defaultMembershipTypeId, ownedFields, removalWarningPercent);
         ImportSource source = new ImportSource(clock.instant());
         source.changeTo(requiredKey(sourceKey), requiredDisplayName(displayName),
                 requiredSeparator(separator), requiredEncoding(encoding), storedLayout, storedTypes,
-                defaultMembershipTypeId, ownedFields, removalWarningPercent);
+                storedLeftOut, defaultMembershipTypeId, ownedFields, removalWarningPercent);
         SourceConfiguration described = toConfiguration(saveOrRejectTakenKey(source));
         events.publishEvent(
                 new DataExchangeEvent.SourceDescribed(described.sourceId(), described.sourceKey()));
@@ -99,18 +102,20 @@ public class ImportSourceService {
     public SourceConfiguration change(UUID sourceId, String sourceKey, String displayName,
                                       String separator, String encoding, ColumnLayout layout,
                                       Map<String, UUID> membershipTypes,
+                                      Collection<String> leftOutCategories,
                                       UUID defaultMembershipTypeId,
                                       Set<CanonicalField> ownedFields, int removalWarningPercent,
                                       boolean columnModeChangeConfirmed) {
         ColumnLayout storedLayout = usableLayout(layout);
         Map<String, UUID> storedTypes = strippedMembershipTypes(membershipTypes);
+        Set<String> storedLeftOut = usableLeftOutCategories(leftOutCategories, storedTypes);
         requireUsable(storedTypes, defaultMembershipTypeId, ownedFields, removalWarningPercent);
         ImportSource source = require(sourceId);
         SourceConfiguration before = toConfiguration(source);
         requireConfirmedModeChange(before.columnMode(), storedLayout.mode(), columnModeChangeConfirmed);
         source.changeTo(requiredKey(sourceKey), requiredDisplayName(displayName),
                 requiredSeparator(separator), requiredEncoding(encoding), storedLayout, storedTypes,
-                defaultMembershipTypeId, ownedFields, removalWarningPercent);
+                storedLeftOut, defaultMembershipTypeId, ownedFields, removalWarningPercent);
         SourceConfiguration after = toConfiguration(saveOrRejectTakenKey(source));
         List<String> changedFields = differingFields(before, after);
         if (!changedFields.isEmpty()) {
@@ -344,6 +349,30 @@ public class ImportSourceService {
                 "import.source.membershipTypes.valueRepeated");
     }
 
+    // A value both mapped and left out would make the same row a member and absent at once.
+    private static Set<String> usableLeftOutCategories(Collection<String> leftOutCategories,
+                                                       Map<String, UUID> membershipTypes) {
+        Collection<String> given = leftOutCategories == null ? List.of() : leftOutCategories;
+        if (given.size() > MAX_MEMBERSHIP_TYPE_MAPPINGS) {
+            throw new ImportSourceInvalidException("import.source.leftOutCategories.tooMany",
+                    Map.of("field", "leftOutCategories", "maxEntries", MAX_MEMBERSHIP_TYPE_MAPPINGS));
+        }
+        Set<String> stripped = new LinkedHashSet<>();
+        for (String value : given) {
+            String usable = usableEntry(value, "import.source.leftOutCategories.valueUnusable",
+                    "leftOutCategories");
+            if (!stripped.add(usable)) {
+                throw new ImportSourceInvalidException("import.source.leftOutCategories.valueRepeated",
+                        Map.of("field", "leftOutCategories", "value", usable));
+            }
+            if (membershipTypes.containsKey(usable)) {
+                throw new ImportSourceInvalidException("import.source.leftOutCategories.alsoMapped",
+                        Map.of("field", "leftOutCategories", "value", usable));
+            }
+        }
+        return stripped;
+    }
+
     // Two keys that differ only in their padding are one key once stored, and taking the last of
     // them would drop a mapping the club sent and answer as though it had been kept.
     private static <T> Map<String, T> strippedKeys(Map<String, T> entries, String field,
@@ -393,7 +422,8 @@ public class ImportSourceService {
                 source.getDisplayName(), source.getSeparator().charAt(0), source.getEncoding(),
                 source.getColumnMode(), Map.copyOf(source.getColumns()),
                 Map.copyOf(source.getPositions()), source.getColumnCount(),
-                Map.copyOf(source.getMembershipTypes()), source.getDefaultMembershipTypeId(),
+                Map.copyOf(source.getMembershipTypes()), Set.copyOf(source.getLeftOutCategories()),
+                source.getDefaultMembershipTypeId(),
                 new HashSet<>(source.getOwnedFields()), source.getRemovalWarningPercent());
     }
 }

@@ -24,6 +24,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -89,7 +90,7 @@ class ImportPreviewAdminControllerTest extends AbstractIntegrationTest {
                         "First name", CanonicalField.FIRST_NAME,
                         "Last name", CanonicalField.LAST_NAME,
                         "Email", CanonicalField.EMAIL)),
-                Map.of(), ACTIVE_TYPE, Set.of(CanonicalField.FIRST_NAME, CanonicalField.LAST_NAME), 10).sourceId();
+                Map.of(), List.of(), ACTIVE_TYPE, Set.of(CanonicalField.FIRST_NAME, CanonicalField.LAST_NAME), 10).sourceId();
         UUID admin = identity.createPerson("Richard", "Miles", "richard.miles@example.org");
         identity.createAccount(admin, "admin", Set.of(Role.ADMIN));
     }
@@ -267,6 +268,53 @@ class ImportPreviewAdminControllerTest extends AbstractIntegrationTest {
 
     @Test
     @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAFullExportWithLeftOutCategories_whenPreviewing_thenItCountsThemAndNamesNobody()
+            throws Exception {
+        // given
+        source = sources.create("club-registry", "Club registry", ",", "UTF-8",
+                ColumnLayout.headers(Map.of("Member number", CanonicalField.EXTERNAL_ID,
+                        "First name", CanonicalField.FIRST_NAME,
+                        "Last name", CanonicalField.LAST_NAME,
+                        "Status", CanonicalField.MEMBERSHIP_TYPE)),
+                Map.of("active", ACTIVE_TYPE), List.of("resigned", "deceased"), ACTIVE_TYPE, Set.of(), 10)
+                .sourceId();
+
+        // when
+        String body = mockMvc.perform(upload("""
+                        Member number,First name,Last name,Status
+                        4711,Jane,Doe,active
+                        4712,John,Roe,resigned
+                        4713,Mary,Major,resigned
+                        4714,Richard,Roe,deceased
+                        """, "FULL_SNAPSHOT"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.rowCount").value(1))
+                .andExpect(jsonPath("$.leftOutRows.resigned").value(2))
+                .andExpect(jsonPath("$.leftOutRows.deceased").value(1))
+                .andExpect(jsonPath("$.changes.length()").value(1))
+                .andExpect(jsonPath("$.changes[0].externalId").value("4711"))
+                .andExpect(jsonPath("$.rowErrors.length()").value(0))
+                .andReturn().getResponse().getContentAsString();
+
+        // then
+        assertThat(body).as("a left-out row is counted and never described").doesNotContain("Mary", "Major", "John");
+        mockMvc.perform(get("/api/admin/import/previews/{id}", JsonPath.<String>read(body, "$.previewId")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.leftOutRows.resigned").value(2));
+        assertThatTheRosterIsUntouched();
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAFileWithoutLeftOutCategories_whenPreviewing_thenItCountsNone() throws Exception {
+        // when / then
+        mockMvc.perform(upload(THREE_ROWS, "FULL_SNAPSHOT"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.leftOutRows.length()").value(0));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
     void givenAColumnThisSourceDoesNotMap_whenPreviewing_thenItIsListedRatherThanDroppedSilently()
             throws Exception {
         // when / then
@@ -330,7 +378,7 @@ class ImportPreviewAdminControllerTest extends AbstractIntegrationTest {
                         "First name", CanonicalField.FIRST_NAME,
                         "Last name", CanonicalField.LAST_NAME,
                         "Email", CanonicalField.EMAIL)),
-                Map.of(), ACTIVE_TYPE,
+                Map.of(), List.of(), ACTIVE_TYPE,
                 Set.of(CanonicalField.FIRST_NAME, CanonicalField.LAST_NAME), 90, false);
 
         // then

@@ -14,6 +14,8 @@ const FIELDS: CanonicalField[] = [
 ];
 // A record is identified by its external id rather than described by it, so no source owns it.
 const OWNABLE = FIELDS.filter((field) => field !== "EXTERNAL_ID");
+// No membership type id ever takes this value, so a category holding it is left out, not mapped.
+const NOT_IN_ROSTER = "not-in-roster";
 const KEY_LENGTH = 40;
 const NAME_LENGTH = 80;
 
@@ -55,6 +57,7 @@ function described(source: ImportSource | undefined) {
     ...layoutOf(source?.columnMode ?? "HEADER", source?.columns ?? {}, positionsOf(source),
       countOf(source)),
     membershipTypes: source?.membershipTypes ?? {},
+    leftOutCategories: [...(source?.leftOutCategories ?? [])].sort(),
     defaultMembershipTypeId: source?.defaultMembershipTypeId ?? "",
     ownedFields: OWNABLE.filter((field) => (source?.ownedFields ?? []).includes(field)),
     removalWarningPercent: source?.removalWarningPercent ?? 10
@@ -71,7 +74,20 @@ function layoutOf(mode: ColumnMode, columns: Record<string, CanonicalField>, pos
 // A category left unassigned is absent from the request, so it has to be absent from the
 // comparison too — otherwise one arriving from the server would mark the source unsaved for good.
 function assigned(categories: Record<string, string> | undefined): Record<string, string> {
-  return Object.fromEntries(Object.entries(categories ?? {}).filter(([, typeId]) => typeId));
+  return Object.fromEntries(Object.entries(categories ?? {})
+    .filter(([, typeId]) => typeId && typeId !== NOT_IN_ROSTER));
+}
+
+function leftOut(categories: Record<string, string>): string[] {
+  return Object.entries(categories).filter(([, choice]) => choice === NOT_IN_ROSTER)
+    .map(([value]) => value).sort();
+}
+
+function choicesOf(source: ImportSource | undefined): Record<string, string> {
+  return {
+    ...source?.membershipTypes,
+    ...Object.fromEntries((source?.leftOutCategories ?? []).map((value) => [value, NOT_IN_ROSTER]))
+  };
 }
 
 // Without a prototype, because a column a club named __proto__ would otherwise reach the inherited
@@ -101,7 +117,7 @@ export function ImportSourceForm({ source, types, disabled, save }: {
   const [sourceKey, setSourceKey] = useState(confirmed.sourceKey);
   const [displayName, setDisplayName] = useState(confirmed.displayName);
   const [mapping, setMapping] = useState<Mapping>(mappingOf(source));
-  const [categories, setCategories] = useState<Record<string, string>>(confirmed.membershipTypes);
+  const [categories, setCategories] = useState<Record<string, string>>(choicesOf(source));
   const [defaultType, setDefaultType] = useState(confirmed.defaultMembershipTypeId);
   const [owned, setOwned] = useState<CanonicalField[]>(confirmed.ownedFields);
   const [threshold, setThreshold] = useState(String(confirmed.removalWarningPercent));
@@ -195,6 +211,7 @@ export function ImportSourceForm({ source, types, disabled, save }: {
       encoding,
       ...layoutOf(mode, columnsOf(mapping), positions, columnCount),
       membershipTypes: assigned(categories),
+      leftOutCategories: leftOut(categories),
       defaultMembershipTypeId: defaultType,
       // In the canonical order rather than the order they were ticked, so a field taken back and
       // given again leaves the same request rather than a reordered one.
@@ -221,7 +238,7 @@ export function ImportSourceForm({ source, types, disabled, save }: {
     setSourceKey(confirmed.sourceKey);
     setDisplayName(confirmed.displayName);
     setMapping(mappingOf(source));
-    setCategories(confirmed.membershipTypes);
+    setCategories(choicesOf(source));
     setDefaultType(confirmed.defaultMembershipTypeId);
     setOwned(confirmed.ownedFields);
     setThreshold(String(confirmed.removalWarningPercent));
@@ -321,6 +338,7 @@ export function ImportSourceForm({ source, types, disabled, save }: {
         <select data-testid={`category-${value}`} id={`${group}-category-${value}`} className="w-full min-w-0 rounded-md border p-2" disabled={disabled} value={categories[value] ?? ""} onChange={(event) => setCategories({ ...categories, [value]: event.target.value })}>
           <option value="">{t("admin.import.noType")}</option>
           {typeOptions(categories[value] ?? "")}
+          <option value={NOT_IN_ROSTER}>{t("admin.import.notInRoster")}</option>
         </select>
       </div>)}
     </div>}

@@ -16,6 +16,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -31,8 +32,8 @@ class SnapshotParserTest {
         byte[] update = repositoryFixture("site/public/examples/roster-import-example-update.csv");
 
         // when
-        CsvSnapshot snapshot = SnapshotParser.parse(content, COLUMNS, StandardCharsets.UTF_8, ';');
-        CsvSnapshot updatedSnapshot = SnapshotParser.parse(update, COLUMNS, StandardCharsets.UTF_8, ';');
+        CsvSnapshot snapshot = SnapshotParser.parse(content, COLUMNS, StandardCharsets.UTF_8, ';', Set.of());
+        CsvSnapshot updatedSnapshot = SnapshotParser.parse(update, COLUMNS, StandardCharsets.UTF_8, ';', Set.of());
 
         // then
         assertThat(snapshot.errors()).isEmpty();
@@ -252,7 +253,7 @@ class SnapshotParserTest {
                 .getBytes(Charset.forName("windows-1252"));
 
         // when
-        CsvSnapshot snapshot = SnapshotParser.parse(windows1252, COLUMNS, Charset.forName("windows-1252"), ',');
+        CsvSnapshot snapshot = SnapshotParser.parse(windows1252, COLUMNS, Charset.forName("windows-1252"), ',', Set.of());
 
         // then
         assertThat(snapshot.errors()).isEmpty();
@@ -268,7 +269,7 @@ class SnapshotParserTest {
 
         // when
         CsvSnapshot snapshot = SnapshotParser.parse(fixture("tab-export.csv"), columns,
-                StandardCharsets.UTF_8, '\t');
+                StandardCharsets.UTF_8, '\t', Set.of());
 
         // then
         assertThat(snapshot.errors()).isEmpty();
@@ -283,7 +284,7 @@ class SnapshotParserTest {
 
         // when
         CsvSnapshot snapshot = SnapshotParser.parse(fixture("comma-in-a-quoted-cell-export.csv"),
-                columns, StandardCharsets.UTF_8, ',');
+                columns, StandardCharsets.UTF_8, ',', Set.of());
 
         // then
         assertThat(snapshot.rows()).singleElement()
@@ -299,7 +300,7 @@ class SnapshotParserTest {
         // when / then — one enormous column names none of the required fields, and a header that
         // cannot be trusted fails the whole file instead of producing a row of nonsense
         assertThatThrownBy(() -> SnapshotParser.parse(fixture("quoted-semicolon-export.csv"),
-                columns, StandardCharsets.UTF_8, ','))
+                columns, StandardCharsets.UTF_8, ',', Set.of()))
                 .isInstanceOf(SnapshotHeaderInvalidException.class)
                 .hasFieldOrPropertyWithValue("code", "import.snapshot.header.missingField");
     }
@@ -312,7 +313,7 @@ class SnapshotParserTest {
 
         // when / then — which 8-bit encoding a file uses cannot be read off its bytes, and a guess
         // that lands on the wrong one imports mangled names without anybody being told
-        assertThatThrownBy(() -> SnapshotParser.parse(windows1252, COLUMNS, StandardCharsets.UTF_8, ','))
+        assertThatThrownBy(() -> SnapshotParser.parse(windows1252, COLUMNS, StandardCharsets.UTF_8, ',', Set.of()))
                 .isInstanceOf(SnapshotHeaderInvalidException.class)
                 .hasFieldOrPropertyWithValue("code", "import.snapshot.notEncoding");
     }
@@ -329,7 +330,7 @@ class SnapshotParserTest {
         System.arraycopy(utf8, 0, withMark, 3, utf8.length);
 
         // when — a mark is a fact about the bytes, the choice is only what to do without one
-        CsvSnapshot snapshot = SnapshotParser.parse(withMark, COLUMNS, Charset.forName("windows-1252"), ',');
+        CsvSnapshot snapshot = SnapshotParser.parse(withMark, COLUMNS, Charset.forName("windows-1252"), ',', Set.of());
 
         // then
         assertThat(snapshot.rows()).singleElement()
@@ -348,7 +349,7 @@ class SnapshotParserTest {
         System.arraycopy(utf16, 0, withMark, 2, utf16.length);
 
         // when
-        CsvSnapshot snapshot = SnapshotParser.parse(withMark, COLUMNS, StandardCharsets.UTF_8, ',');
+        CsvSnapshot snapshot = SnapshotParser.parse(withMark, COLUMNS, StandardCharsets.UTF_8, ',', Set.of());
 
         // then
         assertThat(snapshot.errors()).isEmpty();
@@ -418,7 +419,7 @@ class SnapshotParserTest {
 
         // when
         CsvSnapshot snapshot = SnapshotParser.parse(fixture("quoted-semicolon-export.csv"), columns,
-                StandardCharsets.UTF_8, ';');
+                StandardCharsets.UTF_8, ';', Set.of());
 
         // then
         assertThat(snapshot.errors()).isEmpty();
@@ -441,7 +442,7 @@ class SnapshotParserTest {
 
         // when
         CsvSnapshot snapshot = SnapshotParser.parse(fixture("windows-1252-semicolon-export.csv"), columns,
-                Charset.forName("windows-1252"), ';');
+                Charset.forName("windows-1252"), ';', Set.of());
 
         // then
         assertThat(snapshot.errors()).isEmpty();
@@ -507,7 +508,7 @@ class SnapshotParserTest {
 
         // when / then
         assertThatThrownBy(() -> SnapshotParser.parse(binary, COLUMNS,
-                StandardCharsets.ISO_8859_1, ','))
+                StandardCharsets.ISO_8859_1, ',', Set.of()))
                 .isInstanceOf(SnapshotUploadUnsupportedException.class)
                 .extracting("code").isEqualTo("import.snapshot.notText");
     }
@@ -521,10 +522,54 @@ class SnapshotParserTest {
                 .getBytes(StandardCharsets.ISO_8859_1);
 
         // when
-        CsvSnapshot snapshot = SnapshotParser.parse(content, COLUMNS, StandardCharsets.ISO_8859_1, ',');
+        CsvSnapshot snapshot = SnapshotParser.parse(content, COLUMNS, StandardCharsets.ISO_8859_1, ',', Set.of());
 
         // then
         assertThat(snapshot.rows()).hasSize(1);
+    }
+
+    @Test
+    void givenRowsWhoseCategoryIsLeftOut_whenParsing_thenTheyAreOnlyCounted() {
+        // given
+        String content = """
+                Member number,First name,Last name,Email,Category
+                4711,Mary,Major,,deceased
+                4711,Jane,Doe,jane.doe@example.org,active
+                ,John,Roe,,resigned
+                4712,Richard,Miles,not an address, resigned\s
+                """;
+
+        // when
+        CsvSnapshot snapshot = SnapshotParser.parse(content.getBytes(StandardCharsets.UTF_8), COLUMNS,
+                StandardCharsets.UTF_8, ',', Set.of("resigned", "deceased"));
+
+        // then
+        assertThat(snapshot.errors()).as("a left-out row is not checked for its number or its repetition")
+                .isEmpty();
+        assertThat(snapshot.rows()).singleElement().satisfies(row -> {
+            assertThat(row.externalId()).isEqualTo("4711");
+            assertThat(row.values()).containsEntry(CanonicalField.FIRST_NAME, "Jane");
+        });
+        assertThat(snapshot.leftOutRows()).isEqualTo(Map.of("resigned", 2, "deceased", 1));
+    }
+
+    @Test
+    void givenACategoryNobodyLeftOut_whenParsing_thenItsRowIsReadAndNothingIsCounted() {
+        // given
+        String content = """
+                Member number,First name,Last name,Email,Category
+                4711,Jane,Doe,jane.doe@example.org,active
+                4712,John,Roe,,honorary
+                """;
+
+        // when
+        CsvSnapshot snapshot = SnapshotParser.parse(content.getBytes(StandardCharsets.UTF_8), COLUMNS,
+                StandardCharsets.UTF_8, ',', Set.of("resigned"));
+
+        // then
+        assertThat(snapshot.rows()).extracting(CsvSnapshot.SnapshotRow::externalId)
+                .containsExactly("4711", "4712");
+        assertThat(snapshot.leftOutRows()).as("a value no row carries is not reported").isEmpty();
     }
 
     private static CsvSnapshot parse(String content) {
@@ -533,7 +578,7 @@ class SnapshotParserTest {
 
     private static CsvSnapshot parseWith(String content, char separator) {
         return SnapshotParser.parse(content.getBytes(StandardCharsets.UTF_8), COLUMNS,
-                StandardCharsets.UTF_8, separator);
+                StandardCharsets.UTF_8, separator, Set.of());
     }
 
     private static Map<String, CanonicalField> columns() {

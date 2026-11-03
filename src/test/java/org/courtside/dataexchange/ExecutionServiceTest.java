@@ -83,7 +83,7 @@ class ExecutionServiceTest extends AbstractIntegrationTest {
                         "First name", CanonicalField.FIRST_NAME,
                         "Last name", CanonicalField.LAST_NAME,
                         "Email", CanonicalField.EMAIL)),
-                Map.of(), ACTIVE_TYPE, Set.of(CanonicalField.FIRST_NAME, CanonicalField.LAST_NAME,
+                Map.of(), List.of(), ACTIVE_TYPE, Set.of(CanonicalField.FIRST_NAME, CanonicalField.LAST_NAME,
                         CanonicalField.EMAIL), 10).sourceId();
         UUID admin = identity.createPerson("Richard", "Miles", "richard.miles@example.org");
         actor = identity.createAccount(admin, "admin", Set.of(Role.ADMIN));
@@ -249,7 +249,7 @@ class ExecutionServiceTest extends AbstractIntegrationTest {
                         "Last name", CanonicalField.LAST_NAME,
                         "Email", CanonicalField.EMAIL,
                         "Category", CanonicalField.MEMBERSHIP_TYPE)),
-                Map.of("A", ACTIVE_TYPE), ACTIVE_TYPE, Set.of(CanonicalField.MEMBERSHIP_TYPE), 10).sourceId();
+                Map.of("A", ACTIVE_TYPE), List.of(), ACTIVE_TYPE, Set.of(CanonicalField.MEMBERSHIP_TYPE), 10).sourceId();
         UUID previewId = previews.create(typed, SnapshotMode.FULL_SNAPSHOT, "UTF-8",
                 new SnapshotUpload("roster.csv", "text/csv", """
                 Member number,First name,Last name,Email,Category
@@ -509,7 +509,7 @@ class ExecutionServiceTest extends AbstractIntegrationTest {
                         "First name", CanonicalField.FIRST_NAME,
                         "Last name", CanonicalField.LAST_NAME,
                         "Email", CanonicalField.EMAIL)),
-                Map.of(), membershipTypeId, Set.of(CanonicalField.FIRST_NAME,
+                Map.of(), List.of(), membershipTypeId, Set.of(CanonicalField.FIRST_NAME,
                         CanonicalField.LAST_NAME, CanonicalField.EMAIL), 10).sourceId();
     }
 

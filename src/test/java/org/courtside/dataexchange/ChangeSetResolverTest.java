@@ -272,7 +272,7 @@ class ChangeSetResolverTest {
         // given
         CsvSnapshot snapshot = new CsvSnapshot(List.of(),
                 List.of(new CsvSnapshot.RowError(3, "import.snapshot.row.cellsMissing", Map.of())),
-                List.of());
+                List.of(), Map.of());
 
         // when
         ResolvedChangeSet resolved = resolve(snapshot, SnapshotMode.FULL_SNAPSHOT, emptyRoster());
@@ -381,7 +381,7 @@ class ChangeSetResolverTest {
     }
 
     private static CsvSnapshot snapshotOf(CsvSnapshot.SnapshotRow... rows) {
-        return new CsvSnapshot(List.of(rows), List.of(), List.of());
+        return new CsvSnapshot(List.of(rows), List.of(), List.of(), Map.of());
     }
 
     private static CsvSnapshot.SnapshotRow row(int rowNumber, String externalId, String firstName,

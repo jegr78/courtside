@@ -638,6 +638,12 @@ deaktiviertes Konto oder eine entfernte Mitgliedsrolle nicht automatisch wieder.
 Hinterlege Bezeichnung, Trennzeichen, Zeichensatz und Spaltenzuordnung. Ordne externe
 Kategorien den Mitgliedsarten in Courtside zu.
 
+Enthält dein Export auch ausgetretene oder verstorbene Mitglieder, wähle für deren Kategorie
+*Nicht übernehmen*. Courtside liest von solchen Zeilen nur die Kategorie, speichert nichts von ihnen
+und nennt in der Vorschau nur ihre Anzahl. Wer schon importiert ist und im nächsten vollständigen
+Bestand eine solche Kategorie trägt, verliert seine Mitgliedschaft wie jemand, der in der Datei
+fehlt. Eine Kategorie, die weder zugeordnet noch ausgelassen ist, hält den Import weiterhin an.
+
 Markiere außerdem die Felder, die die Quelle künftig führen soll. Bei bestehenden Personen
 überschreibt jeder Import diese Felder. Nicht markierte Felder bleiben unverändert. Neue Personen
 erhalten beim ersten Import trotzdem alle zugeordneten Werte aus der Datei.

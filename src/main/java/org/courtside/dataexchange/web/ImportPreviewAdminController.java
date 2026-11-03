@@ -27,6 +27,7 @@ import java.io.UncheckedIOException;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.UUID;
 
 @RestController
@@ -67,6 +68,7 @@ class ImportPreviewAdminController implements AdminImportPreviewsApi {
         return new ApiImportPreview(summary.previewId(), summary.sourceId(),
                 ApiSnapshotMode.fromValue(summary.mode().name()), summary.fileName(),
                 summary.fileHash(), summary.rowCount(), summary.ignoredColumns(),
+                new TreeMap<>(summary.leftOutRows()),
                 changesOf(changeSet, summary.personNames()), rowErrorsOf(changeSet),
                 duplicatesOf(changeSet, summary.personNames()), sharedAddressesOf(changeSet),
                 removalsOf(changeSet), summary.needsConfirmation(), summary.superseded(),

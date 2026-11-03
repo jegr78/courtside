@@ -873,8 +873,17 @@ names no person, account or booking.
 ## Membership data exchange
 
 A source describes one external export. It stores column mapping, separator, character set,
-category mapping, source-owned fields, default membership type and the threshold for confirming
-disappearing memberships.
+category mapping, left-out categories, source-owned fields, default membership type and the
+threshold for confirming disappearing memberships.
+
+Each value of the category column is either mapped to a membership type or left out, never both.
+A row whose category is left out counts as absent from the snapshot: only that cell is read, the
+row is neither validated nor stored nor logged, and the preview reports only how many rows each
+left-out value removed. A full snapshot therefore ends the membership of a linked person whose row
+now carries a left-out value, through the same path, removal threshold and account rules as for a
+person missing from the file. A value that is neither mapped nor left out stops the snapshot. A
+row with the wrong number of cells still fails as a row, because its category cell cannot be
+trusted to be the category.
 
 A source reads its files in one of two modes. By header, the default, the first row names the
 columns and each field is found by the header mapped to it. By position, for an export without a
