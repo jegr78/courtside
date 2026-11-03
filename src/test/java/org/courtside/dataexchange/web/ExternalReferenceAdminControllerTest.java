@@ -81,7 +81,7 @@ class ExternalReferenceAdminControllerTest extends AbstractIntegrationTest {
                 .andReturn().getResponse().getHeader("Location");
         assertThat(location).isEqualTo("/api/admin/import/sources/" + source + "/references/"
                 + JsonPath.read(page(), "$.references[0].referenceId"));
-        assertThat(location).doesNotContain("4711");
+        assertThat(location.split("/")).as("no path segment names the external record").doesNotContain("4711");
 
         // then
         mockMvc.perform(get("/api/admin/import/sources/{sourceId}/references", source))
