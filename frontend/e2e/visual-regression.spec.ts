@@ -1,5 +1,6 @@
 import { fileURLToPath } from "node:url";
 import { type Locator, type Page } from "@playwright/test";
+import { accessGrantsExample, connectionCheckExample, operationalLogExample, operatorHealthExample } from "./admin-examples";
 import { backAtTheJourneyInstant, expect, expectAdministrationOverview, onTheVisualDay, routeLongSeries, selectJourneyDate, selectPreference, seriesBookingId, test } from "./fixtures";
 import { journeyInstant } from "./global-setup";
 
@@ -27,6 +28,22 @@ test("stable member surfaces match their reviewed baselines", async ({ page, jou
   // when
   await signIn(page, "doe.jane");
   await selectVisualDate(page, journeyService.visualDate);
+  await expect(page.getByTestId("own-allocation").first()).toBeVisible();
+
+  // then
+  await stableScreenshot(page.getByTestId("court-plan-view"), "court-plan-member.png");
+
+  // when
+  await page.locator('button[data-testid="allocation"]').first().click();
+  await expect(page.getByTestId("waitlist-explanation")).toBeVisible();
+  await page.evaluate(() => window.scrollTo(0, 0));
+
+  // then
+  await stableScreenshot(page.getByTestId("booking-dialog"), "waitlist-dialog.png");
+  await page.getByTestId("booking-close").click();
+  await expect(page.getByTestId("booking-dialog")).toHaveCount(0);
+
+  // when
   const slot = page.locator('[data-testid="free-slot"][data-court-number="1"][data-slot="12:00"]');
   await slot.click();
   await expect(page.getByTestId("booking-dialog")).toBeVisible();
@@ -55,11 +72,28 @@ test("stable member surfaces match their reviewed baselines", async ({ page, jou
   await stableScreenshot(page.getByTestId("my-bookings-page"), "personal-bookings.png", page.locator("time"));
 
   // when
+  await page.locator(`[data-testid="personal-cancel"][data-booking-id="${seriesBookingId}"]`).click();
+  await expect(page.getByRole("dialog").getByTestId("confirm-cancellation")).toBeVisible();
+
+  // then
+  await stableScreenshot(page.getByRole("dialog"), "cancel-dialog.png");
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toBeHidden();
+
+  // when
   await page.getByTestId("my-messages-link").click();
   await expect(page.getByTestId("my-messages-view")).toBeVisible();
 
   // then
   await stableScreenshot(page.getByTestId("my-messages-view"), "my-messages.png");
+
+  // when
+  await page.getByTestId("message-choice-BOOKING_REMINDER").click();
+  await page.getByTestId("my-messages-save").click();
+  await expect(page.getByTestId("my-messages-saved")).toBeVisible();
+
+  // then
+  await stableScreenshot(page.getByTestId("my-messages-view"), "my-messages-saved.png");
 
   // when
   await page.getByTestId("my-bookings-link").click();
@@ -74,6 +108,165 @@ test("stable member surfaces match their reviewed baselines", async ({ page, jou
   // then
   await stableScreenshot(page.getByTestId("move-dialog"), "series-preview.png",
     page.getByTestId("move-preview").locator("li p"));
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("move-dialog")).toBeHidden();
+
+  // when
+  await page.getByTestId("preferences-menu").click();
+  await expect(page.locator("#theme-preference")).toBeVisible();
+
+  // then
+  await stableScreenshot(page.getByTestId("preferences-body").locator(".."), "preferences-menu.png");
+
+  // when
+  await page.getByTestId("account-link").click();
+  await expect(page.getByTestId("account-profile")).toBeVisible();
+  await expect(page.getByTestId("current-password")).toBeVisible();
+
+  // then
+  // A session carries the server's wall-clock time, which the fixed journey clock does not reach.
+  await stableScreenshot(page.getByTestId("account-view"), "account.png", page.locator('[id^="account-session-"] > div'));
+});
+
+test("given a visitor, when a sign-in is refused and a password reset is requested, then each step matches its reviewed baseline", async ({ page }) => {
+  // given
+  await page.goto("/login");
+  await expect(page.getByTestId("login-submit")).toBeVisible();
+
+  // then
+  await stableScreenshot(page.getByTestId("login-view"), "login.png");
+
+  // when
+  await page.getByTestId("username").fill("doe.jane");
+  await page.getByTestId("password").fill("not-the-password");
+  await page.getByTestId("login-submit").click();
+  await expect(page.getByTestId("login-view").getByRole("alert")).toBeVisible();
+
+  // then
+  await stableScreenshot(page.getByTestId("login-view"), "login-refused.png");
+
+  // when
+  await page.getByTestId("forgotten-credentials-link").click();
+  await expect(page.getByTestId("recovery-password-submit")).toBeVisible();
+
+  // then
+  await stableScreenshot(page.getByTestId("account-recovery-view"), "account-recovery.png");
+
+  // when
+  await page.getByTestId("recovery-username").fill("doe.jane");
+  await page.getByTestId("recovery-password-submit").click();
+  await expect(page.getByTestId("recovery-sent")).toBeVisible();
+
+  // then
+  await stableScreenshot(page.getByTestId("account-recovery-view"), "account-recovery-sent.png");
+});
+
+test("given an open place and a waitlist offer, when another member reads their bookings, then both sections match their reviewed baselines", async ({ page, journeyService }) => {
+  // given
+  await journeyService.executeSql(`
+    INSERT INTO waitlist_entry (id, account_id, court_id, card_id, starts_at, ends_at, state, joined_at, offered_at, offer_expires_at)
+    VALUES ('7e000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000116', 'dddddddd-0000-0000-0000-000000000003',
+      '11111111-1111-1111-1111-111111111111', (DATE '${journeyService.visualDate}' + TIME '17:00') AT TIME ZONE 'Europe/Berlin',
+      (DATE '${journeyService.visualDate}' + TIME '18:00') AT TIME ZONE 'Europe/Berlin', 'OFFERED',
+      TIMESTAMPTZ '${journeyInstant}' - INTERVAL '1 hour', TIMESTAMPTZ '${journeyInstant}', TIMESTAMPTZ '${journeyInstant}' + INTERVAL '15 minutes');`);
+  await signIn(page, "doe.jane");
+  await selectVisualDate(page, journeyService.visualDate);
+  await page.locator('[data-testid="free-slot"][data-court-number="1"][data-slot="15:00"]').click();
+  await expect(page.getByTestId("booking-dialog")).toBeVisible();
+  await page.getByTestId("booking-more-summary").click();
+  await page.getByTestId("participant-card").first().selectOption("66666666-6666-6666-6666-666666666666");
+  await page.getByTestId("booking-submit").click();
+  await expect(page.getByTestId("booking-dialog")).toHaveCount(0);
+  await page.getByTestId("my-bookings-link").click();
+  await page.getByTestId("publish-open-place").first().click();
+  await expect(page.getByTestId("withdraw-open-place").first()).toBeVisible();
+  await page.getByTestId("my-messages-link").click();
+  await expect(async () => {
+    await page.reload();
+    await expect(page.locator('[data-testid="notifications"] > li').first()).toBeVisible({ timeout: 2_000 });
+  }, "the booking confirmation reaches the notification list").toPass({ timeout: 30_000 });
+
+  // then
+  await stableScreenshot(page.getByTestId("my-messages-view"), "my-messages-notification.png");
+  await signOut(page);
+
+  // when
+  await signIn(page, "roe.jane");
+  await page.getByTestId("my-bookings-link").click();
+  await expect(page.getByTestId("take-open-place")).toBeVisible();
+  await expect(page.getByTestId("waitlist-accept")).toBeVisible();
+
+  // then
+  await stableScreenshot(page.getByTestId("open-places"), "open-places.png");
+  await stableScreenshot(page.getByTestId("waitlist-entries"), "waitlist-offered.png");
+});
+
+test("given a guardian of a member, when the guardian and the board read the relationship, then both pages match their reviewed baselines", async ({ page, journeyService }) => {
+  // given
+  const relationship = "7f000000-0000-0000-0000-000000000001";
+  await journeyService.executeSql(`
+    INSERT INTO guardian_relationship (id, guardian_person_id, dependant_person_id, started_on)
+    VALUES ('${relationship}', '00000000-0000-0000-0000-000000000101', '00000000-0000-0000-0000-000000000115', DATE '2026-05-01');
+    INSERT INTO guardian_relationship_action (guardian_relationship_id, action)
+    SELECT '${relationship}', unnest(ARRAY['VIEW_BOOKINGS', 'BOOK', 'CANCEL_BOOKINGS', 'READ_MESSAGES']);`);
+  await signIn(page, "doe.jane");
+
+  // when
+  await page.goto("/my-dependants");
+  await expect(page.getByTestId("dependant-booking-list")).toBeVisible();
+  await expect(page.getByTestId("dependant-messages-empty").or(page.getByTestId("dependant-notifications"))).toBeVisible();
+
+  // then
+  await stableScreenshot(page.getByTestId("dependants-view"), "dependants.png");
+
+  // when
+  await signOut(page);
+  await signIn(page, "configuration-admin");
+  await page.goto("/admin/roster/00000000-0000-0000-0000-000000000101");
+  await expect(page.getByTestId("guardianships-list")).toBeVisible();
+  await expect(page.getByTestId("no-shows-none").or(page.getByTestId("no-shows-list"))).toBeVisible();
+
+  // then
+  await stableScreenshot(page.getByTestId("admin-person-view"), "admin-person.png");
+});
+
+test("given a member list without a header row, when the board previews it and then a file that lost a column, then the preview and its refusal match their reviewed baselines", async ({ page }) => {
+  // given
+  const rows = [["9001", "Jane", "Doe", "active"], ["9002", "John", "Roe", "active"], ["9003", "Mary", "Major", "active"]];
+  const file = (name: string, lines: string[][]) => ({ name, mimeType: "text/csv", buffer: Buffer.from(lines.map((line) => line.join(";")).join("\n") + "\n") });
+  await signIn(page, "configuration-admin");
+  await page.goto("/admin/import");
+  await page.getByTestId("new-source").click();
+  await page.getByTestId("column-mode-POSITION").check();
+  await page.getByTestId("source-file").setInputFiles(file("members.csv", rows));
+  await expect(page.getByTestId("sample-column-4")).toBeVisible();
+  await page.getByTestId("source-key").fill("club-registry");
+  await page.getByTestId("source-name").fill("Club registry");
+  for (const [index, field] of ["EXTERNAL_ID", "FIRST_NAME", "LAST_NAME"].entries()) {
+    await page.getByTestId(`position-${field}`).selectOption(String(index + 1));
+  }
+  await page.getByTestId("source-default-type").selectOption("cccccccc-0000-0000-0000-000000000001");
+  await page.getByTestId("save-source").click();
+  await expect(page.getByTestId("snapshot-file")).toBeVisible();
+
+  // when
+  await page.getByTestId("snapshot-mode").selectOption("UPDATE_ONLY");
+  await page.getByTestId("snapshot-file").setInputFiles(file("members.csv", rows));
+  await page.getByTestId("upload-snapshot").click();
+  await expect(page.getByTestId("preview-identity")).toBeVisible();
+  await page.getByTestId("changes-heading").click();
+  await expect(page.getByTestId("change-CREATE-9003")).toBeVisible();
+
+  // then
+  await stableScreenshot(page.getByTestId("import-part-preview"), "admin-import-preview.png");
+
+  // when
+  await page.getByTestId("snapshot-file").setInputFiles(file("members-truncated.csv", rows.map((row) => row.slice(0, 3))));
+  await page.getByTestId("upload-snapshot").click();
+  await expect(page.getByTestId("import-part-preview").getByRole("alert")).toBeVisible();
+
+  // then
+  await stableScreenshot(page.getByTestId("import-part-preview"), "admin-import-refused.png");
 });
 
 test("the phone court plan and personal bookings match their reviewed baselines", async ({ page, journeyService }) => {
@@ -234,16 +427,7 @@ for (const theme of ["dark", "light"] as const) {
 
     test("given a logged warning with a trace, when the board reads the operational log on a phone, then each entry is a readable card", async ({ page }) => {
       // given
-      await page.route("**/api/admin/operational-logs/search", (route) => route.fulfill({ json: {
-        availability: "AVAILABLE", retentionTruncated: false, searchIncomplete: false, droppedRecords: 0,
-        entries: [{
-          id: "7d000000-0000-0000-0000-000000000001", occurredAt: journeyInstant, source: "APPLICATION", severity: "WARN",
-          message: "Mail relay relay.example.org refused the connection on port 587 and the message stays queued: 421 4.7.0 Try again later, "
-            + "closing connection after 3 attempts within 15 minutes; the next attempt for <0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0@relay.example.org> "
-            + "follows the exponential backoff of the outbox",
-          traceId: "4bf92f3577b34da6a3ce929d0e0e4736"
-        }]
-      } }));
+      await page.route("**/api/admin/operational-logs/search", (route) => route.fulfill({ json: operationalLogExample }));
       await page.setViewportSize({ width: 412, height: 915 });
       await signIn(page, "configuration-admin");
 
@@ -470,24 +654,118 @@ test("stable administration surfaces match their reviewed baselines", async ({ p
   // then
   await stableScreenshot(page.getByTestId("admin-messages-view"), "admin-messages.png");
 
-  // when — one check in each state, because the journey world never fails a check of its own
-  await page.context().route("**/api/admin/operator-health", (route) => route.fulfill({ json: operatorHealthSample }));
+  // when
+  await page.context().route("**/api/admin/operator-health", (route) => route.fulfill({ json: operatorHealthExample }));
   await page.goto("/admin/operator-health");
   await expect(page.getByTestId("operator-check-mail"), "the sample, not the live instance, is drawn").toHaveAttribute("data-state", "FAILING");
 
   // then
   await stableScreenshot(page.getByTestId("admin-operator-health-view"), "admin-operator-health.png");
   await page.context().unroute("**/api/admin/operator-health");
-});
 
-const operatorHealthSample = {
-  checkedAt: "2026-10-17T08:00:00Z",
-  version: { state: "OK", version: "0.4.0", revision: "4f2c9e1", builtAt: "2026-10-16T20:00:00Z" },
-  migrations: { state: "OK", reason: null, pending: 0, currentVersion: "63", expectedVersion: "63", location: null },
-  mail: { state: "FAILING", reason: "HANDOVER_FAILING", lastHandedOverAt: "2026-10-17T07:00:00Z", location: "relay.example.org:587" },
-  publicOrigin: { state: "OK", reason: null, origin: "https://courts.example.org" },
-  backup: { state: "UNAVAILABLE", reason: "NOT_CONFIGURED", completedAt: null, ageSeconds: null, location: null }
-};
+  // when
+  await page.context().route("**/api/admin/access-grants", (route) => route.fulfill({ json: accessGrantsExample }));
+  await page.context().route("**/api/admin/access-control/check", (route) => route.fulfill({ json: connectionCheckExample }));
+  await page.goto("/admin/access-grants");
+  await expect(page.getByTestId("access-grant-example-failing"), "the example, not the live instance, is drawn").toHaveAttribute("data-status", "FAILING");
+  await expect(page.getByTestId("access-check-keypad")).toHaveAttribute("data-outcome", "MANUAL");
+
+  // then
+  await stableScreenshot(page.getByTestId("admin-access-grants-view"), "admin-access-grants.png");
+
+  // when
+  await page.context().route("**/api/admin/operational-logs/search", (route) => route.fulfill({ json: operationalLogExample }));
+  await page.goto("/admin/operational-logs");
+  await expect(page.getByTestId("operational-log-row")).toBeVisible();
+
+  // then
+  await stableScreenshot(page.getByTestId("admin-operational-logs-view"), "admin-operational-logs.png");
+
+  // when
+  await page.goto("/admin/usage");
+  await expect(page.getByTestId("usage-period")).toBeVisible();
+  await expect(page.getByTestId("usage-refused-attempts")).toBeVisible();
+
+  // then
+  await stableScreenshot(page.getByTestId("admin-usage-view"), "admin-usage.png");
+
+  // when
+  await page.goto("/admin/message-wording");
+  await expect(page.getByTestId("wording-body")).toBeEnabled();
+
+  // then
+  await stableScreenshot(page.getByTestId("admin-message-wording-view"), "admin-message-wording.png");
+
+  // when
+  await page.goto("/admin/facility/access-points");
+  await expect(page.getByTestId("create-access-point")).toBeEnabled();
+
+  // then
+  await stableScreenshot(page.getByTestId("admin-access-points-view"), "admin-access-points.png");
+
+  // when
+  await page.goto("/admin/facility/opening-hours/exceptions");
+  await expect(page.getByTestId("opening-periods-empty")).toBeVisible();
+  await expect(page.getByTestId("court-closures-empty")).toBeVisible();
+
+  // then
+  await stableScreenshot(page.getByTestId("admin-availability-view"), "admin-availability.png");
+
+  // when
+  await page.goto("/admin/facility/opening-hours");
+  await page.getByTestId("hours-open-WEDNESDAY").fill("10:30");
+  await page.getByTestId("opening-hours-impact-WEDNESDAY").click();
+  await expect(page.getByTestId("impact-WEDNESDAY")).toBeVisible();
+
+  // then
+  await stableScreenshot(page.getByTestId("admin-opening-hours-view"), "admin-opening-hours-impact.png");
+
+  // when
+  await page.goto("/admin/retention");
+  for (const [category, months] of [["BOOKINGS", "24"], ["FORMER_MEMBERS", "12"]]) {
+    await page.getByTestId(`retention-months-${category}`).fill(months);
+    await page.getByTestId(`retention-save-${category}`).click();
+    await expect(page.getByTestId(`retention-state-${category}`)).toHaveAttribute("data-configured", "true");
+  }
+  await page.getByTestId("retention-preview").click();
+  await expect(page.getByTestId("retention-preview-result")).toBeVisible();
+
+  // then
+  await stableScreenshot(page.getByTestId("admin-retention-view"), "admin-retention-preview.png");
+
+  // when
+  await page.goto("/admin/appointments");
+  await expect(page.getByTestId("managed-bookings")).toBeVisible();
+  await expect(page.getByTestId("managed-appointments-page").locator('p[role="status"]')).toHaveCount(0);
+  const match = page.getByTestId("booking-70000000-0000-0000-0000-000000000004");
+  await expect(match).toBeAttached();
+
+  // then
+  await stableScreenshot(page.getByTestId("managed-appointments-page"), "admin-appointments.png");
+
+  // when
+  await match.getByTestId("managed-details").click();
+  await expect(page.getByRole("dialog").getByTestId("managed-participants")).toBeVisible();
+
+  // then
+  await stableScreenshot(page.getByRole("dialog"), "managed-appointment.png");
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toBeHidden();
+
+  // when
+  await page.getByTestId("new-series").click();
+  await page.getByTestId("series-courts").selectOption("dddddddd-0000-0000-0000-000000000001");
+  await page.getByTestId("series-card").selectOption("22222222-2222-2222-2222-222222222222");
+  await page.getByTestId("series-starts-on").fill(journeyService.visualDate);
+  await page.getByTestId("series-start-time").fill("09:00");
+  await page.getByTestId("series-weekday-WEDNESDAY").click();
+  await page.getByTestId("series-occurrence-count").fill("2");
+  await page.getByTestId("preview-series").click();
+  await expect(page.getByTestId("series-creatable-count")).toBeVisible();
+
+  // then
+  await stableScreenshot(page.getByTestId("series-form"), "appointment-series-preview.png");
+});
 
 test("given the dark theme, when a confirmation dialog opens over the person administration, then its surface hides the page behind it", async ({ page }) => {
   // given
@@ -521,6 +799,12 @@ async function signIn(page: Page, username: string): Promise<void> {
   await page.getByTestId("password").fill("temporary-password");
   await page.getByTestId("login-submit").click();
   await expect(page.getByTestId("court-plan-view")).toBeVisible();
+}
+
+async function signOut(page: Page): Promise<void> {
+  await page.getByTestId("preferences-menu").click();
+  await page.getByTestId("logout").click();
+  await expect(page.getByTestId("login-view").or(page.getByTestId("court-plan-view"))).toBeVisible();
 }
 
 async function selectVisualDate(page: Page, date: string): Promise<void> {
