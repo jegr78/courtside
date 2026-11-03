@@ -607,6 +607,12 @@ or restore a member role removed by a complete-list import.
 Enter the label, separator, character set and column mapping. Map external categories to membership
 types in Courtside.
 
+If your export also lists resigned or deceased members, choose *Not in the roster* for their
+category. Courtside reads only the category of such a row, stores nothing of it and shows only
+their number in the preview. Someone already imported whose row carries such a category in the
+next complete list loses their membership like someone missing from the file. A category that is
+neither mapped nor left out still stops the import.
+
 Mark the fields that this source should own. Every later import overwrites owned fields on existing
 people. Unmarked fields remain unchanged. New people still receive every mapped value from the
 file during their first import.

@@ -63,7 +63,7 @@ public class PreviewService {
         supersedeEarlierPreviewsOf(sourceId, now);
         ImportPreview preview = previews.save(new ImportPreview(sourceId, requested,
                 upload.fileName(), PersonFingerprint.sha256(content), snapshot.rows().size(),
-                write(new PreviewContent(resolved, snapshot.ignoredColumns())),
+                write(new PreviewContent(resolved, snapshot.ignoredColumns(), snapshot.leftOutRows())),
                 write(fingerprintsOf(resolved, roster)), resolved.removals().count(),
                 resolved.removals().percent(), configuration.removalWarningPercent(), now,
                 requiredAccountId(accountId), now.plus(properties.previewRetention())));
@@ -73,9 +73,11 @@ public class PreviewService {
     private static CsvSnapshot parsed(byte[] content, SourceConfiguration configuration, Charset charset) {
         if (configuration.columnMode() == ColumnMode.POSITION) {
             return SnapshotParser.parsePositions(content, configuration.positions(),
-                    requiredColumnCount(configuration), charset, configuration.separator());
+                    requiredColumnCount(configuration), charset, configuration.separator(),
+                    configuration.leftOutCategories());
         }
-        return SnapshotParser.parse(content, configuration.columns(), charset, configuration.separator());
+        return SnapshotParser.parse(content, configuration.columns(), charset, configuration.separator(),
+                configuration.leftOutCategories());
     }
 
     private static int requiredColumnCount(SourceConfiguration configuration) {
@@ -184,11 +186,12 @@ public class PreviewService {
     // expired preview answers without the change set even before the sweep has reached its row.
     private PreviewSummary toSummary(ImportPreview preview) {
         PreviewContent stored = preview.hasExpiredBy(clock.instant())
-                ? new PreviewContent(null, List.of())
+                ? new PreviewContent(null, List.of(), Map.of())
                 : read(preview.getChangeSet());
         return new PreviewSummary(preview.getId(), preview.getSourceId(), preview.getMode(),
                 preview.getFileName(), preview.getFileHash(), preview.getRowCount(),
-                stored.ignoredColumns(), stored.changeSet(), namesIn(stored.changeSet()),
+                stored.ignoredColumns(), stored.leftOutRows(), stored.changeSet(),
+                namesIn(stored.changeSet()),
                 preview.needsConfirmation(), preview.getCreatedAt(), preview.getExpiresAt(),
                 preview.isSuperseded());
     }
@@ -222,7 +225,7 @@ public class PreviewService {
 
     private PreviewContent read(String changeSet) {
         return changeSet == null
-                ? new PreviewContent(null, List.of())
+                ? new PreviewContent(null, List.of(), Map.of())
                 : json.readValue(changeSet, PreviewContent.class);
     }
 

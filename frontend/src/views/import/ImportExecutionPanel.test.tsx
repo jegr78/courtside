@@ -16,6 +16,7 @@ const preview: ImportPreview = {
   fileHash: "a1b2c3d4e5f6",
   rowCount: 3,
   ignoredColumns: [],
+  leftOutRows: {},
   changes: [],
   rowErrors: [],
   possibleDuplicates: [],

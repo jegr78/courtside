@@ -30,6 +30,7 @@ import java.time.DayOfWeek;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -467,6 +468,6 @@ class SubjectAccessAdminControllerTest extends AbstractIntegrationTest {
                         "First name", CanonicalField.FIRST_NAME,
                         "Last name", CanonicalField.LAST_NAME,
                         "Email", CanonicalField.EMAIL)),
-                Map.of(), ACTIVE_TYPE, Set.of(), 10).sourceId();
+                Map.of(), List.of(), ACTIVE_TYPE, Set.of(), 10).sourceId();
     }
 }

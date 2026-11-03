@@ -1317,6 +1317,16 @@
         "lifecycle": "import-record"
       }
     },
+    "import_left_out_category": {
+      "source_id": {
+        "level": "operational",
+        "lifecycle": "import-record"
+      },
+      "source_value": {
+        "level": "operational",
+        "lifecycle": "import-record"
+      }
+    },
     "import_owned_field": {
       "canonical_field": {
         "level": "operational",

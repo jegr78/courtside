@@ -16,6 +16,7 @@ import org.springframework.context.annotation.Import;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -147,6 +148,6 @@ class RosterExportServiceTest extends AbstractIntegrationTest {
                 ColumnLayout.headers(Map.of("Member number", CanonicalField.EXTERNAL_ID,
                         "First name", CanonicalField.FIRST_NAME,
                         "Last name", CanonicalField.LAST_NAME)),
-                Map.of(), roster.createMembershipType("Imported"), Set.of(), 10).sourceId();
+                Map.of(), List.of(), roster.createMembershipType("Imported"), Set.of(), 10).sourceId();
     }
 }

@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -59,7 +60,7 @@ class ImportRecordSurvivalTest extends AbstractIntegrationTest {
                         "First name", CanonicalField.FIRST_NAME,
                         "Last name", CanonicalField.LAST_NAME,
                         "Email", CanonicalField.EMAIL)),
-                Map.of(), MEMBERSHIP_TYPE_ID,
+                Map.of(), List.of(), MEMBERSHIP_TYPE_ID,
                 Set.of(CanonicalField.FIRST_NAME, CanonicalField.LAST_NAME), 10).sourceId();
         UUID person = identity.createPerson("Richard", "Miles", "richard.miles@example.org");
         account = identity.createAccount(person, "admin", Set.of(Role.ADMIN));

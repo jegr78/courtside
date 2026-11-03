@@ -8,6 +8,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -71,7 +72,7 @@ class RosterCsvTest {
 
         // when
         byte[] written = RosterCsv.write(List.of(jane(), awkward), ';', StandardCharsets.UTF_8);
-        CsvSnapshot read = SnapshotParser.parse(written, COLUMNS, StandardCharsets.UTF_8, ';');
+        CsvSnapshot read = SnapshotParser.parse(written, COLUMNS, StandardCharsets.UTF_8, ';', Set.of());
 
         // then
         assertThat(read.errors()).isEmpty();
@@ -97,7 +98,7 @@ class RosterCsvTest {
         assertThat(text).contains("'=HYPERLINK").contains("'+15551234").contains("'@Adult");
 
         // and the club gets its own values back when the file is read again
-        CsvSnapshot read = SnapshotParser.parse(written, COLUMNS, StandardCharsets.UTF_8, ';');
+        CsvSnapshot read = SnapshotParser.parse(written, COLUMNS, StandardCharsets.UTF_8, ';', Set.of());
         assertThat(read.rows().getFirst().externalId()).isEqualTo("=HYPERLINK(\"http://example.org\")");
         assertThat(read.rows().getFirst().values())
                 .containsEntry(CanonicalField.EMAIL, "+15551234")

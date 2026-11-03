@@ -155,6 +155,55 @@ class ImportSourceAdminControllerTest extends AbstractIntegrationTest {
 
     @Test
     @WithMockUser(username = "admin", roles = "ADMIN")
+    void whenASourceLeavesOutCategories_thenItReadsThemBackSortedAndACorrectionReplacesThem() throws Exception {
+        // given
+        String id = JsonPath.read(mockMvc.perform(create(withLeftOut("[\"resigned\",\" deceased \"]")))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.leftOutCategories[0]").value("deceased"))
+                .andExpect(jsonPath("$.leftOutCategories[1]").value("resigned"))
+                .andReturn().getResponse().getContentAsString(), "$.id");
+
+        // when / then
+        mockMvc.perform(put("/api/admin/import/sources/{id}", id)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(withLeftOut("[\"deceased\"]"))
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.leftOutCategories.length()").value(1))
+                .andExpect(jsonPath("$.leftOutCategories[0]").value("deceased"));
+        mockMvc.perform(get("/api/admin/import/sources/{id}", id))
+                .andExpect(jsonPath("$.leftOutCategories.length()").value(1));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenACategoryBothMappedAndLeftOut_whenCreatingASource_thenTheValueIsNamed() throws Exception {
+        // when / then
+        mockMvc.perform(create(withLeftOut("[\"A\"]")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:import-source-invalid"))
+                .andExpect(jsonPath("$.violations[0].code").value("import.source.leftOutCategories.alsoMapped"))
+                .andExpect(jsonPath("$.violations[0].params.value").value("A"));
+        mockMvc.perform(get("/api/admin/import/sources"))
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void whenASourceOmitsLeftOutCategories_thenItLeavesNothingOut() throws Exception {
+        // when / then
+        mockMvc.perform(create(COMPLETE))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.leftOutCategories.length()").value(0));
+    }
+
+    private static String withLeftOut(String leftOut) {
+        return COMPLETE.replace("\"defaultMembershipTypeId\"", "\"leftOutCategories\":" + leftOut
+                + ",\n \"defaultMembershipTypeId\"");
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
     void givenAHeaderlessExport_whenASourceIsDescribedByPosition_thenItReadsBackByPosition() throws Exception {
         // when / then
         mockMvc.perform(create(POSITIONAL))

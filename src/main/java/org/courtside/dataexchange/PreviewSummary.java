@@ -7,12 +7,13 @@ import java.util.UUID;
 
 public record PreviewSummary(UUID previewId, UUID sourceId, SnapshotMode mode, String fileName,
                              String fileHash, int rowCount, List<String> ignoredColumns,
-                             ResolvedChangeSet changeSet, Map<UUID, String> personNames,
+                             Map<String, Integer> leftOutRows, ResolvedChangeSet changeSet, Map<UUID, String> personNames,
                              boolean needsConfirmation, Instant createdAt, Instant expiresAt,
                              boolean superseded) {
 
     public PreviewSummary {
         ignoredColumns = List.copyOf(ignoredColumns);
+        leftOutRows = Map.copyOf(leftOutRows);
         personNames = Map.copyOf(personNames);
     }
 }

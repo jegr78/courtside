@@ -11,6 +11,7 @@ public record SourceConfiguration(UUID sourceId, String sourceKey, String displa
                                   Map<Integer, CanonicalField> positions,
                                   Integer columnCount,
                                   Map<String, UUID> membershipTypes,
+                                  Set<String> leftOutCategories,
                                   UUID defaultMembershipTypeId,
                                   Set<CanonicalField> ownedFields,
                                   int removalWarningPercent) {
@@ -20,6 +21,7 @@ public record SourceConfiguration(UUID sourceId, String sourceKey, String displa
         columns = Map.copyOf(columns);
         positions = Map.copyOf(positions);
         membershipTypes = Map.copyOf(membershipTypes);
+        leftOutCategories = leftOutCategories == null ? Set.of() : Set.copyOf(leftOutCategories);
         ownedFields = Set.copyOf(ownedFields);
     }
 
@@ -28,7 +30,7 @@ public record SourceConfiguration(UUID sourceId, String sourceKey, String displa
                                Map<String, UUID> membershipTypes, UUID defaultMembershipTypeId,
                                Set<CanonicalField> ownedFields, int removalWarningPercent) {
         this(sourceId, sourceKey, displayName, separator, encoding, ColumnMode.HEADER, columns,
-                Map.of(), null, membershipTypes, defaultMembershipTypeId, ownedFields,
+                Map.of(), null, membershipTypes, Set.of(), defaultMembershipTypeId, ownedFields,
                 removalWarningPercent);
     }
 

@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -37,6 +38,49 @@ class PositionalSnapshotParserTest {
                 CanonicalField.EMAIL, "jane.doe@example.org"));
         assertThat(february.rows().getFirst().values()).containsEntry(CanonicalField.LAST_NAME, "Doe-Major");
         assertThat(february.rows().get(1).values()).containsEntry(CanonicalField.FIRST_NAME, "Mary");
+    }
+
+    @Test
+    void givenAHeaderlessExportWithALeftOutCategory_whenParsing_thenItsRowsAreOnlyCounted() {
+        // given
+        String content = "4711;Mary;Major;resigned;\n4711;Jane;Doe;active;jane.doe@example.org\n;John;Roe;resigned;\n";
+        Map<Integer, CanonicalField> positions = Map.of(1, CanonicalField.EXTERNAL_ID,
+                2, CanonicalField.FIRST_NAME, 3, CanonicalField.LAST_NAME,
+                4, CanonicalField.MEMBERSHIP_TYPE, 5, CanonicalField.EMAIL);
+
+        // when
+        CsvSnapshot snapshot = SnapshotParser.parsePositions(content.getBytes(StandardCharsets.UTF_8),
+                positions, 5, StandardCharsets.UTF_8, ';', Set.of("resigned"));
+
+        // then
+        assertThat(snapshot.errors()).as("a left-out row is not checked for its number or its repetition")
+                .isEmpty();
+        assertThat(snapshot.rows()).extracting(CsvSnapshot.SnapshotRow::externalId).containsExactly("4711");
+        assertThat(snapshot.leftOutRows()).isEqualTo(Map.of("resigned", 2));
+    }
+
+    @Test
+    void givenAHeaderlessRowWithAStraySeparatorAndALeftOutCategory_whenParsing_thenItIsCountedInsteadOfFailing() {
+        // given
+        String content = "4711;Jane;Doe;jane.doe@example.org;active\n4712;Mary;Major;Main Street; 1;resigned\n"
+                + "4713;John;Roe;;active;surplus\n";
+        Map<Integer, CanonicalField> positions = Map.of(1, CanonicalField.EXTERNAL_ID,
+                2, CanonicalField.FIRST_NAME, 3, CanonicalField.LAST_NAME,
+                4, CanonicalField.EMAIL, 5, CanonicalField.MEMBERSHIP_TYPE);
+
+        // when
+        CsvSnapshot snapshot = SnapshotParser.parsePositions(content.getBytes(StandardCharsets.UTF_8),
+                positions, 5, StandardCharsets.UTF_8, ';', Set.of("resigned"));
+
+        // then
+        assertThat(snapshot.leftOutRows()).as("a stray separator does not hide a left-out category")
+                .isEqualTo(Map.of("resigned", 1));
+        assertThat(snapshot.errors()).as("a malformed row whose category is kept still fails as a row")
+                .singleElement().satisfies(error -> {
+                    assertThat(error.rowNumber()).isEqualTo(3);
+                    assertThat(error.code()).isEqualTo("import.snapshot.row.columnsUnexpected");
+                });
+        assertThat(snapshot.rows()).extracting(CsvSnapshot.SnapshotRow::externalId).containsExactly("4711");
     }
 
     @Test
@@ -93,6 +137,6 @@ class PositionalSnapshotParserTest {
 
     private static CsvSnapshot parse(String content) {
         return SnapshotParser.parsePositions(content.getBytes(StandardCharsets.UTF_8), POSITIONS, 5,
-                StandardCharsets.UTF_8, ';');
+                StandardCharsets.UTF_8, ';', Set.of());
     }
 }

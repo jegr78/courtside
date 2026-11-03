@@ -253,6 +253,9 @@ INSERT INTO import_column_mapping (source_id, column_header, canonical_field) VA
 INSERT INTO import_type_mapping (source_id, source_value, membership_type_id)
 VALUES ('7d000000-0000-0000-0000-000000000001', 'Adult', 'cccccccc-0000-0000-0000-000000000001');
 
+INSERT INTO import_left_out_category (source_id, source_value)
+VALUES ('7d000000-0000-0000-0000-000000000001', 'Resigned');
+
 INSERT INTO import_owned_field (source_id, canonical_field)
 VALUES ('7d000000-0000-0000-0000-000000000001', 'EMAIL');
 

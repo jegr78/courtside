@@ -24,6 +24,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 
 public final class SnapshotParser {
 
@@ -37,19 +38,22 @@ public final class SnapshotParser {
     }
 
     public static CsvSnapshot parse(byte[] content, Map<String, CanonicalField> columns,
-                                    Charset chosen, char separator) {
+                                    Charset chosen, char separator, Set<String> leftOutCategories) {
         String text = decoded(content, chosen);
         try (CSVParser parser = format(separator).parse(new StringReader(text))) {
             List<String> headerNames = parser.getHeaderNames();
-            return read(parser, headerOf(headerNames, columns), headerNames.size(),
-                    ignoredColumns(headerNames, columns));
+            Map<String, CanonicalField> header = headerOf(headerNames, columns);
+            String categoryColumn = keyOf(header, CanonicalField.MEMBERSHIP_TYPE);
+            return read(parser, header, headerNames.size(), ignoredColumns(headerNames, columns),
+                    categoryColumn == null ? -1 : headerNames.indexOf(categoryColumn), leftOutCategories);
         } catch (IOException e) {
             throw new SnapshotHeaderInvalidException("import.snapshot.unreadable", Map.of());
         }
     }
 
     public static CsvSnapshot parsePositions(byte[] content, Map<Integer, CanonicalField> positions,
-                                             int columnCount, Charset chosen, char separator) {
+                                             int columnCount, Charset chosen, char separator,
+                                             Set<String> leftOutCategories) {
         String text = decoded(content, chosen);
         try (CSVParser parser = headerless(separator).parse(new StringReader(text))) {
             List<CSVRecord> records = parser.getRecords();
@@ -58,20 +62,26 @@ public final class SnapshotParser {
                 throw new SnapshotHeaderInvalidException("import.snapshot.columns.countChanged",
                         Map.of("expected", columnCount, "found", found));
             }
-            return readPositions(records, positions, columnCount);
+            return readPositions(records, positions, columnCount, leftOutCategories);
         } catch (IOException e) {
             throw new SnapshotHeaderInvalidException("import.snapshot.unreadable", Map.of());
         }
     }
 
     private static CsvSnapshot readPositions(List<CSVRecord> records, Map<Integer, CanonicalField> positions,
-                                             int columnCount) {
+                                             int columnCount, Set<String> leftOutCategories) {
         List<CsvSnapshot.SnapshotRow> rows = new ArrayList<>();
         List<CsvSnapshot.RowError> errors = new ArrayList<>();
+        Map<String, Integer> leftOut = new TreeMap<>();
+        Integer categoryPosition = keyOf(positions, CanonicalField.MEMBERSHIP_TYPE);
+        int categoryIndex = categoryPosition == null ? -1 : categoryPosition - 1;
         Set<String> seen = new HashSet<>();
         int rowNumber = 0;
         for (CSVRecord record : records) {
             rowNumber++;
+            if (countedAsLeftOut(leftOut, leftOutCategories, record, categoryIndex, columnCount)) {
+                continue;
+            }
             if (record.size() != columnCount) {
                 errors.add(new CsvSnapshot.RowError(rowNumber, record.size() < columnCount
                         ? "import.snapshot.row.columnsMissing" : "import.snapshot.row.columnsUnexpected",
@@ -89,7 +99,7 @@ public final class SnapshotParser {
                 ignored.add(String.valueOf(position));
             }
         }
-        return new CsvSnapshot(rows, errors, ignored);
+        return new CsvSnapshot(rows, errors, ignored, leftOut);
     }
 
     private static void addRow(List<CsvSnapshot.SnapshotRow> rows, List<CsvSnapshot.RowError> errors,
@@ -127,13 +137,18 @@ public final class SnapshotParser {
     }
 
     private static CsvSnapshot read(CSVParser parser, Map<String, CanonicalField> header,
-                                    int cellsPerRow, List<String> ignoredColumns) {
+                                    int cellsPerRow, List<String> ignoredColumns, int categoryIndex,
+                                    Set<String> leftOutCategories) {
         List<CsvSnapshot.SnapshotRow> rows = new ArrayList<>();
         List<CsvSnapshot.RowError> errors = new ArrayList<>();
+        Map<String, Integer> leftOut = new TreeMap<>();
         Set<String> seen = new HashSet<>();
         int rowNumber = 0;
         for (CSVRecord record : parser) {
             rowNumber++;
+            if (countedAsLeftOut(leftOut, leftOutCategories, record, categoryIndex, cellsPerRow)) {
+                continue;
+            }
             CsvSnapshot.RowError shape = shapeErrorOf(record, rowNumber, cellsPerRow);
             if (shape != null) {
                 errors.add(shape);
@@ -141,7 +156,39 @@ public final class SnapshotParser {
             }
             addRow(rows, errors, seen, rowNumber, valuesOf(record, header));
         }
-        return new CsvSnapshot(rows, errors, ignoredColumns);
+        return new CsvSnapshot(rows, errors, ignoredColumns, leftOut);
+    }
+
+    // A left-out row is absent from the snapshot: only its category cell is read, and only counted.
+    // In a row with too many or too few cells the category may sit shifted by exactly that difference.
+    private static boolean countedAsLeftOut(Map<String, Integer> leftOut, Set<String> leftOutCategories,
+                                            CSVRecord record, int categoryIndex, int cellsPerRow) {
+        if (categoryIndex < 0 || leftOutCategories.isEmpty()) {
+            return false;
+        }
+        int shifted = categoryIndex + record.size() - cellsPerRow;
+        return countedAt(leftOut, leftOutCategories, record, categoryIndex)
+                || shifted != categoryIndex && countedAt(leftOut, leftOutCategories, record, shifted);
+    }
+
+    private static boolean countedAt(Map<String, Integer> leftOut, Set<String> leftOutCategories,
+                                     CSVRecord record, int index) {
+        if (index < 0 || index >= record.size()) {
+            return false;
+        }
+        String value = FormulaCharacters.withoutTheEscape(record.get(index).strip());
+        if (!leftOutCategories.contains(value)) {
+            return false;
+        }
+        leftOut.merge(value, 1, Integer::sum);
+        return true;
+    }
+
+    private static <K> K keyOf(Map<K, CanonicalField> mapping, CanonicalField field) {
+        return mapping.entrySet().stream()
+                .filter(entry -> entry.getValue() == field)
+                .map(Map.Entry::getKey)
+                .findFirst().orElse(null);
     }
 
     private static CsvSnapshot.RowError shapeErrorOf(CSVRecord record, int rowNumber, int headerSize) {

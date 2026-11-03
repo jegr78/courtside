@@ -23,6 +23,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.UUID;
 
 @RestController
@@ -47,7 +48,7 @@ class ImportSourceAdminController implements AdminImportApi {
     public ResponseEntity<ApiImportSource> createImportSource(ApiImportSourceRequest request) {
         SourceConfiguration created = sources.create(request.getSourceKey(),
                 request.getDisplayName(), request.getSeparator(), request.getEncoding(),
-                layout(request), request.getMembershipTypes(),
+                layout(request), request.getMembershipTypes(), request.getLeftOutCategories(),
                 request.getDefaultMembershipTypeId(), ownedFields(request),
                 request.getRemovalWarningPercent());
         return ResponseEntity
@@ -65,7 +66,7 @@ class ImportSourceAdminController implements AdminImportApi {
                                                               ApiImportSourceRequest request) {
         return ResponseEntity.ok(toResponse(sources.change(id, request.getSourceKey(),
                 request.getDisplayName(), request.getSeparator(), request.getEncoding(),
-                layout(request), request.getMembershipTypes(),
+                layout(request), request.getMembershipTypes(), request.getLeftOutCategories(),
                 request.getDefaultMembershipTypeId(), ownedFields(request),
                 request.getRemovalWarningPercent(),
                 Boolean.TRUE.equals(request.getConfirmColumnModeChange()))));
@@ -117,6 +118,7 @@ class ImportSourceAdminController implements AdminImportApi {
                 configuration.displayName(), String.valueOf(configuration.separator()),
                 configuration.encoding(), ApiImportColumnMode.fromValue(configuration.columnMode().name()),
                 columns, positions, configuration.columnCount(), configuration.membershipTypes(),
+                new TreeSet<>(configuration.leftOutCategories()),
                 configuration.defaultMembershipTypeId(), owned,
                 configuration.removalWarningPercent());
     }

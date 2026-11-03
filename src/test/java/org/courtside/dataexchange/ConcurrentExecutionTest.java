@@ -15,6 +15,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -75,7 +76,7 @@ class ConcurrentExecutionTest extends AbstractIntegrationTest {
                         "First name", CanonicalField.FIRST_NAME,
                         "Last name", CanonicalField.LAST_NAME,
                         "Email", CanonicalField.EMAIL)),
-                Map.of(), ACTIVE_TYPE, Set.of(CanonicalField.FIRST_NAME), 10).sourceId();
+                Map.of(), List.of(), ACTIVE_TYPE, Set.of(CanonicalField.FIRST_NAME), 10).sourceId();
         UUID admin = identity.createPerson("Richard", "Miles", "richard.miles@example.org");
         actor = identity.createAccount(admin, "admin", Set.of(Role.ADMIN));
     }

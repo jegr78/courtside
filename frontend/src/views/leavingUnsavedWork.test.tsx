@@ -34,7 +34,7 @@ const jane: RosterEntry = {
 };
 const source: ImportSource = {
   id: "source-1", sourceKey: "roster-system", displayName: "Membership system", separator: ";", encoding: "UTF-8",
-  columns: { "Member number": "EXTERNAL_ID" }, membershipTypes: {}, defaultMembershipTypeId: "type-1",
+  columns: { "Member number": "EXTERNAL_ID" }, membershipTypes: {}, leftOutCategories: [], defaultMembershipTypeId: "type-1",
   ownedFields: [], removalWarningPercent: 10, columnMode: "HEADER", positions: [], columnCount: null
 };
 

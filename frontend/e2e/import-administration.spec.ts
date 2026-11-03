@@ -201,3 +201,95 @@ test("a member list that lost a column is refused at its upload, and the earlier
     await expect(page.getByTestId("preview-identity"), "the earlier preview is gone").toHaveCount(0);
     await expect(page.getByTestId("execute-preview"), "no earlier preview can be run").toHaveCount(0);
   });
+
+const FULL_EXPORT = [
+  "Number;Given;Family;Mail;Status",
+  "9101;Jane;Doe;jane.doe@example.org;active",
+  "9102;John;Roe;john.roe@example.org;active",
+  "9103;Mary;Major;mary.major@example.org;resigned",
+  "9104;Richard;Miles;;deceased",
+  "9105;Peter;Poe;;resigned"
+];
+
+function fullExport(name: string, lines: string[]) {
+  return { name, mimeType: "text/csv", buffer: Buffer.from(lines.join("\n") + "\n", "utf8") };
+}
+
+async function previewFullSnapshot(page: Page, name: string, lines: string[]): Promise<void> {
+  await page.getByTestId("snapshot-file").setInputFiles(fullExport(name, lines));
+  await page.getByTestId("snapshot-mode").selectOption("FULL_SNAPSHOT");
+  const previewed = page.waitForResponse((response) =>
+    response.url().includes("/previews") && response.request().method() === "POST");
+  await page.getByTestId("upload-snapshot").click();
+  expect((await previewed).status()).toBe(201);
+  await expect(page.getByTestId("preview-identity")).toContainText(name);
+}
+
+async function executePreview(page: Page): Promise<void> {
+  await page.getByTestId("execute-preview").click();
+  const executed = page.waitForResponse((response) =>
+    response.url().includes("/execution") && response.request().method() === "POST");
+  await page.getByTestId("confirm-execute").click();
+  expect((await executed).status()).toBe(200);
+}
+
+test("a full export that lists former members imports only the roster, and a member who resigns leaves it with the next one",
+  async ({ page }) => {
+    // given a source that maps the current members and leaves the former ones out
+    await signInAsAdministrator(page);
+    await page.getByTestId("admin-import-link").click();
+    await page.getByTestId("new-source").click();
+    await page.getByTestId("source-file").setInputFiles(fullExport("members-full.csv", FULL_EXPORT));
+    await expect(page.getByTestId("source-separator")).toHaveValue(";");
+    await page.getByTestId("source-key").fill("club-registry");
+    await page.getByTestId("source-name").fill("Club registry");
+    await page.getByTestId("column-EXTERNAL_ID").selectOption("Number");
+    await page.getByTestId("column-FIRST_NAME").selectOption("Given");
+    await page.getByTestId("column-LAST_NAME").selectOption("Family");
+    await page.getByTestId("column-EMAIL").selectOption("Mail");
+    await page.getByTestId("column-MEMBERSHIP_TYPE").selectOption("Status");
+    await page.getByTestId("category-active").selectOption({ index: 1 });
+    await page.getByTestId("category-resigned").selectOption("not-in-roster");
+    await page.getByTestId("category-deceased").selectOption("not-in-roster");
+    await page.getByTestId("source-default-type").selectOption({ index: 1 });
+    const sourceCreated = page.waitForResponse((response) =>
+      response.url().endsWith("/api/admin/import/sources") && response.request().method() === "POST");
+    await page.getByTestId("save-source").click();
+    const created = await (await sourceCreated).json() as { leftOutCategories: string[] };
+    expect(created.leftOutCategories, "the source stores the values it leaves out").toEqual(["deceased", "resigned"]);
+
+    // when the club's full export is previewed as a complete list
+    await previewFullSnapshot(page, "members-full.csv", FULL_EXPORT);
+
+    // then only the two current members would be created and the others are only counted
+    await expect(page.getByTestId("changes-heading")).toContainText("2");
+    await expect(page.getByTestId("row-errors-heading")).toContainText("0");
+    await expect(page.getByTestId("preview-left-out")).toContainText("deceased: 1, resigned: 2");
+    await page.getByTestId("changes-heading").click();
+    await expect(page.getByTestId("change-CREATE-9101")).toBeVisible();
+    await expect(page.getByTestId("change-CREATE-9103"), "a left-out row is not imported").toHaveCount(0);
+
+    // when it is run
+    await executePreview(page);
+
+    // then the roster holds the two and nobody of the left-out rows
+    await expect(page.getByTestId("run-result-created")).toContainText("2");
+    await expect(page.getByTestId("reference-9102")).toBeVisible();
+    await expect(page.getByTestId("reference-9103")).toHaveCount(0);
+
+    // when the next full export names John Roe as resigned
+    const resigned = FULL_EXPORT.map((line) => line.startsWith("9102;") ? line.replace(";active", ";resigned") : line);
+    await previewFullSnapshot(page, "members-next.csv", resigned);
+
+    // then his membership would end like that of somebody missing from the file
+    await expect(page.getByTestId("preview-left-out")).toContainText("resigned: 3");
+    await expect(page.getByTestId("needs-confirmation")).toBeVisible();
+    await expect(page.getByTestId("change-END_MEMBERSHIP-9102")).toHaveCount(1);
+
+    // when the board confirms the run
+    await executePreview(page);
+
+    // then it ends exactly that one membership
+    await expect(page.getByTestId("run-result-membershipsEnded")).toContainText("1");
+    await expect(page.getByTestId("run-result-created")).toContainText("0");
+  });
