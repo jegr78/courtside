@@ -746,7 +746,7 @@ test("given no scope, when one sheet has no verdict, then every produced sheet i
   assert.equal(applied.sheets.scope, null);
 });
 
-test("given a scope entry that matches no produced sheet, when the review is applied, then it is reported stale", () => {
+test("given a scope entry that matches no produced sheet, when the review is applied, then it is reported stale and keeps the report a draft", () => {
   // given
   const review = scoped({ "admin--usage--desktop--01": clean }, { basis: "Changelog", sheets: ["admin--usage--desktop--01", "admin--audit--*", "admin--overvew--desktop--01"] });
   // when
@@ -754,6 +754,7 @@ test("given a scope entry that matches no produced sheet, when the review is app
   // then
   assert.deepEqual(applied.sheets.scope.stale, ["admin--audit--*", "admin--overvew--desktop--01"]);
   assert.deepEqual(applied.sheets.outsideScope, ["admin--overview--desktop--01", "admin--overview--portrait--01", "memberA--plan--desktop--01"]);
+  assert.equal(applied.status, "draft", "a mistyped scope entry would otherwise shrink the review without anyone noticing");
 });
 
 test("given verdicts from several reviewers, when the review is applied, then the reviewers of the sheets in scope are counted", () => {

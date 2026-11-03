@@ -73,6 +73,7 @@ export function applyReview(findings, review, sheets = null) {
   const unassessed = reviewed.filter((finding) => finding.review === null).map((finding) => finding.key);
   const stale = Object.keys(assessments).filter((key) => !all.some((finding) => finding.key === key));
   const sheetReview = reviewSheets(sheets, review.sheets ?? {}, new Set(all.map((finding) => finding.key)), review.scope ?? null);
-  const sheetsOpen = sheetReview !== null && (sheetReview.unreviewed.length > 0 || sheetReview.unavailable !== null);
+  const sheetsOpen = sheetReview !== null && (sheetReview.unreviewed.length > 0 || sheetReview.unavailable !== null
+    || (sheetReview.scope?.stale.length ?? 0) > 0);
   return { findings: reviewed, status: unassessed.length === 0 && !sheetsOpen ? "final" : "draft", unassessed, stale, sheets: sheetReview };
 }

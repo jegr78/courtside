@@ -390,8 +390,8 @@ example the changelog range whose new or changed surfaces the scope covers. `she
 one entry; each is an exact sheet name or a prefix ending in `*`, which covers every sheet whose
 name starts with the text before it. The report refuses a scope with another field, an empty
 basis, an empty list, a `*` anywhere but at the end, or an entry listed twice. An entry that
-matches no sheet of this run is listed as stale, like a verdict for a sheet the run did not
-produce, so a misspelt entry shows up instead of narrowing the scope unnoticed.
+matches no sheet of this run is listed as stale and keeps the report a draft, so a misspelt entry
+cannot narrow the scope unnoticed.
 
 Every run starts from different club data, another day and sometimes other courts, so its pictures
 never match an earlier run's. A verdict therefore belongs to the run whose sheets it read, and
@@ -410,7 +410,8 @@ verdict. Sheets outside the scope are listed under their own heading as outside 
 They never count as read, even when `sheets` holds a verdict for one, and they never keep the
 report a draft. Without a `scope` every sheet is in it, so a report never becomes final because a
 scope was left out. A report with any finding left unassessed or any sheet in the scope without a
-verdict is a draft and names what is open, and so is a run whose sheets could not be made.
+verdict is a draft and names what is open, and so is a run whose sheets could not be made or
+whose scope has a stale entry.
 Assessments for keys and verdicts for sheets the run did not produce are listed as stale, and
 neither blocks a final report. Findings assessed as capture artefacts appear under rejected
 suspicions, harness gaps under their own heading.
