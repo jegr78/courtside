@@ -70,6 +70,32 @@ test("given native desktop and phone captures, when sheets are rendered, then ev
   } finally { rmSync(run, { recursive: true, force: true }); }
 });
 
+test("given a scope with a prefix over generated sheet names, when the report renders, then only the matched sheets need a verdict", { skip: runsWithoutTooling }, () => {
+  // given
+  const run = mkdtempSync(join(tmpdir(), "scoped-sheets-"));
+  try {
+    shot(run, "desktop-chrome", 1440, 900);
+    for (const name of ["iphone-15-de", "iphone-15-en", "iphone-se", "pixel-7", "narrow"]) shot(run, name, 960, 1920);
+    const sheets = contactSheets(run);
+    const scope = { basis: "Changelog v0.4.0-rc.2..v0.4.0-rc.3", sheets: ["admin--overview--table--portrait--*"] };
+    const review = (verdicts) => writeFileSync(join(run, "review.json"), JSON.stringify({ assessments: {}, manual: [], scope,
+      sheets: Object.fromEntries(verdicts.map((name) => [name, { verdict: "clean", by: "reviewer" }])) }));
+    const render = () => renderReport(run, { personas: {}, baseUrl: "https://example.org" }, { harnessCommit: "fixture", sheets });
+    // when
+    review(["admin--overview--table--portrait--01"]);
+    const partial = render();
+    review(["admin--overview--table--portrait--01", "admin--overview--table--portrait--02"]);
+    const complete = render();
+    // then
+    assert.deepEqual([...sheets.names].sort(), ["admin--overview--table--desktop--01", "admin--overview--table--portrait--01", "admin--overview--table--portrait--02"]);
+    assert.equal(partial.status, "draft");
+    assert.deepEqual(partial.unreviewedSheets, ["admin--overview--table--portrait--02"], "the prefix covers every portrait chunk the generator built");
+    assert.equal(complete.status, "final", "the desktop sheet outside the scope does not keep the report a draft");
+    assert.deepEqual(complete.outsideScope, ["admin--overview--table--desktop--01"]);
+    assert.match(readFileSync(join(run, "release-summary.md"), "utf8"), /all 2 contact sheets in the review scope carry a verdict/);
+  } finally { rmSync(run, { recursive: true, force: true }); }
+});
+
 test("given colliding screenshot names and a missing full page, when the report renders, then tiles link to distinct unchanged originals", { skip: runsWithoutTooling }, () => {
   // given
   const run = mkdtempSync(join(tmpdir(), "sheet-report-"));

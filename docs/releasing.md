@@ -231,8 +231,11 @@ Candidates are opened and closed with one line of configuration, not with a hand
    graduates again, or the new graduation's candidate finds the version already tagged and stops.
 
 A published candidate is walked on the UAT instance with the acceptance harness described in
-[acceptance-testing.md](acceptance-testing.md). Its release summary, with every finding assessed, is
-posted on the release pull request before the line graduates.
+[acceptance-testing.md](acceptance-testing.md). Its review scope covers the surfaces the changelog
+names as new or changed since the previous candidate, or since the previous release for the first
+candidate of a line, and its `basis` names that changelog range. Its release summary, with every
+finding assessed and every sheet in that scope read, states the scope and is posted on the release
+pull request before the line graduates.
 
 Every candidate is a checkpoint on the same release line. Release Please proposes the changes
 since the preceding candidate; the release-please workflow then folds those entries into the single
