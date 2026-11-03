@@ -1,9 +1,7 @@
 import { execFileSync } from "node:child_process";
-import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readdirSync, statSync, rmSync, readFileSync, writeFileSync } from "node:fs";
-import { join, relative } from "node:path";
+import { existsSync, mkdirSync, readdirSync, statSync, rmSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { findExecutable } from "../lib/executable.mjs";
-import { readEvidence } from "./evidence-file.mjs";
 
 const walk = (directory) => readdirSync(directory).flatMap((name) => {
   const path = join(directory, name);
@@ -29,10 +27,6 @@ export function imageMagick() {
   return null;
 }
 
-function comparisonDigest(path) {
-  try { return createHash("sha256").update(readEvidence(path)).digest("hex"); } catch { return null; }
-}
-
 function deviceClass(project) {
   if (project.startsWith("desktop-")) return "desktop";
   if (project === "ipad") return "tablet";
@@ -45,7 +39,6 @@ export function contactSheets(run) {
   const root = join(run, "shots");
   const directory = join(run, "sheets");
   rmSync(directory, { recursive: true, force: true });
-  rmSync(join(run, "sheet-evidence.json"), { force: true });
   if (!existsSync(root)) return { sheets: 0, names: [], entries: [], skipped: "no screenshots" };
   if (!tool) return { sheets: 0, names: [], entries: [], skipped: "ImageMagick not found on PATH", unavailable: "ImageMagick not found on PATH" };
   const surfaces = new Map();
@@ -85,56 +78,5 @@ export function contactSheets(run) {
       entries.push({ name, columns, tiles });
     }
   }
-  const image = (path) => {
-    if (path === null) return null;
-    const comparison = path.replace(/\.png$/, ".comparison.json");
-    return { path: relative(run, path), digest: createHash("sha256").update(readFileSync(path)).digest("hex"),
-      comparisonDigest: comparisonDigest(comparison) };
-  };
-  writeFileSync(join(run, "sheet-evidence.json"), JSON.stringify({ schemaVersion: 3,
-    sheets: entries.map((entry) => ({ name: entry.name, columns: entry.columns,
-      imageDigest: createHash("sha256").update(readFileSync(join(directory, `${entry.name}.png`))).digest("hex"),
-      frameSignature: sheetFrameSignature(join(directory, `${entry.name}.png`), entry),
-      tiles: entry.tiles.map((tile) => ({ label: tile.label, viewport: image(tile.path), fullPage: image(tile.fullPage) })) }))
-  }, null, 2) + "\n", { mode: 0o600 });
   return { sheets: entries.length, names: entries.map((entry) => entry.name), entries };
-}
-
-export function sheetFrameSignature(path, entry) {
-  const header = readFileSync(path);
-  const columns = Math.min(entry.columns, entry.tiles.length);
-  const cellWidth = header.readUInt32BE(16) / columns;
-  const cellHeight = header.readUInt32BE(20) / Math.ceil(entry.tiles.length / entry.columns);
-  const drawing = entry.tiles.map((tile, index) => {
-    const x = index % columns * cellWidth + 6;
-    const y = Math.floor(index / columns) * cellHeight + 6;
-    return `rectangle ${x},${y} ${x + tile.width - 1},${y + tile.height - 1}`;
-  }).join(" ");
-  const [binary, args] = imageMagick().convert([path, "-fill", "#000000", "-draw", drawing, "-format", "%#", "info:"]);
-  return execFileSync(binary, args, { encoding: "utf8" }).trim();
-}
-
-const sheetNames = (directory) => readdirSync(directory).filter((name) => name.endsWith(".png")).map((name) => name.slice(0, -4)).sort();
-
-// Montage stamps creation dates into the file, so sheets compare by their pixels.
-export function pixelSignature(path) {
-  const tool = imageMagick();
-  if (!tool) throw new Error("ImageMagick not found on PATH");
-  const [binary, args] = tool.convert([path, "-format", "%#", "info:"]);
-  return execFileSync(binary, args, { encoding: "utf8" }).trim();
-}
-
-export function sheetChanges(run, previous, { signature = pixelSignature } = {}) {
-  const current = join(run, "sheets");
-  const before = join(previous, "sheets");
-  if (!existsSync(before)) return { unavailable: `the previous run ${previous} has no contact sheets` };
-  const earlier = new Set(sheetNames(before));
-  const names = existsSync(current) ? sheetNames(current) : [];
-  const changed = [];
-  const added = [];
-  for (const name of names) {
-    if (!earlier.has(name)) added.push(name);
-    else if (signature(join(current, `${name}.png`)) !== signature(join(before, `${name}.png`))) changed.push(name);
-  }
-  return { changed, added, unchanged: names.length - changed.length - added.length };
 }

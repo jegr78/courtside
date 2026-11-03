@@ -218,9 +218,6 @@ of it, or if a trace cannot be read.
 - `--phase matrix` runs only the journeys; `--project <profile>` narrows them.
 - `--phase postflight --run <dir>` cleans up after an interrupted run.
 - `--phase report --run <dir>` renders the report again, for example after the review.
-- `--previous <dir>` with the report phase compares native image evidence with that run after
-  bounded masking of recognized run data. Proven unchanged sheets inherit only previous clean
-  verdicts. Repeat this argument when regenerating a report that uses inheritance.
 
 Discovery writes `lanes.json`: the window, and for each profile and journey its day, court and
 hour. Preflight then proves every lane slot free before a journey starts.
@@ -313,8 +310,8 @@ older sheet names do not review the new chunks.
 
 A view captured on all ten profiles therefore yields six sheets: two desktop, one tablet, one
 landscape and two portrait. A full catalogue run produces about three sheets per captured view,
-and each one needs its own verdict. A first reading opens every tile at native size. An inherited
-verdict requires the native evidence checks below. A reduced montage never substitutes for either.
+and each one in the review scope needs its own verdict. A reading opens every tile at native size.
+A reduced montage never substitutes for it.
 
 The report lists each sheet as an expandable grid of native-size tiles. Scroll horizontally to
 read a tile wider than the report. Clicking a tile opens its original viewport PNG. Each tile
@@ -328,7 +325,7 @@ removed before a key is formed, so the same problem keeps its key from run to ru
 Browser console errors and page errors also retain `consoleEvents` with the receipt time,
 the operation running when the event arrived, and the stack or source location the browser
 supplied. Capture operations distinguish settling, subject placement, viewport and full-page
-screenshots, comparison geometry probes, scroll restoration, layout measurement and axe. Events outside capture work use
+screenshots, scroll restoration, layout measurement and axe. Events outside capture work use
 `journey`. The phase returns to its previous value even when an operation fails.
 
 `browser-events.jsonl` records each event immediately, including events from a capture that fails
@@ -370,9 +367,13 @@ establishes bounded non-reproduction, not the cause of a historical error.
   "manual": [
     { "key": "manual:update-notice", "severity": "major", "kind": "PWA", "title": "Update notice without a deployment", "detail": "", "where": [{ "project": "desktop-firefox" }] }
   ],
+  "scope": {
+    "basis": "Changelog v0.4.0-rc.2..v0.4.0-rc.3: the administration overview and the preferences menu",
+    "sheets": ["admin--the-admin-visits-every-administration-pa--overview--*", "memberA--a-member-when-the-preferences-menu-is-op--preferences-open--desktop--01"]
+  },
   "sheets": {
-    "admin--the-admin-visits-every-administration-pa--overview": { "verdict": "clean", "by": "reviewer" },
-    "memberA--a-member-when-the-preferences-menu-is-op--preferences-open": { "verdict": ["manual:update-notice"], "by": "reviewer" }
+    "admin--the-admin-visits-every-administration-pa--overview--desktop--01": { "verdict": "clean", "by": "reviewer" },
+    "memberA--a-member-when-the-preferences-menu-is-op--preferences-open--desktop--01": { "verdict": ["manual:update-notice"], "by": "reviewer" }
   }
 }
 ```
@@ -381,64 +382,47 @@ An assessment is one of `product-defect`, `known-issue` (with `issue`), `capture
 `harness-gap`, and always has a `reason` and a `followUp`. `manual` holds findings a person made
 while reading the captures; their keys start with `manual:`.
 
-`sheets` holds a human verdict for each sheet read, named as its file in `sheets/` without `.png`.
-A verdict is `clean` or the keys of the findings it shows, and `by` names who read it. The report
-keeps inherited verdicts in generated `sheet-review.json`, with `by` set to
-`inherited:<previous run>`. It lists human and inherited judgments separately. Do not copy an
-inherited marker into human `review.json`.
+`sheets` holds a verdict for each sheet read, named as its file in `sheets/` without `.png`. A
+verdict is `clean` or the keys of the findings it shows, and `by` names who read it.
 
-Each capture writes a value-free `.comparison.json` beside its viewport and full-page PNGs. It
-uses comparison protocol version 3 and binds mask geometry and presentation to those exact image
-bytes. Recognized formatted dates and times require semantic time elements, identified booking/report
-periods, day selectors or temporal statistics buckets. Other date-shaped text stays visible. Known
-run-state counts in identified value fields, the version badge and generated acceptance-name
-suffixes can be masked. Static labels, including numeric usage-card names, numeric configuration
-limits, ordinary welcome text, raw ISO timestamps and unsupported or clipped regions
-remain visible to comparison. Native date/time controls retain their borders and picker area.
-Localized application date/time fields retain their borders and reject raw, unparsed or invalid drafts.
-The journey's value assertions run unchanged.
-Overlapping elements prevent a region from being masked. Full-page masks also avoid the horizontal
-span of fixed or sticky content whose final paint position cannot be established. Generated
-pseudo-elements and native list markers disable masking unless a checkbox or radio indicator is
-proven to stay inside its control. Unsupported visual effects leave their text unmasked.
+`scope` declares which sheets this acceptance reads. `basis` says in words what defines it, for
+example the changelog range whose new or changed surfaces the scope covers. `sheets` lists at least
+one entry; each is an exact sheet name or a prefix ending in `*`, which covers every sheet whose
+name starts with the text before it. The report refuses a scope with another field, an empty
+basis, an empty list, a `*` anywhere but at the end, or an entry listed twice. An entry that
+matches no sheet of this run is listed as stale, like a verdict for a sheet the run did not
+produce, so a misspelt entry shows up instead of narrowing the scope unnoticed.
 
-`sheet-evidence.json` records native image membership, image hashes, comparison-record hashes and
-the contact sheet frame. Evidence reads use regular non-symlink file descriptors. Pixel signatures
-receive the verified PNG bytes through standard input. Inheritance requires compatible membership and frame pixels, unchanged
-pixels outside masks with identical position, width, height and formatting in both the viewport
-and full-page image, and a previous
-clean verdict bound to its review and evidence. Changed layout, styling, browser, browser language,
-timezone or pixel density prevents masking from transferring a verdict. Missing, malformed,
-modified or legacy evidence falls back to a fresh reading. Its change count then comes from an
-unmasked whole-sheet signature, which the report names as no measure of how much changed. The report names the failure beside
-each sheet it could not compare, with paths relative to the runs. Older unchunked sheet names never
-approve new chunks. Original PNGs and human verdicts remain unchanged.
+Every run starts from different club data, another day and sometimes other courts, so its pictures
+never match an earlier run's. A verdict therefore belongs to the run whose sheets it read, and
+nothing carries one over to the next candidate. Comparing looks needs a fixed starting state, which
+the visual regression suite in CI, `frontend/e2e/visual-regression.spec.ts`, has and an acceptance
+run does not.
 
-A previous finding-bearing verdict always requires reading again, even when the pixels match.
-A current explicit human verdict takes precedence. Inherited clean judgments can continue across
-candidate runs because each generated review audit remains bound to its own review and evidence.
-Every new finding still needs an assessment before the report can be final.
+`review-batches.json` lists the sheets in the review scope still without a verdict, in batches of
+at most eight. Give a reviewer one batch at a time. Open its native tiles, write the verdicts into
+`review.json` as soon as that batch finishes, and merge those writes before assigning another
+batch. Do not keep dozens of sheets in one agent context. Render the report again to refresh the
+batches.
 
-`review-batches.json` lists the pending sheets in batches of at most eight. Give a reviewer one
-batch at a time. Open its current native tiles, write the verdicts into `review.json` as soon as
-that batch finishes, and merge those writes before assigning another batch. Do not keep dozens
-of sheets in one agent context. Load previous-run pictures only when a sheet changed and the
-comparison helps explain the change. Previously flagged sheets still receive their own reading.
-Regenerate the report with the same `--previous` argument to refresh the pending batches and
-resolve inherited verdicts.
-
-A report with any finding left unassessed or any sheet without a verdict is a draft and names what
-is open, and so is a run whose sheets could not be made. Assessments for keys and verdicts for
-sheets the run did not produce are listed as stale. Findings assessed as capture artefacts
-appear under rejected suspicions, harness gaps under their own heading.
+A report is final when every finding is assessed and every sheet in the review scope carries a
+verdict. Sheets outside the scope are listed under their own heading as outside the review scope.
+They never count as read, even when `sheets` holds a verdict for one, and they never keep the
+report a draft. Without a `scope` every sheet is in it, so a report never becomes final because a
+scope was left out. A report with any finding left unassessed or any sheet in the scope without a
+verdict is a draft and names what is open, and so is a run whose sheets could not be made.
+Assessments for keys and verdicts for sheets the run did not produce are listed as stale, and
+neither blocks a final report. Findings assessed as capture artefacts appear under rejected
+suspicions, harness gaps under their own heading.
 
 ## Release summary
 
 Each report also writes `release-summary.md`: the version, the run, the passed, failed and skipped
-cells, and every finding with its assessment and issue. It contains no username, email address,
-full name of anybody on the roster, instance host or image; a summary that would is refused. Post
-it on the release pull request. The summary does not say who read the contact sheets or how, so
-the post adds that whenever a verdict did not come from a full reading.
+cells, the review scope's basis, how many sheets in the scope carry a verdict and how many lie
+outside it, who gave the verdicts with a count for each `by`, any stale scope entry, and every
+finding with its assessment and issue. It contains no username, email address, full name of
+anybody on the roster, instance host or image; a summary that would is refused, and the basis and
+every `by` are checked like the review text. Post it on the release pull request.
 
 Full reports and screenshots are never committed. The `report/` directory may be shared
 privately. The rest of the run directory stays on the operator's machine: Playwright traces in

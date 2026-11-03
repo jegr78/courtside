@@ -6,7 +6,6 @@ import { collectFindings } from "./findings.mjs";
 import { applyReview } from "./review.mjs";
 import { forbiddenTerms, releaseSummary, sheetStatus } from "./release-summary.mjs";
 import { imageMagick } from "./sheets.mjs";
-import { inheritSheetVerdicts, writeSheetReview } from "./sheet-inheritance.mjs";
 
 const SEVERITY = { blocker: "Blocker", major: "Major", minor: "Minor", hint: "Hint" };
 const ORDER = { blocker: 0, major: 1, minor: 2, hint: 3 };
@@ -116,23 +115,31 @@ const listOf = (findings, assessment, more = []) => [...findings.filter((finding
 
 const names = (list) => list.map((name) => `<li><code>${esc(name)}</code></li>`).join("");
 
-export function sheetSection(sheets, changes) {
+function sheetCount(sheets) {
+  if (sheets.unavailable) return `No contact sheets to review: ${esc(sheets.unavailable)}.`;
+  if (!sheets.scope) return `${sheets.reviewed.length} of ${sheets.total} contact sheets carry a verdict.`;
+  const outside = sheets.outsideScope.length;
+  return `Review scope: ${esc(sheets.scope.basis)}. ${sheets.reviewed.length} of ${sheets.reviewed.length + sheets.unreviewed.length} contact sheets in the review scope carry a verdict; ${outside} of ${sheets.total} ${outside === 1 ? "is" : "are"} outside the review scope.`;
+}
+
+export function sheetSection(sheets) {
   if (!sheets) return "";
-  const comparison = !changes ? ""
-    : changes.unavailable ? `<p>Comparison with the previous run unavailable: ${esc(changes.unavailable)}.</p>`
-      : `<p>${changes.unmasked
-        ? `Compared unmasked with the previous run, which lacks sheet evidence: ${changes.changed.length} differing in at least one pixel, run data included, ${changes.added.length} new, ${changes.unchanged} identical. This marks sheets for a fresh reading and is no evidence of how much changed.`
-        : `Against the previous run: ${changes.changed.length} changed, ${changes.added.length} new, ${changes.unchanged} unchanged. Changed sheets and previous findings need a fresh reading.`}</p>
-${changes.changed.length ? `<details><summary>Changed sheets</summary><ul>${changes.changed.map((name) => `<li><code>${esc(name)}</code>${changes.unverifiable?.[name] ? ` not comparable: ${esc(changes.unverifiable[name])}` : ""}</li>`).join("")}</ul></details>` : ""}
-${changes.added.length ? `<details><summary>New sheets</summary><ul>${names(changes.added)}</ul></details>` : ""}`;
+  const reviewers = sheets.reviewers.map((reviewer) => `${esc(reviewer.by)} (${reviewer.sheets})`).join(", ");
   return `<section><h2>Contact sheet review</h2>
-<p>${sheets.unavailable ? `No contact sheets to review: ${esc(sheets.unavailable)}.` : `${sheets.reviewed.length} of ${sheets.total} contact sheets carry a verdict.`}</p>
-<p>${sheets.reviewed.length - (sheets.inherited?.length ?? 0)} manually reviewed, ${sheets.inherited?.length ?? 0} inherited.</p>
-${sheets.inherited?.length ? `<details><summary>Inherited verdicts</summary><ul>${sheets.inherited.map((name) => `<li><code>${esc(name)}</code> ${esc(sheets.verdicts[name].by)}</li>`).join("")}</ul></details>` : ""}
+<p>${sheetCount(sheets)}</p>
+${reviewers ? `<p>Verdicts by ${reviewers}.</p>` : ""}
 ${sheets.unreviewed.length ? `<p class="unassessed">Without a verdict:</p><ul>${names(sheets.unreviewed)}</ul>` : ""}
+${sheets.outsideScope.length ? `<details><summary>Outside the review scope</summary><ul>${names(sheets.outsideScope)}</ul></details>` : ""}
 ${sheets.stale.length ? `<p>Verdicts for sheets this run did not produce:</p><ul>${names(sheets.stale)}</ul>` : ""}
-${changes?.inheritanceUnavailable ? `<p>Verdict inheritance unavailable: ${esc(changes.inheritanceUnavailable)}.</p>` : ""}
-${comparison}</section>`;
+${sheets.scope?.stale.length ? `<p>Scope entries that match no sheet this run produced:</p><ul>${names(sheets.scope.stale)}</ul>` : ""}
+</section>`;
+}
+
+export function reviewBatches(sheets, batchSize = 8) {
+  const pending = sheets?.unreviewed ?? [];
+  const batches = [];
+  for (let offset = 0; offset < pending.length; offset += batchSize) batches.push(pending.slice(offset, offset + batchSize));
+  return { schemaVersion: 1, batchSize, batches };
 }
 
 function sheetGallery(sheets, original) {
@@ -145,7 +152,7 @@ ${entries.map((entry) => `<details class="sheet-gallery"><summary>${esc(entry.na
   }).join("")}</div></div></details>`).join("")}</section>`;
 }
 
-export function renderReport(run, config, { harnessCommit, sheets = null, previous = null }) {
+export function renderReport(run, config, { harnessCommit, sheets = null }) {
   const metrics = jsonl(join(run, "metrics.jsonl"));
   const failures = json(join(run, "failures.json"), []);
   const results = json(join(run, "results.json"), { suites: [] });
@@ -159,16 +166,9 @@ export function renderReport(run, config, { harnessCommit, sheets = null, previo
   const residue = json(join(run, "postflight-residue.json"), null)?.residue;
   const surfaces = [...new Map(jsonl(join(run, "role-surfaces.jsonl")).map((row) => [row.key, row])).values()];
   const observations = jsonl(join(run, "observations.jsonl"));
-  const reviewBytes = existsSync(join(run, "review.json")) ? readFileSync(join(run, "review.json")) : Buffer.from("null");
-  const review = JSON.parse(reviewBytes.toString("utf8")) ?? { assessments: {}, manual: [] };
-  const inheritance = inheritSheetVerdicts(run, previous, sheets, review);
-  const reviewed = applyReview(collectFindings({ metrics, failures }), inheritance.review, sheets);
-  const changes = inheritance.changes;
-  if (reviewed.sheets) {
-    reviewed.sheets.inherited = inheritance.inherited;
-    reviewed.sheets.verdicts = inheritance.review.sheets;
-  }
-  writeSheetReview(run, inheritance, reviewed, createHash("sha256").update(reviewBytes).digest("hex"));
+  const review = json(join(run, "review.json"), null) ?? { assessments: {}, manual: [] };
+  const reviewed = applyReview(collectFindings({ metrics, failures }), review, sheets);
+  writeFileSync(join(run, "review-batches.json"), JSON.stringify(reviewBatches(reviewed.sheets), null, 2) + "\n", { mode: 0o600 });
   reviewed.findings.sort((a, b) => ORDER[a.severity] - ORDER[b.severity]);
   const coverage = coverageOf(results);
   const projects = [...new Set(coverage.rows.flatMap((row) => Object.keys(row.cells)))].sort();
@@ -193,7 +193,7 @@ export function renderReport(run, config, { harnessCommit, sheets = null, previo
     return name;
   };
   const counts = Object.fromEntries(Object.keys(ORDER).map((severity) => [severity, reviewed.findings.filter((finding) => finding.severity === severity).length]));
-  const status = reviewed.status === "final" ? "Final: every finding is assessed and every contact sheet carries a verdict."
+  const status = reviewed.status === "final" ? `Final: every finding is assessed and every contact sheet${reviewed.sheets?.scope ? " in the review scope" : ""} carries a verdict.`
     : `Draft: ${[reviewed.unassessed.length ? `${reviewed.unassessed.length} finding(s) not assessed.` : null, sheetStatus(reviewed.sheets)].filter(Boolean).join(" ")}`;
   const notChecked = [
     "The installed app's real standalone mode; Chromium does not emulate display-mode here and the app ships no display-mode CSS.",
@@ -258,7 +258,7 @@ ul { margin: 0; padding-left: 20px; display: grid; gap: 6px; max-width: 72ch; }
   <div class="tile"><b>${metrics.length}</b><span>Captures</span></div>
 </div></section>
 <section><h2>Findings</h2><div class="findings">${reviewed.findings.map((finding) => card(run, finding, images)).join("") || "<p>None.</p>"}</div></section>
-${sheetSection(reviewed.sheets, changes)}
+${sheetSection(reviewed.sheets)}
 ${sheetGallery(sheets, original)}
 <section><h2>Coverage</h2><p class="lede">✓ passed, ✗ failed, – not planned for this profile.</p><div class="scroll"><table><thead><tr><th>Journey</th>${projects.map((p) => `<th>${esc(p)}</th>`).join("")}</tr></thead><tbody>
 ${coverage.rows.map((row) => `<tr><td>${esc(row.flow)}</td>${projects.map((p) => `<td class="st ${row.cells[p]?.status ?? ""}" title="${esc(row.cells[p]?.reason ?? "")}">${row.cells[p] ? STATUS[row.cells[p].status] : ""}</td>`).join("")}</tr>`).join("")}
@@ -285,5 +285,6 @@ ${rawGroups(metrics).map((g) => `<tr><td>${SEVERITY[g.severity]}</td><td>${esc(g
   }
   writeFileSync(join(run, "release-summary.md"), summary);
   return { status: reviewed.status, unassessed: reviewed.unassessed, stale: reviewed.stale,
-    unreviewedSheets: reviewed.sheets?.unreviewed ?? [], staleSheets: reviewed.sheets?.stale ?? [], changedSheets: changes };
+    unreviewedSheets: reviewed.sheets?.unreviewed ?? [], staleSheets: reviewed.sheets?.stale ?? [],
+    outsideScope: reviewed.sheets?.outsideScope ?? [], staleScope: reviewed.sheets?.scope?.stale ?? [] };
 }

@@ -1,5 +1,21 @@
 export const ASSESSMENTS = ["product-defect", "known-issue", "capture-artefact", "harness-gap"];
 
+const SCOPE_FIELDS = ["basis", "sheets"];
+
+function validateScope(scope) {
+  if (scope === null || typeof scope !== "object" || Array.isArray(scope)) throw new Error("review scope must be an object with basis and sheets");
+  for (const field of Object.keys(scope)) if (!SCOPE_FIELDS.includes(field)) throw new Error(`review scope: unknown field ${field}`);
+  if (typeof scope.basis !== "string" || scope.basis.trim() === "") throw new Error("review scope: basis names what defines the scope");
+  if (!Array.isArray(scope.sheets) || scope.sheets.length === 0) throw new Error("review scope: sheets lists at least one sheet");
+  const seen = new Set();
+  for (const entry of scope.sheets) {
+    if (typeof entry !== "string" || entry === "" || entry.slice(0, -1).includes("*"))
+      throw new Error(`review scope sheet ${JSON.stringify(entry)}: a sheet name or a prefix ending in *`);
+    if (seen.has(entry)) throw new Error(`review scope sheet ${JSON.stringify(entry)}: listed twice`);
+    seen.add(entry);
+  }
+}
+
 export function validateReview(review) {
   for (const [key, entry] of Object.entries(review.assessments ?? {})) {
     if (!ASSESSMENTS.includes(entry.assessment)) throw new Error(`review ${key}: assessment must be one of ${ASSESSMENTS.join(", ")}`);
@@ -10,6 +26,7 @@ export function validateReview(review) {
   for (const manual of review.manual ?? []) {
     if (!/^manual:[a-z0-9-]+$/.test(manual.key ?? "")) throw new Error(`review manual finding ${manual.key}: key must be manual:<slug>`);
   }
+  if ("scope" in review) validateScope(review.scope);
   return review;
 }
 
@@ -22,14 +39,27 @@ const sheetVerdict = (name, entry, keys) => {
   if (unknown.length) throw new Error(`review sheet ${name}: names findings this run does not hold: ${unknown.join(", ")}`);
 };
 
-function reviewSheets(sheets, verdicts, keys) {
+const matches = (entry, name) => entry.endsWith("*") ? name.startsWith(entry.slice(0, -1)) : name === entry;
+
+function reviewersOf(names, verdicts) {
+  const counts = new Map();
+  for (const name of names) counts.set(verdicts[name].by, (counts.get(verdicts[name].by) ?? 0) + 1);
+  return [...counts].map(([by, sheets]) => ({ by, sheets })).sort((a, b) => b.sheets - a.sheets || a.by.localeCompare(b.by));
+}
+
+function reviewSheets(sheets, verdicts, keys, scope) {
   if (!sheets) return null;
   for (const [name, entry] of Object.entries(verdicts)) sheetVerdict(name, entry, keys);
   const names = [...sheets.names].sort();
+  const inScope = scope ? names.filter((name) => scope.sheets.some((entry) => matches(entry, name))) : names;
+  const reviewed = inScope.filter((name) => verdicts[name]);
   return {
     total: names.length,
-    reviewed: names.filter((name) => verdicts[name]),
-    unreviewed: names.filter((name) => !verdicts[name]),
+    reviewed,
+    unreviewed: inScope.filter((name) => !verdicts[name]),
+    outsideScope: names.filter((name) => !inScope.includes(name)),
+    reviewers: reviewersOf(reviewed, verdicts),
+    scope: scope ? { basis: scope.basis, stale: scope.sheets.filter((entry) => !names.some((name) => matches(entry, name))) } : null,
     stale: Object.keys(verdicts).filter((name) => !names.includes(name)).sort(),
     unavailable: sheets.unavailable ?? null
   };
@@ -42,7 +72,7 @@ export function applyReview(findings, review, sheets = null) {
   const reviewed = all.map((finding) => ({ ...finding, review: assessments[finding.key] ?? null }));
   const unassessed = reviewed.filter((finding) => finding.review === null).map((finding) => finding.key);
   const stale = Object.keys(assessments).filter((key) => !all.some((finding) => finding.key === key));
-  const sheetReview = reviewSheets(sheets, review.sheets ?? {}, new Set(all.map((finding) => finding.key)));
+  const sheetReview = reviewSheets(sheets, review.sheets ?? {}, new Set(all.map((finding) => finding.key)), review.scope ?? null);
   const sheetsOpen = sheetReview !== null && (sheetReview.unreviewed.length > 0 || sheetReview.unavailable !== null);
   return { findings: reviewed, status: unassessed.length === 0 && !sheetsOpen ? "final" : "draft", unassessed, stale, sheets: sheetReview };
 }

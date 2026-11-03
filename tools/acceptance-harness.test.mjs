@@ -678,45 +678,134 @@ test("given a sheet verdict that is neither clean nor finding keys, lacks its re
   assert.throws(apply({ verdict: ["axe:color-contrast"], by: "reviewer" }), /axe:color-contrast/);
 });
 
-import { sheetChanges } from "../acceptance/report/sheets.mjs";
+const clean = { verdict: "clean", by: "reviewer" };
+const produced = { names: ["admin--overview--desktop--01", "admin--overview--portrait--01", "admin--usage--desktop--01", "memberA--plan--desktop--01"] };
+const scoped = (sheets, scope = { basis: "Changelog v0.4.0-rc.2..v0.4.0-rc.3", sheets: ["admin--overview--*", "admin--usage--desktop--01"] }) =>
+  ({ assessments: assessed, manual: [], scope, sheets });
 
-test("given a previous run, when the sheets are compared, then changed and new sheets are marked and equal ones are not", () => {
+test("given a scope that is not a closed object with a basis and sheet entries, when the review is validated, then each shape is refused by name", () => {
   // given
-  const root = mkdtempSync(join(tmpdir(), "sheet-changes-"));
-  const sheet = (run, name, pixels) => { mkdirSync(join(root, run, "sheets"), { recursive: true }); writeFileSync(join(root, run, "sheets", `${name}.png`), pixels); };
-  sheet("before", "admin--overview", "a"); sheet("before", "admin--usage", "b");
-  sheet("after", "admin--overview", "a"); sheet("after", "admin--usage", "c"); sheet("after", "admin--audit", "d");
-  const signature = (path) => readFileSync(path, "utf8");
-  // when
-  const changes = sheetChanges(join(root, "after"), join(root, "before"), { signature });
-  // then
-  assert.deepEqual(changes, { changed: ["admin--usage"], added: ["admin--audit"], unchanged: 1 });
-  rmSync(root, { recursive: true, force: true });
+  const validate = (scope) => () => validateReview({ assessments: {}, manual: [], scope });
+  // when / then
+  assert.throws(validate(null), /scope must be an object/);
+  assert.throws(validate(["admin--overview"]), /scope must be an object/);
+  assert.throws(validate({ basis: "Changelog", sheets: ["admin--overview"], extra: true }), /scope: unknown field extra/);
+  assert.throws(validate({ sheets: ["admin--overview"] }), /scope: basis names what defines the scope/);
+  assert.throws(validate({ basis: "  ", sheets: ["admin--overview"] }), /scope: basis names what defines the scope/);
+  assert.throws(validate({ basis: "Changelog" }), /scope: sheets lists at least one sheet/);
+  assert.throws(validate({ basis: "Changelog", sheets: [] }), /scope: sheets lists at least one sheet/, "an empty scope would make a report final with nothing read");
+  assert.throws(validate({ basis: "Changelog", sheets: [""] }), /scope sheet "": a sheet name or a prefix ending in \*/);
+  assert.throws(validate({ basis: "Changelog", sheets: [7] }), /scope sheet 7: a sheet name or a prefix ending in \*/);
+  assert.throws(validate({ basis: "Changelog", sheets: ["admin--*--desktop"] }), /scope sheet "admin--\*--desktop": a sheet name or a prefix ending in \*/);
+  assert.throws(validate({ basis: "Changelog", sheets: ["admin--overview", "admin--overview"] }), /scope sheet "admin--overview": listed twice/);
+  assert.doesNotThrow(validate({ basis: "Changelog", sheets: ["admin--overview--*", "memberA--plan--desktop--01"] }));
 });
 
-test("given a previous run without contact sheets, when compared, then the comparison says it is unavailable", () => {
+test("given every sheet in the scope with a verdict and sheets outside it without one, when the review is applied, then the report is final and lists the outside sheets", () => {
   // given
-  const root = mkdtempSync(join(tmpdir(), "sheet-changes-"));
-  mkdirSync(join(root, "after", "sheets"), { recursive: true });
+  const review = scoped({ "admin--overview--desktop--01": clean, "admin--overview--portrait--01": clean, "admin--usage--desktop--01": clean });
   // when
-  const changes = sheetChanges(join(root, "after"), join(root, "before"), { signature: () => "x" });
+  const applied = applyReview(sheetFindings(), review, produced);
   // then
-  assert.match(changes.unavailable, /no contact sheets/);
-  rmSync(root, { recursive: true, force: true });
+  assert.equal(applied.status, "final", "sheets outside the scope do not keep the report a draft");
+  assert.deepEqual(applied.sheets.reviewed, ["admin--overview--desktop--01", "admin--overview--portrait--01", "admin--usage--desktop--01"]);
+  assert.deepEqual(applied.sheets.outsideScope, ["memberA--plan--desktop--01"], "a sheet outside the scope is named, not dropped");
+  assert.deepEqual(applied.sheets.scope, { basis: "Changelog v0.4.0-rc.2..v0.4.0-rc.3", stale: [] });
 });
 
-import { sheetSection } from "../acceptance/report/html.mjs";
-
-test("given sheets without a verdict and a comparison, when the report section is rendered, then it names them and the changed sheets", () => {
+test("given one sheet in the scope without a verdict, when the review is applied, then the report is a draft that names only that sheet", () => {
   // given
-  const sheets = { total: 3, reviewed: ["admin--overview"], unreviewed: ["admin--usage"], stale: ["admin--gone"], unavailable: null };
+  const review = scoped({ "admin--overview--desktop--01": clean, "admin--usage--desktop--01": clean });
   // when
-  const html = sheetSection(sheets, { changed: ["admin--overview"], added: ["admin--audit"], unchanged: 1 });
+  const applied = applyReview(sheetFindings(), review, produced);
   // then
-  assert.match(html, /1 of 3 contact sheets carry a verdict/);
-  assert.match(html, /Without a verdict:<\/p><ul><li><code>admin--usage<\/code>/, "every sheet without a verdict is listed");
+  assert.equal(applied.status, "draft");
+  assert.deepEqual(applied.sheets.unreviewed, ["admin--overview--portrait--01"], "a prefix entry covers every sheet it matches, and only those are open");
+});
+
+test("given a verdict on a sheet outside the scope, when the review is applied, then it is not counted as reviewed", () => {
+  // given
+  const review = scoped({ "admin--overview--desktop--01": clean, "admin--overview--portrait--01": clean, "admin--usage--desktop--01": clean,
+    "memberA--plan--desktop--01": clean });
+  // when
+  const applied = applyReview(sheetFindings(), review, produced);
+  // then
+  assert.equal(applied.sheets.reviewed.includes("memberA--plan--desktop--01"), false, "a verdict outside the scope never counts as a reading");
+  assert.deepEqual(applied.sheets.outsideScope, ["memberA--plan--desktop--01"]);
+});
+
+test("given no scope, when one sheet has no verdict, then every produced sheet is required and the report is a draft", () => {
+  // given
+  const review = { assessments: assessed, manual: [], sheets: { "admin--overview--desktop--01": clean, "admin--overview--portrait--01": clean, "admin--usage--desktop--01": clean } };
+  // when
+  const applied = applyReview(sheetFindings(), review, produced);
+  // then
+  assert.equal(applied.status, "draft", "without a scope nothing becomes final by omission");
+  assert.deepEqual(applied.sheets.unreviewed, ["memberA--plan--desktop--01"]);
+  assert.deepEqual(applied.sheets.outsideScope, []);
+  assert.equal(applied.sheets.scope, null);
+});
+
+test("given a scope entry that matches no produced sheet, when the review is applied, then it is reported stale", () => {
+  // given
+  const review = scoped({ "admin--usage--desktop--01": clean }, { basis: "Changelog", sheets: ["admin--usage--desktop--01", "admin--audit--*", "admin--overvew--desktop--01"] });
+  // when
+  const applied = applyReview(sheetFindings(), review, produced);
+  // then
+  assert.deepEqual(applied.sheets.scope.stale, ["admin--audit--*", "admin--overvew--desktop--01"]);
+  assert.deepEqual(applied.sheets.outsideScope, ["admin--overview--desktop--01", "admin--overview--portrait--01", "memberA--plan--desktop--01"]);
+});
+
+test("given verdicts from several reviewers, when the review is applied, then the reviewers of the sheets in scope are counted", () => {
+  // given
+  const review = scoped({ "admin--overview--desktop--01": { verdict: "clean", by: "maintainer" }, "admin--overview--portrait--01": clean,
+    "admin--usage--desktop--01": clean, "memberA--plan--desktop--01": { verdict: "clean", by: "outsider" } });
+  // when
+  const applied = applyReview(sheetFindings(), review, produced);
+  // then
+  assert.deepEqual(applied.sheets.reviewers, [{ by: "reviewer", sheets: 2 }, { by: "maintainer", sheets: 1 }],
+    "only verdicts inside the scope are attributed, most frequent first");
+});
+
+import { reviewBatches, sheetSection } from "../acceptance/report/html.mjs";
+
+test("given sheets in and outside the scope, when the report section is rendered, then it states the basis, counts both and lists the outside sheets", () => {
+  // given
+  const { sheets } = applyReview(sheetFindings(), scoped({ "admin--overview--desktop--01": clean, "admin--usage--desktop--01": clean, "admin--gone": clean },
+    { basis: "Changelog v0.4.0-rc.2..v0.4.0-rc.3", sheets: ["admin--overview--*", "admin--usage--desktop--01", "admin--audit--*"] }), produced);
+  // when
+  const html = sheetSection(sheets);
+  // then
+  assert.match(html, /Review scope: Changelog v0\.4\.0-rc\.2\.\.v0\.4\.0-rc\.3\./);
+  assert.match(html, /2 of 3 contact sheets in the review scope carry a verdict; 1 of 4 is outside the review scope\./);
+  assert.match(html, /Without a verdict:<\/p><ul><li><code>admin--overview--portrait--01<\/code>/, "every sheet in scope without a verdict is listed");
+  assert.match(html, /<summary>Outside the review scope<\/summary><ul><li><code>memberA--plan--desktop--01<\/code>/);
   assert.match(html, /did not produce:<\/p><ul><li><code>admin--gone<\/code>/);
-  assert.match(html, /1 changed, 1 new, 1 unchanged/);
+  assert.match(html, /Scope entries that match no sheet this run produced:<\/p><ul><li><code>admin--audit--\*<\/code>/);
+  assert.match(html, /Verdicts by reviewer \(2\)\./);
+});
+
+test("given sheets without a scope, when the report section is rendered, then it counts every sheet and names those without a verdict", () => {
+  // given
+  const { sheets } = applyReview([], { assessments: {}, manual: [], sheets: { "admin--overview": clean, "admin--gone": clean } }, { names: ["admin--overview", "admin--usage", "admin--audit"] });
+  // when
+  const html = sheetSection(sheets);
+  // then
+  assert.match(html, /1 of 3 contact sheets carry a verdict\./);
+  assert.match(html, /Without a verdict:<\/p><ul><li><code>admin--audit<\/code><\/li><li><code>admin--usage<\/code>/);
+  assert.doesNotMatch(html, /review scope/i);
+});
+
+test("given ten sheets in the scope still needing a verdict, when the reading is scheduled, then each batch holds at most eight and every sheet appears once", () => {
+  // given
+  const pending = Array.from({ length: 10 }, (_, index) => `admin--overview--${index}`);
+  // when
+  const queue = reviewBatches({ unreviewed: pending });
+  // then
+  assert.equal(queue.batchSize, 8);
+  assert.deepEqual(queue.batches.map((batch) => batch.length), [8, 2]);
+  assert.deepEqual(queue.batches.flat(), pending);
+  assert.deepEqual(reviewBatches(null).batches, [], "a run without sheets schedules nothing");
 });
 
 import { assertPrivacySafe, forbiddenTerms, releaseSummary } from "../acceptance/report/release-summary.mjs";
@@ -764,6 +853,50 @@ test("given every contact sheet judged, when summarised, then the summary says s
     reviewed: { ...reviewed, sheets: { total: 2, reviewed: ["a", "b"], unreviewed: [], stale: [], unavailable: null } }, forbidden });
   // then
   assert.match(summary, /Every finding is assessed and all 2 contact sheets carry a verdict\./);
+  assert.match(summary, /- Review scope: none, every contact sheet needs a verdict\n/);
+});
+
+const summarised = (review, terms = forbidden) => {
+  const applied = applyReview(sheetFindings(), review, produced);
+  return releaseSummary({ version: "1.2.3", runId: "r", harnessCommit: "c", cells: { passed: 1, failed: 0, skipped: 0 },
+    reviewed: { ...applied, findings: reviewed.findings }, forbidden: terms });
+};
+
+test("given every sheet in the scope judged, when summarised, then the summary states the basis, both counts and who gave the verdicts", () => {
+  // when
+  const summary = summarised(scoped({ "admin--overview--desktop--01": { verdict: "clean", by: "maintainer" }, "admin--overview--portrait--01": clean,
+    "admin--usage--desktop--01": clean, "memberA--plan--desktop--01": { verdict: "clean", by: "outsider" } }));
+  // then
+  assert.match(summary, /Every finding is assessed and all 3 contact sheets in the review scope carry a verdict\./);
+  assert.match(summary, /- Review scope: Changelog v0\.4\.0-rc\.2\.\.v0\.4\.0-rc\.3\n/);
+  assert.match(summary, /- Contact sheets: 3 in the review scope with a verdict, 1 outside the scope not counted as read\n/,
+    "the summary separates the reviewed sheets from those outside the scope");
+  assert.match(summary, /- Verdicts by: reviewer \(2\), maintainer \(1\)\n/, "the summary says who read the sheets");
+  assert.doesNotMatch(summary, /outsider/, "a verdict outside the scope is not attributed");
+});
+
+test("given a sheet in the scope without a verdict, when summarised, then the summary is a draft that names it as part of the scope", () => {
+  // when
+  const summary = summarised(scoped({ "admin--overview--desktop--01": clean, "admin--usage--desktop--01": clean }));
+  // then
+  assert.match(summary, /Draft: 1 of 3 contact sheet\(s\) in the review scope without a verdict \(`admin--overview--portrait--01`\)\./);
+});
+
+test("given a scope entry that matches no sheet, when summarised, then the summary names it", () => {
+  // when
+  const summary = summarised(scoped({ "admin--usage--desktop--01": clean }, { basis: "Changelog", sheets: ["admin--usage--desktop--01", "admin--audit--*"] }));
+  // then
+  assert.match(summary, /- Scope entries that match no sheet: `admin--audit--\*`\n/);
+});
+
+test("given a scope basis or a reviewer that names a person from the roster, when summarised, then the summary is refused", () => {
+  // given
+  const terms = { ...forbidden, nameParts: ["Richard"] };
+  const verdicts = { "admin--overview--desktop--01": clean, "admin--overview--portrait--01": clean, "admin--usage--desktop--01": clean };
+  // when / then
+  assert.throws(() => summarised(scoped(verdicts, { basis: "Surfaces Jane Doe asked for", sheets: ["admin--overview--*", "admin--usage--desktop--01"] })), /person/);
+  assert.throws(() => summarised(scoped({ ...verdicts, "admin--usage--desktop--01": { verdict: "clean", by: "Richard" } }), terms), /person/,
+    "a reviewer's name is review text and checked like a reason");
 });
 
 test("given a reason that names a username, an address, a host, a person or an image, when summarised, then each is refused without echoing it", () => {
@@ -906,11 +1039,11 @@ import { parseArguments, waitForLoad } from "../acceptance/run.mjs";
 
 test("when arguments are parsed, then a later phase needs an existing run and projects narrow the matrix", () => {
   // when / then
-  assert.deepEqual(parseArguments([]), { phase: "all", run: null, previous: null, projects: [] });
-  assert.deepEqual(parseArguments(["--phase", "matrix", "--project", "ipad", "--project", "narrow"]), { phase: "matrix", run: null, previous: null, projects: ["ipad", "narrow"] });
+  assert.deepEqual(parseArguments([]), { phase: "all", run: null, projects: [] });
+  assert.deepEqual(parseArguments(["--phase", "matrix", "--project", "ipad", "--project", "narrow"]), { phase: "matrix", run: null, projects: ["ipad", "narrow"] });
   assert.throws(() => parseArguments(["--phase", "report"]), /--run/);
   assert.throws(() => parseArguments(["--phase", "everything"]), /phase/);
-  assert.equal(parseArguments(["--phase", "report", "--run", "b", "--previous", "a"]).previous, "a", "the report compares its sheets with the named run");
+  assert.throws(() => parseArguments(["--phase", "report", "--run", "b", "--previous", "a"]), /unknown argument --previous/, "no run inherits verdicts from another");
 });
 
 test("given a load that falls below the limit, when waited for, then it returns, and a load that never falls stops at the deadline", async () => {

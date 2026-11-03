@@ -33,18 +33,39 @@ const line = (finding) => {
 
 const keys = (names) => names.map((name) => `\`${name}\``).join(", ");
 
+const inScopeTotal = (sheets) => sheets.reviewed.length + sheets.unreviewed.length;
+
 export function sheetStatus(sheets) {
   if (!sheets) return null;
   if (sheets.unavailable) return `No contact sheets to review: ${sheets.unavailable}.`;
-  if (sheets.unreviewed.length) return `${sheets.unreviewed.length} of ${sheets.total} contact sheet(s) without a verdict (${keys(sheets.unreviewed)}).`;
-  return null;
+  if (!sheets.unreviewed.length) return null;
+  return sheets.scope
+    ? `${sheets.unreviewed.length} of ${inScopeTotal(sheets)} contact sheet(s) in the review scope without a verdict (${keys(sheets.unreviewed)}).`
+    : `${sheets.unreviewed.length} of ${sheets.total} contact sheet(s) without a verdict (${keys(sheets.unreviewed)}).`;
 }
 
 function statusLine(reviewed) {
   const sheets = reviewed.sheets ?? null;
-  if (reviewed.status === "final") return sheets ? `Every finding is assessed and all ${sheets.total} contact sheets carry a verdict.` : "Every finding is assessed.";
+  if (reviewed.status === "final") {
+    if (!sheets) return "Every finding is assessed.";
+    return sheets.scope ? `Every finding is assessed and all ${inScopeTotal(sheets)} contact sheets in the review scope carry a verdict.`
+      : `Every finding is assessed and all ${sheets.total} contact sheets carry a verdict.`;
+  }
   const open = [reviewed.unassessed.length ? `${reviewed.unassessed.length} finding(s) not assessed (${keys(reviewed.unassessed)}).` : null, sheetStatus(sheets)];
   return `Draft: ${open.filter(Boolean).join(" ")}`;
+}
+
+function sheetLines(sheets) {
+  if (!sheets || sheets.unavailable) return [];
+  const reviewers = sheets.reviewers ?? [];
+  const stale = sheets.scope?.stale ?? [];
+  return [
+    sheets.scope ? `- Review scope: ${sheets.scope.basis}` : "- Review scope: none, every contact sheet needs a verdict",
+    sheets.scope ? `- Contact sheets: ${sheets.reviewed.length} in the review scope with a verdict, ${(sheets.outsideScope ?? []).length} outside the scope not counted as read`
+      : `- Contact sheets: ${sheets.reviewed.length} of ${sheets.total} with a verdict`,
+    `- Verdicts by: ${reviewers.length ? reviewers.map((reviewer) => `${reviewer.by} (${reviewer.sheets})`).join(", ") : "nobody"}`,
+    ...(stale.length ? [`- Scope entries that match no sheet: ${keys(stale)}`] : [])
+  ];
 }
 
 export function releaseSummary({ version, runId, harnessCommit, cells, reviewed, forbidden }) {
@@ -55,12 +76,14 @@ export function releaseSummary({ version, runId, harnessCommit, cells, reviewed,
     "",
     `- Run \`${runId}\`, harness \`${harnessCommit}\``,
     `- Cells: ${cells.passed} passed, ${cells.failed} failed, ${cells.skipped} skipped`,
+    ...sheetLines(reviewed.sheets),
     "",
     "#### Findings",
     "",
     ...(reviewed.findings.length ? reviewed.findings.map(line) : ["None."]),
     ""
   ].join("\n");
-  const written = reviewed.findings.flatMap((finding) => finding.review ? [finding.review.reason, finding.review.followUp] : []).join("\n");
+  const written = [...reviewed.findings.flatMap((finding) => finding.review ? [finding.review.reason, finding.review.followUp] : []),
+    reviewed.sheets?.scope?.basis ?? "", ...(reviewed.sheets?.reviewers ?? []).map((reviewer) => reviewer.by)].join("\n");
   return assertPrivacySafe(markdown, forbidden, written);
 }
