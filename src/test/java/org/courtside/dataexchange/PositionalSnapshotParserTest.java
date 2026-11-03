@@ -60,6 +60,30 @@ class PositionalSnapshotParserTest {
     }
 
     @Test
+    void givenAHeaderlessRowWithAStraySeparatorAndALeftOutCategory_whenParsing_thenItIsCountedInsteadOfFailing() {
+        // given
+        String content = "4711;Jane;Doe;jane.doe@example.org;active\n4712;Mary;Major;Main Street; 1;resigned\n"
+                + "4713;John;Roe;;active;surplus\n";
+        Map<Integer, CanonicalField> positions = Map.of(1, CanonicalField.EXTERNAL_ID,
+                2, CanonicalField.FIRST_NAME, 3, CanonicalField.LAST_NAME,
+                4, CanonicalField.EMAIL, 5, CanonicalField.MEMBERSHIP_TYPE);
+
+        // when
+        CsvSnapshot snapshot = SnapshotParser.parsePositions(content.getBytes(StandardCharsets.UTF_8),
+                positions, 5, StandardCharsets.UTF_8, ';', Set.of("resigned"));
+
+        // then
+        assertThat(snapshot.leftOutRows()).as("a stray separator does not hide a left-out category")
+                .isEqualTo(Map.of("resigned", 1));
+        assertThat(snapshot.errors()).as("a malformed row whose category is kept still fails as a row")
+                .singleElement().satisfies(error -> {
+                    assertThat(error.rowNumber()).isEqualTo(3);
+                    assertThat(error.code()).isEqualTo("import.snapshot.row.columnsUnexpected");
+                });
+        assertThat(snapshot.rows()).extracting(CsvSnapshot.SnapshotRow::externalId).containsExactly("4711");
+    }
+
+    @Test
     void givenAPositionTheMappingDoesNotName_whenParsing_thenItIsReportedByItsNumber() {
         // when
         CsvSnapshot snapshot = parse("4711;Jane;Doe;A;jane.doe@example.org\n");

@@ -554,6 +554,32 @@ class SnapshotParserTest {
     }
 
     @Test
+    void givenMalformedRowsWhoseCategoryIsLeftOut_whenParsing_thenTheyAreCountedInsteadOfFailing() {
+        // given
+        String content = """
+                Member number,First name,Last name,Email,Category
+                4711,Jane,Doe,jane.doe@example.org,active
+                4712,Mary,Major,Main Street, 1,resigned
+                4713,Richard,Miles,deceased
+                4714,John,Roe,,active,surplus
+                """;
+
+        // when
+        CsvSnapshot snapshot = SnapshotParser.parse(content.getBytes(StandardCharsets.UTF_8), COLUMNS,
+                StandardCharsets.UTF_8, ',', Set.of("resigned", "deceased"));
+
+        // then
+        assertThat(snapshot.leftOutRows()).as("a stray separator or a missing cell does not hide a left-out category")
+                .isEqualTo(Map.of("resigned", 1, "deceased", 1));
+        assertThat(snapshot.errors()).as("a malformed row whose category is kept still fails as a row")
+                .singleElement().satisfies(error -> {
+                    assertThat(error.rowNumber()).isEqualTo(4);
+                    assertThat(error.code()).isEqualTo("import.snapshot.row.cellsUnexpected");
+                });
+        assertThat(snapshot.rows()).extracting(CsvSnapshot.SnapshotRow::externalId).containsExactly("4711");
+    }
+
+    @Test
     void givenACategoryNobodyLeftOut_whenParsing_thenItsRowIsReadAndNothingIsCounted() {
         // given
         String content = """
