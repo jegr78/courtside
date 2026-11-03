@@ -82,9 +82,9 @@ Answer files contain decisions only. Supply an authenticated relay password as
 `COURTSIDE_MAIL_PASSWORD` and an external database password as `COURTSIDE_DATABASE_PASSWORD` in
 the process environment; the launcher refuses password, token, secret and credential keys in an
 answer file. Optional decisions are `overlays` as a comma-separated list, `synthetic_mail`,
-`rootless_port_start`, external-database settings and custom-image settings. A rootless host may
-select only a forwarded-ingress recipe such as `funnel` or `existing-infrastructure` when its
-unprivileged port threshold excludes ports 80 or 25.
+`loxone_simulator`, `rootless_port_start`, external-database settings and custom-image settings.
+A rootless host may select only a forwarded-ingress recipe such as `funnel` or
+`existing-infrastructure` when its unprivileged port threshold excludes ports 80 or 25.
 
 `recovery_material=included` keeps `.env`, local secret files and the MFA key archive inside each private recovery unit.
 Use `external-verified` only after a separate secret store has proved that it can restore every
@@ -262,6 +262,56 @@ are skipped, and deterministic identifiers make a repeated apply add nothing twi
 transaction writes no partial plan; retain the printed recovery unit until the result has been
 checked in the UI. Use the recovery procedure below if the complete pre-seed database state must
 be restored.
+
+### A simulated Miniserver on an acceptance installation
+
+An acceptance installation can run the `loxone` connector against a simulated Miniserver instead
+of a real door. Set `loxone_simulator=true` in the answer file of `init` or `reconfigure`. The
+launcher then starts the simulator from the release's booking-seed image, serves it at
+`https://loxone-miniserver` on an internal network and points the connector at it. Every Compose
+command refuses the setting unless synthetic mail is selected or `.env` sets
+`COURTSIDE_ENVIRONMENT="UAT"`. It also refuses the setting when the release names no booking-seed
+image. The simulator publishes no port.
+
+The simulator offers the normal user groups `Court 1`, `Court 2` and `Members` for the
+access-point mapping. Its codes open no door. The door checklist still needs a real Miniserver.
+
+Select one failure at a time and run the connection check in the administration to see its result:
+
+```sh
+/srv/courtside/current/courtside loxone-failure offline
+/srv/courtside/current/courtside loxone-failure none
+```
+
+| Failure | Check that fails | Result |
+|---|---|---|
+| `wrong-credentials` | login | `access.check.login.refused` |
+| `missing-right` | login | `access.check.login.missingRight` |
+| `locked-user` | login | `access.check.login.locked` |
+| `disabled-user` | login | `access.check.refused`, the device disabled the user |
+| `refused-token` | groups | `access.check.refused`, the device refused the token |
+| `unknown-group` | groups | `access.check.groups.missing` |
+| `offline` | miniserver | `access.check.address.noMiniserver` |
+
+`none` clears the failure and the checks pass again, with two delays a real Miniserver also
+imposes. After `locked-user` the connector waits five minutes before it signs in again. Repeated
+`missing-right` checks end in the device's own lock, which then behaves like `locked-user`.
+
+While the setting is on, the launcher replaces the four `COURTSIDE_ACCESS_CONTROL_LOXONE_*`
+values and the connector from `.env` with the simulator's. The component is applied after
+`config/local.override.yaml`, so an override cannot change it. Its trust-store mount needs Docker
+Engine 26 or later.
+
+The simulator keeps its users and grants in memory. A restart of the simulator loses them, and the
+hourly reconciliation reinstalls the grants it finds missing, so they can be absent for up to an
+hour. Removing the `loxone-caddy-data` volume creates a new certificate authority. Restart the
+application container afterwards, for example `docker restart courtside-app-1` for the project
+`courtside`, because it reads its trust store only when it starts.
+
+To turn the simulator off, set `loxone_simulator=false` with `reconfigure`. The launcher then
+stops passing the component to Compose but leaves its containers behind. Remove them with
+`docker rm -f courtside-loxone-simulator-1 courtside-loxone-miniserver-1 courtside-loxone-trust-1`,
+again for the project `courtside`.
 
 ## Start the instance for the first time
 
@@ -1232,7 +1282,7 @@ default.
 | `COURTSIDE_ACCEPTANCE_MAIL_PORT` | `8025` | Host port on the loopback interface where Mailpit shows the messages it kept. |
 | `COURTSIDE_COOKIE_SECURE` | `true` | Forces host-bound `__Host-SESSION` and `__Host-XSRF-TOKEN` cookies with `Secure` and `Path=/`. Lower it only for local development or a controlled test environment; production refuses to start. HTTPS requests still receive the host-bound policy, while a plain HTTP request then uses the explicit `SESSION` / `XSRF-TOKEN` test names without `Secure`. |
 | `COURTSIDE_ACCESS_CONTROL_CALL_DEADLINE` | `15s` | How long one call to the access-control system may take, all its requests included. A call without an answer by then counts as applied, so a grant it may have installed is revoked later if the booking no longer wants it. |
-| `COURTSIDE_ACCESS_CONTROL_CONNECTOR` | `none` | The access-control system that installs a code per booking. `none` installs nothing and records no access grant. `simulated` keeps grants in memory for development and demonstrations; its codes open no door, so the instance refuses to start with it when `COURTSIDE_ENVIRONMENT` is `PRODUCTION` outside the demo profile. `loxone` manages one user per booking on a Loxone Miniserver with firmware V14.2.5.16 or later and needs the four `COURTSIDE_ACCESS_CONTROL_LOXONE_*` variables below. Any other value is refused at startup. Switching to `none` or to another system while grants are installed leaves them on the old system until their window ends; the access grants page lists what is installed. |
+| `COURTSIDE_ACCESS_CONTROL_CONNECTOR` | `none` | The access-control system that installs a code per booking. `none` installs nothing and records no access grant. `simulated` keeps grants in memory for development and demonstrations; its codes open no door, so the instance refuses to start with it when `COURTSIDE_ENVIRONMENT` is `PRODUCTION` outside the demo profile. `loxone` manages one user per booking on a Loxone Miniserver with firmware V14.2.5.16 or later and needs the four `COURTSIDE_ACCESS_CONTROL_LOXONE_*` variables below; an acceptance installation with `loxone_simulator=true` gets all five values from the launcher instead. Any other value is refused at startup. Switching to `none` or to another system while grants are installed leaves them on the old system until their window ends; the access grants page lists what is installed. |
 | `COURTSIDE_ACCESS_CONTROL_LOXONE_SERIAL` | unset | With `loxone`, the Miniserver's serial of 12 hexadecimal digits. Courtside asks `connect.loxonecloud.com` for the Miniserver's current relay address and asks again after the relay moves. Prefer it to a URL. Set this or `COURTSIDE_ACCESS_CONTROL_LOXONE_URL`, not both. |
 | `COURTSIDE_ACCESS_CONTROL_LOXONE_URL` | unset | With `loxone`, a fixed `https://` address of the Miniserver whose host name matches its certificate, for a local Miniserver `https://192-168-1-47.{serial}.dyndns.loxonecloud.com:{port}`. A bare IP address fails the certificate check, and `http://` is refused at startup. |
 | `COURTSIDE_ACCESS_CONTROL_LOXONE_USER` | unset | With `loxone`, the Miniserver user Courtside signs in as. Its token needs two rights, user management (`0x800`) and changing other users' codes (`0x20`), and Courtside checks each on its own; the user must not be an administrator. The connection check on the access grants page reports a missing right. |

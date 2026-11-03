@@ -9,7 +9,8 @@ import { crc32 } from "node:zlib";
 const YAML = createRequire(new URL("../frontend/package.json", import.meta.url))("yaml");
 
 const roots = ["courtside", "recipe.sh", "mfa-keys.sh", "mail-store-transition.sh", ".env.example", "README.md", "container-contract.md",
-  "compose.booking-seed.yaml", "compose.database-upgrade.yaml", "compose.recovery-check.yaml",
+  "compose.booking-seed.yaml", "compose.loxone-simulator.yaml", "Caddyfile.loxone-simulator",
+  "compose.database-upgrade.yaml", "compose.recovery-check.yaml",
   "compose.key-export.yaml", "examples", "guides"];
 
 export function recipeNames(deploy) {

@@ -58,6 +58,7 @@ export function fixture(use, releaseVersion = "0.1.0") {
 if [ "$1 $2" = "compose version" ]; then echo 'Docker Compose version v2.33.1'; exit 0; fi
 if [ "$1" = "info" ]; then printf '%s\\n' "\${FAKE_DOCKER_SECURITY:-[]}"; exit 0; fi
 printf '%s\\n' "$*" >> "${dockerLog}"
+env | grep -E '^COURTSIDE_(LOXONE_SIMULATOR|ACCESS_CONTROL)_' | sort | sed 's/^/environment /' >> "${dockerLog}"
 previous=''
 for argument in "$@"; do
   if [ "$previous" = '--env-file' ] && [ -f "$argument" ]; then

@@ -1,0 +1,125 @@
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+services:
+  app:
+    depends_on:
+      loxone-trust:
+        condition: service_completed_successfully
+    environment:
+      JAVA_TOOL_OPTIONS: -Djavax.net.ssl.trustStore=/var/lib/courtside/loxone-trust/truststore.p12 -Djavax.net.ssl.trustStoreType=PKCS12
+    networks:
+      loxone: {}
+    volumes:
+      - loxone-trust:/var/lib/courtside/loxone-trust:ro
+
+  loxone-simulator:
+    image: ${COURTSIDE_LOXONE_SIMULATOR_IMAGE:?set COURTSIDE_LOXONE_SIMULATOR_IMAGE}
+    restart: unless-stopped
+    logging: *logging
+    mem_limit: 256m
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    entrypoint:
+      - java
+      - --sun-misc-unsafe-memory-access=deny
+      - -XX:MaxRAMPercentage=75.0
+      - -XX:+ExitOnOutOfMemoryError
+      - -Dloader.main=org.courtside.loxonesimulator.LoxoneSimulatorServer
+      - org.springframework.boot.loader.launch.PropertiesLauncher
+    command: !reset []
+    networks:
+      - loxone
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8081/failure"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+
+  loxone-miniserver:
+    image: caddy:2-alpine@sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f
+    restart: unless-stopped
+    logging: *logging
+    mem_limit: 128m
+    read_only: true
+    tmpfs:
+      - /config
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    # The caddy binary carries cap_net_bind_service, and the kernel refuses to exec it without that capability.
+    cap_add:
+      - NET_BIND_SERVICE
+    depends_on:
+      loxone-simulator:
+        condition: service_healthy
+    networks:
+      - loxone
+    volumes:
+      - ./Caddyfile.loxone-simulator:/etc/caddy/Caddyfile:ro
+      - loxone-caddy-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "test -f /data/caddy/pki/authorities/local/root.crt"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  loxone-trust:
+    image: ${COURTSIDE_LOXONE_SIMULATOR_IMAGE:?set COURTSIDE_LOXONE_SIMULATOR_IMAGE}
+    restart: "no"
+    logging: *logging
+    user: "0:0"
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    network_mode: none
+    depends_on:
+      loxone-miniserver:
+        condition: service_healthy
+    entrypoint:
+      - /bin/sh
+      - -ec
+      # The store keeps certificates only, so it carries no integrity password the application would need.
+      - |
+        rm -f /trust/truststore.partial
+        cp "$$JAVA_HOME/lib/security/cacerts" /trust/truststore.partial
+        chmod 0600 /trust/truststore.partial
+        keytool -J-Dkeystore.pkcs12.certProtectionAlgorithm=NONE -J-Dkeystore.pkcs12.macAlgorithm=NONE \
+          -importcert -noprompt -alias loxone-simulator -file /authority/root.crt \
+          -keystore /trust/truststore.partial -storepass changeit
+        chmod 0644 /trust/truststore.partial
+        mv -f /trust/truststore.partial /trust/truststore.p12
+    command: !reset []
+    healthcheck:
+      disable: true
+    volumes:
+      - type: volume
+        source: loxone-caddy-data
+        target: /authority
+        read_only: true
+        volume:
+          subpath: caddy/pki/authorities/local
+      - loxone-trust:/trust
+
+networks:
+  loxone:
+    internal: true
+
+volumes:
+  loxone-caddy-data:
+  loxone-trust:

@@ -968,3 +968,25 @@ test("given an owner-only staged target, when update retries, then verified cont
     assert.equal(statSync(join(context.target, "config", ".env")).mode & 0o777, 0o600);
   });
 });
+
+test("given the simulator selected, when the target release has no booking-seed image, then the update refuses before Docker", () => {
+  fixture((context) => {
+    // given
+    assert.equal(initialize(context, { synthetic_mail: "true", loxone_simulator: "true" }).status, 0);
+    const next = releaseArchive(context.root, "0.1.1");
+    const manifest = join(next, "manifest.json");
+    const body = JSON.parse(readFileSync(manifest, "utf8"));
+    delete body.bookingSeedImage;
+    writeFileSync(manifest, `${JSON.stringify(body, null, 2)}\n`);
+    rmSync(context.dockerLog, { force: true });
+
+    // when
+    const result = run(next, context.target, ["update", "--archive", next, "--yes"], context.environment);
+
+    // then
+    assert.equal(result.status, 2);
+    assert.match(result.stderr, /loxone_simulator needs a release that provides a booking-seed image/);
+    assert.ok(!existsSync(context.dockerLog), "the update reached Docker before it refused");
+    assert.match(readFileSync(join(context.target, "config", "installation.conf"), "utf8"), /^release=0\.1\.0$/m);
+  });
+});

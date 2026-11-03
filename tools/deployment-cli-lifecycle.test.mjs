@@ -76,6 +76,36 @@ test("given unambiguous ownership, when adoption is applied, then existing ident
   });
 });
 
+test("given an acceptance project running the Loxone simulator, when adoption is applied, then the model it compares "
+  + "includes the simulator component", () => {
+  fixture((context) => {
+    // given
+    const selection = { synthetic_mail: "true", loxone_simulator: "true" };
+    const sourceTarget = join(context.root, "source-instance");
+    assert.equal(run(context.archive, sourceTarget,
+      ["init", "--answers", answers(context.root, selection), "--yes"], context.environment).status, 0);
+    writeFileSync(join(context.root, "docker-compose-list"), '[{"Name":"example-club"}]\n');
+    writeFileSync(join(context.root, "docker-volumes"), "example-club_db\n");
+    rmSync(context.dockerLog, { force: true });
+
+    // when
+    const result = run(context.archive, context.target,
+      ["adopt", "--apply", "--project", "example-club", "--environment", join(sourceTarget, "config", ".env"),
+        "--answers", answers(context.root, selection), "--yes"], context.environment);
+
+    // then
+    assert.equal(result.status, 0, result.stderr);
+    const services = readFileSync(context.dockerLog, "utf8").split("\n")
+      .filter((line) => line.endsWith(" config --services"));
+    assert.ok(services.length > 0, "adoption compared no Compose model");
+    for (const line of services) {
+      assert.match(line, /-f \S+\/compose\.loxone-simulator\.yaml config --services$/,
+        "adoption compared a model without the simulator component");
+    }
+    assert.match(readFileSync(join(context.target, "config", "installation.conf"), "utf8"), /^loxone_simulator=true$/m);
+  });
+});
+
 test("given the adoption source changes during validation, when apply publishes, then it uses the validated snapshot", () => {
   fixture((context) => {
     const sourceTarget = join(context.root, "source-instance");
