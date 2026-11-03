@@ -17,6 +17,9 @@ class ViolationShapeTest {
     private static final List<String> ALLOWED_TO_WRITE_A_CODE = List.of(
             "org/courtside/shared/DomainFailure.java",
             "org/courtside/shared/web/SharedExceptionHandler.java");
+    // The simulator answers in the Miniserver's own envelope, which names its status "code".
+    private static final Path SIMULATED_DEVICE = Path.of(
+            "src/main/java/org/courtside/loxonesimulator/LoxoneSimulator.java");
 
     @Test
     void whenReadingEveryPlaceThatWritesACode_thenOnlyTheTwoBuildersDoIt() throws IOException {
@@ -26,6 +29,7 @@ class ViolationShapeTest {
         // when
         try (Stream<Path> sources = Files.walk(Path.of("src/main/java"))) {
             sources.filter(path -> path.toString().endsWith(".java"))
+                    .filter(path -> !path.equals(SIMULATED_DEVICE))
                     .filter(path -> contains(path, "\"code\""))
                     .map(path -> Path.of("src/main/java").relativize(path).toString())
                     .forEach(writers::add);

@@ -1,6 +1,7 @@
 package org.courtside.access.internal;
 
 import org.courtside.access.CheckOutcome;
+import org.courtside.loxonesimulator.LoxoneSimulator;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -38,8 +39,8 @@ class LoxoneRecordedFixtureTest extends LoxoneTestSupport {
         recorder = new LoxoneRecorder(List.of(LoxoneSimulator.USER, LoxoneSimulator.PASSWORD, LoxoneSimulator.SERIAL,
                 DEVICE_CODE));
         guard = new DeviceGuard(recorder, recorder::created);
-        settings = simulator.settingsBySerial(DEADLINE);
-        client = new LoxoneClient(settings, LoxoneSimulator.clientTrust(), clock,
+        settings = settingsBySerial(DEADLINE);
+        client = new LoxoneClient(settings, SimulatedMiniserver.clientTrust(), clock,
                 LoxoneLogin.clientUuid("courtside-device-contract", settings.address()));
         client.tap(guard);
         device = new LoxoneAccessControl(settings, accessPoint -> Optional.empty(), client, clock);

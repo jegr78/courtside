@@ -2,6 +2,7 @@ package org.courtside.access.internal;
 
 import org.courtside.access.GrantOutcome;
 import org.courtside.access.ProbeOutcome;
+import org.courtside.loxonesimulator.LoxoneSimulator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -22,7 +23,7 @@ class LoxoneAddressTest extends LoxoneTestSupport {
 
     @BeforeEach
     void connectBySerial() {
-        bySerial = connectorFor(simulator.settingsBySerial(DEADLINE));
+        bySerial = connectorFor(settingsBySerial(DEADLINE));
     }
 
     @Test
@@ -187,9 +188,9 @@ class LoxoneAddressTest extends LoxoneTestSupport {
     void givenAResolverNamingAHostOutsideTheRelays_whenACallIsMade_thenNoRequestReachesThatHost() throws IOException {
         // given
         int relayPort = simulator.url().getPort();
-        LoxoneAccessControl confined = connectorFor(simulator.settingsBySerial(DEADLINE,
+        LoxoneAccessControl confined = connectorFor(settingsBySerial(DEADLINE,
                 List.of(new LoxoneAddress.Relay("localhost", relayPort, relayPort))));
-        try (LoxoneSimulator foreign = new LoxoneSimulator(clock)) {
+        try (LoxoneSimulator foreign = SimulatedMiniserver.started(clock)) {
             simulator.resolveTo(foreign.url());
 
             // when / then

@@ -34,7 +34,7 @@ class LoxoneGroupMappingTest extends AbstractIntegrationTest {
         LoxoneAccessControl connector = new LoxoneAccessControl(new LoxoneSettings(
                 new LoxoneAddress.Fixed(URI.create("https://miniserver.example.org")), "courtside",
                 "example-password", Duration.ofSeconds(1)), groups,
-                LoxoneSimulator.clientTrust(), Clock.systemUTC());
+                SimulatedMiniserver.clientTrust(), Clock.systemUTC());
         String before = connector.mappingOf(Set.of(gate));
 
         // when

@@ -3,6 +3,7 @@ package org.courtside.access.internal;
 import org.courtside.access.GrantOutcome;
 import org.courtside.access.ProbeOutcome;
 import org.courtside.access.Scope;
+import org.courtside.loxonesimulator.LoxoneSimulator;
 import org.junit.jupiter.api.Test;
 
 import java.net.URI;
@@ -56,7 +57,7 @@ class LoxoneLoginTest extends LoxoneTestSupport {
         simulator.answerRaw("getkey2", "{\"LL\":{\"control\":\"getkey2\",\"value\":{\"key\":\"00\"}}}");
 
         // when / then
-        assertThatThrownBy(connectorFor(simulator.settingsByUrl(DEADLINE))::probe).isInstanceOf(LoxoneFailure.class)
+        assertThatThrownBy(connectorFor(settingsByUrl(DEADLINE))::probe).isInstanceOf(LoxoneFailure.class)
                 .hasMessage("getkey2 answered without salt");
         assertThat(simulator.count("getjwt")).isZero();
     }
@@ -68,7 +69,7 @@ class LoxoneLoginTest extends LoxoneTestSupport {
         simulator.answerRaw("getkey2", "{\"LL\":{\"control\":\"getkey2\",\"value\":\"{key\",\"code\":200}}");
 
         // when / then
-        assertThatThrownBy(connectorFor(simulator.settingsByUrl(DEADLINE))::probe).isInstanceOf(LoxoneFailure.class)
+        assertThatThrownBy(connectorFor(settingsByUrl(DEADLINE))::probe).isInstanceOf(LoxoneFailure.class)
                 .hasMessage("getkey2 answered without key");
     }
 
@@ -79,7 +80,7 @@ class LoxoneLoginTest extends LoxoneTestSupport {
         simulator.answerRaw("getkey2", "{\"LL\":{\"control\":\"getkey2\",\"value\":\"\",\"Code\":\"500\"}}");
 
         // when / then
-        assertThatThrownBy(connectorFor(simulator.settingsByUrl(DEADLINE))::probe).isInstanceOf(LoxoneFailure.class)
+        assertThatThrownBy(connectorFor(settingsByUrl(DEADLINE))::probe).isInstanceOf(LoxoneFailure.class)
                 .hasMessage("getkey2 answered 500");
     }
 
@@ -91,7 +92,7 @@ class LoxoneLoginTest extends LoxoneTestSupport {
                 + "\"Code\":\"200\"}}");
 
         // when / then
-        assertThatThrownBy(connectorFor(simulator.settingsByUrl(DEADLINE))::probe).isInstanceOf(LoxoneFailure.class)
+        assertThatThrownBy(connectorFor(settingsByUrl(DEADLINE))::probe).isInstanceOf(LoxoneFailure.class)
                 .hasMessage("getjwt answered without a lifespan or rights");
         assertThat(simulator.count("getuserlist2")).isZero();
     }
@@ -99,7 +100,7 @@ class LoxoneLoginTest extends LoxoneTestSupport {
     @Test
     void whenTheSettingsArePrinted_thenThePasswordIsLeftOut() {
         // when
-        String printed = simulator.settingsByUrl(DEADLINE).toString();
+        String printed = settingsByUrl(DEADLINE).toString();
 
         // then
         assertThat(printed).contains(LoxoneSimulator.USER).doesNotContain(LoxoneSimulator.PASSWORD);
@@ -108,7 +109,7 @@ class LoxoneLoginTest extends LoxoneTestSupport {
     @Test
     void givenAClosedConnector_whenProbed_thenNoRequestLeaves() {
         // given
-        LoxoneAccessControl closed = connectorFor(simulator.settingsByUrl(DEADLINE));
+        LoxoneAccessControl closed = connectorFor(settingsByUrl(DEADLINE));
         closed.close();
         simulator.forgetRequests();
 
@@ -123,7 +124,7 @@ class LoxoneLoginTest extends LoxoneTestSupport {
         simulator.hashWith("SHA1");
 
         // when
-        ProbeOutcome probed = connectorFor(simulator.settingsByUrl(DEADLINE)).probe();
+        ProbeOutcome probed = connectorFor(settingsByUrl(DEADLINE)).probe();
 
         // then
         assertThat(probed).isEqualTo(new ProbeOutcome.Answered());
@@ -134,7 +135,7 @@ class LoxoneLoginTest extends LoxoneTestSupport {
     void whenATokenIsAcquired_thenItAsksForAppChangeCodesAndUserManagementWithAStableClientUuid() {
         // when
         connector.probe();
-        connectorFor(simulator.settingsByUrl(DEADLINE)).probe();
+        connectorFor(settingsByUrl(DEADLINE)).probe();
 
         // then
         assertThat(simulator.permissions())
@@ -151,7 +152,7 @@ class LoxoneLoginTest extends LoxoneTestSupport {
     @Test
     void givenTwoInstancesOfOneMiniserver_whenEachAcquiresATokenTwice_thenEachKeepsItsOwnClientUuid() {
         // given
-        LoxoneSettings url = simulator.settingsByUrl(DEADLINE);
+        LoxoneSettings url = settingsByUrl(DEADLINE);
         LoxoneSettings production = new LoxoneSettings(url.address(), url.user(), url.password(), DEADLINE,
                 "https://courts.example.org");
         LoxoneSettings trial = new LoxoneSettings(url.address(), url.user(), url.password(), DEADLINE,
@@ -238,7 +239,7 @@ class LoxoneLoginTest extends LoxoneTestSupport {
     @Test
     void givenAWrongPassword_whenProbed_thenTheConnectorIsRefused() {
         // given
-        LoxoneSettings settings = simulator.settingsByUrl(DEADLINE);
+        LoxoneSettings settings = settingsByUrl(DEADLINE);
         LoxoneAccessControl wrong = connectorFor(new LoxoneSettings(settings.address(), settings.user(),
                 "wrong-example-password", settings.callDeadline()));
 
@@ -257,7 +258,7 @@ class LoxoneLoginTest extends LoxoneTestSupport {
         simulator.answerRaw("getjwt", "{\"LL\":{\"control\":\"getjwt\",\"value\":\"\",\"Code\":\"412\"}}");
 
         // when
-        ProbeOutcome probed = connectorFor(simulator.settingsByUrl(DEADLINE)).probe();
+        ProbeOutcome probed = connectorFor(settingsByUrl(DEADLINE)).probe();
 
         // then
         assertThat(probed).isEqualTo(new ProbeOutcome.Refused(
@@ -270,7 +271,7 @@ class LoxoneLoginTest extends LoxoneTestSupport {
         simulator.answerRaw("getkey2", "{\"LL\":{\"control\":\"getkey2\",\"value\":\"\",\"Code\":\"412\"}}");
 
         // when / then
-        assertThatThrownBy(connectorFor(simulator.settingsByUrl(DEADLINE))::probe).isInstanceOf(LoxoneFailure.class)
+        assertThatThrownBy(connectorFor(settingsByUrl(DEADLINE))::probe).isInstanceOf(LoxoneFailure.class)
                 .hasMessage("getkey2 answered 412");
     }
 
@@ -280,7 +281,7 @@ class LoxoneLoginTest extends LoxoneTestSupport {
         simulator.withholdUserManagement();
 
         // when
-        ProbeOutcome probed = connectorFor(simulator.settingsByUrl(DEADLINE)).probe();
+        ProbeOutcome probed = connectorFor(settingsByUrl(DEADLINE)).probe();
         simulator.expireTokens();
         GrantOutcome granted = connector.grant(instruction(UUID.randomUUID()));
 
@@ -311,7 +312,7 @@ class LoxoneLoginTest extends LoxoneTestSupport {
         simulator.force("getjwt", 423);
 
         // when
-        ProbeOutcome probed = connectorFor(simulator.settingsByUrl(DEADLINE)).probe();
+        ProbeOutcome probed = connectorFor(settingsByUrl(DEADLINE)).probe();
 
         // then
         assertThat(probed).isEqualTo(new ProbeOutcome.Refused("Miniserver disabled the technical user (getjwt 423)"));

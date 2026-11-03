@@ -6,6 +6,7 @@ import org.courtside.access.GrantReference;
 import org.courtside.access.ProbeOutcome;
 import org.courtside.access.RemoteGroup;
 import org.courtside.access.Scope;
+import org.courtside.loxonesimulator.LoxoneSimulator;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
@@ -225,7 +226,7 @@ class LoxoneConnectorTest extends LoxoneTestSupport {
     @Test
     void givenAConnectorThatHasReadNoGroups_whenGranted_thenTheGrantIsRefusedWithoutARequest() {
         // given
-        LoxoneAccessControl unprobed = connectorFor(simulator.settingsByUrl(DEADLINE));
+        LoxoneAccessControl unprobed = connectorFor(settingsByUrl(DEADLINE));
 
         // when
         GrantOutcome outcome = unprobed.grant(instruction(grantId));
@@ -277,7 +278,7 @@ class LoxoneConnectorTest extends LoxoneTestSupport {
     @Test
     void givenAHangingRequest_whenGranted_thenTheCallEndsWithinItsDeadline() {
         // given
-        LoxoneAccessControl bounded = ready(connectorFor(simulator.settingsByUrl(Duration.ofSeconds(1))));
+        LoxoneAccessControl bounded = ready(connectorFor(settingsByUrl(Duration.ofSeconds(1))));
         simulator.hang("getuserlist2");
         long started = System.nanoTime();
 
