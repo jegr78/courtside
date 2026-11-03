@@ -399,6 +399,22 @@ nothing carries one over to the next candidate. Comparing looks needs a fixed st
 the visual regression suite in CI, `frontend/e2e/visual-regression.spec.ts`, has and an acceptance
 run does not.
 
+That suite and the guide captures in `frontend/e2e/guide-screenshots.spec.ts` hold a reviewed
+baseline for each page and dialog the contact sheets show, in at least one state: the court
+plan signed out and signed in, the booking, waitlist, cancellation and move dialogs with a refusal,
+personal bookings with an open place and a waitlist offer, messages with a notification and a
+saved choice, the dependants page, the preferences menu, the account page, sign-in with a refused password, the
+password reset, every administration page, and the administration states the journeys pass
+through: unsaved settings, an opening-hours impact, a season or closure list, a retention preview,
+an import preview and its refusal, a person with a guardian, managed appointments with their
+details and a series preview. A change to how one of them looks fails the pull request, so a review
+here reads what a sheet shows about the club's own data and needs no comparison with an earlier run.
+
+Two kinds of sheet have no baseline of their own. The offline and other-tab captures of the PWA
+journey need an installed service worker and a second browser context, which the PWA browser
+projects check by behaviour instead. A sheet in the second language shows a surface the suite draws
+in one language and the guides draw in both.
+
 `review-batches.json` lists the sheets in the review scope still without a verdict, in batches of
 at most eight. Give a reviewer one batch at a time. Open its native tiles, write the verdicts into
 `review.json` as soon as that batch finishes, and merge those writes before assigning another

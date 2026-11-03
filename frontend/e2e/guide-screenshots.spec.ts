@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { type Page, type TestInfo } from "@playwright/test";
+import { accessGrantsExample, connectionCheckExample, operatorHealthExample } from "./admin-examples";
 import { backAtTheJourneyInstant, expect, expectAdministrationOverview, onTheVisualDay, selectPreference, test } from "./fixtures";
 
 // The guides are read in the light theme on a page column, in the language its project names, and
@@ -302,49 +303,6 @@ const drivers: Record<string, (page: Page, visualDate: string) => Promise<void>>
     await expect(page.getByTestId("retention-preview")).toBeEnabled();
     await expect(page.getByTestId("retention-success")).toBeVisible();
   }
-};
-
-// One check in each state, because the journey instance never fails a check of its own.
-const operatorHealthExample = {
-  checkedAt: "2026-10-17T08:00:00Z",
-  version: { state: "OK", version: "0.4.0", revision: "4f2c9e1", builtAt: "2026-10-16T20:00:00Z" },
-  migrations: { state: "OK", reason: null, pending: 0, currentVersion: "63", expectedVersion: "63", location: null },
-  mail: { state: "FAILING", reason: "HANDOVER_FAILING", lastHandedOverAt: "2026-10-17T07:00:00Z", location: "relay.example.org:587" },
-  publicOrigin: { state: "OK", reason: null, origin: "https://courts.example.org" },
-  backup: { state: "UNAVAILABLE", reason: "NOT_CONFIGURED", completedAt: null, ageSeconds: null, location: null }
-};
-
-// A failing grant beside an installed one, because the simulated access-control system never fails.
-const connectionCheckExample = {
-  checkedAt: "2026-05-14T08:00:00Z",
-  checks: [
-    { check: "miniserver", outcome: "PASSED", code: "access.check.miniserver.reached", params: { version: "16.1.10.3", minimum: "14.2.5.16" } },
-    { check: "login", outcome: "PASSED", code: "access.check.login.accepted", params: {} },
-    { check: "groups", outcome: "PASSED", code: "access.check.groups.mapped", params: { accessPoints: "North gate, South gate" } },
-    { check: "probe-user", outcome: "PASSED", code: "access.check.probeUser.passed", params: {} },
-    { check: "keypad", outcome: "MANUAL", code: "access.check.keypad.manual", params: {} }
-  ]
-};
-
-const accessGrantsExample = {
-  connector: "loxone", connected: true, total: 2,
-  probe: { reachable: true, outcome: "ANSWERED", detail: "", checkedAt: "2026-05-14T08:00:00Z" },
-  grants: [
-    {
-      id: "00000000-0000-4000-8000-000000000001", bookingId: "example-failing", status: "FAILING",
-      validFrom: "2026-05-14T15:45:00Z", validUntil: "2026-05-14T17:45:00Z",
-      startsAt: "2026-05-14T16:00:00Z", endsAt: "2026-05-14T17:30:00Z",
-      courts: [{ number: 3, name: "Court 3" }], accessPoints: ["North gate"],
-      attempts: 5, lastFailure: "The keypad holds no free user slot", nextAttemptAt: null
-    },
-    {
-      id: "00000000-0000-4000-8000-000000000002", bookingId: "example-installed", status: "INSTALLED",
-      validFrom: "2026-05-15T08:45:00Z", validUntil: "2026-05-15T10:15:00Z",
-      startsAt: "2026-05-15T09:00:00Z", endsAt: "2026-05-15T10:00:00Z",
-      courts: [{ number: 1, name: "Court 1" }, { number: 2, name: "Court 2" }], accessPoints: ["North gate", "South gate"],
-      attempts: 0, lastFailure: null, nextAttemptAt: null
-    }
-  ]
 };
 
 test("the court plan every visitor sees is captured", async ({ page, journeyService }, info) => {
