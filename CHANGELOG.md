@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0-rc.4](https://github.com/jegr78/courtside/compare/v0.4.0-rc.3...v0.4.0-rc.4) (2026-11-04)
+
+
+### Features
+
+* let an import source leave out rows by their category value ([#1841](https://github.com/jegr78/courtside/issues/1841)) ([3639604](https://github.com/jegr78/courtside/commit/36396042d0bdab93b11d051cfb4f49ca29b86422))
+
 ## 0.4.0 (2026-11-01)
 
 ### Features
