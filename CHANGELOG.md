@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.4.0 (2026-11-01)
+## 0.4.0 (2026-11-04)
 
 ### Features
 
@@ -39,7 +39,12 @@
 
 ### Documentation
 
+* make the door acceptance checklist runnable at a real keypad ([#1845](https://github.com/jegr78/courtside/issues/1845)) ([3e33003](https://github.com/jegr78/courtside/commit/3e330036de8572eab97c48e142a0dcc92edf1179))
 * post the acceptance summary on the release pull request ([#1825](https://github.com/jegr78/courtside/issues/1825)) ([210e6ea](https://github.com/jegr78/courtside/commit/210e6eaea4337a7fd259b697a40650ce134d74d9))
+
+### Build and dependencies
+
+* graduate the 0.4.0 candidate line from rc.4 ([#1847](https://github.com/jegr78/courtside/issues/1847)) ([5f21100](https://github.com/jegr78/courtside/commit/5f211002be111f0e5033e766a5872d2b635ebd8f))
 
 ### Chores
 
