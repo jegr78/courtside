@@ -4,9 +4,25 @@ description: Updates Trivy databases through independent sources before scans ru
 runs:
   using: composite
   steps:
-    - uses: aquasecurity/setup-trivy@3fb12ec12f41e471780db15c232d5dd185dcb514
-      with:
-        version: v0.70.0
+    - name: Install Trivy from its release
+      shell: bash
+      env:
+        TRIVY_VERSION: 0.70.0
+      run: |
+        case "$RUNNER_ARCH" in
+          X64) asset=Linux-64bit sha256=8b4376d5d6befe5c24d503f10ff136d9e0c49f9127a4279fd110b727929a5aa9 ;;
+          ARM64) asset=Linux-ARM64 sha256=2f6bb988b553a1bbac6bdd1ce890f5e412439564e17522b88a4541b4f364fc8d ;;
+          *) echo "::error::No pinned Trivy archive for runner architecture $RUNNER_ARCH"; exit 1 ;;
+        esac
+        archive="$RUNNER_TEMP/trivy-$TRIVY_VERSION.tar.gz"
+        curl --fail --silent --show-error --location --retry 3 --output "$archive" \
+          "https://github.com/aquasecurity/trivy/releases/download/v$TRIVY_VERSION/trivy_${TRIVY_VERSION}_$asset.tar.gz"
+        echo "$sha256  $archive" | sha256sum --check --strict
+        bin="$RUNNER_TEMP/trivy-bin"
+        mkdir -p "$bin"
+        tar -xzf "$archive" -C "$bin" trivy
+        echo "$bin" >> "$GITHUB_PATH"
+        "$bin/trivy" --version
     - id: date
       shell: bash
       run: echo "date=$(date +'%Y-%m-%d')" >> "$GITHUB_OUTPUT"
