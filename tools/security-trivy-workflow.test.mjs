@@ -48,7 +48,13 @@ test("given shared database preparation, when it finishes, then only successful 
   const prepare = steps.findIndex((step) => /node tools\/security-trivy-database\.mjs/.test(step.run ?? ""));
 
   // when / then
-  assert.ok(steps.slice(0, prepare).some((step) => step.uses?.startsWith("aquasecurity/setup-trivy@")));
+  const install = steps.slice(0, prepare).find((step) => /releases\/download\/v\$TRIVY_VERSION\//.test(step.run ?? ""));
+  assert.ok(install, "Trivy comes from its GitHub release, not from an install script that picks its own host");
+  assert.match(install.run, /sha256sum --check --strict/, "the archive is checked against a pinned digest");
+  assert.match(install.run, /X64\) asset=Linux-64bit sha256=[0-9a-f]{64}/);
+  assert.match(install.run, /ARM64\) asset=Linux-ARM64 sha256=[0-9a-f]{64}/);
+  assert.ok(!steps.some((step) => step.uses?.startsWith("aquasecurity/setup-trivy@")),
+    "setup-trivy downloads through get.trivy.dev, which no longer resolves");
   assert.ok(steps.slice(0, prepare).some((step) => step.uses?.startsWith("actions/cache@")));
   assert.equal(steps[prepare]["continue-on-error"], undefined);
   assert.equal(steps[prepare].shell, "bash");
