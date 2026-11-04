@@ -4,6 +4,7 @@
 
 ### Features
 
+* let an import source leave out rows by their category value ([#1841](https://github.com/jegr78/courtside/issues/1841)) ([3639604](https://github.com/jegr78/courtside/commit/36396042d0bdab93b11d051cfb4f49ca29b86422))
 * run the Loxone simulator beside an acceptance instance ([#1835](https://github.com/jegr78/courtside/issues/1835)) ([71df959](https://github.com/jegr78/courtside/commit/71df959f4697f7ce4aa42f3342f115e7ec8518b6))
 * serve the club logo to the header as a 160-pixel variant ([#1827](https://github.com/jegr78/courtside/issues/1827)) ([80598c9](https://github.com/jegr78/courtside/commit/80598c9cd3a2d087d8f37145b1d2f54d212d0009))
 * add a recoverable Stalwart store transition ([#1805](https://github.com/jegr78/courtside/issues/1805)) ([6cc8c35](https://github.com/jegr78/courtside/commit/6cc8c35f28fa7ff393828d5665d5b31c541f2465))
