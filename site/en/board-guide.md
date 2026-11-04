@@ -313,15 +313,19 @@ Courtside checks the groups and the test user only after a successful login; oth
 
 Run the door acceptance after the setup and after every change to groups or keypads. You need a
 booking whose card grants access, on a court behind the access point. You find its code under
-*My bookings*.
+*My bookings*. Note it down first: after the window and after a cancellation Courtside no longer
+shows it. Setting **Access before play starts** and **Access after play ends** to a few minutes for
+the acceptance saves waiting a quarter of an hour each time. Set them back afterwards.
 
 1. The time in the Loxone app matches the clock in the clubhouse, and the booking's user shows the
    same window in the app as Courtside does under *Access grants*.
 2. Before the window the keypad refuses the code, within the window it opens, afterwards it refuses
-   the code again.
+   the code again. An access point that does not lead to the booking's courts refuses it within the
+   window too.
 3. After a cancellation the keypad refuses the code within a minute.
-4. When you move the booking to a court behind another access point, the code opens the new access
-   point and no longer the old one.
+4. When you move a series appointment to a court behind another access point, the code opens the
+   new access point and no longer the old one. A single booking cannot be moved, so create a series
+   with one appointment under *Administration → Club appointments* for this.
 5. The static code of an access point with a static code still opens as before.
 6. Building control: the **Virtual HTTP Input Command** for `occupied` reads 1 while a booking runs
    whose card counts as occupied, and 0 otherwise. The command for `minutes` counts down to the next

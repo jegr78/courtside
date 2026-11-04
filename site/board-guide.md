@@ -329,15 +329,20 @@ Gruppen und Testbenutzer prüft Courtside nur nach einer erfolgreichen Anmeldung
 
 Mach die Abnahme nach der Einrichtung und nach jeder Änderung an Gruppen oder Tastenfeldern. Du
 brauchst dafür eine Buchung, deren Karte Zugang gewährt, auf einem Platz hinter dem Zugang. Den
-Code der Buchung siehst du unter *Meine Buchungen*.
+Code der Buchung siehst du unter *Meine Buchungen*. Notiere ihn vorher: Nach dem Zeitfenster und
+nach einer Stornierung zeigt Courtside ihn nicht mehr. Setzt du **Zugang vor Spielbeginn** und
+**Zugang nach Spielende** für die Abnahme auf wenige Minuten, wartest du nicht je eine Viertelstunde.
+Stelle sie danach zurück.
 
 1. Die Uhrzeit in der Loxone App stimmt mit der Uhr im Clubhaus überein, und der Benutzer der
    Buchung zeigt in der App dasselbe Zeitfenster wie Courtside unter *Zugangsberechtigungen*.
 2. Vor dem Zeitfenster weist das Tastenfeld den Code ab, im Zeitfenster öffnet er, danach weist es
-   ihn wieder ab.
+   ihn wieder ab. Ein Zugang, der nicht zu den Plätzen der Buchung führt, weist ihn auch im
+   Zeitfenster ab.
 3. Nach einer Stornierung weist das Tastenfeld den Code innerhalb einer Minute ab.
-4. Verschiebst du die Buchung auf einen Platz hinter einem anderen Zugang, öffnet der Code den
-   neuen Zugang und nicht mehr den alten.
+4. Verschiebst du einen Serientermin auf einen Platz hinter einem anderen Zugang, öffnet der Code
+   den neuen Zugang und nicht mehr den alten. Eine einzelne Buchung lässt sich nicht verschieben.
+   Lege dafür unter *Verwaltung → Vereinstermine* eine Serie mit einem Termin an.
 5. Der feste Code eines Zugangs mit festem Code öffnet weiter wie vorher.
 6. Die Gebäudesteuerung: Der **Virtuelle HTTP Eingang Befehl** für `occupied` zeigt 1, solange eine
    Buchung läuft, deren Karte als belegt gilt, und sonst 0. Der Befehl für `minutes` zählt bis zur
