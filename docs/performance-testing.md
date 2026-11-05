@@ -421,7 +421,7 @@ verified. The runner signs in as `member0001` for My bookings and My messages an
 administration routes. It replaces the administrator's one-time password with a random one first,
 otherwise every administration route would show the password change, and keeps it in
 `build/lighthouse-administrator.json`, outside the uploaded results, for a later run against the same
-environment.
+environment. `perf-reset` deletes it, and a refused kept password falls back to the shared one.
 
 Every page runs on mobile, with Lighthouse's default emulation of PageSpeed's phone and slow 4G, and
 on desktop. The court plan, sign-in, My bookings and My messages run three times and report the

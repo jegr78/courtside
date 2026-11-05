@@ -57,7 +57,11 @@ export async function runLighthouse({ args = process.argv.slice(2), environment 
   assertPerformanceSource(source, state);
 
   const administratorFile = join(root, "build", "lighthouse-administrator.json");
-  if (!existsSync(administratorFile)) writeFileSync(administratorFile, "{}\n", { mode: 0o600 });
+  try {
+    writeFileSync(administratorFile, "{}\n", { mode: 0o600, flag: "wx" });
+  } catch (error) {
+    if (error.code !== "EEXIST") throw error;
+  }
   const name = `courtside-lighthouse-${randomBytes(8).toString("hex")}`;
   const plan = lighthouseContainerPlan({ root, output, stateFile, administratorFile, certificatePin: identity.certificatePin, name });
   const run = execute(plan.command, plan.args, { cwd: root, stdio: "inherit", timeout: RUN_LIMIT_MILLISECONDS });

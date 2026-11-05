@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from "node:crypto";
+import { randomBytes } from "node:crypto";
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -18,7 +18,6 @@ const { password } = JSON.parse(readFileSync(process.env.LIGHTHOUSE_STATE, "utf8
 if (!origin || !pin || !output || !password || !administratorFile) {
   throw new Error("Lighthouse needs an origin, a certificate pin, an output, the state and the administrator file");
 }
-const environmentKey = createHash("sha256").update(password).digest("hex");
 
 const context = await chromium.launchPersistentContext(mkdtempSync(join(tmpdir(), "lighthouse-profile-")), {
   channel: "chromium", headless: true,
@@ -69,14 +68,14 @@ async function prepare(account) {
     return {};
   }
   const kept = JSON.parse(readFileSync(administratorFile, "utf8"));
-  const session = kept.environment === environmentKey
+  const session = kept.password
     ? await signIn("admin", kept.password).catch(() => signIn("admin", password))
     : await signIn("admin", password);
   if (session?.passwordChangeRequired) {
     const replacement = randomBytes(24).toString("base64url");
     await expect(call("PUT", "/api/account/initial-password", { json: { password: replacement } }), 204,
       "The initial password change");
-    writeFileSync(administratorFile, `${JSON.stringify({ environment: environmentKey, password: replacement })}\n`);
+    writeFileSync(administratorFile, `${JSON.stringify({ password: replacement })}\n`);
     await signIn("admin", replacement);
   }
   const roster = await expect(call("POST", "/api/admin/roster-search", { json: { limit: 1, sortBy: "NAME", sortDirection: "ASC" } }),
