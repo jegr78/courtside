@@ -325,7 +325,7 @@ const en: Record<keyof typeof de, string> = {
   "admin.config.timeZone": "Time zone",
   "admin.config.timeZoneHelp": "IANA time zone, for example Europe/Berlin. It can only be changed when no future bookings exist.",
   "admin.config.currency": "Currency",
-  "admin.config.currencyHelp": "ISO 4217 code, for example EUR. A change converts no card fee, and guests already booked keep their amount.",
+  "admin.config.currencyHelp": "ISO 4217 code such as EUR. A change converts no amounts.",
   "admin.config.saved": "The club profile was saved.",
   "admin.deadlines.title": "Deadlines and reminders",
   "admin.attendance.title": "Attendance",

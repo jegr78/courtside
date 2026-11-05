@@ -174,6 +174,12 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
               </div>
               <TextField data-testid="imprint-url" label={t("admin.config.imprintUrl")} value={config.imprintUrl ?? ""} onChange={(event) => changeConfig({ imprintUrl: event.target.value || null })} />
               <TextField data-testid="privacy-url" label={t("admin.config.privacyUrl")} value={config.privacyUrl ?? ""} onChange={(event) => changeConfig({ privacyUrl: event.target.value || null })} />
+              <div className="grid gap-1">
+                <TextField data-testid="config-currency" maxLength={3} autoCapitalize="characters" spellCheck={false} className="max-w-32"
+                           aria-describedby="config-currency-hint" label={t("admin.config.currency")} value={config.currency ?? ""}
+                           onChange={(event) => changeConfig({ currency: event.target.value.toUpperCase() })} />
+                <p id="config-currency-hint" className="text-muted text-sm">{t("admin.config.currencyHelp")}</p>
+              </div>
             </div>
             <div data-testid="club-settings" className="grid gap-4">
               <div className="grid gap-1">
@@ -196,12 +202,6 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
                 <p className="text-muted text-sm">{t("admin.config.timeZoneHelp")}</p>
               </div>
               <TextField id="slot-minutes" data-testid="slot-minutes" type="number" min={5} max={120} step={5} className="max-w-32" label={t("admin.config.slotMinutes")} value={config.slotMinutes} onChange={(event) => changeConfig({ slotMinutes: Number(event.target.value) })} />
-              <div className="grid gap-1">
-                <TextField data-testid="config-currency" maxLength={3} autoCapitalize="characters" spellCheck={false} className="max-w-32"
-                           aria-describedby="config-currency-hint" label={t("admin.config.currency")} value={config.currency ?? ""}
-                           onChange={(event) => changeConfig({ currency: event.target.value.toUpperCase() })} />
-                <p id="config-currency-hint" className="text-muted text-sm">{t("admin.config.currencyHelp")}</p>
-              </div>
             </div>
             <div data-testid="club-appearance" className="grid gap-4 [&>*]:min-w-0 sm:grid-cols-2 lg:col-span-2">
               <BrandColorField kind="primary" label={t("admin.config.primaryColor")} value={config.primaryColor} changed={(primaryColor) => changeConfig({ primaryColor })} />

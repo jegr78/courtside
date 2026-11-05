@@ -323,7 +323,7 @@ const de = {
   "admin.config.timeZone": "Zeitzone",
   "admin.config.timeZoneHelp": "IANA-Zeitzone, zum Beispiel Europe/Berlin. Eine Änderung ist nur ohne zukünftige Buchungen möglich.",
   "admin.config.currency": "Währung",
-  "admin.config.currencyHelp": "ISO-4217-Code, zum Beispiel EUR. Ein Wechsel rechnet keine Kartengebühr um, und bereits gebuchte Gäste behalten ihren Betrag.",
+  "admin.config.currencyHelp": "ISO-4217-Code wie EUR. Ein Wechsel rechnet keine Beträge um.",
   "admin.config.saved": "Das Vereinsprofil wurde gespeichert.",
   "admin.deadlines.title": "Fristen und Erinnerungen",
   "admin.attendance.title": "Anwesenheit",

@@ -697,7 +697,7 @@ describe("AdminConfigurationView", () => {
     // then
     const hint = document.getElementById(currency.getAttribute("aria-describedby") ?? "");
     expect(hint, "the field points at its hint").not.toBeNull();
-    expect(hint).toHaveTextContent("A change converts no card fee, and guests already booked keep their amount.");
+    expect(hint).toHaveTextContent("A change converts no amounts.");
     expect(currency).toHaveAttribute("maxlength", "3");
   });
 
