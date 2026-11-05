@@ -12,9 +12,9 @@ const grid = {
     .map((dayOfWeek) => ({ dayOfWeek, opensAt: "08:00:00", closesAt: "22:00:00" }))
 };
 
-function show() {
+function show(currency?: string) {
   render(<BookingDialog selection={{ date: "2026-08-10", slot: "10:00", courtId: court.id }} grid={grid as never}
-    courts={[court]} allocations={[]} canChooseSeveralCourts={false}
+    courts={[court]} allocations={[]} canChooseSeveralCourts={false} currency={currency}
     closed={() => undefined} created={() => Promise.resolve()} conflicted={() => Promise.resolve()} />);
 }
 
@@ -78,7 +78,7 @@ it("given the German copy, when the duration is bounded, then it speaks of the c
 it("given a booking the club refuses, when the refusal arrives, then the duration comes back into view beside it", async () => {
   // given
   vi.spyOn(api, "bookingCards").mockResolvedValue([{
-    id: "55555555-5555-5555-5555-555555555555", label: "Member booking", color: "#b85c38", allowedPlayerCounts: [1, 2, 4], guestAllowed: true
+    id: "55555555-5555-5555-5555-555555555555", label: "Member booking", color: "#b85c38", allowedPlayerCounts: [1, 2, 4], guestAllowed: true, guestFeeMinor: 0
   }]);
   vi.spyOn(api, "createBooking").mockRejectedValue(new ApiError(409, {
     type: "urn:courtside:error:court-unavailable", title: "Court unavailable", status: 409
@@ -122,7 +122,7 @@ it("given the booking form, when the member opens more details, then the first g
 it("given a refusal about a note, when it opens more details, then the first guest field is not scrolled to", async () => {
   // given
   vi.spyOn(api, "bookingCards").mockResolvedValue([{
-    id: "55555555-5555-5555-5555-555555555555", label: "Member booking", color: "#b85c38", allowedPlayerCounts: [1, 2, 4], guestAllowed: true
+    id: "55555555-5555-5555-5555-555555555555", label: "Member booking", color: "#b85c38", allowedPlayerCounts: [1, 2, 4], guestAllowed: true, guestFeeMinor: 0
   }]);
   vi.spyOn(api, "createBooking").mockRejectedValue(new ApiError(400, {
     type: "urn:courtside:error:validation", title: "Invalid", status: 400,
@@ -233,7 +233,7 @@ for (const [height, searchFits] of [[168, true], [160, true], [144, false], [100
 it("given a guardian without a member card, when they book for a member dependant, then the dependant's cards are offered", async () => {
   // given
   const memberCard = {
-    id: "55555555-5555-5555-5555-555555555555", label: "Member booking", color: "#b85c38", allowedPlayerCounts: [2, 4], guestAllowed: true
+    id: "55555555-5555-5555-5555-555555555555", label: "Member booking", color: "#b85c38", allowedPlayerCounts: [2, 4], guestAllowed: true, guestFeeMinor: 0
   };
   vi.spyOn(api, "bookingCards").mockResolvedValue([]);
   const dependantCards = vi.spyOn(api, "dependantBookingCards").mockResolvedValue([memberCard]);
@@ -248,4 +248,64 @@ it("given a guardian without a member card, when they book for a member dependan
   // then
   await waitFor(() => expect(card.value, "the dependant's card is chosen").toBe(memberCard.id));
   expect(dependantCards).toHaveBeenCalledWith("person-2");
+});
+
+function cardWithGuestFee(guestFeeMinor: number) {
+  return { id: "55555555-5555-5555-5555-555555555555", label: "Member booking", color: "#b85c38", allowedPlayerCounts: [1, 2, 4], guestAllowed: true, guestFeeMinor };
+}
+
+async function enterGuests(...names: string[]) {
+  await screen.findByTestId("booking-card");
+  await act(() => new Promise((settled) => setTimeout(settled, 0)));
+  names.slice(1).forEach(() => fireEvent.click(screen.getByTestId("add-guest")));
+  screen.getAllByTestId("guest-name").forEach((field, index) => fireEvent.change(field, { target: { value: names[index] } }));
+}
+
+it("given a card that charges 5 euros per guest place, when two guests are entered, then the dialog states what they cost before booking", async () => {
+  // given
+  vi.spyOn(api, "bookingCards").mockResolvedValue([cardWithGuestFee(500)]);
+  show("EUR");
+
+  // when
+  await enterGuests("Jane Doe", "John Roe");
+
+  // then
+  expect(screen.getByTestId("booking-guest-fee")).toHaveTextContent("2 Gäste × 5,00 € = 10,00 €");
+});
+
+it("given a card that charges 5 euros per guest place, when one guest is entered in English, then the line speaks of one guest", async () => {
+  // given
+  await i18n.changeLanguage("en");
+  vi.spyOn(api, "bookingCards").mockResolvedValue([cardWithGuestFee(500)]);
+  show("EUR");
+
+  // when
+  await enterGuests("Jane Doe");
+
+  // then
+  expect(screen.getByTestId("booking-guest-fee")).toHaveTextContent("1 guest × €5.00 = €5.00");
+});
+
+it("given a card without a guest fee, when two guests are entered, then no amount is stated", async () => {
+  // given
+  vi.spyOn(api, "bookingCards").mockResolvedValue([cardWithGuestFee(0)]);
+  show("EUR");
+
+  // when
+  await enterGuests("Jane Doe", "John Roe");
+
+  // then
+  expect(screen.queryByTestId("booking-guest-fee"), "a free guest place costs nothing to state").not.toBeInTheDocument();
+});
+
+it("given a card that charges per guest place, when no guest is entered, then no amount is stated", async () => {
+  // given
+  vi.spyOn(api, "bookingCards").mockResolvedValue([cardWithGuestFee(500)]);
+  show("EUR");
+
+  // when
+  await enterGuests("  ");
+
+  // then
+  expect(screen.queryByTestId("booking-guest-fee"), "a blank guest field is no guest").not.toBeInTheDocument();
 });

@@ -16,6 +16,7 @@ export function editable(loaded: AdminClubConfig): ClubConfigRequest {
     defaultLocale: loaded.defaultLocale,
     slotMinutes: loaded.slotMinutes,
     timeZone: loaded.timeZone,
+    currency: loaded.currency,
     newAccountCredentialHours: loaded.newAccountCredentialHours,
     passwordResetCredentialHours: loaded.passwordResetCredentialHours,
     passwordResetTokenMinutes: loaded.passwordResetTokenMinutes,
@@ -32,7 +33,7 @@ type ConfigField = keyof ClubConfigRequest;
 
 export const ownedFields = {
   clubProfile: ["clubName", "shortName", "primaryColor", "accentColor", "logoUrl", "imprintUrl", "privacyUrl",
-    "documentationUrl", "defaultLocale", "timeZone", "slotMinutes"],
+    "documentationUrl", "defaultLocale", "timeZone", "slotMinutes", "currency"],
   deadlines: ["newAccountCredentialHours", "passwordResetCredentialHours", "passwordResetTokenMinutes", "bookingReminderHours",
     "waitlistOfferMinutes"],
   accessSettings: ["accessLeadMinutes", "accessLagMinutes", "accessCodeLength"],

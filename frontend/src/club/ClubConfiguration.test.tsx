@@ -9,7 +9,7 @@ import { useClubConfiguration } from "./registry";
 
 const club: ClubConfig = {
   clubName: "Example Tennis Club", primaryColor: "#b85c38", accentColor: "#d7e24b",
-  defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30, timeZone: "Pacific/Auckland"
+  defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30, timeZone: "Pacific/Auckland", currency: "EUR"
 };
 
 // The element appears only once there is something to say, so a test that waits for it waits for

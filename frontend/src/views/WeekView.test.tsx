@@ -55,14 +55,14 @@ beforeEach(async () => {
     label: "Member booking",
     color: "#b85c38",
     allowedPlayerCounts: [2, 4],
-    guestAllowed: true
+    guestAllowed: true, guestFeeMinor: 0
   }]);
   vi.spyOn(api, "dependantBookingCards").mockResolvedValue([{
     id: "55555555-5555-5555-5555-555555555555",
     label: "Member booking",
     color: "#b85c38",
     allowedPlayerCounts: [2, 4],
-    guestAllowed: true
+    guestAllowed: true, guestFeeMinor: 0
   }]);
   vi.spyOn(api, "bookingCardLegend").mockResolvedValue([{
     id: null,
@@ -440,8 +440,8 @@ it("given a plan on screen, when the language changes, then the week is not fetc
 it("given a chosen booking card, when the language changes, then the choice is still made", async () => {
   // given
   vi.mocked(api.bookingCards).mockResolvedValue([
-    { id: "55555555-5555-5555-5555-555555555555", label: "Member booking", color: "#b85c38", allowedPlayerCounts: [2, 4], guestAllowed: true },
-    { id: "88888888-8888-8888-8888-888888888888", label: "Trial session", color: "#176b55", allowedPlayerCounts: [2], guestAllowed: false }
+    { id: "55555555-5555-5555-5555-555555555555", label: "Member booking", color: "#b85c38", allowedPlayerCounts: [2, 4], guestAllowed: true, guestFeeMinor: 0 },
+    { id: "88888888-8888-8888-8888-888888888888", label: "Trial session", color: "#176b55", allowedPlayerCounts: [2], guestAllowed: false, guestFeeMinor: 0 }
   ]);
   render(<WeekView today={clubInstant("12:00")} />);
   const slot = await findFreeSlot(1, "12:30");
@@ -1767,7 +1767,7 @@ it("given a card that counts no players, when the dialog opens, then no requirem
     label: "Closure",
     color: "#b85c38",
     allowedPlayerCounts: [],
-    guestAllowed: false
+    guestAllowed: false, guestFeeMinor: 0
   }]);
   render(<WeekView today={clubInstant("07:00")} />);
 

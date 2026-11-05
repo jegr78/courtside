@@ -26,7 +26,7 @@ const stored: AdminClubConfig = {
   passwordResetTokenMinutes: 60,
   bookingReminderHours: 24, waitlistOfferMinutes: 15, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6,
   noMembershipTypeRuleSetId: "rule-set",
-  logoUploaded: false
+  logoUploaded: false, currency: "EUR"
 };
 
 function show(configurationChanged = () => undefined) {
@@ -77,7 +77,7 @@ describe("AdminDeadlinesView", () => {
     expect(changing).toHaveBeenCalledWith({
       clubName: "Example Tennis Club", shortName: "Example", primaryColor: "#b85c38", accentColor: "#d7e24b",
       logoUrl: "/icon.svg", imprintUrl: "/imprint", privacyUrl: "/privacy", documentationUrl: undefined,
-      defaultLocale: "en", slotMinutes: 30, timeZone: "Europe/Berlin",
+      defaultLocale: "en", slotMinutes: 30, timeZone: "Europe/Berlin", currency: "EUR",
       newAccountCredentialHours: 72, passwordResetCredentialHours: 24, passwordResetTokenMinutes: 60,
       bookingReminderHours: 3, waitlistOfferMinutes: 15, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6, noMembershipTypeRuleSetId: "rule-set"
     });

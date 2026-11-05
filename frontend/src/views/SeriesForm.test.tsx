@@ -37,7 +37,7 @@ describe("SeriesForm", () => {
     vi.restoreAllMocks();
     await i18n.changeLanguage("en");
     vi.spyOn(api, "bookingCards").mockResolvedValue([
-      { id: "card-1", label: "Training", color: "#b85c38", allowedPlayerCounts: [], guestAllowed: false }
+      { id: "card-1", label: "Training", color: "#b85c38", allowedPlayerCounts: [], guestAllowed: false, guestFeeMinor: 0 }
     ]);
   });
 

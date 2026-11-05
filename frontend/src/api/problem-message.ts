@@ -12,6 +12,10 @@ export function isUnauthenticated(failure: unknown): boolean {
   return failure instanceof ApiError && failure.problem?.type === `${TYPE_PREFIX}unauthenticated`;
 }
 
+export function refusesField(failure: unknown, field: string): boolean {
+  return failure instanceof ApiError && (failure.problem?.fieldErrors ?? []).some((refusal) => refusal.field === field);
+}
+
 export function problemMessage(failure: unknown, t: TFunction): string {
   const message = problemText(failure, t);
   return isCorrectableRefusal(failure, t) ? message : withReference(failure, message, t);
