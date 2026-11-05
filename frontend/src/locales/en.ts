@@ -1468,7 +1468,7 @@ const en: Record<keyof typeof de, string> = {
   "error.type.card-label-taken": "Another booking card already has this label.",
   "error.type.card-not-bookable": "This booking card cannot be used to book.",
   "error.type.card-not-found": "This booking card no longer exists. Reload the page.",
-  "error.type.card-role-required": "Your roles do not allow this booking card.",
+  "error.type.card-role-required": "This booking card is not open to you.",
   "error.type.club-logo-not-found": "No club logo has been uploaded.",
   "error.type.concurrent-modification": "Somebody else changed this just now. Reload the page and try again.",
   "error.type.constraint-violation": "This cannot be saved as entered. Check the entries and try again.",

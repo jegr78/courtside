@@ -162,6 +162,24 @@ class CardControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
+    @WithMockUser(username = "roe.john", roles = "TRAINER")
+    void givenATrainerWithoutMembership_whenListingPublicly_thenOnlyCardsNamingTheRoleArePresent() throws Exception {
+        // given
+        UUID person = identity.createPerson("John", "Roe", "john.roe@example.org");
+        identity.createEnabledAccount(person, "roe.john", Set.of(Role.TRAINER));
+        BookingCard training = cards.createCard("Trainer session", "#3a4a5c", Set.of(Role.TRAINER), Set.of(),
+                new short[0], false, false, false, false, true);
+        BookingCard open = cards.createCard("Match play", "#3a4a5c", Set.of(), Set.of(),
+                new short[] {2, 4}, true, true, true, false, true);
+
+        // when / then
+        mockMvc.perform(get("/api/public/booking-cards"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.id=='" + training.getId() + "')]").isNotEmpty())
+                .andExpect(jsonPath("$[?(@.id=='" + open.getId() + "')]").isEmpty());
+    }
+
+    @Test
     void whenListingBookingCardsPublicly_thenOnlyMemberFacingFieldsAreExposed() throws Exception {
         // given
         BookingCard card = cards.createCard(

@@ -5,6 +5,7 @@ import org.courtside.api.ApiBookingCreated;
 import org.courtside.api.ApiCreateBookingRequest;
 import org.courtside.api.ApiPersonalBookingPage;
 import org.courtside.api.ApiPersonalBookingView;
+import org.courtside.api.ApiPublicBookingCard;
 import org.courtside.api.DependantBookingsApi;
 import org.courtside.booking.DependantBookings;
 import org.courtside.booking.ParticipantSpec;
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.InitBinder;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -41,6 +43,14 @@ class DependantBookingController implements DependantBookingsApi {
     }
 
     @Override
+    public ResponseEntity<List<ApiPublicBookingCard>> listDependantBookingCards(UUID personId) {
+        return ResponseEntity.ok(dependantBookings.cardsFor(personId).stream()
+                .map(card -> new ApiPublicBookingCard(card.getId(), card.getLabel(), card.getColor(),
+                        playerCounts(card.getAllowedPlayerCounts()), card.isGuestAllowed()))
+                .toList());
+    }
+
+    @Override
     public ResponseEntity<ApiBookingCreated> createDependantBooking(UUID personId, String idempotencyKey,
                                                                     ApiCreateBookingRequest request) {
         List<ParticipantSpec> participants = request.getParticipants() == null
@@ -59,5 +69,13 @@ class DependantBookingController implements DependantBookingsApi {
     public ResponseEntity<Void> cancelDependantBooking(UUID personId, UUID bookingId) {
         dependantBookings.cancelFor(personId, bookingId);
         return ResponseEntity.noContent().build();
+    }
+
+    private static List<Integer> playerCounts(short[] counts) {
+        List<Integer> result = new ArrayList<>(counts.length);
+        for (short count : counts) {
+            result.add((int) count);
+        }
+        return result;
     }
 }

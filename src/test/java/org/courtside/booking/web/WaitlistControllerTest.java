@@ -202,6 +202,22 @@ class WaitlistControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
+    @WithMockUser(username = "roe.trainer", roles = "TRAINER")
+    void givenACardWithoutRoles_whenATrainerWithoutMembershipJoinsWithIt_thenTheCardIsRefused() throws Exception {
+        // given
+        book(holder);
+        UUID person = identity.createPerson("John", "Roe", "roe.trainer@example.org");
+        identity.createEnabledAccount(person, "roe.trainer", passwordEncoder.encode("secret"), Set.of(Role.TRAINER));
+
+        // when / then
+        mockMvc.perform(post("/api/my/waitlist").with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content(joinBody(MEMBER_CARD, SLOT)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:card-role-required"));
+        assertThat(entries()).isZero();
+    }
+
+    @Test
     void givenNoSession_whenJoiningAWaitlist_thenTheCallerMustSignIn() throws Exception {
         // given
         book(holder);

@@ -6626,8 +6626,9 @@ paths:
       operationId: listBookableCards
       summary: The booking cards the caller may use.
       description: |
-        Filtered by the caller's roles: a card gated behind a role they do not hold is absent
-        rather than shown and refused. Authenticated despite the path — the answer depends on who
+        Filtered by the caller's roles and membership: a card gated behind a role they do not hold,
+        or a card without roles while they hold no running membership, is absent rather than shown
+        and refused. Authenticated despite the path — the answer depends on who
         is asking.
       responses:
         "200":
@@ -6975,6 +6976,39 @@ paths:
         "429":
           $ref: "#/components/responses/RateLimited"
 
+  /api/my/dependants/{personId}/booking-cards:
+    get:
+      tags: [dependant-bookings]
+      operationId: listDependantBookingCards
+      summary: The booking cards a guardian granted to book may use for a dependant.
+      description: |
+        The answer of `listBookableCards` measured against the dependant: their roles and their
+        membership decide, the guardian's own roles and membership do not, and the administrator
+        override does not pass to them. The refusals are those of `createDependantBooking`.
+      parameters:
+        - $ref: "#/components/parameters/DependantPersonId"
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: The cards the dependant may book with.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/PublicBookingCard" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/RateLimited"
   /api/my/dependants/{personId}/bookings:
     get:
       tags: [dependant-bookings]

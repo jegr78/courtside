@@ -100,12 +100,18 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
   const bookingHours = ownLimits ? ownBookingHours : undefined;
 
   useEffect(() => {
-    void Promise.all([api.bookingCards(), api.participantCards()]).then(([cards, participants]) => {
-      setBookingCards(cards);
-      setParticipantCards(participants);
-      setCardId(cards[0]?.id ?? "");
-    }).catch((failure: unknown) => report(failure));
+    void api.participantCards().then(setParticipantCards).catch((failure: unknown) => report(failure));
   }, [report]);
+
+  useEffect(() => {
+    let active = true;
+    void (bookFor ? api.dependantBookingCards(bookFor) : api.bookingCards()).then((cards) => {
+      if (!active) return;
+      setBookingCards(cards);
+      setCardId((chosen) => cards.some((card) => card.id === chosen) ? chosen : cards[0]?.id ?? "");
+    }).catch((failure: unknown) => { if (active) report(failure); });
+    return () => { active = false; };
+  }, [bookFor, report]);
 
   useEffect(() => {
     const query = memberQuery.trim();

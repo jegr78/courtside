@@ -256,8 +256,9 @@ A guardian acts for a dependant from their own session, and every action reads t
 afresh, so ending it takes effect at once; only an action whose check passed just before the board
 ended it can still complete. A booking a guardian makes is held by the dependant's
 account with the dependant in the first place, and every rule, quota, card and deadline is measured
-against the dependant and the dependant's roles; neither the guardian's roles nor the dependant's
-administrator override apply. The guardian is recorded on the booking and in the change log as the
+against the dependant, the dependant's roles and the dependant's membership; neither the guardian's
+roles nor the dependant's administrator override apply. The booking dialog offers the cards the
+dependant may use. The guardian is recorded on the booking and in the change log as the
 one who acted. A guardian cancels only bookings the dependant holds, in the dependant's name and
 under the dependant's deadline. Reading a dependant's messages marks nothing read. A guardian never
 requests new credentials for a dependant whose account holds the administrator role. Somebody acted

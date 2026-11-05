@@ -8,7 +8,7 @@ public class CardRoleRequiredException extends DomainFailure {
 
     public static final ProblemType PROBLEM_TYPE = new ProblemType(
             "card-role-required", HttpStatus.FORBIDDEN,
-            "Booking card not allowed", "Your roles do not allow this booking card");
+            "Booking card not allowed", "This booking card is not open to you");
 
     public CardRoleRequiredException(String message) {
         super(message);

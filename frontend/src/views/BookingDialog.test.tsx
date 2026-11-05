@@ -229,3 +229,23 @@ for (const [height, searchFits] of [[168, true], [160, true], [144, false], [100
     expect(scrolled.mock.contexts.includes(screen.getByTestId("member-search")), "the search field is revealed only when the row remains visible").toBe(searchFits);
   });
 }
+
+it("given a guardian without a member card, when they book for a member dependant, then the dependant's cards are offered", async () => {
+  // given
+  const memberCard = {
+    id: "55555555-5555-5555-5555-555555555555", label: "Member booking", color: "#b85c38", allowedPlayerCounts: [2, 4], guestAllowed: true
+  };
+  vi.spyOn(api, "bookingCards").mockResolvedValue([]);
+  const dependantCards = vi.spyOn(api, "dependantBookingCards").mockResolvedValue([memberCard]);
+  render(<BookingDialog selection={{ date: "2026-08-10", slot: "10:00", courtId: court.id }} grid={grid as never}
+    courts={[court]} allocations={[]} canChooseSeveralCourts={false} selfBookable={false}
+    dependants={[{ personId: "person-2", firstName: "John", lastName: "Roe", grants: ["BOOK"], endedOn: null }]}
+    closed={() => undefined} created={() => Promise.resolve()} conflicted={() => Promise.resolve()} />);
+
+  // when
+  const card = await screen.findByTestId<HTMLSelectElement>("booking-card");
+
+  // then
+  await waitFor(() => expect(card.value, "the dependant's card is chosen").toBe(memberCard.id));
+  expect(dependantCards).toHaveBeenCalledWith("person-2");
+});

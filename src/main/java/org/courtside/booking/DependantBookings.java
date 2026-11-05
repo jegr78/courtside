@@ -2,6 +2,8 @@ package org.courtside.booking;
 
 import lombok.RequiredArgsConstructor;
 import org.courtside.booking.internal.DependantBookingNotHeldException;
+import org.courtside.card.BookingCard;
+import org.courtside.card.CardService;
 import org.courtside.member.GuardianDelegation;
 import org.courtside.member.GuardianGrant;
 import org.courtside.shared.TimeSlot;
@@ -18,10 +20,16 @@ public class DependantBookings {
     private final GuardianDelegation delegation;
     private final BookingService bookings;
     private final BookingRepository repository;
+    private final CardService cards;
 
     public PersonalBookingPage bookingsOf(UUID dependantPersonId, PersonalBookingView view, UUID cursor, int limit) {
         GuardianDelegation.Delegation granted = delegation.require(dependantPersonId, GuardianGrant.VIEW_BOOKINGS);
         return bookings.personalBookings(granted.dependant().getId(), view, cursor, limit);
+    }
+
+    public List<BookingCard> cardsFor(UUID dependantPersonId) {
+        GuardianDelegation.Delegation granted = delegation.requireBookable(dependantPersonId, GuardianGrant.BOOK);
+        return cards.bookableCards(granted.dependant().getId(), granted.dependantRoles());
     }
 
     public UUID bookFor(UUID dependantPersonId, List<UUID> courtIds, UUID cardId, TimeSlot slot, String note,

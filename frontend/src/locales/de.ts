@@ -1466,7 +1466,7 @@ const de = {
   "error.type.card-label-taken": "Diese Bezeichnung trägt schon eine andere Buchungskarte.",
   "error.type.card-not-bookable": "Mit dieser Buchungskarte kann nicht gebucht werden.",
   "error.type.card-not-found": "Diese Buchungskarte gibt es nicht mehr. Lade die Seite neu.",
-  "error.type.card-role-required": "Deine Rollen erlauben diese Buchungskarte nicht.",
+  "error.type.card-role-required": "Diese Buchungskarte steht dir nicht offen.",
   "error.type.club-logo-not-found": "Es ist kein Vereinslogo hochgeladen.",
   "error.type.concurrent-modification": "Jemand anderes hat das gerade geändert. Lade die Seite neu und versuche es erneut.",
   "error.type.constraint-violation": "Das lässt sich so nicht speichern. Prüfe die Eingaben und versuche es erneut.",

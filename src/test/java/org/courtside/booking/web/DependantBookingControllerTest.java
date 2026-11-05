@@ -143,6 +143,49 @@ class DependantBookingControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenAGuardianWithoutAMembership_whenListingCardsForAMemberDependant_thenTheDependantsCardsAreOffered()
+            throws Exception {
+        // given
+        UUID richard = identity.createPerson("Richard", "Miles", "richard.miles@example.org");
+        identity.createEnabledAccount(richard, "miles.richard", Set.of(Role.TRAINER));
+        members.linkGuardian(richard, john, Set.of(GuardianGrant.BOOK));
+
+        // when / then
+        mockMvc.perform(get("/api/my/dependants/{personId}/booking-cards", john).with(as("miles.richard")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.id=='" + MEMBER_BOOKING_CARD + "')]").isNotEmpty());
+        mockMvc.perform(get("/api/public/booking-cards").with(as("miles.richard")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.id=='" + MEMBER_BOOKING_CARD + "')]").isEmpty());
+    }
+
+    @Test
+    void givenADependantWithoutAMembership_whenAGuardianListsTheirCards_thenTheCardWithoutRolesIsAbsent()
+            throws Exception {
+        // given
+        UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
+        identity.createEnabledAccount(mary, "major.mary", Set.of(Role.MEMBER));
+        members.linkGuardian(jane, mary, Set.of(GuardianGrant.BOOK));
+
+        // when / then
+        mockMvc.perform(get("/api/my/dependants/{personId}/booking-cards", mary).with(as("doe.jane")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.id=='" + MEMBER_BOOKING_CARD + "')]").isEmpty());
+    }
+
+    @Test
+    void givenARelationshipThatDoesNotGrantBooking_whenTheGuardianListsTheDependantsCards_thenItIsRefusedByName()
+            throws Exception {
+        // given
+        members.linkGuardian(jane, john, Set.of(GuardianGrant.VIEW_BOOKINGS));
+
+        // when / then
+        mockMvc.perform(get("/api/my/dependants/{personId}/booking-cards", john).with(as("doe.jane")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:guardian-action-not-granted"));
+    }
+
+    @Test
     void givenAnAdministratorGuardian_whenBookingForADependantBarredFromCourts_thenTheDependantsRulesRefuseIt()
             throws Exception {
         // given
