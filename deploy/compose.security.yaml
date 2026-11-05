@@ -130,7 +130,7 @@ services:
       org.courtside.security.instance-fingerprint: ${COURTSIDE_SECURITY_INSTANCE_FINGERPRINT:?required}
 
   mail:
-    image: axllent/mailpit:v1.32@sha256:0790692be935ea4420d085694f7985b1f692ca6a8771ab0e0bd8ba75ac180498
+    image: axllent/mailpit:v1.33@sha256:9b3a463be15354c0f0eba91697d80e3e0d8a5623ef0e627cacc836bc17fd5231
     pull_policy: never
     user: ${COURTSIDE_SECURITY_MAIL_USER:?required}
     read_only: true
@@ -319,7 +319,7 @@ services:
 
   schemathesis:
     profiles: [assessment]
-    image: schemathesis/schemathesis:v4.32.7@sha256:4ad0d12f128fa206fa3bbf708e0eee9624bba16838f3eded94a40ea2d6eb80bf
+    image: schemathesis/schemathesis:v4.33.0@sha256:57cdf625c01901bc050355225251a7fc255c0cd8a07d4ac77fb86e4d3ffb25a2
     pull_policy: never
     entrypoint: ["tail", "-f", "/dev/null"]
     read_only: true

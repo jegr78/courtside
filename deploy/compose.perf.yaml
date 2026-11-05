@@ -21,7 +21,7 @@ services:
 
   # A booking hands its message over on an executor that makes the caller wait once the queue fills.
   mail:
-    image: axllent/mailpit:v1.32@sha256:0790692be935ea4420d085694f7985b1f692ca6a8771ab0e0bd8ba75ac180498
+    image: axllent/mailpit:v1.33@sha256:9b3a463be15354c0f0eba91697d80e3e0d8a5623ef0e627cacc836bc17fd5231
     user: ${COURTSIDE_PERF_MAIL_USER:?run node tools/courtside.mjs perf}
     command:
       - --smtp-tls-cert

@@ -22,7 +22,7 @@ services:
       - ./Caddyfile.stalwart:/etc/caddy/sites.d/stalwart.caddy:ro
 
   mail:
-    image: stalwartlabs/stalwart:v1.0.0@sha256:baafeacd6cbde77acdd94af49972d41c6709e54a376df48e18a9fe3f445eb3d5
+    image: stalwartlabs/stalwart:v1.0.1@sha256:b9da4df8b4efc06bc926dd6e990bdeb0ad7b9261a7c3893d74b0461a00bb389b
     profiles: [mail]
     restart: unless-stopped
     logging: *logging
@@ -89,7 +89,7 @@ services:
       start_period: 60s
 
   mail-reload:
-    image: node:26-alpine@sha256:0b36e8c136b94cd4fcf02188228e76c31ad5872eef3fec8cbd2eee500cfd9e80
+    image: node:26-alpine@sha256:c6ad9e9c1d80f6eb607c26b4b0a132ff7a2344fad1c78ea3baa2a7d4c8de6d94
     profiles: [mail]
     restart: unless-stopped
     logging: *logging
@@ -126,7 +126,7 @@ services:
       start_period: 60s
 
   mail-ready:
-    image: node:26-alpine@sha256:0b36e8c136b94cd4fcf02188228e76c31ad5872eef3fec8cbd2eee500cfd9e80
+    image: node:26-alpine@sha256:c6ad9e9c1d80f6eb607c26b4b0a132ff7a2344fad1c78ea3baa2a7d4c8de6d94
     profiles: [mail-setup]
     logging: *logging
     security_opt:
