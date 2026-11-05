@@ -125,6 +125,9 @@ time it opens.
 * Enter a valid IANA time zone such as `Europe/Berlin`. You can only change it while there are no
   future bookings.
 * The **Booking grid** determines the rows in the court plan and the permitted start times.
+* The **Currency** is a three-letter ISO code such as `EUR` or `CHF`. Guest fees are stated in it.
+  A change converts nothing: the fees of the booking types keep their number, and guests already
+  booked keep their amount.
 
 ## Club → Deadlines and reminders
 
@@ -396,6 +399,7 @@ or closure. Add one card for every type the club needs.
 | **Allowed player counts** | Permitted participant counts. With no value, the card records no participants |
 | **Counts against booking limits** | Counts the booking towards the member's open-booking limit |
 | **Guests allowed** | Allows named guests |
+| **Guest fee per guest** | The amount in the club currency one guest place costs. 0 charges nothing. Each guest keeps the fee that applied when they were booked |
 | **Show neutral occupancy** | Shows *Occupied* instead of the card label in the public plan |
 | **Bookings receive the access code** | Bookings on this card are the ones the code of their courts' access points applies to. The *Court closed* card does not offer it |
 | **Bookings count as occupied for building automation** | Bookings on this card report their court as occupied to the building automation, see *Building automation* under *Access points*. New cards carry it, the *Court closed* card does not offer it |

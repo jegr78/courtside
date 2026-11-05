@@ -188,7 +188,8 @@ Der Buchungsdialog zeigt, wie viele Spielerplätze bereits belegt sind.
   nur einen Spielerplatz belegen. Als buchende Person hast du schon einen Platz, deshalb bietet die
   Suche dich nicht an.
 * Trage **Gäste** unter *Weitere Angaben* namentlich ein. Das Feld erscheint nur bei passenden
-  Buchungsarten.
+  Buchungsarten. Erhebt die Buchungsart eine Gastgebühr, zeigt der Dialog vor dem Buchen die Zahl der
+  Gäste, die Gebühr pro Gast und die Summe.
 * Wähle unter ***Was mitspielt*** einen Platzfüller, zum Beispiel eine Ballmaschine oder einen
   Eintrag "Spielpartner gesucht". Courtside meldet, wenn zur gewählten Zeit kein Exemplar frei ist.
 

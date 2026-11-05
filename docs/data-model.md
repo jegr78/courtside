@@ -155,6 +155,8 @@ decides whether the card's bookings receive access codes; it defaults to false, 
 `booking_card_closure_grants_no_access` keeps it false on the closure card. `signals_occupancy`
 decides whether the card's bookings count as occupied in the occupancy signal; it defaults to true,
 and `booking_card_closure_signals_no_occupancy` keeps it false on the closure card.
+`guest_fee_minor` is the price of one guest place in the minor unit of the club currency, 0 by
+default and never negative under `booking_card_guest_fee_not_negative`.
 
 The role tables replaced a single `required_role` column, because a card that only one role may use
 cannot express "trainers and youth directors". Both accept the roles `user_account_role` accepts.
@@ -164,7 +166,10 @@ cannot express "trainers and youth directors". Both accept the roles `user_accou
 `booking_participant` carries a `kind` of `MEMBER`, `GUEST` or `CARD`, and
 `booking_participant_kind_matches_filler` enforces that exactly the matching column is set: a
 `person_id`, a `guest_name` or a `card_id`. `position` is unique per booking, and a person may fill
-at most one slot in a booking.
+at most one slot in a booking. A `GUEST` row carries `guest_fee_minor` and `guest_fee_currency`,
+the card's fee and the club currency when the booking was made; any other kind carries neither, and
+`booking_participant_guest_fee_matches_kind` enforces both. Guests booked before the fee existed
+carry 0.
 
 ## Recurring appointments
 
@@ -354,7 +359,9 @@ how many hours before a booking the reminder goes out, and how many minutes a fr
 reserved for the member whose turn it is on its waitlist, 1 to 1440 and 15 by default. Three
 columns govern access codes: `access_lead_minutes` and `access_lag_minutes`, 0 to 240 and 15 by
 default, extend a booking's time on either side, and `access_code_length`, 4 to 8 and 6 by default,
-is the number of digits a new static code has.
+is the number of digits a new static code has. `currency` is an ISO 4217 code, `EUR` by default,
+kept to three capital letters by `club_config_currency_code`; every amount the instance records is
+stated in it.
 
 The time zone is checked against `pg_timezone_names` by a trigger, so a typo is refused where it is
 written rather than at the next reminder. The logo is stored in the row itself, content, media type

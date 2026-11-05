@@ -302,6 +302,14 @@ each remaining slot contains a member, guest or participant card. The member sea
 slots leaves out the searching person, because the booker already holds a slot. Cards with no player
 count do not track participants.
 
+A booking card carries a guest fee per guest place, zero by default, in the currency of the club
+configuration. Amounts are stored and exchanged in the currency's minor unit, cents for the euro.
+When a booking names a guest, `BookingWriter` stamps the card's current fee and the club currency
+on that guest, so a later fee change or currency change leaves every booked guest with what applied
+when it was booked. Changing the currency converts nothing: card fees keep their number. The booking
+dialog shows guests, fee and total before a member confirms a booking with guests on a card with a
+fee. Courtside records the fee; it issues no invoice and marks nothing as paid.
+
 ### Series
 
 A series stores its recurrence rule and ordered courts. Creation materialises each accepted
