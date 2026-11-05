@@ -2,7 +2,6 @@ import { Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } f
 import { flushSync } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
-import { AccountRecoveryView } from "./views/AccountRecoveryView";
 import { api, type ClubConfig, type SessionStatus, type SourceOffer } from "./api/client";
 import { Alert } from "./components/Alert";
 import { BuildIdentity, EnvironmentMarker } from "./components/BuildIdentity";
@@ -23,10 +22,6 @@ import { currentSignInPath, returnQuery, returnSearch, returnTargetIn, signInPat
 import { HomeView } from "./views/HomeView";
 import { InitialPasswordView } from "./views/InitialPasswordView";
 import { LoginView } from "./views/LoginView";
-import { MyBookingsPage } from "./views/MyBookingsPage";
-import { MyMessagesView } from "./views/MyMessagesView";
-import { DependantsView } from "./views/DependantsView";
-import { AccountView } from "./views/AccountView";
 import { clearRecoveryCodes } from "./security/recoveryCodes";
 import { MfaProofContext, ProofOwnerContext, WebauthnProofContext } from "./security/reauthentication";
 import { RecoveryCodesNotice } from "./components/RecoveryCodesNotice";
@@ -35,6 +30,12 @@ import { warnAbout } from "./api/failureWarning";
 const DEFAULT_DOCUMENTATION_URL = "https://jegr78.github.io/courtside/";
 
 const AdminRoutes = lazySurface(() => import("./views/AdminRoutes"));
+const AccountRecoveryView = lazySurface(() => import("./views/AccountRecoveryView")
+  .then((loaded) => ({ default: loaded.AccountRecoveryView })));
+const MyBookingsPage = lazySurface(() => import("./views/MyBookingsPage").then((loaded) => ({ default: loaded.MyBookingsPage })));
+const MyMessagesView = lazySurface(() => import("./views/MyMessagesView").then((loaded) => ({ default: loaded.MyMessagesView })));
+const DependantsView = lazySurface(() => import("./views/DependantsView").then((loaded) => ({ default: loaded.DependantsView })));
+const AccountView = lazySurface(() => import("./views/AccountView").then((loaded) => ({ default: loaded.AccountView })));
 
 interface AppRoutesProps {
   session: SessionStatus;
@@ -66,6 +67,7 @@ export function AppRoutes({ session, refreshSession, passwordChanged, initialPas
     <div key={session.username ?? "anonymous"} className="flex w-full flex-col items-center gap-4">
     <UnsavedChangesGuard />
     {!administrative && <PrimaryNavigation session={session} />}
+    <Suspense fallback={<p role="status">{t("status.loading")}</p>}>
     <Routes>
     <Route path="/" element={<HomeView session={session} offline={offline} />} />
     <Route path="/courts" element={<HomeView session={session} offline={offline} />} />
@@ -102,6 +104,7 @@ export function AppRoutes({ session, refreshSession, passwordChanged, initialPas
       : <Navigate to="/" replace />} />
     <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    </Suspense>
     </div>
   </UnsavedChangesProvider></WebauthnProofContext></MfaProofContext></ProofOwnerContext>;
 }
