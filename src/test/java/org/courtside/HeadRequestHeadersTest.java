@@ -68,13 +68,14 @@ class HeadRequestHeadersTest extends AbstractIntegrationTest {
         HttpResponse<String> document = send("GET", "/index.html");
         Map<String, String> expected = new TreeMap<>(headers(document));
         expected.put("content-language", "de");
+        assertThat(expected.remove("last-modified")).as("the file itself still carries its date").isNotNull();
 
         // when / then
         assertThat(shellRoutes()).allSatisfy(route -> {
             HttpResponse<String> shell = send("GET", route);
             assertThat(shell.body()).as("GET %s serves the shell document", route).isEqualTo(document.body());
             assertThat(headers(shell))
-                    .as("GET %s carries the headers of GET /index.html and the locale a rendered view stated", route)
+                    .as("GET %s carries the headers of GET /index.html, the locale a rendered view stated and no file date", route)
                     .isEqualTo(expected);
         });
     }

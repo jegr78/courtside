@@ -1,6 +1,7 @@
 package org.courtside.config.internal;
 
 import lombok.RequiredArgsConstructor;
+import org.courtside.shared.ApplicationShellText;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
@@ -18,7 +19,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 @RequiredArgsConstructor
-public class InstalledAppService {
+public class InstalledAppService implements ApplicationShellText {
 
     public static final String PAGE_COLOR = "#101713";
     public static final String ANY = "any";
@@ -51,7 +52,7 @@ public class InstalledAppService {
         return new InstalledAppManifest(
                 configuration.clubName(),
                 configuration.effectiveShortName(),
-                message("description", locale).replace("{clubName}", configuration.clubName()),
+                description(configuration, locale),
                 configuration.defaultLocale(),
                 configuration.primaryColor(),
                 PAGE_COLOR,
@@ -59,6 +60,17 @@ public class InstalledAppService {
                 List.of(new InstalledAppManifest.Shortcut(message("shortcut.courts", locale), "/courts"),
                         new InstalledAppManifest.Shortcut(message("shortcut.myBookings", locale),
                                 "/my-bookings")));
+    }
+
+    @Override
+    public Text current() {
+        ClubConfigurationSnapshot configuration = config.current();
+        return new Text(configuration.defaultLocale(),
+                description(configuration, Locale.forLanguageTag(configuration.defaultLocale())));
+    }
+
+    private static String description(ClubConfigurationSnapshot configuration, Locale locale) {
+        return message("description", locale).replace("{clubName}", configuration.clubName());
     }
 
     public AppIcon icon(Integer size, String purpose) {

@@ -525,6 +525,14 @@ aspect ratio and transparency kept and never enlarged, so the header and tab ico
 original. The manifest keeps the original with its dimensions. Logo URLs are root-relative or HTTPS. Remote logos disclose the visitor's
 address and Courtside origin to their host, so club-hosted images are preferred.
 
+The application shell names the club too. Every client route answers `index.html` with `<html lang>`
+set to the club's language and a `<meta name="description">` built from the club name in that
+language, the same text the manifest's description carries. The server writes both, because link
+previews and most crawlers run no JavaScript, and it sends no `Last-Modified` for the shell, since
+a renamed club changes the document without changing the file. An installed app's service worker
+answers navigations from the `index.html` it cached at build time, which carries neither; the
+frontend sets the language there once it starts.
+
 An installed instance carries the club rather than the product. `/api/public/config/icon` serves PNG
 icons at 180, 192 and 512 pixels, rasterised from the uploaded logo or drawn from the Courtside mark.
 A maskable icon is opaque and keeps its content inside the central 80 % a launcher may crop to: a logo

@@ -124,6 +124,7 @@ class AuditedOperationCoverageTest {
             "FacilityService#today",
             "FacilityService#weeklyOpeningHours",
             "FacilityUtilisationService#report",
+            "InstalledAppService#current",
             "InstalledAppService#icon",
             "InstalledAppService#manifest",
             "HeaderLogoService#variant",
