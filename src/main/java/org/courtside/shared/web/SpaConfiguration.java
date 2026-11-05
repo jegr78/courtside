@@ -1,6 +1,7 @@
 package org.courtside.shared.web;
 
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.extern.slf4j.Slf4j;
 import jakarta.servlet.http.HttpServletResponse;
 import org.courtside.shared.ApplicationShellText;
 import org.jspecify.annotations.Nullable;
@@ -27,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 
+@Slf4j
 @Configuration(proxyBeanMethods = false)
 class SpaConfiguration {
 
@@ -127,7 +129,8 @@ class SpaConfiguration {
                 Resource document = location.createRelative(SHELL_DOCUMENT);
                 if (document.isReadable()) {
                     String shell = document.getContentAsString(StandardCharsets.UTF_8);
-                    return new ShellDocument(withClubText(shell, clubText.language(), clubText.description())
+                    ApplicationShellText.Text text = clubText.current();
+                    return new ShellDocument(withClubText(shell, text.language(), text.description())
                             .getBytes(StandardCharsets.UTF_8));
                 }
             }
@@ -136,6 +139,7 @@ class SpaConfiguration {
 
         static String withClubText(String shell, String language, String description) {
             if (!shell.contains("<html lang=\"") || !shell.contains("</title>")) {
+                log.warn("The application shell has no <html lang> or <title> to carry the club's description");
                 return shell;
             }
             return shell.replaceFirst("<html lang=\"[^\"]*\">",

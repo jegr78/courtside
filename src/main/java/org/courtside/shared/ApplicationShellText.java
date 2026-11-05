@@ -2,7 +2,8 @@ package org.courtside.shared;
 
 public interface ApplicationShellText {
 
-    String language();
+    Text current();
 
-    String description();
+    record Text(String language, String description) {
+    }
 }

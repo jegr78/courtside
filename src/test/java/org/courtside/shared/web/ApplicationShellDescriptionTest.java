@@ -69,7 +69,6 @@ class ApplicationShellDescriptionTest extends AbstractIntegrationTest {
 
         // then
         assertThat(shell).contains("<html lang=\"de\">")
-                .as("the document declares UTF-8 ahead of the description")
                 .contains("<meta name=\"description\" content=\"Plätze buchen bei Example Tennis Club\" />");
     }
 

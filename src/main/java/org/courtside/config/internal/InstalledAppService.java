@@ -52,7 +52,7 @@ public class InstalledAppService implements ApplicationShellText {
         return new InstalledAppManifest(
                 configuration.clubName(),
                 configuration.effectiveShortName(),
-                message("description", locale).replace("{clubName}", configuration.clubName()),
+                description(configuration, locale),
                 configuration.defaultLocale(),
                 configuration.primaryColor(),
                 PAGE_COLOR,
@@ -63,15 +63,14 @@ public class InstalledAppService implements ApplicationShellText {
     }
 
     @Override
-    public String language() {
-        return config.current().defaultLocale();
+    public Text current() {
+        ClubConfigurationSnapshot configuration = config.current();
+        return new Text(configuration.defaultLocale(),
+                description(configuration, Locale.forLanguageTag(configuration.defaultLocale())));
     }
 
-    @Override
-    public String description() {
-        ClubConfigurationSnapshot configuration = config.current();
-        return message("description", Locale.forLanguageTag(configuration.defaultLocale()))
-                .replace("{clubName}", configuration.clubName());
+    private static String description(ClubConfigurationSnapshot configuration, Locale locale) {
+        return message("description", locale).replace("{clubName}", configuration.clubName());
     }
 
     public AppIcon icon(Integer size, String purpose) {
