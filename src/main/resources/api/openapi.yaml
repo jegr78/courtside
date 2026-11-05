@@ -1766,7 +1766,8 @@ components:
           uniqueItems: true
           description: |
             Roles allowed to create a booking with this card. Holding any listed role is
-            sufficient. Empty permits every authenticated member account. Future external
+            sufficient. Empty permits every account whose person holds a running membership,
+            whatever its roles; no role stands in for that membership. Future external
             accounts may book only when this list explicitly includes `EXTERNAL_BOOKER`.
             Administrators may always book.
           items: { $ref: "#/components/schemas/Role" }
@@ -1805,7 +1806,8 @@ components:
           uniqueItems: true
           description: |
             Roles allowed to create a booking with this card. Holding any listed role is
-            sufficient. Empty permits every authenticated member account. Future external
+            sufficient. Empty permits every account whose person holds a running membership,
+            whatever its roles; no role stands in for that membership. Future external
             accounts may book only when this list explicitly includes `EXTERNAL_BOOKER`.
             Administrators may always book.
           items: { $ref: "#/components/schemas/Role" }
