@@ -8,6 +8,7 @@ import org.courtside.card.ParticipantCard;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
+import org.courtside.member.testfixture.MemberTestFixture;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.BeforeEach;
@@ -43,7 +44,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@Import({FacilityTestFixture.class, IdentityTestFixture.class})
+@Import({FacilityTestFixture.class, IdentityTestFixture.class, MemberTestFixture.class})
 class PartnerSearchControllerTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_CARD = UUID.fromString("11111111-1111-1111-1111-111111111111");
@@ -62,6 +63,9 @@ class PartnerSearchControllerTest extends AbstractIntegrationTest {
 
     @Autowired
     private IdentityTestFixture identity;
+
+    @Autowired
+    private MemberTestFixture members;
 
     @Autowired
     private PasswordEncoder passwordEncoder;
@@ -211,6 +215,7 @@ class PartnerSearchControllerTest extends AbstractIntegrationTest {
 
     private Account account(String firstName, String lastName, String username) {
         UUID person = identity.createPerson(firstName, lastName, username + "@example.org");
+        members.holdRunningMembership(person);
         return new Account(identity.createEnabledAccount(person, username, passwordEncoder.encode("secret"),
                 Set.of(Role.MEMBER)), person);
     }

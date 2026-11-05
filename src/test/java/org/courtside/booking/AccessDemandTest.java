@@ -6,6 +6,7 @@ import org.courtside.card.testfixture.CardTestFixture;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
+import org.courtside.member.testfixture.MemberTestFixture;
 import org.courtside.shared.AccessDemand;
 import org.courtside.shared.BookingAnnouncer;
 import org.courtside.shared.OpeningWindow;
@@ -24,7 +25,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@Import({FacilityTestFixture.class, IdentityTestFixture.class, BookingTestFixture.class, CardTestFixture.class})
+@Import({FacilityTestFixture.class, IdentityTestFixture.class, MemberTestFixture.class, BookingTestFixture.class, CardTestFixture.class})
 class AccessDemandTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_BOOKING_CARD = UUID.fromString("11111111-1111-1111-1111-111111111111");
@@ -36,6 +37,9 @@ class AccessDemandTest extends AbstractIntegrationTest {
 
     @Autowired
     private IdentityTestFixture identity;
+
+    @Autowired
+    private MemberTestFixture members;
 
     @Autowired
     private BookingTestFixture bookings;
@@ -58,6 +62,7 @@ class AccessDemandTest extends AbstractIntegrationTest {
         courts = List.of(facility.createCourt(1, "Court 1"), facility.createCourt(2, "Court 2"));
         jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
         janeAccount = identity.createEnabledAccount(jane, "doe.jane", Set.of(Role.MEMBER));
+        members.holdRunningMembership(jane);
     }
 
     @Test

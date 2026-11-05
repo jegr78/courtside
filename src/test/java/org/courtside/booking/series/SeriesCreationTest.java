@@ -277,13 +277,16 @@ class SeriesCreationTest extends AbstractIntegrationTest {
     void givenACardThatTracksPlayers_whenCreating_thenItIsRejectedAndNoSeriesRowIsWritten() {
         // given
         List<Instant> confirmed = starts(previewAsTrainer(rule(4)));
+        UUID memberPersonId = identity.createPerson("Jane", "Doe", "jane@example.org");
+        UUID memberAccountId = identity.createEnabledAccount(memberPersonId, "doe.jane", Set.of(Role.MEMBER));
+        members.holdRunningMembership(memberPersonId);
         SeriesRule memberCardRule = new SeriesRule(
                 List.of(courtOne, courtTwo), MEMBER_BOOKING_CARD,
                 LocalDate.of(2026, 4, 7), LocalTime.of(18, 0), 120,
                 1, Set.of(DayOfWeek.TUESDAY), null, 4);
 
         // when / then
-        assertThatThrownBy(() -> seriesService.create(memberCardRule, confirmed, UUID.randomUUID(), null,
+        assertThatThrownBy(() -> seriesService.create(memberCardRule, confirmed, memberAccountId, null,
                 Set.of(Role.MEMBER), "Club round"))
                 .isInstanceOfSatisfying(ParticipantsInvalidException.class, exception ->
                         assertThat(exception.getCode()).isEqualTo("booking.series.cardTracksPlayers"));

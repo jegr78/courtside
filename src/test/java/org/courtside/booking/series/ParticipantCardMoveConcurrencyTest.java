@@ -11,6 +11,7 @@ import org.courtside.booking.ParticipantSpec;
 import org.courtside.booking.internal.ParticipantsInvalidException;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
+import org.courtside.member.testfixture.MemberTestFixture;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.BeforeEach;
@@ -42,7 +43,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @TestPropertySource(properties = "courtside.test.clock=2026-04-01T10:00:00Z")
 @Timeout(value = 30, unit = TimeUnit.SECONDS)
-@Import({FacilityTestFixture.class, IdentityTestFixture.class})
+@Import({FacilityTestFixture.class, IdentityTestFixture.class, MemberTestFixture.class})
 class ParticipantCardMoveConcurrencyTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_BOOKING_CARD =
@@ -74,6 +75,9 @@ class ParticipantCardMoveConcurrencyTest extends AbstractIntegrationTest {
     private IdentityTestFixture identity;
 
     @Autowired
+    private MemberTestFixture members;
+
+    @Autowired
     private PlatformTransactionManager transactions;
 
     @Autowired
@@ -83,6 +87,7 @@ class ParticipantCardMoveConcurrencyTest extends AbstractIntegrationTest {
     private UUID competingCourt;
     private UUID trainer;
     private UUID memberPersonId;
+    private UUID memberAccountId;
 
     @BeforeEach
     void setUp() {
@@ -90,6 +95,8 @@ class ParticipantCardMoveConcurrencyTest extends AbstractIntegrationTest {
         competingCourt = facilityFixture.createCourt(2, "Court 2");
         trainer = UUID.randomUUID();
         memberPersonId = identity.createPerson("Jane", "Doe", "jane@example.org");
+        memberAccountId = identity.createEnabledAccount(memberPersonId, "doe.jane", Set.of(Role.MEMBER));
+        members.holdRunningMembership(memberPersonId);
         for (DayOfWeek day : DayOfWeek.values()) {
             facilityFixture.setOpeningHours(day, new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0)));
         }
@@ -122,7 +129,7 @@ class ParticipantCardMoveConcurrencyTest extends AbstractIntegrationTest {
                         List.of(competingCourt), MEMBER_BOOKING_CARD,
                         new TimeSlot(Instant.parse("2026-04-07T18:00:00Z"),
                                 Instant.parse("2026-04-07T20:00:00Z")),
-                        UUID.randomUUID(), memberPersonId, Set.of(Role.MEMBER), null,
+                        memberAccountId, memberPersonId, Set.of(Role.MEMBER), null,
                         List.of(ParticipantSpec.card(BALL_MACHINE)), null));
                 return Outcome.MOVED;
             } catch (ParticipantsInvalidException failure) {

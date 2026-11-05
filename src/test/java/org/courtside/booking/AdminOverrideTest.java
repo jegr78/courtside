@@ -56,11 +56,14 @@ class AdminOverrideTest extends AbstractIntegrationTest {
 
     private UUID courtId;
     private UUID bookerPersonId;
+    private UUID bookerAccountId;
 
     @BeforeEach
     void setUp() {
         courtId = facilityFixture.createCourt(1, "Court 1");
         bookerPersonId = identity.createPerson("Jane", "Doe", "jane@example.org");
+        bookerAccountId = identity.createEnabledAccount(bookerPersonId, "doe.jane", Set.of(Role.MEMBER));
+        members.holdRunningMembership(bookerPersonId);
 
         for (DayOfWeek day : DayOfWeek.values()) {
             facilityFixture.setOpeningHours(day, new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0)));
@@ -81,6 +84,7 @@ class AdminOverrideTest extends AbstractIntegrationTest {
     void givenAnAdvanceWindowOfSevenDays_whenAnAdminBooksBeyondIt_thenItIsAccepted() {
         // given
         UUID personId = identity.createPerson("John", "Roe", "john@example.org");
+        identity.createEnabledAccount(personId, "roe.john", Set.of(Role.ADMIN));
         members.assignMembership(personId, STANDARD_MEMBERSHIP);
 
         // when
@@ -96,6 +100,7 @@ class AdminOverrideTest extends AbstractIntegrationTest {
     void givenAnAdvanceWindowOfSevenDays_whenAMemberBooksBeyondIt_thenItIsRejected() {
         // given
         UUID personId = identity.createPerson("Mary", "Major", "mary@example.org");
+        identity.createEnabledAccount(personId, "major.mary", Set.of(Role.MEMBER));
         members.assignMembership(personId, STANDARD_MEMBERSHIP);
 
         // when / then
@@ -147,7 +152,7 @@ class AdminOverrideTest extends AbstractIntegrationTest {
 
         return bookingService.create(new CreateBookingCommand(
                 List.of(courtId), cardId, new TimeSlot(start, end),
-                UUID.randomUUID(), bookerPersonId, Set.of(role), null, participants, null));
+                bookerAccountId, bookerPersonId, Set.of(role), null, participants, null));
     }
 
     private UUID bookAs(UUID personId, Role role, UUID cardId, Instant start) {
@@ -157,6 +162,6 @@ class AdminOverrideTest extends AbstractIntegrationTest {
 
         return bookingService.create(new CreateBookingCommand(
                 List.of(courtId), cardId, new TimeSlot(start, start.plus(1, ChronoUnit.HOURS)),
-                UUID.randomUUID(), personId, Set.of(role), null, participants, null));
+                identity.accountIdOf(personId), personId, Set.of(role), null, participants, null));
     }
 }

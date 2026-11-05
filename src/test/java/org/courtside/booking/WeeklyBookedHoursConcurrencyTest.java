@@ -2,10 +2,10 @@ package org.courtside.booking;
 
 import org.courtside.AbstractIntegrationTest;
 import org.courtside.PostgresDiagnostics;
-import org.courtside.config.testfixture.ConfigTestFixture;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
+import org.courtside.member.testfixture.MemberTestFixture;
 import org.courtside.rules.RuleViolation;
 import org.courtside.rules.testfixture.RulesTestFixture;
 import org.courtside.shared.OpeningWindow;
@@ -36,7 +36,7 @@ import java.util.concurrent.TimeUnit;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @Timeout(value = 30, unit = TimeUnit.SECONDS)
-@Import({FacilityTestFixture.class, IdentityTestFixture.class, ConfigTestFixture.class, RulesTestFixture.class})
+@Import({FacilityTestFixture.class, IdentityTestFixture.class, MemberTestFixture.class, RulesTestFixture.class})
 class WeeklyBookedHoursConcurrencyTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_BOOKING_CARD =
@@ -61,7 +61,7 @@ class WeeklyBookedHoursConcurrencyTest extends AbstractIntegrationTest {
     private IdentityTestFixture identity;
 
     @Autowired
-    private ConfigTestFixture clubConfiguration;
+    private MemberTestFixture members;
 
     @Autowired
     private RulesTestFixture rules;
@@ -72,7 +72,7 @@ class WeeklyBookedHoursConcurrencyTest extends AbstractIntegrationTest {
     @Autowired
     private JdbcClient jdbc;
 
-    private final UUID account = UUID.randomUUID();
+    private UUID account;
     private UUID courtId;
     private UUID personId;
 
@@ -83,7 +83,9 @@ class WeeklyBookedHoursConcurrencyTest extends AbstractIntegrationTest {
         }
         courtId = facilityFixture.createCourt(1, "Court 1");
         personId = identity.createPerson("Jane", "Doe", "jane@example.org");
-        clubConfiguration.bindPeopleWithoutAMembershipTypeTo(rules.ruleSetLimitingWeeklyHours("Two hours a week", 2));
+        account = identity.createEnabledAccount(personId, "doe.jane", Set.of(Role.MEMBER));
+        members.assignMembership(personId, members.membershipTypeMeasuredBy(
+                "Two hours a week", rules.ruleSetLimitingWeeklyHours("Two hours a week", 2)));
     }
 
     @Test

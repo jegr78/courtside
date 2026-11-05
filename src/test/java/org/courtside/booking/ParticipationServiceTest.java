@@ -4,6 +4,7 @@ import org.courtside.AbstractIntegrationTest;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
+import org.courtside.member.testfixture.MemberTestFixture;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.BeforeEach;
@@ -22,7 +23,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-@Import({FacilityTestFixture.class, IdentityTestFixture.class})
+@Import({FacilityTestFixture.class, IdentityTestFixture.class, MemberTestFixture.class})
 class ParticipationServiceTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_BOOKING_CARD =
@@ -49,6 +50,9 @@ class ParticipationServiceTest extends AbstractIntegrationTest {
     @Autowired
     private IdentityTestFixture identityFixture;
 
+    @Autowired
+    private MemberTestFixture members;
+
     private UUID courtId;
     private UUID bookerAccountId;
     private UUID bookerPersonId;
@@ -58,8 +62,9 @@ class ParticipationServiceTest extends AbstractIntegrationTest {
     @BeforeEach
     void setUp() {
         courtId = facilityFixture.createCourt(1, "Court 1");
-        bookerAccountId = UUID.randomUUID();
         bookerPersonId = identityFixture.createPerson("Jane", "Doe", "jane.doe@example.org");
+        bookerAccountId = identityFixture.createEnabledAccount(bookerPersonId, "doe.jane", Set.of(Role.MEMBER));
+        members.holdRunningMembership(bookerPersonId);
         namedAccountId = UUID.randomUUID();
         namedPersonId = identityFixture.createPerson("John", "Roe", "john.roe@example.org");
         for (DayOfWeek day : DayOfWeek.values()) {

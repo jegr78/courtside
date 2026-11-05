@@ -6,6 +6,7 @@ import org.courtside.booking.testfixture.BookingTestFixture;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
+import org.courtside.member.testfixture.MemberTestFixture;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.BeforeEach;
@@ -34,7 +35,7 @@ import java.util.concurrent.TimeUnit;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @Timeout(value = 60, unit = TimeUnit.SECONDS)
-@Import({FacilityTestFixture.class, IdentityTestFixture.class, BookingTestFixture.class})
+@Import({FacilityTestFixture.class, IdentityTestFixture.class, MemberTestFixture.class, BookingTestFixture.class})
 class ParticipationWithdrawalConcurrencyTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_CARD = UUID.fromString("11111111-1111-1111-1111-111111111111");
@@ -63,6 +64,9 @@ class ParticipationWithdrawalConcurrencyTest extends AbstractIntegrationTest {
     private IdentityTestFixture identity;
 
     @Autowired
+    private MemberTestFixture members;
+
+    @Autowired
     private PlatformTransactionManager transactions;
 
     @Autowired
@@ -82,8 +86,10 @@ class ParticipationWithdrawalConcurrencyTest extends AbstractIntegrationTest {
         }
         holderPerson = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
         holderAccount = identity.createEnabledAccount(holderPerson, "doe.jane", Set.of(Role.MEMBER));
+        members.holdRunningMembership(holderPerson);
         playerPerson = identity.createPerson("John", "Roe", "john.roe@example.org");
         playerAccount = identity.createEnabledAccount(playerPerson, "roe.john", Set.of(Role.MEMBER));
+        members.holdRunningMembership(playerPerson);
     }
 
     @Test

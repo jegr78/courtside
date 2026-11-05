@@ -6,6 +6,7 @@ import org.courtside.card.CardService;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
+import org.courtside.member.testfixture.MemberTestFixture;
 import org.courtside.shared.OpeningWindow;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -30,7 +31,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@Import({FacilityTestFixture.class, IdentityTestFixture.class})
+@Import({FacilityTestFixture.class, IdentityTestFixture.class, MemberTestFixture.class})
 class ParticipationControllerTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_BOOKING_CARD =
@@ -47,6 +48,9 @@ class ParticipationControllerTest extends AbstractIntegrationTest {
 
     @Autowired
     private IdentityTestFixture identityFixture;
+
+    @Autowired
+    private MemberTestFixture members;
 
     private MockMvc mockMvc;
     private UUID courtId;
@@ -212,6 +216,7 @@ class ParticipationControllerTest extends AbstractIntegrationTest {
     private UUID createAccount(String firstName, String lastName, String username) {
         UUID personId = identityFixture.createPerson(firstName, lastName, username + "@example.org");
         identityFixture.createEnabledAccount(personId, username, Set.of(Role.MEMBER));
+        members.holdRunningMembership(personId);
         return personId;
     }
 }

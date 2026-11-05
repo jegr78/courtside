@@ -377,6 +377,9 @@ class PartnerSearchTest extends AbstractIntegrationTest {
     private Member member(String firstName, String lastName, Role role) {
         UUID person = identity.createPerson(firstName, lastName,
                 (firstName + "." + lastName).toLowerCase() + "@example.org");
+        if (role == Role.MEMBER) {
+            memberships.holdRunningMembership(person);
+        }
         Set<Role> roles = Set.of(role);
         return new Member(identity.createEnabledAccount(person, (lastName + "." + firstName).toLowerCase(), roles),
                 person, roles);

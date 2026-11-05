@@ -8,6 +8,7 @@ import org.courtside.booking.ParticipantSpec;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
+import org.courtside.member.testfixture.MemberTestFixture;
 import org.courtside.shared.DomainFailure;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.shared.TimeSlot;
@@ -40,7 +41,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 
 @Timeout(value = 90, unit = TimeUnit.SECONDS)
-@Import({FacilityTestFixture.class, IdentityTestFixture.class})
+@Import({FacilityTestFixture.class, IdentityTestFixture.class, MemberTestFixture.class})
 class WaitlistConcurrencyTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_CARD = UUID.fromString("11111111-1111-1111-1111-111111111111");
@@ -69,6 +70,9 @@ class WaitlistConcurrencyTest extends AbstractIntegrationTest {
 
     @Autowired
     private IdentityTestFixture identity;
+
+    @Autowired
+    private MemberTestFixture members;
 
     @Autowired
     private JdbcClient jdbc;
@@ -383,6 +387,7 @@ class WaitlistConcurrencyTest extends AbstractIntegrationTest {
 
     private Member member(int index) {
         UUID person = identity.createPerson("Jane", "Doe", "jane.doe." + index + "@example.org");
+        members.holdRunningMembership(person);
         return new Member(identity.createEnabledAccount(person, "doe.jane." + index, Set.of(Role.MEMBER)), person);
     }
 

@@ -139,6 +139,9 @@ class BookingControllerTest extends AbstractIntegrationTest {
         UUID personId = identity.createPerson(firstName, lastName, username + "@example.org");
         identity.createEnabledAccount(
                 personId, username, passwordEncoder.encode("secret"), Set.of(role));
+        if (role == Role.MEMBER) {
+            members.holdRunningMembership(personId);
+        }
     }
 
     @Test

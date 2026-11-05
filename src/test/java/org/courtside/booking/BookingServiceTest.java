@@ -8,6 +8,7 @@ import io.micrometer.core.instrument.MeterRegistry;
 import org.courtside.booking.internal.CourtUnavailableException;
 import org.courtside.AbstractIntegrationTest;
 import org.courtside.facility.testfixture.FacilityTestFixture;
+import org.courtside.member.testfixture.MemberTestFixture;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.card.CardService;
 import org.courtside.card.BookingCard;
@@ -36,7 +37,7 @@ import java.util.stream.Stream;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-@Import({FacilityTestFixture.class, IdentityTestFixture.class})
+@Import({FacilityTestFixture.class, IdentityTestFixture.class, MemberTestFixture.class})
 class BookingServiceTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_BOOKING_CARD =
@@ -64,16 +65,21 @@ class BookingServiceTest extends AbstractIntegrationTest {
     private IdentityTestFixture identity;
 
     @Autowired
+    private MemberTestFixture members;
+
+    @Autowired
     private MeterRegistry meters;
 
     private UUID courtId;
-    private final UUID someUser = UUID.randomUUID();
+    private UUID someUser;
     private UUID bookerPersonId;
 
     @BeforeEach
     void setUp() {
         courtId = facilityFixture.createCourt(1, "Court 1");
         bookerPersonId = identity.createPerson("Jane", "Doe", "jane@example.org");
+        someUser = identity.createEnabledAccount(bookerPersonId, "doe.jane", Set.of(Role.MEMBER));
+        members.holdRunningMembership(bookerPersonId);
 
         for (DayOfWeek day : DayOfWeek.values()) {
             facilityFixture.setOpeningHours(

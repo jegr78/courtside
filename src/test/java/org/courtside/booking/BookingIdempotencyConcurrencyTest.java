@@ -5,6 +5,7 @@ import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.PostgresDiagnostics;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
+import org.courtside.member.testfixture.MemberTestFixture;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.BeforeEach;
@@ -33,7 +34,7 @@ import java.util.concurrent.TimeUnit;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @Timeout(value = 30, unit = TimeUnit.SECONDS)
-@Import({FacilityTestFixture.class, IdentityTestFixture.class})
+@Import({FacilityTestFixture.class, IdentityTestFixture.class, MemberTestFixture.class})
 class BookingIdempotencyConcurrencyTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_BOOKING_CARD =
@@ -55,6 +56,9 @@ class BookingIdempotencyConcurrencyTest extends AbstractIntegrationTest {
     private IdentityTestFixture identity;
 
     @Autowired
+    private MemberTestFixture members;
+
+    @Autowired
     private PlatformTransactionManager transactions;
 
     @Autowired
@@ -66,12 +70,14 @@ class BookingIdempotencyConcurrencyTest extends AbstractIntegrationTest {
     void setUp() {
         UUID courtId = facilityFixture.createCourt(1, "Court 1");
         UUID personId = identity.createPerson("Jane", "Doe", "jane@example.org");
+        UUID accountId = identity.createEnabledAccount(personId, "doe.jane", Set.of(Role.MEMBER));
+        members.holdRunningMembership(personId);
         for (DayOfWeek day : DayOfWeek.values()) {
             facilityFixture.setOpeningHours(day, new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0)));
         }
         command = new CreateBookingCommand(
                 List.of(courtId), MEMBER_BOOKING_CARD, new TimeSlot(SIX_PM, SEVEN_PM),
-                UUID.randomUUID(), personId, Set.of(Role.MEMBER), null,
+                accountId, personId, Set.of(Role.MEMBER), null,
                 List.of(ParticipantSpec.guest("Partner")), null);
     }
 
