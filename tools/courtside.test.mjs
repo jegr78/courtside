@@ -74,6 +74,30 @@ test("given marker-free legacy PERFORMANCE state, when the actual legacy start r
   assert.ok(events.some(event => event.args?.includes("--force-recreate")));
 });
 
+test("given a published fixtures image, when PERFORMANCE starts from it, then it is pulled and tagged instead of built", async () => {
+  // given
+  const reference = `ghcr.io/jegr78/courtside@sha256:${"a".repeat(64)}`;
+  const events = [];
+  const runtime = { readState: () => undefined, assertStateOwnership() {}, run: plan => events.push(plan),
+    relay: () => ({}), writeState() {}, extract: () => events.push("extract"), stage: () => events.push("stage"), output() {} };
+  // when
+  await startPerformance(parseArguments(["perf", "--fixtures-reference", reference, "--no-credential-output"]), runtime);
+  // then
+  assert.deepEqual(events.slice(0, 2).map(plan => plan.args), [["pull", reference], ["tag", reference, "courtside:perf-local"]],
+    "the fixtures image is pulled by digest and takes the tag the Compose file runs");
+  assert.ok(events[2].args.includes("--force-recreate"), "the stack starts right after the tag");
+  assert.equal(events.length, 3, "nothing is built, extracted or staged");
+});
+
+test("given a fixtures reference, when it is not pinned by digest or is combined with a build choice, then perf refuses it", () => {
+  // when / then
+  assert.throws(() => parseArguments(["perf", "--fixtures-reference", "ghcr.io/jegr78/courtside:booking-seed-nightly"]),
+    /--fixtures-reference requires an image pinned by digest/);
+  assert.throws(() => parseArguments(["perf", "--fixtures-reference", `ghcr.io/jegr78/courtside@sha256:${"a".repeat(64)}`,
+    "--skip-verify"]), /--fixtures-reference cannot be combined/);
+  assert.throws(() => parseArguments(["perf-run", "smoke", "--fixtures-reference", "x"]), /Unknown option for perf-run/);
+});
+
 test("given a paired seed command, when parsing its BASE checkout, then the explicit compose root is retained only for seeding", () => {
   // given
   const args = ["security-seed", "compare-base-1-1", `sha256:${"a".repeat(64)}`,
@@ -1523,6 +1547,22 @@ test("given the performance compose contract, when inspecting isolation, then re
   assert.match(dashboard, /k6_http_req_duration/);
   const caddy = readFileSync(fileURLToPath(new URL("../deploy/Caddyfile.perf", import.meta.url)), "utf8");
   assert.match(caddy, /^https:\/\/localhost:443, https:\/\/proxy:443 \{$/m);
+});
+
+test("given the performance proxy, when its response headers are read, then they are the deployment's apart from HSTS on localhost", () => {
+  // given
+  const read = (name) => readFileSync(fileURLToPath(new URL(`../deploy/${name}`, import.meta.url)), "utf8");
+  const headers = (caddyfile, site) => {
+    const block = caddyfile.slice(caddyfile.indexOf(site));
+    return block.slice(block.indexOf("\theader {") + 9, block.indexOf("\t}", block.indexOf("\theader {")))
+      .split("\n").map((line) => line.trim()).filter(Boolean);
+  };
+  // when
+  const deployed = headers(read("Caddyfile"), "{$COURTSIDE_SITE_ADDRESS} {")
+    .filter((line) => !line.startsWith("Strict-Transport-Security"));
+  const performance = headers(read("Caddyfile.perf"), "https://localhost:443, https://proxy:443 {");
+  // then
+  assert.deepEqual(performance, deployed, "Lighthouse and k6 measure the headers a club's proxy sends");
 });
 
 test("given performance telemetry, when inspecting collectors, then budgets and plugin startup are bounded", () => {

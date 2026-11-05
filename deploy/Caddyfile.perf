@@ -63,7 +63,7 @@ https://localhost:443, https://proxy:443 {
 		X-Content-Type-Options nosniff
 		X-Frame-Options DENY
 		Referrer-Policy strict-origin-when-cross-origin
-		X-Robots-Tag "noindex, nofollow"
+		Permissions-Policy "geolocation=(), camera=(), microphone=()"
 		-Server
 		-Via
 	}
