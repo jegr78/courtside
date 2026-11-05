@@ -743,7 +743,7 @@ class BookingControllerTest extends AbstractIntegrationTest {
             throws Exception {
         // given
         BookingCard otherCard = cards.createCard("Team meeting", "#34584A", Set.of(Role.TRAINER),
-                Set.of(Role.SPORT_DIRECTOR), new short[] { }, false, true, true, false, true);
+                Set.of(Role.SPORT_DIRECTOR), new short[] { }, false, true, true, false, true, 0);
         String expected = createManagedBooking(courtId, TRAINING_CARD,
                 "2026-05-12T18:00:00+02:00", "2026-05-12T19:00:00+02:00");
         createManagedBooking(secondCourtId, TRAINING_CARD,
@@ -785,7 +785,7 @@ class BookingControllerTest extends AbstractIntegrationTest {
             throws Exception {
         // given
         BookingCard sportDirectorCard = cards.createCard("Team preparation", "#34584A",
-                Set.of(Role.TRAINER), Set.of(Role.SPORT_DIRECTOR), new short[] { }, false, true, true, false, true);
+                Set.of(Role.TRAINER), Set.of(Role.SPORT_DIRECTOR), new short[] { }, false, true, true, false, true, 0);
         String bookingId = createManagedBooking(courtId, sportDirectorCard.getId(),
                 "2026-05-12T18:00:00+02:00", "2026-05-12T19:00:00+02:00");
         mockMvc.perform(delete("/api/bookings/{id}", bookingId)
@@ -806,7 +806,7 @@ class BookingControllerTest extends AbstractIntegrationTest {
             throws Exception {
         // given
         BookingCard card = cards.createCard("Member event", "#B85C38", Set.of(Role.MEMBER), Set.of(),
-                new short[] { 2 }, false, true, true, false, true);
+                new short[] { 2 }, false, true, true, false, true, 0);
         String bookingId = JsonPath.read(mockMvc.perform(bookingPost()
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(bookingJson(courtId, card.getId(), GUEST_PARTICIPANT))
@@ -831,7 +831,7 @@ class BookingControllerTest extends AbstractIntegrationTest {
             throws Exception {
         // given
         BookingCard card = cards.createCard("Open practice", "#34584A", Set.of(Role.TRAINER),
-                Set.of(), new short[] { 2 }, false, true, true, false, true);
+                Set.of(), new short[] { 2 }, false, true, true, false, true, 0);
         mockMvc.perform(bookingPost()
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(bookingJson(courtId, card.getId(), GUEST_PARTICIPANT))
@@ -853,7 +853,7 @@ class BookingControllerTest extends AbstractIntegrationTest {
             throws Exception {
         // given
         BookingCard card = cards.createCard("Open practice", "#B85C38",
-                Set.of(Role.MEMBER, Role.TRAINER), Set.of(), new short[] { 2 }, false, true, true, false, true);
+                Set.of(Role.MEMBER, Role.TRAINER), Set.of(), new short[] { 2 }, false, true, true, false, true, 0);
         String bookingId = JsonPath.read(mockMvc.perform(bookingPost()
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(bookingJson(courtId, card.getId(), GUEST_PARTICIPANT))
@@ -874,7 +874,7 @@ class BookingControllerTest extends AbstractIntegrationTest {
             throws Exception {
         // given
         BookingCard card = cards.createCard("Junior squad", "#34584A", Set.of(Role.TRAINER),
-                Set.of(Role.TRAINER), new short[] { 2 }, false, true, true, false, true);
+                Set.of(Role.TRAINER), new short[] { 2 }, false, true, true, false, true, 0);
         String bookingId = JsonPath.read(mockMvc.perform(bookingPost()
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(bookingJson(courtId, card.getId(), GUEST_PARTICIPANT))
@@ -1359,7 +1359,7 @@ class BookingControllerTest extends AbstractIntegrationTest {
             throws Exception {
         // given
         BookingCard card = cards.createCard("Junior training", "#34584A", Set.of(Role.MEMBER), Set.of(),
-                new short[] {2}, false, false, false, false, true);
+                new short[] {2}, false, false, false, false, true, 0);
         UUID participantId = accounts.findByUsername("major.mary").orElseThrow().getPerson().getId();
         mockMvc.perform(bookingPost()
                         .contentType(MediaType.APPLICATION_JSON)

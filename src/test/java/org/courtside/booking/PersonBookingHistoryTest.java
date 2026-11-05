@@ -15,6 +15,7 @@ import org.springframework.context.annotation.Import;
 import java.time.DayOfWeek;
 import java.time.Instant;
 import java.time.LocalTime;
+import java.util.Currency;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -128,7 +129,7 @@ class PersonBookingHistoryTest extends AbstractIntegrationTest {
         // given — a booking an import brought in carries no booker, and a guest carries no person
         Booking imported = new Booking(MEMBER_BOOKING_CARD, null, NOTE, SIX_PM);
         imported.allocate(courtId, new TimeSlot(SIX_PM, SEVEN_PM));
-        imported.addParticipant(ParticipantSpec.guest(GUEST));
+        imported.addParticipant(ParticipantSpec.guest(GUEST), new GuestFee(0, Currency.getInstance("EUR")));
         bookingRows.saveAndFlush(imported);
 
         // when / then

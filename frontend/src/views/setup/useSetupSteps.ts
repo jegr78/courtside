@@ -40,6 +40,7 @@ const factoryConfiguration = {
   accessLeadMinutes: 15,
   accessLagMinutes: 15,
   accessCodeLength: 6,
+  currency: "EUR",
   logoUploaded: false,
   noMembershipTypeRuleSetId: null
 } as const;

@@ -3,6 +3,8 @@ package org.courtside.config.web;
 import org.courtside.AbstractIntegrationTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
@@ -329,14 +331,16 @@ class ConfigControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.timeZone").value("Pacific/Auckland"));
     }
 
-    @Test
     @WithMockUser(username = "admin", roles = "ADMIN")
-    void givenACurrencyCodeTheJdkDoesNotKnow_whenChangingTheConfig_thenTheFieldIsRefused() throws Exception {
+    @ParameterizedTest
+    @ValueSource(strings = {"ABC", "XAU"})
+    void givenACurrencyCodeWithoutAMinorUnitOrUnknown_whenChangingTheConfig_thenTheFieldIsRefused(String code)
+            throws Exception {
         // when / then
         mockMvc.perform(put("/api/admin/config")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(configJson("Example Tennis Club").replace("\"slotMinutes\": 30,",
-                                "\"slotMinutes\": 30, \"currency\": \"ABC\","))
+                                "\"slotMinutes\": 30, \"currency\": \"" + code + "\","))
                         .with(csrf()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.fieldErrors[0].field").value("currency"))

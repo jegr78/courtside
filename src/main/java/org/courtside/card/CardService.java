@@ -79,15 +79,6 @@ public class CardService {
     public BookingCard createCard(String label, String color, Set<Role> allowedRoles,
                                   Set<Role> managingRoles, short[] allowedPlayerCounts,
                                   boolean countsAgainstLimits, boolean guestAllowed,
-                                  boolean showGenericOccupancy, boolean grantsAccess, boolean signalsOccupancy) {
-        return createCard(label, color, allowedRoles, managingRoles, allowedPlayerCounts, countsAgainstLimits,
-                guestAllowed, showGenericOccupancy, grantsAccess, signalsOccupancy, 0);
-    }
-
-    @Transactional
-    public BookingCard createCard(String label, String color, Set<Role> allowedRoles,
-                                  Set<Role> managingRoles, short[] allowedPlayerCounts,
-                                  boolean countsAgainstLimits, boolean guestAllowed,
                                   boolean showGenericOccupancy, boolean grantsAccess, boolean signalsOccupancy,
                                   int guestFeeMinor) {
         BookingCard created = new BookingCard(label, color, allowedRoles, managingRoles,
@@ -100,17 +91,6 @@ public class CardService {
                 card.isCountsAgainstLimits(), card.isGuestAllowed(), card.isShowGenericOccupancy(),
                 card.isGrantsAccess(), card.isSignalsOccupancy(), card.getGuestFeeMinor()));
         return card;
-    }
-
-    @Transactional
-    public BookingCard changeCard(UUID cardId, String label, String color, Set<Role> allowedRoles,
-                                  Set<Role> managingRoles, short[] allowedPlayerCounts,
-                                  boolean countsAgainstLimits, boolean guestAllowed,
-                                  boolean showGenericOccupancy, boolean grantsAccess,
-                                  Boolean requestedSignalsOccupancy) {
-        return changeCard(cardId, label, color, allowedRoles, managingRoles, allowedPlayerCounts,
-                countsAgainstLimits, guestAllowed, showGenericOccupancy, grantsAccess, requestedSignalsOccupancy,
-                null);
     }
 
     /** A null {@code requestedSignalsOccupancy} or {@code requestedGuestFeeMinor} keeps the stored value. */

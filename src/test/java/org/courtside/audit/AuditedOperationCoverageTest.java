@@ -70,6 +70,7 @@ class AuditedOperationCoverageTest {
             "ConfigService#accessLag",
             "ConfigService#accessLead",
             "ConfigService#clubName",
+            "ConfigService#currency",
             "ConfigService#current",
             "ConfigService#defaultLocale",
             "ConfigService#deleteLogo",

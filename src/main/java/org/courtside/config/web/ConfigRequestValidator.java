@@ -50,8 +50,9 @@ class ConfigRequestValidator implements Validator {
             }
         }
         String currency = request.getCurrency();
+        // A code without a minor unit, such as gold, cannot carry an amount in minor units.
         if (currency != null && Currency.getAvailableCurrencies().stream()
-                .noneMatch(known -> known.getCurrencyCode().equals(currency))) {
+                .noneMatch(known -> known.getCurrencyCode().equals(currency) && known.getDefaultFractionDigits() >= 0)) {
             errors.rejectValue("currency", "Currency");
         }
     }

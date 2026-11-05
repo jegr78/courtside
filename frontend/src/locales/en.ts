@@ -1949,7 +1949,6 @@ const en: Record<keyof typeof de, string> = {
   "audit.event.booking.participant.withdrew": "Player withdrew",
   "audit.event.card.bookingCard.added": "Booking card added",
   "audit.event.card.bookingCard.changed": "Booking card changed",
-  "audit.event.card.bookingCard.changed_fields": "Booking card changed: {{changedFields}}",
   "audit.event.card.bookingCard.accessGranted": "Booking card hands out access codes",
   "audit.event.card.bookingCard.availabilityChanged": "Booking card availability changed",
   "audit.event.card.bookingCard.availabilityChanged_active": "Booking card activated",

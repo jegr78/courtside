@@ -24,7 +24,6 @@ const clubFields = ["clubName", "shortName", "primaryColor", "accentColor", "log
   "bookingReminderHours", "waitlistOfferMinutes", "accessLeadMinutes", "accessLagMinutes", "accessCodeLength", "currency"];
 
 const changedFieldLabels: Record<string, Record<string, string>> = {
-  "card.bookingCard.changed": { label: "admin.facility.label", color: "admin.facility.color", guestFeeMinor: "admin.facility.guestFee" },
   "config.club.changed": {
     ...Object.fromEntries(clubFields.map((field) => [field, `admin.config.${field}`])),
     noMembershipTypeRuleSetId: "admin.config.noMembershipTypeRuleSet"

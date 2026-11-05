@@ -1947,7 +1947,6 @@ const de = {
   "audit.event.booking.participant.withdrew": "Mitglied aus einer Buchung ausgetragen",
   "audit.event.card.bookingCard.added": "Buchungskarte angelegt",
   "audit.event.card.bookingCard.changed": "Buchungskarte geändert",
-  "audit.event.card.bookingCard.changed_fields": "Buchungskarte geändert: {{changedFields}}",
   "audit.event.card.bookingCard.accessGranted": "Buchungskarte gibt Zugangscodes heraus",
   "audit.event.card.bookingCard.availabilityChanged": "Verfügbarkeit der Buchungskarte geändert",
   "audit.event.card.bookingCard.availabilityChanged_active": "Buchungskarte aktiviert",

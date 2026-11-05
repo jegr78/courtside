@@ -3,7 +3,7 @@ import { beforeEach, expect, it, onTestFinished, vi } from "vitest";
 import { ApiError, api } from "../api/client";
 import i18n from "../i18n";
 import { withFinePointer } from "../test/pointer";
-import { BookingDialog } from "./BookingDialog";
+import { BookingDialog, type WaitlistSelection } from "./BookingDialog";
 
 const court = { id: "11111111-1111-1111-1111-111111111111", number: 1, name: "Centre Court" };
 const grid = {
@@ -12,9 +12,9 @@ const grid = {
     .map((dayOfWeek) => ({ dayOfWeek, opensAt: "08:00:00", closesAt: "22:00:00" }))
 };
 
-function show(currency?: string) {
+function show(currency?: string, waitlist?: WaitlistSelection) {
   render(<BookingDialog selection={{ date: "2026-08-10", slot: "10:00", courtId: court.id }} grid={grid as never}
-    courts={[court]} allocations={[]} canChooseSeveralCourts={false} currency={currency}
+    courts={[court]} allocations={[]} canChooseSeveralCourts={false} currency={currency} waitlist={waitlist}
     closed={() => undefined} created={() => Promise.resolve()} conflicted={() => Promise.resolve()} />);
 }
 
@@ -308,4 +308,16 @@ it("given a card that charges per guest place, when no guest is entered, then no
 
   // then
   expect(screen.queryByTestId("booking-guest-fee"), "a blank guest field is no guest").not.toBeInTheDocument();
+});
+
+it("given a card that charges per guest place, when a guest joins the waitlist, then no amount is stated before the offer is accepted", async () => {
+  // given
+  vi.spyOn(api, "bookingCards").mockResolvedValue([cardWithGuestFee(500)]);
+  show("EUR", { startsAt: "2026-08-10T08:00:00Z", endsAt: "2026-08-10T09:00:00Z" });
+
+  // when
+  await enterGuests("Jane Doe");
+
+  // then
+  expect(screen.queryByTestId("booking-guest-fee"), "the fee applies only once the offer is accepted").not.toBeInTheDocument();
 });
