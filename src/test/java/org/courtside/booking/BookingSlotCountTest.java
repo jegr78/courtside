@@ -152,11 +152,11 @@ class BookingSlotCountTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void givenNoPersonBehindTheAccount_whenBookingAMemberCard_thenItIsRejected() {
+    void givenAnAdministratorWithNoPersonBehindTheAccount_whenBookingAMemberCard_thenItIsRejected() {
         // when / then
         assertThatThrownBy(() -> bookingService.create(new CreateBookingCommand(
                 List.of(courtId), MEMBER_BOOKING_CARD, new TimeSlot(SIX_PM, SEVEN_PM),
-                UUID.randomUUID(), null, Set.of(Role.MEMBER), null,
+                UUID.randomUUID(), null, Set.of(Role.ADMIN), null,
                 List.of(ParticipantSpec.guest("John Roe")), null)))
                 .isInstanceOf(ParticipantsInvalidException.class)
                 .extracting("code")

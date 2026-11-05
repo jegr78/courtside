@@ -129,6 +129,20 @@ class DependantBookingControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenADependantWithoutAMembership_whenAGuardianWhoHoldsOneBooksForThem_thenTheDependantsMembershipDecides()
+            throws Exception {
+        // given
+        UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
+        identity.createEnabledAccount(mary, "major.mary", Set.of(Role.MEMBER));
+        members.linkGuardian(jane, mary, Set.of(GuardianGrant.BOOK));
+
+        // when / then
+        book(as("doe.jane"), mary, "guardian-key", "18:00", "19:00")
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:card-role-required"));
+    }
+
+    @Test
     void givenAnAdministratorGuardian_whenBookingForADependantBarredFromCourts_thenTheDependantsRulesRefuseIt()
             throws Exception {
         // given
