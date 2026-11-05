@@ -7,6 +7,7 @@ import org.courtside.card.testfixture.CardTestFixture;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
+import org.courtside.member.testfixture.MemberTestFixture;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.AfterEach;
@@ -38,7 +39,8 @@ import static org.assertj.core.api.Assertions.assertThat;
         "courtside.access-control.insert-page-size=2",
         "courtside.database.lock-timeout=1s"})
 @Import({SettablePassClock.Configuration.class, ScriptedAccessControl.Configuration.class,
-        FacilityTestFixture.class, IdentityTestFixture.class, BookingTestFixture.class, CardTestFixture.class})
+        FacilityTestFixture.class, IdentityTestFixture.class, BookingTestFixture.class, CardTestFixture.class,
+        MemberTestFixture.class})
 abstract class AccessPassTestSupport extends AbstractIntegrationTest {
 
     static final UUID MEMBER_BOOKING_CARD = UUID.fromString("11111111-1111-1111-1111-111111111111");
@@ -79,6 +81,9 @@ abstract class AccessPassTestSupport extends AbstractIntegrationTest {
     CardTestFixture cards;
 
     @Autowired
+    MemberTestFixture members;
+
+    @Autowired
     ProbeReadings readings;
 
     @Autowired
@@ -111,6 +116,7 @@ abstract class AccessPassTestSupport extends AbstractIntegrationTest {
         cards.letBookingsReceiveAccessCodes(MEMBER_BOOKING_CARD, true);
         jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
         janeAccount = identity.createEnabledAccount(jane, "doe.jane", Set.of(Role.MEMBER, Role.ADMIN));
+        members.holdRunningMembership(jane);
     }
 
     @AfterEach

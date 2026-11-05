@@ -9,6 +9,7 @@ import org.courtside.booking.ParticipationService;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
+import org.courtside.member.testfixture.MemberTestFixture;
 import org.courtside.notification.testfixture.NotificationTestFixture;
 import org.courtside.shared.BookingDisplaced;
 import org.courtside.shared.BookingReminderDue;
@@ -36,7 +37,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doNothing;
 
-@Import({FacilityTestFixture.class, IdentityTestFixture.class, NotificationTestFixture.class})
+@Import({FacilityTestFixture.class, IdentityTestFixture.class, NotificationTestFixture.class, MemberTestFixture.class})
 class NotificationCentreTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_BOOKING_CARD =
@@ -55,6 +56,9 @@ class NotificationCentreTest extends AbstractIntegrationTest {
 
     @Autowired
     private IdentityTestFixture identity;
+
+    @Autowired
+    private MemberTestFixture members;
 
     @Autowired
     private NotificationTestFixture notifications;
@@ -84,6 +88,7 @@ class NotificationCentreTest extends AbstractIntegrationTest {
         }
         bookerPersonId = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
         bookerAccountId = identity.createEnabledAccount(bookerPersonId, "doe.jane", Set.of(Role.MEMBER));
+        members.holdRunningMembership(bookerPersonId);
     }
 
     @Test

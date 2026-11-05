@@ -7,6 +7,7 @@ import org.courtside.card.testfixture.CardTestFixture;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
+import org.courtside.member.testfixture.MemberTestFixture;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.Test;
@@ -31,7 +32,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.verify;
 
-@Import({FacilityTestFixture.class, IdentityTestFixture.class, CardTestFixture.class, BookingTestFixture.class})
+@Import({FacilityTestFixture.class, IdentityTestFixture.class, CardTestFixture.class, BookingTestFixture.class,
+        MemberTestFixture.class})
 class UnconnectedAccessMailTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_BOOKING_CARD = UUID.fromString("11111111-1111-1111-1111-111111111111");
@@ -47,6 +49,9 @@ class UnconnectedAccessMailTest extends AbstractIntegrationTest {
 
     @Autowired
     private IdentityTestFixture identity;
+
+    @Autowired
+    private MemberTestFixture members;
 
     @Autowired
     private CardTestFixture cards;
@@ -73,6 +78,7 @@ class UnconnectedAccessMailTest extends AbstractIntegrationTest {
         cards.letBookingsReceiveAccessCodes(MEMBER_BOOKING_CARD, true);
         UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
         UUID janeAccount = identity.createEnabledAccount(jane, "doe.jane", Set.of(Role.MEMBER));
+        members.holdRunningMembership(jane);
         UUID john = identity.createPerson("John", "Roe", "john.roe@example.org");
 
         // when

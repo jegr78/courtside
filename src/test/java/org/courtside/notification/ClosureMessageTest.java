@@ -10,6 +10,7 @@ import org.courtside.facility.FacilityService;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
+import org.courtside.member.testfixture.MemberTestFixture;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.BeforeEach;
@@ -41,7 +42,7 @@ import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
-@Import({FacilityTestFixture.class, IdentityTestFixture.class})
+@Import({FacilityTestFixture.class, IdentityTestFixture.class, MemberTestFixture.class})
 class ClosureMessageTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_BOOKING_CARD =
@@ -72,6 +73,9 @@ class ClosureMessageTest extends AbstractIntegrationTest {
     private IdentityTestFixture identity;
 
     @Autowired
+    private MemberTestFixture members;
+
+    @Autowired
     private JdbcClient jdbc;
 
     private UUID courtId;
@@ -89,6 +93,7 @@ class ClosureMessageTest extends AbstractIntegrationTest {
         }
         bookerPersonId = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
         bookerAccountId = identity.createEnabledAccount(bookerPersonId, "doe.jane", Set.of(Role.MEMBER));
+        members.holdRunningMembership(bookerPersonId);
         playerPersonId = identity.createPerson("John", "Roe", "john.roe@example.org");
         playerAccountId = identity.createEnabledAccount(playerPersonId, "roe.john", Set.of(Role.MEMBER));
         book(courtId);

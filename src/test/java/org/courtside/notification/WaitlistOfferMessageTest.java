@@ -6,6 +6,7 @@ import org.courtside.booking.testfixture.BookingTestFixture;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
+import org.courtside.member.testfixture.MemberTestFixture;
 import org.courtside.notification.testfixture.NotificationTestFixture;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.shared.TimeSlot;
@@ -36,7 +37,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@Import({FacilityTestFixture.class, IdentityTestFixture.class, NotificationTestFixture.class, BookingTestFixture.class})
+@Import({FacilityTestFixture.class, IdentityTestFixture.class, NotificationTestFixture.class, BookingTestFixture.class,
+        MemberTestFixture.class})
 class WaitlistOfferMessageTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_CARD = UUID.fromString("11111111-1111-1111-1111-111111111111");
@@ -54,6 +56,9 @@ class WaitlistOfferMessageTest extends AbstractIntegrationTest {
 
     @Autowired
     private IdentityTestFixture identity;
+
+    @Autowired
+    private MemberTestFixture members;
 
     @Autowired
     private NotificationTestFixture notifications;
@@ -85,9 +90,11 @@ class WaitlistOfferMessageTest extends AbstractIntegrationTest {
         }
         holderPerson = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
         holderAccount = identity.createEnabledAccount(holderPerson, "doe.jane", Set.of(Role.MEMBER));
+        members.holdRunningMembership(holderPerson);
         waitingPerson = identity.createPerson("Mary", "Major", "mary.major@example.org");
         waitingAccount = identity.createEnabledAccount(waitingPerson, "major.mary",
                 passwordEncoder.encode("secret"), Set.of(Role.MEMBER));
+        members.holdRunningMembership(waitingPerson);
         partnerPerson = identity.createPerson("Richard", "Miles", "richard.miles@example.org");
     }
 
@@ -166,6 +173,7 @@ class WaitlistOfferMessageTest extends AbstractIntegrationTest {
         UUID booking = bookings.createBookingNamingMember(court, MEMBER_CARD, SLOT, holderAccount, holderPerson, Set.of(Role.MEMBER), null, partnerPerson);
         UUID otherPerson = identity.createPerson("John", "Roe", "john.roe@example.org");
         UUID otherAccount = identity.createEnabledAccount(otherPerson, "roe.john", Set.of(Role.MEMBER));
+        members.holdRunningMembership(otherPerson);
         UUID foreign = bookings.joinWaitlist(court, MEMBER_CARD, SLOT, otherAccount, otherPerson, partnerPerson);
         bookings.cancelBooking(booking, holderAccount, Set.of(Role.MEMBER));
         jdbc.sql("""

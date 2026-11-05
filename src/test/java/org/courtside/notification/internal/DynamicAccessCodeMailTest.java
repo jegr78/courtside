@@ -13,6 +13,7 @@ import org.courtside.card.testfixture.CardTestFixture;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
+import org.courtside.member.testfixture.MemberTestFixture;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.BeforeEach;
@@ -47,7 +48,7 @@ import static org.mockito.Mockito.verify;
 
 @TestPropertySource(properties = "courtside.access-control.connector=simulated")
 @Import({FacilityTestFixture.class, IdentityTestFixture.class, CardTestFixture.class, BookingTestFixture.class,
-        AccessTestFixture.class})
+        AccessTestFixture.class, MemberTestFixture.class})
 class DynamicAccessCodeMailTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_BOOKING_CARD = UUID.fromString("11111111-1111-1111-1111-111111111111");
@@ -68,6 +69,9 @@ class DynamicAccessCodeMailTest extends AbstractIntegrationTest {
 
     @Autowired
     private IdentityTestFixture identity;
+
+    @Autowired
+    private MemberTestFixture members;
 
     @Autowired
     private CardTestFixture cards;
@@ -103,6 +107,7 @@ class DynamicAccessCodeMailTest extends AbstractIntegrationTest {
         cards.letBookingsReceiveAccessCodes(MEMBER_BOOKING_CARD, true);
         jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
         janeAccount = identity.createEnabledAccount(jane, "doe.jane", Set.of(Role.MEMBER, Role.TRAINER));
+        members.holdRunningMembership(jane);
         john = identity.createPerson("John", "Roe", "john.roe@example.org");
         identity.createEnabledAccount(john, "roe.john", Set.of(Role.MEMBER));
     }

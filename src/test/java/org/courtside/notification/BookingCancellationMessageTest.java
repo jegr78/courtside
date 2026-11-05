@@ -8,6 +8,7 @@ import org.courtside.booking.ParticipantSpec;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
+import org.courtside.member.testfixture.MemberTestFixture;
 import org.courtside.notification.testfixture.NotificationTestFixture;
 import org.courtside.shared.CancellationReason;
 import org.courtside.shared.CodedDomainFailure;
@@ -34,7 +35,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doNothing;
 
-@Import({FacilityTestFixture.class, IdentityTestFixture.class, NotificationTestFixture.class})
+@Import({FacilityTestFixture.class, IdentityTestFixture.class, NotificationTestFixture.class, MemberTestFixture.class})
 class BookingCancellationMessageTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_BOOKING_CARD =
@@ -55,6 +56,9 @@ class BookingCancellationMessageTest extends AbstractIntegrationTest {
 
     @Autowired
     private IdentityTestFixture identity;
+
+    @Autowired
+    private MemberTestFixture members;
 
     @Autowired
     private NotificationTestFixture notifications;
@@ -79,6 +83,7 @@ class BookingCancellationMessageTest extends AbstractIntegrationTest {
         }
         bookerPersonId = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
         bookerAccountId = identity.createEnabledAccount(bookerPersonId, "doe.jane", Set.of(Role.MEMBER));
+        members.holdRunningMembership(bookerPersonId);
         playerPersonId = identity.createPerson("John", "Roe", "john.roe@example.org");
         playerAccountId = identity.createEnabledAccount(playerPersonId, "roe.john", Set.of(Role.MEMBER));
         boardAccountId = identity.createEnabledAccount(

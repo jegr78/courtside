@@ -12,6 +12,7 @@ import org.courtside.booking.ParticipantSpec;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
+import org.courtside.member.testfixture.MemberTestFixture;
 import org.courtside.notification.testfixture.NotificationTestFixture;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.shared.TimeSlot;
@@ -39,7 +40,7 @@ import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
-@Import({FacilityTestFixture.class, IdentityTestFixture.class, NotificationTestFixture.class})
+@Import({FacilityTestFixture.class, IdentityTestFixture.class, NotificationTestFixture.class, MemberTestFixture.class})
 class DeclinedMessageTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_BOOKING_CARD =
@@ -58,6 +59,9 @@ class DeclinedMessageTest extends AbstractIntegrationTest {
 
     @Autowired
     private IdentityTestFixture identity;
+
+    @Autowired
+    private MemberTestFixture members;
 
     @Autowired
     private NotificationTestFixture messages;
@@ -81,6 +85,7 @@ class DeclinedMessageTest extends AbstractIntegrationTest {
         }
         bookerPersonId = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
         bookerAccountId = identity.createEnabledAccount(bookerPersonId, "doe.jane", Set.of(Role.MEMBER));
+        members.holdRunningMembership(bookerPersonId);
         playerPersonId = identity.createPerson("John", "Roe", "john.roe@example.org");
         logged.start();
         ownLogger().addAppender(logged);

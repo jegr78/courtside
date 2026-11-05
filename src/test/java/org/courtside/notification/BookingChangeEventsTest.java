@@ -17,6 +17,7 @@ import org.courtside.config.testfixture.ConfigTestFixture;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
+import org.courtside.member.testfixture.MemberTestFixture;
 import org.courtside.rules.testfixture.RulesTestFixture;
 import org.courtside.shared.BookingAnnouncement;
 import org.courtside.shared.BookingAnnouncer;
@@ -58,7 +59,8 @@ import static org.mockito.Mockito.doAnswer;
 
 @TestPropertySource(properties = "courtside.test.clock=2026-04-01T10:00:00Z")
 @Import({FacilityTestFixture.class, IdentityTestFixture.class, ConfigTestFixture.class,
-        RulesTestFixture.class, AuditTestFixture.class, BookingChangeEventsTest.OccupancyConsumer.class})
+        RulesTestFixture.class, AuditTestFixture.class, BookingChangeEventsTest.OccupancyConsumer.class,
+        MemberTestFixture.class})
 class BookingChangeEventsTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_BOOKING_CARD =
@@ -82,6 +84,9 @@ class BookingChangeEventsTest extends AbstractIntegrationTest {
 
     @Autowired
     private IdentityTestFixture identity;
+
+    @Autowired
+    private MemberTestFixture members;
 
     @Autowired
     private ConfigTestFixture config;
@@ -112,6 +117,7 @@ class BookingChangeEventsTest extends AbstractIntegrationTest {
         }
         memberPerson = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
         member = identity.createEnabledAccount(memberPerson, "doe.jane", Set.of(Role.MEMBER));
+        members.holdRunningMembership(memberPerson);
     }
 
     @Test

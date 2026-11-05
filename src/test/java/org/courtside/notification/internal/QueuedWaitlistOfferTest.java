@@ -9,6 +9,7 @@ import org.courtside.booking.testfixture.BookingTestFixture;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
+import org.courtside.member.testfixture.MemberTestFixture;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.shared.TimeSlot;
 import org.courtside.shared.WaitlistAnnouncer;
@@ -37,7 +38,7 @@ import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
-@Import({FacilityTestFixture.class, IdentityTestFixture.class, BookingTestFixture.class})
+@Import({FacilityTestFixture.class, IdentityTestFixture.class, BookingTestFixture.class, MemberTestFixture.class})
 class QueuedWaitlistOfferTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_CARD = UUID.fromString("11111111-1111-1111-1111-111111111111");
@@ -58,6 +59,9 @@ class QueuedWaitlistOfferTest extends AbstractIntegrationTest {
 
     @Autowired
     private IdentityTestFixture identity;
+
+    @Autowired
+    private MemberTestFixture members;
 
     @Autowired
     private MailOutbox outbox;
@@ -84,8 +88,10 @@ class QueuedWaitlistOfferTest extends AbstractIntegrationTest {
         }
         holderPerson = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
         holderAccount = identity.createEnabledAccount(holderPerson, "doe.jane", Set.of(Role.MEMBER));
+        members.holdRunningMembership(holderPerson);
         waitingPerson = identity.createPerson("Mary", "Major", "mary.major@example.org");
         waitingAccount = identity.createEnabledAccount(waitingPerson, "major.mary", Set.of(Role.MEMBER));
+        members.holdRunningMembership(waitingPerson);
         partnerPerson = identity.createPerson("Richard", "Miles", "richard.miles@example.org");
     }
 
@@ -128,6 +134,7 @@ class QueuedWaitlistOfferTest extends AbstractIntegrationTest {
         // given
         UUID nextPerson = identity.createPerson("John", "Roe", "john.roe@example.org");
         UUID nextAccount = identity.createEnabledAccount(nextPerson, "roe.john", Set.of(Role.MEMBER));
+        members.holdRunningMembership(nextPerson);
         UUID booking = bookings.createBookingNamingMember(court, MEMBER_CARD, SLOT, holderAccount, holderPerson,
                 Set.of(Role.MEMBER), null, partnerPerson);
         UUID entry = bookings.joinWaitlist(court, MEMBER_CARD, SLOT, waitingAccount, waitingPerson, partnerPerson);

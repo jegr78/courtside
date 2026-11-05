@@ -6,6 +6,7 @@ import org.courtside.booking.testfixture.BookingTestFixture;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
+import org.courtside.member.testfixture.MemberTestFixture;
 import org.courtside.notification.testfixture.NotificationTestFixture;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.shared.TimeSlot;
@@ -26,7 +27,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doNothing;
 
-@Import({FacilityTestFixture.class, IdentityTestFixture.class, NotificationTestFixture.class, BookingTestFixture.class})
+@Import({FacilityTestFixture.class, IdentityTestFixture.class, NotificationTestFixture.class, BookingTestFixture.class,
+        MemberTestFixture.class})
 class PartnerPlaceMessageTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_CARD = UUID.fromString("11111111-1111-1111-1111-111111111111");
@@ -41,6 +43,9 @@ class PartnerPlaceMessageTest extends AbstractIntegrationTest {
 
     @Autowired
     private IdentityTestFixture identity;
+
+    @Autowired
+    private MemberTestFixture members;
 
     @Autowired
     private NotificationTestFixture notifications;
@@ -65,8 +70,10 @@ class PartnerPlaceMessageTest extends AbstractIntegrationTest {
         }
         holderPerson = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
         holderAccount = identity.createEnabledAccount(holderPerson, "doe.jane", Set.of(Role.MEMBER));
+        members.holdRunningMembership(holderPerson);
         joinerPerson = identity.createPerson("John", "Roe", "john.roe@example.org");
         joinerAccount = identity.createEnabledAccount(joinerPerson, "roe.john", Set.of(Role.MEMBER));
+        members.holdRunningMembership(joinerPerson);
     }
 
     @Test
@@ -111,6 +118,7 @@ class PartnerPlaceMessageTest extends AbstractIntegrationTest {
         UUID person = identity.createPerson("Mary", "Major", "mary.major@example.org");
         UUID otherAccount = identity.createEnabledAccount(person, "major.mary", Set.of(Role.MEMBER));
         UUID takingAccount = identity.createEnabledAccount(person, "major.mary2", Set.of(Role.MEMBER));
+        members.holdRunningMembership(person);
         UUID booking = bookings.createBookingLookingForAPartner(court, MEMBER_CARD, SLOT, holderAccount, holderPerson);
         UUID invitation = bookings.publishOpenPlace(booking, holderAccount);
 
