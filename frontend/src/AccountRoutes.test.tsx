@@ -60,7 +60,7 @@ it("given an account without membership, when it opens the account and security 
   const router = routes(account, "/account");
 
   // when / then
-  expect(screen.getByTestId("profile-username")).toHaveTextContent("doe.jane");
+  expect(await screen.findByTestId("profile-username")).toHaveTextContent("doe.jane");
   expect(screen.getByTestId("account-title")).toHaveFocus();
   screen.getByTestId("current-password").focus();
   await act(() => router.navigate("/account"));
