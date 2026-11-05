@@ -9,6 +9,7 @@ import org.courtside.card.CardService;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
+import org.courtside.member.testfixture.MemberTestFixture;
 import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -37,7 +38,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WithMockUser(username = "admin", roles = "ADMIN")
-@Import({BookingTestFixture.class, FacilityTestFixture.class, IdentityTestFixture.class})
+@Import({BookingTestFixture.class, FacilityTestFixture.class, IdentityTestFixture.class, MemberTestFixture.class})
 class BookingCardAdminControllerTest extends AbstractIntegrationTest {
 
     @Autowired
@@ -54,6 +55,9 @@ class BookingCardAdminControllerTest extends AbstractIntegrationTest {
 
     @Autowired
     private IdentityTestFixture identity;
+
+    @Autowired
+    private MemberTestFixture members;
 
     private MockMvc mockMvc;
 
@@ -304,6 +308,8 @@ class BookingCardAdminControllerTest extends AbstractIntegrationTest {
         String id = createCard("Match play", "#3a4a5c");
         UUID courtId = facilityFixture.createCourt(1, "Court 1");
         UUID personId = identity.createPerson("Jane", "Doe", "jane@example.org");
+        UUID accountId = identity.createEnabledAccount(personId, "doe.jane", Set.of(Role.MEMBER));
+        members.holdRunningMembership(personId);
         for (DayOfWeek day : DayOfWeek.values()) {
             facilityFixture.setOpeningHours(day, new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0)));
         }
@@ -311,7 +317,7 @@ class BookingCardAdminControllerTest extends AbstractIntegrationTest {
         Instant sevenPm = Instant.parse("2026-05-12T17:00:00Z");
         UUID bookingId = bookingFixture.createBookingWithGuest(
                 courtId, UUID.fromString(id), new TimeSlot(sixPm, sevenPm),
-                personId, Set.of(Role.MEMBER), "Partner");
+                accountId, personId, Set.of(Role.MEMBER), null, "Partner");
 
         // when
         mockMvc.perform(put("/api/admin/booking-cards/" + id)

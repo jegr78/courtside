@@ -64,7 +64,7 @@ class MaxBookingDurationRuleTest extends AbstractIntegrationTest {
 
     private UUID courtId;
     private UUID bookerPersonId;
-    private final UUID booker = UUID.randomUUID();
+    private UUID booker;
 
     @BeforeEach
     void openTheFacilityForAYouthMember() {
@@ -75,6 +75,7 @@ class MaxBookingDurationRuleTest extends AbstractIntegrationTest {
         courtId = facilityFixture.createCourt(1, "Court 1");
         bookerPersonId = identity.createPerson("Jane", "Doe", "jane@example.org");
         members.assignMembership(bookerPersonId, YOUTH);
+        booker = identity.createEnabledAccount(bookerPersonId, "doe.jane", Set.of(Role.MEMBER));
     }
 
     @Test

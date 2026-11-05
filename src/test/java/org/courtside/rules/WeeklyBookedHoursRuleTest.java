@@ -67,7 +67,7 @@ class WeeklyBookedHoursRuleTest extends AbstractIntegrationTest {
     @Autowired
     private MemberTestFixture members;
 
-    private final UUID account = UUID.randomUUID();
+    private UUID account;
     private UUID courtId;
     private UUID personId;
 
@@ -79,6 +79,7 @@ class WeeklyBookedHoursRuleTest extends AbstractIntegrationTest {
         courtId = facilityFixture.createCourt(1, "Court 1");
         personId = identity.createPerson("Jane", "Doe", "jane@example.org");
         members.assignMembership(personId, ACTIVE);
+        account = identity.createEnabledAccount(personId, "doe.jane", Set.of(Role.MEMBER));
         ruleAdmin.removeRule(STANDARD_RULE_SET, RuleType.MAX_OPEN_BOOKINGS);
     }
 

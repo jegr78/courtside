@@ -5,15 +5,19 @@ import org.courtside.card.BookingCard;
 import org.courtside.card.CardService;
 import org.courtside.card.ParticipantCard;
 import org.courtside.identity.Role;
+import org.courtside.identity.testfixture.IdentityTestFixture;
+import org.courtside.member.testfixture.MemberTestFixture;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 import java.util.Set;
+import java.util.UUID;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.anonymous;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -23,6 +27,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WithMockUser(username = "jane.doe", roles = "MEMBER")
+@Import({IdentityTestFixture.class, MemberTestFixture.class})
 class CardControllerTest extends AbstractIntegrationTest {
 
     @Autowired
@@ -31,11 +36,20 @@ class CardControllerTest extends AbstractIntegrationTest {
     @Autowired
     private CardService cards;
 
+    @Autowired
+    private IdentityTestFixture identity;
+
+    @Autowired
+    private MemberTestFixture members;
+
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
+        UUID person = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
+        identity.createEnabledAccount(person, "jane.doe", Set.of(Role.MEMBER));
+        members.holdRunningMembership(person);
     }
 
     @Test

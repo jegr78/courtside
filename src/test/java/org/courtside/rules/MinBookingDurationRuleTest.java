@@ -71,6 +71,7 @@ class MinBookingDurationRuleTest extends AbstractIntegrationTest {
         courtId = facilityFixture.createCourt(1, "Court 1");
         personId = identity.createPerson("Jane", "Doe", "jane@example.org");
         members.assignMembership(personId, ACTIVE);
+        identity.createEnabledAccount(personId, "doe.jane", Set.of(Role.MEMBER));
     }
 
     @Test
@@ -144,7 +145,7 @@ class MinBookingDurationRuleTest extends AbstractIntegrationTest {
 
     private UUID book(int minutes, Role role) {
         return bookingService.create(new CreateBookingCommand(List.of(courtId), MEMBER_BOOKING_CARD,
-                new TimeSlot(WEDNESDAY_SIX_PM, WEDNESDAY_SIX_PM.plusSeconds(minutes * 60L)), UUID.randomUUID(),
+                new TimeSlot(WEDNESDAY_SIX_PM, WEDNESDAY_SIX_PM.plusSeconds(minutes * 60L)), identity.accountIdOf(personId),
                 personId, Set.of(role), null, List.of(ParticipantSpec.guest("Partner")), null));
     }
 

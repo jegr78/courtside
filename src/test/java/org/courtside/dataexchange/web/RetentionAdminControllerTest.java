@@ -176,6 +176,7 @@ class RetentionAdminControllerTest extends AbstractIntegrationTest {
         // given
         UUID janePerson = roster.addPerson("Jane", "Doe", "jane.doe@example.org");
         roster.giveAccount(janePerson, "jane.doe", Set.of(Role.MEMBER));
+        roster.holdRunningMembership(janePerson);
         UUID jane = identity.accountIdOf(janePerson);
         UUID johnPerson = roster.addPerson("John", "Roe", "john.roe@example.org");
         UUID old = bookings.createBookingWithGuest(courtId, MEMBER_BOOKING_CARD, TOMORROW_SIX_PM, jane, janePerson,
@@ -219,6 +220,7 @@ class RetentionAdminControllerTest extends AbstractIntegrationTest {
         // given
         UUID janePerson = roster.addPerson("Jane", "Doe", "jane.doe@example.org");
         roster.giveAccount(janePerson, "jane.doe", Set.of(Role.MEMBER));
+        roster.holdRunningMembership(janePerson);
         UUID jane = identity.accountIdOf(janePerson);
         UUID john = roster.addPerson("John", "Roe", "john.roe@example.org");
         UUID old = bookings.createBookingWithGuest(courtId, MEMBER_BOOKING_CARD, TOMORROW_SIX_PM, jane, janePerson,
@@ -278,7 +280,7 @@ class RetentionAdminControllerTest extends AbstractIntegrationTest {
         roster.giveAccount(janePerson, "jane.doe", Set.of(Role.MEMBER));
         UUID jane = identity.accountIdOf(janePerson);
         UUID old = bookings.createBookingWithGuest(courtId, MEMBER_BOOKING_CARD, TOMORROW_SIX_PM, admin, adminPerson,
-                Set.of(Role.MEMBER), null, "Mary Major");
+                Set.of(Role.ADMIN), null, "Mary Major");
         actedBy(old, jane);
         shiftBack(old, 500);
         keep("BOOKINGS", 12);
@@ -302,7 +304,7 @@ class RetentionAdminControllerTest extends AbstractIntegrationTest {
         // given
         UUID guardian = formerMember("Jane", "Doe", "jane.doe");
         UUID kept = bookings.createBookingWithGuest(courtId, MEMBER_BOOKING_CARD, TOMORROW_SIX_PM, admin, adminPerson,
-                Set.of(Role.MEMBER), null, "Mary Major");
+                Set.of(Role.ADMIN), null, "Mary Major");
         actedBy(kept, identity.accountIdOf(guardian));
         keep("FORMER_MEMBERS", 24);
 

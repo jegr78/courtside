@@ -83,8 +83,10 @@ class BookingHoursRuleTest extends AbstractIntegrationTest {
         courtId = facilityFixture.createCourt(1, "Court 1");
         youthPersonId = identity.createPerson("Jane", "Doe", "jane@example.org");
         members.assignMembership(youthPersonId, YOUTH);
+        identity.createEnabledAccount(youthPersonId, "doe.jane", Set.of(Role.MEMBER));
         activePersonId = identity.createPerson("John", "Roe", "john@example.org");
         members.assignMembership(activePersonId, ACTIVE);
+        identity.createEnabledAccount(activePersonId, "roe.john", Set.of(Role.MEMBER));
     }
 
     @Test
@@ -283,7 +285,7 @@ class BookingHoursRuleTest extends AbstractIntegrationTest {
     private UUID book(UUID personId, Role role, LocalTime localStart) {
         TimeSlot slot = clubSlot(localStart, 60);
         return bookingService.create(new CreateBookingCommand(
-                List.of(courtId), MEMBER_BOOKING_CARD, slot, UUID.randomUUID(), personId,
+                List.of(courtId), MEMBER_BOOKING_CARD, slot, identity.accountIdOf(personId), personId,
                 Set.of(role), null, List.of(ParticipantSpec.guest("Partner")), null));
     }
 

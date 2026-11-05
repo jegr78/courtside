@@ -5,6 +5,7 @@ import org.courtside.booking.testfixture.BookingTestFixture;
 import org.courtside.card.testfixture.CardTestFixture;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.identity.testfixture.IdentityTestFixture;
+import org.courtside.member.testfixture.MemberTestFixture;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.AfterEach;
@@ -31,7 +32,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@Import({BookingTestFixture.class, CardTestFixture.class, FacilityTestFixture.class, IdentityTestFixture.class})
+@Import({BookingTestFixture.class, CardTestFixture.class, FacilityTestFixture.class, IdentityTestFixture.class,
+        MemberTestFixture.class})
 class SessionAppointmentAccessTest extends AbstractIntegrationTest {
 
     @Autowired
@@ -50,18 +52,22 @@ class SessionAppointmentAccessTest extends AbstractIntegrationTest {
     private BookingTestFixture bookings;
 
     @Autowired
+    private MemberTestFixture members;
+
+    @Autowired
     private UserDetailsService userDetailsService;
 
     private MockMvc mockMvc;
     private UUID administratorPerson;
+    private UUID treasurerPerson;
 
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
         administratorPerson = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
         identity.createEnabledAccount(administratorPerson, "doe.jane", Set.of(Role.ADMIN));
-        UUID treasurer = identity.createPerson("John", "Roe", "john.roe@example.org");
-        identity.createEnabledAccount(treasurer, "roe.john", Set.of(Role.MEMBER, Role.TREASURER));
+        treasurerPerson = identity.createPerson("John", "Roe", "john.roe@example.org");
+        identity.createEnabledAccount(treasurerPerson, "roe.john", Set.of(Role.MEMBER, Role.TREASURER));
         identity.signInAs("doe.jane");
     }
 
@@ -92,15 +98,27 @@ class SessionAppointmentAccessTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void givenACardOpenToEveryRoleThatTracksNoPlayers_whenTheTreasurerReadsTheSession_thenItCreatesSeries()
+    void givenACardWithoutARoleListThatTracksNoPlayers_whenATreasurerHoldingAMembershipReadsTheSession_thenItCreatesSeries()
+            throws Exception {
+        // given
+        cards.createBookingCard("Open practice", Set.of(), Set.of());
+        members.holdRunningMembership(treasurerPerson);
+
+        // when / then
+        session("roe.john")
+                .andExpect(jsonPath("$.managesAppointments").value(false))
+                .andExpect(jsonPath("$.createsSeries").value(true));
+    }
+
+    @Test
+    void givenACardWithoutARoleListThatTracksNoPlayers_whenATreasurerWithoutAMembershipReadsTheSession_thenItCreatesNoSeries()
             throws Exception {
         // given
         cards.createBookingCard("Open practice", Set.of(), Set.of());
 
         // when / then
         session("roe.john")
-                .andExpect(jsonPath("$.managesAppointments").value(false))
-                .andExpect(jsonPath("$.createsSeries").value(true));
+                .andExpect(jsonPath("$.createsSeries").value(false));
     }
 
     @Test

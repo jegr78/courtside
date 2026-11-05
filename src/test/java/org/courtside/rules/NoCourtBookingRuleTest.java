@@ -63,7 +63,7 @@ class NoCourtBookingRuleTest extends AbstractIntegrationTest {
 
     private UUID courtId;
     private UUID bookerPersonId;
-    private final UUID booker = UUID.randomUUID();
+    private UUID booker;
 
     @org.junit.jupiter.api.BeforeEach
     void openTheFacilityForAYouthMember() {
@@ -74,6 +74,7 @@ class NoCourtBookingRuleTest extends AbstractIntegrationTest {
         courtId = facilityFixture.createCourt(1, "Court 1");
         bookerPersonId = identity.createPerson("Jane", "Doe", "jane@example.org");
         members.assignMembership(bookerPersonId, YOUTH);
+        booker = identity.createEnabledAccount(bookerPersonId, "doe.jane", Set.of(Role.MEMBER));
     }
 
     @Test

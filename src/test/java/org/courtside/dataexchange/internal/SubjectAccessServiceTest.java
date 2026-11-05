@@ -75,6 +75,7 @@ class SubjectAccessServiceTest extends AbstractIntegrationTest {
         // given
         UUID personId = roster.addPerson("Jane", "Doe", "jane.doe@example.org");
         UUID accountId = identity.createEnabledAccount(personId, "jane.doe", Set.of(Role.MEMBER));
+        roster.holdRunningMembership(personId);
         UUID namedId = roster.addPerson("John", "Roe", "john.roe@example.org");
         UUID bookingId = bookings.createBookingNamingMember(courtId, MEMBER_BOOKING_CARD,
                 new TimeSlot(SIX_PM, SEVEN_PM), accountId, personId, Set.of(Role.MEMBER), "Doubles",
@@ -97,10 +98,13 @@ class SubjectAccessServiceTest extends AbstractIntegrationTest {
         // given
         UUID personId = roster.addPerson("Jane", "Doe", "jane.doe@example.org");
         UUID accountId = identity.createEnabledAccount(personId, "jane.doe", Set.of(Role.MEMBER));
+        roster.holdRunningMembership(personId);
         UUID holderPerson = roster.addPerson("Mary", "Major", "mary.major@example.org");
         UUID holderAccount = identity.createEnabledAccount(holderPerson, "major.mary", Set.of(Role.MEMBER));
+        roster.holdRunningMembership(holderPerson);
         UUID otherPerson = roster.addPerson("John", "Roe", "john.roe@example.org");
         UUID otherAccount = identity.createEnabledAccount(otherPerson, "roe.john", Set.of(Role.MEMBER));
+        roster.holdRunningMembership(otherPerson);
         TimeSlot slot = new TimeSlot(SIX_PM, SEVEN_PM);
         bookings.createBookingNamingMember(courtId, MEMBER_BOOKING_CARD, slot, holderAccount, holderPerson,
                 Set.of(Role.MEMBER), null, otherPerson);
@@ -143,6 +147,7 @@ class SubjectAccessServiceTest extends AbstractIntegrationTest {
         // given
         UUID personId = roster.addPerson("Jane", "Doe", "jane.doe@example.org");
         UUID accountId = identity.createEnabledAccount(personId, "jane.doe", Set.of(Role.MEMBER));
+        roster.holdRunningMembership(personId);
         UUID offered = bookings.createBookingLookingForAPartner(courtId, MEMBER_BOOKING_CARD,
                 new TimeSlot(SIX_PM, SEVEN_PM), accountId, personId);
         bookings.publishOpenPlace(offered, accountId);
@@ -164,8 +169,10 @@ class SubjectAccessServiceTest extends AbstractIntegrationTest {
         // given
         UUID personId = roster.addPerson("Jane", "Doe", "jane.doe@example.org");
         UUID accountId = identity.createEnabledAccount(personId, "jane.doe", Set.of(Role.MEMBER));
+        roster.holdRunningMembership(personId);
         UUID holderPerson = roster.addPerson("Mary", "Major", "mary.major@example.org");
         UUID holderAccount = identity.createEnabledAccount(holderPerson, "major.mary", Set.of(Role.MEMBER));
+        roster.holdRunningMembership(holderPerson);
         TimeSlot slot = new TimeSlot(SIX_PM, SEVEN_PM);
         bookings.createBookingNamingMember(courtId, MEMBER_BOOKING_CARD, slot, holderAccount, holderPerson,
                 Set.of(Role.MEMBER), null, personId);

@@ -110,6 +110,7 @@ class SubjectAccessAdminControllerTest extends AbstractIntegrationTest {
         // given
         UUID personId = roster.addPerson("Jane", "Doe", "jane.doe@example.org");
         roster.giveAccount(personId, "jane.doe", Set.of(Role.MEMBER));
+        roster.holdRunningMembership(personId);
         UUID accountId = identity.accountIdOf(personId);
         UUID bookingId = bookings.createBookingLookingForAPartner(courtId, MEMBER_BOOKING_CARD,
                 new TimeSlot(SIX_PM, SEVEN_PM), accountId, personId);
@@ -161,6 +162,7 @@ class SubjectAccessAdminControllerTest extends AbstractIntegrationTest {
         UUID child = roster.addPerson("John", "Roe", "john.roe@example.org");
         roster.giveAccount(personId, "jane.doe", Set.of(Role.MEMBER));
         roster.giveAccount(child, "john.roe", Set.of(Role.MEMBER));
+        roster.holdRunningMembership(child);
         UUID bookingId = bookings.createBookingForDependant(courtId, MEMBER_BOOKING_CARD,
                 new TimeSlot(SIX_PM, SEVEN_PM), identity.accountIdOf(child), child, identity.accountIdOf(personId));
 
@@ -320,6 +322,7 @@ class SubjectAccessAdminControllerTest extends AbstractIntegrationTest {
         // given
         UUID makerId = roster.addPerson("Jane", "Doe", "jane.doe@example.org");
         roster.giveAccount(makerId, "jane.doe", Set.of(Role.MEMBER));
+        roster.holdRunningMembership(makerId);
         UUID makerAccountId = identity.accountIdOf(makerId);
         UUID namedId = roster.addPerson("John", "Roe", "john.roe@example.org");
         bookings.createBookingNamingMember(courtId, MEMBER_BOOKING_CARD,
@@ -348,6 +351,7 @@ class SubjectAccessAdminControllerTest extends AbstractIntegrationTest {
         // given
         UUID makerId = roster.addPerson("Jane", "Doe", "jane.doe@example.org");
         roster.giveAccount(makerId, "jane.doe", Set.of(Role.MEMBER));
+        roster.holdRunningMembership(makerId);
         UUID makerAccountId = identity.accountIdOf(makerId);
         UUID namedId = roster.addPerson("John", "Roe", "john.roe@example.org");
         UUID bookingId = bookings.createBookingNamingMember(courtId, MEMBER_BOOKING_CARD,
@@ -446,6 +450,7 @@ class SubjectAccessAdminControllerTest extends AbstractIntegrationTest {
         // given
         UUID personId = roster.addPerson("Jane", "Doe", "jane.doe@example.org");
         roster.giveAccount(personId, "jane.doe", Set.of(Role.MEMBER));
+        roster.holdRunningMembership(personId);
         UUID accountId = identity.accountIdOf(personId);
         UUID board = identity.createEnabledAccount(identity.createPerson("Richard", "Miles"), "miles.richard",
                 Set.of(Role.ADMIN));
