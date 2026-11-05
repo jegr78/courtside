@@ -289,7 +289,9 @@ refuses it with `card.closure.grantsNoAccess`, and the `booking_card_closure_gra
 refuses it below the service. The last, `signalsOccupancy`, decides whether its bookings count as
 occupied for building automation; it is on by default and off for the closure card the same way.
 
-An empty booking-role set permits every authenticated member account. An empty managing-role set
+An empty booking-role set permits every account whose person holds a membership covering today; no
+role stands in for that membership, `MEMBER` included. An account without one books only cards that
+name one of its roles. An empty managing-role set
 permits only the owner and administrators to manage the booking. Managing roles never inherit from
 booking roles.
 
@@ -412,7 +414,7 @@ request budget the same however many days it shows.
 
 The session reports whether an active card names one of the account's roles other than MEMBER as
 managing role, the same filter the managed-booking view applies, and whether an active card that
-tracks no players permits one of its roles. The client offers the
+tracks no players permits the account. The client offers the
 managed-booking view and the series form only on those grounds; an administrator always has both.
 
 A member recorded as a participant receives a message and may remove themselves without the

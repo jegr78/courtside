@@ -1,4 +1,4 @@
 @org.springframework.modulith.ApplicationModule(
         displayName = "Card",
-        allowedDependencies = {"identity", "config"})
+        allowedDependencies = {"identity", "member", "config"})
 package org.courtside.card;

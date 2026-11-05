@@ -767,7 +767,7 @@ const en: Record<keyof typeof de, string> = {
   "admin.facility.label": "Label",
   "admin.facility.color": "Colour",
   "admin.facility.allowedRoles": "Allowed roles",
-  "admin.facility.allowedRolesHint": "Any selected role is sufficient. With none selected, every signed-in person may book; administrators may always book.",
+  "admin.facility.allowedRolesHint": "Any selected role is sufficient. With none selected, everybody with a running membership may book; administrators may always book.",
   "admin.facility.managingRoles": "Managing roles",
   "admin.facility.managingRolesHint": "These roles may open every booking made on this card, see the participant names and cancel it. With none selected, only administrators may.",
   "admin.facility.playerCounts": "Allowed player counts",

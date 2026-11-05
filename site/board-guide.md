@@ -413,7 +413,7 @@ Punktspiel oder Sperrung. Lege für jede benötigte Art eine Karte an.
 | Einstellung | Wirkung |
 |---|---|
 | **Bezeichnung und Farbe** | Darstellung im Platzplan. Courtside zeigt den Kontrast der Beschriftung zur Farbe und warnt unter 4,5 zu 1 |
-| **Berechtigte Rollen** | Rollen, die mit der Karte buchen dürfen. Ohne Auswahl dürfen alle angemeldeten Personen buchen |
+| **Berechtigte Rollen** | Rollen, die mit der Karte buchen dürfen. Ohne Auswahl dürfen alle buchen, deren Mitgliedschaft heute läuft. Wer keine Mitgliedschaft hat, bucht nur Karten, die eine seiner Rollen nennen |
 | **Verantwortliche Rollen** | Rollen, die jede Buchung dieser Karte öffnen, einsehen und stornieren dürfen |
 | **Erlaubte Spielerzahlen** | Zulässige Zahl von Teilnehmenden. Ohne Wert erfasst die Karte keine Teilnehmenden |
 | **Zählt gegen Buchungslimits** | Rechnet die Buchung auf die Obergrenze offener Buchungen an |
@@ -424,7 +424,7 @@ Punktspiel oder Sperrung. Lege für jede benötigte Art eine Karte an.
 
 Administratoren dürfen jede Karte verwenden und verwalten. Eine Buchung mit der Karte *Platz
 gesperrt* geht einer Reservierung von der Warteliste vor. Leerst du ihre berechtigten Rollen, darf
-jede angemeldete Person sperren und damit jedes Angebot auf der Warteliste beenden.
+jedes Mitglied sperren und damit jedes Angebot auf der Warteliste beenden.
 
 Eine neutrale Anzeige schützt die
 Bezeichnung nicht vor technischem Zugriff, da die öffentliche Schnittstelle sie weiterhin liefert.

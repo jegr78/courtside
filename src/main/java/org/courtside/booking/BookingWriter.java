@@ -91,7 +91,7 @@ class BookingWriter implements SeriesOccurrenceCancellation, BookingDrafts, Unat
         if (!facility.findUnbookableCourts(command.courtIds()).isEmpty()) {
             return false;
         }
-        if (!cardEligibility.admits(command.cardId(), command.callerRoles())) {
+        if (!cardEligibility.admits(command.cardId(), command.bookedBy(), command.callerRoles())) {
             return false;
         }
         try {
@@ -104,7 +104,7 @@ class BookingWriter implements SeriesOccurrenceCancellation, BookingDrafts, Unat
 
     private List<ParticipantSpec> bookable(CreateBookingCommand command) {
         facility.requireBookableCourts(command.courtIds());
-        return checked(cardEligibility.requireEligible(command.cardId(), command.callerRoles()), command);
+        return checked(cardEligibility.requireEligible(command.cardId(), command.bookedBy(), command.callerRoles()), command);
     }
 
     private List<ParticipantSpec> checked(BookingCard card, CreateBookingCommand command) {

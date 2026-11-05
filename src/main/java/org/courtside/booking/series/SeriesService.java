@@ -140,7 +140,8 @@ public class SeriesService {
                 .toList();
         List<List<RuleViolation>> violations = ruleGate.violationsFor(checks);
         List<CourtOccupancy> occupancies = occupancies(rule, expansion.slots());
-        List<Reserved> reserved = CourtReservations.overriddenBy(callerRoles, rule.cardId(), card.permits(callerRoles))
+        List<Reserved> reserved = CourtReservations.overriddenBy(callerRoles, rule.cardId(),
+                cardEligibility.admits(rule.cardId(), bookedBy, callerRoles))
                 ? List.of()
                 : reservedOver(expansion.slots());
         List<SeriesPreview.Occurrence> occurrences = IntStream.range(0, expansion.slots().size())
@@ -160,7 +161,7 @@ public class SeriesService {
         }
         requireOfferedBySchedule(rule, confirmedStarts);
         facility.requireBookableCourts(rule.courtIds());
-        BookingCard card = cardEligibility.requireEligible(rule.cardId(), callerRoles);
+        BookingCard card = cardEligibility.requireEligible(rule.cardId(), bookedBy, callerRoles);
         requireCardDoesNotTrackPlayers(card);
 
         BookingSeries series = seriesRepository.saveAndFlush(
@@ -270,7 +271,7 @@ public class SeriesService {
                 ? moveRuleViolations(planned, callerRoles)
                 : planned.stream().map(ignored -> List.<RuleViolation>of()).toList();
         List<Reserved> reserved = reservedAround(planned);
-        boolean overriding = overrides(planned, callerRoles);
+        boolean overriding = overrides(planned, movedBy, callerRoles);
         List<MovePreview.Move> moves = IntStream.range(0, planned.size())
                 .mapToObj(index -> toPreviewMove(
                         planned.get(index), planned, movingIds, targets, ruleViolations.get(index), reserved,
@@ -353,7 +354,7 @@ public class SeriesService {
             throw e;
         }
         releaseVacated(preview.moves(), vacatedCourts);
-        settleReservations(executions, callerRoles);
+        settleReservations(executions, movedBy, callerRoles);
         if (earliest != null) {
             events.publishEvent(new SeriesMoved(request.seriesId(), movingIds, movedBy,
                     earliest.from().start(), earliest.from().end(), previousCourts));
@@ -374,12 +375,12 @@ public class SeriesService {
     }
 
     // The club taking a reservation withdraws it, and an owner moving onto their own wait books it.
-    private void settleReservations(List<MoveExecution> executions, Set<Role> callerRoles) {
+    private void settleReservations(List<MoveExecution> executions, UUID movedBy, Set<Role> callerRoles) {
         if (executions.isEmpty()) {
             return;
         }
         UUID cardId = executions.getFirst().booking().getCardId();
-        if (CourtReservations.overriddenBy(callerRoles, cardId, cardEligibility.admits(cardId, callerRoles))) {
+        if (CourtReservations.overriddenBy(callerRoles, cardId, cardEligibility.admits(cardId, movedBy, callerRoles))) {
             Instant from = executions.stream().map(execution -> execution.slot().start()).min(Instant::compareTo).orElseThrow();
             Instant to = executions.stream().map(execution -> execution.slot().end()).max(Instant::compareTo).orElseThrow();
             reservations.withdraw(reservations.reservedBetween(from, to).stream()
@@ -441,12 +442,12 @@ public class SeriesService {
         return reservations.reservedBetween(from, to);
     }
 
-    private boolean overrides(List<PlannedMove> planned, Set<Role> callerRoles) {
+    private boolean overrides(List<PlannedMove> planned, UUID movedBy, Set<Role> callerRoles) {
         if (planned.isEmpty()) {
             return false;
         }
         UUID cardId = planned.getFirst().cardId();
-        return CourtReservations.overriddenBy(callerRoles, cardId, cardEligibility.admits(cardId, callerRoles));
+        return CourtReservations.overriddenBy(callerRoles, cardId, cardEligibility.admits(cardId, movedBy, callerRoles));
     }
 
     private MovePreview.Move toPreviewMove(PlannedMove move, List<PlannedMove> planned,

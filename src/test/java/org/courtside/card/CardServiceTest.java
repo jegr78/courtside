@@ -2,8 +2,11 @@ package org.courtside.card;
 
 import org.courtside.AbstractIntegrationTest;
 import org.courtside.identity.Role;
+import org.courtside.identity.testfixture.IdentityTestFixture;
+import org.courtside.member.testfixture.MemberTestFixture;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
 
 import java.util.List;
 import java.util.Set;
@@ -11,6 +14,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+@Import({MemberTestFixture.class, IdentityTestFixture.class})
 class CardServiceTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_BOOKING_CARD =
@@ -28,6 +32,10 @@ class CardServiceTest extends AbstractIntegrationTest {
 
     @Autowired
     private CardService cardService;
+    @Autowired
+    private MemberTestFixture members;
+    @Autowired
+    private IdentityTestFixture identity;
 
     @Test
     void whenListingActiveCards_thenTheFourSeededCardsAreReturned() {
@@ -42,8 +50,11 @@ class CardServiceTest extends AbstractIntegrationTest {
 
     @Test
     void givenAnAdmin_whenListingBookableCards_thenEveryActiveCardIsVisibleRegardlessOfRequiredRole() {
+        // given
+        UUID admin = account("example.admin", false, Role.ADMIN);
+
         // when
-        List<BookingCard> result = cardService.bookableCards(Set.of(Role.ADMIN));
+        List<BookingCard> result = cardService.bookableCards(admin, Set.of(Role.ADMIN));
 
         // then
         assertThat(result).extracting(BookingCard::getId)
@@ -52,26 +63,54 @@ class CardServiceTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void givenDirectors_whenListingBookableCards_thenCardsGatedBehindAnyHeldRoleArePresent() {
+    void givenDirectorsWithoutMembership_whenListingBookableCards_thenOnlyCardsNamingTheirRoleArePresent() {
+        // given
+        UUID sport = account("john.roe", false, Role.SPORT_DIRECTOR);
+        UUID youth = account("mary.major", false, Role.YOUTH_DIRECTOR);
+
         // when
-        List<BookingCard> sport = cardService.bookableCards(Set.of(Role.SPORT_DIRECTOR));
-        List<BookingCard> youth = cardService.bookableCards(Set.of(Role.YOUTH_DIRECTOR));
+        List<BookingCard> sportCards = cardService.bookableCards(sport, Set.of(Role.SPORT_DIRECTOR));
+        List<BookingCard> youthCards = cardService.bookableCards(youth, Set.of(Role.YOUTH_DIRECTOR));
 
         // then
-        assertThat(sport).extracting(BookingCard::getId)
-                .containsExactlyInAnyOrder(MEMBER_BOOKING_CARD, TRAINING_CARD, LEAGUE_MATCH_CARD);
-        assertThat(youth).extracting(BookingCard::getId)
-                .containsExactlyInAnyOrder(MEMBER_BOOKING_CARD, TRAINING_CARD, LEAGUE_MATCH_CARD);
+        assertThat(sportCards).extracting(BookingCard::getId)
+                .containsExactlyInAnyOrder(TRAINING_CARD, LEAGUE_MATCH_CARD);
+        assertThat(youthCards).extracting(BookingCard::getId)
+                .containsExactlyInAnyOrder(TRAINING_CARD, LEAGUE_MATCH_CARD);
     }
 
     @Test
     void givenAnOrdinaryMember_whenListingBookableCards_thenOrganizationalCardsAreAbsent() {
+        // given
+        UUID member = account("jane.doe", true, Role.MEMBER);
+
         // when
-        List<BookingCard> result = cardService.bookableCards(Set.of(Role.MEMBER));
+        List<BookingCard> result = cardService.bookableCards(member, Set.of(Role.MEMBER));
 
         // then
         assertThat(result).extracting(BookingCard::getId)
                 .containsExactly(MEMBER_BOOKING_CARD);
+    }
+
+    @Test
+    void givenAMemberRoleWithoutRunningMembership_whenListingBookableCards_thenNoCardIsOffered() {
+        // given
+        UUID departed = account("richard.miles", false, Role.MEMBER);
+
+        // when
+        List<BookingCard> result = cardService.bookableCards(departed, Set.of(Role.MEMBER));
+
+        // then
+        assertThat(result).as("the member card asks for a membership, not for the member role").isEmpty();
+    }
+
+    private UUID account(String username, boolean currentMember, Role... roles) {
+        UUID personId = members.addPerson("Jane", "Doe", username + "@example.org");
+        members.giveAccount(personId, username, Set.of(roles));
+        if (currentMember) {
+            members.assignMembership(personId, members.createMembershipType("Adult " + username));
+        }
+        return identity.accountIdOf(personId);
     }
 
     @Test

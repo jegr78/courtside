@@ -6,6 +6,7 @@ import org.courtside.card.internal.ClosureCardSignalsNoOccupancyException;
 import org.courtside.card.internal.CardLabelTakenException;
 import org.courtside.card.internal.ParticipantCardRepository;
 import org.courtside.identity.Role;
+import org.courtside.member.MemberService;
 import org.courtside.shared.CardGrantsAccess;
 import org.courtside.shared.SqlConstraintViolation;
 import lombok.RequiredArgsConstructor;
@@ -34,17 +35,19 @@ public class CardService {
     private final BookingCardRepository cards;
     private final ParticipantCardRepository participantCards;
     private final ApplicationEventPublisher events;
+    private final MemberService members;
 
     public List<BookingCard> activeCards() {
         return cards.findByActiveTrueOrderByLabelAsc();
     }
 
-    public List<BookingCard> bookableCards(Set<Role> callerRoles) {
+    public List<BookingCard> bookableCards(UUID accountId, Set<Role> callerRoles) {
         if (callerRoles.contains(Role.ADMIN)) {
             return activeCards();
         }
+        boolean currentMember = members.isCurrentMember(accountId);
         return activeCards().stream()
-                .filter(card -> card.permits(callerRoles))
+                .filter(card -> card.permits(callerRoles, currentMember))
                 .toList();
     }
 

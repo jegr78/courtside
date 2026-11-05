@@ -765,7 +765,7 @@ const de = {
   "admin.facility.label": "Bezeichnung",
   "admin.facility.color": "Farbe",
   "admin.facility.allowedRoles": "Berechtigte Rollen",
-  "admin.facility.allowedRolesHint": "Eine der gewählten Rollen genügt. Ohne Auswahl dürfen alle angemeldeten Personen buchen; Administratoren dürfen immer buchen.",
+  "admin.facility.allowedRolesHint": "Eine der gewählten Rollen genügt. Ohne Auswahl dürfen alle mit laufender Mitgliedschaft buchen; Administratoren dürfen immer buchen.",
   "admin.facility.managingRoles": "Verantwortliche Rollen",
   "admin.facility.managingRolesHint": "Diese Rollen dürfen jede Buchung auf dieser Karte öffnen, die Namen der Teilnehmenden sehen und sie stornieren. Ohne Auswahl darf das nur die Administration.",
   "admin.facility.playerCounts": "Erlaubte Spielerzahlen",

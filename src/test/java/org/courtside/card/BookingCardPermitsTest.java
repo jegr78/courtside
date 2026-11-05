@@ -15,13 +15,23 @@ class BookingCardPermitsTest {
     }
 
     @Test
-    void givenACardRequiringNoRole_whenAskedWhoItPermits_thenEveryCallerIsPermitted() {
+    void givenACardRequiringNoRole_whenTheCallerHoldsARunningMembership_thenTheCallerIsPermitted() {
         // given
         BookingCard card = cardAllowing();
 
         // when / then
-        assertThat(card.permits(Set.of())).isTrue();
-        assertThat(card.permits(Set.of(Role.MEMBER))).isTrue();
+        assertThat(card.permits(Set.of(), true)).isTrue();
+        assertThat(card.permits(Set.of(Role.MEMBER), true)).isTrue();
+    }
+
+    @Test
+    void givenACardRequiringNoRole_whenTheCallerHoldsNoRunningMembership_thenNoRoleStandsInForIt() {
+        // given
+        BookingCard card = cardAllowing();
+
+        // when / then
+        assertThat(card.permits(Set.of(Role.MEMBER), false)).as("a stale member role").isFalse();
+        assertThat(card.permits(Set.of(Role.TRAINER, Role.GROUNDSKEEPER), false)).isFalse();
     }
 
     @Test
@@ -30,8 +40,8 @@ class BookingCardPermitsTest {
         BookingCard card = cardAllowing(Role.TRAINER, Role.TREASURER);
 
         // when / then
-        assertThat(card.permits(Set.of(Role.TRAINER))).isTrue();
-        assertThat(card.permits(Set.of(Role.TREASURER))).isTrue();
+        assertThat(card.permits(Set.of(Role.TRAINER), false)).isTrue();
+        assertThat(card.permits(Set.of(Role.TREASURER), false)).isTrue();
     }
 
     @Test
@@ -40,7 +50,7 @@ class BookingCardPermitsTest {
         BookingCard card = cardAllowing(Role.TRAINER, Role.TREASURER);
 
         // when / then
-        assertThat(card.permits(Set.of(Role.MEMBER, Role.TRAINER))).isTrue();
+        assertThat(card.permits(Set.of(Role.MEMBER, Role.TRAINER), false)).isTrue();
     }
 
     @Test
@@ -49,7 +59,7 @@ class BookingCardPermitsTest {
         BookingCard card = cardAllowing(Role.TRAINER);
 
         // when / then
-        assertThat(card.permits(Set.of(Role.MEMBER, Role.TREASURER))).isFalse();
+        assertThat(card.permits(Set.of(Role.MEMBER, Role.TREASURER), true)).isFalse();
     }
 
     @Test
@@ -58,7 +68,7 @@ class BookingCardPermitsTest {
         BookingCard card = cardAllowing(Role.TRAINER);
 
         // when / then
-        assertThat(card.permits(Set.of())).isFalse();
+        assertThat(card.permits(Set.of(), false)).isFalse();
     }
 
     @Test
@@ -67,7 +77,7 @@ class BookingCardPermitsTest {
         BookingCard card = cardAllowing(Role.TRAINER);
 
         // when / then
-        assertThat(card.permits(Set.of(Role.ADMIN))).isFalse();
+        assertThat(card.permits(Set.of(Role.ADMIN), false)).isFalse();
     }
 
     @Test
@@ -98,7 +108,7 @@ class BookingCardPermitsTest {
                 new short[]{}, false, false, false, false, true);
 
         // when / then
-        assertThat(card.permits(Set.of(Role.TRAINER))).isTrue();
+        assertThat(card.permits(Set.of(Role.TRAINER), false)).isTrue();
         assertThat(card.permitsManagement(Set.of(Role.TRAINER))).isFalse();
     }
 
