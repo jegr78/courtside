@@ -93,8 +93,10 @@ class AccessCodeVisibilityTest extends AbstractIntegrationTest {
         cards.letBookingsReceiveAccessCodes(MEMBER_BOOKING_CARD, true);
         jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
         janeAccount = identity.createEnabledAccount(jane, "doe.jane", Set.of(Role.MEMBER));
+        members.holdRunningMembership(jane);
         john = identity.createPerson("John", "Roe", "john.roe@example.org");
         johnAccount = identity.createEnabledAccount(john, "roe.john", Set.of(Role.MEMBER));
+        members.holdRunningMembership(john);
     }
 
     @Test

@@ -1079,6 +1079,14 @@ test("an admin adds a person, gives them an account, and that person signs in an
   await expect(page.getByTestId("credential-state"))
     .toHaveAttribute("data-state", "CREDENTIAL_ISSUED");
 
+  // when — the club records the membership that opens the member card to her
+  await page.getByTestId("membership-type").selectOption({ index: 1 });
+  await page.getByTestId("membership-started-on").fill("2026-01-01");
+  await page.getByTestId("save-person").click();
+
+  // then
+  await expect(page.getByTestId("end-membership")).toBeVisible();
+
   // when — the member signs in with what the instance mailed them and replaces it. Their
   // first name is in the first password they try, which is what the policy refuses.
   await page.getByTestId("preferences-menu").click();

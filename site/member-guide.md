@@ -175,7 +175,8 @@ Die Buchungsart bestimmt:
 * welche Rollen diese Buchungsart verwenden dürfen.
 
 Der Vorstand richtet die Buchungsarten ein. Im Buchungsdialog erscheinen nur die Arten, die du
-verwenden darfst.
+verwenden darfst. Eine Buchungsart ohne Rollen steht allen offen, deren Mitgliedschaft läuft. Ohne
+laufende Mitgliedschaft buchst du nur Arten, die eine deiner Rollen nennen.
 
 ![Die Auswahl der Buchungsart im Buchungsdialog.](screenshots/de/booking-kind.png)
 

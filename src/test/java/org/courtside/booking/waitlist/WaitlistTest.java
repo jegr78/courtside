@@ -384,7 +384,8 @@ class WaitlistTest extends AbstractIntegrationTest {
     @Test
     void givenAWeekFilledAfterJoining_whenTheSlotFrees_thenTheMemberIsSkippedAndCannotTakeIt() {
         // given
-        configuration.bindPeopleWithoutAMembershipTypeTo(rulesFixture.ruleSetLimitingWeeklyHours("An hour a week", 1));
+        memberships.assignMembership(first.personId(), memberships.membershipTypeMeasuredBy("An hour a week",
+                rulesFixture.ruleSetLimitingWeeklyHours("An hour a week", 1)));
         UUID held = book(holder, SLOT);
         UUID entry = join(first, SLOT);
         book(first, shifted(SLOT, 1));
@@ -962,6 +963,9 @@ class WaitlistTest extends AbstractIntegrationTest {
     private Member member(String firstName, String lastName, Role role) {
         UUID person = identity.createPerson(firstName, lastName,
                 (firstName + "." + lastName + "." + role).toLowerCase() + "@example.org");
+        if (role == Role.MEMBER) {
+            memberships.holdRunningMembership(person);
+        }
         return new Member(identity.createEnabledAccount(person, (lastName + "." + firstName + "." + role).toLowerCase(),
                 Set.of(role)), person);
     }

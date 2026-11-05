@@ -9,14 +9,11 @@ import org.courtside.card.CardService;
 import org.courtside.card.ParticipantCard;
 import lombok.RequiredArgsConstructor;
 import org.courtside.identity.CurrentUser;
-import org.courtside.identity.Role;
-import org.courtside.identity.UserAccount;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 
 @RestController
 @RequiredArgsConstructor
@@ -27,7 +24,9 @@ class CardController implements CardsApi {
 
     @Override
     public ResponseEntity<List<ApiPublicBookingCard>> listBookableCards() {
-        return ResponseEntity.ok(cards.bookableCards(callerRoles()).stream()
+        return ResponseEntity.ok(currentUser.account()
+                .map(account -> cards.bookableCards(account.getId(), account.getRoles()))
+                .orElseGet(List::of).stream()
                 .map(CardController::toResponse)
                 .toList());
     }
@@ -50,10 +49,6 @@ class CardController implements CardsApi {
         return ResponseEntity.ok(cards.activeParticipantCards().stream()
                 .map(CardController::toResponse)
                 .toList());
-    }
-
-    private Set<Role> callerRoles() {
-        return currentUser.account().map(UserAccount::getRoles).orElseGet(Set::of);
     }
 
     private static ApiPublicBookingCard toResponse(BookingCard card) {

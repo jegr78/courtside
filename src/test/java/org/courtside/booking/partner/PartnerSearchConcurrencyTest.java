@@ -11,6 +11,7 @@ import org.courtside.card.ParticipantCard;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
+import org.courtside.member.testfixture.MemberTestFixture;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,7 +36,7 @@ import java.util.concurrent.Future;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@Import({FacilityTestFixture.class, IdentityTestFixture.class, BookingTestFixture.class})
+@Import({FacilityTestFixture.class, IdentityTestFixture.class, MemberTestFixture.class, BookingTestFixture.class})
 class PartnerSearchConcurrencyTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_CARD = UUID.fromString("11111111-1111-1111-1111-111111111111");
@@ -59,6 +60,9 @@ class PartnerSearchConcurrencyTest extends AbstractIntegrationTest {
 
     @Autowired
     private IdentityTestFixture identity;
+
+    @Autowired
+    private MemberTestFixture members;
 
     @Autowired
     private JdbcClient jdbc;
@@ -179,6 +183,7 @@ class PartnerSearchConcurrencyTest extends AbstractIntegrationTest {
     private Member member(String firstName, String lastName) {
         UUID person = identity.createPerson(firstName, lastName,
                 (firstName + "." + lastName).toLowerCase() + "@example.org");
+        members.holdRunningMembership(person);
         return new Member(identity.createEnabledAccount(person, (lastName + "." + firstName).toLowerCase(),
                 Set.of(Role.MEMBER)), person);
     }

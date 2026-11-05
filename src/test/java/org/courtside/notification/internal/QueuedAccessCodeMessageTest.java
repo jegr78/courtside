@@ -11,6 +11,7 @@ import org.courtside.card.testfixture.CardTestFixture;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
+import org.courtside.member.testfixture.MemberTestFixture;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.BeforeEach;
@@ -40,7 +41,7 @@ import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.verify;
 
-@Import({FacilityTestFixture.class, IdentityTestFixture.class, CardTestFixture.class})
+@Import({FacilityTestFixture.class, IdentityTestFixture.class, CardTestFixture.class, MemberTestFixture.class})
 class QueuedAccessCodeMessageTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_BOOKING_CARD = UUID.fromString("11111111-1111-1111-1111-111111111111");
@@ -63,6 +64,9 @@ class QueuedAccessCodeMessageTest extends AbstractIntegrationTest {
 
     @Autowired
     private IdentityTestFixture identity;
+
+    @Autowired
+    private MemberTestFixture members;
 
     @Autowired
     private CardTestFixture cards;
@@ -89,6 +93,7 @@ class QueuedAccessCodeMessageTest extends AbstractIntegrationTest {
         cards.letBookingsReceiveAccessCodes(MEMBER_BOOKING_CARD, true);
         UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
         janeAccount = identity.createEnabledAccount(jane, "doe.jane", Set.of(Role.MEMBER));
+        members.holdRunningMembership(jane);
         john = identity.createPerson("John", "Roe", "john.roe@example.org");
         johnAccount = identity.createEnabledAccount(john, "roe.john", Set.of(Role.MEMBER));
         bookingId = bookings.create(new CreateBookingCommand(List.of(court), MEMBER_BOOKING_CARD,

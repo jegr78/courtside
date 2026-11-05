@@ -7,6 +7,7 @@ import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.courtside.loxonesimulator.LoxoneSimulator;
+import org.courtside.member.testfixture.MemberTestFixture;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.Test;
@@ -40,7 +41,7 @@ import static org.assertj.core.api.Assertions.assertThat;
         "courtside.access-control.connector=simulated",
         "courtside.access-control.call-deadline=10s"})
 @Import({LoxoneGrantJourneyTest.Miniserver.class, SettablePassClock.Configuration.class, FacilityTestFixture.class,
-        IdentityTestFixture.class, BookingTestFixture.class, CardTestFixture.class})
+        IdentityTestFixture.class, BookingTestFixture.class, CardTestFixture.class, MemberTestFixture.class})
 class LoxoneGrantJourneyTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_BOOKING_CARD = UUID.fromString("11111111-1111-1111-1111-111111111111");
@@ -85,6 +86,9 @@ class LoxoneGrantJourneyTest extends AbstractIntegrationTest {
     private CardTestFixture cards;
 
     @Autowired
+    private MemberTestFixture members;
+
+    @Autowired
     private JdbcClient jdbc;
 
     @Test
@@ -102,6 +106,7 @@ class LoxoneGrantJourneyTest extends AbstractIntegrationTest {
         cards.letBookingsReceiveAccessCodes(MEMBER_BOOKING_CARD, true);
         UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
         UUID janeAccount = identity.createEnabledAccount(jane, "doe.jane", Set.of(Role.MEMBER, Role.ADMIN));
+        members.holdRunningMembership(jane);
         UUID series = bookings.createSeries(court, TRAINING_CARD, LocalDate.of(2026, 5, 12), LocalTime.of(16, 0),
                 60, 1, janeAccount, jane, Set.of(Role.ADMIN));
         List<String> codes = new ArrayList<>();

@@ -7,6 +7,7 @@ import org.courtside.booking.BookingRulesViolatedException;
 import org.courtside.booking.BookingService;
 import org.courtside.booking.CreateBookingCommand;
 import org.courtside.booking.ParticipantSpec;
+import org.courtside.card.testfixture.CardTestFixture;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
@@ -31,7 +32,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
 
-@Import({FacilityTestFixture.class, IdentityTestFixture.class, ConfigTestFixture.class,
+@Import({CardTestFixture.class, FacilityTestFixture.class, IdentityTestFixture.class, ConfigTestFixture.class,
         MemberTestFixture.class})
 class MaxOpenBookingsRuleTest extends AbstractIntegrationTest {
 
@@ -61,11 +62,15 @@ class MaxOpenBookingsRuleTest extends AbstractIntegrationTest {
     private MemberTestFixture members;
 
     @Autowired
+    private CardTestFixture cards;
+
+    @Autowired
     private JdbcClient jdbc;
 
     private UUID courtId;
     private final UUID member = UUID.randomUUID();
     private UUID bookerPersonId;
+    private UUID cardNamingMembers;
 
     @BeforeEach
     void setUp() {
@@ -74,6 +79,7 @@ class MaxOpenBookingsRuleTest extends AbstractIntegrationTest {
         }
         courtId = facilityFixture.createCourt(1, "Court 1");
         bookerPersonId = identity.createPerson("Jane", "Doe", "jane@example.org");
+        cardNamingMembers = cards.createCardCountingAgainstLimits("Member hour", Set.of(Role.MEMBER));
     }
 
     @Test
@@ -227,8 +233,7 @@ class MaxOpenBookingsRuleTest extends AbstractIntegrationTest {
     }
 
     private UUID book(String start) {
-        return book(MEMBER_BOOKING_CARD, Role.MEMBER, start,
-                List.of(ParticipantSpec.guest("Partner")));
+        return book(cardNamingMembers, Role.MEMBER, start, List.of());
     }
 
     private UUID bookTraining(String start) {

@@ -81,6 +81,7 @@ class DependantNotificationControllerTest extends AbstractIntegrationTest {
         identity.createEnabledAccount(jane, "doe.jane", Set.of(Role.MEMBER));
         john = identity.createPerson("John", "Roe", "john.roe@example.org");
         johnAccount = identity.createEnabledAccount(john, "roe.john", Set.of(Role.MEMBER));
+        members.holdRunningMembership(john);
         bookings.create(new CreateBookingCommand(List.of(courtId), MEMBER_BOOKING_CARD,
                 new TimeSlot(Instant.parse("2026-05-12T16:00:00Z"), Instant.parse("2026-05-12T17:00:00Z")),
                 johnAccount, john, Set.of(Role.MEMBER), null, List.of(ParticipantSpec.guest("Richard Miles")), null));

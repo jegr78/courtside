@@ -57,6 +57,13 @@ beforeEach(async () => {
     allowedPlayerCounts: [2, 4],
     guestAllowed: true
   }]);
+  vi.spyOn(api, "dependantBookingCards").mockResolvedValue([{
+    id: "55555555-5555-5555-5555-555555555555",
+    label: "Member booking",
+    color: "#b85c38",
+    allowedPlayerCounts: [2, 4],
+    guestAllowed: true
+  }]);
   vi.spyOn(api, "bookingCardLegend").mockResolvedValue([{
     id: null,
     label: "?",

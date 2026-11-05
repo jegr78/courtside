@@ -45,6 +45,9 @@ class BookingExportServiceTest extends AbstractIntegrationTest {
     @Autowired
     private MemberTestFixture roster;
 
+    @Autowired
+    private IdentityTestFixture identity;
+
     private UUID courtId;
 
     @BeforeEach
@@ -55,6 +58,14 @@ class BookingExportServiceTest extends AbstractIntegrationTest {
         }
     }
 
+    private void bookAnEveningAsAMember() {
+        UUID personId = roster.addPerson("Jane", "Doe", "jane.doe@example.org");
+        UUID accountId = identity.createEnabledAccount(personId, "doe.jane", Set.of(Role.MEMBER));
+        roster.holdRunningMembership(personId);
+        bookings.createBookingWithGuest(courtId, MEMBER_BOOKING_CARD,
+                new TimeSlot(SIX_PM, SEVEN_PM), accountId, personId, Set.of(Role.MEMBER), null, "Guest");
+    }
+
     private String exported(LocalDate from, LocalDate to) {
         return new String(exports.bookings(from, to, ',', "UTF-8"), StandardCharsets.UTF_8);
     }
@@ -62,9 +73,7 @@ class BookingExportServiceTest extends AbstractIntegrationTest {
     @Test
     void givenAConfirmedBooking_whenThePeriodIsExported_thenItIsARowNamingCourtSlotAndCard() {
         // given
-        UUID personId = roster.addPerson("Jane", "Doe", "jane.doe@example.org");
-        bookings.createBookingWithGuest(courtId, MEMBER_BOOKING_CARD,
-                new TimeSlot(SIX_PM, SEVEN_PM), personId, Set.of(Role.MEMBER), "Guest");
+        bookAnEveningAsAMember();
 
         // when
         String written = exported(LocalDate.of(2026, 5, 13), LocalDate.of(2026, 5, 13));
@@ -79,9 +88,7 @@ class BookingExportServiceTest extends AbstractIntegrationTest {
     @Test
     void givenABookingOutsideThePeriod_whenItIsExported_thenTheFileHoldsOnlyTheHeader() {
         // given
-        UUID personId = roster.addPerson("Jane", "Doe", "jane.doe@example.org");
-        bookings.createBookingWithGuest(courtId, MEMBER_BOOKING_CARD,
-                new TimeSlot(SIX_PM, SEVEN_PM), personId, Set.of(Role.MEMBER), "Guest");
+        bookAnEveningAsAMember();
 
         // when
         String written = exported(LocalDate.of(2026, 5, 14), LocalDate.of(2026, 5, 20));

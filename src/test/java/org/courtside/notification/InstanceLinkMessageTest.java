@@ -9,6 +9,7 @@ import org.courtside.booking.testfixture.BookingTestFixture;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
+import org.courtside.member.testfixture.MemberTestFixture;
 import org.courtside.shared.CancellationReason;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.shared.TimeSlot;
@@ -40,7 +41,7 @@ import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.verify;
 
 @TestPropertySource(properties = "courtside.public-url=https://courts.example.org")
-@Import({FacilityTestFixture.class, IdentityTestFixture.class, BookingTestFixture.class})
+@Import({FacilityTestFixture.class, IdentityTestFixture.class, BookingTestFixture.class, MemberTestFixture.class})
 class InstanceLinkMessageTest extends AbstractIntegrationTest {
 
     private static final String INSTANCE = "https://courts.example.org";
@@ -57,6 +58,9 @@ class InstanceLinkMessageTest extends AbstractIntegrationTest {
 
     @Autowired
     private IdentityTestFixture identity;
+
+    @Autowired
+    private MemberTestFixture members;
 
     @Autowired
     private BookingTestFixture bookings;
@@ -78,6 +82,7 @@ class InstanceLinkMessageTest extends AbstractIntegrationTest {
         }
         holderPerson = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
         holderAccount = identity.createEnabledAccount(holderPerson, "doe.jane", Set.of(Role.MEMBER));
+        members.holdRunningMembership(holderPerson);
         playerPerson = identity.createPerson("Richard", "Miles", "richard.miles@example.org");
         identity.createEnabledAccount(playerPerson, "miles.richard", Set.of(Role.MEMBER));
     }
@@ -123,6 +128,7 @@ class InstanceLinkMessageTest extends AbstractIntegrationTest {
         UUID booking = book();
         UUID waitingPerson = identity.createPerson("John", "Roe", "john.roe@example.org");
         UUID waitingAccount = identity.createEnabledAccount(waitingPerson, "roe.john", Set.of(Role.MEMBER));
+        members.holdRunningMembership(waitingPerson);
         UUID entry = bookings.joinWaitlist(court, MEMBER_CARD, SLOT, waitingAccount, waitingPerson, playerPerson);
 
         // when

@@ -225,6 +225,7 @@
         "listOpenPlaces",
         "acceptPartnerInvitation",
         "listDependantBookings",
+        "listDependantBookingCards",
         "createDependantBooking",
         "cancelDependantBooking"
       ],

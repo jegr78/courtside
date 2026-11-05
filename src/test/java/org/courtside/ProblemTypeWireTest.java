@@ -5,6 +5,7 @@ import com.jayway.jsonpath.JsonPath;
 import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.courtside.identity.Role;
 import org.courtside.identity.UserAccountRepository;
+import org.courtside.member.testfixture.MemberTestFixture;
 import org.courtside.shared.OpeningWindow;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -38,7 +39,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WithMockUser(username = "admin", roles = "ADMIN")
-@Import({FacilityTestFixture.class, IdentityTestFixture.class})
+@Import({FacilityTestFixture.class, IdentityTestFixture.class, MemberTestFixture.class})
 class ProblemTypeWireTest extends AbstractIntegrationTest {
 
     private static final Pattern ALLOWED_TYPE = Pattern.compile("^urn:courtside:error:[a-z0-9-]+$");
@@ -56,6 +57,9 @@ class ProblemTypeWireTest extends AbstractIntegrationTest {
 
     @Autowired
     private IdentityTestFixture identity;
+
+    @Autowired
+    private MemberTestFixture members;
 
     @Autowired
     private UserAccountRepository accounts;
@@ -513,7 +517,7 @@ class ProblemTypeWireTest extends AbstractIntegrationTest {
     @WithMockUser(username = "doe.jane", roles = "MEMBER")
     void givenABookingOutsideOpeningHours_whenCreatingIt_thenTheResponseCarriesItsOwnType() throws Exception {
         // given
-        createAccount("doe.jane", Role.MEMBER);
+        createMember("doe.jane");
 
         // when
         ResultActions result = mockMvc.perform(bookingPost()
@@ -537,7 +541,7 @@ class ProblemTypeWireTest extends AbstractIntegrationTest {
     @WithMockUser(username = "doe.jane", roles = "MEMBER")
     void givenAMemberCardBookedAlone_whenCreatingABooking_thenTheResponseCarriesItsOwnType() throws Exception {
         // given
-        createAccount("doe.jane", Role.MEMBER);
+        createMember("doe.jane");
 
         // when
         ResultActions result = mockMvc.perform(bookingPost()
@@ -561,7 +565,7 @@ class ProblemTypeWireTest extends AbstractIntegrationTest {
     @WithMockUser(username = "doe.jane", roles = "MEMBER")
     void givenAnOccupiedSlot_whenBookingItAgain_thenTheResponseCarriesItsOwnType() throws Exception {
         // given
-        createAccount("doe.jane", Role.MEMBER);
+        createMember("doe.jane");
         String body = """
                 {
                   "courtIds": ["%s"],
@@ -718,9 +722,18 @@ class ProblemTypeWireTest extends AbstractIntegrationTest {
     }
 
     private void createAccount(String username, Role role) {
+        identity.createAccount(personNamedBy(username), username, Set.of(role));
+    }
+
+    private void createMember(String username) {
+        UUID person = personNamedBy(username);
+        identity.createEnabledAccount(person, username, Set.of(Role.MEMBER));
+        members.holdRunningMembership(person);
+    }
+
+    private UUID personNamedBy(String username) {
         String[] name = username.split("\\.");
-        UUID person = identity.createPerson(capitalize(name[1]), capitalize(name[0]), username + "@example.org");
-        identity.createAccount(person, username, Set.of(role));
+        return identity.createPerson(capitalize(name[1]), capitalize(name[0]), username + "@example.org");
     }
 
     private MockHttpServletRequestBuilder bookingPost() {

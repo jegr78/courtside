@@ -3,6 +3,7 @@ package org.courtside.booking;
 import org.courtside.booking.internal.ParticipantsInvalidException;
 import org.courtside.AbstractIntegrationTest;
 import org.courtside.facility.testfixture.FacilityTestFixture;
+import org.courtside.member.testfixture.MemberTestFixture;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
@@ -22,7 +23,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-@Import({FacilityTestFixture.class, IdentityTestFixture.class})
+@Import({FacilityTestFixture.class, IdentityTestFixture.class, MemberTestFixture.class})
 class BookingSlotCountTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_BOOKING_CARD =
@@ -45,13 +46,19 @@ class BookingSlotCountTest extends AbstractIntegrationTest {
     @Autowired
     private IdentityTestFixture identity;
 
+    @Autowired
+    private MemberTestFixture members;
+
     private UUID courtId;
     private UUID bookerPersonId;
+    private UUID bookerAccountId;
 
     @BeforeEach
     void setUp() {
         courtId = facilityFixture.createCourt(1, "Court 1");
         bookerPersonId = identity.createPerson("Jane", "Doe", "jane@example.org");
+        bookerAccountId = identity.createEnabledAccount(bookerPersonId, "doe.jane", Set.of(Role.MEMBER));
+        members.holdRunningMembership(bookerPersonId);
 
         for (DayOfWeek day : DayOfWeek.values()) {
             facilityFixture.setOpeningHours(day, new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0)));
@@ -145,11 +152,11 @@ class BookingSlotCountTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void givenNoPersonBehindTheAccount_whenBookingAMemberCard_thenItIsRejected() {
+    void givenAnAdministratorWithNoPersonBehindTheAccount_whenBookingAMemberCard_thenItIsRejected() {
         // when / then
         assertThatThrownBy(() -> bookingService.create(new CreateBookingCommand(
                 List.of(courtId), MEMBER_BOOKING_CARD, new TimeSlot(SIX_PM, SEVEN_PM),
-                UUID.randomUUID(), null, Set.of(Role.MEMBER), null,
+                UUID.randomUUID(), null, Set.of(Role.ADMIN), null,
                 List.of(ParticipantSpec.guest("John Roe")), null)))
                 .isInstanceOf(ParticipantsInvalidException.class)
                 .extracting("code")
@@ -193,6 +200,6 @@ class BookingSlotCountTest extends AbstractIntegrationTest {
     private UUID bookAs(UUID cardId, Role role, List<ParticipantSpec> participants) {
         return bookingService.create(new CreateBookingCommand(
                 List.of(courtId), cardId, new TimeSlot(SIX_PM, SEVEN_PM),
-                UUID.randomUUID(), bookerPersonId, Set.of(role), null, participants, null));
+                bookerAccountId, bookerPersonId, Set.of(role), null, participants, null));
     }
 }

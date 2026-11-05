@@ -329,11 +329,12 @@ class RuleDefinitionAdminControllerTest extends AbstractIntegrationTest {
         }
         UUID personId = identity.createPerson("Jane", "Doe", "jane@example.org");
         members.assignMembership(personId, STANDARD_MEMBERSHIP);
+        UUID accountId = identity.createEnabledAccount(personId, "doe.jane", Set.of(Role.MEMBER));
         Instant eightDaysOut = NOW.plus(8, ChronoUnit.DAYS);
 
         // when / then
         setRule(STANDARD_RULE_SET.toString(), "ADVANCE_WINDOW", "maxDays", 1);
-        assertThatThrownBy(() -> book(courtId, personId, eightDaysOut))
+        assertThatThrownBy(() -> book(courtId, accountId, personId, eightDaysOut))
                 .isInstanceOf(BookingRulesViolatedException.class)
                 .extracting("violations")
                 .satisfies(violations -> assertThat((List<?>) violations)
@@ -342,15 +343,15 @@ class RuleDefinitionAdminControllerTest extends AbstractIntegrationTest {
 
         // when / then
         setRule(STANDARD_RULE_SET.toString(), "ADVANCE_WINDOW", "maxDays", 365);
-        UUID bookingId = book(courtId, personId, eightDaysOut);
+        UUID bookingId = book(courtId, accountId, personId, eightDaysOut);
         assertThat(bookingFixture.isConfirmed(bookingId)).isTrue();
     }
 
-    private UUID book(UUID courtId, UUID personId, Instant start) {
+    private UUID book(UUID courtId, UUID accountId, UUID personId, Instant start) {
         return bookingFixture.createBookingWithGuest(
                 courtId, MEMBER_BOOKING_CARD,
                 new TimeSlot(start, start.plus(1, ChronoUnit.HOURS)),
-                personId, Set.of(Role.MEMBER), "John Roe");
+                accountId, personId, Set.of(Role.MEMBER), null, "John Roe");
     }
 
     private void setRule(String ruleSetId, String ruleType, String paramKey, int value) throws Exception {

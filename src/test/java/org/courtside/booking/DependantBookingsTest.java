@@ -3,6 +3,7 @@ package org.courtside.booking;
 import org.courtside.booking.internal.BookingNotFoundException;
 import org.courtside.booking.internal.DependantBookingNotHeldException;
 import org.courtside.identity.UserAccount;
+import org.courtside.card.CardService;
 import org.courtside.member.GuardianDelegation;
 import org.courtside.member.GuardianGrant;
 import org.junit.jupiter.api.Test;
@@ -36,7 +37,7 @@ class DependantBookingsTest {
                 .thenReturn(new GuardianDelegation.Delegation(guardian, dependant));
         when(booking.getBookedBy()).thenReturn(UUID.randomUUID());
         when(repository.findById(bookingId)).thenReturn(Optional.of(booking));
-        DependantBookings dependantBookings = new DependantBookings(delegation, bookings, repository);
+        DependantBookings dependantBookings = new DependantBookings(delegation, bookings, repository, mock(CardService.class));
 
         // when / then
         assertThatThrownBy(() -> dependantBookings.cancelFor(dependantPersonId, bookingId))

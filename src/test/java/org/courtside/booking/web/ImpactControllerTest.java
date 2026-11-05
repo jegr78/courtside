@@ -6,6 +6,7 @@ import org.courtside.booking.BookingService;
 import org.courtside.booking.CreateBookingCommand;
 import org.courtside.booking.ParticipantSpec;
 import org.courtside.booking.internal.ImpactService;
+import org.courtside.member.testfixture.MemberTestFixture;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
@@ -44,7 +45,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WithMockUser(username = "admin", roles = "ADMIN")
-@Import({FacilityTestFixture.class, IdentityTestFixture.class})
+@Import({FacilityTestFixture.class, IdentityTestFixture.class, MemberTestFixture.class})
 class ImpactControllerTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_BOOKING_CARD =
@@ -60,6 +61,9 @@ class ImpactControllerTest extends AbstractIntegrationTest {
 
     @Autowired
     private IdentityTestFixture identity;
+
+    @Autowired
+    private MemberTestFixture members;
 
     @Autowired
     private BookingService bookings;
@@ -86,7 +90,7 @@ class ImpactControllerTest extends AbstractIntegrationTest {
         for (DayOfWeek day : DayOfWeek.values()) {
             facilityFixture.setOpeningHours(day, new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0)));
         }
-        UUID bookerPersonId = identity.createPerson("Jane", "Doe", "jane@example.org");
+        UUID bookerPersonId = jane();
 
         book(courtOne, bookerPersonId, "2026-05-12T16:00:00Z", "2026-05-12T17:00:00Z");
         book(courtOne, bookerPersonId, "2026-05-19T16:00:00Z", "2026-05-19T17:00:00Z");
@@ -120,7 +124,7 @@ class ImpactControllerTest extends AbstractIntegrationTest {
         // given
         UUID court = facilityFixture.createCourt(1, null);
         setStandardOpeningHours();
-        UUID bookerPersonId = identity.createPerson("Jane", "Doe", "jane@example.org");
+        UUID bookerPersonId = jane();
 
         UUID confirmedBookingId = book(court, bookerPersonId, "2026-05-12T16:00:00Z", "2026-05-12T17:00:00Z");
         insertBooking(court, "2026-05-12T18:00:00Z", "2026-05-12T19:00:00Z", "CANCELLED");
@@ -138,7 +142,7 @@ class ImpactControllerTest extends AbstractIntegrationTest {
         // given
         UUID court = facilityFixture.createCourt(1, null);
         setStandardOpeningHours();
-        UUID bookerPersonId = identity.createPerson("Jane", "Doe", "jane@example.org");
+        UUID bookerPersonId = jane();
 
         UUID futureBookingId = book(court, bookerPersonId, "2026-05-12T16:00:00Z", "2026-05-12T17:00:00Z");
         insertBooking(court, "2026-05-12T08:00:00Z", "2026-05-12T09:00:00Z", "CONFIRMED");
@@ -156,7 +160,7 @@ class ImpactControllerTest extends AbstractIntegrationTest {
         // given
         UUID court = facilityFixture.createCourt(1, null);
         setStandardOpeningHours();
-        UUID bookerPersonId = identity.createPerson("Jane", "Doe", "jane@example.org");
+        UUID bookerPersonId = jane();
 
         book(court, bookerPersonId, "2026-05-12T16:00:00Z", "2026-05-12T17:00:00Z");
         UUID trainingBookingId = insertBookingWithCard(
@@ -198,7 +202,7 @@ class ImpactControllerTest extends AbstractIntegrationTest {
         // given
         UUID court = facilityFixture.createCourt(1, null);
         setStandardOpeningHours();
-        UUID bookerPersonId = identity.createPerson("Jane", "Doe", "jane@example.org");
+        UUID bookerPersonId = jane();
 
         book(court, bookerPersonId, "2026-05-12T13:00:00Z", "2026-05-12T14:00:00Z");
         UUID lateBookingId = book(court, bookerPersonId, "2026-05-12T19:00:00Z", "2026-05-12T20:00:00Z");
@@ -236,7 +240,7 @@ class ImpactControllerTest extends AbstractIntegrationTest {
         // given
         UUID court = facilityFixture.createCourt(1, null);
         setStandardOpeningHours();
-        UUID bookerPersonId = identity.createPerson("Jane", "Doe", "jane@example.org");
+        UUID bookerPersonId = jane();
 
         book(court, bookerPersonId, "2026-05-12T13:00:00Z", "2026-05-12T14:00:00Z");
         book(court, bookerPersonId, "2026-05-12T19:00:00Z", "2026-05-12T20:00:00Z");
@@ -449,7 +453,7 @@ class ImpactControllerTest extends AbstractIntegrationTest {
         // given
         UUID court = facilityFixture.createCourt(1, null);
         setStandardOpeningHours();
-        UUID bookerPersonId = identity.createPerson("Jane", "Doe", "jane@example.org");
+        UUID bookerPersonId = jane();
         book(court, bookerPersonId, "2026-05-12T13:00:00Z", "2026-05-12T14:00:00Z");
 
         // when / then
@@ -466,7 +470,7 @@ class ImpactControllerTest extends AbstractIntegrationTest {
         // given
         UUID court = facilityFixture.createCourt(1, null);
         setStandardOpeningHours();
-        UUID bookerPersonId = identity.createPerson("Jane", "Doe", "jane@example.org");
+        UUID bookerPersonId = jane();
         book(court, bookerPersonId, "2026-05-12T13:00:00Z", "2026-05-12T14:00:00Z");
 
         // when / then
@@ -483,7 +487,7 @@ class ImpactControllerTest extends AbstractIntegrationTest {
         // given
         UUID court = facilityFixture.createCourt(1, null);
         setStandardOpeningHours();
-        UUID booking = book(court, identity.createPerson("Jane", "Doe", "jane@example.org"),
+        UUID booking = book(court, jane(),
                 "2026-05-13T16:00:00Z", "2026-05-13T17:00:00Z");
 
         // when / then
@@ -503,7 +507,7 @@ class ImpactControllerTest extends AbstractIntegrationTest {
         // given
         UUID court = facilityFixture.createCourt(1, null);
         setStandardOpeningHours();
-        UUID booking = book(court, identity.createPerson("Jane", "Doe", "jane@example.org"),
+        UUID booking = book(court, jane(),
                 "2026-05-13T16:00:00Z", "2026-05-13T17:00:00Z");
 
         // when / then
@@ -564,8 +568,15 @@ class ImpactControllerTest extends AbstractIntegrationTest {
         return bookings.create(new CreateBookingCommand(
                 List.of(courtId), MEMBER_BOOKING_CARD,
                 new TimeSlot(Instant.parse(startsAt), Instant.parse(endsAt)),
-                UUID.randomUUID(), bookerPersonId, Set.of(Role.MEMBER), null,
+                identity.accountIdOf(bookerPersonId), bookerPersonId, Set.of(Role.MEMBER), null,
                 List.of(ParticipantSpec.guest("Partner")), null));
+    }
+
+    private UUID jane() {
+        UUID personId = identity.createPerson("Jane", "Doe", "jane@example.org");
+        identity.createEnabledAccount(personId, "doe.jane", Set.of(Role.MEMBER));
+        members.holdRunningMembership(personId);
+        return personId;
     }
 
     private UUID insertBooking(UUID courtId, String startsAt, String endsAt, String status) {

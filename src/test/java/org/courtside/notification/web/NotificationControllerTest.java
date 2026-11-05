@@ -10,6 +10,7 @@ import org.courtside.booking.ParticipationService;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
+import org.courtside.member.testfixture.MemberTestFixture;
 import org.courtside.notification.MessageKind;
 import org.courtside.notification.testfixture.NotificationTestFixture;
 import org.courtside.shared.CancellationReason;
@@ -49,7 +50,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@Import({FacilityTestFixture.class, IdentityTestFixture.class, NotificationTestFixture.class})
+@Import({FacilityTestFixture.class, IdentityTestFixture.class, NotificationTestFixture.class, MemberTestFixture.class})
 class NotificationControllerTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_BOOKING_CARD =
@@ -77,6 +78,9 @@ class NotificationControllerTest extends AbstractIntegrationTest {
     private IdentityTestFixture identity;
 
     @Autowired
+    private MemberTestFixture members;
+
+    @Autowired
     private NotificationTestFixture notifications;
 
     @Autowired
@@ -102,8 +106,10 @@ class NotificationControllerTest extends AbstractIntegrationTest {
         }
         janePersonId = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
         janeAccountId = identity.createEnabledAccount(janePersonId, "doe.jane", Set.of(Role.MEMBER));
+        members.holdRunningMembership(janePersonId);
         johnPersonId = identity.createPerson("John", "Roe", "john.roe@example.org");
         johnAccountId = identity.createEnabledAccount(johnPersonId, "roe.john", Set.of(Role.MEMBER));
+        members.holdRunningMembership(johnPersonId);
     }
 
     @AfterEach

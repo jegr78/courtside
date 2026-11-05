@@ -13,6 +13,7 @@ import org.courtside.card.CardService;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
+import org.courtside.member.testfixture.MemberTestFixture;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,7 +36,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@Import({FacilityTestFixture.class, IdentityTestFixture.class})
+@Import({FacilityTestFixture.class, IdentityTestFixture.class, MemberTestFixture.class})
 class CursorVisibilityTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_BOOKING_CARD =
@@ -65,6 +66,9 @@ class CursorVisibilityTest extends AbstractIntegrationTest {
     private IdentityTestFixture identity;
 
     @Autowired
+    private MemberTestFixture members;
+
+    @Autowired
     private JdbcClient jdbc;
 
     private UUID firstCourt;
@@ -83,8 +87,10 @@ class CursorVisibilityTest extends AbstractIntegrationTest {
         }
         janePersonId = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
         janeAccountId = identity.createEnabledAccount(janePersonId, "doe.jane", Set.of(Role.MEMBER));
+        members.holdRunningMembership(janePersonId);
         johnPersonId = identity.createPerson("John", "Roe", "john.roe@example.org");
         johnAccountId = identity.createEnabledAccount(johnPersonId, "roe.john", Set.of(Role.MEMBER));
+        members.holdRunningMembership(johnPersonId);
     }
 
     @Test

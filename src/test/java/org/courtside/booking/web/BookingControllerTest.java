@@ -43,6 +43,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 import java.time.DayOfWeek;
+import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.Set;
 import java.util.UUID;
@@ -139,6 +140,9 @@ class BookingControllerTest extends AbstractIntegrationTest {
         UUID personId = identity.createPerson(firstName, lastName, username + "@example.org");
         identity.createEnabledAccount(
                 personId, username, passwordEncoder.encode("secret"), Set.of(role));
+        if (role == Role.MEMBER) {
+            members.holdRunningMembership(personId);
+        }
     }
 
     @Test
@@ -1071,6 +1075,36 @@ class BookingControllerTest extends AbstractIntegrationTest {
                         .content(trainingJson())
                         .with(csrf()))
                 .andExpect(status().isCreated());
+    }
+
+    @Test
+    @WithMockUser(username = "trainer.john", roles = "TRAINER")
+    void givenACardWithoutRoles_whenATrainerWithoutMembershipBooksIt_thenForbidden() throws Exception {
+        // when / then
+        mockMvc.perform(bookingPost()
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(bookingJson("2026-05-12T18:00:00+02:00", "2026-05-12T19:00:00+02:00"))
+                        .with(csrf()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:card-role-required"));
+    }
+
+    @Test
+    @WithMockUser(username = "former.member", roles = "MEMBER")
+    void givenACardWithoutRoles_whenAMemberRoleWhoseMembershipEndedBooksIt_thenForbidden() throws Exception {
+        // given
+        UUID personId = identity.createPerson("Richard", "Roe", "former.member@example.org");
+        identity.createEnabledAccount(personId, "former.member", passwordEncoder.encode("secret"), Set.of(Role.MEMBER));
+        members.addMembershipPeriod(personId, members.createMembershipType("Former"),
+                LocalDate.of(2020, 1, 1), LocalDate.of(2021, 1, 1));
+
+        // when / then
+        mockMvc.perform(bookingPost()
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(bookingJson("2026-05-12T18:00:00+02:00", "2026-05-12T19:00:00+02:00"))
+                        .with(csrf()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:card-role-required"));
     }
 
     @Test

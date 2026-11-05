@@ -6,6 +6,7 @@ import org.courtside.facility.Court;
 import org.courtside.facility.internal.CourtRepository;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
+import org.courtside.member.testfixture.MemberTestFixture;
 import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -36,7 +37,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@Import({BookingTestFixture.class, IdentityTestFixture.class})
+@Import({BookingTestFixture.class, IdentityTestFixture.class, MemberTestFixture.class})
 class OpeningHoursAdminControllerTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_BOOKING_CARD =
@@ -53,6 +54,9 @@ class OpeningHoursAdminControllerTest extends AbstractIntegrationTest {
 
     @Autowired
     private BookingTestFixture bookingFixture;
+
+    @Autowired
+    private MemberTestFixture members;
 
     private MockMvc mockMvc;
 
@@ -251,11 +255,13 @@ class OpeningHoursAdminControllerTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk());
         UUID courtId = courts.save(new Court(1, null)).getId();
         UUID bookerPersonId = identity.createPerson("Jane", "Doe", "jane@example.org");
+        UUID bookerAccountId = identity.createEnabledAccount(bookerPersonId, "doe.jane", Set.of(Role.MEMBER));
+        members.holdRunningMembership(bookerPersonId);
         UUID bookingId = bookingFixture.createBookingWithGuest(
                 courtId, MEMBER_BOOKING_CARD,
                 new TimeSlot(Instant.parse("2026-05-12T19:00:00Z"),
                         Instant.parse("2026-05-12T20:00:00Z")),
-                bookerPersonId, Set.of(Role.MEMBER), "Partner");
+                bookerAccountId, bookerPersonId, Set.of(Role.MEMBER), null, "Partner");
 
         // when
         mockMvc.perform(saveWeek(open(DayOfWeek.TUESDAY, "08:00", "18:00")))

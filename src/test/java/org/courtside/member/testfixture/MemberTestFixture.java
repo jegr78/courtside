@@ -7,6 +7,7 @@ import org.courtside.member.GuardianshipService;
 import org.courtside.member.MemberService;
 import org.courtside.member.MembershipPeriod;
 import org.courtside.member.MembershipPeriodService;
+import org.courtside.member.internal.MembershipType;
 import org.courtside.member.RosterChangeSet;
 import org.courtside.member.RosterService;
 import org.courtside.member.RosterSyncService;
@@ -24,6 +25,8 @@ import java.util.stream.Collectors;
 public class MemberTestFixture {
 
     private static final LocalDate DEFAULT_STARTED_ON = LocalDate.of(2026, 1, 1);
+    private static final LocalDate RUNNING_MEMBERSHIP_STARTED_ON = LocalDate.of(2000, 1, 1);
+    private static final String RUNNING_MEMBERSHIP_TYPE = "Running membership";
 
     private final MemberService memberships;
     private final RosterService roster;
@@ -110,6 +113,15 @@ public class MemberTestFixture {
 
     public void assignMembership(UUID personId, UUID membershipTypeId) {
         assignMembership(personId, membershipTypeId, DEFAULT_STARTED_ON);
+    }
+
+    public void holdRunningMembership(UUID personId) {
+        UUID typeId = memberships.allMembershipTypes().stream()
+                .filter(type -> RUNNING_MEMBERSHIP_TYPE.equals(type.getName()))
+                .findFirst()
+                .map(MembershipType::getId)
+                .orElseGet(() -> createMembershipType(RUNNING_MEMBERSHIP_TYPE));
+        assignMembership(personId, typeId, RUNNING_MEMBERSHIP_STARTED_ON);
     }
 
     public void endMembership(UUID personId) {

@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -17,13 +18,13 @@ class CardAppointmentAccess implements AppointmentAccess {
     private final CardService cards;
 
     @Override
-    public Reach reachOf(Set<Role> roles) {
+    public Reach reachOf(UUID accountId, Set<Role> roles) {
         if (roles.contains(Role.ADMIN)) {
             return new Reach(true, true);
         }
         List<BookingCard> active = cards.activeCards();
         return new Reach(
                 active.stream().anyMatch(card -> card.permitsManagement(BookingCard.managementRoles(roles))),
-                active.stream().anyMatch(card -> card.permits(roles) && !card.tracksPlayers()));
+                cards.bookableCards(accountId, roles).stream().anyMatch(card -> !card.tracksPlayers()));
     }
 }

@@ -32,7 +32,7 @@ class SessionStatusController implements SessionStatusApi {
     }
 
     private ApiSessionStatus authenticated(UserAccount account) {
-        AppointmentAccess.Reach reach = appointmentAccess.reachOf(account.getRoles());
+        AppointmentAccess.Reach reach = appointmentAccess.reachOf(account.getId(), account.getRoles());
         List<ApiRole> roles = account.getRoles().stream()
                 .map(role -> ApiRole.valueOf(role.name()))
                 .toList();

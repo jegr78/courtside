@@ -169,7 +169,9 @@ The booking type determines:
 * whether the booking counts against your open-booking limit,
 * which roles may use the booking type.
 
-The board configures the booking types. The booking dialog only offers the types you may use.
+The board configures the booking types. The booking dialog only offers the types you may use. A
+booking type without roles is open to everybody whose membership runs. Without a running membership
+you book only types that name one of your roles.
 
 ![The booking type selection in the booking dialog.](../screenshots/en/booking-kind.png)
 

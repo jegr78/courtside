@@ -7,6 +7,7 @@ import org.courtside.booking.internal.CourtUnavailableException;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
+import org.courtside.member.testfixture.MemberTestFixture;
 import org.courtside.rules.RuleViolation;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.shared.TimeSlot;
@@ -40,7 +41,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.mockingDetails;
 import static org.mockito.Mockito.verify;
 
-@Import({FacilityTestFixture.class, IdentityTestFixture.class})
+@Import({FacilityTestFixture.class, IdentityTestFixture.class, MemberTestFixture.class})
 class BookingConflictPrecheckTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_CARD = UUID.fromString("11111111-1111-1111-1111-111111111111");
@@ -63,6 +64,9 @@ class BookingConflictPrecheckTest extends AbstractIntegrationTest {
     private IdentityTestFixture identity;
 
     @Autowired
+    private MemberTestFixture members;
+
+    @Autowired
     private MeterRegistry meters;
 
     @Autowired
@@ -73,11 +77,14 @@ class BookingConflictPrecheckTest extends AbstractIntegrationTest {
 
     private UUID court;
     private UUID person;
+    private UUID account;
 
     @BeforeEach
     void setUp() {
         court = facility.createCourt(1, "Court 1");
         person = identity.createPerson("Jane", "Doe", "jane@example.org");
+        account = identity.createEnabledAccount(person, "doe.jane", Set.of(Role.MEMBER));
+        members.holdRunningMembership(person);
         for (DayOfWeek day : DayOfWeek.values()) {
             facility.setOpeningHours(day, new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0)));
         }
@@ -179,7 +186,7 @@ class BookingConflictPrecheckTest extends AbstractIntegrationTest {
 
     private CreateBookingCommand command(Instant start, Instant end) {
         return new CreateBookingCommand(List.of(court), MEMBER_CARD, new TimeSlot(start, end),
-                UUID.randomUUID(), person, Set.of(Role.MEMBER), null,
+                account, person, Set.of(Role.MEMBER), null,
                 List.of(ParticipantSpec.guest("Example Guest")), null);
     }
 }

@@ -10,6 +10,7 @@ import org.courtside.facility.OpeningPeriod;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
+import org.courtside.member.testfixture.MemberTestFixture;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.BeforeEach;
@@ -32,7 +33,7 @@ import java.util.stream.Collectors;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-@Import({FacilityTestFixture.class, IdentityTestFixture.class})
+@Import({FacilityTestFixture.class, IdentityTestFixture.class, MemberTestFixture.class})
 class AvailabilityEntryImpactTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_BOOKING_CARD =
@@ -53,6 +54,9 @@ class AvailabilityEntryImpactTest extends AbstractIntegrationTest {
     @Autowired
     private IdentityTestFixture identity;
 
+    @Autowired
+    private MemberTestFixture members;
+
     private UUID courtId;
     private UUID bookingId;
 
@@ -64,6 +68,7 @@ class AvailabilityEntryImpactTest extends AbstractIntegrationTest {
         }
         UUID personId = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
         UUID accountId = identity.createEnabledAccount(personId, "doe.jane", Set.of(Role.MEMBER));
+        members.holdRunningMembership(personId);
         UUID playerId = identity.createPerson("John", "Roe", "john.roe@example.org");
         bookingId = bookings.create(new CreateBookingCommand(List.of(courtId), MEMBER_BOOKING_CARD,
                 new TimeSlot(Instant.parse("2026-05-13T16:00:00Z"), Instant.parse("2026-05-13T17:00:00Z")),

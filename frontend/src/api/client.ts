@@ -850,6 +850,8 @@ export const api = {
     `/api/my/participations/${bookingId}`, { method: "DELETE" }
   ),
   dependants: () => request<Dependant[]>("/api/my/dependants"),
+  dependantBookingCards: (personId: string) =>
+    request<PublicBookingCard[]>(`/api/my/dependants/${personId}/booking-cards`),
   dependantBookings: (personId: string, options: { view?: PersonalBookingView; cursor?: string; limit?: number } = {}) =>
     request<PersonalBookingPage>(`/api/my/dependants/${personId}/bookings?${new URLSearchParams({
       limit: String(options.limit ?? 50),

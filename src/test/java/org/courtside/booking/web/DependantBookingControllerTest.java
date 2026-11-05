@@ -96,8 +96,10 @@ class DependantBookingControllerTest extends AbstractIntegrationTest {
         courtId = facility.createCourt(1, "Court 1");
         jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
         janeAccount = identity.createEnabledAccount(jane, "doe.jane", Set.of(Role.MEMBER));
+        members.holdRunningMembership(jane);
         john = identity.createPerson("John", "Roe", "john.roe@example.org");
         johnAccount = identity.createEnabledAccount(john, "roe.john", Set.of(Role.MEMBER));
+        members.holdRunningMembership(john);
     }
 
     @Test
@@ -124,6 +126,63 @@ class DependantBookingControllerTest extends AbstractIntegrationTest {
         assertThat(audit.eventsAbout(id, "booking.booking.confirmed"))
                 .extracting(AuditTestFixture.RecordedEvent::actorAccountId)
                 .as("the change log names the guardian").containsExactly(janeAccount);
+    }
+
+    @Test
+    void givenADependantWithoutAMembership_whenAGuardianWhoHoldsOneBooksForThem_thenTheDependantsMembershipDecides()
+            throws Exception {
+        // given
+        UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
+        identity.createEnabledAccount(mary, "major.mary", Set.of(Role.MEMBER));
+        members.linkGuardian(jane, mary, Set.of(GuardianGrant.BOOK));
+
+        // when / then
+        book(as("doe.jane"), mary, "guardian-key", "18:00", "19:00")
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:card-role-required"));
+    }
+
+    @Test
+    void givenAGuardianWithoutAMembership_whenListingCardsForAMemberDependant_thenTheDependantsCardsAreOffered()
+            throws Exception {
+        // given
+        UUID richard = identity.createPerson("Richard", "Miles", "richard.miles@example.org");
+        identity.createEnabledAccount(richard, "miles.richard", Set.of(Role.TRAINER));
+        members.linkGuardian(richard, john, Set.of(GuardianGrant.BOOK));
+
+        // when / then
+        mockMvc.perform(get("/api/my/dependants/{personId}/booking-cards", john).with(as("miles.richard")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.id=='" + MEMBER_BOOKING_CARD + "')]").isNotEmpty());
+        mockMvc.perform(get("/api/public/booking-cards").with(as("miles.richard")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.id=='" + MEMBER_BOOKING_CARD + "')]").isEmpty());
+    }
+
+    @Test
+    void givenADependantWithoutAMembership_whenAGuardianListsTheirCards_thenTheCardWithoutRolesIsAbsent()
+            throws Exception {
+        // given
+        UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
+        identity.createEnabledAccount(mary, "major.mary", Set.of(Role.MEMBER));
+        members.linkGuardian(jane, mary, Set.of(GuardianGrant.BOOK));
+
+        // when / then
+        mockMvc.perform(get("/api/my/dependants/{personId}/booking-cards", mary).with(as("doe.jane")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.id=='" + MEMBER_BOOKING_CARD + "')]").isEmpty());
+    }
+
+    @Test
+    void givenARelationshipThatDoesNotGrantBooking_whenTheGuardianListsTheDependantsCards_thenItIsRefusedByName()
+            throws Exception {
+        // given
+        members.linkGuardian(jane, john, Set.of(GuardianGrant.VIEW_BOOKINGS));
+
+        // when / then
+        mockMvc.perform(get("/api/my/dependants/{personId}/booking-cards", john).with(as("doe.jane")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:guardian-action-not-granted"));
     }
 
     @Test

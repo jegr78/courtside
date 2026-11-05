@@ -9,6 +9,7 @@ import org.courtside.booking.waitlist.WaitlistService;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
+import org.courtside.member.testfixture.MemberTestFixture;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.BeforeEach;
@@ -43,7 +44,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@Import({FacilityTestFixture.class, IdentityTestFixture.class})
+@Import({FacilityTestFixture.class, IdentityTestFixture.class, MemberTestFixture.class})
 class WaitlistControllerTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_CARD = UUID.fromString("11111111-1111-1111-1111-111111111111");
@@ -65,6 +66,9 @@ class WaitlistControllerTest extends AbstractIntegrationTest {
 
     @Autowired
     private IdentityTestFixture identity;
+
+    @Autowired
+    private MemberTestFixture members;
 
     @Autowired
     private PasswordEncoder passwordEncoder;
@@ -192,6 +196,22 @@ class WaitlistControllerTest extends AbstractIntegrationTest {
         // when / then
         mockMvc.perform(post("/api/my/waitlist").with(csrf())
                         .contentType(MediaType.APPLICATION_JSON).content(joinBody(TRAINING_CARD, SLOT)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:card-role-required"));
+        assertThat(entries()).isZero();
+    }
+
+    @Test
+    @WithMockUser(username = "roe.trainer", roles = "TRAINER")
+    void givenACardWithoutRoles_whenATrainerWithoutMembershipJoinsWithIt_thenTheCardIsRefused() throws Exception {
+        // given
+        book(holder);
+        UUID person = identity.createPerson("John", "Roe", "roe.trainer@example.org");
+        identity.createEnabledAccount(person, "roe.trainer", passwordEncoder.encode("secret"), Set.of(Role.TRAINER));
+
+        // when / then
+        mockMvc.perform(post("/api/my/waitlist").with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content(joinBody(MEMBER_CARD, SLOT)))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:card-role-required"));
         assertThat(entries()).isZero();
@@ -372,6 +392,7 @@ class WaitlistControllerTest extends AbstractIntegrationTest {
 
     private Account account(String firstName, String lastName, String username) {
         UUID person = identity.createPerson(firstName, lastName, username + "@example.org");
+        members.holdRunningMembership(person);
         return new Account(identity.createEnabledAccount(person, username, passwordEncoder.encode("secret"),
                 Set.of(Role.MEMBER)), person);
     }

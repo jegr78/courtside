@@ -18,6 +18,7 @@ import org.courtside.booking.series.SeriesService;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
+import org.courtside.member.testfixture.MemberTestFixture;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.AfterEach;
@@ -52,7 +53,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 
-@Import({FacilityTestFixture.class, IdentityTestFixture.class})
+@Import({FacilityTestFixture.class, IdentityTestFixture.class, MemberTestFixture.class})
 class BookingConfirmationMessageTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_BOOKING_CARD =
@@ -79,6 +80,9 @@ class BookingConfirmationMessageTest extends AbstractIntegrationTest {
     private IdentityTestFixture identity;
 
     @Autowired
+    private MemberTestFixture members;
+
+    @Autowired
     private JdbcClient jdbc;
 
     @Autowired
@@ -99,6 +103,7 @@ class BookingConfirmationMessageTest extends AbstractIntegrationTest {
         }
         personId = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
         accountId = identity.createEnabledAccount(personId, "doe.jane", Set.of(Role.MEMBER));
+        members.holdRunningMembership(personId);
         logged.start();
         ownLogger().addAppender(logged);
     }
@@ -202,6 +207,7 @@ class BookingConfirmationMessageTest extends AbstractIntegrationTest {
         // given
         UUID addressless = identity.createPerson("Mary", "Major", "");
         UUID account = identity.createEnabledAccount(addressless, "major.mary", Set.of(Role.MEMBER));
+        members.holdRunningMembership(addressless);
 
         // when
         bookings.create(new CreateBookingCommand(List.of(courtId), MEMBER_BOOKING_CARD,

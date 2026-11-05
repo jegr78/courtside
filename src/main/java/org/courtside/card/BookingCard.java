@@ -90,8 +90,12 @@ public class BookingCard {
         return false;
     }
 
-    public boolean permits(Set<Role> callerRoles) {
-        return allowedRoles.isEmpty() || callerRoles.stream().anyMatch(allowedRoles::contains);
+    public boolean permits(Set<Role> callerRoles, boolean currentMember) {
+        return allowedRoles.isEmpty() ? currentMember : callerRoles.stream().anyMatch(allowedRoles::contains);
+    }
+
+    public boolean requiresMembership() {
+        return allowedRoles.isEmpty();
     }
 
     public Set<Role> getAllowedRoles() {
