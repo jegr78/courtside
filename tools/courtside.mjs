@@ -746,6 +746,7 @@ async function execute(options) {
     } else runInteractive(perfResetPlan());
     rmSync(perfStateFile, { force: true });
     rmSync(perfMailDirectory, { recursive: true, force: true });
+    rmSync(join(root, "build", "lighthouse-administrator.json"), { force: true });
     process.stdout.write("Performance data and local credentials removed.\n");
     return;
   }

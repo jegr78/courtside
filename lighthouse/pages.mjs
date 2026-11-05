@@ -32,6 +32,18 @@ export function landingFailure(report, path) {
   return landed === path ? undefined : `landed on ${landed} instead of ${path}`;
 }
 
+const METRICS = ["first-contentful-paint", "largest-contentful-paint", "total-blocking-time", "cumulative-layout-shift"];
+
+export function reportSummary(report) {
+  return {
+    requestedUrl: report.requestedUrl,
+    finalDisplayedUrl: report.finalDisplayedUrl,
+    categories: Object.fromEntries(Object.entries(report.categories).map(([id, { score }]) => [id, { score }])),
+    audits: Object.fromEntries(METRICS.map((id) => [id, { numericValue: report.audits[id]?.numericValue }])),
+    environment: { benchmarkIndex: report.environment?.benchmarkIndex }
+  };
+}
+
 const score = (report, id) => {
   const value = report.categories[id]?.score;
   return typeof value === "number" ? String(Math.round(value * 100)) : "n/a";

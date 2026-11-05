@@ -390,7 +390,9 @@ unqualified, in a public registry. Nightly retention removes them after 14 days.
 - A failure outside the commit, such as a runner that died or a registry that timed out: choose
   Re-run failed jobs on the candidate run. `evidence` and `tag` run again once everything is green.
 - A red `lighthouse` job needs no re-run for the release. Its summary names the page that did not
-  load; dispatch `lighthouse.yml` against the candidate's booking-seed image once that is fixed.
+  load; dispatch `lighthouse.yml` against the candidate's booking-seed image once that is fixed. A
+  commit that predates the Lighthouse runner, such as one on a release branch cut before it, fails
+  this job without measuring anything.
 - A refused `anchor` job: the release commit no longer heads its branch and no anchor names it,
   because the push's anchor step failed or predates this check. Treat it like a defect in the
   commit below and dispatch the candidate for the head of the branch.

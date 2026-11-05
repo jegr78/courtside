@@ -1,9 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { PINNED_BROWSER_IMAGE } from "../frontend/e2e/container-images.ts";
-import { landingFailure, lighthousePlan, resolvedPath, summaryMarkdown } from "../lighthouse/pages.mjs";
-import { lighthouseContainerPlan, lighthouseOutcome } from "./courtside.lighthouse.mjs";
+import { landingFailure, lighthousePlan, reportSummary, resolvedPath, summaryMarkdown } from "../lighthouse/pages.mjs";
+import { lighthouseContainerPlan, lighthouseOutcome, runLighthouse } from "./courtside.lighthouse.mjs";
 
 const json = (path) => JSON.parse(readFileSync(new URL(`../${path}`, import.meta.url), "utf8"));
 const routes = readFileSync(new URL("../frontend/src/views/AdminRoutes.tsx", import.meta.url), "utf8");
@@ -19,7 +21,7 @@ const report = ({ requested = "https://proxy/my-bookings", final = requested, ru
   environment: { benchmarkIndex: 1500 }
 });
 
-test("given the page plan, when it is built, then every page runs on mobile and desktop and member pages run three times", () => {
+test("when the page plan is built, then every page runs on mobile and desktop and member pages run three times", () => {
   // when
   const plan = lighthousePlan();
   // then
@@ -40,14 +42,15 @@ test("given the administration routes, when the plan is read, then it measures e
   const declared = [...routes.matchAll(/<Route (?:index|path="([^"*]+)")/g)]
     .map(([, path]) => path ?? "")
     .filter((path) => path !== "facility");
-  const nested = declared.map((path) => ["courts", "access-points", "opening-hours", "opening-hours/exceptions",
-    "booking-cards", "booking-cards/:cardId", "slot-fillers"].includes(path) ? `/admin/facility/${path}` : `/admin/${path}`)
-    .map((path) => path.replace(/\/$/, ""));
+  const facility = routes.slice(routes.indexOf('<Route path="facility">'), routes.indexOf("</Route>", routes.indexOf('<Route path="facility">')));
+  const children = new Set([...facility.matchAll(/<Route path="([^"]+)"/g)].map(([, path]) => path));
+  const nested = [...new Set(declared.map((path) => children.has(path) ? `/admin/facility/${path}` : `/admin/${path}`)
+    .map((path) => path.replace(/\/$/, "")))];
   // when
   const measured = new Set(lighthousePlan().filter((page) => page.account === "admin").map((page) => page.path));
   // then
-  assert.equal(nested.length, 28, "the admin surface declares 27 routes plus the facility index redirect");
-  for (const path of nested.filter((path) => path !== "/admin/facility")) {
+  assert.equal(nested.length, 27, "the admin surface declares 27 routes");
+  for (const path of nested) {
     assert.ok(measured.has(path), `${path} is measured`);
   }
 });
@@ -98,7 +101,7 @@ test("given a verified performance target, when the Lighthouse container is plan
   // when
   const plan = lighthouseContainerPlan({ root: "/repo", output: "/repo/build/lighthouse",
     stateFile: "/repo/build/perf-environment.json", administratorFile: "/repo/build/lighthouse-administrator.json",
-    certificatePin: "pin=", user: ["--user", "1000:1000"] });
+    certificatePin: "pin=", name: "courtside-lighthouse-test", user: ["--user", "1000:1000"] });
   // then
   assert.equal(plan.args.at(-3), PINNED_BROWSER_IMAGE);
   assert.deepEqual(plan.args.slice(plan.args.indexOf("--network"), plan.args.indexOf("--network") + 2),
@@ -109,11 +112,91 @@ test("given a verified performance target, when the Lighthouse container is plan
   assert.ok(plan.args.includes("/repo/build/lighthouse-administrator.json:/run/courtside/administrator.json"),
     "a second run signs in with the password the first one set, outside the uploaded results");
   assert.ok(plan.args.includes("LIGHTHOUSE_CERTIFICATE_PIN=pin="), "the browser trusts only the verified certificate");
+  assert.ok(plan.args.includes("--init"), "a stop signal reaches the runner instead of an unhandled PID 1");
+  assert.deepEqual(plan.args.slice(plan.args.indexOf("--name"), plan.args.indexOf("--name") + 2),
+    ["--name", "courtside-lighthouse-test"]);
 });
 
 test("given page results and the container's exit, when the outcome is read, then every failure is named and none is dropped", () => {
   // when / then
-  assert.deepEqual(lighthouseOutcome([{ path: "/", formFactor: "mobile", report: {} }], 0), []);
-  assert.deepEqual(lighthouseOutcome([{ path: "/admin", formFactor: "desktop", failure: "landed on /" }], 1),
+  assert.deepEqual(lighthouseOutcome([{ path: "/", formFactor: "mobile", report: {} }], { status: 0 }), []);
+  assert.deepEqual(lighthouseOutcome([{ path: "/admin", formFactor: "desktop", failure: "landed on /" }], { status: 1 }),
     ["desktop /admin: landed on /", "the Lighthouse container exited with 1"]);
+});
+
+const performanceSource = { environment: "PERFORMANCE", commit: "f1faef0f" };
+
+function orchestration({ source = performanceSource, results, timedOut = false, calls = [] }) {
+  const root = mkdtempSync(join(tmpdir(), "lighthouse-orchestration-"));
+  mkdirSync(join(root, "build"));
+  writeFileSync(join(root, "build", "perf-environment.json"), JSON.stringify({ password: "placeholder-password" }));
+  const summary = join(root, "step-summary.md");
+  const execute = (command, args) => {
+    calls.push(args);
+    if (args.includes("cp")) writeFileSync(args.at(-1), "certificate");
+    if (args[0] === "run" && timedOut) return { status: null, signal: "SIGTERM", error: Object.assign(new Error("spawnSync docker ETIMEDOUT"), { code: "ETIMEDOUT" }) };
+    if (args[0] === "run" && results) writeFileSync(join(root, "build", "lighthouse", "results.json"), JSON.stringify(results));
+    return { status: 0 };
+  };
+  const request = async () => ({ statusCode: 200, certificatePin: "pin=", body: JSON.stringify(source) });
+  const run = () => runLighthouse({ args: ["--image", "image@sha256:abc"], environment: { GITHUB_STEP_SUMMARY: summary },
+    root, execute, request });
+  return { root, summary, run };
+}
+
+test("given a target that is not the performance environment, when Lighthouse starts, then it refuses before measuring", async () => {
+  // given
+  const { root, run } = orchestration({ source: { environment: "UAT" }, results: [] });
+  // when / then
+  try {
+    await assert.rejects(run, /did not identify itself as the disposable PERFORMANCE environment/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("given a container that wrote no results, when the run ends, then it fails although the container exited cleanly", async () => {
+  // given
+  const { root, run } = orchestration({});
+  // when / then
+  try {
+    await assert.rejects(run, /Lighthouse wrote no results/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("given one page that failed, when the run ends, then the summary lists it and the run fails naming it", async () => {
+  // given
+  const { root, summary, run } = orchestration({ results: [
+    { path: "/", formFactor: "mobile", runs: 3, report: report({ requested: "https://proxy/" }) },
+    { path: "/admin/audit", formFactor: "desktop", runs: 1, failure: "landed on / instead of /admin/audit" }] });
+  // when / then
+  try {
+    await assert.rejects(run, /desktop \/admin\/audit: landed on \/ instead of \/admin\/audit/);
+    assert.match(readFileSync(summary, "utf8"), /\| `\/` \| mobile \| 3 \| 100 \|/, "the measured page reaches the job summary");
+    assert.match(readFileSync(join(root, "build", "lighthouse", "summary.md"), "utf8"), /failed: landed on \//);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("given a Lighthouse report, when it is summarised, then only scores, the four metrics and the benchmark remain", () => {
+  // given
+  const full = { ...report(), audits: { ...report().audits, "unused-javascript": { details: { items: [] } } },
+    categories: { performance: { score: 0.9, auditRefs: [{ id: "x" }] } } };
+  // when
+  const summary = reportSummary(full);
+  // then
+  assert.deepEqual(summary.categories, { performance: { score: 0.9 } });
+  assert.deepEqual(Object.keys(summary.audits), ["first-contentful-paint", "largest-contentful-paint",
+    "total-blocking-time", "cumulative-layout-shift"]);
+  assert.equal(summary.environment.benchmarkIndex, 1500);
+});
+
+test("given a run that exceeds its limit, when the run ends, then the container is removed and the timeout is named", async () => {
+  // given
+  const calls = [];
+  const { root, run } = orchestration({ timedOut: true, calls });
+  // when / then
+  try {
+    await assert.rejects(run, /the Lighthouse container exceeded 55 minutes/);
+    const removal = calls.find((args) => args[0] === "rm");
+    assert.deepEqual(removal?.slice(0, 2), ["rm", "-f"], "the hung container leaves the load network");
+    assert.match(removal[2], /^courtside-lighthouse-[a-f0-9]{16}$/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });

@@ -6,7 +6,7 @@ import {
   remoteRefOf
 } from "./release-line.mjs";
 
-const releaseWorkflows = ["release-candidate.yml", "release-gates.yml", "lighthouse.yml", "release.yml", "release-plan-sync.yml"]
+const releaseWorkflows = ["release-candidate.yml", "release-gates.yml", "release.yml", "release-plan-sync.yml"]
   .map((name) => `.github/workflows/${name}`);
 
 // A tag push runs these from the tagged commit, so a release line must carry main's copies.

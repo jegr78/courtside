@@ -6,7 +6,7 @@ import lighthouse from "lighthouse";
 import desktopConfig from "lighthouse/core/config/desktop-config.js";
 import { computeMedianRun, filterToValidRuns } from "lighthouse/core/lib/median-run.js";
 import { chromium } from "playwright-core";
-import { landingFailure, lighthousePlan, resolvedPath } from "./pages.mjs";
+import { landingFailure, lighthousePlan, reportSummary, resolvedPath } from "./pages.mjs";
 
 const SEEDED_MEMBER_CARD = "11111111-1111-1111-1111-111111111111";
 const DEBUGGING_PORT = 9222;
@@ -69,7 +69,9 @@ async function prepare(account) {
     return {};
   }
   const kept = JSON.parse(readFileSync(administratorFile, "utf8"));
-  const session = await signIn("admin", kept.environment === environmentKey ? kept.password : password);
+  const session = kept.environment === environmentKey
+    ? await signIn("admin", kept.password).catch(() => signIn("admin", password))
+    : await signIn("admin", password);
   if (session?.passwordChangeRequired) {
     const replacement = randomBytes(24).toString("base64url");
     await expect(call("PUT", "/api/account/initial-password", { json: { password: replacement } }), 204,
@@ -106,25 +108,25 @@ let prepared;
 for (const entry of lighthousePlan()) {
   const name = `${entry.formFactor}${entry.path.replaceAll(/[/:]+/g, "-").replace(/-$/, "") || "-court-plan"}`;
   const summary = { path: entry.path, formFactor: entry.formFactor, runs: entry.runs };
+  process.stdout.write(`${entry.formFactor} ${entry.path}: measuring\n`);
   try {
-    if (prepared?.account !== entry.account) prepared = { account: entry.account, identifiers: await prepare(entry.account) };
+    if (prepared?.account !== entry.account) {
+      prepared = { account: entry.account };
+      prepared.identifiers = await prepare(entry.account).catch((error) => { prepared.error = error; });
+    }
+    if (prepared.error) throw prepared.error;
     const { result, failure } = await measure(entry, prepared.identifiers);
     if (failure) summary.failure = failure;
     else {
       writeFileSync(join(output, "reports", `${name}.html`), result.report[0]);
       writeFileSync(join(output, "reports", `${name}.json`), result.report[1]);
-      summary.report = result.lhr;
+      summary.report = reportSummary(result.lhr);
     }
   } catch (error) {
     summary.failure = error.message;
-    prepared = undefined;
   }
   process.stdout.write(`${entry.formFactor} ${entry.path}: ${summary.failure ?? "measured"}\n`);
   results.push(summary);
+  writeFileSync(join(output, "results.json"), `${JSON.stringify(results, null, 2)}\n`);
 }
 await context.close();
-writeFileSync(join(output, "results.json"), `${JSON.stringify(results.map(({ report, ...rest }) => ({ ...rest,
-  ...(report ? { report: { requestedUrl: report.requestedUrl, finalDisplayedUrl: report.finalDisplayedUrl,
-    categories: Object.fromEntries(Object.entries(report.categories).map(([id, { score }]) => [id, { score }])), audits: Object.fromEntries(["first-contentful-paint", "largest-contentful-paint",
-      "total-blocking-time", "cumulative-layout-shift"].map((id) => [id, { numericValue: report.audits[id]?.numericValue }])),
-    environment: { benchmarkIndex: report.environment?.benchmarkIndex } } } : {}) })), null, 2)}\n`);
