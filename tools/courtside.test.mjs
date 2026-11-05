@@ -18,7 +18,7 @@ import {
   funnelResetPlan, lifecyclePlan, listenerOutputMatches, parseArguments, parseTailscaleNodeStatus, newBootstrapPassword,
   developmentEnvironment, openBackupForRestore, packagedApplicationJar, processPlans, requiredPorts, restoreDatabase, runInteractive,
   runLifecyclePlans, startProcesses,
-  startPerformance,
+  startPerformance, requiresJava,
   assertPerformanceSource,
   superviseFunnel, terminate,
   terminateChildren, uatComposeArgs, uatResetPlans, perfComposeArgs, perfComposePlan, perfResetPlan,
@@ -89,6 +89,16 @@ test("given a published fixtures image, when PERFORMANCE starts from it, then it
   assert.equal(events.length, 3, "nothing is built, extracted or staged");
 });
 
+test("given a published fixtures image, when perf starts from it, then no Java toolchain is demanded", () => {
+  // given
+  const reference = `ghcr.io/jegr78/courtside@sha256:${"a".repeat(64)}`;
+  // when / then
+  assert.equal(requiresJava(parseArguments(["perf", "--fixtures-reference", reference])), false,
+    "a runner without Java starts the environment from the pulled image");
+  assert.equal(requiresJava(parseArguments(["perf"])), true, "a local perf build still needs Java");
+  assert.equal(requiresJava(parseArguments(["uat", "--version", "0.4.0"])), false);
+});
+
 test("given a fixtures reference, when it is not pinned by digest or is combined with a build choice, then perf refuses it", () => {
   // when / then
   assert.throws(() => parseArguments(["perf", "--fixtures-reference", "ghcr.io/jegr78/courtside:booking-seed-nightly"]),
@@ -136,7 +146,7 @@ test("given an image proof failure with a private cleanup receipt, when the actu
   let output = "";
   const process = { argv: [], stderr: { write: value => { output += value; } } };
   const main = runInNewContext(body + "\nmain", { process, parseArguments: () => ({ command: "perf", image: "selected" }),
-    validateNode() {}, validateDocker() {}, execute: async () => { throw failure; } });
+    requiresJava: () => false, validateNode() {}, validateDocker() {}, execute: async () => { throw failure; } });
   // when
   await main();
   // then
