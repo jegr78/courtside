@@ -438,9 +438,9 @@ test("stored text projections remain inert on administrative and managed views",
       WHERE id = '00000000-0000-0000-0000-000000000110';
     UPDATE booking SET note = $payload$${payload}$payload$
       WHERE id = '70000000-0000-0000-0000-000000000004';
-    INSERT INTO booking_participant (id, booking_id, kind, guest_name, position)
+    INSERT INTO booking_participant (id, booking_id, kind, guest_name, position, guest_fee_minor, guest_fee_currency)
       VALUES ('71000000-0000-0000-0000-000000000099',
-        '70000000-0000-0000-0000-000000000004', 'GUEST', $payload$${payload}$payload$, 0);
+        '70000000-0000-0000-0000-000000000004', 'GUEST', $payload$${payload}$payload$, 0, 0, 'EUR');
     UPDATE membership_type SET name = $payload$${payload}$payload$
       WHERE id = 'cccccccc-0000-0000-0000-000000000001';
     INSERT INTO import_source (id, source_key, display_name, separator, encoding,
