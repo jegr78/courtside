@@ -51,7 +51,7 @@ export function validateDependabot(candidate) {
     }
     return `${update["package-ecosystem"]}:${update.directory}`;
   });
-  assert.deepEqual(locations.sort(), ["docker-compose:/deploy", "docker:/", "github-actions:/", "maven:/", "npm:/frontend", "npm:/site"]);
+  assert.deepEqual(locations.sort(), ["docker-compose:/deploy", "docker:/", "github-actions:/", "maven:/", "npm:/frontend", "npm:/lighthouse", "npm:/site"]);
   const frontend = candidate.updates.find((update) => update["package-ecosystem"] === "npm" && update.directory === "/frontend");
   assert.deepEqual(frontend.groups, {
     "frontend-minor-and-patch": { "applies-to": "version-updates", patterns: ["*"], "update-types": ["minor", "patch"] }

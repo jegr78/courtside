@@ -1,0 +1,68 @@
+name: lighthouse
+
+on:
+  workflow_dispatch:
+    inputs:
+      fixtures-image:
+        description: The fixtures image to measure, by tag or digest
+        required: true
+        type: string
+        default: ghcr.io/jegr78/courtside:booking-seed-nightly
+  workflow_call:
+    inputs:
+      fixtures-image:
+        required: true
+        type: string
+      source-commit:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.source-commit || github.sha }}
+          persist-credentials: false
+      - uses: ./.github/actions/tool-dependencies
+      - name: Install the Lighthouse runner
+        working-directory: lighthouse
+        run: npm ci
+      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Pull the browser image
+        run: node tools/pull-images.mjs "$(node frontend/e2e/container-images.ts --browser)"
+      - id: fixtures
+        name: Resolve the fixtures image to its digest
+        env:
+          FIXTURES_IMAGE: ${{ inputs.fixtures-image }}
+        run: |
+          node tools/pull-images.mjs "$FIXTURES_IMAGE"
+          echo "reference=$(docker image inspect --format '{{index .RepoDigests 0}}' "$FIXTURES_IMAGE")" >> "$GITHUB_OUTPUT"
+      - name: Start the performance environment from the fixtures image
+        env:
+          REFERENCE: ${{ steps.fixtures.outputs.reference }}
+        run: node tools/courtside.mjs perf --fixtures-reference "$REFERENCE" --no-credential-output
+      - name: Measure every page
+        env:
+          REFERENCE: ${{ steps.fixtures.outputs.reference }}
+        run: node tools/courtside.lighthouse.mjs --image "$REFERENCE"
+      - if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: lighthouse-${{ github.run_id }}-${{ github.run_attempt }}
+          path: build/lighthouse
+          retention-days: 30
+          if-no-files-found: warn
+      - name: Remove the performance environment
+        if: always()
+        run: node tools/courtside.mjs perf-reset courtside-perf

@@ -116,7 +116,7 @@ export function parseArguments(argv) {
     target: undefined, baseline: undefined, output: undefined, runId: undefined, authorization: undefined,
     state: undefined,
     qualification: undefined,
-    attempt: undefined, image: undefined, fixturesImage: undefined, sourceCommit: undefined,
+    attempt: undefined, image: undefined, fixturesImage: undefined, sourceCommit: undefined, fixturesReference: undefined,
     planOnly: false, forceFull: false, rerun: false, base: "main"
   };
   let explicitImage = false;
@@ -135,6 +135,11 @@ export function parseArguments(argv) {
       if (options[key] !== undefined) throw new Error("Duplicate immutable image selection");
       options[key] = requiredOptionValue(flags, ++index, flag);
       if (flag === "--image") explicitImage = true;
+    } else if (flag === "--fixtures-reference" && command === "perf") {
+      options.fixturesReference = requiredOptionValue(flags, ++index, flag);
+      if (!/^[a-z0-9][a-z0-9./_-]*@sha256:[a-f0-9]{64}$/.test(options.fixturesReference)) {
+        throw new Error("--fixtures-reference requires an image pinned by digest");
+      }
     } else if (flag === "--plan" && command === "check") {
       options.planOnly = true;
     } else if (flag === "--full" && command === "check") {
@@ -221,6 +226,9 @@ export function parseArguments(argv) {
     } else {
       throw new Error(`Unknown option for ${command}: ${flag}`);
     }
+  }
+  if (options.fixturesReference && (options.skipVerify || explicitImage || options.fixturesImage || options.sourceCommit)) {
+    throw new Error("--fixtures-reference cannot be combined with a build or immutable image choice");
   }
   if (command.startsWith("uat-mfa-")) validateMfaMaintenance({ ...options, action: command.slice(4) });
   if (explicitImage || options.fixturesImage !== undefined || options.sourceCommit !== undefined) {
@@ -738,6 +746,7 @@ async function execute(options) {
     } else runInteractive(perfResetPlan());
     rmSync(perfStateFile, { force: true });
     rmSync(perfMailDirectory, { recursive: true, force: true });
+    rmSync(join(root, "build", "lighthouse-administrator.json"), { force: true });
     process.stdout.write("Performance data and local credentials removed.\n");
     return;
   }
@@ -1108,12 +1117,17 @@ export async function startPerformance(options, runtime = {}) {
   const record = { password, dbPort: options.dbPort, telemetry: options.telemetry };
   if (runtime.writeState) runtime.writeState(record);
   else writePrivateFile(perfStateFile, `${JSON.stringify(record, null, 2)}\n`);
-  run(processPlans(parseArguments([options.skipVerify ? "build" : "verify"])).single);
-  (runtime.extract ?? extractApplicationLayers)();
-  const [productionImage, fixtureImage] = performanceImagePlans();
-  run(productionImage);
-  (runtime.stage ?? stageFixtureClasses)();
-  run(fixtureImage);
+  if (options.fixturesReference) {
+    run({ command: "docker", args: ["pull", options.fixturesReference] });
+    run({ command: "docker", args: ["tag", options.fixturesReference, "courtside:perf-local"] });
+  } else {
+    run(processPlans(parseArguments([options.skipVerify ? "build" : "verify"])).single);
+    (runtime.extract ?? extractApplicationLayers)();
+    const [productionImage, fixtureImage] = performanceImagePlans();
+    run(productionImage);
+    (runtime.stage ?? stageFixtureClasses)();
+    run(fixtureImage);
+  }
   run(perfComposePlan(["up", "-d", "--wait", "--force-recreate", "--remove-orphans"],
     { dbPort: options.dbPort, telemetry: options.telemetry, environment }));
   (runtime.output ?? ((message) => process.stdout.write(message)))(performanceStartupSummary(password, options));
@@ -2508,7 +2522,7 @@ function parseJson(value) {
 }
 
 function showHelp() {
-  process.stdout.write(`Usage: node tools/courtside.mjs <command>\n\nCommands:\n  build\n  verify\n  check [--plan] [--full] [--rerun] [--base <main|release/x.y>]\n  dev\n  dev-debug [--suspend]\n  dev-stop\n  dev-reset\n  uat [--version <tag>] [--skip-verify] [--db-port] [--no-credential-output]\n  uat share\n  uat-stop\n  uat-logs\n  uat-db-shell\n  uat-cert [file]\n  uat-mfa-recover --account-id <UUID> --identity-checked\n  uat-mfa-correct-email --account-id <UUID> --identity-checked --email-file <private-file>\n  uat-mfa-rotate-keys\n  uat-backup [file]\n  uat-restore <file> --confirm courtside-uat\n  uat-reset courtside-uat [--all]\n  uat-seed-bookings [--confirm courtside-uat]\n  perf --image <ENGINE_ID> --fixtures-image <ENGINE_ID> --source-commit <COMMIT> [--db-port] [--telemetry]\n  perf [--skip-verify] [--db-port] [--telemetry] [--no-credential-output]\n  perf-run <smoke|baseline|peak|stress|contention|soak|browser> [--confirm courtside-perf] [--fresh] [--remote-write]\n  perf-run funnel-smoke --target <https-origin> --confirm courtside-uat-funnel\n  perf-promote <summary.json> --confirm courtside-perf\n  perf-compare <summary.json> --baseline <baseline.json> --output <comparison.json>\n  perf-stop\n  perf-logs\n  perf-db-shell\n  perf-reset courtside-perf\n  security <RUN_ID> --image <ENGINE_ID> --fixtures-image <ENGINE_ID> --source-commit <COMMIT>\n  security <RUN_ID> <IMAGE_DIGEST> [--fixtures-image <ENGINE_ID> --source-commit <COMMIT>]\n  security-seed <RUN_ID> <IMAGE_DIGEST> --state <environment.json> [--compose-root <absolute-checkout>]\n  security-verify <RUN_ID>\n  security-plan <RUN_ID> <safe|active|destructive>\n  security-run <RUN_ID> <safe|active|destructive> --qualification <qualification.json> [--authorize <exact-authorization>]\n  security-report <RUN_ID> [--attempt <number>]\n  security-stop <RUN_ID>\n  security-cleanup <RUN_ID>\n  security-recover <RUN_ID> --attempt <number>\n  security-reset <RUN_ID> --confirm courtside-security-<RUN_ID>\n  status <dev|uat|perf> [--json]\n`);
+  process.stdout.write(`Usage: node tools/courtside.mjs <command>\n\nCommands:\n  build\n  verify\n  check [--plan] [--full] [--rerun] [--base <main|release/x.y>]\n  dev\n  dev-debug [--suspend]\n  dev-stop\n  dev-reset\n  uat [--version <tag>] [--skip-verify] [--db-port] [--no-credential-output]\n  uat share\n  uat-stop\n  uat-logs\n  uat-db-shell\n  uat-cert [file]\n  uat-mfa-recover --account-id <UUID> --identity-checked\n  uat-mfa-correct-email --account-id <UUID> --identity-checked --email-file <private-file>\n  uat-mfa-rotate-keys\n  uat-backup [file]\n  uat-restore <file> --confirm courtside-uat\n  uat-reset courtside-uat [--all]\n  uat-seed-bookings [--confirm courtside-uat]\n  perf --image <ENGINE_ID> --fixtures-image <ENGINE_ID> --source-commit <COMMIT> [--db-port] [--telemetry]\n  perf [--skip-verify] [--db-port] [--telemetry] [--no-credential-output]\n  perf --fixtures-reference <IMAGE@sha256:DIGEST> [--db-port] [--telemetry] [--no-credential-output]\n  perf-run <smoke|baseline|peak|stress|contention|soak|browser> [--confirm courtside-perf] [--fresh] [--remote-write]\n  perf-run funnel-smoke --target <https-origin> --confirm courtside-uat-funnel\n  perf-promote <summary.json> --confirm courtside-perf\n  perf-compare <summary.json> --baseline <baseline.json> --output <comparison.json>\n  perf-stop\n  perf-logs\n  perf-db-shell\n  perf-reset courtside-perf\n  security <RUN_ID> --image <ENGINE_ID> --fixtures-image <ENGINE_ID> --source-commit <COMMIT>\n  security <RUN_ID> <IMAGE_DIGEST> [--fixtures-image <ENGINE_ID> --source-commit <COMMIT>]\n  security-seed <RUN_ID> <IMAGE_DIGEST> --state <environment.json> [--compose-root <absolute-checkout>]\n  security-verify <RUN_ID>\n  security-plan <RUN_ID> <safe|active|destructive>\n  security-run <RUN_ID> <safe|active|destructive> --qualification <qualification.json> [--authorize <exact-authorization>]\n  security-report <RUN_ID> [--attempt <number>]\n  security-stop <RUN_ID>\n  security-cleanup <RUN_ID>\n  security-recover <RUN_ID> --attempt <number>\n  security-reset <RUN_ID> --confirm courtside-security-<RUN_ID>\n  status <dev|uat|perf> [--json]\n`);
 }
 
 const invokedPath = process.argv[1] ? pathToFileURL(resolve(process.argv[1])).href : undefined;

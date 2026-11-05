@@ -351,6 +351,7 @@ tag; `release.yml` answers the tag and publishes exactly what was qualified.
 | `qualify` | The exact deployment archive is checked against that digest and all four recipes, then the digest is brought up through the reference deployment on `amd64` and `arm64` and checked against the candidate-image policy |
 | `gates` | Calls `release-gates.yml` with the candidate digest, the same workflow the nightly rehearses. Its `mail` job exercises the archive's self-hosted-mail recipe against controlled DNS, TLS and SMTP peers. `active-security` runs the scanners of the `active` profile against the running candidate; the `destructive` profile does not run here. `restore` restores a backup taken from the candidate into it. `security-record` collects the build, image, qualify and active-security evidence into one file, without `upgrade` and `restore`. `archive-reproducibility` builds the archive again from the release commit and requires the same bytes. `npm-audit` holds the release npm policy. `upgrade` migrates a database from each resolved origin into the candidate; the first release has none |
 | `evidence` | The record `release-candidate-evidence-<sha>`: both digests, the archive checksum, the version, the run and the push build, written only when every job above succeeded |
+| `lighthouse` | Calls `lighthouse.yml` with the booking-seed digest: Lighthouse scores for the member pages and every administration route on mobile and desktop, as a job summary and report artifact. It feeds neither `evidence` nor `tag`, so a red run is visible and does not hold the release |
 | `tag` | Writes `v<version>` at the qualified commit through the release token, marks the release pull request `autorelease: tagged` and removes the version's anchors. An existing tag is accepted only where it already names the qualified commit, so a re-run completes and a tag never moves |
 | `candidate` | In `release.yml`: the tag sits on the branch its version belongs to, names the version the commit records and belongs to the newest published line, and the newest release-mode candidate evidence for that commit verifies, including the archive's checksum |
 | `publish` | The qualified manifests are signed with cosign and given SBOMs and provenance attestations; the draft release receives the candidate's archive, notes and security record, the version tags are pushed, and only then is the release made visible |
@@ -388,6 +389,10 @@ unqualified, in a public registry. Nightly retention removes them after 14 days.
   candidate starts when that attempt turns green.
 - A failure outside the commit, such as a runner that died or a registry that timed out: choose
   Re-run failed jobs on the candidate run. `evidence` and `tag` run again once everything is green.
+- A red `lighthouse` job needs no re-run for the release. Its summary names the page that did not
+  load; dispatch `lighthouse.yml` against the candidate's booking-seed image once that is fixed. A
+  commit that predates the Lighthouse runner, such as one on a release branch cut before it, fails
+  this job without measuring anything.
 - A refused `anchor` job: the release commit no longer heads its branch and no anchor names it,
   because the push's anchor step failed or predates this check. Treat it like a defect in the
   commit below and dispatch the candidate for the head of the branch.
@@ -458,6 +463,7 @@ The jobs, in order:
 | `qualify` | The reference deployment and image policy on `amd64` and `arm64` |
 | `gates` | Every release gate on those exact digests and that archive |
 | `evidence` | The record `release-candidate-evidence-<sha>`, written only when every job above succeeded |
+| `lighthouse` | Lighthouse scores of the booking-seed image, reported without a gate |
 | `tag` | For a release only: the tag at the qualified commit, which starts `release.yml`, then the anchors of that version are removed |
 
 A rehearsal writes no git tag, no GitHub release and no version tag. Its only registry writes are the

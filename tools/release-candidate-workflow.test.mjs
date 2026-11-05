@@ -67,7 +67,7 @@ test("given a job that judges the candidate, when it runs, then its tools come f
 
 test("given every job that checks out source, when the candidate runs, then it checks out the selected commit", () => {
   // when
-  const checkouts = Object.entries(jobs).filter(([name]) => !["select", "gates", ...controlJobs].includes(name))
+  const checkouts = Object.entries(jobs).filter(([name]) => !["select", "gates", "lighthouse", ...controlJobs].includes(name))
     .flatMap(([name, job]) => job.steps.filter((entry) => String(entry.uses).startsWith("actions/checkout"))
       .map((entry) => [name, entry.with?.ref]));
 
@@ -76,6 +76,8 @@ test("given every job that checks out source, when the candidate runs, then it c
   for (const [name, ref] of checkouts) {
     assert.equal(ref, "${{ needs.select.outputs.commit }}", `${name} would build the dispatch ref`);
   }
+  assert.equal(jobs.lighthouse.with["source-commit"], "${{ needs.select.outputs.commit }}",
+    "Lighthouse runs the candidate's own runner");
 });
 
 test("given a dispatch on any ref, when the candidate runs, then nothing reads the dispatch commit or ref", () => {

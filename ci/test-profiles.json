@@ -45,6 +45,7 @@
         "ci/",
         "deploy/",
         "frontend/e2e/",
+        "lighthouse/",
         "performance/",
         "quality/",
         "security/",

@@ -406,6 +406,44 @@ formatting options, including time zone and hour cycle, identify each entry. The
 oldest entry when full. It never stores formatted dates, and each formatter still resolves offsets
 for the instant being formatted. Club-time helpers and court-plan date labels share this cache.
 
+## Lighthouse report
+
+The `lighthouse` workflow measures a published image with Lighthouse in the performance
+environment. A manual dispatch measures `ghcr.io/jegr78/courtside:booking-seed-nightly` unless it is
+given another fixtures image, and every release candidate calls it with its own booking-seed digest.
+It does not run in pull requests.
+
+`node tools/courtside.mjs perf --fixtures-reference <image@sha256:digest>` pulls that fixtures image
+and starts the environment from it without building anything. `node tools/courtside.lighthouse.mjs
+--image <reference>` then runs `lighthouse/run.mjs` in the pinned Playwright image on the load
+network against `https://proxy`. Chromium trusts only the certificate pin the identity probe
+verified. The runner signs in as `member0001` for My bookings and My messages and as `admin` for the
+administration routes. It replaces the administrator's one-time password with a random one first,
+otherwise every administration route would show the password change, and keeps it in
+`build/lighthouse-administrator.json`, outside the uploaded results, for a later run against the same
+environment. `perf-reset` deletes it, and a refused kept password falls back to the shared one.
+
+Every page runs on mobile, with Lighthouse's default emulation of PageSpeed's phone and slow 4G, and
+on desktop. The court plan, sign-in, My bookings and My messages run three times and report the
+median run; each administration route runs once. The list lives in `lighthouse/pages.mjs`, and
+`tools/lighthouse.test.mjs` fails when the administration UI declares a route the list does not
+measure.
+
+`build/lighthouse/summary.md`, also the job summary, lists the four category scores, FCP, LCP, TBT,
+CLS and the runner's benchmark index per page and form factor. `build/lighthouse/reports` holds the
+HTML and JSON report of each measured run. No score fails the run. A page that lands on another URL,
+answers with an error or crashes Lighthouse fails it, and the summary names that page. Scores from a
+shared runner vary between runs, so compare reports from one environment, and a score gate needs the
+spread of several runs first.
+
+`deploy/Caddyfile.perf` sends the response headers of `deploy/Caddyfile` apart from HSTS, which a
+local `localhost` proxy must not pin in a developer's browser; `tools/courtside.test.mjs` keeps the
+two blocks equal. Lighthouse's HSTS audit is informative and does not enter the best-practices
+score.
+
+Run it locally with the same commands, then remove the environment with
+`node tools/courtside.mjs perf-reset courtside-perf`.
+
 ## Reference baselines
 
 Only a successful authoritative `baseline`, `browser`, or `soak` result using the current

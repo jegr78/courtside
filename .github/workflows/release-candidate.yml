@@ -656,6 +656,16 @@ jobs:
       security-base-artifact: release-security-base
       upgrade-origins: ${{ needs.release-build.outputs.upgrade-origins }}
 
+  lighthouse:
+    needs: [select, image]
+    permissions:
+      contents: read
+      packages: read
+    uses: ./.github/workflows/lighthouse.yml
+    with:
+      fixtures-image: ghcr.io/${{ github.repository }}@${{ needs.image.outputs.booking-seed-digest }}
+      source-commit: ${{ needs.select.outputs.commit }}
+
   evidence:
     needs: [select, preconditions, release-build, image, archive, qualify, gates]
     if: ${{ always() && needs.select.outputs.release == 'true' }}

@@ -159,6 +159,13 @@
       "validators": []
     },
     {
+      "path": ".github/workflows/lighthouse.yml",
+      "profiles": [
+        "full"
+      ],
+      "validators": []
+    },
+    {
       "path": ".github/workflows/mail-smoke.yml",
       "profiles": [
         "full"
