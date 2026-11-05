@@ -165,7 +165,11 @@ public class Booking implements Persistable<UUID> {
     }
 
     public void addParticipant(ParticipantSpec spec) {
-        participants.add(new BookingParticipant(this, spec, nextPosition()));
+        addParticipant(spec, null);
+    }
+
+    public void addParticipant(ParticipantSpec spec, GuestFee guestFee) {
+        participants.add(new BookingParticipant(this, spec, nextPosition(), guestFee));
     }
 
     private int nextPosition() {

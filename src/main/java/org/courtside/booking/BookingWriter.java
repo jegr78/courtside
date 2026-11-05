@@ -19,6 +19,7 @@ import org.courtside.booking.internal.UnattendedRelease;
 import org.courtside.booking.internal.IdempotencyKeyRaceException;
 import org.courtside.card.BookingCard;
 import org.courtside.card.CardService;
+import org.courtside.config.ClubCurrency;
 import org.courtside.card.ParticipantCard;
 import org.courtside.facility.FacilityService;
 import org.courtside.config.BookingGridCoordination;
@@ -74,6 +75,7 @@ class BookingWriter implements SeriesOccurrenceCancellation, BookingDrafts, Unat
     private final MeterRegistry meters;
     private final ApplicationEventPublisher events;
     private final CourtReservations reservations;
+    private final ClubCurrency currency;
 
     @Override
     public UUID write(CreateBookingCommand command) {
@@ -127,7 +129,9 @@ class BookingWriter implements SeriesOccurrenceCancellation, BookingDrafts, Unat
         Booking booking = new Booking(
                 command.cardId(), command.bookedBy(), command.note(), clock.instant());
         command.courtIds().forEach(courtId -> booking.allocate(courtId, command.slot()));
-        slots.forEach(booking::addParticipant);
+        GuestFee guestFee = new GuestFee(cards.findCard(command.cardId()).orElseThrow().getGuestFeeMinor(),
+                currency.currency());
+        slots.forEach(slot -> booking.addParticipant(slot, guestFee));
         booking.joinSeries(command.seriesId());
         booking.identifyRequest(idempotencyKey, requestFingerprint);
         booking.actedOnBehalfBy(command.actedBy());

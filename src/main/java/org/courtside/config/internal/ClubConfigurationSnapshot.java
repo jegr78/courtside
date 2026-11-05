@@ -25,7 +25,8 @@ public record ClubConfigurationSnapshot(
         int accessLeadMinutes,
         int accessLagMinutes,
         int accessCodeLength,
-        UUID noMembershipTypeRuleSetId) {
+        UUID noMembershipTypeRuleSetId,
+        String currency) {
 
     static ClubConfigurationSnapshot from(ClubConfiguration configuration) {
         return new ClubConfigurationSnapshot(
@@ -51,7 +52,8 @@ public record ClubConfigurationSnapshot(
                 configuration.getAccessLeadMinutes(),
                 configuration.getAccessLagMinutes(),
                 configuration.getAccessCodeLength(),
-                configuration.getNoMembershipTypeRuleSetId());
+                configuration.getNoMembershipTypeRuleSetId(),
+                configuration.getCurrency());
     }
 
     public String effectiveShortName() {

@@ -47,7 +47,8 @@ class CardAdminController implements AdminBookingCardsApi, AdminParticipantCards
                 roles(request.getManagingRoles()),
                 toPlayerCounts(request.getAllowedPlayerCounts()), request.getCountsAgainstLimits(),
                 request.getGuestAllowed(), Boolean.TRUE.equals(request.getShowGenericOccupancy()),
-                Boolean.TRUE.equals(request.getGrantsAccess()), !Boolean.FALSE.equals(request.getSignalsOccupancy()));
+                Boolean.TRUE.equals(request.getGrantsAccess()), !Boolean.FALSE.equals(request.getSignalsOccupancy()),
+                request.getGuestFeeMinor() == null ? 0 : request.getGuestFeeMinor());
         return ResponseEntity
                 .created(URI.create("/api/admin/booking-cards/" + card.getId()))
                 .body(toResponse(card));
@@ -60,7 +61,8 @@ class CardAdminController implements AdminBookingCardsApi, AdminParticipantCards
                 roles(request.getManagingRoles()),
                 toPlayerCounts(request.getAllowedPlayerCounts()), request.getCountsAgainstLimits(),
                 request.getGuestAllowed(), Boolean.TRUE.equals(request.getShowGenericOccupancy()),
-                Boolean.TRUE.equals(request.getGrantsAccess()), request.getSignalsOccupancy())));
+                Boolean.TRUE.equals(request.getGrantsAccess()), request.getSignalsOccupancy(),
+                request.getGuestFeeMinor())));
     }
 
     @Override
@@ -148,8 +150,8 @@ class CardAdminController implements AdminBookingCardsApi, AdminParticipantCards
                 card.getId(), card.getLabel(), card.getColor(),
                 roleNames(card.getAllowedRoles()), roleNames(card.getManagingRoles()),
                 toPlayerCountList(card.getAllowedPlayerCounts()), card.tracksPlayers(),
-                card.isCountsAgainstLimits(), card.isGuestAllowed(), card.isShowGenericOccupancy(),
-                card.isGrantsAccess(), card.isSignalsOccupancy(), card.isActive());
+                card.isCountsAgainstLimits(), card.isGuestAllowed(), card.getGuestFeeMinor(),
+                card.isShowGenericOccupancy(), card.isGrantsAccess(), card.isSignalsOccupancy(), card.isActive());
     }
 
     private static ApiParticipantCard toResponse(ParticipantCard card) {

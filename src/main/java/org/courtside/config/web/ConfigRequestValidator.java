@@ -9,6 +9,7 @@ import org.springframework.validation.Errors;
 import org.springframework.validation.Validator;
 import java.time.DateTimeException;
 import java.time.ZoneId;
+import java.util.Currency;
 
 @Component
 @RequiredArgsConstructor
@@ -47,6 +48,11 @@ class ConfigRequestValidator implements Validator {
             } catch (DateTimeException exception) {
                 errors.rejectValue("timeZone", "TimeZone");
             }
+        }
+        String currency = request.getCurrency();
+        if (currency != null && Currency.getAvailableCurrencies().stream()
+                .noneMatch(known -> known.getCurrencyCode().equals(currency))) {
+            errors.rejectValue("currency", "Currency");
         }
     }
 }

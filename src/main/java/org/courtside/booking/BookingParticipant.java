@@ -45,7 +45,13 @@ public class BookingParticipant {
     @Column(nullable = false)
     private int position;
 
-    BookingParticipant(Booking booking, ParticipantSpec spec, int position) {
+    @Column(name = "guest_fee_minor")
+    private Integer guestFeeMinor;
+
+    @Column(name = "guest_fee_currency")
+    private String guestFeeCurrency;
+
+    BookingParticipant(Booking booking, ParticipantSpec spec, int position, GuestFee guestFee) {
         this.id = UUID.randomUUID();
         this.booking = booking;
         this.kind = spec.kind();
@@ -53,6 +59,13 @@ public class BookingParticipant {
         this.guestName = spec.guestName();
         this.cardId = spec.cardId();
         this.position = position;
+        if (spec.kind() == ParticipantKind.GUEST) {
+            if (guestFee == null) {
+                throw new IllegalStateException("A guest is booked with the fee in force for the card");
+            }
+            this.guestFeeMinor = guestFee.minor();
+            this.guestFeeCurrency = guestFee.currency().getCurrencyCode();
+        }
     }
 
     void becomeMember(UUID personId) {

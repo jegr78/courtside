@@ -39,6 +39,7 @@ import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.bind.annotation.InitBinder;
 
 import java.time.Duration;
+import java.util.Currency;
 
 @RestController
 @RequiredArgsConstructor
@@ -85,7 +86,8 @@ class ConfigController implements ClubConfigApi, AdminConfigApi, ManifestApi {
                 request.getAccessLagMinutes() == null
                         ? null : new AccessLagTime(request.getAccessLagMinutes()),
                 request.getAccessCodeLength() == null
-                        ? null : new AccessCodeLength(request.getAccessCodeLength())))));
+                        ? null : new AccessCodeLength(request.getAccessCodeLength()),
+                request.getCurrency() == null ? null : Currency.getInstance(request.getCurrency())))));
     }
 
     @Override
@@ -161,7 +163,7 @@ class ConfigController implements ClubConfigApi, AdminConfigApi, ManifestApi {
                 configuration.clubName(), configuration.primaryColor(),
                 configuration.accentColor(), configuration.defaultLocale(),
                 languages.tags(),
-                configuration.slotMinutes(), configuration.timeZone())
+                configuration.slotMinutes(), configuration.timeZone(), configuration.currency())
                 .logoUrl(configuration.headerLogoUrl())
                 .imprintUrl(configuration.imprintUrl())
                 .privacyUrl(configuration.privacyUrl())
@@ -174,7 +176,7 @@ class ConfigController implements ClubConfigApi, AdminConfigApi, ManifestApi {
                 configuration.clubName(), configuration.primaryColor(),
                 configuration.accentColor(), configuration.defaultLocale(),
                 languages.tags(),
-                configuration.slotMinutes(), configuration.timeZone(),
+                configuration.slotMinutes(), configuration.timeZone(), configuration.currency(),
                 configuration.logoUploaded(),
                 configuration.newAccountCredentialHours(),
                 configuration.passwordResetCredentialHours(),

@@ -170,6 +170,26 @@ class CheckConstraintTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void whenStoringACurrencyThatIsNoThreeLetterCode_thenTheDatabaseRefusesIt() {
+        // when / then
+        assertThatThrownBy(() -> jdbc.sql("""
+                UPDATE club_config SET currency = 'euro'
+                WHERE id = '00000000-0000-0000-0000-000000000001'
+                """).update())
+                .hasMessageContaining("club_config_currency_code");
+    }
+
+    @Test
+    void whenStoringANegativeGuestFeeOnACard_thenTheDatabaseRefusesIt() {
+        // when / then
+        assertThatThrownBy(() -> jdbc.sql("""
+                UPDATE booking_card SET guest_fee_minor = -1
+                WHERE id = '11111111-1111-1111-1111-111111111111'
+                """).update())
+                .hasMessageContaining("booking_card_guest_fee_not_negative");
+    }
+
+    @Test
     void whenStoringABlankTimeZone_thenTheDatabaseRefusesIt() {
         // when / then
         assertThatThrownBy(() -> jdbc.sql("""

@@ -90,6 +90,24 @@ class CardAuditTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenABookingCardThatAdmitsGuests_whenItsGuestFeeChanges_thenTheLogNamesTheFieldAndCarriesTheNewFee() {
+        // given
+        BookingCard card = cards.createCard("Guest hour", "#112233", Set.of(Role.MEMBER),
+                Set.of(), new short[]{2}, false, true, false, false, true, 500);
+
+        // when
+        cards.changeCard(card.getId(), "Guest hour", "#112233", Set.of(Role.MEMBER),
+                Set.of(), new short[]{2}, false, true, false, false, true, 750);
+
+        // then
+        assertThat(audit.latestPayload(card.getId(), CardEvent.BookingCardAdded.TYPE))
+                .containsEntry("guestFeeMinor", 500);
+        assertThat(audit.latestPayload(card.getId(), CardEvent.BookingCardChanged.TYPE))
+                .containsEntry("guestFeeMinor", 750)
+                .containsEntry("changedFields", List.of("guestFeeMinor"));
+    }
+
+    @Test
     void givenABookingCard_whenItsLabelAndColourChange_thenBothAreNamedWithoutTheirValues() {
         // given
         BookingCard card = cards.createCard("Team", "#112233", Set.of(Role.MEMBER),

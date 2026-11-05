@@ -1424,7 +1424,7 @@ components:
     ClubConfig:
       type: object
       required: [clubName, primaryColor, accentColor, defaultLocale, supportedLocales, slotMinutes,
-                 timeZone]
+                 timeZone, currency]
       properties:
         clubName: { type: string }
         installedAppName:
@@ -1478,6 +1478,13 @@ components:
             it names one of these.
         slotMinutes: { type: integer, minimum: 5, maximum: 120, multipleOf: 5 }
         timeZone: { type: string, example: Europe/Berlin }
+        currency:
+          type: string
+          pattern: "^[A-Z]{3}$"
+          description: |
+            The ISO 4217 code every amount of this instance is stated in, such as a booking card's
+            guest fee. Amounts travel in the currency's minor unit.
+          example: EUR
 
     AdminClubConfig:
       description: |
@@ -1619,6 +1626,14 @@ components:
             How many digits a new or changed static access code has. Codes stored before a change keep
             working. Leaving it out keeps the current value.
           example: 6
+        currency:
+          type: string
+          pattern: "^[A-Z]{3}$"
+          description: |
+            An ISO 4217 code the JDK knows, refused with the field code `Currency` otherwise. A change
+            converts nothing: card fees keep their number in the new currency, and a guest already
+            booked keeps the amount and currency stamped on it. Leaving it out keeps the current value.
+          example: EUR
         newAccountCredentialHours:
           type: integer
           minimum: 1
@@ -1701,7 +1716,7 @@ components:
 
     PublicBookingCard:
       type: object
-      required: [id, label, color, allowedPlayerCounts, guestAllowed]
+      required: [id, label, color, allowedPlayerCounts, guestAllowed, guestFeeMinor]
       properties:
         id: { type: string, format: uuid }
         label: { type: string }
@@ -1710,6 +1725,12 @@ components:
           type: array
           items: { type: integer }
         guestAllowed: { type: boolean }
+        guestFeeMinor:
+          type: integer
+          minimum: 0
+          description: |
+            What one guest place on this card costs, in the minor unit of the club's `currency`.
+            Zero charges nothing. A guest keeps the fee in force when the booking named them.
 
     BookingCardLegendEntry:
       type: object
@@ -1756,7 +1777,7 @@ components:
       description: |
         What kind of occupancy a booking is. Member booking, training, league match and court
         closure differ only by their card, so a new kind is a row rather than a deployment.
-      required: [id, label, color, allowedRoles, managingRoles, allowedPlayerCounts, tracksPlayers, countsAgainstLimits, guestAllowed, showGenericOccupancy, grantsAccess, signalsOccupancy, active]
+      required: [id, label, color, allowedRoles, managingRoles, allowedPlayerCounts, tracksPlayers, countsAgainstLimits, guestAllowed, guestFeeMinor, showGenericOccupancy, grantsAccess, signalsOccupancy, active]
       properties:
         id: { type: string, format: uuid }
         label: { type: string }
@@ -1784,6 +1805,12 @@ components:
         tracksPlayers: { type: boolean }
         countsAgainstLimits: { type: boolean }
         guestAllowed: { type: boolean }
+        guestFeeMinor:
+          type: integer
+          minimum: 0
+          description: |
+            What one guest place on this card costs, in the minor unit of the club's `currency`.
+            Zero charges nothing. A guest keeps the fee in force when the booking named them.
         showGenericOccupancy:
           type: boolean
           description: Show a neutral booked label in the member-facing court plan instead of the card label.
@@ -1828,6 +1855,14 @@ components:
           items: { type: integer, minimum: 1, maximum: 20 }
         countsAgainstLimits: { type: boolean }
         guestAllowed: { type: boolean }
+        guestFeeMinor:
+          type: integer
+          minimum: 0
+          maximum: 1000000
+          description: |
+            What one guest place costs, in the minor unit of the club's `currency`. A change applies to
+            guests booked afterwards and leaves every guest already booked with the fee stamped on them.
+            Leaving it out keeps the current fee, or zero for a new card.
         showGenericOccupancy:
           type: boolean
           default: false

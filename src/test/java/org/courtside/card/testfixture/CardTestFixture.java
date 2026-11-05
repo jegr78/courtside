@@ -47,6 +47,13 @@ public final class CardTestFixture {
                 card.isShowGenericOccupancy(), card.isGrantsAccess(), signalsOccupancy);
     }
 
+    public void chargeGuests(UUID cardId, int guestFeeMinor) {
+        BookingCard card = cards.requireCard(cardId);
+        cards.changeCard(cardId, card.getLabel(), card.getColor(), card.getAllowedRoles(), card.getManagingRoles(),
+                card.getAllowedPlayerCounts(), card.isCountsAgainstLimits(), card.isGuestAllowed(),
+                card.isShowGenericOccupancy(), card.isGrantsAccess(), card.isSignalsOccupancy(), guestFeeMinor);
+    }
+
     public void deactivateBookingCard(UUID cardId) {
         cards.setCardActive(cardId, false);
     }
