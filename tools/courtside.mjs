@@ -626,6 +626,11 @@ export function listenerOutputMatches(output, port) {
     line.includes(`127.0.0.1:${port}`) && /LISTEN(?:ING)?/i.test(line));
 }
 
+export function requiresJava(options) {
+  return ["build", "verify", "dev", "dev-debug", "uat", "uat-share", "perf"].includes(options.command)
+    && !options.version && !options.image && !options.fixturesReference;
+}
+
 async function main() {
   let options;
   try {
@@ -635,9 +640,7 @@ async function main() {
       return;
     }
     validateNode();
-    if (["build", "verify", "dev", "dev-debug", "uat", "uat-share", "perf"].includes(options.command) && !options.version && !options.image) {
-      validateJava();
-    }
+    if (requiresJava(options)) validateJava();
     if (!["build", "check", "help", "perf-compare", "security-plan", "security-report", "security-stop"].includes(options.command)) {
       validateDocker();
     }
