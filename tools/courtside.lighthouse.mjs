@@ -11,13 +11,16 @@ import {
 const repositoryRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const RUN_LIMIT_MILLISECONDS = 55 * 60 * 1000;
 
-export function lighthouseContainerPlan({ root, output, stateFile, certificatePin, user = containerUserArguments() }) {
+export function lighthouseContainerPlan({ root, output, stateFile, administratorFile, certificatePin,
+  user = containerUserArguments() }) {
   return {
     command: "docker",
     args: ["run", "--rm", ...user, "--network", "courtside-perf_load", "--shm-size", "1g",
       "-e", "HOME=/tmp", "-e", "LIGHTHOUSE_ORIGIN=https://proxy", "-e", `LIGHTHOUSE_CERTIFICATE_PIN=${certificatePin}`,
       "-e", "LIGHTHOUSE_STATE=/run/courtside/perf.json", "-e", "LIGHTHOUSE_OUTPUT=/results",
+      "-e", "LIGHTHOUSE_ADMINISTRATOR=/run/courtside/administrator.json",
       "-v", `${join(root, "lighthouse")}:/lighthouse:ro`, "-v", `${stateFile}:/run/courtside/perf.json:ro`,
+      "-v", `${administratorFile}:/run/courtside/administrator.json`,
       "-v", `${output}:/results`, PINNED_BROWSER_IMAGE, "node", "/lighthouse/run.mjs"]
   };
 }
@@ -51,7 +54,9 @@ export async function runLighthouse({ args = process.argv.slice(2), environment 
   const source = JSON.parse(identity.body);
   assertPerformanceSource(source, state);
 
-  const plan = lighthouseContainerPlan({ root, output, stateFile, certificatePin: identity.certificatePin });
+  const administratorFile = join(root, "build", "lighthouse-administrator.json");
+  if (!existsSync(administratorFile)) writeFileSync(administratorFile, "{}\n", { mode: 0o600 });
+  const plan = lighthouseContainerPlan({ root, output, stateFile, administratorFile, certificatePin: identity.certificatePin });
   const run = execute(plan.command, plan.args, { cwd: root, stdio: "inherit", timeout: RUN_LIMIT_MILLISECONDS });
   const resultsFile = join(output, "results.json");
   const results = existsSync(resultsFile) ? JSON.parse(readFileSync(resultsFile, "utf8")) : [];

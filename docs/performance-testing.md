@@ -419,7 +419,9 @@ and starts the environment from it without building anything. `node tools/courts
 network against `https://proxy`. Chromium trusts only the certificate pin the identity probe
 verified. The runner signs in as `member0001` for My bookings and My messages and as `admin` for the
 administration routes. It replaces the administrator's one-time password with a random one first,
-otherwise every administration route would show the password change.
+otherwise every administration route would show the password change, and keeps it in
+`build/lighthouse-administrator.json`, outside the uploaded results, for a later run against the same
+environment.
 
 Every page runs on mobile, with Lighthouse's default emulation of PageSpeed's phone and slow 4G, and
 on desktop. The court plan, sign-in, My bookings and My messages run three times and report the
@@ -436,8 +438,8 @@ spread of several runs first.
 
 `deploy/Caddyfile.perf` sends the response headers of `deploy/Caddyfile` apart from HSTS, which a
 local `localhost` proxy must not pin in a developer's browser; `tools/courtside.test.mjs` keeps the
-two blocks equal. Lighthouse's best-practices category therefore reports a missing HSTS header that
-a club's proxy sends.
+two blocks equal. Lighthouse's HSTS audit is informative and does not enter the best-practices
+score.
 
 Run it locally with the same commands, then remove the environment with
 `node tools/courtside.mjs perf-reset courtside-perf`.

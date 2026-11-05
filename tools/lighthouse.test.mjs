@@ -97,7 +97,8 @@ test("given the Lighthouse package, when its browser is read, then it drives the
 test("given a verified performance target, when the Lighthouse container is planned, then it runs the pinned browser on the load network", () => {
   // when
   const plan = lighthouseContainerPlan({ root: "/repo", output: "/repo/build/lighthouse",
-    stateFile: "/repo/build/perf-environment.json", certificatePin: "pin=", user: ["--user", "1000:1000"] });
+    stateFile: "/repo/build/perf-environment.json", administratorFile: "/repo/build/lighthouse-administrator.json",
+    certificatePin: "pin=", user: ["--user", "1000:1000"] });
   // then
   assert.equal(plan.args.at(-3), PINNED_BROWSER_IMAGE);
   assert.deepEqual(plan.args.slice(plan.args.indexOf("--network"), plan.args.indexOf("--network") + 2),
@@ -105,6 +106,8 @@ test("given a verified performance target, when the Lighthouse container is plan
   assert.ok(plan.args.includes("/repo/lighthouse:/lighthouse:ro"), "the runner's code is mounted read-only");
   assert.ok(plan.args.includes("/repo/build/perf-environment.json:/run/courtside/perf.json:ro"),
     "the shared password stays in its private file");
+  assert.ok(plan.args.includes("/repo/build/lighthouse-administrator.json:/run/courtside/administrator.json"),
+    "a second run signs in with the password the first one set, outside the uploaded results");
   assert.ok(plan.args.includes("LIGHTHOUSE_CERTIFICATE_PIN=pin="), "the browser trusts only the verified certificate");
 });
 

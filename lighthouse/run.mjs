@@ -1,4 +1,4 @@
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -13,8 +13,12 @@ const DEBUGGING_PORT = 9222;
 const origin = process.env.LIGHTHOUSE_ORIGIN;
 const pin = process.env.LIGHTHOUSE_CERTIFICATE_PIN;
 const output = process.env.LIGHTHOUSE_OUTPUT;
+const administratorFile = process.env.LIGHTHOUSE_ADMINISTRATOR;
 const { password } = JSON.parse(readFileSync(process.env.LIGHTHOUSE_STATE, "utf8"));
-if (!origin || !pin || !output || !password) throw new Error("Lighthouse needs an origin, a certificate pin, an output and the state");
+if (!origin || !pin || !output || !password || !administratorFile) {
+  throw new Error("Lighthouse needs an origin, a certificate pin, an output, the state and the administrator file");
+}
+const environmentKey = createHash("sha256").update(password).digest("hex");
 
 const context = await chromium.launchPersistentContext(mkdtempSync(join(tmpdir(), "lighthouse-profile-")), {
   channel: "chromium", headless: true,
@@ -64,12 +68,14 @@ async function prepare(account) {
     await signIn("member0001", password);
     return {};
   }
-  const session = await signIn("admin", prepare.adminPassword ?? password);
+  const kept = JSON.parse(readFileSync(administratorFile, "utf8"));
+  const session = await signIn("admin", kept.environment === environmentKey ? kept.password : password);
   if (session?.passwordChangeRequired) {
-    prepare.adminPassword = randomBytes(24).toString("base64url");
-    await expect(call("PUT", "/api/account/initial-password", { json: { password: prepare.adminPassword } }), 204,
+    const replacement = randomBytes(24).toString("base64url");
+    await expect(call("PUT", "/api/account/initial-password", { json: { password: replacement } }), 204,
       "The initial password change");
-    await signIn("admin", prepare.adminPassword);
+    writeFileSync(administratorFile, `${JSON.stringify({ environment: environmentKey, password: replacement })}\n`);
+    await signIn("admin", replacement);
   }
   const roster = await expect(call("POST", "/api/admin/roster-search", { json: { limit: 1, sortBy: "NAME", sortDirection: "ASC" } }),
     200, "The roster search");
