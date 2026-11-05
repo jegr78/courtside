@@ -2,9 +2,9 @@
   "schemaVersion": 1,
   "reviewedAt": "2026-11-01",
   "purpose": "This is the normative authorization policy for the shipped Courtside API. OpenAPI defines the transport shape; this policy defines who may perform each operation, which resource attributes narrow that permission, and which protected fields each projection may read or write.",
-  "openApiFieldInventorySha256": "9891b81b046ed7a58888b0cad2781bc9289b58afd4a9945d483b89994a4599e6",
+  "openApiFieldInventorySha256": "e42086f61e21f8e833a999a8b56ac9ece259221c9df6cf277e58fa3b5e592cdd",
   "protectedFieldInventorySha256": "df963788c76c5d8d2687a2127a69d2961341cfa78d7c298b65bc1a37bdc24cb8",
-  "productionAuthorizationSha256": "ee6f3a636411c68607e8d0241b98dfd9a946d91ce7b0a8abcaada75000b18e5c",
+  "productionAuthorizationSha256": "e3fdd67e519433121c8e2164bb2915c4478edbbc4825e8f3f9a3a1b0873ffcc4",
   "ordinaryFields": [
     "Problem.detail",
     "Problem.fieldErrors",
@@ -1809,6 +1809,20 @@
     "listCourtsForAdmin:response:Violation.code",
     "listCourtsForAdmin:response:Violation.params",
     "listCourtsForAdmin:response:Violation.params.*",
+    "listDependantBookingCards:parameter:$parameter.path.personId",
+    "listDependantBookingCards:response:$response.header.Retry-After",
+    "listDependantBookingCards:response:FieldError.code",
+    "listDependantBookingCards:response:FieldError.field",
+    "listDependantBookingCards:response:FieldError.params",
+    "listDependantBookingCards:response:FieldError.params.*",
+    "listDependantBookingCards:response:PublicBookingCard.allowedPlayerCounts",
+    "listDependantBookingCards:response:PublicBookingCard.color",
+    "listDependantBookingCards:response:PublicBookingCard.guestAllowed",
+    "listDependantBookingCards:response:PublicBookingCard.id",
+    "listDependantBookingCards:response:PublicBookingCard.label",
+    "listDependantBookingCards:response:Violation.code",
+    "listDependantBookingCards:response:Violation.params",
+    "listDependantBookingCards:response:Violation.params.*",
     "listDependantBookings:parameter:$parameter.path.personId",
     "listDependantBookings:parameter:$parameter.query.cursor",
     "listDependantBookings:parameter:$parameter.query.limit",
@@ -3535,7 +3549,7 @@
     },
     {
       "id": "current-membership",
-      "description": "Whether a referenced person holds a membership that has not ended."
+      "description": "Whether a referenced person holds a membership period covering today."
     },
     {
       "id": "current-session",
@@ -4081,10 +4095,11 @@
     },
     {
       "id": "guardian-acting-for-dependant",
-      "description": "A permanent account lists the dependants it acts for today, and for each one reads its bookings, books in its name, cancels the bookings it holds and reads its notification centre, each only where the relationship grants that action.",
+      "description": "A permanent account lists the dependants it acts for today, and for each one reads its bookings and the cards it may book with, books in its name, cancels the bookings it holds and reads its notification centre, each only where the relationship grants that action.",
       "operationIds": [
         "listDependants",
         "listDependantBookings",
+        "listDependantBookingCards",
         "createDependantBooking",
         "cancelDependantBooking",
         "listDependantNotifications"
@@ -4780,11 +4795,12 @@
     {
       "id": "booking-card-eligibility",
       "title": "Booking card role and state",
-      "rule": "A booking card must be active and admit at least one actor role; ADMIN bypasses the card role list but not facility availability or invariant checks. The start-up warm-up also acts here as an in-process caller without an account or request input, and it rolls back every write it makes.",
+      "rule": "A booking card must be active and admit at least one actor role. A card with an empty role list admits exactly the accounts whose person holds a membership covering today, whatever roles they carry; a card naming roles admits those roles with or without a membership. ADMIN bypasses the card role list but not facility availability or invariant checks. The start-up warm-up also acts here as an in-process caller without an account or request input, and it rolls back every write it makes.",
       "attributes": [
         "booking-card",
         "booking-card-active",
         "allowed-role",
+        "current-membership",
         "administrator-override"
       ],
       "productionPaths": [
@@ -4798,7 +4814,7 @@
         "src/main/java/org/courtside/booking/internal/BookingRuleGate.java#restrictionsApplyTo",
         "src/main/java/org/courtside/booking/BookingWriter.java#write/3",
         "src/main/java/org/courtside/card/CardService.java#bookableCards",
-        "src/main/java/org/courtside/card/web/CardController.java#callerRoles",
+        "src/main/java/org/courtside/card/web/CardController.java#listBookableCards",
         "src/main/java/org/courtside/booking/series/SeriesService.java#create",
         "src/main/java/org/courtside/booking/web/BookingController.java#getBookingEligibility",
         "src/main/java/org/courtside/booking/web/BookingController.java#createBooking",
@@ -4810,16 +4826,19 @@
         "src/main/java/org/courtside/booking/BookingWriter.java#bookable",
         "src/main/java/org/courtside/booking/waitlist/WaitlistQueue.java#eligible",
         "src/main/java/org/courtside/booking/internal/CardEligibilityPolicy.java#admits",
+        "src/main/java/org/courtside/booking/internal/CardEligibilityPolicy.java#permits",
         "src/main/java/org/courtside/booking/BookingWriter.java#isBookable",
         "src/main/java/org/courtside/booking/partner/PartnerSearchService.java#mayTakeAPlace",
         "src/main/java/org/courtside/booking/partner/PartnerSearchService.java#openPlaces",
         "src/main/java/org/courtside/booking/partner/PartnerSearchService.java#accept"
       ],
       "positiveTests": [
-        "src/test/java/org/courtside/booking/internal/CardEligibilityPolicyTest.java#givenTheRequiredRole_whenRequiringEligibility_thenTheCardIsReturned"
+        "src/test/java/org/courtside/booking/internal/CardEligibilityPolicyTest.java#givenTheRequiredRole_whenRequiringEligibility_thenTheCardIsReturned",
+        "src/test/java/org/courtside/booking/internal/CardEligibilityPolicyTest.java#givenACardNamingNoRole_whenTheAccountHoldsARunningMembership_thenTheCardIsReturned"
       ],
       "negativeTests": [
-        "src/test/java/org/courtside/booking/internal/CardEligibilityPolicyTest.java#givenOnlyAnotherRole_whenRequiringEligibility_thenTheRoleFailureIsRaised"
+        "src/test/java/org/courtside/booking/internal/CardEligibilityPolicyTest.java#givenOnlyAnotherRole_whenRequiringEligibility_thenTheRoleFailureIsRaised",
+        "src/test/java/org/courtside/booking/internal/CardEligibilityPolicyTest.java#givenACardNamingNoRole_whenTheAccountHoldsOnlyARoleWithoutMembership_thenTheRoleFailureIsRaised"
       ]
     },
     {
@@ -4867,7 +4886,7 @@
     {
       "id": "guardian-delegation",
       "title": "Guardian delegation",
-      "rule": "Every guardian action reads, at its point of use, the relationship between the authenticated account's person and the named dependant on the club's today. Without one holding, or while the guardian's account is disabled or the dependant holds no account, the dependant answers as not found; an action the relationship does not grant is refused by name. A booking is held by the dependant's account and measured against the dependant and the dependant's roles without the administrator override; cancellation reaches only a booking the dependant holds, in the dependant's name. Reading messages marks nothing read.",
+      "rule": "Every guardian action reads, at its point of use, the relationship between the authenticated account's person and the named dependant on the club's today. Without one holding, or while the guardian's account is disabled or the dependant holds no account, the dependant answers as not found; an action the relationship does not grant is refused by name. A booking is held by the dependant's account and measured against the dependant, the dependant's roles without the administrator override and the dependant's membership, and the cards offered for it are those the dependant may use; cancellation reaches only a booking the dependant holds, in the dependant's name. Reading messages marks nothing read.",
       "attributes": [
         "current-account",
         "guardian-relationship",
@@ -4876,6 +4895,7 @@
       ],
       "productionPaths": [
         "src/main/java/org/courtside/member/GuardianDelegation.java#require",
+        "src/main/java/org/courtside/booking/DependantBookings.java#cardsFor",
         "src/main/java/org/courtside/member/GuardianDelegation.java#requireBookable",
         "src/main/java/org/courtside/member/GuardianDelegation.java#requireReadableAccount",
         "src/main/java/org/courtside/member/GuardianRelationships.java#grantsFor",
@@ -4945,12 +4965,13 @@
     {
       "id": "partner-invitation-ownership",
       "title": "Partner invitation holder and taker",
-      "rule": "Only the account holding a booking publishes or withdraws its open place; another account's booking answers as not found. Open places are listed to and taken by an enabled account acting as its own person, not barred from booking, whose roles the card admits, that neither holds the booking nor already plays in it, checked again under the booking row lock; any other invitation answers as not found, and no listed place names a person or a booking.",
+      "rule": "Only the account holding a booking publishes or withdraws its open place; another account's booking answers as not found. Open places are listed to and taken by an enabled account acting as its own person, not barred from booking, whom the card admits by role or, for a card without roles, by a membership covering today, that neither holds the booking nor already plays in it, checked again under the booking row lock; any other invitation answers as not found, and no listed place names a person or a booking.",
       "attributes": [
         "current-account",
         "booking-owner",
         "booking-card",
-        "allowed-role"
+        "allowed-role",
+        "current-membership"
       ],
       "productionPaths": [
         "src/main/java/org/courtside/booking/partner/PartnerSearchService.java#publish",
@@ -6185,7 +6206,8 @@
       "attributes": [
         "current-account",
         "booking-card",
-        "allowed-role"
+        "allowed-role",
+        "current-membership"
       ],
       "decisions": [
         "permanent-account-gate",
@@ -6552,7 +6574,8 @@
       "attributes": [
         "current-account",
         "booking-card",
-        "allowed-role"
+        "allowed-role",
+        "current-membership"
       ],
       "decisions": [
         "booking-card-eligibility",
