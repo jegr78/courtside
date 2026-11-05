@@ -1,9 +1,9 @@
 import { setTimeout as delay } from "node:timers/promises";
 export const securityMailObservationSource = Object.freeze({
-  image: "axllent/mailpit:v1.32",
-  version: "1.32.0",
-  commit: "ce798cfd781ef07b321427fc5082b3eebdcae460",
-  imageDigest: "sha256:0790692be935ea4420d085694f7985b1f692ca6a8771ab0e0bd8ba75ac180498"
+  image: "axllent/mailpit:v1.33",
+  version: "1.33.0",
+  commit: "364916b15e80a8bac1e7b0ab66a4f2b3d7d745c2",
+  imageDigest: "sha256:9b3a463be15354c0f0eba91697d80e3e0d8a5623ef0e627cacc836bc17fd5231"
 });
 import { failureCode } from "./failure-reason.mjs";
 
