@@ -833,7 +833,7 @@ function renderCell(
     return <td key={court.id} className={`${cellClass} day-plan-free-cell p-1`}>
       <div data-testid="outside-slot" data-date={date} data-court-number={court.number} data-slot={slot}
         data-state="outside" className="day-plan-slot day-plan-free-slot flex w-full items-center justify-center rounded-md px-2 text-sm">
-        {t("week.outside")}
+        <span className="day-plan-slot-label">{t("week.outside")}</span>
       </div>
     </td>;
   }
@@ -841,7 +841,7 @@ function renderCell(
     return <td key={court.id} className={`${cellClass} day-plan-free-cell p-1`}>
       <div data-testid="closed-court-slot" data-date={date} data-court-number={court.number} data-slot={slot}
         data-state="closed" className="day-plan-slot day-plan-free-slot flex w-full items-center justify-center rounded-md px-2 text-sm">
-        {t("week.courtClosed")}
+        <span className="day-plan-slot-label">{t("week.courtClosed")}</span>
       </div>
     </td>;
   }
@@ -861,9 +861,9 @@ function renderCell(
       onPointerDown={(event) => drag.start(event.pointerType)}
       onPointerEnter={drag.extend}
     >
-      {isPast ? t("week.past") : t("week.available")}
+      <span className="day-plan-slot-label">{isPast ? t("week.past") : t("week.available")}</span>
     </button> : <div data-testid="free-slot" data-date={date} data-court-number={court.number} data-slot={slot} data-state={isPast ? "past" : "free"} className="day-plan-slot day-plan-free-slot flex w-full items-center justify-center rounded-md px-2 text-sm">
-      {isPast ? t("week.past") : t("week.available")}
+      <span className="day-plan-slot-label">{isPast ? t("week.past") : t("week.available")}</span>
     </div>;
   return <td key={court.id} className={`${cellClass} day-plan-free-cell p-1`}>
     {content}

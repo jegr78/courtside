@@ -2072,3 +2072,33 @@ test("given a keyboard user on a short landscape screen, when more booking detai
     return Math.min(control.y - frame.y, frame.y + frame.height - control.y - control.height - 16);
   }, { message: "the keyboard focus remains fully visible above the faded edge", timeout: 10_000 }).toBeGreaterThanOrEqual(-0.5);
 });
+
+for (const language of ["de", "en"]) {
+  test(`given the court plan in ${language} on a phone 390 px wide, when it is drawn, then no visible text is smaller than 12 px`, async ({ page, journeyService }) => {
+    // given
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.addInitScript((locale) => window.localStorage.setItem("courtside.locale", locale), language);
+    await page.goto("/");
+    await selectJourneyDate(page, journeyService.visualDate);
+    await expect(page.locator('[data-testid="allocation"]:visible').first()).toBeVisible();
+
+    // when
+    const smallText = await page.getByTestId("week-grid").evaluate((grid) => {
+      const found: string[] = [];
+      const walker = document.createTreeWalker(grid, NodeFilter.SHOW_TEXT);
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        const element = node.parentElement;
+        const text = node.textContent?.trim();
+        if (!element || !text || !element.checkVisibility({ visibilityProperty: true, opacityProperty: true })) continue;
+        const bounds = element.getBoundingClientRect();
+        if (bounds.width <= 1 && bounds.height <= 1) continue;
+        const size = Number.parseFloat(getComputedStyle(element).fontSize);
+        if (size < 12) found.push(`${size}px "${text}" in .${[...element.classList].join(".")}`);
+      }
+      return found;
+    });
+
+    // then
+    expect(smallText, "a member reads the phone plan without zooming").toEqual([]);
+  });
+}
