@@ -18,8 +18,8 @@ function offlineBookingGrid(): BookingGrid {
   };
 }
 
-export function MyBookingsView({ now, offline = false }: {
-  now?: Date; offline?: boolean;
+export function MyBookingsView({ now, offline = false, memberFeatures = true }: {
+  now?: Date; offline?: boolean; memberFeatures?: boolean;
 }) {
   const { t, i18n } = useTranslation();
   const [reference] = useState(() => now ?? new Date());
@@ -216,7 +216,7 @@ export function MyBookingsView({ now, offline = false }: {
     {error && <Alert>{error}</Alert>}
     {success && <SuccessFeedback>{success}</SuccessFeedback>}
     {loading && !loaded ? <p aria-live="polite">{t("status.loading")}</p> : grid && <div className="mt-4 grid gap-6">
-      <BookingSection testId="upcoming-bookings" title={t("myBookings.upcoming")} titleHidden empty={t("myBookings.noUpcoming")} bookings={sections.upcoming} courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone} actionable={!offline && !loading} busy={loading} action={chooseAction} searchPartner={searchPartner} checkIn={checkIn} reference={reference} t={t} />
+      <BookingSection testId="upcoming-bookings" title={t("myBookings.upcoming")} titleHidden empty={t("myBookings.noUpcoming")} bookings={sections.upcoming} courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone} actionable={!offline && !loading} busy={loading} action={chooseAction} searchPartner={memberFeatures ? searchPartner : undefined} checkIn={checkIn} reference={reference} t={t} />
       {!offline && nextCursor && <Button variant="secondary" data-testid="load-more-bookings" className="justify-self-start" disabled={loadingMore} onClick={() => void loadMore()}>{t("myBookings.loadMore")}</Button>}
       {cancelled.length > 0 && <details data-testid="cancelled-bookings">
         <summary data-testid="cancelled-bookings-summary" className="cursor-pointer font-semibold">{t(cancelledNextCursor ? "myBookings.cancelledCountMore" : "myBookings.cancelledCount", { count: cancelled.length })}</summary>
@@ -231,10 +231,10 @@ export function MyBookingsView({ now, offline = false }: {
           {historyNextCursor && <Button variant="secondary" data-testid="load-more-past-bookings" className="mt-4" disabled={loadingMore} onClick={() => void loadMoreHistory()}>{t("myBookings.loadMorePast")}</Button>}
         </details>)}
     </div>}
-    {!offline && !loading && grid && <WaitlistSection courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone}
+    {memberFeatures && !offline && !loading && grid && <WaitlistSection courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone}
       booked={async () => { await load(); setSuccess(t("myWaitlist.booked")); }}
       left={(declined) => setSuccess(t(declined ? "myWaitlist.declined" : "myWaitlist.left"))} />}
-    {!offline && !loading && grid && <OpenPlacesSection courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone}
+    {memberFeatures && !offline && !loading && grid && <OpenPlacesSection courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone}
       taken={async () => { await load(); setSuccess(t("openPlaces.taken")); }} />}
     {!loading && grid && (!offline || participations.length > 0) && <ParticipationSection participations={participations} courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone} reference={reference} actionable={!offline} withdrawn={async () => { await load(); setSuccess(t("participations.withdrawn")); }} nextCursor={offline ? undefined : participationsNextCursor} loadingMore={loadingMore} loadMore={loadMoreParticipations} t={t} />}
     {grid && action?.kind === "cancel" && <CancelDialog booking={action.booking} seriesBookings={bookings.filter((booking) => booking.seriesId === action.booking.seriesId && booking.status === "CONFIRMED")} incompleteSeries={nextCursor !== undefined} timeZone={grid.timeZone} closed={() => setAction(undefined)} completed={async () => { setAction(undefined); await load(); setSuccess(t("booking.cancelledSuccess")); }} />}

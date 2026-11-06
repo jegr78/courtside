@@ -28,6 +28,7 @@ class ProblemTypeUriTest {
     // Every URN src/main may produce. Two sources: a domain failure carries a ProblemType
     // constant, a framework exception only a literal in the advice answering for it.
     private static final List<String> KNOWN_FAILURE_SLUGS = List.of(
+            "urn:courtside:error:access-denied",
             "urn:courtside:error:mfa-proof-failed",
             "urn:courtside:error:mfa-resource-not-found",
             "urn:courtside:error:webauthn-credential-limit-reached",

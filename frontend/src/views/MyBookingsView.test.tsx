@@ -1312,3 +1312,24 @@ it("given no cached participations, when offline, then no empty participation li
   expect(screen.queryByTestId("participations"), "an uncached list is not an empty one").not.toBeInTheDocument();
   expect(screen.queryByRole("alert"), "a missing cached page is not a failure").not.toBeInTheDocument();
 });
+
+it("given an account without member features, when its bookings load, then no waitlist, open place or partner search is offered", async () => {
+  // given
+  const single = "55555555-5555-5555-5555-555555555555";
+  vi.mocked(api.personalBookings).mockImplementation((options) => Promise.resolve(options?.view ? { items: [] } : { items: [{
+    id: single, seriesId: null, courtIds: ["33333333-3333-3333-3333-333333333333"],
+    startsAt: "2026-08-12T16:00:00Z", endsAt: "2026-08-12T17:00:00Z",
+    cardLabel: "Winter hall", cardColor: "#176b55", status: "CONFIRMED" as const, partnerSearch: "AVAILABLE" as const
+  }] }));
+
+  // when
+  render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} memberFeatures={false} />);
+  const entry = await screen.findByTestId(`booking-${single}`);
+
+  // then
+  expect(within(entry).queryByTestId("publish-open-place")).toBeNull();
+  expect(screen.queryByTestId("waitlist-title")).toBeNull();
+  expect(screen.queryByTestId("open-places-title")).toBeNull();
+  expect(api.waitlistEntries).not.toHaveBeenCalled();
+  expect(api.openPlaces).not.toHaveBeenCalled();
+});

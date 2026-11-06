@@ -1184,3 +1184,21 @@ test("given an MFA authorization run without mail cleanup, when it starts, then 
   }), /bounded MFA mail scope/);
   assert.equal(requests, 0);
 });
+
+test("given member-only operations, when classifying the external actor, then it is refused there and admitted elsewhere", () => {
+  // given
+  const matrix = buildOperationAuthorizationMatrix(api);
+  const byId = (operationId) => matrix.find((entry) => entry.operationId === operationId);
+  const closed = ["searchParticipantMembers", "listParticipantCards", "listOpenPlaces", "acceptPartnerInvitation",
+    "publishPartnerInvitation", "withdrawPartnerInvitation", "listDependants", "createDependantBooking",
+    "listOwnWaitlistEntries", "joinWaitlist", "leaveWaitlist", "acceptWaitlistOffer", "previewSeries", "createSeries",
+    "cancelSeries", "previewSeriesMove", "moveSeries"];
+
+  // when / then
+  for (const operationId of closed) {
+    assert.equal(byId(operationId).expectations.EXTERNAL, "deny-forbidden", `${operationId} is closed to an outsider`);
+    assert.equal(byId(operationId).expectations.MEMBER, "allow", `${operationId} stays open to a member`);
+  }
+  assert.equal(byId("listBookableCards").expectations.EXTERNAL, "allow");
+  assert.equal(byId("getSessionStatus").expectations.EXTERNAL, "allow");
+});

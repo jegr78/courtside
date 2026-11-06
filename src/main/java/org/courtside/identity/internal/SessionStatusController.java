@@ -6,6 +6,7 @@ import org.courtside.api.ApiSessionStatus;
 import org.courtside.api.SessionStatusApi;
 import org.courtside.config.ExternalBookings;
 import org.courtside.identity.AppointmentAccess;
+import org.courtside.identity.Outsiders;
 import org.courtside.identity.CurrentUser;
 import org.courtside.identity.UserAccount;
 import org.springframework.http.ResponseEntity;
@@ -20,6 +21,7 @@ class SessionStatusController implements SessionStatusApi {
 
     private final CurrentUser currentUser;
     private final AppointmentAccess appointmentAccess;
+    private final Outsiders outsiders;
     private final MfaTotpRepository totp;
     private final MfaFactors factors;
     private final MfaWebAuthn webAuthn;
@@ -35,6 +37,7 @@ class SessionStatusController implements SessionStatusApi {
 
     private ApiSessionStatus authenticated(UserAccount account) {
         AppointmentAccess.Reach reach = appointmentAccess.reachOf(account.getId(), account.getRoles());
+        boolean memberFeatures = !outsiders.isOutsider(account.getId(), account.getRoles());
         List<ApiRole> roles = account.getRoles().stream()
                 .map(role -> ApiRole.valueOf(role.name()))
                 .toList();
@@ -49,8 +52,9 @@ class SessionStatusController implements SessionStatusApi {
                 .totpAvailable(totp.enabled(account.getId()))
                 .webauthnAvailable(webAuthn.available() && credentials.enabled(account.getId()))
                 .managesAppointments(reach.managesAppointments())
-                .createsSeries(reach.createsSeries())
-                .externalBookings(externalBookings.admitted());
+                .createsSeries(memberFeatures && reach.createsSeries())
+                .externalBookings(externalBookings.admitted())
+                .memberFeatures(memberFeatures);
     }
 
     private ApiSessionStatus anonymous() {
@@ -61,7 +65,8 @@ class SessionStatusController implements SessionStatusApi {
                 .webauthnAvailable(false)
                 .managesAppointments(false)
                 .createsSeries(false)
-                .externalBookings(externalBookings.admitted());
+                .externalBookings(externalBookings.admitted())
+                .memberFeatures(false);
         if (SecurityContextHolder.getContext().getAuthentication() instanceof MfaPendingAuthentication pending) {
             status.mfaRequired(true).totpAvailable(totp.enabled(pending.getPrincipal().account()))
                     .webauthnAvailable(webAuthn.available() && credentials.enabled(pending.getPrincipal().account()));

@@ -1716,3 +1716,22 @@ function removeTabIcons() {
 function tabIcon() {
   return document.head.querySelector<HTMLLinkElement>('link[rel="icon"]');
 }
+
+it("given an account without member features, when it opens the dependants address, then it lands on its bookings without asking for dependants", async () => {
+  // given
+  vi.spyOn(api, "session").mockResolvedValue({ ...signedInMember, roles: ["EXTERNAL"], memberFeatures: false });
+  vi.spyOn(api, "config").mockResolvedValue({
+    clubName: "Example Tennis Club", primaryColor: "#b85c38", accentColor: "#d7e24b",
+    defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30, timeZone: "Europe/Berlin", currency: "EUR"
+  });
+  vi.spyOn(api, "source").mockRejectedValue(new Error("unavailable"));
+  const dependants = vi.spyOn(api, "dependants").mockResolvedValue([]);
+  holdMemberPages();
+
+  // when
+  render(<RoutedShell initialEntries={["/my-dependants"]}><App /><CurrentAddress /></RoutedShell>);
+
+  // then
+  await waitFor(() => expect(screen.getByTestId("current-address")).toHaveTextContent("/my-bookings"));
+  expect(dependants).not.toHaveBeenCalled();
+});

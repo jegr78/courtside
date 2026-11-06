@@ -113,7 +113,7 @@ class SecurityAssessmentDataSeeder implements ApplicationRunner {
         for (Role role : Role.values()) {
             for (int index = 1; index <= SecurityAssessmentDataset.isolatedAccountsPerRole(); index++) {
                 String key = "security." + role.name().toLowerCase().replace('_', '.') + "." + index;
-                result.add(createIdentity("Security", roleLabel(role) + index, key, hash, Set.of(role), true));
+                result.add(createIdentity("Security", roleLabel(role) + index, key, hash, Set.of(role), role != Role.EXTERNAL));
             }
         }
         return result;

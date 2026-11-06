@@ -12,6 +12,7 @@ import org.courtside.booking.internal.BookingNotFoundException;
 import org.courtside.booking.internal.BookingRuleGate;
 import org.courtside.booking.internal.CardEligibilityPolicy;
 import org.courtside.card.ParticipantCard;
+import org.courtside.identity.Outsiders;
 import org.courtside.identity.Role;
 import org.courtside.identity.UserAccount;
 import org.courtside.identity.UserAccountRepository;
@@ -40,6 +41,7 @@ public class PartnerSearchService {
     private static final String ONE_PARTICIPATION_PER_PERSON = "booking_participant_unique_person";
 
     private final PartnerInvitationRows rows;
+    private final Outsiders outsiders;
     private final BookingRepository bookings;
     private final EntityManager entityManager;
     private final CardEligibilityPolicy cardEligibility;
@@ -51,6 +53,7 @@ public class PartnerSearchService {
     // Publishing twice answers with the invitation that already stands.
     @Transactional
     public UUID publish(UUID bookingId, UUID accountId) {
+        outsiders.refuseAccount(accountId);
         Booking booking = lockedOwn(bookingId, accountId);
         if (!isOpen(booking, clock.instant())) {
             throw PartnerPlaceUnavailableException.closed();
@@ -69,12 +72,14 @@ public class PartnerSearchService {
 
     @Transactional
     public void withdraw(UUID bookingId, UUID accountId) {
+        outsiders.refuseAccount(accountId);
         lockedOwn(bookingId, accountId);
         rows.deleteForBooking(bookingId);
     }
 
     @Transactional(readOnly = true)
     public List<OpenPlace> openPlaces(UUID accountId, UUID personId, Set<Role> roles) {
+        outsiders.refuse(accountId, roles);
         if (!mayTakeAPlace(accountId, personId, roles)) {
             return List.of();
         }
@@ -88,6 +93,7 @@ public class PartnerSearchService {
     // The booking row lock orders every acceptance, withdrawal and cancellation of the booking.
     @Transactional
     public UUID accept(UUID invitationId, UUID accountId, UUID personId, Set<Role> roles) {
+        outsiders.refuse(accountId, roles);
         PartnerInvitationRows.Invitation invitation = rows.find(invitationId)
                 .orElseThrow(PartnerInvitationNotFoundException::new);
         bookings.lockById(invitation.bookingId()).orElseThrow(PartnerInvitationNotFoundException::new);

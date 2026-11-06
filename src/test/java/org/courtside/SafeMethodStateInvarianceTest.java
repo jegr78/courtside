@@ -67,6 +67,8 @@ import static org.assertj.core.api.Assertions.assertThat;
         MemberTestFixture.class})
 class SafeMethodStateInvarianceTest extends AbstractIntegrationTest {
 
+    private static final Set<Role> EVERY_MEMBER_ROLE = java.util.EnumSet.complementOf(java.util.EnumSet.of(Role.EXTERNAL));
+
     private static final String DOCUMENT = "/api/openapi.yaml";
 
     private static final Set<String> SAFE_METHODS = Set.of("get", "head", "options");
@@ -258,7 +260,7 @@ class SafeMethodStateInvarianceTest extends AbstractIntegrationTest {
     private void prepareTheClubAndSignIn() throws Exception {
         UUID personId = identity.createPerson("Richard", "Miles", "richard.miles@example.org");
         UUID accountId = identity.createEnabledAccount(
-                personId, USERNAME, passwordEncoder.encode(PASSWORD), Set.of(Role.values()));
+                personId, USERNAME, passwordEncoder.encode(PASSWORD), EVERY_MEMBER_ROLE);
         holdASessionForAnotherAccount();
         askForCredentialsSoTheMessageLogHasAnEntry();
         signIn();
@@ -269,7 +271,7 @@ class SafeMethodStateInvarianceTest extends AbstractIntegrationTest {
         }
         String bookingCardId = seededId("SELECT id FROM booking_card WHERE guest_allowed ORDER BY label");
         UUID bookingId = bookings.createBookingWithGuest(courtId, UUID.fromString(bookingCardId),
-                new TimeSlot(BOOKED_FROM, BOOKED_UNTIL), accountId, personId, Set.of(Role.values()),
+                new TimeSlot(BOOKED_FROM, BOOKED_UNTIL), accountId, personId, EVERY_MEMBER_ROLE,
                 null, "John Roe");
         uploadClubLogo();
 

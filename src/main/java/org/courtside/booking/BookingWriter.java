@@ -23,6 +23,7 @@ import org.courtside.config.ClubCurrency;
 import org.courtside.card.ParticipantCard;
 import org.courtside.facility.FacilityService;
 import org.courtside.config.BookingGridCoordination;
+import org.courtside.identity.Outsiders;
 import org.courtside.identity.PersonRepository;
 import org.courtside.identity.Role;
 import org.courtside.shared.BookingCancelled;
@@ -70,6 +71,7 @@ class BookingWriter implements SeriesOccurrenceCancellation, BookingDrafts, Unat
     private final CardEligibilityPolicy cardEligibility;
     private final FacilityService facility;
     private final PersonRepository personRepository;
+    private final Outsiders outsiders;
     private final ParticipantCardCapacity participantCardCapacity;
     private final BookingGridCoordination bookingGridCoordination;
     private final MeterRegistry meters;
@@ -276,6 +278,11 @@ class BookingWriter implements SeriesOccurrenceCancellation, BookingDrafts, Unat
 
         if (command.bookedByPersonId() == null) {
             throw new ParticipantsInvalidException("booking.participants.bookerUnknown", Map.of());
+        }
+
+        if (outsiders.isOutsider(command.bookedBy(), command.callerRoles())
+                && command.participants().stream().anyMatch(slot -> slot.kind() != ParticipantKind.GUEST)) {
+            throw new ParticipantsInvalidException("booking.participants.outsiderGuestsOnly", Map.of());
         }
 
         List<ParticipantSpec> slots = new ArrayList<>();

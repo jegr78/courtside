@@ -9,6 +9,7 @@ import org.courtside.card.CardService;
 import org.courtside.card.ParticipantCard;
 import lombok.RequiredArgsConstructor;
 import org.courtside.identity.CurrentUser;
+import org.courtside.identity.UserAccount;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -46,7 +47,8 @@ class CardController implements CardsApi {
 
     @Override
     public ResponseEntity<List<ApiPublicParticipantCard>> listParticipantCards() {
-        return ResponseEntity.ok(cards.activeParticipantCards().stream()
+        UserAccount account = currentUser.requireAccount();
+        return ResponseEntity.ok(cards.activeParticipantCardsFor(account.getId(), account.getRoles()).stream()
                 .map(CardController::toResponse)
                 .toList());
     }

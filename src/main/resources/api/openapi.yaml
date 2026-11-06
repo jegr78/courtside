@@ -468,6 +468,13 @@ components:
           description: |
             Whether the club admits bookings by people outside the club, with or without a session.
             A client that lacks the field treats it as false.
+        memberFeatures:
+          type: boolean
+          description: |
+            Whether the account may use what requires a club membership: the member search for
+            participants, participant cards, partner invitations, dependants, the waitlist and series.
+            False for an external account without a running membership and without a session. A
+            client that lacks the field treats it as true for a signed-in account.
         createsSeries:
           type: boolean
           description: |
@@ -6827,6 +6834,8 @@ paths:
                 items: { $ref: "#/components/schemas/PublicParticipantCard" }
         "401":
           $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "429":
           $ref: "#/components/responses/RateLimited"
 
@@ -6842,9 +6851,8 @@ paths:
         contact details. This reach is deliberate, for the co-player picker — the way
         `Allocation.bookedByName` documents its own visibility rule rather than leaving it
         implicit. The searching person is left out, because a booking already gives its booker a
-        slot. The current authorization does not verify club membership. Before authenticated
-        external guest accounts are introduced, this endpoint must gain that boundary so those
-        accounts do not inherit the directory reach.
+        slot. An external account without a running membership is refused with `access-denied`,
+        so it never inherits the directory reach.
 
         Reading the directory is a `POST` because the fragment is part of somebody's name, and a
         name in a URL outlives the request in browser history, an intermediary's log and an
@@ -7123,6 +7131,8 @@ paths:
                 items: { $ref: "#/components/schemas/Dependant" }
         "401":
           $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "429":
           $ref: "#/components/responses/RateLimited"
 
@@ -7491,6 +7501,8 @@ paths:
                 items: { $ref: "#/components/schemas/WaitlistEntry" }
         "401":
           $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "429":
           $ref: "#/components/responses/RateLimited"
     post:

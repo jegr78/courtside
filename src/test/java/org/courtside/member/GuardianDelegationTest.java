@@ -2,6 +2,10 @@ package org.courtside.member;
 
 import org.courtside.config.ClubTimeZone;
 import org.courtside.identity.CurrentUser;
+import org.courtside.identity.Role;
+import org.courtside.identity.OutsiderRefusedException;
+import org.courtside.identity.UserAccountRepository;
+import org.courtside.identity.Outsiders;
 import org.courtside.identity.Person;
 import org.courtside.identity.UserAccount;
 import org.courtside.member.internal.DependantNotFoundException;
@@ -21,6 +25,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 class GuardianDelegationTest {
@@ -32,7 +37,8 @@ class GuardianDelegationTest {
     private final ClubTimeZone clubTimeZone = () -> ZoneId.of("UTC");
     private final Clock clock = Clock.fixed(Instant.parse("2026-05-12T10:00:00Z"), ZoneOffset.UTC);
     private final GuardianDelegation delegation =
-            new GuardianDelegation(currentUser, relationships, clubTimeZone, clock);
+            new GuardianDelegation(currentUser,
+                    new Outsiders(accountId -> true, mock(UserAccountRepository.class)), relationships, clubTimeZone, clock);
 
     private final UUID guardianAccountId = UUID.randomUUID();
     private final UUID guardianPersonId = UUID.randomUUID();
@@ -46,6 +52,20 @@ class GuardianDelegationTest {
         when(guardian.getId()).thenReturn(guardianAccountId);
         when(guardian.getPerson()).thenReturn(person);
         when(currentUser.requireAccount()).thenReturn(guardian);
+    }
+
+    @Test
+    void givenAnOutsiderGuardian_whenItActsForADependant_thenItIsRefusedBeforeAnyRelationshipIsRead() {
+        // given
+        UserAccount outsider = currentUser.requireAccount();
+        when(outsider.getRoles()).thenReturn(Set.of(Role.EXTERNAL));
+        GuardianDelegation withoutMembership = new GuardianDelegation(currentUser,
+                new Outsiders(accountId -> false, mock(UserAccountRepository.class)), relationships, clubTimeZone, clock);
+
+        // when / then
+        assertThatThrownBy(() -> withoutMembership.require(dependantPersonId, GuardianGrant.BOOK))
+                .isInstanceOf(OutsiderRefusedException.class);
+        verifyNoInteractions(relationships);
     }
 
     @Test

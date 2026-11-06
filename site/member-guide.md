@@ -196,6 +196,11 @@ Der Buchungsdialog zeigt, wie viele Spielerplätze bereits belegt sind.
 Eingetragene Mitglieder erhalten eine E-Mail. Sie müssen der Eintragung nicht zustimmen und können
 sich selbst wieder austragen.
 
+Lässt dein Verein externe Buchungen zu, kannst du ohne Mitgliedschaft die Buchungsarten nutzen, die
+der Vorstand für Externe freigibt. Mitspielende trägst du dann nur als **Gäste** ein. Die Suche nach
+Mitgliedern, Platzfüller, die Warteliste, die Partnersuche, Serientermine und das Buchen für
+Angehörige stehen nur Mitgliedern offen und erscheinen bei dir nicht.
+
 ![Der Bereich für Mitspieler, Gäste und Platzfüller im Buchungsdialog.](screenshots/de/booking-participants.png)
 
 ## Als Mitspieler eingetragen

@@ -2,6 +2,7 @@ package org.courtside.booking;
 
 import org.courtside.AbstractIntegrationTest;
 import org.courtside.booking.internal.CardRoleRequiredException;
+import org.courtside.booking.internal.ParticipantsInvalidException;
 import org.courtside.card.testfixture.CardTestFixture;
 import org.courtside.config.testfixture.ConfigTestFixture;
 import org.courtside.facility.testfixture.FacilityTestFixture;
@@ -87,6 +88,42 @@ class ExternalBookingTest extends AbstractIntegrationTest {
         assertThatThrownBy(() -> book(membersOnly)).as("an empty role list means members only")
                 .isInstanceOf(CardRoleRequiredException.class);
         assertThatThrownBy(() -> book(namingMembers)).isInstanceOf(CardRoleRequiredException.class);
+    }
+
+    @Test
+    void givenADoublesCardOpenToExternals_whenAnExternalAccountBooksWithAGuest_thenTheBookingIsConfirmed() {
+        // given
+        config.admitExternalBookings(true);
+        UUID doubles = cards.createDoublesCardForGuestsAllowing("Winter doubles", Set.of(Role.EXTERNAL));
+
+        // when
+        UUID booking = book(doubles, List.of(ParticipantSpec.guest("Mary Major")));
+
+        // then
+        assertThat(booking).isNotNull();
+    }
+
+    @Test
+    void givenADoublesCardOpenToExternals_whenAnExternalAccountNamesAMember_thenTheParticipantsAreRefused() {
+        // given
+        config.admitExternalBookings(true);
+        UUID doubles = cards.createDoublesCardForGuestsAllowing("Winter doubles", Set.of(Role.EXTERNAL));
+        UUID member = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
+        UUID ballMachine = cards.createUnlimitedParticipantCard("Ball machine");
+
+        // when / then
+        assertThatThrownBy(() -> book(doubles, List.of(ParticipantSpec.member(member))))
+                .isInstanceOfSatisfying(ParticipantsInvalidException.class, refused -> assertThat(refused.violationCodes())
+                        .containsExactly("booking.participants.outsiderGuestsOnly"));
+        assertThatThrownBy(() -> book(doubles, List.of(ParticipantSpec.card(ballMachine))))
+                .isInstanceOfSatisfying(ParticipantsInvalidException.class, refused -> assertThat(refused.violationCodes())
+                        .containsExactly("booking.participants.outsiderGuestsOnly"));
+    }
+
+    private UUID book(UUID cardId, List<ParticipantSpec> participants) {
+        return bookingService.create(new CreateBookingCommand(List.of(courtId), cardId,
+                new TimeSlot(TOMORROW_AFTERNOON, TOMORROW_AFTERNOON.plusSeconds(3600)), externalAccount, externalPerson,
+                Set.of(Role.EXTERNAL), null, participants, null));
     }
 
     private UUID book(UUID cardId) {

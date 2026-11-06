@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.courtside.booking.CreateBookingCommand;
 import org.courtside.booking.internal.BookingDrafts;
 import org.courtside.config.BookingGridCoordination;
+import org.courtside.identity.Outsiders;
 import org.courtside.identity.Role;
 import org.courtside.shared.SqlConstraintViolation;
 import org.courtside.shared.TimeSlot;
@@ -25,6 +26,7 @@ public class WaitlistService {
     static final int MAX_ENTRIES = 20;
 
     private final WaitlistRows rows;
+    private final Outsiders outsiders;
     private final WaitlistQueue queue;
     private final BookingDrafts drafts;
     private final BookingGridCoordination grid;
@@ -32,6 +34,7 @@ public class WaitlistService {
 
     @Transactional
     public UUID join(JoinWaitlistCommand command) {
+        outsiders.refuse(command.accountId(), command.roles());
         grid.lock();
         drafts.requireBookable(command.asBooking());
         if (rows.confirmedOverlap(command.courtId(), command.slot(), command.accountId())
@@ -59,6 +62,7 @@ public class WaitlistService {
 
     @Transactional
     public void leave(UUID entryId, UUID accountId) {
+        outsiders.refuseAccount(accountId);
         grid.lock();
         WaitlistEntry entry = rows.lockOwn(entryId, accountId).orElseThrow(WaitlistEntryNotFoundException::new);
         if (!entry.state().isOpen()) {
@@ -73,6 +77,7 @@ public class WaitlistService {
     // Accepting twice answers with the booking the first acceptance made while that booking stands.
     @Transactional
     public UUID accept(UUID entryId, UUID accountId, UUID personId, Set<Role> roles) {
+        outsiders.refuse(accountId, roles);
         grid.lock();
         WaitlistEntry entry = rows.lockOwn(entryId, accountId).orElseThrow(WaitlistEntryNotFoundException::new);
         if (entry.state() == WaitlistState.BOOKED && entry.bookingId() != null
@@ -89,6 +94,7 @@ public class WaitlistService {
     // An offer past its deadline reads as expired before the sweep has written it so.
     @Transactional(readOnly = true)
     public List<WaitlistEntry> ownEntries(UUID accountId) {
+        outsiders.refuseAccount(accountId);
         Instant now = clock.instant();
         return rows.ownNotEnded(accountId, now).stream()
                 .map(entry -> entry.state() == WaitlistState.OFFERED && !entry.offerExpiresAt().isAfter(now)

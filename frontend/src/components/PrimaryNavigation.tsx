@@ -57,7 +57,7 @@ function DestinationIcon({ destination }: { destination: Destination }) {
 export function PrimaryNavigation({ session }: { session: SessionStatus }) {
   const { t } = useTranslation();
   const { pathname } = useLocation();
-  const hasDependants = useHasDependants(session.authenticated, pathname);
+  const hasDependants = useHasDependants(session.authenticated && session.memberFeatures !== false, pathname);
   const offered = destinations.filter((destination) => destination.visible(session, hasDependants));
   // A thumb reaches four places on a phone; the bookings page links the dependants when the bar is full.
   const open = offered.length > MOST_DESTINATIONS ? offered.filter((destination) => destination.icon !== "dependants") : offered;

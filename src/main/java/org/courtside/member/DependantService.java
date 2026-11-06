@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.courtside.config.ClubTimeZone;
 import org.courtside.identity.AccountCredentials;
 import org.courtside.identity.CurrentUser;
+import org.courtside.identity.Outsiders;
 import org.courtside.identity.Person;
 import org.courtside.identity.PersonRepository;
 import org.courtside.identity.RecentAuthentication;
@@ -32,6 +33,7 @@ import java.util.stream.Collectors;
 public class DependantService {
 
     private final CurrentUser currentUser;
+    private final Outsiders outsiders;
     private final GuardianRelationships relationships;
     private final GuardianDelegation delegation;
     private final PersonRepository people;
@@ -48,6 +50,7 @@ public class DependantService {
     @Transactional(readOnly = true)
     public List<Dependant> dependantsOfCurrentAccount() {
         UserAccount guardian = currentUser.requireAccount();
+        outsiders.refuse(guardian.getId(), guardian.getRoles());
         if (guardian.getPerson() == null) {
             return List.of();
         }

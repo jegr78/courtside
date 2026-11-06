@@ -29,6 +29,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Import(IdentityTestFixture.class)
 class AmbiguousParameterTest extends AbstractIntegrationTest {
 
+    private static final Set<Role> EVERY_MEMBER_ROLE = java.util.EnumSet.complementOf(java.util.EnumSet.of(Role.EXTERNAL));
+
     private static final String USERNAME = "richard.miles";
     private static final String ANOTHER_USERNAME = "john.roe";
     private static final String PASSWORD = "correct-horse-battery-staple";
@@ -51,7 +53,7 @@ class AmbiguousParameterTest extends AbstractIntegrationTest {
     @BeforeEach
     void createTheAccounts() {
         identity.createEnabledAccount(identity.createPerson("Richard", "Miles"), USERNAME,
-                passwordEncoder.encode(PASSWORD), Set.of(Role.values()));
+                passwordEncoder.encode(PASSWORD), EVERY_MEMBER_ROLE);
         identity.createEnabledAccount(identity.createPerson("John", "Roe"), ANOTHER_USERNAME,
                 passwordEncoder.encode(PASSWORD), Set.of(Role.MEMBER));
     }

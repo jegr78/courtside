@@ -52,6 +52,7 @@ class AuditedOperationCoverageTest {
             "BookingExportService#bookings",
             "CardService#activeCards",
             "CardService#activeParticipantCards",
+            "CardService#activeParticipantCardsFor",
             "CardService#allCards",
             "CardService#allParticipantCards",
             "CardService#bookableCards",

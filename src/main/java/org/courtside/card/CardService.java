@@ -7,6 +7,7 @@ import org.courtside.card.internal.ClosureCardSignalsNoOccupancyException;
 import org.courtside.card.internal.CardLabelTakenException;
 import org.courtside.card.internal.ParticipantCardRepository;
 import org.courtside.config.ExternalBookings;
+import org.courtside.identity.Outsiders;
 import org.courtside.identity.Role;
 import org.courtside.member.MemberService;
 import org.courtside.shared.CardGrantsAccess;
@@ -39,6 +40,7 @@ public class CardService {
     private final ApplicationEventPublisher events;
     private final MemberService members;
     private final ExternalBookings externalBookings;
+    private final Outsiders outsiders;
 
     public List<BookingCard> activeCards() {
         return cards.findByActiveTrueOrderByLabelAsc();
@@ -61,6 +63,11 @@ public class CardService {
 
     public Optional<BookingCard> findCard(UUID cardId) {
         return cards.findById(cardId);
+    }
+
+    public List<ParticipantCard> activeParticipantCardsFor(UUID accountId, Set<Role> callerRoles) {
+        outsiders.refuse(accountId, callerRoles);
+        return activeParticipantCards();
     }
 
     public List<ParticipantCard> activeParticipantCards() {

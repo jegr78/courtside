@@ -2,6 +2,7 @@ package org.courtside.member;
 
 import org.courtside.config.ClubTimeZone;
 import org.courtside.config.RuleSetForPeopleWithoutAMembershipType;
+import org.courtside.identity.Outsiders;
 import org.courtside.member.internal.MembershipType;
 import org.courtside.member.internal.MembershipTypeInactiveException;
 import org.courtside.member.internal.MembershipTypeNameTakenException;
@@ -38,6 +39,7 @@ public class MemberService {
     private static final String RULE_SET_FOREIGN_KEY = "membership_type_rule_set_id_fkey";
 
     private final MemberRepository members;
+    private final Outsiders outsiders;
     private final MembershipTypeRepository membershipTypes;
     private final RuleSetActivationRepository ruleSetActivation;
     private final ApplicationEventPublisher events;
@@ -108,6 +110,7 @@ public class MemberService {
     }
 
     public List<MemberParticipant> findParticipants(String query, UUID searcherAccountId) {
+        outsiders.refuseAccount(searcherAccountId);
         String normalized = query.trim().toLowerCase(Locale.ROOT);
         if (normalized.isEmpty()) {
             return List.of();

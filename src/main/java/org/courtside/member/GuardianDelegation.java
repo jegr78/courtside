@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.courtside.config.ClubTimeZone;
 import org.courtside.identity.CurrentUser;
 import org.courtside.identity.DependantMessageAccess;
+import org.courtside.identity.Outsiders;
 import org.courtside.identity.Role;
 import org.courtside.identity.UserAccount;
 import org.courtside.member.internal.DependantAccountDisabledException;
@@ -26,6 +27,7 @@ import java.util.UUID;
 public class GuardianDelegation implements DependantMessageAccess {
 
     private final CurrentUser currentUser;
+    private final Outsiders outsiders;
     private final GuardianRelationships relationships;
     private final ClubTimeZone clubTimeZone;
     private final Clock clock;
@@ -46,6 +48,7 @@ public class GuardianDelegation implements DependantMessageAccess {
             throw new IllegalStateException("A delegated action names the dependant and the action");
         }
         UserAccount guardian = currentUser.requireAccount();
+        outsiders.refuse(guardian.getId(), guardian.getRoles());
         Optional<Set<GuardianGrant>> granted = guardian.getPerson() == null ? Optional.empty()
                 : relationships.grantsFor(guardian.getPerson().getId(), dependantPersonId, today());
         if (granted.map(grants -> grants.contains(grant)).orElse(false)) {
