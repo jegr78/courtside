@@ -174,6 +174,43 @@ describe("ImportSourceForm", () => {
     }));
   });
 
+  it("given a mapped category, when it is split by birth year into two bands, then the bands are sent with the category as fallback", async () => {
+    // given
+    const save = vi.fn().mockResolvedValue(existing);
+    show(existing, save);
+    await userEvent.upload(screen.getByTestId("source-file"),
+      file("Member number;First name;Last name;Status;Born\n1;Jane;Doe;active;2010\n"));
+    await screen.findByTestId("column-MEMBERSHIP_TYPE");
+    await userEvent.selectOptions(screen.getByTestId("column-MEMBERSHIP_TYPE"), "Status");
+    await userEvent.selectOptions(screen.getByTestId("column-BIRTH_DATE"), "Born");
+    await userEvent.selectOptions(await screen.findByTestId("category-active"), "type-1");
+
+    // when
+    await userEvent.click(screen.getByTestId("split-by-age-active"));
+    await userEvent.selectOptions(screen.getByTestId("age-band-type-active-0"), "type-2");
+    await userEvent.click(screen.getByTestId("age-band-add-active"));
+    await userEvent.type(screen.getByTestId("age-band-from-active-1"), "18");
+    await userEvent.selectOptions(screen.getByTestId("age-band-type-active-1"), "type-1");
+    await userEvent.click(screen.getByTestId("save-source"));
+
+    // then
+    expect(save).toHaveBeenCalledWith(expect.objectContaining({
+      membershipTypes: { active: "type-1" },
+      ageBands: { active: [{ fromAge: 0, membershipTypeId: "type-2" }, { fromAge: 18, membershipTypeId: "type-1" }] },
+      columns: expect.objectContaining({ Born: "BIRTH_DATE" })
+    }));
+    expect(screen.queryByTestId("owned-BIRTH_DATE"), "a birth date is never owned").not.toBeInTheDocument();
+  });
+
+  it("given a category marked as not in the roster, when the form is read, then it offers no split by age", async () => {
+    // when
+    show({ ...existing, columns: { ...existing.columns, Status: "MEMBERSHIP_TYPE" }, leftOutCategories: ["resigned"] }, vi.fn());
+
+    // then
+    expect(await screen.findByTestId("category-resigned")).toBeInTheDocument();
+    expect(screen.queryByTestId("split-by-age-resigned"), "a left-out row has no type to fall back to").not.toBeInTheDocument();
+  });
+
   it("given a category read from the sample, when it is marked as not in the roster, then it is sent as left out and not mapped", async () => {
     // given
     const save = vi.fn().mockResolvedValue(existing);

@@ -914,6 +914,17 @@ row with too many or too few cells, a stray separator in a name or an address, t
 read at its column and at that column shifted by the difference; a left-out value in either
 leaves the row out, and otherwise it fails as a row.
 
+A mapped category value can also be split by age. A source then maps a `BIRTH_DATE` column, which it
+can never own, and lists for that value lower age bounds starting at 0, each naming a membership
+type. The age is the one a person reaches in the current calendar year of the club time zone, so a
+type changes with the first import of a year. `SnapshotParser` turns the cell into the band's type
+while it reads the row: the import reads a birth date only to select a type and stores nothing of
+it, neither in the change set, the stored preview, the fingerprint, the audit nor a log. A row
+without a readable date in `DD.MM.YYYY`, `YYYY-MM-DD` or `YYYY` form takes the value's own mapping
+and is counted in the preview, which marks a type that came from a band and never shows an age. A
+split requires the source to own `MEMBERSHIP_TYPE`, because otherwise it would act only when a
+person is created.
+
 A source reads its files in one of two modes. By header, the default, the first row names the
 columns and each field is found by the header mapped to it. By position, for an export without a
 header row, each field comes from a numbered column and the source stores how many columns a file

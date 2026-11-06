@@ -281,6 +281,20 @@ describe("ImportPreviewPanel", () => {
     expect(screen.getByTestId("preview-left-out")).toHaveTextContent("deceased: 1, resigned: 2");
   });
 
+  it("given a split category, when the preview is read, then banded changes say so and rows without a date are counted without an age", () => {
+    // given / when
+    show({ ...preview, ageFallbackRows: { active: 3 },
+      changes: preview.changes.map((change, index) => ({ ...change, typeFromAgeBand: index === 0 })) });
+
+    // then
+    expect(screen.getByTestId("preview-age-fallback")).toHaveTextContent("active: 3");
+    expect(screen.getByTestId(`change-age-band-${preview.changes[0].externalId}`)).toBeInTheDocument();
+    expect(screen.queryByTestId(`change-age-band-${preview.changes[1].externalId}`)).not.toBeInTheDocument();
+    const banded = preview.changes[0];
+    expect(screen.getByTestId(`change-${banded.kind}-${banded.externalId}`).textContent, "no age or year is shown")
+      .not.toMatch(/\b(19|20)\d\d\b/);
+  });
+
   it("given a file without left-out rows, when the preview is read, then nothing is said about them", () => {
     // given / when
     show(preview);
