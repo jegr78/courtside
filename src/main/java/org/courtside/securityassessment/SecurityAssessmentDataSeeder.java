@@ -35,9 +35,12 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Component
 @Profile("security")
@@ -199,16 +202,13 @@ class SecurityAssessmentDataSeeder implements ApplicationRunner {
         return count == null ? 0 : count;
     }
 
-    private static String roleLabel(Role role) {
-        return switch (role) {
-            case MEMBER -> "Member";
-            case TRAINER -> "Trainer";
-            case SPORT_DIRECTOR -> "SportDirector";
-            case YOUTH_DIRECTOR -> "YouthDirector";
-            case GROUNDSKEEPER -> "Groundskeeper";
-            case TREASURER -> "Treasurer";
-            case ADMIN -> "Administrator";
-        };
+    static String roleLabel(Role role) {
+        if (role == Role.ADMIN) {
+            return "Administrator";
+        }
+        return Arrays.stream(role.name().split("_"))
+                .map(word -> word.charAt(0) + word.substring(1).toLowerCase(Locale.ROOT))
+                .collect(Collectors.joining());
     }
 
     private record SecurityIdentity(Person person, UserAccount account) {
