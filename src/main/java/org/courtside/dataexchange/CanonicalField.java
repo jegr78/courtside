@@ -5,5 +5,6 @@ public enum CanonicalField {
     FIRST_NAME,
     LAST_NAME,
     EMAIL,
-    MEMBERSHIP_TYPE
+    MEMBERSHIP_TYPE,
+    BIRTH_DATE
 }

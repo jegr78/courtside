@@ -1,6 +1,7 @@
 package org.courtside.dataexchange;
 
 import lombok.RequiredArgsConstructor;
+import org.courtside.dataexchange.internal.AgeBandEntry;
 import org.courtside.dataexchange.internal.ExternalReferenceRepository;
 import org.courtside.dataexchange.internal.ImportSource;
 import org.courtside.dataexchange.internal.ImportRunRepository;
@@ -17,6 +18,7 @@ import java.lang.reflect.RecordComponent;
 import java.time.Clock;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -26,6 +28,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -41,6 +44,7 @@ public class ImportSourceService {
     private static final int MAX_ENTRY_LENGTH = 120;
     private static final int MAX_MEMBERSHIP_TYPE_MAPPINGS = 200;
     private static final int MAX_COLUMNS = 200;
+    private static final int MAX_AGE_BOUND = 150;
 
     // Read off the record rather than listed, so a field added to the configuration is reported the
     // day it is added. The log names which part moved and never what it moved to.
@@ -82,16 +86,18 @@ public class ImportSourceService {
                                       String encoding, ColumnLayout layout,
                                       Map<String, UUID> membershipTypes,
                                       Collection<String> leftOutCategories,
+                                      Map<String, List<AgeBand>> ageBands,
                                       UUID defaultMembershipTypeId,
                                       Set<CanonicalField> ownedFields, int removalWarningPercent) {
         ColumnLayout storedLayout = usableLayout(layout);
         Map<String, UUID> storedTypes = strippedMembershipTypes(membershipTypes);
         Set<String> storedLeftOut = usableLeftOutCategories(leftOutCategories, storedTypes);
         requireUsable(storedTypes, defaultMembershipTypeId, ownedFields, removalWarningPercent);
+        Map<String, List<AgeBand>> storedBands = usableAgeBands(ageBands, storedTypes, ownedFields);
         ImportSource source = new ImportSource(clock.instant());
         source.changeTo(requiredKey(sourceKey), requiredDisplayName(displayName),
                 requiredSeparator(separator), requiredEncoding(encoding), storedLayout, storedTypes,
-                storedLeftOut, defaultMembershipTypeId, ownedFields, removalWarningPercent);
+                storedLeftOut, storedBands, defaultMembershipTypeId, ownedFields, removalWarningPercent);
         SourceConfiguration described = toConfiguration(saveOrRejectTakenKey(source));
         events.publishEvent(
                 new DataExchangeEvent.SourceDescribed(described.sourceId(), described.sourceKey()));
@@ -103,6 +109,7 @@ public class ImportSourceService {
                                       String separator, String encoding, ColumnLayout layout,
                                       Map<String, UUID> membershipTypes,
                                       Collection<String> leftOutCategories,
+                                      Map<String, List<AgeBand>> ageBands,
                                       UUID defaultMembershipTypeId,
                                       Set<CanonicalField> ownedFields, int removalWarningPercent,
                                       boolean columnModeChangeConfirmed) {
@@ -110,12 +117,13 @@ public class ImportSourceService {
         Map<String, UUID> storedTypes = strippedMembershipTypes(membershipTypes);
         Set<String> storedLeftOut = usableLeftOutCategories(leftOutCategories, storedTypes);
         requireUsable(storedTypes, defaultMembershipTypeId, ownedFields, removalWarningPercent);
+        Map<String, List<AgeBand>> storedBands = usableAgeBands(ageBands, storedTypes, ownedFields);
         ImportSource source = require(sourceId);
         SourceConfiguration before = toConfiguration(source);
         requireConfirmedModeChange(before.columnMode(), storedLayout.mode(), columnModeChangeConfirmed);
         source.changeTo(requiredKey(sourceKey), requiredDisplayName(displayName),
                 requiredSeparator(separator), requiredEncoding(encoding), storedLayout, storedTypes,
-                storedLeftOut, defaultMembershipTypeId, ownedFields, removalWarningPercent);
+                storedLeftOut, storedBands, defaultMembershipTypeId, ownedFields, removalWarningPercent);
         SourceConfiguration after = toConfiguration(saveOrRejectTakenKey(source));
         List<String> changedFields = differingFields(before, after);
         if (!changedFields.isEmpty()) {
@@ -253,6 +261,59 @@ public class ImportSourceService {
             throw new ImportSourceInvalidException("import.source.ownedFields.externalId",
                     Map.of("field", "ownedFields"));
         }
+        if (requiredOwnedFields(ownedFields).contains(CanonicalField.BIRTH_DATE)) {
+            throw new ImportSourceInvalidException("import.source.ownedFields.birthDate",
+                    Map.of("field", "ownedFields"));
+        }
+    }
+
+    // A split acts on every import, so it needs the source to keep the type current; otherwise it
+    // would decide only when a person is created and then never again.
+    private Map<String, List<AgeBand>> usableAgeBands(Map<String, List<AgeBand>> ageBands,
+                                                      Map<String, UUID> membershipTypes,
+                                                      Set<CanonicalField> ownedFields) {
+        Map<String, List<AgeBand>> given = ageBands == null ? Map.of() : ageBands;
+        if (given.isEmpty()) {
+            return Map.of();
+        }
+        if (!requiredOwnedFields(ownedFields).contains(CanonicalField.MEMBERSHIP_TYPE)) {
+            throw new ImportSourceInvalidException("import.source.ageBands.membershipTypeNotOwned",
+                    Map.of("field", "ageBands"));
+        }
+        Map<String, List<AgeBand>> stripped = strippedKeys(given, "ageBands",
+                "import.source.ageBands.valueUnusable", "import.source.ageBands.valueRepeated");
+        if (stripped.values().stream().mapToInt(bands -> bands == null ? 0 : bands.size()).sum()
+                > MAX_MEMBERSHIP_TYPE_MAPPINGS) {
+            throw new ImportSourceInvalidException("import.source.ageBands.tooMany",
+                    Map.of("field", "ageBands", "maxEntries", MAX_MEMBERSHIP_TYPE_MAPPINGS));
+        }
+        Map<String, List<AgeBand>> usable = new LinkedHashMap<>();
+        stripped.forEach((value, bands) -> {
+            Map<String, Object> where = Map.of("field", "ageBands", "value", value);
+            if (!membershipTypes.containsKey(value)) {
+                throw new ImportSourceInvalidException("import.source.ageBands.fallbackMissing", where);
+            }
+            List<AgeBand> ordered = (bands == null ? List.<AgeBand>of() : bands).stream()
+                    .sorted(Comparator.comparingInt(AgeBand::fromAge)).toList();
+            if (ordered.isEmpty() || ordered.getFirst().fromAge() != 0) {
+                throw new ImportSourceInvalidException("import.source.ageBands.startsAtZero", where);
+            }
+            for (int index = 0; index < ordered.size(); index++) {
+                AgeBand band = ordered.get(index);
+                if (band.fromAge() > MAX_AGE_BOUND) {
+                    throw new ImportSourceInvalidException("import.source.ageBands.boundOutOfRange",
+                            Map.of("field", "ageBands", "value", value, "maxAge", MAX_AGE_BOUND));
+                }
+                if (index > 0 && ordered.get(index - 1).fromAge() == band.fromAge()) {
+                    throw new ImportSourceInvalidException("import.source.ageBands.boundRepeated", where);
+                }
+                if (band.membershipTypeId() == null || !memberships.knowsMembershipType(band.membershipTypeId())) {
+                    throw new ImportSourceInvalidException("import.source.ageBands.membershipTypeUnknown", where);
+                }
+            }
+            usable.put(value, ordered);
+        });
+        return usable;
     }
 
     private void requireKnownMembershipTypes(Map<String, UUID> membershipTypes) {
@@ -417,13 +478,19 @@ public class ImportSourceService {
         return SupportedEncodings.resolve(encoding).name();
     }
 
+    private static Map<String, List<AgeBand>> ageBandsOf(ImportSource source) {
+        return source.getAgeBands().stream().collect(Collectors.groupingBy(AgeBandEntry::getSourceValue,
+                Collectors.mapping(entry -> new AgeBand(entry.getLowerBound(), entry.getMembershipTypeId()),
+                        Collectors.toList())));
+    }
+
     private static SourceConfiguration toConfiguration(ImportSource source) {
         return new SourceConfiguration(source.getId(), source.getSourceKey(),
                 source.getDisplayName(), source.getSeparator().charAt(0), source.getEncoding(),
                 source.getColumnMode(), Map.copyOf(source.getColumns()),
                 Map.copyOf(source.getPositions()), source.getColumnCount(),
                 Map.copyOf(source.getMembershipTypes()), Set.copyOf(source.getLeftOutCategories()),
-                source.getDefaultMembershipTypeId(),
+                ageBandsOf(source), source.getDefaultMembershipTypeId(),
                 new HashSet<>(source.getOwnedFields()), source.getRemovalWarningPercent());
     }
 }

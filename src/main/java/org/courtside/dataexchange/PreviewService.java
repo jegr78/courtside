@@ -2,6 +2,8 @@ package org.courtside.dataexchange;
 
 import lombok.RequiredArgsConstructor;
 import org.courtside.dataexchange.internal.ChangeSetResolver;
+import org.courtside.config.ClubTimeZone;
+import org.courtside.dataexchange.internal.AgeBanding;
 import org.courtside.dataexchange.internal.CsvSnapshot;
 import org.courtside.dataexchange.internal.CurrentRoster;
 import org.courtside.dataexchange.internal.ExternalReference;
@@ -24,6 +26,7 @@ import tools.jackson.databind.ObjectMapper;
 import java.nio.charset.Charset;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.Year;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -47,6 +50,7 @@ public class PreviewService {
     private final RosterService roster;
     private final ObjectMapper json;
     private final ImportProperties properties;
+    private final ClubTimeZone clubTimeZone;
     private final Clock clock;
 
     @Transactional(timeoutString = DatabaseDeadlines.REPORT)
@@ -56,28 +60,31 @@ public class PreviewService {
         SourceConfiguration configuration = sources.configurationForUpdate(sourceId);
         SnapshotMode requested = requiredMode(mode);
         CsvSnapshot snapshot = parsed(content, configuration,
-                SupportedEncodings.resolve(encodingInForce(encoding, configuration)));
+                SupportedEncodings.resolve(encodingInForce(encoding, configuration)),
+                new AgeBanding(configuration.ageBands(), Year.now(clock.withZone(clubTimeZone.zoneId())).getValue()));
         CurrentRoster roster = currentRosterFor(sourceId, snapshot);
         ResolvedChangeSet resolved = ChangeSetResolver.resolve(snapshot, configuration, requested, roster);
         Instant now = clock.instant();
         supersedeEarlierPreviewsOf(sourceId, now);
         ImportPreview preview = previews.save(new ImportPreview(sourceId, requested,
                 upload.fileName(), PersonFingerprint.sha256(content), snapshot.rows().size(),
-                write(new PreviewContent(resolved, snapshot.ignoredColumns(), snapshot.leftOutRows())),
+                write(new PreviewContent(resolved, snapshot.ignoredColumns(), snapshot.leftOutRows(),
+                        snapshot.ageFallbackRows())),
                 write(fingerprintsOf(resolved, roster)), resolved.removals().count(),
                 resolved.removals().percent(), configuration.removalWarningPercent(), now,
                 requiredAccountId(accountId), now.plus(properties.previewRetention())));
         return toSummary(preview);
     }
 
-    private static CsvSnapshot parsed(byte[] content, SourceConfiguration configuration, Charset charset) {
+    private static CsvSnapshot parsed(byte[] content, SourceConfiguration configuration, Charset charset,
+                                      AgeBanding banding) {
         if (configuration.columnMode() == ColumnMode.POSITION) {
             return SnapshotParser.parsePositions(content, configuration.positions(),
                     requiredColumnCount(configuration), charset, configuration.separator(),
-                    configuration.leftOutCategories());
+                    configuration.leftOutCategories(), banding);
         }
         return SnapshotParser.parse(content, configuration.columns(), charset, configuration.separator(),
-                configuration.leftOutCategories());
+                configuration.leftOutCategories(), banding);
     }
 
     private static int requiredColumnCount(SourceConfiguration configuration) {
@@ -186,11 +193,11 @@ public class PreviewService {
     // expired preview answers without the change set even before the sweep has reached its row.
     private PreviewSummary toSummary(ImportPreview preview) {
         PreviewContent stored = preview.hasExpiredBy(clock.instant())
-                ? new PreviewContent(null, List.of(), Map.of())
+                ? new PreviewContent(null, List.of(), Map.of(), Map.of())
                 : read(preview.getChangeSet());
         return new PreviewSummary(preview.getId(), preview.getSourceId(), preview.getMode(),
                 preview.getFileName(), preview.getFileHash(), preview.getRowCount(),
-                stored.ignoredColumns(), stored.leftOutRows(), stored.changeSet(),
+                stored.ignoredColumns(), stored.leftOutRows(), stored.ageFallbackRows(), stored.changeSet(),
                 namesIn(stored.changeSet()),
                 preview.needsConfirmation(), preview.getCreatedAt(), preview.getExpiresAt(),
                 preview.isSuperseded());
@@ -225,7 +232,7 @@ public class PreviewService {
 
     private PreviewContent read(String changeSet) {
         return changeSet == null
-                ? new PreviewContent(null, List.of(), Map.of())
+                ? new PreviewContent(null, List.of(), Map.of(), Map.of())
                 : json.readValue(changeSet, PreviewContent.class);
     }
 

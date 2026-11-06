@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.UUID;
 
 public final class SnapshotParser {
 
@@ -39,13 +40,19 @@ public final class SnapshotParser {
 
     public static CsvSnapshot parse(byte[] content, Map<String, CanonicalField> columns,
                                     Charset chosen, char separator, Set<String> leftOutCategories) {
+        return parse(content, columns, chosen, separator, leftOutCategories, AgeBanding.NONE);
+    }
+
+    public static CsvSnapshot parse(byte[] content, Map<String, CanonicalField> columns,
+                                    Charset chosen, char separator, Set<String> leftOutCategories,
+                                    AgeBanding banding) {
         String text = decoded(content, chosen);
         try (CSVParser parser = format(separator).parse(new StringReader(text))) {
             List<String> headerNames = parser.getHeaderNames();
             Map<String, CanonicalField> header = headerOf(headerNames, columns);
             String categoryColumn = keyOf(header, CanonicalField.MEMBERSHIP_TYPE);
             return read(parser, header, headerNames.size(), ignoredColumns(headerNames, columns),
-                    categoryColumn == null ? -1 : headerNames.indexOf(categoryColumn), leftOutCategories);
+                    categoryColumn == null ? -1 : headerNames.indexOf(categoryColumn), leftOutCategories, banding);
         } catch (IOException e) {
             throw new SnapshotHeaderInvalidException("import.snapshot.unreadable", Map.of());
         }
@@ -54,6 +61,13 @@ public final class SnapshotParser {
     public static CsvSnapshot parsePositions(byte[] content, Map<Integer, CanonicalField> positions,
                                              int columnCount, Charset chosen, char separator,
                                              Set<String> leftOutCategories) {
+        return parsePositions(content, positions, columnCount, chosen, separator, leftOutCategories,
+                AgeBanding.NONE);
+    }
+
+    public static CsvSnapshot parsePositions(byte[] content, Map<Integer, CanonicalField> positions,
+                                             int columnCount, Charset chosen, char separator,
+                                             Set<String> leftOutCategories, AgeBanding banding) {
         String text = decoded(content, chosen);
         try (CSVParser parser = headerless(separator).parse(new StringReader(text))) {
             List<CSVRecord> records = parser.getRecords();
@@ -62,15 +76,16 @@ public final class SnapshotParser {
                 throw new SnapshotHeaderInvalidException("import.snapshot.columns.countChanged",
                         Map.of("expected", columnCount, "found", found));
             }
-            return readPositions(records, positions, columnCount, leftOutCategories);
+            return readPositions(records, positions, columnCount, leftOutCategories, banding);
         } catch (IOException e) {
             throw new SnapshotHeaderInvalidException("import.snapshot.unreadable", Map.of());
         }
     }
 
     private static CsvSnapshot readPositions(List<CSVRecord> records, Map<Integer, CanonicalField> positions,
-                                             int columnCount, Set<String> leftOutCategories) {
+                                             int columnCount, Set<String> leftOutCategories, AgeBanding banding) {
         List<CsvSnapshot.SnapshotRow> rows = new ArrayList<>();
+        Map<String, Integer> ageFallback = new TreeMap<>();
         List<CsvSnapshot.RowError> errors = new ArrayList<>();
         Map<String, Integer> leftOut = new TreeMap<>();
         Integer categoryPosition = keyOf(positions, CanonicalField.MEMBERSHIP_TYPE);
@@ -91,7 +106,7 @@ public final class SnapshotParser {
             Map<CanonicalField, String> values = new EnumMap<>(CanonicalField.class);
             positions.forEach((position, field) -> values.put(field,
                     FormulaCharacters.withoutTheEscape(record.get(position - 1).strip())));
-            addRow(rows, errors, seen, rowNumber, values);
+            addRow(rows, errors, seen, rowNumber, values, banding, ageFallback);
         }
         List<String> ignored = new ArrayList<>();
         for (int position = 1; position <= columnCount; position++) {
@@ -99,11 +114,13 @@ public final class SnapshotParser {
                 ignored.add(String.valueOf(position));
             }
         }
-        return new CsvSnapshot(rows, errors, ignored, leftOut);
+        return new CsvSnapshot(rows, errors, ignored, leftOut, ageFallback);
     }
 
     private static void addRow(List<CsvSnapshot.SnapshotRow> rows, List<CsvSnapshot.RowError> errors,
-                               Set<String> seen, int rowNumber, Map<CanonicalField, String> values) {
+                               Set<String> seen, int rowNumber, Map<CanonicalField, String> values,
+                               AgeBanding banding, Map<String, Integer> ageFallback) {
+        String birthDate = values.remove(CanonicalField.BIRTH_DATE);
         String externalId = values.remove(CanonicalField.EXTERNAL_ID);
         if (!MemberNumber.isUsable(externalId)) {
             errors.add(new CsvSnapshot.RowError(rowNumber,
@@ -113,7 +130,12 @@ public final class SnapshotParser {
             errors.add(new CsvSnapshot.RowError(rowNumber,
                     "import.snapshot.row.duplicateExternalId", Map.of("externalId", externalId)));
         } else {
-            rows.add(new CsvSnapshot.SnapshotRow(rowNumber, externalId, values));
+            String category = values.get(CanonicalField.MEMBERSHIP_TYPE);
+            UUID banded = banding.typeFor(category, birthDate);
+            if (banded == null && banding.splits(category)) {
+                ageFallback.merge(category, 1, Integer::sum);
+            }
+            rows.add(new CsvSnapshot.SnapshotRow(rowNumber, externalId, values, banded));
         }
     }
 
@@ -138,8 +160,9 @@ public final class SnapshotParser {
 
     private static CsvSnapshot read(CSVParser parser, Map<String, CanonicalField> header,
                                     int cellsPerRow, List<String> ignoredColumns, int categoryIndex,
-                                    Set<String> leftOutCategories) {
+                                    Set<String> leftOutCategories, AgeBanding banding) {
         List<CsvSnapshot.SnapshotRow> rows = new ArrayList<>();
+        Map<String, Integer> ageFallback = new TreeMap<>();
         List<CsvSnapshot.RowError> errors = new ArrayList<>();
         Map<String, Integer> leftOut = new TreeMap<>();
         Set<String> seen = new HashSet<>();
@@ -154,9 +177,9 @@ public final class SnapshotParser {
                 errors.add(shape);
                 continue;
             }
-            addRow(rows, errors, seen, rowNumber, valuesOf(record, header));
+            addRow(rows, errors, seen, rowNumber, valuesOf(record, header), banding, ageFallback);
         }
-        return new CsvSnapshot(rows, errors, ignoredColumns, leftOut);
+        return new CsvSnapshot(rows, errors, ignoredColumns, leftOut, ageFallback);
     }
 
     // A left-out row is absent from the snapshot: only its category cell is read, and only counted.

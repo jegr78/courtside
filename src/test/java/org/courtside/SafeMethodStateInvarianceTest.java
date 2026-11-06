@@ -279,7 +279,7 @@ class SafeMethodStateInvarianceTest extends AbstractIntegrationTest {
                         "First name", CanonicalField.FIRST_NAME,
                         "Last name", CanonicalField.LAST_NAME,
                         "Email", CanonicalField.EMAIL)),
-                Map.of(), List.of(), UUID.fromString(membershipTypeId),
+                Map.of(), List.of(), Map.of(), UUID.fromString(membershipTypeId),
                 Set.of(CanonicalField.FIRST_NAME, CanonicalField.LAST_NAME), 10).sourceId();
         UUID previewId = previews.create(sourceId, SnapshotMode.FULL_SNAPSHOT, "UTF-8",
                 new SnapshotUpload("roster.csv", "text/csv", """

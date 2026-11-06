@@ -68,7 +68,7 @@ class ImportPreviewAdminController implements AdminImportPreviewsApi {
         return new ApiImportPreview(summary.previewId(), summary.sourceId(),
                 ApiSnapshotMode.fromValue(summary.mode().name()), summary.fileName(),
                 summary.fileHash(), summary.rowCount(), summary.ignoredColumns(),
-                new TreeMap<>(summary.leftOutRows()),
+                new TreeMap<>(summary.leftOutRows()), new TreeMap<>(summary.ageFallbackRows()),
                 changesOf(changeSet, summary.personNames()), rowErrorsOf(changeSet),
                 duplicatesOf(changeSet, summary.personNames()), sharedAddressesOf(changeSet),
                 removalsOf(changeSet), summary.needsConfirmation(), summary.superseded(),
@@ -86,7 +86,7 @@ class ImportPreviewAdminController implements AdminImportPreviewsApi {
             change.values().forEach((field, value) -> values.put(field.name(), value));
             return new ApiImportPersonChange(ApiImportChangeKind.fromValue(change.kind().name()),
                     change.rowNumber(), change.externalId(), values,
-                    ApiImportAccountOutcome.fromValue(change.account().name()))
+                    ApiImportAccountOutcome.fromValue(change.account().name()), change.typeFromAgeBand())
                     .personId(change.personId())
                     .personName(nameOf(names, change.personId()))
                     .membershipTypeId(change.membershipTypeId());

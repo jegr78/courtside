@@ -60,7 +60,7 @@ class ImportRecordSurvivalTest extends AbstractIntegrationTest {
                         "First name", CanonicalField.FIRST_NAME,
                         "Last name", CanonicalField.LAST_NAME,
                         "Email", CanonicalField.EMAIL)),
-                Map.of(), List.of(), MEMBERSHIP_TYPE_ID,
+                Map.of(), List.of(), Map.of(), MEMBERSHIP_TYPE_ID,
                 Set.of(CanonicalField.FIRST_NAME, CanonicalField.LAST_NAME), 10).sourceId();
         UUID person = identity.createPerson("Richard", "Miles", "richard.miles@example.org");
         account = identity.createAccount(person, "admin", Set.of(Role.ADMIN));

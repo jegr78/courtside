@@ -14,6 +14,7 @@ import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.courtside.dataexchange.AgeBand;
 import org.courtside.dataexchange.CanonicalField;
 import org.courtside.dataexchange.ColumnLayout;
 import org.courtside.dataexchange.ColumnMode;
@@ -21,6 +22,7 @@ import org.courtside.dataexchange.ColumnMode;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -88,6 +90,10 @@ public class ImportSource {
     private Set<String> leftOutCategories = new HashSet<>();
 
     @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "import_age_band", joinColumns = @JoinColumn(name = "source_id"))
+    private Set<AgeBandEntry> ageBands = new HashSet<>();
+
+    @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "import_owned_field", joinColumns = @JoinColumn(name = "source_id"))
     @Enumerated(EnumType.STRING)
     @Column(name = "canonical_field", nullable = false)
@@ -101,7 +107,7 @@ public class ImportSource {
     public void changeTo(String sourceKey, String displayName, String separator, String encoding,
                          ColumnLayout layout,
                          Map<String, UUID> membershipTypes, Set<String> leftOutCategories,
-                         UUID defaultMembershipTypeId,
+                         Map<String, List<AgeBand>> ageBands, UUID defaultMembershipTypeId,
                          Set<CanonicalField> ownedFields, int removalWarningPercent) {
         this.sourceKey = sourceKey;
         this.displayName = displayName;
@@ -119,6 +125,9 @@ public class ImportSource {
         this.membershipTypes.putAll(membershipTypes);
         this.leftOutCategories.clear();
         this.leftOutCategories.addAll(leftOutCategories);
+        this.ageBands.clear();
+        ageBands.forEach((value, bands) -> bands.forEach(band ->
+                this.ageBands.add(new AgeBandEntry(value, band.fromAge(), band.membershipTypeId()))));
         this.ownedFields.clear();
         this.ownedFields.addAll(ownedFields);
     }

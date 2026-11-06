@@ -80,7 +80,7 @@ class LeftOutCategoryImportTest extends AbstractIntegrationTest {
                         "Last name", CanonicalField.LAST_NAME,
                         "Email", CanonicalField.EMAIL,
                         "Status", CanonicalField.MEMBERSHIP_TYPE)),
-                Map.of("active", granting), List.of("resigned", "deceased"), granting,
+                Map.of("active", granting), List.of("resigned", "deceased"), Map.of(), granting,
                 Set.of(CanonicalField.FIRST_NAME, CanonicalField.LAST_NAME, CanonicalField.EMAIL,
                         CanonicalField.MEMBERSHIP_TYPE), 10).sourceId();
         UUID admin = identity.createPerson("Richard", "Miles", "richard.miles@example.org");
