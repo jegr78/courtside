@@ -140,7 +140,10 @@ Statusleiste der installierten App übernimmt die Primärfarbe beim nächsten Ö
   gebuchte Gäste behalten ihren Betrag.
 * **Externe Buchungen zulassen** öffnet Buchungskarten, die die Rolle *Extern* nennen, für Personen
   außerhalb des Vereins. Ohne diesen Haken bucht niemand mit dieser Rolle, auch wenn eine Karte sie
-  nennt.
+  nennt. Solange er gesetzt ist, bietet die Anmeldeseite eine Registrierung an, und zwei Felder
+  nehmen den **Registrierungstext** auf Deutsch und Englisch auf. Die Registrierungsseite zeigt ihn als
+  einfachen Text, etwa wie Gäste bezahlen. Die Registrierung bleibt geschlossen, bis der Betreiber
+  der Instanz ihre öffentliche Adresse eingetragen hat, denn die Bestätigungsmail verlinkt darauf.
 
 ## Verein → Fristen und Erinnerungen
 

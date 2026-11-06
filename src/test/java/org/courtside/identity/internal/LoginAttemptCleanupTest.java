@@ -18,7 +18,7 @@ class LoginAttemptCleanupTest extends AbstractIntegrationTest {
     @Test
     void givenExpiredAndCurrentAttempts_whenCleanupRuns_thenOnlyExpiredAttemptsAreDeleted() {
         // given
-        insertAttempt("a".repeat(64), "2026-05-12 08:00:00Z");
+        insertAttempt("a".repeat(64), "2026-05-12 07:00:00Z");
         insertAttempt("b".repeat(64), "2026-05-12 10:00:00Z");
 
         // when

@@ -54,14 +54,17 @@ class MessageChoiceControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void givenAMemberWhoChoseNothing_whenTheyReadTheirChoices_thenEveryKindIsOnAndSaysWhetherItMayGoOff()
+    void givenAMemberWhoChoseNothing_whenTheyReadTheirChoices_thenEveryKindTheyCanReceiveIsOnAndSaysWhetherItMayGoOff()
             throws Exception {
         // when
         List<Choice> choices = choices();
 
         // then
         assertThat(choices).extracting(Choice::kind)
+                .as("registration mail reaches an address before any account is signed in")
                 .containsExactlyInAnyOrderElementsOf(Arrays.stream(MessageKind.values())
+                        .filter(kind -> kind != MessageKind.REGISTRATION_VERIFICATION
+                                && kind != MessageKind.REGISTRATION_NAME_TAKEN)
                         .map(Enum::name).toList());
         assertThat(choices).allMatch(Choice::enabled, "nothing is switched off before anybody chose");
         assertThat(declinable(choices)).containsExactlyInAnyOrder(

@@ -1033,6 +1033,23 @@ Self-service recovery mails a single-use code for a username without changing th
 the code accepts a permanent password and ends every session. An email-address request mails each
 username registered to that address. Responses do not reveal whether the subject exists.
 
+While the club admits external bookings, a person outside the club registers at `/register` with
+name, username, password and email address (`RegistrationService`). The account carries `EXTERNAL`,
+stays disabled and holds a `registration_verification` row. Its mail carries a single-use link valid
+24 hours; redeeming it enables the account, unless the board has disabled the account or changed
+its roles or username since, or external bookings are off again. The response is `202` whether the username is free or
+taken. A taken username creates nothing and mails the submitted address a pointer back to
+registration, recorded against the holder's account without reaching its centre. The verification
+mail repeats nothing the registrant typed. Each client address, and each submitted mailbox, may
+register a configured number of times per window (`COURTSIDE_REGISTRATION_MAX_PER_WINDOW`,
+`COURTSIDE_REGISTRATION_WINDOW`). The hourly identity cleanup removes an unverified account and its
+person once the window lapsed, unless the board has since switched the account on or other records
+refer to the person; then only the row goes. Redeeming a link is audited. Registration answers
+`registration-closed` while external bookings are off and while `COURTSIDE_PUBLIC_URL` is unset,
+because the link needs it. The board may set a plain-text registration text per language
+(`registration_text_de`, `registration_text_en`) that the page shows above the form. The address
+stays a non-unique contact attribute, and Courtside asks for no proof of age.
+
 Correcting an email address invalidates credentials and reset codes sent to the old one. Disabling
 an account, removing a role, changing membership, correcting username or replacing a password raises
 the security epoch and invalidates older sessions.

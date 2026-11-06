@@ -73,6 +73,8 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
             "/api/account-recovery/mfa/redemption",
             "/api/account-recovery/usernames",
             "/api/openapi.yaml",
+            "/api/registration",
+            "/api/registration/verification",
             "/api/public/booking-card-legend",
             "/api/public/booking-grid",
             "/api/public/config",
@@ -455,6 +457,11 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
                         .andExpect(status().isBadRequest())
                         .andExpect(jsonPath("$.type")
                                 .value("urn:courtside:error:account-recovery-code-invalid"));
+            } else if (endpoint.pattern().equals("/api/registration")
+                    || endpoint.pattern().equals("/api/registration/verification")) {
+                mockMvc.perform(request)
+                        .andExpect(status().isNotFound())
+                        .andExpect(jsonPath("$.type").value("urn:courtside:error:registration-closed"));
             } else if (MFA_PROOF_REQUIRED_ENDPOINTS.contains(endpoint.key())) {
                 mockMvc.perform(request)
                         .andExpect(status().isForbidden())
@@ -645,6 +652,14 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
             }
             if (pattern.equals("/api/account-recovery/mfa/redemption")) {
                 return "{\"username\":\"nobody.here\",\"code\":\"ABCD-EFGH\",\"password\":\"nobody-holds-this-code\"}";
+            }
+            if (pattern.equals("/api/registration")) {
+                return "{\"firstName\":\"Jane\",\"lastName\":\"Doe\",\"username\":\"jane.doe\","
+                        + "\"password\":\"correct horse battery staple\",\"email\":\"jane@example.org\","
+                        + "\"language\":\"en\"}";
+            }
+            if (pattern.equals("/api/registration/verification")) {
+                return "{\"code\":\"ABCD-EFGH\"}";
             }
             if (pattern.equals("/api/account-recovery/usernames")) {
                 return "{\"email\":\"nobody@example.org\"}";

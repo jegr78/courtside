@@ -30,6 +30,7 @@ const REVIEWED_PASSWORD_FIELDS = [
   "frontend/src/views/InitialPasswordView.tsx#confirm-password",
   "frontend/src/views/InitialPasswordView.tsx#new-password",
   "frontend/src/views/LoginView.tsx#password",
+  "frontend/src/views/RegisterView.tsx#registration-password",
   "frontend/src/views/import/ImportExecutionPanel.tsx#import-reauthentication-password"
 ];
 const pom = readFileSync(join(repository, "pom.xml"), "utf8");

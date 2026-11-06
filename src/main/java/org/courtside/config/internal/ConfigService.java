@@ -285,6 +285,12 @@ public class ConfigService implements BookingGridSettings, BookingGridCoordinati
         if (command.externalBookings() != null) {
             addIfChanged(fields, "externalBookings", configuration.isExternalBookings(), command.externalBookings());
         }
+        if (command.registrationTexts() != null) {
+            addIfChanged(fields, "registrationTextDe", configuration.getRegistrationTextDe(),
+                    command.registrationTexts().german());
+            addIfChanged(fields, "registrationTextEn", configuration.getRegistrationTextEn(),
+                    command.registrationTexts().english());
+        }
         addIfChanged(fields, "noMembershipTypeRuleSetId",
                 configuration.getNoMembershipTypeRuleSetId(), command.noMembershipTypeRuleSetId());
         return new Changes(List.copyOf(fields),
@@ -322,6 +328,10 @@ public class ConfigService implements BookingGridSettings, BookingGridCoordinati
         }
         if (command.externalBookings() != null) {
             configuration.admitExternalBookings(command.externalBookings());
+        }
+        if (command.registrationTexts() != null) {
+            configuration.describeRegistrationIn(command.registrationTexts().german(),
+                    command.registrationTexts().english());
         }
         configuration.bindPeopleWithoutAMembershipTypeTo(command.noMembershipTypeRuleSetId());
     }

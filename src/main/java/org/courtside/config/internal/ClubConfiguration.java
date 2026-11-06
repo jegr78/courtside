@@ -95,6 +95,12 @@ public class ClubConfiguration {
     @Column(name = "external_bookings", nullable = false)
     private boolean externalBookings;
 
+    @Column(name = "registration_text_de")
+    private String registrationTextDe;
+
+    @Column(name = "registration_text_en")
+    private String registrationTextEn;
+
     @Column(name = "no_membership_type_rule_set_id")
     private UUID noMembershipTypeRuleSetId;
 
@@ -147,6 +153,11 @@ public class ClubConfiguration {
 
     public void admitExternalBookings(boolean admitted) {
         this.externalBookings = admitted;
+    }
+
+    public void describeRegistrationIn(String german, String english) {
+        this.registrationTextDe = german;
+        this.registrationTextEn = english;
     }
 
     public void bindPeopleWithoutAMembershipTypeTo(UUID ruleSetId) {

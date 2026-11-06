@@ -33,6 +33,12 @@ name for each short form. Your own bookings also carry a person symbol.
 The board creates your account. Courtside first sends you a welcome message, then the username and a
 one-time password in a separate email. Nobody on the board sees or chooses that password.
 
+If your club admits external bookings, you can register yourself without a membership. Select *No
+account? Register without a membership* on the sign-in page, enter your name, email address,
+username and password, and open the link in the email that follows. Only then can you sign in. The
+link works once for 24 hours; Courtside removes an account that is not confirmed by then. Courtside
+asks for no proof of age.
+
 1. Select *Sign in*.
 2. Enter your username and password.
 3. Select *Sign in* again.

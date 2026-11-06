@@ -148,6 +148,11 @@ const BOUNDARIES = {
     classification: "passed back to sign-in only when returnTarget accepts it, and dropped otherwise",
     test: "src/views/AccountRecoveryView.test.tsx#given recovery reached with a target, when the member goes back to sign in, then the target travels with them"
   },
+  "src/views/RegistrationVerificationView.tsx useLocation": {
+    value: "the verification code in the address fragment",
+    classification: "sent once to the verification endpoint, which decides whether it is valid, and never stored or rendered",
+    test: "src/views/RegisterView.test.tsx#given a link with its code, when the page opens, then the code is verified once and the account is announced active"
+  },
   "src/views/MyBookingsView.tsx location": {
     value: "the fragment a notification link put on the address",
     classification: "names an element id the page looks up among the bookings it already shows, so an unknown id moves nothing and reaches no data",

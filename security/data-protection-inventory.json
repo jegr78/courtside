@@ -272,7 +272,8 @@
     "mfa-credential": "Removed by its holder, MFA disablement, successful controlled recovery or account deletion. Labels and usage metadata remain private to the holder while the credential exists.",
     "mfa-controlled-recovery": "Replaced by a new rescue, invalidated by address correction and removed by successful redemption or account deletion. Expiry denies redemption and retains the recovery block until a new rescue completes.",
     "access-grant": "Kept for as long as its booking: the row is never deleted, holds what the access pass last derived and what the access-control system answered, and names a person only through the booking.",
-    "access-code": "A grant's current code is detached once no door can accept it any more and the detached row is deleted by the access pass when its hold ends, which is the latest window any install asked for."
+    "access-code": "A grant's current code is detached once no door can accept it any more and the detached row is deleted by the access pass when its hold ends, which is the latest window any install asked for.",
+    "registration-verification": "Deleted when the mailed code is redeemed; the identity cleanup sweep removes it together with its unverified account and person once it has lapsed."
   },
   "inMemoryState": {
     "AuditAdminController": {
@@ -1045,6 +1046,14 @@
         "lifecycle": "club-configuration"
       },
       "external_bookings": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "registration_text_de": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "registration_text_en": {
         "level": "operational",
         "lifecycle": "club-configuration"
       },
@@ -2365,6 +2374,28 @@
       "position": {
         "level": "operational",
         "lifecycle": "waitlist-sweep"
+      }
+    },
+    "registration_verification": {
+      "account_id": {
+        "level": "pseudonymous",
+        "lifecycle": "registration-verification"
+      },
+      "code_hash": {
+        "level": "secret",
+        "lifecycle": "registration-verification"
+      },
+      "created_at": {
+        "level": "operational",
+        "lifecycle": "registration-verification"
+      },
+      "expires_at": {
+        "level": "operational",
+        "lifecycle": "registration-verification"
+      },
+      "security_epoch": {
+        "level": "operational",
+        "lifecycle": "registration-verification"
       }
     }
   }

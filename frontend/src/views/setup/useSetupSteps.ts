@@ -42,13 +42,15 @@ const factoryConfiguration = {
   accessCodeLength: 6,
   currency: "EUR",
   externalBookings: false,
+  registrationTextDe: null,
+  registrationTextEn: null,
   logoUploaded: false,
   noMembershipTypeRuleSetId: null
 } as const;
 
 function configurationChanged(configuration: AdminClubConfig): boolean {
   return Object.entries(factoryConfiguration)
-    .some(([key, value]) => configuration[key as keyof AdminClubConfig] !== value);
+    .some(([key, value]) => (configuration[key as keyof AdminClubConfig] ?? null) !== value);
 }
 
 async function hasCurrentMember(): Promise<boolean> {

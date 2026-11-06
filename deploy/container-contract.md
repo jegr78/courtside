@@ -211,7 +211,8 @@ when the first message is sent. These two refusals are easy to meet on another p
 `COURTSIDE_SOURCE_URL` defaults to this repository, so an image built from modified source has to
 point it at that source.
 
-`COURTSIDE_PUBLIC_URL` is the address booking messages link to. Unset, they go out without a link.
+`COURTSIDE_PUBLIC_URL` is the address booking messages link to. Unset, they go out without a link,
+and self-registration stays closed because its verification link needs the address.
 Set, it must be an absolute `https://` address without path, query or credentials, or the
 application refuses to start.
 
@@ -341,6 +342,8 @@ they name a file on the host, in the container the path it is mounted at. The
 | `COURTSIDE_PASSWORD_RESET_MAIL_MAX_PER_WINDOW` | `5` |
 | `COURTSIDE_PASSWORD_RESET_MAIL_RETENTION` | `24h` |
 | `COURTSIDE_PASSWORD_RESET_MAIL_WINDOW` | `1h` |
+| `COURTSIDE_REGISTRATION_MAX_PER_WINDOW` | `5` |
+| `COURTSIDE_REGISTRATION_WINDOW` | `1h` |
 | `COURTSIDE_PASSWORD_TERMS_FILE` | unset |
 | `COURTSIDE_MFA_KEY_FILE` | unset |
 | `COURTSIDE_MFA_KEY_ROOT` | unset |

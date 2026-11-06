@@ -41,8 +41,9 @@ class InstanceLinks implements InstanceOrigin {
             case BOOKING_CANCELLED, BOOKING_CANCELLED_BY_CLUB, BOOKING_RELEASED, BOOKING_SERIES_CREATED,
                  BOOKING_SERIES_CANCELLED_BY_CLUB, BOOKING_SERIES_MOVED_BY_CLUB, MEMBERS_DOOR_CODE_CHANGED -> "/my-bookings";
             case WAITLIST_OFFER -> "/my-bookings#waitlist-" + message.waitlistEntry();
+            case REGISTRATION_NAME_TAKEN -> "/register";
             case CREDENTIALS_NEW_ACCOUNT, CREDENTIALS_PASSWORD_RESET, ACCOUNT_USERNAME_REMINDER,
-                 ACCOUNT_PASSWORD_RESET_CODE, ACCOUNT_MFA_RECOVERY_CODE ->
+                 ACCOUNT_PASSWORD_RESET_CODE, ACCOUNT_MFA_RECOVERY_CODE, REGISTRATION_VERIFICATION ->
                     throw new IllegalStateException(message.kind() + " is a credential message and carries no link");
         };
         return origin.isEmpty() ? "" : origin + target;

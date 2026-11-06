@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Arrays;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -16,6 +17,9 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class OwnMessageChoices {
+
+    private static final Set<MessageKind> BEFORE_ANY_ACCOUNT =
+            EnumSet.of(MessageKind.REGISTRATION_VERIFICATION, MessageKind.REGISTRATION_NAME_TAKEN);
 
     private final CurrentUser currentUser;
     private final MessageChoices choices;
@@ -25,6 +29,7 @@ public class OwnMessageChoices {
     public List<MessageChoiceView> current() {
         Set<MessageKind> declined = Set.copyOf(choices.declinedBy(accountId()));
         return Arrays.stream(MessageKind.values())
+                .filter(kind -> !BEFORE_ANY_ACCOUNT.contains(kind))
                 .map(kind -> new MessageChoiceView(kind, kind.isDeclinable(), !declined.contains(kind)))
                 .toList();
     }

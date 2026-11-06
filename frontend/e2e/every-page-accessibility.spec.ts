@@ -1,6 +1,6 @@
 import { expect, selectJourneyDate, selectPreference, test } from "./fixtures";
 import { routePattern } from "./declared-routes";
-import { become, concretePath, PERSONAS, personas, routerPages, settled } from "./page-sweep";
+import { admitExternalBookings, become, concretePath, PERSONAS, personas, routerPages, settled } from "./page-sweep";
 import { STANDARD_RULE_SET } from "./shipped-rows";
 import { axeFindings, expectCourtPlanLoaded, expectNoWcagViolations, signIn, tabToTestId, transitionsSettled } from "./accessibility-checks";
 
@@ -50,6 +50,7 @@ const managedAppointmentsPage = {
 };
 
 async function standInsForEmptyTables(page: import("@playwright/test").Page) {
+  await admitExternalBookings(page);
   await page.route("**/api/managed/bookings?**", (route) => route.fulfill({ json: managedAppointmentsPage }));
   await page.route("**/api/admin/operational-logs/search", (route) => route.fulfill({ json: operationalLogPage }));
   await page.route("**/api/admin/statistics/messages**", async (route) => {

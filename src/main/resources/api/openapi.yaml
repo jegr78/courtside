@@ -82,6 +82,8 @@ servers:
 tags:
   - name: session
     description: Logging in and out.
+  - name: registration
+    description: Accounts for people outside the club.
   - name: documentation
     description: The contract this instance answers to.
   - name: source
@@ -394,6 +396,51 @@ components:
           format: password
           minLength: 12
           maxLength: 256
+
+    RegistrationRequest:
+      type: object
+      description: |
+        A person outside the club asking for an account. The username follows the shape
+        `UsernameRequest` states, and the password meets the same policy as any other.
+      required: [firstName, lastName, username, password, email, language]
+      properties:
+        firstName:
+          type: string
+          minLength: 1
+          maxLength: 60
+          pattern: "[^\\u0000-\\u001f\\u007f-\\u009f]*[^\\u0000-\\u0020\\u007f-\\u009f\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff][^\\u0000-\\u001f\\u007f-\\u009f]*"
+        lastName:
+          type: string
+          minLength: 1
+          maxLength: 60
+          pattern: "[^\\u0000-\\u001f\\u007f-\\u009f]*[^\\u0000-\\u0020\\u007f-\\u009f\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff][^\\u0000-\\u001f\\u007f-\\u009f]*"
+        username:
+          type: string
+          minLength: 3
+          maxLength: 60
+          pattern: "^[a-z0-9._-]+$"
+        password:
+          type: string
+          format: password
+          minLength: 12
+          maxLength: 256
+        email:
+          type: string
+          format: email
+          minLength: 3
+          maxLength: 120
+        language:
+          type: string
+          enum: [de, en]
+          description: The language the verification message is written in.
+
+    RegistrationVerificationRequest:
+      type: object
+      required: [code]
+      properties:
+        code:
+          type: string
+          pattern: "^[2-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{4}[- ]?[2-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{4}$"
 
     UsernameReminderRequest:
       type: object
@@ -1464,6 +1511,14 @@ components:
           type: [string, "null"]
           maxLength: 500
           pattern: "^(https?://\\S+|/[^/\\\\\\s]\\S*|/)$"
+        registrationTextDe:
+          type: [string, "null"]
+          maxLength: 2000
+          description: Plain text the registration page shows in German. Null shows none.
+        registrationTextEn:
+          type: [string, "null"]
+          maxLength: 2000
+          description: Plain text the registration page shows in English. Null shows none.
         privacyUrl:
           type: [string, "null"]
           maxLength: 500
@@ -1570,6 +1625,18 @@ components:
           type: [string, "null"]
           maxLength: 500
           pattern: "^(https?://\\S+|/[^/\\\\\\s]\\S*|/)$"
+        registrationTextDe:
+          type: [string, "null"]
+          maxLength: 2000
+          description: |
+            Plain text the registration page shows in German. Leaving it out keeps the current
+            text; an empty text removes it.
+        registrationTextEn:
+          type: [string, "null"]
+          maxLength: 2000
+          description: |
+            Plain text the registration page shows in English. Leaving it out keeps the current
+            text; an empty text removes it.
         privacyUrl:
           type: [string, "null"]
           maxLength: 500
@@ -4519,7 +4586,7 @@ components:
              BOOKING_REMINDER, BOOKING_CANCELLED, BOOKING_CANCELLED_BY_CLUB, BOOKING_RELEASED,
              BOOKING_SERIES_CREATED, BOOKING_SERIES_CANCELLED_BY_CLUB, BOOKING_SERIES_MOVED_BY_CLUB,
              WAITLIST_OFFER, BOOKING_PARTNER_FOUND, BOOKING_PLACE_TAKEN, ACCESS_CODE_CHANGED,
-             ACCESS_CODE_READY, MEMBERS_DOOR_CODE_CHANGED]
+             ACCESS_CODE_READY, MEMBERS_DOOR_CODE_CHANGED, REGISTRATION_VERIFICATION, REGISTRATION_NAME_TAKEN]
 
     MessageTemplateLanguage:
       type: string
@@ -5626,6 +5693,75 @@ paths:
         "202":
           description: |
             The request was accepted. Whether a message follows is deliberately not said.
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/registration:
+    post:
+      tags: [registration]
+      operationId: registerExternalAccount
+      summary: Register an account for a person outside the club.
+      description: |
+        Available only while the club admits external bookings; otherwise the answer is `404` with
+        `urn:courtside:error:registration-closed`. The account is created with the role `EXTERNAL`
+        and stays unable to sign in until the address is verified through the link the instance
+        mails. The link is single-use and expires after 24 hours; an account still unverified then
+        is removed together with its person.
+
+        The answer is `202` with no body whether or not the username is taken. A taken username
+        creates nothing; the submitted address receives a message pointing back to registration
+        instead. The address is a contact attribute and may repeat across accounts.
+
+        Each client address may register a limited number of times per window. Over that limit the
+        answer is `429` with `urn:courtside:error:registration-rate-limited` and `Retry-After`.
+      security:
+        - csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RegistrationRequest" }
+      responses:
+        "202":
+          description: >-
+            The registration was accepted. The response does not say whether an account was created; the
+            mail to the submitted address does.
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/registration/verification:
+    post:
+      tags: [registration]
+      operationId: verifyRegistration
+      summary: Verify a registered address with the code from its link.
+      description: |
+        Enables the account the code was mailed for and consumes the code. An unknown or already
+        used code is answered `400` with `urn:courtside:error:registration-code-invalid`, an
+        expired one with `urn:courtside:error:registration-code-expired`.
+      security:
+        - csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RegistrationVerificationRequest" }
+      responses:
+        "204":
+          description: The address is verified and the account can sign in.
         "400":
           $ref: "#/components/responses/Invalid"
         "403":

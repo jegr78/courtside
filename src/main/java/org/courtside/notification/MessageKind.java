@@ -27,7 +27,9 @@ public enum MessageKind {
     BOOKING_PLACE_TAKEN("booking.placeTaken", true, false),
     ACCESS_CODE_CHANGED("booking.accessCodeChanged", false, false),
     ACCESS_CODE_READY("booking.accessCodeReady", false, false),
-    MEMBERS_DOOR_CODE_CHANGED("members.doorCodeChanged", false, false);
+    MEMBERS_DOOR_CODE_CHANGED("members.doorCodeChanged", false, false),
+    REGISTRATION_VERIFICATION("account.registrationVerification", false, true),
+    REGISTRATION_NAME_TAKEN("account.registrationNameTaken", false, true);
 
     private final String templateKey;
     private final boolean declinable;

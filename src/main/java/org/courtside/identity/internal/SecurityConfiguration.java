@@ -89,7 +89,10 @@ public class SecurityConfiguration {
                 .matcher(HttpMethod.POST, "/api/account-recovery/password/redemption");
         RequestMatcher mfaRecovery = PathPatternRequestMatcher.withDefaults()
                 .matcher(HttpMethod.POST, "/api/account-recovery/mfa/redemption");
+        RequestMatcher registrationVerification = PathPatternRequestMatcher.withDefaults()
+                .matcher(HttpMethod.POST, "/api/registration/verification");
         return request -> mfaRecovery.matches(request) || reauthentication.matches(request)
+                || registrationVerification.matches(request)
                 || initialPasswordChange.matches(request)
                 || passwordChange.matches(request)
                 || resetRedemption.matches(request);
@@ -178,6 +181,7 @@ public class SecurityConfiguration {
                         .requestMatchers("/api/openapi.yaml", "/api/source").permitAll()
                         .requestMatchers("/", "/courts", "/login", "/initial-password", "/my-bookings",
                                 "/my-messages", "/my-dependants", "/account", "/account/security", "/account-recovery",
+                                "/register", "/registration/verify",
                                 "/admin", "/admin/appointments", "/admin/setup",
                                 "/admin/configuration", "/admin/deadlines", "/admin/rule-sets", "/admin/message-wording",
                                 "/admin/facility",
@@ -202,6 +206,7 @@ public class SecurityConfiguration {
                                 "/workbox-*.js").permitAll()
                         .requestMatchers("/api/session").permitAll()
                         .requestMatchers("/api/session/mfa", "/api/session/mfa/**").permitAll()
+                        .requestMatchers("/api/registration", "/api/registration/verification").permitAll()
                         .requestMatchers("/api/account-recovery/password",
                                 "/api/account-recovery/password/redemption",
                                 "/api/account-recovery/usernames", "/api/account-recovery/mfa/redemption").permitAll()

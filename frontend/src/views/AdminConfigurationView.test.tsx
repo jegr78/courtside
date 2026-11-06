@@ -688,6 +688,30 @@ describe("AdminConfigurationView", () => {
     await waitFor(() => expect(changing).toHaveBeenCalledWith(expect.objectContaining({ externalBookings: true })));
   });
 
+  it("given external bookings switched on, when the board writes the registration texts, then both are sent with the profile", async () => {
+    // given
+    const changing = vi.spyOn(api, "changeAdminConfig").mockResolvedValue({
+      clubName: "Example Tennis Club", primaryColor: "#b85c38", accentColor: "#d7e24b",
+      defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30,
+      timeZone: "Europe/Berlin", newAccountCredentialHours: 168, passwordResetCredentialHours: 24, passwordResetTokenMinutes: 60,
+      bookingReminderHours: 24, waitlistOfferMinutes: 15, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6, logoUploaded: false, externalBookings: true, currency: "EUR"
+    });
+    render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
+    const external = await screen.findByTestId("config-external-bookings");
+    expect(screen.queryByTestId("config-registration-text-de"), "the texts only matter once outsiders may register").toBeNull();
+
+    // when
+    await userEvent.click(external);
+    await userEvent.type(screen.getByTestId("config-registration-text-de"), "Gäste zahlen bar.");
+    await userEvent.type(screen.getByTestId("config-registration-text-en"), "Guests pay cash.");
+    await userEvent.click(screen.getByTestId("save-club-config"));
+
+    // then
+    await waitFor(() => expect(changing).toHaveBeenCalledWith(expect.objectContaining({
+      registrationTextDe: "Gäste zahlen bar.", registrationTextEn: "Guests pay cash."
+    })));
+  });
+
   it("given a club that charges in euros, when the board types another currency, then the upper-case code is written", async () => {
     // given
     const changing = vi.spyOn(api, "changeAdminConfig").mockResolvedValue({

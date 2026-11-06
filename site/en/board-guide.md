@@ -129,7 +129,11 @@ time it opens.
   A change converts nothing: the fees of the booking types keep their number, and guests already
   booked keep their amount.
 * **Admit external bookings** opens booking cards that name the *External* role to people outside
-  the club. Without it nobody with that role books, even on a card that names it.
+  the club. Without it nobody with that role books, even on a card that names it. While it is on,
+  the sign-in page offers registration, and two fields take the **registration text** in German
+  and English. The registration page shows it as plain text, for example how guests pay.
+  Registration stays closed until whoever runs the instance has set its public address, because the
+  confirmation mail links to it.
 
 ## Club → Deadlines and reminders
 

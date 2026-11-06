@@ -18,6 +18,7 @@ import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.HexFormat;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -146,6 +147,26 @@ class LoginAttemptProtection {
                 SecurityEventLog.ControlTrigger.ACCOUNT_RECOVERY_ADDRESS_LIMIT);
         // A campaign spread thin enough to miss both buckets still has to move the instance-wide
         // count, which is the only thing an operator watches for one.
+        lock(Scope.GLOBAL, hash("all"));
+        observeGlobalAttempt();
+        return Optional.empty();
+    }
+
+    @Transactional
+    Optional<LoginBlock> registerRegistrationAttempt(String recipient, String address) {
+        String mailbox = "registration-recipient:" + normalizeAddress(recipient).toLowerCase(Locale.ROOT);
+        String source = "registration-address:" + normalizeAddress(address);
+        lock(Scope.ACCOUNT, hash(mailbox));
+        lock(Scope.ADDRESS, hash(source));
+        Optional<LoginBlock> retryAfter = retryAfter(Scope.ACCOUNT, mailbox)
+                .or(() -> retryAfter(Scope.ADDRESS, source));
+        if (retryAfter.isPresent()) {
+            return retryAfter;
+        }
+        recordAttempt(Scope.ACCOUNT, mailbox, properties.registration(),
+                SecurityEventLog.ControlTrigger.REGISTRATION_RECIPIENT_LIMIT);
+        recordAttempt(Scope.ADDRESS, source, properties.registration(),
+                SecurityEventLog.ControlTrigger.REGISTRATION_ADDRESS_LIMIT);
         lock(Scope.GLOBAL, hash("all"));
         observeGlobalAttempt();
         return Optional.empty();

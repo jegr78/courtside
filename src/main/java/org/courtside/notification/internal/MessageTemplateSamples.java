@@ -24,6 +24,7 @@ final class MessageTemplateSamples {
         values.put("username", "jane.doe");
         values.put("credential", "K7m2-pX9q");
         values.put("resetCode", "4826-1937");
+        values.put("verificationLink", "https://courts.example.org/registration/verify#4826-1937");
         values.put("player", "John Roe");
         values.put("day", DateTimeFormatter.ofLocalizedDate(FormatStyle.FULL).withLocale(locale).format(DAY));
         values.put("untilDay", DateTimeFormatter.ofLocalizedDate(FormatStyle.FULL).withLocale(locale).format(DAY));

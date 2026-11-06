@@ -1,6 +1,6 @@
 import { type Page } from "@playwright/test";
 import { routePattern } from "./declared-routes";
-import { become, concretePath, PERSONAS, personas, routerPages } from "./page-sweep";
+import { admitExternalBookings, become, concretePath, PERSONAS, personas, routerPages } from "./page-sweep";
 import { expect, expectAdministrationOverview, expectShownAsEmpty, routeLongSeries, selectJourneyDate, seriesBookingId, test } from "./fixtures";
 import { LEAGUE_MATCH_CARD, MEMBER_BOOKING_CARD } from "./shipped-rows";
 import { expectNoWcagViolations } from "./accessibility-checks";
@@ -1755,6 +1755,7 @@ test("given a German word longer than a 320 px line, when a heading wraps it, th
 
 test("every page keeps its text legible and its controls on screen at phone width", async ({ page }) => {
   // given
+  await admitExternalBookings(page);
   const pages = routerPages();
   const visits = PERSONAS
     .map((persona) => ({ persona, paths: pages.filter((route) => personas(route.path).includes(persona)).map((route) => route.path) }));
