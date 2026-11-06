@@ -13,6 +13,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.nio.charset.Charset;
+import java.text.Collator;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.Year;
@@ -20,6 +22,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Currency;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -32,6 +35,8 @@ public class GuestFeeReportService {
 
     private static final List<String> TRAILING_HEADER =
             List.of("firstName", "lastName", "email", "guestPlaces", "amount", "currency");
+
+    private static final Collator NAMES = Collator.getInstance(Locale.ROOT);
 
     private final BookingLedger ledger;
     private final PersonRepository persons;
@@ -66,13 +71,14 @@ public class GuestFeeReportService {
     @Transactional(timeoutString = DatabaseDeadlines.REPORT)
     public Download file(LocalDate from, LocalDate to, char separator, String encoding) {
         RosterExportService.requireUsableSeparator(separator);
+        Charset charset = SupportedEncodings.forWriting(encoding);
         Report report = read(from, to, DataExchangeEvent.GuestFeesRead.Form.FILE);
         List<String> header = new ArrayList<>();
-        report.sources().forEach(source -> header.add(ExportCsv.cell("memberNumber " + source.displayName())));
+        report.sources().forEach(source -> header.add("memberNumber " + source.displayName()));
         header.addAll(TRAILING_HEADER);
         List<List<String>> rows = report.rows().stream().map(row -> cells(row, report.sources())).toList();
         return new Download(report.from(), report.to(),
-                ExportCsv.write(header, rows, separator, SupportedEncodings.forWriting(encoding)));
+                ExportCsv.write(header, rows, separator, charset));
     }
 
     private Report read(LocalDate requestedFrom, LocalDate requestedTo, DataExchangeEvent.GuestFeesRead.Form form) {
@@ -95,7 +101,7 @@ public class GuestFeeReportService {
                 reference -> sourceOrder.indexOf(reference.sourceId()))));
         List<Row> rows = charged.members().stream()
                 .map(line -> row(line, people.get(line.personId()), numbers.getOrDefault(line.personId(), List.of())))
-                .sorted(Comparator.comparing(Row::lastName).thenComparing(Row::firstName)
+                .sorted(Comparator.comparing(Row::lastName, NAMES).thenComparing(Row::firstName, NAMES)
                         .thenComparing(Row::personId).thenComparing(Row::currency))
                 .toList();
         events.publishEvent(new DataExchangeEvent.GuestFeesRead(from, to, form));

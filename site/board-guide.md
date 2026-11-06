@@ -808,7 +808,7 @@ der Verein die Währung gewechselt, steht ein Mitglied für jede Währung in ein
 Gastplätze aus Buchungen, die nach der Aufbewahrungsfrist kein Mitglied mehr nennen, nennt die Seite
 nur als Anzahl.
 
-*Herunterladen* speichert die Liste als CSV-Datei mit einer Spalte Mitgliedsnummer je Importquelle,
+*Datei herunterladen* speichert die Liste als CSV-Datei mit einer Spalte Mitgliedsnummer je Importquelle,
 Vorname, Nachname, E-Mail-Adresse, Gastplätzen, Betrag und Währung. Courtside markiert nichts als
 abgerechnet. Jedes Öffnen und jeder Download steht im Änderungsprotokoll, mit dem Zeitraum, ohne
 Namen oder Beträge.

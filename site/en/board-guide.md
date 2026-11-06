@@ -766,7 +766,7 @@ to the account the booking was made for, also when a guardian booked for their c
 changed its currency, a member has one row per currency. Guest places from bookings that no longer
 name a member after the retention period appear only as a count.
 
-*Download* saves the list as a CSV file with one member number column per import source, first
+*Download the file* saves the list as a CSV file with one member number column per import source, first
 name, last name, email address, guest places, amount and currency. Courtside marks nothing as
 invoiced. Every opening and every download is in the change log with its period, without names or
 amounts.

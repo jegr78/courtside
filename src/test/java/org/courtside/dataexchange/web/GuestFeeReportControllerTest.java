@@ -158,6 +158,40 @@ class GuestFeeReportControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenATreasurerWhoMustStillChangeTheirPassword_whenTheyAskForTheReport_thenTheyAreRefused() throws Exception {
+        // given
+        identity.requirePasswordChange("major.mary");
+
+        // when / then
+        mockMvc.perform(post(REPORT).with(csrf()).with(user(as("major.mary")))).andExpect(status().isForbidden());
+        mockMvc.perform(post(EXPORT).with(csrf()).with(user(as("major.mary")))).andExpect(status().isForbidden());
+    }
+
+    @Test
+    void givenNoSession_whenTheReportIsAskedFor_thenTheCallerMustSignIn() throws Exception {
+        // when / then
+        mockMvc.perform(post(REPORT).with(csrf())).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void givenAPeriodLongerThanAYear_whenTheReportIsRead_thenItIsRefusedByNameAndNothingIsRecorded() throws Exception {
+        // when / then
+        mockMvc.perform(post(REPORT).param("from", "2025-01-01").param("to", "2026-01-02")
+                        .with(csrf()).with(user(as("major.mary"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.violations[0].code").value("booking.facilityUtilisation.periodTooLong"));
+        assertThat(readsRecorded()).as("a refused period reads nothing").isZero();
+    }
+
+    @Test
+    void givenAnEncodingThatCannotWrite_whenTheReportIsDownloaded_thenItIsRefusedAndNothingIsRecorded() throws Exception {
+        // when / then
+        mockMvc.perform(post(EXPORT).param("encoding", "UTF-99").with(csrf()).with(user(as("major.mary"))))
+                .andExpect(status().isBadRequest());
+        assertThat(readsRecorded()).as("a refused download reads nothing").isZero();
+    }
+
+    @Test
     void givenAReversedPeriod_whenTheReportIsRead_thenThePeriodIsRefusedByName() throws Exception {
         // when / then
         mockMvc.perform(post(REPORT).param("from", "2026-12-31").param("to", "2026-01-01")
@@ -210,6 +244,11 @@ class GuestFeeReportControllerTest extends AbstractIntegrationTest {
         UUID forgotten = booking(johnAccount, "2026-02-01T10:00:00Z");
         bookings.chargeGuests(forgotten, 1, 500, "EUR");
         bookings.pseudonymise(forgotten);
+    }
+
+    private long readsRecorded() {
+        return jdbc.sql("SELECT count(*) FROM domain_event WHERE event_type = 'dataexchange.guestFees.read'")
+                .query(Long.class).single();
     }
 
     private UUID booking(UUID bookedBy, String startsAt) {
