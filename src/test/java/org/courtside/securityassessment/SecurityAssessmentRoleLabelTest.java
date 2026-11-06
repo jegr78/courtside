@@ -22,6 +22,6 @@ class SecurityAssessmentRoleLabelTest {
         assertThat(labels).containsExactlyInAnyOrderEntriesOf(Map.of(
                 Role.MEMBER, "Member", Role.TRAINER, "Trainer", Role.SPORT_DIRECTOR, "SportDirector",
                 Role.YOUTH_DIRECTOR, "YouthDirector", Role.GROUNDSKEEPER, "Groundskeeper",
-                Role.TREASURER, "Treasurer", Role.ADMIN, "Administrator"));
+                Role.TREASURER, "Treasurer", Role.ADMIN, "Administrator", Role.EXTERNAL, "External"));
     }
 }

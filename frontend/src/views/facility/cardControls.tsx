@@ -34,8 +34,11 @@ function RoleCheckboxes({ options, legendKey, hintKey, hintTestId, name, selecte
   </fieldset>;
 }
 
+// A person outside the club books cards that name them, and never manages anybody's booking.
+const allowedRoleOptions: Role[] = [...roles, "EXTERNAL"];
+
 export function AllowedRoleCheckboxes(props: { name?: string; selected: Role[]; disabled?: boolean; changed?: (roles: Role[]) => void; testIdPrefix?: string }) {
-  return <RoleCheckboxes {...props} options={roles} legendKey="admin.facility.allowedRoles" hintKey="admin.facility.allowedRolesHint" hintTestId="allowed-roles-hint" />;
+  return <RoleCheckboxes {...props} options={allowedRoleOptions} legendKey="admin.facility.allowedRoles" hintKey="admin.facility.allowedRolesHint" hintTestId="allowed-roles-hint" />;
 }
 
 export function ManagingRoleCheckboxes(props: { name?: string; selected: Role[]; disabled?: boolean; changed?: (roles: Role[]) => void; testIdPrefix?: string }) {

@@ -1,6 +1,8 @@
 package org.courtside.card;
 
 import org.courtside.AbstractIntegrationTest;
+import org.courtside.card.testfixture.CardTestFixture;
+import org.courtside.config.testfixture.ConfigTestFixture;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.courtside.member.testfixture.MemberTestFixture;
@@ -14,7 +16,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@Import({MemberTestFixture.class, IdentityTestFixture.class})
+@Import({MemberTestFixture.class, IdentityTestFixture.class, CardTestFixture.class, ConfigTestFixture.class})
 class CardServiceTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_BOOKING_CARD =
@@ -36,6 +38,10 @@ class CardServiceTest extends AbstractIntegrationTest {
     private MemberTestFixture members;
     @Autowired
     private IdentityTestFixture identity;
+    @Autowired
+    private CardTestFixture cards;
+    @Autowired
+    private ConfigTestFixture config;
 
     @Test
     void whenListingActiveCards_thenTheFourSeededCardsAreReturned() {
@@ -102,6 +108,23 @@ class CardServiceTest extends AbstractIntegrationTest {
 
         // then
         assertThat(result).as("the member card asks for a membership, not for the member role").isEmpty();
+    }
+
+    @Test
+    void givenACardNamingExternals_whenAnExternalAccountListsBookableCards_thenTheSwitchDecidesWhetherItIsOffered() {
+        // given
+        UUID external = account("roe.john", false, Role.EXTERNAL);
+        UUID winterHall = cards.createBookingCard("Winter hall", Set.of(Role.EXTERNAL), Set.of());
+
+        // when
+        List<BookingCard> whileClosed = cardService.bookableCards(external, Set.of(Role.EXTERNAL));
+        config.admitExternalBookings(true);
+        List<BookingCard> whileAdmitted = cardService.bookableCards(external, Set.of(Role.EXTERNAL));
+
+        // then
+        assertThat(whileClosed).as("the switch is off by default").isEmpty();
+        assertThat(whileAdmitted).extracting(BookingCard::getId)
+                .as("a member card stays closed to an external account").containsExactly(winterHall);
     }
 
     private UUID account(String username, boolean currentMember, Role... roles) {

@@ -563,6 +563,22 @@ class BookingCardAdminControllerTest extends AbstractIntegrationTest {
                 .as("an absent signal keeps the card's current value").isFalse();
     }
 
+    @Test
+    void givenANewCard_whenABoardNamesTheExternalRoleAsManaging_thenTheCardIsRefusedByCode() throws Exception {
+        // when / then
+        mockMvc.perform(post("/api/admin/booking-cards")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"label": "Winter hall", "color": "#c8a415",
+                                 "allowedRoles": ["EXTERNAL"], "managingRoles": ["EXTERNAL"], "allowedPlayerCounts": [],
+                                 "countsAgainstLimits": false, "guestAllowed": false}
+                                """)
+                        .with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:external-manages-no-card"))
+                .andExpect(jsonPath("$.violations[0].params.field").value("managingRoles"));
+    }
+
     private static String signalJson(String label, boolean signalsOccupancy) {
         return """
                 {"label": "%s", "color": "#c8a415",

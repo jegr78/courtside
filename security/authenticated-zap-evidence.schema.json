@@ -20,7 +20,7 @@
         "additionalProperties": false,
         "required": ["role", "outcome"],
         "properties": {
-          "role": { "enum": ["MEMBER", "TRAINER", "SPORT_DIRECTOR", "YOUTH_DIRECTOR", "GROUNDSKEEPER", "TREASURER", "ADMIN"] },
+          "role": { "enum": ["MEMBER", "TRAINER", "SPORT_DIRECTOR", "YOUTH_DIRECTOR", "GROUNDSKEEPER", "TREASURER", "ADMIN", "EXTERNAL"] },
           "outcome": { "const": "passed" }
         }
       }

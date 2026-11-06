@@ -16,6 +16,7 @@ import { captureResourceState } from "./security-resource-state.mjs";
 import { parseResourceJournal } from "./security-resource-journal.mjs";
 import { resourceDatePlan } from "./security-resource-dates.mjs";
 import { captureSecurityMailBaseline } from "./security-mail-observation.mjs";
+import { isMfaFixtureHolder } from "./security-mfa-fixture.mjs";
 import { resourceIntegritySnapshotFingerprint } from "./security-resource-integrity.mjs";
 import { observeResourceEffects, cleanupAndRecoverResourceRuntime, createResourceEvidence,
   writeNativeEvidence, retainResourceEvidenceFailure } from "./security-resource-runtime.mjs";
@@ -1825,7 +1826,7 @@ export function securityMfaOutboxProjectionSql(after, usernames) {
   if ((after !== null && (typeof after !== "string" || !/^(?:0|[1-9][0-9]{0,18})$/.test(after)
         || BigInt(after) > 9223372036854775807n)) || !Array.isArray(usernames) || usernames.length < 1 || usernames.length > 2
       || new Set(usernames).size !== usernames.length
-      || usernames.some(name => typeof name !== "string" || !/^security\.(?:member|trainer|sport\.director|youth\.director|groundskeeper|treasurer|admin)\.2$/.test(name))) {
+      || usernames.some(name => !isMfaFixtureHolder(name))) {
     throw new Error("Invalid MFA mail projection");
   }
   const names = usernames.map(name => `'${name}'`).join(",");

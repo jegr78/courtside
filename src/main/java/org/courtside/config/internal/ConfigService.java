@@ -22,6 +22,7 @@ import org.courtside.config.WaitlistOfferPolicy;
 import org.courtside.config.WaitlistOfferWindow;
 import org.courtside.config.BookingGridCoordination;
 import org.courtside.config.ClubCurrency;
+import org.courtside.config.ExternalBookings;
 import org.courtside.config.ClubTimeZone;
 import org.courtside.config.ConfigEvent;
 import org.courtside.config.RuleSetAvailability;
@@ -46,7 +47,7 @@ import java.time.ZoneId;
 @Transactional(readOnly = true)
 public class ConfigService implements BookingGridSettings, BookingGridCoordination, ClubTimeZone,
         CredentialValidity, PasswordResetTokenValidity, ClubIdentity, BookingReminderPolicy,
-        WaitlistOfferPolicy, AccessPolicy, ClubCurrency {
+        WaitlistOfferPolicy, AccessPolicy, ClubCurrency, ExternalBookings {
 
     private static final String RULE_SET_CONSTRAINT = "club_config_no_membership_type_rule_set";
 
@@ -83,6 +84,11 @@ public class ConfigService implements BookingGridSettings, BookingGridCoordinati
     @Override
     public Currency currency() {
         return Currency.getInstance(current().currency());
+    }
+
+    @Override
+    public boolean admitted() {
+        return current().externalBookings();
     }
 
     @Override
@@ -276,6 +282,9 @@ public class ConfigService implements BookingGridSettings, BookingGridCoordinati
         if (command.currency() != null) {
             addIfChanged(fields, "currency", configuration.getCurrency(), command.currency().getCurrencyCode());
         }
+        if (command.externalBookings() != null) {
+            addIfChanged(fields, "externalBookings", configuration.isExternalBookings(), command.externalBookings());
+        }
         addIfChanged(fields, "noMembershipTypeRuleSetId",
                 configuration.getNoMembershipTypeRuleSetId(), command.noMembershipTypeRuleSetId());
         return new Changes(List.copyOf(fields),
@@ -310,6 +319,9 @@ public class ConfigService implements BookingGridSettings, BookingGridCoordinati
         }
         if (command.currency() != null) {
             configuration.chargeIn(command.currency());
+        }
+        if (command.externalBookings() != null) {
+            configuration.admitExternalBookings(command.externalBookings());
         }
         configuration.bindPeopleWithoutAMembershipTypeTo(command.noMembershipTypeRuleSetId());
     }

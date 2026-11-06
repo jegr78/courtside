@@ -159,7 +159,8 @@ and `booking_card_closure_signals_no_occupancy` keeps it false on the closure ca
 default and never negative under `booking_card_guest_fee_not_negative`.
 
 The role tables replaced a single `required_role` column, because a card that only one role may use
-cannot express "trainers and youth directors". Both accept the roles `user_account_role` accepts.
+cannot express "trainers and youth directors". Both accept the roles `user_account_role` accepts,
+except that `EXTERNAL` never manages a card.
 
 ## Player slots
 
@@ -361,7 +362,9 @@ columns govern access codes: `access_lead_minutes` and `access_lag_minutes`, 0 t
 default, extend a booking's time on either side, and `access_code_length`, 4 to 8 and 6 by default,
 is the number of digits a new static code has. `currency` is an ISO 4217 code, `EUR` by default,
 kept to three capital letters by `club_config_currency_code`; every amount the instance records is
-stated in it.
+stated in it. `external_bookings`, off by default, decides whether a card naming the `EXTERNAL` role
+admits anybody holding it. `user_account_role` and `booking_card_allowed_role` know `EXTERNAL`;
+`booking_card_managing_role` does not.
 
 The time zone is checked against `pg_timezone_names` by a trigger, so a typo is refused where it is
 written rather than at the next reminder. The logo is stored in the row itself, content, media type

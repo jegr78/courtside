@@ -93,8 +93,11 @@ public class BookingCard {
         return false;
     }
 
-    public boolean permits(Set<Role> callerRoles, boolean currentMember) {
-        return allowedRoles.isEmpty() ? currentMember : callerRoles.stream().anyMatch(allowedRoles::contains);
+    // EXTERNAL opens a card only while the club admits external bookings, whatever else the card names.
+    public boolean permits(Set<Role> callerRoles, boolean currentMember, boolean externalBookingsAdmitted) {
+        return allowedRoles.isEmpty() ? currentMember : callerRoles.stream()
+                .filter(role -> role != Role.EXTERNAL || externalBookingsAdmitted)
+                .anyMatch(allowedRoles::contains);
     }
 
     public boolean requiresMembership() {
@@ -107,7 +110,7 @@ public class BookingCard {
 
     public static Set<Role> managementRoles(Set<Role> roles) {
         return roles.stream()
-                .filter(role -> role != Role.MEMBER)
+                .filter(role -> role != Role.MEMBER && role != Role.EXTERNAL)
                 .collect(Collectors.toUnmodifiableSet());
     }
 

@@ -69,6 +69,7 @@ class AuditedOperationCoverageTest {
             "ConfigService#accessCodeLength",
             "ConfigService#accessLag",
             "ConfigService#accessLead",
+            "ConfigService#admitted",
             "ConfigService#clubName",
             "ConfigService#currency",
             "ConfigService#current",

@@ -149,9 +149,15 @@ export const mfaFixtureMaxRequestsPerExercise = Math.max(...mfaFixtureOperationI
 const actorNames = {
   MEMBER: "security.member.2", TRAINER: "security.trainer.2", SPORT_DIRECTOR: "security.sport.director.2",
   YOUTH_DIRECTOR: "security.youth.director.2", GROUNDSKEEPER: "security.groundskeeper.2",
-  TREASURER: "security.treasurer.2", ADMIN: "security.admin.2"
+  TREASURER: "security.treasurer.2", ADMIN: "security.admin.2", EXTERNAL: "security.external.2"
 };
 const jsonHeaders = { "content-type": "application/json" };
+
+export const mfaFixtureHolders = Object.freeze(Object.values(actorNames));
+
+export function isMfaFixtureHolder(username) {
+  return typeof username === "string" && mfaFixtureHolders.includes(username);
+}
 
 export function createMfaFixture({ request, makeClient, clients, sharedPassword, origin, resetLoginAttempts, readRecoveryCode, beginMailScope, now = Date.now,
   sleep = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)) }) {

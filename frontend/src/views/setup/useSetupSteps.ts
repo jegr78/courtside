@@ -41,6 +41,7 @@ const factoryConfiguration = {
   accessLagMinutes: 15,
   accessCodeLength: 6,
   currency: "EUR",
+  externalBookings: false,
   logoUploaded: false,
   noMembershipTypeRuleSetId: null
 } as const;

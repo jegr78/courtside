@@ -2334,3 +2334,14 @@ for (const changed of ["labels", "container ID", "image", "network ID", "externa
     assert.equal(h.calls.filter(({ args }) => args[0] === "exec").length, executions);
   });
 }
+
+test("given every MFA fixture holder, when its outbox projection is built, then the holder is accepted", async () => {
+  // given
+  const module = await import("./security-environment.mjs");
+  const { mfaFixtureHolders } = await import("./security-mfa-fixture.mjs");
+  // when / then
+  for (const holder of mfaFixtureHolders) {
+    assert.match(module.securityMfaOutboxProjectionSql(null, [holder]), new RegExp(`'${holder.replaceAll(".", "\\.")}'`),
+      `${holder} must be projected`);
+  }
+});

@@ -138,6 +138,9 @@ Statusleiste der installierten App übernimmt die Primärfarbe beim nächsten Ö
 * Die **Währung** ist ein dreistelliger ISO-Code wie `EUR` oder `CHF`. In ihr gelten Gastgebühren.
   Ein Wechsel rechnet nichts um: Die Gebühren der Buchungsarten behalten ihre Zahl, und bereits
   gebuchte Gäste behalten ihren Betrag.
+* **Externe Buchungen zulassen** öffnet Buchungskarten, die die Rolle *Extern* nennen, für Personen
+  außerhalb des Vereins. Ohne diesen Haken bucht niemand mit dieser Rolle, auch wenn eine Karte sie
+  nennt.
 
 ## Verein → Fristen und Erinnerungen
 
@@ -417,7 +420,7 @@ Punktspiel oder Sperrung. Lege für jede benötigte Art eine Karte an.
 | Einstellung | Wirkung |
 |---|---|
 | **Bezeichnung und Farbe** | Darstellung im Platzplan. Courtside zeigt den Kontrast der Beschriftung zur Farbe und warnt unter 4,5 zu 1 |
-| **Berechtigte Rollen** | Rollen, die mit der Karte buchen dürfen. Ohne Auswahl dürfen alle buchen, deren Mitgliedschaft heute läuft. Wer keine Mitgliedschaft hat, bucht nur Karten, die eine seiner Rollen nennen |
+| **Berechtigte Rollen** | Rollen, die mit der Karte buchen dürfen. Ohne Auswahl dürfen alle buchen, deren Mitgliedschaft heute läuft. Wer keine Mitgliedschaft hat, bucht nur Karten, die eine seiner Rollen nennen. **Extern** öffnet die Karte für Personen außerhalb des Vereins, aber nur, solange im Vereinsprofil *Externe Buchungen zulassen* gesetzt ist. Als verwaltende Rolle gibt es Extern nicht |
 | **Verantwortliche Rollen** | Rollen, die jede Buchung dieser Karte öffnen, einsehen und stornieren dürfen |
 | **Erlaubte Spielerzahlen** | Zulässige Zahl von Teilnehmenden. Ohne Wert erfasst die Karte keine Teilnehmenden |
 | **Zählt gegen Buchungslimits** | Rechnet die Buchung auf die Obergrenze offener Buchungen an |

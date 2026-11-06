@@ -67,10 +67,10 @@ info:
     they are never credentials and carry no shared secret. State-changing requests also require
     the CSRF token declared below.
 
-    Future paid bookings by people without a club membership use verified external accounts, not
-    anonymous writes. Those accounts retain their booking and payment history and may later gain
-    an active membership without changing identity. They may use only cards that explicitly allow
-    the future `EXTERNAL_BOOKER` permission; an empty card role list never grants external access.
+    People without a club membership book through external accounts, not anonymous writes. Those
+    accounts retain their booking history and may later gain an active membership without changing
+    identity. They may use only cards whose role list names `EXTERNAL`, and only while the club
+    configuration admits external bookings; an empty card role list never grants external access.
   license:
     name: AGPL-3.0-or-later
     identifier: AGPL-3.0-or-later
@@ -256,8 +256,11 @@ components:
 
     Role:
       type: string
-      description: A permission bundle. One person often holds several.
-      enum: [MEMBER, TRAINER, SPORT_DIRECTOR, YOUTH_DIRECTOR, GROUNDSKEEPER, TREASURER, ADMIN]
+      description: |
+        A permission bundle. One person often holds several. `EXTERNAL` marks a person outside the
+        club who registered themselves; it opens only cards that name it, and only while the club
+        admits external bookings.
+      enum: [MEMBER, TRAINER, SPORT_DIRECTOR, YOUTH_DIRECTOR, GROUNDSKEEPER, TREASURER, ADMIN, EXTERNAL]
 
     InitialPasswordChangeRequest:
       type: object
@@ -460,6 +463,11 @@ components:
             Whether an active booking card names one of the account's roles among its managing
             roles, so the club appointments list has something to show. Always true for an
             administrator, false without a session. A client that lacks the field treats it as false.
+        externalBookings:
+          type: boolean
+          description: |
+            Whether the club admits bookings by people outside the club, with or without a session.
+            A client that lacks the field treats it as false.
         createsSeries:
           type: boolean
           description: |
@@ -1497,11 +1505,14 @@ components:
         - type: object
           required: [newAccountCredentialHours, passwordResetCredentialHours,
                      passwordResetTokenMinutes, bookingReminderHours, waitlistOfferMinutes,
-                     accessLeadMinutes, accessLagMinutes, accessCodeLength, logoUploaded]
+                     accessLeadMinutes, accessLagMinutes, accessCodeLength, logoUploaded, externalBookings]
           properties:
             logoUploaded:
               type: boolean
               description: Whether the effective logo is stored by this Courtside instance.
+            externalBookings:
+              type: boolean
+              description: Whether people outside the club may book cards that name `EXTERNAL`.
             logoFallbackUrl:
               type: [string, "null"]
               maxLength: 500
@@ -1636,6 +1647,11 @@ components:
             converts nothing: card fees keep their number in the new currency, and a guest already
             booked keeps the amount and currency stamped on it. Leaving it out keeps the current value.
           example: EUR
+        externalBookings:
+          type: boolean
+          description: |
+            Whether people outside the club may book cards that name `EXTERNAL`. Off by default.
+            Leaving it out keeps the current value.
         newAccountCredentialHours:
           type: integer
           minimum: 1
@@ -1790,8 +1806,9 @@ components:
           description: |
             Roles allowed to create a booking with this card. Holding any listed role is
             sufficient. Empty permits every account whose person holds a running membership,
-            whatever its roles; no role stands in for that membership. Future external
-            accounts may book only when this list explicitly includes `EXTERNAL_BOOKER`.
+            whatever its roles; no role stands in for that membership. External accounts may
+            book only when this list explicitly includes `EXTERNAL` and the club admits external
+            bookings.
             Administrators may always book.
           items: { $ref: "#/components/schemas/Role" }
         managingRoles:
@@ -1836,8 +1853,9 @@ components:
           description: |
             Roles allowed to create a booking with this card. Holding any listed role is
             sufficient. Empty permits every account whose person holds a running membership,
-            whatever its roles; no role stands in for that membership. Future external
-            accounts may book only when this list explicitly includes `EXTERNAL_BOOKER`.
+            whatever its roles; no role stands in for that membership. External accounts may
+            book only when this list explicitly includes `EXTERNAL` and the club admits external
+            bookings.
             Administrators may always book.
           items: { $ref: "#/components/schemas/Role" }
         managingRoles:

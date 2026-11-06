@@ -140,6 +140,6 @@ class CardEligibilityPolicyTest {
     }
 
     private CardEligibilityPolicy policy() {
-        return new CardEligibilityPolicy(cards, securityEvents, members);
+        return new CardEligibilityPolicy(cards, securityEvents, members, () -> false);
     }
 }

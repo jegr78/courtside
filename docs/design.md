@@ -292,7 +292,12 @@ occupied for building automation; it is on by default and off for the closure ca
 
 An empty booking-role set permits every account whose person holds a membership covering today; no
 role stands in for that membership, `MEMBER` included. An account without one books only cards that
-name one of its roles. An empty managing-role set
+name one of its roles. `EXTERNAL` marks a person outside the club and counts towards a card only
+while `club_config.external_bookings` is on, which it is not by default; `BookingCard.permits` takes
+that switch, so turning it off closes every card to the role at once. `EXTERNAL` is never a managing
+role: `CardService` refuses it with `card.managingRoles.external` and the managing-role CHECK leaves
+it out below the service. The session reports the switch as `externalBookings`, also without a
+session. An empty managing-role set
 permits only the owner and administrators to manage the booking. Managing roles never inherit from
 booking roles.
 

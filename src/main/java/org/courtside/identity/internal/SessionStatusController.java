@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.courtside.api.ApiRole;
 import org.courtside.api.ApiSessionStatus;
 import org.courtside.api.SessionStatusApi;
+import org.courtside.config.ExternalBookings;
 import org.courtside.identity.AppointmentAccess;
 import org.courtside.identity.CurrentUser;
 import org.courtside.identity.UserAccount;
@@ -23,6 +24,7 @@ class SessionStatusController implements SessionStatusApi {
     private final MfaFactors factors;
     private final MfaWebAuthn webAuthn;
     private final MfaWebAuthnCredentials credentials;
+    private final ExternalBookings externalBookings;
 
     @Override
     public ResponseEntity<ApiSessionStatus> getSessionStatus() {
@@ -47,7 +49,8 @@ class SessionStatusController implements SessionStatusApi {
                 .totpAvailable(totp.enabled(account.getId()))
                 .webauthnAvailable(webAuthn.available() && credentials.enabled(account.getId()))
                 .managesAppointments(reach.managesAppointments())
-                .createsSeries(reach.createsSeries());
+                .createsSeries(reach.createsSeries())
+                .externalBookings(externalBookings.admitted());
     }
 
     private ApiSessionStatus anonymous() {
@@ -57,7 +60,8 @@ class SessionStatusController implements SessionStatusApi {
                 .totpAvailable(false)
                 .webauthnAvailable(false)
                 .managesAppointments(false)
-                .createsSeries(false);
+                .createsSeries(false)
+                .externalBookings(externalBookings.admitted());
         if (SecurityContextHolder.getContext().getAuthentication() instanceof MfaPendingAuthentication pending) {
             status.mfaRequired(true).totpAvailable(totp.enabled(pending.getPrincipal().account()))
                     .webauthnAvailable(webAuthn.available() && credentials.enabled(pending.getPrincipal().account()));

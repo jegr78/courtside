@@ -26,7 +26,8 @@ public record ClubConfigurationSnapshot(
         int accessLagMinutes,
         int accessCodeLength,
         UUID noMembershipTypeRuleSetId,
-        String currency) {
+        String currency,
+        boolean externalBookings) {
 
     static ClubConfigurationSnapshot from(ClubConfiguration configuration) {
         return new ClubConfigurationSnapshot(
@@ -53,7 +54,8 @@ public record ClubConfigurationSnapshot(
                 configuration.getAccessLagMinutes(),
                 configuration.getAccessCodeLength(),
                 configuration.getNoMembershipTypeRuleSetId(),
-                configuration.getCurrency());
+                configuration.getCurrency(),
+                configuration.isExternalBookings());
     }
 
     public String effectiveShortName() {

@@ -10,7 +10,8 @@ public enum Role {
     YOUTH_DIRECTOR,
     GROUNDSKEEPER,
     TREASURER,
-    ADMIN;
+    ADMIN,
+    EXTERNAL;
 
     public static Optional<Role> named(String name) {
         return Arrays.stream(values())

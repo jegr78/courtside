@@ -252,4 +252,14 @@ describe("AdminBookingCardsView", () => {
     expect(screen.getByTestId("new-card-guest-fee-error")).toHaveTextContent("Enter an amount of 0 or more, such as 5.50.");
     expect(createCard, "a refused amount never reaches the server").not.toHaveBeenCalled();
   });
+
+  it("given a new card, when its roles are read, then outsiders can be allowed to book it but never manage it", async () => {
+    // when
+    show();
+    await screen.findByTestId("new-card-label");
+
+    // then
+    expect(screen.getByTestId("new-card-role-EXTERNAL")).toBeInTheDocument();
+    expect(screen.queryByTestId("new-card-managing-roles-EXTERNAL")).not.toBeInTheDocument();
+  });
 });

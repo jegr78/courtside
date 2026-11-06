@@ -18,7 +18,7 @@
         "required": ["id", "actors", "entryPoints", "operationIds", "backgroundEntryPoints", "stateTransitions", "alternatePaths", "failurePaths", "productionPaths", "evidence"],
         "properties": {
           "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
-          "actors": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "enum": ["ANONYMOUS", "MEMBER", "TRAINER", "SPORT_DIRECTOR", "YOUTH_DIRECTOR", "GROUNDSKEEPER", "TREASURER", "ADMIN", "INITIAL_PASSWORD"] } },
+          "actors": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "enum": ["ANONYMOUS", "MEMBER", "TRAINER", "SPORT_DIRECTOR", "YOUTH_DIRECTOR", "GROUNDSKEEPER", "TREASURER", "ADMIN", "EXTERNAL", "INITIAL_PASSWORD"] } },
           "entryPoints": { "type": "string", "minLength": 1 },
           "operationIds": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "pattern": "^[a-z][A-Za-z0-9]+$" } },
           "backgroundEntryPoints": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9.]+#.+$" } },

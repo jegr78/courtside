@@ -3,6 +3,7 @@ import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
+import { mfaFixtureHolders } from "./security-mfa-fixture.mjs";
 import { captureSecurityMailBaseline, observeSecurityMail, securityMailObservationLimits,
   securityMailObservationImage, securityMailObservationSource } from "./security-mail-observation.mjs";
 
@@ -751,4 +752,20 @@ test("given changed application ownership, when fixture mail cleanup reaches the
   // when / then
   await assert.rejects(finish(), { message: "mail-app-untrusted" });
   assert.equal(h.calls.some(({ args }) => args.includes("DELETE")), false);
+});
+
+test("given every MFA fixture holder, when its mail scope and recovery reader are opened, then the holder is accepted and a first account is not", async () => {
+  // given
+  const module = await import("./security-mail-observation.mjs");
+  const reached = new Error("validated");
+  const begin = module.createSecurityMfaMailScope({ runId, command: () => "", identity, projectOutbox: async () => ({}),
+    control: { beforeRequest() { throw reached; }, remainingMilliseconds: () => 1000 } });
+  // when / then
+  assert.ok(mfaFixtureHolders.includes("security.external.2"), "the external role has its own MFA holder");
+  for (const holder of mfaFixtureHolders) {
+    await assert.rejects(begin([holder]), (error) => error === reached, `${holder} must pass the mail scope`);
+    await assert.rejects(module.readSecurityMfaRecoveryCode({ runId, command: () => { throw reached; }, identity, username: holder, after: 0 }),
+      (error) => error.message !== "mfa-mail-fixture-input-invalid", `${holder} must pass the recovery reader`);
+  }
+  await assert.rejects(begin(["security.member.1"]), /mfa-mail-scope-invalid/);
 });

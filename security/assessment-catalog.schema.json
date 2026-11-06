@@ -379,7 +379,8 @@
         "YOUTH_DIRECTOR",
         "GROUNDSKEEPER",
         "TREASURER",
-        "ADMIN"
+        "ADMIN",
+        "EXTERNAL"
       ]
     },
     "actor": {

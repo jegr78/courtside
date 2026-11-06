@@ -1044,6 +1044,10 @@
         "level": "operational",
         "lifecycle": "club-configuration"
       },
+      "external_bookings": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
       "short_name": {
         "level": "operational",
         "lifecycle": "club-configuration"

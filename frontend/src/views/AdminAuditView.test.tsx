@@ -334,7 +334,8 @@ describe("AdminAuditView", () => {
     ["roster.membership.written", { startedOn: null }, "Membership recorded"],
     ["card.bookingCard.changed", { changedFields: ["label", "guestFeeMinor"] }, /^Booking card changed$/],
     ["card.bookingCard.changed", { changedFields: [] }, /^Booking card changed$/],
-    ["config.club.changed", { changedFields: ["currency", "noMembershipTypeRuleSetId"] }, "Club configuration changed: Currency, Rule set for people without a membership type"]
+    ["config.club.changed", { changedFields: ["currency", "noMembershipTypeRuleSetId"] }, "Club configuration changed: Currency, Rule set for people without a membership type"],
+    ["config.club.changed", { changedFields: ["externalBookings"] }, "Club configuration changed: Admit external bookings"]
   ])("given a %s event, when it is shown, then its interpolated values are resolved, not left as template text", async (eventType, parameters, expected) => {
     // given
     const entry: AuditEntry = { ...courtAdded, eventType, parameters };

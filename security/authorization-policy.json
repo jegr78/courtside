@@ -2,9 +2,9 @@
   "schemaVersion": 1,
   "reviewedAt": "2026-11-01",
   "purpose": "This is the normative authorization policy for the shipped Courtside API. OpenAPI defines the transport shape; this policy defines who may perform each operation, which resource attributes narrow that permission, and which protected fields each projection may read or write.",
-  "openApiFieldInventorySha256": "7eea0bcf6060f79406e49d3b7e219e45f7283384d9fee2993347997abd709cc3",
+  "openApiFieldInventorySha256": "873035fc07a43e795a96d9bbd84dd6004a929dcc1d4f845d21258fbc4c1d0a14",
   "protectedFieldInventorySha256": "df963788c76c5d8d2687a2127a69d2961341cfa78d7c298b65bc1a37bdc24cb8",
-  "productionAuthorizationSha256": "41e7dde9edc0a048480c3d992263177885e254439111040a2c4f8a019bb78752",
+  "productionAuthorizationSha256": "a42c6f33a7d05ee264b190a4be7850f2b634c9cfb83b6160f336014bf5bc06f3",
   "ordinaryFields": [
     "Problem.detail",
     "Problem.fieldErrors",
@@ -273,6 +273,7 @@
     "changeClubConfig:request:ClubConfigRequest.currency",
     "changeClubConfig:request:ClubConfigRequest.defaultLocale",
     "changeClubConfig:request:ClubConfigRequest.documentationUrl",
+    "changeClubConfig:request:ClubConfigRequest.externalBookings",
     "changeClubConfig:request:ClubConfigRequest.imprintUrl",
     "changeClubConfig:request:ClubConfigRequest.logoUrl",
     "changeClubConfig:request:ClubConfigRequest.passwordResetTokenMinutes",
@@ -287,6 +288,7 @@
     "changeClubConfig:response:AdminClubConfig.accessCodeLength",
     "changeClubConfig:response:AdminClubConfig.accessLagMinutes",
     "changeClubConfig:response:AdminClubConfig.accessLeadMinutes",
+    "changeClubConfig:response:AdminClubConfig.externalBookings",
     "changeClubConfig:response:AdminClubConfig.logoFallbackUrl",
     "changeClubConfig:response:AdminClubConfig.logoUploaded",
     "changeClubConfig:response:AdminClubConfig.passwordResetTokenMinutes",
@@ -1048,6 +1050,7 @@
     "deleteClubLogo:response:AdminClubConfig.accessCodeLength",
     "deleteClubLogo:response:AdminClubConfig.accessLagMinutes",
     "deleteClubLogo:response:AdminClubConfig.accessLeadMinutes",
+    "deleteClubLogo:response:AdminClubConfig.externalBookings",
     "deleteClubLogo:response:AdminClubConfig.logoFallbackUrl",
     "deleteClubLogo:response:AdminClubConfig.logoUploaded",
     "deleteClubLogo:response:AdminClubConfig.passwordResetTokenMinutes",
@@ -1442,6 +1445,7 @@
     "getClubConfigForAdmin:response:AdminClubConfig.accessCodeLength",
     "getClubConfigForAdmin:response:AdminClubConfig.accessLagMinutes",
     "getClubConfigForAdmin:response:AdminClubConfig.accessLeadMinutes",
+    "getClubConfigForAdmin:response:AdminClubConfig.externalBookings",
     "getClubConfigForAdmin:response:AdminClubConfig.logoFallbackUrl",
     "getClubConfigForAdmin:response:AdminClubConfig.logoUploaded",
     "getClubConfigForAdmin:response:AdminClubConfig.passwordResetTokenMinutes",
@@ -1595,6 +1599,7 @@
     "getSessionStatus:response:FieldError.params",
     "getSessionStatus:response:FieldError.params.*",
     "getSessionStatus:response:SessionStatus.authenticated",
+    "getSessionStatus:response:SessionStatus.externalBookings",
     "getSessionStatus:response:Violation.code",
     "getSessionStatus:response:Violation.params",
     "getSessionStatus:response:Violation.params.*",
@@ -3463,6 +3468,7 @@
     "uploadClubLogo:response:AdminClubConfig.accessCodeLength",
     "uploadClubLogo:response:AdminClubConfig.accessLagMinutes",
     "uploadClubLogo:response:AdminClubConfig.accessLeadMinutes",
+    "uploadClubLogo:response:AdminClubConfig.externalBookings",
     "uploadClubLogo:response:AdminClubConfig.logoFallbackUrl",
     "uploadClubLogo:response:AdminClubConfig.logoUploaded",
     "uploadClubLogo:response:AdminClubConfig.passwordResetTokenMinutes",
@@ -3581,6 +3587,10 @@
     {
       "id": "ADMIN",
       "description": "An authenticated account holding the instance administrator role. The start-up warm-up passes this role without an account to write a booking it rolls back."
+    },
+    {
+      "id": "EXTERNAL",
+      "description": "A person outside the club who registered themselves; books only cards that name the role while the club admits external bookings."
     },
     {
       "id": "INITIAL_PASSWORD",
@@ -3820,6 +3830,7 @@
         "GROUNDSKEEPER",
         "TREASURER",
         "ADMIN",
+        "EXTERNAL",
         "INITIAL_PASSWORD"
       ],
       "decisions": [
@@ -3841,6 +3852,7 @@
         "GROUNDSKEEPER",
         "TREASURER",
         "ADMIN",
+        "EXTERNAL",
         "INITIAL_PASSWORD"
       ],
       "decisions": [
@@ -3863,6 +3875,7 @@
         "GROUNDSKEEPER",
         "TREASURER",
         "ADMIN",
+        "EXTERNAL",
         "INITIAL_PASSWORD"
       ],
       "decisions": [
@@ -3885,6 +3898,7 @@
         "GROUNDSKEEPER",
         "TREASURER",
         "ADMIN",
+        "EXTERNAL",
         "INITIAL_PASSWORD"
       ],
       "decisions": [
@@ -3907,6 +3921,7 @@
         "GROUNDSKEEPER",
         "TREASURER",
         "ADMIN",
+        "EXTERNAL",
         "INITIAL_PASSWORD"
       ],
       "decisions": [
@@ -3938,6 +3953,7 @@
         "GROUNDSKEEPER",
         "TREASURER",
         "ADMIN",
+        "EXTERNAL",
         "INITIAL_PASSWORD"
       ],
       "decisions": [
@@ -3979,7 +3995,8 @@
         "YOUTH_DIRECTOR",
         "GROUNDSKEEPER",
         "TREASURER",
-        "ADMIN"
+        "ADMIN",
+        "EXTERNAL"
       ],
       "decisions": [
         "permanent-account-gate",
@@ -4000,7 +4017,8 @@
         "YOUTH_DIRECTOR",
         "GROUNDSKEEPER",
         "TREASURER",
-        "ADMIN"
+        "ADMIN",
+        "EXTERNAL"
       ],
       "decisions": [
         "permanent-account-gate",
@@ -4022,7 +4040,8 @@
         "YOUTH_DIRECTOR",
         "GROUNDSKEEPER",
         "TREASURER",
-        "ADMIN"
+        "ADMIN",
+        "EXTERNAL"
       ],
       "decisions": [
         "permanent-account-gate",
@@ -4043,7 +4062,8 @@
         "YOUTH_DIRECTOR",
         "GROUNDSKEEPER",
         "TREASURER",
-        "ADMIN"
+        "ADMIN",
+        "EXTERNAL"
       ],
       "decisions": [
         "permanent-account-gate",
@@ -4063,7 +4083,8 @@
         "YOUTH_DIRECTOR",
         "GROUNDSKEEPER",
         "TREASURER",
-        "ADMIN"
+        "ADMIN",
+        "EXTERNAL"
       ],
       "decisions": [
         "permanent-account-gate",
@@ -4083,7 +4104,8 @@
         "YOUTH_DIRECTOR",
         "GROUNDSKEEPER",
         "TREASURER",
-        "ADMIN"
+        "ADMIN",
+        "EXTERNAL"
       ],
       "decisions": [
         "permanent-account-gate",
@@ -4106,7 +4128,8 @@
         "YOUTH_DIRECTOR",
         "GROUNDSKEEPER",
         "TREASURER",
-        "ADMIN"
+        "ADMIN",
+        "EXTERNAL"
       ],
       "decisions": [
         "permanent-account-gate",
@@ -4130,7 +4153,8 @@
         "YOUTH_DIRECTOR",
         "GROUNDSKEEPER",
         "TREASURER",
-        "ADMIN"
+        "ADMIN",
+        "EXTERNAL"
       ],
       "decisions": [
         "permanent-account-gate",
@@ -4150,7 +4174,8 @@
         "YOUTH_DIRECTOR",
         "GROUNDSKEEPER",
         "TREASURER",
-        "ADMIN"
+        "ADMIN",
+        "EXTERNAL"
       ],
       "decisions": [
         "permanent-account-gate",
@@ -4170,7 +4195,8 @@
         "YOUTH_DIRECTOR",
         "GROUNDSKEEPER",
         "TREASURER",
-        "ADMIN"
+        "ADMIN",
+        "EXTERNAL"
       ],
       "decisions": [
         "permanent-account-gate",
@@ -4196,7 +4222,8 @@
         "YOUTH_DIRECTOR",
         "GROUNDSKEEPER",
         "TREASURER",
-        "ADMIN"
+        "ADMIN",
+        "EXTERNAL"
       ],
       "decisions": [
         "permanent-account-gate",
@@ -4219,7 +4246,8 @@
         "YOUTH_DIRECTOR",
         "GROUNDSKEEPER",
         "TREASURER",
-        "ADMIN"
+        "ADMIN",
+        "EXTERNAL"
       ],
       "decisions": [
         "permanent-account-gate",
@@ -4243,7 +4271,8 @@
         "YOUTH_DIRECTOR",
         "GROUNDSKEEPER",
         "TREASURER",
-        "ADMIN"
+        "ADMIN",
+        "EXTERNAL"
       ],
       "decisions": [
         "permanent-account-gate",
@@ -4265,7 +4294,8 @@
         "YOUTH_DIRECTOR",
         "GROUNDSKEEPER",
         "TREASURER",
-        "ADMIN"
+        "ADMIN",
+        "EXTERNAL"
       ],
       "decisions": [
         "permanent-account-gate",
@@ -4287,7 +4317,8 @@
         "YOUTH_DIRECTOR",
         "GROUNDSKEEPER",
         "TREASURER",
-        "ADMIN"
+        "ADMIN",
+        "EXTERNAL"
       ],
       "decisions": [
         "permanent-account-gate",
@@ -4570,6 +4601,7 @@
         "GROUNDSKEEPER",
         "TREASURER",
         "ADMIN",
+        "EXTERNAL",
         "INITIAL_PASSWORD"
       ],
       "decisions": [
@@ -4591,7 +4623,8 @@
         "YOUTH_DIRECTOR",
         "GROUNDSKEEPER",
         "TREASURER",
-        "ADMIN"
+        "ADMIN",
+        "EXTERNAL"
       ],
       "decisions": [
         "permanent-account-gate",
@@ -4619,7 +4652,8 @@
         "YOUTH_DIRECTOR",
         "GROUNDSKEEPER",
         "TREASURER",
-        "ADMIN"
+        "ADMIN",
+        "EXTERNAL"
       ],
       "decisions": [
         "permanent-account-gate",
@@ -4641,7 +4675,8 @@
         "YOUTH_DIRECTOR",
         "GROUNDSKEEPER",
         "TREASURER",
-        "ADMIN"
+        "ADMIN",
+        "EXTERNAL"
       ],
       "decisions": [
         "permanent-account-gate",
@@ -4693,6 +4728,7 @@
         "GROUNDSKEEPER",
         "TREASURER",
         "ADMIN",
+        "EXTERNAL",
         "INITIAL_PASSWORD"
       ],
       "decisions": [
@@ -4715,7 +4751,8 @@
         "YOUTH_DIRECTOR",
         "GROUNDSKEEPER",
         "TREASURER",
-        "ADMIN"
+        "ADMIN",
+        "EXTERNAL"
       ],
       "decisions": [
         "permanent-account-gate",
@@ -4737,6 +4774,7 @@
         "GROUNDSKEEPER",
         "TREASURER",
         "ADMIN",
+        "EXTERNAL",
         "INITIAL_PASSWORD"
       ],
       "decisions": [
@@ -4927,6 +4965,7 @@
         "src/main/java/org/courtside/booking/waitlist/WaitlistQueue.java#eligible",
         "src/main/java/org/courtside/booking/internal/CardEligibilityPolicy.java#admits",
         "src/main/java/org/courtside/booking/internal/CardEligibilityPolicy.java#permits",
+        "src/main/java/org/courtside/card/BookingCard.java#permits",
         "src/main/java/org/courtside/booking/BookingWriter.java#isBookable",
         "src/main/java/org/courtside/booking/partner/PartnerSearchService.java#mayTakeAPlace",
         "src/main/java/org/courtside/booking/partner/PartnerSearchService.java#openPlaces",
@@ -4937,6 +4976,7 @@
         "src/test/java/org/courtside/booking/internal/CardEligibilityPolicyTest.java#givenACardNamingNoRole_whenTheAccountHoldsARunningMembership_thenTheCardIsReturned"
       ],
       "negativeTests": [
+        "src/test/java/org/courtside/booking/ExternalBookingTest.java#givenExternalBookingsNotAdmitted_whenAnExternalAccountBooksACardNamingThem_thenTheCardIsRefused",
         "src/test/java/org/courtside/booking/internal/CardEligibilityPolicyTest.java#givenOnlyAnotherRole_whenRequiringEligibility_thenTheRoleFailureIsRaised",
         "src/test/java/org/courtside/booking/internal/CardEligibilityPolicyTest.java#givenACardNamingNoRole_whenTheAccountHoldsOnlyARoleWithoutMembership_thenTheRoleFailureIsRaised"
       ]
@@ -4959,6 +4999,7 @@
         "src/main/java/org/courtside/booking/internal/BookingAccessControl.java#requireManagementAccess",
         "src/main/java/org/courtside/booking/internal/BookingAccessControl.java#requireRoleManagementAccess",
         "src/main/java/org/courtside/card/BookingCard.java#managementRoles",
+        "src/main/java/org/courtside/card/CardService.java#requireMemberManagers",
         "src/main/java/org/courtside/booking/ParticipationService.java#withdraw",
         "src/main/java/org/courtside/booking/internal/BookingAnnouncements.java#describeVisibleTo",
         "src/main/java/org/courtside/booking/internal/BookingAnnouncements.java#visibleTo",
@@ -4976,6 +5017,7 @@
         "src/test/java/org/courtside/booking/web/AttendanceControllerTest.java#givenTheCheckInWindowIsOpen_whenTheMemberChecksIn_thenTheirBookingShowsItAsCheckedIn"
       ],
       "negativeTests": [
+        "src/test/java/org/courtside/card/web/BookingCardAdminControllerTest.java#givenANewCard_whenABoardNamesTheExternalRoleAsManaging_thenTheCardIsRefusedByCode",
         "src/test/java/org/courtside/booking/web/BookingControllerTest.java#givenAForeignBooking_whenAMemberCancelsIt_thenItIsNotFoundAndItStaysConfirmed",
         "src/test/java/org/courtside/notification/web/NotificationControllerTest.java#givenAPlayerWhoLeftTheBooking_whenTheyReadTheCentre_thenTheEntryNoLongerDescribesOrLinksIt",
         "src/test/java/org/courtside/booking/attendance/AttendanceTest.java#givenSomebodyElsesBooking_whenAMemberChecksIn_thenItIsAnsweredLikeABookingThatDoesNotExist",
@@ -5654,6 +5696,7 @@
         "GROUNDSKEEPER",
         "TREASURER",
         "ADMIN",
+        "EXTERNAL",
         "INITIAL_PASSWORD"
       ],
       "attributes": [
@@ -5695,6 +5738,7 @@
         "GROUNDSKEEPER",
         "TREASURER",
         "ADMIN",
+        "EXTERNAL",
         "INITIAL_PASSWORD"
       ],
       "attributes": [
@@ -5726,7 +5770,8 @@
         "YOUTH_DIRECTOR",
         "GROUNDSKEEPER",
         "TREASURER",
-        "ADMIN"
+        "ADMIN",
+        "EXTERNAL"
       ],
       "attributes": [
         "current-account"
@@ -5773,7 +5818,8 @@
         "YOUTH_DIRECTOR",
         "GROUNDSKEEPER",
         "TREASURER",
-        "ADMIN"
+        "ADMIN",
+        "EXTERNAL"
       ],
       "attributes": [
         "dedicated-workflow",
@@ -5803,7 +5849,8 @@
         "YOUTH_DIRECTOR",
         "GROUNDSKEEPER",
         "TREASURER",
-        "ADMIN"
+        "ADMIN",
+        "EXTERNAL"
       ],
       "attributes": [
         "dedicated-workflow",
@@ -5832,7 +5879,8 @@
         "YOUTH_DIRECTOR",
         "GROUNDSKEEPER",
         "TREASURER",
-        "ADMIN"
+        "ADMIN",
+        "EXTERNAL"
       ],
       "attributes": [
         "current-membership"
@@ -5864,6 +5912,7 @@
         "GROUNDSKEEPER",
         "TREASURER",
         "ADMIN",
+        "EXTERNAL",
         "INITIAL_PASSWORD"
       ],
       "attributes": [
@@ -5896,7 +5945,8 @@
         "YOUTH_DIRECTOR",
         "GROUNDSKEEPER",
         "TREASURER",
-        "ADMIN"
+        "ADMIN",
+        "EXTERNAL"
       ],
       "attributes": [
         "booking-owner",
@@ -5928,7 +5978,8 @@
         "YOUTH_DIRECTOR",
         "GROUNDSKEEPER",
         "TREASURER",
-        "ADMIN"
+        "ADMIN",
+        "EXTERNAL"
       ],
       "attributes": [
         "current-account",
@@ -5959,7 +6010,8 @@
         "YOUTH_DIRECTOR",
         "GROUNDSKEEPER",
         "TREASURER",
-        "ADMIN"
+        "ADMIN",
+        "EXTERNAL"
       ],
       "attributes": [
         "booking-card",
@@ -6288,7 +6340,8 @@
         "YOUTH_DIRECTOR",
         "GROUNDSKEEPER",
         "TREASURER",
-        "ADMIN"
+        "ADMIN",
+        "EXTERNAL"
       ],
       "attributes": [
         "current-account",
@@ -6320,7 +6373,8 @@
         "YOUTH_DIRECTOR",
         "GROUNDSKEEPER",
         "TREASURER",
-        "ADMIN"
+        "ADMIN",
+        "EXTERNAL"
       ],
       "attributes": [
         "current-account",
@@ -6536,6 +6590,7 @@
         "GROUNDSKEEPER",
         "TREASURER",
         "ADMIN",
+        "EXTERNAL",
         "INITIAL_PASSWORD"
       ],
       "attributes": [
@@ -6567,6 +6622,7 @@
         "GROUNDSKEEPER",
         "TREASURER",
         "ADMIN",
+        "EXTERNAL",
         "INITIAL_PASSWORD"
       ],
       "attributes": [
@@ -6597,6 +6653,7 @@
         "GROUNDSKEEPER",
         "TREASURER",
         "ADMIN",
+        "EXTERNAL",
         "INITIAL_PASSWORD"
       ],
       "attributes": [
@@ -6628,7 +6685,8 @@
         "YOUTH_DIRECTOR",
         "GROUNDSKEEPER",
         "TREASURER",
-        "ADMIN"
+        "ADMIN",
+        "EXTERNAL"
       ],
       "attributes": [
         "current-account",
@@ -6661,7 +6719,8 @@
         "YOUTH_DIRECTOR",
         "GROUNDSKEEPER",
         "TREASURER",
-        "ADMIN"
+        "ADMIN",
+        "EXTERNAL"
       ],
       "attributes": [
         "current-account",
@@ -6688,7 +6747,8 @@
         "YOUTH_DIRECTOR",
         "GROUNDSKEEPER",
         "TREASURER",
-        "ADMIN"
+        "ADMIN",
+        "EXTERNAL"
       ],
       "attributes": [
         "current-account",
@@ -6720,6 +6780,7 @@
         "GROUNDSKEEPER",
         "TREASURER",
         "ADMIN",
+        "EXTERNAL",
         "INITIAL_PASSWORD"
       ],
       "attributes": [
@@ -6799,7 +6860,8 @@
         "YOUTH_DIRECTOR",
         "GROUNDSKEEPER",
         "TREASURER",
-        "ADMIN"
+        "ADMIN",
+        "EXTERNAL"
       ],
       "attributes": [
         "current-account"
@@ -6826,7 +6888,8 @@
         "YOUTH_DIRECTOR",
         "GROUNDSKEEPER",
         "TREASURER",
-        "ADMIN"
+        "ADMIN",
+        "EXTERNAL"
       ],
       "attributes": [
         "current-account",
@@ -6856,7 +6919,8 @@
         "YOUTH_DIRECTOR",
         "GROUNDSKEEPER",
         "TREASURER",
-        "ADMIN"
+        "ADMIN",
+        "EXTERNAL"
       ],
       "attributes": [
         "current-account",
@@ -6886,6 +6950,7 @@
         "GROUNDSKEEPER",
         "TREASURER",
         "ADMIN",
+        "EXTERNAL",
         "INITIAL_PASSWORD"
       ],
       "attributes": [
@@ -6913,7 +6978,8 @@
         "YOUTH_DIRECTOR",
         "GROUNDSKEEPER",
         "TREASURER",
-        "ADMIN"
+        "ADMIN",
+        "EXTERNAL"
       ],
       "attributes": [
         "current-account",
@@ -6943,7 +7009,8 @@
         "YOUTH_DIRECTOR",
         "GROUNDSKEEPER",
         "TREASURER",
-        "ADMIN"
+        "ADMIN",
+        "EXTERNAL"
       ],
       "attributes": [
         "current-account",
@@ -6975,6 +7042,7 @@
         "GROUNDSKEEPER",
         "TREASURER",
         "ADMIN",
+        "EXTERNAL",
         "INITIAL_PASSWORD"
       ],
       "attributes": [
@@ -7004,7 +7072,8 @@
         "YOUTH_DIRECTOR",
         "GROUNDSKEEPER",
         "TREASURER",
-        "ADMIN"
+        "ADMIN",
+        "EXTERNAL"
       ],
       "attributes": [
         "current-account",
@@ -7032,7 +7101,8 @@
         "YOUTH_DIRECTOR",
         "GROUNDSKEEPER",
         "TREASURER",
-        "ADMIN"
+        "ADMIN",
+        "EXTERNAL"
       ],
       "attributes": [
         "current-account",
@@ -7060,7 +7130,8 @@
         "YOUTH_DIRECTOR",
         "GROUNDSKEEPER",
         "TREASURER",
-        "ADMIN"
+        "ADMIN",
+        "EXTERNAL"
       ],
       "attributes": [
         "current-account",
@@ -7087,7 +7158,8 @@
         "YOUTH_DIRECTOR",
         "GROUNDSKEEPER",
         "TREASURER",
-        "ADMIN"
+        "ADMIN",
+        "EXTERNAL"
       ],
       "attributes": [
         "current-account",
@@ -7121,6 +7193,7 @@
         "GROUNDSKEEPER",
         "TREASURER",
         "ADMIN",
+        "EXTERNAL",
         "INITIAL_PASSWORD"
       ],
       "attributes": [
@@ -7197,6 +7270,7 @@
         "GROUNDSKEEPER",
         "TREASURER",
         "ADMIN",
+        "EXTERNAL",
         "INITIAL_PASSWORD"
       ],
       "attributes": [
@@ -7274,7 +7348,8 @@
         "YOUTH_DIRECTOR",
         "GROUNDSKEEPER",
         "TREASURER",
-        "ADMIN"
+        "ADMIN",
+        "EXTERNAL"
       ],
       "attributes": [
         "booking-owner",
@@ -7302,7 +7377,8 @@
         "YOUTH_DIRECTOR",
         "GROUNDSKEEPER",
         "TREASURER",
-        "ADMIN"
+        "ADMIN",
+        "EXTERNAL"
       ],
       "attributes": [
         "participant-person",
@@ -7329,7 +7405,8 @@
         "YOUTH_DIRECTOR",
         "GROUNDSKEEPER",
         "TREASURER",
-        "ADMIN"
+        "ADMIN",
+        "EXTERNAL"
       ],
       "attributes": [
         "current-account",
@@ -7357,7 +7434,8 @@
         "YOUTH_DIRECTOR",
         "GROUNDSKEEPER",
         "TREASURER",
-        "ADMIN"
+        "ADMIN",
+        "EXTERNAL"
       ],
       "attributes": [
         "booking-owner",

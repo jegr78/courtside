@@ -3,6 +3,7 @@ package org.courtside.booking.internal;
 import lombok.RequiredArgsConstructor;
 import org.courtside.card.BookingCard;
 import org.courtside.card.CardService;
+import org.courtside.config.ExternalBookings;
 import org.courtside.identity.Role;
 import org.courtside.member.MemberService;
 import org.courtside.shared.SecurityEventLog;
@@ -19,6 +20,7 @@ public class CardEligibilityPolicy {
     private final CardService cards;
     private final SecurityEventLog securityEvents;
     private final MemberService members;
+    private final ExternalBookings externalBookings;
 
     public BookingCard requireActive(UUID cardId) {
         BookingCard card = cards.findCard(cardId)
@@ -50,6 +52,7 @@ public class CardEligibilityPolicy {
 
     private boolean permits(BookingCard card, UUID accountId, Set<Role> callerRoles) {
         return callerRoles.contains(Role.ADMIN)
-                || card.permits(callerRoles, card.requiresMembership() && members.isCurrentMember(accountId));
+                || card.permits(callerRoles, card.requiresMembership() && members.isCurrentMember(accountId),
+                externalBookings.admitted());
     }
 }

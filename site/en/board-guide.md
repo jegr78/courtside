@@ -128,6 +128,8 @@ time it opens.
 * The **Currency** is a three-letter ISO code such as `EUR` or `CHF`. Guest fees are stated in it.
   A change converts nothing: the fees of the booking types keep their number, and guests already
   booked keep their amount.
+* **Admit external bookings** opens booking cards that name the *External* role to people outside
+  the club. Without it nobody with that role books, even on a card that names it.
 
 ## Club → Deadlines and reminders
 
@@ -394,7 +396,7 @@ or closure. Add one card for every type the club needs.
 | Setting | Effect |
 |---|---|
 | **Label and colour** | Appearance in the court plan. Courtside shows the contrast of the label against the colour and warns below 4.5 to 1 |
-| **Allowed roles** | Roles that may book with the card. With no selection, everybody whose membership runs today may book. An account without a membership books only cards that name one of its roles |
+| **Allowed roles** | Roles that may book with the card. With no selection, everybody whose membership runs today may book. An account without a membership books only cards that name one of its roles. **External** opens the card to people outside the club, but only while *Admit external bookings* is set in the club profile. External is never a managing role |
 | **Managing roles** | Roles that may open, inspect and cancel every booking made with this card |
 | **Allowed player counts** | Permitted participant counts. With no value, the card records no participants |
 | **Counts against booking limits** | Counts the booking towards the member's open-booking limit |
