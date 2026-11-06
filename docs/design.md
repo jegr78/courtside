@@ -297,7 +297,13 @@ while `club_config.external_bookings` is on, which it is not by default; `Bookin
 that switch, so turning it off closes every card to the role at once. `EXTERNAL` is never a managing
 role: `CardService` refuses it with `card.managingRoles.external` and the managing-role CHECK leaves
 it out below the service. The session reports the switch as `externalBookings`, also without a
-session. An empty managing-role set
+session. An account holding `EXTERNAL` without a running membership and without `ADMIN` is an outsider
+(`Outsiders`): the
+request boundary and each service refuse it the member search, participant cards, partner
+invitations, dependants, the waitlist and series with `access-denied`, `BookingWriter` refuses any
+participant but a guest with `booking.participants.outsiderGuestsOnly`, and the session reports
+`memberFeatures` false so the client hides those features. A running membership lifts the closure.
+An empty managing-role set
 permits only the owner and administrators to manage the booking. Managing roles never inherit from
 booking roles.
 

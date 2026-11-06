@@ -321,3 +321,29 @@ it("given a card that charges per guest place, when a guest joins the waitlist, 
   // then
   expect(screen.queryByTestId("booking-guest-fee"), "the fee applies only once the offer is accepted").not.toBeInTheDocument();
 });
+
+it("given an account without member features, when the dialog opens, then only guests can be added and no member or card is asked for", async () => {
+  // given
+  const cards = vi.spyOn(api, "participantCards");
+
+  // when
+  render(<BookingDialog selection={{ date: "2026-08-10", slot: "10:00", courtId: court.id }} grid={grid as never}
+    courts={[court]} allocations={[]} canChooseSeveralCourts={false} memberFeatures={false}
+    closed={() => undefined} created={() => Promise.resolve()} conflicted={() => Promise.resolve()} />);
+  await screen.findByTestId("guest-participants");
+
+  // then
+  expect(screen.queryByTestId("member-participants")).toBeNull();
+  expect(screen.queryByTestId("member-search")).toBeNull();
+  expect(screen.queryByTestId("card-participants")).toBeNull();
+  expect(cards).not.toHaveBeenCalled();
+});
+
+it("given an account with member features, when the dialog opens, then members and participant cards are offered", async () => {
+  // when
+  show();
+
+  // then
+  expect(await screen.findByTestId("member-participants")).toBeInTheDocument();
+  expect(screen.getByTestId("card-participants")).toBeInTheDocument();
+});

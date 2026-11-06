@@ -1335,6 +1335,7 @@ const de = {
   "booking.participants.bookerUnknown": "Diese Buchungskarte benötigt ein Konto, das mit einer Person verknüpft ist.",
   "booking.participants.duplicate": "Ein Spieler kann nur einen Platz einer Buchung belegen.",
   "booking.participants.guestNotAllowed": "Die Karte {{cardLabel}} erlaubt keine Gäste.",
+  "booking.participants.outsiderGuestsOnly": "Ohne Mitgliedschaft im Verein kannst du nur Gäste eintragen.",
   "booking.participants.invalid": "Ein Teilnehmer muss entweder ein Mitglied oder ein namentlich genannter Gast sein.",
   "booking.participants.unknownCard": "Dieser Platzfüller ist nicht verfügbar.",
   "booking.participants.cardUnavailable": "{{cardLabel}} ist zu dieser Zeit bereits vergeben. Der Verein hat insgesamt {{capacity}}.",

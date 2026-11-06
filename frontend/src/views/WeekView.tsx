@@ -35,6 +35,7 @@ interface WeekViewProps {
   canChooseSeveralCourts?: boolean;
   offline?: boolean;
   currency?: string;
+  memberFeatures?: boolean;
 }
 
 interface WeekData {
@@ -77,7 +78,7 @@ interface DayPlanCellProps {
   shortLabelOf: Map<string, string>;
   book: (courtId: string, slot: string) => void;
   cancel: (allocation: Allocation) => void;
-  queue: (allocation: Allocation) => void;
+  queue?: (allocation: Allocation) => void;
   past: boolean;
   outside: boolean;
   courtClosed: boolean;
@@ -90,7 +91,7 @@ interface DayPlanCellProps {
 const systemClock = () => new Date();
 
 export function WeekView({ today, clock = systemClock, canBook = true,
-  canChooseSeveralCourts = false, offline = false, currency }: WeekViewProps) {
+  canChooseSeveralCourts = false, offline = false, currency, memberFeatures = true }: WeekViewProps) {
   const { t, i18n } = useTranslation();
   const [referenceInstant] = useState(() => today ?? clock());
   const [currentInstant, setCurrentInstant] = useState(referenceInstant);
@@ -166,7 +167,8 @@ export function WeekView({ today, clock = systemClock, canBook = true,
     clearEligibility();
     const refresh = () => {
       const dependantsAsked = ++dependantsRequest.current;
-      void api.dependants()
+      if (!memberFeatures) setBookableDependants([]);
+      else void api.dependants()
         .then((dependants) => {
           if (active && dependantsAsked === dependantsRequest.current) {
             setBookableDependants(dependants.filter((dependant) => dependant.grants.includes("BOOK")));
@@ -194,7 +196,7 @@ export function WeekView({ today, clock = systemClock, canBook = true,
       window.clearInterval(interval);
       window.removeEventListener("focus", refresh);
     };
-  }, [canBook, clearEligibility, offline, reportEligibility]);
+  }, [canBook, clearEligibility, memberFeatures, offline, reportEligibility]);
 
   const selfBookable = eligibility?.violations.length === 0;
   const bookingAllowed = canBook && (selfBookable || (eligibility !== undefined && bookableDependants.length > 0));
@@ -576,7 +578,7 @@ export function WeekView({ today, clock = systemClock, canBook = true,
             {data.courts.map((court) => <DayPlanCell key={court.id}
               court={court} slot={slot} date={selectedDate} startsAt={visibleSlotStartsAt}
               allocations={selectedBoundaries} grid={data.grid} locale={language} t={t} shortLabelOf={shortLabelOf}
-              book={openBooking} cancel={openCancellation} queue={openWaitlist} past={past} outside={outside}
+              book={openBooking} cancel={openCancellation} queue={memberFeatures ? openWaitlist : undefined} past={past} outside={outside}
               courtClosed={closures.has(court.id)}
               canBook={bookingAllowed} firstVisible={slot === slots[0]}
               selected={drag?.courtId === court.id && dragSpan.includes(slot)}
@@ -626,6 +628,7 @@ export function WeekView({ today, clock = systemClock, canBook = true,
       bookingHours={ownLimits?.bookingHours ?? undefined}
       dependants={bookableDependants}
       selfBookable={selfBookable}
+      memberFeatures={memberFeatures}
       closed={() => setBookingSelection(undefined)}
       created={async () => {
         setBookingSelection(undefined);
@@ -646,6 +649,7 @@ export function WeekView({ today, clock = systemClock, canBook = true,
       allocations={[]}
       canChooseSeveralCourts={false}
       currency={currency}
+      memberFeatures={memberFeatures}
       closed={() => setWaitlistSelection(undefined)}
       created={() => {
         setWaitlistSelection(undefined);
@@ -756,7 +760,7 @@ function renderCell(
   shortLabelOf: Map<string, string>,
   book: () => void,
   cancel: (allocation: Allocation) => void,
-  queue: (allocation: Allocation) => void,
+  queue: ((allocation: Allocation) => void) | undefined,
   isPast: boolean,
   isOutside: boolean,
   isCourtClosed: boolean,
@@ -816,7 +820,7 @@ function renderCell(
         onClick={() => cancel(allocation)}
         className={className}
         style={style}
-      >{content}</button> : !allocation.ownBooking && !reservation?.ownEntryId && ahead && canBook ? <button
+      >{content}</button> : !allocation.ownBooking && !reservation?.ownEntryId && ahead && canBook && queue ? <button
         type="button"
         data-testid="allocation"
         data-booking-id={reservation ? undefined : allocation.bookingId}

@@ -44,6 +44,7 @@ import org.courtside.card.BookingCard;
 import org.courtside.config.BookingGridCoordination;
 import org.courtside.config.ClubTimeZone;
 import org.courtside.facility.FacilityService;
+import org.courtside.identity.Outsiders;
 import org.courtside.identity.Role;
 import org.courtside.rules.RuleViolation;
 import org.courtside.shared.CancellationReason;
@@ -68,6 +69,7 @@ public class SeriesService {
     private static final String OVERLAP_CONSTRAINT = "court_allocation_no_overlap";
 
     private final SeriesSchedule schedule;
+    private final Outsiders outsiders;
     private final CourtAllocationRepository allocations;
     private final BookingService bookings;
     private final SeriesOccurrenceCancellation occurrences;
@@ -87,7 +89,7 @@ public class SeriesService {
     private final CourtReservations reservations;
     private final RuleRejectionLog rejections;
 
-    public SeriesService(SeriesSchedule schedule,
+    public SeriesService(SeriesSchedule schedule, Outsiders outsiders,
                          CourtAllocationRepository allocations,
                          BookingService bookings,
                          SeriesOccurrenceCancellation occurrences,
@@ -107,6 +109,7 @@ public class SeriesService {
                          CourtReservations reservations,
                          RuleRejectionLog rejections) {
         this.schedule = schedule;
+        this.outsiders = outsiders;
         this.allocations = allocations;
         this.bookings = bookings;
         this.occurrences = occurrences;
@@ -130,6 +133,7 @@ public class SeriesService {
     @Transactional(readOnly = true)
     public SeriesPreview preview(SeriesRule rule, UUID bookedBy, UUID bookedByPersonId,
                                  Set<Role> callerRoles) {
+        outsiders.refuse(bookedBy, callerRoles);
         BookingCard card = cardEligibility.requireActive(rule.cardId());
         requireCardDoesNotTrackPlayers(card);
         facility.requireBookableCourts(rule.courtIds());
@@ -156,6 +160,7 @@ public class SeriesService {
     public SeriesCreationResult create(SeriesRule rule, List<Instant> confirmedStarts,
                                        UUID bookedBy, UUID bookedByPersonId,
                                        Set<Role> callerRoles, String note) {
+        outsiders.refuse(bookedBy, callerRoles);
         if (confirmedStarts.isEmpty()) {
             return new SeriesCreationResult(null, List.of(), List.of());
         }
@@ -221,6 +226,7 @@ public class SeriesService {
     @Transactional
     public int cancel(UUID seriesId, UUID fromBookingId, CancelScope scope,
                       UUID cancelledBy, Set<Role> cancellerRoles, CancellationReason reason) {
+        outsiders.refuse(cancelledBy, cancellerRoles);
         requireManagementAccessTo(seriesId, fromBookingId, cancelledBy, cancellerRoles);
         bookingGridCoordination.lock();
         BookingSeries series = lockSeries(seriesId);
@@ -246,6 +252,7 @@ public class SeriesService {
 
     @Transactional(readOnly = true)
     public MovePreview previewMove(MoveRequest request, UUID movedBy, Set<Role> callerRoles) {
+        outsiders.refuse(movedBy, callerRoles);
         return previewMove(request, movedBy, callerRoles, true);
     }
 
@@ -283,6 +290,7 @@ public class SeriesService {
 
     @Transactional
     public int move(MoveRequest request, UUID movedBy, Set<Role> callerRoles) {
+        outsiders.refuse(movedBy, callerRoles);
         requireManagementAccessTo(request.seriesId(), request.fromBookingId(), movedBy, callerRoles);
         bookingGridCoordination.lock();
         lockSeries(request.seriesId());

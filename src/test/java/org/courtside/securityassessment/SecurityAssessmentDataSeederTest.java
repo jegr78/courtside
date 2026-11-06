@@ -83,6 +83,13 @@ class SecurityAssessmentDataSeederTest {
         verify(members, times(SecurityAssessmentDataSeeder.ROLE_ACCOUNT_COUNT
                 + SecurityAssessmentDataset.managerCombinationAccounts())).save(member.capture());
         assertThat(member.getAllValues()).anySatisfy(value -> assertThat(value.getEndedOn()).isNotNull());
+        java.util.Set<java.util.UUID> outsiders = account.getAllValues().stream()
+                .filter(value -> value.getRoles().equals(java.util.Set.of(Role.EXTERNAL)))
+                .map(value -> value.getPerson().getId())
+                .collect(java.util.stream.Collectors.toSet());
+        assertThat(member.getAllValues()).filteredOn(value -> outsiders.contains(value.getPersonId()))
+                .as("an external assessment account holds no running membership, so the closures apply to it")
+                .hasSize(2).allSatisfy(value -> assertThat(value.getEndedOn()).isNotNull());
         verify(bookings, times(SecurityAssessmentDataset.standaloneBookings())).save(any());
         verify(bookings, times(SecurityAssessmentDataset.seriesOccurrences())).saveAndFlush(any());
         verify(jdbc, times(2 + SecurityAssessmentDataset.seriesOccurrences()))

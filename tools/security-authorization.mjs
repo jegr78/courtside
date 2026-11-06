@@ -99,6 +99,15 @@ function mfaEntryProof(path) {
   return path === "/api/account-recovery/mfa/redemption" ? "controlled-recovery-code" : null;
 }
 
+export const memberOnlyPaths = Object.freeze([
+  /^\/api\/public\/participant-(?:members|cards)$/,
+  /^\/api\/partner-invitations(?:\/|$)/,
+  /^\/api\/my\/bookings\/[^/]+\/partner-invitation$/,
+  /^\/api\/my\/dependants(?:\/|$)/,
+  /^\/api\/my\/waitlist(?:\/|$)/,
+  /^\/api\/booking-series(?:-preview)?(?:\/|$)/
+]);
+
 function operationExpectations(path, method, security) {
   const expectations = Object.fromEntries(authorizationActors.map((actor) => [actor, "deny-forbidden"]));
   if (path === "/api/account/initial-password") {
@@ -136,6 +145,7 @@ function operationExpectations(path, method, security) {
     return expectations;
   }
   for (const role of roles) expectations[role] = "allow";
+  if (memberOnlyPaths.some((pattern) => pattern.test(path))) expectations.EXTERNAL = "deny-forbidden";
   return expectations;
 }
 

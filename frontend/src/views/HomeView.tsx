@@ -25,6 +25,6 @@ export function HomeView({ session, offline = false }: {
       </Link>
     </div>}
     <WeekView canBook={session.authenticated} canChooseSeveralCourts={holdsAnOfficeBeyondMembership(session)}
-      offline={offline} currency={club?.currency} />
+      offline={offline} currency={club?.currency} memberFeatures={session.memberFeatures !== false} />
   </section>;
 }

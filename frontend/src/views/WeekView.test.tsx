@@ -3087,3 +3087,16 @@ it("given a placed current line, when the rows change height on resize or layout
     vi.unstubAllGlobals();
   }
 });
+
+it("given an account without member features, when another booking is ahead, then it is no waitlist entry and no dependant is asked for", async () => {
+  // given
+  const dependants = vi.mocked(api.dependants);
+
+  // when
+  render(<WeekView today={clubInstant("12:00")} memberFeatures={false} />);
+  const taken = await screen.findByTestId("allocation");
+
+  // then
+  expect(taken.tagName, "a taken court offers no waitlist").not.toBe("BUTTON");
+  expect(dependants).not.toHaveBeenCalled();
+});

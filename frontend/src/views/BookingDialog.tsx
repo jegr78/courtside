@@ -31,12 +31,13 @@ export interface WaitlistSelection {
 export function BookingDialog({ selection, grid, courts, allocations, canChooseSeveralCourts,
   maxBookingMinutes: ownMaxBookingMinutes, minBookingMinutes: ownMinBookingMinutes,
   maxWeeklyBookedHours: ownMaxWeeklyBookedHours, bookingHours: ownBookingHours,
-  dependants = [], selfBookable = true, currency, closed, created, conflicted, waitlist }: {
+  dependants = [], selfBookable = true, currency, memberFeatures = true, closed, created, conflicted, waitlist }: {
   selection: BookingSelection;
   grid: BookingGrid;
   courts: PublicCourt[];
   allocations: Allocation[];
   canChooseSeveralCourts: boolean;
+  memberFeatures?: boolean;
   maxBookingMinutes?: number;
   minBookingMinutes?: number;
   maxWeeklyBookedHours?: number;
@@ -102,8 +103,9 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
   const bookingHours = ownLimits ? ownBookingHours : undefined;
 
   useEffect(() => {
+    if (!memberFeatures) return;
     void api.participantCards().then(setParticipantCards).catch((failure: unknown) => report(failure));
-  }, [report]);
+  }, [memberFeatures, report]);
 
   useEffect(() => {
     let active = true;
@@ -117,7 +119,7 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
 
   useEffect(() => {
     const query = memberQuery.trim();
-    if (query.length < PERSON_SEARCH_MIN_LENGTH) {
+    if (!memberFeatures || query.length < PERSON_SEARCH_MIN_LENGTH) {
       setMemberMatches([]);
       return;
     }
@@ -132,7 +134,7 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
       active = false;
       window.clearTimeout(timeout);
     };
-  }, [memberQuery, report, selectedMembers]);
+  }, [memberFeatures, memberQuery, report, selectedMembers]);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -290,7 +292,7 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
       {requiredPlayers !== undefined && <p data-testid="booking-players" aria-live="polite" className="mt-2">
         {t("booking.players", { players: chosenPlayers, required: requiredPlayers })}
       </p>}
-      <fieldset className="mt-4 grid gap-3" aria-invalid={fieldViolations("members").length > 0} aria-describedby={describedBy("members")}>
+      {memberFeatures && <fieldset data-testid="member-participants" className="mt-4 grid gap-3" aria-invalid={fieldViolations("members").length > 0} aria-describedby={describedBy("members")}>
         <legend id="booking-members-legend" className="font-semibold">{t("booking.members")}</legend>
         <input ref={memberSearch} data-testid="member-search" type="search" aria-labelledby="booking-members-legend" value={memberQuery} onChange={(event) => setMemberQuery(event.target.value)} className="form-control rounded-lg border px-3 py-3" />
         {memberMatches.length > 0 && <ul className="grid gap-2">
@@ -307,7 +309,7 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
           <span data-testid="selected-member-name" className="min-w-0 flex-1 break-words">{member.displayName}</span>
           <Button variant="secondary" type="button" data-testid="remove-member" aria-label={t("booking.removeMember", { name: member.displayName })} title={t("booking.removeMemberShort")} className="min-w-11 shrink-0" onClick={() => setSelectedMembers((current) => current.filter((selected) => selected.personId !== member.personId))}><span aria-hidden="true">×</span></Button>
         </div>)}
-      </fieldset>
+      </fieldset>}
       <FieldViolations id="booking-members-errors" violations={fieldViolations("members")} />
       <details data-testid="booking-more" open={showsMore} onToggle={(event) => {
         const opened = event.currentTarget.open;
@@ -327,7 +329,7 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
         </label>)}
         <Button variant="secondary" type="button" data-testid="add-guest" className="justify-self-start" onClick={() => setGuestNames((current) => [...current, ""])}>{t("booking.addGuest")}</Button>
       </fieldset>
-      <fieldset className="mt-4 grid gap-3" aria-invalid={fieldViolations("participants").length > 0} aria-describedby={describedBy("participants")}>
+      {memberFeatures && <fieldset data-testid="card-participants" className="mt-4 grid gap-3" aria-invalid={fieldViolations("participants").length > 0} aria-describedby={describedBy("participants")}>
         <legend className="font-semibold">{t("booking.participantCards")}</legend>
         {participantCardIds.map((participantCardId, index) => <label key={index} className="grid gap-2 font-medium">
           {index === 0 ? t("booking.participantCard") : t("booking.participantCardNumber", { number: index + 1 })}
@@ -337,7 +339,7 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
           </select>
         </label>)}
         <Button variant="secondary" type="button" className="justify-self-start" onClick={() => setParticipantCardIds((current) => [...current, ""])}>{t("booking.addParticipantCard")}</Button>
-      </fieldset>
+      </fieldset>}
       <FieldViolations id="booking-participants-errors" violations={fieldViolations("participants")} />
       <label className="mt-4 grid gap-2 font-medium">{t("booking.note")}
         <textarea data-testid="booking-note" maxLength={500} value={note} onChange={(event) => setNote(event.target.value)} aria-invalid={fieldViolations("note").length > 0} aria-describedby={describedBy("note")} className="form-control rounded-lg border px-3 py-3" />

@@ -190,6 +190,11 @@ The booking dialog shows how many player slots are already filled.
 Recorded members receive an email. They do not need to accept the booking and can remove
 themselves later.
 
+If your club admits external bookings, you can book without a membership on the booking types the
+board opens to external players. You then add other players as **guests** only. The member search,
+slot fillers, the waitlist, the partner search, series and booking for dependants are open to
+members only and do not appear for you.
+
 ![The booking fields for members, guests and slot fillers.](../screenshots/en/booking-participants.png)
 
 ## Recorded as a co-player

@@ -1,6 +1,7 @@
 package org.courtside.identity.internal;
 
 import org.courtside.identity.CurrentUser;
+import org.courtside.identity.Outsiders;
 import org.courtside.identity.Role;
 import org.courtside.identity.RecentAuthentication;
 import org.courtside.identity.UserAccountRepository;
@@ -50,9 +51,11 @@ import org.springframework.session.web.http.DefaultCookieSerializer;
 
 import java.net.URI;
 import java.time.Clock;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 @Configuration(proxyBeanMethods = false)
 @EnableConfigurationProperties({BootstrapAdminProperties.class, CredentialIssueProperties.class,
@@ -69,6 +72,11 @@ public class SecurityConfiguration {
     private static final int SALT_LENGTH_IN_BYTES = 16;
     private static final int HASH_LENGTH_IN_BYTES = 32;
     private static final String LOGIN_PROCESSING_URL = "/api/session";
+    private static final String[] MEMBER_ONLY_PATHS = {
+            "/api/public/participant-members", "/api/public/participant-cards",
+            "/api/partner-invitations", "/api/partner-invitations/**", "/api/my/bookings/*/partner-invitation",
+            "/api/my/dependants", "/api/my/dependants/**", "/api/my/waitlist", "/api/my/waitlist/**",
+            "/api/booking-series-preview", "/api/booking-series", "/api/booking-series/**"};
 
     private static RequestMatcher credentialVerificationEndpoints() {
         RequestMatcher reauthentication = PathPatternRequestMatcher.withDefaults()
@@ -121,6 +129,7 @@ public class SecurityConfiguration {
     @Bean
     public SecurityFilterChain filterChain(
             HttpSecurity http,
+            Outsiders outsiders,
             ProblemDetailAccessDeniedHandler accessDeniedHandler,
             ProblemDetailAuthenticationEntryPoint authenticationEntryPoint,
             LoginAttemptProtection loginAttemptProtection,
@@ -146,8 +155,12 @@ public class SecurityConfiguration {
                 .authorizeHttpRequests(auth -> auth
                         // The error dispatch is the tail of a request already decided, not a new one.
                         .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
-                        .requestMatchers("/api/public/booking-cards", "/api/public/participant-cards",
-                                "/api/public/participant-members")
+                        .requestMatchers(MEMBER_ONLY_PATHS).access((authentication, context) -> new AuthorizationDecision(
+                                isAuthenticated(authentication.get())
+                                        && !hasAuthority(authentication.get(),
+                                        CourtsideUserDetailsService.PASSWORD_CHANGE_REQUIRED)
+                                        && !isOutsider(outsiders, authentication.get())))
+                        .requestMatchers("/api/public/booking-cards")
                         .access((authentication, context) -> new AuthorizationDecision(
                                 isAuthenticated(authentication.get())
                                         && !hasAuthority(authentication.get(),
@@ -459,6 +472,20 @@ public class SecurityConfiguration {
             org.springframework.security.core.Authentication authentication, String authority) {
         return authentication.getAuthorities().stream()
                 .anyMatch(granted -> granted.getAuthority().equals(authority));
+    }
+
+    private static boolean isOutsider(Outsiders outsiders,
+                                      org.springframework.security.core.Authentication authentication) {
+        if (!(authentication.getPrincipal() instanceof CourtsideUserDetails details)) {
+            return false;
+        }
+        Set<Role> roles = authentication.getAuthorities().stream()
+                .map(granted -> granted.getAuthority())
+                .filter(authority -> authority.startsWith("ROLE_"))
+                .flatMap(authority -> Arrays.stream(Role.values())
+                        .filter(role -> authority.equals("ROLE_" + role.name())))
+                .collect(Collectors.toUnmodifiableSet());
+        return outsiders.isOutsider(details.accountId(), roles);
     }
 
     private static boolean isAuthenticated(

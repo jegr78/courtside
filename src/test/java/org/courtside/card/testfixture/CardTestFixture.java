@@ -28,6 +28,11 @@ public final class CardTestFixture {
         return cards.createCard(label, "#34584A", allowedRoles, Set.of(), new short[]{}, true, false, false, false, true, 0).getId();
     }
 
+    public UUID createDoublesCardForGuestsAllowing(String label, Set<Role> allowedRoles) {
+        return cards.createCard(label, "#34584A", allowedRoles, Set.of(), new short[]{2},
+                false, true, false, false, true, 0).getId();
+    }
+
     public UUID createDoublesCardForGuests(String label, Set<Role> managingRoles) {
         return cards.createCard(label, "#34584A", Set.of(), managingRoles, new short[]{2},
                 false, true, false, false, true, 0).getId();

@@ -89,9 +89,9 @@ export function AppRoutes({ session, refreshSession, passwordChanged, initialPas
     <Route path="/my-messages" element={session.authenticated
       ? <MyMessagesView />
       : signInFirst} />
-    <Route path="/my-dependants" element={session.authenticated
-      ? <DependantsView />
-      : signInFirst} />
+    <Route path="/my-dependants" element={!session.authenticated
+      ? signInFirst
+      : session.memberFeatures === false ? <Navigate to="/my-bookings" replace /> : <DependantsView />} />
     <Route path="/account" element={session.authenticated
       ? <AccountView key={address.key} session={session} offline={offline} passwordChanged={() => initialPasswordChanged?.()}
         signedOut={(preserve) => signedOut?.(preserve)} />
