@@ -196,9 +196,10 @@ describe("ImportSourceForm", () => {
     // then
     expect(save).toHaveBeenCalledWith(expect.objectContaining({
       membershipTypes: { active: "type-1" },
-      ageBands: { active: [{ fromAge: 0, membershipTypeId: "type-2" }, { fromAge: 18, membershipTypeId: "type-1" }] },
-      columns: expect.objectContaining({ Born: "BIRTH_DATE" })
+      ageBands: { active: [{ fromAge: 0, membershipTypeId: "type-2" }, { fromAge: 18, membershipTypeId: "type-1" }] }
     }));
+    const [request] = save.mock.calls[0] as [ImportSourceRequest];
+    expect(request.columns?.Born, "the birth date column is sent with the rest").toBe("BIRTH_DATE");
     expect(screen.queryByTestId("owned-BIRTH_DATE"), "a birth date is never owned").not.toBeInTheDocument();
   });
 
