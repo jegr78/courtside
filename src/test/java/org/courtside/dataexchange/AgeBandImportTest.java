@@ -109,6 +109,69 @@ class AgeBandImportTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenAnImportedSplit_whenTheSameFileComesAgainAndThenABirthDateChanges_thenOnlyTheChangedBandIsAnUpdate() {
+        // given
+        UUID source = splitSource(Set.of(CanonicalField.MEMBERSHIP_TYPE));
+        executions.execute(preview(source, EXPORT).previewId(), false, actor);
+
+        // when
+        PreviewSummary again = preview(source, EXPORT);
+        PreviewSummary moved = preview(source, EXPORT.replace("4711,Jane,Doe,active,16.03.2010",
+                "4711,Jane,Doe,active,16.03.1990"));
+
+        // then
+        assertThat(again.changeSet().changes()).as("an unchanged band changes nothing").isEmpty();
+        assertThat(moved.changeSet().changes())
+                .extracting(ResolvedChangeSet.PersonChange::kind, ResolvedChangeSet.PersonChange::externalId,
+                        ResolvedChangeSet.PersonChange::membershipTypeId, ResolvedChangeSet.PersonChange::typeFromAgeBand)
+                .containsExactly(tuple(ResolvedChangeSet.ChangeKind.UPDATE, "4711", adult, true));
+    }
+
+    @Test
+    void givenABandWhoseTypeWasRetired_whenAFileFallsIntoIt_thenTheSnapshotStopsByTheCategory() {
+        // given
+        UUID source = splitSource(Set.of(CanonicalField.MEMBERSHIP_TYPE));
+        memberFixture.deactivateMembershipType(youth);
+
+        // when / then
+        assertThatThrownBy(() -> preview(source, EXPORT))
+                .hasFieldOrPropertyWithValue("code", "import.snapshot.membershipType.inactive");
+    }
+
+    @Test
+    void givenASplitSource_whenItsValueLosesItsOwnMapping_thenTheChangeIsRefusedForTheMissingFallback() {
+        // given
+        UUID source = splitSource(Set.of(CanonicalField.MEMBERSHIP_TYPE));
+
+        // when / then
+        assertThatThrownBy(() -> sources.change(source, "club-registry", "Club registry", ",", "UTF-8",
+                ColumnLayout.headers(COLUMNS), Map.of("honorary", honorary), List.of(),
+                Map.of("active", List.of(new AgeBand(0, youth))), unsorted, Set.of(CanonicalField.MEMBERSHIP_TYPE),
+                10, false))
+                .hasFieldOrPropertyWithValue("code", "import.source.ageBands.fallbackMissing");
+    }
+
+    @Test
+    void givenASplitSource_whenTheSplitIsChangedAndThenRemoved_thenEachStoredStateReadsBack() {
+        // given
+        UUID source = splitSource(Set.of(CanonicalField.MEMBERSHIP_TYPE));
+
+        // when
+        SourceConfiguration rebanded = sources.change(source, "club-registry", "Club registry", ",", "UTF-8",
+                ColumnLayout.headers(COLUMNS), Map.of("active", unsorted), List.of(),
+                Map.of("active", List.of(new AgeBand(0, youth), new AgeBand(14, adult), new AgeBand(65, honorary))),
+                unsorted, Set.of(CanonicalField.MEMBERSHIP_TYPE), 10, false);
+        SourceConfiguration unsplit = sources.change(source, "club-registry", "Club registry", ",", "UTF-8",
+                ColumnLayout.headers(COLUMNS), Map.of("active", unsorted), List.of("passive"), Map.of(), unsorted,
+                Set.of(CanonicalField.MEMBERSHIP_TYPE), 10, false);
+
+        // then
+        assertThat(sources.configurationOf(source).ageBands()).isEmpty();
+        assertThat(rebanded.ageBands().get("active")).extracting(AgeBand::fromAge).containsExactly(0, 14, 65);
+        assertThat(unsplit.ageBands()).isEmpty();
+    }
+
+    @Test
     void givenASourceThatDoesNotOwnTheType_whenACategoryIsSplit_thenTheSplitIsRefusedByItsField() {
         // when / then
         assertThatThrownBy(() -> splitSource(Set.of(CanonicalField.FIRST_NAME)))
@@ -145,6 +208,11 @@ class AgeBandImportTest extends AbstractIntegrationTest {
                 ColumnLayout.headers(COLUMNS), Map.of("active", unsorted), List.of(), Map.of(), unsorted,
                 Set.of(CanonicalField.BIRTH_DATE), 10))
                 .hasFieldOrPropertyWithValue("code", "import.source.ownedFields.birthDate");
+    }
+
+    private PreviewSummary preview(UUID source, String content) {
+        return previews.create(source, SnapshotMode.UPDATE_ONLY, "UTF-8",
+                new SnapshotUpload("members.csv", "text/csv", content.getBytes(StandardCharsets.UTF_8)), actor);
     }
 
     private UUID splitSource(Set<CanonicalField> owned) {
