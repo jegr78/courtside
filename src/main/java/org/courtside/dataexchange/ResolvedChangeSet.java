@@ -34,13 +34,18 @@ public record ResolvedChangeSet(List<PersonChange> changes, List<RowError> error
 
     public record PersonChange(ChangeKind kind, int rowNumber, String externalId, UUID personId,
                                Map<CanonicalField, String> values, UUID membershipTypeId,
-                               AccountOutcome account) {
+                               AccountOutcome account, boolean typeFromAgeBand) {
 
         // A change set stored before this instance knew the question carries no answer, and
         // nobody asked is what that is - reading one back must not be a 500.
         public PersonChange {
             values = Map.copyOf(values);
             account = account == null ? AccountOutcome.NOT_ASKED : account;
+        }
+
+        public PersonChange(ChangeKind kind, int rowNumber, String externalId, UUID personId,
+                            Map<CanonicalField, String> values, UUID membershipTypeId, AccountOutcome account) {
+            this(kind, rowNumber, externalId, personId, values, membershipTypeId, account, false);
         }
     }
 

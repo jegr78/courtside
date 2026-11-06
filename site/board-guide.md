@@ -654,6 +654,16 @@ und nennt in der Vorschau nur ihre Anzahl. Wer schon importiert ist und im näch
 Bestand eine solche Kategorie trägt, verliert seine Mitgliedschaft wie jemand, der in der Datei
 fehlt. Eine Kategorie, die weder zugeordnet noch ausgelassen ist, hält den Import weiterhin an.
 
+Trägt dein Export für Jugendliche und Erwachsene dieselbe Kategorie, kannst du sie *Nach Geburtsjahr
+aufteilen*. Ordne dafür eine Spalte dem *Geburtsdatum* zu. Courtside liest `TT.MM.JJJJ`,
+`JJJJ-MM-TT` oder nur das Jahr. Jedes Altersband beginnt bei einem Alter, das erste bei 0, und nennt
+eine Mitgliedsart. Es zählt das Alter, das jemand im laufenden Kalenderjahr erreicht. Wer im
+nächsten Jahr eine Grenze erreicht, wechselt daher mit dem ersten Import dieses Jahres. Eine Zeile
+ohne lesbares Geburtsdatum erhält die Mitgliedsart, die der Kategorie selbst zugeordnet ist, und die
+Vorschau zählt solche Zeilen. Courtside speichert weder Geburtsdatum noch Geburtsjahr und zeigt in
+der Vorschau nur, dass eine Mitgliedsart aus einem Altersband stammt. Eine Aufteilung setzt voraus,
+dass die Quelle die Mitgliedsart führt. Elternbeziehungen beendet weiterhin der Vorstand.
+
 Markiere außerdem die Felder, die die Quelle künftig führen soll. Bei bestehenden Personen
 überschreibt jeder Import diese Felder. Nicht markierte Felder bleiben unverändert. Neue Personen
 erhalten beim ersten Import trotzdem alle zugeordneten Werte aus der Datei.

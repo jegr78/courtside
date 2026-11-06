@@ -224,7 +224,7 @@ class ExternalReferenceServiceTest extends AbstractIntegrationTest {
                         "First name", CanonicalField.FIRST_NAME,
                         "Last name", CanonicalField.LAST_NAME,
                         "Email", CanonicalField.EMAIL)),
-                Map.of(), List.of(), ACTIVE_TYPE, Set.of(), 10).sourceId();
+                Map.of(), List.of(), Map.of(), ACTIVE_TYPE, Set.of(), 10).sourceId();
     }
 
     private UUID person(String firstName, String lastName) {

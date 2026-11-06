@@ -2104,8 +2104,22 @@ components:
       type: string
       description: |
         A field of the roster a snapshot can carry. `EXTERNAL_ID` is the member number the source
-        system holds and is what a record is matched by; the other four are the person's data.
-      enum: [EXTERNAL_ID, FIRST_NAME, LAST_NAME, EMAIL, MEMBERSHIP_TYPE]
+        system holds and is what a record is matched by; the next four are the person's data.
+        `BIRTH_DATE` is read only to choose an age band of a split category. Courtside stores
+        nothing of it, and a source can never own it.
+      enum: [EXTERNAL_ID, FIRST_NAME, LAST_NAME, EMAIL, MEMBERSHIP_TYPE, BIRTH_DATE]
+
+    ImportAgeBand:
+      type: object
+      additionalProperties: false
+      required: [fromAge, membershipTypeId]
+      properties:
+        fromAge:
+          type: integer
+          minimum: 0
+          maximum: 150
+          description: The age a person reaches in the current calendar year from which this band applies.
+        membershipTypeId: { type: string, format: uuid }
 
     ImportColumnMode:
       type: string
@@ -2132,7 +2146,7 @@ components:
     ImportSource:
       type: object
       required: [id, sourceKey, displayName, separator, encoding, columnMode, columns, positions,
-                 columnCount, membershipTypes, leftOutCategories, defaultMembershipTypeId,
+                 columnCount, membershipTypes, leftOutCategories, ageBands, defaultMembershipTypeId,
                  ownedFields, removalWarningPercent]
       properties:
         id: { type: string, format: uuid }
@@ -2184,6 +2198,12 @@ components:
           uniqueItems: true
           description: The category values whose rows are not in the roster, in ascending order.
           items: { type: string }
+        ageBands:
+          type: object
+          description: For each split category value, its age bands ordered by `fromAge`.
+          additionalProperties:
+            type: array
+            items: { $ref: "#/components/schemas/ImportAgeBand" }
         defaultMembershipTypeId: { type: string, format: uuid }
         ownedFields:
           type: array
@@ -2325,6 +2345,20 @@ components:
             two that differ only in it are refused as one value given twice. A value that is
             neither mapped nor left out still stops the snapshot.
           items: { type: string, minLength: 1, maxLength: 120, pattern: ".*\\S.*" }
+        ageBands:
+          type: object
+          maxProperties: 200
+          description: |
+            Category values split by age. Each list starts at `fromAge` 0, holds each bound once
+            and names a type per band. The age is the one a person reaches in the current calendar
+            year, read from the `BIRTH_DATE` column. The value's own `membershipTypes` entry is the
+            fallback for a row without a readable birth date, so a split value must also be mapped
+            there. A split requires the source to own `MEMBERSHIP_TYPE`. A source holds at most 200
+            age bands in all.
+          additionalProperties:
+            type: array
+            minItems: 1
+            items: { $ref: "#/components/schemas/ImportAgeBand" }
         defaultMembershipTypeId:
           type: string
           format: uuid
@@ -2428,7 +2462,7 @@ components:
 
     ImportPersonChange:
       type: object
-      required: [kind, rowNumber, externalId, values, account]
+      required: [kind, rowNumber, externalId, values, account, typeFromAgeBand]
       properties:
         kind: { $ref: "#/components/schemas/ImportChangeKind" }
         rowNumber:
@@ -2453,6 +2487,9 @@ components:
           additionalProperties: { type: string }
         membershipTypeId: { type: [string, "null"], format: uuid }
         account: { $ref: "#/components/schemas/ImportAccountOutcome" }
+        typeFromAgeBand:
+          type: boolean
+          description: Whether `membershipTypeId` came from an age band. No age or year is reported.
 
     ImportRowError:
       type: object
@@ -2520,7 +2557,7 @@ components:
     ImportPreview:
       type: object
       required: [previewId, sourceId, mode, fileName, fileHash, rowCount, ignoredColumns,
-                 leftOutRows, changes, rowErrors, possibleDuplicates, sharedAddresses, removals,
+                 leftOutRows, ageFallbackRows, changes, rowErrors, possibleDuplicates, sharedAddresses, removals,
                  needsConfirmation, superseded, createdAt, expiresAt]
       properties:
         previewId: { type: string, format: uuid }
@@ -2547,6 +2584,12 @@ components:
             For each category value the source leaves out, how many rows of the file carried it.
             Those rows are counted and nothing else: no name, member number or row number of them
             is kept. A value no row carried is absent, and `rowCount` does not include them.
+          additionalProperties: { type: integer, minimum: 1 }
+        ageFallbackRows:
+          type: object
+          description: |
+            For each split category value, how many rows had no readable birth date and took the
+            value's own mapping. A value without such rows is absent.
           additionalProperties: { type: integer, minimum: 1 }
         changes:
           type: array

@@ -621,6 +621,15 @@ their number in the preview. Someone already imported whose row carries such a c
 next complete list loses their membership like someone missing from the file. A category that is
 neither mapped nor left out still stops the import.
 
+If your export gives young people and adults the same category, you can *Split by birth year*. Map
+a column to the *Birth date* for that. Courtside reads `DD.MM.YYYY`, `YYYY-MM-DD` or the year alone.
+Each age band starts at an age, the first at 0, and names a membership type. The age a person
+reaches in the current calendar year counts, so someone who reaches a bound next year moves with
+the first import of that year. A row without a readable birth date gets the type mapped to the
+category itself, and the preview counts such rows. Courtside stores neither the birth date nor the
+year and shows in the preview only that a type came from an age band. A split requires the source
+to own the membership type. Guardian relationships are still ended by the board.
+
 Mark the fields that this source should own. Every later import overwrites owned fields on existing
 people. Unmarked fields remain unchanged. New people still receive every mapped value from the
 file during their first import.

@@ -64,7 +64,7 @@ class ExternalReferenceAdminControllerTest extends AbstractIntegrationTest {
                         "First name", CanonicalField.FIRST_NAME,
                         "Last name", CanonicalField.LAST_NAME,
                         "Email", CanonicalField.EMAIL)),
-                Map.of(), List.of(), ACTIVE_TYPE, Set.of(), 10).sourceId();
+                Map.of(), List.of(), Map.of(), ACTIVE_TYPE, Set.of(), 10).sourceId();
     }
 
     @Test
@@ -246,7 +246,7 @@ class ExternalReferenceAdminControllerTest extends AbstractIntegrationTest {
                         "First name", CanonicalField.FIRST_NAME,
                         "Last name", CanonicalField.LAST_NAME,
                         "Email", CanonicalField.EMAIL)),
-                Map.of(), List.of(), ACTIVE_TYPE, Set.of(), 10).sourceId();
+                Map.of(), List.of(), Map.of(), ACTIVE_TYPE, Set.of(), 10).sourceId();
 
         // when / then
         mockMvc.perform(delete("/api/admin/import/sources/{sourceId}/references/{referenceId}",

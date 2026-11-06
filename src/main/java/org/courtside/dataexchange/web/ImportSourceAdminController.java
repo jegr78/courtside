@@ -3,10 +3,12 @@ package org.courtside.dataexchange.web;
 import lombok.RequiredArgsConstructor;
 import org.courtside.api.AdminImportApi;
 import org.courtside.api.ApiCanonicalField;
+import org.courtside.api.ApiImportAgeBand;
 import org.courtside.api.ApiImportColumnMode;
 import org.courtside.api.ApiImportColumnPosition;
 import org.courtside.api.ApiImportSource;
 import org.courtside.api.ApiImportSourceRequest;
+import org.courtside.dataexchange.AgeBand;
 import org.courtside.dataexchange.CanonicalField;
 import org.courtside.dataexchange.ColumnLayout;
 import org.courtside.dataexchange.ColumnMode;
@@ -23,6 +25,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.UUID;
 
@@ -49,7 +52,7 @@ class ImportSourceAdminController implements AdminImportApi {
         SourceConfiguration created = sources.create(request.getSourceKey(),
                 request.getDisplayName(), request.getSeparator(), request.getEncoding(),
                 layout(request), request.getMembershipTypes(), request.getLeftOutCategories(),
-                request.getDefaultMembershipTypeId(), ownedFields(request),
+                ageBands(request), request.getDefaultMembershipTypeId(), ownedFields(request),
                 request.getRemovalWarningPercent());
         return ResponseEntity
                 .created(URI.create("/api/admin/import/sources/" + created.sourceId()))
@@ -67,7 +70,7 @@ class ImportSourceAdminController implements AdminImportApi {
         return ResponseEntity.ok(toResponse(sources.change(id, request.getSourceKey(),
                 request.getDisplayName(), request.getSeparator(), request.getEncoding(),
                 layout(request), request.getMembershipTypes(), request.getLeftOutCategories(),
-                request.getDefaultMembershipTypeId(), ownedFields(request),
+                ageBands(request), request.getDefaultMembershipTypeId(), ownedFields(request),
                 request.getRemovalWarningPercent(),
                 Boolean.TRUE.equals(request.getConfirmColumnModeChange()))));
     }
@@ -92,6 +95,16 @@ class ImportSourceAdminController implements AdminImportApi {
         return new ColumnLayout(mode, columns, positions, request.getColumnCount());
     }
 
+    private static Map<String, List<AgeBand>> ageBands(ApiImportSourceRequest request) {
+        Map<String, List<AgeBand>> bands = new LinkedHashMap<>();
+        if (request.getAgeBands() != null) {
+            request.getAgeBands().forEach((value, listed) -> bands.put(value, listed == null ? null
+                    : listed.stream().map(band -> new AgeBand(band.getFromAge(), band.getMembershipTypeId()))
+                            .toList()));
+        }
+        return bands;
+    }
+
     private static Set<CanonicalField> ownedFields(ApiImportSourceRequest request) {
         Set<CanonicalField> owned = new LinkedHashSet<>();
         request.getOwnedFields().forEach(field -> owned.add(field(field)));
@@ -100,6 +113,13 @@ class ImportSourceAdminController implements AdminImportApi {
 
     private static CanonicalField field(ApiCanonicalField field) {
         return CanonicalField.valueOf(field.getValue());
+    }
+
+    private static Map<String, List<ApiImportAgeBand>> ageBandsOf(SourceConfiguration configuration) {
+        Map<String, List<ApiImportAgeBand>> bands = new TreeMap<>();
+        configuration.ageBands().forEach((value, listed) -> bands.put(value, listed.stream()
+                .map(band -> new ApiImportAgeBand(band.fromAge(), band.membershipTypeId())).toList()));
+        return bands;
     }
 
     private static ApiImportSource toResponse(SourceConfiguration configuration) {
@@ -118,7 +138,7 @@ class ImportSourceAdminController implements AdminImportApi {
                 configuration.displayName(), String.valueOf(configuration.separator()),
                 configuration.encoding(), ApiImportColumnMode.fromValue(configuration.columnMode().name()),
                 columns, positions, configuration.columnCount(), configuration.membershipTypes(),
-                new TreeSet<>(configuration.leftOutCategories()),
+                new TreeSet<>(configuration.leftOutCategories()), ageBandsOf(configuration),
                 configuration.defaultMembershipTypeId(), owned,
                 configuration.removalWarningPercent());
     }

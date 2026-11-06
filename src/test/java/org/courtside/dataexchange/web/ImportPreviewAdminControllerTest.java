@@ -90,7 +90,7 @@ class ImportPreviewAdminControllerTest extends AbstractIntegrationTest {
                         "First name", CanonicalField.FIRST_NAME,
                         "Last name", CanonicalField.LAST_NAME,
                         "Email", CanonicalField.EMAIL)),
-                Map.of(), List.of(), ACTIVE_TYPE, Set.of(CanonicalField.FIRST_NAME, CanonicalField.LAST_NAME), 10).sourceId();
+                Map.of(), List.of(), Map.of(), ACTIVE_TYPE, Set.of(CanonicalField.FIRST_NAME, CanonicalField.LAST_NAME), 10).sourceId();
         UUID admin = identity.createPerson("Richard", "Miles", "richard.miles@example.org");
         identity.createAccount(admin, "admin", Set.of(Role.ADMIN));
     }
@@ -276,7 +276,7 @@ class ImportPreviewAdminControllerTest extends AbstractIntegrationTest {
                         "First name", CanonicalField.FIRST_NAME,
                         "Last name", CanonicalField.LAST_NAME,
                         "Status", CanonicalField.MEMBERSHIP_TYPE)),
-                Map.of("active", ACTIVE_TYPE), List.of("resigned", "deceased"), ACTIVE_TYPE, Set.of(), 10)
+                Map.of("active", ACTIVE_TYPE), List.of("resigned", "deceased"), Map.of(), ACTIVE_TYPE, Set.of(), 10)
                 .sourceId();
 
         // when
@@ -378,7 +378,7 @@ class ImportPreviewAdminControllerTest extends AbstractIntegrationTest {
                         "First name", CanonicalField.FIRST_NAME,
                         "Last name", CanonicalField.LAST_NAME,
                         "Email", CanonicalField.EMAIL)),
-                Map.of(), List.of(), ACTIVE_TYPE,
+                Map.of(), List.of(), Map.of(), ACTIVE_TYPE,
                 Set.of(CanonicalField.FIRST_NAME, CanonicalField.LAST_NAME), 90, false);
 
         // then

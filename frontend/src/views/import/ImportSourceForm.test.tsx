@@ -18,7 +18,7 @@ const existing: ImportSource = {
   displayName: "Membership system", separator: ";", encoding: "UTF-8",
   columns: { "Member number": "EXTERNAL_ID", "First name": "FIRST_NAME", "Last name": "LAST_NAME" },
   membershipTypes: {},
-  leftOutCategories: [],
+  leftOutCategories: [], ageBands: {},
   defaultMembershipTypeId: "type-1",
   ownedFields: [],
   removalWarningPercent: 10, columnMode: "HEADER", positions: [], columnCount: null
@@ -172,6 +172,44 @@ describe("ImportSourceForm", () => {
     expect(save).toHaveBeenCalledWith(expect.objectContaining({
       membershipTypes: { passive: "type-2" }
     }));
+  });
+
+  it("given a mapped category, when it is split by birth year into two bands, then the bands are sent with the category as fallback", async () => {
+    // given
+    const save = vi.fn().mockResolvedValue(existing);
+    show(existing, save);
+    await userEvent.upload(screen.getByTestId("source-file"),
+      file("Member number;First name;Last name;Status;Born\n1;Jane;Doe;active;2010\n"));
+    await screen.findByTestId("column-MEMBERSHIP_TYPE");
+    await userEvent.selectOptions(screen.getByTestId("column-MEMBERSHIP_TYPE"), "Status");
+    await userEvent.selectOptions(screen.getByTestId("column-BIRTH_DATE"), "Born");
+    await userEvent.selectOptions(await screen.findByTestId("category-active"), "type-1");
+
+    // when
+    await userEvent.click(screen.getByTestId("split-by-age-active"));
+    await userEvent.selectOptions(screen.getByTestId("age-band-type-active-0"), "type-2");
+    await userEvent.click(screen.getByTestId("age-band-add-active"));
+    await userEvent.type(screen.getByTestId("age-band-from-active-1"), "18");
+    await userEvent.selectOptions(screen.getByTestId("age-band-type-active-1"), "type-1");
+    await userEvent.click(screen.getByTestId("save-source"));
+
+    // then
+    expect(save).toHaveBeenCalledWith(expect.objectContaining({
+      membershipTypes: { active: "type-1" },
+      ageBands: { active: [{ fromAge: 0, membershipTypeId: "type-2" }, { fromAge: 18, membershipTypeId: "type-1" }] }
+    }));
+    const [request] = save.mock.calls[0] as [ImportSourceRequest];
+    expect(request.columns?.Born, "the birth date column is sent with the rest").toBe("BIRTH_DATE");
+    expect(screen.queryByTestId("owned-BIRTH_DATE"), "a birth date is never owned").not.toBeInTheDocument();
+  });
+
+  it("given a category marked as not in the roster, when the form is read, then it offers no split by age", async () => {
+    // when
+    show({ ...existing, columns: { ...existing.columns, Status: "MEMBERSHIP_TYPE" }, leftOutCategories: ["resigned"] }, vi.fn());
+
+    // then
+    expect(await screen.findByTestId("category-resigned")).toBeInTheDocument();
+    expect(screen.queryByTestId("split-by-age-resigned"), "a left-out row has no type to fall back to").not.toBeInTheDocument();
   });
 
   it("given a category read from the sample, when it is marked as not in the roster, then it is sent as left out and not mapped", async () => {
@@ -501,6 +539,42 @@ it("given a described source, when an edit is discarded, then the stored descrip
   expect(screen.getByTestId("source-name")).toHaveValue("Membership system");
   expect(screen.getByTestId("owned-FIRST_NAME")).not.toBeChecked();
   await waitFor(() => expect(screen.getByTestId("unsaved-count")).toHaveTextContent("0"));
+});
+
+it("given a split source, when a band is added and the edit discarded, then the stored bands return and nothing is left to lose", async () => {
+  // given
+  const split: ImportSource = { ...existing, columns: { ...existing.columns, Status: "MEMBERSHIP_TYPE", Born: "BIRTH_DATE" },
+    membershipTypes: { active: "type-1" }, ageBands: { active: [{ fromAge: 0, membershipTypeId: "type-2" }] } };
+  show(split, () => Promise.resolve());
+  await userEvent.click(await screen.findByTestId("age-band-add-active"));
+  expect(screen.getByTestId("age-band-active-1")).toBeInTheDocument();
+
+  // when
+  await userEvent.click(screen.getByTestId("discard-import-source:source-1"));
+
+  // then
+  expect(screen.queryByTestId("age-band-active-1"), "the added band is gone").not.toBeInTheDocument();
+  await waitFor(() => expect(screen.getByTestId("unsaved-count")).toHaveTextContent("0"));
+});
+
+it("given bands entered out of age order, when the source is saved, then they are sent in age order like the server keeps them", async () => {
+  // given
+  const save = vi.fn().mockResolvedValue(existing);
+  const split: ImportSource = { ...existing, columns: { ...existing.columns, Status: "MEMBERSHIP_TYPE", Born: "BIRTH_DATE" },
+    membershipTypes: { active: "type-1" }, ageBands: { active: [{ fromAge: 0, membershipTypeId: "type-2" },
+      { fromAge: 18, membershipTypeId: "type-1" }] } };
+  show(split, save);
+  await userEvent.click(await screen.findByTestId("age-band-add-active"));
+  await userEvent.type(screen.getByTestId("age-band-from-active-2"), "6");
+  await userEvent.selectOptions(screen.getByTestId("age-band-type-active-2"), "type-2");
+
+  // when
+  await userEvent.click(screen.getByTestId("save-source"));
+
+  // then
+  expect(save).toHaveBeenCalledWith(expect.objectContaining({ ageBands: { active: [
+    { fromAge: 0, membershipTypeId: "type-2" }, { fromAge: 6, membershipTypeId: "type-2" },
+    { fromAge: 18, membershipTypeId: "type-1" }] } }));
 });
 
 // The column mapping is a record inside the request, and rebuilding it reorders its keys.

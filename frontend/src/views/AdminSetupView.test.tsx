@@ -122,7 +122,7 @@ describe("AdminSetupView", () => {
     });
     vi.spyOn(api, "importSources").mockResolvedValue([{
       id: "source-1", sourceKey: "roster-system", displayName: "Membership system",
-      separator: ";", encoding: "UTF-8", columns: {}, membershipTypes: {}, leftOutCategories: [],
+      separator: ";", encoding: "UTF-8", columns: {}, membershipTypes: {}, leftOutCategories: [], ageBands: {},
       defaultMembershipTypeId: "type-1", ownedFields: [], removalWarningPercent: 10, columnMode: "HEADER", positions: [], columnCount: null
     }]);
 

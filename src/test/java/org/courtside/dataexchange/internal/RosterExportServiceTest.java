@@ -148,6 +148,6 @@ class RosterExportServiceTest extends AbstractIntegrationTest {
                 ColumnLayout.headers(Map.of("Member number", CanonicalField.EXTERNAL_ID,
                         "First name", CanonicalField.FIRST_NAME,
                         "Last name", CanonicalField.LAST_NAME)),
-                Map.of(), List.of(), roster.createMembershipType("Imported"), Set.of(), 10).sourceId();
+                Map.of(), List.of(), Map.of(), roster.createMembershipType("Imported"), Set.of(), 10).sourceId();
     }
 }

@@ -5,7 +5,7 @@ import { isExecutable, isExpired } from "./previewState";
 function preview(fields: Partial<ImportPreview>): ImportPreview {
   return {
     previewId: "preview-1", sourceId: "source-1", mode: "UPDATE_ONLY", fileName: "members.csv",
-    fileHash: "abc", rowCount: 0, ignoredColumns: [], leftOutRows: {}, changes: [], rowErrors: [],
+    fileHash: "abc", rowCount: 0, ignoredColumns: [], leftOutRows: {}, ageFallbackRows: {}, changes: [], rowErrors: [],
     possibleDuplicates: [], sharedAddresses: [],
     removals: { count: 0, currentlyLinked: 0, percent: 0 },
     needsConfirmation: false, superseded: false,

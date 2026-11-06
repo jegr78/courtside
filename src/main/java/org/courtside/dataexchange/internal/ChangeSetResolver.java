@@ -119,7 +119,7 @@ public final class ChangeSetResolver {
         return new ResolvedChangeSet.PersonChange(ResolvedChangeSet.ChangeKind.CREATE,
                 row.rowNumber(), row.externalId(), null, values, membershipTypeId,
                 accountOutcomeOf(roster, false, membershipTypeId, possibleDuplicate,
-                        addressAfterThisRun(row, configuration, null)));
+                        addressAfterThisRun(row, configuration, null)), row.bandedTypeId() != null);
     }
 
     private static Optional<ResolvedChangeSet.PersonChange> updateOf(
@@ -151,7 +151,7 @@ public final class ChangeSetResolver {
         }
         return Optional.of(new ResolvedChangeSet.PersonChange(
                 ResolvedChangeSet.ChangeKind.UPDATE, row.rowNumber(), row.externalId(), personId,
-                changed, membershipTypeId, account));
+                changed, membershipTypeId, account, membershipTypeId != null && row.bandedTypeId() != null));
     }
 
     // An account is a membership's benefit, so a lapsed member whose row writes no membership is
@@ -204,7 +204,7 @@ public final class ChangeSetResolver {
             case FIRST_NAME -> person.firstName();
             case LAST_NAME -> person.lastName();
             case EMAIL -> person.email();
-            case EXTERNAL_ID, MEMBERSHIP_TYPE -> null;
+            case EXTERNAL_ID, MEMBERSHIP_TYPE, BIRTH_DATE -> null;
         };
     }
 
@@ -265,7 +265,7 @@ public final class ChangeSetResolver {
                 anyRowFallsBack |= roster.personIdsByExternalId().get(row.externalId()) == null;
                 continue;
             }
-            UUID typeId = configuration.membershipTypes().get(value);
+            UUID typeId = row.bandedTypeId() != null ? row.bandedTypeId() : configuration.membershipTypes().get(value);
             if (typeId == null) {
                 unmapped.add(value);
             } else if (!roster.activeMembershipTypeIds().contains(typeId)) {
@@ -297,6 +297,9 @@ public final class ChangeSetResolver {
 
     private static UUID mappedMembershipTypeOf(CsvSnapshot.SnapshotRow row,
                                                SourceConfiguration configuration) {
+        if (row.bandedTypeId() != null) {
+            return row.bandedTypeId();
+        }
         String value = row.values().get(CanonicalField.MEMBERSHIP_TYPE);
         return value == null || value.isBlank() ? null : configuration.membershipTypes().get(value);
     }

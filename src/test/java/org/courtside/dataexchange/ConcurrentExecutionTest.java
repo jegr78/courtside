@@ -76,7 +76,7 @@ class ConcurrentExecutionTest extends AbstractIntegrationTest {
                         "First name", CanonicalField.FIRST_NAME,
                         "Last name", CanonicalField.LAST_NAME,
                         "Email", CanonicalField.EMAIL)),
-                Map.of(), List.of(), ACTIVE_TYPE, Set.of(CanonicalField.FIRST_NAME), 10).sourceId();
+                Map.of(), List.of(), Map.of(), ACTIVE_TYPE, Set.of(CanonicalField.FIRST_NAME), 10).sourceId();
         UUID admin = identity.createPerson("Richard", "Miles", "richard.miles@example.org");
         actor = identity.createAccount(admin, "admin", Set.of(Role.ADMIN));
     }
