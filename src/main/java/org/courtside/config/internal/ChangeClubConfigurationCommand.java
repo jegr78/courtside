@@ -33,10 +33,11 @@ public record ChangeClubConfigurationCommand(
         AccessLeadTime accessLead,
         AccessLagTime accessLag,
         AccessCodeLength accessCodeLength,
-        Currency currency) {
+        Currency currency,
+        Boolean externalBookings) {
 
     // Links, logo, short name and the no-membership rule set may be unset, and an absent waitlist, access
-    // or currency setting keeps the stored one; an absent value anywhere else is a caller that skipped its validation.
+    // currency or external booking setting keeps the stored one; an absent value anywhere else is a caller that skipped its validation.
     public ChangeClubConfigurationCommand {
         requirePresent(clubName, "clubName");
         requirePresent(primaryColor, "primaryColor");
@@ -62,7 +63,7 @@ public record ChangeClubConfigurationCommand(
         this(clubName, primaryColor, accentColor, logoUrl, imprintUrl, privacyUrl, documentationUrl, shortName,
                 defaultLocale, slotDuration, timeZone, newAccountCredential, passwordResetCredential,
                 passwordResetToken, bookingReminder, noMembershipTypeRuleSetId, waitlistOffer, accessLead, accessLag,
-                accessCodeLength, null);
+                accessCodeLength, null, null);
     }
 
     private static void requirePresent(Object value, String field) {

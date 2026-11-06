@@ -41,8 +41,7 @@ class EnumeratedColumnInListPatternTest {
         String expected = enumValuesOf("org.courtside.identity.Role");
 
         // when
-        String actual = sqlInListValues(
-                "V14__booking_card_allowed_roles.sql", "booking_card_allowed_role_known", "role");
+        String actual = latestSqlInListValues("booking_card_allowed_role_known", "role");
 
         // then
         assertThat(actual)
@@ -51,14 +50,13 @@ class EnumeratedColumnInListPatternTest {
     }
 
     @Test
-    void whenReadingTheBookingCardManagingRoleInList_thenItAcceptsExactlyTheRoleEnumConstants()
+    void whenReadingTheBookingCardManagingRoleInList_thenItAcceptsEveryRoleButExternal()
             throws IOException, ReflectiveOperationException {
         // given
-        String expected = enumValuesOf("org.courtside.identity.Role");
+        String expected = enumValuesOf("org.courtside.identity.Role").replace("EXTERNAL,", "");
 
         // when
-        String actual = sqlInListValues(
-                "V18__booking_card_managing_roles.sql", "booking_card_managing_role_known", "role");
+        String actual = latestSqlInListValues("booking_card_managing_role_known", "role");
 
         // then
         assertThat(actual)
@@ -73,8 +71,7 @@ class EnumeratedColumnInListPatternTest {
         String expected = enumValuesOf("org.courtside.identity.Role");
 
         // when
-        String actual = sqlInListValues(
-                "V14__booking_card_allowed_roles.sql", "user_account_role_role_known", "role");
+        String actual = latestSqlInListValues("user_account_role_role_known", "role");
 
         // then
         assertThat(actual)

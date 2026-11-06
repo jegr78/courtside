@@ -65,7 +65,7 @@
     "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
     "operationId": { "type": "string", "pattern": "^[a-z][A-Za-z0-9]+$" },
     "actor": {
-      "enum": ["ANONYMOUS", "MEMBER", "TRAINER", "SPORT_DIRECTOR", "YOUTH_DIRECTOR", "GROUNDSKEEPER", "TREASURER", "ADMIN", "INITIAL_PASSWORD"]
+      "enum": ["ANONYMOUS", "MEMBER", "TRAINER", "SPORT_DIRECTOR", "YOUTH_DIRECTOR", "GROUNDSKEEPER", "TREASURER", "ADMIN", "EXTERNAL", "INITIAL_PASSWORD"]
     },
     "actors": {
       "type": "array",

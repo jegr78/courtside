@@ -30,7 +30,7 @@ import { GuardianshipsSection } from "./GuardianshipsSection";
 import { MembershipPeriodsSection } from "./MembershipPeriodsSection";
 
 const roles: Role[] = [
-  "MEMBER", "TRAINER", "SPORT_DIRECTOR", "YOUTH_DIRECTOR", "GROUNDSKEEPER", "TREASURER", "ADMIN"
+  "MEMBER", "TRAINER", "SPORT_DIRECTOR", "YOUTH_DIRECTOR", "GROUNDSKEEPER", "TREASURER", "ADMIN", "EXTERNAL"
 ];
 
 const NAME_LENGTH = 60;

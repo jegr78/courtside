@@ -92,6 +92,9 @@ public class ClubConfiguration {
     @Column(nullable = false)
     private String currency;
 
+    @Column(name = "external_bookings", nullable = false)
+    private boolean externalBookings;
+
     @Column(name = "no_membership_type_rule_set_id")
     private UUID noMembershipTypeRuleSetId;
 
@@ -140,6 +143,10 @@ public class ClubConfiguration {
 
     public void chargeIn(Currency currency) {
         this.currency = currency.getCurrencyCode();
+    }
+
+    public void admitExternalBookings(boolean admitted) {
+        this.externalBookings = admitted;
     }
 
     public void bindPeopleWithoutAMembershipTypeTo(UUID ruleSetId) {

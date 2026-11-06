@@ -21,7 +21,7 @@ const configured: AdminClubConfig = {
   imprintUrl: null, privacyUrl: null, documentationUrl: null, shortName: null, defaultLocale: "en",
   supportedLocales: ["de", "en"], slotMinutes: 30, timeZone: "Europe/Berlin", newAccountCredentialHours: 168,
   passwordResetCredentialHours: 24, passwordResetTokenMinutes: 60, bookingReminderHours: 24, waitlistOfferMinutes: 15, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6,
-  logoUploaded: false, logoFallbackUrl: null, noMembershipTypeRuleSetId: null, currency: "EUR"
+  logoUploaded: false, externalBookings: false, logoFallbackUrl: null, noMembershipTypeRuleSetId: null, currency: "EUR"
 };
 
 const currentMember: RosterEntry = {

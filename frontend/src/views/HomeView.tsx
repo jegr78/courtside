@@ -5,9 +5,9 @@ import { useClubConfiguration } from "../club/registry";
 import { WeekView } from "./WeekView";
 
 // Booking several courts at once is what an officer does; which roles those are is the club's own
-// decision, so it is derived from holding anything beyond MEMBER rather than from a list of ours.
+// decision, so it is derived from holding anything beyond MEMBER or EXTERNAL rather than a list of ours.
 function holdsAnOfficeBeyondMembership(session: SessionStatus): boolean {
-  return session.roles.some((role) => role !== "MEMBER");
+  return session.roles.some((role) => role !== "MEMBER" && role !== "EXTERNAL");
 }
 
 export function HomeView({ session, offline = false }: {

@@ -375,6 +375,31 @@ class ConfigControllerTest extends AbstractIntegrationTest {
 
     @Test
     @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAClubThatAdmitsExternalBookings_whenTheSessionIsRead_thenEveryVisitorLearnsItAndLeavingItOutKeepsIt()
+            throws Exception {
+        // given
+        mockMvc.perform(get("/api/session")).andExpect(jsonPath("$.externalBookings").value(false));
+        mockMvc.perform(put("/api/admin/config")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(configJson("Example Tennis Club").replace("\"slotMinutes\": 30,",
+                                "\"slotMinutes\": 30, \"externalBookings\": true,"))
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.externalBookings").value(true));
+
+        // when
+        mockMvc.perform(put("/api/admin/config")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(configJson("Example Tennis Club"))
+                        .with(csrf()))
+                .andExpect(status().isOk());
+
+        // then
+        mockMvc.perform(get("/api/session")).andExpect(jsonPath("$.externalBookings").value(true));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
     void givenAnInvalidTimeZone_whenChangingTheConfig_thenItIsRejected() throws Exception {
         // when / then
         mockMvc.perform(put("/api/admin/config")

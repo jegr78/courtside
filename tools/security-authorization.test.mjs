@@ -70,6 +70,7 @@ test("given the OpenAPI contract, when generating authorization cases, then ever
     GROUNDSKEEPER: "allow",
     TREASURER: "allow",
     ADMIN: "allow",
+    EXTERNAL: "allow",
     INITIAL_PASSWORD: "deny-forbidden"
   });
   assert.deepEqual(matrix.find((entry) => entry.operationId === "facilityUtilisation").expectations, {
@@ -81,6 +82,7 @@ test("given the OpenAPI contract, when generating authorization cases, then ever
     GROUNDSKEEPER: "deny-forbidden",
     TREASURER: "deny-forbidden",
     ADMIN: "allow",
+    EXTERNAL: "deny-forbidden",
     INITIAL_PASSWORD: "deny-forbidden"
   });
   for (const operationId of ["changeOwnPassword", "listOwnSessions",
@@ -94,6 +96,7 @@ test("given the OpenAPI contract, when generating authorization cases, then ever
       GROUNDSKEEPER: "allow",
       TREASURER: "allow",
       ADMIN: "allow",
+      EXTERNAL: "allow",
       INITIAL_PASSWORD: "deny-forbidden"
     });
   }
@@ -106,6 +109,7 @@ test("given the OpenAPI contract, when generating authorization cases, then ever
     GROUNDSKEEPER: "allow",
     TREASURER: "allow",
     ADMIN: "allow",
+    EXTERNAL: "allow",
     INITIAL_PASSWORD: "deny-forbidden"
   });
   for (const operationId of ["endAccountSessions", "endAllSessions"]) {
@@ -613,7 +617,7 @@ test("given authorization evidence, when one operation actor pair is absent, the
     problemType: "urn:courtside:error:login-rate-limited",
     observation: "encoded-and-canonical-login-share-rate-limit" };
   const identityChecks = ["MEMBER", "TRAINER", "SPORT_DIRECTOR", "YOUTH_DIRECTOR", "GROUNDSKEEPER",
-    "TREASURER", "ADMIN"].map((actor) => ({ actor, sessionStatus: 200,
+    "TREASURER", "ADMIN", "EXTERNAL"].map((actor) => ({ actor, sessionStatus: 200,
     adminStatus: actor === "ADMIN" ? 200 : 403, outcome: "passed",
     observation: "independent-identity-boundary-proven" }));
   identityChecks.push(...[1, 2].map((index) => ({ actor: `MANAGER_COMBINATION_${index}`,
@@ -960,7 +964,7 @@ async function minimalEvidence() {
     observation: "authorization-gate-passed"
   }));
   const identityChecks = ["MEMBER", "TRAINER", "SPORT_DIRECTOR", "YOUTH_DIRECTOR", "GROUNDSKEEPER",
-    "TREASURER", "ADMIN"].map((actor) => ({ actor, sessionStatus: 200,
+    "TREASURER", "ADMIN", "EXTERNAL"].map((actor) => ({ actor, sessionStatus: 200,
     adminStatus: actor === "ADMIN" ? 200 : 403, outcome: "passed",
     observation: "independent-identity-boundary-proven" }));
   identityChecks.push(...[1, 2].map((index) => ({ actor: `MANAGER_COMBINATION_${index}`,
@@ -1093,7 +1097,7 @@ test("given the shipped contract and a target that answers every probe at once, 
       .filter((actor) => !operation.proofRequirement || actor === "ANONYMOUS")
       .map((actor) => [operation.operationId, actor]) : []);
   assert.deepEqual(exercised, expectedFixtures);
-  assert.equal(evidence.results.filter((result) => result.proofSourceActor && result.proofSourceActor !== result.actor).length, 32);
+  assert.equal(evidence.results.filter((result) => result.proofSourceActor && result.proofSourceActor !== result.actor).length, 36);
   for (const result of evidence.results.filter((entry) => entry.proofSourceActor)) {
     assert.equal(result.proofSourceActor, "ANONYMOUS");
     assert.equal(result.outcome, "passed");

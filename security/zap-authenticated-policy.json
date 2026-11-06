@@ -10,7 +10,8 @@
     "YOUTH_DIRECTOR",
     "GROUNDSKEEPER",
     "TREASURER",
-    "ADMIN"
+    "ADMIN",
+    "EXTERNAL"
   ],
   "spider": {
     "methods": ["GET", "HEAD", "OPTIONS"],

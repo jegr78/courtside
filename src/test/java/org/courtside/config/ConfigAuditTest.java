@@ -80,6 +80,38 @@ class ConfigAuditTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenTheConfiguration_whenExternalBookingsAreAdmitted_thenTheEventNamesTheField() {
+        // given
+        ClubConfigurationSnapshot current = config.current();
+
+        // when
+        config.update(withExternalBookings(current, true));
+
+        // then
+        assertThat(latestPayloadOf(ConfigEvent.ClubChanged.TYPE))
+                .containsEntry("changedFields", List.of("externalBookings"));
+        assertThat(config.current().externalBookings()).isTrue();
+    }
+
+    @Test
+    void givenExternalBookingsAdmitted_whenAChangeOmitsTheSwitch_thenItStaysOnAndIsNotNamed() {
+        // given
+        config.update(withExternalBookings(config.current(), true));
+        ClubConfigurationSnapshot current = config.current();
+        long switchChanges = changesNaming(List.of("externalBookings"));
+        long nameChanges = changesNaming(List.of("clubName"));
+
+        // when
+        config.update(withExternalBookings(withClubName(current, current.clubName() + " Annex"), null));
+
+        // then
+        assertThat(changesNaming(List.of("clubName"))).isEqualTo(nameChanges + 1);
+        assertThat(changesNaming(List.of("externalBookings"))).as("an omitted switch is not a change")
+                .isEqualTo(switchChanges);
+        assertThat(config.current().externalBookings()).isTrue();
+    }
+
+    @Test
     void givenTheConfiguration_whenOnlyThePrivacyLinkChanges_thenTheEventNamesTheFieldAndNoValue() {
         // given
         ClubConfigurationSnapshot current = config.current();
@@ -202,6 +234,12 @@ class ConfigAuditTest extends AbstractIntegrationTest {
                 .orElseThrow();
     }
 
+    private long changesNaming(List<String> fields) {
+        return audit.eventsOfType(ConfigEvent.ClubChanged.TYPE).stream()
+                .filter(event -> fields.equals(event.payload().get("changedFields")))
+                .count();
+    }
+
     private int countOf(String eventType) {
         return audit.eventsOfType(eventType).size();
     }
@@ -231,6 +269,21 @@ class ConfigAuditTest extends AbstractIntegrationTest {
             ClubConfigurationSnapshot current, UUID ruleSetId) {
         return change(current, current.clubName(), current.defaultLocale(), current.slotMinutes(),
                 current.timeZone(), ruleSetId);
+    }
+
+    private static ChangeClubConfigurationCommand withExternalBookings(
+            ClubConfigurationSnapshot current, Boolean externalBookings) {
+        return withExternalBookings(withClubName(current, current.clubName()), externalBookings);
+    }
+
+    private static ChangeClubConfigurationCommand withExternalBookings(
+            ChangeClubConfigurationCommand base, Boolean externalBookings) {
+        return new ChangeClubConfigurationCommand(base.clubName(), base.primaryColor(), base.accentColor(),
+                base.logoUrl(), base.imprintUrl(), base.privacyUrl(), base.documentationUrl(), base.shortName(),
+                base.defaultLocale(), base.slotDuration(), base.timeZone(), base.newAccountCredential(),
+                base.passwordResetCredential(), base.passwordResetToken(), base.bookingReminder(),
+                base.noMembershipTypeRuleSetId(), base.waitlistOffer(), base.accessLead(), base.accessLag(),
+                base.accessCodeLength(), base.currency(), externalBookings);
     }
 
     private static ChangeClubConfigurationCommand withPrivacyUrl(

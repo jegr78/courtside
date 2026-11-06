@@ -1,5 +1,6 @@
 package org.courtside.card;
 
+import org.courtside.card.testfixture.CardTestFixture;
 import org.courtside.identity.Role;
 import org.junit.jupiter.api.Test;
 
@@ -20,8 +21,8 @@ class BookingCardPermitsTest {
         BookingCard card = cardAllowing();
 
         // when / then
-        assertThat(card.permits(Set.of(), true)).isTrue();
-        assertThat(card.permits(Set.of(Role.MEMBER), true)).isTrue();
+        assertThat(card.permits(Set.of(), true, false)).isTrue();
+        assertThat(card.permits(Set.of(Role.MEMBER), true, false)).isTrue();
     }
 
     @Test
@@ -30,8 +31,8 @@ class BookingCardPermitsTest {
         BookingCard card = cardAllowing();
 
         // when / then
-        assertThat(card.permits(Set.of(Role.MEMBER), false)).as("a stale member role").isFalse();
-        assertThat(card.permits(Set.of(Role.TRAINER, Role.GROUNDSKEEPER), false)).isFalse();
+        assertThat(card.permits(Set.of(Role.MEMBER), false, false)).as("a stale member role").isFalse();
+        assertThat(card.permits(Set.of(Role.TRAINER, Role.GROUNDSKEEPER), false, false)).isFalse();
     }
 
     @Test
@@ -40,8 +41,8 @@ class BookingCardPermitsTest {
         BookingCard card = cardAllowing(Role.TRAINER, Role.TREASURER);
 
         // when / then
-        assertThat(card.permits(Set.of(Role.TRAINER), false)).isTrue();
-        assertThat(card.permits(Set.of(Role.TREASURER), false)).isTrue();
+        assertThat(card.permits(Set.of(Role.TRAINER), false, false)).isTrue();
+        assertThat(card.permits(Set.of(Role.TREASURER), false, false)).isTrue();
     }
 
     @Test
@@ -50,7 +51,7 @@ class BookingCardPermitsTest {
         BookingCard card = cardAllowing(Role.TRAINER, Role.TREASURER);
 
         // when / then
-        assertThat(card.permits(Set.of(Role.MEMBER, Role.TRAINER), false)).isTrue();
+        assertThat(card.permits(Set.of(Role.MEMBER, Role.TRAINER), false, false)).isTrue();
     }
 
     @Test
@@ -59,7 +60,7 @@ class BookingCardPermitsTest {
         BookingCard card = cardAllowing(Role.TRAINER);
 
         // when / then
-        assertThat(card.permits(Set.of(Role.MEMBER, Role.TREASURER), true)).isFalse();
+        assertThat(card.permits(Set.of(Role.MEMBER, Role.TREASURER), true, false)).isFalse();
     }
 
     @Test
@@ -68,7 +69,7 @@ class BookingCardPermitsTest {
         BookingCard card = cardAllowing(Role.TRAINER);
 
         // when / then
-        assertThat(card.permits(Set.of(), false)).isFalse();
+        assertThat(card.permits(Set.of(), false, false)).isFalse();
     }
 
     @Test
@@ -77,7 +78,7 @@ class BookingCardPermitsTest {
         BookingCard card = cardAllowing(Role.TRAINER);
 
         // when / then
-        assertThat(card.permits(Set.of(Role.ADMIN), false)).isFalse();
+        assertThat(card.permits(Set.of(Role.ADMIN), false, false)).isFalse();
     }
 
     @Test
@@ -108,12 +109,33 @@ class BookingCardPermitsTest {
                 new short[]{}, false, false, false, false, true);
 
         // when / then
-        assertThat(card.permits(Set.of(Role.TRAINER), false)).isTrue();
+        assertThat(card.permits(Set.of(Role.TRAINER), false, false)).isTrue();
         assertThat(card.permitsManagement(Set.of(Role.TRAINER))).isFalse();
     }
 
     private static BookingCard cardManagedBy(Role... managingRoles) {
         return new BookingCard("Training", "#34584A", Set.of(), Set.of(managingRoles),
                 new short[]{}, false, false, false, false, true);
+    }
+
+    @Test
+    void givenACardNamingTheExternalRole_whenTheClubAdmitsExternalBookingsOrNot_thenOnlyTheSwitchOpensIt() {
+        // given
+        BookingCard card = CardTestFixture.bookingCardAllowing(Role.EXTERNAL);
+
+        // when / then
+        assertThat(card.permits(Set.of(Role.EXTERNAL), false, true)).isTrue();
+        assertThat(card.permits(Set.of(Role.EXTERNAL), false, false)).as("the switch is off").isFalse();
+        assertThat(CardTestFixture.bookingCardAllowing(Role.EXTERNAL, Role.MEMBER)
+                .permits(Set.of(Role.MEMBER), true, false)).as("members keep the card while the switch is off").isTrue();
+    }
+
+    @Test
+    void givenAnExternalAccount_whenAskedForItsManagementRoles_thenItHoldsNone() {
+        // when
+        Set<Role> roles = BookingCard.managementRoles(Set.of(Role.EXTERNAL, Role.MEMBER, Role.TRAINER));
+
+        // then
+        assertThat(roles).as("neither MEMBER nor EXTERNAL ever manages a card").containsExactly(Role.TRAINER);
     }
 }

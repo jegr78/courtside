@@ -6,6 +6,7 @@ export const securityMailObservationSource = Object.freeze({
   imageDigest: "sha256:9b3a463be15354c0f0eba91697d80e3e0d8a5623ef0e627cacc836bc17fd5231"
 });
 import { failureCode } from "./failure-reason.mjs";
+import { isMfaFixtureHolder } from "./security-mfa-fixture.mjs";
 
 export const securityMailObservationLimits = Object.freeze({
   messages: 100, rawBytes: 262144, totalRawBytes: 4 * 1024 * 1024,
@@ -292,7 +293,7 @@ export async function observeSecurityMail({ runId, command, baseline, identity }
 import { isIP } from "node:net";
 
 export async function readSecurityMfaRecoveryCode({ runId, command, identity, username, after, excludedCodes = [] } = {}) {
-  if (typeof username !== "string" || !/^security\.(?:member|trainer|sport\.director|youth\.director|groundskeeper|treasurer|admin)\.2$/.test(username)
+  if (!isMfaFixtureHolder(username)
       || !Number.isFinite(after) || after < 0 || !Array.isArray(excludedCodes) || excludedCodes.length > 200
       || excludedCodes.some(code => typeof code !== "string" || code.length > 128)) throw new Error("mfa-mail-fixture-input-invalid");
   const ctx = context(runId, command, identity);
@@ -338,7 +339,6 @@ export async function withSecurityMfaRecoveryReader(control, options, action) {
 }
 
 
-const mfaHolder = /^security\.(?:member|trainer|sport\.director|youth\.director|groundskeeper|treasurer|admin)\.2$/;
 const mfaKinds = new Set(["ACCOUNT_SECURITY_CHANGED", "ACCOUNT_MFA_RECOVERY_CODE"]);
 function checkedOutbox(projection, usernames) {
   if (!projection || typeof projection.watermark !== "string" || !/^(?:0|[1-9][0-9]{0,18})$/.test(projection.watermark)
@@ -357,7 +357,7 @@ function checkedOutbox(projection, usernames) {
 export function createSecurityMfaMailScope({ runId, command, identity, control, projectOutbox, wait = delay } = {}) {
   return async (usernames) => {
     if (!Array.isArray(usernames) || usernames.length < 1 || usernames.length > 2
-        || new Set(usernames).size !== usernames.length || usernames.some(name => typeof name !== "string" || !mfaHolder.test(name))
+        || new Set(usernames).size !== usernames.length || usernames.some(name => !isMfaFixtureHolder(name))
         || typeof projectOutbox !== "function" || typeof control?.beforeRequest !== "function"
         || typeof control?.remainingMilliseconds !== "function") {
       throw new Error("mfa-mail-scope-invalid");

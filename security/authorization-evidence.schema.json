@@ -118,6 +118,7 @@
             "GROUNDSKEEPER",
             "TREASURER",
             "ADMIN",
+            "EXTERNAL",
             "INITIAL_PASSWORD"
           ]
         },
@@ -163,6 +164,7 @@
             "GROUNDSKEEPER",
             "TREASURER",
             "ADMIN",
+            "EXTERNAL",
             "INITIAL_PASSWORD"
           ]
         }
@@ -219,6 +221,7 @@
             "GROUNDSKEEPER",
             "TREASURER",
             "ADMIN",
+            "EXTERNAL",
             "MANAGER_COMBINATION_1",
             "MANAGER_COMBINATION_2"
           ]

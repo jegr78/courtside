@@ -19,6 +19,7 @@
       "GROUNDSKEEPER",
       "TREASURER",
       "ADMIN",
+      "EXTERNAL",
       "COMPROMISED_ACCOUNT"
     ],
     "roleCombinations": [
@@ -2912,6 +2913,7 @@
         "GROUNDSKEEPER",
         "TREASURER",
         "ADMIN",
+        "EXTERNAL",
         "COMPROMISED_ACCOUNT"
       ],
       "surface": "rest-api",
@@ -3459,7 +3461,8 @@
         "YOUTH_DIRECTOR",
         "GROUNDSKEEPER",
         "TREASURER",
-        "ADMIN"
+        "ADMIN",
+        "EXTERNAL"
       ],
       "surface": "rest-api",
       "profile": "active",

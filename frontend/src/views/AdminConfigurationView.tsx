@@ -201,6 +201,15 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
                 </label>
                 <p className="text-muted text-sm">{t("admin.config.timeZoneHelp")}</p>
               </div>
+              <label className="flex items-start gap-2">
+                <input data-testid="config-external-bookings" type="checkbox" className="mt-1"
+                       checked={Boolean(config.externalBookings)} aria-describedby="config-external-bookings-hint"
+                       onChange={(event) => changeConfig({ externalBookings: event.target.checked })} />
+                <span className="grid gap-1">
+                  <span className="font-medium">{t("admin.config.externalBookings")}</span>
+                  <span id="config-external-bookings-hint" className="text-muted text-sm">{t("admin.config.externalBookingsHelp")}</span>
+                </span>
+              </label>
               <TextField id="slot-minutes" data-testid="slot-minutes" type="number" min={5} max={120} step={5} className="max-w-32" label={t("admin.config.slotMinutes")} value={config.slotMinutes} onChange={(event) => changeConfig({ slotMinutes: Number(event.target.value) })} />
             </div>
             <div data-testid="club-appearance" className="grid gap-4 [&>*]:min-w-0 sm:grid-cols-2 lg:col-span-2">

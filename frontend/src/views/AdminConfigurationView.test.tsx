@@ -23,7 +23,7 @@ describe("AdminConfigurationView", () => {
       newAccountCredentialHours: 168,
       passwordResetCredentialHours: 24, passwordResetTokenMinutes: 60,
       bookingReminderHours: 24, waitlistOfferMinutes: 15, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6,
-      logoUploaded: false, currency: "EUR"
+      logoUploaded: false, externalBookings: false, currency: "EUR"
     });
     vi.spyOn(api, "ruleSets").mockResolvedValue([]);
   });
@@ -44,7 +44,7 @@ describe("AdminConfigurationView", () => {
       clubName: "Example Tennis Club", primaryColor: "#b85c38", accentColor: "#d7e24b",
       defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30,
       timeZone: "Europe/Berlin", newAccountCredentialHours: 168, passwordResetCredentialHours: 24, passwordResetTokenMinutes: 60,
-      bookingReminderHours: 24, waitlistOfferMinutes: 15, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6, logoUploaded: false, privacyUrl: "/privacy", currency: "EUR"
+      bookingReminderHours: 24, waitlistOfferMinutes: 15, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6, logoUploaded: false, externalBookings: false, privacyUrl: "/privacy", currency: "EUR"
     });
     render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
     await screen.findByTestId("privacy-url");
@@ -64,7 +64,7 @@ describe("AdminConfigurationView", () => {
       clubName: "Example Tennis Club", primaryColor: "#b85c38", accentColor: "#d7e24b",
       defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30,
       timeZone: "Europe/Berlin", newAccountCredentialHours: 168, passwordResetCredentialHours: 24,
-      passwordResetTokenMinutes: 60, bookingReminderHours: 24, waitlistOfferMinutes: 15, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6, logoUploaded: false,
+      passwordResetTokenMinutes: 60, bookingReminderHours: 24, waitlistOfferMinutes: 15, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6, logoUploaded: false, externalBookings: false,
       documentationUrl: "https://docs.example.org/courtside", currency: "EUR"
     });
     render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
@@ -85,7 +85,7 @@ describe("AdminConfigurationView", () => {
       clubName: "Example Tennis Club", primaryColor: "#b85c38", accentColor: "#d7e24b",
       defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30,
       timeZone: "Europe/Berlin", newAccountCredentialHours: 168, passwordResetCredentialHours: 24,
-      passwordResetTokenMinutes: 60, bookingReminderHours: 24, waitlistOfferMinutes: 15, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6, logoUploaded: false,
+      passwordResetTokenMinutes: 60, bookingReminderHours: 24, waitlistOfferMinutes: 15, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6, logoUploaded: false, externalBookings: false,
       shortName: "ETC Example", currency: "EUR"
     });
     render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
@@ -118,14 +118,14 @@ describe("AdminConfigurationView", () => {
       clubName: "Example Tennis Club", primaryColor: "#b85c38", accentColor: "#d7e24b",
       defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30,
       timeZone: "Europe/Berlin", newAccountCredentialHours: 168, passwordResetCredentialHours: 24,
-      passwordResetTokenMinutes: 60, bookingReminderHours: 24, waitlistOfferMinutes: 15, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6, logoUploaded: false,
+      passwordResetTokenMinutes: 60, bookingReminderHours: 24, waitlistOfferMinutes: 15, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6, logoUploaded: false, externalBookings: false,
       shortName: "ETC Example", currency: "EUR"
     });
     const changing = vi.spyOn(api, "changeAdminConfig").mockResolvedValue({
       clubName: "Example Tennis Club", primaryColor: "#b85c38", accentColor: "#d7e24b",
       defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30,
       timeZone: "Europe/Berlin", newAccountCredentialHours: 168, passwordResetCredentialHours: 24,
-      passwordResetTokenMinutes: 60, bookingReminderHours: 24, waitlistOfferMinutes: 15, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6, logoUploaded: false, currency: "EUR"
+      passwordResetTokenMinutes: 60, bookingReminderHours: 24, waitlistOfferMinutes: 15, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6, logoUploaded: false, externalBookings: false, currency: "EUR"
     });
     render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
     await waitFor(() => expect(screen.getByTestId("short-name")).toHaveValue("ETC Example"));
@@ -191,7 +191,7 @@ describe("AdminConfigurationView", () => {
       clubName: "Example Tennis Club", primaryColor: "#b85c38", accentColor: "#d7e24b",
       defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30,
       timeZone: "Europe/Berlin", newAccountCredentialHours: 168, passwordResetCredentialHours: 24, passwordResetTokenMinutes: 60,
-      bookingReminderHours: 24, waitlistOfferMinutes: 15, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6, logoUploaded: true, logoFallbackUrl: "/fallback.svg",
+      bookingReminderHours: 24, waitlistOfferMinutes: 15, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6, logoUploaded: true, externalBookings: false, logoFallbackUrl: "/fallback.svg",
       logoUrl: `/api/public/config/logo?v=${"a".repeat(64)}`, currency: "EUR"
     };
     const upload = vi.spyOn(api, "uploadClubLogo").mockResolvedValue(uploaded);
@@ -239,14 +239,14 @@ describe("AdminConfigurationView", () => {
       clubName: "Example Tennis Club", primaryColor: "#b85c38", accentColor: "#d7e24b",
       defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30,
       timeZone: "Europe/Berlin", newAccountCredentialHours: 168, passwordResetCredentialHours: 24, passwordResetTokenMinutes: 60,
-      bookingReminderHours: 24, waitlistOfferMinutes: 15, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6, logoUploaded: true, logoFallbackUrl: "/fallback.svg",
+      bookingReminderHours: 24, waitlistOfferMinutes: 15, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6, logoUploaded: true, externalBookings: false, logoFallbackUrl: "/fallback.svg",
       logoUrl: `/api/public/config/logo?v=${"a".repeat(64)}`, currency: "EUR"
     });
     const removed = {
       clubName: "Example Tennis Club", primaryColor: "#b85c38", accentColor: "#d7e24b",
       defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30,
       timeZone: "Europe/Berlin", newAccountCredentialHours: 168, passwordResetCredentialHours: 24, passwordResetTokenMinutes: 60,
-      bookingReminderHours: 24, waitlistOfferMinutes: 15, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6, logoUploaded: false, logoFallbackUrl: "/fallback.svg",
+      bookingReminderHours: 24, waitlistOfferMinutes: 15, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6, logoUploaded: false, externalBookings: false, logoFallbackUrl: "/fallback.svg",
       logoUrl: "/fallback.svg", currency: "EUR"
     };
     const remove = vi.spyOn(api, "deleteClubLogo").mockResolvedValue(removed);
@@ -306,13 +306,13 @@ describe("AdminConfigurationView", () => {
       clubName: "Example Tennis Club", primaryColor: "#b85c38", accentColor: "#d7e24b",
       defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30,
       timeZone: "Europe/Berlin", newAccountCredentialHours: 168, passwordResetCredentialHours: 24, passwordResetTokenMinutes: 60,
-      bookingReminderHours: 24, waitlistOfferMinutes: 15, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6, logoUploaded: false, privacyUrl: "/privacy", currency: "EUR"
+      bookingReminderHours: 24, waitlistOfferMinutes: 15, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6, logoUploaded: false, externalBookings: false, privacyUrl: "/privacy", currency: "EUR"
     });
     const changing = vi.spyOn(api, "changeAdminConfig").mockResolvedValue({
       clubName: "Example Tennis Club", primaryColor: "#b85c38", accentColor: "#d7e24b",
       defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30,
       timeZone: "Europe/Berlin", newAccountCredentialHours: 168, passwordResetCredentialHours: 24, passwordResetTokenMinutes: 60,
-      bookingReminderHours: 24, waitlistOfferMinutes: 15, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6, logoUploaded: false, currency: "EUR"
+      bookingReminderHours: 24, waitlistOfferMinutes: 15, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6, logoUploaded: false, externalBookings: false, currency: "EUR"
     });
     render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
     await screen.findByTestId("privacy-url");
@@ -332,14 +332,14 @@ describe("AdminConfigurationView", () => {
       clubName: "Example Tennis Club", primaryColor: "#b85c38", accentColor: "#d7e24b",
       defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30,
       timeZone: "Europe/Berlin", newAccountCredentialHours: 168, passwordResetCredentialHours: 24,
-      passwordResetTokenMinutes: 60, bookingReminderHours: 24, waitlistOfferMinutes: 15, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6, logoUploaded: false,
+      passwordResetTokenMinutes: 60, bookingReminderHours: 24, waitlistOfferMinutes: 15, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6, logoUploaded: false, externalBookings: false,
       documentationUrl: "https://docs.example.org/courtside", currency: "EUR"
     });
     const changing = vi.spyOn(api, "changeAdminConfig").mockResolvedValue({
       clubName: "Example Tennis Club", primaryColor: "#b85c38", accentColor: "#d7e24b",
       defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30,
       timeZone: "Europe/Berlin", newAccountCredentialHours: 168, passwordResetCredentialHours: 24,
-      passwordResetTokenMinutes: 60, bookingReminderHours: 24, waitlistOfferMinutes: 15, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6, logoUploaded: false, currency: "EUR"
+      passwordResetTokenMinutes: 60, bookingReminderHours: 24, waitlistOfferMinutes: 15, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6, logoUploaded: false, externalBookings: false, currency: "EUR"
     });
     render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
     await screen.findByTestId("documentation-url");
@@ -397,7 +397,7 @@ describe("AdminConfigurationView", () => {
 
   it("given an uploaded logo, when the logo fieldset is laid out, then its preview shares a row instead of adding one", async () => {
     // given
-    vi.mocked(api.adminConfig).mockResolvedValue({ ...(await api.adminConfig()), logoUrl: "/api/public/config/logo?v=1", logoUploaded: true });
+    vi.mocked(api.adminConfig).mockResolvedValue({ ...(await api.adminConfig()), logoUrl: "/api/public/config/logo?v=1", logoUploaded: true, externalBookings: false });
 
     // when
     render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
@@ -449,7 +449,7 @@ describe("AdminConfigurationView", () => {
       timeZone: "Pacific/Auckland",
       newAccountCredentialHours: 168,
       passwordResetCredentialHours: 24, passwordResetTokenMinutes: 60,
-      bookingReminderHours: 24, waitlistOfferMinutes: 15, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6, logoUploaded: false, currency: "EUR"
+      bookingReminderHours: 24, waitlistOfferMinutes: 15, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6, logoUploaded: false, externalBookings: false, currency: "EUR"
     });
     const configurationChanged = vi.fn();
     render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={configurationChanged} /></UnsavedChangesProvider></MemoryRouter>);
@@ -567,7 +567,7 @@ describe("AdminConfigurationView", () => {
       timeZone: "US/Eastern",
       newAccountCredentialHours: 168,
       passwordResetCredentialHours: 24, passwordResetTokenMinutes: 60,
-      bookingReminderHours: 24, waitlistOfferMinutes: 15, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6, logoUploaded: false, currency: "EUR"
+      bookingReminderHours: 24, waitlistOfferMinutes: 15, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6, logoUploaded: false, externalBookings: false, currency: "EUR"
     });
 
     // when
@@ -583,7 +583,7 @@ describe("AdminConfigurationView", () => {
       clubName: "Example Tennis Club", primaryColor: "#b85c38", accentColor: "#d7e24b",
       defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30,
       timeZone: "Europe/Berlin", newAccountCredentialHours: 168, passwordResetCredentialHours: 24, passwordResetTokenMinutes: 60,
-      bookingReminderHours: 24, waitlistOfferMinutes: 15, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6, logoUploaded: false, privacyUrl: "/privacy", currency: "EUR"
+      bookingReminderHours: 24, waitlistOfferMinutes: 15, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6, logoUploaded: false, externalBookings: false, privacyUrl: "/privacy", currency: "EUR"
     });
     render(<MemoryRouter><UnsavedChangesProvider>
       <UnsavedCount />
@@ -653,7 +653,7 @@ describe("AdminConfigurationView", () => {
   it("given an edited club name, when a logo is uploaded, then the typed name survives and stays unsaved", async () => {
     // given
     const stored = await api.adminConfig();
-    vi.spyOn(api, "uploadClubLogo").mockResolvedValue({ ...stored, logoUploaded: true, logoUrl: "/api/public/config/logo?v=1" });
+    vi.spyOn(api, "uploadClubLogo").mockResolvedValue({ ...stored, logoUploaded: true, externalBookings: false, logoUrl: "/api/public/config/logo?v=1" });
     render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
     const input = await screen.findByTestId("logo-file");
     await userEvent.type(screen.getByTestId("club-name"), " North");
@@ -668,13 +668,33 @@ describe("AdminConfigurationView", () => {
     expect(screen.getByTestId("save-club-config"), "the name still waits for the profile's save").toBeEnabled();
   });
 
+  it("given a club without external bookings, when the board admits them, then the switch is sent with the profile", async () => {
+    // given
+    const changing = vi.spyOn(api, "changeAdminConfig").mockResolvedValue({
+      clubName: "Example Tennis Club", primaryColor: "#b85c38", accentColor: "#d7e24b",
+      defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30,
+      timeZone: "Europe/Berlin", newAccountCredentialHours: 168, passwordResetCredentialHours: 24, passwordResetTokenMinutes: 60,
+      bookingReminderHours: 24, waitlistOfferMinutes: 15, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6, logoUploaded: false, externalBookings: true, currency: "EUR"
+    });
+    render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
+    const external = await screen.findByTestId("config-external-bookings");
+    expect(external, "a club starts closed to outsiders").not.toBeChecked();
+
+    // when
+    await userEvent.click(external);
+    await userEvent.click(screen.getByTestId("save-club-config"));
+
+    // then
+    await waitFor(() => expect(changing).toHaveBeenCalledWith(expect.objectContaining({ externalBookings: true })));
+  });
+
   it("given a club that charges in euros, when the board types another currency, then the upper-case code is written", async () => {
     // given
     const changing = vi.spyOn(api, "changeAdminConfig").mockResolvedValue({
       clubName: "Example Tennis Club", primaryColor: "#b85c38", accentColor: "#d7e24b",
       defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30,
       timeZone: "Europe/Berlin", newAccountCredentialHours: 168, passwordResetCredentialHours: 24, passwordResetTokenMinutes: 60,
-      bookingReminderHours: 24, waitlistOfferMinutes: 15, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6, logoUploaded: false, currency: "CHF"
+      bookingReminderHours: 24, waitlistOfferMinutes: 15, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6, logoUploaded: false, externalBookings: false, currency: "CHF"
     });
     render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
     const currency = await screen.findByTestId("config-currency");

@@ -26,7 +26,7 @@ describe("AdminRuleSetsView", () => {
       newAccountCredentialHours: 168,
       passwordResetCredentialHours: 24, passwordResetTokenMinutes: 60,
       bookingReminderHours: 24, waitlistOfferMinutes: 15, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6,
-      logoUploaded: false, currency: "EUR"
+      logoUploaded: false, externalBookings: false, currency: "EUR"
     });
     vi.spyOn(api, "ruleSets").mockResolvedValue([{ id: "rule-set", name: "Standard", active: true }]);
     vi.spyOn(api, "ruleTypes").mockResolvedValue([
@@ -61,7 +61,7 @@ describe("AdminRuleSetsView", () => {
       clubName: "Example Tennis Club", primaryColor: "#b85c38", accentColor: "#d7e24b",
       defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30,
       timeZone: "Europe/Berlin", newAccountCredentialHours: 168, passwordResetCredentialHours: 24, passwordResetTokenMinutes: 60,
-      bookingReminderHours: 24, waitlistOfferMinutes: 15, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6, logoUploaded: false, noMembershipTypeRuleSetId: "juniors", currency: "EUR"
+      bookingReminderHours: 24, waitlistOfferMinutes: 15, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6, logoUploaded: false, externalBookings: false, noMembershipTypeRuleSetId: "juniors", currency: "EUR"
     });
 
     // when
@@ -107,7 +107,7 @@ describe("AdminRuleSetsView", () => {
       logoUrl: "/icon.svg", logoFallbackUrl: "/icon.svg", imprintUrl: "/imprint", privacyUrl: "/privacy",
       documentationUrl: "/documentation", defaultLocale: "en" as const, supportedLocales: ["de", "en"], slotMinutes: 15,
       timeZone: "Europe/Berlin", newAccountCredentialHours: 72, passwordResetCredentialHours: 24, passwordResetTokenMinutes: 60,
-      bookingReminderHours: 3, waitlistOfferMinutes: 15, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6, logoUploaded: false, currency: "EUR"
+      bookingReminderHours: 3, waitlistOfferMinutes: 15, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6, logoUploaded: false, externalBookings: false, currency: "EUR"
     };
     vi.spyOn(api, "adminConfig").mockResolvedValue(stored);
     const changing = vi.spyOn(api, "changeAdminConfig").mockResolvedValue({ ...stored, noMembershipTypeRuleSetId: "rule-set" });
@@ -124,7 +124,7 @@ describe("AdminRuleSetsView", () => {
     expect(changing).toHaveBeenCalledWith({
       clubName: "Example Tennis Club", shortName: "Example", primaryColor: "#b85c38", accentColor: "#d7e24b",
       logoUrl: "/icon.svg", imprintUrl: "/imprint", privacyUrl: "/privacy", documentationUrl: "/documentation",
-      defaultLocale: "en", slotMinutes: 15, timeZone: "Europe/Berlin", currency: "EUR",
+      defaultLocale: "en", slotMinutes: 15, timeZone: "Europe/Berlin", currency: "EUR", externalBookings: false,
       newAccountCredentialHours: 72, passwordResetCredentialHours: 24, passwordResetTokenMinutes: 60,
       bookingReminderHours: 3, waitlistOfferMinutes: 15, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6, noMembershipTypeRuleSetId: "rule-set"
     });
@@ -340,7 +340,7 @@ describe("AdminRuleSetsView", () => {
       clubName: "Example Tennis Club", primaryColor: "#b85c38", accentColor: "#d7e24b",
       defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30,
       timeZone: "Europe/Berlin", newAccountCredentialHours: 168, passwordResetCredentialHours: 24, passwordResetTokenMinutes: 60,
-      bookingReminderHours: 24, waitlistOfferMinutes: 15, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6, logoUploaded: false,
+      bookingReminderHours: 24, waitlistOfferMinutes: 15, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6, logoUploaded: false, externalBookings: false,
       noMembershipTypeRuleSetId: "rule-set", currency: "EUR"
     });
     render(<MemoryRouter><UnsavedChangesProvider><AdminRuleSetsView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
@@ -365,7 +365,7 @@ describe("AdminRuleSetsView", () => {
       clubName: "Example Tennis Club", primaryColor: "#b85c38", accentColor: "#d7e24b",
       defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30,
       timeZone: "Europe/Berlin", newAccountCredentialHours: 168, passwordResetCredentialHours: 24, passwordResetTokenMinutes: 60,
-      bookingReminderHours: 24, waitlistOfferMinutes: 15, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6, logoUploaded: false,
+      bookingReminderHours: 24, waitlistOfferMinutes: 15, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6, logoUploaded: false, externalBookings: false,
       noMembershipTypeRuleSetId: "retired", currency: "EUR"
     });
     render(<MemoryRouter><UnsavedChangesProvider><AdminRuleSetsView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);

@@ -88,8 +88,8 @@ class OpenApiFormatContractTest {
                     .as("%s.allowedRoles", schema)
                     .contains("Holding any listed role is sufficient")
                     .contains("Empty permits every account whose person holds a running membership")
-                    .contains("Future external accounts may book only when this list explicitly includes"
-                            + " `EXTERNAL_BOOKER`")
+                    .contains("External accounts may book only when this list explicitly includes"
+                            + " `EXTERNAL` and the club admits external bookings")
                     .contains("Administrators may always book");
             assertThat(normalizedDescription(schema, "managingRoles").toLowerCase())
                     .as("%s.managingRoles", schema)

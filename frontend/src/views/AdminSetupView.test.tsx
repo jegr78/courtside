@@ -22,7 +22,7 @@ const configuration: AdminClubConfig = {
   newAccountCredentialHours: 168,
   passwordResetCredentialHours: 24, passwordResetTokenMinutes: 60,
   bookingReminderHours: 24, waitlistOfferMinutes: 15, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6,
-  logoUploaded: false,
+  logoUploaded: false, externalBookings: false,
   logoFallbackUrl: null,
   noMembershipTypeRuleSetId: null, currency: "EUR"
 };

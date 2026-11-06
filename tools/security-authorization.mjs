@@ -16,7 +16,7 @@ const authorizationEvidenceSchema = JSON.parse(readFileSync(
 const validateEvidenceSchema = new Ajv2020({ allErrors: true, strict: true }).compile(authorizationEvidenceSchema);
 const multipartBoundary = "courtside-security-boundary";
 const methods = new Set(["get", "post", "put", "patch", "delete"]);
-const roles = ["MEMBER", "TRAINER", "SPORT_DIRECTOR", "YOUTH_DIRECTOR", "GROUNDSKEEPER", "TREASURER", "ADMIN"];
+const roles = ["MEMBER", "TRAINER", "SPORT_DIRECTOR", "YOUTH_DIRECTOR", "GROUNDSKEEPER", "TREASURER", "ADMIN", "EXTERNAL"];
 export const authorizationActors = Object.freeze(["ANONYMOUS", ...roles, "INITIAL_PASSWORD"]);
 const loginTimingSamplesPerClass = 12;
 const managerCombinationCount = 2;
@@ -31,6 +31,7 @@ export const actorUsernames = Object.freeze({
   GROUNDSKEEPER: "security.groundskeeper.1",
   TREASURER: "security.treasurer.1",
   ADMIN: "security.admin.1",
+  EXTERNAL: "security.external.1",
   INITIAL_PASSWORD: "security.bootstrap"
 });
 

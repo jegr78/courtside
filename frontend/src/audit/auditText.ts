@@ -21,7 +21,8 @@ const nullSafeContexts: { eventType: string; field: string; context: string }[] 
 
 const clubFields = ["clubName", "shortName", "primaryColor", "accentColor", "logo", "logoUrl", "imprintUrl", "privacyUrl",
   "documentationUrl", "newAccountCredentialHours", "passwordResetCredentialHours", "passwordResetTokenMinutes",
-  "bookingReminderHours", "waitlistOfferMinutes", "accessLeadMinutes", "accessLagMinutes", "accessCodeLength", "currency"];
+  "bookingReminderHours", "waitlistOfferMinutes", "accessLeadMinutes", "accessLagMinutes", "accessCodeLength", "currency",
+  "externalBookings"];
 
 const changedFieldLabels: Record<string, Record<string, string>> = {
   "config.club.changed": {

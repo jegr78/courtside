@@ -194,7 +194,7 @@ function unitProtocol({ sessionRoles } = {}) {
   const roles = {
     "security.member.2": "MEMBER", "security.trainer.2": "TRAINER", "security.sport.director.2": "SPORT_DIRECTOR",
     "security.youth.director.2": "YOUTH_DIRECTOR", "security.groundskeeper.2": "GROUNDSKEEPER",
-    "security.treasurer.2": "TREASURER", "security.admin.2": "ADMIN"
+    "security.treasurer.2": "TREASURER", "security.admin.2": "ADMIN", "security.external.2": "EXTERNAL"
   };
   const account = (username) => {
     if (!accounts.has(username)) accounts.set(username, { username, id: `account-${accounts.size}`, password: original, enabled: false, pending: false, recoveryPending: false, codes: [], key: undefined });
@@ -336,7 +336,7 @@ test("given an extra administrator role, when the member fixture proves its logi
   });
 });
 
-for (const role of ["MEMBER", "TRAINER", "SPORT_DIRECTOR", "YOUTH_DIRECTOR", "GROUNDSKEEPER", "TREASURER", "ADMIN"]) {
+for (const role of ["MEMBER", "TRAINER", "SPORT_DIRECTOR", "YOUTH_DIRECTOR", "GROUNDSKEEPER", "TREASURER", "ADMIN", "EXTERNAL"]) {
   test(`given the ${role} unit holder fixture, when response roles are checked, then use only its dedicated role account`, async () => {
     // given
     const protocol = unitProtocol();

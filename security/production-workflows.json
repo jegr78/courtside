@@ -15,6 +15,7 @@
         "GROUNDSKEEPER",
         "TREASURER",
         "ADMIN",
+        "EXTERNAL",
         "INITIAL_PASSWORD"
       ],
       "entryPoints": "Public source-offer and OpenAPI endpoints.",
@@ -51,6 +52,7 @@
         "GROUNDSKEEPER",
         "TREASURER",
         "ADMIN",
+        "EXTERNAL",
         "INITIAL_PASSWORD"
       ],
       "entryPoints": "Login, logout, reauthentication, unauthenticated account recovery and own-account endpoints.",
@@ -137,6 +139,7 @@
         "GROUNDSKEEPER",
         "TREASURER",
         "ADMIN",
+        "EXTERNAL",
         "INITIAL_PASSWORD"
       ],
       "entryPoints": "Public configuration, courts, opening hours, cards, participant lookup and booking-grid endpoints, and the key-protected court occupancy signal.",
@@ -194,6 +197,7 @@
         "GROUNDSKEEPER",
         "TREASURER",
         "ADMIN",
+        "EXTERNAL",
         "INITIAL_PASSWORD"
       ],
       "entryPoints": "Booking, participation, managed-appointment and recurring-series endpoints.",
@@ -317,7 +321,8 @@
         "YOUTH_DIRECTOR",
         "GROUNDSKEEPER",
         "TREASURER",
-        "ADMIN"
+        "ADMIN",
+        "EXTERNAL"
       ],
       "entryPoints": "The member's own check-in and the administrative attendance policy, attendance and no-show endpoints.",
       "operationIds": [
@@ -934,6 +939,7 @@
         "GROUNDSKEEPER",
         "TREASURER",
         "ADMIN",
+        "EXTERNAL",
         "INITIAL_PASSWORD"
       ],
       "entryPoints": "Password-first pending MFA login, authenticated own-factor operations, two coarse administrator flags, fresh-MFA administrator rescue and public mailed-code redemption.",

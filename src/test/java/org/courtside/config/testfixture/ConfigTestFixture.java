@@ -84,7 +84,20 @@ public class ConfigTestFixture {
                 unchanged.slotDuration(), unchanged.timeZone(), unchanged.newAccountCredential(),
                 unchanged.passwordResetCredential(), unchanged.passwordResetToken(), unchanged.bookingReminder(),
                 unchanged.noMembershipTypeRuleSetId(), unchanged.waitlistOffer(), unchanged.accessLead(),
-                unchanged.accessLag(), unchanged.accessCodeLength(), Currency.getInstance(currencyCode)));
+                unchanged.accessLag(), unchanged.accessCodeLength(), Currency.getInstance(currencyCode), null));
+    }
+
+    public void admitExternalBookings(boolean admitted) {
+        ClubConfigurationSnapshot current = config.current();
+        ChangeClubConfigurationCommand unchanged = commandFrom(current, current.bookingReminderHours(),
+                current.noMembershipTypeRuleSetId(), current.defaultLocale());
+        config.update(new ChangeClubConfigurationCommand(unchanged.clubName(), unchanged.primaryColor(),
+                unchanged.accentColor(), unchanged.logoUrl(), unchanged.imprintUrl(), unchanged.privacyUrl(),
+                unchanged.documentationUrl(), unchanged.shortName(), unchanged.defaultLocale(),
+                unchanged.slotDuration(), unchanged.timeZone(), unchanged.newAccountCredential(),
+                unchanged.passwordResetCredential(), unchanged.passwordResetToken(), unchanged.bookingReminder(),
+                unchanged.noMembershipTypeRuleSetId(), unchanged.waitlistOffer(), unchanged.accessLead(),
+                unchanged.accessLag(), unchanged.accessCodeLength(), null, admitted));
     }
 
     public void nameTheClub(String clubName) {

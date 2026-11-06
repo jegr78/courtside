@@ -17,7 +17,7 @@ import { formatCalendarDate } from "../time/clubZone";
 const NAME_LENGTH = 60;
 const EMAIL_LENGTH = 120;
 const PAGE_SIZE = 20;
-const ROLES: Role[] = ["MEMBER", "TRAINER", "SPORT_DIRECTOR", "YOUTH_DIRECTOR", "GROUNDSKEEPER", "TREASURER", "ADMIN"];
+const ROLES: Role[] = ["MEMBER", "TRAINER", "SPORT_DIRECTOR", "YOUTH_DIRECTOR", "GROUNDSKEEPER", "TREASURER", "ADMIN", "EXTERNAL"];
 const CREDENTIAL_STATES: CredentialState[] = ["AWAITING_CREDENTIAL", "CREDENTIAL_ISSUED", "CREDENTIAL_EXPIRED", "PASSWORD_CHOSEN"];
 const NOT_CHOSEN = "NOT_CHOSEN";
 const SORT_FIELDS: { field: RosterSortField; label: string }[] = [

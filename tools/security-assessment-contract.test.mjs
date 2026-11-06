@@ -137,7 +137,7 @@ test("given the shipped attack surface, when reading the catalog, then every act
   // given
   const expectedRoles = [
     "ANONYMOUS", "MEMBER", "TRAINER", "SPORT_DIRECTOR", "YOUTH_DIRECTOR", "GROUNDSKEEPER",
-    "TREASURER", "ADMIN", "COMPROMISED_ACCOUNT"
+    "TREASURER", "ADMIN", "EXTERNAL", "COMPROMISED_ACCOUNT"
   ];
 
   // when

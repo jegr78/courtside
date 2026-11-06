@@ -87,7 +87,8 @@ class ConfigController implements ClubConfigApi, AdminConfigApi, ManifestApi {
                         ? null : new AccessLagTime(request.getAccessLagMinutes()),
                 request.getAccessCodeLength() == null
                         ? null : new AccessCodeLength(request.getAccessCodeLength()),
-                request.getCurrency() == null ? null : Currency.getInstance(request.getCurrency())))));
+                request.getCurrency() == null ? null : Currency.getInstance(request.getCurrency()),
+                request.getExternalBookings()))));
     }
 
     @Override
@@ -177,7 +178,7 @@ class ConfigController implements ClubConfigApi, AdminConfigApi, ManifestApi {
                 configuration.accentColor(), configuration.defaultLocale(),
                 languages.tags(),
                 configuration.slotMinutes(), configuration.timeZone(), configuration.currency(),
-                configuration.logoUploaded(),
+                configuration.logoUploaded(), configuration.externalBookings(),
                 configuration.newAccountCredentialHours(),
                 configuration.passwordResetCredentialHours(),
                 configuration.passwordResetTokenMinutes(),

@@ -2,9 +2,11 @@ package org.courtside.card;
 
 import org.courtside.card.internal.BookingCardRepository;
 import org.courtside.card.internal.ClosureCardGrantsNoAccessException;
+import org.courtside.card.internal.ExternalManagesNoCardException;
 import org.courtside.card.internal.ClosureCardSignalsNoOccupancyException;
 import org.courtside.card.internal.CardLabelTakenException;
 import org.courtside.card.internal.ParticipantCardRepository;
+import org.courtside.config.ExternalBookings;
 import org.courtside.identity.Role;
 import org.courtside.member.MemberService;
 import org.courtside.shared.CardGrantsAccess;
@@ -36,6 +38,7 @@ public class CardService {
     private final ParticipantCardRepository participantCards;
     private final ApplicationEventPublisher events;
     private final MemberService members;
+    private final ExternalBookings externalBookings;
 
     public List<BookingCard> activeCards() {
         return cards.findByActiveTrueOrderByLabelAsc();
@@ -46,8 +49,9 @@ public class CardService {
             return activeCards();
         }
         boolean currentMember = members.isCurrentMember(accountId);
+        boolean externalBookingsAdmitted = externalBookings.admitted();
         return activeCards().stream()
-                .filter(card -> card.permits(callerRoles, currentMember))
+                .filter(card -> card.permits(callerRoles, currentMember, externalBookingsAdmitted))
                 .toList();
     }
 
@@ -81,6 +85,7 @@ public class CardService {
                                   boolean countsAgainstLimits, boolean guestAllowed,
                                   boolean showGenericOccupancy, boolean grantsAccess, boolean signalsOccupancy,
                                   int guestFeeMinor) {
+        requireMemberManagers(managingRoles);
         BookingCard created = new BookingCard(label, color, allowedRoles, managingRoles,
                 allowedPlayerCounts, countsAgainstLimits, guestAllowed, showGenericOccupancy, grantsAccess,
                 signalsOccupancy);
@@ -93,6 +98,12 @@ public class CardService {
         return card;
     }
 
+    private static void requireMemberManagers(Set<Role> managingRoles) {
+        if (managingRoles != null && managingRoles.contains(Role.EXTERNAL)) {
+            throw new ExternalManagesNoCardException();
+        }
+    }
+
     /** A null {@code requestedSignalsOccupancy} or {@code requestedGuestFeeMinor} keeps the stored value. */
     @Transactional
     public BookingCard changeCard(UUID cardId, String label, String color, Set<Role> allowedRoles,
@@ -100,6 +111,7 @@ public class CardService {
                                   boolean countsAgainstLimits, boolean guestAllowed,
                                   boolean showGenericOccupancy, boolean grantsAccess,
                                   Boolean requestedSignalsOccupancy, Integer requestedGuestFeeMinor) {
+        requireMemberManagers(managingRoles);
         if (grantsAccess && BookingCard.COURT_CLOSED.equals(cardId)) {
             throw new ClosureCardGrantsNoAccessException();
         }
