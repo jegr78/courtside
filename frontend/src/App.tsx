@@ -16,7 +16,7 @@ import { applyAccountLocale, supportedLocale } from "./i18n";
 import {
   clearPersonalBookingsOfflineData, listenForOtherClientSessionChanges, offlineMemberState
 } from "./offlineBookings";
-import { reachesAdministration } from "./navigation/administrationAccess";
+import { reachesAdministration, readsGuestFees } from "./navigation/administrationAccess";
 import { lazySurface } from "./navigation/lazySurface";
 import { currentSignInPath, returnQuery, returnSearch, returnTargetIn, signInPath } from "./navigation/returnTarget";
 import { HomeView } from "./views/HomeView";
@@ -103,7 +103,8 @@ export function AppRoutes({ session, refreshSession, passwordChanged, initialPas
     {/* The role is asked once for the whole surface rather than once per destination. */}
     <Route path="/admin/*" element={!session.authenticated ? signInFirst : reachesAdministration(session)
       ? <Suspense fallback={<p role="status">{t("status.loading")}</p>}>
-        <AdminRoutes administrator={administrator} managesAppointments={administrator || Boolean(session.managesAppointments)}
+        <AdminRoutes administrator={administrator} treasurer={readsGuestFees(session)}
+          managesAppointments={administrator || Boolean(session.managesAppointments)}
           createsSeries={administrator || Boolean(session.createsSeries)}
           configurationChanged={(changed) => configurationChanged?.(changed)} />
       </Suspense>

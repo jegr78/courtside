@@ -113,6 +113,8 @@ export type AccountRequest = components["schemas"]["AccountRequest"];
 export type SubjectAccessExport = components["schemas"]["SubjectAccessExport"];
 export type FacilityUtilisation = components["schemas"]["FacilityUtilisation"];
 export type UsageReport = components["schemas"]["UsageReport"];
+export type GuestFeeReport = components["schemas"]["GuestFeeReport"];
+export type GuestFeeMember = components["schemas"]["GuestFeeMember"];
 export type RetentionCategory = components["schemas"]["RetentionCategory"];
 export type RetentionPolicy = components["schemas"]["RetentionPolicy"];
 export type RetentionPreview = components["schemas"]["RetentionPreview"];
@@ -179,6 +181,11 @@ export interface BookingExportParameters extends Record<string, string> {
   to: string;
   separator: string;
   encoding: string;
+}
+
+export interface GuestFeePeriod extends Record<string, string> {
+  from: string;
+  to: string;
 }
 
 export type ExportedLog = "audit" | "messages";
@@ -732,6 +739,11 @@ export const api = {
     request<MemberStatistics>(withPeriod("/api/admin/statistics/members", period)),
   messageStatistics: (period?: StatisticsPeriodQuery) =>
     request<MessageStatistics>(withPeriod("/api/admin/statistics/messages", period)),
+  guestFees: (period?: GuestFeePeriod) => request<GuestFeeReport>(
+    period ? `/api/treasury/guest-fees?${new URLSearchParams(period).toString()}` : "/api/treasury/guest-fees",
+    { method: "POST" }),
+  exportGuestFees: (period: GuestFeePeriod & { separator: string }) => requestFile(
+    `/api/treasury/guest-fees/export?${new URLSearchParams(period).toString()}`, { method: "POST" }),
   exportBookings: (parameters: BookingExportParameters) => requestFile(
     `/api/admin/export/bookings?${new URLSearchParams(parameters).toString()}`, { method: "POST" }),
   exportAuditLog: (parameters: LogExportParameters) => requestFile(

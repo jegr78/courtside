@@ -1,5 +1,6 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { MemoryRouter } from "react-router-dom";
 import { api } from "../api/client";
 import i18n from "../i18n";
 import { AdminExportView } from "./AdminExportView";
@@ -16,7 +17,7 @@ describe("AdminExportView", () => {
     vi.spyOn(api, "importSources").mockResolvedValue([]);
 
     // when
-    render(<AdminExportView />);
+    render(<MemoryRouter><AdminExportView /></MemoryRouter>);
 
     // then
     await waitFor(() => expect(screen.getByTestId("roster-export")).toBeInTheDocument());
@@ -28,7 +29,7 @@ describe("AdminExportView", () => {
     vi.spyOn(api, "importSources").mockRejectedValue(new Error("refused"));
 
     // when
-    render(<AdminExportView />);
+    render(<MemoryRouter><AdminExportView /></MemoryRouter>);
 
     // then
     await waitFor(() => expect(screen.getByRole("alert")).toBeInTheDocument());

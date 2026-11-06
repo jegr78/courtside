@@ -465,7 +465,10 @@ describe("AppRoutes", () => {
     expect(screen.queryByTestId("admin-configuration-link")).not.toBeInTheDocument();
   });
 
-  it("given a treasurer no active card lets book or manage, when opening club appointments, then the court plan is served instead", () => {
+  it("given a treasurer no active card lets book or manage, when opening club appointments, then the guest fees are served instead", async () => {
+    // given
+    vi.spyOn(api, "guestFees").mockResolvedValue({ from: "2026-01-01", to: "2026-12-31", sources: [], members: [], unassignedGuestPlaces: 0 });
+
     // when
     render(<RoutedShell initialEntries={["/admin/appointments"]}><AppRoutes session={{
       authenticated: true, username: "roe.john", displayName: "John Roe",
@@ -473,9 +476,8 @@ describe("AppRoutes", () => {
     }} refreshSession={() => Promise.resolve()} /></RoutedShell>);
 
     // then
+    expect(await screen.findByTestId("admin-guest-fees-view")).toBeInTheDocument();
     expect(screen.queryByTestId("managed-appointments-page")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("administration-link")).not.toBeInTheDocument();
-    expect(screen.getByTestId("court-plan-view")).toBeInTheDocument();
   });
 
   it("given a treasurer a card names as managing role, when opening club appointments, then the list is served without the series form", async () => {

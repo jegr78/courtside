@@ -201,6 +201,46 @@ public class BookingTestFixture {
         return id;
     }
 
+    public void chargeGuests(UUID bookingId, int guests, int feeMinor, String currency) {
+        for (int guest = 0; guest < guests; guest++) {
+            jdbc.sql("""
+                            INSERT INTO booking_participant
+                                (id, booking_id, kind, guest_name, position, guest_fee_minor, guest_fee_currency)
+                            VALUES (:id, :bookingId, 'GUEST', 'Example Guest',
+                                    (SELECT coalesce(max(position), -1) + 1 FROM booking_participant
+                                     WHERE booking_id = :bookingId), :fee, :currency)
+                            """)
+                    .param("id", UUID.randomUUID()).param("bookingId", bookingId)
+                    .param("fee", feeMinor).param("currency", currency)
+                    .update();
+        }
+    }
+
+    public void allocateAnotherCourt(UUID bookingId, UUID courtId) {
+        jdbc.sql("""
+                        INSERT INTO court_allocation (id, booking_id, court_id, starts_at, ends_at, status)
+                        SELECT :id, booking_id, :courtId, starts_at, ends_at, status FROM court_allocation
+                        WHERE booking_id = :bookingId LIMIT 1
+                        """)
+                .param("id", UUID.randomUUID()).param("bookingId", bookingId).param("courtId", courtId)
+                .update();
+    }
+
+    public void cancelRecorded(UUID bookingId) {
+        jdbc.sql("UPDATE court_allocation SET status = 'CANCELLED' WHERE booking_id = :id")
+                .param("id", bookingId).update();
+        jdbc.sql("UPDATE booking SET status = 'CANCELLED', cancelled_at = created_at WHERE id = :id")
+                .param("id", bookingId).update();
+    }
+
+    public void pseudonymise(UUID bookingId) {
+        jdbc.sql("""
+                        UPDATE booking SET booked_by = NULL, cancelled_by = NULL, moved_by = NULL, acted_by = NULL,
+                            note = NULL, pseudonymised_at = created_at WHERE id = :id
+                        """)
+                .param("id", bookingId).update();
+    }
+
     public String issueOccupancyKey() {
         return occupancyKeys.issue().key();
     }

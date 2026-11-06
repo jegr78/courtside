@@ -93,12 +93,12 @@ describe("PrimaryNavigation", () => {
     expect(screen.queryByTestId("administration-link")).not.toBeInTheDocument();
   });
 
-  it("given a treasurer no active card lets book or manage, when rendered, then nothing offers administration", () => {
+  it("given a treasurer no active card lets book or manage, when rendered, then administration is offered for the guest fees", () => {
     // when
     show(cardlessTreasurer);
 
     // then
-    expect(screen.queryByTestId("administration-link")).not.toBeInTheDocument();
+    expect(screen.getByTestId("administration-link")).toHaveAttribute("href", "/admin");
   });
 
   it("given a treasurer a card names as managing role, when rendered, then administration is offered", () => {

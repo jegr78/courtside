@@ -129,6 +129,11 @@ function operationExpectations(path, method, security) {
     expectations.ADMIN = "allow";
     return expectations;
   }
+  if (path.startsWith("/api/treasury")) {
+    expectations.TREASURER = "allow";
+    expectations.ADMIN = "allow";
+    return expectations;
+  }
   for (const role of roles) expectations[role] = "allow";
   return expectations;
 }

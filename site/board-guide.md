@@ -11,7 +11,8 @@ Konten sehen dort ausschließlich die *Vereinstermine*, und nur dann, wenn eine 
 eine ihrer Rollen außer *Mitglied* als verwaltende Rolle nennt oder einer ihrer Rollen das Buchen
 ohne Spielerliste erlaubt. Die Liste zeigt, wofür die verwaltenden Rollen zuständig sind, das Serienformular, was die
 buchenden Rollen erlauben. Ein Konto, dem keine Karte etwas davon gibt, erhält auch über eine direkt
-eingegebene Adresse keinen Zugriff. Das ändern Vorstände an den Buchungskarten.
+eingegebene Adresse keinen Zugriff. Das ändern Vorstände an den Buchungskarten. Konten mit der
+Rolle **Kassenwart** sehen in der Verwaltung außerdem die *Gastgebühren*.
 
 Die Seitenleiste führt oben zur Übersicht und ordnet die Verwaltung darunter in vier Bereiche:
 
@@ -790,6 +791,27 @@ Unter **Nachweise** findest du neun Ansichten. Die *Aufbewahrung* beschreibt der
   angebundenes Zutrittssystem bleibt die Liste leer und die Buchungen laufen wie bisher.
 
 ![Die Statistik mit Zeitraumwahl, Kennzahlen zur Auslastung und ihrer Veränderung.](screenshots/de/utilisation.png)
+
+## Nachweise → Gastgebühren
+
+Die Seite *Gastgebühren* zeigt, welches Mitglied in einem Zeitraum wie viele Gäste mitgebracht hat
+und was dafür fällig ist. Sie steht Administratoren und der Rolle **Kassenwart** offen. Administratoren
+erreichen sie über *Datenexport*, Kassenwarte direkt über die Seitenleiste.
+
+![Die Gastgebühren eines Jahres mit Mitgliedsnummer, Gastplätzen und Betrag je Mitglied.](screenshots/de/guest-fees.png)
+
+Ohne eigene Auswahl gilt das laufende Kalenderjahr, ein Zeitraum darf höchstens 366 Tage umfassen.
+Es zählt jeder Gastplatz mit einer Gebühr über null aus einer bestätigten Buchung, die im Zeitraum
+begonnen hat und vorbei ist. Stornierte und noch nicht gespielte Buchungen zählen nicht. Die Gebühr
+gehört dem Konto, für das gebucht wurde, auch wenn ein Elternteil für sein Kind gebucht hat. Hat
+der Verein die Währung gewechselt, steht ein Mitglied für jede Währung in einer eigenen Zeile.
+Gastplätze aus Buchungen, die nach der Aufbewahrungsfrist kein Mitglied mehr nennen, nennt die Seite
+nur als Anzahl.
+
+*Datei herunterladen* speichert die Liste als CSV-Datei mit einer Spalte Mitgliedsnummer je Importquelle,
+Vorname, Nachname, E-Mail-Adresse, Gastplätzen, Betrag und Währung. Courtside markiert nichts als
+abgerechnet. Jedes Öffnen und jeder Download steht im Änderungsprotokoll, mit dem Zeitraum, ohne
+Namen oder Beträge.
 
 ## Nachweise → Aufbewahrung
 

@@ -840,6 +840,40 @@
       ]
     },
     {
+      "id": "guest-fee-report",
+      "actors": [
+        "TREASURER",
+        "ADMIN"
+      ],
+      "entryPoints": "Guest fee report and its CSV download under /api/treasury.",
+      "operationIds": [
+        "reportGuestFees",
+        "exportGuestFees"
+      ],
+      "backgroundEntryPoints": [],
+      "stateTransitions": [
+        "Each read and each download records one whole-instance audit entry naming the period and whether it was the screen or the file, never a name or sum."
+      ],
+      "alternatePaths": [
+        "Without dates the report covers the current calendar year in the club time zone.",
+        "Guest places whose booking no longer names a member are counted, not listed."
+      ],
+      "failurePaths": [
+        "Members and other roles are refused.",
+        "A reversed or longer than 366 day period is refused with a typed failure."
+      ],
+      "productionPaths": [
+        "src/main/java/org/courtside/dataexchange/web/TreasuryController.java",
+        "src/main/java/org/courtside/dataexchange/internal/GuestFeeReportService.java",
+        "src/main/java/org/courtside/booking/internal/BookingLedgerService.java"
+      ],
+      "evidence": [
+        "src/test/java/org/courtside/dataexchange/web/GuestFeeReportControllerTest.java#givenAYearOfGuestBookings_whenTheTreasurerReadsTheReport_thenOnlyEndedConfirmedChargedGuestsCount",
+        "src/test/java/org/courtside/dataexchange/web/GuestFeeReportControllerTest.java#givenAMember_whenTheyAskForTheReport_thenTheyAreRefused",
+        "src/test/java/org/courtside/dataexchange/web/GuestFeeReportControllerTest.java#givenAYearOfGuestBookings_whenTheReportIsReadAndDownloaded_thenEachReadIsRecordedWithoutItsContent"
+      ]
+    },
+    {
       "id": "personal-data-retention",
       "actors": [
         "ADMIN"

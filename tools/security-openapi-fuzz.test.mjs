@@ -663,7 +663,8 @@ test("given a log export whose every input is an optional query parameter, when 
   });
 
   // then
-  for (const path of ["/api/admin/export/audit", "/api/admin/export/messages"]) {
+  for (const path of ["/api/admin/export/audit", "/api/admin/export/messages", "/api/treasury/guest-fees",
+    "/api/treasury/guest-fees/export"]) {
     assert.equal(probes.get(path)?.path, `${path}?from=invalid`,
       `${path} must be probed with a value its date parameter refuses, or the probe sends a valid request`);
     assert.equal(probes.get(path)?.body, undefined);
@@ -686,7 +687,8 @@ test("given the contract, when an operation offers only optional query parameter
     });
 
   // when / then
-  assert.deepEqual(shapes.map(({ operationId }) => operationId), ["exportAuditLog", "exportMessageLog"],
+  assert.deepEqual(shapes.map(({ operationId }) => operationId).toSorted(),
+    ["exportAuditLog", "exportGuestFees", "exportMessageLog", "reportGuestFees"],
     "an operation whose probe can only corrupt an optional query parameter needs its own case in the test above");
 });
 

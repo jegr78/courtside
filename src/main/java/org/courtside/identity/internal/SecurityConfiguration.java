@@ -182,6 +182,7 @@ public class SecurityConfiguration {
                                 "/admin/operational-logs",
                                 "/admin/access-grants",
                                 "/admin/operator-health",
+                                "/admin/guest-fees",
                                 "/index.html",
                                 "/assets/**", "/font-licenses.txt", "/icon.svg",
                                 "/manifest.webmanifest", "/sw.js",
@@ -200,6 +201,13 @@ public class SecurityConfiguration {
                                 "(?i)^/api/admin(?:/.*)?(?:\\?.*)?$")).access((authentication, context) ->
                                 new AuthorizationDecision(hasAuthority(authentication.get(),
                                         "ROLE_" + Role.ADMIN.name())
+                                        && !hasAuthority(authentication.get(),
+                                        CourtsideUserDetailsService.PASSWORD_CHANGE_REQUIRED)))
+                        .requestMatchers(RegexRequestMatcher.regexMatcher(
+                                "(?i)^/api/treasury(?:/.*)?(?:\\?.*)?$")).access((authentication, context) ->
+                                new AuthorizationDecision((hasAuthority(authentication.get(),
+                                        "ROLE_" + Role.ADMIN.name())
+                                        || hasAuthority(authentication.get(), "ROLE_" + Role.TREASURER.name()))
                                         && !hasAuthority(authentication.get(),
                                         CourtsideUserDetailsService.PASSWORD_CHANGE_REQUIRED)))
                         .anyRequest().access((authentication, context) -> new AuthorizationDecision(

@@ -6,7 +6,7 @@ const ADMINISTRATION = [
   "/admin/facility/opening-hours/exceptions", "/admin/facility/booking-cards", "/admin/facility/booking-cards/:cardId",
   "/admin/facility/slot-fillers", "/admin/roster", "/admin/roster/:personId", "/admin/membership-types", "/admin/import",
   "/admin/export", "/admin/retention", "/admin/utilisation", "/admin/usage", "/admin/audit", "/admin/messages",
-  "/admin/operational-logs", "/admin/access-grants", "/admin/operator-health"
+  "/admin/operational-logs", "/admin/access-grants", "/admin/operator-health", "/admin/guest-fees"
 ];
 export const FORM_FACTORS = ["mobile", "desktop"];
 
