@@ -18,7 +18,7 @@ const existing: ImportSource = {
   displayName: "Membership system", separator: ";", encoding: "UTF-8",
   columns: { "Member number": "EXTERNAL_ID", "First name": "FIRST_NAME", "Last name": "LAST_NAME" },
   membershipTypes: {},
-  leftOutCategories: [],
+  leftOutCategories: [], ageBands: {},
   defaultMembershipTypeId: "type-1",
   ownedFields: [],
   removalWarningPercent: 10, columnMode: "HEADER", positions: [], columnCount: null

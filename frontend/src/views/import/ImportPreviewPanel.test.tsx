@@ -13,11 +13,11 @@ const preview: ImportPreview = {
   fileHash: "a1b2c3d4e5f6",
   rowCount: 3,
   ignoredColumns: [],
-  leftOutRows: {},
+  leftOutRows: {}, ageFallbackRows: {},
   changes: [
-    { kind: "CREATE", rowNumber: 1, externalId: "4711", personId: null, personName: null, values: { FIRST_NAME: "Jane", LAST_NAME: "Doe" }, account: "CREATE" },
-    { kind: "UPDATE", rowNumber: 2, externalId: "4712", personId: "person-2", personName: "John Roe", values: { EMAIL: "john.roe@example.org" }, account: "NO_ADDRESS" },
-    { kind: "END_MEMBERSHIP", rowNumber: 0, externalId: "4713", personId: "person-3", personName: "Mary Major", values: {}, account: "NOT_ASKED" }
+    { kind: "CREATE", rowNumber: 1, externalId: "4711", personId: null, personName: null, values: { FIRST_NAME: "Jane", LAST_NAME: "Doe" }, account: "CREATE", typeFromAgeBand: false },
+    { kind: "UPDATE", rowNumber: 2, externalId: "4712", personId: "person-2", personName: "John Roe", values: { EMAIL: "john.roe@example.org" }, account: "NO_ADDRESS", typeFromAgeBand: false },
+    { kind: "END_MEMBERSHIP", rowNumber: 0, externalId: "4713", personId: "person-3", personName: "Mary Major", values: {}, account: "NOT_ASKED", typeFromAgeBand: false }
   ],
   rowErrors: [{ rowNumber: 4, code: "import.snapshot.row.externalIdUnusable", params: { maxLength: 120 } }],
   possibleDuplicates: [{ rowNumber: 5, externalId: "4714", personId: "person-4", personName: "Richard Miles" }],
@@ -226,7 +226,7 @@ describe("ImportPreviewPanel", () => {
     const many = { ...preview, changes: Array.from({ length: 120 }, (_, index) => ({
       kind: "CREATE" as const, rowNumber: index + 1, externalId: `n${index}`,
       personId: null, personName: null, values: { FIRST_NAME: "Jane", LAST_NAME: "Doe" },
-      account: "MEMBERSHIP_TYPE_GRANTS_NONE" as const
+      account: "MEMBERSHIP_TYPE_GRANTS_NONE" as const, typeFromAgeBand: false
     })) };
     show(many);
 

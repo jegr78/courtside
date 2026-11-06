@@ -26,8 +26,8 @@ function unmappedColumns(preview: ImportPreview, columnMode: ImportSource["colum
     .map((column) => columnMode === "POSITION" ? t("admin.import.columnNumber", { position: column }) : column).join(", ");
 }
 
-function leftOutCounts(preview: ImportPreview): string {
-  return Object.entries(preview.leftOutRows).sort(([left], [right]) => left.localeCompare(right))
+function counts(rows: Record<string, number>): string {
+  return Object.entries(rows).sort(([left], [right]) => left.localeCompare(right))
     .map(([value, count]) => `${value}: ${count}`).join(", ");
 }
 
@@ -139,7 +139,10 @@ export function ImportPreviewPanel({ sourceId, sourceEncoding, columnMode, previ
         {t("admin.import.unmapped", { columns: unmappedColumns(preview, columnMode, t) })}
       </p>}
       {Object.keys(preview.leftOutRows).length > 0 && <p data-testid="preview-left-out">
-        {t("admin.import.leftOut", { counts: leftOutCounts(preview) })}
+        {t("admin.import.leftOut", { counts: counts(preview.leftOutRows) })}
+      </p>}
+      {Object.keys(preview.ageFallbackRows).length > 0 && <p data-testid="preview-age-fallback">
+        {t("admin.import.ageFallback", { counts: counts(preview.ageFallbackRows) })}
       </p>}
 
       <Section testId="changes" heading={t("admin.import.changes", { shown: preview.changes.length })}>
@@ -149,6 +152,7 @@ export function ImportPreviewPanel({ sourceId, sourceEncoding, columnMode, previ
             {" "}<span className="font-mono">{change.externalId}</span>
             {change.personName && <> — {change.personName}</>}
             {Object.keys(change.values).length > 0 && <> — {changed(change, t)}</>}
+            {change.typeFromAgeBand && <> — <span data-testid={`change-age-band-${change.externalId}`}>{t("admin.import.typeFromAgeBand")}</span></>}
             {change.account !== "NOT_ASKED" && <> — {t(`admin.import.account.${change.account}`)}</>}
           </li>)}
         </ul>

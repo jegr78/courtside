@@ -1,4 +1,4 @@
-import { useEffect, useId, useState, type ChangeEvent } from "react";
+import { useEffect, useId, useState, type ChangeEvent, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { api, type CanonicalField, type ImportSource, type ImportSourceRequest, type MembershipType } from "../../api/client";
 import { EncodingUnreadableHereError, NotUtf8Error, looksLikeHeader, readCsvColumn, readCsvHeader, readCsvRows, suggestSeparator } from "../../import/read-csv";
@@ -10,16 +10,31 @@ import { importSourceMark } from "./importSourceMark";
 import { SaveBar } from "../../unsaved/SaveBar";
 
 const FIELDS: CanonicalField[] = [
-  "EXTERNAL_ID", "FIRST_NAME", "LAST_NAME", "EMAIL", "MEMBERSHIP_TYPE"
+  "EXTERNAL_ID", "FIRST_NAME", "LAST_NAME", "EMAIL", "MEMBERSHIP_TYPE", "BIRTH_DATE"
 ];
-// A record is identified by its external id rather than described by it, so no source owns it.
-const OWNABLE = FIELDS.filter((field) => field !== "EXTERNAL_ID");
+// A record is identified by its external id and a birth date only chooses a band, so neither is owned.
+const OWNABLE = FIELDS.filter((field) => field !== "EXTERNAL_ID" && field !== "BIRTH_DATE");
 // No membership type id ever takes this value, so a category holding it is left out, not mapped.
 const NOT_IN_ROSTER = "not-in-roster";
 const KEY_LENGTH = 40;
 const NAME_LENGTH = 80;
 
 type Mapping = Partial<Record<CanonicalField, string>>;
+interface Band { fromAge: string; membershipTypeId: string }
+type Bands = Record<string, Band[]>;
+
+function bandsOf(source: ImportSource | undefined): Bands {
+  return Object.fromEntries(Object.entries(source?.ageBands ?? {}).map(([value, bands]) =>
+    [value, bands.map((band) => ({ fromAge: String(band.fromAge), membershipTypeId: band.membershipTypeId }))]));
+}
+
+// Only a value mapped to a type can be split, because that type is the fallback for a row without a date.
+function splitsOf(bands: Bands, categories: Record<string, string>) {
+  return Object.fromEntries(Object.entries(bands)
+    .filter(([value, listed]) => listed.length > 0 && categories[value] && categories[value] !== NOT_IN_ROSTER)
+    .map(([value, listed]) => [value, listed.map((band) =>
+      ({ fromAge: Number(band.fromAge), membershipTypeId: band.membershipTypeId }))]));
+}
 type ColumnMode = "HEADER" | "POSITION";
 type Positions = Partial<Record<CanonicalField, string>>;
 
@@ -58,6 +73,7 @@ function described(source: ImportSource | undefined) {
       countOf(source)),
     membershipTypes: source?.membershipTypes ?? {},
     leftOutCategories: [...(source?.leftOutCategories ?? [])].sort(),
+    ageBands: splitsOf(bandsOf(source), choicesOf(source)),
     defaultMembershipTypeId: source?.defaultMembershipTypeId ?? "",
     ownedFields: OWNABLE.filter((field) => (source?.ownedFields ?? []).includes(field)),
     removalWarningPercent: source?.removalWarningPercent ?? 10
@@ -118,6 +134,7 @@ export function ImportSourceForm({ source, types, disabled, save }: {
   const [displayName, setDisplayName] = useState(confirmed.displayName);
   const [mapping, setMapping] = useState<Mapping>(mappingOf(source));
   const [categories, setCategories] = useState<Record<string, string>>(choicesOf(source));
+  const [bands, setBands] = useState<Bands>(bandsOf(source));
   const [defaultType, setDefaultType] = useState(confirmed.defaultMembershipTypeId);
   const [owned, setOwned] = useState<CanonicalField[]>(confirmed.ownedFields);
   const [threshold, setThreshold] = useState(String(confirmed.removalWarningPercent));
@@ -142,6 +159,7 @@ export function ImportSourceForm({ source, types, disabled, save }: {
   }
 
   const categoryColumn = mapping.MEMBERSHIP_TYPE;
+  const birthDateMapped = mode === "POSITION" ? Boolean(positions.BIRTH_DATE) : Boolean(mapping.BIRTH_DATE);
   const knownValues = [...new Set([...Object.keys(categories), ...readValues])];
   const mapped = new Set(Object.values(mapping).filter(Boolean));
   const unmapped = headers.filter((header) => !mapped.has(header));
@@ -212,6 +230,7 @@ export function ImportSourceForm({ source, types, disabled, save }: {
       ...layoutOf(mode, columnsOf(mapping), positions, columnCount),
       membershipTypes: assigned(categories),
       leftOutCategories: leftOut(categories),
+      ageBands: splitsOf(bands, categories),
       defaultMembershipTypeId: defaultType,
       // In the canonical order rather than the order they were ticked, so a field taken back and
       // given again leaves the same request rather than a reordered one.
@@ -340,6 +359,9 @@ export function ImportSourceForm({ source, types, disabled, save }: {
           {typeOptions(categories[value] ?? "")}
           <option value={NOT_IN_ROSTER}>{t("admin.import.notInRoster")}</option>
         </select>
+        {categories[value] && categories[value] !== NOT_IN_ROSTER && <AgeBands value={value} bands={bands[value] ?? []}
+          disabled={disabled} typeOptions={typeOptions} birthDateMapped={birthDateMapped}
+          changed={(listed) => setBands({ ...bands, [value]: listed })} />}
       </div>)}
     </div>}
 
@@ -378,4 +400,45 @@ export function ImportSourceForm({ source, types, disabled, save }: {
     <SaveBar id={mark} subject={source?.displayName ?? t("admin.import.newSource")} saveTestId="save-source"
              unsaved={unsaved} pending={disabled} save={submit} discard={discard} />
   </section>;
+}
+
+function AgeBands({ value, bands, disabled, typeOptions, birthDateMapped, changed }: {
+  value: string;
+  bands: Band[];
+  disabled: boolean;
+  typeOptions: (chosen: string) => ReactNode;
+  birthDateMapped: boolean;
+  changed: (bands: Band[]) => void;
+}) {
+  const { t } = useTranslation();
+  const group = useId();
+  const split = bands.length > 0;
+  const replace = (index: number, band: Band) => changed(bands.map((held, at) => at === index ? band : held));
+  return <div data-testid={`age-bands-${value}`} className="grid gap-2 border-l-2 pl-3">
+    <label className="flex items-center gap-2 text-sm">
+      <input data-testid={`split-by-age-${value}`} type="checkbox" disabled={disabled} checked={split}
+        onChange={(event) => changed(event.target.checked ? [{ fromAge: "0", membershipTypeId: "" }] : [])} />
+      {t("admin.import.splitByAge")}
+    </label>
+    {split && <>
+      <p className="text-muted text-sm">{t(birthDateMapped ? "admin.import.splitByAgeHint" : "admin.import.splitByAgeNoColumn")}</p>
+      {bands.map((band, index) => <div key={index} data-testid={`age-band-${value}-${index}`} className="flex flex-wrap items-end gap-2">
+        <TextField data-testid={`age-band-from-${value}-${index}`} id={`${group}-from-${index}`} type="number" min={0} max={150}
+          className="max-w-24" disabled={disabled || index === 0} label={t("admin.import.fromAge")} value={band.fromAge}
+          onChange={(event) => replace(index, { ...band, fromAge: event.target.value })} />
+        <label className="grid min-w-0 gap-1 font-semibold">
+          {t("admin.import.bandType")}
+          <select data-testid={`age-band-type-${value}-${index}`} className="min-w-0 rounded-md border p-2" disabled={disabled}
+            value={band.membershipTypeId} onChange={(event) => replace(index, { ...band, membershipTypeId: event.target.value })}>
+            <option value="">{t("admin.import.noType")}</option>
+            {typeOptions(band.membershipTypeId)}
+          </select>
+        </label>
+        {index > 0 && <Button variant="secondary" type="button" data-testid={`age-band-remove-${value}-${index}`} disabled={disabled}
+          onClick={() => changed(bands.filter((_, at) => at !== index))}>{t("admin.import.removeBand")}</Button>}
+      </div>)}
+      <Button variant="secondary" type="button" data-testid={`age-band-add-${value}`} className="justify-self-start" disabled={disabled}
+        onClick={() => changed([...bands, { fromAge: "", membershipTypeId: "" }])}>{t("admin.import.addBand")}</Button>
+    </>}
+  </div>;
 }

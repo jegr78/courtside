@@ -17,7 +17,7 @@ const rosterSystem: ImportSource = {
   displayName: "Membership system", separator: ";", encoding: "UTF-8",
   columns: { "Member number": "EXTERNAL_ID", "First name": "FIRST_NAME", "Last name": "LAST_NAME" },
   membershipTypes: {},
-  leftOutCategories: [],
+  leftOutCategories: [], ageBands: {},
   defaultMembershipTypeId: "type-1",
   ownedFields: [],
   removalWarningPercent: 10, columnMode: "HEADER", positions: [], columnCount: null
@@ -25,7 +25,7 @@ const rosterSystem: ImportSource = {
 
 const snapshot: ImportPreview = {
   previewId: "preview-1", sourceId: "source-1", mode: "UPDATE_ONLY", fileName: "members.csv",
-  fileHash: "abc", rowCount: 1, ignoredColumns: [], leftOutRows: {}, changes: [], rowErrors: [],
+  fileHash: "abc", rowCount: 1, ignoredColumns: [], leftOutRows: {}, ageFallbackRows: {}, changes: [], rowErrors: [],
   possibleDuplicates: [], sharedAddresses: [], removals: { count: 0, currentlyLinked: 0, percent: 0 },
   needsConfirmation: false, superseded: false,
   createdAt: "2026-08-21T10:00:00Z", expiresAt: "2126-08-22T10:00:00Z"
@@ -183,7 +183,7 @@ describe("AdminImportView", () => {
       .mockResolvedValue({ references: [], nextCursor: null });
     vi.spyOn(api, "createImportPreview").mockResolvedValue({
       previewId: "preview-1", sourceId: "source-1", mode: "UPDATE_ONLY", fileName: "members.csv",
-      fileHash: "abc", rowCount: 1, ignoredColumns: [], leftOutRows: {}, changes: [], rowErrors: [],
+      fileHash: "abc", rowCount: 1, ignoredColumns: [], leftOutRows: {}, ageFallbackRows: {}, changes: [], rowErrors: [],
       possibleDuplicates: [], sharedAddresses: [], removals: { count: 0, currentlyLinked: 0, percent: 0 },
       needsConfirmation: false, superseded: false,
       createdAt: "2026-08-21T10:00:00Z", expiresAt: "2126-08-22T10:00:00Z"
