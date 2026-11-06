@@ -540,6 +540,42 @@ it("given a described source, when an edit is discarded, then the stored descrip
   await waitFor(() => expect(screen.getByTestId("unsaved-count")).toHaveTextContent("0"));
 });
 
+it("given a split source, when a band is added and the edit discarded, then the stored bands return and nothing is left to lose", async () => {
+  // given
+  const split: ImportSource = { ...existing, columns: { ...existing.columns, Status: "MEMBERSHIP_TYPE", Born: "BIRTH_DATE" },
+    membershipTypes: { active: "type-1" }, ageBands: { active: [{ fromAge: 0, membershipTypeId: "type-2" }] } };
+  show(split, () => Promise.resolve());
+  await userEvent.click(await screen.findByTestId("age-band-add-active"));
+  expect(screen.getByTestId("age-band-active-1")).toBeInTheDocument();
+
+  // when
+  await userEvent.click(screen.getByTestId("discard-import-source:source-1"));
+
+  // then
+  expect(screen.queryByTestId("age-band-active-1"), "the added band is gone").not.toBeInTheDocument();
+  await waitFor(() => expect(screen.getByTestId("unsaved-count")).toHaveTextContent("0"));
+});
+
+it("given bands entered out of age order, when the source is saved, then they are sent in age order like the server keeps them", async () => {
+  // given
+  const save = vi.fn().mockResolvedValue(existing);
+  const split: ImportSource = { ...existing, columns: { ...existing.columns, Status: "MEMBERSHIP_TYPE", Born: "BIRTH_DATE" },
+    membershipTypes: { active: "type-1" }, ageBands: { active: [{ fromAge: 0, membershipTypeId: "type-2" },
+      { fromAge: 18, membershipTypeId: "type-1" }] } };
+  show(split, save);
+  await userEvent.click(await screen.findByTestId("age-band-add-active"));
+  await userEvent.type(screen.getByTestId("age-band-from-active-2"), "6");
+  await userEvent.selectOptions(screen.getByTestId("age-band-type-active-2"), "type-2");
+
+  // when
+  await userEvent.click(screen.getByTestId("save-source"));
+
+  // then
+  expect(save).toHaveBeenCalledWith(expect.objectContaining({ ageBands: { active: [
+    { fromAge: 0, membershipTypeId: "type-2" }, { fromAge: 6, membershipTypeId: "type-2" },
+    { fromAge: 18, membershipTypeId: "type-1" }] } }));
+});
+
 // The column mapping is a record inside the request, and rebuilding it reorders its keys.
 it("given an owned field ticked and unticked again, when the source is read, then nothing is left to lose", async () => {
   // given

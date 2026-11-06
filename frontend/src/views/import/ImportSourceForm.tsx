@@ -33,7 +33,8 @@ function splitsOf(bands: Bands, categories: Record<string, string>) {
   return Object.fromEntries(Object.entries(bands)
     .filter(([value, listed]) => listed.length > 0 && categories[value] && categories[value] !== NOT_IN_ROSTER)
     .map(([value, listed]) => [value, listed.map((band) =>
-      ({ fromAge: Number(band.fromAge), membershipTypeId: band.membershipTypeId }))]));
+      ({ fromAge: Number(band.fromAge), membershipTypeId: band.membershipTypeId }))
+      .sort((left, right) => left.fromAge - right.fromAge)]));
 }
 type ColumnMode = "HEADER" | "POSITION";
 type Positions = Partial<Record<CanonicalField, string>>;
@@ -258,6 +259,7 @@ export function ImportSourceForm({ source, types, disabled, save }: {
     setDisplayName(confirmed.displayName);
     setMapping(mappingOf(source));
     setCategories(choicesOf(source));
+    setBands(bandsOf(source));
     setDefaultType(confirmed.defaultMembershipTypeId);
     setOwned(confirmed.ownedFields);
     setThreshold(String(confirmed.removalWarningPercent));

@@ -2353,11 +2353,11 @@ components:
             and names a type per band. The age is the one a person reaches in the current calendar
             year, read from the `BIRTH_DATE` column. The value's own `membershipTypes` entry is the
             fallback for a row without a readable birth date, so a split value must also be mapped
-            there. A split requires the source to own `MEMBERSHIP_TYPE`.
+            there. A split requires the source to own `MEMBERSHIP_TYPE`. A source holds at most 200
+            age bands in all.
           additionalProperties:
             type: array
             minItems: 1
-            maxItems: 20
             items: { $ref: "#/components/schemas/ImportAgeBand" }
         defaultMembershipTypeId:
           type: string
