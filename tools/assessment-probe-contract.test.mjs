@@ -31,7 +31,8 @@ const METHOD_BEFORE = new RegExp("(?:method:\\s*\"([A-Za-z]+)\"|http\\.(get|post
   + "|\"(GET|POST|PUT|DELETE|PATCH)\",\\s*)(?:[^/]|/(?!api/))*$");
 
 const PREFIX_PREDICATES = new Map([
-  ["/api/admin", "decides which operations the matrix expects only an administrator to reach"]
+  ["/api/admin", "decides which operations the matrix expects only an administrator to reach"],
+  ["/api/treasury", "decides which operations the matrix expects only a treasurer or an administrator to reach"]
 ]);
 
 const NO_METHOD_BESIDE_IT = new Map([
@@ -141,8 +142,10 @@ test("given the prefix the matrix reads an admin-only expectation from, "
   + "when the contract is built into a matrix, then every admin-only operation still lies under it", () => {
   // given
   const matrix = buildOperationAuthorizationMatrix(api);
-  const adminOnly = matrix.filter(({ expectations }) =>
-    expectations.ADMIN === "allow" && expectations.MEMBER === "deny-forbidden");
+  const adminOnly = matrix.filter(({ expectations }) => expectations.ADMIN === "allow"
+    && expectations.MEMBER === "deny-forbidden" && expectations.TREASURER === "deny-forbidden");
+  const treasury = matrix.filter(({ expectations }) =>
+    expectations.TREASURER === "allow" && expectations.MEMBER === "deny-forbidden");
 
   // when / then
   assert.ok(adminOnly.length > 0,
@@ -153,6 +156,8 @@ test("given the prefix the matrix reads an admin-only expectation from, "
       + " prefix the predicate tests, is one the predicate stopped deciding. It does not fail: it"
       + " falls through to expecting every role to be allowed, and a server that does not enforce"
       + " the boundary then reads as passed.");
+  assert.deepEqual(treasury.filter(({ path }) => !path.startsWith("/api/treasury")).map(({ path }) => path), [],
+    "an operation the matrix expects only a treasurer or an administrator to reach lies outside /api/treasury");
 });
 
 test("given a listed exception, when the runtime stops naming it, then the list stops carrying it", () => {

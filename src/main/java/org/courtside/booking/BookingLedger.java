@@ -3,6 +3,7 @@ package org.courtside.booking;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.UUID;
 
 public interface BookingLedger {
 
@@ -13,4 +14,13 @@ public interface BookingLedger {
     }
 
     List<Occupancy> confirmedBetween(LocalDate from, LocalDate to);
+
+    record ChargedGuests(UUID personId, String currency, int guestPlaces, long sumMinor) {
+    }
+
+    record GuestFeeLedger(List<ChargedGuests> members, int unassignedGuestPlaces) {
+    }
+
+    // Confirmed bookings that started within the period and have ended, with a fee above zero.
+    GuestFeeLedger chargedGuestsBetween(LocalDate from, LocalDate to);
 }

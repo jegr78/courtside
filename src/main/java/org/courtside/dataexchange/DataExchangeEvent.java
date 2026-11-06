@@ -178,4 +178,22 @@ public sealed interface DataExchangeEvent extends DomainEventRecord {
             return null;
         }
     }
+
+    // A report over every member of the club concerns no single subject.
+    record GuestFeesRead(LocalDate from, LocalDate to, Form form) implements DataExchangeEvent {
+
+        static final String TYPE = "dataexchange.guestFees.read";
+
+        public enum Form { SCREEN, FILE }
+
+        @Override
+        public String eventType() {
+            return TYPE;
+        }
+
+        @Override
+        public @Nullable UUID subjectId() {
+            return null;
+        }
+    }
 }

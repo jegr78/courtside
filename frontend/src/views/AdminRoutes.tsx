@@ -5,6 +5,7 @@ import { AdminAccessGrantsView } from "./AdminAccessGrantsView";
 import { AdminAuditView } from "./AdminAuditView";
 import { AdminConfigurationView } from "./AdminConfigurationView";
 import { AdminExportView } from "./AdminExportView";
+import { AdminGuestFeesView } from "./AdminGuestFeesView";
 import { AdminStatisticsView } from "./AdminStatisticsView";
 import { AdminUsageView } from "./AdminUsageView";
 import { AdminRetentionView } from "./AdminRetentionView";
@@ -29,17 +30,21 @@ import { AdminAvailabilityView } from "./facility/AdminAvailabilityView";
 import { AdminOpeningHoursView } from "./facility/AdminOpeningHoursView";
 import { AdminSlotFillersView } from "./facility/AdminSlotFillersView";
 
-export default function AdminRoutes({ configurationChanged, administrator, managesAppointments, createsSeries }: {
+export default function AdminRoutes({ configurationChanged, administrator, treasurer = administrator, managesAppointments, createsSeries }: {
   configurationChanged: (config: ClubConfig) => void;
   administrator: boolean;
+  treasurer?: boolean;
   managesAppointments: boolean;
   createsSeries: boolean;
 }) {
+  const appointmentsShown = administrator || managesAppointments || createsSeries;
+  const landing = appointmentsShown ? "/admin/appointments" : "/admin/guest-fees";
   return <Routes>
-    <Route element={<AdminShell administrator={administrator} />}>
-      <Route index element={administrator ? <AdminOverviewView /> : <Navigate to="/admin/appointments" replace />} />
-      <Route path="appointments" element={<AdminManagedAppointmentsView managesAppointments={managesAppointments}
-        createsSeries={createsSeries} administrator={administrator} />} />
+    <Route element={<AdminShell administrator={administrator} treasurer={treasurer} appointmentsShown={appointmentsShown} />}>
+      <Route index element={administrator ? <AdminOverviewView /> : <Navigate to={landing} replace />} />
+      <Route path="appointments" element={appointmentsShown ? <AdminManagedAppointmentsView managesAppointments={managesAppointments}
+        createsSeries={createsSeries} administrator={administrator} /> : <Navigate to={landing} replace />} />
+      {treasurer && <Route path="guest-fees" element={<AdminGuestFeesView />} />}
       {administrator && <>
       <Route path="setup" element={<AdminSetupView />} />
       <Route path="configuration" element={<AdminConfigurationView configurationChanged={configurationChanged} />} />
@@ -70,7 +75,7 @@ export default function AdminRoutes({ configurationChanged, administrator, manag
       <Route path="access-grants" element={<AdminAccessGrantsView />} />
       <Route path="operator-health" element={<AdminOperatorHealthView />} />
       </>}
-      <Route path="*" element={<Navigate to={administrator ? "/" : "/admin/appointments"} replace />} />
+      <Route path="*" element={<Navigate to={administrator ? "/" : landing} replace />} />
     </Route>
   </Routes>;
 }

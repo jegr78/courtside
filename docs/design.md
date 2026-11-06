@@ -310,6 +310,15 @@ when it was booked. Changing the currency converts nothing: card fees keep their
 dialog shows guests, fee and total before a member confirms a booking with guests on a card with a
 fee. Courtside records the fee; it issues no invoice and marks nothing as paid.
 
+The guest fee report under `/api/treasury` lists, for `TREASURER` and `ADMIN`, each member's charged
+guest places and their sum for a period, by default the current calendar year in the club time
+zone. A guest place counts when its fee is above zero and its booking is confirmed, started within
+the period and has ended. The fee belongs to the booking's `booked_by` account, so a dependant's
+booking is listed under the dependant. Sums are per currency, never converted. Guest places of a
+pseudonymised booking are only counted. The CSV download carries one member number column per import
+source. Each read and download records a `dataexchange.guestFees.read` entry with the period and the
+form, not the content.
+
 ### Series
 
 A series stores its recurrence rule and ordered courts. Creation materialises each accepted

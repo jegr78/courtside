@@ -75,6 +75,8 @@ class ResponseHeaderSurfaceTest extends AbstractIntegrationTest {
                     "a stored identifier, escaped into one path segment"),
             Map.entry("org/courtside/dataexchange/web/ExportAdminController.java CONTENT_DISPOSITION",
                     "a name built here from dates the request states"),
+            Map.entry("org/courtside/dataexchange/web/TreasuryController.java CONTENT_DISPOSITION",
+                    "a name built here from the dates of the period read"),
             Map.entry("org/courtside/identity/internal/LoginRateLimitHandler.java Retry-After",
                     "a count of seconds this application formatted"),
             Map.entry("org/courtside/identity/internal/MfaSessionAuthentication.java "

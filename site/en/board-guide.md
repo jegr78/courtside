@@ -11,7 +11,7 @@ roles other than *Member* as a managing role or lets one of their roles book it 
 list. The list shows
 what the managing roles cover, the series form what the booking roles allow. An account no card
 grants either cannot enter, not even by typing the address directly. Board members change this on
-the booking cards.
+the booking cards. Accounts with the **Treasurer** role also see *Guest fees* in the administration.
 
 The sidebar leads to the overview at the top and divides administration below it into four areas:
 
@@ -750,6 +750,26 @@ The **Records** area has nine views. The next section describes *Retention*.
   system the list stays empty and bookings work as before.
 
 ![Statistics with the period choice and the utilisation key figures with their change.](../screenshots/en/utilisation.png)
+
+## Records → Guest fees
+
+The *Guest fees* page shows which member brought how many guests in a period and what they owe for
+them. Administrators and the **Treasurer** role may open it. Administrators reach it from *Data
+export*, treasurers directly from the sidebar.
+
+![A year's guest fees with member number, guest places and amount per member.](../screenshots/en/guest-fees.png)
+
+Without a choice of your own it covers the current calendar year, and a period spans at most 366
+days. Every guest place with a fee above zero counts when its booking is confirmed, started within
+the period and is over. Cancelled bookings and bookings not yet played do not count. The fee belongs
+to the account the booking was made for, also when a guardian booked for their child. If the club
+changed its currency, a member has one row per currency. Guest places from bookings that no longer
+name a member after the retention period appear only as a count.
+
+*Download* saves the list as a CSV file with one member number column per import source, first
+name, last name, email address, guest places, amount and currency. Courtside marks nothing as
+invoiced. Every opening and every download is in the change log with its period, without names or
+amounts.
 
 ## Records → Retention
 

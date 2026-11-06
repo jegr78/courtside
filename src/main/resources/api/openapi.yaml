@@ -162,6 +162,8 @@ tags:
     description: How the club is doing over a period, as aggregates that name nobody.
   - name: admin-usage-reports
     description: How the courts were used, cancelled, missed and refused over a period, as counts that name nobody.
+  - name: treasury
+    description: What members owe the club, for the treasurer and the administration.
 
 security:
   - sessionCookie: []
@@ -3833,6 +3835,58 @@ components:
           type: array
           items: { $ref: "#/components/schemas/CourtUtilisation" }
 
+    GuestFeeReport:
+      type: object
+      additionalProperties: false
+      required: [from, to, sources, members, unassignedGuestPlaces]
+      properties:
+        from: { type: string, format: date }
+        to: { type: string, format: date }
+        sources:
+          type: array
+          maxItems: 200
+          description: The import sources whose member numbers the rows carry, ordered by key.
+          items: { $ref: "#/components/schemas/GuestFeeSource" }
+        members:
+          type: array
+          maxItems: 100000
+          description: One entry per member and currency, ordered by last name, first name.
+          items: { $ref: "#/components/schemas/GuestFeeMember" }
+        unassignedGuestPlaces:
+          type: integer
+          format: int32
+          minimum: 0
+          description: Charged guest places whose booking no longer names a member.
+    GuestFeeSource:
+      type: object
+      additionalProperties: false
+      required: [id, displayName]
+      properties:
+        id: { type: string, format: uuid }
+        displayName: { type: string, maxLength: 200 }
+    GuestFeeMember:
+      type: object
+      additionalProperties: false
+      required: [personId, firstName, lastName, email, memberNumbers, currency, guestPlaces, sumMinor]
+      properties:
+        personId: { type: string, format: uuid }
+        firstName: { type: string, maxLength: 200 }
+        lastName: { type: string, maxLength: 200 }
+        email: { type: string, maxLength: 320 }
+        memberNumbers:
+          type: array
+          maxItems: 200
+          items: { $ref: "#/components/schemas/GuestFeeMemberNumber" }
+        currency: { type: string, pattern: "^[A-Z]{3}$" }
+        guestPlaces: { type: integer, format: int32, minimum: 1 }
+        sumMinor: { type: integer, format: int64, minimum: 1 }
+    GuestFeeMemberNumber:
+      type: object
+      additionalProperties: false
+      required: [sourceId, externalId]
+      properties:
+        sourceId: { type: string, format: uuid }
+        externalId: { type: string, maxLength: 200 }
     UsageReport:
       type: object
       description: Aggregate usage of the courts in an inclusive local-date period of `timeZone`.
@@ -7961,6 +8015,107 @@ paths:
                 items: { $ref: "#/components/schemas/ReservedSlot" }
         "400":
           $ref: "#/components/responses/Invalid"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/treasury/guest-fees:
+    post:
+      tags: [treasury]
+      operationId: reportGuestFees
+      summary: The guest fees each member owes for a period.
+      description: |
+        One row per member and currency with the charged guest places of the period and their sum.
+        A guest place counts when its booking is confirmed, started within the period and has
+        ended, and when its fee is above zero. The fee belongs to the account the booking was made
+        for. Guest places whose booking no longer names a member are only counted.
+
+        `from` and `to` are inclusive dates in the club time zone. A missing `from` is the first
+        and a missing `to` the last day of the current calendar year. The period may span at most
+        366 days. Reading the report is recorded,
+        without its content, which is why it is a `POST`.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: from
+          in: query
+          required: false
+          schema: { type: string, format: date }
+        - name: to
+          in: query
+          required: false
+          schema: { type: string, format: date }
+      responses:
+        "200":
+          description: The period's guest fees per member.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/GuestFeeReport" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/treasury/guest-fees/export:
+    post:
+      tags: [treasury]
+      operationId: exportGuestFees
+      summary: The guest fees each member owes for a period as a CSV file.
+      description: |
+        The rows of `/api/treasury/guest-fees` for the same period. One member number column per
+        import source, then first name, last name, email address, guest places, amount and
+        currency. The amount is a decimal number in the currency's minor unit. A cell that a
+        spreadsheet would read as a formula starts with an apostrophe. Downloading is recorded,
+        without the file's content.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: from
+          in: query
+          required: false
+          schema: { type: string, format: date }
+        - name: to
+          in: query
+          required: false
+          schema: { type: string, format: date }
+        - name: separator
+          in: query
+          required: false
+          description: The single character between two cells.
+          schema: { type: string, pattern: '^[,;|\t]$', minLength: 1, maxLength: 1, default: "," }
+        - name: encoding
+          in: query
+          required: false
+          description: |
+            One of the names `/api/admin/import/encodings` lists that can write a file; a
+            decode-only one is answered `400`.
+          schema:
+            type: string
+            pattern: "^[A-Za-z0-9][A-Za-z0-9._:+-]{0,39}$"
+            maxLength: 40
+            default: "UTF-8"
+      responses:
+        "200":
+          description: The period's guest fees per member.
+          headers:
+            Content-Disposition:
+              description: |
+                `attachment` with a fixed ASCII file name carrying the period it covers.
+              schema: { type: string }
+          content:
+            text/csv:
+              schema: { type: string, format: binary }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "429":
           $ref: "#/components/responses/RateLimited"
 

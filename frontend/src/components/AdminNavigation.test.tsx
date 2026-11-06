@@ -58,6 +58,26 @@ describe("AdminNavigation", () => {
     expect(screen.queryByTestId("admin-group-club")).not.toBeInTheDocument();
   });
 
+  it("given a treasurer without administration rights, when the navigation is read, then guest fees are offered and appointments are not", () => {
+    // when
+    render(<MemoryRouter initialEntries={["/admin/guest-fees"]}>
+      <AdminNavigation administrator={false} treasurer appointmentsShown={false} />
+    </MemoryRouter>);
+
+    // then
+    expect(screen.getByTestId("admin-guest-fees-link")).toHaveAttribute("aria-current", "page");
+    expect(screen.queryByTestId("admin-appointments-link"), "a treasurer manages no appointments").not.toBeInTheDocument();
+    expect(screen.queryByTestId("admin-group-club")).not.toBeInTheDocument();
+  });
+
+  it("given an appointment manager who is no treasurer, when the navigation is read, then guest fees are not offered", () => {
+    // when
+    render(<MemoryRouter initialEntries={["/admin/appointments"]}><AdminNavigation administrator={false} /></MemoryRouter>);
+
+    // then
+    expect(screen.queryByTestId("admin-guest-fees-link")).not.toBeInTheDocument();
+  });
+
   it("given the administration, when the navigation is read, then the court plan is the way back", () => {
     // when
     show("/admin/configuration");

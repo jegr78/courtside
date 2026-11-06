@@ -355,6 +355,11 @@
       "holds": "The links between a club member number and a person, as one page of them.",
       "bounded": "The request that built it."
     },
+    "GuestFeeReportService": {
+      "level": "personal",
+      "holds": "Each member owing guest fees for a period, with name, email address and member numbers.",
+      "bounded": "The report request or download that reads it."
+    },
     "JoinWaitlistCommand": {
       "level": "personal",
       "holds": "The participant specifications of one waitlist join, each able to name a guest.",
@@ -462,6 +467,19 @@
     }
   },
   "exportedFields": {
+    "guestFees": {
+      "writtenBy": "src/main/java/org/courtside/dataexchange/internal/GuestFeeReportService.java",
+      "level": "personal",
+      "bounded": "A treasurer or an administrator asks for it and the file leaves the instance; the audit log records the period, not the content. One memberNumber column per import source precedes these columns and comes from import_external_reference.external_id.",
+      "columns": {
+        "firstName": "person.first_name",
+        "lastName": "person.last_name",
+        "email": "person.email",
+        "guestPlaces": "booking_participant.kind",
+        "amount": "booking_participant.guest_fee_minor",
+        "currency": "booking_participant.guest_fee_currency"
+      }
+    },
     "roster": {
       "writtenBy": "src/main/java/org/courtside/dataexchange/internal/RosterCsv.java",
       "level": "personal",

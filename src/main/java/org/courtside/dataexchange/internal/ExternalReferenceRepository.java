@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -16,6 +17,8 @@ public interface ExternalReferenceRepository extends JpaRepository<ExternalRefer
     List<ExternalReference> findBySourceIdAndExternalIdIn(UUID sourceId, Iterable<String> externalIds);
 
     List<ExternalReference> findBySourceId(UUID sourceId);
+
+    List<ExternalReference> findByPersonIdIn(Collection<UUID> personIds);
 
     List<ExternalReference> findByPersonIdOrderByLinkedAtAscIdAsc(UUID personId);
 

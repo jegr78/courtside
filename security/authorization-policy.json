@@ -2,9 +2,9 @@
   "schemaVersion": 1,
   "reviewedAt": "2026-11-01",
   "purpose": "This is the normative authorization policy for the shipped Courtside API. OpenAPI defines the transport shape; this policy defines who may perform each operation, which resource attributes narrow that permission, and which protected fields each projection may read or write.",
-  "openApiFieldInventorySha256": "d37af86b58f9167b3bb214a8497b98f4ea2e358751851f62b78487c1a8062989",
+  "openApiFieldInventorySha256": "4597adb8a05db817327b1b929d3743a9a30c3e77735f1802ae6ca77e354a519f",
   "protectedFieldInventorySha256": "df963788c76c5d8d2687a2127a69d2961341cfa78d7c298b65bc1a37bdc24cb8",
-  "productionAuthorizationSha256": "81836c7a7f463aa3b4eca99088c0757ec7485402c2cece4bd699e43d767b78f6",
+  "productionAuthorizationSha256": "a3a5e0e0253f9b6d89c9b7b41bc903e377f59ba576bf8508fce3383ec82895e0",
   "ordinaryFields": [
     "Problem.detail",
     "Problem.fieldErrors",
@@ -1167,6 +1167,19 @@
     "exportBookings:response:Violation.code",
     "exportBookings:response:Violation.params",
     "exportBookings:response:Violation.params.*",
+    "exportGuestFees:parameter:$parameter.query.encoding",
+    "exportGuestFees:parameter:$parameter.query.from",
+    "exportGuestFees:parameter:$parameter.query.separator",
+    "exportGuestFees:parameter:$parameter.query.to",
+    "exportGuestFees:response:$response.header.Content-Disposition",
+    "exportGuestFees:response:$response.header.Retry-After",
+    "exportGuestFees:response:FieldError.code",
+    "exportGuestFees:response:FieldError.field",
+    "exportGuestFees:response:FieldError.params",
+    "exportGuestFees:response:FieldError.params.*",
+    "exportGuestFees:response:Violation.code",
+    "exportGuestFees:response:Violation.params",
+    "exportGuestFees:response:Violation.params.*",
     "exportMessageLog:parameter:$parameter.query.encoding",
     "exportMessageLog:parameter:$parameter.query.from",
     "exportMessageLog:parameter:$parameter.query.separator",
@@ -3030,6 +3043,33 @@
     "replaceOwnRecoveryCodes:response:Violation.code",
     "replaceOwnRecoveryCodes:response:Violation.params",
     "replaceOwnRecoveryCodes:response:Violation.params.*",
+    "reportGuestFees:parameter:$parameter.query.from",
+    "reportGuestFees:parameter:$parameter.query.to",
+    "reportGuestFees:response:$response.header.Retry-After",
+    "reportGuestFees:response:FieldError.code",
+    "reportGuestFees:response:FieldError.field",
+    "reportGuestFees:response:FieldError.params",
+    "reportGuestFees:response:FieldError.params.*",
+    "reportGuestFees:response:GuestFeeMember.currency",
+    "reportGuestFees:response:GuestFeeMember.email",
+    "reportGuestFees:response:GuestFeeMember.firstName",
+    "reportGuestFees:response:GuestFeeMember.guestPlaces",
+    "reportGuestFees:response:GuestFeeMember.lastName",
+    "reportGuestFees:response:GuestFeeMember.memberNumbers",
+    "reportGuestFees:response:GuestFeeMember.personId",
+    "reportGuestFees:response:GuestFeeMember.sumMinor",
+    "reportGuestFees:response:GuestFeeMemberNumber.externalId",
+    "reportGuestFees:response:GuestFeeMemberNumber.sourceId",
+    "reportGuestFees:response:GuestFeeReport.from",
+    "reportGuestFees:response:GuestFeeReport.members",
+    "reportGuestFees:response:GuestFeeReport.sources",
+    "reportGuestFees:response:GuestFeeReport.to",
+    "reportGuestFees:response:GuestFeeReport.unassignedGuestPlaces",
+    "reportGuestFees:response:GuestFeeSource.displayName",
+    "reportGuestFees:response:GuestFeeSource.id",
+    "reportGuestFees:response:Violation.code",
+    "reportGuestFees:response:Violation.params",
+    "reportGuestFees:response:Violation.params.*",
     "requestAccountCredentials:parameter:$parameter.path.personId",
     "requestAccountCredentials:response:$response.header.Retry-After",
     "requestAccountCredentials:response:FieldError.code",
@@ -4353,6 +4393,21 @@
       ]
     },
     {
+      "id": "treasury",
+      "description": "The guest fee report requires an enabled permanent account carrying TREASURER or ADMIN; it names members with their email addresses, member numbers and the guest fees they owe, and every read is recorded.",
+      "operationIds": [
+        "reportGuestFees",
+        "exportGuestFees"
+      ],
+      "actors": [
+        "TREASURER",
+        "ADMIN"
+      ],
+      "decisions": [
+        "treasury-gate"
+      ]
+    },
+    {
       "id": "recent-person-administration",
       "description": "Correcting a person's identity or address requires ADMIN and a recent full-password proof.",
       "operationIds": [
@@ -5337,6 +5392,25 @@
         "src/test/java/org/courtside/dataexchange/web/SubjectAccessAdminControllerTest.java#givenABookingSomebodyElseMade_whenABoardAsksAboutTheNamedMember_thenNeitherMakerNorNoteIsNamed",
         "src/test/java/org/courtside/operations/OperationalLogAdminControllerTest.java#givenAMemberOrMissingCsrf_whenSearching_thenAccessIsRefused",
         "src/test/java/org/courtside/dataexchange/web/LogExportAdminControllerTest.java#givenAMember_whenTheyAskForEitherLog_thenTheyAreRefusedAndNothingIsRecorded"
+      ]
+    },
+    {
+      "id": "treasury-gate",
+      "title": "Treasury gate",
+      "rule": "Every route below /api/treasury requires TREASURER or ADMIN and rejects anonymous, initial-password and every other product role before the operation runs.",
+      "attributes": [
+        "route",
+        "role",
+        "password-change-required"
+      ],
+      "productionPaths": [
+        "src/main/java/org/courtside/identity/internal/SecurityConfiguration.java#filterChain"
+      ],
+      "positiveTests": [
+        "src/test/java/org/courtside/dataexchange/web/GuestFeeReportControllerTest.java#givenAYearOfGuestBookings_whenTheTreasurerReadsTheReport_thenOnlyEndedConfirmedChargedGuestsCount"
+      ],
+      "negativeTests": [
+        "src/test/java/org/courtside/dataexchange/web/GuestFeeReportControllerTest.java#givenAMember_whenTheyAskForTheReport_thenTheyAreRefused"
       ]
     },
     {

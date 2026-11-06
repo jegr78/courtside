@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { type Page, type TestInfo } from "@playwright/test";
-import { accessGrantsExample, connectionCheckExample, operatorHealthExample } from "./admin-examples";
+import { accessGrantsExample, connectionCheckExample, guestFeesExample, operatorHealthExample } from "./admin-examples";
 import { backAtTheJourneyInstant, expect, expectAdministrationOverview, onTheVisualDay, selectPreference, test } from "./fixtures";
 
 // The guides are read in the light theme on a page column, in the language its project names, and
@@ -293,6 +293,13 @@ const drivers: Record<string, (page: Page, visualDate: string) => Promise<void>>
     await expect(page.getByTestId("access-grant-example-failing"), "the example, not the live instance, is drawn").toHaveAttribute("data-status", "FAILING");
     await expect(page.getByTestId("access-check-keypad")).toHaveAttribute("data-outcome", "MANUAL");
   },
+  "guest-fees": async (page) => {
+    await page.context().route("**/api/treasury/guest-fees", (route) => route.fulfill({ json: guestFeesExample }));
+    await page.getByTestId("admin-export-link").click();
+    await page.getByTestId("guest-fees-open").click();
+    await expect(page.getByTestId("guest-fees-row"), "the example, not the live instance, is drawn").toHaveCount(3);
+    await expect(page.getByTestId("guest-fees-download")).toBeEnabled();
+  },
   "retention": async (page) => {
     await page.getByTestId("admin-retention-link").click();
     for (const [category, months] of [["BOOKINGS", "24"], ["FORMER_MEMBERS", "12"]]) {
@@ -492,6 +499,16 @@ test("the grants an access-control system holds per booking are captured", async
 
   // when / then
   await capture(page, "access-grants", journeyService.visualDate);
+});
+
+test("the guest fees a treasurer settles are captured", async ({ page, journeyService }, info) => {
+  // given
+  await prepare(page, localeOf(info));
+  await signIn(page, "configuration-admin", "court-plan-view");
+  await page.getByTestId("administration-link").click();
+
+  // when / then
+  await capture(page, "guest-fees", journeyService.visualDate);
 });
 
 test("the periods a board keeps personal records for are captured", async ({ page, journeyService }, info) => {

@@ -49,7 +49,7 @@ test("given the administration routes, when the plan is read, then it measures e
   // when
   const measured = new Set(lighthousePlan().filter((page) => page.account === "admin").map((page) => page.path));
   // then
-  assert.equal(nested.length, 27, "the admin surface declares 27 routes");
+  assert.equal(nested.length, 28, "the admin surface declares 28 routes");
   for (const path of nested) {
     assert.ok(measured.has(path), `${path} is measured`);
   }

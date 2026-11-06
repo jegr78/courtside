@@ -25,6 +25,7 @@ interface Group {
 
 const overview: Destination = { to: "/admin", testId: "admin-overview-link", label: "nav.adminOverview" };
 const appointments: Destination = { to: "/admin/appointments", testId: "admin-appointments-link", label: "nav.adminAppointments" };
+const guestFees: Destination = { to: "/admin/guest-fees", testId: "admin-guest-fees-link", label: "nav.adminGuestFees" };
 
 const groups: Group[] = [
   {
@@ -82,12 +83,14 @@ function isCurrent(destination: Destination, pathname: string): boolean {
 }
 
 function currentLabel(pathname: string): string | undefined {
-  return [overview, appointments, ...groups.flatMap((group) => group.destinations)]
+  return [overview, appointments, guestFees, ...groups.flatMap((group) => group.destinations)]
     .find((destination) => isCurrent(destination, pathname))
     ?.label;
 }
 
-export function AdminNavigation({ administrator = true }: { administrator?: boolean }) {
+export function AdminNavigation({ administrator = true, treasurer = false, appointmentsShown = true }: {
+  administrator?: boolean; treasurer?: boolean; appointmentsShown?: boolean;
+}) {
   const { t } = useTranslation();
   const { pathname } = useLocation();
   const current = currentLabel(pathname);
@@ -148,7 +151,8 @@ export function AdminNavigation({ administrator = true }: { administrator?: bool
       <Link data-testid="court-plan-link" to="/" className="focus-ring rounded-lg font-semibold underline-offset-4">
         {t("nav.courts")}
       </Link>
-      <NavigationLink destination={appointments} pathname={pathname} chosen={() => { if (!laidOpen) setUnfolded(false); }} />
+      {appointmentsShown && <NavigationLink destination={appointments} pathname={pathname} chosen={() => { if (!laidOpen) setUnfolded(false); }} />}
+      {treasurer && !administrator && <NavigationLink destination={guestFees} pathname={pathname} chosen={() => { if (!laidOpen) setUnfolded(false); }} />}
       {administrator && <NavigationLink destination={overview} pathname={pathname} chosen={() => { if (!laidOpen) setUnfolded(false); }} />}
       {administrator && groups.map((group) => <div key={group.testId} data-testid={group.testId} role="group" aria-labelledby={`${group.testId}-heading`} className="grid gap-2 lg:gap-0.5">
         <p id={`${group.testId}-heading`} className="text-muted text-xs font-bold tracking-wide uppercase">{t(group.heading)}</p>

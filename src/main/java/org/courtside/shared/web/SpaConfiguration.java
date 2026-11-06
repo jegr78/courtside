@@ -75,7 +75,8 @@ class SpaConfiguration {
             "/admin/messages",
             "/admin/operational-logs",
             "/admin/access-grants",
-            "/admin/operator-health");
+            "/admin/operator-health",
+            "/admin/guest-fees");
 
     @Bean
     SimpleUrlHandlerMapping applicationShellMapping(ApplicationShell shell) {

@@ -53,3 +53,21 @@ export const operationalLogExample = {
     traceId: "4bf92f3577b34da6a3ce929d0e0e4736"
   }]
 };
+
+export const guestFeesExample = {
+  from: "2026-01-01",
+  to: "2026-12-31",
+  sources: [{ id: "55555555-0000-0000-0000-000000000001", displayName: "Club registry" }],
+  members: [
+    { personId: "66666666-0000-0000-0000-000000000001", firstName: "Jane", lastName: "Doe",
+      email: "jane.doe@example.org", memberNumbers: [{ sourceId: "55555555-0000-0000-0000-000000000001", externalId: "1017" }],
+      currency: "EUR", guestPlaces: 5, sumMinor: 2500 },
+    { personId: "66666666-0000-0000-0000-000000000002", firstName: "Mary", lastName: "Major",
+      email: "mary.major@example.org", memberNumbers: [{ sourceId: "55555555-0000-0000-0000-000000000001", externalId: "1023" }],
+      currency: "EUR", guestPlaces: 2, sumMinor: 1000 },
+    { personId: "66666666-0000-0000-0000-000000000003", firstName: "John", lastName: "Roe",
+      email: "john.roe@example.org", memberNumbers: [{ sourceId: "55555555-0000-0000-0000-000000000001", externalId: "1031" }],
+      currency: "EUR", guestPlaces: 1, sumMinor: 500 }
+  ],
+  unassignedGuestPlaces: 1
+};
