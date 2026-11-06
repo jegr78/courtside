@@ -26,7 +26,7 @@ class CardAuditTest extends AbstractIntegrationTest {
     void givenABookingCard_whenItIsCreated_thenTheLogCarriesItsRolesAndNotItsLabel() {
         // when
         BookingCard card = cards.createCard("Team", "#112233", Set.of(Role.MEMBER),
-                Set.of(Role.ADMIN), new short[]{2, 4}, true, false, false, false, true);
+                Set.of(Role.ADMIN), new short[]{2, 4}, true, false, false, false, true, 0);
 
         // then
         assertThat(audit.latestPayload(card.getId(), CardEvent.BookingCardAdded.TYPE))
@@ -40,11 +40,11 @@ class CardAuditTest extends AbstractIntegrationTest {
     void givenABookingCard_whenItStartsGrantingAccess_thenTheChangeIsRecordedWithTheFlag() {
         // given
         BookingCard card = cards.createCard("Team", "#112233", Set.of(Role.MEMBER),
-                Set.of(), new short[]{2}, false, false, false, false, true);
+                Set.of(), new short[]{2}, false, false, false, false, true, 0);
 
         // when
         cards.changeCard(card.getId(), "Team", "#112233", Set.of(Role.MEMBER),
-                Set.of(), new short[]{2}, false, false, false, true, true);
+                Set.of(), new short[]{2}, false, false, false, true, true, null);
 
         // then
         assertThat(audit.latestPayload(card.getId(), CardEvent.BookingCardAdded.TYPE))
@@ -58,11 +58,11 @@ class CardAuditTest extends AbstractIntegrationTest {
     void givenACardThatSignalsNoOccupancy_whenAChangeLeavesTheFlagOut_thenTheStoredValueIsKept() {
         // given
         BookingCard card = cards.createCard("Team", "#112233", Set.of(Role.MEMBER),
-                Set.of(), new short[]{2}, false, false, false, false, false);
+                Set.of(), new short[]{2}, false, false, false, false, false, 0);
 
         // when
         BookingCard changed = cards.changeCard(card.getId(), "Squad", "#112233", Set.of(Role.MEMBER),
-                Set.of(), new short[]{2}, false, false, false, false, null);
+                Set.of(), new short[]{2}, false, false, false, false, null, null);
 
         // then
         assertThat(changed.isSignalsOccupancy()).as("an absent flag keeps the stored one").isFalse();
@@ -74,11 +74,11 @@ class CardAuditTest extends AbstractIntegrationTest {
     void givenABookingCard_whenItStopsSignallingOccupancy_thenTheChangeIsRecordedWithTheFlag() {
         // given
         BookingCard card = cards.createCard("Team", "#112233", Set.of(Role.MEMBER),
-                Set.of(), new short[]{2}, false, false, false, false, true);
+                Set.of(), new short[]{2}, false, false, false, false, true, 0);
 
         // when
         cards.changeCard(card.getId(), "Team", "#112233", Set.of(Role.MEMBER),
-                Set.of(), new short[]{2}, false, false, false, false, false);
+                Set.of(), new short[]{2}, false, false, false, false, false, null);
 
         // then
         assertThat(audit.latestPayload(card.getId(), CardEvent.BookingCardAdded.TYPE))
@@ -90,14 +90,32 @@ class CardAuditTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenABookingCardThatAdmitsGuests_whenItsGuestFeeChanges_thenTheLogNamesTheFieldAndCarriesTheNewFee() {
+        // given
+        BookingCard card = cards.createCard("Guest hour", "#112233", Set.of(Role.MEMBER),
+                Set.of(), new short[]{2}, false, true, false, false, true, 500);
+
+        // when
+        cards.changeCard(card.getId(), "Guest hour", "#112233", Set.of(Role.MEMBER),
+                Set.of(), new short[]{2}, false, true, false, false, true, 750);
+
+        // then
+        assertThat(audit.latestPayload(card.getId(), CardEvent.BookingCardAdded.TYPE))
+                .containsEntry("guestFeeMinor", 500);
+        assertThat(audit.latestPayload(card.getId(), CardEvent.BookingCardChanged.TYPE))
+                .containsEntry("guestFeeMinor", 750)
+                .containsEntry("changedFields", List.of("guestFeeMinor"));
+    }
+
+    @Test
     void givenABookingCard_whenItsLabelAndColourChange_thenBothAreNamedWithoutTheirValues() {
         // given
         BookingCard card = cards.createCard("Team", "#112233", Set.of(Role.MEMBER),
-                Set.of(Role.ADMIN), new short[]{2, 4}, true, false, false, false, true);
+                Set.of(Role.ADMIN), new short[]{2, 4}, true, false, false, false, true, 0);
 
         // when
         cards.changeCard(card.getId(), "Squad", "#445566", Set.of(Role.MEMBER),
-                Set.of(Role.ADMIN), new short[]{2, 4}, true, false, false, false, true);
+                Set.of(Role.ADMIN), new short[]{2, 4}, true, false, false, false, true, null);
 
         // then
         Map<String, Object> payload = audit.latestPayload(card.getId(), CardEvent.BookingCardChanged.TYPE);
@@ -111,7 +129,7 @@ class CardAuditTest extends AbstractIntegrationTest {
         BookingCard card = cards.createCard("Team", "#112233",
                 Set.of(Role.TRAINER, Role.ADMIN, Role.MEMBER),
                 Set.of(Role.YOUTH_DIRECTOR, Role.ADMIN),
-                new short[]{2, 4}, true, false, false, false, true);
+                new short[]{2, 4}, true, false, false, false, true, 0);
 
         // then
         assertThat(audit.latestPayload(card.getId(), CardEvent.BookingCardAdded.TYPE))
@@ -123,11 +141,11 @@ class CardAuditTest extends AbstractIntegrationTest {
     void givenABookingCard_whenChangedWithIdenticalValues_thenNothingIsRecorded() {
         // given
         BookingCard card = cards.createCard("Team", "#112233", Set.of(Role.MEMBER),
-                Set.of(Role.ADMIN), new short[]{2, 4}, true, false, false, false, true);
+                Set.of(Role.ADMIN), new short[]{2, 4}, true, false, false, false, true, 0);
 
         // when
         cards.changeCard(card.getId(), "Team", "#112233", Set.of(Role.MEMBER),
-                Set.of(Role.ADMIN), new short[]{2, 4}, true, false, false, false, true);
+                Set.of(Role.ADMIN), new short[]{2, 4}, true, false, false, false, true, null);
 
         // then
         assertThat(audit.eventsAbout(card.getId(), CardEvent.BookingCardChanged.TYPE)).isEmpty();
@@ -188,7 +206,7 @@ class CardAuditTest extends AbstractIntegrationTest {
     void givenAnInactiveCard_whenItIsDeactivatedAgain_thenNothingIsRecorded() {
         // given
         BookingCard card = cards.createCard("Team", "#112233", Set.of(Role.MEMBER),
-                Set.of(Role.ADMIN), new short[]{2, 4}, true, false, false, false, true);
+                Set.of(Role.ADMIN), new short[]{2, 4}, true, false, false, false, true, 0);
         cards.setCardActive(card.getId(), false);
 
         // when
@@ -203,7 +221,7 @@ class CardAuditTest extends AbstractIntegrationTest {
     void givenAnActiveCard_whenItIsDeactivated_thenTheLogCarriesTheFlag() {
         // given
         BookingCard card = cards.createCard("Team", "#112233", Set.of(Role.MEMBER),
-                Set.of(Role.ADMIN), new short[]{2, 4}, true, false, false, false, true);
+                Set.of(Role.ADMIN), new short[]{2, 4}, true, false, false, false, true, 0);
 
         // when
         cards.setCardActive(card.getId(), false);
@@ -244,7 +262,7 @@ class CardAuditTest extends AbstractIntegrationTest {
     void givenTwoCardKinds_whenTheLogNamesThem_thenEachResolvesToItsOwnLabel() {
         // given
         BookingCard booking = cards.createCard("Team", "#112233", Set.of(Role.MEMBER),
-                Set.of(Role.ADMIN), new short[]{2, 4}, true, false, false, false, true);
+                Set.of(Role.ADMIN), new short[]{2, 4}, true, false, false, false, true, 0);
         ParticipantCard participant = cards.createParticipantCard("Guests", 2);
 
         // when / then

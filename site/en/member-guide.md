@@ -182,7 +182,8 @@ The booking dialog shows how many player slots are already filled.
 * Search for **Members** by name and add them. Each member can occupy only one player slot in a
   booking. You hold a slot yourself as the booker, so the search does not offer you.
 * Enter **Guests** by name under *More details*. The field only appears for booking types that
-  allow guests.
+  allow guests. If the booking type charges a guest fee, the dialog shows the number of guests, the
+  fee per guest and the total before you book.
 * Under ***What plays***, select a slot filler such as a ball machine or a "looking for a partner"
   entry. Courtside reports when none are available at the chosen time.
 

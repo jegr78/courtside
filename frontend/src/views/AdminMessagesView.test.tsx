@@ -36,7 +36,7 @@ const refused: MessageEntry = {
 const clubConfig: ClubConfig = {
   clubName: "Example Tennis Club", primaryColor: "#000000", accentColor: "#ffffff",
   logoUrl: null, imprintUrl: null, defaultLocale: "en", supportedLocales: ["de", "en"],
-  slotMinutes: 60, timeZone: "Europe/Berlin"
+  slotMinutes: 60, timeZone: "Europe/Berlin", currency: "EUR"
 };
 
 function show() {

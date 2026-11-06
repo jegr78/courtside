@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 
 import java.time.Instant;
+import java.util.Currency;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -43,7 +44,7 @@ class BookingInsertQueryBudgetTest extends AbstractIntegrationTest {
         booking.allocate(court, new TimeSlot(Instant.parse("2026-05-12T16:00:00Z"),
                 Instant.parse("2026-05-12T17:00:00Z")));
         booking.addParticipant(ParticipantSpec.member(person));
-        booking.addParticipant(ParticipantSpec.guest("Example Guest"));
+        booking.addParticipant(ParticipantSpec.guest("Example Guest"), new GuestFee(0, Currency.getInstance("EUR")));
     }
 
     @AfterEach

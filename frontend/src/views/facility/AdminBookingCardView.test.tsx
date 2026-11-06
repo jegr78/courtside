@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
-import { api, type BookingCard } from "../../api/client";
+import { ApiError, api, type BookingCard } from "../../api/client";
 import i18n from "../../i18n";
 import { UnsavedChangesProvider } from "../../unsaved/UnsavedChangesProvider";
 import { UnsavedCount } from "../../test/UnsavedCount";
@@ -12,7 +12,7 @@ import { AdminBookingCardView } from "./AdminBookingCardView";
 const memberCard: BookingCard = {
   id: "card-1", label: "Member booking", color: "#b85c38", allowedRoles: ["MEMBER"],
   managingRoles: [], allowedPlayerCounts: [2, 4], tracksPlayers: true, countsAgainstLimits: true,
-  guestAllowed: true, showGenericOccupancy: false, grantsAccess: false, signalsOccupancy: true, active: true
+  guestAllowed: true, showGenericOccupancy: false, grantsAccess: false, signalsOccupancy: true, active: true, guestFeeMinor: 0
 };
 
 function show(cardId = "card-1", counted = false, state?: unknown) {
@@ -144,6 +144,8 @@ describe("AdminBookingCardView", () => {
     await userEvent.click(screen.getByTestId("card-allowed-roles-TRAINER"));
     await userEvent.click(screen.getByTestId("card-managing-roles-SPORT_DIRECTOR"));
     await userEvent.click(screen.getByTestId("card-guest-allowed"));
+    await userEvent.clear(screen.getByTestId("card-guest-fee"));
+    await userEvent.type(screen.getByTestId("card-guest-fee"), "2");
     await userEvent.click(screen.getByTestId("save-card"));
 
     // then
@@ -151,7 +153,8 @@ describe("AdminBookingCardView", () => {
     expect(change).toHaveBeenCalledWith("card-1", {
       label: "Training", color: "#b85c38", allowedRoles: ["MEMBER", "TRAINER"],
       managingRoles: ["SPORT_DIRECTOR"], allowedPlayerCounts: [2, 4],
-      countsAgainstLimits: true, guestAllowed: false, showGenericOccupancy: false, grantsAccess: false, signalsOccupancy: true
+      countsAgainstLimits: true, guestAllowed: false, showGenericOccupancy: false, grantsAccess: false, signalsOccupancy: true,
+      guestFeeMinor: 200
     });
   });
 
@@ -393,5 +396,70 @@ describe("AdminBookingCardView", () => {
     // then
     expect(screen.queryByTestId("card-signals-occupancy")).not.toBeInTheDocument();
     await waitFor(() => expect(change).toHaveBeenCalledWith(closure, expect.objectContaining({ signalsOccupancy: false })));
+  });
+
+  it("given a card, when its guest fee is typed with a decimal comma, then the fee is sent in cents", async () => {
+    // given
+    const change = vi.spyOn(api, "changeAdminBookingCard").mockResolvedValue({ ...memberCard, guestFeeMinor: 550 });
+    show();
+    const fee = await screen.findByTestId("card-guest-fee");
+    expect(fee).toHaveValue("0.00");
+
+    // when
+    await userEvent.clear(fee);
+    await userEvent.type(fee, "5,50");
+    await userEvent.click(screen.getByTestId("save-card"));
+
+    // then
+    await waitFor(() => expect(change).toHaveBeenCalledWith("card-1", expect.objectContaining({ guestFeeMinor: 550 })));
+    expect(screen.getByTestId("card-guest-fee")).toHaveValue("5.50");
+  });
+
+  it("given a card, when a negative guest fee is typed, then the field says so and nothing is sent", async () => {
+    // given
+    const change = vi.spyOn(api, "changeAdminBookingCard").mockResolvedValue(memberCard);
+    show();
+    const fee = await screen.findByTestId("card-guest-fee");
+
+    // when
+    await userEvent.clear(fee);
+    await userEvent.type(fee, "-1");
+    await userEvent.click(screen.getByTestId("save-card"));
+
+    // then
+    expect(fee).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByTestId("card-guest-fee-error")).toHaveTextContent("Enter an amount of 0 or more, such as 5.50.");
+    expect(fee.getAttribute("aria-describedby")?.split(" ")).toContain("card-guest-fee-error");
+    expect(change, "a refused amount never reaches the server").not.toHaveBeenCalled();
+  });
+
+  it("given the server refuses the guest fee, when the card is saved, then the field is marked and the reason is shown", async () => {
+    // given
+    vi.spyOn(api, "changeAdminBookingCard").mockRejectedValue(new ApiError(400, {
+      type: "urn:courtside:error:validation", title: "Validation failed", status: 400,
+      fieldErrors: [{ field: "guestFeeMinor", code: "validation.Min", params: { value: 0 } }]
+    }));
+    show();
+    const fee = await screen.findByTestId("card-guest-fee");
+
+    // when
+    await userEvent.clear(fee);
+    await userEvent.type(fee, "5");
+    await userEvent.click(screen.getByTestId("save-card"));
+
+    // then
+    expect(await screen.findByRole("alert")).toHaveTextContent("This field must be at least 0.");
+    expect(fee).toHaveAttribute("aria-invalid", "true");
+  });
+
+  it("given a card, when its guest fee field is read, then it names the club currency and when a change applies", async () => {
+    // when
+    show();
+    const fee = await screen.findByTestId("card-guest-fee");
+
+    // then
+    expect(fee.getAttribute("aria-describedby")).toBe("card-guest-fee-hint");
+    expect(screen.getByTestId("card-guest-fee-hint")).toHaveTextContent("Applies to guests booked after the change.");
+    expect(fee.closest("label")).toHaveTextContent("Guest fee per guest place in EUR");
   });
 });

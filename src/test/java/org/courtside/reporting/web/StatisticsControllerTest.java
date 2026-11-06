@@ -666,7 +666,11 @@ class StatisticsControllerTest extends AbstractIntegrationTest {
     }
 
     private void guestNamed(UUID bookingId, String name, int position) {
-        jdbc.sql("INSERT INTO booking_participant (id, booking_id, kind, guest_name, position) VALUES (?, ?, 'GUEST', ?, ?)")
+        jdbc.sql("""
+                        INSERT INTO booking_participant
+                            (id, booking_id, kind, guest_name, position, guest_fee_minor, guest_fee_currency)
+                        VALUES (?, ?, 'GUEST', ?, ?, 0, 'EUR')
+                        """)
                 .params(UUID.randomUUID(), bookingId, name, position)
                 .update();
     }

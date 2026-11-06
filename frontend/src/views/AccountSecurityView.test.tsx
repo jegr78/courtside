@@ -211,7 +211,7 @@ describe("AccountSecurityView", () => {
   it("given session instants and a club zone, when the locale changes, then both dates retain the club time", async () => {
     // given
     vi.spyOn(api, "accountSessions").mockResolvedValue([{ ...current, createdAt: "2026-10-23T16:53:00Z", lastActivityAt: "2026-10-23T16:53:00Z" }]);
-    const club = { clubName: "Example Tennis Club", primaryColor: "#000000", accentColor: "#ffffff", defaultLocale: "de", supportedLocales: ["de", "en"], slotMinutes: 60, timeZone: "Europe/Berlin" };
+    const club = { clubName: "Example Tennis Club", primaryColor: "#000000", accentColor: "#ffffff", defaultLocale: "de", supportedLocales: ["de", "en"], slotMinutes: 60, timeZone: "Europe/Berlin", currency: "EUR" };
     await i18n.changeLanguage("de");
     const rendered = render(<WithClubConfiguration club={club}><AccountSecurityView passwordChanged={vi.fn()} signedOut={vi.fn()} /></WithClubConfiguration>);
     const view = await renderedSecurityView();
@@ -256,7 +256,7 @@ describe("AccountSecurityView", () => {
     // when
     await userEvent.click(screen.getByTestId("retry-load"));
     expect(load).toHaveBeenCalledTimes(initialLoads + 1);
-    rendered.rerender(<ClubConfigurationContext value={{ club: { clubName: "Example Tennis Club", primaryColor: "#000000", accentColor: "#ffffff", defaultLocale: "de", supportedLocales: ["de", "en"], slotMinutes: 60, timeZone: "Europe/Berlin" }, load, changed, refresh: vi.fn() }}><AccountSecurityView passwordChanged={vi.fn()} signedOut={vi.fn()} /></ClubConfigurationContext>);
+    rendered.rerender(<ClubConfigurationContext value={{ club: { clubName: "Example Tennis Club", primaryColor: "#000000", accentColor: "#ffffff", defaultLocale: "de", supportedLocales: ["de", "en"], slotMinutes: 60, timeZone: "Europe/Berlin", currency: "EUR" }, load, changed, refresh: vi.fn() }}><AccountSecurityView passwordChanged={vi.fn()} signedOut={vi.fn()} /></ClubConfigurationContext>);
 
     // then
     expect(screen.queryByTestId("load-failure")).toBeNull();

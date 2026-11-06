@@ -12,7 +12,7 @@ import { AdminBookingCardsView } from "./AdminBookingCardsView";
 const memberCard: BookingCard = {
   id: "card-1", label: "Member booking", color: "#b85c38", allowedRoles: ["MEMBER"],
   managingRoles: [], allowedPlayerCounts: [2, 4], tracksPlayers: true, countsAgainstLimits: true,
-  guestAllowed: true, showGenericOccupancy: true, grantsAccess: false, signalsOccupancy: true, active: true
+  guestAllowed: true, showGenericOccupancy: true, grantsAccess: false, signalsOccupancy: true, active: true, guestFeeMinor: 0
 };
 
 function ArrivedAtCard() {
@@ -219,5 +219,37 @@ describe("AdminBookingCardsView", () => {
     // then
     expect(await screen.findByTestId("arrived-at-card-2")).toBeVisible();
     expect(screen.getByTestId("unsaved-count")).toHaveTextContent("0");
+  });
+
+  it("given a new card, when its guest fee is typed with a decimal comma, then the fee is sent in cents", async () => {
+    // given
+    const createCard = vi.spyOn(api, "createAdminBookingCard").mockResolvedValue({ ...memberCard, id: "card-2", guestFeeMinor: 550 });
+    show();
+    await screen.findByTestId("new-card-label");
+
+    // when
+    await userEvent.type(screen.getByTestId("new-card-label"), "Training");
+    await userEvent.type(screen.getByTestId("new-card-guest-fee"), "5,50");
+    await userEvent.click(screen.getByTestId("create-card"));
+
+    // then
+    expect(createCard).toHaveBeenCalledWith(expect.objectContaining({ guestFeeMinor: 550 }));
+  });
+
+  it("given a new card, when a negative guest fee is typed, then the field says so and nothing is created", async () => {
+    // given
+    const createCard = vi.spyOn(api, "createAdminBookingCard").mockResolvedValue({ ...memberCard, id: "card-2" });
+    show();
+    await screen.findByTestId("new-card-label");
+
+    // when
+    await userEvent.type(screen.getByTestId("new-card-label"), "Training");
+    await userEvent.type(screen.getByTestId("new-card-guest-fee"), "-1");
+    await userEvent.click(screen.getByTestId("create-card"));
+
+    // then
+    expect(screen.getByTestId("new-card-guest-fee")).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByTestId("new-card-guest-fee-error")).toHaveTextContent("Enter an amount of 0 or more, such as 5.50.");
+    expect(createCard, "a refused amount never reaches the server").not.toHaveBeenCalled();
   });
 });

@@ -382,8 +382,13 @@ class UatBookingSeeder {
         for (Participant participant : booking.participants()) {
             jdbc.sql("""
                     INSERT INTO booking_participant
-                        (id, booking_id, kind, person_id, guest_name, card_id, position)
-                    VALUES (:id, :bookingId, :kind, :personId, :guestName, :cardId, :position)
+                        (id, booking_id, kind, person_id, guest_name, card_id, position,
+                         guest_fee_minor, guest_fee_currency)
+                    SELECT :id, :bookingId, :kind, :personId, :guestName, :cardId, :position,
+                           CASE WHEN :kind = 'GUEST' THEN card.guest_fee_minor END,
+                           CASE WHEN :kind = 'GUEST' THEN config.currency END
+                    FROM booking_card card, club_config config
+                    WHERE card.id = (SELECT card_id FROM booking WHERE id = :bookingId)
                     """).param("id", stableId("participant-" + booking.id() + "-" + position))
                     .param("bookingId", booking.id()).param("kind", participant.kind())
                     .param("personId", participant.personId()).param("guestName", participant.guestName())

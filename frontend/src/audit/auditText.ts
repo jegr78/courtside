@@ -19,6 +19,24 @@ const nullSafeContexts: { eventType: string; field: string; context: string }[] 
   { eventType: "roster.membership.written", field: "startedOn", context: "unknownStart" }
 ];
 
+const clubFields = ["clubName", "shortName", "primaryColor", "accentColor", "logo", "logoUrl", "imprintUrl", "privacyUrl",
+  "documentationUrl", "newAccountCredentialHours", "passwordResetCredentialHours", "passwordResetTokenMinutes",
+  "bookingReminderHours", "waitlistOfferMinutes", "accessLeadMinutes", "accessLagMinutes", "accessCodeLength", "currency"];
+
+const changedFieldLabels: Record<string, Record<string, string>> = {
+  "config.club.changed": {
+    ...Object.fromEntries(clubFields.map((field) => [field, `admin.config.${field}`])),
+    noMembershipTypeRuleSetId: "admin.config.noMembershipTypeRuleSet"
+  }
+};
+
+function changedFieldsLabel(entry: AuditEntry, t: TFunction): string | undefined {
+  const labels = changedFieldLabels[entry.eventType];
+  const fields = entry.parameters.changedFields;
+  if (!labels || !Array.isArray(fields) || fields.length === 0) return undefined;
+  return fields.map((field) => typeof field === "string" && labels[field] ? t(labels[field]) : String(field)).join(", ");
+}
+
 function paramsLabel(params: Record<string, unknown>, t: TFunction): string {
   return Object.entries(params)
     .map(([name, value]) => `${t(`admin.rules.parameter.${name}`)}: ${String(value)}`)
@@ -65,6 +83,7 @@ export function auditMessage(entry: AuditEntry, t: TFunction): string {
   const outcome = typeof entry.parameters.outcome === "string"
     ? t(`managedAppointments.attendance.${entry.parameters.outcome}`)
     : undefined;
+  const changedFields = changedFieldsLabel(entry, t);
   return t(`audit.event.${entry.eventType}`, {
     ...entry.parameters,
     ...(weekday !== undefined ? { weekday } : {}),
@@ -74,7 +93,8 @@ export function auditMessage(entry: AuditEntry, t: TFunction): string {
     ...(closesAt !== undefined ? { closesAt } : {}),
     ...(kind !== undefined ? { kind } : {}),
     ...(outcome !== undefined ? { outcome } : {}),
-    ...(context ? { context } : {})
+    ...(changedFields !== undefined ? { changedFields } : {}),
+    ...(context ? { context } : changedFields !== undefined ? { context: "fields" } : {})
   });
 }
 

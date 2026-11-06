@@ -9,7 +9,8 @@ const exampleClub: ClubConfig = {
   defaultLocale: "en",
   supportedLocales: ["de", "en"],
   slotMinutes: 30,
-  timeZone: "Pacific/Auckland"
+  timeZone: "Pacific/Auckland",
+  currency: "EUR"
 };
 
 export function WithClubConfiguration({ club = exampleClub, children }: { club?: ClubConfig; children: ReactNode }) {

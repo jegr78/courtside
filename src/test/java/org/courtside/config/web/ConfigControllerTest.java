@@ -3,6 +3,8 @@ package org.courtside.config.web;
 import org.courtside.AbstractIntegrationTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
@@ -327,6 +329,48 @@ class ConfigControllerTest extends AbstractIntegrationTest {
         mockMvc.perform(get("/api/public/booking-grid"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.timeZone").value("Pacific/Auckland"));
+    }
+
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    @ParameterizedTest
+    @ValueSource(strings = {"ABC", "XAU"})
+    void givenACurrencyCodeWithoutAMinorUnitOrUnknown_whenChangingTheConfig_thenTheFieldIsRefused(String code)
+            throws Exception {
+        // when / then
+        mockMvc.perform(put("/api/admin/config")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(configJson("Example Tennis Club").replace("\"slotMinutes\": 30,",
+                                "\"slotMinutes\": 30, \"currency\": \"" + code + "\","))
+                        .with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("currency"))
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.Currency"));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenTheClubChoosingFrancs_whenTheConfigIsRead_thenEveryVisitorSeesTheCurrencyAndLeavingItOutKeepsIt()
+            throws Exception {
+        // given
+        mockMvc.perform(put("/api/admin/config")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(configJson("Example Tennis Club").replace("\"slotMinutes\": 30,",
+                                "\"slotMinutes\": 30, \"currency\": \"CHF\","))
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.currency").value("CHF"));
+
+        // when
+        mockMvc.perform(put("/api/admin/config")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(configJson("Example Tennis Club"))
+                        .with(csrf()))
+                .andExpect(status().isOk());
+
+        // then
+        mockMvc.perform(get("/api/public/config"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.currency").value("CHF"));
     }
 
     @Test

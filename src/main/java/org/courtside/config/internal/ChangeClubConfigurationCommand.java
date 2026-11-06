@@ -9,6 +9,7 @@ import org.courtside.config.ReminderLeadTime;
 import org.courtside.config.ResetTokenLifetime;
 import org.courtside.config.WaitlistOfferWindow;
 
+import java.util.Currency;
 import java.util.UUID;
 
 public record ChangeClubConfigurationCommand(
@@ -31,10 +32,11 @@ public record ChangeClubConfigurationCommand(
         WaitlistOfferWindow waitlistOffer,
         AccessLeadTime accessLead,
         AccessLagTime accessLag,
-        AccessCodeLength accessCodeLength) {
+        AccessCodeLength accessCodeLength,
+        Currency currency) {
 
-    // Links, logo, short name and the no-membership rule set may be unset, and an absent waitlist or access
-    // setting keeps the stored one; an absent value anywhere else is a caller that skipped its validation.
+    // Links, logo, short name and the no-membership rule set may be unset, and an absent waitlist, access
+    // or currency setting keeps the stored one; an absent value anywhere else is a caller that skipped its validation.
     public ChangeClubConfigurationCommand {
         requirePresent(clubName, "clubName");
         requirePresent(primaryColor, "primaryColor");
@@ -49,6 +51,18 @@ public record ChangeClubConfigurationCommand(
         if (shortName != null && !AppShortName.fits(shortName)) {
             throw new IllegalArgumentException("A short name has to fit under an app icon");
         }
+    }
+
+    public ChangeClubConfigurationCommand(String clubName, String primaryColor, String accentColor, String logoUrl,
+            String imprintUrl, String privacyUrl, String documentationUrl, String shortName, String defaultLocale,
+            BookingSlotDuration slotDuration, String timeZone, CredentialLifetime newAccountCredential,
+            CredentialLifetime passwordResetCredential, ResetTokenLifetime passwordResetToken,
+            ReminderLeadTime bookingReminder, UUID noMembershipTypeRuleSetId, WaitlistOfferWindow waitlistOffer,
+            AccessLeadTime accessLead, AccessLagTime accessLag, AccessCodeLength accessCodeLength) {
+        this(clubName, primaryColor, accentColor, logoUrl, imprintUrl, privacyUrl, documentationUrl, shortName,
+                defaultLocale, slotDuration, timeZone, newAccountCredential, passwordResetCredential,
+                passwordResetToken, bookingReminder, noMembershipTypeRuleSetId, waitlistOffer, accessLead, accessLag,
+                accessCodeLength, null);
     }
 
     private static void requirePresent(Object value, String field) {

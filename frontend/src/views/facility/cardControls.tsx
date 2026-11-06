@@ -5,6 +5,7 @@ import { Button } from "../../components/Button";
 import { TextField } from "../../components/TextField";
 import { ColorInput } from "../../components/ColorInput";
 import { ContrastReading } from "../../components/ContrastReading";
+import { minorAsDecimal } from "../../money";
 import { cardContrast } from "../cardColors";
 
 const MIN_PLAYER_COUNT = 1;
@@ -83,6 +84,21 @@ export function CardColorField({ value, disabled, changed, name, testId }: { val
     <ColorInput id={testId} valueTestId={`${testId}-value`} pickerTestId={testId} name={name} disabled={disabled} value={value} changed={changed} />
     {contrast && <ContrastReading contrast={contrast} testId={`${testId}-contrast`} />}
   </fieldset>;
+}
+
+export function GuestFeeField({ testId, name, value, currency, invalid, refused, disabled, changed }: { testId: string; name?: string; value: string; currency: string; invalid: boolean; refused?: boolean; disabled?: boolean; changed: (value: string) => void }) {
+  const { t, i18n } = useTranslation();
+  const hint = `${testId}-hint`;
+  const error = `${testId}-error`;
+  return <div className="grid content-start gap-1">
+    <TextField data-testid={testId} name={name} inputMode="decimal" autoComplete="off" className="max-w-40" disabled={disabled}
+               label={t("admin.facility.guestFeeIn", { currency })} value={value} aria-invalid={invalid || refused || undefined}
+               aria-describedby={invalid ? `${error} ${hint}` : hint} onChange={(event) => changed(event.target.value)} />
+    {invalid && <p id={error} data-testid={error} className="text-destructive text-sm">
+      {t("admin.facility.guestFeeInvalid", { example: minorAsDecimal(550, i18n.language, currency) })}
+    </p>}
+    <p id={hint} data-testid={hint} className="text-muted text-sm">{t("admin.facility.guestFeeHelp")}</p>
+  </div>;
 }
 
 export function BookingRules({ children }: { children: ReactNode }) {

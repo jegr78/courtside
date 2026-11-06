@@ -26,7 +26,7 @@ const courtAdded: AuditEntry = {
 const clubConfig: ClubConfig = {
   clubName: "Example Tennis Club", primaryColor: "#000000", accentColor: "#ffffff",
   logoUrl: null, imprintUrl: null, defaultLocale: "en", supportedLocales: ["de", "en"],
-  slotMinutes: 60, timeZone: "Europe/Berlin"
+  slotMinutes: 60, timeZone: "Europe/Berlin", currency: "EUR"
 };
 
 function show({ club = clubConfig, at = "/admin/audit" }: { club?: ClubConfig; at?: string } = {}) {
@@ -331,7 +331,10 @@ describe("AdminAuditView", () => {
     ["booking.attendance.recorded", { outcome: "NO_SHOW" }, "Attendance recorded: No-show"],
     ["booking.attendance.noShowsLifted", { lifted: 2 }, "2 no-shows lifted"],
     ["roster.membership.written", { startedOn: "2026-01-01" }, "Membership recorded from 2026-01-01"],
-    ["roster.membership.written", { startedOn: null }, "Membership recorded"]
+    ["roster.membership.written", { startedOn: null }, "Membership recorded"],
+    ["card.bookingCard.changed", { changedFields: ["label", "guestFeeMinor"] }, /^Booking card changed$/],
+    ["card.bookingCard.changed", { changedFields: [] }, /^Booking card changed$/],
+    ["config.club.changed", { changedFields: ["currency", "noMembershipTypeRuleSetId"] }, "Club configuration changed: Currency, Rule set for people without a membership type"]
   ])("given a %s event, when it is shown, then its interpolated values are resolved, not left as template text", async (eventType, parameters, expected) => {
     // given
     const entry: AuditEntry = { ...courtAdded, eventType, parameters };

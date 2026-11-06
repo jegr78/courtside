@@ -21,6 +21,7 @@ import org.courtside.config.ReminderLeadTime;
 import org.courtside.config.WaitlistOfferPolicy;
 import org.courtside.config.WaitlistOfferWindow;
 import org.courtside.config.BookingGridCoordination;
+import org.courtside.config.ClubCurrency;
 import org.courtside.config.ClubTimeZone;
 import org.courtside.config.ConfigEvent;
 import org.courtside.config.RuleSetAvailability;
@@ -30,6 +31,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.Currency;
 import java.util.List;
 import java.util.Objects;
 import java.util.Map;
@@ -44,7 +46,7 @@ import java.time.ZoneId;
 @Transactional(readOnly = true)
 public class ConfigService implements BookingGridSettings, BookingGridCoordination, ClubTimeZone,
         CredentialValidity, PasswordResetTokenValidity, ClubIdentity, BookingReminderPolicy,
-        WaitlistOfferPolicy, AccessPolicy {
+        WaitlistOfferPolicy, AccessPolicy, ClubCurrency {
 
     private static final String RULE_SET_CONSTRAINT = "club_config_no_membership_type_rule_set";
 
@@ -76,6 +78,11 @@ public class ConfigService implements BookingGridSettings, BookingGridCoordinati
     @Override
     public BookingSlotDuration slotDuration() {
         return new BookingSlotDuration(current().slotMinutes());
+    }
+
+    @Override
+    public Currency currency() {
+        return Currency.getInstance(current().currency());
     }
 
     @Override
@@ -266,6 +273,9 @@ public class ConfigService implements BookingGridSettings, BookingGridCoordinati
             addIfChanged(fields, "accessCodeLength",
                     configuration.getAccessCodeLength(), command.accessCodeLength().digits());
         }
+        if (command.currency() != null) {
+            addIfChanged(fields, "currency", configuration.getCurrency(), command.currency().getCurrencyCode());
+        }
         addIfChanged(fields, "noMembershipTypeRuleSetId",
                 configuration.getNoMembershipTypeRuleSetId(), command.noMembershipTypeRuleSetId());
         return new Changes(List.copyOf(fields),
@@ -297,6 +307,9 @@ public class ConfigService implements BookingGridSettings, BookingGridCoordinati
         }
         if (command.accessCodeLength() != null) {
             configuration.requireAccessCodesOf(command.accessCodeLength().digits());
+        }
+        if (command.currency() != null) {
+            configuration.chargeIn(command.currency());
         }
         configuration.bindPeopleWithoutAMembershipTypeTo(command.noMembershipTypeRuleSetId());
     }

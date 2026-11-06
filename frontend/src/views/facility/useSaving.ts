@@ -4,7 +4,7 @@ import { useReportedFailure } from "../../failures/useReportedFailure";
 
 export function useSaving() {
   const { t } = useTranslation();
-  const { message: error, report, refuse: refuseWith, clear } = useReportedFailure();
+  const { message: error, failure, report, refuse: refuseWith, clear } = useReportedFailure();
   const [success, setSuccess] = useState<string>();
   const pendingRef = useRef(new Set<string>());
   const [pending, setPending] = useState(new Set<string>());
@@ -44,5 +44,5 @@ export function useSaving() {
     }
   }
 
-  return { error, success, pending, reportError, refuse, clear, save };
+  return { error, failure, success, pending, reportError, refuse, clear, save };
 }

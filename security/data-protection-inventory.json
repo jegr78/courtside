@@ -826,6 +826,10 @@
         "level": "operational",
         "lifecycle": "club-configuration"
       },
+      "guest_fee_minor": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
       "id": {
         "level": "operational",
         "lifecycle": "club-configuration"
@@ -874,6 +878,14 @@
       },
       "guest_name": {
         "level": "personal",
+        "lifecycle": "booking-pseudonymisation"
+      },
+      "guest_fee_currency": {
+        "level": "operational",
+        "lifecycle": "booking-pseudonymisation"
+      },
+      "guest_fee_minor": {
+        "level": "operational",
         "lifecycle": "booking-pseudonymisation"
       },
       "id": {
@@ -1087,6 +1099,10 @@
         "lifecycle": "club-configuration"
       },
       "access_lead_minutes": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "currency": {
         "level": "operational",
         "lifecycle": "club-configuration"
       }

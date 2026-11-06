@@ -24,7 +24,7 @@ const configuration: AdminClubConfig = {
   bookingReminderHours: 24, waitlistOfferMinutes: 15, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6,
   logoUploaded: false,
   logoFallbackUrl: null,
-  noMembershipTypeRuleSetId: null
+  noMembershipTypeRuleSetId: null, currency: "EUR"
 };
 
 const factoryResponse: AdminClubConfig = {

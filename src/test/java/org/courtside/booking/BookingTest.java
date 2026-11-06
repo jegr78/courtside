@@ -3,6 +3,7 @@ package org.courtside.booking;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
+import java.util.Currency;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -38,7 +39,7 @@ class BookingTest {
         // given
         Booking booking = new Booking(CARD, BOOKER_ACCOUNT, null, CREATED_AT);
         booking.addParticipant(ParticipantSpec.member(UUID.randomUUID()));
-        booking.addParticipant(ParticipantSpec.guest("John Roe"));
+        booking.addParticipant(ParticipantSpec.guest("John Roe"), new GuestFee(0, Currency.getInstance("EUR")));
 
         // when
         boolean withdrawn = booking.withdrawParticipant(null);

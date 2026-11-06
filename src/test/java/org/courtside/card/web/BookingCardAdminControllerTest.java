@@ -206,6 +206,51 @@ class BookingCardAdminControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void whenCreatingABookingCardWithANegativeGuestFee_thenTheFieldIsRefused() throws Exception {
+        // when / then
+        mockMvc.perform(post("/api/admin/booking-cards")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"label": "Guest hour", "color": "#c8a415",
+                                 "allowedRoles": [], "allowedPlayerCounts": [2], "countsAgainstLimits": false,
+                                 "guestAllowed": true, "guestFeeMinor": -1}
+                                """)
+                        .with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("guestFeeMinor"))
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.Min"));
+    }
+
+    @Test
+    void givenACardWithAGuestFee_whenItIsChangedWithoutNamingTheFee_thenTheFeeStays() throws Exception {
+        // given
+        String created = mockMvc.perform(post("/api/admin/booking-cards")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"label": "Guest hour", "color": "#c8a415",
+                                 "allowedRoles": [], "allowedPlayerCounts": [2], "countsAgainstLimits": false,
+                                 "guestAllowed": true, "guestFeeMinor": 500}
+                                """)
+                        .with(csrf()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.guestFeeMinor").value(500))
+                .andReturn().getResponse().getContentAsString();
+        String id = JsonPath.read(created, "$.id");
+
+        // when / then
+        mockMvc.perform(put("/api/admin/booking-cards/{id}", id)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"label": "Guest hour renamed", "color": "#c8a415",
+                                 "allowedRoles": [], "allowedPlayerCounts": [2], "countsAgainstLimits": false,
+                                 "guestAllowed": true}
+                                """)
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.guestFeeMinor").value(500));
+    }
+
+    @Test
     void whenCreatingABookingCardWithARepeatedPlayerCount_thenItIsRejectedWithTheApisOwnViolationShape()
             throws Exception {
         // when / then

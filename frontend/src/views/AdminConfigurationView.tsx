@@ -174,6 +174,12 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
               </div>
               <TextField data-testid="imprint-url" label={t("admin.config.imprintUrl")} value={config.imprintUrl ?? ""} onChange={(event) => changeConfig({ imprintUrl: event.target.value || null })} />
               <TextField data-testid="privacy-url" label={t("admin.config.privacyUrl")} value={config.privacyUrl ?? ""} onChange={(event) => changeConfig({ privacyUrl: event.target.value || null })} />
+              <div className="grid gap-1">
+                <TextField data-testid="config-currency" maxLength={3} autoCapitalize="characters" spellCheck={false} className="max-w-32"
+                           aria-describedby="config-currency-hint" label={t("admin.config.currency")} value={config.currency ?? ""}
+                           onChange={(event) => changeConfig({ currency: event.target.value.toUpperCase() })} />
+                <p id="config-currency-hint" className="text-muted text-sm">{t("admin.config.currencyHelp")}</p>
+              </div>
             </div>
             <div data-testid="club-settings" className="grid gap-4">
               <div className="grid gap-1">

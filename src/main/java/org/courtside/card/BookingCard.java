@@ -70,6 +70,9 @@ public class BookingCard {
     @Column(name = "signals_occupancy", nullable = false)
     private boolean signalsOccupancy;
 
+    @Column(name = "guest_fee_minor", nullable = false)
+    private int guestFeeMinor;
+
     @Column(nullable = false)
     private boolean active;
 
@@ -132,6 +135,13 @@ public class BookingCard {
         this.grantsAccess = grantsAccess;
         this.signalsOccupancy = signalsOccupancy;
         this.active = true;
+    }
+
+    public void chargeGuests(int guestFeeMinor) {
+        if (guestFeeMinor < 0) {
+            throw new IllegalStateException("A guest fee is never negative; the request validation was skipped");
+        }
+        this.guestFeeMinor = guestFeeMinor;
     }
 
     public void changeTo(String label, String color, Set<Role> allowedRoles, Set<Role> managingRoles,

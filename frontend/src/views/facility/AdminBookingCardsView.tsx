@@ -2,11 +2,14 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router-dom";
 import { api, type BookingCard, type Role } from "../../api/client";
+import { refusesField } from "../../api/problem-message";
+import { useClubConfiguration } from "../../club/registry";
 import { Button } from "../../components/Button";
 import { TextField } from "../../components/TextField";
 import { formString } from "../../forms/formString";
+import { parseMinor } from "../../money";
 import { useUnsavedForm } from "../../unsaved/useUnsavedForm";
-import { AllowedRoleCheckboxes, BookingRules, CardColorField, Checkbox, DEFAULT_CARD_COLOR, ManagingRoleCheckboxes, PlayerCounts } from "./cardControls";
+import { AllowedRoleCheckboxes, BookingRules, CardColorField, Checkbox, DEFAULT_CARD_COLOR, GuestFeeField, ManagingRoleCheckboxes, PlayerCounts } from "./cardControls";
 import { FacilityPage } from "./FacilityPage";
 import { useSaving } from "./useSaving";
 
@@ -15,10 +18,14 @@ export function AdminBookingCardsView() {
   const navigate = useNavigate();
   const [cards, setCards] = useState<BookingCard[]>();
   const [counts, setCounts] = useState<number[]>([]);
-  const { error, pending, reportError, save } = useSaving();
+  const { club, error: clubError } = useClubConfiguration();
+  const { error, failure, pending, reportError, save } = useSaving();
   const [color, setColor] = useState(DEFAULT_CARD_COLOR);
-  const newCard = useUnsavedForm("card:new", counts.length > 0 || color !== DEFAULT_CARD_COLOR);
+  const [fee, setFee] = useState("");
+  const newCard = useUnsavedForm("card:new", counts.length > 0 || color !== DEFAULT_CARD_COLOR || fee !== "");
   const disabled = pending.has("card:new");
+  const guestFeeMinor = fee.trim() && club ? parseMinor(fee, club.currency) : undefined;
+  const feeInvalid = fee.trim() !== "" && guestFeeMinor === undefined;
 
   useEffect(() => {
     void api.adminBookingCards().then(setCards).catch(reportError);
@@ -26,6 +33,7 @@ export function AdminBookingCardsView() {
 
   function create(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (feeInvalid) return Promise.resolve();
     const form = new FormData(event.currentTarget);
     return save("card:new", async () => {
       const created = await api.createAdminBookingCard({
@@ -38,18 +46,21 @@ export function AdminBookingCardsView() {
         guestAllowed: form.get("guestAllowed") === "on",
         showGenericOccupancy: form.get("showGenericOccupancy") === "on",
         grantsAccess: form.get("grantsAccess") === "on",
-        signalsOccupancy: form.get("signalsOccupancy") === "on"
+        signalsOccupancy: form.get("signalsOccupancy") === "on",
+        guestFeeMinor
       });
       setCounts([]);
       setColor(DEFAULT_CARD_COLOR);
+      setFee("");
       newCard.saved();
       await navigate(`/admin/facility/booking-cards/${created.id}`, { state: { cardCreated: true } });
     });
   }
 
-  return <FacilityPage testId="admin-booking-cards-view" title={t("admin.facility.cards")} error={error}>
-    {cards !== undefined && <>
-      <CardCreateForm disabled={disabled} form={newCard.form} counts={counts} setCounts={setCounts} color={color} setColor={setColor} create={create} />
+  return <FacilityPage testId="admin-booking-cards-view" title={t("admin.facility.cards")} error={error ?? clubError}>
+    {cards !== undefined && club !== undefined && <>
+      <CardCreateForm disabled={disabled} form={newCard.form} counts={counts} setCounts={setCounts} color={color} setColor={setColor}
+                      fee={{ value: fee, currency: club.currency, invalid: feeInvalid, refused: refusesField(failure, "guestFeeMinor"), changed: setFee }} create={create} />
       <section className="grid gap-3">
         <h2 className="text-2xl font-bold">{t("admin.facility.allCards")}</h2>
         <div className="overflow-x-auto">
@@ -78,7 +89,7 @@ export function AdminBookingCardsView() {
   </FacilityPage>;
 }
 
-function CardCreateForm({ disabled, form, counts, setCounts, color, setColor, create }: { disabled: boolean; form: ReturnType<typeof useUnsavedForm>["form"]; counts: number[]; setCounts: (counts: number[]) => void; color: string; setColor: (color: string) => void; create: (event: FormEvent<HTMLFormElement>) => Promise<void> }) {
+function CardCreateForm({ disabled, form, counts, setCounts, color, setColor, fee, create }: { disabled: boolean; form: ReturnType<typeof useUnsavedForm>["form"]; counts: number[]; setCounts: (counts: number[]) => void; color: string; setColor: (color: string) => void; fee: { value: string; currency: string; invalid: boolean; refused: boolean; changed: (fee: string) => void }; create: (event: FormEvent<HTMLFormElement>) => Promise<void> }) {
   const { t } = useTranslation();
   return <form noValidate {...form} onSubmit={(event) => void create(event)} className="grid gap-4 rounded-xl border p-4">
     <h2 className="font-bold">{t("admin.facility.newCard")}</h2>
@@ -94,6 +105,7 @@ function CardCreateForm({ disabled, form, counts, setCounts, color, setColor, cr
       <BookingRules>
         <Checkbox disabled={disabled} name="countsAgainstLimits" label={t("admin.facility.countsAgainstLimits")} />
         <Checkbox disabled={disabled} name="guestAllowed" label={t("admin.facility.guestAllowed")} />
+        <GuestFeeField testId="new-card-guest-fee" disabled={disabled} {...fee} />
         <Checkbox disabled={disabled} name="grantsAccess" data-testid="new-card-grants-access" label={t("admin.facility.grantsAccess")} />
         <Checkbox disabled={disabled} name="signalsOccupancy" data-testid="new-card-signals-occupancy" defaultChecked label={t("admin.facility.signalsOccupancy")} />
       </BookingRules>

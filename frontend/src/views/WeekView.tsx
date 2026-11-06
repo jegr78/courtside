@@ -34,6 +34,7 @@ interface WeekViewProps {
   canBook?: boolean;
   canChooseSeveralCourts?: boolean;
   offline?: boolean;
+  currency?: string;
 }
 
 interface WeekData {
@@ -89,7 +90,7 @@ interface DayPlanCellProps {
 const systemClock = () => new Date();
 
 export function WeekView({ today, clock = systemClock, canBook = true,
-  canChooseSeveralCourts = false, offline = false }: WeekViewProps) {
+  canChooseSeveralCourts = false, offline = false, currency }: WeekViewProps) {
   const { t, i18n } = useTranslation();
   const [referenceInstant] = useState(() => today ?? clock());
   const [currentInstant, setCurrentInstant] = useState(referenceInstant);
@@ -618,6 +619,7 @@ export function WeekView({ today, clock = systemClock, canBook = true,
       courts={data.courts}
       allocations={data.allocations.get(bookingSelection.date) ?? []}
       canChooseSeveralCourts={canChooseSeveralCourts}
+      currency={currency}
       maxBookingMinutes={ownLimits?.maxBookingMinutes ?? undefined}
       minBookingMinutes={ownLimits?.minBookingMinutes ?? undefined}
       maxWeeklyBookedHours={ownLimits?.maxWeeklyBookedHours ?? undefined}
@@ -643,6 +645,7 @@ export function WeekView({ today, clock = systemClock, canBook = true,
       courts={data.courts}
       allocations={[]}
       canChooseSeveralCourts={false}
+      currency={currency}
       closed={() => setWaitlistSelection(undefined)}
       created={() => {
         setWaitlistSelection(undefined);

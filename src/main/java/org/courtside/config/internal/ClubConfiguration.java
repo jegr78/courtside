@@ -8,6 +8,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.util.Currency;
 import java.util.UUID;
 
 @Entity
@@ -88,6 +89,9 @@ public class ClubConfiguration {
     @Column(name = "access_code_length", nullable = false)
     private int accessCodeLength;
 
+    @Column(nullable = false)
+    private String currency;
+
     @Column(name = "no_membership_type_rule_set_id")
     private UUID noMembershipTypeRuleSetId;
 
@@ -132,6 +136,10 @@ public class ClubConfiguration {
 
     public void requireAccessCodesOf(int digits) {
         this.accessCodeLength = digits;
+    }
+
+    public void chargeIn(Currency currency) {
+        this.currency = currency.getCurrencyCode();
     }
 
     public void bindPeopleWithoutAMembershipTypeTo(UUID ruleSetId) {

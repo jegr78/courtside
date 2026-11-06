@@ -14,6 +14,7 @@ import { closureOn, hoursOn } from "../time/openingHours";
 import { PERSON_SEARCH_DEBOUNCE_MS, PERSON_SEARCH_MIN_LENGTH } from "../person-search";
 import { warnAbout } from "../api/failureWarning";
 import { useFinePointer } from "../booking/finePointer";
+import { formatMinor } from "../money";
 
 export interface BookingSelection {
   date: string;
@@ -30,7 +31,7 @@ export interface WaitlistSelection {
 export function BookingDialog({ selection, grid, courts, allocations, canChooseSeveralCourts,
   maxBookingMinutes: ownMaxBookingMinutes, minBookingMinutes: ownMinBookingMinutes,
   maxWeeklyBookedHours: ownMaxWeeklyBookedHours, bookingHours: ownBookingHours,
-  dependants = [], selfBookable = true, closed, created, conflicted, waitlist }: {
+  dependants = [], selfBookable = true, currency, closed, created, conflicted, waitlist }: {
   selection: BookingSelection;
   grid: BookingGrid;
   courts: PublicCourt[];
@@ -42,6 +43,7 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
   bookingHours?: BookingHours;
   dependants?: Dependant[];
   selfBookable?: boolean;
+  currency?: string;
   closed: () => void;
   created: () => Promise<void>;
   conflicted: () => Promise<void>;
@@ -203,10 +205,15 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
     ? durationMinutes : durations[0] ?? grid.slotMinutes;
   const period = useMemo(() => waitlist ?? bookingTimeSlot(selection.date, selection.slot, grid.timeZone, selectedDuration),
     [waitlist, selection.date, selection.slot, grid.timeZone, selectedDuration]);
-  const chosenPlayers = 1 + selectedMembers.length
-    + guestNames.filter((name) => name.trim()).length
-    + participantCardIds.filter(Boolean).length;
-  const requiredPlayers = requiredFor(bookingCards.find((card) => card.id === cardId), chosenPlayers);
+  const guestCount = guestNames.filter((name) => name.trim()).length;
+  const chosenPlayers = 1 + selectedMembers.length + guestCount + participantCardIds.filter(Boolean).length;
+  const chosenCard = bookingCards.find((card) => card.id === cardId);
+  const requiredPlayers = requiredFor(chosenCard, chosenPlayers);
+  const guestFee = !waitlist && currency && chosenCard && chosenCard.guestFeeMinor > 0 && guestCount > 0 ? {
+    count: guestCount,
+    fee: formatMinor(chosenCard.guestFeeMinor, i18n.language, currency),
+    total: formatMinor(chosenCard.guestFeeMinor * guestCount, i18n.language, currency)
+  } : undefined;
 
   return <Modal labelledBy="booking-heading" closed={closed} width="xl" composed testId="booking-dialog">
     <form onSubmit={(event) => void submit(event)} className="flex min-h-0 flex-col">
@@ -318,7 +325,7 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
           {index === 0 ? t("booking.guest") : t("booking.guestNumber", { number: index + 1 })}
           <input ref={index === 0 ? firstGuest : undefined} data-testid="guest-name" value={guestName} onChange={(event) => setGuestNames((current) => current.map((name, currentIndex) => currentIndex === index ? event.target.value : name))} className="form-control rounded-lg border px-3 py-3" />
         </label>)}
-        <Button variant="secondary" type="button" className="justify-self-start" onClick={() => setGuestNames((current) => [...current, ""])}>{t("booking.addGuest")}</Button>
+        <Button variant="secondary" type="button" data-testid="add-guest" className="justify-self-start" onClick={() => setGuestNames((current) => [...current, ""])}>{t("booking.addGuest")}</Button>
       </fieldset>
       <fieldset className="mt-4 grid gap-3" aria-invalid={fieldViolations("participants").length > 0} aria-describedby={describedBy("participants")}>
         <legend className="font-semibold">{t("booking.participantCards")}</legend>
@@ -337,6 +344,9 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
       </label>
       <FieldViolations id="booking-note-errors" violations={fieldViolations("note")} />
       </details>
+      </div>
+      <div aria-live="polite">
+        {guestFee && <p data-testid="booking-guest-fee" className="mt-4 font-semibold">{t("booking.guestFee", guestFee)}</p>}
       </div>
       </DialogBody>
       {/* Outside the scrolling form, so a refusal shows beside the button that caused it. */}

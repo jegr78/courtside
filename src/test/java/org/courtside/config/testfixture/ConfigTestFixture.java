@@ -13,6 +13,7 @@ import org.courtside.config.internal.ChangeClubConfigurationCommand;
 import org.courtside.config.internal.ClubConfigurationSnapshot;
 import org.courtside.config.internal.ConfigService;
 
+import java.util.Currency;
 import java.util.UUID;
 
 @RequiredArgsConstructor
@@ -71,6 +72,19 @@ public class ConfigTestFixture {
         ClubConfigurationSnapshot current = config.current();
         config.update(commandFrom(current, current.bookingReminderHours(),
                 current.noMembershipTypeRuleSetId(), languageTag));
+    }
+
+    public void chargeIn(String currencyCode) {
+        ClubConfigurationSnapshot current = config.current();
+        ChangeClubConfigurationCommand unchanged = commandFrom(current, current.bookingReminderHours(),
+                current.noMembershipTypeRuleSetId(), current.defaultLocale());
+        config.update(new ChangeClubConfigurationCommand(unchanged.clubName(), unchanged.primaryColor(),
+                unchanged.accentColor(), unchanged.logoUrl(), unchanged.imprintUrl(), unchanged.privacyUrl(),
+                unchanged.documentationUrl(), unchanged.shortName(), unchanged.defaultLocale(),
+                unchanged.slotDuration(), unchanged.timeZone(), unchanged.newAccountCredential(),
+                unchanged.passwordResetCredential(), unchanged.passwordResetToken(), unchanged.bookingReminder(),
+                unchanged.noMembershipTypeRuleSetId(), unchanged.waitlistOffer(), unchanged.accessLead(),
+                unchanged.accessLag(), unchanged.accessCodeLength(), Currency.getInstance(currencyCode)));
     }
 
     public void nameTheClub(String clubName) {
