@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.courtside.config.ClubIdentity;
 import org.courtside.config.ClubTimeZone;
 import org.courtside.identity.AccountAddresses;
+import org.courtside.identity.AccountAnonymisedException;
 import org.courtside.identity.AccountCredentials;
 import org.courtside.identity.AccountSessions;
 import org.courtside.identity.CredentialState;
@@ -139,6 +140,9 @@ public class RosterService {
         String address = strippedAddress(email);
         Person person = persons.findById(id)
                 .orElseThrow(() -> new PersonNotFoundException("No person with id " + id));
+        if (anonymised(id)) {
+            throw new AccountAnonymisedException();
+        }
         requireAddressWhereAnAccountNeedsOne(id, address);
         Set<String> changed = changedFields(person, first, last, address);
         person.rename(first, last);
@@ -157,6 +161,9 @@ public class RosterService {
         UUID id = requiredPersonId(personId);
         Person person = persons.findById(id)
                 .orElseThrow(() -> new PersonNotFoundException("No person with id " + id));
+        if (anonymised(id)) {
+            return;
+        }
         Set<String> corrected = correctedFields(person, firstName, lastName, email);
         if (firstName != null || lastName != null) {
             person.rename(
@@ -486,10 +493,18 @@ public class RosterService {
         if (!persons.existsById(personId)) {
             throw new PersonNotFoundException("No person with id " + personId);
         }
-        return accounts.findWithLockByPersonIdIn(List.of(personId)).stream()
+        UserAccount account = accounts.findWithLockByPersonIdIn(List.of(personId)).stream()
                 .reduce(RosterService::preferredAccount)
                 .orElseThrow(() -> new AccountNotFoundException(
                         "No account for person " + personId));
+        if (account.isAnonymised()) {
+            throw new AccountAnonymisedException();
+        }
+        return account;
+    }
+
+    private boolean anonymised(UUID personId) {
+        return accounts.findWithLockByPersonIdIn(List.of(personId)).stream().anyMatch(UserAccount::isAnonymised);
     }
 
     private Person requireLockedPerson(UUID personId) {

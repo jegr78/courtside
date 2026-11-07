@@ -208,6 +208,51 @@ describe("AccountSecurityView", () => {
     expect(passwordChanged).not.toHaveBeenCalled();
   });
 
+  it("given an account that may close itself, when the player confirms the closure, then it closes and the session ends", async () => {
+    // given
+    const closed = vi.spyOn(api, "closeOwnAccount").mockResolvedValue(undefined);
+    const signedOut = vi.fn();
+    render(<WithClubConfiguration><AccountSecurityView passwordChanged={vi.fn()} signedOut={signedOut} closable /></WithClubConfiguration>);
+    await renderedSecurityView();
+
+    // when
+    await userEvent.click(screen.getByTestId("close-account"));
+    expect(closed, "the first click only asks for confirmation").not.toHaveBeenCalled();
+    await userEvent.click(screen.getByTestId("close-account-confirm"));
+
+    // then
+    await waitFor(() => expect(signedOut).toHaveBeenCalledOnce());
+    expect(closed).toHaveBeenCalledOnce();
+  });
+
+  it("given an upcoming booking, when the player confirms the closure, then the refusal says why and nothing ends", async () => {
+    // given
+    vi.spyOn(api, "closeOwnAccount").mockRejectedValue(new ApiError(409, {
+      type: "urn:courtside:error:account-closure-blocked-by-booking", title: "Upcoming booking", status: 409,
+      violations: [{ code: "identity.account.closureBlockedByBooking", params: {} }]
+    }));
+    const signedOut = vi.fn();
+    render(<WithClubConfiguration><AccountSecurityView passwordChanged={vi.fn()} signedOut={signedOut} closable /></WithClubConfiguration>);
+    await renderedSecurityView();
+
+    // when
+    await userEvent.click(screen.getByTestId("close-account"));
+    await userEvent.click(screen.getByTestId("close-account-confirm"));
+
+    // then
+    expect(await screen.findByRole("alert")).toHaveTextContent(i18n.t("identity.account.closureBlockedByBooking"));
+    expect(signedOut).not.toHaveBeenCalled();
+  });
+
+  it("given an account that may not close itself, when the view loads, then it offers no closure", async () => {
+    // when
+    render(<WithClubConfiguration><AccountSecurityView passwordChanged={vi.fn()} signedOut={vi.fn()} /></WithClubConfiguration>);
+    await renderedSecurityView();
+
+    // then
+    expect(screen.queryByTestId("close-account"), "a member's account ends through the board").not.toBeInTheDocument();
+  });
+
   it("given session instants and a club zone, when the locale changes, then both dates retain the club time", async () => {
     // given
     vi.spyOn(api, "accountSessions").mockResolvedValue([{ ...current, createdAt: "2026-10-23T16:53:00Z", lastActivityAt: "2026-10-23T16:53:00Z" }]);

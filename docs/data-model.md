@@ -301,6 +301,11 @@ name that arrived through a roster import. `user_account.username` is unique; `p
 **`user_account.password_hash` is nullable.** It is null until the instance has issued a credential,
 and the sign-in path answers such a row exactly as it answers a wrong password.
 
+**`user_account.anonymised_at` marks an account that names nobody.** A closed external account keeps
+its `person` and `user_account` rows so bookings still refer to it, but the person's name and email
+and the username are placeholders. `user_account_anonymised_is_disabled` keeps such an account
+disabled and without a password.
+
 **`member` holds one row per period.** `started_on` is required and `ended_on` is the first day the
 period no longer holds, so a period covers `[started_on, ended_on)`. Both may lie in the future.
 The exclusion `member_periods_disjoint` keeps the periods of one person from overlapping; a period

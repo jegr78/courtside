@@ -34,6 +34,7 @@ export function AccountView({ session, offline = false, focusSecurity = false, p
       </dl> : <p data-testid="profile-unavailable" role="status">{t("account.unavailable")}</p>}
     </section>
     <AccountSecurityView key={session.username ?? "unavailable"} embedded focusRequested={focusSecurity}
-      passwordChanged={passwordChanged} signedOut={signedOut} mfaEnabled={session.mfaEnabled} username={session.username} />
+      passwordChanged={passwordChanged} signedOut={signedOut} mfaEnabled={session.mfaEnabled} username={session.username}
+      closable={identified && session.memberFeatures === false} />
   </div>;
 }

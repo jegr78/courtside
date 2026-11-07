@@ -21,6 +21,7 @@ class AccountController implements AccountApi {
     private final PermanentPasswordService permanentPasswords;
     private final AccountSessionService sessions;
     private final AccountLocaleService locales;
+    private final AccountClosure closure;
     private final HttpServletRequest request;
     @Override
     public ResponseEntity<Void> changeInitialPassword(ApiInitialPasswordChangeRequest change) {
@@ -52,6 +53,13 @@ class AccountController implements AccountApi {
     @Override
     public ResponseEntity<Void> endOwnSessions() {
         sessions.endAll();
+        invalidateCurrentSession();
+        return ResponseEntity.noContent().build();
+    }
+
+    @Override
+    public ResponseEntity<Void> closeOwnAccount() {
+        closure.closeOwn();
         invalidateCurrentSession();
         return ResponseEntity.noContent().build();
     }

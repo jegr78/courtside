@@ -5960,6 +5960,32 @@ paths:
         "429":
           $ref: "#/components/responses/RateLimited"
 
+  /api/account:
+    delete:
+      tags: [account]
+      operationId: closeOwnAccount
+      summary: Close the signed-in external account.
+      description: |
+        Anonymises the signed-in account in place: the person's name and email become placeholders,
+        the username is released, the account is disabled and its password, second factors and
+        sessions are removed. Open only to an external account without a running membership and
+        without ADMIN, without an upcoming confirmed booking of its own, and with a re-authentication
+        no older than five minutes.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      responses:
+        "204":
+          description: The account is closed and its sessions end after this response completed.
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
   /api/account/initial-password:
     put:
       tags: [account]
