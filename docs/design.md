@@ -1452,7 +1452,7 @@ The audit log stores identifiers, event types, actors and non-personal change de
 not copy names, addresses, credentials, static access codes or free text. Erasing the referenced person removes the link
 without rewriting the append-only event.
 
-A board keeps two categories of record for a number of months it chooses, and a category without a
+A board keeps three categories of record for a number of months it chooses, and a category without a
 period is never touched. `BOOKINGS` pseudonymises bookings and series that ended before the cut-off:
 booker, canceller, mover, creator, notes, member players and guest names leave the booking, while
 court time, status, card and guest places stay for utilisation and booking counts. `FORMER_MEMBERS`
@@ -1461,11 +1461,17 @@ were opened since, with those accounts and everything they hold. Removal does no
 departure: a member who leaves is deactivated, and only the period the board set after that ending
 erases them. A person is reported as blocked instead while an account of theirs holds the
 administrator role, a booking or series the run keeps still names them, or they wait for a court.
+`EXTERNAL_ACCOUNTS` anonymises, through `AccountAnonymisation` as a closure does, an account that is
+not anonymised yet, whose person holds no membership period, whose person's accounts all hold
+`EXTERNAL` and none `ADMIN`, and that was neither created nor signed in since the cut-off and has no
+own booking ending on or after it, an upcoming one included. Person and account rows stay, so its
+bookings keep a reference that names nobody.
 
 Every run starts as a preview that changes nothing, counts what it would change and lists the
 blocked people with their reason. Only the account that took the preview can run it, with a recent
 full authentication proof, once, before it expires and while the periods it applies are unchanged. A run
-re-checks each former member under a lock and skips one who became ineligible. Pseudonymising a
+re-checks each former member and each external account under a lock and skips one who became
+ineligible. Pseudonymising a
 booking also reaches the records that would tie it back to a person: its change log entries lose
 their actor and the person and account fields of their payload but keep type, time and subject, and
 its notification entries and queued messages are deleted. Removing a person leaves their entries

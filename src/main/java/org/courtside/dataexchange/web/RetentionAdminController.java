@@ -6,6 +6,7 @@ import org.courtside.api.ApiRetentionBlockReason;
 import org.courtside.api.ApiRetentionBlockedRecord;
 import org.courtside.api.ApiRetentionBookingsPreview;
 import org.courtside.api.ApiRetentionCategory;
+import org.courtside.api.ApiRetentionExternalAccountsPreview;
 import org.courtside.api.ApiRetentionFormerMembersPreview;
 import org.courtside.api.ApiRetentionPeriod;
 import org.courtside.api.ApiRetentionPolicy;
@@ -54,6 +55,7 @@ class RetentionAdminController implements AdminRetentionApi {
         RetentionPlan.Preview preview = retention.preview(currentUser.requireAccount().getId());
         RetentionPlan.Bookings bookings = preview.bookings();
         RetentionPlan.FormerMembers formerMembers = preview.formerMembers();
+        RetentionPlan.ExternalAccounts externalAccounts = preview.externalAccounts();
         ApiRetentionPreview response = new ApiRetentionPreview(preview.previewId(),
                 WireTypes.toOffsetDateTime(preview.expiresAt()),
                 bookings == null ? null : new ApiRetentionBookingsPreview(
@@ -61,6 +63,9 @@ class RetentionAdminController implements AdminRetentionApi {
                         Math.toIntExact(bookings.bookings()), Math.toIntExact(bookings.series())),
                 formerMembers == null ? null : new ApiRetentionFormerMembersPreview(formerMembers.membershipEndedBefore(),
                         Math.toIntExact(formerMembers.people()), Math.toIntExact(formerMembers.accounts())),
+                externalAccounts == null ? null : new ApiRetentionExternalAccountsPreview(
+                        WireTypes.toOffsetDateTime(externalAccounts.inactiveBefore()),
+                        Math.toIntExact(externalAccounts.accounts())),
                 preview.blocked().stream().map(blocked -> new ApiRetentionBlockedRecord(blocked.personId(),
                         ApiRetentionBlockReason.fromValue(blocked.reason().name()))).toList());
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
@@ -72,7 +77,8 @@ class RetentionAdminController implements AdminRetentionApi {
         RetentionPlan.Run run = retention.run(id, currentUser.requireAccount().getId());
         return ResponseEntity.ok(new ApiRetentionRun(run.runId(), Math.toIntExact(run.bookingsPseudonymised()),
                 Math.toIntExact(run.seriesPseudonymised()), Math.toIntExact(run.formerMembersRemoved()),
-                Math.toIntExact(run.accountsRemoved()), Math.toIntExact(run.formerMembersSkipped())));
+                Math.toIntExact(run.accountsRemoved()), Math.toIntExact(run.formerMembersSkipped()),
+                Math.toIntExact(run.externalAccountsAnonymised()), Math.toIntExact(run.externalAccountsSkipped())));
     }
 
     private static RetentionCategory toDomain(ApiRetentionCategory category) {

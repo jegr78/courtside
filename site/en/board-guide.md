@@ -793,7 +793,7 @@ A category without a period stays untouched, however old its records are. Which 
 is the club's decision as the controller. The [privacy kit](privacy-kit.md) helps to document that
 decision but is no legal advice.
 
-There are two categories, each with a period in months from 1 to 1200:
+There are three categories, each with a period in months from 1 to 1200:
 
 * **Bookings** pseudonymises bookings and series that ended before the period. Bookers, the
   accounts that cancelled or moved them, notes, member players and guest names disappear. Card,
@@ -802,6 +802,10 @@ There are two categories, each with a period in months from 1 to 1200:
 * **Former members** removes a person whose membership ended before the period and whose accounts
   have neither signed in nor been opened since. Their accounts and everything attached to them go
   with them.
+* **External accounts** anonymises the account of an external player without any membership that
+  was neither opened nor signed in since the period and has no booking of its own from that day,
+  an upcoming one included. Name, email address, username and password go, and its bookings stay
+  without a name. An account the player closed is already anonymous and is not counted.
 
 Before you set a booking period, know what you lose: for pseudonymised periods the statistics no
 longer count active members, and usage can no longer attribute that capacity to a membership type.
@@ -809,7 +813,7 @@ A departure is not handled by retention: a member who leaves is recorded with *E
 and only the period removes the person later.
 
 A run always starts with *Create preview*. The preview changes nothing. It counts how many
-bookings, series, former members and accounts a run would cover now and names the people it cannot
+bookings, series, former members, accounts and external accounts a run would cover now and names the people it cannot
 reach yet, with the reason:
 
 * An account of the person holds the *Administrator* role.
@@ -823,7 +827,7 @@ account that created it can run it, and it runs at most once. Anybody who signed
 preview is skipped and counted. The change log records the periods and the figures of a run, never
 the names.
 
-![Retention with one period for bookings and one for former members.](../screenshots/en/retention.png)
+![Retention with its three categories and one period per category.](../screenshots/en/retention.png)
 
 ## Two rules that hold everywhere
 

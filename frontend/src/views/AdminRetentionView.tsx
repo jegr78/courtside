@@ -20,11 +20,12 @@ import { useRetry } from "../failures/useRetry";
 import { parseDate } from "../time/clubZone";
 import { dateTimeFormatter } from "../time/dateTimeFormatter";
 
-const CATEGORIES: RetentionCategory[] = ["BOOKINGS", "FORMER_MEMBERS"];
+const CATEGORIES: RetentionCategory[] = ["BOOKINGS", "FORMER_MEMBERS", "EXTERNAL_ACCOUNTS"];
 const RECENT_AUTH = "urn:courtside:error:recent-authentication-required";
 const USED_UP = ["urn:courtside:error:retention-preview-not-found", "urn:courtside:error:retention-preview-expired"];
 const RUN_FIGURES = [
-  "bookingsPseudonymised", "seriesPseudonymised", "formerMembersRemoved", "accountsRemoved", "formerMembersSkipped"
+  "bookingsPseudonymised", "seriesPseudonymised", "formerMembersRemoved", "accountsRemoved", "formerMembersSkipped",
+  "externalAccountsAnonymised", "externalAccountsSkipped"
 ] as const;
 
 export function AdminRetentionView() {
@@ -210,6 +211,11 @@ export function AdminRetentionView() {
                 {t("admin.retention.previewFormerMembers", {
                   people: preview.formerMembers.people, accounts: preview.formerMembers.accounts,
                   before: calendarDay(preview.formerMembers.membershipEndedBefore)
+                })}
+              </li>}
+              {preview.externalAccounts && <li data-testid="retention-preview-external-accounts">
+                {t("admin.retention.previewExternalAccounts", {
+                  accounts: preview.externalAccounts.accounts, before: instantDay(preview.externalAccounts.inactiveBefore)
                 })}
               </li>}
             </ul>

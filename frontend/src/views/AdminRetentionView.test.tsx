@@ -22,12 +22,14 @@ const preview: RetentionPreview = {
   expiresAt: "2026-10-17T10:30:00Z",
   bookings: { endedBefore: "2024-10-16T11:00:00Z", bookings: 41, series: 2 },
   formerMembers: { membershipEndedBefore: "2025-10-17", people: 3, accounts: 2 },
+  externalAccounts: { inactiveBefore: "2025-10-16T22:00:00Z", accounts: 4 },
   blocked: [{ personId: MARY, reason: "NAMED_IN_BOOKINGS" }, { personId: RICHARD, reason: "ADMINISTRATOR" }]
 };
 
 const run: RetentionRun = {
   runId: "6b000000-0000-0000-0000-000000000001",
-  bookingsPseudonymised: 41, seriesPseudonymised: 2, formerMembersRemoved: 3, accountsRemoved: 2, formerMembersSkipped: 0
+  bookingsPseudonymised: 41, seriesPseudonymised: 2, formerMembersRemoved: 3, accountsRemoved: 2, formerMembersSkipped: 0,
+  externalAccountsAnonymised: 4, externalAccountsSkipped: 0
 };
 
 const recentAuthenticationRequired = new ApiError(403, {
@@ -124,6 +126,8 @@ describe("AdminRetentionView", () => {
     // then
     expect(screen.getByTestId("retention-preview-bookings")).toHaveTextContent("41 bookings, 2 series");
     expect(screen.getByTestId("retention-preview-former-members")).toHaveTextContent("3 former members with 2 accounts");
+    expect(screen.getByTestId("retention-preview-external-accounts"), "the third category counts the external accounts it anonymises")
+      .toHaveTextContent("4 external accounts");
     const rows = within(screen.getByTestId("retention-blocked")).getAllByTestId("retention-blocked-row");
     expect(rows.map((row) => row.dataset.reason)).toEqual(["NAMED_IN_BOOKINGS", "ADMINISTRATOR"]);
     expect(rows[0]).toHaveTextContent(i18n.t("admin.retention.reason.NAMED_IN_BOOKINGS"));

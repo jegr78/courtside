@@ -5,7 +5,8 @@ import java.util.UUID;
 
 public enum RetentionCategory {
     BOOKINGS,
-    FORMER_MEMBERS;
+    FORMER_MEMBERS,
+    EXTERNAL_ACCOUNTS;
 
     /** The change-log subject for this category's period, stable across instances. */
     public UUID subjectId() {

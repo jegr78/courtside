@@ -84,6 +84,7 @@ public class RetentionRows {
         String cutoff = switch (category) {
             case BOOKINGS -> "bookings_ended_before";
             case FORMER_MEMBERS -> "memberships_ended_before";
+            case EXTERNAL_ACCOUNTS -> "externals_inactive_before";
         };
         return jdbc.sql("DELETE FROM retention_preview WHERE " + cutoff + " IS NOT NULL").update();
     }
@@ -210,6 +211,47 @@ public class RetentionRows {
                 .list();
     }
 
+    private static final String INACTIVE_EXTERNAL = """
+            u.anonymised_at IS NULL
+              AND NOT EXISTS (SELECT 1 FROM member m WHERE m.person_id = u.person_id)
+              AND NOT EXISTS (SELECT 1 FROM user_account o WHERE o.person_id = u.person_id
+                              AND (o.created_at >= :inactiveBefore OR o.last_login_at >= :inactiveBefore
+                                   OR NOT EXISTS (SELECT 1 FROM user_account_role r
+                                                  WHERE r.user_account_id = o.id AND r.role = 'EXTERNAL')
+                                   OR EXISTS (SELECT 1 FROM user_account_role r
+                                              WHERE r.user_account_id = o.id AND r.role = 'ADMIN')
+                                   OR EXISTS (SELECT 1 FROM booking b WHERE b.booked_by = o.id
+                                              AND %s >= :inactiveBefore)))""".formatted(BOOKING_END);
+
+    /** External accounts of people without a membership period that did nothing since the cut-off. */
+    public List<UUID> inactiveExternalAccounts(Instant inactiveBefore) {
+        return jdbc.sql("SELECT u.id FROM user_account u WHERE " + INACTIVE_EXTERNAL + " ORDER BY u.id")
+                .param("inactiveBefore", utc(inactiveBefore))
+                .query(UUID.class)
+                .list();
+    }
+
+    // The locks come first, so the check that follows reads what a waiting booking or sign-in committed.
+    public boolean lockIfStillInactiveExternal(UUID accountId, Instant inactiveBefore) {
+        List<UUID> person = jdbc.sql("""
+                        SELECT p.id FROM person p JOIN user_account u ON u.person_id = p.id
+                        WHERE u.id = :id FOR UPDATE OF p
+                        """).param("id", accountId).query(UUID.class).list();
+        if (person.isEmpty()) {
+            return false;
+        }
+        jdbc.sql("SELECT id FROM user_account WHERE person_id = :person ORDER BY id FOR UPDATE")
+                .param("person", person.getFirst()).query(UUID.class).list();
+        jdbc.sql("SELECT id FROM member WHERE person_id = :person FOR UPDATE")
+                .param("person", person.getFirst()).query(UUID.class).list();
+        return jdbc.sql("SELECT u.id FROM user_account u WHERE u.id = :id AND " + INACTIVE_EXTERNAL)
+                .param("id", accountId)
+                .param("inactiveBefore", utc(inactiveBefore))
+                .query(UUID.class)
+                .optional()
+                .isPresent();
+    }
+
     public long accountsOf(List<UUID> personIds) {
         if (personIds.isEmpty()) {
             return 0;
@@ -296,12 +338,15 @@ public class RetentionRows {
 
     public void savePreview(UUID previewId, UUID createdBy, Instant createdAt, Instant expiresAt,
                             @Nullable Instant bookingsEndedBefore, @Nullable LocalDate membershipsEndedBefore,
-                            List<UUID> formerMemberIds) {
+                            List<UUID> formerMemberIds, @Nullable Instant externalsInactiveBefore,
+                            List<UUID> externalAccountIds) {
         jdbc.sql("""
                         INSERT INTO retention_preview (id, created_by, created_at, expires_at, bookings_ended_before,
-                                                       memberships_ended_before, former_member_ids)
+                                                       memberships_ended_before, former_member_ids,
+                                                       externals_inactive_before, external_account_ids)
                         VALUES (:id, :createdBy, :createdAt, :expiresAt, :bookingsEndedBefore,
-                                :membershipsEndedBefore, CAST(:formerMemberIds AS uuid[]))
+                                :membershipsEndedBefore, CAST(:formerMemberIds AS uuid[]),
+                                :externalsInactiveBefore, CAST(:externalAccountIds AS uuid[]))
                         """)
                 .param("id", previewId)
                 .param("createdBy", createdBy)
@@ -311,17 +356,21 @@ public class RetentionRows {
                 .param("membershipsEndedBefore", membershipsEndedBefore)
                 .param("formerMemberIds", formerMemberIds.stream().map(UUID::toString)
                         .collect(Collectors.joining(",", "{", "}")))
+                .param("externalsInactiveBefore", externalsInactiveBefore == null ? null : utc(externalsInactiveBefore))
+                .param("externalAccountIds", externalAccountIds.stream().map(UUID::toString)
+                        .collect(Collectors.joining(",", "{", "}")))
                 .update();
     }
 
     public record StoredPreview(UUID createdBy, Instant createdAt, Instant expiresAt, @Nullable Instant bookingsEndedBefore,
-                                @Nullable LocalDate membershipsEndedBefore, List<UUID> formerMemberIds) {
+                                @Nullable LocalDate membershipsEndedBefore, List<UUID> formerMemberIds,
+                                @Nullable Instant externalsInactiveBefore, List<UUID> externalAccountIds) {
     }
 
     public Optional<StoredPreview> lockPreview(UUID previewId) {
         return jdbc.sql("""
                         SELECT created_by, created_at, expires_at, bookings_ended_before, memberships_ended_before,
-                               former_member_ids
+                               former_member_ids, externals_inactive_before, external_account_ids
                         FROM retention_preview WHERE id = :id FOR UPDATE
                         """)
                 .param("id", previewId)
@@ -332,7 +381,10 @@ public class RetentionRows {
                         Optional.ofNullable(rs.getObject("bookings_ended_before", OffsetDateTime.class))
                                 .map(OffsetDateTime::toInstant).orElse(null),
                         rs.getObject("memberships_ended_before", LocalDate.class),
-                        uuids(rs.getArray("former_member_ids"))))
+                        uuids(rs.getArray("former_member_ids")),
+                        Optional.ofNullable(rs.getObject("externals_inactive_before", OffsetDateTime.class))
+                                .map(OffsetDateTime::toInstant).orElse(null),
+                        uuids(rs.getArray("external_account_ids"))))
                 .optional();
     }
 

@@ -837,7 +837,7 @@ sind. Welche Frist rechtmäßig ist, entscheidet der Verein als Verantwortlicher
 [Datenschutz-Kit](privacy-kit.md) hilft beim Dokumentieren dieser Entscheidung, ersetzt aber keine
 Rechtsberatung.
 
-Es gibt zwei Kategorien, jede mit einer Frist in Monaten von 1 bis 1200:
+Es gibt drei Kategorien, jede mit einer Frist in Monaten von 1 bis 1200:
 
 * **Buchungen** pseudonymisiert Buchungen und Serien, die vor der Frist endeten. Bucher, stornierende
   und verschiebende Konten, Notizen, mitspielende Mitglieder und die Namen von Gästen verschwinden.
@@ -846,6 +846,11 @@ Es gibt zwei Kategorien, jede mit einer Frist in Monaten von 1 bis 1200:
 * **Ehemalige Mitglieder** entfernt eine Person, deren Mitgliedschaft vor der Frist endete und deren
   Konten sich seither nicht angemeldet haben und nicht neu angelegt wurden. Mit ihr verschwinden
   ihre Konten und alles, was an ihnen hängt.
+* **Externe Konten** anonymisiert das Konto eines externen Spielers ohne jede Mitgliedschaft, das
+  seit der Frist weder angelegt noch angemeldet wurde und keine eigene Buchung ab diesem Tag hat,
+  auch keine anstehende. Name, E-Mail-Adresse, Benutzername und Passwort entfallen, seine Buchungen
+  bleiben ohne Namen. Ein Konto, das der Spieler selbst geschlossen hat, ist schon anonym und zählt
+  nicht mit.
 
 Lies vor dem Setzen einer Buchungsfrist, was dir danach fehlt: Für pseudonymisierte Zeiträume zählt
 die Statistik keine aktiven Mitglieder mehr, und die Nutzung kann die Kapazität dieser Zeit keiner
@@ -854,7 +859,7 @@ Aufbewahrung: Wer geht, wird mit *Mitgliedschaft beenden* ausgetragen, und erst 
 die Person später.
 
 Ein Lauf beginnt immer mit *Vorschau erstellen*. Die Vorschau ändert nichts. Sie zählt, wie viele
-Buchungen, Serien, ehemalige Mitglieder und Konten ein Lauf jetzt erfassen würde, und nennt die
+Buchungen, Serien, ehemalige Mitglieder, Konten und externe Konten ein Lauf jetzt erfassen würde, und nennt die
 Personen, die er noch nicht erreicht, mit dem Grund:
 
 * Ein Konto der Person hat die Rolle *Administrator*.
@@ -868,7 +873,7 @@ gilt 30 Minuten, nur das Konto, das sie erstellt hat, kann sie ausführen, und s
 einmal. Wer sich seit der Vorschau wieder angemeldet hat, wird übersprungen und gezählt. Das
 Änderungsprotokoll hält die gesetzten Fristen und die Zahlen eines Laufs fest, nie die Namen.
 
-![Die Aufbewahrung mit je einer Frist für Buchungen und für ehemalige Mitglieder.](screenshots/de/retention.png)
+![Die Aufbewahrung mit ihren drei Kategorien und einer Frist je Kategorie.](screenshots/de/retention.png)
 
 ## Zwei Regeln, die überall gelten
 
