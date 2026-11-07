@@ -782,11 +782,11 @@ test("given the security job, when CodeQL brackets the build, then only the trac
   const analyze = steps.findIndex((step) => String(step.uses ?? "").startsWith("github/codeql-action/analyze"));
 
   // when
-  const bracketed = steps.slice(init + 1, analyze).map((step) => step.name ?? step.uses);
+  const bracketed = steps.slice(init + 1, analyze).map((step) => step.name ?? String(step.uses).replace(/@.*/, ""));
 
   // then
   assert.deepEqual(bracketed, [
-    "actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad", "./.github/actions/npm-network",
+    "actions/setup-java", "./.github/actions/npm-network",
     "Install security toolchain", "Build security candidate"
   ], "a failure inside the bracket uploads an unsuccessful CodeQL execution and blames CodeQL for another step");
 });
