@@ -69,6 +69,7 @@
         "listOwnSessions",
         "endOwnSessions",
         "endOwnSession",
+        "closeOwnAccount",
         "changeOwnLocale",
         "listOwnMessageChoices",
         "chooseOwnMessages",

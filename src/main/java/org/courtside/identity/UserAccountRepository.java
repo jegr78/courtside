@@ -96,4 +96,8 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, UUID> 
             """)
     long countEnabledHoldingRoleExcept(@Param("role") Role role,
                                        @Param("excludedAccountId") UUID excludedAccountId);
+
+    // A closure holds the row for update, so a booking waits for it and then sees the account closed.
+    @Query(value = "SELECT anonymised_at IS NOT NULL FROM user_account WHERE id = :id FOR SHARE", nativeQuery = true)
+    Optional<Boolean> lockClosedFlag(@Param("id") UUID id);
 }

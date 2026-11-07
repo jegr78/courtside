@@ -97,6 +97,7 @@
         "createImportSource",
         "createMembershipType",
         "createOpeningPeriod",
+        "closeOwnAccount",
         "createParticipantCard",
         "createPerson",
         "createRuleSet",

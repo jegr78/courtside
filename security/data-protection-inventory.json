@@ -2177,6 +2177,10 @@
         "level": "personal",
         "lifecycle": "account-cascade"
       },
+      "anonymised_at": {
+        "level": "operational",
+        "lifecycle": "account-cascade"
+      },
       "locale": {
         "level": "operational",
         "lifecycle": "account-cascade"

@@ -306,6 +306,19 @@ request boundary and each service refuse it the member search, participant cards
 invitations, dependants, the waitlist and series with `access-denied`, `BookingWriter` refuses any
 participant but a guest with `booking.participants.outsiderGuestsOnly`, and the session reports
 `memberFeatures` false so the client hides those features. A running membership lifts the closure.
+An outsider closes its own account with `DELETE /api/account` after a re-authentication no older
+than five minutes; a member's account ends through the board. `AccountClosure` refuses anyone else
+with `identity.account.closureNotOpen` and an outsider holding a confirmed booking of its own that has
+not ended, read through `shared.UpcomingBookings`, with `identity.account.closureBlockedByBooking`.
+Closing anonymises the account in place through `AccountAnonymisation`: the person's name and email
+become placeholders, the username becomes `anonymised-` and the account id so the name is free again,
+the account is disabled and records `anonymised_at`, its password, second factors, challenges, reset
+code, queued messages, notification entries and import references are deleted and its sessions end
+after commit. Person and account rows stay, so bookings keep a reference that names nobody.
+`identity.account.closed` names the account id only. The roster refuses to change, enable or issue
+credentials to an anonymised account with `identity.account.anonymised`, a roster synchronisation
+leaves such a person untouched, and `BookingWriter` reads the booker's account `FOR SHARE`, so a
+booking written while the account closes waits for the closure and is then refused the same way.
 An empty managing-role set
 permits only the owner and administrators to manage the booking. Managing roles never inherit from
 booking roles.

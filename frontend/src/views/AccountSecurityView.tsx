@@ -20,9 +20,10 @@ export function AccountSecurityView(props: ComponentProps<typeof AccountSecurity
   return <AccountSecurityContent key={props.username} {...props} />;
 }
 
-function AccountSecurityContent({ passwordChanged, signedOut, embedded = false, focusRequested = false, mfaEnabled, username }: {
+function AccountSecurityContent({ passwordChanged, signedOut, embedded = false, focusRequested = false, mfaEnabled, username, closable = false }: {
   mfaEnabled?: boolean;
   username?: string;
+  closable?: boolean;
   passwordChanged: () => void;
   signedOut: (preserveRecoveryCodes?: boolean) => void;
   embedded?: boolean;
@@ -34,6 +35,7 @@ function AccountSecurityContent({ passwordChanged, signedOut, embedded = false, 
   const [failure, setFailure] = useState<string>();
   const [reauthenticationFailure, setReauthenticationFailure] = useState<string>();
   const [pending, setPending] = useState(false);
+  const [confirmingClosure, setConfirmingClosure] = useState(false);
   const heading = useRef<HTMLHeadingElement>(null);
   const actionVersion = useRef(0);
   const proofVersion = useRef(0);
@@ -175,5 +177,19 @@ function AccountSecurityContent({ passwordChanged, signedOut, embedded = false, 
       <TextField id="confirm-password" name="confirm-password" data-testid="confirm-password" type="password" autoComplete="new-password" minLength={12} maxLength={256} required label={t("password.confirm")} />
       <div><Button variant="primary" data-testid="password-submit" disabled={pending} type="submit">{t("password.submit")}</Button></div>
     </form>
+    {closable && <section data-testid="account-closure" aria-labelledby="account-closure-title" className="grid gap-3">
+      <Subheading id="account-closure-title" className="text-xl font-bold">{t("accountSecurity.closure.title")}</Subheading>
+      <p className="text-muted">{t("accountSecurity.closure.hint")}</p>
+      {confirmingClosure ? <div className="grid gap-3">
+        <p data-testid="close-account-warning" className="font-semibold">{t("accountSecurity.closure.warning")}</p>
+        <div className="flex flex-wrap gap-3">
+          <Button variant="destructive" disabled={pending} type="button" data-testid="close-account-confirm"
+            onClick={() => void run(api.closeOwnAccount, signedOut)}>{t("accountSecurity.closure.confirm")}</Button>
+          <Button variant="secondary" disabled={pending} type="button" data-testid="close-account-cancel"
+            onClick={() => setConfirmingClosure(false)}>{t("accountSecurity.closure.keep")}</Button>
+        </div>
+      </div> : <div><Button variant="destructive" disabled={pending} type="button" data-testid="close-account"
+        onClick={() => setConfirmingClosure(true)}>{t("accountSecurity.closure.start")}</Button></div>}
+    </section>}
   </section>;
 }

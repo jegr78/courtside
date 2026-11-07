@@ -58,6 +58,9 @@ public class UserAccount {
     @Column(name = "last_login_at", insertable = false, updatable = false)
     private Instant lastLoginAt;
 
+    @Column(name = "anonymised_at")
+    private Instant anonymisedAt;
+
     @Column(name = "security_epoch", nullable = false)
     private long securityEpoch;
 
@@ -154,6 +157,20 @@ public class UserAccount {
         this.credentialsExpireAt = null;
         revokeSessions();
         return true;
+    }
+
+    public boolean isAnonymised() {
+        return anonymisedAt != null;
+    }
+
+    public void anonymise(Instant at) {
+        this.username = "anonymised-" + id;
+        this.passwordHash = null;
+        this.credentialsExpireAt = null;
+        this.passwordChangeRequired = false;
+        this.enabled = false;
+        this.anonymisedAt = at;
+        revokeSessions();
     }
 
     void revokeSessions() {

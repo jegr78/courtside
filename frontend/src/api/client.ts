@@ -404,6 +404,7 @@ export const api = {
   verifyRegistration: (code: string) => request<void>("/api/registration/verification", {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code })
   }),
+  closeOwnAccount: () => request<void>("/api/account", { method: "DELETE" }, true, true),
   requestPasswordReset: (username: string) => request<void>("/api/account-recovery/password", {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username })
   }),

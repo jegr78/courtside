@@ -23,9 +23,11 @@ import org.courtside.config.ClubCurrency;
 import org.courtside.card.ParticipantCard;
 import org.courtside.facility.FacilityService;
 import org.courtside.config.BookingGridCoordination;
+import org.courtside.identity.AccountAnonymisedException;
 import org.courtside.identity.Outsiders;
 import org.courtside.identity.PersonRepository;
 import org.courtside.identity.Role;
+import org.courtside.identity.UserAccountRepository;
 import org.courtside.shared.BookingCancelled;
 import org.courtside.shared.CancellationReason;
 import org.courtside.shared.DomainFailure;
@@ -71,6 +73,7 @@ class BookingWriter implements SeriesOccurrenceCancellation, BookingDrafts, Unat
     private final CardEligibilityPolicy cardEligibility;
     private final FacilityService facility;
     private final PersonRepository personRepository;
+    private final UserAccountRepository accounts;
     private final Outsiders outsiders;
     private final ParticipantCardCapacity participantCardCapacity;
     private final BookingGridCoordination bookingGridCoordination;
@@ -120,6 +123,9 @@ class BookingWriter implements SeriesOccurrenceCancellation, BookingDrafts, Unat
 
     UUID write(CreateBookingCommand command, String idempotencyKey, String requestFingerprint) {
         bookingGridCoordination.lock();
+        if (accounts.lockClosedFlag(command.bookedBy()).orElse(false)) {
+            throw new AccountAnonymisedException();
+        }
         List<ParticipantSpec> slots = bookable(command);
         if (CourtReservations.overriddenBy(command.callerRoles(), command.cardId(), true)) {
             reservations.withdrawFor(command.courtIds(), command.slot(), command.bookedBy());
