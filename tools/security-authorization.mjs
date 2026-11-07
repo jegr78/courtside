@@ -50,7 +50,7 @@ export function buildOperationAuthorizationMatrix(api) {
           parameters: [...(pathItem.parameters ?? []), ...(operation.parameters ?? [])],
           requestBody: operation.requestBody,
           security: operation.security ?? inheritedSecurity,
-          expectations: operationExpectations(path, method, operation.security ?? inheritedSecurity),
+          expectations: operationExpectations(path, method, operation.operationId, operation.security ?? inheritedSecurity),
           ...(mfaEntryProof(path) ? { proofRequirement: mfaEntryProof(path) } : {})
         };
       }));
@@ -108,7 +108,7 @@ export const memberOnlyPaths = Object.freeze([
   /^\/api\/booking-series(?:-preview)?(?:\/|$)/
 ]);
 
-function operationExpectations(path, method, security) {
+function operationExpectations(path, method, operationId, security) {
   const expectations = Object.fromEntries(authorizationActors.map((actor) => [actor, "deny-forbidden"]));
   if (path === "/api/account/initial-password") {
     expectations.ANONYMOUS = "deny-unauthenticated";
@@ -135,6 +135,10 @@ function operationExpectations(path, method, security) {
     return Object.fromEntries(authorizationActors.map((actor) => [actor, "allow"]));
   }
   expectations.ANONYMOUS = "deny-unauthenticated";
+  if (operationId === "closeOwnAccount") {
+    expectations.EXTERNAL = "allow";
+    return expectations;
+  }
   if (path.startsWith("/api/admin")) {
     expectations.ADMIN = "allow";
     return expectations;
@@ -152,7 +156,8 @@ function operationExpectations(path, method, security) {
 const terminalOperationOrder = new Map([
   ["endOwnSessions", 1],
   ["endAllSessions", 2],
-  ["logOut", 3]
+  ["logOut", 3],
+  ["closeOwnAccount", 4]
 ]);
 const credentialProofOperationIds = new Set([
   "reauthenticate",
