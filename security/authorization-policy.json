@@ -4,7 +4,7 @@
   "purpose": "This is the normative authorization policy for the shipped Courtside API. OpenAPI defines the transport shape; this policy defines who may perform each operation, which resource attributes narrow that permission, and which protected fields each projection may read or write.",
   "openApiFieldInventorySha256": "f31c14d52d66f163b1198256f6b13324b3badb5b8766ec0657227aebe0f78d12",
   "protectedFieldInventorySha256": "5295a7c44ccdfbecede95000d5f40299f3bfb9026c9b5b5afde1dc1e58301aa0",
-  "productionAuthorizationSha256": "0f74a6f6df5125a661b69c3ffca120a4b79e777b70f179e25c1792d058ed9698",
+  "productionAuthorizationSha256": "7fa0a4fc1b7d3bd0d730e288ebfb741e6835fbdbcca1852017f3c7a5369444e1",
   "ordinaryFields": [
     "Problem.detail",
     "Problem.fieldErrors",
@@ -4214,7 +4214,7 @@
     },
     {
       "id": "members-door-codes",
-      "description": "Permanent accounts read the static codes of the doors open to every member, answered only to a current member.",
+      "description": "Permanent accounts read the static codes of the doors open to every member, answered only to a current member or to an outsider whose own booking still opens the doors.",
       "operationIds": [
         "listMembersDoorCodes"
       ],
@@ -5483,22 +5483,26 @@
     {
       "id": "members-door-code-projection",
       "title": "Members' door code projection",
-      "rule": "The door codes derive identity from the current account and list the name and static code of each active access point open to members only when that account is enabled and its person holds a membership period covering today; anybody else receives an empty list rather than a refusal.",
+      "rule": "The door codes derive identity from the current account and list the name and static code of each active access point open to members only when that account is enabled and its person holds a membership period covering today, or when it is an outsider holding a confirmed booking of its own on a card that grants access whose access window has not closed; anybody else receives an empty list rather than a refusal.",
       "attributes": [
         "current-account",
         "current-membership"
       ],
       "productionPaths": [
         "src/main/java/org/courtside/booking/web/DoorCodeController.java#listMembersDoorCodes",
+        "src/main/java/org/courtside/booking/internal/BookedDoorCodeAudience.java#includes",
         "src/main/java/org/courtside/member/MemberService.java#isCurrentMember",
         "src/main/java/org/courtside/facility/FacilityService.java#membersDoorCodes"
       ],
       "positiveTests": [
-        "src/test/java/org/courtside/booking/web/MembersDoorCodeVisibilityTest.java#givenACurrentMemberWithoutAnyBooking_whenReadingTheDoorCodes_thenOnlyTheClubhouseCodeComes"
+        "src/test/java/org/courtside/booking/web/MembersDoorCodeVisibilityTest.java#givenACurrentMemberWithoutAnyBooking_whenReadingTheDoorCodes_thenOnlyTheClubhouseCodeComes",
+        "src/test/java/org/courtside/booking/web/ExternalDoorCodeVisibilityTest.java#givenAnExternalPlayerWithAnUpcomingBooking_whenReadingTheDoorCodes_thenEveryDoorOpenToMembersComes"
       ],
       "negativeTests": [
         "src/test/java/org/courtside/booking/web/MembersDoorCodeVisibilityTest.java#givenAFormerMember_whenReadingTheDoorCodes_thenTheListIsEmpty",
-        "src/test/java/org/courtside/booking/web/MembersDoorCodeVisibilityTest.java#givenACurrentMemberWhoseAccountIsDisabled_whenReadingTheDoorCodes_thenTheListIsEmpty"
+        "src/test/java/org/courtside/booking/web/MembersDoorCodeVisibilityTest.java#givenACurrentMemberWhoseAccountIsDisabled_whenReadingTheDoorCodes_thenTheListIsEmpty",
+        "src/test/java/org/courtside/booking/web/ExternalDoorCodeVisibilityTest.java#givenAnExternalPlayerWithoutABooking_whenReadingTheDoorCodes_thenTheListIsEmpty",
+        "src/test/java/org/courtside/booking/web/ExternalDoorCodeVisibilityTest.java#givenAnExternalPlayerWhoseLastWindowHasEnded_whenReadingTheDoorCodes_thenTheListIsEmpty"
       ]
     },
     {
@@ -7600,7 +7604,7 @@
     {
       "id": "members-door-code-read",
       "access": "read",
-      "description": "A door's static code reaches a member outside a booking only in the members' door code projection, and only while that member is current.",
+      "description": "A door's static code open to members reaches an account only in the members' door code projection, and only while that account is a current member or an outsider whose own booking still opens the doors.",
       "fields": [
         "AccessCode.code"
       ],

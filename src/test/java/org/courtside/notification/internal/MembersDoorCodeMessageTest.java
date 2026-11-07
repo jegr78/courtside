@@ -203,7 +203,7 @@ class MembersDoorCodeMessageTest extends AbstractIntegrationTest {
         assertThat(captured.getAllValues()).as("a former member is not handed the door code").isEmpty();
         assertThat(jdbc.sql("SELECT state, reason FROM message_record WHERE kind = 'MEMBERS_DOOR_CODE_CHANGED'")
                 .query().singleRow())
-                .containsEntry("state", "FAILED").containsEntry("reason", "NoLongerMember");
+                .containsEntry("state", "FAILED").containsEntry("reason", "NoLongerEntitled");
     }
 
     private UUID member(String firstName, String lastName, LocalDate startedOn, LocalDate endedOn) {

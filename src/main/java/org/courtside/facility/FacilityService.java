@@ -180,6 +180,7 @@ public class FacilityService {
         requireCodes(accessPointId, staticCode, codeChanged, emergencyCode, emergencyCodeChanged);
         requireCodeWhenOpenToMembers(staticCode, openToMembers);
         boolean openedToMembers = openToMembers && !accessPoint.isOpenToMembers();
+        boolean closedToMembers = !openToMembers && accessPoint.isOpenToMembers();
         String group = requireLoxoneGroup(loxoneGroup);
         List<String> changedFields = new ArrayList<>();
         if (!accessPoint.getName().equals(stored)) changedFields.add("name");
@@ -197,7 +198,7 @@ public class FacilityService {
             events.publishEvent(new FacilityEvent.AccessPointChanged(
                     saved.getId(), sorted(courtsServed), changedFields));
         }
-        announceCode(saved, codeChanged ? courtsServed : added);
+        announceCode(saved, codeChanged || closedToMembers ? courtsServed : added);
         if (codeChanged || openedToMembers) {
             announceToMembers(saved);
         }
@@ -222,7 +223,8 @@ public class FacilityService {
     }
 
     private void announceCode(AccessPoint accessPoint, Set<UUID> courtsReached) {
-        if (accessPoint.isActive() && accessPoint.getStaticCode() != null && !courtsReached.isEmpty()) {
+        if (accessPoint.isActive() && accessPoint.getStaticCode() != null && !accessPoint.isOpenToMembers()
+                && !courtsReached.isEmpty()) {
             events.publishEvent(new AccessCodeChanged(accessPoint.getId(), sorted(courtsReached)));
         }
     }

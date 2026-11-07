@@ -1247,6 +1247,7 @@ const de = {
   "myBookings.emergencyCodeFor": "Notfallcode für {{accessPoint}}:",
   "myBookings.doorCodes": "Türcodes",
   "myBookings.doorCodesHint": "Diese Codes öffnen Türen des Vereins für alle Mitglieder, mit oder ohne Buchung.",
+  "myBookings.doorCodesHintBooking": "Diese Codes öffnen Türen des Vereins, solange du eine Buchung hast, bis das Zugangsfenster deiner letzten endet.",
   "myBookings.checkedInSuccess": "Du bist eingecheckt.",
   "myBookings.checkInFrom": "Einchecken ab {{time}}",
   "myBookings.unknownCourt": "Unbekannter Platz",

@@ -171,7 +171,9 @@ packages; none of them depends on it. `access` depends on `card`, `config`, `fac
 reads bookings only through `shared.BookingAnnouncer` and reacts to their events after commit;
 `booking` does not depend on it and reads a booking's own code through `shared.IssuedAccessCodes`,
 which `access` implements. `notification` depends on `facility` and `member` only to tell current
-members a door code, which no booking event carries, and on `access` only for `access.grant.installed`.
+members a door code, which no booking event carries, and reads the outsiders who may see it through
+`shared.DoorCodeAudience`, which `booking` implements. It depends on `access` only for
+`access.grant.installed`.
 
 Controllers implement generated interfaces and translate HTTP. Services own business operations.
 Repositories persist state and do not decide policy.
@@ -189,7 +191,8 @@ and the outbox message in the same transaction. A committed change therefore alw
 message cannot be stored does not commit: the request fails and nothing of it remains. A mail
 listener never talks to the relay, so a failed handover cannot roll back a change that committed.
 The members' door code is the exception: its listener runs after commit through the publication
-registry, off the request thread, and queues one page of current members per transaction. After a
+registry, off the request thread, and queues one page of current members, then of bookers whose
+booking still opens the doors, per transaction. After a
 crash the walk repeats from the start, so earlier pages may be told twice and none is skipped.
 Publishing such an event outside a transaction is refused. Other after-commit listeners run through
 Spring Modulith's event publication registry, whose incomplete publications remain available after
@@ -628,13 +631,15 @@ one either.
 
 A board may open an access point with a static code to every member, for a clubhouse door that is
 not tied to a court. `GET /api/my/door-codes` lists the name and code of every active access point
-open to members, and it is empty for an account that is not a current member: one whose person holds
-a membership period covering today and whose account is enabled. My bookings shows that list at its
-top. The installed app reads it from the network first and keeps the last answer beside the bookings
+open to members to a current member, one whose person holds a membership period covering today and
+whose account is enabled. An outsider sees the same list while it holds a confirmed booking of its
+own on a card that grants access whose access window has not closed, from the booking's confirmation
+on. Every other account receives an empty list. My bookings shows that list at its top. The installed app reads it from the network first and keeps the last answer beside the bookings
 for offline use, with no end of validity, until the next refresh or sign-out. The mark needs a static code: `FacilityService` refuses a mark without one,
 or clearing the code of a marked access point, with `facility.accessPoint.openToMembersNeedsCode`
-before `access_point_open_to_members_has_code` would. Such an access point may still serve courts and
-then hands its code to their bookings as any other one does.
+before `access_point_open_to_members_has_code` would. Such an access point may still serve courts, but
+its code stays out of their bookings and their booking messages, which carry only the codes of the
+access points kept to bookings. Its courts announce `ACCESS_CODE_CHANGED` when it loses the mark.
 
 An access point without a static code may keep an emergency code, which the board leaves on the
 keypad for the case that a booking's own code is missing or does not work. It follows the static
@@ -1206,13 +1211,12 @@ through `shared` events, `facility.accessPoint.codeChanged` or `card.bookingCard
 then `booking.booking.accessCodeChanged`, so `notification` gains no dependency on `card`.
 
 An active access point open to members announces `MEMBERS_DOOR_CODE_CHANGED` to every current member
-when its code changes, when it gains the mark or is created with it, and when it is activated again.
+and to every outsider who may read the list above when its code changes, when it gains the mark or is created with it, and when it is activated again.
 `facility.accessPoint.membersDoorCodeChanged` names the access point only. `notification` pages the
-current members' accounts a hundred at a time, one transaction per page, and the message carries the
-code current when it is written; one written after the access point lost its mark, its code or its
-active flag fails as `AccessWithdrawn`, and one written after the recipient stopped being a current
-member fails as `NoLongerMember`. A member who also holds a booking behind that access point
-may receive the booking notice as well.
+current members' accounts, then the bookers whose booking still opens the doors, a hundred at a time
+and one transaction per page, and the message carries the code current when it is written; one
+written after the access point lost its mark, its code or its active flag fails as `AccessWithdrawn`,
+and one written after the recipient may no longer read the list fails as `NoLongerEntitled`.
 
 Current messages cover the welcome for a new account, generated credentials, password-reset codes, username reminders, booking
 confirmations, participant additions and withdrawals, displaced bookings, upcoming reminders,

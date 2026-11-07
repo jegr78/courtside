@@ -86,6 +86,33 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
                                                      @Param("after") UUID after, @Param("limit") int limit);
 
     @Query(value = """
+            SELECT EXISTS (SELECT 1 FROM booking b
+            JOIN court_allocation a ON a.booking_id = b.id
+            JOIN booking_card c ON c.id = b.card_id
+            WHERE b.booked_by = :accountId
+              AND b.status = 'CONFIRMED'
+              AND a.status = 'CONFIRMED'
+              AND c.grants_access
+              AND a.ends_at > :endedBefore)
+            """, nativeQuery = true)
+    boolean existsOpeningDoorsBookedBy(@Param("accountId") UUID accountId, @Param("endedBefore") Instant endedBefore);
+
+    @Query(value = """
+            SELECT DISTINCT b.booked_by FROM booking b
+            JOIN court_allocation a ON a.booking_id = b.id
+            JOIN booking_card c ON c.id = b.card_id
+            WHERE b.status = 'CONFIRMED'
+              AND a.status = 'CONFIRMED'
+              AND c.grants_access
+              AND a.ends_at > :endedBefore
+              AND b.booked_by > :after
+            ORDER BY b.booked_by
+            LIMIT :limit
+            """, nativeQuery = true)
+    List<UUID> findBookersOpeningDoorsAfter(@Param("endedBefore") Instant endedBefore, @Param("after") UUID after,
+                                            @Param("limit") int limit);
+
+    @Query(value = """
             SELECT DISTINCT b.id FROM booking b
             JOIN court_allocation a ON a.booking_id = b.id
             WHERE b.status = 'CONFIRMED'

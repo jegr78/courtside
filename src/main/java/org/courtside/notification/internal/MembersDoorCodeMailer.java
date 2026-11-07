@@ -9,6 +9,7 @@ import org.courtside.identity.UserAccount;
 import org.courtside.identity.UserAccountRepository;
 import org.courtside.member.MemberService;
 import org.courtside.notification.MessageKind;
+import org.courtside.shared.DoorCodeAudience;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -21,6 +22,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.BiFunction;
 import java.util.function.Consumer;
 
 @Component
@@ -31,6 +33,7 @@ class MembersDoorCodeMailer implements MessageComposer {
     private static final UUID FIRST = new UUID(0, 0);
 
     private final MemberService members;
+    private final DoorCodeAudience audience;
     private final FacilityService facility;
     private final UserAccountRepository accounts;
     private final ClubIdentity club;
@@ -45,13 +48,23 @@ class MembersDoorCodeMailer implements MessageComposer {
         TransactionTemplate transactions = new TransactionTemplate(transactionManager);
         transactions.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         Map<String, String> parameters = Map.of(QueuedMessage.ACCESS_POINT, changed.accessPointId().toString());
+        Consumer<UUID> tell = accountId -> outbox.queue(accountId, MessageKind.MEMBERS_DOOR_CODE_CHANGED, parameters);
+        walk(transactions, members::currentMemberAccountIdsAfter, tell);
+        walk(transactions, audience::bookersAfter, accountId -> {
+            if (!members.isCurrentMember(accountId) && audience.includes(accountId)) {
+                tell.accept(accountId);
+            }
+        });
+    }
+
+    private static void walk(TransactionTemplate transactions, BiFunction<UUID, Integer, List<UUID>> pages,
+                             Consumer<UUID> tell) {
         UUID after = FIRST;
         List<UUID> page;
         do {
-            page = members.currentMemberAccountIdsAfter(after, PAGE_SIZE);
+            page = pages.apply(after, PAGE_SIZE);
             List<UUID> told = page;
-            transactions.executeWithoutResult(status -> told.forEach(accountId ->
-                    outbox.queue(accountId, MessageKind.MEMBERS_DOOR_CODE_CHANGED, parameters)));
+            transactions.executeWithoutResult(status -> told.forEach(tell));
             after = page.isEmpty() ? after : page.getLast();
         } while (page.size() == PAGE_SIZE);
     }
@@ -64,8 +77,8 @@ class MembersDoorCodeMailer implements MessageComposer {
     // The code is read when the message is written, so a second change before then sends the latest one.
     @Override
     public void compose(QueuedMessage message, Consumer<OutgoingMail> handOver) {
-        if (!members.isCurrentMember(message.accountId())) {
-            throw new MessageUndeliverableException("NoLongerMember");
+        if (!audience.includes(message.accountId())) {
+            throw new MessageUndeliverableException("NoLongerEntitled");
         }
         UUID accessPointId = message.accessPoint();
         AccessPoint door = facility.membersDoorCodes().stream()

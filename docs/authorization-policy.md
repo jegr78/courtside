@@ -382,15 +382,15 @@ Negative tests: `src/test/java/org/courtside/member/web/ParticipantMemberControl
 
 ### Members' door code projection
 
-The door codes derive identity from the current account and list the name and static code of each active access point open to members only when that account is enabled and its person holds a membership period covering today; anybody else receives an empty list rather than a refusal.
+The door codes derive identity from the current account and list the name and static code of each active access point open to members only when that account is enabled and its person holds a membership period covering today, or when it is an outsider holding a confirmed booking of its own on a card that grants access whose access window has not closed; anybody else receives an empty list rather than a refusal.
 
 Attributes: `current-account`, `current-membership`.
 
-Production: `src/main/java/org/courtside/booking/web/DoorCodeController.java#listMembersDoorCodes`, `src/main/java/org/courtside/member/MemberService.java#isCurrentMember`, `src/main/java/org/courtside/facility/FacilityService.java#membersDoorCodes`.
+Production: `src/main/java/org/courtside/booking/web/DoorCodeController.java#listMembersDoorCodes`, `src/main/java/org/courtside/booking/internal/BookedDoorCodeAudience.java#includes`, `src/main/java/org/courtside/member/MemberService.java#isCurrentMember`, `src/main/java/org/courtside/facility/FacilityService.java#membersDoorCodes`.
 
-Positive tests: `src/test/java/org/courtside/booking/web/MembersDoorCodeVisibilityTest.java#givenACurrentMemberWithoutAnyBooking_whenReadingTheDoorCodes_thenOnlyTheClubhouseCodeComes`.
+Positive tests: `src/test/java/org/courtside/booking/web/MembersDoorCodeVisibilityTest.java#givenACurrentMemberWithoutAnyBooking_whenReadingTheDoorCodes_thenOnlyTheClubhouseCodeComes`, `src/test/java/org/courtside/booking/web/ExternalDoorCodeVisibilityTest.java#givenAnExternalPlayerWithAnUpcomingBooking_whenReadingTheDoorCodes_thenEveryDoorOpenToMembersComes`.
 
-Negative tests: `src/test/java/org/courtside/booking/web/MembersDoorCodeVisibilityTest.java#givenAFormerMember_whenReadingTheDoorCodes_thenTheListIsEmpty`, `src/test/java/org/courtside/booking/web/MembersDoorCodeVisibilityTest.java#givenACurrentMemberWhoseAccountIsDisabled_whenReadingTheDoorCodes_thenTheListIsEmpty`.
+Negative tests: `src/test/java/org/courtside/booking/web/MembersDoorCodeVisibilityTest.java#givenAFormerMember_whenReadingTheDoorCodes_thenTheListIsEmpty`, `src/test/java/org/courtside/booking/web/MembersDoorCodeVisibilityTest.java#givenACurrentMemberWhoseAccountIsDisabled_whenReadingTheDoorCodes_thenTheListIsEmpty`, `src/test/java/org/courtside/booking/web/ExternalDoorCodeVisibilityTest.java#givenAnExternalPlayerWithoutABooking_whenReadingTheDoorCodes_thenTheListIsEmpty`, `src/test/java/org/courtside/booking/web/ExternalDoorCodeVisibilityTest.java#givenAnExternalPlayerWhoseLastWindowHasEnded_whenReadingTheDoorCodes_thenTheListIsEmpty`.
 
 ### Administrative response projection
 

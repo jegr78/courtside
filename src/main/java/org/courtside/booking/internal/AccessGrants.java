@@ -63,7 +63,9 @@ public class AccessGrants {
 
     public Map<UUID, AnnouncedAccess> of(Collection<Booking> bookings) {
         Map<UUID, AnnouncedAccess> grants = new HashMap<>();
-        windowsOf(bookings, facility.activeAccessPointsWithCodes()).forEach((bookingId, served) -> grants.put(
+        List<AccessPoint> courtDoors = facility.activeAccessPointsWithCodes().stream()
+                .filter(accessPoint -> !accessPoint.isOpenToMembers()).toList();
+        windowsOf(bookings, courtDoors).forEach((bookingId, served) -> grants.put(
                 bookingId, new AnnouncedAccess(served.validFrom(), served.validUntil(), served.accessPoints().stream()
                         .map(accessPoint -> new AccessCode(accessPoint.getName(), accessPoint.getStaticCode()))
                         .toList())));
