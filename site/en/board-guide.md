@@ -518,7 +518,9 @@ disabled account carries a colour and a mark of its own. The access column says 
 have not been issued yet, are issued or have expired, or whether the member has chosen a password of
 their own. The **Access** filter set to **No password of their own yet** lists everybody who has not
 chosen one yet. On a phone, sort with **Sort by** and **Order**. You can correct first name, last
-name and email address later.
+name and email address later. The search finds people by name or email
+address. When somebody with the same email address already exists, Courtside names them before the
+new person is created. A second click on **Create** creates the new person anyway.
 
 ![The people list with search, filters and the main account details.](../screenshots/en/admin-roster.png)
 
@@ -554,6 +556,15 @@ the club's responsibility.
 For a person with an account the **No-shows** section lists the recorded no-shows that still count.
 **Lift the no-shows** keeps them recorded but stops them counting, which ends the block of the
 *No-shows* rule. A no-show recorded later counts again.
+
+### An external person becomes a member
+
+When somebody who registered as an external person joins the club, do not create a new person.
+Find them by name or email address, open them and enter the new membership under **Membership
+periods** or **Membership**. Username, password and bookings stay. Courtside adds the
+*Member* role unless the membership is already over. The *External* role stays until you clear it
+under **Account**. The audit log records the new period and the added role. The import never links
+to an existing person by itself.
 
 ### Deactivate an account
 

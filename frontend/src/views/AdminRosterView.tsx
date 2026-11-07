@@ -126,6 +126,8 @@ export function AdminRosterView() {
   const [matching, setMatching] = useState(0);
   const [types, setTypes] = useState<MembershipType[]>([]);
   const [nextCursor, setNextCursor] = useState<string>();
+  const [sameEmail, setSameEmail] = useState<RosterEntry[]>([]);
+  const [checkedEmail, setCheckedEmail] = useState<string>();
   const [pageCursor, setPageCursor] = useState<string>();
   const [previousCursors, setPreviousCursors] = useState<(string | undefined)[]>([]);
   const [criteria, setCriteria] = useState<Criteria>({ membershipTypeId: requestedMembershipTypeId, access: requestedAccess,
@@ -207,11 +209,19 @@ export function AdminRosterView() {
     if (pending) return;
     setPending(true);
     const form = new FormData(event.currentTarget);
+    const email = formString(form, "email").trim();
     try {
+      if (email && checkedEmail !== email.toLowerCase()) {
+        const page = await api.roster({ query: email, limit: 5 });
+        const matches = page.entries.filter((entry) => entry.email?.toLowerCase() === email.toLowerCase());
+        setCheckedEmail(email.toLowerCase());
+        setSameEmail(matches);
+        if (matches.length > 0) return;
+      }
       const created = await api.createPerson({
         firstName: formString(form, "firstName"),
         lastName: formString(form, "lastName"),
-        email: formString(form, "email") || null
+        email: email || null
       });
       newPerson.saved();
       await navigate(`/admin/roster/${created.personId}`, { state: { personCreated: true } });
@@ -238,6 +248,14 @@ export function AdminRosterView() {
             <TextField data-testid="new-person-last-name" disabled={pending} name="lastName" maxLength={NAME_LENGTH} label={t("admin.roster.lastName")} />
             <TextField data-testid="new-person-email" disabled={pending} name="email" type="email" maxLength={EMAIL_LENGTH} label={t("admin.roster.email")} />
           </div>
+          {sameEmail.length > 0 && <Alert tone="warning" testId="new-person-same-email">
+            <p>{t("admin.roster.sameEmail")}</p>
+            <ul className="mt-2 grid gap-1">
+              {sameEmail.map((entry) => <li key={entry.personId}>
+                <Link data-testid={`new-person-same-email-${entry.personId}`} className="font-semibold underline" to={`/admin/roster/${entry.personId}`}>{entry.firstName} {entry.lastName}</Link>
+              </li>)}
+            </ul>
+          </Alert>}
           <Button variant="primary" data-testid="create-person" disabled={pending} className="justify-self-start" type="submit">{t("admin.create")}</Button>
         </form>
         <section className="grid gap-4">
@@ -247,7 +265,7 @@ export function AdminRosterView() {
           </div>
           <div className="grid gap-3 lg:grid-cols-[1fr_auto_auto_auto] lg:items-end">
             <form noValidate onSubmit={(event) => void search(event)} className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
-              <TextField data-testid="roster-search" name="query" maxLength={NAME_LENGTH} label={t("admin.roster.search")} />
+              <TextField data-testid="roster-search" name="query" maxLength={EMAIL_LENGTH} label={t("admin.roster.search")} />
               <Button variant="secondary" data-testid="roster-search-submit" disabled={pending} type="submit">{t("admin.roster.searchSubmit")}</Button>
             </form>
             <label className="grid gap-2 font-medium">

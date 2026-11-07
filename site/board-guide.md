@@ -547,7 +547,10 @@ gesperrtes Konto ist farbig und mit eigenem Zeichen markiert. Die Spalte Zugang 
 noch nicht ausgestellt, ausgestellt oder abgelaufen sind oder ob das Mitglied ein eigenes Passwort
 gewählt hat. Der Filter **Zugang** mit **Noch kein eigenes Passwort** listet alle, die noch kein
 eigenes Passwort gewählt haben. Auf dem Smartphone sortierst du über **Sortieren nach** und **Reihenfolge**.
-Vorname, Nachname und E-Mail-Adresse kannst du später korrigieren.
+Vorname, Nachname und E-Mail-Adresse kannst du später korrigieren. Die Suche findet Personen über den
+Namen oder die E-Mail-Adresse. Gibt es zu einer neuen Person schon jemanden mit derselben E-Mail-Adresse,
+nennt Courtside diese Person vor dem Anlegen. Ein zweiter Klick auf **Anlegen** legt die neue Person
+trotzdem an.
 
 ![Die Personenliste mit Suche, Filter und den wichtigsten Kontodaten.](screenshots/de/admin-roster.png)
 
@@ -585,6 +588,16 @@ bleibt Aufgabe des Vereins.
 Bei einer Person mit Konto zeigt der Abschnitt **Nichterscheinen**, welche erfassten Nichterscheinen
 noch zählen. **Nichterscheinen aufheben** lässt sie erfasst, aber nicht mehr zählen. Damit endet die
 Sperre der Regel *Nichterscheinen*. Ein später erfasstes Nichterscheinen zählt wieder.
+
+### Externe Person wird Mitglied
+
+Wird jemand Mitglied, der sich bisher als externe Person registriert hat, legst du keine neue Person an.
+Suche die Person über Name oder E-Mail-Adresse, öffne sie und trage unter **Zeiträume der
+Mitgliedschaft** oder **Mitgliedschaft** die neue Mitgliedschaft ein. Benutzername, Passwort und
+Buchungen bleiben erhalten. Courtside ergänzt dabei die Rolle *Mitglied*, sofern die
+Mitgliedschaft noch nicht vorbei ist. Die Rolle *Extern* bleibt, bis du sie unter **Konto** abwählst.
+Das Änderungsprotokoll hält den neuen Zeitraum und die ergänzte Rolle fest. Der Import verknüpft nie
+von selbst mit einer bestehenden Person.
 
 ### Konto deaktivieren
 

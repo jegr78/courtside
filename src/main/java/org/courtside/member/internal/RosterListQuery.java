@@ -67,8 +67,9 @@ public class RosterListQuery {
         parameters.put("now", now.atOffset(ZoneOffset.UTC));
         parameters.put("today", LocalDate.ofInstant(now, clubTimeZone.zoneId()));
         StringBuilder criteria = new StringBuilder("""
-                WHERE lower(concat(p.first_name, ' ', p.last_name))
+                WHERE (lower(concat(p.first_name, ' ', p.last_name))
                       LIKE concat('%', :nameFragment, '%') ESCAPE '!'
+                    OR lower(p.email) LIKE concat('%', :nameFragment, '%') ESCAPE '!')
                 """);
         if (membershipTypeId != null) {
             criteria.append("""

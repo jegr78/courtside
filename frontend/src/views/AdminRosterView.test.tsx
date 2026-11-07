@@ -394,6 +394,42 @@ describe("AdminRosterView", () => {
     expect(await screen.findByTestId("opened-person")).toHaveAttribute("data-created", "true");
   });
 
+  it("given a person with the same email address, when adding a person, then the board is pointed at them before anybody is created twice", async () => {
+    // given
+    const existing: RosterEntry = {
+      personId: "person-7", firstName: "John", lastName: "Roe", email: "john.roe@example.org",
+      accountId: "account-7", username: "roe.john", enabled: true, membershipCurrent: false, roles: ["EXTERNAL"]
+    };
+    const created: RosterEntry = { ...existing, personId: "person-9", accountId: null, username: null, roles: [] };
+    vi.spyOn(api, "createPerson").mockResolvedValue(created);
+    render(<MemoryRouter initialEntries={["/admin/roster"]}><UnsavedChangesProvider>
+      <Routes>
+        <Route path="/admin/roster" element={<AdminRosterView />} />
+        <Route path="/admin/roster/:personId" element={<OpenedPerson />} />
+      </Routes>
+    </UnsavedChangesProvider></MemoryRouter>);
+    await screen.findByTestId("roster-row-person-1");
+    vi.mocked(api.roster).mockResolvedValueOnce({ entries: [existing], nextCursor: null, matching: 1 });
+
+    // when
+    await userEvent.type(screen.getByTestId("new-person-first-name"), "John");
+    await userEvent.type(screen.getByTestId("new-person-last-name"), "Roe");
+    await userEvent.type(screen.getByTestId("new-person-email"), "John.Roe@example.org");
+    await userEvent.click(screen.getByTestId("create-person"));
+
+    // then
+    const notice = await screen.findByTestId("new-person-same-email");
+    expect(api.roster).toHaveBeenLastCalledWith({ query: "John.Roe@example.org", limit: 5 });
+    expect(api.createPerson).not.toHaveBeenCalled();
+    expect(within(notice).getByTestId("new-person-same-email-person-7")).toHaveAttribute("href", "/admin/roster/person-7");
+
+    // when
+    await userEvent.click(screen.getByTestId("create-person"));
+
+    // then
+    expect(api.createPerson).toHaveBeenCalledWith({ firstName: "John", lastName: "Roe", email: "John.Roe@example.org" });
+  });
+
   function rosterRouter() {
     return createMemoryRouter([{
       path: "*",

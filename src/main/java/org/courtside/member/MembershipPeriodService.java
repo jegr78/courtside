@@ -6,6 +6,7 @@ import org.courtside.identity.PersonRepository;
 import org.courtside.identity.UserAccountRepository;
 import org.courtside.member.internal.MembershipPeriodNotFoundException;
 import org.courtside.member.internal.MembershipPeriodsOverlapException;
+import org.courtside.member.internal.OutsiderMembershipLink;
 import org.courtside.member.internal.PersonNotFoundException;
 import org.courtside.shared.SqlConstraintViolation;
 import org.springframework.context.ApplicationEventPublisher;
@@ -30,6 +31,7 @@ public class MembershipPeriodService {
     private final UserAccountRepository accounts;
     private final AccountSessions sessions;
     private final MemberService memberships;
+    private final OutsiderMembershipLink outsiders;
     private final ApplicationEventPublisher events;
 
     public List<Period> periodsOf(UUID personId) {
@@ -47,10 +49,12 @@ public class MembershipPeriodService {
         UUID id = requiredPersonId(personId);
         MembershipPeriod requested = requiredPeriod(period).requireStart();
         requireLockedPerson(id);
+        outsiders.refuseAnonymised(id);
         UUID typeId = typeIdFor(membershipTypeId, requested, false);
         Member created = new Member(id, typeId, requested.startedOn());
         created.endOn(requested.endedOn());
         saveOrRejectOverlap(members, created);
+        outsiders.grantMemberRole(id, created.getEndedOn(), memberships.today());
         revokeSessionsOf(id);
         events.publishEvent(new RosterEvent.MembershipPeriodAdded(
                 id, created.getId(), typeId, created.getStartedOn(), created.getEndedOn()));
