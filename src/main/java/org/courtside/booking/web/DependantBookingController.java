@@ -46,7 +46,8 @@ class DependantBookingController implements DependantBookingsApi {
     public ResponseEntity<List<ApiPublicBookingCard>> listDependantBookingCards(UUID personId) {
         return ResponseEntity.ok(dependantBookings.cardsFor(personId).stream()
                 .map(card -> new ApiPublicBookingCard(card.getId(), card.getLabel(), card.getColor(),
-                        playerCounts(card.getAllowedPlayerCounts()), card.isGuestAllowed(), card.getGuestFeeMinor()))
+                        playerCounts(card.getAllowedPlayerCounts()), card.isGuestAllowed(), card.getGuestFeeMinor(),
+                        card.getExternalPriceMinor()))
                 .toList());
     }
 

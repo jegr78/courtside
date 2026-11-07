@@ -12,7 +12,7 @@ import { AdminBookingCardView } from "./AdminBookingCardView";
 const memberCard: BookingCard = {
   id: "card-1", label: "Member booking", color: "#b85c38", allowedRoles: ["MEMBER"],
   managingRoles: [], allowedPlayerCounts: [2, 4], tracksPlayers: true, countsAgainstLimits: true,
-  guestAllowed: true, showGenericOccupancy: false, grantsAccess: false, signalsOccupancy: true, active: true, guestFeeMinor: 0
+  guestAllowed: true, showGenericOccupancy: false, grantsAccess: false, signalsOccupancy: true, active: true, guestFeeMinor: 0, externalPriceMinor: 0
 };
 
 function show(cardId = "card-1", counted = false, state?: unknown) {
@@ -154,7 +154,7 @@ describe("AdminBookingCardView", () => {
       label: "Training", color: "#b85c38", allowedRoles: ["MEMBER", "TRAINER"],
       managingRoles: ["SPORT_DIRECTOR"], allowedPlayerCounts: [2, 4],
       countsAgainstLimits: true, guestAllowed: false, showGenericOccupancy: false, grantsAccess: false, signalsOccupancy: true,
-      guestFeeMinor: 200
+      guestFeeMinor: 200, externalPriceMinor: 0
     });
   });
 
@@ -413,6 +413,64 @@ describe("AdminBookingCardView", () => {
     // then
     await waitFor(() => expect(change).toHaveBeenCalledWith("card-1", expect.objectContaining({ guestFeeMinor: 550 })));
     expect(screen.getByTestId("card-guest-fee")).toHaveValue("5.50");
+  });
+
+  it("given a members card, when the board opens it to external players, then their hourly price appears and is saved in cents", async () => {
+    // given
+    const change = vi.spyOn(api, "changeAdminBookingCard").mockResolvedValue({ ...memberCard, allowedRoles: ["MEMBER", "EXTERNAL"], externalPriceMinor: 1800 });
+    show();
+    await screen.findByTestId("card-guest-fee");
+    expect(screen.queryByTestId("card-external-price"), "a card closed to external players has no price").toBeNull();
+
+    // when
+    await userEvent.click(screen.getByTestId("card-allowed-roles-EXTERNAL"));
+    const price = screen.getByTestId("card-external-price");
+    await userEvent.clear(price);
+    await userEvent.type(price, "18");
+    await userEvent.click(screen.getByTestId("save-card"));
+
+    // then
+    await waitFor(() => expect(change).toHaveBeenCalledWith("card-1", expect.objectContaining({ externalPriceMinor: 1800 })));
+    expect(screen.getByTestId("card-external-price-hint")).toHaveTextContent("Applies to bookings made after the change.");
+  });
+
+  it("given an unreadable external price, when the board closes the card to external players again, then the card still saves", async () => {
+    // given
+    const change = vi.spyOn(api, "changeAdminBookingCard").mockResolvedValue(memberCard);
+    show();
+    await screen.findByTestId("card-guest-fee");
+    await userEvent.click(screen.getByTestId("card-allowed-roles-EXTERNAL"));
+    await userEvent.type(screen.getByTestId("card-external-price"), "abc");
+
+    // when
+    await userEvent.click(screen.getByTestId("card-allowed-roles-EXTERNAL"));
+    await userEvent.clear(screen.getByTestId("card-label"));
+    await userEvent.type(screen.getByTestId("card-label"), "Member hour");
+    await userEvent.click(screen.getByTestId("save-card"));
+
+    // then
+    await waitFor(() => expect(change, "a hidden price never blocks the save").toHaveBeenCalledWith("card-1",
+      expect.objectContaining({ label: "Member hour", allowedRoles: ["MEMBER"] })));
+  });
+
+  it("given the server refuses the external price, when the card is saved, then the field is marked", async () => {
+    // given
+    vi.spyOn(api, "adminBookingCards").mockResolvedValue([{ ...memberCard, allowedRoles: ["EXTERNAL"] }]);
+    vi.spyOn(api, "changeAdminBookingCard").mockRejectedValue(new ApiError(400, {
+      type: "urn:courtside:error:validation", title: "Validation failed", status: 400,
+      fieldErrors: [{ field: "externalPriceMinor", code: "validation.Min", params: { value: 0 } }]
+    }));
+    show();
+    const price = await screen.findByTestId("card-external-price");
+
+    // when
+    await userEvent.clear(price);
+    await userEvent.type(price, "5");
+    await userEvent.click(screen.getByTestId("save-card"));
+
+    // then
+    expect(await screen.findByRole("alert")).toHaveTextContent("This field must be at least 0.");
+    expect(price).toHaveAttribute("aria-invalid", "true");
   });
 
   it("given a card, when a negative guest fee is typed, then the field says so and nothing is sent", async () => {

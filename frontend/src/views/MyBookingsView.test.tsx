@@ -1346,3 +1346,22 @@ it("given an account without member features, when its bookings load, then no wa
   expect(api.waitlistEntries).not.toHaveBeenCalled();
   expect(api.openPlaces).not.toHaveBeenCalled();
 });
+
+it("given an external player's booking with a stamped amount, when the bookings load, then the amount is shown with it", async () => {
+  // given
+  vi.mocked(api.personalBookings).mockImplementation((options) => Promise.resolve(options?.view === "UPCOMING" || !options?.view
+    ? { items: [{
+      id: upcomingId, courtIds: ["33333333-3333-3333-3333-333333333333"],
+      startsAt: "2026-08-12T16:00:00Z", endsAt: "2026-08-12T17:30:00Z",
+      cardLabel: "Winter hall", cardColor: "#176b55", status: "CONFIRMED",
+      amount: { minor: 1949, currency: "EUR" }
+    }] }
+    : { items: [] }));
+
+  // when
+  render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} />);
+
+  // then
+  expect(within(await screen.findByTestId(`booking-${upcomingId}`)).getByTestId("booking-amount"))
+    .toHaveTextContent("Amount: €19.49");
+});

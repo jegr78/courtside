@@ -55,7 +55,8 @@ class CardController implements CardsApi {
 
     private static ApiPublicBookingCard toResponse(BookingCard card) {
         return new ApiPublicBookingCard(card.getId(), card.getLabel(), card.getColor(),
-                toPlayerCountList(card.getAllowedPlayerCounts()), card.isGuestAllowed(), card.getGuestFeeMinor());
+                toPlayerCountList(card.getAllowedPlayerCounts()), card.isGuestAllowed(), card.getGuestFeeMinor(),
+                card.getExternalPriceMinor());
     }
 
     private static ApiPublicParticipantCard toResponse(ParticipantCard card) {

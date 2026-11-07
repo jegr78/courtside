@@ -22,7 +22,9 @@ import org.springframework.data.domain.Persistable;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Currency;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Entity
@@ -84,6 +86,12 @@ public class Booking implements Persistable<UUID> {
     @Column(name = "request_fingerprint", length = 64)
     private String requestFingerprint;
 
+    @Column(name = "amount_minor")
+    private Integer amountMinor;
+
+    @Column(name = "amount_currency")
+    private String amountCurrency;
+
     @OneToMany(mappedBy = "booking", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<CourtAllocation> allocations = new ArrayList<>();
 
@@ -98,6 +106,16 @@ public class Booking implements Persistable<UUID> {
         this.note = note;
         this.status = BookingStatus.CONFIRMED;
         this.createdAt = createdAt;
+    }
+
+    public void charge(BookingAmount amount) {
+        this.amountMinor = amount.minor();
+        this.amountCurrency = amount.currency().getCurrencyCode();
+    }
+
+    public Optional<BookingAmount> amount() {
+        return amountMinor == null ? Optional.empty()
+                : Optional.of(new BookingAmount(amountMinor, Currency.getInstance(amountCurrency)));
     }
 
     public void actedOnBehalfBy(UUID guardianAccountId) {

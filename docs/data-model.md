@@ -35,6 +35,10 @@ A booking a guardian makes for a dependant is held by the dependant's account in
 and per account that acted, so a guardian's key never meets one the dependant or another guardian
 used. Pseudonymising a booking clears `acted_by` with `booked_by`.
 
+A booking an external booker made carries `amount_minor` and `amount_currency`, the amount the
+card's hourly price came to and the club currency when it was made. Every other booking carries
+neither, and `booking_amount_in_currency` refuses one without the other or a negative amount.
+
 A cancelled booking may carry a `cancellation_reason`, one of five codes chosen by whoever cancelled
 somebody else's booking. It is never free text, so it names nobody. CHECK constraints accept only
 the known codes and only on a cancelled booking.
@@ -156,7 +160,9 @@ decides whether the card's bookings receive access codes; it defaults to false, 
 decides whether the card's bookings count as occupied in the occupancy signal; it defaults to true,
 and `booking_card_closure_signals_no_occupancy` keeps it false on the closure card.
 `guest_fee_minor` is the price of one guest place in the minor unit of the club currency, 0 by
-default and never negative under `booking_card_guest_fee_not_negative`.
+default and never negative under `booking_card_guest_fee_not_negative`. `external_price_minor` is
+what an external booker pays for one court and hour in the same unit, 0 by default and never
+negative under `booking_card_external_price_not_negative`.
 
 The role tables replaced a single `required_role` column, because a card that only one role may use
 cannot express "trainers and youth directors". Both accept the roles `user_account_role` accepts,

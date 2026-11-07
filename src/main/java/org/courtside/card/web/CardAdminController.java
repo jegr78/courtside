@@ -48,7 +48,8 @@ class CardAdminController implements AdminBookingCardsApi, AdminParticipantCards
                 toPlayerCounts(request.getAllowedPlayerCounts()), request.getCountsAgainstLimits(),
                 request.getGuestAllowed(), Boolean.TRUE.equals(request.getShowGenericOccupancy()),
                 Boolean.TRUE.equals(request.getGrantsAccess()), !Boolean.FALSE.equals(request.getSignalsOccupancy()),
-                request.getGuestFeeMinor() == null ? 0 : request.getGuestFeeMinor());
+                request.getGuestFeeMinor() == null ? 0 : request.getGuestFeeMinor(),
+                request.getExternalPriceMinor() == null ? 0 : request.getExternalPriceMinor());
         return ResponseEntity
                 .created(URI.create("/api/admin/booking-cards/" + card.getId()))
                 .body(toResponse(card));
@@ -62,7 +63,7 @@ class CardAdminController implements AdminBookingCardsApi, AdminParticipantCards
                 toPlayerCounts(request.getAllowedPlayerCounts()), request.getCountsAgainstLimits(),
                 request.getGuestAllowed(), Boolean.TRUE.equals(request.getShowGenericOccupancy()),
                 Boolean.TRUE.equals(request.getGrantsAccess()), request.getSignalsOccupancy(),
-                request.getGuestFeeMinor())));
+                request.getGuestFeeMinor(), request.getExternalPriceMinor())));
     }
 
     @Override
@@ -151,7 +152,7 @@ class CardAdminController implements AdminBookingCardsApi, AdminParticipantCards
                 roleNames(card.getAllowedRoles()), roleNames(card.getManagingRoles()),
                 toPlayerCountList(card.getAllowedPlayerCounts()), card.tracksPlayers(),
                 card.isCountsAgainstLimits(), card.isGuestAllowed(), card.getGuestFeeMinor(),
-                card.isShowGenericOccupancy(), card.isGrantsAccess(), card.isSignalsOccupancy(), card.isActive());
+                card.getExternalPriceMinor(), card.isShowGenericOccupancy(), card.isGrantsAccess(), card.isSignalsOccupancy(), card.isActive());
     }
 
     private static ApiParticipantCard toResponse(ParticipantCard card) {

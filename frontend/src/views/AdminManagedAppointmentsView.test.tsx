@@ -27,7 +27,7 @@ describe("AdminManagedAppointmentsView", () => {
     vi.spyOn(api, "managedAppointments").mockResolvedValue({ series: seriesFacts, items: [first, second] });
     vi.spyOn(api, "courts").mockResolvedValue([{ id: "court-1", number: 1, name: "Centre Court" }]);
     vi.spyOn(api, "bookingCards").mockResolvedValue([{
-      id: "card-training", label: "Training", color: "#34584a", allowedPlayerCounts: [8], guestAllowed: false, guestFeeMinor: 0
+      id: "card-training", label: "Training", color: "#34584a", allowedPlayerCounts: [8], guestAllowed: false, guestFeeMinor: 0, externalPriceMinor: 0
     }]);
     vi.spyOn(api, "bookingGrid").mockResolvedValue({ timeZone: "Europe/Berlin", slotMinutes: 30, openingWeeks: [], openingPeriods: [], courtClosures: [], openingHours: [] });
     vi.spyOn(api, "bookingEligibility").mockResolvedValue({ violations: [] });

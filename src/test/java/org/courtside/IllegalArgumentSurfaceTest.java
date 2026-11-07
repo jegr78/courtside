@@ -21,6 +21,7 @@ class IllegalArgumentSurfaceTest {
             "org/courtside/access/GrantOutcome.java",
             "org/courtside/access/GrantReference.java",
             "org/courtside/access/internal/Demand.java",
+            "org/courtside/booking/BookingAmount.java",
             "org/courtside/booking/BookingRuleCheck.java",
             "org/courtside/booking/GuestFee.java",
             "org/courtside/booking/series/MoveRequest.java",

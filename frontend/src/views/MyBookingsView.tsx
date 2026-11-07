@@ -6,6 +6,7 @@ import { Alert } from "../components/Alert";
 import { LoadFailure } from "../components/LoadFailure";
 import { Button } from "../components/Button";
 import { SuccessFeedback } from "../components/SuccessFeedback";
+import { formatMinor } from "../money";
 import { formatBookingPeriod, formatClockTime, formatDateTime, formatTime } from "../time/clubZone";
 import { CancelDialog, MoveDialog } from "./AppointmentDialogs";
 import { OpenPlacesSection } from "./OpenPlacesSection";
@@ -316,6 +317,7 @@ export function BookingSection({ testId, title, titleHidden = false, empty, book
             {group.series && <span data-testid="series-marker" className="rounded-full border px-2 font-semibold">{t("myBookings.series")}</span>}
           </span>
           {booking.status === "CANCELLED" && <span>{t(booking.released ? "myBookings.released" : "myBookings.cancelled")}</span>}
+          {booking.amount && booking.amount.minor > 0 && <span data-testid="booking-amount">{t("myBookings.amount", { amount: formatMinor(booking.amount.minor, locale, booking.amount.currency) })}</span>}
           {booking.partnerSearch === "PUBLISHED" && <span data-testid="partner-search-published">{t("myBookings.partnerSearchPublished")}</span>}
           {booking.checkIn?.checkedIn && <span data-testid="checked-in">{t("myBookings.checkedIn")}</span>}
           {booking.access && <AccessCodes access={booking.access} reference={reference} locale={locale} timeZone={timeZone} t={t}

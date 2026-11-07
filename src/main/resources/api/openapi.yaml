@@ -1718,8 +1718,8 @@ components:
           pattern: "^[A-Z]{3}$"
           description: |
             An ISO 4217 code the JDK knows, refused with the field code `Currency` otherwise. A change
-            converts nothing: card fees keep their number in the new currency, and a guest already
-            booked keeps the amount and currency stamped on it. Leaving it out keeps the current value.
+            converts nothing: card fees and prices keep their number in the new currency, and a guest or
+            booking already made keeps the amount and currency stamped on it. Leaving it out keeps the current value.
           example: EUR
         externalBookings:
           type: boolean
@@ -1808,7 +1808,7 @@ components:
 
     PublicBookingCard:
       type: object
-      required: [id, label, color, allowedPlayerCounts, guestAllowed, guestFeeMinor]
+      required: [id, label, color, allowedPlayerCounts, guestAllowed, guestFeeMinor, externalPriceMinor]
       properties:
         id: { type: string, format: uuid }
         label: { type: string }
@@ -1823,6 +1823,12 @@ components:
           description: |
             What one guest place on this card costs, in the minor unit of the club's `currency`.
             Zero charges nothing. A guest keeps the fee in force when the booking named them.
+        externalPriceMinor:
+          type: integer
+          minimum: 0
+          description: |
+            What an external booker pays for one court and hour on this card, in the minor unit of the
+            club's `currency`, charged proportionally for other durations. Zero charges nothing.
 
     BookingCardLegendEntry:
       type: object
@@ -1869,7 +1875,7 @@ components:
       description: |
         What kind of occupancy a booking is. Member booking, training, league match and court
         closure differ only by their card, so a new kind is a row rather than a deployment.
-      required: [id, label, color, allowedRoles, managingRoles, allowedPlayerCounts, tracksPlayers, countsAgainstLimits, guestAllowed, guestFeeMinor, showGenericOccupancy, grantsAccess, signalsOccupancy, active]
+      required: [id, label, color, allowedRoles, managingRoles, allowedPlayerCounts, tracksPlayers, countsAgainstLimits, guestAllowed, guestFeeMinor, externalPriceMinor, showGenericOccupancy, grantsAccess, signalsOccupancy, active]
       properties:
         id: { type: string, format: uuid }
         label: { type: string }
@@ -1904,6 +1910,12 @@ components:
           description: |
             What one guest place on this card costs, in the minor unit of the club's `currency`.
             Zero charges nothing. A guest keeps the fee in force when the booking named them.
+        externalPriceMinor:
+          type: integer
+          minimum: 0
+          description: |
+            What an external booker pays for one court and hour on this card, in the minor unit of the
+            club's `currency`, charged proportionally for other durations. Zero charges nothing.
         showGenericOccupancy:
           type: boolean
           description: Show a neutral booked label in the member-facing court plan instead of the card label.
@@ -1957,6 +1969,15 @@ components:
             What one guest place costs, in the minor unit of the club's `currency`. A change applies to
             guests booked afterwards and leaves every guest already booked with the fee stamped on them.
             Leaving it out keeps the current fee, or zero for a new card.
+        externalPriceMinor:
+          type: integer
+          minimum: 0
+          maximum: 1000000
+          description: |
+            What an external booker pays for one court and hour, in the minor unit of the club's
+            `currency`. A change applies to bookings made afterwards and leaves every booking already
+            made with the amount stamped on it. Leaving it out keeps the current price, or zero for a
+            new card.
         showGenericOccupancy:
           type: boolean
           default: false
@@ -3386,6 +3407,18 @@ components:
             time. Absent otherwise.
         access:
           $ref: "#/components/schemas/AccessGrant"
+        amount:
+          $ref: "#/components/schemas/BookingAmount"
+
+    BookingAmount:
+      type: object
+      description: |
+        What an external booker owes for the booking, stamped when it was made from the card's
+        price in force at that moment. Absent on a booking made by anybody else.
+      required: [minor, currency]
+      properties:
+        minor: { type: integer, minimum: 0 }
+        currency: { type: string, pattern: "^[A-Z]{3}$" }
 
     AccessGrant:
       type: object

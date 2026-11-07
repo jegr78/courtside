@@ -729,6 +729,14 @@
         "level": "pseudonymous",
         "lifecycle": "booking-pseudonymisation"
       },
+      "amount_currency": {
+        "level": "operational",
+        "lifecycle": "booking-pseudonymisation"
+      },
+      "amount_minor": {
+        "level": "operational",
+        "lifecycle": "booking-pseudonymisation"
+      },
       "booked_by": {
         "level": "pseudonymous",
         "lifecycle": "booking-pseudonymisation"
@@ -846,6 +854,10 @@
         "lifecycle": "club-configuration"
       },
       "guest_fee_minor": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "external_price_minor": {
         "level": "operational",
         "lifecycle": "club-configuration"
       },

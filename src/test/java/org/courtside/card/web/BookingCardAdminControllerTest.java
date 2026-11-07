@@ -222,6 +222,80 @@ class BookingCardAdminControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void whenCreatingABookingCardWithANegativeExternalPrice_thenTheFieldIsRefused() throws Exception {
+        // when / then
+        mockMvc.perform(post("/api/admin/booking-cards")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"label": "Guest court", "color": "#c8a415",
+                                 "allowedRoles": ["EXTERNAL"], "allowedPlayerCounts": [2], "countsAgainstLimits": false,
+                                 "guestAllowed": true, "externalPriceMinor": -1}
+                                """)
+                        .with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("externalPriceMinor"))
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.Min"));
+    }
+
+    @Test
+    void givenACardOpenToExternals_whenItIsChangedToANegativePrice_thenTheFieldIsRefused() throws Exception {
+        // given
+        String created = mockMvc.perform(post("/api/admin/booking-cards")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"label": "Guest court", "color": "#c8a415",
+                                 "allowedRoles": ["EXTERNAL"], "allowedPlayerCounts": [2], "countsAgainstLimits": false,
+                                 "guestAllowed": true, "externalPriceMinor": 1500}
+                                """)
+                        .with(csrf()))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        String id = JsonPath.read(created, "$.id");
+
+        // when / then
+        mockMvc.perform(put("/api/admin/booking-cards/{id}", id)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"label": "Guest court", "color": "#c8a415",
+                                 "allowedRoles": ["EXTERNAL"], "allowedPlayerCounts": [2], "countsAgainstLimits": false,
+                                 "guestAllowed": true, "externalPriceMinor": -1}
+                                """)
+                        .with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("externalPriceMinor"))
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.Min"));
+    }
+
+    @Test
+    void givenACardWithAnExternalPrice_whenItIsChangedWithoutNamingThePrice_thenThePriceStays() throws Exception {
+        // given
+        String created = mockMvc.perform(post("/api/admin/booking-cards")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"label": "Guest court", "color": "#c8a415",
+                                 "allowedRoles": ["EXTERNAL"], "allowedPlayerCounts": [2], "countsAgainstLimits": false,
+                                 "guestAllowed": true, "externalPriceMinor": 1500}
+                                """)
+                        .with(csrf()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.externalPriceMinor").value(1500))
+                .andReturn().getResponse().getContentAsString();
+        String id = JsonPath.read(created, "$.id");
+
+        // when / then
+        mockMvc.perform(put("/api/admin/booking-cards/{id}", id)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"label": "Guest court renamed", "color": "#c8a415",
+                                 "allowedRoles": ["EXTERNAL"], "allowedPlayerCounts": [2], "countsAgainstLimits": false,
+                                 "guestAllowed": true}
+                                """)
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.externalPriceMinor").value(1500));
+    }
+
+    @Test
     void givenACardWithAGuestFee_whenItIsChangedWithoutNamingTheFee_thenTheFeeStays() throws Exception {
         // given
         String created = mockMvc.perform(post("/api/admin/booking-cards")

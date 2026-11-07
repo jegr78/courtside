@@ -12,7 +12,7 @@ import { AdminBookingCardsView } from "./AdminBookingCardsView";
 const memberCard: BookingCard = {
   id: "card-1", label: "Member booking", color: "#b85c38", allowedRoles: ["MEMBER"],
   managingRoles: [], allowedPlayerCounts: [2, 4], tracksPlayers: true, countsAgainstLimits: true,
-  guestAllowed: true, showGenericOccupancy: true, grantsAccess: false, signalsOccupancy: true, active: true, guestFeeMinor: 0
+  guestAllowed: true, showGenericOccupancy: true, grantsAccess: false, signalsOccupancy: true, active: true, guestFeeMinor: 0, externalPriceMinor: 0
 };
 
 function ArrivedAtCard() {
@@ -234,6 +234,40 @@ describe("AdminBookingCardsView", () => {
 
     // then
     expect(createCard).toHaveBeenCalledWith(expect.objectContaining({ guestFeeMinor: 550 }));
+  });
+
+  it("given a new card, when the board opens it to external players, then their hourly price appears and is sent in cents", async () => {
+    // given
+    const createCard = vi.spyOn(api, "createAdminBookingCard").mockResolvedValue({ ...memberCard, id: "card-2" });
+    show();
+    await screen.findByTestId("new-card-label");
+    expect(screen.queryByTestId("new-card-external-price"), "a card closed to external players has no price").toBeNull();
+
+    // when
+    await userEvent.type(screen.getByTestId("new-card-label"), "Winter hall");
+    await userEvent.click(screen.getByTestId("new-card-role-EXTERNAL"));
+    await userEvent.type(screen.getByTestId("new-card-external-price"), "15,50");
+    await userEvent.click(screen.getByTestId("create-card"));
+
+    // then
+    expect(createCard).toHaveBeenCalledWith(expect.objectContaining({ allowedRoles: ["EXTERNAL"], externalPriceMinor: 1550 }));
+  });
+
+  it("given a new card open to external players, when a negative price is typed, then the field says so and nothing is created", async () => {
+    // given
+    const createCard = vi.spyOn(api, "createAdminBookingCard").mockResolvedValue({ ...memberCard, id: "card-2" });
+    show();
+    await screen.findByTestId("new-card-label");
+
+    // when
+    await userEvent.type(screen.getByTestId("new-card-label"), "Winter hall");
+    await userEvent.click(screen.getByTestId("new-card-role-EXTERNAL"));
+    await userEvent.type(screen.getByTestId("new-card-external-price"), "-1");
+    await userEvent.click(screen.getByTestId("create-card"));
+
+    // then
+    expect(screen.getByTestId("new-card-external-price")).toHaveAttribute("aria-invalid", "true");
+    expect(createCard, "a refused price never reaches the server").not.toHaveBeenCalled();
   });
 
   it("given a new card, when a negative guest fee is typed, then the field says so and nothing is created", async () => {
