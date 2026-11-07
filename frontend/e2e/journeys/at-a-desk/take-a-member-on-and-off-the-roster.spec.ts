@@ -16,7 +16,7 @@ test("given a board that has taken on a new member, when they record the person,
     await expect(page.getByTestId("admin-roster-view")).toBeVisible();
     await writeInto(page.getByTestId("new-person-first-name"), "Mray");
     await writeInto(page.getByTestId("new-person-last-name"), "Major");
-    await writeInto(page.getByTestId("new-person-email"), "mary.major@example.org");
+    await writeInto(page.getByTestId("new-person-email"), "mary.major+joining@example.org");
     await activate(page.getByTestId("create-person"));
 
     // then
@@ -37,7 +37,7 @@ test("given a board that has taken on a new member, when they record the person,
 
     // then — the one-time password went to the member, and the board never saw it
     await expect(page.getByTestId("account-username")).toHaveValue("major.mary");
-    await expect(page.getByTestId("credential-destination")).toContainText("mary.major@example.org");
+    await expect(page.getByTestId("credential-destination")).toContainText("mary.major+joining@example.org");
 
     // when — the club records what the person joined as, without waiting for that message: the
     // instance answers first and writes the account again when it hands the credential over.
@@ -47,7 +47,7 @@ test("given a board that has taken on a new member, when they record the person,
 
     // then
     await expect(page.getByTestId("end-membership")).toBeVisible();
-    await messageTo(journeyService.mailboxURL, "mary.major@example.org");
+    await messageTo(journeyService.mailboxURL, "mary.major+joining@example.org");
 
     // when — the board looks for everybody who has not chosen a password yet
     const personId = new URL(page.url()).pathname.split("/").at(-1) ?? "";

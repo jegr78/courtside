@@ -16,7 +16,7 @@ async function addPerson(page: Page, firstName: string, lastName: string): Promi
   await expect(page.getByTestId("admin-roster-view")).toBeVisible();
   await page.getByTestId("new-person-first-name").fill(firstName);
   await page.getByTestId("new-person-last-name").fill(lastName);
-  await page.getByTestId("new-person-email").fill(`${firstName}.${lastName}@example.org`.toLowerCase());
+  await page.getByTestId("new-person-email").fill(`${firstName}.${lastName}+periods@example.org`.toLowerCase());
   const created = page.waitForResponse((response) =>
     response.url().endsWith("/api/admin/roster") && response.request().method() === "POST");
   await page.getByTestId("create-person").click();

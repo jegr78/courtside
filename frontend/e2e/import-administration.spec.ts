@@ -116,7 +116,7 @@ test("a member number the file does not yet carry is linked by hand rather than 
     await page.getByTestId("admin-roster-link").click();
     await page.getByTestId("new-person-first-name").fill("Mary");
     await page.getByTestId("new-person-last-name").fill("Major");
-    await page.getByTestId("new-person-email").fill("mary.major@example.org");
+    await page.getByTestId("new-person-email").fill("mary.major+registry@example.org");
     const personCreated = page.waitForResponse((response) =>
       response.url().endsWith("/api/admin/roster") && response.request().method() === "POST");
     await page.getByTestId("create-person").click();
