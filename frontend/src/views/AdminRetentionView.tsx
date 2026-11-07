@@ -172,7 +172,7 @@ export function AdminRetentionView() {
       : <>
         {error && <Alert testId="retention-error">{error}</Alert>}
         {success && <SuccessFeedback testId="retention-success">{success}</SuccessFeedback>}
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {CATEGORIES.map((category) => {
             const months = monthsOf(category);
             return <form key={category} data-testid={`retention-policy-${category}`} noValidate onSubmit={(event) => save(event, category)}
