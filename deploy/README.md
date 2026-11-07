@@ -74,6 +74,11 @@ launcher from the verified candidate archive as the operations handbook describe
 - [Container contract](container-contract.md) is the platform-neutral contract for operators who do
   not use these Compose recipes.
 
+Sign-in, account recovery and external registration count requests per client address. A reverse
+proxy in front of the bundled one must therefore forward the real client address in
+`X-Forwarded-For`, as the [operations handbook](guides/operations.md) describes; otherwise every
+visitor shares one budget.
+
 The club owns its host, external services, credentials, backups and availability. Courtside checks
 the software-controlled part of the selected recipe. Public DNS, routing, certificate issuance,
 mail reputation and third-party delivery remain operator-owned conditions.

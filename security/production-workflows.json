@@ -78,7 +78,9 @@
         "markOwnNotificationRead",
         "listDependants",
         "listDependantNotifications",
-        "requestDependantCredentials"
+        "requestDependantCredentials",
+        "registerExternalAccount",
+        "verifyRegistration"
       ],
       "backgroundEntryPoints": [
         "AgedSessionSweep#deleteSessionsPastTheirLifetime",
@@ -90,7 +92,10 @@
         "IdentityCleanupSchedule#deleteExpiredResetTokens",
         "PasswordResetCodeMailer#on(PasswordResetRequested)",
         "SignInFailureLog#on(AbstractAuthenticationFailureEvent)",
-        "UsernameReminderMailer#on(UsernameReminderRequested)"
+        "UsernameReminderMailer#on(UsernameReminderRequested)",
+        "IdentityCleanupSchedule#deleteUnverifiedRegistrations",
+        "RegistrationMailer#on(RegistrationNameTaken)",
+        "RegistrationMailer#on(RegistrationVerificationRequested)"
       ],
       "stateTransitions": [
         "Password login creates an authenticated session only without MFA; enrolled accounts first receive a roleless pending session.",

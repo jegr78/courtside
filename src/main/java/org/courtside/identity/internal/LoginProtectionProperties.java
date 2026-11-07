@@ -13,12 +13,14 @@ import java.util.stream.Stream;
 @Validated
 @ConfigurationProperties("courtside.login-protection")
 record LoginProtectionProperties(@NotNull @Valid Limit address,
+                                 @NotNull @Valid Limit registration,
                                  @NotNull @Valid Factor factor,
                                  @NotNull @Valid Observation global,
                                  @Min(1) int verificationConcurrency) {
 
     Duration retention() {
-        return Stream.of(address.window().plus(address.block()), global.window())
+        return Stream.of(address.window().plus(address.block()), registration.window().plus(registration.block()),
+                        global.window())
                 .max(Duration::compareTo)
                 .orElseThrow();
     }

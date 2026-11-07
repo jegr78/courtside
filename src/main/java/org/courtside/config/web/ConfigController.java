@@ -88,7 +88,10 @@ class ConfigController implements ClubConfigApi, AdminConfigApi, ManifestApi {
                 request.getAccessCodeLength() == null
                         ? null : new AccessCodeLength(request.getAccessCodeLength()),
                 request.getCurrency() == null ? null : Currency.getInstance(request.getCurrency()),
-                request.getExternalBookings()))));
+                request.getExternalBookings(),
+                request.getRegistrationTextDe() == null && request.getRegistrationTextEn() == null ? null
+                        : new ChangeClubConfigurationCommand.RegistrationTexts(request.getRegistrationTextDe(),
+                        request.getRegistrationTextEn())))));
     }
 
     @Override
@@ -169,6 +172,8 @@ class ConfigController implements ClubConfigApi, AdminConfigApi, ManifestApi {
                 .imprintUrl(configuration.imprintUrl())
                 .privacyUrl(configuration.privacyUrl())
                 .documentationUrl(configuration.documentationUrl())
+                .registrationTextDe(configuration.registrationTextDe())
+                .registrationTextEn(configuration.registrationTextEn())
                 .installedAppName(configuration.effectiveShortName());
     }
 
@@ -194,6 +199,8 @@ class ConfigController implements ClubConfigApi, AdminConfigApi, ManifestApi {
                 .privacyUrl(configuration.privacyUrl())
                 .documentationUrl(configuration.documentationUrl())
                 .shortName(configuration.shortName())
+                .registrationTextDe(configuration.registrationTextDe())
+                .registrationTextEn(configuration.registrationTextEn())
                 .noMembershipTypeRuleSetId(configuration.noMembershipTypeRuleSetId());
     }
 }

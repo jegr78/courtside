@@ -26,6 +26,7 @@ class TransactionalEventListenerPhaseTest {
             "org/courtside/notification/internal/DisplacementMailer.java",
             "org/courtside/notification/internal/ParticipationMailer.java",
             "org/courtside/notification/internal/PasswordResetCodeMailer.java",
+            "org/courtside/notification/internal/RegistrationMailer.java",
             "org/courtside/notification/internal/ReleaseMailer.java",
             "org/courtside/notification/internal/ReminderMailer.java",
             "org/courtside/notification/internal/SeriesMailer.java",

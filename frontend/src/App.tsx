@@ -34,6 +34,10 @@ const DEFAULT_DOCUMENTATION_URL = "https://jegr78.github.io/courtside/";
 const AdminRoutes = lazySurface(() => import("./views/AdminRoutes"));
 const AccountRecoveryView = lazySurface<Record<string, never>>(() =>
   import("./views/AccountRecoveryView").then((loaded) => ({ default: loaded.AccountRecoveryView })));
+const RegisterView = lazySurface<Record<string, never>>(() =>
+  import("./views/RegisterView").then((loaded) => ({ default: loaded.RegisterView })));
+const RegistrationVerificationView = lazySurface<Record<string, never>>(() =>
+  import("./views/RegistrationVerificationView").then((loaded) => ({ default: loaded.RegistrationVerificationView })));
 const MyBookingsPage = lazySurface<ComponentProps<typeof MyBookingsSurface>>(() =>
   import("./views/MyBookingsPage").then((loaded) => ({ default: loaded.MyBookingsPage })));
 const MyMessagesView = lazySurface<Record<string, never>>(() =>
@@ -80,9 +84,15 @@ export function AppRoutes({ session, refreshSession, passwordChanged, initialPas
     <Route path="/account-recovery" element={session.authenticated
       ? <Navigate to="/" replace />
       : <AccountRecoveryView />} />
+    <Route path="/register" element={session.authenticated
+      ? <Navigate to="/" replace />
+      : session.externalBookings ? <RegisterView /> : <Navigate to="/login" replace />} />
+    <Route path="/registration/verify" element={session.authenticated
+      ? <Navigate to="/" replace />
+      : <RegistrationVerificationView />} />
     <Route path="/login" element={session.authenticated
       ? <Navigate to={returnTargetIn(address.search) ?? afterSignIn} replace />
-      : <LoginView refreshSession={refreshSession} passwordChanged={passwordChanged} mfaRequired={session.mfaRequired} totpAvailable={session.totpAvailable} webauthnAvailable={session.webauthnAvailable} />} />
+      : <LoginView refreshSession={refreshSession} registration={Boolean(session.externalBookings)} passwordChanged={passwordChanged} mfaRequired={session.mfaRequired} totpAvailable={session.totpAvailable} webauthnAvailable={session.webauthnAvailable} />} />
     <Route path="/my-bookings" element={session.authenticated
       ? <MyBookingsPage session={session} offline={offline} />
       : signInFirst} />

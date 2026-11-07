@@ -136,6 +136,10 @@ class RequestEntryPointInventoryTest extends AbstractIntegrationTest {
                     new Boundary("the peer address the recovery window counts, read the same way"
                             + " and through the same reverse proxy as the login limit's",
                             List.of("getRemoteAddr"))),
+            Map.entry("org/courtside/identity/internal/RegistrationController.java",
+                    new Boundary("the peer address the registration limit counts, read the same way"
+                            + " and through the same reverse proxy as the login limit's",
+                            List.of("getRemoteAddr"))),
             Map.entry("org/courtside/identity/internal/LoginAttemptFilter.java",
                     new Boundary("the peer address the rate limit counts, which is whatever"
                             + " ForwardedHeaderFilter read out of X-Forwarded-For, so the reverse"

@@ -51,6 +51,23 @@ class MessageOutbox {
         enqueue(accountId, kind, Map.of(), previousAddress, Duration.ZERO);
     }
 
+    // A registration message goes to an address the account does not yet answer for, so it skips the centre.
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void queueToAddress(UUID accountId, MessageKind kind, String address, Map<String, String> parameters) {
+        if (address == null || address.isBlank()) {
+            throw new IllegalStateException("A registration message needs an address");
+        }
+        String messageId = MailDispatch.newMessageId(MailSettings.senderDomain(properties.from()));
+        Instant now = clock.instant();
+        records.save(new MessageRecord(accountId, kind, messageId, now, now, parameters, address));
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                worker.wake();
+            }
+        });
+    }
+
     private void enqueue(UUID accountId, MessageKind kind, Map<String, String> parameters, String previousAddress,
                          Duration wait) {
         if (!choices.wants(accountId, kind)) {

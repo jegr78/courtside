@@ -18,6 +18,21 @@ export function personas(path: string): Persona[] {
   return path.startsWith("/admin") ? ["configuration-admin"] : ["signed out", "doe.jane"];
 }
 
+// The registration page exists only while the club admits external bookings.
+export async function admitExternalBookings(page: Page) {
+  await page.addInitScript(() => {
+    const original = window.fetch.bind(window);
+    window.fetch = async (input, init) => {
+      const response = await original(input, init);
+      const url = new URL(input instanceof Request ? input.url : String(input), location.href);
+      if (url.pathname !== "/api/session" || (init?.method ?? "GET") !== "GET" || !response.ok) return response;
+      const session = (await response.json()) as Record<string, unknown>;
+      return new Response(JSON.stringify({ ...session, externalBookings: true }),
+        { status: response.status, headers: response.headers });
+    };
+  });
+}
+
 export async function settled(page: Page) {
   await page.waitForLoadState("networkidle", { timeout: 10_000 });
 }

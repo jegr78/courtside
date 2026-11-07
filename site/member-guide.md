@@ -34,6 +34,12 @@ Der Vorstand legt dein Konto an. Courtside schickt dir zuerst eine Willkommensna
 in einer eigenen E-Mail den Benutzernamen und ein Einmalpasswort. Niemand im Vorstand sieht oder
 bestimmt dieses Passwort.
 
+Lässt dein Verein externe Buchungen zu, kannst du dich ohne Mitgliedschaft selbst registrieren.
+Wähle dazu auf der Anmeldeseite *Kein Konto? Ohne Mitgliedschaft registrieren*, gib Namen, E-Mail-Adresse,
+Benutzernamen und Passwort ein und öffne den Link aus der folgenden E-Mail. Erst danach kannst du
+dich anmelden. Der Link gilt 24 Stunden und nur einmal; ein Konto, das bis dahin nicht bestätigt
+ist, löscht Courtside wieder. Einen Altersnachweis verlangt Courtside nicht.
+
 1. Wähle *Anmelden*.
 2. Gib deinen Benutzernamen und dein Passwort ein.
 3. Wähle erneut *Anmelden*.

@@ -13,6 +13,7 @@ class IdentityCleanupScheduleTest {
             .withBean(LoginAttemptCleanup.class, () -> mock(LoginAttemptCleanup.class))
             .withBean(PasswordResetMailLimit.class, () -> mock(PasswordResetMailLimit.class))
             .withBean(PasswordResetTokenService.class, () -> mock(PasswordResetTokenService.class))
+            .withBean(RegistrationService.class, () -> mock(RegistrationService.class))
             .withUserConfiguration(IdentityCleanupSchedule.class);
 
     @Test

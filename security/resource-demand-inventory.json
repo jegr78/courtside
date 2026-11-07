@@ -37,6 +37,7 @@
       "src/main/java/org/courtside/notification/internal/DisplacementMailer.java",
       "src/main/java/org/courtside/notification/internal/ParticipationMailer.java",
       "src/main/java/org/courtside/notification/internal/PasswordResetCodeMailer.java",
+      "src/main/java/org/courtside/notification/internal/RegistrationMailer.java",
       "src/main/java/org/courtside/notification/internal/ReleaseMailer.java",
       "src/main/java/org/courtside/notification/internal/ReminderMailer.java",
       "src/main/java/org/courtside/notification/internal/SeriesMailer.java",
@@ -238,10 +239,12 @@
         "reauthenticate",
         "redeemMfaRecovery",
         "redeemPasswordReset",
+        "registerExternalAccount",
         "requestAccountCredentials",
         "requestDependantCredentials",
         "requestPasswordReset",
-        "requestUsernameReminder"
+        "requestUsernameReminder",
+        "verifyRegistration"
       ],
       "growthDrivers": "Password hashing and policy lookup, native WebAuthn signature/attestation verification, TOTP/recovery-code checks and credential delivery dominate these identity proof paths. Disabling MFA deletes the holder credential set, which grows with the number of enrolled credentials.",
       "inputOrDataBound": "Passwords and account fields have contract limits; HIBP responses stop at 256 KiB and their request deadline defaults to three seconds. MFA code input stops at 128 characters; native JSON has bounded encoded authenticator/client-data/signature fields and server ceremony payloads stop at 65,536 characters. A challenge expires after five minutes and permits at most five attempts; regeneration does not reset persistent account/address guess budgets. The holder credential count has no per-account row ceiling.",
@@ -617,6 +620,8 @@
         "ParticipationMailer#on(ParticipantWithdrew)",
         "ParticipationMailer#on(PartnerJoined)",
         "PasswordResetCodeMailer#on(PasswordResetRequested)",
+        "RegistrationMailer#on(RegistrationNameTaken)",
+        "RegistrationMailer#on(RegistrationVerificationRequested)",
         "ReleaseMailer#on(BookingReleased)",
         "ReminderMailer#on(BookingReminderDue)",
         "SeriesMailer#on(SeriesCancelled)",
@@ -664,6 +669,7 @@
         "IdentityCleanupSchedule#deleteExpiredLoginAttempts",
         "IdentityCleanupSchedule#deleteExpiredResetMailWindows",
         "IdentityCleanupSchedule#deleteExpiredResetTokens",
+        "IdentityCleanupSchedule#deleteUnverifiedRegistrations",
         "PartnerSearchSweep#removeWhatNobodyCanTake",
         "PreviewExpirySchedule#sweepNow",
         "WaitlistSweep#passOnWhatIsDue"

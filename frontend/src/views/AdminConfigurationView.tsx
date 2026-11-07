@@ -210,6 +210,16 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
                   <span id="config-external-bookings-hint" className="text-muted text-sm">{t("admin.config.externalBookingsHelp")}</span>
                 </span>
               </label>
+              {config.externalBookings && <>
+                <label className="grid gap-2 font-medium">{t("admin.config.registrationTextDe")}
+                  <textarea data-testid="config-registration-text-de" rows={3} maxLength={2000} className="form-control w-full min-w-0 rounded-lg border px-3 py-3"
+                            value={config.registrationTextDe ?? ""} onChange={(event) => changeConfig({ registrationTextDe: event.target.value })} />
+                </label>
+                <label className="grid gap-2 font-medium">{t("admin.config.registrationTextEn")}
+                  <textarea data-testid="config-registration-text-en" rows={3} maxLength={2000} className="form-control w-full min-w-0 rounded-lg border px-3 py-3"
+                            value={config.registrationTextEn ?? ""} onChange={(event) => changeConfig({ registrationTextEn: event.target.value })} />
+                </label>
+              </>}
               <TextField id="slot-minutes" data-testid="slot-minutes" type="number" min={5} max={120} step={5} className="max-w-32" label={t("admin.config.slotMinutes")} value={config.slotMinutes} onChange={(event) => changeConfig({ slotMinutes: Number(event.target.value) })} />
             </div>
             <div data-testid="club-appearance" className="grid gap-4 [&>*]:min-w-0 sm:grid-cols-2 lg:col-span-2">

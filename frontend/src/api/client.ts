@@ -4,6 +4,7 @@ import { clearPersonalBookingsOfflineData, notifyOtherClientsOfSessionChange, wi
 import { warnAbout } from "./failureWarning";
 
 export type SessionStatus = components["schemas"]["SessionStatus"];
+export type RegistrationRequest = components["schemas"]["RegistrationRequest"];
 export type ClubConfig = components["schemas"]["ClubConfig"];
 export type AdminClubConfig = components["schemas"]["AdminClubConfig"];
 export type ClubConfigRequest = components["schemas"]["ClubConfigRequest"];
@@ -397,6 +398,12 @@ export const api = {
     `/api/account/sessions/${encodeURIComponent(handle)}`, { method: "DELETE" }, true, current
   ),
   endOwnSessions: () => request<void>("/api/account/sessions", { method: "DELETE" }, true, true),
+  register: (registration: RegistrationRequest) => request<void>("/api/registration", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(registration)
+  }),
+  verifyRegistration: (code: string) => request<void>("/api/registration/verification", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code })
+  }),
   requestPasswordReset: (username: string) => request<void>("/api/account-recovery/password", {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username })
   }),

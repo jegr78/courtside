@@ -41,6 +41,8 @@ class SpaConfiguration {
             "/",
             "/courts",
             "/account-recovery",
+            "/register",
+            "/registration/verify",
             "/login",
             "/initial-password",
             "/my-bookings",

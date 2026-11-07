@@ -112,6 +112,21 @@ class ConfigAuditTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenTheConfiguration_whenOnlyTheEnglishRegistrationTextChanges_thenTheEventNamesThatFieldAlone() {
+        // given
+        ClubConfigurationSnapshot current = config.current();
+
+        // when
+        config.update(withRegistrationTexts(current, new ChangeClubConfigurationCommand.RegistrationTexts(
+                current.registrationTextDe(), "Guests pay at the court.")));
+
+        // then
+        assertThat(latestPayloadOf(ConfigEvent.ClubChanged.TYPE))
+                .containsEntry("changedFields", List.of("registrationTextEn"));
+        assertThat(config.current().registrationTextEn()).isEqualTo("Guests pay at the court.");
+    }
+
+    @Test
     void givenTheConfiguration_whenOnlyThePrivacyLinkChanges_thenTheEventNamesTheFieldAndNoValue() {
         // given
         ClubConfigurationSnapshot current = config.current();
@@ -284,6 +299,17 @@ class ConfigAuditTest extends AbstractIntegrationTest {
                 base.passwordResetCredential(), base.passwordResetToken(), base.bookingReminder(),
                 base.noMembershipTypeRuleSetId(), base.waitlistOffer(), base.accessLead(), base.accessLag(),
                 base.accessCodeLength(), base.currency(), externalBookings);
+    }
+
+    private static ChangeClubConfigurationCommand withRegistrationTexts(
+            ClubConfigurationSnapshot current, ChangeClubConfigurationCommand.RegistrationTexts texts) {
+        ChangeClubConfigurationCommand base = withClubName(current, current.clubName());
+        return new ChangeClubConfigurationCommand(base.clubName(), base.primaryColor(), base.accentColor(),
+                base.logoUrl(), base.imprintUrl(), base.privacyUrl(), base.documentationUrl(), base.shortName(),
+                base.defaultLocale(), base.slotDuration(), base.timeZone(), base.newAccountCredential(),
+                base.passwordResetCredential(), base.passwordResetToken(), base.bookingReminder(),
+                base.noMembershipTypeRuleSetId(), base.waitlistOffer(), base.accessLead(), base.accessLag(),
+                base.accessCodeLength(), base.currency(), null, texts);
     }
 
     private static ChangeClubConfigurationCommand withPrivacyUrl(

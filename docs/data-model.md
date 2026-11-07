@@ -293,6 +293,7 @@ separate from the token, so losing or expiring a token cannot restore password-o
 | `guardian_relationship` | One person allowed to act for another: who acts, for whom, from which day and until which | `person` twice |
 | `guardian_relationship_action` | One row per action a relationship grants | `guardian_relationship` |
 | `password_reset_token` | The one outstanding reset code an account has: its hash, the address it was mailed to, the epoch it was issued under and when it expires | `user_account` |
+| `registration_verification` | A self-registered account still waiting for its address to be verified: the hash of the mailed code, the account's security epoch at registration, when the registration arrived and when it lapses | `user_account` |
 
 **`person` and `user_account` are separate** because not every person has an account, a child, a
 name that arrived through a roster import. `user_account.username` is unique; `person.email` is not.
@@ -324,6 +325,13 @@ relationship when the dependant comes of age. Removing a former member removes t
 account's latest successful sign-in and stays null until the first one. A sign-in overwrites it
 without touching `version`, and a failed or refused attempt leaves it as it was. A sign-in while
 another change holds the account row does not wait for it and leaves the time unrecorded.
+
+**A `registration_verification` row exists at most 24 hours after a self-registered account was
+created.** The account stays disabled until the mailed code is redeemed, which deletes the row and
+enables the account. A code no longer redeems once the board has acted on the account, which moves
+its security epoch, or once the club stops admitting external bookings. The code hash is empty until the mailer issues the message. Once the row has
+lapsed, the hourly identity cleanup removes it together with a still disabled account and its person.
+An account the board switched on, or a person other rows refer to, stays.
 
 **`password_reset_token` holds at most one row per account**, because `account_id` is its primary
 key. Asking again replaces the code that was outstanding, the delete and the insert are what do
@@ -364,7 +372,9 @@ is the number of digits a new static code has. `currency` is an ISO 4217 code, `
 kept to three capital letters by `club_config_currency_code`; every amount the instance records is
 stated in it. `external_bookings`, off by default, decides whether a card naming the `EXTERNAL` role
 admits anybody holding it. `user_account_role` and `booking_card_allowed_role` know `EXTERNAL`;
-`booking_card_managing_role` does not.
+`booking_card_managing_role` does not. `registration_text_de` and `registration_text_en` hold the plain text
+the registration page shows in each language, at most 2000 characters each, and are empty until the
+club writes one.
 
 The time zone is checked against `pg_timezone_names` by a trigger, so a typo is refused where it is
 written rather than at the next reminder. The logo is stored in the row itself, content, media type

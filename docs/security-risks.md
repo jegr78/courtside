@@ -70,8 +70,11 @@ budget. A caller holding many accounts or many address prefixes gets one budget 
 total load it can send grows with what it controls; the per-class bulkheads still cap demanding work
 for the whole instance. The instance remembers 50,000 budgets and forgets the least recently seen
 first, so a caller cycling through more prefixes than that can return to a full budget. Visitors
-behind one clubhouse address share that address's budget until they sign in. Reconsider an
-instance-wide budget when production evidence shows sustained load from many principals at once.
+behind one clubhouse address share that address's budget until they sign in. While a club admits
+external bookings, anybody can register an account, so one person can hold as many signed-in budgets
+as the registration limit per client address and the mail verification let them create; each costs
+a verified address. Reconsider an instance-wide budget when production evidence shows sustained load
+from many principals at once.
 
 ## Account recovery exposes bounded availability and timing differences
 
@@ -80,6 +83,17 @@ still differ because a known subject creates mail work. Source and subject windo
 The shared subject window lets another caller delay recovery for that username, and a shared source
 address can make unrelated members share a limit. Neither blocks sign-in, and the board can issue
 credentials from the roster.
+
+## Self-registration tells its own mailbox whether a username exists
+
+While a club admits external bookings, the registration answer is the same for a free and a taken
+username, but the mail is not: a free name brings a verification link, a taken one a pointer back to
+registration. Anybody who registers with a mailbox they read learns whether a username exists,
+including an administrator's. The same form lets a caller send either mail to a stranger's address.
+Each client address and each submitted mailbox get five registrations per hour by default, and
+every attempt runs the full password check and hash. An unverified account is disabled, and a sign-in against it can finish
+sooner than one against an unknown name. Reconsider when usernames stop being guessable from member
+names, or when a club reports registration mail it did not ask for.
 
 ## A message can reach its recipient twice
 

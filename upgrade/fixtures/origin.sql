@@ -207,6 +207,10 @@ INSERT INTO password_reset_token
 VALUES ('72000000-0000-0000-0000-000000000001', repeat('c', 64), repeat('d', 64), 0,
         '2025-01-01T00:00:00Z', '2025-01-01T00:15:00Z');
 
+INSERT INTO registration_verification (account_id, code_hash, security_epoch, created_at, expires_at)
+VALUES ('72000000-0000-0000-0000-000000000001', repeat('e', 64), 0, '2025-01-01T00:00:00Z',
+        '2025-01-02T00:00:00Z');
+
 INSERT INTO message_optout (user_account_id, kind, created_at)
 VALUES ('72000000-0000-0000-0000-000000000001', 'BOOKING_REMINDER', '2025-01-01T00:00:00Z');
 

@@ -2,9 +2,9 @@
   "schemaVersion": 1,
   "reviewedAt": "2026-11-01",
   "purpose": "This is the normative authorization policy for the shipped Courtside API. OpenAPI defines the transport shape; this policy defines who may perform each operation, which resource attributes narrow that permission, and which protected fields each projection may read or write.",
-  "openApiFieldInventorySha256": "14f398d27c1609fb51cc458608dee25fc21894038da7e25bac16de7f8e676143",
-  "protectedFieldInventorySha256": "df963788c76c5d8d2687a2127a69d2961341cfa78d7c298b65bc1a37bdc24cb8",
-  "productionAuthorizationSha256": "c522bd36cf69723905c5c495d2eb237d87bed892b0d553d21582ffb85a8a5138",
+  "openApiFieldInventorySha256": "f31c14d52d66f163b1198256f6b13324b3badb5b8766ec0657227aebe0f78d12",
+  "protectedFieldInventorySha256": "5295a7c44ccdfbecede95000d5f40299f3bfb9026c9b5b5afde1dc1e58301aa0",
+  "productionAuthorizationSha256": "0f74a6f6df5125a661b69c3ffca120a4b79e777b70f179e25c1792d058ed9698",
   "ordinaryFields": [
     "Problem.detail",
     "Problem.fieldErrors",
@@ -279,6 +279,8 @@
     "changeClubConfig:request:ClubConfigRequest.passwordResetTokenMinutes",
     "changeClubConfig:request:ClubConfigRequest.primaryColor",
     "changeClubConfig:request:ClubConfigRequest.privacyUrl",
+    "changeClubConfig:request:ClubConfigRequest.registrationTextDe",
+    "changeClubConfig:request:ClubConfigRequest.registrationTextEn",
     "changeClubConfig:request:ClubConfigRequest.shortName",
     "changeClubConfig:request:ClubConfigRequest.slotMinutes",
     "changeClubConfig:request:ClubConfigRequest.timeZone",
@@ -304,6 +306,8 @@
     "changeClubConfig:response:ClubConfig.logoUrl",
     "changeClubConfig:response:ClubConfig.primaryColor",
     "changeClubConfig:response:ClubConfig.privacyUrl",
+    "changeClubConfig:response:ClubConfig.registrationTextDe",
+    "changeClubConfig:response:ClubConfig.registrationTextEn",
     "changeClubConfig:response:ClubConfig.slotMinutes",
     "changeClubConfig:response:ClubConfig.supportedLocales",
     "changeClubConfig:response:ClubConfig.timeZone",
@@ -1066,6 +1070,8 @@
     "deleteClubLogo:response:ClubConfig.logoUrl",
     "deleteClubLogo:response:ClubConfig.primaryColor",
     "deleteClubLogo:response:ClubConfig.privacyUrl",
+    "deleteClubLogo:response:ClubConfig.registrationTextDe",
+    "deleteClubLogo:response:ClubConfig.registrationTextEn",
     "deleteClubLogo:response:ClubConfig.slotMinutes",
     "deleteClubLogo:response:ClubConfig.supportedLocales",
     "deleteClubLogo:response:ClubConfig.timeZone",
@@ -1431,6 +1437,8 @@
     "getClubConfig:response:ClubConfig.logoUrl",
     "getClubConfig:response:ClubConfig.primaryColor",
     "getClubConfig:response:ClubConfig.privacyUrl",
+    "getClubConfig:response:ClubConfig.registrationTextDe",
+    "getClubConfig:response:ClubConfig.registrationTextEn",
     "getClubConfig:response:ClubConfig.slotMinutes",
     "getClubConfig:response:ClubConfig.supportedLocales",
     "getClubConfig:response:ClubConfig.timeZone",
@@ -1461,6 +1469,8 @@
     "getClubConfigForAdmin:response:ClubConfig.logoUrl",
     "getClubConfigForAdmin:response:ClubConfig.primaryColor",
     "getClubConfigForAdmin:response:ClubConfig.privacyUrl",
+    "getClubConfigForAdmin:response:ClubConfig.registrationTextDe",
+    "getClubConfigForAdmin:response:ClubConfig.registrationTextEn",
     "getClubConfigForAdmin:response:ClubConfig.slotMinutes",
     "getClubConfigForAdmin:response:ClubConfig.supportedLocales",
     "getClubConfigForAdmin:response:ClubConfig.timeZone",
@@ -2957,6 +2967,15 @@
     "redeemPasswordReset:response:Violation.code",
     "redeemPasswordReset:response:Violation.params",
     "redeemPasswordReset:response:Violation.params.*",
+    "registerExternalAccount:response:$response.header.Accept",
+    "registerExternalAccount:response:$response.header.Retry-After",
+    "registerExternalAccount:response:FieldError.code",
+    "registerExternalAccount:response:FieldError.field",
+    "registerExternalAccount:response:FieldError.params",
+    "registerExternalAccount:response:FieldError.params.*",
+    "registerExternalAccount:response:Violation.code",
+    "registerExternalAccount:response:Violation.params",
+    "registerExternalAccount:response:Violation.params.*",
     "removeCourtClosure:parameter:$parameter.path.closureId",
     "removeCourtClosure:response:$response.header.Retry-After",
     "removeCourtClosure:response:FieldError.code",
@@ -3485,6 +3504,8 @@
     "uploadClubLogo:response:ClubConfig.logoUrl",
     "uploadClubLogo:response:ClubConfig.primaryColor",
     "uploadClubLogo:response:ClubConfig.privacyUrl",
+    "uploadClubLogo:response:ClubConfig.registrationTextDe",
+    "uploadClubLogo:response:ClubConfig.registrationTextEn",
     "uploadClubLogo:response:ClubConfig.slotMinutes",
     "uploadClubLogo:response:ClubConfig.supportedLocales",
     "uploadClubLogo:response:ClubConfig.timeZone",
@@ -3546,6 +3567,15 @@
     "usageReport:response:Violation.code",
     "usageReport:response:Violation.params",
     "usageReport:response:Violation.params.*",
+    "verifyRegistration:response:$response.header.Accept",
+    "verifyRegistration:response:$response.header.Retry-After",
+    "verifyRegistration:response:FieldError.code",
+    "verifyRegistration:response:FieldError.field",
+    "verifyRegistration:response:FieldError.params",
+    "verifyRegistration:response:FieldError.params.*",
+    "verifyRegistration:response:Violation.code",
+    "verifyRegistration:response:Violation.params",
+    "verifyRegistration:response:Violation.params.*",
     "withdrawPartnerInvitation:parameter:$parameter.path.bookingId",
     "withdrawPartnerInvitation:response:$response.header.Retry-After",
     "withdrawPartnerInvitation:response:FieldError.code",
@@ -4802,6 +4832,31 @@
         "request-boundary",
         "occupancy-key-gate"
       ]
+    },
+    {
+      "id": "public-external-registration",
+      "description": "While the club admits external bookings, anybody may register a disabled EXTERNAL account and verify its address with the mailed code; the answer to a registration is the same whether or not the username is taken.",
+      "operationIds": [
+        "registerExternalAccount",
+        "verifyRegistration"
+      ],
+      "actors": [
+        "ANONYMOUS",
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN",
+        "EXTERNAL",
+        "INITIAL_PASSWORD"
+      ],
+      "decisions": [
+        "request-boundary",
+        "credential-write-only",
+        "external-self-registration"
+      ]
     }
   ],
   "decisions": [
@@ -5718,6 +5773,30 @@
         "src/test/java/org/courtside/booking/OutsiderServiceGuardTest.java#givenAnOutsider_whenItReachesAMemberOnlyServiceBehindTheWebLayer_thenEachServiceRefusesIt",
         "src/test/java/org/courtside/booking/ExternalBookingTest.java#givenADoublesCardOpenToExternals_whenAnExternalAccountNamesAMember_thenTheParticipantsAreRefused",
         "src/test/java/org/courtside/member/GuardianDelegationTest.java#givenAnOutsiderGuardian_whenItActsForADependant_thenItIsRefusedBeforeAnyRelationshipIsRead"
+      ]
+    },
+    {
+      "id": "external-self-registration",
+      "title": "Self-registration of external accounts",
+      "rule": "Registration exists only while the club admits external bookings. It creates a disabled account holding EXTERNAL and nothing else, which only the mailed single-use code enables within 24 hours. A taken username creates nothing, and each client address is limited per window.",
+      "attributes": [
+        "route",
+        "request-field",
+        "account-enabled"
+      ],
+      "productionPaths": [
+        "src/main/java/org/courtside/identity/internal/RegistrationService.java#register",
+        "src/main/java/org/courtside/identity/internal/RegistrationService.java#verify"
+      ],
+      "positiveTests": [
+        "src/test/java/org/courtside/identity/internal/RegistrationTest.java#givenExternalBookingsAdmitted_whenSomebodyRegisters_thenADisabledExternalAccountWaitsForItsVerificationMail",
+        "src/test/java/org/courtside/identity/internal/RegistrationTest.java#givenAMailedCode_whenItIsUsedTwice_thenTheFirstUseActivatesTheAccountAndTheSecondIsRefused"
+      ],
+      "negativeTests": [
+        "src/test/java/org/courtside/identity/internal/RegistrationTest.java#givenExternalBookingsSwitchedOff_whenSomebodyRegisters_thenRegistrationIsClosedAndNothingIsCreated",
+        "src/test/java/org/courtside/identity/internal/RegistrationTest.java#givenACodeWhoseRegistrationExpired_whenItIsUsed_thenItIsRefusedAsExpiredAndTheAccountStaysDisabled",
+        "src/test/java/org/courtside/identity/internal/RegistrationTest.java#givenOneClientAddress_whenItRegistersPastItsBudget_thenTheNextRegistrationIsRefusedWithRetryAfter",
+        "src/test/java/org/courtside/identity/internal/RegistrationTest.java#givenATakenUsername_whenSomebodyRegistersWithIt_thenTheAnswerMatchesAndOnlyAMailToTheSubmittedAddressFollows"
       ]
     }
   ],
@@ -7574,6 +7653,73 @@
       ],
       "decisions": [
         "emergency-code-participation"
+      ]
+    },
+    {
+      "id": "external-registration-request",
+      "access": "never-read",
+      "description": "What a person outside the club submits to register. It is written only: the operation returns no body, so a caller learns nothing about whether the username was taken.",
+      "fields": [
+        "RegistrationRequest.firstName",
+        "RegistrationRequest.lastName",
+        "RegistrationRequest.username",
+        "RegistrationRequest.password",
+        "RegistrationRequest.email",
+        "RegistrationRequest.language"
+      ],
+      "operationIds": [
+        "registerExternalAccount"
+      ],
+      "actors": [
+        "ANONYMOUS",
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN",
+        "EXTERNAL",
+        "INITIAL_PASSWORD"
+      ],
+      "attributes": [
+        "route",
+        "request-field"
+      ],
+      "decisions": [
+        "request-boundary",
+        "credential-write-only"
+      ]
+    },
+    {
+      "id": "external-registration-code",
+      "access": "never-read",
+      "description": "The code that verifies a registered address. It is written only and occurs in no response.",
+      "fields": [
+        "RegistrationVerificationRequest.code"
+      ],
+      "operationIds": [
+        "verifyRegistration"
+      ],
+      "actors": [
+        "ANONYMOUS",
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN",
+        "EXTERNAL",
+        "INITIAL_PASSWORD"
+      ],
+      "attributes": [
+        "route",
+        "request-field"
+      ],
+      "decisions": [
+        "request-boundary",
+        "credential-write-only"
       ]
     }
   ]

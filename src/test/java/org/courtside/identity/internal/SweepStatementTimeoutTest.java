@@ -24,7 +24,7 @@ class SweepStatementTimeoutTest extends AbstractIntegrationTest {
     void givenEveryIdentitySweep_whenItRuns_thenItsStatementsMayRunForTheMaintenanceTimeout(
             @Autowired LoginAttemptCleanup loginAttempts, @Autowired CredentialIssueLimit credentialIssues,
             @Autowired PasswordResetMailLimit resetMails, @Autowired PasswordResetTokenService resetTokens,
-            @Autowired AgedSessionSweep sessions) {
+            @Autowired AgedSessionSweep sessions, @Autowired RegistrationService registrations) {
         // given
         Map<String, Runnable> sweeps = new LinkedHashMap<>();
         sweeps.put("login attempts", loginAttempts::deleteExpiredAttempts);
@@ -32,6 +32,7 @@ class SweepStatementTimeoutTest extends AbstractIntegrationTest {
         sweeps.put("reset mail windows", resetMails::deleteExpiredWindows);
         sweeps.put("reset tokens", resetTokens::deleteExpired);
         sweeps.put("aged sessions", sessions::deleteSessionsPastTheirLifetime);
+        sweeps.put("unverified registrations", registrations::deleteExpired);
 
         // when
         Map<String, String> timeouts = new LinkedHashMap<>();

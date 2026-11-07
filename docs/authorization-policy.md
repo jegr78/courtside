@@ -124,6 +124,7 @@ The maintained JSON classifies every reachable OpenAPI field either as ordinary 
 | `public-mfa-rescue-redemption` | `redeemMfaRecovery` | `ANONYMOUS`, `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN`, `EXTERNAL`, `INITIAL_PASSWORD` | `request-boundary`, `credential-write-only`, `mfa-controlled-rescue` |
 | `booking-emergency-code` | `requestEmergencyCode`, `requestParticipationEmergencyCode` | `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN`, `EXTERNAL` | `permanent-account-gate`, `emergency-code-participation` |
 | `occupancy-signal` | `getCourtOccupancy` | `ANONYMOUS`, `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN`, `EXTERNAL`, `INITIAL_PASSWORD` | `request-boundary`, `occupancy-key-gate` |
+| `public-external-registration` | `registerExternalAccount`, `verifyRegistration` | `ANONYMOUS`, `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN`, `EXTERNAL`, `INITIAL_PASSWORD` | `request-boundary`, `credential-write-only`, `external-self-registration` |
 
 ## Authorization decisions
 
@@ -511,6 +512,18 @@ Positive tests: `src/test/java/org/courtside/booking/web/ExternalClosureTest.jav
 
 Negative tests: `src/test/java/org/courtside/booking/web/ExternalClosureTest.java#givenAnExternalAccountWithoutMembership_whenItCallsAMemberOnlyOperation_thenAccessIsDenied`, `src/test/java/org/courtside/booking/OutsiderServiceGuardTest.java#givenAnOutsider_whenItReachesAMemberOnlyServiceBehindTheWebLayer_thenEachServiceRefusesIt`, `src/test/java/org/courtside/booking/ExternalBookingTest.java#givenADoublesCardOpenToExternals_whenAnExternalAccountNamesAMember_thenTheParticipantsAreRefused`, `src/test/java/org/courtside/member/GuardianDelegationTest.java#givenAnOutsiderGuardian_whenItActsForADependant_thenItIsRefusedBeforeAnyRelationshipIsRead`.
 
+### Self-registration of external accounts
+
+Registration exists only while the club admits external bookings. It creates a disabled account holding EXTERNAL and nothing else, which only the mailed single-use code enables within 24 hours. A taken username creates nothing, and each client address is limited per window.
+
+Attributes: `route`, `request-field`, `account-enabled`.
+
+Production: `src/main/java/org/courtside/identity/internal/RegistrationService.java#register`, `src/main/java/org/courtside/identity/internal/RegistrationService.java#verify`.
+
+Positive tests: `src/test/java/org/courtside/identity/internal/RegistrationTest.java#givenExternalBookingsAdmitted_whenSomebodyRegisters_thenADisabledExternalAccountWaitsForItsVerificationMail`, `src/test/java/org/courtside/identity/internal/RegistrationTest.java#givenAMailedCode_whenItIsUsedTwice_thenTheFirstUseActivatesTheAccountAndTheSecondIsRefused`.
+
+Negative tests: `src/test/java/org/courtside/identity/internal/RegistrationTest.java#givenExternalBookingsSwitchedOff_whenSomebodyRegisters_thenRegistrationIsClosedAndNothingIsCreated`, `src/test/java/org/courtside/identity/internal/RegistrationTest.java#givenACodeWhoseRegistrationExpired_whenItIsUsed_thenItIsRefusedAsExpiredAndTheAccountStaysDisabled`, `src/test/java/org/courtside/identity/internal/RegistrationTest.java#givenOneClientAddress_whenItRegistersPastItsBudget_thenTheNextRegistrationIsRefusedWithRetryAfter`, `src/test/java/org/courtside/identity/internal/RegistrationTest.java#givenATakenUsername_whenSomebodyRegistersWithIt_thenTheAnswerMatchesAndOnlyAMailToTheSubmittedAddressFollows`.
+
 ## Protected field rules
 
 | Rule | Access | Fields | Operations | Actors and attributes |
@@ -579,5 +592,7 @@ Negative tests: `src/test/java/org/courtside/booking/web/ExternalClosureTest.jav
 | `participation-access-code-read` | read | `Participation.access` | `listOwnParticipations` | `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN`, `EXTERNAL`; `participant-person`, `current-account` |
 | `members-door-code-read` | read | `AccessCode.code` | `listMembersDoorCodes` | `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN`, `EXTERNAL`; `current-account`, `current-membership` |
 | `emergency-code-read` | read | `EmergencyAccess.codes` | `requestEmergencyCode`, `requestParticipationEmergencyCode` | `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN`, `EXTERNAL`; `booking-owner`, `participant-person`, `current-account` |
+| `external-registration-request` | never-read | `RegistrationRequest.firstName`, `RegistrationRequest.lastName`, `RegistrationRequest.username`, `RegistrationRequest.password`, `RegistrationRequest.email`, `RegistrationRequest.language` | `registerExternalAccount` | `ANONYMOUS`, `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN`, `EXTERNAL`, `INITIAL_PASSWORD`; `route`, `request-field` |
+| `external-registration-code` | never-read | `RegistrationVerificationRequest.code` | `verifyRegistration` | `ANONYMOUS`, `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN`, `EXTERNAL`, `INITIAL_PASSWORD`; `route`, `request-field` |
 
 Every field not declared by an operation's OpenAPI request schema is rejected before the operation runs. Every field not declared by its response schema is outside that operation's projection. The rules above name the fields whose visibility or mutability is narrower than merely satisfying that schema.

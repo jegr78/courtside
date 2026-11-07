@@ -116,6 +116,10 @@ courtside:
       max-failures: ${COURTSIDE_LOGIN_ADDRESS_MAX_FAILURES:20}
       window: ${COURTSIDE_LOGIN_ADDRESS_WINDOW:1m}
       block: ${COURTSIDE_LOGIN_ADDRESS_BLOCK:1m}
+    registration:
+      max-failures: ${COURTSIDE_REGISTRATION_MAX_PER_WINDOW:5}
+      window: ${COURTSIDE_REGISTRATION_WINDOW:1h}
+      block: ${COURTSIDE_REGISTRATION_WINDOW:1h}
     factor:
       max-failures: ${COURTSIDE_LOGIN_FACTOR_MAX_FAILURES:5}
       block: ${COURTSIDE_LOGIN_FACTOR_BLOCK:1m}

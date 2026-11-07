@@ -14,6 +14,7 @@ class IdentityCleanupSchedule {
     private final LoginAttemptCleanup loginAttempts;
     private final PasswordResetMailLimit resetMails;
     private final PasswordResetTokenService resetTokens;
+    private final RegistrationService registrations;
 
     @Scheduled(initialDelayString = "PT1H", fixedDelayString = "PT1H")
     void deleteExpiredCredentialIssues() {
@@ -33,5 +34,10 @@ class IdentityCleanupSchedule {
     @Scheduled(initialDelayString = "PT1H", fixedDelayString = "PT1H")
     void deleteExpiredResetTokens() {
         resetTokens.deleteExpired();
+    }
+
+    @Scheduled(initialDelayString = "PT1H", fixedDelayString = "PT1H")
+    void deleteUnverifiedRegistrations() {
+        registrations.deleteExpired();
     }
 }

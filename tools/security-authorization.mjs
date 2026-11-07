@@ -119,7 +119,7 @@ function operationExpectations(path, method, security) {
     return Object.fromEntries(authorizationActors.map((actor) => [actor, "allow"]));
   }
   if (["/api/account-recovery/password", "/api/account-recovery/password/redemption",
-    "/api/account-recovery/usernames"].includes(path)) {
+    "/api/account-recovery/usernames", "/api/registration", "/api/registration/verification"].includes(path)) {
     return Object.fromEntries(authorizationActors.map((actor) => [actor, "allow"]));
   }
   if (path === "/api/session/logout") {

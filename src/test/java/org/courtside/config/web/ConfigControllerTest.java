@@ -400,6 +400,70 @@ class ConfigControllerTest extends AbstractIntegrationTest {
 
     @Test
     @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenRegistrationTexts_whenTheBoardSavesThem_thenVisitorsReadThemAndLeavingThemOutKeepsThem()
+            throws Exception {
+        // given
+        mockMvc.perform(put("/api/admin/config")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(configJson("Example Tennis Club").replace("\"slotMinutes\": 30,",
+                                "\"slotMinutes\": 30, \"registrationTextDe\": \"  Gäste zahlen am Platz.  \","
+                                        + " \"registrationTextEn\": \"Guests pay at the court.\","))
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.registrationTextDe").value("Gäste zahlen am Platz."));
+
+        // when
+        mockMvc.perform(put("/api/admin/config")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(configJson("Example Tennis Club"))
+                        .with(csrf()))
+                .andExpect(status().isOk());
+
+        // then
+        mockMvc.perform(get("/api/public/config"))
+                .andExpect(jsonPath("$.registrationTextDe").value("Gäste zahlen am Platz."))
+                .andExpect(jsonPath("$.registrationTextEn").value("Guests pay at the court."));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAStoredRegistrationText_whenTheBoardBlanksIt_thenVisitorsReadNone() throws Exception {
+        // given
+        mockMvc.perform(put("/api/admin/config")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(configJson("Example Tennis Club").replace("\"slotMinutes\": 30,",
+                                "\"slotMinutes\": 30, \"registrationTextEn\": \"Guests pay at the court.\","))
+                        .with(csrf()))
+                .andExpect(status().isOk());
+
+        // when
+        mockMvc.perform(put("/api/admin/config")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(configJson("Example Tennis Club").replace("\"slotMinutes\": 30,",
+                                "\"slotMinutes\": 30, \"registrationTextEn\": \" \","))
+                        .with(csrf()))
+                .andExpect(status().isOk());
+
+        // then
+        mockMvc.perform(get("/api/public/config"))
+                .andExpect(jsonPath("$.registrationTextEn").doesNotExist());
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenARegistrationTextBeyondItsLength_whenTheBoardSavesIt_thenTheFieldIsRefused() throws Exception {
+        // when / then
+        mockMvc.perform(put("/api/admin/config")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(configJson("Example Tennis Club").replace("\"slotMinutes\": 30,",
+                                "\"slotMinutes\": 30, \"registrationTextDe\": \"" + "x".repeat(2001) + "\","))
+                        .with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("registrationTextDe"));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
     void givenAnInvalidTimeZone_whenChangingTheConfig_thenItIsRejected() throws Exception {
         // when / then
         mockMvc.perform(put("/api/admin/config")

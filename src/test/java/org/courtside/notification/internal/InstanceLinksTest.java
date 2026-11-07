@@ -119,6 +119,7 @@ class InstanceLinksTest {
         expected.put(MessageKind.BOOKING_SERIES_MOVED_BY_CLUB, bookings);
         expected.put(MessageKind.MEMBERS_DOOR_CODE_CHANGED, bookings);
         expected.put(MessageKind.WAITLIST_OFFER, ADDRESS + "/my-bookings#waitlist-" + ENTRY);
+        expected.put(MessageKind.REGISTRATION_NAME_TAKEN, ADDRESS + "/register");
 
         // when
         Map<MessageKind, String> resolved = new EnumMap<>(MessageKind.class);

@@ -11,7 +11,7 @@ import { TextField } from "../components/TextField";
 import { getSecurityKey, securityKeyFailure, supportsSecurityKeys } from "../security/webauthn";
 import { returnSearch } from "../navigation/returnTarget";
 
-export function LoginView({ refreshSession, passwordChanged = false, mfaRequired = false, totpAvailable = true, webauthnAvailable = false }: { refreshSession: (signal?: AbortSignal) => Promise<void>; passwordChanged?: boolean; mfaRequired?: boolean; totpAvailable?: boolean; webauthnAvailable?: boolean }) {
+export function LoginView({ refreshSession, passwordChanged = false, mfaRequired = false, totpAvailable = true, webauthnAvailable = false, registration = false }: { refreshSession: (signal?: AbortSignal) => Promise<void>; passwordChanged?: boolean; mfaRequired?: boolean; totpAvailable?: boolean; webauthnAvailable?: boolean; registration?: boolean }) {
   const { t } = useTranslation();
   const { search } = useLocation();
   const [factorStage, setFactorStage] = useState<boolean>();
@@ -169,6 +169,9 @@ export function LoginView({ refreshSession, passwordChanged = false, mfaRequired
     </form>}
     {!factorRequired && <p className="mt-6">
       <Link data-testid="forgotten-credentials-link" to={`/account-recovery${returnSearch(search)}`} className="font-semibold underline underline-offset-4">{t("auth.forgotten")}</Link>
+    </p>}
+    {!factorRequired && registration && <p className="mt-3">
+      <Link data-testid="registration-link" to="/register" className="font-semibold underline underline-offset-4">{t("registration.link")}</Link>
     </p>}
   </section>;
 }
