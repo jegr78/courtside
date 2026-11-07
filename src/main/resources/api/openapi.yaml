@@ -7230,8 +7230,9 @@ paths:
       operationId: listMembersDoorCodes
       summary: The codes of the doors open to every member.
       description: |
-        The static codes of the active access points open to members, by name. Empty for an account
-        whose person holds no membership period covering today.
+        The static codes of the active access points open to members, by name. Empty unless the
+        account's person holds a membership period covering today, or the account is an outsider
+        whose own confirmed booking on a card that grants access has an access window still open.
       responses:
         "200":
           description: The codes, possibly none.

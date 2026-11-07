@@ -1249,6 +1249,7 @@ const en: Record<keyof typeof de, string> = {
   "myBookings.emergencyCodeFor": "Emergency code for {{accessPoint}}:",
   "myBookings.doorCodes": "Door codes",
   "myBookings.doorCodesHint": "These codes open doors of the club for every member, with or without a booking.",
+  "myBookings.doorCodesHintBooking": "These codes open doors of the club while you hold a booking, until the access window of your last one closes.",
   "myBookings.checkedInSuccess": "You are checked in.",
   "myBookings.checkInFrom": "Check in from {{time}}",
   "myBookings.unknownCourt": "Unknown court",

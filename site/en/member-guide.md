@@ -360,7 +360,11 @@ it.
 
 When the club opens a door to every member, such as the clubhouse door, its code sits at the top of
 *My bookings* under *Door codes*, with or without a booking. You see it as long as you are a member.
-In the installed app it stays there without a connection until you open the page online again or
+The booking itself does not show it, only the codes of the court doors.
+
+If you registered as an external player, you see the door codes from the confirmation of your booking
+until the access window of your last booking closes. This holds for booking types the club hands
+access codes to. In the installed app it stays there without a connection until you open the page online again or
 sign out. When the club changes the code, you receive a message with the new one.
 
 ![The door codes at the top of My bookings with the name of the door and its code.](../screenshots/en/members-door-codes.png)

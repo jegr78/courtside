@@ -52,6 +52,7 @@ class AccessCodeAnnouncements {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     void on(CardGrantsAccess granted) {
         Set<UUID> courtsBehindACode = facility.activeAccessPointsWithCodes().stream()
+                .filter(accessPoint -> !accessPoint.isOpenToMembers())
                 .flatMap(accessPoint -> accessPoint.getCourtIds().stream()).collect(Collectors.toSet());
         if (courtsBehindACode.isEmpty()) {
             return;

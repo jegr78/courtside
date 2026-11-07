@@ -126,6 +126,19 @@ it("given doors open to every member, when My bookings loads, then their codes l
     "the door codes sit at the top of My bookings").toBeTruthy();
 });
 
+it("given an external player whose booking opens the doors, when My bookings loads, then the hint ties the codes to the booking", async () => {
+  // given
+  vi.mocked(api.doorCodes).mockResolvedValue([{ accessPointName: "Clubhouse door", code: "135790" }]);
+
+  // when
+  render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} memberFeatures={false} />);
+
+  // then
+  const block = await screen.findByTestId("members-door-codes");
+  expect(within(block).getByTestId("door-codes-hint"), "an external player holds the codes only while booked")
+    .toHaveTextContent(i18n.t("myBookings.doorCodesHintBooking"));
+});
+
 it("given no door open to members, when My bookings loads, then no door code block is shown", async () => {
   // when
   render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} />);

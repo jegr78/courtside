@@ -374,7 +374,11 @@ wer ihn abgefragt hat.
 
 Gibt der Verein eine Tür für alle Mitglieder frei, etwa die Tür zum Clubhaus, steht ihr Code ganz
 oben in *Meine Buchungen* unter *Türcodes*, auch ohne Buchung. Du siehst ihn, solange du Mitglied
-bist. In der installierten App bleibt er ohne Verbindung stehen, bis du die Seite wieder mit
+bist. Bei der Buchung selbst steht er nicht, dort stehen nur die Codes der Platztüren.
+
+Bist du als externer Spieler registriert, siehst du die Türcodes ab der Bestätigung deiner Buchung,
+bis das Zugangsfenster deiner letzten Buchung endet. Das gilt für Buchungsarten, für die der Verein
+Zugangscodes vergibt. In der installierten App bleibt er ohne Verbindung stehen, bis du die Seite wieder mit
 Verbindung öffnest oder dich abmeldest. Ändert der Verein den Code, bekommst du eine Nachricht mit
 dem neuen.
 

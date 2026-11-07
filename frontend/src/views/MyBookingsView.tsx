@@ -207,7 +207,7 @@ export function MyBookingsView({ now, offline = false, memberFeatures = true }: 
     {doorCodes.length > 0 && <section data-testid="members-door-codes" aria-labelledby="members-door-codes-title"
       className="surface-raised border-structural mt-4 rounded-xl border px-4 py-3">
       <h2 id="members-door-codes-title" className="text-lg font-semibold">{t("myBookings.doorCodes")}</h2>
-      <p className="text-muted text-sm">{t("myBookings.doorCodesHint")}</p>
+      <p data-testid="door-codes-hint" className="text-muted text-sm">{t(memberFeatures ? "myBookings.doorCodesHint" : "myBookings.doorCodesHintBooking")}</p>
       <ul className="mt-2 grid gap-1">{doorCodes.map((door) => <li key={door.accessPointName} data-testid="members-door-code">
         {door.accessPointName}: <span className="font-mono text-base font-semibold">{door.code}</span>
       </li>)}</ul>
