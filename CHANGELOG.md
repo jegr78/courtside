@@ -1,7 +1,6 @@
 # Changelog
 
-## [0.5.0-rc.1](https://github.com/jegr78/courtside/compare/v0.4.0...v0.5.0-rc.1) (2026-11-07)
-
+## 0.5.0 (2026-11-07)
 
 ### Features
 
@@ -14,7 +13,6 @@
 * show an external booker the clubhouse door codes while their booking opens them ([#1899](https://github.com/jegr78/courtside/issues/1899)) ([d67cf10](https://github.com/jegr78/courtside/commit/d67cf10272e1e32050cb08b896827a6baaa6d12b)), closes [#1857](https://github.com/jegr78/courtside/issues/1857)
 * split an import category into membership types by birth year ([#1888](https://github.com/jegr78/courtside/issues/1888)) ([4232267](https://github.com/jegr78/courtside/commit/42322672e14c9bf5693008af984f53c4a83ae2eb))
 
-
 ### Bug fixes
 
 * book cards without a role list only with a running membership ([#1882](https://github.com/jegr78/courtside/issues/1882)) ([6abc723](https://github.com/jegr78/courtside/commit/6abc7232f8086ba9b2bc73ad8b6e58a80aa10a6e))
@@ -24,11 +22,9 @@
 * bump the frontend-minor-and-patch group in /frontend with 4 updates ([#1875](https://github.com/jegr78/courtside/issues/1875)) ([189d4e4](https://github.com/jegr78/courtside/commit/189d4e4bb7b592bda0f26f43bfee92edc155bbd7))
 * keep every word of the phone court plan at a readable size ([#1885](https://github.com/jegr78/courtside/issues/1885)) ([5943e7e](https://github.com/jegr78/courtside/commit/5943e7e986a20fe72d913f9435841d8c18886b77))
 
-
 ### Performance
 
 * load the account area only when a member opens it ([#1884](https://github.com/jegr78/courtside/issues/1884)) ([d582269](https://github.com/jegr78/courtside/commit/d5822698344072e1457d3f30f3e705b56de8428e))
-
 
 ### Chores
 
