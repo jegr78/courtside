@@ -648,7 +648,7 @@ test("given legacy mail, when an explicit transition is previewed, then exact co
     assert.equal(result.status, 0, result.stderr);
     assert.match(result.stdout, /mail_transition=reinitialize/);
     assert.match(result.stdout, /v0\.16\.27@sha256:[a-f0-9]{64}/);
-    assert.match(result.stdout, /v1\.0\.1@sha256:[a-f0-9]{64}/);
+    assert.match(result.stdout, /mail_target_image=stalwartlabs\/stalwart:v1\.\d+\.\d+@sha256:[a-f0-9]{64}/);
     assert.match(result.stdout, /not copied/);
     assert.match(result.stdout, /DKIM.*DNS/);
     assert.equal(readFileSync(file, "utf8"), before);
