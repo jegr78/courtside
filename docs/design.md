@@ -342,6 +342,14 @@ when it was booked. Changing the currency converts nothing: card fees keep their
 dialog shows guests, fee and total before a member confirms a booking with guests on a card with a
 fee. Courtside records the fee; it issues no invoice and marks nothing as paid.
 
+A booking card also carries an hourly price for external bookers, zero by default, in the same
+currency and unit. When an outsider books, `BookingWriter` stamps the amount on the booking: the
+price times the number of courts times the booked minutes over 60, rounded half up to the minor
+unit. A later price or currency change leaves every booking with the amount it was made with.
+Bookings by anybody else, a member or an external player whose membership is running, carry no
+amount. The card administration shows the price only while the card names `EXTERNAL`, and the
+booking dialog shows the amount to an outsider before they confirm.
+
 The guest fee report under `/api/treasury` lists, for `TREASURER` and `ADMIN`, each member's charged
 guest places and their sum for a period, by default the current calendar year in the club time
 zone. A guest place counts when its fee is above zero and its booking is confirmed, started within

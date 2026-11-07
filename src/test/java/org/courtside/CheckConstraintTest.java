@@ -190,6 +190,16 @@ class CheckConstraintTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void whenStoringANegativeExternalPriceOnACard_thenTheDatabaseRefusesIt() {
+        // when / then
+        assertThatThrownBy(() -> jdbc.sql("""
+                UPDATE booking_card SET external_price_minor = -1
+                WHERE id = '11111111-1111-1111-1111-111111111111'
+                """).update())
+                .hasMessageContaining("booking_card_external_price_not_negative");
+    }
+
+    @Test
     void whenStoringABlankTimeZone_thenTheDatabaseRefusesIt() {
         // when / then
         assertThatThrownBy(() -> jdbc.sql("""

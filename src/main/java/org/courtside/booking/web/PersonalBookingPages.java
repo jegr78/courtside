@@ -1,6 +1,7 @@
 package org.courtside.booking.web;
 
 import lombok.RequiredArgsConstructor;
+import org.courtside.api.ApiBookingAmount;
 import org.courtside.api.ApiBookingStatus;
 import org.courtside.api.ApiAccessCode;
 import org.courtside.api.ApiAccessGrant;
@@ -94,7 +95,9 @@ class PersonalBookingPages {
                             .checkIn(toCheckIn(checkIns.get(booking.getId())))
                             .released(released.contains(booking.getId()) ? Boolean.TRUE : null)
                             .access(toAccess(booking.getId(), access.get(booking.getId()),
-                                    dynamic.get(booking.getId())));
+                                    dynamic.get(booking.getId())))
+                            .amount(booking.amount().map(amount -> new ApiBookingAmount(amount.minor(),
+                                    amount.currency().getCurrencyCode())).orElse(null));
                 })
                 .toList();
         List<ApiPublicCourt> courtLabels = facility.allCourts().stream()

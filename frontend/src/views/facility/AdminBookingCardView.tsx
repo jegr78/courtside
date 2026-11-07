@@ -11,7 +11,7 @@ import { minorAsDecimal, parseMinor } from "../../money";
 import { differs } from "../../unsaved/differs";
 import { SaveBar } from "../../unsaved/SaveBar";
 import { CardPreview } from "./CardPreview";
-import { AllowedRoleCheckboxes, BookingRules, Checkbox, CardColorField, GuestFeeField, ManagingRoleCheckboxes, PlayerCounts } from "./cardControls";
+import { AllowedRoleCheckboxes, BookingRules, Checkbox, CardColorField, AmountField, ManagingRoleCheckboxes, PlayerCounts } from "./cardControls";
 import { FacilityPage } from "./FacilityPage";
 import { useSaving } from "./useSaving";
 
@@ -32,10 +32,13 @@ export function AdminBookingCardView() {
   const [missing, setMissing] = useState(false);
   const [confirmed, setConfirmed] = useState<BookingCard>();
   const [feeDraft, setFeeDraft] = useState<string>();
+  const [priceDraft, setPriceDraft] = useState<string>();
   const { error, failure, success, pending, reportError, save } = useSaving();
   const [created, setCreated] = useState(() => arrivedFromCardCreation(location.state as unknown));
   const disabled = pending.has(MARK);
   const feeInvalid = feeDraft !== undefined && club !== undefined && parseMinor(feeDraft, club.currency) === undefined;
+  const priceInvalid = card?.allowedRoles.includes("EXTERNAL") === true && priceDraft !== undefined && club !== undefined
+    && parseMinor(priceDraft, club.currency) === undefined;
 
   useEffect(() => {
     void api.adminBookingCards()
@@ -51,6 +54,7 @@ export function AdminBookingCardView() {
   function confirm(changed: BookingCard) {
     setCreated(false);
     setFeeDraft(undefined);
+    setPriceDraft(undefined);
     setCard(changed);
     setConfirmed(changed);
   }
@@ -61,20 +65,28 @@ export function AdminBookingCardView() {
     if (card && minor !== undefined) setCard({ ...card, guestFeeMinor: minor });
   }
 
+  function changePrice(text: string) {
+    setPriceDraft(text);
+    const minor = club && parseMinor(text, club.currency);
+    if (card && minor !== undefined) setCard({ ...card, externalPriceMinor: minor });
+  }
+
   function discard() {
     setFeeDraft(undefined);
+    setPriceDraft(undefined);
     setCard(confirmed);
   }
 
   function saveCard() {
-    if (!card || feeInvalid) return Promise.resolve();
+    if (!card || feeInvalid || priceInvalid) return Promise.resolve();
     setCreated(false);
     return save(MARK, async () => confirm(await api.changeAdminBookingCard(card.id, {
       label: card.label, color: card.color, allowedRoles: card.allowedRoles,
       managingRoles: card.managingRoles, allowedPlayerCounts: card.allowedPlayerCounts,
       countsAgainstLimits: card.countsAgainstLimits, guestAllowed: card.guestAllowed,
       showGenericOccupancy: card.showGenericOccupancy, grantsAccess: card.grantsAccess,
-      signalsOccupancy: card.signalsOccupancy, guestFeeMinor: card.guestFeeMinor
+      signalsOccupancy: card.signalsOccupancy, guestFeeMinor: card.guestFeeMinor,
+      externalPriceMinor: card.externalPriceMinor
     })));
   }
 
@@ -115,9 +127,13 @@ export function AdminBookingCardView() {
           <BookingRules>
             <Checkbox disabled={disabled} data-testid="card-counts-against-limits" label={t("admin.facility.countsAgainstLimits")} checked={card.countsAgainstLimits} changed={(countsAgainstLimits) => setCard({ ...card, countsAgainstLimits })} />
             <Checkbox disabled={disabled} data-testid="card-guest-allowed" label={t("admin.facility.guestAllowed")} checked={card.guestAllowed} changed={(guestAllowed) => setCard({ ...card, guestAllowed })} />
-            <GuestFeeField testId="card-guest-fee" disabled={disabled} currency={club.currency} invalid={feeInvalid}
-                           refused={refusesField(failure, "guestFeeMinor")} changed={changeFee}
-                           value={feeDraft ?? minorAsDecimal(card.guestFeeMinor, i18n.language, club.currency)} />
+            <AmountField kind="guestFee" testId="card-guest-fee" disabled={disabled} currency={club.currency} invalid={feeInvalid}
+                         refused={refusesField(failure, "guestFeeMinor")} changed={changeFee}
+                         value={feeDraft ?? minorAsDecimal(card.guestFeeMinor, i18n.language, club.currency)} />
+            {card.allowedRoles.includes("EXTERNAL") &&
+              <AmountField kind="externalPrice" testId="card-external-price" disabled={disabled} currency={club.currency} invalid={priceInvalid}
+                           refused={refusesField(failure, "externalPriceMinor")} changed={changePrice}
+                           value={priceDraft ?? minorAsDecimal(card.externalPriceMinor, i18n.language, club.currency)} />}
             {card.id === COURT_CLOSED
               ? <p data-testid="card-grants-access-closure" className="text-muted text-sm">{t("admin.facility.grantsAccessClosure")}</p>
               : <Checkbox disabled={disabled} data-testid="card-grants-access" label={t("admin.facility.grantsAccess")} checked={card.grantsAccess} changed={(grantsAccess) => setCard({ ...card, grantsAccess })} />}
@@ -129,7 +145,7 @@ export function AdminBookingCardView() {
       </div>
       <Button variant={card.active ? "destructive" : "primary"} disabled={disabled} data-testid="toggle-card" className="justify-self-start" type="button" onClick={() => void toggleActive()}>{t(card.active ? "admin.deactivate" : "admin.activate")}</Button>
       <ImpactPanel kind="booking-card" subject={card.id} timeZone={club.timeZone} ask={() => api.bookingCardImpact(card.id)} reportError={reportError} />
-      <SaveBar id={MARK} subject={t("admin.facility.card")} saveTestId="save-card" unsaved={feeInvalid || differs(card, confirmed)}
+      <SaveBar id={MARK} subject={t("admin.facility.card")} saveTestId="save-card" unsaved={feeInvalid || priceInvalid || differs(card, confirmed)}
                pending={disabled} save={() => void saveCard()} discard={discard} />
     </>}
   </FacilityPage>;

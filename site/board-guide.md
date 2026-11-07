@@ -135,7 +135,7 @@ Statusleiste der installierten App übernimmt die Primärfarbe beim nächsten Ö
 * Gib eine gültige IANA-Zeitzone ein, zum Beispiel `Europe/Berlin`. Du kannst die Zeitzone
   nur ändern, solange keine zukünftige Buchung vorhanden ist.
 * Das **Buchungsraster** bestimmt die Zeilen im Platzplan und die zulässigen Startzeiten.
-* Die **Währung** ist ein dreistelliger ISO-Code wie `EUR` oder `CHF`. In ihr gelten Gastgebühren.
+* Die **Währung** ist ein dreistelliger ISO-Code wie `EUR` oder `CHF`. In ihr gelten Gastgebühren und Preise für Externe.
   Ein Wechsel rechnet nichts um: Die Gebühren der Buchungsarten behalten ihre Zahl, und bereits
   gebuchte Gäste behalten ihren Betrag.
 * **Externe Buchungen zulassen** öffnet Buchungskarten, die die Rolle *Extern* nennen, für Personen
@@ -429,6 +429,7 @@ Punktspiel oder Sperrung. Lege für jede benötigte Art eine Karte an.
 | **Zählt gegen Buchungslimits** | Rechnet die Buchung auf die Obergrenze offener Buchungen an |
 | **Gäste erlaubt** | Erlaubt namentlich erfasste Gäste |
 | **Gastgebühr pro Gast** | Betrag in der Vereinswährung, den ein Gastplatz kostet. 0 erhebt nichts. Jeder Gast behält die Gebühr, die beim Buchen galt |
+| **Preis pro Platz und Stunde für Externe** | Erscheint, sobald *Extern* zu den berechtigten Rollen gehört. Betrag in der Vereinswährung, den eine externe Person für einen Platz und eine Stunde zahlt. Andere Dauern kosten anteilig, auf den Cent gerundet. 0 erhebt nichts. Jede Buchung behält den Betrag, der beim Buchen galt |
 | **Neutral anzeigen** | Zeigt im öffentlichen Platzplan *Belegt* statt der Kartenbezeichnung |
 | **Buchungen erhalten den Zugangscode** | Buchungen mit dieser Karte gehören zu den Buchungen, für die der Code der Zugänge ihrer Plätze gilt. Die Karte *Platz gesperrt* bietet das nicht an |
 | **Buchungen gelten für die Gebäudesteuerung als belegt** | Buchungen mit dieser Karte melden ihren Platz der Gebäudesteuerung als belegt, siehe *Gebäudesteuerung* unter *Zugänge*. Neue Karten tragen es, die Karte *Platz gesperrt* bietet es nicht an |

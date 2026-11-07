@@ -78,7 +78,7 @@ it("given the German copy, when the duration is bounded, then it speaks of the c
 it("given a booking the club refuses, when the refusal arrives, then the duration comes back into view beside it", async () => {
   // given
   vi.spyOn(api, "bookingCards").mockResolvedValue([{
-    id: "55555555-5555-5555-5555-555555555555", label: "Member booking", color: "#b85c38", allowedPlayerCounts: [1, 2, 4], guestAllowed: true, guestFeeMinor: 0
+    id: "55555555-5555-5555-5555-555555555555", label: "Member booking", color: "#b85c38", allowedPlayerCounts: [1, 2, 4], guestAllowed: true, guestFeeMinor: 0, externalPriceMinor: 0
   }]);
   vi.spyOn(api, "createBooking").mockRejectedValue(new ApiError(409, {
     type: "urn:courtside:error:court-unavailable", title: "Court unavailable", status: 409
@@ -122,7 +122,7 @@ it("given the booking form, when the member opens more details, then the first g
 it("given a refusal about a note, when it opens more details, then the first guest field is not scrolled to", async () => {
   // given
   vi.spyOn(api, "bookingCards").mockResolvedValue([{
-    id: "55555555-5555-5555-5555-555555555555", label: "Member booking", color: "#b85c38", allowedPlayerCounts: [1, 2, 4], guestAllowed: true, guestFeeMinor: 0
+    id: "55555555-5555-5555-5555-555555555555", label: "Member booking", color: "#b85c38", allowedPlayerCounts: [1, 2, 4], guestAllowed: true, guestFeeMinor: 0, externalPriceMinor: 0
   }]);
   vi.spyOn(api, "createBooking").mockRejectedValue(new ApiError(400, {
     type: "urn:courtside:error:validation", title: "Invalid", status: 400,
@@ -233,7 +233,7 @@ for (const [height, searchFits] of [[168, true], [160, true], [144, false], [100
 it("given a guardian without a member card, when they book for a member dependant, then the dependant's cards are offered", async () => {
   // given
   const memberCard = {
-    id: "55555555-5555-5555-5555-555555555555", label: "Member booking", color: "#b85c38", allowedPlayerCounts: [2, 4], guestAllowed: true, guestFeeMinor: 0
+    id: "55555555-5555-5555-5555-555555555555", label: "Member booking", color: "#b85c38", allowedPlayerCounts: [2, 4], guestAllowed: true, guestFeeMinor: 0, externalPriceMinor: 0
   };
   vi.spyOn(api, "bookingCards").mockResolvedValue([]);
   const dependantCards = vi.spyOn(api, "dependantBookingCards").mockResolvedValue([memberCard]);
@@ -251,7 +251,7 @@ it("given a guardian without a member card, when they book for a member dependan
 });
 
 function cardWithGuestFee(guestFeeMinor: number) {
-  return { id: "55555555-5555-5555-5555-555555555555", label: "Member booking", color: "#b85c38", allowedPlayerCounts: [1, 2, 4], guestAllowed: true, guestFeeMinor };
+  return { id: "55555555-5555-5555-5555-555555555555", label: "Member booking", color: "#b85c38", allowedPlayerCounts: [1, 2, 4], guestAllowed: true, guestFeeMinor, externalPriceMinor: 0 };
 }
 
 async function enterGuests(...names: string[]) {
@@ -346,4 +346,31 @@ it("given an account with member features, when the dialog opens, then members a
   // then
   expect(await screen.findByTestId("member-participants")).toBeInTheDocument();
   expect(screen.getByTestId("card-participants")).toBeInTheDocument();
+});
+
+it("given a card priced at 12.99 per hour for external players, when an external player picks 90 minutes, then the dialog states the amount before booking", async () => {
+  // given
+  vi.spyOn(api, "bookingCards").mockResolvedValue([{ ...cardWithGuestFee(0), externalPriceMinor: 1299 }]);
+  render(<BookingDialog selection={{ date: "2026-08-10", slot: "10:00", courtId: court.id }} grid={grid as never}
+    courts={[court]} allocations={[]} canChooseSeveralCourts={false} memberFeatures={false} currency="EUR"
+    closed={() => undefined} created={() => Promise.resolve()} conflicted={() => Promise.resolve()} />);
+  await screen.findByTestId("booking-card");
+  await act(() => new Promise((settled) => setTimeout(settled, 0)));
+
+  // when
+  fireEvent.change(screen.getByTestId("booking-duration"), { target: { value: "90" } });
+
+  // then
+  expect(screen.getByTestId("booking-amount")).toHaveTextContent("Betrag: 19,49 €");
+});
+
+it("given a card priced for external players, when a member opens the dialog, then no amount is shown", async () => {
+  // given
+  vi.spyOn(api, "bookingCards").mockResolvedValue([{ ...cardWithGuestFee(0), externalPriceMinor: 1299 }]);
+  show("EUR");
+  await screen.findByTestId("booking-card");
+  await act(() => new Promise((settled) => setTimeout(settled, 0)));
+
+  // then
+  expect(screen.queryByTestId("booking-amount"), "a member owes nothing for a court").toBeNull();
 });

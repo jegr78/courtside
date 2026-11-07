@@ -205,7 +205,9 @@ sich selbst wieder austragen.
 Lässt dein Verein externe Buchungen zu, kannst du ohne Mitgliedschaft die Buchungsarten nutzen, die
 der Vorstand für Externe freigibt. Mitspielende trägst du dann nur als **Gäste** ein. Die Suche nach
 Mitgliedern, Platzfüller, die Warteliste, die Partnersuche, Serientermine und das Buchen für
-Angehörige stehen nur Mitgliedern offen und erscheinen bei dir nicht.
+Angehörige stehen nur Mitgliedern offen und erscheinen bei dir nicht. Hat die Buchungsart einen
+Preis für Externe, zeigt der Dialog vor dem Buchen den Betrag für die gewählte Dauer. Unter *Meine
+Buchungen* steht er bei der Buchung, auch wenn der Verein den Preis später ändert.
 
 ![Der Bereich für Mitspieler, Gäste und Platzfüller im Buchungsdialog.](screenshots/de/booking-participants.png)
 

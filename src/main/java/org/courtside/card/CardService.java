@@ -91,17 +91,19 @@ public class CardService {
                                   Set<Role> managingRoles, short[] allowedPlayerCounts,
                                   boolean countsAgainstLimits, boolean guestAllowed,
                                   boolean showGenericOccupancy, boolean grantsAccess, boolean signalsOccupancy,
-                                  int guestFeeMinor) {
+                                  int guestFeeMinor, int externalPriceMinor) {
         requireMemberManagers(managingRoles);
         BookingCard created = new BookingCard(label, color, allowedRoles, managingRoles,
                 allowedPlayerCounts, countsAgainstLimits, guestAllowed, showGenericOccupancy, grantsAccess,
                 signalsOccupancy);
         created.chargeGuests(guestFeeMinor);
+        created.priceForExternals(externalPriceMinor);
         BookingCard card = saveOrRejectTakenLabel(created);
         events.publishEvent(new CardEvent.BookingCardAdded(card.getId(), List.copyOf(card.getAllowedRoles()),
                 List.copyOf(card.getManagingRoles()), boxed(card.getAllowedPlayerCounts()),
                 card.isCountsAgainstLimits(), card.isGuestAllowed(), card.isShowGenericOccupancy(),
-                card.isGrantsAccess(), card.isSignalsOccupancy(), card.getGuestFeeMinor()));
+                card.isGrantsAccess(), card.isSignalsOccupancy(), card.getGuestFeeMinor(),
+                card.getExternalPriceMinor()));
         return card;
     }
 
@@ -111,13 +113,14 @@ public class CardService {
         }
     }
 
-    /** A null {@code requestedSignalsOccupancy} or {@code requestedGuestFeeMinor} keeps the stored value. */
+    /** A null {@code requestedSignalsOccupancy}, {@code requestedGuestFeeMinor} or {@code requestedExternalPriceMinor} keeps the stored value. */
     @Transactional
     public BookingCard changeCard(UUID cardId, String label, String color, Set<Role> allowedRoles,
                                   Set<Role> managingRoles, short[] allowedPlayerCounts,
                                   boolean countsAgainstLimits, boolean guestAllowed,
                                   boolean showGenericOccupancy, boolean grantsAccess,
-                                  Boolean requestedSignalsOccupancy, Integer requestedGuestFeeMinor) {
+                                  Boolean requestedSignalsOccupancy, Integer requestedGuestFeeMinor,
+                                  Integer requestedExternalPriceMinor) {
         requireMemberManagers(managingRoles);
         if (grantsAccess && BookingCard.COURT_CLOSED.equals(cardId)) {
             throw new ClosureCardGrantsNoAccessException();
@@ -139,6 +142,11 @@ public class CardService {
         if (card.getGuestFeeMinor() != guestFeeMinor) {
             changedFields.add("guestFeeMinor");
         }
+        int externalPriceMinor = requestedExternalPriceMinor == null ? card.getExternalPriceMinor()
+                : requestedExternalPriceMinor;
+        if (card.getExternalPriceMinor() != externalPriceMinor) {
+            changedFields.add("externalPriceMinor");
+        }
         boolean otherFieldsChanged = !card.getAllowedRoles().equals(allowedRoles)
                 || !card.getManagingRoles().equals(managingRoles)
                 || !Arrays.equals(card.getAllowedPlayerCounts(), allowedPlayerCounts)
@@ -152,13 +160,15 @@ public class CardService {
                 allowedPlayerCounts, countsAgainstLimits, guestAllowed, showGenericOccupancy, grantsAccess,
                 signalsOccupancy);
         card.chargeGuests(guestFeeMinor);
+        card.priceForExternals(externalPriceMinor);
         BookingCard saved = saveOrRejectTakenLabel(card);
         if (!changedFields.isEmpty() || otherFieldsChanged) {
             events.publishEvent(new CardEvent.BookingCardChanged(saved.getId(),
                     List.copyOf(saved.getAllowedRoles()), List.copyOf(saved.getManagingRoles()),
                     boxed(saved.getAllowedPlayerCounts()), saved.isCountsAgainstLimits(),
                     saved.isGuestAllowed(), saved.isShowGenericOccupancy(), saved.isGrantsAccess(),
-                    saved.isSignalsOccupancy(), saved.getGuestFeeMinor(), List.copyOf(changedFields)));
+                    saved.isSignalsOccupancy(), saved.getGuestFeeMinor(), saved.getExternalPriceMinor(),
+                    List.copyOf(changedFields)));
         }
         if (startsGrantingAccess) {
             events.publishEvent(new CardGrantsAccess(saved.getId()));

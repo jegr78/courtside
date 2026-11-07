@@ -89,18 +89,18 @@ export function CardColorField({ value, disabled, changed, name, testId }: { val
   </fieldset>;
 }
 
-export function GuestFeeField({ testId, name, value, currency, invalid, refused, disabled, changed }: { testId: string; name?: string; value: string; currency: string; invalid: boolean; refused?: boolean; disabled?: boolean; changed: (value: string) => void }) {
+export function AmountField({ kind, testId, name, value, currency, invalid, refused, disabled, changed }: { kind: "guestFee" | "externalPrice"; testId: string; name?: string; value: string; currency: string; invalid: boolean; refused?: boolean; disabled?: boolean; changed: (value: string) => void }) {
   const { t, i18n } = useTranslation();
   const hint = `${testId}-hint`;
   const error = `${testId}-error`;
   return <div className="grid content-start gap-1">
     <TextField data-testid={testId} name={name} inputMode="decimal" autoComplete="off" className="max-w-40" disabled={disabled}
-               label={t("admin.facility.guestFeeIn", { currency })} value={value} aria-invalid={invalid || refused || undefined}
+               label={t(`admin.facility.${kind}In`, { currency })} value={value} aria-invalid={invalid || refused || undefined}
                aria-describedby={invalid ? `${error} ${hint}` : hint} onChange={(event) => changed(event.target.value)} />
     {invalid && <p id={error} data-testid={error} className="text-destructive text-sm">
-      {t("admin.facility.guestFeeInvalid", { example: minorAsDecimal(550, i18n.language, currency) })}
+      {t("admin.facility.amountInvalid", { example: minorAsDecimal(550, i18n.language, currency) })}
     </p>}
-    <p id={hint} data-testid={hint} className="text-muted text-sm">{t("admin.facility.guestFeeHelp")}</p>
+    <p id={hint} data-testid={hint} className="text-muted text-sm">{t(`admin.facility.${kind}Help`)}</p>
   </div>;
 }
 

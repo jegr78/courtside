@@ -199,7 +199,9 @@ themselves later.
 If your club admits external bookings, you can book without a membership on the booking types the
 board opens to external players. You then add other players as **guests** only. The member search,
 slot fillers, the waitlist, the partner search, series and booking for dependants are open to
-members only and do not appear for you.
+members only and do not appear for you. If the booking type has a price for external players,
+the dialog shows the amount for the chosen duration before you book. *My bookings* shows it with
+the booking, even if the club changes the price later.
 
 ![The booking fields for members, guests and slot fillers.](../screenshots/en/booking-participants.png)
 

@@ -73,6 +73,9 @@ public class BookingCard {
     @Column(name = "guest_fee_minor", nullable = false)
     private int guestFeeMinor;
 
+    @Column(name = "external_price_minor", nullable = false)
+    private int externalPriceMinor;
+
     @Column(nullable = false)
     private boolean active;
 
@@ -145,6 +148,13 @@ public class BookingCard {
             throw new IllegalStateException("A guest fee is never negative; the request validation was skipped");
         }
         this.guestFeeMinor = guestFeeMinor;
+    }
+
+    public void priceForExternals(int externalPriceMinor) {
+        if (externalPriceMinor < 0) {
+            throw new IllegalStateException("An external price is never negative; the request validation was skipped");
+        }
+        this.externalPriceMinor = externalPriceMinor;
     }
 
     public void changeTo(String label, String color, Set<Role> allowedRoles, Set<Role> managingRoles,

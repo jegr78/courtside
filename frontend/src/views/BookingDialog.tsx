@@ -216,6 +216,9 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
     fee: formatMinor(chosenCard.guestFeeMinor, i18n.language, currency),
     total: formatMinor(chosenCard.guestFeeMinor * guestCount, i18n.language, currency)
   } : undefined;
+  const externalAmount = !waitlist && !memberFeatures && currency && chosenCard && chosenCard.externalPriceMinor > 0
+    ? formatMinor(Math.round(chosenCard.externalPriceMinor * courtIds.length * selectedDuration / 60), i18n.language, currency)
+    : undefined;
 
   return <Modal labelledBy="booking-heading" closed={closed} width="xl" composed testId="booking-dialog">
     <form onSubmit={(event) => void submit(event)} className="flex min-h-0 flex-col">
@@ -349,6 +352,7 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
       </div>
       <div aria-live="polite">
         {guestFee && <p data-testid="booking-guest-fee" className="mt-4 font-semibold">{t("booking.guestFee", guestFee)}</p>}
+        {externalAmount && <p data-testid="booking-amount" className="mt-4 font-semibold">{t("booking.amount", { amount: externalAmount })}</p>}
       </div>
       </DialogBody>
       {/* Outside the scrolling form, so a refusal shows beside the button that caused it. */}
