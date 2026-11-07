@@ -44,6 +44,12 @@ public class Person {
         this.email = email;
     }
 
+    public void anonymise() {
+        this.firstName = "";
+        this.lastName = "Anonymised";
+        this.email = "anonymised-" + id + "@example.invalid";
+    }
+
     public String getDisplayName() {
         return (firstName + " " + lastName).trim();
     }

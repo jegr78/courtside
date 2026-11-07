@@ -99,6 +99,7 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
             "/api/account/mfa/totp/confirmation",
             "/api/account/mfa/recovery-codes",
             "/api/account/mfa/webauthn",
+            "/api/account",
             "/api/account/mfa/webauthn/registration-options",
             "/api/account/mfa/webauthn/authentication-options",
             "/api/account/mfa/webauthn/credentials/{credentialId}",
@@ -144,6 +145,7 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
             "/api/partner-invitations/{invitationId}/acceptance");
 
     private static final Set<String> RECENT_AUTHENTICATION_ENDPOINTS = Set.of(
+            "DELETE /api/account",
             "DELETE /api/account/sessions",
             "POST /api/account/mfa/totp",
             "POST /api/account/mfa/totp/confirmation",
