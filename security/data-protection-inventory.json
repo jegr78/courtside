@@ -2078,6 +2078,14 @@
       "former_member_ids": {
         "level": "pseudonymous",
         "lifecycle": "retention-preview"
+      },
+      "externals_inactive_before": {
+        "level": "operational",
+        "lifecycle": "retention-preview"
+      },
+      "external_account_ids": {
+        "level": "pseudonymous",
+        "lifecycle": "retention-preview"
       }
     },
     "rule_definition": {

@@ -2755,10 +2755,11 @@ components:
 
     RetentionCategory:
       type: string
-      enum: [BOOKINGS, FORMER_MEMBERS]
+      enum: [BOOKINGS, FORMER_MEMBERS, EXTERNAL_ACCOUNTS]
       description: |
         `BOOKINGS` covers bookings and series by when they ended. `FORMER_MEMBERS` covers people
-        by when their membership ended, with their accounts.
+        by when their membership ended, with their accounts. `EXTERNAL_ACCOUNTS` covers external
+        accounts of people without any membership period by when they were last active.
 
     RetentionPolicy:
       type: object
@@ -2782,7 +2783,7 @@ components:
 
     RetentionPreview:
       type: object
-      required: [previewId, expiresAt, bookings, formerMembers, blocked]
+      required: [previewId, expiresAt, bookings, formerMembers, externalAccounts, blocked]
       properties:
         previewId: { type: string, format: uuid }
         expiresAt: { type: string, format: date-time }
@@ -2795,6 +2796,11 @@ components:
           description: Whom the run would remove; null when former members have no period.
           oneOf:
             - $ref: "#/components/schemas/RetentionFormerMembersPreview"
+            - type: "null"
+        externalAccounts:
+          description: Which external accounts the run would anonymise; null when they have no period.
+          oneOf:
+            - $ref: "#/components/schemas/RetentionExternalAccountsPreview"
             - type: "null"
         blocked:
           type: array
@@ -2817,6 +2823,16 @@ components:
         people: { type: integer }
         accounts: { type: integer }
 
+    RetentionExternalAccountsPreview:
+      type: object
+      required: [inactiveBefore, accounts]
+      properties:
+        inactiveBefore:
+          type: string
+          format: date-time
+          description: An account created, signed in or booked since this instant stays.
+        accounts: { type: integer }
+
     RetentionBlockedRecord:
       type: object
       required: [personId, reason]
@@ -2835,7 +2851,7 @@ components:
     RetentionRun:
       type: object
       required: [runId, bookingsPseudonymised, seriesPseudonymised, formerMembersRemoved,
-                 accountsRemoved, formerMembersSkipped]
+                 accountsRemoved, formerMembersSkipped, externalAccountsAnonymised, externalAccountsSkipped]
       properties:
         runId: { type: string, format: uuid }
         bookingsPseudonymised: { type: integer }
@@ -2845,6 +2861,10 @@ components:
         formerMembersSkipped:
           type: integer
           description: Former members the preview listed who were no longer eligible when the run reached them.
+        externalAccountsAnonymised: { type: integer }
+        externalAccountsSkipped:
+          type: integer
+          description: External accounts the preview listed that were active again when the run reached them.
 
     MembershipTypeRequest:
       type: object

@@ -29,11 +29,15 @@ public final class RetentionPlan {
     public record FormerMembers(LocalDate membershipEndedBefore, long people, long accounts) {
     }
 
+    public record ExternalAccounts(Instant inactiveBefore, long accounts) {
+    }
+
     public record Blocked(UUID personId, BlockReason reason) {
     }
 
     public record Preview(UUID previewId, Instant expiresAt, @Nullable Bookings bookings,
-                          @Nullable FormerMembers formerMembers, List<Blocked> blocked) {
+                          @Nullable FormerMembers formerMembers, @Nullable ExternalAccounts externalAccounts,
+                          List<Blocked> blocked) {
 
         public Preview {
             blocked = List.copyOf(blocked);
@@ -41,6 +45,7 @@ public final class RetentionPlan {
     }
 
     public record Run(UUID runId, long bookingsPseudonymised, long seriesPseudonymised,
-                      long formerMembersRemoved, long accountsRemoved, long formerMembersSkipped) {
+                      long formerMembersRemoved, long accountsRemoved, long formerMembersSkipped,
+                      long externalAccountsAnonymised, long externalAccountsSkipped) {
     }
 }

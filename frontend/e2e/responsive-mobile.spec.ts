@@ -245,7 +245,11 @@ async function openBookingWithPartner(page: Page, visualDate: string, viewport?:
   await selectJourneyDate(page, visualDate);
   await page.locator('[data-testid="free-slot"][data-court-number="2"][data-slot="12:00"]:visible').tap();
   const dialog = page.getByTestId("booking-dialog");
-  await dialog.getByTestId("member-search").fill("Mary");
+  // The dialog may re-render while its eligibility settles and drop a term typed before that.
+  await expect(async () => {
+    await dialog.getByTestId("member-search").fill("Mary");
+    await expect(dialog.getByTestId("member-match")).toBeVisible({ timeout: 5_000 });
+  }).toPass({ timeout: 30_000 });
   await dialog.getByTestId("member-match").tap();
   return dialog;
 }

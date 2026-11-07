@@ -91,7 +91,7 @@ created.
   an ok reading has to carry an age that follows from its completion time. A UAT that starts
   recording backups therefore needs no change to the harness.
 - The retention journey needs an instance that answers the retention periods to the administrator;
-  the preflight checks it. On desktop-chrome the admin records the period of both categories in
+  the preflight checks it. On desktop-chrome the admin records the periods of bookings and former members in
   the ledger, sets each to another number of months on the retention page, takes a preview and
   reads its counts and the blocked people with their reason. Former members on the instance may
   make the preview count and block somebody, so the journey checks the shape and never a number.

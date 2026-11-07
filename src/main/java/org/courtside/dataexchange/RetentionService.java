@@ -5,6 +5,7 @@ import org.courtside.config.ClubTimeZone;
 import org.courtside.dataexchange.RetentionPlan.Blocked;
 import org.courtside.dataexchange.RetentionPlan.BlockReason;
 import org.courtside.dataexchange.internal.RetentionRows;
+import org.courtside.identity.AccountAnonymisation;
 import org.courtside.shared.DatabaseDeadlines;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -37,10 +38,13 @@ public class RetentionService {
     private final ApplicationEventPublisher events;
     private final Clock clock;
     private final Duration previewLifetime;
+    private final AccountAnonymisation anonymisation;
 
     RetentionService(RetentionRows rows, ClubTimeZone clubTimeZone, ApplicationEventPublisher events, Clock clock,
-                     @Value("${courtside.retention.preview-lifetime}") Duration previewLifetime) {
+                     @Value("${courtside.retention.preview-lifetime}") Duration previewLifetime,
+                     AccountAnonymisation anonymisation) {
         this.rows = rows;
+        this.anonymisation = anonymisation;
         this.clubTimeZone = clubTimeZone;
         this.events = events;
         this.clock = clock;
@@ -113,10 +117,17 @@ public class RetentionService {
                     rows.accountsOf(removable));
         }
 
+        Instant externalsInactiveBefore = cutoff(configured.get(RetentionCategory.EXTERNAL_ACCOUNTS), today, zone);
+        List<UUID> externals = externalsInactiveBefore == null ? List.of()
+                : rows.inactiveExternalAccounts(externalsInactiveBefore);
+        RetentionPlan.ExternalAccounts externalAccounts = externalsInactiveBefore == null ? null
+                : new RetentionPlan.ExternalAccounts(externalsInactiveBefore, externals.size());
+
         UUID previewId = UUID.randomUUID();
         Instant expiresAt = now.plus(previewLifetime);
-        rows.savePreview(previewId, accountId, now, expiresAt, bookingsEndedBefore, membershipsEndedBefore, removable);
-        return new RetentionPlan.Preview(previewId, expiresAt, bookings, formerMembers, blocked);
+        rows.savePreview(previewId, accountId, now, expiresAt, bookingsEndedBefore, membershipsEndedBefore, removable,
+                externalsInactiveBefore, externals);
+        return new RetentionPlan.Preview(previewId, expiresAt, bookings, formerMembers, externalAccounts, blocked);
     }
 
     @Transactional(timeoutString = DatabaseDeadlines.REPORT)
@@ -155,12 +166,25 @@ public class RetentionService {
                 }
             }
         }
+        long anonymised = 0;
+        long externalsSkipped = 0;
+        Instant externalsInactiveBefore = preview.externalsInactiveBefore();
+        if (externalsInactiveBefore != null) {
+            for (UUID externalId : preview.externalAccountIds().stream().sorted().toList()) {
+                if (rows.lockIfStillInactiveExternal(externalId, externalsInactiveBefore)) {
+                    anonymisation.anonymise(externalId);
+                    anonymised++;
+                } else {
+                    externalsSkipped++;
+                }
+            }
+        }
         UUID runId = UUID.randomUUID();
         RetentionPlan.Run run = new RetentionPlan.Run(runId, pseudonymised[0], pseudonymised[1], removed, accounts,
-                skipped);
+                skipped, anonymised, externalsSkipped);
         events.publishEvent(new DataExchangeEvent.RetentionRun(runId, run.bookingsPseudonymised(),
                 run.seriesPseudonymised(), run.formerMembersRemoved(), run.accountsRemoved(),
-                run.formerMembersSkipped()));
+                run.formerMembersSkipped(), run.externalAccountsAnonymised(), run.externalAccountsSkipped()));
         log.info("Retention run {}: {} bookings and {} series pseudonymised, {} former members with {} accounts "
                         + "removed, {} skipped", runId, run.bookingsPseudonymised(), run.seriesPseudonymised(),
                 run.formerMembersRemoved(), run.accountsRemoved(), run.formerMembersSkipped());
@@ -177,7 +201,9 @@ public class RetentionService {
         Integer memberMonths = configured.get(RetentionCategory.FORMER_MEMBERS);
         boolean membersKept = preview.membershipsEndedBefore() == null || (memberMonths != null
                 && preview.membershipsEndedBefore().equals(previewedOn.minusMonths(memberMonths)));
-        if (!bookingsKept || !membersKept) {
+        boolean externalsKept = preview.externalsInactiveBefore() == null || preview.externalsInactiveBefore()
+                .equals(cutoff(configured.get(RetentionCategory.EXTERNAL_ACCOUNTS), previewedOn, zone));
+        if (!bookingsKept || !membersKept || !externalsKept) {
             throw new RetentionPreviewNotFoundException("A retention preview applies a period the board has changed since");
         }
     }

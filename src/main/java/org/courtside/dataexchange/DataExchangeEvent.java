@@ -144,7 +144,8 @@ public sealed interface DataExchangeEvent extends DomainEventRecord {
 
     // Counts only: an entry that listed whom a run removed would keep what the run erased.
     record RetentionRun(UUID runId, long bookingsPseudonymised, long seriesPseudonymised,
-                        long formerMembersRemoved, long accountsRemoved, long formerMembersSkipped)
+                        long formerMembersRemoved, long accountsRemoved, long formerMembersSkipped,
+                        long externalAccountsAnonymised, long externalAccountsSkipped)
             implements DataExchangeEvent {
 
         static final String TYPE = "dataexchange.retention.run";

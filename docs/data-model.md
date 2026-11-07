@@ -425,13 +425,14 @@ a different file than the one previewed is visible after the fact.
 | Table | Holds | References |
 |---|---|---|
 | `retention_policy` | For one record category, how many months the club keeps it after it ended | None |
-| `retention_preview` | What a reviewed retention run will apply: the cut-off of each category and the former members it would remove | `user_account` |
+| `retention_preview` | What a reviewed retention run will apply: the cut-off of each category, the former members it would remove and the external accounts it would anonymise | `user_account` |
 
 A category without a `retention_policy` row is never touched, and nothing seeds one, because the
 period is the club's decision. `retention_policy_retain_months_range` accepts 1 to 1200 months.
 `retention_preview_covers_a_category` refuses a preview with no cut-off, and
 `retention_preview_members_need_a_cutoff` refuses former members without the membership cut-off they
-were judged against. A preview row is deleted when its run starts, when the board changes or removes
+were judged against; `retention_preview_externals_need_a_cutoff` does the same for external accounts
+and `externals_inactive_before`. A preview row is deleted when its run starts, when the board changes or removes
 a period it applies, by the preview sweep once it has expired, and with the account that created it.
 
 A run sets `booking.pseudonymised_at` and `booking_series.pseudonymised_at`.
