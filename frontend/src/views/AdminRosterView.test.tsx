@@ -394,6 +394,66 @@ describe("AdminRosterView", () => {
     expect(await screen.findByTestId("opened-person")).toHaveAttribute("data-created", "true");
   });
 
+  it("given a person with the same email address, when adding a person, then the board is pointed at them before anybody is created twice", async () => {
+    // given
+    const existing: RosterEntry = {
+      personId: "person-7", firstName: "John", lastName: "Roe", email: "john.roe@example.org",
+      accountId: "account-7", username: "roe.john", enabled: true, membershipCurrent: false, roles: ["EXTERNAL"]
+    };
+    const created: RosterEntry = { ...existing, personId: "person-9", accountId: null, username: null, roles: [] };
+    vi.spyOn(api, "createPerson").mockResolvedValue(created);
+    render(<MemoryRouter initialEntries={["/admin/roster"]}><UnsavedChangesProvider>
+      <Routes>
+        <Route path="/admin/roster" element={<AdminRosterView />} />
+        <Route path="/admin/roster/:personId" element={<OpenedPerson />} />
+      </Routes>
+    </UnsavedChangesProvider></MemoryRouter>);
+    await screen.findByTestId("roster-row-person-1");
+    const lookalike: RosterEntry = { ...existing, personId: "person-8", email: "joejohn.roe@example.org" };
+    vi.mocked(api.roster)
+      .mockResolvedValueOnce({ entries: [lookalike], nextCursor: "person-8", matching: 2 })
+      .mockResolvedValueOnce({ entries: [existing], nextCursor: null, matching: 2 });
+
+    // when
+    await userEvent.type(screen.getByTestId("new-person-first-name"), "John");
+    await userEvent.type(screen.getByTestId("new-person-last-name"), "Roe");
+    await userEvent.type(screen.getByTestId("new-person-email"), "John.Roe@example.org");
+    await userEvent.click(screen.getByTestId("create-person"));
+
+    // then
+    const notice = await screen.findByTestId("new-person-same-email");
+    expect(api.roster).toHaveBeenLastCalledWith({ query: "John.Roe@example.org", cursor: "person-8", limit: 200 });
+    expect(within(notice).queryByTestId("new-person-same-email-person-8")).not.toBeInTheDocument();
+    expect(api.createPerson).not.toHaveBeenCalled();
+    expect(within(notice).getByTestId("new-person-same-email-person-7")).toHaveAttribute("href", "/admin/roster/person-7");
+
+    // when
+    await userEvent.click(screen.getByTestId("create-person"));
+
+    // then
+    expect(api.createPerson).toHaveBeenCalledWith({ firstName: "John", lastName: "Roe", email: "John.Roe@example.org" });
+  });
+
+  it("given a warning about the same email address, when the address is changed, then the warning goes away", async () => {
+    // given
+    const existing: RosterEntry = {
+      personId: "person-7", firstName: "John", lastName: "Roe", email: "john.roe@example.org",
+      accountId: null, username: null, enabled: false, membershipCurrent: false, roles: []
+    };
+    render(<MemoryRouter><UnsavedChangesProvider><AdminRosterView /></UnsavedChangesProvider></MemoryRouter>);
+    await screen.findByTestId("roster-row-person-1");
+    vi.mocked(api.roster).mockResolvedValueOnce({ entries: [existing], nextCursor: null, matching: 1 });
+    await userEvent.type(screen.getByTestId("new-person-email"), "john.roe@example.org");
+    await userEvent.click(screen.getByTestId("create-person"));
+    await screen.findByTestId("new-person-same-email");
+
+    // when
+    await userEvent.type(screen.getByTestId("new-person-email"), "x");
+
+    // then
+    expect(screen.queryByTestId("new-person-same-email")).not.toBeInTheDocument();
+  });
+
   function rosterRouter() {
     return createMemoryRouter([{
       path: "*",

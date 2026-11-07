@@ -3032,8 +3032,8 @@ components:
       properties:
         query:
           type: string
-          maxLength: 60
-          description: Matches against the person's full name, case-insensitively.
+          maxLength: 120
+          description: Matches against the person's full name or email address, case-insensitively.
         membershipTypeId:
           type: string
           format: uuid

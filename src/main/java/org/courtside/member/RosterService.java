@@ -20,6 +20,7 @@ import org.courtside.member.internal.PersonAccountExistsException;
 import org.courtside.member.internal.PersonNotFoundException;
 import org.courtside.member.internal.PersonText;
 import org.courtside.member.internal.RosterListQuery;
+import org.courtside.member.internal.OutsiderMembershipLink;
 import org.courtside.member.internal.RosterCursorUnknownException;
 import org.courtside.member.internal.UsernameTakenException;
 import org.courtside.shared.CursorPage;
@@ -51,7 +52,7 @@ import java.util.stream.Collectors;
 public class RosterService {
 
     private static final int MAX_PAGE_SIZE = 200;
-    private static final int MAX_QUERY_LENGTH = 60;
+    private static final int MAX_QUERY_LENGTH = 120;
     private static final String UNIQUE_USERNAME_CONSTRAINT = "user_account_unique_username";
 
     private static final Comparator<UserAccount> ACCOUNT_PRECEDENCE =
@@ -64,6 +65,7 @@ public class RosterService {
     private final MemberRepository members;
     private final RosterListQuery rosterQuery;
     private final MemberService memberships;
+    private final OutsiderMembershipLink outsiders;
     private final AdministratorLock administrators;
     private final AccountSessions sessions;
     private final AccountCredentials credentials;
@@ -281,6 +283,7 @@ public class RosterService {
         UUID id = requiredPersonId(personId);
         MembershipPeriod requested = requiredPeriod(period);
         requireLockedPerson(id);
+        outsiders.refuseAnonymised(id);
         LocalDate today = today();
         List<Member> periods = members.findByPersonIdOrderByStartedOnAscIdAsc(id);
         Member target = MemberService.representativePeriod(periods, today);
@@ -329,6 +332,7 @@ public class RosterService {
             revokeSessionsOf(id);
         }
         withdrawn.forEach(member -> events.publishEvent(new RosterEvent.MembershipPeriodRemoved(id, member.getId())));
+        outsiders.grantMemberRole(id, written.getEndedOn(), today);
         events.publishEvent(new RosterEvent.MembershipWritten(id, written.getId(),
                 written.getMembershipTypeId(), written.getStartedOn(), written.getEndedOn()));
         return load(List.of(id)).getFirst();

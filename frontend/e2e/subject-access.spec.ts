@@ -20,7 +20,7 @@ async function addPerson(page: Page, firstName: string, lastName: string): Promi
   await page.getByTestId("new-person-first-name").fill(firstName);
   await page.getByTestId("new-person-last-name").fill(lastName);
   await page.getByTestId("new-person-email")
-    .fill(`${firstName}.${lastName}@example.org`.toLowerCase());
+    .fill(`${firstName}.${lastName}+access@example.org`.toLowerCase());
   const created = page.waitForResponse((response) =>
     response.url().endsWith("/api/admin/roster") && response.request().method() === "POST");
   await page.getByTestId("create-person").click();
@@ -61,7 +61,7 @@ test("a board answers what the club holds about one member, and about nobody els
     expect(held.personId).toBe(personId);
     expect(held.firstName).toBe("Richard");
     expect(held.lastName).toBe("Miles");
-    expect(held.email).toBe("richard.miles@example.org");
+    expect(held.email).toBe("richard.miles+access@example.org");
     expect(held.accounts.map((account) => account.username)).toEqual(["miles.richard"]);
 
     // and about nobody else

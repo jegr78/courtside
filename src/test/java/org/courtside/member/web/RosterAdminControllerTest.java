@@ -271,7 +271,7 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
     void givenAQueryLongerThanTheContractAllows_whenListingTheRoster_thenItIsRejectedByTheContract()
             throws Exception {
         // when / then
-        mockMvc.perform(searchRoster("{\"query\":\"" + "d".repeat(61) + "\"}"))
+        mockMvc.perform(searchRoster("{\"query\":\"" + "d".repeat(121) + "\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:validation-failed"))
                 .andExpect(jsonPath("$.fieldErrors[0].field").value("query"))

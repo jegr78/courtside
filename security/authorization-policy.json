@@ -4,7 +4,7 @@
   "purpose": "This is the normative authorization policy for the shipped Courtside API. OpenAPI defines the transport shape; this policy defines who may perform each operation, which resource attributes narrow that permission, and which protected fields each projection may read or write.",
   "openApiFieldInventorySha256": "58a17d0fea0c73bb3a04b6037c442b4b35269be8d136feb2f9ff016ecb81c3c0",
   "protectedFieldInventorySha256": "5295a7c44ccdfbecede95000d5f40299f3bfb9026c9b5b5afde1dc1e58301aa0",
-  "productionAuthorizationSha256": "05f384d001e1f6dd4c10a17e1d20e9bdb92e3c42ad1e8548de59c5a1eee732fa",
+  "productionAuthorizationSha256": "d090b882793f2afdbc3dc9052f6d07e0192eae4744f0cbd1086717aadf6a24d6",
   "ordinaryFields": [
     "Problem.detail",
     "Problem.fieldErrors",
@@ -4530,7 +4530,8 @@
       ],
       "decisions": [
         "administrator-gate",
-        "administrative-projection"
+        "administrative-projection",
+        "outsider-membership-link"
       ]
     },
     {
@@ -5832,6 +5833,29 @@
       "negativeTests": [
         "src/test/java/org/courtside/identity/AccountClosureTest.java#givenAMember_whenTheyCloseTheirAccount_thenOnlyTheBoardMayEndIt",
         "src/test/java/org/courtside/identity/AccountClosureTest.java#givenAnExternalPlayerWithAnUpcomingBooking_whenTheyCloseTheirAccount_thenTheBookingRefusesIt"
+      ]
+    },
+    {
+      "id": "outsider-membership-link",
+      "title": "Outsider membership link",
+      "rule": "A membership period the board adds or corrects, or a membership it writes, adds MEMBER to that person's accounts that hold EXTERNAL without MEMBER, unless the written period is already over; accounts without EXTERNAL keep the roles the board set, and an anonymised person is refused without any change.",
+      "attributes": [
+        "role",
+        "current-membership"
+      ],
+      "productionPaths": [
+        "src/main/java/org/courtside/member/internal/OutsiderMembershipLink.java#grantMemberRole",
+        "src/main/java/org/courtside/member/internal/OutsiderMembershipLink.java#refuseAnonymised"
+      ],
+      "positiveTests": [
+        "src/test/java/org/courtside/member/ExternalPersonBecomesMemberTest.java#givenAnExternalPlayer_whenTheBoardAddsAMembershipPeriod_thenTheSameAccountSignsInAsAMemberAndBooksMemberCards",
+        "src/test/java/org/courtside/member/ExternalPersonBecomesMemberTest.java#givenAnExternalPlayer_whenTheBoardAssignsAMembership_thenTheAccountGainsTheMemberRole",
+        "src/test/java/org/courtside/member/ExternalPersonBecomesMemberTest.java#givenAnExternalPlayerWithAPastPeriod_whenTheBoardCorrectsItToRunOn_thenTheAccountGainsTheMemberRole"
+      ],
+      "negativeTests": [
+        "src/test/java/org/courtside/member/ExternalPersonBecomesMemberTest.java#givenAPersonWithoutTheExternalRole_whenTheBoardAddsAPeriod_thenTheirRolesStayAsTheBoardSetThem",
+        "src/test/java/org/courtside/member/ExternalPersonBecomesMemberTest.java#givenAnExternalPlayer_whenTheBoardRecordsAPeriodThatHasEnded_thenTheAccountStaysExternal",
+        "src/test/java/org/courtside/member/ExternalPersonBecomesMemberTest.java#givenAClosedAccount_whenTheBoardWritesAMembership_thenTheAnonymisedPersonIsRefused"
       ]
     },
     {
