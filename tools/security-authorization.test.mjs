@@ -472,6 +472,31 @@ test("given the occupancy poll, when generating and evaluating its cases, then n
     "an answer without the key is an admitted poll");
 });
 
+test("given the own account closure, when the matrix is built and run, then only an external account may close and it closes last", async () => {
+  // given
+  const matrix = buildOperationAuthorizationMatrix({ paths: {
+    "/api/account": { delete: { operationId: "closeOwnAccount", security: [{}] } },
+    "/api/session/logout": { post: { operationId: "logOut" } },
+    "/api/public/example": { get: { operationId: "readExample", security: [] } }
+  } });
+  const calls = [];
+
+  // when
+  await executeOperationMatrix(matrix, async (operation, actor) => {
+    calls.push(operation.operationId);
+    return { status: 200 };
+  });
+
+  // then
+  const closure = matrix.find((operation) => operation.operationId === "closeOwnAccount");
+  assert.equal(closure.expectations.EXTERNAL, "allow", "an outsider closes its own account");
+  assert.equal(closure.expectations.MEMBER, "deny-forbidden", "a member's account ends through the board");
+  assert.equal(closure.expectations.ADMIN, "deny-forbidden");
+  assert.equal(closure.expectations.ANONYMOUS, "deny-unauthenticated");
+  assert.ok(calls.slice(-authorizationActors.length).every((call) => call === "closeOwnAccount"),
+    "a closed synthetic account must not be needed by any later case");
+});
+
 test("given session-ending operations, when executing the matrix, then their side effects cannot poison later cases",
   async () => {
   // given

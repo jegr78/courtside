@@ -135,6 +135,10 @@ function operationExpectations(path, method, security) {
     return Object.fromEntries(authorizationActors.map((actor) => [actor, "allow"]));
   }
   expectations.ANONYMOUS = "deny-unauthenticated";
+  if (path === "/api/account" && method === "delete") {
+    expectations.EXTERNAL = "allow";
+    return expectations;
+  }
   if (path.startsWith("/api/admin")) {
     expectations.ADMIN = "allow";
     return expectations;
@@ -152,7 +156,8 @@ function operationExpectations(path, method, security) {
 const terminalOperationOrder = new Map([
   ["endOwnSessions", 1],
   ["endAllSessions", 2],
-  ["logOut", 3]
+  ["logOut", 3],
+  ["closeOwnAccount", 4]
 ]);
 const credentialProofOperationIds = new Set([
   "reauthenticate",

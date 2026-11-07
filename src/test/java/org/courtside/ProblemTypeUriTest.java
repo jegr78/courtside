@@ -77,6 +77,8 @@ class ProblemTypeUriTest {
             "urn:courtside:error:access-control-not-connected",
             "urn:courtside:error:access-grant-not-failing",
             "urn:courtside:error:access-grant-not-found",
+            "urn:courtside:error:account-anonymised",
+            "urn:courtside:error:account-closure-blocked-by-booking",
             "urn:courtside:error:access-point-name-taken",
             "urn:courtside:error:access-point-not-found",
             "urn:courtside:error:access-point-rejected",

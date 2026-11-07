@@ -20,9 +20,10 @@ class AccountControllerTest {
     private final PermanentPasswordService permanentPasswords = mock(PermanentPasswordService.class);
     private final AccountSessionService sessions = mock(AccountSessionService.class);
     private final AccountLocaleService locales = mock(AccountLocaleService.class);
+    private final AccountClosure closure = mock(AccountClosure.class);
     private final HttpServletRequest request = mock(HttpServletRequest.class);
     private final AccountController controller = new AccountController(
-            passwords, permanentPasswords, sessions, locales, request);
+            passwords, permanentPasswords, sessions, locales, closure, request);
 
     @Test
     void givenAnExistingSession_whenChangingTheInitialPassword_thenTheSessionIsInvalidated() {

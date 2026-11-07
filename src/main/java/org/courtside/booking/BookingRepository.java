@@ -113,6 +113,16 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
                                             @Param("limit") int limit);
 
     @Query(value = """
+            SELECT EXISTS (SELECT 1 FROM booking b
+            JOIN court_allocation a ON a.booking_id = b.id
+            WHERE b.booked_by = :accountId
+              AND b.status = 'CONFIRMED'
+              AND a.status = 'CONFIRMED'
+              AND a.ends_at > :now)
+            """, nativeQuery = true)
+    boolean existsUpcomingBookedBy(@Param("accountId") UUID accountId, @Param("now") Instant now);
+
+    @Query(value = """
             SELECT DISTINCT b.id FROM booking b
             JOIN court_allocation a ON a.booking_id = b.id
             WHERE b.status = 'CONFIRMED'
