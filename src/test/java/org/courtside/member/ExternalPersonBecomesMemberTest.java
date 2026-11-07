@@ -11,6 +11,7 @@ import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.identity.AccountAnonymisation;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
+import org.courtside.member.testfixture.MemberTestFixture;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.BeforeEach;
@@ -30,6 +31,7 @@ import org.springframework.web.context.WebApplicationContext;
 import java.time.Clock;
 import java.time.DayOfWeek;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.Set;
@@ -46,7 +48,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@Import({IdentityTestFixture.class, FacilityTestFixture.class, BookingTestFixture.class, CardTestFixture.class,
+@Import({IdentityTestFixture.class, MemberTestFixture.class, FacilityTestFixture.class, BookingTestFixture.class, CardTestFixture.class,
         ConfigTestFixture.class})
 class ExternalPersonBecomesMemberTest extends AbstractIntegrationTest {
 
@@ -61,6 +63,9 @@ class ExternalPersonBecomesMemberTest extends AbstractIntegrationTest {
 
     @Autowired
     private IdentityTestFixture identity;
+
+    @Autowired
+    private MemberTestFixture members;
 
     @Autowired
     private FacilityTestFixture facility;
@@ -183,9 +188,32 @@ class ExternalPersonBecomesMemberTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void givenAClosedAccount_whenTheBoardAddsOrAssignsAMembership_thenTheAnonymisedPersonIsRefused()
+    void givenAnExternalPlayerWithAPastPeriod_whenTheBoardCorrectsItToRunOn_thenTheAccountGainsTheMemberRole()
             throws Exception {
         // given
+        String added = asBoard(post("/api/admin/roster/{id}/membership-periods", john)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"membershipTypeId\":\"" + ACTIVE + "\",\"startedOn\":\"2020-01-01\","
+                        + "\"endedOn\":\"2021-01-01\"}"))
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+
+        // when
+        asBoard(put("/api/admin/roster/{id}/membership-periods/{periodId}", john, JsonPath.<String>read(added, "$.id"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"membershipTypeId\":\"" + ACTIVE + "\",\"startedOn\":\"2020-01-01\",\"endedOn\":null}"))
+                .andExpect(status().isOk());
+
+        // then
+        assertThat(roles(johnAccount)).as("a correction that leaves a running membership links the account")
+                .containsExactlyInAnyOrder("MEMBER", "EXTERNAL");
+    }
+
+    @Test
+    void givenAClosedAccount_whenTheBoardWritesAMembership_thenTheAnonymisedPersonIsRefused()
+            throws Exception {
+        // given
+        UUID earlier = members.addMembershipPeriod(john, UUID.fromString(ACTIVE), LocalDate.of(2020, 1, 1),
+                LocalDate.of(2021, 1, 1));
         anonymisation.anonymise(johnAccount);
 
         // when / then
@@ -198,8 +226,13 @@ class ExternalPersonBecomesMemberTest extends AbstractIntegrationTest {
                 .content("{\"membershipTypeId\":\"" + ACTIVE + "\"}"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:account-anonymised"));
-        assertThat(jdbc.sql("SELECT count(*) FROM member WHERE person_id = :id").param("id", john)
-                .query(Long.class).single()).as("a closed person holds no membership").isZero();
+        asBoard(put("/api/admin/roster/{id}/membership-periods/{periodId}", john, earlier)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"membershipTypeId\":\"" + ACTIVE + "\",\"startedOn\":\"2020-01-01\",\"endedOn\":null}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:account-anonymised"));
+        assertThat(jdbc.sql("SELECT count(*) FROM member WHERE person_id = :id AND ended_on IS NULL").param("id", john)
+                .query(Long.class).single()).as("a closed person holds no running membership").isZero();
     }
 
     @Test

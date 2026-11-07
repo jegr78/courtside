@@ -204,6 +204,17 @@ export function AdminRosterView() {
     await read({ ...criteria, sortBy: field, sortDirection: direction });
   }
 
+  async function peopleWithEmail(email: string): Promise<RosterEntry[]> {
+    const matches: RosterEntry[] = [];
+    let cursor: string | undefined;
+    do {
+      const page = await api.roster({ query: email, ...(cursor ? { cursor } : {}), limit: 200 });
+      matches.push(...page.entries.filter((entry) => entry.email?.toLowerCase() === email.toLowerCase()));
+      cursor = page.nextCursor ?? undefined;
+    } while (cursor);
+    return matches;
+  }
+
   async function createPerson(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (pending) return;
@@ -212,8 +223,7 @@ export function AdminRosterView() {
     const email = formString(form, "email").trim();
     try {
       if (email && checkedEmail !== email.toLowerCase()) {
-        const page = await api.roster({ query: email, limit: 5 });
-        const matches = page.entries.filter((entry) => entry.email?.toLowerCase() === email.toLowerCase());
+        const matches = await peopleWithEmail(email);
         setCheckedEmail(email.toLowerCase());
         setSameEmail(matches);
         if (matches.length > 0) return;
@@ -246,7 +256,7 @@ export function AdminRosterView() {
           <div className="grid gap-3 md:grid-cols-3">
             <TextField data-testid="new-person-first-name" disabled={pending} name="firstName" maxLength={NAME_LENGTH} label={t("admin.roster.firstName")} />
             <TextField data-testid="new-person-last-name" disabled={pending} name="lastName" maxLength={NAME_LENGTH} label={t("admin.roster.lastName")} />
-            <TextField data-testid="new-person-email" disabled={pending} name="email" type="email" maxLength={EMAIL_LENGTH} label={t("admin.roster.email")} />
+            <TextField data-testid="new-person-email" disabled={pending} onChange={() => { setSameEmail([]); setCheckedEmail(undefined); }} name="email" type="email" maxLength={EMAIL_LENGTH} label={t("admin.roster.email")} />
           </div>
           {sameEmail.length > 0 && <Alert tone="warning" testId="new-person-same-email">
             <p>{t("admin.roster.sameEmail")}</p>

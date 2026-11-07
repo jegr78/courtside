@@ -409,7 +409,10 @@ describe("AdminRosterView", () => {
       </Routes>
     </UnsavedChangesProvider></MemoryRouter>);
     await screen.findByTestId("roster-row-person-1");
-    vi.mocked(api.roster).mockResolvedValueOnce({ entries: [existing], nextCursor: null, matching: 1 });
+    const lookalike: RosterEntry = { ...existing, personId: "person-8", email: "joejohn.roe@example.org" };
+    vi.mocked(api.roster)
+      .mockResolvedValueOnce({ entries: [lookalike], nextCursor: "person-8", matching: 2 })
+      .mockResolvedValueOnce({ entries: [existing], nextCursor: null, matching: 2 });
 
     // when
     await userEvent.type(screen.getByTestId("new-person-first-name"), "John");
@@ -419,7 +422,8 @@ describe("AdminRosterView", () => {
 
     // then
     const notice = await screen.findByTestId("new-person-same-email");
-    expect(api.roster).toHaveBeenLastCalledWith({ query: "John.Roe@example.org", limit: 5 });
+    expect(api.roster).toHaveBeenLastCalledWith({ query: "John.Roe@example.org", cursor: "person-8", limit: 200 });
+    expect(within(notice).queryByTestId("new-person-same-email-person-8")).not.toBeInTheDocument();
     expect(api.createPerson).not.toHaveBeenCalled();
     expect(within(notice).getByTestId("new-person-same-email-person-7")).toHaveAttribute("href", "/admin/roster/person-7");
 
@@ -428,6 +432,26 @@ describe("AdminRosterView", () => {
 
     // then
     expect(api.createPerson).toHaveBeenCalledWith({ firstName: "John", lastName: "Roe", email: "John.Roe@example.org" });
+  });
+
+  it("given a warning about the same email address, when the address is changed, then the warning goes away", async () => {
+    // given
+    const existing: RosterEntry = {
+      personId: "person-7", firstName: "John", lastName: "Roe", email: "john.roe@example.org",
+      accountId: null, username: null, enabled: false, membershipCurrent: false, roles: []
+    };
+    render(<MemoryRouter><UnsavedChangesProvider><AdminRosterView /></UnsavedChangesProvider></MemoryRouter>);
+    await screen.findByTestId("roster-row-person-1");
+    vi.mocked(api.roster).mockResolvedValueOnce({ entries: [existing], nextCursor: null, matching: 1 });
+    await userEvent.type(screen.getByTestId("new-person-email"), "john.roe@example.org");
+    await userEvent.click(screen.getByTestId("create-person"));
+    await screen.findByTestId("new-person-same-email");
+
+    // when
+    await userEvent.type(screen.getByTestId("new-person-email"), "x");
+
+    // then
+    expect(screen.queryByTestId("new-person-same-email")).not.toBeInTheDocument();
   });
 
   function rosterRouter() {

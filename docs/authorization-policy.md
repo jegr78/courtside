@@ -527,15 +527,15 @@ Negative tests: `src/test/java/org/courtside/identity/AccountClosureTest.java#gi
 
 ### Outsider membership link
 
-A membership period or membership the board writes for a person adds MEMBER to that person's accounts that hold EXTERNAL without MEMBER, unless the written period is already over; accounts without EXTERNAL keep the roles the board set, and an anonymised person is refused without any change.
+A membership period the board adds or corrects, or a membership it writes, adds MEMBER to that person's accounts that hold EXTERNAL without MEMBER, unless the written period is already over; accounts without EXTERNAL keep the roles the board set, and an anonymised person is refused without any change.
 
 Attributes: `role`, `current-membership`.
 
 Production: `src/main/java/org/courtside/member/internal/OutsiderMembershipLink.java#grantMemberRole`, `src/main/java/org/courtside/member/internal/OutsiderMembershipLink.java#refuseAnonymised`.
 
-Positive tests: `src/test/java/org/courtside/member/ExternalPersonBecomesMemberTest.java#givenAnExternalPlayer_whenTheBoardAddsAMembershipPeriod_thenTheSameAccountSignsInAsAMemberAndBooksMemberCards`, `src/test/java/org/courtside/member/ExternalPersonBecomesMemberTest.java#givenAnExternalPlayer_whenTheBoardAssignsAMembership_thenTheAccountGainsTheMemberRole`.
+Positive tests: `src/test/java/org/courtside/member/ExternalPersonBecomesMemberTest.java#givenAnExternalPlayer_whenTheBoardAddsAMembershipPeriod_thenTheSameAccountSignsInAsAMemberAndBooksMemberCards`, `src/test/java/org/courtside/member/ExternalPersonBecomesMemberTest.java#givenAnExternalPlayer_whenTheBoardAssignsAMembership_thenTheAccountGainsTheMemberRole`, `src/test/java/org/courtside/member/ExternalPersonBecomesMemberTest.java#givenAnExternalPlayerWithAPastPeriod_whenTheBoardCorrectsItToRunOn_thenTheAccountGainsTheMemberRole`.
 
-Negative tests: `src/test/java/org/courtside/member/ExternalPersonBecomesMemberTest.java#givenAPersonWithoutTheExternalRole_whenTheBoardAddsAPeriod_thenTheirRolesStayAsTheBoardSetThem`, `src/test/java/org/courtside/member/ExternalPersonBecomesMemberTest.java#givenAnExternalPlayer_whenTheBoardRecordsAPeriodThatHasEnded_thenTheAccountStaysExternal`, `src/test/java/org/courtside/member/ExternalPersonBecomesMemberTest.java#givenAClosedAccount_whenTheBoardAddsOrAssignsAMembership_thenTheAnonymisedPersonIsRefused`.
+Negative tests: `src/test/java/org/courtside/member/ExternalPersonBecomesMemberTest.java#givenAPersonWithoutTheExternalRole_whenTheBoardAddsAPeriod_thenTheirRolesStayAsTheBoardSetThem`, `src/test/java/org/courtside/member/ExternalPersonBecomesMemberTest.java#givenAnExternalPlayer_whenTheBoardRecordsAPeriodThatHasEnded_thenTheAccountStaysExternal`, `src/test/java/org/courtside/member/ExternalPersonBecomesMemberTest.java#givenAClosedAccount_whenTheBoardWritesAMembership_thenTheAnonymisedPersonIsRefused`.
 
 ### Self-registration of external accounts
 

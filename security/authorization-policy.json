@@ -5838,7 +5838,7 @@
     {
       "id": "outsider-membership-link",
       "title": "Outsider membership link",
-      "rule": "A membership period or membership the board writes for a person adds MEMBER to that person's accounts that hold EXTERNAL without MEMBER, unless the written period is already over; accounts without EXTERNAL keep the roles the board set, and an anonymised person is refused without any change.",
+      "rule": "A membership period the board adds or corrects, or a membership it writes, adds MEMBER to that person's accounts that hold EXTERNAL without MEMBER, unless the written period is already over; accounts without EXTERNAL keep the roles the board set, and an anonymised person is refused without any change.",
       "attributes": [
         "role",
         "current-membership"
@@ -5849,12 +5849,13 @@
       ],
       "positiveTests": [
         "src/test/java/org/courtside/member/ExternalPersonBecomesMemberTest.java#givenAnExternalPlayer_whenTheBoardAddsAMembershipPeriod_thenTheSameAccountSignsInAsAMemberAndBooksMemberCards",
-        "src/test/java/org/courtside/member/ExternalPersonBecomesMemberTest.java#givenAnExternalPlayer_whenTheBoardAssignsAMembership_thenTheAccountGainsTheMemberRole"
+        "src/test/java/org/courtside/member/ExternalPersonBecomesMemberTest.java#givenAnExternalPlayer_whenTheBoardAssignsAMembership_thenTheAccountGainsTheMemberRole",
+        "src/test/java/org/courtside/member/ExternalPersonBecomesMemberTest.java#givenAnExternalPlayerWithAPastPeriod_whenTheBoardCorrectsItToRunOn_thenTheAccountGainsTheMemberRole"
       ],
       "negativeTests": [
         "src/test/java/org/courtside/member/ExternalPersonBecomesMemberTest.java#givenAPersonWithoutTheExternalRole_whenTheBoardAddsAPeriod_thenTheirRolesStayAsTheBoardSetThem",
         "src/test/java/org/courtside/member/ExternalPersonBecomesMemberTest.java#givenAnExternalPlayer_whenTheBoardRecordsAPeriodThatHasEnded_thenTheAccountStaysExternal",
-        "src/test/java/org/courtside/member/ExternalPersonBecomesMemberTest.java#givenAClosedAccount_whenTheBoardAddsOrAssignsAMembership_thenTheAnonymisedPersonIsRefused"
+        "src/test/java/org/courtside/member/ExternalPersonBecomesMemberTest.java#givenAClosedAccount_whenTheBoardWritesAMembership_thenTheAnonymisedPersonIsRefused"
       ]
     },
     {

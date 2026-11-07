@@ -66,11 +66,13 @@ public class MembershipPeriodService {
         UUID id = requiredPersonId(personId);
         MembershipPeriod requested = requiredPeriod(period).requireStart();
         requireLockedPerson(id);
+        outsiders.refuseAnonymised(id);
         Member existing = requirePeriod(id, periodId);
         UUID typeId = typeIdFor(membershipTypeId, requested, existing.getMembershipTypeId().equals(membershipTypeId));
         existing.assignTo(typeId);
         existing.correctPeriod(requested.startedOn(), requested.endedOn());
         saveOrRejectOverlap(members, existing);
+        outsiders.grantMemberRole(id, existing.getEndedOn(), memberships.today());
         revokeSessionsOf(id);
         events.publishEvent(new RosterEvent.MembershipPeriodCorrected(
                 id, existing.getId(), typeId, existing.getStartedOn(), existing.getEndedOn()));

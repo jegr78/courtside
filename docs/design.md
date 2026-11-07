@@ -307,9 +307,10 @@ invitations, dependants, the waitlist and series with `access-denied`, `BookingW
 participant but a guest with `booking.participants.outsiderGuestsOnly`, and the session reports
 `memberFeatures` false so the client hides those features. A running membership lifts the closure.
 When an outsider joins, the board adds the membership to the existing person, so the account keeps
-its credentials and history. A period or membership that is not over yet adds `MEMBER` to an account
-holding `EXTERNAL` without it (`OutsiderMembershipLink`), audited as `roster.account.rolesChanged`;
-`EXTERNAL` stays until the board removes it. Neither write accepts an anonymised person.
+its credentials and history. A period the board adds or corrects, or a membership it writes, that is
+not over yet adds `MEMBER` to an account holding `EXTERNAL` without it (`OutsiderMembershipLink`),
+audited as `roster.account.rolesChanged`; `EXTERNAL` stays until the board removes it. None of these
+writes accepts an anonymised person. The import's membership writes add no role.
 An outsider closes its own account with `DELETE /api/account` after a re-authentication no older
 than five minutes; a member's account ends through the board. `AccountClosure` refuses anyone else
 with `identity.account.closureNotOpen` and an outsider holding a confirmed booking of its own that has
