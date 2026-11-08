@@ -30,6 +30,7 @@ import org.courtside.shared.TimeSlot;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
 import java.sql.Timestamp;
+import java.time.Instant;
 import java.time.Duration;
 import java.util.List;
 import java.util.Set;
@@ -61,6 +62,13 @@ public class BookingTestFixture {
         return bookingService.create(new CreateBookingCommand(List.of(courtId), cardId, slot, dependantAccountId,
                 dependantPersonId, Set.of(Role.MEMBER), null,
                 List.of(ParticipantSpec.card(ParticipantCard.LOOKING_FOR_A_PARTNER)), null, guardianAccountId));
+    }
+
+    public UUID createPendingBooking(UUID courtId, UUID cardId, TimeSlot slot, UUID bookedBy, Instant expiresAt) {
+        Booking booking = new Booking(cardId, bookedBy, null, slot.start().minus(Duration.ofDays(3)));
+        booking.allocate(courtId, slot);
+        booking.awaitPayment(expiresAt);
+        return bookings.saveAndFlush(booking).getId();
     }
 
     public UUID publishOpenPlace(UUID bookingId, UUID holderAccountId) {

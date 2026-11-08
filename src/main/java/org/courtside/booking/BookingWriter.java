@@ -196,7 +196,7 @@ class BookingWriter implements SeriesOccurrenceCancellation, BookingDrafts, Unat
     }
 
     private void requireAvailableCourts(CreateBookingCommand command, String idempotencyKey) {
-        if (!allocations.existsConfirmedOverlapping(command.courtIds(), command.slot().start(), command.slot().end())) {
+        if (!allocations.existsOccupyingOverlapping(command.courtIds(), command.slot().start(), command.slot().end())) {
             return;
         }
         if (idempotencyKey != null

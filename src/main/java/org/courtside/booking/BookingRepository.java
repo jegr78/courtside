@@ -116,8 +116,8 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
             SELECT EXISTS (SELECT 1 FROM booking b
             JOIN court_allocation a ON a.booking_id = b.id
             WHERE b.booked_by = :accountId
-              AND b.status = 'CONFIRMED'
-              AND a.status = 'CONFIRMED'
+              AND b.status <> 'CANCELLED'
+              AND a.status <> 'CANCELLED'
               AND a.ends_at > :now)
             """, nativeQuery = true)
     boolean existsUpcomingBookedBy(@Param("accountId") UUID accountId, @Param("now") Instant now);
@@ -126,8 +126,8 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
             SELECT EXISTS (SELECT 1 FROM booking b
             JOIN court_allocation a ON a.booking_id = b.id
             WHERE b.amount_minor > 0
-              AND b.status = 'CONFIRMED'
-              AND a.status = 'CONFIRMED'
+              AND b.status <> 'CANCELLED'
+              AND a.status <> 'CANCELLED'
               AND a.ends_at > :now)
             """, nativeQuery = true)
     boolean existsUpcomingCharged(@Param("now") Instant now);
@@ -163,7 +163,7 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
     @Query("""
             SELECT count(b) FROM Booking b
             WHERE b.bookedBy = :bookedBy
-              AND b.status = org.courtside.booking.BookingStatus.CONFIRMED
+              AND b.status <> org.courtside.booking.BookingStatus.CANCELLED
               AND EXISTS (SELECT 1 FROM CourtAllocation a
                           WHERE a.booking = b AND a.endsAt > :now)
               AND EXISTS (SELECT 1 FROM BookingCard c
@@ -181,7 +181,7 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
                   JOIN court_allocation a ON a.booking_id = b.id
                   JOIN booking_card c ON c.id = b.card_id
                   WHERE b.booked_by = :bookedBy
-                    AND b.status = 'CONFIRMED'
+                    AND b.status <> 'CANCELLED'
                     AND c.counts_against_limits
                   GROUP BY b.id) span
             WHERE span.starts_at >= :from AND span.starts_at < :until
@@ -197,7 +197,7 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
                   JOIN court_allocation a ON a.booking_id = b.id
                   JOIN booking_card c ON c.id = b.card_id
                   WHERE b.booked_by = :bookedBy
-                    AND b.status = 'CONFIRMED'
+                    AND b.status <> 'CANCELLED'
                     AND c.counts_against_limits
                     AND b.id NOT IN (:excluded)
                   GROUP BY b.id) span
@@ -228,8 +228,8 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
             JOIN p.booking b
             JOIN b.allocations a
             WHERE p.cardId = :cardId
-              AND b.status = org.courtside.booking.BookingStatus.CONFIRMED
-              AND a.status = org.courtside.booking.BookingStatus.CONFIRMED
+              AND b.status <> org.courtside.booking.BookingStatus.CANCELLED
+              AND a.status <> org.courtside.booking.BookingStatus.CANCELLED
               AND a.startsAt < :endsAt
               AND a.endsAt > :startsAt
             """)
@@ -243,8 +243,8 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
             JOIN b.allocations a
             WHERE p.cardId = :cardId
               AND b.id NOT IN :excludedBookingIds
-              AND b.status = org.courtside.booking.BookingStatus.CONFIRMED
-              AND a.status = org.courtside.booking.BookingStatus.CONFIRMED
+              AND b.status <> org.courtside.booking.BookingStatus.CANCELLED
+              AND a.status <> org.courtside.booking.BookingStatus.CANCELLED
               AND a.startsAt < :endsAt
               AND a.endsAt > :startsAt
             """)
@@ -265,7 +265,7 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
     @Query("""
             SELECT b.id FROM Booking b
             WHERE b.bookedBy = :bookedBy
-              AND b.status = :status
+              AND b.status IN :statuses
               AND (SELECT max(a.endsAt) FROM CourtAllocation a WHERE a.booking = b) >= :now
               AND (:cursor IS NULL
                 OR ((SELECT min(a.startsAt) FROM CourtAllocation a WHERE a.booking = b), b.id)
@@ -276,7 +276,7 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
                      b.id ASC
             """)
     List<UUID> findUpcomingPersonalBookingIds(@Param("bookedBy") UUID bookedBy,
-                                              @Param("status") BookingStatus status,
+                                              @Param("statuses") Collection<BookingStatus> statuses,
                                               @Param("now") Instant now,
                                               @Param("cursor") UUID cursor,
                                               Pageable pageable);

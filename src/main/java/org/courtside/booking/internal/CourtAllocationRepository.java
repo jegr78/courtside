@@ -36,13 +36,13 @@ public interface CourtAllocationRepository extends JpaRepository<CourtAllocation
     @Query(value = """
             SELECT EXISTS (
                 SELECT 1 FROM court_allocation a
-                WHERE a.status = 'CONFIRMED'
+                WHERE a.status <> 'CANCELLED'
                   AND a.court_id IN (:courtIds)
                   AND tstzrange(a.starts_at, a.ends_at, '[)')
                       && tstzrange(CAST(:startsAt AS timestamptz), CAST(:endsAt AS timestamptz), '[)')
             )
             """, nativeQuery = true)
-    boolean existsConfirmedOverlapping(@Param("courtIds") Collection<UUID> courtIds,
+    boolean existsOccupyingOverlapping(@Param("courtIds") Collection<UUID> courtIds,
                                        @Param("startsAt") Instant startsAt,
                                        @Param("endsAt") Instant endsAt);
 
@@ -78,6 +78,16 @@ public interface CourtAllocationRepository extends JpaRepository<CourtAllocation
     List<CourtAllocation> findConfirmedStartingBetween(@Param("from") Instant from,
                                                        @Param("to") Instant to);
 
+    @Query("""
+            SELECT a FROM CourtAllocation a
+            JOIN FETCH a.booking
+            WHERE a.status <> org.courtside.booking.BookingStatus.CANCELLED
+              AND a.startsAt >= :from
+              AND a.startsAt < :to
+            ORDER BY a.startsAt ASC
+            """)
+    List<CourtAllocation> findOccupyingStartingBetween(@Param("from") Instant from, @Param("to") Instant to);
+
     @Query(value = """
             SELECT c.id AS "courtId",
                    c.number AS "courtNumber",
@@ -110,7 +120,7 @@ public interface CourtAllocationRepository extends JpaRepository<CourtAllocation
             SELECT new org.courtside.booking.internal.CourtOccupancy(a.courtId, a.startsAt, a.endsAt)
             FROM CourtAllocation a
             WHERE a.courtId IN :courtIds
-              AND a.status = org.courtside.booking.BookingStatus.CONFIRMED
+              AND a.status <> org.courtside.booking.BookingStatus.CANCELLED
               AND a.startsAt < :endsAt
               AND a.endsAt > :startsAt
             """)
@@ -121,7 +131,7 @@ public interface CourtAllocationRepository extends JpaRepository<CourtAllocation
     @Query("""
             SELECT DISTINCT a.courtId FROM CourtAllocation a
             WHERE a.courtId IN :courtIds
-              AND a.status = org.courtside.booking.BookingStatus.CONFIRMED
+              AND a.status <> org.courtside.booking.BookingStatus.CANCELLED
               AND a.startsAt < :endsAt
               AND a.endsAt > :startsAt
               AND a.booking.id NOT IN :excludedBookingIds

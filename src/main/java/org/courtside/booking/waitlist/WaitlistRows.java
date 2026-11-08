@@ -188,7 +188,7 @@ class WaitlistRows {
         return jdbc.sql("""
                         SELECT EXISTS (
                             SELECT 1 FROM court_allocation a JOIN booking b ON b.id = a.booking_id
-                            WHERE a.court_id = :courtId AND a.status = 'CONFIRMED'
+                            WHERE a.court_id = :courtId AND a.status <> 'CANCELLED'
                               AND a.starts_at < :endsAt AND a.ends_at > :startsAt
                               AND (CAST(:bookedBy AS uuid) IS NULL OR b.booked_by = CAST(:bookedBy AS uuid)))
                         """)
@@ -212,7 +212,7 @@ class WaitlistRows {
                                    AND w.ends_at > CAST(:windowStart AS timestamptz)))
                           AND NOT EXISTS (
                               SELECT 1 FROM court_allocation a
-                              WHERE a.court_id = w.court_id AND a.status = 'CONFIRMED'
+                              WHERE a.court_id = w.court_id AND a.status <> 'CANCELLED'
                                 AND a.starts_at < w.ends_at AND a.ends_at > w.starts_at)
                         GROUP BY w.court_id, w.starts_at, w.ends_at
                         ORDER BY first_joined

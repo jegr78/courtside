@@ -56,7 +56,7 @@ class WarmUpTarget {
             LocalTime opensAt = window.get().opensAt();
             Instant start = date.atTime(opensAt).atZone(timeZone.zoneId()).toInstant();
             Instant end = start.plusSeconds(minutes * 60L);
-            if (!allocations.existsConfirmedOverlapping(List.of(court.get()), start, end)) {
+            if (!allocations.existsOccupyingOverlapping(List.of(court.get()), start, end)) {
                 return Optional.of(new Target(court.get(), card.get(), date, opensAt, minutes,
                         new TimeSlot(start, end)));
             }

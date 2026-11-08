@@ -142,7 +142,7 @@ public class BookingService {
 
     @Transactional(readOnly = true)
     public List<CourtAllocation> allocationsBetween(Instant from, Instant to) {
-        return allocations.findConfirmedStartingBetween(from, to);
+        return allocations.findOccupyingStartingBetween(from, to);
     }
 
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
@@ -153,10 +153,10 @@ public class BookingService {
         }
         PageRequest window = PageRequest.of(0, Math.addExact(limit, 1));
         List<UUID> ids = switch (view) {
-            case UPCOMING -> bookings.findUpcomingPersonalBookingIds(
-                    bookedBy, BookingStatus.CONFIRMED, clock.instant(), cursor, window);
+            case UPCOMING -> bookings.findUpcomingPersonalBookingIds(bookedBy,
+                    List.of(BookingStatus.CONFIRMED, BookingStatus.PENDING_PAYMENT), clock.instant(), cursor, window);
             case CANCELLED -> bookings.findUpcomingPersonalBookingIds(
-                    bookedBy, BookingStatus.CANCELLED, clock.instant(), cursor, window);
+                    bookedBy, List.of(BookingStatus.CANCELLED), clock.instant(), cursor, window);
             case HISTORY -> bookings.findPersonalBookingHistoryIds(bookedBy, clock.instant(), cursor, window);
         };
         CursorPage.Result<Booking> page = CursorPage.of(ids, limit, bookings::findAllByIdIn, Booking::getId);
