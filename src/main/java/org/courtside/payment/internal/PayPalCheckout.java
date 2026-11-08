@@ -125,7 +125,7 @@ public class PayPalCheckout {
         }
     }
 
-    /** Settles an open order whose hold may have ended; it is captured only while its booking is still held. */
+    /** Settles an open order; an approved one is captured while its booking is held, also past the deadline. */
     public Settlement reconcile(String orderId) {
         requireNoTransaction();
         StoredOrder stored = orders.find(orderId).orElseThrow(PayPalOrderNotFoundException::new);
@@ -142,13 +142,15 @@ public class PayPalCheckout {
         Optional<PayPalClient.Capture> capture = order.get().capture();
         if (capture.isPresent()) return settle(stored, capture.get(), mismatch(stored, order.get()).isEmpty());
         Optional<PayPalClient.Credentials> active = credentials.active(stored.environment());
-        boolean held = pendingPayments.pending(stored.bookingId())
-                .filter(pending -> pending.expiresAt().isAfter(clock.instant())).isPresent();
-        if (active.isPresent() && held) return settle(stored, active.get(), order.get());
+        Optional<PendingBooking> pending = pendingPayments.pending(stored.bookingId());
+        boolean beforeDeadline = pending.filter(held -> held.expiresAt().isAfter(clock.instant())).isPresent();
+        if (active.isPresent() && pending.isPresent()
+                && (beforeDeadline || order.get().status().equals("APPROVED"))) {
+            return settle(stored, active.get(), order.get());
+        }
         if (!UNCAPTURED.contains(order.get().status())) return processing(stored);
         Rejection reason = active.isEmpty() ? Rejection.CREDENTIALS_CHANGED
-                : pendingPayments.pending(stored.bookingId()).isPresent() ? Rejection.HOLD_EXPIRED
-                : Rejection.BOOKING_RELEASED;
+                : pending.isPresent() ? Rejection.HOLD_EXPIRED : Rejection.BOOKING_RELEASED;
         return voided(stored, reason);
     }
 

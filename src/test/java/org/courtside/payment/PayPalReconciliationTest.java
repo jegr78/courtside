@@ -255,23 +255,26 @@ class PayPalReconciliationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void givenAnApprovedOrderPastTheDeadline_whenTheJobRuns_thenItIsVoidedWithoutACapture() throws Exception {
+    void givenAnApprovedOrderPastTheDeadline_whenItsBookingIsStillHeld_thenTheJobCapturesAndConfirms()
+            throws Exception {
         // given
         UUID booking = bookWithOrder();
         age(Duration.ofMinutes(16));
         expire(booking);
         PAYPAL.reply(READ, 200, order("APPROVED", booking, null));
+        PAYPAL.reply(CAPTURE, 201, order("COMPLETED", booking, capture("COMPLETED", "15.00")));
 
         // when
         reconciliation.run();
 
         // then
-        assertThat(PAYPAL.seen(CAPTURE)).as("nothing is captured once the hold has ended").isEmpty();
-        assertThat(bookingStatus(booking)).isEqualTo("CANCELLED");
-        assertThat(orderStatus()).isEqualTo("VOIDED");
-        assertThat(entries(booking)).isEmpty();
-        assertThat(audit("payment.paypal.rejected", booking)).singleElement()
-                .satisfies(payload -> assertThat(payload.get("reason").asString()).isEqualTo("HOLD_EXPIRED"));
+        assertThat(PAYPAL.seen(CAPTURE)).as("the court was never given away, so the approval is captured")
+                .hasSize(1);
+        assertThat(bookingStatus(booking)).isEqualTo("CONFIRMED");
+        assertThat(orderStatus()).isEqualTo("CAPTURED");
+        assertThat(entries(booking)).containsExactlyInAnyOrder(Map.of("kind", "PAYPAL_PAYMENT", "amount_minor", 1500),
+                Map.of("kind", "BOOKING_DEBIT", "amount_minor", -1500));
+        assertThat(audit("payment.paypal.captured", booking)).hasSize(1);
     }
 
     @Test
@@ -394,6 +397,7 @@ class PayPalReconciliationTest extends AbstractIntegrationTest {
         age(Duration.ofMinutes(16));
         expire(booking);
         PAYPAL.reply(READ, 200, order("APPROVED", booking, null));
+        PAYPAL.reply(READ, 200, order("PAYER_ACTION_REQUIRED", booking, null));
         PAYPAL.reply(CAPTURE, 201, order("COMPLETED", booking, capture("COMPLETED", "15.00")));
         CountDownLatch heldCapture = PAYPAL.holdFirst(CAPTURE);
         CompletableFuture<String> returned = CompletableFuture.supplyAsync(this::captureOutcome);

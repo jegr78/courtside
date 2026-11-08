@@ -967,7 +967,7 @@
         "A capture verifies the order at PayPal, captures it outside any transaction and then, under the order row lock, confirms the booking and records the PayPal payment and the booking debit once.",
         "A capture that finds the booking no longer pending, or a captured amount that differs, releases the booking and credits the captured amount to the booker.",
         "Cancelling an order reads it at PayPal first; without money taken it is voided and its booking released at once, a capture is recorded as on return, and an unclear state leaves the order open.",
-        "Every minute the reconciliation reads open orders older than five minutes and those whose hold has passed: a capture is recorded, an approved order is captured while its booking is still held, and an order without money taken whose hold ended, whose booking was released or whose credentials are no longer active is voided and audited.",
+        "Every minute the reconciliation reads open orders older than five minutes and those whose hold has passed: a capture is recorded, an approved order is captured while its booking is still held, also past the deadline, and an unapproved order whose hold ended, an order whose booking was released or whose credentials are no longer active is voided and audited.",
         "The reconciliation releases a held booking without an order once its deadline has passed, and for 72 hours rereads voided orders whose capture was attempted so that a capture PayPal completed later becomes credit."
       ],
       "alternatePaths": [
