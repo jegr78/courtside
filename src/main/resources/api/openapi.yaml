@@ -13537,7 +13537,8 @@ paths:
         out, and `payment.paypal.settings.changed` and `payment.paypal.credentials.removed`, whose
         subject is the stored PayPal settings. The rest is recorded outside those surfaces:
         `booking.booking.confirmed` and the four other booking entries, `payment.paypal.order.created`,
-        `payment.paypal.captured`, `payment.paypal.lateCapture` and `payment.paypal.rejected`, whose
+        `payment.paypal.captured`, `payment.paypal.lateCapture`, `payment.paypal.rejected` and
+        `payment.paypal.voided`, whose
         subject is the booking a PayPal order pays for, `access.grant.installed` and
         `access.grant.failing`, and
         `identity.account.credentialsRequested`, which names the account a credential was issued

@@ -101,4 +101,19 @@ public sealed interface PaymentEvent extends DomainEventRecord {
             return bookingId;
         }
     }
+
+    record PayPalVoided(UUID bookingId, String orderId, String reason) implements PaymentEvent {
+
+        static final String TYPE = "payment.paypal.voided";
+
+        @Override
+        public String eventType() {
+            return TYPE;
+        }
+
+        @Override
+        public UUID subjectId() {
+            return bookingId;
+        }
+    }
 }

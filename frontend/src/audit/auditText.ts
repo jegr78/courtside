@@ -136,6 +136,7 @@ const BOOKING_MODULE_SUBJECTS: Record<string, "booking" | "series" | "waitlistEn
   "payment.paypal.captured": "booking",
   "payment.paypal.lateCapture": "booking",
   "payment.paypal.rejected": "booking",
+  "payment.paypal.voided": "booking",
   "booking.occupancyKey.created": "named",
   "booking.occupancyKey.revoked": "named",
   "access.grant.installed": "booking",

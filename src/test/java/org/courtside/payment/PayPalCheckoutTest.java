@@ -700,8 +700,9 @@ class PayPalCheckoutTest extends AbstractIntegrationTest {
         assertThat(cancellationReason(booking)).isEqualTo("PAYMENT_EXPIRED");
         assertThat(allocationStatus(booking)).isEqualTo("CANCELLED");
         assertThat(orderStatus()).isEqualTo("VOIDED");
-        assertThat(audit("payment.paypal.rejected", booking)).singleElement()
+        assertThat(audit("payment.paypal.voided", booking)).singleElement()
                 .satisfies(payload -> assertThat(payload.get("reason").asString()).isEqualTo("ABANDONED"));
+        assertThat(audit("payment.paypal.rejected", booking)).as("giving up is not a refusal").isEmpty();
         int reads = PAYPAL.seen(READ).size();
         cancel("roe.john").andExpect(status().isOk()).andExpect(jsonPath("$.outcome").value("REJECTED"));
         assertThat(audit("booking.payment.expired", booking)).as("a second cancel changes nothing").hasSize(1);

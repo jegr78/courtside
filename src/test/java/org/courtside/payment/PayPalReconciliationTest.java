@@ -208,7 +208,7 @@ class PayPalReconciliationTest extends AbstractIntegrationTest {
         assertThat(PAYPAL.seen(READ)).hasSize(1);
         assertThat(bookingStatus(booking)).isEqualTo("PENDING_PAYMENT");
         assertThat(orderStatus()).isEqualTo("CREATED");
-        assertThat(audit("payment.paypal.rejected", booking)).isEmpty();
+        assertThat(audit("payment.paypal.voided", booking)).isEmpty();
     }
 
     @Test
@@ -229,9 +229,10 @@ class PayPalReconciliationTest extends AbstractIntegrationTest {
         assertThat(allocationStatus(booking)).as("the court is free").isEqualTo("CANCELLED");
         assertThat(orderStatus()).isEqualTo("VOIDED");
         assertThat(entries(booking)).isEmpty();
-        assertThat(audit("payment.paypal.rejected", booking)).singleElement()
+        assertThat(audit("payment.paypal.voided", booking)).singleElement()
                 .satisfies(payload -> assertThat(payload.get("reason").asString()).isEqualTo("HOLD_EXPIRED"));
         assertThat(audit("booking.payment.expired", booking)).hasSize(1);
+        assertThat(audit("payment.paypal.rejected", booking)).as("a void is not a refusal").isEmpty();
     }
 
     @Test
@@ -251,7 +252,7 @@ class PayPalReconciliationTest extends AbstractIntegrationTest {
         assertThat(allocationStatus(booking)).isEqualTo("PENDING_PAYMENT");
         assertThat(orderStatus()).isEqualTo("CREATED");
         assertThat(entries(booking)).isEmpty();
-        assertThat(audit("payment.paypal.rejected", booking)).isEmpty();
+        assertThat(audit("payment.paypal.voided", booking)).isEmpty();
     }
 
     @Test
@@ -323,7 +324,7 @@ class PayPalReconciliationTest extends AbstractIntegrationTest {
         assertThat(allocationStatus(booking)).isEqualTo("CANCELLED");
         assertThat(orderStatus()).isEqualTo("VOIDED");
         assertThat(entries(booking)).isEmpty();
-        assertThat(audit("payment.paypal.rejected", booking)).singleElement().satisfies(payload ->
+        assertThat(audit("payment.paypal.voided", booking)).singleElement().satisfies(payload ->
                 assertThat(payload.get("reason").asString()).isEqualTo("CREDENTIALS_CHANGED"));
     }
 
@@ -344,7 +345,7 @@ class PayPalReconciliationTest extends AbstractIntegrationTest {
         assertThat(allocationStatus(booking)).isEqualTo("CANCELLED");
         assertThat(orderStatus()).isEqualTo("VOIDED");
         assertThat(entries(booking)).isEmpty();
-        assertThat(audit("payment.paypal.rejected", booking)).singleElement().satisfies(payload ->
+        assertThat(audit("payment.paypal.voided", booking)).singleElement().satisfies(payload ->
                 assertThat(payload.get("reason").asString()).isEqualTo("CREDENTIALS_CHANGED"));
     }
 
@@ -364,7 +365,7 @@ class PayPalReconciliationTest extends AbstractIntegrationTest {
         assertThat(cancellationReason(booking)).isEqualTo("PAYMENT_EXPIRED");
         assertThat(orderStatus()).isEqualTo("VOIDED");
         assertThat(entries(booking)).isEmpty();
-        assertThat(audit("payment.paypal.rejected", booking)).singleElement().satisfies(payload ->
+        assertThat(audit("payment.paypal.voided", booking)).singleElement().satisfies(payload ->
                 assertThat(payload.get("reason").asString()).isEqualTo("CREDENTIALS_CHANGED"));
     }
 
@@ -381,7 +382,7 @@ class PayPalReconciliationTest extends AbstractIntegrationTest {
         // then
         assertThat(orderStatus()).as("an order that may hold money is never voided unread").isEqualTo("CREATED");
         assertThat(bookingStatus(booking)).isEqualTo("PENDING_PAYMENT");
-        assertThat(audit("payment.paypal.rejected", booking)).isEmpty();
+        assertThat(audit("payment.paypal.voided", booking)).isEmpty();
     }
 
     @Test
@@ -442,7 +443,7 @@ class PayPalReconciliationTest extends AbstractIntegrationTest {
         assertThat(bookingStatus(booking)).isEqualTo("CANCELLED");
         assertThat(orderStatus()).isEqualTo("VOIDED");
         assertThat(entries(booking)).isEmpty();
-        assertThat(audit("payment.paypal.rejected", booking)).singleElement()
+        assertThat(audit("payment.paypal.voided", booking)).singleElement()
                 .satisfies(payload -> assertThat(payload.get("reason").asString()).isEqualTo("HOLD_EXPIRED"));
     }
 
@@ -465,7 +466,7 @@ class PayPalReconciliationTest extends AbstractIntegrationTest {
         assertThat(orderStatus()).isEqualTo("CAPTURED");
         assertThat(entries(booking)).containsExactlyInAnyOrder(Map.of("kind", "PAYPAL_PAYMENT", "amount_minor", 1500),
                 Map.of("kind", "BOOKING_DEBIT", "amount_minor", -1500));
-        assertThat(audit("payment.paypal.rejected", booking)).isEmpty();
+        assertThat(audit("payment.paypal.voided", booking)).isEmpty();
     }
 
     @Test
@@ -534,7 +535,7 @@ class PayPalReconciliationTest extends AbstractIntegrationTest {
         assertThat(PAYPAL.seen(CAPTURE)).as("a released booking is never captured").isEmpty();
         assertThat(orderStatus()).isEqualTo("VOIDED");
         assertThat(entries(booking)).isEmpty();
-        assertThat(audit("payment.paypal.rejected", booking)).singleElement()
+        assertThat(audit("payment.paypal.voided", booking)).singleElement()
                 .satisfies(payload -> assertThat(payload.get("reason").asString()).isEqualTo("BOOKING_RELEASED"));
     }
 
