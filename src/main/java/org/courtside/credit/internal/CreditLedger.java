@@ -126,7 +126,7 @@ public class CreditLedger {
         var query = jdbc.sql("SELECT * FROM (" + ENTRIES + ") t " + after
                         + " ORDER BY t.position DESC LIMIT :limit")
                 .param("account", accountId)
-                .param("limit", limit + 1);
+                .param("limit", Math.addExact(limit, 1));
         if (cursor != null) {
             query = query.param("cursor", cursor);
         }
