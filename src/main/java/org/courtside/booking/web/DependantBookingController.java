@@ -2,6 +2,7 @@ package org.courtside.booking.web;
 
 import lombok.RequiredArgsConstructor;
 import org.courtside.api.ApiBookingCreated;
+import org.courtside.booking.BookingService;
 import org.courtside.api.ApiCreateBookingRequest;
 import org.courtside.api.ApiPersonalBookingPage;
 import org.courtside.api.ApiPersonalBookingView;
@@ -27,6 +28,7 @@ import java.util.UUID;
 class DependantBookingController implements DependantBookingsApi {
 
     private final DependantBookings dependantBookings;
+    private final BookingService bookings;
     private final PersonalBookingPages personalBookingPages;
     private final BookingRequestValidator crossFieldRules;
 
@@ -63,7 +65,7 @@ class DependantBookingController implements DependantBookingsApi {
                 new TimeSlot(WireTypes.toInstant(request.getStartsAt()), WireTypes.toInstant(request.getEndsAt())),
                 request.getNote(), participants, idempotencyKey);
         return ResponseEntity.created(URI.create("/api/my/dependants/" + personId + "/bookings/" + id))
-                .body(new ApiBookingCreated(id));
+                .body(BookingCreatedResponses.of(bookings.booking(id)));
     }
 
     @Override

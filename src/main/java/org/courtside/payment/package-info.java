@@ -1,4 +1,4 @@
 @org.springframework.modulith.ApplicationModule(
         displayName = "Payment",
-        allowedDependencies = {"identity"})
+        allowedDependencies = {"identity", "booking"})
 package org.courtside.payment;

@@ -445,4 +445,23 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
             """)
     Optional<Booking> findIdempotentRequest(@Param("bookedBy") UUID bookedBy, @Param("actedBy") UUID actedBy,
                                             @Param("idempotencyKey") String idempotencyKey);
+
+    @Query("""
+            SELECT b.paymentExpiresAt FROM Booking b
+            WHERE b.bookedBy = :bookedBy AND b.status = org.courtside.booking.BookingStatus.PENDING_PAYMENT
+            """)
+    Optional<Instant> findPendingExpiryOf(@Param("bookedBy") UUID bookedBy);
+
+    @Query(value = """
+            SELECT id FROM booking WHERE status = 'PENDING_PAYMENT' AND created_at < :before ORDER BY id
+            """, nativeQuery = true)
+    List<UUID> findPendingCreatedBefore(@Param("before") Instant before);
+
+    @Query(value = """
+            SELECT id FROM booking WHERE status = 'PENDING_PAYMENT' AND payment_expires_at <= :now ORDER BY id
+            """, nativeQuery = true)
+    List<UUID> findPendingExpiredAt(@Param("now") Instant now);
+
+    @Query(value = "SELECT id FROM booking WHERE id IN (:ids) AND status = 'PENDING_PAYMENT'", nativeQuery = true)
+    List<UUID> findPendingAmong(@Param("ids") Collection<UUID> ids);
 }

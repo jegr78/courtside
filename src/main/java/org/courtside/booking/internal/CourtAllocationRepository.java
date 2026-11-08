@@ -145,7 +145,7 @@ public interface CourtAllocationRepository extends JpaRepository<CourtAllocation
             SELECT b.id FROM booking b
             JOIN court_allocation a ON a.booking_id = b.id
             WHERE a.court_id = :courtId
-              AND a.status = 'CONFIRMED'
+              AND a.status <> 'CANCELLED'
               AND a.starts_at >= :from
             GROUP BY b.id
             HAVING :firstPage = true OR (MIN(a.starts_at), b.id) > (
@@ -153,7 +153,7 @@ public interface CourtAllocationRepository extends JpaRepository<CourtAllocation
                 JOIN court_allocation ca ON ca.booking_id = cb.id
                 WHERE cb.id = :cursor
                   AND ca.court_id = :courtId
-                  AND ca.status = 'CONFIRMED'
+                  AND ca.status <> 'CANCELLED'
                   AND ca.starts_at >= :from
                 GROUP BY cb.id
             )
@@ -169,7 +169,7 @@ public interface CourtAllocationRepository extends JpaRepository<CourtAllocation
             SELECT COUNT(DISTINCT b.id) FROM booking b
             JOIN court_allocation a ON a.booking_id = b.id
             WHERE a.court_id = :courtId
-              AND a.status = 'CONFIRMED'
+              AND a.status <> 'CANCELLED'
               AND a.starts_at >= :from
             """, nativeQuery = true)
     long countImpactBookingsByCourt(@Param("courtId") UUID courtId, @Param("from") Instant from);
@@ -178,7 +178,7 @@ public interface CourtAllocationRepository extends JpaRepository<CourtAllocation
             SELECT b.id FROM booking b
             JOIN court_allocation a ON a.booking_id = b.id
             WHERE b.card_id = :cardId
-              AND a.status = 'CONFIRMED'
+              AND a.status <> 'CANCELLED'
               AND a.starts_at >= :from
             GROUP BY b.id
             HAVING :firstPage = true OR (MIN(a.starts_at), b.id) > (
@@ -186,7 +186,7 @@ public interface CourtAllocationRepository extends JpaRepository<CourtAllocation
                 JOIN court_allocation ca ON ca.booking_id = cb.id
                 WHERE cb.id = :cursor
                   AND cb.card_id = :cardId
-                  AND ca.status = 'CONFIRMED'
+                  AND ca.status <> 'CANCELLED'
                   AND ca.starts_at >= :from
                 GROUP BY cb.id
             )
@@ -202,7 +202,7 @@ public interface CourtAllocationRepository extends JpaRepository<CourtAllocation
             SELECT COUNT(DISTINCT b.id) FROM booking b
             JOIN court_allocation a ON a.booking_id = b.id
             WHERE b.card_id = :cardId
-              AND a.status = 'CONFIRMED'
+              AND a.status <> 'CANCELLED'
               AND a.starts_at >= :from
             """, nativeQuery = true)
     long countImpactBookingsByCard(@Param("cardId") UUID cardId, @Param("from") Instant from);
@@ -210,7 +210,7 @@ public interface CourtAllocationRepository extends JpaRepository<CourtAllocation
     @Query(value = """
             SELECT b.id FROM booking b
             JOIN court_allocation a ON a.booking_id = b.id
-            WHERE a.status = 'CONFIRMED'
+            WHERE a.status <> 'CANCELLED'
               AND a.starts_at >= :from
               AND a.starts_at < :until
               AND date_part('isodow', timezone(:zone, a.starts_at)) = :isoDayOfWeek
@@ -221,7 +221,7 @@ public interface CourtAllocationRepository extends JpaRepository<CourtAllocation
                 SELECT MIN(ca.starts_at), cb.id FROM booking cb
                 JOIN court_allocation ca ON ca.booking_id = cb.id
                 WHERE cb.id = :cursor
-                  AND ca.status = 'CONFIRMED'
+                  AND ca.status <> 'CANCELLED'
                   AND ca.starts_at >= :from
                   AND ca.starts_at < :until
                   AND date_part('isodow', timezone(:zone, ca.starts_at)) = :isoDayOfWeek
@@ -245,7 +245,7 @@ public interface CourtAllocationRepository extends JpaRepository<CourtAllocation
     @Query(value = """
             SELECT COUNT(DISTINCT b.id) FROM booking b
             JOIN court_allocation a ON a.booking_id = b.id
-            WHERE a.status = 'CONFIRMED'
+            WHERE a.status <> 'CANCELLED'
               AND a.starts_at >= :from
               AND a.starts_at < :until
               AND date_part('isodow', timezone(:zone, a.starts_at)) = :isoDayOfWeek
@@ -263,12 +263,12 @@ public interface CourtAllocationRepository extends JpaRepository<CourtAllocation
     @Query("""
             SELECT new org.courtside.booking.internal.BookedSlot(a.booking.id, a.courtId, a.startsAt, a.endsAt)
             FROM CourtAllocation a
-            WHERE a.status = org.courtside.booking.BookingStatus.CONFIRMED
+            WHERE a.status <> org.courtside.booking.BookingStatus.CANCELLED
               AND a.startsAt >= :from
               AND a.startsAt < :until
             ORDER BY a.startsAt, a.booking.id, a.courtId
             """)
-    List<BookedSlot> findConfirmedSlotsStartingBetween(@Param("from") Instant from, @Param("until") Instant until);
+    List<BookedSlot> findOccupyingSlotsStartingBetween(@Param("from") Instant from, @Param("until") Instant until);
 
     @Query("""
             SELECT a FROM CourtAllocation a

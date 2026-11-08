@@ -3385,9 +3385,16 @@ components:
 
     BookingCreated:
       type: object
-      required: [id]
+      required: [id, status]
       properties:
         id: { type: string, format: uuid }
+        status: { $ref: "#/components/schemas/BookingStatus" }
+        paymentExpiresAt:
+          type: [string, "null"]
+          format: date-time
+          description: |
+            When the hold on a booking awaiting a PayPal payment ends. Present only while the status
+            is PENDING_PAYMENT.
 
     PersonalBooking:
       type: object
@@ -7317,6 +7324,8 @@ paths:
         Non-overlap is decided by the database, not by a check beforehand — time passes between
         checking and inserting. A collision is a `409`, and it is authoritative. Every booking
         attempt carries an idempotency key; retrying the same request returns the original booking.
+        An external player whose credit does not cover the price, while the club accepts PayPal,
+        receives a booking in `PENDING_PAYMENT` that holds the court until `paymentExpiresAt`.
       security:
         - sessionCookie: []
           csrfToken: []

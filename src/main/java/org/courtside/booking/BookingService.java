@@ -141,6 +141,12 @@ public class BookingService {
     }
 
     @Transactional(readOnly = true)
+    public Booking booking(UUID bookingId) {
+        return bookings.findById(bookingId)
+                .orElseThrow(() -> new BookingNotFoundException("No booking with id " + bookingId));
+    }
+
+    @Transactional(readOnly = true)
     public List<CourtAllocation> allocationsBetween(Instant from, Instant to) {
         return allocations.findOccupyingStartingBetween(from, to);
     }

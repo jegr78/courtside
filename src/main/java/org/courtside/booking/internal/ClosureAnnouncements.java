@@ -1,6 +1,8 @@
 package org.courtside.booking.internal;
 
 import lombok.RequiredArgsConstructor;
+import org.courtside.booking.BookingRepository;
+import org.courtside.booking.PendingPayments;
 import org.courtside.card.CardEvent;
 import org.courtside.config.ClubTimeZone;
 import org.courtside.facility.AvailabilityChange;
@@ -19,7 +21,10 @@ import org.springframework.transaction.event.TransactionalEventListener;
 import java.time.Clock;
 import java.time.DayOfWeek;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.BiFunction;
 import java.util.function.Function;
@@ -34,6 +39,8 @@ class ClosureAnnouncements {
     private final ApplicationEventPublisher events;
     private final Clock clock;
     private final ClubTimeZone timeZone;
+    private final BookingRepository bookings;
+    private final PendingPayments pendingPayments;
 
     @Async("closureAnnouncementExecutor")
     @TransactionalEventListener
@@ -104,7 +111,9 @@ class ClosureAnnouncements {
     }
 
     private void announce(List<ImpactService.AffectedBooking> affected, BookingDisplaced.Closure closure) {
-        affected.forEach(booking -> events.publishEvent(new BookingDisplaced(booking.bookingId(), closure)));
+        List<UUID> held = new ArrayList<>();
+        displace(affected, closure, held);
+        held.forEach(pendingPayments::release);
     }
 
     // One instant for every page: a clock read per page lets a booking that starts in between drop
@@ -117,12 +126,31 @@ class ClosureAnnouncements {
     private <P> void announce(Function<Instant, P> window, BiFunction<P, UUID, ImpactService.ImpactPage> page,
                               BookingDisplaced.Closure closure) {
         P fixed = window.apply(clock.instant());
+        List<UUID> held = new ArrayList<>();
         UUID cursor = null;
         do {
             ImpactService.ImpactPage impacted = page.apply(fixed, cursor);
-            impacted.bookings().forEach(booking ->
-                    events.publishEvent(new BookingDisplaced(booking.bookingId(), closure)));
+            displace(impacted.bookings(), closure, held);
             cursor = impacted.nextCursor();
         } while (cursor != null);
+        // Released only after the walk, because the cursor names a booking the next page must still find.
+        held.forEach(pendingPayments::release);
+    }
+
+    // A booking still awaiting its payment was never confirmed, so the closure ends its hold instead.
+    private void displace(List<ImpactService.AffectedBooking> affected, BookingDisplaced.Closure closure,
+                          List<UUID> held) {
+        if (affected.isEmpty()) {
+            return;
+        }
+        Set<UUID> pending = new HashSet<>(bookings.findPendingAmong(
+                affected.stream().map(ImpactService.AffectedBooking::bookingId).toList()));
+        affected.forEach(booking -> {
+            if (pending.contains(booking.bookingId())) {
+                held.add(booking.bookingId());
+            } else {
+                events.publishEvent(new BookingDisplaced(booking.bookingId(), closure));
+            }
+        });
     }
 }

@@ -1,5 +1,7 @@
 package org.courtside.booking.internal;
 
+import org.courtside.booking.BookingRepository;
+import org.courtside.booking.PendingPayments;
 import org.courtside.card.CardEvent;
 import org.courtside.facility.FacilityEvent;
 import org.courtside.shared.BookingDisplaced;
@@ -34,7 +36,8 @@ class ClosureAnnouncementsTest {
         ImpactService impact = mock(ImpactService.class);
         ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
         ClosureAnnouncements announcements = new ClosureAnnouncements(
-                impact, events, Clock.fixed(NOW, ZoneOffset.UTC), () -> ZoneOffset.UTC);
+                impact, events, Clock.fixed(NOW, ZoneOffset.UTC), () -> ZoneOffset.UTC,
+                mock(BookingRepository.class), mock(PendingPayments.class));
         UUID firstBooking = UUID.randomUUID();
         UUID secondBooking = UUID.randomUUID();
         UUID cursor = UUID.randomUUID();
@@ -65,7 +68,8 @@ class ClosureAnnouncementsTest {
         ImpactService impact = mock(ImpactService.class);
         ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
         ClosureAnnouncements announcements = new ClosureAnnouncements(
-                impact, events, Clock.fixed(NOW, ZoneOffset.UTC), () -> ZoneOffset.UTC);
+                impact, events, Clock.fixed(NOW, ZoneOffset.UTC), () -> ZoneOffset.UTC,
+                mock(BookingRepository.class), mock(PendingPayments.class));
         UUID courtId = UUID.randomUUID();
         UUID cardId = UUID.randomUUID();
         when(impact.pageOfDeactivating(courtId, NOW, null, 100))
@@ -92,7 +96,8 @@ class ClosureAnnouncementsTest {
         // given
         ImpactService impact = mock(ImpactService.class);
         ClosureAnnouncements announcements = new ClosureAnnouncements(impact,
-                mock(ApplicationEventPublisher.class), Clock.fixed(NOW, ZoneOffset.UTC), () -> ZoneOffset.UTC);
+                mock(ApplicationEventPublisher.class), Clock.fixed(NOW, ZoneOffset.UTC), () -> ZoneOffset.UTC,
+                mock(BookingRepository.class), mock(PendingPayments.class));
         OpeningWindow window = new OpeningWindow(LocalTime.of(10, 0), LocalTime.of(18, 0));
         ImpactService.Period winter = new ImpactService.Period(
                 Instant.parse("2026-11-01T00:00:00Z"), Instant.parse("2027-03-01T00:00:00Z"));

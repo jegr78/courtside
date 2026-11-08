@@ -161,7 +161,7 @@ public class ImpactService {
             return List.of();
         }
         Map<UUID, List<BookedSlot>> byBooking = new LinkedHashMap<>();
-        allocations.findConfirmedSlotsStartingBetween(from, until).forEach(slot ->
+        allocations.findOccupyingSlotsStartingBetween(from, until).forEach(slot ->
                 byBooking.computeIfAbsent(slot.bookingId(), ignored -> new ArrayList<>()).add(slot));
         return byBooking.values().stream()
                 .filter(booking -> !after.admits(booking, zone) && before.admits(booking, zone))

@@ -131,6 +131,7 @@ const BOOKING_MODULE_SUBJECTS: Record<string, "booking" | "series" | "waitlistEn
   "booking.booking.reminderDue": "booking",
   "booking.booking.accessCodeChanged": "booking",
   "booking.emergencyCode.requested": "booking",
+  "booking.payment.expired": "booking",
   "booking.occupancyKey.created": "named",
   "booking.occupancyKey.revoked": "named",
   "access.grant.installed": "booking",
