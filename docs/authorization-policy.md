@@ -131,6 +131,8 @@ The maintained JSON classifies every reachable OpenAPI field either as ordinary 
 | `occupancy-signal` | `getCourtOccupancy` | `ANONYMOUS`, `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN`, `EXTERNAL`, `INITIAL_PASSWORD` | `request-boundary`, `occupancy-key-gate` |
 | `public-external-registration` | `registerExternalAccount`, `verifyRegistration` | `ANONYMOUS`, `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN`, `EXTERNAL`, `INITIAL_PASSWORD` | `request-boundary`, `credential-write-only`, `external-self-registration` |
 | `treasury-paypal-settings` | `getPayPalSettings`, `checkPayPalConnection` | `TREASURER`, `ADMIN` | `treasury-gate`, `paypal-secret-write-only` |
+| `own-paypal-checkout` | `createPayPalOrder`, `capturePayPalOrder`, `cancelPayPalOrder` | `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN`, `EXTERNAL` | `permanent-account-gate`, `paypal-order-ownership` |
+| `paypal-availability` | `getPayPalAvailability` | `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN`, `EXTERNAL` | `permanent-account-gate` |
 | `treasury-paypal-credentials` | `savePayPalSettings`, `removePayPalCredentials` | `TREASURER`, `ADMIN` | `treasury-gate`, `recent-authentication`, `paypal-secret-write-only` |
 
 ## Authorization decisions
@@ -230,6 +232,18 @@ Production: `src/main/java/org/courtside/booking/BookingService.java#cancel/4`, 
 Positive tests: `src/test/java/org/courtside/booking/web/BookingControllerTest.java#givenAnOwnBooking_whenCancellingIt_thenItDisappearsFromTheGrid`, `src/test/java/org/courtside/notification/web/NotificationControllerTest.java#givenAPlayerStillInABooking_whenTheyReadTheCentre_thenTheEntryDescribesAndLinksTheBooking`, `src/test/java/org/courtside/booking/web/AttendanceControllerTest.java#givenTheCheckInWindowIsOpen_whenTheMemberChecksIn_thenTheirBookingShowsItAsCheckedIn`.
 
 Negative tests: `src/test/java/org/courtside/card/web/BookingCardAdminControllerTest.java#givenANewCard_whenABoardNamesTheExternalRoleAsManaging_thenTheCardIsRefusedByCode`, `src/test/java/org/courtside/booking/web/BookingControllerTest.java#givenAForeignBooking_whenAMemberCancelsIt_thenItIsNotFoundAndItStaysConfirmed`, `src/test/java/org/courtside/notification/web/NotificationControllerTest.java#givenAPlayerWhoLeftTheBooking_whenTheyReadTheCentre_thenTheEntryNoLongerDescribesOrLinksIt`, `src/test/java/org/courtside/booking/attendance/AttendanceTest.java#givenSomebodyElsesBooking_whenAMemberChecksIn_thenItIsAnsweredLikeABookingThatDoesNotExist`, `src/test/java/org/courtside/booking/ParticipationServiceTest.java#givenACancelledBooking_whenSomebodyItNeverNamedWithdraws_thenItIsNotFoundRatherThanCancelled`, `src/test/java/org/courtside/booking/ParticipationWithdrawalConcurrencyTest.java#givenACancellationHoldingTheBooking_whenTheCoPlayerWithdraws_thenTheWithdrawalWaitsAndIsRefused`.
+
+### PayPal order ownership
+
+Creating, capturing and cancelling a PayPal order require the signed-in account that booked the pending booking. The account comes from the session and is compared with the booking's booker on create and with the order's stored account on capture and cancel; any other booking or order answers as not found before PayPal is called.
+
+Attributes: `current-account`, `booking-owner`.
+
+Production: `src/main/java/org/courtside/payment/internal/PayPalCheckout.java#create`, `src/main/java/org/courtside/payment/internal/PayPalCheckout.java#cancel`, `src/main/java/org/courtside/payment/internal/PayPalCheckout.java#owned`, `src/main/java/org/courtside/payment/internal/PayPalCheckout.java#signedIn`, `src/main/java/org/courtside/payment/web/PayPalCheckoutController.java#capturePayPalOrder`.
+
+Positive tests: `src/test/java/org/courtside/payment/PayPalCheckoutTest.java#givenAnApprovedOrder_whenTheBookerReturns_thenTheBookingIsConfirmedWithTwoLedgerEntries`, `src/test/java/org/courtside/payment/PayPalCheckoutTest.java#givenAnAbandonedPayment_whenCancelled_thenTheCourtIsFreeAtOnce`.
+
+Negative tests: `src/test/java/org/courtside/payment/PayPalCheckoutTest.java#givenAnotherAccount_whenCapturingOrCancelling_thenTheOrderIsNotFound`, `src/test/java/org/courtside/payment/PayPalCheckoutTest.java#givenNoSession_whenCreatingAnOrder_thenItIsUnauthenticated`.
 
 ### Guardian delegation
 

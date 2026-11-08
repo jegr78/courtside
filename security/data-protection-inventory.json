@@ -47,6 +47,11 @@
       "class": "identifier"
     },
     {
+      "name": "orderId",
+      "in": "path",
+      "class": "identifier"
+    },
+    {
       "name": "id",
       "in": "path",
       "class": "identifier"
@@ -2540,6 +2545,10 @@
         "lifecycle": "payment-provider"
       },
       "amount_minor": {
+        "level": "operational",
+        "lifecycle": "payment-provider"
+      },
+      "approve_url": {
         "level": "operational",
         "lifecycle": "payment-provider"
       },

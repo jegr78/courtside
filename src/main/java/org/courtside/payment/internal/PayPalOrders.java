@@ -1,0 +1,80 @@
+package org.courtside.payment.internal;
+
+import lombok.RequiredArgsConstructor;
+import org.courtside.payment.PayPalEnvironment;
+import org.jspecify.annotations.Nullable;
+import org.springframework.jdbc.core.RowMapper;
+import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.stereotype.Component;
+
+import java.net.URI;
+import java.sql.Timestamp;
+import java.time.Clock;
+import java.util.Currency;
+import java.util.Optional;
+import java.util.UUID;
+
+@Component
+@RequiredArgsConstructor
+class PayPalOrders {
+
+    private static final String COLUMNS = """
+            SELECT order_id, booking_id, account_id, environment, amount_minor, currency, status, approve_url
+            FROM paypal_order
+            """;
+    private static final RowMapper<StoredOrder> ROW = (rs, n) -> new StoredOrder(rs.getString(1),
+            rs.getObject(2, UUID.class), rs.getObject(3, UUID.class), PayPalEnvironment.valueOf(rs.getString(4)),
+            rs.getInt(5), Currency.getInstance(rs.getString(6)), Status.valueOf(rs.getString(7)),
+            URI.create(rs.getString(8)));
+
+    private final JdbcClient jdbc;
+    private final Clock clock;
+
+    /** Stores a new order; false when the booking or the order id already has one. */
+    boolean insert(StoredOrder order) {
+        Timestamp now = Timestamp.from(clock.instant());
+        return jdbc.sql("""
+                        INSERT INTO paypal_order (order_id, booking_id, account_id, environment, amount_minor, currency,
+                                                  status, approve_url, created_at, updated_at)
+                        VALUES (:order, :booking, :account, :environment, :amount, :currency, :status, :approve,
+                                :now, :now)
+                        ON CONFLICT DO NOTHING
+                        """)
+                .param("order", order.orderId()).param("booking", order.bookingId())
+                .param("account", order.accountId()).param("environment", order.environment().name())
+                .param("amount", order.amountMinor()).param("currency", order.currency().getCurrencyCode())
+                .param("status", order.status().name()).param("approve", order.approveUrl().toString())
+                .param("now", now).update() == 1;
+    }
+
+    Optional<StoredOrder> find(String orderId) {
+        return jdbc.sql(COLUMNS + "WHERE order_id = :order").param("order", orderId).query(ROW).optional();
+    }
+
+    Optional<StoredOrder> ofBooking(UUID bookingId) {
+        return jdbc.sql(COLUMNS + "WHERE booking_id = :booking").param("booking", bookingId).query(ROW).optional();
+    }
+
+    /** Reads the order and holds its row until the caller's transaction ends. */
+    Optional<StoredOrder> lock(String orderId) {
+        return jdbc.sql(COLUMNS + "WHERE order_id = :order FOR UPDATE").param("order", orderId).query(ROW)
+                .optional();
+    }
+
+    void mark(String orderId, Status status, @Nullable String captureId) {
+        jdbc.sql("""
+                        UPDATE paypal_order
+                        SET status = :status, capture_id = coalesce(CAST(:capture AS text), capture_id),
+                            updated_at = :now
+                        WHERE order_id = :order
+                        """)
+                .param("order", orderId).param("status", status.name()).param("capture", captureId)
+                .param("now", Timestamp.from(clock.instant())).update();
+    }
+
+    enum Status { CREATED, CAPTURED, LATE_CAPTURED, REJECTED, VOIDED }
+
+    record StoredOrder(String orderId, UUID bookingId, UUID accountId, PayPalEnvironment environment, int amountMinor,
+                       Currency currency, Status status, URI approveUrl) {
+    }
+}

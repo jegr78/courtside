@@ -162,6 +162,37 @@ class PayPalClientTest {
     }
 
     @Test
+    void givenACaptureAnswerWithoutAUnitAmount_whenCapturing_thenTheCapturedAmountIsRead() throws IOException {
+        // given
+        reply("POST /v1/oauth2/token", 200, TOKEN);
+        reply("POST /v2/checkout/orders/ORD1/capture", 201, "{\"id\":\"ORD1\",\"status\":\"COMPLETED\","
+                + "\"purchase_units\":[{\"payments\":{\"captures\":[{\"id\":\"CAP1\",\"status\":\"COMPLETED\","
+                + "\"amount\":{\"currency_code\":\"EUR\",\"value\":\"12.34\"}}]}}]}");
+        PayPalClient client = client(Duration.ofSeconds(2));
+
+        // when
+        PayPalClient.Capture capture = client.captureOrder(credentials(), "ORD1");
+
+        // then
+        assertThat(capture).as("a capture answer may leave the unit amount out")
+                .isEqualTo(new PayPalClient.Capture("CAP1", "COMPLETED", 1234, "EUR"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {0, -1})
+    void givenANonPositiveAmount_whenCreatingAnOrder_thenItIsACallerBugAndNothingIsSent(int amount)
+            throws IOException {
+        // given
+        PayPalClient client = client(Duration.ofSeconds(2));
+
+        // when / then
+        assertThatThrownBy(() -> client.createOrder(credentials(), UUID.randomUUID(), amount, EUR, RETURN, CANCEL))
+                .as("an amount the caller should never have computed is a bug, not PayPal's refusal")
+                .isInstanceOf(IllegalStateException.class);
+        assertThat(seen).isEmpty();
+    }
+
+    @Test
     void givenAnotherClientError_whenCapturing_thenTheReasonIsPayPalsBoundedPrintableName() throws IOException {
         // given
         reply("POST /v1/oauth2/token", 200, TOKEN);

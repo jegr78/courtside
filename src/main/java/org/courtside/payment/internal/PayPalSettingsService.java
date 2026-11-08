@@ -108,19 +108,28 @@ public class PayPalSettingsService {
     }
 
     public PayPalConnectionCheck.Result check() {
-        Optional<Credentials> credentials = jdbc.sql("""
-                        SELECT environment, client_id, secret_ciphertext FROM paypal_settings
-                        WHERE secret_ciphertext IS NOT NULL
-                        """)
-                .query((rs, n) -> new Credentials(PayPalEnvironment.valueOf(rs.getString(1)), rs.getString(2),
-                        rs.getString(3)))
-                .optional();
-        if (credentials.isEmpty()) return new PayPalConnectionCheck.Result(PayPalConnectionCheck.Outcome.NOT_CONFIGURED,
+        Optional<PayPalClient.Credentials> stored = credentials(false);
+        if (stored.isEmpty()) return new PayPalConnectionCheck.Result(PayPalConnectionCheck.Outcome.NOT_CONFIGURED,
                 null);
-        Credentials stored = credentials.get();
-        String secret = new String(secrets.decrypt(PayPalStoredSecret.PURPOSE, stored.encryptedSecret()),
-                StandardCharsets.UTF_8);
-        return connection.check(stored.environment(), stored.clientId(), secret);
+        PayPalClient.Credentials credentials = stored.get();
+        return connection.check(credentials.environment(), credentials.clientId(), credentials.secret());
+    }
+
+    /** The decrypted credentials while PayPal payment is switched on. */
+    Optional<PayPalClient.Credentials> activeCredentials() {
+        return credentials(true);
+    }
+
+    private Optional<PayPalClient.Credentials> credentials(boolean enabledOnly) {
+        return jdbc.sql("""
+                        SELECT environment, client_id, secret_ciphertext FROM paypal_settings
+                        WHERE secret_ciphertext IS NOT NULL AND (enabled OR NOT :enabledOnly)
+                        """)
+                .param("enabledOnly", enabledOnly)
+                .query((rs, n) -> new PayPalClient.Credentials(PayPalEnvironment.valueOf(rs.getString(1)),
+                        rs.getString(2), new String(secrets.decrypt(PayPalStoredSecret.PURPOSE, rs.getString(3)),
+                        StandardCharsets.UTF_8)))
+                .optional();
     }
 
     private String encrypted(String secret) {
@@ -144,8 +153,5 @@ public class PayPalSettingsService {
 
     private record Row(UUID id, String clientId, PayPalEnvironment environment, boolean enabled,
                        @Nullable Instant secretStoredAt) {
-    }
-
-    private record Credentials(PayPalEnvironment environment, String clientId, String encryptedSecret) {
     }
 }

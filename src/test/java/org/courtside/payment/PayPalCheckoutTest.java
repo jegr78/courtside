@@ -1,0 +1,746 @@
+package org.courtside.payment;
+
+import com.sun.net.httpserver.HttpServer;
+import org.courtside.AbstractIntegrationTest;
+import org.courtside.booking.BookingService;
+import org.courtside.booking.CreateBookingCommand;
+import org.courtside.booking.PendingPayments;
+import org.courtside.card.testfixture.CardTestFixture;
+import org.courtside.config.testfixture.ConfigTestFixture;
+import org.courtside.credit.testfixture.CreditTestFixture;
+import org.courtside.facility.testfixture.FacilityTestFixture;
+import org.courtside.identity.Role;
+import org.courtside.identity.testfixture.IdentityTestFixture;
+import org.courtside.payment.internal.PayPalCheckout;
+import org.courtside.payment.testfixture.PaymentTestFixture;
+import org.courtside.shared.OpeningWindow;
+import org.courtside.shared.TimeSlot;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.context.WebApplicationContext;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
+import java.time.DayOfWeek;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.LocalTime;
+import java.util.ArrayDeque;
+import java.util.Deque;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+@TestPropertySource(properties = {"courtside.public-url=https://courts.example.org",
+        "courtside.payment.paypal.request-timeout=1s"})
+@Import({FacilityTestFixture.class, IdentityTestFixture.class, CardTestFixture.class, ConfigTestFixture.class,
+        CreditTestFixture.class, PaymentTestFixture.class})
+class PayPalCheckoutTest extends AbstractIntegrationTest {
+
+    private static final ObjectMapper JSON = new ObjectMapper();
+    private static final String ORDER = "ORDER1";
+    private static final String APPROVE = "https://paypal.example.org/checkoutnow?token=ORDER1";
+    private static final String TOKEN = "POST /sandbox/v1/oauth2/token";
+    private static final String CREATE = "POST /sandbox/v2/checkout/orders";
+    private static final String READ = "GET /sandbox/v2/checkout/orders/" + ORDER;
+    private static final String CAPTURE = "POST /sandbox/v2/checkout/orders/" + ORDER + "/capture";
+    private static final Instant TOMORROW_AFTERNOON = Instant.parse("2026-05-13T16:00:00Z");
+    private static final FakePayPal PAYPAL = new FakePayPal();
+
+    @Autowired
+    private WebApplicationContext context;
+    @Autowired
+    private UserDetailsService userDetails;
+    @Autowired
+    private BookingService bookingService;
+    @Autowired
+    private PendingPayments pendingPayments;
+    @Autowired
+    private PayPalCheckout checkout;
+    @Autowired
+    private FacilityTestFixture facility;
+    @Autowired
+    private IdentityTestFixture identity;
+    @Autowired
+    private CardTestFixture cards;
+    @Autowired
+    private ConfigTestFixture config;
+    @Autowired
+    private CreditTestFixture credit;
+    @Autowired
+    private PaymentTestFixture payment;
+    @Autowired
+    private JdbcClient jdbc;
+
+    private MockMvc mockMvc;
+    private UUID courtId;
+    private UUID johnPerson;
+    private UUID johnAccount;
+    private UUID winterHall;
+
+    @DynamicPropertySource
+    static void endpoints(DynamicPropertyRegistry registry) {
+        String base = "http://127.0.0.1:" + PAYPAL.port();
+        registry.add("courtside.payment.paypal.sandbox-endpoint", () -> base + "/sandbox");
+        registry.add("courtside.payment.paypal.live-endpoint", () -> base + "/live");
+    }
+
+    @AfterAll
+    static void stop() {
+        PAYPAL.stop();
+    }
+
+    @BeforeEach
+    void setUp() {
+        PAYPAL.reset();
+        PAYPAL.reply(TOKEN, 200, "{\"access_token\":\"token-1\",\"expires_in\":3600}");
+        PAYPAL.reply("POST /live/v1/oauth2/token", 200, "{\"access_token\":\"token-2\",\"expires_in\":3600}");
+        mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
+        courtId = facility.createCourt(1, "Court 1");
+        for (DayOfWeek day : DayOfWeek.values()) {
+            facility.setOpeningHours(day, new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0)));
+        }
+        johnPerson = identity.createPerson("John", "Roe", "john.roe@example.org");
+        johnAccount = identity.createEnabledAccount(johnPerson, "roe.john", Set.of(Role.EXTERNAL));
+        identity.createEnabledAccount(identity.createPerson("Jane", "Doe", "jane.doe@example.org"), "doe.jane",
+                Set.of(Role.EXTERNAL));
+        config.admitExternalBookings(true);
+        winterHall = cards.createBookingCard("Winter hall", Set.of(Role.EXTERNAL, Role.MEMBER), Set.of());
+        cards.priceForExternals(winterHall, 1500);
+        payment.storePayPalCredentials("SANDBOX", "client-sandbox", "paypal-secret-value");
+    }
+
+    @Test
+    void givenAPendingBooking_whenTheOrderIsCreated_thenItCarriesTheServerAmountAndTheBookingId() throws Exception {
+        // given
+        UUID booking = book();
+        PAYPAL.reply(CREATE, 201, order("PAYER_ACTION_REQUIRED", booking, "15.00", null));
+
+        // when
+        create("roe.john", booking)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.orderId").value(ORDER))
+                .andExpect(jsonPath("$.approveUrl").value(APPROVE));
+
+        // then
+        Seen request = PAYPAL.only(CREATE);
+        JsonNode unit = request.json().get("purchase_units").get(0);
+        assertThat(unit.get("custom_id").asString()).as("PayPal carries the booking id back").isEqualTo(booking.toString());
+        assertThat(unit.get("amount").get("value").asString()).isEqualTo("15.00");
+        assertThat(unit.get("amount").get("currency_code").asString()).isEqualTo("EUR");
+        JsonNode experience = request.json().get("payment_source").get("paypal").get("experience_context");
+        assertThat(experience.get("return_url").asString()).isEqualTo("https://courts.example.org/payment/paypal/return");
+        assertThat(experience.get("cancel_url").asString()).isEqualTo("https://courts.example.org/payment/paypal/cancel");
+        assertThat(request.header("PayPal-Request-Id")).as("PayPal deduplicates a retried create")
+                .isEqualTo(booking.toString());
+        assertThat(order()).isEqualTo(Map.of("booking_id", booking, "account_id", johnAccount,
+                "environment", "SANDBOX", "amount_minor", 1500, "currency", "EUR", "status", "CREATED"));
+        assertThat(audit("payment.paypal.order.created", booking)).singleElement().satisfies(payload -> {
+            assertThat(payload.get("orderId").asString()).isEqualTo(ORDER);
+            assertThat(payload.get("amountMinor").asInt()).isEqualTo(1500);
+            assertThat(payload.get("environment").asString()).isEqualTo("SANDBOX");
+        });
+    }
+
+    @Test
+    void givenAnOrderExists_whenCreatingAgain_thenTheSameApproveUrlComes() throws Exception {
+        // given
+        UUID booking = book();
+        PAYPAL.reply(CREATE, 201, order("PAYER_ACTION_REQUIRED", booking, "15.00", null));
+        create("roe.john", booking).andExpect(status().isOk());
+
+        // when
+        create("roe.john", booking)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.orderId").value(ORDER))
+                .andExpect(jsonPath("$.approveUrl").value(APPROVE));
+
+        // then
+        assertThat(PAYPAL.seen(CREATE)).as("one booking gets one PayPal order").hasSize(1);
+        assertThat(audit("payment.paypal.order.created", booking)).hasSize(1);
+    }
+
+    @Test
+    void givenThePriceChangedAfterBooking_whenTheOrderIsCreated_thenItCarriesTheStoredAmount() throws Exception {
+        // given
+        UUID booking = book();
+        cards.priceForExternals(winterHall, 2500);
+        PAYPAL.reply(CREATE, 201, order("PAYER_ACTION_REQUIRED", booking, "15.00", null));
+
+        // when
+        create("roe.john", booking).andExpect(status().isOk());
+
+        // then
+        JsonNode amount = PAYPAL.only(CREATE).json().get("purchase_units").get(0).get("amount");
+        assertThat(amount.get("value").asString()).as("the booking's stored amount, not today's price")
+                .isEqualTo("15.00");
+    }
+
+    @Test
+    void givenARequestNamingAnAmount_whenTheOrderIsCreated_thenItIsRefusedAndNothingReachesPayPal() throws Exception {
+        // given
+        UUID booking = book();
+
+        // when
+        mockMvc.perform(post("/api/payments/paypal/orders").with(csrf()).with(user(account("roe.john")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"bookingId\":\"" + booking + "\",\"amountMinor\":1}"))
+
+                // then
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:validation-failed"));
+        assertThat(PAYPAL.seen(CREATE)).isEmpty();
+    }
+
+    @Test
+    void givenAnApprovedOrder_whenTheBookerReturns_thenTheBookingIsConfirmedWithTwoLedgerEntries() throws Exception {
+        // given
+        UUID booking = bookWithOrder();
+        PAYPAL.reply(READ, 200, order("APPROVED", booking, "15.00", null));
+        PAYPAL.reply(CAPTURE, 201, order("COMPLETED", booking, "15.00", capture("COMPLETED", "15.00")));
+
+        // when
+        capture("roe.john")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.bookingId").value(booking.toString()))
+                .andExpect(jsonPath("$.outcome").value("CONFIRMED"));
+
+        // then
+        assertThat(bookingStatus(booking)).isEqualTo("CONFIRMED");
+        assertThat(entries(booking)).as("the payment and the debit leave the balance unchanged")
+                .containsExactlyInAnyOrder(Map.of("kind", "PAYPAL_PAYMENT", "amount_minor", 1500),
+                        Map.of("kind", "BOOKING_DEBIT", "amount_minor", -1500));
+        assertThat(credit.balance(johnAccount)).isZero();
+        assertThat(orderStatus()).isEqualTo("CAPTURED");
+        assertThat(jdbc.sql("SELECT capture_id FROM paypal_order").query(String.class).single()).isEqualTo("CAPTURE1");
+        assertThat(audit("payment.paypal.captured", booking)).singleElement()
+                .satisfies(payload -> assertThat(payload.get("captureId").asString()).isEqualTo("CAPTURE1"));
+        assertThat(audit("booking.booking.confirmed", booking)).hasSize(1);
+    }
+
+    @Test
+    void givenTwoConcurrentReturns_whenBothCapture_thenOneConfirmationAndOnePayPalPayment() throws Exception {
+        // given
+        UUID booking = bookWithOrder();
+        PAYPAL.reply(READ, 200, order("APPROVED", booking, "15.00", null));
+        PAYPAL.reply(CAPTURE, 201, order("COMPLETED", booking, "15.00", capture("COMPLETED", "15.00")));
+        PAYPAL.holdUntilBothArrive(CAPTURE);
+
+        // when
+        CompletableFuture<String> first = CompletableFuture.supplyAsync(this::captureOutcome);
+        CompletableFuture<String> second = CompletableFuture.supplyAsync(this::captureOutcome);
+
+        // then
+        assertThat(List.of(first.get(10, TimeUnit.SECONDS), second.get(10, TimeUnit.SECONDS)))
+                .as("both returns show the confirmed booking").containsExactly("CONFIRMED", "CONFIRMED");
+        assertThat(PAYPAL.seen(CAPTURE)).as("both returns did reach PayPal at once").hasSize(2);
+        assertThat(entries(booking)).as("one PayPal payment for one order")
+                .containsExactlyInAnyOrder(Map.of("kind", "PAYPAL_PAYMENT", "amount_minor", 1500),
+                        Map.of("kind", "BOOKING_DEBIT", "amount_minor", -1500));
+        assertThat(audit("booking.booking.confirmed", booking)).hasSize(1);
+        assertThat(audit("payment.paypal.captured", booking)).hasSize(1);
+    }
+
+    @Test
+    void givenAMismatchedAmount_whenCapturing_thenNothingIsCapturedAndTheCourtIsFree() throws Exception {
+        // given
+        UUID booking = bookWithOrder();
+        PAYPAL.reply(READ, 200, order("APPROVED", booking, "1.00", null));
+
+        // when
+        capture("roe.john")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.outcome").value("REJECTED"));
+
+        // then
+        assertThat(PAYPAL.seen(CAPTURE)).as("no money moves on a mismatch").isEmpty();
+        assertThat(bookingStatus(booking)).isEqualTo("CANCELLED");
+        assertThat(allocationStatus(booking)).as("the court is free").isEqualTo("CANCELLED");
+        assertThat(orderStatus()).isEqualTo("REJECTED");
+        assertThat(entries(booking)).isEmpty();
+        assertThat(audit("payment.paypal.rejected", booking)).singleElement()
+                .satisfies(payload -> assertThat(payload.get("reason").asString()).isEqualTo("AMOUNT_MISMATCH"));
+    }
+
+    @Test
+    void givenAnotherBookingsOrder_whenCapturing_thenItIsRejectedBeforeAnyCapture() throws Exception {
+        // given
+        UUID booking = bookWithOrder();
+        PAYPAL.reply(READ, 200, order("APPROVED", UUID.randomUUID(), "15.00", null));
+
+        // when
+        capture("roe.john").andExpect(jsonPath("$.outcome").value("REJECTED"));
+
+        // then
+        assertThat(PAYPAL.seen(CAPTURE)).isEmpty();
+        assertThat(bookingStatus(booking)).isEqualTo("CANCELLED");
+        assertThat(audit("payment.paypal.rejected", booking)).singleElement()
+                .satisfies(payload -> assertThat(payload.get("reason").asString()).isEqualTo("BOOKING_MISMATCH"));
+    }
+
+    @Test
+    void givenACaptureOfAnotherAmount_whenCapturing_thenTheBookingIsReleasedAndTheCaptureBecomesCredit()
+            throws Exception {
+        // given
+        UUID booking = bookWithOrder();
+        PAYPAL.reply(READ, 200, order("APPROVED", booking, "15.00", null));
+        PAYPAL.reply(CAPTURE, 201, order("COMPLETED", booking, "15.00", capture("COMPLETED", "14.00")));
+
+        // when
+        capture("roe.john").andExpect(jsonPath("$.outcome").value("LATE_CREDITED"));
+
+        // then
+        assertThat(bookingStatus(booking)).as("a booking is confirmed only for its own amount").isEqualTo("CANCELLED");
+        assertThat(entries(booking)).as("the money is never neither a booking nor credit")
+                .containsExactly(Map.of("kind", "PAYPAL_LATE_CAPTURE", "amount_minor", 1400));
+        assertThat(orderStatus()).isEqualTo("LATE_CAPTURED");
+    }
+
+    @Test
+    void givenAnOrderCompletedForAnotherAmount_whenCapturing_thenTheCapturedMoneyBecomesCredit() throws Exception {
+        // given
+        UUID booking = bookWithOrder();
+        PAYPAL.reply(READ, 200, order("COMPLETED", booking, "14.00", capture("COMPLETED", "14.00")));
+
+        // when
+        capture("roe.john").andExpect(jsonPath("$.outcome").value("LATE_CREDITED"));
+
+        // then
+        assertThat(bookingStatus(booking)).isEqualTo("CANCELLED");
+        assertThat(entries(booking)).as("money PayPal already moved is never refused into nothing")
+                .containsExactly(Map.of("kind", "PAYPAL_LATE_CAPTURE", "amount_minor", 1400));
+        assertThat(audit("payment.paypal.rejected", booking)).isEmpty();
+    }
+
+    @Test
+    void givenACaptureOfNothing_whenCapturing_thenTheOrderIsRecordedWithoutCredit() throws Exception {
+        // given
+        UUID booking = bookWithOrder();
+        PAYPAL.reply(READ, 200, order("APPROVED", booking, "15.00", null));
+        PAYPAL.reply(CAPTURE, 201, order("COMPLETED", booking, "15.00", capture("COMPLETED", "0.00")));
+
+        // when
+        capture("roe.john").andExpect(status().isOk()).andExpect(jsonPath("$.outcome").value("LATE_CREDITED"));
+
+        // then
+        assertThat(entries(booking)).as("a capture of nothing is no credit").isEmpty();
+        assertThat(orderStatus()).as("the capture is still recorded").isEqualTo("LATE_CAPTURED");
+        assertThat(bookingStatus(booking)).isEqualTo("CANCELLED");
+    }
+
+    @Test
+    void givenAReleasedBooking_whenItsOrderIsCaptured_thenTheAmountBecomesCredit() throws Exception {
+        // given
+        UUID booking = bookWithOrder();
+        assertThat(pendingPayments.release(booking)).isTrue();
+        PAYPAL.reply(READ, 200, order("APPROVED", booking, "15.00", null));
+        PAYPAL.reply(CAPTURE, 201, order("COMPLETED", booking, "15.00", capture("COMPLETED", "15.00")));
+
+        // when
+        capture("roe.john").andExpect(jsonPath("$.outcome").value("LATE_CREDITED"));
+
+        // then
+        assertThat(bookingStatus(booking)).isEqualTo("CANCELLED");
+        assertThat(entries(booking)).containsExactly(Map.of("kind", "PAYPAL_LATE_CAPTURE", "amount_minor", 1500));
+        assertThat(credit.balance(johnAccount)).isEqualTo(1500);
+        assertThat(orderStatus()).isEqualTo("LATE_CAPTURED");
+        assertThat(audit("payment.paypal.lateCapture", booking)).singleElement()
+                .satisfies(payload -> assertThat(payload.get("credited").asBoolean()).isTrue());
+        assertThat(audit("booking.booking.confirmed", booking)).isEmpty();
+    }
+
+    @Test
+    void givenAnAnonymisedBooker_whenALateCaptureArrives_thenTheOrderIsRecordedWithoutCredit() throws Exception {
+        // given
+        UUID booking = bookWithOrder();
+        assertThat(pendingPayments.release(booking)).isTrue();
+        jdbc.sql("UPDATE user_account SET anonymised_at = now(), enabled = false, password_hash = NULL WHERE id = :id")
+                .param("id", johnAccount).update();
+        PAYPAL.reply(READ, 200, order("APPROVED", booking, "15.00", null));
+        PAYPAL.reply(CAPTURE, 201, order("COMPLETED", booking, "15.00", capture("COMPLETED", "15.00")));
+
+        // when
+        PayPalCheckout.Settlement settlement = checkout.settle(ORDER);
+
+        // then
+        assertThat(settlement.outcome()).isEqualTo(PayPalCheckout.Outcome.LATE_CREDITED);
+        assertThat(entries(booking)).as("an anonymised account receives no credit").isEmpty();
+        assertThat(orderStatus()).as("the captured order stays on record for the treasurer").isEqualTo("LATE_CAPTURED");
+        assertThat(audit("payment.paypal.lateCapture", booking)).singleElement()
+                .satisfies(payload -> assertThat(payload.get("credited").asBoolean()).isFalse());
+    }
+
+    @Test
+    void givenTheJobAlreadyConfirmed_whenThePlayerReturns_thenTheReturnShowsTheConfirmedBooking() throws Exception {
+        // given
+        UUID booking = bookWithOrder();
+        PAYPAL.reply(READ, 200, order("APPROVED", booking, "15.00", null));
+        PAYPAL.reply(CAPTURE, 201, order("COMPLETED", booking, "15.00", capture("COMPLETED", "15.00")));
+        assertThat(checkout.settle(ORDER).outcome()).isEqualTo(PayPalCheckout.Outcome.CONFIRMED);
+        int calls = PAYPAL.all().size();
+
+        // when
+        capture("roe.john").andExpect(status().isOk()).andExpect(jsonPath("$.outcome").value("CONFIRMED"));
+
+        // then
+        assertThat(PAYPAL.all()).as("a settled order is answered from what is stored").hasSize(calls);
+        assertThat(entries(booking)).hasSize(2);
+    }
+
+    @Test
+    void givenAnOrderAlreadyCompletedAtPayPal_whenCapturing_thenItIsConfirmedWithoutASecondCapture() throws Exception {
+        // given
+        UUID booking = bookWithOrder();
+        PAYPAL.reply(READ, 200, order("COMPLETED", booking, "15.00", capture("COMPLETED", "15.00")));
+
+        // when
+        capture("roe.john").andExpect(jsonPath("$.outcome").value("CONFIRMED"));
+
+        // then
+        assertThat(PAYPAL.seen(CAPTURE)).isEmpty();
+        assertThat(bookingStatus(booking)).isEqualTo("CONFIRMED");
+    }
+
+    @Test
+    void givenACaptureTimeout_whenCapturing_thenTheOrderStaysOpenAndTheOutcomeIsProcessing() throws Exception {
+        // given
+        UUID booking = bookWithOrder();
+        PAYPAL.reply(READ, 200, order("APPROVED", booking, "15.00", null));
+        PAYPAL.replyAfter(CAPTURE, 201, order("COMPLETED", booking, "15.00", capture("COMPLETED", "15.00")),
+                Duration.ofSeconds(3));
+
+        // when
+        capture("roe.john").andExpect(status().isOk()).andExpect(jsonPath("$.outcome").value("PROCESSING"));
+
+        // then
+        assertThat(orderStatus()).as("the outcome is unknown, so the order is left for reconciliation")
+                .isEqualTo("CREATED");
+        assertThat(bookingStatus(booking)).as("the court stays held").isEqualTo("PENDING_PAYMENT");
+        assertThat(entries(booking)).isEmpty();
+    }
+
+    @Test
+    void givenAnOrderOfTheOtherEnvironment_whenCapturing_thenItIsNotCapturedWithTheCurrentCredentials()
+            throws Exception {
+        // given
+        UUID booking = bookWithOrder();
+        payment.switchPayPalEnvironment("LIVE");
+
+        // when
+        capture("roe.john").andExpect(status().isOk()).andExpect(jsonPath("$.outcome").value("PROCESSING"));
+
+        // then
+        assertThat(PAYPAL.all()).extracting(Seen::route)
+                .as("a sandbox order is never sent with live credentials")
+                .noneMatch(route -> route.startsWith("POST /live") || route.startsWith("GET /live"))
+                .doesNotContain(READ, CAPTURE);
+        assertThat(orderStatus()).isEqualTo("CREATED");
+        assertThat(bookingStatus(booking)).isEqualTo("PENDING_PAYMENT");
+    }
+
+    @Test
+    void givenAnotherAccount_whenCapturingOrCancelling_thenTheOrderIsNotFound() throws Exception {
+        // given
+        UUID booking = bookWithOrder();
+
+        // when
+        ResultActions capture = capture("doe.jane");
+        ResultActions cancel = cancel("doe.jane");
+        ResultActions create = create("doe.jane", booking);
+
+        // then
+        for (ResultActions answer : List.of(capture, cancel, create)) {
+            answer.andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.type").value("urn:courtside:error:paypal-order-not-found"));
+        }
+        assertThat(PAYPAL.seen(READ)).isEmpty();
+        assertThat(bookingStatus(booking)).isEqualTo("PENDING_PAYMENT");
+        assertThat(orderStatus()).isEqualTo("CREATED");
+    }
+
+    @Test
+    void givenNoSession_whenCreatingAnOrder_thenItIsUnauthenticated() throws Exception {
+        // when
+        mockMvc.perform(post("/api/payments/paypal/orders").with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"bookingId\":\"" + UUID.randomUUID() + "\"}"))
+
+                // then
+                .andExpect(status().isUnauthorized());
+        assertThat(PAYPAL.all()).isEmpty();
+    }
+
+    @Test
+    void givenAnAbandonedPayment_whenCancelled_thenTheCourtIsFreeAtOnce() throws Exception {
+        // given
+        UUID booking = bookWithOrder();
+
+        // when
+        cancel("roe.john").andExpect(status().isNoContent());
+
+        // then
+        assertThat(bookingStatus(booking)).isEqualTo("CANCELLED");
+        assertThat(allocationStatus(booking)).isEqualTo("CANCELLED");
+        assertThat(orderStatus()).isEqualTo("VOIDED");
+        cancel("roe.john").andExpect(status().isNoContent());
+        assertThat(audit("booking.payment.expired", booking)).as("a second cancel changes nothing").hasSize(1);
+        capture("roe.john").andExpect(jsonPath("$.outcome").value("REJECTED"));
+        assertThat(PAYPAL.seen(READ)).as("a voided order is never captured").isEmpty();
+    }
+
+    @Test
+    void givenACapturedOrder_whenCancelled_thenNothingChanges() throws Exception {
+        // given
+        UUID booking = bookWithOrder();
+        PAYPAL.reply(READ, 200, order("APPROVED", booking, "15.00", null));
+        PAYPAL.reply(CAPTURE, 201, order("COMPLETED", booking, "15.00", capture("COMPLETED", "15.00")));
+        capture("roe.john").andExpect(jsonPath("$.outcome").value("CONFIRMED"));
+
+        // when
+        cancel("roe.john").andExpect(status().isNoContent());
+
+        // then
+        assertThat(bookingStatus(booking)).isEqualTo("CONFIRMED");
+        assertThat(orderStatus()).isEqualTo("CAPTURED");
+    }
+
+    @Test
+    void givenPayPalSwitchedOnOrOff_whenTheBookerAsks_thenAvailabilitySaysSo() throws Exception {
+        // when
+        mockMvc.perform(get("/api/payments/paypal/availability").with(user(account("roe.john"))))
+
+                // then
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.available").value(true));
+        jdbc.sql("UPDATE paypal_settings SET enabled = false").update();
+        mockMvc.perform(get("/api/payments/paypal/availability").with(user(account("roe.john"))))
+                .andExpect(jsonPath("$.available").value(false));
+    }
+
+    private UUID book() {
+        return bookingService.create(new CreateBookingCommand(List.of(courtId), winterHall,
+                new TimeSlot(TOMORROW_AFTERNOON, TOMORROW_AFTERNOON.plus(Duration.ofHours(1))), johnAccount,
+                johnPerson, Set.of(Role.EXTERNAL), null, List.of(), null));
+    }
+
+    private UUID bookWithOrder() throws Exception {
+        UUID booking = book();
+        PAYPAL.reply(CREATE, 201, order("PAYER_ACTION_REQUIRED", booking, "15.00", null));
+        create("roe.john", booking).andExpect(status().isOk());
+        return booking;
+    }
+
+    private ResultActions create(String username, UUID booking) throws Exception {
+        return mockMvc.perform(post("/api/payments/paypal/orders").with(csrf()).with(user(account(username)))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"bookingId\":\"" + booking + "\"}"));
+    }
+
+    private ResultActions capture(String username) throws Exception {
+        return mockMvc.perform(post("/api/payments/paypal/orders/{orderId}/capture", ORDER).with(csrf())
+                .with(user(account(username))));
+    }
+
+    private ResultActions cancel(String username) throws Exception {
+        return mockMvc.perform(post("/api/payments/paypal/orders/{orderId}/cancel", ORDER).with(csrf())
+                .with(user(account(username))));
+    }
+
+    private String captureOutcome() {
+        try {
+            String body = capture("roe.john").andReturn().getResponse().getContentAsString();
+            return JSON.readTree(body).path("outcome").asString();
+        } catch (Exception failed) {
+            throw new IllegalStateException(failed);
+        }
+    }
+
+    private UserDetails account(String username) {
+        return userDetails.loadUserByUsername(username);
+    }
+
+    private Map<String, Object> order() {
+        return jdbc.sql("SELECT booking_id, account_id, environment, amount_minor, currency, status FROM paypal_order")
+                .query().singleRow();
+    }
+
+    private String orderStatus() {
+        return jdbc.sql("SELECT status FROM paypal_order").query(String.class).single();
+    }
+
+    private String bookingStatus(UUID booking) {
+        return jdbc.sql("SELECT status FROM booking WHERE id = :id").param("id", booking).query(String.class).single();
+    }
+
+    private String allocationStatus(UUID booking) {
+        return jdbc.sql("SELECT status FROM court_allocation WHERE booking_id = :id").param("id", booking)
+                .query(String.class).single();
+    }
+
+    private List<Map<String, Object>> entries(UUID booking) {
+        return jdbc.sql("SELECT kind, amount_minor FROM credit_entry WHERE booking_id = :booking")
+                .param("booking", booking).query().listOfRows();
+    }
+
+    private List<JsonNode> audit(String type, UUID booking) {
+        return jdbc.sql("SELECT payload FROM domain_event WHERE event_type = :type AND subject_id = :id")
+                .param("type", type).param("id", booking).query(String.class).list().stream()
+                .map(JSON::readTree).toList();
+    }
+
+    private static String order(String status, UUID booking, String value, String capture) {
+        String payments = capture == null ? "" : ",\"payments\":{\"captures\":[" + capture + "]}";
+        return "{\"id\":\"" + ORDER + "\",\"status\":\"" + status + "\",\"purchase_units\":[{\"custom_id\":\""
+                + booking + "\",\"amount\":{\"currency_code\":\"EUR\",\"value\":\"" + value + "\"}" + payments
+                + "}],\"links\":[{\"rel\":\"payer-action\",\"href\":\"" + APPROVE + "\"}]}";
+    }
+
+    private static String capture(String status, String value) {
+        return "{\"id\":\"CAPTURE1\",\"status\":\"" + status + "\",\"amount\":{\"currency_code\":\"EUR\",\"value\":\""
+                + value + "\"}}";
+    }
+
+    private record Reply(int status, String body, Duration delay) {
+    }
+
+    private record Seen(String route, Map<String, String> headers, String body) {
+
+        String header(String name) {
+            return headers.get(name.toLowerCase(java.util.Locale.ROOT));
+        }
+
+        JsonNode json() {
+            return JSON.readTree(body);
+        }
+    }
+
+    private static final class FakePayPal {
+
+        private final List<Seen> seen = new CopyOnWriteArrayList<>();
+        private final Map<String, Deque<Reply>> replies = new ConcurrentHashMap<>();
+        private final Map<String, CountDownLatch> held = new ConcurrentHashMap<>();
+        private final HttpServer server;
+
+        FakePayPal() {
+            try {
+                server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+            } catch (IOException failed) {
+                throw new UncheckedIOException(failed);
+            }
+            server.createContext("/", exchange -> {
+                String route = exchange.getRequestMethod() + " " + exchange.getRequestURI().getPath();
+                Map<String, String> headers = new ConcurrentHashMap<>();
+                exchange.getRequestHeaders().forEach((name, values) ->
+                        headers.put(name.toLowerCase(java.util.Locale.ROOT), String.join(",", values)));
+                seen.add(new Seen(route, headers,
+                        new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8)));
+                CountDownLatch together = held.get(route);
+                if (together != null) {
+                    together.countDown();
+                    await(together);
+                }
+                Reply reply = next(route);
+                try {
+                    Thread.sleep(reply.delay().toMillis());
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                }
+                byte[] answer = reply.body().getBytes(StandardCharsets.UTF_8);
+                try {
+                    exchange.sendResponseHeaders(reply.status(), answer.length);
+                    exchange.getResponseBody().write(answer);
+                } catch (IOException abandoned) {
+                    exchange.close();
+                    return;
+                }
+                exchange.close();
+            });
+            server.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
+            server.start();
+        }
+
+        int port() {
+            return server.getAddress().getPort();
+        }
+
+        void stop() {
+            server.stop(0);
+        }
+
+        void reset() {
+            seen.clear();
+            replies.clear();
+            held.clear();
+        }
+
+        void holdUntilBothArrive(String route) {
+            held.put(route, new CountDownLatch(2));
+        }
+
+        private static void await(CountDownLatch latch) {
+            try {
+                latch.await(5, TimeUnit.SECONDS);
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+            }
+        }
+
+        void reply(String route, int status, String body) {
+            replyAfter(route, status, body, Duration.ZERO);
+        }
+
+        void replyAfter(String route, int status, String body, Duration delay) {
+            replies.computeIfAbsent(route, key -> new ArrayDeque<>()).add(new Reply(status, body, delay));
+        }
+
+        List<Seen> all() {
+            return List.copyOf(seen);
+        }
+
+        List<Seen> seen(String route) {
+            return seen.stream().filter(request -> request.route().equals(route)).toList();
+        }
+
+        Seen only(String route) {
+            assertThat(seen(route)).as("exactly one request for %s", route).hasSize(1);
+            return seen(route).getFirst();
+        }
+
+        private synchronized Reply next(String route) {
+            Deque<Reply> queue = replies.get(route);
+            if (queue == null || queue.isEmpty()) return new Reply(404, "{}", Duration.ZERO);
+            return queue.size() > 1 ? queue.poll() : queue.peek();
+        }
+    }
+}

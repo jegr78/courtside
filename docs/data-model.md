@@ -458,7 +458,7 @@ booking an entry paid leaves the entry.
 | Table | Holds | References |
 |---|---|---|
 | `paypal_settings` | The club's PayPal client id, encrypted secret and since when it is stored, sandbox or live, whether PayPal payment is on, and when and by which account the row last changed | None |
-| `paypal_order` | One PayPal order per held booking: order id, booking, account, sandbox or live, amount in the minor unit, currency, status (`CREATED`, `CAPTURED`, `LATE_CAPTURED`, `REJECTED`, `VOIDED`), the capture id and when it was created and last changed | None |
+| `paypal_order` | One PayPal order per held booking: order id, booking, account, sandbox or live, amount in the minor unit, currency, status (`CREATED`, `CAPTURED`, `LATE_CAPTURED`, `REJECTED`, `VOIDED`), the capture id, the address PayPal sends the payer to for approval, and when it was created and last changed | None |
 
 `paypal_settings_single_row` keeps at most one row, and removing the credentials deletes it.
 `paypal_settings_secret_stored` keeps the ciphertext and its timestamp together, and

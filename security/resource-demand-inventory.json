@@ -60,11 +60,12 @@
     {
       "id": "ordinary-http",
       "kind": "ordinary",
-      "rationale": "These operations perform bounded single-record work or bounded page and calendar reads; their contract limits do not grow into a separate resource-demand decision. MFA administration reads two flags or changes one account state; TOTP setup encrypts one 160-bit key, recovery-code replacement generates ten verifiers and credential renaming/removal addresses one holder-owned record. The access-grant overview reads at most 100 grants and the probe kept in memory, a retry locks one grant row and a connection-check request only sets two flags and wakes the access worker, and reading the latest connection check reads it from memory; none of them calls the access-control system. The occupancy signal reads one key row and one grouped query over the next 24 hours of allocations, answering at most two lines per active court; the occupancy-key administration reads, replaces or deletes that one row. A credit ledger page reads at most 100 entries, a treasury search at most 20 accounts and the balance list only the accounts that hold credit; recording an entry locks one account row and appends one entry. The PayPal settings read, replace or delete one row and encrypt at most one secret of 500 characters; none of them calls PayPal.",
+      "rationale": "These operations perform bounded single-record work or bounded page and calendar reads; their contract limits do not grow into a separate resource-demand decision. MFA administration reads two flags or changes one account state; TOTP setup encrypts one 160-bit key, recovery-code replacement generates ten verifiers and credential renaming/removal addresses one holder-owned record. The access-grant overview reads at most 100 grants and the probe kept in memory, a retry locks one grant row and a connection-check request only sets two flags and wakes the access worker, and reading the latest connection check reads it from memory; none of them calls the access-control system. The occupancy signal reads one key row and one grouped query over the next 24 hours of allocations, answering at most two lines per active court; the occupancy-key administration reads, replaces or deletes that one row. A credit ledger page reads at most 100 entries, a treasury search at most 20 accounts and the balance list only the accounts that hold credit; recording an entry locks one account row and appends one entry. The PayPal settings read, replace or delete one row and encrypt at most one secret of 500 characters; none of them calls PayPal. Reading whether PayPal payment is available reads one settings row, and cancelling an unpaid PayPal order locks that order and its booking and frees the court; neither calls PayPal.",
       "entryPoints": [
         "addMembershipPeriod",
         "assignMembership",
         "beginTotpEnrollment",
+        "cancelPayPalOrder",
         "changeAccessPoint",
         "changeAccountLocale",
         "changeAccountRoles",
@@ -207,6 +208,7 @@
         "listCreditEntries",
         "recordCreditEntry",
         "searchCreditAccounts",
+        "getPayPalAvailability",
         "getPayPalSettings",
         "savePayPalSettings",
         "removePayPalCredentials"
@@ -623,6 +625,32 @@
       "evidence": [
         "src/test/java/org/courtside/payment/internal/PayPalConnectionCheckTest.java#givenAProviderThatNeverAnswers_whenChecking_thenTheCheckGivesUpAsUnreachable",
         "src/test/java/org/courtside/payment/PayPalSettingsTest.java#givenAWrongSecret_whenChecking_thenPayPalsReasonIsReported",
+        "src/test/java/org/courtside/shared/web/AdmissionPlanTest.java#whenLoadingTheShippedPlan_thenEveryDemandingClassHasItsDecidedCostAndBulkhead"
+      ]
+    },
+    {
+      "id": "payment-provider-checkout",
+      "kind": "demanding",
+      "entryPoints": [
+        "capturePayPalOrder",
+        "createPayPalOrder"
+      ],
+      "growthDrivers": "At most four outbound requests to PayPal per call (token, create or read, capture, read after a refused capture); the work does not grow with club data.",
+      "inputOrDataBound": "The request carries a booking id or a path-bounded order id of at most 64 characters. Each PayPal answer is read up to 64 KiB.",
+      "concurrencyOrRateBound": "Only the signed-in booker of a held booking reaches PayPal, an account holds at most one pending booking, and each call spends 2 tokens of the caller's request budget.",
+      "executionModel": "Every PayPal call runs synchronously in the request thread outside any transaction; the order row, the grid lock and the booking row are locked only in the short transaction that follows the capture.",
+      "failureBehavior": "A refused or unreachable create answers urn:courtside:error:paypal-unavailable and stores nothing. A capture whose outcome is unknown answers PROCESSING and leaves the order open, so the court stays held until it is settled or released.",
+      "consumerTimeoutBehavior": "Each PayPal request has its own 10-second deadline, the connection timeout included. The reference proxy sets no response deadline, and repeating either call is safe because a booking has one order and a settled order is answered from what is stored.",
+      "productionPaths": [
+        "src/main/java/org/courtside/payment/internal/PayPalCheckout.java",
+        "src/main/java/org/courtside/payment/internal/PayPalClient.java",
+        "src/main/java/org/courtside/payment/internal/PayPalOrders.java",
+        "src/main/resources/application.yaml",
+        "src/main/java/org/courtside/shared/web/AdmissionControl.java"
+      ],
+      "evidence": [
+        "src/test/java/org/courtside/payment/PayPalCheckoutTest.java#givenACaptureTimeout_whenCapturing_thenTheOrderStaysOpenAndTheOutcomeIsProcessing",
+        "src/test/java/org/courtside/payment/PayPalCheckoutTest.java#givenAnOrderExists_whenCreatingAgain_thenTheSameApproveUrlComes",
         "src/test/java/org/courtside/shared/web/AdmissionPlanTest.java#whenLoadingTheShippedPlan_thenEveryDemandingClassHasItsDecidedCostAndBulkhead"
       ]
     },

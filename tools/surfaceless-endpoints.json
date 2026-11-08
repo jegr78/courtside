@@ -10,5 +10,9 @@
   "getBookingCard": "The admin list already answers with every field of every one of these, active or not, so a second call would fetch what the page is already holding.",
   "getParticipantCard": "The admin list already answers with every field of every one of these, active or not, so a second call would fetch what the page is already holding.",
   "getRuleSet": "The admin list already answers with every field of every rule set, active or not, so a second call would fetch what the page is already holding.",
-  "getCourtOccupancy": "Building automation polls this with the occupancy key; the board's page creates the key and shows the address, and no view reads occupancy through it."
+  "getCourtOccupancy": "Building automation polls this with the occupancy key; the board's page creates the key and shows the address, and no view reads occupancy through it.",
+  "getPayPalAvailability": "No view starts a PayPal payment yet; the booking dialog and the return and cancel pages that call this are still to come.",
+  "createPayPalOrder": "No view starts a PayPal payment yet; the booking dialog and the return and cancel pages that call this are still to come.",
+  "capturePayPalOrder": "No view starts a PayPal payment yet; the booking dialog and the return and cancel pages that call this are still to come.",
+  "cancelPayPalOrder": "No view starts a PayPal payment yet; the booking dialog and the return and cancel pages that call this are still to come."
 }

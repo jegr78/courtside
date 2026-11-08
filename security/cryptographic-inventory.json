@@ -233,6 +233,32 @@
       ]
     },
     {
+      "id": "paypal-token-cache-key",
+      "purpose": "Key the in-memory cache of PayPal access tokens by the credentials that obtained them, without keeping the secret as a map key",
+      "algorithm": "SHA-256",
+      "implementation": "java-runtime",
+      "strength": {
+        "decidedBy": "repository",
+        "bits": 128,
+        "basis": "The collision resistance of SHA-256's 256-bit output, so a changed secret never reuses a token another secret obtained. The digest is not offered as protection of the secret; it never leaves application memory."
+      },
+      "class": "pseudonymisation",
+      "owner": "club-operator",
+      "storageBoundary": "Application memory only, as part of the cache key next to the environment and client id. It is never stored, logged or sent.",
+      "permittedUse": "Telling apart cached PayPal tokens of different credentials. It is not an authenticator and authorises nothing.",
+      "rotation": "Not applicable: no key exists. A new secret yields a new cache key and a new token.",
+      "revocation": "Not applicable. A token PayPal refuses is dropped from the cache and requested again once.",
+      "recovery": "None is needed: the cache is rebuilt on demand.",
+      "retirement": "Replacing the digest only changes cache keys, which last until the instance restarts.",
+      "evidence": "src/test/java/org/courtside/payment/internal/PayPalClientTest.java",
+      "detects": [
+        "MessageDigest"
+      ],
+      "locations": [
+        "src/main/java/org/courtside/payment/internal/PayPalClient.java"
+      ]
+    },
+    {
       "id": "mfa-recovery-code",
       "purpose": "Replace one second-factor proof or authorize controlled recovery after an external identity check",
       "algorithm": "SecureRandom",

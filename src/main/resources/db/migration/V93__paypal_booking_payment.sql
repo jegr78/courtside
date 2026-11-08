@@ -44,6 +44,7 @@ CREATE TABLE paypal_order (
     currency text NOT NULL,
     status text NOT NULL,
     capture_id text,
+    approve_url text NOT NULL,
     created_at timestamptz NOT NULL,
     updated_at timestamptz NOT NULL,
     CONSTRAINT paypal_order_environment CHECK (environment IN ('SANDBOX', 'LIVE')),

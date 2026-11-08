@@ -156,6 +156,7 @@ courtside:
       logo-normalization: { cost: 10, concurrency: 1 }
       global-session-revocation: { cost: 5, concurrency: 1 }
       payment-provider-check: { cost: 5, concurrency: 1 }
+      payment-provider-checkout: { cost: 2 }
   access-control:
     connector: ${COURTSIDE_ACCESS_CONTROL_CONNECTOR:none}
     call-deadline: ${COURTSIDE_ACCESS_CONTROL_CALL_DEADLINE:15s}

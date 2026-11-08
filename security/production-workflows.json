@@ -936,6 +936,57 @@
       ]
     },
     {
+      "id": "paypal-checkout",
+      "actors": [
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN",
+        "EXTERNAL"
+      ],
+      "entryPoints": "Whether PayPal payment is available under /api/payments/paypal/availability, and the PayPal order of a booking that awaits payment under /api/payments/paypal/orders.",
+      "operationIds": [
+        "getPayPalAvailability",
+        "createPayPalOrder",
+        "capturePayPalOrder",
+        "cancelPayPalOrder"
+      ],
+      "backgroundEntryPoints": [],
+      "stateTransitions": [
+        "The booker of a pending booking creates one PayPal order carrying the booking id and the amount stored with the booking, and one audit entry.",
+        "A capture verifies the order at PayPal, captures it outside any transaction and then, under the order row lock, confirms the booking and records the PayPal payment and the booking debit once.",
+        "A capture that finds the booking no longer pending, or a captured amount that differs, releases the booking and credits the captured amount to the booker.",
+        "Cancelling an unpaid order voids it and releases its booking at once."
+      ],
+      "alternatePaths": [
+        "Creating again for the same booking answers the stored order.",
+        "A settled order is answered from what is stored without calling PayPal.",
+        "An order PayPal reports as already completed is confirmed from its capture without a second capture."
+      ],
+      "failurePaths": [
+        "An order or booking of another account is answered as not found.",
+        "A mismatch of booking id, amount or currency refuses the capture, releases the booking and records the reason; no money moves.",
+        "A capture whose outcome is unknown, or an order of credentials that are no longer active, leaves the order open and answers PROCESSING.",
+        "Without a public address the order is refused with paypal-public-url-missing; a refused or unreachable create stores nothing."
+      ],
+      "productionPaths": [
+        "src/main/java/org/courtside/payment/web/PayPalCheckoutController.java",
+        "src/main/java/org/courtside/payment/internal/PayPalCheckout.java",
+        "src/main/java/org/courtside/payment/internal/PayPalOrders.java",
+        "src/main/java/org/courtside/payment/internal/PayPalClient.java"
+      ],
+      "evidence": [
+        "src/test/java/org/courtside/payment/PayPalCheckoutTest.java#givenAnApprovedOrder_whenTheBookerReturns_thenTheBookingIsConfirmedWithTwoLedgerEntries",
+        "src/test/java/org/courtside/payment/PayPalCheckoutTest.java#givenTwoConcurrentReturns_whenBothCapture_thenOneConfirmationAndOnePayPalPayment",
+        "src/test/java/org/courtside/payment/PayPalCheckoutTest.java#givenAMismatchedAmount_whenCapturing_thenNothingIsCapturedAndTheCourtIsFree",
+        "src/test/java/org/courtside/payment/PayPalCheckoutTest.java#givenAnotherAccount_whenCapturingOrCancelling_thenTheOrderIsNotFound",
+        "src/test/java/org/courtside/payment/PayPalCheckoutTest.java#givenAnAbandonedPayment_whenCancelled_thenTheCourtIsFreeAtOnce"
+      ]
+    },
+    {
       "id": "guest-fee-report",
       "actors": [
         "TREASURER",

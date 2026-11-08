@@ -63,7 +63,7 @@ public class PayPalClient {
     Order createOrder(Credentials credentials, UUID bookingId, int amountMinor, Currency currency, URI returnUrl,
                       URI cancelUrl) {
         int digits = currency.getDefaultFractionDigits();
-        if (digits < 0 || amountMinor <= 0) throw new PayPalRefusedException("The amount cannot be sent to PayPal");
+        if (digits < 0 || amountMinor <= 0) throw new IllegalStateException("The amount cannot be sent to PayPal");
         ObjectNode body = JSON.createObjectNode();
         body.put("intent", "CAPTURE");
         ObjectNode unit = body.putArray("purchase_units").addObject();
@@ -90,7 +90,7 @@ public class PayPalClient {
         if (answer.status() == 422 && alreadyCaptured(answer.body())) {
             return captureOf(getOrder(credentials, orderId));
         }
-        return captureOf(order(success(answer)));
+        return capture(success(answer)).orElseThrow(() -> new PayPalRefusedException("PayPal order has no capture"));
     }
 
     Answer requestToken(PayPalEnvironment environment, String clientId, String secret) {
@@ -209,22 +209,27 @@ public class PayPalClient {
     private static Order order(JsonNode body) {
         String id = required(body, "id");
         String status = required(body, "status");
+        JsonNode unit = firstUnit(body);
+        Money amount = money(unit.get("amount"));
+        return new Order(id, status, text(unit, "custom_id"), amount.minor(), amount.currency(),
+                approveUrl(body.get("links")), capture(body));
+    }
+
+    private static Optional<Capture> capture(JsonNode body) {
+        JsonNode captures = firstUnit(body).path("payments").path("captures");
+        if (!captures.isArray() || captures.isEmpty()) return Optional.empty();
+        JsonNode first = captures.get(0);
+        Money captured = money(first.get("amount"));
+        return Optional.of(new Capture(required(first, "id"), required(first, "status"), captured.minor(),
+                captured.currency()));
+    }
+
+    private static JsonNode firstUnit(JsonNode body) {
         JsonNode units = body.get("purchase_units");
         if (units == null || !units.isArray() || units.isEmpty()) {
             throw new PayPalRefusedException("PayPal order has no purchase unit");
         }
-        JsonNode unit = units.get(0);
-        Money amount = money(unit.get("amount"));
-        JsonNode captures = unit.path("payments").path("captures");
-        Optional<Capture> capture = Optional.empty();
-        if (captures.isArray() && !captures.isEmpty()) {
-            JsonNode first = captures.get(0);
-            Money captured = money(first.get("amount"));
-            capture = Optional.of(new Capture(required(first, "id"), required(first, "status"), captured.minor(),
-                    captured.currency()));
-        }
-        return new Order(id, status, text(unit, "custom_id"), amount.minor(), amount.currency(),
-                approveUrl(body.get("links")), capture);
+        return units.get(0);
     }
 
     private static Optional<URI> approveUrl(@Nullable JsonNode links) {
