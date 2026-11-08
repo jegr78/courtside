@@ -958,6 +958,7 @@ const en: Record<keyof typeof de, string> = {
   "admin.usage.reason.booking.rule.slotGrid.duration": "Duration outside the slot grid",
   "admin.usage.reason.booking.rule.advanceWindow.exceeded": "Advance booking limit",
   "admin.usage.reason.booking.rule.cancellationDeadline.exceeded": "Cancellation deadline",
+  "admin.usage.reason.booking.payment.creditInsufficient": "Credit too low",
   "admin.usage.reason.booking.rule.maxBookingDuration.exceeded": "Maximum booking duration",
   "admin.usage.reason.booking.rule.maxOpenBookings.exceeded": "Open booking limit",
   "admin.usage.reason.booking.rule.noCourtBooking": "No booking entitlement",

@@ -231,7 +231,8 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
     ? Math.round(chosenCard.externalPriceMinor * courtIds.length * selectedDuration / 60) : undefined;
   const externalAmount = externalAmountMinor !== undefined && currency
     ? formatMinor(externalAmountMinor, i18n.language, currency) : undefined;
-  const creditShort = externalAmountMinor !== undefined && credit !== undefined && credit.balanceMinor < externalAmountMinor;
+  const creditShort = externalAmountMinor !== undefined && credit !== undefined
+    && (credit.currency !== currency || credit.balanceMinor < externalAmountMinor);
 
   return <Modal labelledBy="booking-heading" closed={closed} width="xl" composed testId="booking-dialog">
     <form onSubmit={(event) => void submit(event)} className="flex min-h-0 flex-col">

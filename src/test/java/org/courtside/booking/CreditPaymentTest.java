@@ -41,6 +41,7 @@ import static org.assertj.core.api.Assertions.catchThrowableOfType;
         CreditTestFixture.class, RulesTestFixture.class})
 class CreditPaymentTest extends AbstractIntegrationTest {
 
+    private static final Instant NOW = Instant.parse("2026-05-12T10:00:00Z");
     private static final Instant TOMORROW_AFTERNOON = Instant.parse("2026-05-13T16:00:00Z");
 
     @Autowired
@@ -190,6 +191,49 @@ class CreditPaymentTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenAPaidBookingThatHasStarted_whenTheClubCancelsIt_thenNothingIsCredited() {
+        // given
+        credit.credit(johnAccount, 1500);
+        UUID booking = bookAt(NOW);
+
+        // when
+        bookingService.cancel(booking, adminAccount, Set.of(Role.MEMBER, Role.ADMIN));
+
+        // then
+        assertThat(status(booking)).isEqualTo("CANCELLED");
+        assertThat(balance()).as("a booking that has started was played or forfeited").isZero();
+    }
+
+    @Test
+    void givenAPaidBookingWithoutADeadline_whenThePlayerCancelsOnceItStarted_thenNothingIsCredited() {
+        // given
+        credit.credit(johnAccount, 1500);
+        UUID booking = bookAt(NOW);
+
+        // when
+        bookingService.cancel(booking, johnAccount, Set.of(Role.EXTERNAL));
+
+        // then
+        assertThat(balance()).as("without a deadline the start still ends the refund").isZero();
+    }
+
+    @Test
+    void givenAPaidBookingOfAnAccountAnonymisedSince_whenTheClubCancelsIt_thenNothingIsCredited() {
+        // given
+        credit.credit(johnAccount, 1500);
+        UUID booking = book(0);
+        jdbc.sql("UPDATE user_account SET anonymised_at = now(), enabled = false, password_hash = NULL WHERE id = :id")
+                .param("id", johnAccount).update();
+
+        // when
+        bookingService.cancel(booking, adminAccount, Set.of(Role.MEMBER, Role.ADMIN));
+
+        // then
+        assertThat(entriesFor(booking)).as("credit on an anonymised account could never be paid out")
+                .extracting(entry -> entry.get("kind")).containsExactly("BOOKING_DEBIT");
+    }
+
+    @Test
     void givenACancelledPaidBooking_whenItIsCancelledAgain_thenItIsRefundedOnce() {
         // given
         credit.credit(johnAccount, 1500);
@@ -290,7 +334,10 @@ class CreditPaymentTest extends AbstractIntegrationTest {
     }
 
     private UUID book(int hoursAfter) {
-        Instant start = TOMORROW_AFTERNOON.plus(Duration.ofHours(hoursAfter));
+        return bookAt(TOMORROW_AFTERNOON.plus(Duration.ofHours(hoursAfter)));
+    }
+
+    private UUID bookAt(Instant start) {
         return bookingService.create(new CreateBookingCommand(List.of(courtId), winterHall,
                 new TimeSlot(start, start.plus(Duration.ofHours(1))), johnAccount, johnPerson,
                 Set.of(Role.EXTERNAL), null, List.of(), null));

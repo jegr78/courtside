@@ -763,7 +763,7 @@ Begründung. Ein Spieler mit Guthaben kann sein Konto nicht schließen, bis du e
 
 Bucht ein externer Spieler eine Buchungsart mit Preis, zieht Courtside den Betrag von seinem Guthaben
 ab. Reicht es nicht, lehnt Courtside die Buchung ab. Ein Storno vor der Stornofrist bucht den Betrag
-zurück, ein Storno durch den Verein immer. Beide Einträge erscheinen im Verlauf als *Buchung bezahlt*
+zurück, ein Storno durch den Verein bis zum Beginn der Buchung immer. Beide Einträge erscheinen im Verlauf als *Buchung bezahlt*
 und *Erstattung nach Storno*. Von Hand kannst du sie nicht anlegen.
 
 ## Nachweise

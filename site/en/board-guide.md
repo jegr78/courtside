@@ -725,7 +725,7 @@ holding credit cannot close their account until you have paid it out.
 
 When an external player books a priced booking type, Courtside takes the amount from their credit.
 If it does not cover the amount, Courtside refuses the booking. A cancellation before the deadline
-returns the amount, a cancellation by the club always does. Both entries appear in the ledger as
+returns the amount, a cancellation by the club does until the booking starts. Both entries appear in the ledger as
 *Booking paid* and *Refund after cancellation*. You cannot record either by hand.
 
 ## Records

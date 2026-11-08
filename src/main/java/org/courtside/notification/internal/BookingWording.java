@@ -52,7 +52,7 @@ class BookingWording {
 
     String refund(BookingAnnouncement booking, UserAccount recipient, Locale locale) {
         BookingAnnouncement.AnnouncedPayment paid = booking.payment();
-        if (paid == null || !recipient.getId().equals(booking.bookedByAccountId())) {
+        if (paid == null || !paid.refunded() || !recipient.getId().equals(booking.bookedByAccountId())) {
             return "";
         }
         return "\n\n" + templates.render("booking.payment.refunded", locale, Map.of("amount", money(paid, locale)));

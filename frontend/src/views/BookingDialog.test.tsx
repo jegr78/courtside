@@ -417,6 +417,17 @@ it("given an external player whose credit covers the amount, when the dialog ope
   expect(screen.queryByTestId("booking-credit-short"), "a balance equal to the amount covers it").toBeNull();
 });
 
+it("given credit in another currency than the club's, when the dialog opens, then it does not count as covering the amount", async () => {
+  // given
+  vi.spyOn(api, "ownCredit").mockResolvedValue({ ...creditOf(5000), currency: "CHF" });
+
+  // when
+  await showExternal(1299);
+
+  // then
+  expect(await screen.findByTestId("booking-credit-short"), "francs never pay a booking in euros").toBeInTheDocument();
+});
+
 it("given a free card, when an external player opens the dialog, then no balance is read", async () => {
   // given
   const read = vi.spyOn(api, "ownCredit");

@@ -374,13 +374,15 @@ it. After the overlap and the rules have passed, `BookingWriter` hands the amoun
 `credit.BookingPayments`, which locks the account like every other ledger write and appends a
 `BOOKING_DEBIT` naming the booking. When the balance falls short, the booking is refused with the
 violation `booking.payment.creditInsufficient`, carrying amount, balance and currency, and nothing is
-written. A booking that costs nothing writes no entry. Cancelling a paid booking appends a
-`BOOKING_REFUND` of the debited amount in the same transaction. The booker can cancel only before the
-cancellation deadline of their rule set, so a refund after the deadline happens only when somebody
-else, the club, cancels the booking. A booking released because nobody turned up is not refunded.
+written. A booking that costs nothing writes no entry. Cancelling a paid booking before it starts
+appends a `BOOKING_REFUND` of the debited amount in the same transaction. The booker can cancel only
+before the cancellation deadline of their rule set, so a refund after the deadline happens only when
+somebody else, the club, cancels the booking. Once the booking has started nothing is refunded, nor
+is a booking released because nobody turned up, nor one whose account has been anonymised since.
 A unique index allows one debit and one refund per booking. The treasury cannot record either kind
 by hand. The confirmation mail names the amount and that it was paid from credit, and the club's
-cancellation mail tells the booker that the amount is back on their credit.
+cancellation mail tells the booker that the amount is back on their credit; both read the payment
+from the ledger, not from the booking's amount.
 
 The guest fee report under `/api/treasury` lists, for `TREASURER` and `ADMIN`, each member's charged
 guest places and their sum for a period, by default the current calendar year in the club time

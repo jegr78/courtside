@@ -79,7 +79,8 @@ test("given every rule violation code the backend emits, when checking both clie
   // given
   const { de, en } = localeKeys();
   const codes = [...new Set(javaSources(join(root, "src/main/java"))
-    .flatMap((source) => [...source.matchAll(/"(booking\.rule\.[A-Za-z.]+)"/g)].map((match) => match[1])))];
+    .flatMap((source) => [...source.matchAll(/"(booking\.rule\.[A-Za-z.]+)"|new RuleViolation\(\s*"([A-Za-z.]+)"/g)]
+      .map((match) => match[1] ?? match[2])))];
 
   // when
   const missing = codes.flatMap((code) => [

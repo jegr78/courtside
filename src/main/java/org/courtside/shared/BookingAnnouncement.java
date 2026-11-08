@@ -21,7 +21,7 @@ public record BookingAnnouncement(UUID bookedByAccountId, List<UUID> playerPerso
     }
 
     /** What the booker paid for the booking and how; a booking that cost nothing announces none. */
-    public record AnnouncedPayment(int amountMinor, String currency, PaymentMethod method) {
+    public record AnnouncedPayment(int amountMinor, String currency, PaymentMethod method, boolean refunded) {
 
         public enum PaymentMethod {
             CREDIT

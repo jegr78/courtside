@@ -211,8 +211,8 @@ You pay a priced booking from your credit. Before you book, the dialog shows you
 the amount. If it covers the amount, Courtside takes it when you book, and the confirmation states
 the amount and how you paid. If it does not, Courtside refuses the booking and takes nothing. If you
 cancel before your club's cancellation deadline, the full amount goes back to your credit. After the
-deadline you can no longer cancel. If the club cancels your booking, you always get the amount
-back. If you do not turn up and Courtside releases the court for that reason, the club keeps the
+deadline you can no longer cancel. If the club cancels your booking before it starts, you always get
+the amount back. If you do not turn up and Courtside releases the court for that reason, the club keeps the
 amount.
 
 ![The booking fields for members, guests and slot fillers.](../screenshots/en/booking-participants.png)

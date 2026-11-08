@@ -19,6 +19,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
+import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
@@ -62,6 +63,8 @@ class PaidBookingMessageTest extends AbstractIntegrationTest {
     private ConfigTestFixture config;
     @Autowired
     private CreditTestFixture credit;
+    @Autowired
+    private JdbcClient jdbc;
 
     private UUID courtId;
     private UUID winterDoubles;
@@ -111,6 +114,24 @@ class PaidBookingMessageTest extends AbstractIntegrationTest {
         // then
         assertThat(textOf(firstMailTo("john.roe@example.org")))
                 .contains("15,00 € sind wieder auf deinem Guthaben.");
+    }
+
+    @Test
+    void givenABookingWithAnAmountButNoDebit_whenTheClubCancelsIt_thenTheMailPromisesNoRefund() throws Exception {
+        // given
+        cards.priceForExternals(winterDoubles, 0);
+        UUID booking = book();
+        jdbc.sql("UPDATE booking SET amount_minor = 1500 WHERE id = :id").param("id", booking).update();
+        firstMailTo("john.roe@example.org");
+        clearInvocations(sender);
+
+        // when
+        bookings.cancel(booking, adminAccount, Set.of(Role.ADMIN));
+
+        // then
+        assertThat(textOf(firstMailTo("john.roe@example.org")))
+                .as("a booking made before payments existed was never debited, so nothing returns")
+                .doesNotContain("Guthaben");
     }
 
     private UUID book() {

@@ -123,7 +123,7 @@ public class CreditLedger implements BookingPayments {
                 .query((rs, row) -> new Debit(rs.getObject("account_id", UUID.class), rs.getInt("amount_minor"),
                         rs.getString("currency")))
                 .optional();
-        if (debit.isEmpty()) {
+        if (debit.isEmpty() || anonymised(debit.get().accountId())) {
             return;
         }
         lock(debit.get().accountId());
@@ -136,6 +136,29 @@ public class CreditLedger implements BookingPayments {
             insert(debit.get().accountId(), CreditEntryKind.BOOKING_REFUND, -debit.get().amountMinor(),
                     debit.get().currency(), bookingId, null);
         }
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<Payment> paymentOf(UUID bookingId) {
+        if (bookingId == null) {
+            throw new IllegalStateException("A payment belongs to a booking");
+        }
+        return jdbc.sql("""
+                        SELECT d.amount_minor, d.currency,
+                               EXISTS (SELECT 1 FROM credit_entry r
+                                       WHERE r.booking_id = d.booking_id AND r.kind = 'BOOKING_REFUND') AS refunded
+                        FROM credit_entry d WHERE d.booking_id = :booking AND d.kind = 'BOOKING_DEBIT'
+                        """)
+                .param("booking", bookingId)
+                .query((rs, row) -> new Payment(-rs.getInt("amount_minor"), rs.getString("currency"),
+                        rs.getBoolean("refunded")))
+                .optional();
+    }
+
+    private boolean anonymised(UUID accountId) {
+        return jdbc.sql("SELECT anonymised_at IS NOT NULL FROM user_account WHERE id = :account")
+                .param("account", accountId).query(Boolean.class).optional().orElse(true);
     }
 
     private Recorded insert(UUID accountId, CreditEntryKind kind, int signed, String currency,

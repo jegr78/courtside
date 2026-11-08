@@ -956,6 +956,7 @@ const de = {
   "admin.usage.reason.booking.rule.slotGrid.duration": "Dauer außerhalb des Zeitrasters",
   "admin.usage.reason.booking.rule.advanceWindow.exceeded": "Vorausbuchungsgrenze",
   "admin.usage.reason.booking.rule.cancellationDeadline.exceeded": "Stornierungsfrist",
+  "admin.usage.reason.booking.payment.creditInsufficient": "Guthaben reicht nicht",
   "admin.usage.reason.booking.rule.maxBookingDuration.exceeded": "Höchstbuchungsdauer",
   "admin.usage.reason.booking.rule.maxOpenBookings.exceeded": "Höchstzahl offener Buchungen",
   "admin.usage.reason.booking.rule.noCourtBooking": "Keine Buchungsberechtigung",

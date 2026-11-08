@@ -256,9 +256,16 @@ class BookingWriter implements SeriesOccurrenceCancellation, BookingDrafts, Unat
         bookings.saveAndFlush(booking);
         if (changed) {
             releaseCourtsOf(booking);
-            payments.refund(bookingId);
+            if (cancelledAt.isBefore(startOf(booking))) {
+                payments.refund(bookingId);
+            }
         }
         return changed;
+    }
+
+    private static Instant startOf(Booking booking) {
+        return booking.getAllocations().stream().map(CourtAllocation::getStartsAt).min(Instant::compareTo)
+                .orElseThrow(() -> new IllegalStateException("A booking must occupy a court"));
     }
 
     @Override
