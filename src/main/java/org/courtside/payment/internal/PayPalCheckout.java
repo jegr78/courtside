@@ -20,6 +20,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import java.net.URI;
 import java.util.Currency;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 /** Creates, captures and cancels the PayPal order of a pending booking; PayPal is called outside any transaction. */
@@ -30,6 +31,7 @@ public class PayPalCheckout {
 
     private static final String RETURN_PATH = "/payment/paypal/return";
     private static final String CANCEL_PATH = "/payment/paypal/cancel";
+    private static final Set<String> UNCAPTURED = Set.of("APPROVED", "CREATED", "PAYER_ACTION_REQUIRED", "VOIDED");
 
     private final PayPalClient client;
     private final PayPalOrders orders;
@@ -150,8 +152,9 @@ public class PayPalCheckout {
                     refused.reason());
         }
         try {
-            return client.getOrder(credentials, stored.orderId()).capture()
-                    .map(capture -> settle(stored, capture, true)).orElseGet(() -> processing(stored));
+            PayPalClient.Order order = client.getOrder(credentials, stored.orderId());
+            if (order.capture().isPresent()) return settle(stored, order.capture().get(), true);
+            return UNCAPTURED.contains(order.status()) ? reject(stored, Rejection.CAPTURE_REFUSED) : processing(stored);
         } catch (PayPalUnavailableException | PayPalRefusedException failed) {
             log.warn("PayPal order {} of booking {} could not be read after its capture: {}", stored.orderId(),
                     stored.bookingId(), failed.getMessage());
@@ -277,7 +280,9 @@ public class PayPalCheckout {
         }
     }
 
-    private enum Rejection { BOOKING_MISMATCH, CURRENCY_MISMATCH, AMOUNT_MISMATCH, ORDER_VOIDED, CAPTURE_DECLINED }
+    private enum Rejection {
+        BOOKING_MISMATCH, CURRENCY_MISMATCH, AMOUNT_MISMATCH, ORDER_VOIDED, CAPTURE_DECLINED, CAPTURE_REFUSED
+    }
 
     public enum Outcome { CONFIRMED, LATE_CREDITED, REJECTED, PROCESSING }
 

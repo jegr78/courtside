@@ -969,6 +969,7 @@
       "failurePaths": [
         "An order or booking of another account is answered as not found.",
         "A mismatch of booking id, amount or currency refuses the capture, releases the booking and records the reason; no money moves.",
+        "A capture PayPal refuses, with the order then showing no capture and a status in which no money moved, rejects the order and releases the booking.",
         "A capture whose outcome is unknown, or an order of credentials that are no longer active, leaves the order open and answers PROCESSING.",
         "Without a public address the order is refused with paypal-public-url-missing; a refused or unreachable create stores nothing."
       ],

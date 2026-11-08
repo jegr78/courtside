@@ -4247,9 +4247,10 @@ components:
       description: |
         `CONFIRMED`: the payment was captured and the booking is confirmed. `LATE_CREDITED`: the
         payment was captured after the hold had ended, so the booking is gone and the amount is
-        recorded for the account instead. `REJECTED`: the order did not match its booking or was
-        cancelled; no money moved and the court is free. `PROCESSING`: PayPal has not settled the
-        payment yet or could not be reached; the court stays held and Courtside keeps asking PayPal.
+        recorded for the account instead. `REJECTED`: the order did not match its booking, was
+        cancelled or PayPal refused to capture it; no money moved and the court is free.
+        `PROCESSING`: PayPal has not settled the payment yet or could not be reached; the court
+        stays held and Courtside keeps asking PayPal.
 
     PayPalCapture:
       type: object

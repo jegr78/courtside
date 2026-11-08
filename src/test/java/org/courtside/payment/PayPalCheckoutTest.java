@@ -77,6 +77,8 @@ class PayPalCheckoutTest extends AbstractIntegrationTest {
     private static final String CREATE = "POST /sandbox/v2/checkout/orders";
     private static final String READ = "GET /sandbox/v2/checkout/orders/" + ORDER;
     private static final String CAPTURE = "POST /sandbox/v2/checkout/orders/" + ORDER + "/capture";
+    private static final String DECLINED = "{\"name\":\"UNPROCESSABLE_ENTITY\",\"message\":\"declined\","
+            + "\"details\":[{\"issue\":\"INSTRUMENT_DECLINED\"}]}";
     private static final Instant TOMORROW_AFTERNOON = Instant.parse("2026-05-13T16:00:00Z");
     private static final FakePayPal PAYPAL = new FakePayPal();
 
@@ -435,6 +437,66 @@ class PayPalCheckoutTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenARefusedCaptureAndAnOrderWithoutCapture_whenCapturing_thenItIsRejectedAndTheCourtIsFree()
+            throws Exception {
+        // given
+        UUID booking = bookWithOrder();
+        PAYPAL.reply(READ, 200, order("APPROVED", booking, "15.00", null));
+        PAYPAL.reply(CAPTURE, 422, DECLINED);
+
+        // when
+        capture("roe.john").andExpect(status().isOk()).andExpect(jsonPath("$.outcome").value("REJECTED"));
+
+        // then
+        assertThat(PAYPAL.seen(READ)).as("the order is read again after the refusal").hasSize(2);
+        assertThat(cancellationReason(booking)).as("no money moved, so the hold ends at once")
+                .isEqualTo("PAYMENT_EXPIRED");
+        assertThat(bookingStatus(booking)).isEqualTo("CANCELLED");
+        assertThat(allocationStatus(booking)).isEqualTo("CANCELLED");
+        assertThat(orderStatus()).isEqualTo("REJECTED");
+        assertThat(entries(booking)).isEmpty();
+        assertThat(audit("payment.paypal.rejected", booking)).singleElement()
+                .satisfies(payload -> assertThat(payload.get("reason").asString()).isEqualTo("CAPTURE_REFUSED"));
+    }
+
+    @Test
+    void givenARefusedCaptureAndACompletedOrderWithoutCapture_whenCapturing_thenTheCourtStaysHeld() throws Exception {
+        // given
+        UUID booking = bookWithOrder();
+        PAYPAL.reply(READ, 200, order("APPROVED", booking, "15.00", null));
+        PAYPAL.reply(READ, 200, order("COMPLETED", booking, "15.00", null));
+        PAYPAL.reply(CAPTURE, 422, DECLINED);
+
+        // when
+        capture("roe.john").andExpect(status().isOk()).andExpect(jsonPath("$.outcome").value("PROCESSING"));
+
+        // then
+        assertThat(bookingStatus(booking)).as("money may have moved, so reconciliation decides")
+                .isEqualTo("PENDING_PAYMENT");
+        assertThat(orderStatus()).isEqualTo("CREATED");
+        assertThat(entries(booking)).isEmpty();
+    }
+
+    @Test
+    void givenARefusedCaptureAndAnUnreadableOrder_whenCapturing_thenTheCourtStaysHeldAndTheOutcomeIsProcessing()
+            throws Exception {
+        // given
+        UUID booking = bookWithOrder();
+        PAYPAL.reply(READ, 200, order("APPROVED", booking, "15.00", null));
+        PAYPAL.reply(READ, 503, "{}");
+        PAYPAL.reply(CAPTURE, 422, DECLINED);
+
+        // when
+        capture("roe.john").andExpect(status().isOk()).andExpect(jsonPath("$.outcome").value("PROCESSING"));
+
+        // then
+        assertThat(PAYPAL.seen(READ)).hasSize(2);
+        assertThat(bookingStatus(booking)).as("an unknown outcome keeps the court held").isEqualTo("PENDING_PAYMENT");
+        assertThat(orderStatus()).isEqualTo("CREATED");
+        assertThat(entries(booking)).isEmpty();
+    }
+
+    @Test
     void givenACaptureTimeout_whenCapturing_thenTheOrderStaysOpenAndTheOutcomeIsProcessing() throws Exception {
         // given
         UUID booking = bookWithOrder();
@@ -601,6 +663,11 @@ class PayPalCheckoutTest extends AbstractIntegrationTest {
 
     private String bookingStatus(UUID booking) {
         return jdbc.sql("SELECT status FROM booking WHERE id = :id").param("id", booking).query(String.class).single();
+    }
+
+    private String cancellationReason(UUID booking) {
+        return jdbc.sql("SELECT cancellation_reason FROM booking WHERE id = :id").param("id", booking)
+                .query(String.class).single();
     }
 
     private String allocationStatus(UUID booking) {
