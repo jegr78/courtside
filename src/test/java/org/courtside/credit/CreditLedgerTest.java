@@ -21,6 +21,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.context.WebApplicationContext;
 
 import java.time.Clock;
+import java.util.Currency;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -146,6 +147,18 @@ class CreditLedgerTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenATreasurer_whenTheyRecordABookingRefundByHand_thenTheRequestIsRefused() throws Exception {
+        // when / then
+        record("miles.richard", johnAccount, "BOOKING_REFUND", 1000, "Refund", true)
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:validation-failed"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("kind"));
+        assertThat(entries(johnAccount)).as("only a booking writes its own payment and refund").isZero();
+        assertThatThrownBy(() -> ledger.append(johnAccount, CreditEntryKind.BOOKING_REFUND, 1000, "Refund"))
+                .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
     void givenAnExternalPlayer_whenTheyCreditThemselves_thenTheTreasuryIsClosedToThem() throws Exception {
         // when / then
         record("roe.john", johnAccount, "CREDIT", 1000, "Free money", true).andExpect(status().isForbidden());
@@ -186,6 +199,42 @@ class CreditLedgerTest extends AbstractIntegrationTest {
             assertThat(secondWaited).as("the second payout waits for the account lock").isTrue();
             assertThat(first.get(10, TimeUnit.SECONDS)).isTrue();
             assertThat(second.get(10, TimeUnit.SECONDS)).as("the second payout sees the reduced balance").isFalse();
+        } finally {
+            releaseFirst.countDown();
+            pool.shutdownNow();
+        }
+        assertThat(ledger.page(johnAccount, null, 10).balanceMinor()).isEqualTo(200);
+    }
+
+    @Test
+    void givenCreditForOneBooking_whenASecondDebitStartsBeforeTheFirstCommits_thenItWaitsAndIsNotCovered()
+            throws Exception {
+        // given
+        credit.credit(johnAccount, 1000);
+        Currency euro = Currency.getInstance("EUR");
+        CountDownLatch firstWritten = new CountDownLatch(1);
+        CountDownLatch releaseFirst = new CountDownLatch(1);
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+
+        // when
+        try {
+            Future<Boolean> first = pool.submit(() -> transactions.execute(status -> {
+                boolean covered = ledger.debit(johnAccount, UUID.randomUUID(), 800, euro).covered();
+                firstWritten.countDown();
+                await(releaseFirst);
+                return covered;
+            }));
+            assertThat(firstWritten.await(10, TimeUnit.SECONDS)).isTrue();
+            Future<Boolean> second = pool.submit(() -> transactions.execute(status ->
+                    ledger.debit(johnAccount, UUID.randomUUID(), 800, euro).covered()));
+            Thread.sleep(500);
+            boolean secondWaited = !second.isDone();
+            releaseFirst.countDown();
+
+            // then
+            assertThat(secondWaited).as("the second debit waits for the account lock").isTrue();
+            assertThat(first.get(10, TimeUnit.SECONDS)).isTrue();
+            assertThat(second.get(10, TimeUnit.SECONDS)).as("the second debit sees the spent credit").isFalse();
         } finally {
             releaseFirst.countDown();
             pool.shutdownNow();

@@ -3,6 +3,7 @@ package org.courtside.booking;
 import org.courtside.AbstractIntegrationTest;
 import org.courtside.card.testfixture.CardTestFixture;
 import org.courtside.config.testfixture.ConfigTestFixture;
+import org.courtside.credit.testfixture.CreditTestFixture;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
@@ -29,7 +30,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @Import({FacilityTestFixture.class, IdentityTestFixture.class, MemberTestFixture.class, CardTestFixture.class,
-        ConfigTestFixture.class})
+        ConfigTestFixture.class, CreditTestFixture.class})
 class ExternalBookingPriceTest extends AbstractIntegrationTest {
 
     private static final Instant TOMORROW_AFTERNOON = Instant.parse("2026-05-13T16:00:00Z");
@@ -46,6 +47,8 @@ class ExternalBookingPriceTest extends AbstractIntegrationTest {
     private CardTestFixture cards;
     @Autowired
     private ConfigTestFixture config;
+    @Autowired
+    private CreditTestFixture credit;
     @Autowired
     private JdbcClient jdbc;
 
@@ -103,6 +106,7 @@ class ExternalBookingPriceTest extends AbstractIntegrationTest {
         // given
         cards.priceForExternals(winterHall, 1500);
         UUID secondCourt = facility.createCourt(2, "Court 2");
+        credit.credit(externalAccount, 3000);
 
         // when
         UUID booking = bookingService.create(new CreateBookingCommand(List.of(courtId, secondCourt), winterHall,
@@ -173,6 +177,9 @@ class ExternalBookingPriceTest extends AbstractIntegrationTest {
     }
 
     private UUID book(UUID account, UUID person, Set<Role> roles, int hoursAfter, Duration duration) {
+        if (account.equals(externalAccount)) {
+            credit.credit(account, 2000);
+        }
         Instant start = TOMORROW_AFTERNOON.plus(Duration.ofHours(hoursAfter));
         return bookingService.create(new CreateBookingCommand(List.of(courtId), winterHall,
                 new TimeSlot(start, start.plus(duration)), account, person, roles, null, List.of(), null));

@@ -9,7 +9,8 @@ import java.util.UUID;
 public record BookingAnnouncement(UUID bookedByAccountId, List<UUID> playerPersonIds,
                                   Instant startsAt, Instant endsAt,
                                   List<AnnouncedCourt> courts, String cardLabel, boolean cancelled,
-                                  @Nullable AnnouncedAccess access, @Nullable DynamicAccess dynamicAccess) {
+                                  @Nullable AnnouncedAccess access, @Nullable DynamicAccess dynamicAccess,
+                                  @Nullable AnnouncedPayment payment) {
 
     public BookingAnnouncement {
         playerPersonIds = List.copyOf(playerPersonIds);
@@ -17,6 +18,14 @@ public record BookingAnnouncement(UUID bookedByAccountId, List<UUID> playerPerso
     }
 
     public record AnnouncedCourt(int number, String name) {
+    }
+
+    /** What the booker paid for the booking and how; a booking that cost nothing announces none. */
+    public record AnnouncedPayment(int amountMinor, String currency, PaymentMethod method, boolean refunded) {
+
+        public enum PaymentMethod {
+            CREDIT
+        }
     }
 
     /** The static codes that open the booking's access points from {@code validFrom} until {@code validUntil}. */

@@ -8,6 +8,7 @@ import org.courtside.booking.BookingParticipant;
 import org.courtside.booking.CourtAllocation;
 import org.courtside.card.BookingCard;
 import org.courtside.card.CardService;
+import org.courtside.credit.BookingPayments;
 import org.courtside.facility.Court;
 import org.courtside.facility.FacilityService;
 import org.courtside.shared.AccessDemand;
@@ -40,6 +41,7 @@ class BookingAnnouncements implements BookingAnnouncer {
     private final FacilityService facility;
     private final CardService cards;
     private final AccessGrants accessGrants;
+    private final BookingPayments payments;
 
     @Override
     @Transactional(readOnly = true)
@@ -173,7 +175,7 @@ class BookingAnnouncements implements BookingAnnouncer {
                 .orElseGet(List::of);
     }
 
-    private static Optional<BookingAnnouncement> announcementOf(Booking booking, List<UUID> players,
+    private Optional<BookingAnnouncement> announcementOf(Booking booking, List<UUID> players,
                                                                 Function<UUID, BookingAnnouncement.AnnouncedCourt> courtOf,
                                                                 Function<UUID, String> cardLabelOf,
                                                                 BookingAnnouncement.AnnouncedAccess access,
@@ -190,7 +192,18 @@ class BookingAnnouncements implements BookingAnnouncer {
                 allocations.stream().map(allocation -> courtOf.apply(allocation.getCourtId())).toList(),
                 cardLabelOf.apply(booking.getCardId()),
                 booking.getStatus() == BookingStatus.CANCELLED,
-                access, dynamicAccess));
+                access, dynamicAccess,
+                paymentOf(booking)));
+    }
+
+    private BookingAnnouncement.AnnouncedPayment paymentOf(Booking booking) {
+        if (booking.amount().filter(amount -> amount.minor() > 0).isEmpty()) {
+            return null;
+        }
+        return payments.paymentOf(booking.getId())
+                .map(paid -> new BookingAnnouncement.AnnouncedPayment(paid.amountMinor(), paid.currency(),
+                        BookingAnnouncement.AnnouncedPayment.PaymentMethod.CREDIT, paid.refunded()))
+                .orElse(null);
     }
 
     private static BookingAnnouncement.AnnouncedCourt announcedCourt(Court court) {

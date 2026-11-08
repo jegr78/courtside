@@ -2,9 +2,9 @@
   "schemaVersion": 1,
   "reviewedAt": "2026-11-01",
   "purpose": "This is the normative authorization policy for the shipped Courtside API. OpenAPI defines the transport shape; this policy defines who may perform each operation, which resource attributes narrow that permission, and which protected fields each projection may read or write.",
-  "openApiFieldInventorySha256": "888ea85274c12cb14ee49e330c9346a758c74da62a3cfc68564bc1a1fca2fdf1",
+  "openApiFieldInventorySha256": "de36eb95b0fa2ac435dd6850a7cb042b856e324368f0214ea8e89e446b0ee56f",
   "protectedFieldInventorySha256": "5295a7c44ccdfbecede95000d5f40299f3bfb9026c9b5b5afde1dc1e58301aa0",
-  "productionAuthorizationSha256": "1f38aaa23087caf0e71bbddd532907ce5d2e9c73fac7295787fc01e918b4403c",
+  "productionAuthorizationSha256": "bea0de7c795d4d0b86b060af69b216e933357ed1264792e293d430d17775a807",
   "ordinaryFields": [
     "Problem.detail",
     "Problem.fieldErrors",
@@ -1890,6 +1890,7 @@
     "listCreditEntries:response:$response.header.Retry-After",
     "listCreditEntries:response:CreditEntry.amountMinor",
     "listCreditEntries:response:CreditEntry.balanceAfterMinor",
+    "listCreditEntries:response:CreditEntry.bookingId",
     "listCreditEntries:response:CreditEntry.currency",
     "listCreditEntries:response:CreditEntry.id",
     "listCreditEntries:response:CreditEntry.kind",
@@ -2254,6 +2255,7 @@
     "listOwnCredit:response:$response.header.Retry-After",
     "listOwnCredit:response:CreditEntry.amountMinor",
     "listOwnCredit:response:CreditEntry.balanceAfterMinor",
+    "listOwnCredit:response:CreditEntry.bookingId",
     "listOwnCredit:response:CreditEntry.currency",
     "listOwnCredit:response:CreditEntry.id",
     "listOwnCredit:response:CreditEntry.kind",
@@ -3039,6 +3041,7 @@
     "recordCreditEntry:response:$response.header.Retry-After",
     "recordCreditEntry:response:CreditEntry.amountMinor",
     "recordCreditEntry:response:CreditEntry.balanceAfterMinor",
+    "recordCreditEntry:response:CreditEntry.bookingId",
     "recordCreditEntry:response:CreditEntry.currency",
     "recordCreditEntry:response:CreditEntry.id",
     "recordCreditEntry:response:CreditEntry.kind",
@@ -5774,7 +5777,8 @@
         "target-account"
       ],
       "productionPaths": [
-        "src/main/java/org/courtside/credit/internal/CreditLedger.java#append"
+        "src/main/java/org/courtside/credit/internal/CreditLedger.java#append",
+        "src/main/java/org/courtside/credit/internal/CreditLedger.java#insert"
       ],
       "positiveTests": [
         "src/test/java/org/courtside/credit/CreditLedgerTest.java#givenABalanceCoveringOnlyOnePayout_whenASecondStartsBeforeTheFirstCommits_thenExactlyOneSucceeds"
@@ -5782,7 +5786,8 @@
       "negativeTests": [
         "src/test/java/org/courtside/credit/CreditLedgerTest.java#givenABalance_whenThePayoutExceedsIt_thenItIsRefusedAndNothingIsWritten",
         "src/test/java/org/courtside/credit/CreditLedgerTest.java#givenAMemberAccount_whenTheTreasurerCreditsIt_thenOnlyAnExternalAccountReceivesCredit",
-        "src/test/java/org/courtside/credit/CreditLedgerTest.java#givenALedgerEntry_whenItIsChangedOrRemoved_thenTheDatabaseRefuses"
+        "src/test/java/org/courtside/credit/CreditLedgerTest.java#givenALedgerEntry_whenItIsChangedOrRemoved_thenTheDatabaseRefuses",
+        "src/test/java/org/courtside/credit/CreditLedgerTest.java#givenATreasurer_whenTheyRecordABookingRefundByHand_thenTheRequestIsRefused"
       ]
     },
     {

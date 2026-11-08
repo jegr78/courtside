@@ -71,6 +71,7 @@ class CreditController implements CreditApi {
     private static ApiCreditEntry entry(CreditLedger.LedgerEntry entry) {
         return new ApiCreditEntry(entry.id(), ApiCreditEntryKind.fromValue(entry.kind().name()), entry.amountMinor(),
                 entry.currency(), entry.balanceAfterMinor(), entry.recordedAt().atOffset(ZoneOffset.UTC))
-                .note(entry.note());
+                .note(entry.note())
+                .bookingId(entry.bookingId());
     }
 }

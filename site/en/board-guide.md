@@ -127,8 +127,8 @@ time it opens.
 * The **Booking grid** determines the rows in the court plan and the permitted start times.
 * The **Currency** is a three-letter ISO code such as `EUR` or `CHF`. Guest fees and prices for external players are stated in it.
   A change converts nothing: the fees of the booking types keep their number, and guests already
-  booked keep their amount. While any account holds credit, Courtside refuses the change. Pay the
-  credit out first.
+  booked keep their amount. While any account holds credit or a paid booking has not ended yet,
+  Courtside refuses the change. Pay the credit out first.
 * **Admit external bookings** opens booking cards that name the *External* role to people outside
   the club. Without it nobody with that role books, even on a card that names it. While it is on,
   the sign-in page offers registration, and two fields take the **registration text** in German
@@ -722,6 +722,11 @@ password proof Courtside asks for your password.
 Entries can be neither changed nor deleted. You correct a mistake with an entry in the other
 direction. The change log records every entry with amount and kind, without the reason. A player
 holding credit cannot close their account until you have paid it out.
+
+When an external player books a priced booking type, Courtside takes the amount from their credit.
+If it does not cover the amount, Courtside refuses the booking. A cancellation before the deadline
+returns the amount, a cancellation by the club does until the booking starts. Both entries appear in the ledger as
+*Booking paid* and *Refund after cancellation*. You cannot record either by hand.
 
 ## Records
 

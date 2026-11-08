@@ -21,4 +21,10 @@ class OwnUpcomingBookings implements UpcomingBookings {
     public boolean heldBy(UUID accountId) {
         return accountId != null && bookings.existsUpcomingBookedBy(accountId, clock.instant());
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean chargedToAnyone() {
+        return bookings.existsUpcomingCharged(clock.instant());
+    }
 }

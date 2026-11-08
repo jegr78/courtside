@@ -214,6 +214,14 @@ Guthaben gut. In *Mein Konto* zeigt der Bereich *Guthaben* deinen Stand und jede
 Art, Begründung, Betrag und dem Stand danach, die neuesten zuerst. Eine Auszahlung bekommst du beim
 Kassenwart.
 
+Eine Buchung mit Preis bezahlst du aus deinem Guthaben. Der Dialog zeigt vor dem Buchen neben dem
+Betrag deinen Stand. Reicht er, zieht Courtside den Betrag beim Buchen ab, und die Bestätigung nennt
+Betrag und Zahlweg. Reicht er nicht, lehnt Courtside die Buchung ab und zieht nichts ab. Stornierst
+du vor der Stornofrist deines Vereins, kommt der volle Betrag zurück auf dein Guthaben. Nach der
+Frist kannst du nicht mehr stornieren. Storniert der Verein deine Buchung vor ihrem Beginn, bekommst
+du den Betrag immer zurück. Erscheinst du nicht und gibt Courtside den Platz deshalb frei, bleibt der Betrag beim
+Verein.
+
 ![Der Bereich für Mitspieler, Gäste und Platzfüller im Buchungsdialog.](screenshots/de/booking-participants.png)
 
 ## Als Mitspieler eingetragen

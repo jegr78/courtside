@@ -24,6 +24,7 @@ beforeEach(async () => {
   vi.spyOn(api, "bookingCards").mockResolvedValue([]);
   vi.spyOn(api, "participantCards").mockResolvedValue([]);
   vi.spyOn(api, "participantMembers").mockResolvedValue([]);
+  vi.spyOn(api, "ownCredit").mockResolvedValue(creditOf(0));
 });
 
 it("given a mouse, when the dialog opens, then it says the plan can be dragged across", async () => {
@@ -373,4 +374,101 @@ it("given a card priced for external players, when a member opens the dialog, th
 
   // then
   expect(screen.queryByTestId("booking-amount"), "a member owes nothing for a court").toBeNull();
+});
+
+function creditOf(balanceMinor: number) {
+  return { balanceMinor, currency: "EUR", items: [], nextCursor: null };
+}
+
+async function showExternal(externalPriceMinor: number) {
+  vi.spyOn(api, "bookingCards").mockResolvedValue([{ ...cardWithGuestFee(0), externalPriceMinor }]);
+  render(<BookingDialog selection={{ date: "2026-08-10", slot: "10:00", courtId: court.id }} grid={grid as never}
+    courts={[court]} allocations={[]} canChooseSeveralCourts={false} memberFeatures={false} currency="EUR"
+    closed={() => undefined} created={() => Promise.resolve()} conflicted={() => Promise.resolve()} />);
+  await screen.findByTestId("booking-card");
+  await act(() => new Promise((settled) => setTimeout(settled, 0)));
+}
+
+it("given an external player whose credit falls short of the amount, when the dialog opens, then it shows the balance and says the treasurer can top it up", async () => {
+  // given
+  const read = vi.spyOn(api, "ownCredit").mockResolvedValue(creditOf(1000));
+
+  // when
+  await showExternal(1299);
+  fireEvent.change(screen.getByTestId("booking-duration"), { target: { value: "90" } });
+
+  // then
+  expect(await screen.findByTestId("booking-balance")).toHaveTextContent("Dein Guthaben: 10,00 €");
+  expect(screen.getByTestId("booking-credit-short")).toHaveTextContent("Dein Guthaben reicht für diese Buchung nicht. Der Kassenwart kann es aufladen.");
+  expect(screen.getByTestId("booking-submit"), "the server decides whether the booking is paid").toBeEnabled();
+  expect(read).toHaveBeenCalledTimes(1);
+});
+
+it("given an external player whose credit covers the amount, when the dialog opens, then it shows the balance without a hint", async () => {
+  // given
+  vi.spyOn(api, "ownCredit").mockResolvedValue(creditOf(1949));
+
+  // when
+  await showExternal(1299);
+  fireEvent.change(screen.getByTestId("booking-duration"), { target: { value: "90" } });
+
+  // then
+  expect(await screen.findByTestId("booking-balance")).toHaveTextContent("Dein Guthaben: 19,49 €");
+  expect(screen.queryByTestId("booking-credit-short"), "a balance equal to the amount covers it").toBeNull();
+});
+
+it("given credit in another currency than the club's, when the dialog opens, then it does not count as covering the amount", async () => {
+  // given
+  vi.spyOn(api, "ownCredit").mockResolvedValue({ ...creditOf(5000), currency: "CHF" });
+
+  // when
+  await showExternal(1299);
+
+  // then
+  expect(await screen.findByTestId("booking-credit-short"), "francs never pay a booking in euros").toBeInTheDocument();
+});
+
+it("given a free card, when an external player opens the dialog, then no balance is read", async () => {
+  // given
+  const read = vi.spyOn(api, "ownCredit");
+
+  // when
+  await showExternal(0);
+
+  // then
+  expect(read, "nothing is owed for a free card").not.toHaveBeenCalled();
+  expect(screen.queryByTestId("booking-balance")).toBeNull();
+});
+
+it("given a card priced for external players, when a member opens the dialog, then no balance is read", async () => {
+  // given
+  vi.spyOn(api, "bookingCards").mockResolvedValue([{ ...cardWithGuestFee(0), externalPriceMinor: 1299 }]);
+  const read = vi.spyOn(api, "ownCredit");
+
+  // when
+  show("EUR");
+  await screen.findByTestId("booking-card");
+  await act(() => new Promise((settled) => setTimeout(settled, 0)));
+
+  // then
+  expect(read, "a member owes nothing for a court").not.toHaveBeenCalled();
+  expect(screen.queryByTestId("booking-balance")).toBeNull();
+});
+
+it("given credit short of the amount, when the club refuses the booking, then the refusal names balance and amount as money", async () => {
+  // given
+  vi.spyOn(api, "createBooking").mockRejectedValue(new ApiError(422, {
+    type: "urn:courtside:error:booking-rules-violated", title: "Booking rules violated", status: 422,
+    violations: [{ code: "booking.payment.creditInsufficient", params: { amountMinor: 1949, balanceMinor: 1000, currency: "EUR" } }]
+  }));
+  await showExternal(1299);
+
+  // when
+  fireEvent.click(screen.getByTestId("booking-submit"));
+
+  // then
+  expect(await screen.findByTestId("booking-outcome"))
+    .toHaveTextContent("Dein Guthaben von 10,00 € reicht für diese Buchung über 19,49 € nicht.");
+  expect(document.getElementById("booking-startsAt-errors"), "short credit is no fault of the chosen time").toBeNull();
+  expect(screen.queryByTestId("booking-refusal"), "the refusal is stated once").toBeNull();
 });

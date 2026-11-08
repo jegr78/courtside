@@ -1,6 +1,6 @@
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { api, ApiError, type CreditEntryKind, type CreditEntryRequest, type CreditHolder, type CreditPageOptions } from "../api/client";
+import { api, ApiError, type CreditEntryRequest, type CreditEntryRequestKind, type CreditHolder, type CreditPageOptions } from "../api/client";
 import { problemMessage } from "../api/problem-message";
 import { useClubConfiguration } from "../club/registry";
 import { Alert } from "../components/Alert";
@@ -21,7 +21,7 @@ import { CreditLedger } from "./CreditLedger";
 import { useCreditLedger } from "./useCreditLedger";
 
 const RECENT_AUTH = "urn:courtside:error:recent-authentication-required";
-const KINDS: CreditEntryKind[] = ["CREDIT", "PAYOUT"];
+const KINDS: CreditEntryRequestKind[] = ["CREDIT", "PAYOUT"];
 const LARGEST_ENTRY_MINOR = 1_000_000;
 const NOTE_LENGTH = 200;
 

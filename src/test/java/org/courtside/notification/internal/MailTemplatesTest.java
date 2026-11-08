@@ -44,7 +44,8 @@ class MailTemplatesTest {
             entry("last", "Tuesday, 2 June 2026"), entry("count", "3"),
             entry("reason", "Reason: the weather."), entry("previousFrom", "17:00"), entry("previousTo", "19:00"),
             entry("previousCourts", "Court 2"), entry("until", "18:15"), entry("untilDay", "Wednesday, 13 May 2026"),
-            entry("accessCodes", ""), entry("instanceLink", "https://courts.example.org/my-bookings"));
+            entry("accessCodes", ""), entry("payment", ""), entry("refund", ""), entry("amount", "€15.00"),
+            entry("instanceLink", "https://courts.example.org/my-bookings"));
 
     private static final String ADDRESS_LIKE = "(?i)[a-z][a-z0-9+.-]*://|\\b[\\p{L}0-9-]+\\.\\p{L}{2,}\\b";
 

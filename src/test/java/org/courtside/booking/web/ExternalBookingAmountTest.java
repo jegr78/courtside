@@ -4,6 +4,7 @@ import org.courtside.AbstractIntegrationTest;
 import org.courtside.booking.testfixture.BookingTestFixture;
 import org.courtside.card.testfixture.CardTestFixture;
 import org.courtside.config.testfixture.ConfigTestFixture;
+import org.courtside.credit.testfixture.CreditTestFixture;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
@@ -30,7 +31,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @Import({FacilityTestFixture.class, IdentityTestFixture.class, BookingTestFixture.class, CardTestFixture.class,
-        ConfigTestFixture.class})
+        ConfigTestFixture.class, CreditTestFixture.class})
 class ExternalBookingAmountTest extends AbstractIntegrationTest {
 
     private static final TimeSlot EVENING =
@@ -50,6 +51,8 @@ class ExternalBookingAmountTest extends AbstractIntegrationTest {
     private CardTestFixture cards;
     @Autowired
     private ConfigTestFixture config;
+    @Autowired
+    private CreditTestFixture credit;
 
     @Test
     void givenAPricedBookingOfAnExternalPlayer_whenTheyReadTheirBookings_thenTheStampedAmountComesWithIt()
@@ -65,6 +68,7 @@ class ExternalBookingAmountTest extends AbstractIntegrationTest {
         cards.priceForExternals(winterDoubles, 1600);
         UUID john = identity.createPerson("John", "Roe", "john.roe@example.org");
         UUID johnAccount = identity.createEnabledAccount(john, "roe.john", Set.of(Role.EXTERNAL));
+        credit.credit(johnAccount, 2400);
         bookings.createBookingWithGuest(court, winterDoubles, EVENING, johnAccount, john, Set.of(Role.EXTERNAL),
                 null, "Mary Major");
         cards.priceForExternals(winterDoubles, 2000);

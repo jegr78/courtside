@@ -21,6 +21,7 @@ import org.courtside.card.BookingCard;
 import org.courtside.card.CardService;
 import org.courtside.config.ClubCurrency;
 import org.courtside.card.ParticipantCard;
+import org.courtside.credit.BookingPayments;
 import org.courtside.facility.FacilityService;
 import org.courtside.config.BookingGridCoordination;
 import org.courtside.identity.AccountAnonymisedException;
@@ -28,6 +29,7 @@ import org.courtside.identity.Outsiders;
 import org.courtside.identity.PersonRepository;
 import org.courtside.identity.Role;
 import org.courtside.identity.UserAccountRepository;
+import org.courtside.rules.RuleViolation;
 import org.courtside.shared.BookingCancelled;
 import org.courtside.shared.CancellationReason;
 import org.courtside.shared.DomainFailure;
@@ -50,6 +52,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -81,6 +84,7 @@ class BookingWriter implements SeriesOccurrenceCancellation, BookingDrafts, Unat
     private final ApplicationEventPublisher events;
     private final CourtReservations reservations;
     private final ClubCurrency currency;
+    private final BookingPayments payments;
 
     @Override
     public UUID write(CreateBookingCommand command) {
@@ -159,6 +163,10 @@ class BookingWriter implements SeriesOccurrenceCancellation, BookingDrafts, Unat
             }
             throw e;
         }
+        Optional<BookingAmount> amount = booking.amount().filter(charged -> charged.minor() > 0);
+        if (amount.isPresent()) {
+            payFromCredit(command.bookedBy(), booking.getId(), amount.get());
+        }
         reservations.booked(command.bookedBy(), booking.getId(), command.courtIds(), command.slot());
         countCreatedOnCommit();
         // A series is one decision and gets one message of its own, not one per occurrence.
@@ -167,6 +175,15 @@ class BookingWriter implements SeriesOccurrenceCancellation, BookingDrafts, Unat
             announceRecordedMembers(booking.getId(), command);
         }
         return booking.getId();
+    }
+
+    private void payFromCredit(UUID bookedBy, UUID bookingId, BookingAmount amount) {
+        BookingPayments.BookingDebit debit = payments.debit(bookedBy, bookingId, amount.minor(), amount.currency());
+        if (!debit.covered()) {
+            throw new BookingRulesViolatedException(List.of(new RuleViolation("booking.payment.creditInsufficient",
+                    Map.of("amountMinor", amount.minor(), "balanceMinor", debit.balanceMinor(),
+                            "currency", debit.currency()))));
+        }
     }
 
     private void countCreatedOnCommit() {
@@ -239,8 +256,16 @@ class BookingWriter implements SeriesOccurrenceCancellation, BookingDrafts, Unat
         bookings.saveAndFlush(booking);
         if (changed) {
             releaseCourtsOf(booking);
+            if (cancelledAt.isBefore(startOf(booking))) {
+                payments.refund(bookingId);
+            }
         }
         return changed;
+    }
+
+    private static Instant startOf(Booking booking) {
+        return booking.getAllocations().stream().map(CourtAllocation::getStartsAt).min(Instant::compareTo)
+                .orElseThrow(() -> new IllegalStateException("A booking must occupy a court"));
     }
 
     @Override
