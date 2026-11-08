@@ -26,6 +26,7 @@ import java.util.concurrent.TimeUnit;
 public class PayPalReconciliation {
 
     static final int PAGE_SIZE = 50;
+    private static final int OUTAGE_AFTER = 3;
     private static final Duration CAPTURE_WATCH = Duration.ofHours(72);
 
     private final PayPalOrders orders;
@@ -61,19 +62,28 @@ public class PayPalReconciliation {
                 guarded(bookingId.toString(), () -> pendingPayments.release(bookingId));
             }
         }
+        Unreachable unreachable = new Unreachable();
         for (String orderId : due) {
+            if (unreachable.outage()) break;
             guarded(orderId, () -> {
-                if (checkout.reconcile(orderId, unresolvedReleaseAfter).outcome() == Outcome.PROCESSING) {
-                    orders.checked(orderId, Status.CREATED);
-                }
+                PayPalCheckout.Reconciled reconciled = checkout.reconcile(orderId, unresolvedReleaseAfter);
+                unreachable.count(reconciled.payPalUnreachable());
+                if (reconciled.outcome() == Outcome.PROCESSING) orders.checked(orderId, Status.CREATED);
             });
         }
-        for (String orderId : orders.voidedAfterCaptureAttempt(now.minus(CAPTURE_WATCH), now.minus(reconcileAfter),
-                PAGE_SIZE)) {
-            guarded(orderId, () -> {
-                checkout.recheckVoided(orderId);
-                orders.checked(orderId, Status.VOIDED);
-            });
+        if (!unreachable.outage()) {
+            for (String orderId : orders.voidedAfterCaptureAttempt(now.minus(CAPTURE_WATCH),
+                    now.minus(reconcileAfter), PAGE_SIZE)) {
+                if (unreachable.outage()) break;
+                guarded(orderId, () -> {
+                    unreachable.count(!checkout.recheckVoided(orderId));
+                    orders.checked(orderId, Status.VOIDED);
+                });
+            }
+        }
+        if (unreachable.outage()) {
+            log.warn("PayPal did not answer {} reads in a row; the remaining orders wait for the next run",
+                    OUTAGE_AFTER);
         }
     }
 
@@ -82,6 +92,19 @@ public class PayPalReconciliation {
             step.run();
         } catch (RuntimeException failed) {
             log.error("PayPal reconciliation failed for {} and retries on the next run", subject, failed);
+        }
+    }
+
+    private static final class Unreachable {
+
+        private int inARow;
+
+        void count(boolean unreachable) {
+            inARow = unreachable ? inARow + 1 : 0;
+        }
+
+        boolean outage() {
+            return inARow >= OUTAGE_AFTER;
         }
     }
 }

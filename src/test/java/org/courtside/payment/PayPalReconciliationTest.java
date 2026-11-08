@@ -254,6 +254,25 @@ class PayPalReconciliationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenPayPalDown_whenTheJobMeetsThreeUnreachableOrders_thenTheRunStopsAndTheRestWait() {
+        // given
+        List<String> open = List.of("ORDERA", "ORDERB", "ORDERC", "ORDERD", "ORDERE");
+        open.forEach(orderId -> {
+            storeAttemptedOrder(orderId, "EUR");
+            PAYPAL.reply(readOf(orderId), 503, UNAVAILABLE);
+        });
+
+        // when
+        reconciliation.run();
+
+        // then
+        assertThat(open.stream().mapToInt(orderId -> PAYPAL.seen(readOf(orderId)).size()).sum())
+                .as("an outage costs a run at most three PayPal calls").isEqualTo(3);
+        assertThat(jdbc.sql("SELECT count(*) FROM paypal_order WHERE status = 'CREATED'").query(Integer.class).single())
+                .isEqualTo(5);
+    }
+
+    @Test
     void givenAnApprovedOrderAndPayPalDown_whenTheDeadlinePasses_thenTheBookingStaysHeld() throws Exception {
         // given
         UUID booking = bookWithOrder();
@@ -679,6 +698,21 @@ class PayPalReconciliationTest extends AbstractIntegrationTest {
     private void expire(UUID booking, Duration ago) {
         jdbc.sql("UPDATE booking SET payment_expires_at = :at WHERE id = :id")
                 .param("at", Timestamp.from(clock.instant().minus(ago))).param("id", booking).update();
+    }
+
+    private void storeAttemptedOrder(String orderId, String currency) {
+        jdbc.sql("""
+                        INSERT INTO paypal_order (order_id, booking_id, account_id, environment, amount_minor, currency,
+                                                  status, capture_attempted_at, approve_url, created_at, updated_at)
+                        VALUES (:order, gen_random_uuid(), :account, 'SANDBOX', 1500, :currency, 'CREATED', :old,
+                                'https://paypal.example.org/checkoutnow', :old, :old)
+                        """)
+                .param("order", orderId).param("account", johnAccount).param("currency", currency)
+                .param("old", Timestamp.from(clock.instant().minus(Duration.ofHours(1)))).update();
+    }
+
+    private static String readOf(String orderId) {
+        return "GET /sandbox/v2/checkout/orders/" + orderId;
     }
 
     private boolean captureAttempted() {

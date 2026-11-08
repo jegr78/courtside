@@ -130,30 +130,45 @@ public class PayPalCheckout {
     }
 
     /** Settles an open order; one PayPal cannot show releases its booking {@code unresolvedAfter} past the deadline. */
-    public Settlement reconcile(String orderId, Duration unresolvedAfter) {
+    public Reconciled reconcile(String orderId, Duration unresolvedAfter) {
         requireNoTransaction();
         StoredOrder stored = orders.find(orderId).orElseThrow(PayPalOrderNotFoundException::new);
         Optional<Settlement> settled = settled(stored);
-        if (settled.isPresent()) return settled.get();
+        if (settled.isPresent()) return Reconciled.answered(settled.get());
         Optional<PendingBooking> pending = pendingPayments.pending(stored.bookingId());
-        if (stored.captureAttemptedAt() == null && pending.isEmpty()) return voided(stored, VoidReason.BOOKING_RELEASED);
+        if (stored.captureAttemptedAt() == null && pending.isEmpty()) {
+            return Reconciled.answered(voided(stored, VoidReason.BOOKING_RELEASED));
+        }
         Optional<PayPalClient.Credentials> readable = credentials.stored(stored.environment());
         if (readable.isEmpty()) {
             log.warn("PayPal order {} of booking {} cannot be read: no stored {} credentials", stored.orderId(),
                     stored.bookingId(), stored.environment());
-            return unresolved(stored, pending, unresolvedAfter);
+            return Reconciled.answered(unresolved(stored, pending, unresolvedAfter));
         }
-        Optional<PayPalClient.Order> order = read(stored, readable.get());
-        if (order.isEmpty()) return unresolved(stored, pending, unresolvedAfter);
-        Optional<PayPalClient.Capture> capture = order.get().capture();
-        if (capture.isPresent()) return settle(stored, capture.get(), mismatch(stored, order.get()).isEmpty());
+        PayPalClient.Order order;
+        try {
+            order = client.getOrder(readable.get(), stored.orderId());
+        } catch (PayPalUnavailableException down) {
+            log.warn("PayPal order {} of booking {} could not be read: {}", stored.orderId(), stored.bookingId(),
+                    down.getMessage());
+            return new Reconciled(unresolved(stored, pending, unresolvedAfter).outcome(), true);
+        } catch (PayPalRefusedException refused) {
+            log.warn("PayPal order {} of booking {} could not be read: {}", stored.orderId(), stored.bookingId(),
+                    refused.getMessage());
+            return Reconciled.answered(unresolved(stored, pending, unresolvedAfter));
+        }
+        return Reconciled.answered(decide(stored, pending, order));
+    }
+
+    private Settlement decide(StoredOrder stored, Optional<PendingBooking> pending, PayPalClient.Order order) {
+        Optional<PayPalClient.Capture> capture = order.capture();
+        if (capture.isPresent()) return settle(stored, capture.get(), mismatch(stored, order).isEmpty());
         Optional<PayPalClient.Credentials> active = credentials.active(stored.environment());
         boolean beforeDeadline = pending.filter(held -> held.expiresAt().isAfter(clock.instant())).isPresent();
-        if (active.isPresent() && pending.isPresent()
-                && (beforeDeadline || order.get().status().equals("APPROVED"))) {
-            return settle(stored, active.get(), order.get());
+        if (active.isPresent() && pending.isPresent() && (beforeDeadline || order.status().equals("APPROVED"))) {
+            return settle(stored, active.get(), order);
         }
-        if (!UNCAPTURED.contains(order.get().status())) return processing(stored);
+        if (!UNCAPTURED.contains(order.status())) return processing(stored);
         VoidReason reason = active.isEmpty() ? VoidReason.CREDENTIALS_CHANGED
                 : pending.isPresent() ? VoidReason.HOLD_EXPIRED : VoidReason.BOOKING_RELEASED;
         return voided(stored, reason);
@@ -175,15 +190,25 @@ public class PayPalCheckout {
         });
     }
 
-    /** Records a capture PayPal completed after the order was voided; the money becomes credit. */
-    public void recheckVoided(String orderId) {
+    /** Records a capture PayPal completed after the order was voided; false when PayPal did not answer. */
+    public boolean recheckVoided(String orderId) {
         requireNoTransaction();
         Optional<StoredOrder> stored = orders.find(orderId).filter(order -> order.status() == Status.VOIDED);
-        if (stored.isEmpty()) return;
-        Optional<PayPalClient.Order> order = credentials.stored(stored.get().environment())
-                .flatMap(readable -> read(stored.get(), readable));
-        order.flatMap(PayPalClient.Order::capture).filter(capture -> capture.status().equals("COMPLETED"))
-                .ifPresent(capture -> record(stored.get(), capture, mismatch(stored.get(), order.get()).isEmpty()));
+        Optional<PayPalClient.Credentials> readable = stored.flatMap(order -> credentials.stored(order.environment()));
+        if (readable.isEmpty()) return true;
+        PayPalClient.Order order;
+        try {
+            order = client.getOrder(readable.get(), orderId);
+        } catch (PayPalUnavailableException down) {
+            log.warn("Voided PayPal order {} could not be read: {}", orderId, down.getMessage());
+            return false;
+        } catch (PayPalRefusedException refused) {
+            log.warn("Voided PayPal order {} could not be read: {}", orderId, refused.getMessage());
+            return true;
+        }
+        order.capture().filter(capture -> capture.status().equals("COMPLETED"))
+                .ifPresent(capture -> record(stored.get(), capture, mismatch(stored.get(), order).isEmpty()));
+        return true;
     }
 
     private Settlement settleOrVoid(StoredOrder stored, PayPalClient.Credentials readable, VoidReason reason) {
@@ -403,5 +428,13 @@ public class PayPalCheckout {
     }
 
     public record Settlement(UUID bookingId, Outcome outcome) {
+    }
+
+    /** The outcome of one reconciled order and whether PayPal failed to answer its read. */
+    public record Reconciled(Outcome outcome, boolean payPalUnreachable) {
+
+        static Reconciled answered(Settlement settlement) {
+            return new Reconciled(settlement.outcome(), false);
+        }
     }
 }
