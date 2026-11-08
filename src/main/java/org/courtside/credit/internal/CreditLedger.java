@@ -111,6 +111,41 @@ public class CreditLedger implements BookingPayments {
 
     @Override
     @Transactional(propagation = Propagation.MANDATORY)
+    public void payByPayPal(UUID accountId, UUID bookingId, String orderId, int amountMinor, Currency currency) {
+        requirePayPalCapture(accountId, bookingId, orderId, amountMinor, currency);
+        lock(accountId);
+        String code = currency.getCurrencyCode();
+        insert(accountId, CreditEntryKind.PAYPAL_PAYMENT, amountMinor, code, bookingId, null, orderId);
+        insert(accountId, CreditEntryKind.BOOKING_DEBIT, -amountMinor, code, bookingId, null, null);
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public boolean creditLateCapture(UUID accountId, UUID bookingId, String orderId, int amountMinor,
+                                     Currency currency) {
+        requirePayPalCapture(accountId, bookingId, orderId, amountMinor, currency);
+        if (anonymised(accountId)) {
+            return false;
+        }
+        lock(accountId);
+        insert(accountId, CreditEntryKind.PAYPAL_LATE_CAPTURE, amountMinor, currency.getCurrencyCode(), bookingId,
+                null, orderId);
+        return true;
+    }
+
+    private void requirePayPalCapture(UUID accountId, UUID bookingId, String orderId, int amountMinor,
+                                      Currency currency) {
+        if (accountId == null || bookingId == null || orderId == null || orderId.isBlank() || currency == null
+                || amountMinor < 1) {
+            throw new IllegalStateException("A PayPal capture needs an account, a booking, an order and a positive amount");
+        }
+        if (!currency.equals(clubCurrency.currency())) {
+            throw new IllegalStateException("A PayPal capture must be in the club currency");
+        }
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
     public void refund(UUID bookingId) {
         if (bookingId == null) {
             throw new IllegalStateException("A refund needs a booking");
@@ -146,12 +181,15 @@ public class CreditLedger implements BookingPayments {
         }
         return jdbc.sql("""
                         SELECT d.amount_minor, d.currency,
+                               EXISTS (SELECT 1 FROM credit_entry p
+                                       WHERE p.booking_id = d.booking_id AND p.kind = 'PAYPAL_PAYMENT') AS paypal,
                                EXISTS (SELECT 1 FROM credit_entry r
                                        WHERE r.booking_id = d.booking_id AND r.kind = 'BOOKING_REFUND') AS refunded
                         FROM credit_entry d WHERE d.booking_id = :booking AND d.kind = 'BOOKING_DEBIT'
                         """)
                 .param("booking", bookingId)
                 .query((rs, row) -> new Payment(-rs.getInt("amount_minor"), rs.getString("currency"),
+                        rs.getBoolean("paypal") ? PaymentMethod.PAYPAL : PaymentMethod.CREDIT,
                         rs.getBoolean("refunded")))
                 .optional();
     }
@@ -163,12 +201,17 @@ public class CreditLedger implements BookingPayments {
 
     private Recorded insert(UUID accountId, CreditEntryKind kind, int signed, String currency,
                             @Nullable UUID bookingId, @Nullable String reason) {
+        return insert(accountId, kind, signed, currency, bookingId, reason, null);
+    }
+
+    private Recorded insert(UUID accountId, CreditEntryKind kind, int signed, String currency,
+                            @Nullable UUID bookingId, @Nullable String reason, @Nullable String orderId) {
         UUID entryId = UUID.randomUUID();
         Instant now = clock.instant().truncatedTo(ChronoUnit.MICROS);
         jdbc.sql("""
                         INSERT INTO credit_entry (id, account_id, kind, amount_minor, currency, recorded_at, recorded_by,
-                                                  booking_id)
-                        VALUES (:id, :account, :kind, :amount, :currency, :at, :by, :booking)
+                                                  booking_id, paypal_order_id)
+                        VALUES (:id, :account, :kind, :amount, :currency, :at, :by, :booking, :order)
                         """)
                 .param("id", entryId)
                 .param("account", accountId)
@@ -178,6 +221,7 @@ public class CreditLedger implements BookingPayments {
                 .param("at", Timestamp.from(now))
                 .param("by", currentUser.accountId().orElse(null))
                 .param("booking", bookingId)
+                .param("order", orderId)
                 .update();
         if (reason != null) {
             jdbc.sql("INSERT INTO credit_entry_note (entry_id, reason_text) VALUES (:id, :note)")
