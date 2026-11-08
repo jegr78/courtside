@@ -753,16 +753,16 @@
         "level": "pseudonymous",
         "lifecycle": "booking-pseudonymisation"
       },
-      "cancellation_reason": {
-        "level": "operational",
-        "lifecycle": "booking-pseudonymisation"
-      },
       "cancelled_at": {
         "level": "operational",
         "lifecycle": "booking-pseudonymisation"
       },
       "cancelled_by": {
         "level": "pseudonymous",
+        "lifecycle": "booking-pseudonymisation"
+      },
+      "cancellation_reason": {
+        "level": "operational",
         "lifecycle": "booking-pseudonymisation"
       },
       "card_id": {
@@ -793,14 +793,6 @@
         "level": "personal",
         "lifecycle": "booking-pseudonymisation"
       },
-      "payment_expires_at": {
-        "level": "operational",
-        "lifecycle": "booking-pseudonymisation"
-      },
-      "pseudonymised_at": {
-        "level": "operational",
-        "lifecycle": "booking-pseudonymisation"
-      },
       "reminded_at": {
         "level": "operational",
         "lifecycle": "booking-pseudonymisation"
@@ -814,6 +806,14 @@
         "lifecycle": "booking-pseudonymisation"
       },
       "status": {
+        "level": "operational",
+        "lifecycle": "booking-pseudonymisation"
+      },
+      "pseudonymised_at": {
+        "level": "operational",
+        "lifecycle": "booking-pseudonymisation"
+      },
+      "payment_expires_at": {
         "level": "operational",
         "lifecycle": "booking-pseudonymisation"
       }
@@ -1277,10 +1277,6 @@
         "level": "operational",
         "lifecycle": "credit-ledger"
       },
-      "paypal_order_id": {
-        "level": "operational",
-        "lifecycle": "credit-ledger"
-      },
       "position": {
         "level": "operational",
         "lifecycle": "credit-ledger"
@@ -1291,6 +1287,10 @@
       },
       "recorded_by": {
         "level": "pseudonymous",
+        "lifecycle": "credit-ledger"
+      },
+      "paypal_order_id": {
+        "level": "operational",
         "lifecycle": "credit-ledger"
       }
     },
@@ -1400,24 +1400,6 @@
         "lifecycle": "roster-record"
       }
     },
-    "import_age_band": {
-      "lower_bound": {
-        "level": "operational",
-        "lifecycle": "import-record"
-      },
-      "membership_type_id": {
-        "level": "operational",
-        "lifecycle": "import-record"
-      },
-      "source_id": {
-        "level": "operational",
-        "lifecycle": "import-record"
-      },
-      "source_value": {
-        "level": "operational",
-        "lifecycle": "import-record"
-      }
-    },
     "import_column_mapping": {
       "canonical_field": {
         "level": "operational",
@@ -1464,6 +1446,24 @@
         "lifecycle": "import-record"
       },
       "source_id": {
+        "level": "operational",
+        "lifecycle": "import-record"
+      }
+    },
+    "import_age_band": {
+      "lower_bound": {
+        "level": "operational",
+        "lifecycle": "import-record"
+      },
+      "membership_type_id": {
+        "level": "operational",
+        "lifecycle": "import-record"
+      },
+      "source_id": {
+        "level": "operational",
+        "lifecycle": "import-record"
+      },
+      "source_value": {
         "level": "operational",
         "lifecycle": "import-record"
       }
@@ -2108,86 +2108,6 @@
         "lifecycle": "reset-code"
       }
     },
-    "paypal_order": {
-      "account_id": {
-        "level": "pseudonymous",
-        "lifecycle": "payment-provider"
-      },
-      "amount_minor": {
-        "level": "operational",
-        "lifecycle": "payment-provider"
-      },
-      "booking_id": {
-        "level": "operational",
-        "lifecycle": "payment-provider"
-      },
-      "capture_id": {
-        "level": "operational",
-        "lifecycle": "payment-provider"
-      },
-      "created_at": {
-        "level": "operational",
-        "lifecycle": "payment-provider"
-      },
-      "currency": {
-        "level": "operational",
-        "lifecycle": "payment-provider"
-      },
-      "environment": {
-        "level": "operational",
-        "lifecycle": "payment-provider"
-      },
-      "order_id": {
-        "level": "operational",
-        "lifecycle": "payment-provider"
-      },
-      "status": {
-        "level": "operational",
-        "lifecycle": "payment-provider"
-      },
-      "updated_at": {
-        "level": "operational",
-        "lifecycle": "payment-provider"
-      }
-    },
-    "paypal_settings": {
-      "client_id": {
-        "level": "operational",
-        "lifecycle": "payment-provider"
-      },
-      "enabled": {
-        "level": "operational",
-        "lifecycle": "payment-provider"
-      },
-      "environment": {
-        "level": "operational",
-        "lifecycle": "payment-provider"
-      },
-      "id": {
-        "level": "operational",
-        "lifecycle": "payment-provider"
-      },
-      "secret_ciphertext": {
-        "level": "secret",
-        "lifecycle": "payment-provider"
-      },
-      "secret_stored_at": {
-        "level": "operational",
-        "lifecycle": "payment-provider"
-      },
-      "singleton": {
-        "level": "operational",
-        "lifecycle": "payment-provider"
-      },
-      "updated_at": {
-        "level": "operational",
-        "lifecycle": "payment-provider"
-      },
-      "updated_by": {
-        "level": "pseudonymous",
-        "lifecycle": "payment-provider"
-      }
-    },
     "person": {
       "email": {
         "level": "personal",
@@ -2204,28 +2124,6 @@
       "last_name": {
         "level": "personal",
         "lifecycle": "roster-record"
-      }
-    },
-    "registration_verification": {
-      "account_id": {
-        "level": "pseudonymous",
-        "lifecycle": "registration-verification"
-      },
-      "code_hash": {
-        "level": "secret",
-        "lifecycle": "registration-verification"
-      },
-      "created_at": {
-        "level": "operational",
-        "lifecycle": "registration-verification"
-      },
-      "expires_at": {
-        "level": "operational",
-        "lifecycle": "registration-verification"
-      },
-      "security_epoch": {
-        "level": "operational",
-        "lifecycle": "registration-verification"
       }
     },
     "retention_policy": {
@@ -2574,6 +2472,108 @@
       "position": {
         "level": "operational",
         "lifecycle": "waitlist-sweep"
+      }
+    },
+    "registration_verification": {
+      "account_id": {
+        "level": "pseudonymous",
+        "lifecycle": "registration-verification"
+      },
+      "code_hash": {
+        "level": "secret",
+        "lifecycle": "registration-verification"
+      },
+      "created_at": {
+        "level": "operational",
+        "lifecycle": "registration-verification"
+      },
+      "expires_at": {
+        "level": "operational",
+        "lifecycle": "registration-verification"
+      },
+      "security_epoch": {
+        "level": "operational",
+        "lifecycle": "registration-verification"
+      }
+    },
+    "paypal_settings": {
+      "client_id": {
+        "level": "operational",
+        "lifecycle": "payment-provider"
+      },
+      "enabled": {
+        "level": "operational",
+        "lifecycle": "payment-provider"
+      },
+      "environment": {
+        "level": "operational",
+        "lifecycle": "payment-provider"
+      },
+      "id": {
+        "level": "operational",
+        "lifecycle": "payment-provider"
+      },
+      "secret_ciphertext": {
+        "level": "secret",
+        "lifecycle": "payment-provider"
+      },
+      "secret_stored_at": {
+        "level": "operational",
+        "lifecycle": "payment-provider"
+      },
+      "singleton": {
+        "level": "operational",
+        "lifecycle": "payment-provider"
+      },
+      "updated_at": {
+        "level": "operational",
+        "lifecycle": "payment-provider"
+      },
+      "updated_by": {
+        "level": "pseudonymous",
+        "lifecycle": "payment-provider"
+      }
+    },
+    "paypal_order": {
+      "account_id": {
+        "level": "pseudonymous",
+        "lifecycle": "payment-provider"
+      },
+      "amount_minor": {
+        "level": "operational",
+        "lifecycle": "payment-provider"
+      },
+      "booking_id": {
+        "level": "operational",
+        "lifecycle": "payment-provider"
+      },
+      "capture_id": {
+        "level": "operational",
+        "lifecycle": "payment-provider"
+      },
+      "created_at": {
+        "level": "operational",
+        "lifecycle": "payment-provider"
+      },
+      "currency": {
+        "level": "operational",
+        "lifecycle": "payment-provider"
+      },
+      "environment": {
+        "level": "operational",
+        "lifecycle": "payment-provider"
+      },
+      "order_id": {
+        "level": "operational",
+        "lifecycle": "payment-provider"
+      },
+      "status": {
+        "level": "operational",
+        "lifecycle": "payment-provider"
+      },
+      "updated_at": {
+        "level": "operational",
+        "lifecycle": "payment-provider"
       }
     }
   }
