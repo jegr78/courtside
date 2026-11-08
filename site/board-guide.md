@@ -12,7 +12,7 @@ eine ihrer Rollen außer *Mitglied* als verwaltende Rolle nennt oder einer ihrer
 ohne Spielerliste erlaubt. Die Liste zeigt, wofür die verwaltenden Rollen zuständig sind, das Serienformular, was die
 buchenden Rollen erlauben. Ein Konto, dem keine Karte etwas davon gibt, erhält auch über eine direkt
 eingegebene Adresse keinen Zugriff. Das ändern Vorstände an den Buchungskarten. Konten mit der
-Rolle **Kassenwart** sehen in der Verwaltung außerdem die *Gastgebühren*.
+Rolle **Kassenwart** sehen in der Verwaltung außerdem die *Gastgebühren* und das *Guthaben*.
 
 Die Seitenleiste führt oben zur Übersicht und ordnet die Verwaltung darunter in vier Bereiche:
 
@@ -20,7 +20,7 @@ Die Seitenleiste führt oben zur Übersicht und ordnet die Verwaltung darunter i
 |---|---|
 | **Verein** | Einrichtung, Vereinsprofil, Fristen und Erinnerungen, Buchungsregeln, Nachrichtentexte |
 | **Anlage** | Plätze, Öffnungszeiten, Buchungskarten und Platzfüller |
-| **Mitglieder** | Personen, Konten, Mitgliedsarten und Import |
+| **Mitglieder** | Personen, Konten, Mitgliedsarten, Import und Guthaben |
 | **Nachweise** | Statistik, Nutzung, Datenexport, Aufbewahrung, Änderungsprotokoll und Nachrichtenprotokoll |
 
 Über dieselbe Leiste kehrst du zum Platzplan zurück.
@@ -137,7 +137,8 @@ Statusleiste der installierten App übernimmt die Primärfarbe beim nächsten Ö
 * Das **Buchungsraster** bestimmt die Zeilen im Platzplan und die zulässigen Startzeiten.
 * Die **Währung** ist ein dreistelliger ISO-Code wie `EUR` oder `CHF`. In ihr gelten Gastgebühren und Preise für Externe.
   Ein Wechsel rechnet nichts um: Die Gebühren der Buchungsarten behalten ihre Zahl, und bereits
-  gebuchte Gäste behalten ihren Betrag.
+  gebuchte Gäste behalten ihren Betrag. Solange ein Konto Guthaben hat, lehnt Courtside den Wechsel
+  ab. Zahle das Guthaben vorher aus.
 * **Externe Buchungen zulassen** öffnet Buchungskarten, die die Rolle *Extern* nennen, für Personen
   außerhalb des Vereins. Ohne diesen Haken bucht niemand mit dieser Rolle, auch wenn eine Karte sie
   nennt. Solange er gesetzt ist, bietet die Anmeldeseite eine Registrierung an, und zwei Felder
@@ -739,6 +740,27 @@ Ein späterer korrekter Import stellt deaktivierte Konten oder entfernte Mitglie
 automatisch wieder her. Nach einer versehentlich unvollständigen Liste musst du betroffene Konten
 aktivieren und Mitgliedsrollen neu vergeben.
 
+## Mitglieder → Guthaben
+
+Externe Spieler können beim Verein Guthaben haben, zum Beispiel nach einer Barzahlung im Clubhaus.
+Die Seite *Guthaben* steht Administratoren und der Rolle **Kassenwart** offen. Ohne Suche listet sie
+jedes Konto mit Guthaben. Die Suche findet externe Konten nach Name, E-Mail-Adresse oder
+Benutzername. Administratoren finden die Seite unter *Mitglieder*, Kassenwarte direkt in der
+Seitenleiste.
+
+![Das Guthaben eines externen Spielers mit Stand, Einträgen und dem Formular für Gutschrift und Auszahlung.](screenshots/de/credit.png)
+
+Ein gewähltes Konto zeigt seine Einträge, die neuesten zuerst, mit dem Stand nach jedem Eintrag.
+Mit **Gutschrift** buchst du Geld auf ein externes Konto, mit **Auszahlung** gibst du Guthaben
+zurück. Ein Eintrag liegt zwischen 0,01 und 10.000,00 in der Vereinswährung und braucht eine
+Begründung von höchstens 200 Zeichen. Der Spieler sieht sie in seinem Konto, schreib also nichts
+hinein, was er nicht lesen soll. Eine Auszahlung über den Stand hinaus lehnt Courtside ab. Fehlt
+eine frische Passwortbestätigung, fragt Courtside dein Passwort ab.
+
+Einträge lassen sich weder ändern noch löschen. Einen Fehler korrigierst du mit einem Eintrag in die
+andere Richtung. Das Änderungsprotokoll hält jeden Eintrag mit Betrag und Art fest, ohne die
+Begründung. Ein Spieler mit Guthaben kann sein Konto nicht schließen, bis du es ausgezahlt hast.
+
 ## Nachweise
 
 Unter **Nachweise** findest du neun Ansichten. Die *Aufbewahrung* beschreibt der nächste Abschnitt.
@@ -864,7 +886,8 @@ Es gibt drei Kategorien, jede mit einer Frist in Monaten von 1 bis 1200:
   seit der Frist weder angelegt noch angemeldet wurde und keine eigene Buchung ab diesem Tag hat,
   auch keine anstehende. Name, E-Mail-Adresse, Benutzername und Passwort entfallen, seine Buchungen
   bleiben ohne Namen. Ein Konto, das der Spieler selbst geschlossen hat, ist schon anonym und zählt
-  nicht mit.
+  nicht mit. Ein Konto mit Guthaben bleibt, bis du es ausgezahlt hast. Die Einträge seines
+  Guthabens bleiben ohne Begründung erhalten.
 
 Lies vor dem Setzen einer Buchungsfrist, was dir danach fehlt: Für pseudonymisierte Zeiträume zählt
 die Statistik keine aktiven Mitglieder mehr, und die Nutzung kann die Kapazität dieser Zeit keiner
@@ -879,6 +902,7 @@ Personen, die er noch nicht erreicht, mit dem Grund:
 * Ein Konto der Person hat die Rolle *Administrator*.
 * Eine Buchung oder Serie, die bleibt, nennt die Person noch.
 * Die Person wartet auf einen Platz.
+* Ein Konto der Person hat Einträge im Guthaben. Sie werden nie gelöscht, deshalb bleibt die Person.
 
 Über *Person öffnen* erreichst du die Person und kannst den Grund beheben. Erst wenn du im Formular
 bestätigst, dass der Lauf nicht rückgängig zu machen ist, startet *Endgültig ausführen* genau diese

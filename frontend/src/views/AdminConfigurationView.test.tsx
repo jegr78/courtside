@@ -545,6 +545,25 @@ describe("AdminConfigurationView", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("The input does not have the permitted format.");
   });
 
+  it("given an account holds credit, when the currency change is saved, then the refusal says to pay out first", async () => {
+    // given
+    vi.spyOn(api, "changeAdminConfig").mockRejectedValue(new ApiError(409, {
+      type: "urn:courtside:error:currency-change-blocked-by-credit",
+      title: "Credit held in the current currency",
+      status: 409,
+      violations: [{ code: "config.currency.creditHeld", params: {} }]
+    }));
+    render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
+    await screen.findByTestId("club-name");
+    await userEvent.type(screen.getByTestId("club-name"), "!");
+
+    // when
+    await userEvent.click(screen.getByTestId("save-club-config"));
+
+    // then
+    expect(await screen.findByRole("alert")).toHaveTextContent("The currency cannot be changed while an account holds credit.");
+  });
+
   it("offers the club time zone as a list of known zones", async () => {
     render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
 

@@ -23,6 +23,7 @@ const REVIEWED_PASSWORD_FIELDS = [
   "frontend/src/views/AccountSecurityView.tsx#current-password",
   "frontend/src/views/AccountSecurityView.tsx#new-password",
   "frontend/src/views/AccountSecurityView.tsx#reauthentication-password",
+  "frontend/src/views/AdminCreditView.tsx#admin-reauthentication-password",
   "frontend/src/views/AdminMessageWordingView.tsx#admin-reauthentication-password",
   "frontend/src/views/AdminPersonView.tsx#admin-reauthentication-password",
   "frontend/src/views/AdminRetentionView.tsx#retention-reauthentication-password",

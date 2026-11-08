@@ -4,6 +4,7 @@ import org.courtside.AbstractIntegrationTest;
 import org.courtside.booking.testfixture.BookingTestFixture;
 import org.courtside.card.testfixture.CardTestFixture;
 import org.courtside.config.testfixture.ConfigTestFixture;
+import org.courtside.credit.testfixture.CreditTestFixture;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.courtside.member.RosterService;
@@ -41,7 +42,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @Import({FacilityTestFixture.class, IdentityTestFixture.class, MemberTestFixture.class, BookingTestFixture.class,
-        CardTestFixture.class, ConfigTestFixture.class})
+        CardTestFixture.class, ConfigTestFixture.class, CreditTestFixture.class})
 class AccountClosureTest extends AbstractIntegrationTest {
 
     private static final TimeSlot EVENING =
@@ -79,6 +80,9 @@ class AccountClosureTest extends AbstractIntegrationTest {
 
     @Autowired
     private Clock clock;
+
+    @Autowired
+    private CreditTestFixture credit;
 
     private MockMvc mockMvc;
     private UUID court;
@@ -235,6 +239,39 @@ class AccountClosureTest extends AbstractIntegrationTest {
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:recent-authentication-required"));
         assertThat(identity.isAccountEnabled(johnAccount)).as("nothing closes without a fresh proof").isTrue();
+    }
+
+    @Test
+    void givenAnExternalPlayerHoldingCredit_whenTheyCloseTheirAccount_thenTheyAreSentToTheTreasurerFirst()
+            throws Exception {
+        // given
+        credit.credit(johnAccount, 1500);
+
+        // when / then
+        close(userDetails.loadUserByUsername("roe.john"), true)
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:account-closure-blocked-by-credit"))
+                .andExpect(jsonPath("$.violations[0].code").value("identity.account.closureBlockedByCredit"));
+        assertThat(identity.isAccountEnabled(johnAccount)).as("a refused closure changes nothing").isTrue();
+    }
+
+    @Test
+    void givenAPaidOutLedger_whenThePlayerClosesTheirAccount_thenTheEntriesStayAndTheirReasonsGo() throws Exception {
+        // given
+        credit.credit(johnAccount, 1500);
+        credit.payOut(johnAccount, 1500);
+
+        // when
+        close(userDetails.loadUserByUsername("roe.john"), true).andExpect(status().isNoContent());
+
+        // then
+        assertThat(jdbc.sql("SELECT count(*) FROM credit_entry WHERE account_id = :id").param("id", johnAccount)
+                .query(Long.class).single()).as("ledger rows are never deleted").isEqualTo(2);
+        assertThat(jdbc.sql("""
+                        SELECT count(*) FROM credit_entry_note n JOIN credit_entry e ON e.id = n.entry_id
+                        WHERE e.account_id = :id
+                        """).param("id", johnAccount).query(Long.class).single())
+                .as("the free-text reasons that might name somebody are gone").isZero();
     }
 
     private ResultActions close(UserDetails signedIn, boolean recentlyProven) throws Exception {

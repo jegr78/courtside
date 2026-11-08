@@ -200,6 +200,7 @@ public class SecurityConfiguration {
                                 "/admin/access-grants",
                                 "/admin/operator-health",
                                 "/admin/guest-fees",
+                                "/admin/credit",
                                 "/index.html",
                                 "/assets/**", "/font-licenses.txt", "/icon.svg",
                                 "/manifest.webmanifest", "/sw.js",

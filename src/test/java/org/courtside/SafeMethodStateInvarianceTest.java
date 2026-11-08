@@ -106,7 +106,8 @@ class SafeMethodStateInvarianceTest extends AbstractIntegrationTest {
             "/api/public/participant-members", "{\"query\":\"Miles\"}",
             "/api/admin/roster-search", "{\"query\":\"Miles\",\"limit\":10}",
             "/api/admin/audit/search", "{\"query\":\"Miles\",\"limit\":10}",
-            "/api/admin/operational-logs/search", "{}");
+            "/api/admin/operational-logs/search", "{}",
+            "/api/treasury/credit/account-search", "{\"query\":\"Miles\"}");
 
     private static final String OCCUPANCY_KEY = "{occupancyKey}";
 
@@ -150,6 +151,9 @@ class SafeMethodStateInvarianceTest extends AbstractIntegrationTest {
             entry("/api/bookings", read("date=" + TODAY)),
             entry("/api/booking-eligibility", read()),
             entry("/api/my/bookings", read()),
+            entry("/api/my/credit", read()),
+            entry("/api/treasury/credit/accounts", read()),
+            entry("/api/treasury/credit/accounts/{accountId}/entries", read("accountId", "")),
             entry("/api/my/door-codes", read()),
             entry("/api/my/dependants", read()),
             entry("/api/my/dependants/{personId}/booking-cards", read("dependantPersonId", "")),

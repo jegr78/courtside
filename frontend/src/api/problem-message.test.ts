@@ -45,6 +45,23 @@ for (const [language, expected] of [
   });
 }
 
+for (const [language, expected] of [
+  ["en", "€15.00"],
+  ["de", "15,00 €"]
+]) {
+  it(`given ${language}, when an insufficient-credit refusal is resolved, then the balance reads as money in that language`, async () => {
+    // given
+    await i18n.changeLanguage(language);
+
+    // when
+    const message = violationMessage("credit.insufficient", { balanceMinor: 1500, currency: "EUR" }, i18n.t);
+
+    // then
+    expect(message.replace(/\s/g, " "), "the balance is formatted, never its minor units").toContain(expected);
+    expect(message).not.toContain("1500");
+  });
+}
+
 it("given a violation code this client does not carry, when resolving it, then it is told apart from a generic failure", () => {
   // when
   const message = violationMessage("booking.rule.introducedLater", {}, i18n.t);

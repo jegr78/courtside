@@ -70,12 +70,33 @@ describe("AdminNavigation", () => {
     expect(screen.queryByTestId("admin-group-club")).not.toBeInTheDocument();
   });
 
+  it("given a treasurer without administration rights, when the credit accounts are open, then their link is offered and current", () => {
+    // when
+    render(<MemoryRouter initialEntries={["/admin/credit"]}>
+      <AdminNavigation administrator={false} treasurer appointmentsShown={false} />
+    </MemoryRouter>);
+
+    // then
+    expect(screen.getByTestId("admin-credit-link")).toHaveAttribute("aria-current", "page");
+    expect(screen.getByTestId("admin-menu")).toHaveTextContent(i18n.t("nav.adminCredit"));
+  });
+
+  it("given the administration, when the navigation is read, then the credit accounts sit with the people", () => {
+    // when
+    show("/admin/roster");
+
+    // then
+    expect(within(screen.getByTestId("admin-group-people")).getByTestId("admin-credit-link")).toHaveAttribute("href", "/admin/credit");
+    expect(screen.getAllByTestId("admin-credit-link"), "an administrator is offered the link once").toHaveLength(1);
+  });
+
   it("given an appointment manager who is no treasurer, when the navigation is read, then guest fees are not offered", () => {
     // when
     render(<MemoryRouter initialEntries={["/admin/appointments"]}><AdminNavigation administrator={false} /></MemoryRouter>);
 
     // then
     expect(screen.queryByTestId("admin-guest-fees-link")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("admin-credit-link")).not.toBeInTheDocument();
   });
 
   it("given the administration, when the navigation is read, then the court plan is the way back", () => {

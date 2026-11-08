@@ -2,9 +2,9 @@
   "schemaVersion": 1,
   "reviewedAt": "2026-11-01",
   "purpose": "This is the normative authorization policy for the shipped Courtside API. OpenAPI defines the transport shape; this policy defines who may perform each operation, which resource attributes narrow that permission, and which protected fields each projection may read or write.",
-  "openApiFieldInventorySha256": "12aa2723b0ffa0276cb3655759f7669247932c26099fa7b1ac00988cc7e97415",
+  "openApiFieldInventorySha256": "888ea85274c12cb14ee49e330c9346a758c74da62a3cfc68564bc1a1fca2fdf1",
   "protectedFieldInventorySha256": "5295a7c44ccdfbecede95000d5f40299f3bfb9026c9b5b5afde1dc1e58301aa0",
-  "productionAuthorizationSha256": "7cc0062c41004c941f96f7c901895022b0f79d0a4ac0318d5bfd8c53d52ac577",
+  "productionAuthorizationSha256": "5ee95261a9693230eb1af9897f17481945e6f7c403149ad89bf332d8de3b67a6",
   "ordinaryFields": [
     "Problem.detail",
     "Problem.fieldErrors",
@@ -1884,6 +1884,42 @@
     "listCourtsForAdmin:response:Violation.code",
     "listCourtsForAdmin:response:Violation.params",
     "listCourtsForAdmin:response:Violation.params.*",
+    "listCreditEntries:parameter:$parameter.path.accountId",
+    "listCreditEntries:parameter:$parameter.query.cursor",
+    "listCreditEntries:parameter:$parameter.query.limit",
+    "listCreditEntries:response:$response.header.Retry-After",
+    "listCreditEntries:response:CreditEntry.amountMinor",
+    "listCreditEntries:response:CreditEntry.balanceAfterMinor",
+    "listCreditEntries:response:CreditEntry.currency",
+    "listCreditEntries:response:CreditEntry.id",
+    "listCreditEntries:response:CreditEntry.kind",
+    "listCreditEntries:response:CreditEntry.note",
+    "listCreditEntries:response:CreditEntry.recordedAt",
+    "listCreditEntries:response:CreditLedgerPage.balanceMinor",
+    "listCreditEntries:response:CreditLedgerPage.currency",
+    "listCreditEntries:response:CreditLedgerPage.items",
+    "listCreditEntries:response:CreditLedgerPage.nextCursor",
+    "listCreditEntries:response:FieldError.code",
+    "listCreditEntries:response:FieldError.field",
+    "listCreditEntries:response:FieldError.params",
+    "listCreditEntries:response:FieldError.params.*",
+    "listCreditEntries:response:Violation.code",
+    "listCreditEntries:response:Violation.params",
+    "listCreditEntries:response:Violation.params.*",
+    "listCreditHolders:response:$response.header.Retry-After",
+    "listCreditHolders:response:CreditHolder.accountId",
+    "listCreditHolders:response:CreditHolder.balanceMinor",
+    "listCreditHolders:response:CreditHolder.currency",
+    "listCreditHolders:response:CreditHolder.email",
+    "listCreditHolders:response:CreditHolder.firstName",
+    "listCreditHolders:response:CreditHolder.lastName",
+    "listCreditHolders:response:FieldError.code",
+    "listCreditHolders:response:FieldError.field",
+    "listCreditHolders:response:FieldError.params",
+    "listCreditHolders:response:FieldError.params.*",
+    "listCreditHolders:response:Violation.code",
+    "listCreditHolders:response:Violation.params",
+    "listCreditHolders:response:Violation.params.*",
     "listDependantBookingCards:parameter:$parameter.path.personId",
     "listDependantBookingCards:response:$response.header.Retry-After",
     "listDependantBookingCards:response:FieldError.code",
@@ -2213,6 +2249,27 @@
     "listOpeningScheduleForAdmin:response:Violation.code",
     "listOpeningScheduleForAdmin:response:Violation.params",
     "listOpeningScheduleForAdmin:response:Violation.params.*",
+    "listOwnCredit:parameter:$parameter.query.cursor",
+    "listOwnCredit:parameter:$parameter.query.limit",
+    "listOwnCredit:response:$response.header.Retry-After",
+    "listOwnCredit:response:CreditEntry.amountMinor",
+    "listOwnCredit:response:CreditEntry.balanceAfterMinor",
+    "listOwnCredit:response:CreditEntry.currency",
+    "listOwnCredit:response:CreditEntry.id",
+    "listOwnCredit:response:CreditEntry.kind",
+    "listOwnCredit:response:CreditEntry.note",
+    "listOwnCredit:response:CreditEntry.recordedAt",
+    "listOwnCredit:response:CreditLedgerPage.balanceMinor",
+    "listOwnCredit:response:CreditLedgerPage.currency",
+    "listOwnCredit:response:CreditLedgerPage.items",
+    "listOwnCredit:response:CreditLedgerPage.nextCursor",
+    "listOwnCredit:response:FieldError.code",
+    "listOwnCredit:response:FieldError.field",
+    "listOwnCredit:response:FieldError.params",
+    "listOwnCredit:response:FieldError.params.*",
+    "listOwnCredit:response:Violation.code",
+    "listOwnCredit:response:Violation.params",
+    "listOwnCredit:response:Violation.params.*",
     "listOwnMessageChannels:response:$response.header.Retry-After",
     "listOwnMessageChannels:response:FieldError.code",
     "listOwnMessageChannels:response:FieldError.field",
@@ -2974,6 +3031,26 @@
     "recordAttendance:response:Violation.code",
     "recordAttendance:response:Violation.params",
     "recordAttendance:response:Violation.params.*",
+    "recordCreditEntry:parameter:$parameter.path.accountId",
+    "recordCreditEntry:request:CreditEntryRequest.amountMinor",
+    "recordCreditEntry:request:CreditEntryRequest.kind",
+    "recordCreditEntry:request:CreditEntryRequest.note",
+    "recordCreditEntry:response:$response.header.Accept",
+    "recordCreditEntry:response:$response.header.Retry-After",
+    "recordCreditEntry:response:CreditEntry.amountMinor",
+    "recordCreditEntry:response:CreditEntry.balanceAfterMinor",
+    "recordCreditEntry:response:CreditEntry.currency",
+    "recordCreditEntry:response:CreditEntry.id",
+    "recordCreditEntry:response:CreditEntry.kind",
+    "recordCreditEntry:response:CreditEntry.note",
+    "recordCreditEntry:response:CreditEntry.recordedAt",
+    "recordCreditEntry:response:FieldError.code",
+    "recordCreditEntry:response:FieldError.field",
+    "recordCreditEntry:response:FieldError.params",
+    "recordCreditEntry:response:FieldError.params.*",
+    "recordCreditEntry:response:Violation.code",
+    "recordCreditEntry:response:Violation.params",
+    "recordCreditEntry:response:Violation.params.*",
     "redeemMfaRecovery:response:$response.header.Accept",
     "redeemMfaRecovery:response:$response.header.Retry-After",
     "redeemMfaRecovery:response:FieldError.code",
@@ -3284,6 +3361,22 @@
     "searchAuditLog:response:Violation.code",
     "searchAuditLog:response:Violation.params",
     "searchAuditLog:response:Violation.params.*",
+    "searchCreditAccounts:request:CreditAccountSearchRequest.query",
+    "searchCreditAccounts:response:$response.header.Accept",
+    "searchCreditAccounts:response:$response.header.Retry-After",
+    "searchCreditAccounts:response:CreditHolder.accountId",
+    "searchCreditAccounts:response:CreditHolder.balanceMinor",
+    "searchCreditAccounts:response:CreditHolder.currency",
+    "searchCreditAccounts:response:CreditHolder.email",
+    "searchCreditAccounts:response:CreditHolder.firstName",
+    "searchCreditAccounts:response:CreditHolder.lastName",
+    "searchCreditAccounts:response:FieldError.code",
+    "searchCreditAccounts:response:FieldError.field",
+    "searchCreditAccounts:response:FieldError.params",
+    "searchCreditAccounts:response:FieldError.params.*",
+    "searchCreditAccounts:response:Violation.code",
+    "searchCreditAccounts:response:Violation.params",
+    "searchCreditAccounts:response:Violation.params.*",
     "searchOperationalLogs:request:OperationalLogSearchRequest.cursor",
     "searchOperationalLogs:request:OperationalLogSearchRequest.from",
     "searchOperationalLogs:request:OperationalLogSearchRequest.limit",
@@ -4125,6 +4218,27 @@
       ]
     },
     {
+      "id": "own-credit-ledger",
+      "description": "A permanent account reads only its own credit balance and entries.",
+      "operationIds": [
+        "listOwnCredit"
+      ],
+      "actors": [
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN",
+        "EXTERNAL"
+      ],
+      "decisions": [
+        "permanent-account-gate",
+        "own-account-scope"
+      ]
+    },
+    {
       "id": "authenticated-booking-card-discovery",
       "description": "Permanent accounts may discover active booking cards admitted by their roles for future booking requests.",
       "operationIds": [
@@ -4565,6 +4679,38 @@
       ]
     },
     {
+      "id": "treasury-credit-ledger",
+      "description": "The credit ledger administration requires an enabled permanent account carrying TREASURER or ADMIN; it names accounts with their email addresses and balances and shows one account's entries with their reasons.",
+      "operationIds": [
+        "listCreditHolders",
+        "listCreditEntries",
+        "searchCreditAccounts"
+      ],
+      "actors": [
+        "TREASURER",
+        "ADMIN"
+      ],
+      "decisions": [
+        "treasury-gate"
+      ]
+    },
+    {
+      "id": "treasury-credit-entry",
+      "description": "A treasurer or administrator appends a credit to an external account or a payout of at most the balance after a recent full proof; nothing else changes a ledger.",
+      "operationIds": [
+        "recordCreditEntry"
+      ],
+      "actors": [
+        "TREASURER",
+        "ADMIN"
+      ],
+      "decisions": [
+        "treasury-gate",
+        "recent-authentication",
+        "credit-ledger-append"
+      ]
+    },
+    {
       "id": "recent-person-administration",
       "description": "Correcting a person's identity or address requires ADMIN and a recent full-password proof.",
       "operationIds": [
@@ -4992,7 +5138,7 @@
     {
       "id": "own-account-scope",
       "title": "Own account scope",
-      "rule": "The authenticated account identifier selects profile identity, session, locale, appointment reach, message-choice, channel-choice and notification state; callers cannot supply another account identifier to these operations, and a notification id outside the account answers as not found. MFA state follows immutable principal identity rather than a reused username.",
+      "rule": "The authenticated account identifier selects profile identity, session, locale, appointment reach, message-choice, channel-choice, notification and credit ledger state; callers cannot supply another account identifier to these operations, and a notification id outside the account answers as not found. MFA state follows immutable principal identity rather than a reused username.",
       "attributes": [
         "current-account",
         "session-handle"
@@ -5012,13 +5158,15 @@
         "src/main/java/org/courtside/notification/internal/OwnNotifications.java#markRead",
         "src/main/java/org/courtside/notification/internal/OwnNotifications.java#accountId",
         "src/main/java/org/courtside/card/internal/CardAppointmentAccess.java#reachOf",
-        "src/main/java/org/courtside/identity/internal/AccountClosure.java#closeOwn"
+        "src/main/java/org/courtside/identity/internal/AccountClosure.java#closeOwn",
+        "src/main/java/org/courtside/credit/web/CreditController.java#listOwnCredit"
       ],
       "positiveTests": [
         "src/test/java/org/courtside/identity/AccountSessionLifecycleTest.java#givenTwoActiveSessions_whenOneIsListedAndEnded_thenOnlyPrivacySafeMetadataAndTheOtherRemain",
         "src/test/java/org/courtside/notification/web/NotificationControllerTest.java#givenNotificationsForTwoMembers_whenOneReadsTheCentre_thenOnlyTheirOwnAreServedWithContentAndLink",
         "src/test/java/org/courtside/identity/SessionAppointmentAccessTest.java#givenACardNamingTheTreasurerOnlyAsManagingRole_whenItReadsTheSession_thenItManagesButCreatesNoSeries",
-        "src/test/java/org/courtside/identity/SessionProfileTest.java#givenAnAccountWithAssignedRoles_whenReadingItsSession_thenItsOwnNamePartsAndExactRolesAreReturned"
+        "src/test/java/org/courtside/identity/SessionProfileTest.java#givenAnAccountWithAssignedRoles_whenReadingItsSession_thenItsOwnNamePartsAndExactRolesAreReturned",
+        "src/test/java/org/courtside/credit/CreditLedgerTest.java#givenATreasurer_whenTheyCreditAndThenPayOut_thenThePlayerSeesBothEntriesAndTheRemainingBalance"
       ],
       "negativeTests": [
         "src/test/java/org/courtside/identity/internal/AccountSessionServiceTest.java#givenAnUnknownHandle_whenASessionIsEnded_thenNothingIsDeleted",
@@ -5366,7 +5514,8 @@
         "src/main/java/org/courtside/member/web/RosterAdminController.java#endGuardianRelationship",
         "src/main/java/org/courtside/member/web/RosterAdminController.java#removeGuardianRelationship",
         "src/main/java/org/courtside/member/DependantService.java#requestCredentials",
-        "src/main/java/org/courtside/identity/internal/AccountClosure.java#closeOwn"
+        "src/main/java/org/courtside/identity/internal/AccountClosure.java#closeOwn",
+        "src/main/java/org/courtside/credit/internal/CreditLedger.java#record"
       ],
       "positiveTests": [
         "src/test/java/org/courtside/identity/AdminRecentAuthenticationTest.java#givenAnotherAccountsSessions_whenAdminProofIsRefreshed_thenOnlyTheTargetEnds",
@@ -5379,7 +5528,8 @@
         "src/test/java/org/courtside/member/web/GuardianshipAdminControllerTest.java#givenAStaleSignIn_whenTheBoardWritesARelationship_thenEveryWriteAsksForAFreshProof",
         "src/test/java/org/courtside/member/web/DependantControllerTest.java#givenAStaleSignIn_whenTheGuardianAsksForCredentials_thenAFreshProofIsRequiredAndNothingIsIssued",
         "src/test/java/org/courtside/identity/internal/MfaLoginTest.java#givenAnMfaSessionWithExpiredProof_whenOnlyThePasswordIsRepeated_thenSensitiveProofIsNotRenewed",
-        "src/test/java/org/courtside/identity/AccountClosureTest.java#givenAnExternalPlayerWithoutARecentProof_whenTheyCloseTheirAccount_thenTheyMustProveItFirst"
+        "src/test/java/org/courtside/identity/AccountClosureTest.java#givenAnExternalPlayerWithoutARecentProof_whenTheyCloseTheirAccount_thenTheyMustProveItFirst",
+        "src/test/java/org/courtside/credit/CreditLedgerTest.java#givenNoRecentProof_whenTheTreasurerCredits_thenTheyMustProveItFirst"
       ]
     },
     {
@@ -5607,10 +5757,32 @@
         "src/main/java/org/courtside/identity/internal/SecurityConfiguration.java#filterChain"
       ],
       "positiveTests": [
-        "src/test/java/org/courtside/dataexchange/web/GuestFeeReportControllerTest.java#givenAYearOfGuestBookings_whenTheTreasurerReadsTheReport_thenOnlyEndedConfirmedChargedGuestsCount"
+        "src/test/java/org/courtside/dataexchange/web/GuestFeeReportControllerTest.java#givenAYearOfGuestBookings_whenTheTreasurerReadsTheReport_thenOnlyEndedConfirmedChargedGuestsCount",
+        "src/test/java/org/courtside/credit/CreditLedgerTest.java#givenHoldersAndOthers_whenTheTreasurerLists_thenOnlyBalancesShowAndASearchFindsExternalAccounts"
       ],
       "negativeTests": [
-        "src/test/java/org/courtside/dataexchange/web/GuestFeeReportControllerTest.java#givenAMember_whenTheyAskForTheReport_thenTheyAreRefused"
+        "src/test/java/org/courtside/dataexchange/web/GuestFeeReportControllerTest.java#givenAMember_whenTheyAskForTheReport_thenTheyAreRefused",
+        "src/test/java/org/courtside/credit/CreditLedgerTest.java#givenAnExternalPlayer_whenTheyCreditThemselves_thenTheTreasuryIsClosedToThem"
+      ]
+    },
+    {
+      "id": "credit-ledger-append",
+      "title": "Append-only credit ledger",
+      "rule": "A credit reaches only an account holding EXTERNAL that is not anonymised, a payout never exceeds the balance, and every write locks the account's ledger row before it reads the balance; a refused write appends nothing and the database refuses any change or removal of an entry.",
+      "attributes": [
+        "role",
+        "target-account"
+      ],
+      "productionPaths": [
+        "src/main/java/org/courtside/credit/internal/CreditLedger.java#append"
+      ],
+      "positiveTests": [
+        "src/test/java/org/courtside/credit/CreditLedgerTest.java#givenABalanceCoveringOnlyOnePayout_whenASecondStartsBeforeTheFirstCommits_thenExactlyOneSucceeds"
+      ],
+      "negativeTests": [
+        "src/test/java/org/courtside/credit/CreditLedgerTest.java#givenABalance_whenThePayoutExceedsIt_thenItIsRefusedAndNothingIsWritten",
+        "src/test/java/org/courtside/credit/CreditLedgerTest.java#givenAMemberAccount_whenTheTreasurerCreditsIt_thenOnlyAnExternalAccountReceivesCredit",
+        "src/test/java/org/courtside/credit/CreditLedgerTest.java#givenALedgerEntry_whenItIsChangedOrRemoved_thenTheDatabaseRefuses"
       ]
     },
     {
@@ -5830,7 +6002,7 @@
     {
       "id": "outsider-account-closure",
       "title": "Outsider account closure",
-      "rule": "Only an account that is an outsider closes itself, and only while it holds no confirmed booking of its own that has not ended; closing anonymises the current account in place and ends its sessions. A member, an administrator or an outsider with an upcoming booking is refused without any change.",
+      "rule": "Only an account that is an outsider closes itself, and only while it holds no confirmed booking of its own that has not ended and no credit balance; closing anonymises the current account in place and ends its sessions. A member, an administrator or an outsider with an upcoming booking or a credit balance is refused without any change.",
       "attributes": [
         "current-account",
         "role",
@@ -5839,7 +6011,8 @@
       "productionPaths": [
         "src/main/java/org/courtside/identity/internal/AccountClosure.java#closeOwn",
         "src/main/java/org/courtside/identity/internal/AccountAnonymiser.java#anonymise",
-        "src/main/java/org/courtside/booking/internal/OwnUpcomingBookings.java#heldBy"
+        "src/main/java/org/courtside/booking/internal/OwnUpcomingBookings.java#heldBy",
+        "src/main/java/org/courtside/credit/internal/LedgerBalances.java#heldBy"
       ],
       "positiveTests": [
         "src/test/java/org/courtside/identity/AccountClosureTest.java#givenAnExternalPlayerWithoutABooking_whenTheyCloseTheirAccount_thenNothingOfThemRemainsAndTheyCannotSignIn",
@@ -5847,7 +6020,8 @@
       ],
       "negativeTests": [
         "src/test/java/org/courtside/identity/AccountClosureTest.java#givenAMember_whenTheyCloseTheirAccount_thenOnlyTheBoardMayEndIt",
-        "src/test/java/org/courtside/identity/AccountClosureTest.java#givenAnExternalPlayerWithAnUpcomingBooking_whenTheyCloseTheirAccount_thenTheBookingRefusesIt"
+        "src/test/java/org/courtside/identity/AccountClosureTest.java#givenAnExternalPlayerWithAnUpcomingBooking_whenTheyCloseTheirAccount_thenTheBookingRefusesIt",
+        "src/test/java/org/courtside/identity/AccountClosureTest.java#givenAnExternalPlayerHoldingCredit_whenTheyCloseTheirAccount_thenTheyAreSentToTheTreasurerFirst"
       ]
     },
     {

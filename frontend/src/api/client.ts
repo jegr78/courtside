@@ -116,6 +116,11 @@ export type FacilityUtilisation = components["schemas"]["FacilityUtilisation"];
 export type UsageReport = components["schemas"]["UsageReport"];
 export type GuestFeeReport = components["schemas"]["GuestFeeReport"];
 export type GuestFeeMember = components["schemas"]["GuestFeeMember"];
+export type CreditEntry = components["schemas"]["CreditEntry"];
+export type CreditEntryKind = components["schemas"]["CreditEntryKind"];
+export type CreditEntryRequest = components["schemas"]["CreditEntryRequest"];
+export type CreditHolder = components["schemas"]["CreditHolder"];
+export type CreditLedgerPage = components["schemas"]["CreditLedgerPage"];
 export type RetentionCategory = components["schemas"]["RetentionCategory"];
 export type RetentionPolicy = components["schemas"]["RetentionPolicy"];
 export type RetentionPreview = components["schemas"]["RetentionPreview"];
@@ -182,6 +187,15 @@ export interface BookingExportParameters extends Record<string, string> {
   to: string;
   separator: string;
   encoding: string;
+}
+
+export interface CreditPageOptions {
+  cursor?: string;
+  limit?: number;
+}
+
+function creditPageQuery(options: CreditPageOptions): string {
+  return new URLSearchParams({ limit: String(options.limit ?? 50), ...(options.cursor ? { cursor: options.cursor } : {}) }).toString();
 }
 
 export interface GuestFeePeriod extends Record<string, string> {
@@ -750,6 +764,19 @@ export const api = {
   guestFees: (period?: GuestFeePeriod) => request<GuestFeeReport>(
     period ? `/api/treasury/guest-fees?${new URLSearchParams(period).toString()}` : "/api/treasury/guest-fees",
     { method: "POST" }),
+  creditHolders: (query?: string) => query ? api.searchCreditAccounts(query) : api.listCreditHolders(),
+  listCreditHolders: () => request<CreditHolder[]>("/api/treasury/credit/accounts"),
+  searchCreditAccounts: (query: string) => request<CreditHolder[]>("/api/treasury/credit/account-search", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query })
+  }),
+  creditEntries: (accountId: string, options: CreditPageOptions = {}) => request<CreditLedgerPage>(
+    `/api/treasury/credit/accounts/${encodeURIComponent(accountId)}/entries?${creditPageQuery(options)}`),
+  recordCreditEntry: (accountId: string, entry: CreditEntryRequest) => request<CreditEntry>(
+    `/api/treasury/credit/accounts/${encodeURIComponent(accountId)}/entries`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(entry)
+    }),
   exportGuestFees: (period: GuestFeePeriod & { separator: string }) => requestFile(
     `/api/treasury/guest-fees/export?${new URLSearchParams(period).toString()}`, { method: "POST" }),
   exportBookings: (parameters: BookingExportParameters) => requestFile(
@@ -865,6 +892,7 @@ export const api = {
   participations: (cursor?: string, limit = 50) => request<ParticipationPage>(
     `/api/my/participations?${new URLSearchParams({ limit: String(limit), ...(cursor ? { cursor } : {}) })}`
   ).then((page) => ({ ...page, items: withoutEndedAccess(page.items) })),
+  ownCredit: (options: CreditPageOptions = {}) => request<CreditLedgerPage>(`/api/my/credit?${creditPageQuery(options)}`),
   doorCodes: () => request<AccessCode[]>("/api/my/door-codes"),
   withdrawParticipation: (bookingId: string) => request<void>(
     `/api/my/participations/${bookingId}`, { method: "DELETE" }

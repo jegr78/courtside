@@ -166,6 +166,8 @@ tags:
     description: How the courts were used, cancelled, missed and refused over a period, as counts that name nobody.
   - name: treasury
     description: What members owe the club, for the treasurer and the administration.
+  - name: credit
+    description: Money the club holds for an account, and how that balance came about.
 
 security:
   - sessionCookie: []
@@ -2851,7 +2853,9 @@ components:
         inactiveBefore:
           type: string
           format: date-time
-          description: An account created, signed in or booked since this instant stays.
+          description: |
+            An account created, signed in or booked since this instant stays, and so does one that
+            still holds a credit balance.
         accounts: { type: integer }
 
     RetentionBlockedRecord:
@@ -2863,11 +2867,12 @@ components:
 
     RetentionBlockReason:
       type: string
-      enum: [ADMINISTRATOR, NAMED_IN_BOOKINGS, ON_A_WAITING_LIST]
+      enum: [ADMINISTRATOR, NAMED_IN_BOOKINGS, ON_A_WAITING_LIST, HOLDS_A_CREDIT_LEDGER]
       description: |
         `ADMINISTRATOR`: an account of the person holds the administrator role.
         `NAMED_IN_BOOKINGS`: a booking or series that this run does not pseudonymise still names
-        the person. `ON_A_WAITING_LIST`: the person waits for a court.
+        the person. `ON_A_WAITING_LIST`: the person waits for a court. `HOLDS_A_CREDIT_LEDGER`: an
+        account of the person has credit ledger entries, which are never removed.
 
     RetentionRun:
       type: object
@@ -2885,7 +2890,9 @@ components:
         externalAccountsAnonymised: { type: integer }
         externalAccountsSkipped:
           type: integer
-          description: External accounts the preview listed that were active again when the run reached them.
+          description: |
+            External accounts the preview listed that were active again or held a credit balance
+            when the run reached them.
 
     MembershipTypeRequest:
       type: object
@@ -4022,6 +4029,94 @@ components:
         courts:
           type: array
           items: { $ref: "#/components/schemas/CourtUtilisation" }
+
+    CreditEntryKind:
+      type: string
+      description: |
+        `CREDIT`: the treasurer credited the account, for example after a cash payment. `PAYOUT`:
+        the treasurer paid out part of the balance.
+      enum: [CREDIT, PAYOUT]
+
+    CreditEntry:
+      type: object
+      additionalProperties: false
+      required: [id, kind, amountMinor, currency, balanceAfterMinor, recordedAt]
+      properties:
+        id: { type: string, format: uuid }
+        kind: { $ref: "#/components/schemas/CreditEntryKind" }
+        amountMinor:
+          type: integer
+          description: Signed amount in the currency's minor unit; a payout is negative.
+        currency: { type: string, pattern: "^[A-Z]{3}$" }
+        balanceAfterMinor:
+          type: integer
+          format: int64
+          description: The balance in this currency right after this entry.
+        recordedAt: { type: string, format: date-time }
+        note:
+          type: [string, "null"]
+          maxLength: 200
+          description: The reason the treasurer gave. Removed once the account is anonymised.
+
+    CreditLedgerPage:
+      type: object
+      additionalProperties: false
+      required: [balanceMinor, currency, items]
+      properties:
+        balanceMinor:
+          type: integer
+          format: int64
+          description: The balance in the club currency.
+        currency: { type: string, pattern: "^[A-Z]{3}$" }
+        items:
+          type: array
+          maxItems: 100
+          items: { $ref: "#/components/schemas/CreditEntry" }
+        nextCursor:
+          type: [string, "null"]
+          format: uuid
+          description: Pass this entry id as `cursor` to continue after the current page.
+
+    CreditHolder:
+      type: object
+      additionalProperties: false
+      required: [accountId, firstName, lastName, email, balanceMinor, currency]
+      properties:
+        accountId: { type: string, format: uuid }
+        firstName: { type: string }
+        lastName: { type: string }
+        email: { type: string }
+        balanceMinor: { type: integer, format: int64 }
+        currency: { type: string, pattern: "^[A-Z]{3}$" }
+
+    CreditAccountSearchRequest:
+      type: object
+      additionalProperties: false
+      required: [query]
+      properties:
+        query:
+          type: string
+          minLength: 1
+          maxLength: 100
+          pattern: ".*\\S.*"
+
+    CreditEntryRequest:
+      type: object
+      additionalProperties: false
+      required: [kind, amountMinor, note]
+      properties:
+        kind: { $ref: "#/components/schemas/CreditEntryKind" }
+        amountMinor:
+          type: integer
+          minimum: 1
+          maximum: 1000000
+          description: The unsigned amount in the club currency's minor unit.
+        note:
+          type: string
+          minLength: 1
+          maxLength: 200
+          pattern: ".*\\S.*"
+          description: Why the entry is made. The account holder sees it.
 
     GuestFeeReport:
       type: object
@@ -8405,6 +8500,185 @@ paths:
           $ref: "#/components/responses/Unauthenticated"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/my/credit:
+    get:
+      tags: [credit]
+      operationId: listOwnCredit
+      summary: The signed-in account's credit balance and ledger entries.
+      description: |
+        The balance in the club currency and the entries that produced it, most recent first. An
+        account without entries reads a balance of zero and no entries. A cursor this account's
+        entries do not contain yields an empty page.
+      parameters:
+        - name: cursor
+          in: query
+          required: false
+          description: The `nextCursor` returned by the preceding page.
+          schema: { type: string, format: uuid }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+      responses:
+        "200":
+          description: The balance and one page of entries.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CreditLedgerPage" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/treasury/credit/accounts:
+    get:
+      tags: [credit]
+      operationId: listCreditHolders
+      summary: Every account whose credit balance is not zero.
+      description: |
+        Every account whose balance in the club currency is not zero, ordered by last and first
+        name. Anonymised accounts are never listed.
+      responses:
+        "200":
+          description: The accounts with their balances.
+          content:
+            application/json:
+              schema:
+                type: array
+                maxItems: 100000
+                items: { $ref: "#/components/schemas/CreditHolder" }
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/treasury/credit/account-search:
+    post:
+      tags: [credit]
+      operationId: searchCreditAccounts
+      x-courtside-state-invariant: true
+      summary: The accounts a treasurer can credit or pay out, found by name, email or username.
+      description: |
+        At most 20 accounts that are external or have ledger entries and whose name, email address
+        or username contains `query`, ignoring case, ordered by last and first name, each with its
+        balance. Anonymised accounts are never listed. It is a `POST` because the query names a
+        person; it changes nothing.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreditAccountSearchRequest" }
+      responses:
+        "200":
+          description: The accounts found.
+          content:
+            application/json:
+              schema:
+                type: array
+                maxItems: 20
+                items: { $ref: "#/components/schemas/CreditHolder" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/treasury/credit/accounts/{accountId}/entries:
+    get:
+      tags: [credit]
+      operationId: listCreditEntries
+      summary: One account's credit balance and ledger entries.
+      description: |
+        The same page `/api/my/credit` gives the account itself. An account without entries reads
+        a balance of zero and no entries; an id that names no account is answered `404`.
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: cursor
+          in: query
+          required: false
+          description: The `nextCursor` returned by the preceding page.
+          schema: { type: string, format: uuid }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+      responses:
+        "200":
+          description: The balance and one page of entries.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CreditLedgerPage" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+    post:
+      tags: [credit]
+      operationId: recordCreditEntry
+      summary: Credit an account or pay out part of its balance.
+      description: |
+        Appends one entry in the club currency. Entries are never changed or removed; a mistake is
+        corrected by an entry in the other direction. A `CREDIT` is open only to an external
+        account and is refused with `urn:courtside:error:credit-account-not-external` otherwise. A
+        `PAYOUT` larger than the balance is refused with `urn:courtside:error:credit-insufficient`.
+        An anonymised account is refused with `urn:courtside:error:account-anonymised`. Requires a
+        re-authentication no older than five minutes. The audit record carries the amount and
+        kind, never the reason.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreditEntryRequest" }
+      responses:
+        "201":
+          description: The recorded entry with the balance after it.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CreditEntry" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
         "429":
           $ref: "#/components/responses/RateLimited"
 
@@ -12867,8 +13141,9 @@ paths:
         `facility.court.added`, `card.bookingCard.changed`, `config.club.changed`,
         `rules.ruleSet.changed`, `roster.person.corrected`, `dataexchange.source.described` and
         `notification.template.changed`, each with siblings, `access.grant.retryRequested`, whose
-        subject is the booking the retried grant belongs to, and `access.control.checkRequested` without a
-        subject. The rest is recorded outside those surfaces:
+        subject is the booking the retried grant belongs to, `access.control.checkRequested` without a
+        subject, and `credit.entry.recorded`, whose subject is the account a treasurer credited or paid
+        out. The rest is recorded outside those surfaces:
         `booking.booking.confirmed` and the four other booking entries, `access.grant.installed` and
         `access.grant.failing`, and
         `identity.account.credentialsRequested`, which names the account a credential was issued

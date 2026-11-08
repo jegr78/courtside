@@ -5,6 +5,7 @@ import org.courtside.AbstractIntegrationTest;
 import org.courtside.booking.testfixture.BookingTestFixture;
 import org.courtside.card.testfixture.CardTestFixture;
 import org.courtside.config.testfixture.ConfigTestFixture;
+import org.courtside.credit.testfixture.CreditTestFixture;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.identity.AccountAnonymisation;
 import org.courtside.identity.Role;
@@ -41,7 +42,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@Import({IdentityTestFixture.class, MemberTestFixture.class, FacilityTestFixture.class, BookingTestFixture.class,
+@Import({CreditTestFixture.class, IdentityTestFixture.class, MemberTestFixture.class, FacilityTestFixture.class, BookingTestFixture.class,
         CardTestFixture.class, ConfigTestFixture.class})
 class ExternalAccountRetentionTest extends AbstractIntegrationTest {
 
@@ -78,6 +79,9 @@ class ExternalAccountRetentionTest extends AbstractIntegrationTest {
 
     @Autowired
     private Clock clock;
+
+    @Autowired
+    private CreditTestFixture credit;
 
     private MockMvc mockMvc;
     private UUID court;
@@ -187,6 +191,68 @@ class ExternalAccountRetentionTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.externalAccountsAnonymised").value(0))
                 .andExpect(jsonPath("$.externalAccountsSkipped").value(1));
         assertThat(anonymised(john)).as("the run checks again before it anonymises").isFalse();
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAnInactiveExternalAccountHoldingCredit_whenTheRunApplies_thenItStaysUntilThePayout() throws Exception {
+        // given
+        UUID john = external("John", "Roe");
+        credit.credit(john, 1500);
+        keep("EXTERNAL_ACCOUNTS", 12);
+
+        // when
+        String preview = mockMvc.perform(post("/api/admin/retention/previews").with(csrf()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.externalAccounts.accounts").value(0))
+                .andReturn().getResponse().getContentAsString();
+        mockMvc.perform(post("/api/admin/retention/previews/{id}/run", JsonPath.<String>read(preview, "$.previewId"))
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.externalAccountsAnonymised").value(0));
+
+        // then
+        assertThat(anonymised(john)).as("the club still owes this account money").isFalse();
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAPersonWhoseOtherAccountHoldsCredit_whenTheRunApplies_thenNeitherAccountIsAnonymised()
+            throws Exception {
+        // given
+        UUID idle = external("Jim", "Roe");
+        UUID holding = identity.createEnabledAccount(identity.personIdForUsername("roe.jim"), "roe.jim.two",
+                Set.of(Role.EXTERNAL));
+        jdbc.sql("UPDATE user_account SET created_at = :createdAt WHERE id = :id")
+                .param("createdAt", java.sql.Timestamp.from(LONG_AGO)).param("id", holding).update();
+        credit.credit(holding, 1500);
+        keep("EXTERNAL_ACCOUNTS", 12);
+
+        // when / then
+        mockMvc.perform(post("/api/admin/retention/previews").with(csrf()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.externalAccounts.accounts").value(0));
+        assertThat(anonymised(idle)).isFalse();
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAFormerMemberWithCreditLedgerEntries_whenPreviewed_thenTheLedgerKeepsThePerson() throws Exception {
+        // given
+        UUID ann = external("Ann", "Roe");
+        credit.credit(ann, 1000);
+        credit.payOut(ann, 1000);
+        UUID person = identity.personIdForUsername("roe.ann");
+        members.addMembershipPeriod(person, members.createMembershipType("Adult"),
+                LocalDate.of(2020, 1, 1), LocalDate.of(2021, 1, 1));
+        keep("FORMER_MEMBERS", 24);
+
+        // when / then
+        mockMvc.perform(post("/api/admin/retention/previews").with(csrf()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.formerMembers.people").value(0))
+                .andExpect(jsonPath("$.blocked[?(@.personId == '" + person + "')].reason")
+                        .value("HOLDS_A_CREDIT_LEDGER"));
     }
 
     private UUID external(String firstName, String lastName) {

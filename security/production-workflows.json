@@ -851,6 +851,51 @@
       ]
     },
     {
+      "id": "credit-ledger",
+      "actors": [
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN",
+        "EXTERNAL"
+      ],
+      "entryPoints": "The signed-in account's own credit ledger under /api/my/credit and the treasury's credit ledger administration under /api/treasury/credit.",
+      "operationIds": [
+        "listOwnCredit",
+        "listCreditHolders",
+        "searchCreditAccounts",
+        "listCreditEntries",
+        "recordCreditEntry"
+      ],
+      "backgroundEntryPoints": [],
+      "stateTransitions": [
+        "A treasurer or administrator appends a credit to an external account or a payout of at most the balance, under the account's credit_account row lock, and records one audit entry without the reason.",
+        "Anonymising an account deletes the reasons of its entries and keeps the entries."
+      ],
+      "alternatePaths": [
+        "Without a search the treasury lists every account with a balance; a search finds at most 20 external accounts.",
+        "An account without entries reads a balance of zero."
+      ],
+      "failurePaths": [
+        "Accounts without TREASURER or ADMIN are refused under /api/treasury.",
+        "A missing recent authentication, a payout beyond the balance, a credit to a non-external account and an anonymised account are refused without writing an entry.",
+        "Updating or deleting a ledger entry is refused by the database."
+      ],
+      "productionPaths": [
+        "src/main/java/org/courtside/credit/web/CreditController.java",
+        "src/main/java/org/courtside/credit/internal/CreditLedger.java"
+      ],
+      "evidence": [
+        "src/test/java/org/courtside/credit/CreditLedgerTest.java#givenATreasurer_whenTheyCreditAndThenPayOut_thenThePlayerSeesBothEntriesAndTheRemainingBalance",
+        "src/test/java/org/courtside/credit/CreditLedgerTest.java#givenABalance_whenThePayoutExceedsIt_thenItIsRefusedAndNothingIsWritten",
+        "src/test/java/org/courtside/credit/CreditLedgerTest.java#givenAnExternalPlayer_whenTheyCreditThemselves_thenTheTreasuryIsClosedToThem",
+        "src/test/java/org/courtside/credit/CreditLedgerTest.java#givenABalanceCoveringOnlyOnePayout_whenASecondStartsBeforeTheFirstCommits_thenExactlyOneSucceeds"
+      ]
+    },
+    {
       "id": "guest-fee-report",
       "actors": [
         "TREASURER",

@@ -7,6 +7,11 @@ export function formatMinor(minor: number, locale: string, currency: string): st
   return new Intl.NumberFormat(locale, { style: "currency", currency }).format(minor / 10 ** digits);
 }
 
+export function formatSignedMinor(minor: number, locale: string, currency: string): string {
+  const digits = fractionDigits(locale, currency);
+  return new Intl.NumberFormat(locale, { style: "currency", currency, signDisplay: "exceptZero" }).format(minor / 10 ** digits);
+}
+
 // Integer arithmetic, because 0.29 * 100 is not 29 in floating point.
 export function parseMinor(text: string, currency: string): number | undefined {
   const match = /^(\d+)(?:[.,](\d*))?$/.exec(text.trim());

@@ -315,11 +315,13 @@ An outsider closes its own account with `DELETE /api/account` after a re-authent
 than five minutes; a member's account ends through the board. `AccountClosure` refuses anyone else
 with `identity.account.closureNotOpen` and an outsider holding a confirmed booking of its own that has
 not ended, read through `shared.UpcomingBookings`, with `identity.account.closureBlockedByBooking`.
+An outsider whose credit ledger still holds a balance, read through `shared.HeldCredit`, is refused
+with `identity.account.closureBlockedByCredit` and asks the treasurer for a payout first.
 Closing anonymises the account in place through `AccountAnonymisation`: the person's name and email
 become placeholders, the username becomes `anonymised-` and the account id so the name is free again,
 the account is disabled and records `anonymised_at`, its password, second factors, challenges, reset
-code, queued messages, notification entries and import references are deleted and its sessions end
-after commit. Person and account rows stay, so bookings keep a reference that names nobody.
+code, queued messages, notification entries, import references and the reasons of its credit
+ledger entries are deleted and its sessions end after commit. Person and account rows stay, so bookings keep a reference that names nobody.
 `identity.account.closed` names the account id only. The roster refuses to change, enable or issue
 credentials to an anonymised account with `identity.account.anonymised`, a roster synchronisation
 leaves such a person untouched, and `BookingWriter` reads the booker's account `FOR SHARE`, so a
@@ -349,6 +351,22 @@ unit. A later price or currency change leaves every booking with the amount it w
 Bookings by anybody else, a member or an external player whose membership is running, carry no
 amount. The card administration shows the price only while the card names `EXTERNAL`, and the
 booking dialog shows the amount to an outsider before they confirm.
+
+Each account has a credit ledger in the `credit` module: money the club holds for it, as entries
+that are appended and never changed or removed. A trigger refuses every `UPDATE` and `DELETE` on
+`credit_entry`. An entry records its kind, the signed amount in the club currency's minor unit, the
+time, the account that recorded it and the reason, which lives in `credit_entry_note` so that
+anonymising the account can delete it while the entry stays. The balance is the sum of the entries
+in the club currency. `TREASURER` and `ADMIN` record a `CREDIT`, open only to an account holding
+`EXTERNAL`, or a `PAYOUT` of at most the balance, each between 0.01 and 10,000.00 with a reason of at
+most 200 characters and after a re-authentication no older than five minutes. A correction is an
+entry in the other direction. Every write locks the account's `credit_account` row `FOR UPDATE` before
+it reads the balance, so two writes against one account run one after the other and a balance never
+goes below zero. `credit.entry.recorded` names the account, the entry, its kind, amount and
+currency, never the reason. The account holder reads its balance and entries, most recent first with
+the balance after each, under `/api/my/credit`; the treasury searches external accounts and lists
+every account with a balance under `/api/treasury/credit`. The club currency cannot change while any
+account holds a balance, which `config.currency.creditHeld` reports.
 
 The guest fee report under `/api/treasury` lists, for `TREASURER` and `ADMIN`, each member's charged
 guest places and their sum for a period, by default the current calendar year in the club time
@@ -1473,12 +1491,13 @@ removes a person all of whose periods ended, the latest before the cut-off, and 
 were opened since, with those accounts and everything they hold. Removal does not record a
 departure: a member who leaves is deactivated, and only the period the board set after that ending
 erases them. A person is reported as blocked instead while an account of theirs holds the
-administrator role, a booking or series the run keeps still names them, or they wait for a court.
+administrator role, a booking or series the run keeps still names them, they wait for a court, or an
+account of theirs has credit ledger entries, which are never removed.
 `EXTERNAL_ACCOUNTS` anonymises, through `AccountAnonymisation` as a closure does, an account that is
 not anonymised yet, whose person holds no membership period, whose person's accounts all hold
 `EXTERNAL` and none `ADMIN`, and that was neither created nor signed in since the cut-off and has no
-own booking ending on or after it, an upcoming one included. Person and account rows stay, so its
-bookings keep a reference that names nobody.
+own booking ending on or after it, an upcoming one included, and that holds no credit balance.
+Person and account rows stay, so its bookings and ledger entries keep a reference that names nobody.
 
 Every run starts as a preview that changes nothing, counts what it would change and lists the
 blocked people with their reason. Only the account that took the preview can run it, with a recent

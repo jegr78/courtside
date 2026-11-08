@@ -225,6 +225,25 @@ describe("AccountSecurityView", () => {
     expect(closed).toHaveBeenCalledOnce();
   });
 
+  it("given a remaining credit balance, when the player confirms the closure, then the refusal sends them to the treasurer and nothing ends", async () => {
+    // given
+    vi.spyOn(api, "closeOwnAccount").mockRejectedValue(new ApiError(409, {
+      type: "urn:courtside:error:account-closure-blocked-by-credit", title: "Credit balance remains", status: 409,
+      violations: [{ code: "identity.account.closureBlockedByCredit", params: {} }]
+    }));
+    const signedOut = vi.fn();
+    render(<WithClubConfiguration><AccountSecurityView passwordChanged={vi.fn()} signedOut={signedOut} closable /></WithClubConfiguration>);
+    await renderedSecurityView();
+
+    // when
+    await userEvent.click(screen.getByTestId("close-account"));
+    await userEvent.click(screen.getByTestId("close-account-confirm"));
+
+    // then
+    expect(await screen.findByRole("alert")).toHaveTextContent("Ask the treasurer to pay it out before closing your account.");
+    expect(signedOut).not.toHaveBeenCalled();
+  });
+
   it("given an upcoming booking, when the player confirms the closure, then the refusal says why and nothing ends", async () => {
     // given
     vi.spyOn(api, "closeOwnAccount").mockRejectedValue(new ApiError(409, {

@@ -209,6 +209,11 @@ Angehörige stehen nur Mitgliedern offen und erscheinen bei dir nicht. Hat die B
 Preis für Externe, zeigt der Dialog vor dem Buchen den Betrag für die gewählte Dauer. Unter *Meine
 Buchungen* steht er bei der Buchung, auch wenn der Verein den Preis später ändert.
 
+Hast du dem Verein Geld gegeben, zum Beispiel bar im Clubhaus, bucht der Kassenwart es dir als
+Guthaben gut. In *Mein Konto* zeigt der Bereich *Guthaben* deinen Stand und jeden Eintrag mit Datum,
+Art, Begründung, Betrag und dem Stand danach, die neuesten zuerst. Eine Auszahlung bekommst du beim
+Kassenwart.
+
 ![Der Bereich für Mitspieler, Gäste und Platzfüller im Buchungsdialog.](screenshots/de/booking-participants.png)
 
 ## Als Mitspieler eingetragen
@@ -467,8 +472,9 @@ Fehler in deinem Namen oder Benutzernamen korrigiert der Vorstand in der Persone
 Als externer Spieler kannst du dein Konto selbst schließen. Wähle in *Mein Konto* unter *Konto
 schließen* die Schaltfläche und bestätige. Liegt deine Anmeldung mehr als fünf Minuten zurück, fragt
 Courtside vorher erneut nach deinem Passwort. Hast du noch eine anstehende Buchung, storniere sie
-zuerst. Beim Schließen entfernt Courtside deinen Namen, deine E-Mail-Adresse, deinen Benutzernamen und
-dein Passwort und meldet dich ab. Vergangene Buchungen bleiben ohne deinen Namen beim Verein. Deinen
+zuerst. Hast du noch Guthaben, lass es dir vorher vom Kassenwart auszahlen. Beim Schließen entfernt
+Courtside deinen Namen, deine E-Mail-Adresse, deinen Benutzernamen und dein Passwort und meldet dich
+ab. Vergangene Buchungen bleiben ohne deinen Namen beim Verein. Deinen
 Benutzernamen kann danach jemand neu registrieren. Als Mitglied beendet der Vorstand dein Konto.
 
 ![Die Kontosicherheit mit Zwei-Faktor-Authentifizierung, Sicherheitsschlüsseln, aktiven Sitzungen und Passwortänderung.](screenshots/de/account-security.png)

@@ -39,6 +39,8 @@ class AccountAnonymiser implements AccountAnonymisation {
                 "user_entities", "password_reset_token", "message_record", "notification"}) {
             jdbc.sql("DELETE FROM " + table + " WHERE account_id = :id").param("id", accountId).update();
         }
+        jdbc.sql("DELETE FROM credit_entry_note n USING credit_entry e WHERE n.entry_id = e.id AND e.account_id = :id")
+                .param("id", accountId).update();
         jdbc.sql("DELETE FROM import_external_reference WHERE person_id = :person")
                 .param("person", account.getPerson().getId()).update();
     }

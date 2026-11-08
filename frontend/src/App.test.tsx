@@ -428,7 +428,8 @@ describe("AppRoutes", () => {
   it.each([
     ["/admin/setup", "admin-setup-view"],
     ["/admin/configuration", "admin-configuration-view"],
-    ["/admin/facility/opening-hours", "admin-opening-hours-view"]
+    ["/admin/facility/opening-hours", "admin-opening-hours-view"],
+    ["/admin/credit", "admin-credit-view"]
   ])("given a member session, when opening %s, then it is not served", (address, view) => {
     // when
     render(<RoutedShell initialEntries={[address]}><AppRoutes session={{
@@ -478,6 +479,21 @@ describe("AppRoutes", () => {
     // then
     expect(await screen.findByTestId("admin-guest-fees-view")).toBeInTheDocument();
     expect(screen.queryByTestId("managed-appointments-page")).not.toBeInTheDocument();
+  });
+
+  it("given a treasurer, when opening the credit accounts, then they are served", async () => {
+    // given
+    vi.spyOn(api, "creditHolders").mockResolvedValue([]);
+
+    // when
+    render(<RoutedShell initialEntries={["/admin/credit"]}><AppRoutes session={{
+      authenticated: true, username: "roe.john", displayName: "John Roe",
+      roles: ["MEMBER", "TREASURER"], passwordChangeRequired: false, managesAppointments: false, createsSeries: false
+    }} refreshSession={() => Promise.resolve()} /></RoutedShell>);
+
+    // then
+    expect(await screen.findByTestId("admin-credit-view")).toBeInTheDocument();
+    expect(screen.getByTestId("admin-credit-link")).toHaveAttribute("aria-current", "page");
   });
 
   it("given a treasurer a card names as managing role, when opening club appointments, then the list is served without the series form", async () => {
