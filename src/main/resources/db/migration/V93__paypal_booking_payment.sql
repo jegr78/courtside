@@ -44,6 +44,7 @@ CREATE TABLE paypal_order (
     currency text NOT NULL,
     status text NOT NULL,
     capture_id text,
+    capture_attempted_at timestamptz,
     approve_url text NOT NULL,
     created_at timestamptz NOT NULL,
     updated_at timestamptz NOT NULL,

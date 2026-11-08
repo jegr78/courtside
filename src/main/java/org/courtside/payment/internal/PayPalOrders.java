@@ -10,7 +10,9 @@ import org.springframework.stereotype.Component;
 import java.net.URI;
 import java.sql.Timestamp;
 import java.time.Clock;
+import java.time.Instant;
 import java.util.Currency;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -59,6 +61,43 @@ class PayPalOrders {
     Optional<StoredOrder> lock(String orderId) {
         return jdbc.sql(COLUMNS + "WHERE order_id = :order FOR UPDATE").param("order", orderId).query(ROW)
                 .optional();
+    }
+
+    List<StoredOrder> open(PayPalEnvironment environment) {
+        return jdbc.sql(COLUMNS + "WHERE status = 'CREATED' AND environment = :environment ORDER BY created_at")
+                .param("environment", environment.name()).query(ROW).list();
+    }
+
+    /** Open orders created before the given instant, the longest unchecked first. */
+    List<String> openSince(Instant createdBefore, int limit) {
+        return jdbc.sql("""
+                        SELECT order_id FROM paypal_order WHERE status = 'CREATED' AND created_at <= :before
+                        ORDER BY updated_at, order_id LIMIT :limit
+                        """)
+                .param("before", Timestamp.from(createdBefore)).param("limit", limit).query(String.class).list();
+    }
+
+    /** Voided orders whose capture was attempted after the first instant and not checked since the second. */
+    List<String> voidedAfterCaptureAttempt(Instant attemptedAfter, Instant checkedBefore, int limit) {
+        return jdbc.sql("""
+                        SELECT order_id FROM paypal_order
+                        WHERE status = 'VOIDED' AND capture_attempted_at > :attempted AND updated_at <= :checked
+                        ORDER BY updated_at, order_id LIMIT :limit
+                        """)
+                .param("attempted", Timestamp.from(attemptedAfter)).param("checked", Timestamp.from(checkedBefore))
+                .param("limit", limit).query(String.class).list();
+    }
+
+    void markCaptureAttempted(String orderId) {
+        jdbc.sql("UPDATE paypal_order SET capture_attempted_at = :now WHERE order_id = :order")
+                .param("order", orderId).param("now", Timestamp.from(clock.instant())).update();
+    }
+
+    /** Records that an order was looked at without a change, so the next run looks at others first. */
+    void checked(String orderId, Status status) {
+        jdbc.sql("UPDATE paypal_order SET updated_at = :now WHERE order_id = :order AND status = :status")
+                .param("order", orderId).param("status", status.name())
+                .param("now", Timestamp.from(clock.instant())).update();
     }
 
     void mark(String orderId, Status status, @Nullable String captureId) {

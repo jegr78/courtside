@@ -2556,6 +2556,10 @@
         "level": "operational",
         "lifecycle": "payment-provider"
       },
+      "capture_attempted_at": {
+        "level": "operational",
+        "lifecycle": "payment-provider"
+      },
       "capture_id": {
         "level": "operational",
         "lifecycle": "payment-provider"

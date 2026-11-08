@@ -220,9 +220,9 @@ VALUES ('7f200000-0000-0000-0000-000000000001', '72000000-0000-0000-0000-0000000
 INSERT INTO credit_entry_note (entry_id, reason_text) VALUES ('7f200000-0000-0000-0000-000000000001', 'Cash at the clubhouse');
 
 INSERT INTO paypal_order (order_id, booking_id, account_id, environment, amount_minor, currency, status, capture_id,
-                          approve_url, created_at, updated_at)
+                          capture_attempted_at, approve_url, created_at, updated_at)
 VALUES ('EXAMPLEORDER0000001', '7f400000-0000-0000-0000-000000000001', '72000000-0000-0000-0000-000000000001',
-        'SANDBOX', 1500, 'EUR', 'CAPTURED', 'EXAMPLECAPTURE001',
+        'SANDBOX', 1500, 'EUR', 'CAPTURED', 'EXAMPLECAPTURE001', '2025-01-01T00:00:00Z',
         'https://www.sandbox.paypal.com/checkoutnow?token=EXAMPLEORDER0000001', '2025-01-01T00:00:00Z',
         '2025-01-01T00:00:00Z');
 

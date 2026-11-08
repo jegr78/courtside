@@ -33,6 +33,8 @@ class AdmissionPlanTest {
                 Map.entry("courtImpact", Optional.of(2)),
                 Map.entry("endAllSessions", Optional.of(1)),
                 Map.entry("checkPayPalConnection", Optional.of(1)),
+                Map.entry("savePayPalSettings", Optional.of(1)),
+                Map.entry("removePayPalCredentials", Optional.of(1)),
                 Map.entry("createPayPalOrder", Optional.empty()),
                 Map.entry("capturePayPalOrder", Optional.empty()),
                 Map.entry("cancelPayPalOrder", Optional.empty()));
@@ -51,6 +53,8 @@ class AdmissionPlanTest {
                 Map.entry("courtImpact", 5),
                 Map.entry("endAllSessions", 5),
                 Map.entry("checkPayPalConnection", 5),
+                Map.entry("savePayPalSettings", 5),
+                Map.entry("removePayPalCredentials", 5),
                 Map.entry("createPayPalOrder", 2),
                 Map.entry("capturePayPalOrder", 2),
                 Map.entry("cancelPayPalOrder", 2));

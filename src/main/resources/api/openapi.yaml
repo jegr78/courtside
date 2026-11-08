@@ -8857,6 +8857,11 @@ paths:
         without a new one, is refused with `urn:courtside:error:paypal-secret-required`.
         Requires a re-authentication no older than five minutes. The audit record names what
         changed, never the secret or the client id.
+
+        When the client id or the environment changes or PayPal is switched off, Courtside reads every
+        open order of the former credentials at PayPal after the change is stored. A captured order is
+        recorded as a return would record it; an order without a capture is voided and its court is
+        freed. An order PayPal cannot show stays open and keeps its court for the reconciliation.
       security:
         - sessionCookie: []
           csrfToken: []
@@ -8887,7 +8892,10 @@ paths:
       tags: [payment]
       operationId: removePayPalCredentials
       summary: Remove the stored PayPal credentials, which switches PayPal payment off.
-      description: Requires a re-authentication no older than five minutes.
+      description: |
+        Requires a re-authentication no older than five minutes. Open orders of the removed
+        credentials are read at PayPal and then recorded or voided as on a switch-off; an order
+        PayPal cannot show stays open and keeps its court.
       security:
         - sessionCookie: []
           csrfToken: []

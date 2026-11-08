@@ -911,7 +911,8 @@
       "backgroundEntryPoints": [],
       "stateTransitions": [
         "A treasurer or administrator stores the client id, environment and switch and, when given, a new secret encrypted with the instance keyring, and records one audit entry without client id or secret.",
-        "Removing the credentials deletes the settings row and records one audit entry."
+        "Removing the credentials deletes the settings row and records one audit entry.",
+        "Changing the client id or environment, switching PayPal off or removing the credentials reads every open order of the former credentials at PayPal after the change commits; a capture is recorded as on return, an order without one is voided and its booking released."
       ],
       "alternatePaths": [
         "A save without a secret keeps the stored one.",
@@ -920,11 +921,13 @@
       "failurePaths": [
         "Accounts without TREASURER or ADMIN are refused under /api/treasury.",
         "A missing recent authentication and switching PayPal on without a stored secret are refused without writing.",
-        "A refusal by PayPal answers REJECTED with its reason and a timeout or failed connection UNREACHABLE; the check stores nothing."
+        "A refusal by PayPal answers REJECTED with its reason and a timeout or failed connection UNREACHABLE; the check stores nothing.",
+        "An open order PayPal cannot show during a credential change stays open with its court held, and the reconciliation reads it with the stored credentials later."
       ],
       "productionPaths": [
         "src/main/java/org/courtside/payment/web/PayPalSettingsController.java",
         "src/main/java/org/courtside/payment/internal/PayPalSettingsService.java",
+        "src/main/java/org/courtside/payment/internal/PayPalCredentials.java",
         "src/main/java/org/courtside/payment/internal/PayPalClient.java",
         "src/main/java/org/courtside/payment/internal/PayPalConnectionCheck.java"
       ],
@@ -932,7 +935,9 @@
         "src/test/java/org/courtside/payment/PayPalSettingsTest.java#givenATreasurer_whenTheyStoreCredentials_thenTheSettingsShowSinceWhenButNeverTheSecret",
         "src/test/java/org/courtside/payment/PayPalSettingsTest.java#givenNoRecentProof_whenTheTreasurerStoresCredentials_thenTheyMustProveItFirst",
         "src/test/java/org/courtside/payment/PayPalSettingsTest.java#givenAWrongSecret_whenChecking_thenPayPalsReasonIsReported",
-        "src/test/java/org/courtside/payment/PayPalSettingsTest.java#givenAMember_whenReadingOrChangingTheSettings_thenTheyAreRefused"
+        "src/test/java/org/courtside/payment/PayPalSettingsTest.java#givenAMember_whenReadingOrChangingTheSettings_thenTheyAreRefused",
+        "src/test/java/org/courtside/payment/PayPalReconciliationTest.java#givenAnOpenOrder_whenPayPalIsSwitchedOff_thenItIsVoidedAndTheCourtIsFree",
+        "src/test/java/org/courtside/payment/PayPalReconciliationTest.java#givenAnOpenOrderWithACapture_whenTheEnvironmentChanges_thenItIsRecordedNotVoided"
       ]
     },
     {
@@ -954,12 +959,16 @@
         "capturePayPalOrder",
         "cancelPayPalOrder"
       ],
-      "backgroundEntryPoints": [],
+      "backgroundEntryPoints": [
+        "PayPalReconciliation#run"
+      ],
       "stateTransitions": [
         "The booker of a pending booking creates one PayPal order carrying the booking id and the amount stored with the booking, and one audit entry.",
         "A capture verifies the order at PayPal, captures it outside any transaction and then, under the order row lock, confirms the booking and records the PayPal payment and the booking debit once.",
         "A capture that finds the booking no longer pending, or a captured amount that differs, releases the booking and credits the captured amount to the booker.",
-        "Cancelling an order reads it at PayPal first; without money taken it is voided and its booking released at once, a capture is recorded as on return, and an unclear state leaves the order open."
+        "Cancelling an order reads it at PayPal first; without money taken it is voided and its booking released at once, a capture is recorded as on return, and an unclear state leaves the order open.",
+        "Every minute the reconciliation reads open orders older than five minutes and those whose hold has passed: a capture is recorded, an approved order is captured while its booking is still held, and an order without money taken whose hold ended, whose booking was released or whose credentials are no longer active is voided and audited.",
+        "The reconciliation releases a held booking without an order once its deadline has passed, and for 72 hours rereads voided orders whose capture was attempted so that a capture PayPal completed later becomes credit."
       ],
       "alternatePaths": [
         "Creating again for the same booking answers the stored order.",
@@ -971,15 +980,20 @@
         "A mismatch of booking id, amount or currency refuses the capture, releases the booking and records the reason; no money moves.",
         "A capture PayPal refuses, with the order then showing no capture and a status in which no money moved, rejects the order and releases the booking.",
         "A capture whose outcome is unknown, or an order of credentials that are no longer active, leaves the order open and answers PROCESSING.",
+        "An order PayPal cannot show to the reconciliation keeps its booking held, also past the deadline, until a later run reads it.",
         "Without a public address the order is refused with paypal-public-url-missing; a refused or unreachable create stores nothing."
       ],
       "productionPaths": [
         "src/main/java/org/courtside/payment/web/PayPalCheckoutController.java",
         "src/main/java/org/courtside/payment/internal/PayPalCheckout.java",
         "src/main/java/org/courtside/payment/internal/PayPalOrders.java",
-        "src/main/java/org/courtside/payment/internal/PayPalClient.java"
+        "src/main/java/org/courtside/payment/internal/PayPalClient.java",
+        "src/main/java/org/courtside/payment/internal/PayPalReconciliation.java"
       ],
       "evidence": [
+        "src/test/java/org/courtside/payment/PayPalReconciliationTest.java#givenAnApprovedOrderNeverReturned_whenTheJobRuns_thenTheBookingIsConfirmed",
+        "src/test/java/org/courtside/payment/PayPalReconciliationTest.java#givenAnApprovedOrderAndPayPalDown_whenTheDeadlinePasses_thenTheBookingStaysHeld",
+        "src/test/java/org/courtside/payment/PayPalReconciliationTest.java#givenACaptureRacingTheExpiry_whenBothRun_thenEitherConfirmedOrCreditedNeverBoth",
         "src/test/java/org/courtside/payment/PayPalCheckoutTest.java#givenAnApprovedOrder_whenTheBookerReturns_thenTheBookingIsConfirmedWithTwoLedgerEntries",
         "src/test/java/org/courtside/payment/PayPalCheckoutTest.java#givenTwoConcurrentReturns_whenBothCapture_thenOneConfirmationAndOnePayPalPayment",
         "src/test/java/org/courtside/payment/PayPalCheckoutTest.java#givenAMismatchedAmount_whenCapturing_thenNothingIsCapturedAndTheCourtIsFree",

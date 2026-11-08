@@ -18,6 +18,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.net.URI;
+import java.time.Clock;
 import java.util.Currency;
 import java.util.Optional;
 import java.util.Set;
@@ -35,7 +36,7 @@ public class PayPalCheckout {
 
     private final PayPalClient client;
     private final PayPalOrders orders;
-    private final PayPalSettingsService settings;
+    private final PayPalCredentials credentials;
     private final PayPalAvailability availability;
     private final PendingPayments pendingPayments;
     private final BookingPayments bookingPayments;
@@ -44,6 +45,7 @@ public class PayPalCheckout {
     private final CurrentUser currentUser;
     private final TransactionTemplate transactions;
     private final ApplicationEventPublisher events;
+    private final Clock clock;
 
     public boolean available() {
         return availability.payPalAvailable();
@@ -59,13 +61,13 @@ public class PayPalCheckout {
                 .orElseThrow(PayPalOrderNotFoundException::new);
         Optional<StoredOrder> existing = orders.ofBooking(bookingId);
         if (existing.isPresent()) return created(existing.get());
-        PayPalClient.Credentials credentials = settings.activeCredentials().orElseThrow(() -> {
+        PayPalClient.Credentials active = this.credentials.active().orElseThrow(() -> {
             log.info("PayPal payment is off, so booking {} gets no PayPal order", bookingId);
             return new PayPalCheckoutUnavailableException();
         });
         PayPalClient.Order order;
         try {
-            order = client.createOrder(credentials, bookingId, pending.amountMinor(), pending.currency(),
+            order = client.createOrder(active, bookingId, pending.amountMinor(), pending.currency(),
                     origin.resolve(RETURN_PATH), origin.resolve(CANCEL_PATH));
         } catch (PayPalUnavailableException | PayPalRefusedException failed) {
             log.warn("PayPal created no order for booking {}: {}", bookingId, failed.getMessage());
@@ -75,7 +77,7 @@ public class PayPalCheckout {
             log.warn("PayPal order {} of booking {} came without an approve link", order.id(), bookingId);
             return new PayPalCheckoutUnavailableException();
         });
-        StoredOrder fresh = new StoredOrder(order.id(), bookingId, account, credentials.environment(),
+        StoredOrder fresh = new StoredOrder(order.id(), bookingId, account, active.environment(),
                 pending.amountMinor(), pending.currency(), Status.CREATED, approveUrl);
         return transactions.execute(status -> {
             if (orders.insert(fresh)) {
@@ -103,29 +105,86 @@ public class PayPalCheckout {
         requireNoTransaction();
         Optional<Settlement> settled = settled(stored);
         if (settled.isPresent()) return settled.get();
-        Optional<PayPalClient.Credentials> credentials = settings.activeCredentials()
-                .filter(active -> active.environment() == stored.environment());
-        if (credentials.isEmpty()) return processing(stored);
-        PayPalClient.Order order;
-        try {
-            order = client.getOrder(credentials.get(), stored.orderId());
-        } catch (PayPalUnavailableException | PayPalRefusedException failed) {
-            log.warn("PayPal order {} of booking {} could not be read before its cancel: {}", stored.orderId(),
-                    stored.bookingId(), failed.getMessage());
-            return processing(stored);
-        }
-        if (order.capture().isPresent()) {
-            return settle(stored, order.capture().get(), mismatch(stored, order).isEmpty());
-        }
-        return UNCAPTURED.contains(order.status()) ? voided(stored) : processing(stored);
+        return credentials.active(stored.environment())
+                .map(active -> settleOrVoid(stored, active, Rejection.ABANDONED))
+                .orElseGet(() -> processing(stored));
     }
 
-    private Settlement voided(StoredOrder stored) {
+    /** Settles or voids every open order of credentials that are no longer active; an unreadable one stays open. */
+    void retire(PayPalClient.Credentials retired) {
+        requireNoTransaction();
+        for (StoredOrder stored : orders.open(retired.environment())) {
+            Settlement settlement = settleOrVoid(stored, retired, Rejection.CREDENTIALS_CHANGED);
+            log.info("PayPal order {} of booking {} after a credential change: {}", stored.orderId(),
+                    stored.bookingId(), settlement.outcome());
+        }
+    }
+
+    /** Settles an open order whose hold may have ended; it is captured only while its booking is still held. */
+    public Settlement reconcile(String orderId) {
+        requireNoTransaction();
+        StoredOrder stored = orders.find(orderId).orElseThrow(PayPalOrderNotFoundException::new);
+        Optional<Settlement> settled = settled(stored);
+        if (settled.isPresent()) return settled.get();
+        Optional<PayPalClient.Credentials> readable = credentials.stored(stored.environment());
+        if (readable.isEmpty()) {
+            log.warn("PayPal order {} of booking {} cannot be read: no stored {} credentials", stored.orderId(),
+                    stored.bookingId(), stored.environment());
+            return processing(stored);
+        }
+        Optional<PayPalClient.Order> order = read(stored, readable.get());
+        if (order.isEmpty()) return processing(stored);
+        Optional<PayPalClient.Capture> capture = order.get().capture();
+        if (capture.isPresent()) return settle(stored, capture.get(), mismatch(stored, order.get()).isEmpty());
+        Optional<PayPalClient.Credentials> active = credentials.active(stored.environment());
+        boolean held = pendingPayments.pending(stored.bookingId())
+                .filter(pending -> pending.expiresAt().isAfter(clock.instant())).isPresent();
+        if (active.isPresent() && held) return settle(stored, active.get(), order.get());
+        if (!UNCAPTURED.contains(order.get().status())) return processing(stored);
+        Rejection reason = active.isEmpty() ? Rejection.CREDENTIALS_CHANGED
+                : pendingPayments.pending(stored.bookingId()).isPresent() ? Rejection.HOLD_EXPIRED
+                : Rejection.BOOKING_RELEASED;
+        return voided(stored, reason);
+    }
+
+    /** Records a capture PayPal completed after the order was voided; the money becomes credit. */
+    public void recheckVoided(String orderId) {
+        requireNoTransaction();
+        Optional<StoredOrder> stored = orders.find(orderId).filter(order -> order.status() == Status.VOIDED);
+        if (stored.isEmpty()) return;
+        Optional<PayPalClient.Order> order = credentials.stored(stored.get().environment())
+                .flatMap(readable -> read(stored.get(), readable));
+        order.flatMap(PayPalClient.Order::capture).filter(capture -> capture.status().equals("COMPLETED"))
+                .ifPresent(capture -> record(stored.get(), capture, mismatch(stored.get(), order.get()).isEmpty()));
+    }
+
+    private Settlement settleOrVoid(StoredOrder stored, PayPalClient.Credentials readable, Rejection reason) {
+        Optional<PayPalClient.Order> order = read(stored, readable);
+        if (order.isEmpty()) return processing(stored);
+        if (order.get().capture().isPresent()) {
+            return settle(stored, order.get().capture().get(), mismatch(stored, order.get()).isEmpty());
+        }
+        return UNCAPTURED.contains(order.get().status()) ? voided(stored, reason) : processing(stored);
+    }
+
+    private Optional<PayPalClient.Order> read(StoredOrder stored, PayPalClient.Credentials readable) {
+        try {
+            return Optional.of(client.getOrder(readable, stored.orderId()));
+        } catch (PayPalUnavailableException | PayPalRefusedException failed) {
+            log.warn("PayPal order {} of booking {} could not be read: {}", stored.orderId(), stored.bookingId(),
+                    failed.getMessage());
+            return Optional.empty();
+        }
+    }
+
+    private Settlement voided(StoredOrder stored, Rejection reason) {
         return transactions.execute(status -> {
             StoredOrder locked = lock(stored);
             if (locked.status() != Status.CREATED) return settled(locked).orElseThrow();
             orders.mark(locked.orderId(), Status.VOIDED, null);
             pendingPayments.release(locked.bookingId());
+            events.publishEvent(new PaymentEvent.PayPalRejected(locked.bookingId(), locked.orderId(), reason.name()));
+            log.info("PayPal order {} of booking {} was voided: {}", locked.orderId(), locked.bookingId(), reason);
             return new Settlement(locked.bookingId(), Outcome.REJECTED);
         });
     }
@@ -134,21 +193,17 @@ public class PayPalCheckout {
         requireNoTransaction();
         Optional<Settlement> settled = settled(stored);
         if (settled.isPresent()) return settled.get();
-        Optional<PayPalClient.Credentials> credentials = settings.activeCredentials()
-                .filter(active -> active.environment() == stored.environment());
-        if (credentials.isEmpty()) {
+        Optional<PayPalClient.Credentials> active = credentials.active(stored.environment());
+        if (active.isEmpty()) {
             log.info("PayPal order {} of booking {} waits: no active {} credentials", stored.orderId(),
                     stored.bookingId(), stored.environment());
             return processing(stored);
         }
-        PayPalClient.Order order;
-        try {
-            order = client.getOrder(credentials.get(), stored.orderId());
-        } catch (PayPalUnavailableException | PayPalRefusedException failed) {
-            log.warn("PayPal order {} of booking {} could not be read: {}", stored.orderId(), stored.bookingId(),
-                    failed.getMessage());
-            return processing(stored);
-        }
+        Optional<PayPalClient.Order> order = read(stored, active.get());
+        return order.map(read -> settle(stored, active.get(), read)).orElseGet(() -> processing(stored));
+    }
+
+    private Settlement settle(StoredOrder stored, PayPalClient.Credentials active, PayPalClient.Order order) {
         Optional<Rejection> mismatch = mismatch(stored, order);
         if (order.status().equals("COMPLETED")) {
             return order.capture().map(capture -> settle(stored, capture, mismatch.isEmpty()))
@@ -156,13 +211,14 @@ public class PayPalCheckout {
         }
         if (mismatch.isPresent()) return reject(stored, mismatch.get());
         return switch (order.status()) {
-            case "APPROVED" -> capture(stored, credentials.get());
+            case "APPROVED" -> capture(stored, active);
             case "VOIDED" -> reject(stored, Rejection.ORDER_VOIDED);
             default -> processing(stored);
         };
     }
 
     private Settlement capture(StoredOrder stored, PayPalClient.Credentials credentials) {
+        transactions.executeWithoutResult(status -> orders.markCaptureAttempted(stored.orderId()));
         try {
             return settle(stored, client.captureOrder(credentials, stored.orderId()), true);
         } catch (PayPalUnavailableException unknown) {
@@ -305,7 +361,8 @@ public class PayPalCheckout {
     }
 
     private enum Rejection {
-        BOOKING_MISMATCH, CURRENCY_MISMATCH, AMOUNT_MISMATCH, ORDER_VOIDED, CAPTURE_DECLINED, CAPTURE_REFUSED
+        BOOKING_MISMATCH, CURRENCY_MISMATCH, AMOUNT_MISMATCH, ORDER_VOIDED, CAPTURE_DECLINED, CAPTURE_REFUSED,
+        ABANDONED, HOLD_EXPIRED, BOOKING_RELEASED, CREDENTIALS_CHANGED
     }
 
     public enum Outcome { CONFIRMED, LATE_CREDITED, REJECTED, PROCESSING }

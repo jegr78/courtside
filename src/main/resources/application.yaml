@@ -57,6 +57,8 @@ courtside:
       sandbox-endpoint: https://api-m.sandbox.paypal.com
       live-endpoint: https://api-m.paypal.com
       request-timeout: 10s
+      reconcile-interval: 60s
+      reconcile-after: 5m
   mfa:
     key-root: ${COURTSIDE_MFA_KEY_ROOT:}
     key-file: ${COURTSIDE_MFA_KEY_FILE:}

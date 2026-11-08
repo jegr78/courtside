@@ -11,6 +11,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.nio.charset.StandardCharsets;
 import java.sql.Timestamp;
@@ -28,6 +29,9 @@ public class PayPalSettingsService {
 
     private final JdbcClient jdbc;
     private final InstanceSecrets secrets;
+    private final PayPalCredentials credentials;
+    private final PayPalCheckout checkout;
+    private final TransactionTemplate transactions;
     private final PayPalConnectionCheck connection;
     private final RecentAuthentication recentAuthentication;
     private final CurrentUser currentUser;
@@ -40,9 +44,17 @@ public class PayPalSettingsService {
                 row.secretStoredAt())).orElse(Settings.NONE);
     }
 
-    @Transactional
+    /** Stores the settings; open orders of credentials that stop being active are settled or voided afterwards. */
     public Settings save(String clientId, PayPalEnvironment environment, boolean enabled, @Nullable String secret) {
         recentAuthentication.requireRecent();
+        @Nullable UUID actor = currentUser.accountId().orElse(null);
+        Saved saved = transactions.execute(status -> write(clientId, environment, enabled, secret, actor));
+        saved.retired().ifPresent(checkout::retire);
+        return saved.settings();
+    }
+
+    private Saved write(String clientId, PayPalEnvironment environment, boolean enabled, @Nullable String secret,
+                        @Nullable UUID actor) {
         String client = clientId == null ? "" : clientId.strip();
         if (client.isEmpty() || client.length() > MAX_CLIENT_ID_LENGTH || environment == null) {
             throw new IllegalStateException("A client id of at most " + MAX_CLIENT_ID_LENGTH
@@ -52,7 +64,6 @@ public class PayPalSettingsService {
             throw new IllegalStateException("A PayPal secret holds 1 to " + MAX_SECRET_LENGTH + " characters");
         }
         Instant now = clock.instant();
-        @Nullable UUID actor = currentUser.accountId().orElse(null);
         Optional<Row> current = stored(true);
         if (current.isEmpty()) {
             if (enabled && secret == null) throw new PayPalSecretRequiredException();
@@ -72,7 +83,8 @@ public class PayPalSettingsService {
             if (created == 1) {
                 events.publishEvent(new PaymentEvent.PayPalSettingsChanged(id, environment, enabled, true,
                         secret != null));
-                return new Settings(client, environment, enabled, secret == null ? null : now);
+                return new Saved(new Settings(client, environment, enabled, secret == null ? null : now),
+                        Optional.empty());
             }
             current = stored(true);
         }
@@ -83,6 +95,8 @@ public class PayPalSettingsService {
             throw new PayPalSecretRequiredException();
         }
         @Nullable Instant storedAt = secret == null ? row.secretStoredAt() : now;
+        Optional<PayPalClient.Credentials> retired = credentialsMoved || row.enabled() && !enabled
+                ? credentials.stored() : Optional.empty();
         jdbc.sql("""
                         UPDATE paypal_settings
                         SET client_id = :client, secret_ciphertext = coalesce(CAST(:secret AS text), secret_ciphertext),
@@ -97,39 +111,27 @@ public class PayPalSettingsService {
                 .param("enabled", enabled).param("now", Timestamp.from(now)).param("actor", actor).update();
         events.publishEvent(new PaymentEvent.PayPalSettingsChanged(row.id(), environment, enabled,
                 !row.clientId().equals(client), secret != null));
-        return new Settings(client, environment, enabled, storedAt);
+        return new Saved(new Settings(client, environment, enabled, storedAt), retired);
     }
 
-    @Transactional
+    /** Deletes the settings; open orders of the removed credentials are settled or voided afterwards. */
     public void remove() {
         recentAuthentication.requireRecent();
-        jdbc.sql("DELETE FROM paypal_settings RETURNING id").query(UUID.class).optional()
-                .ifPresent(id -> events.publishEvent(new PaymentEvent.PayPalCredentialsRemoved(id)));
+        Optional<PayPalClient.Credentials> retired = transactions.execute(status -> {
+            Optional<PayPalClient.Credentials> removed = credentials.stored();
+            jdbc.sql("DELETE FROM paypal_settings RETURNING id").query(UUID.class).optional()
+                    .ifPresent(id -> events.publishEvent(new PaymentEvent.PayPalCredentialsRemoved(id)));
+            return removed;
+        });
+        retired.ifPresent(checkout::retire);
     }
 
     public PayPalConnectionCheck.Result check() {
-        Optional<PayPalClient.Credentials> stored = credentials(false);
+        Optional<PayPalClient.Credentials> stored = credentials.stored();
         if (stored.isEmpty()) return new PayPalConnectionCheck.Result(PayPalConnectionCheck.Outcome.NOT_CONFIGURED,
                 null);
         PayPalClient.Credentials credentials = stored.get();
         return connection.check(credentials.environment(), credentials.clientId(), credentials.secret());
-    }
-
-    /** The decrypted credentials while PayPal payment is switched on. */
-    Optional<PayPalClient.Credentials> activeCredentials() {
-        return credentials(true);
-    }
-
-    private Optional<PayPalClient.Credentials> credentials(boolean enabledOnly) {
-        return jdbc.sql("""
-                        SELECT environment, client_id, secret_ciphertext FROM paypal_settings
-                        WHERE secret_ciphertext IS NOT NULL AND (enabled OR NOT :enabledOnly)
-                        """)
-                .param("enabledOnly", enabledOnly)
-                .query((rs, n) -> new PayPalClient.Credentials(PayPalEnvironment.valueOf(rs.getString(1)),
-                        rs.getString(2), new String(secrets.decrypt(PayPalStoredSecret.PURPOSE, rs.getString(3)),
-                        StandardCharsets.UTF_8)))
-                .optional();
     }
 
     private String encrypted(String secret) {
@@ -149,6 +151,9 @@ public class PayPalSettingsService {
     public record Settings(@Nullable String clientId, PayPalEnvironment environment, boolean enabled,
                            @Nullable Instant secretStoredAt) {
         static final Settings NONE = new Settings(null, PayPalEnvironment.SANDBOX, false, null);
+    }
+
+    private record Saved(Settings settings, Optional<PayPalClient.Credentials> retired) {
     }
 
     private record Row(UUID id, String clientId, PayPalEnvironment environment, boolean enabled,
