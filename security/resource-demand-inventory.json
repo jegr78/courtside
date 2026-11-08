@@ -614,6 +614,7 @@
       "failureBehavior": "A refusal by PayPal answers REJECTED with its reason, a timeout or failed connection answers UNREACHABLE; nothing is stored either way.",
       "consumerTimeoutBehavior": "The token request has its own 10-second deadline, the connection timeout included. The reference proxy sets no response deadline, and a repeated check is safe because it changes nothing.",
       "productionPaths": [
+        "src/main/java/org/courtside/payment/internal/PayPalClient.java",
         "src/main/java/org/courtside/payment/internal/PayPalConnectionCheck.java",
         "src/main/java/org/courtside/payment/internal/PayPalSettingsService.java",
         "src/main/resources/application.yaml",

@@ -925,6 +925,7 @@
       "productionPaths": [
         "src/main/java/org/courtside/payment/web/PayPalSettingsController.java",
         "src/main/java/org/courtside/payment/internal/PayPalSettingsService.java",
+        "src/main/java/org/courtside/payment/internal/PayPalClient.java",
         "src/main/java/org/courtside/payment/internal/PayPalConnectionCheck.java"
       ],
       "evidence": [

@@ -17,10 +17,10 @@ class PaymentConfigurationTest {
     @Test
     void givenProductionNamesAnotherPayPalHost_whenTheCheckIsBuilt_thenTheOverrideIsRefused() {
         // when / then
-        assertThatThrownBy(() -> new PaymentConfiguration().payPalConnectionCheck(
+        assertThatThrownBy(() -> new PaymentConfiguration().payPalClient(
                 new PayPalProperties(SANDBOX, ELSEWHERE, Duration.ofSeconds(10)), "PRODUCTION"))
                 .isInstanceOf(IllegalStateException.class).hasMessageContaining("cannot override PayPal in production");
-        assertThatThrownBy(() -> new PaymentConfiguration().payPalConnectionCheck(
+        assertThatThrownBy(() -> new PaymentConfiguration().payPalClient(
                 new PayPalProperties(ELSEWHERE, LIVE, Duration.ofSeconds(10)), "production"))
                 .isInstanceOf(IllegalStateException.class).hasMessageContaining("cannot override PayPal in production");
     }
@@ -28,9 +28,9 @@ class PaymentConfigurationTest {
     @Test
     void givenTheCanonicalHostsOrADevelopmentInstance_whenTheCheckIsBuilt_thenItIsAccepted() {
         // when / then
-        assertThat(new PaymentConfiguration().payPalConnectionCheck(
+        assertThat(new PaymentConfiguration().payPalClient(
                 new PayPalProperties(SANDBOX, LIVE, Duration.ofSeconds(10)), "PRODUCTION")).isNotNull();
-        assertThat(new PaymentConfiguration().payPalConnectionCheck(
+        assertThat(new PaymentConfiguration().payPalClient(
                 new PayPalProperties(ELSEWHERE, ELSEWHERE, Duration.ofSeconds(10)), "DEVELOPMENT")).isNotNull();
     }
 }

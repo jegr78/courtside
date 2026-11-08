@@ -30,7 +30,7 @@ class PayPalConnectionCheckTest {
     void givenAProviderThatNeverAnswers_whenChecking_thenTheCheckGivesUpAsUnreachable() throws IOException {
         // given
         URI endpoint = serve(200, "{}", Duration.ofSeconds(5));
-        PayPalConnectionCheck check = new PayPalConnectionCheck(
+        PayPalConnectionCheck check = connectionCheck(
                 new PayPalProperties(endpoint, endpoint, Duration.ofMillis(300)));
 
         // when
@@ -49,7 +49,7 @@ class PayPalConnectionCheckTest {
             port = socket.getLocalPort();
         }
         URI closed = URI.create("http://127.0.0.1:" + port);
-        PayPalConnectionCheck check = new PayPalConnectionCheck(new PayPalProperties(closed, closed, Duration.ofSeconds(2)));
+        PayPalConnectionCheck check = connectionCheck(new PayPalProperties(closed, closed, Duration.ofSeconds(2)));
 
         // when / then
         assertThat(check.check(PayPalEnvironment.LIVE, "client", "secret").outcome())
@@ -60,7 +60,7 @@ class PayPalConnectionCheckTest {
     void givenAnUnstructuredRefusal_whenChecking_thenTheStatusIsTheReasonAndTheBodyIsNotRepeated() throws IOException {
         // given
         URI endpoint = serve(503, "<html>\u001b[31mmaintenance " + "x".repeat(500) + "</html>", Duration.ZERO);
-        PayPalConnectionCheck check = new PayPalConnectionCheck(
+        PayPalConnectionCheck check = connectionCheck(
                 new PayPalProperties(endpoint, endpoint, Duration.ofSeconds(2)));
 
         // when
@@ -76,7 +76,7 @@ class PayPalConnectionCheckTest {
         // given
         URI endpoint = serve(400, "{\"error\":\"invalid_request\",\"error_description\":\"bad\\u0007 " + "y".repeat(500)
                 + "\"}", Duration.ZERO);
-        PayPalConnectionCheck check = new PayPalConnectionCheck(
+        PayPalConnectionCheck check = connectionCheck(
                 new PayPalProperties(endpoint, endpoint, Duration.ofSeconds(2)));
 
         // when
@@ -100,7 +100,7 @@ class PayPalConnectionCheckTest {
         });
         server.start();
         URI endpoint = URI.create("http://127.0.0.1:" + server.getAddress().getPort());
-        PayPalConnectionCheck check = new PayPalConnectionCheck(
+        PayPalConnectionCheck check = connectionCheck(
                 new PayPalProperties(endpoint, endpoint, Duration.ofSeconds(2)));
 
         // when
@@ -110,6 +110,10 @@ class PayPalConnectionCheckTest {
         assertThat(result.outcome()).isEqualTo(PayPalConnectionCheck.Outcome.REJECTED);
         assertThat(result.providerReason()).isEqualTo("HTTP 302");
         assertThat(paths).as("only the token endpoint ever sees the credentials").containsExactly("/v1/oauth2/token");
+    }
+
+    private static PayPalConnectionCheck connectionCheck(PayPalProperties properties) {
+        return new PayPalConnectionCheck(new PayPalClient(properties));
     }
 
     private URI serve(int status, String body, Duration delay) throws IOException {
