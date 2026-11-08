@@ -65,7 +65,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @TestPropertySource(properties = {"courtside.public-url=https://courts.example.org",
-        "courtside.payment.paypal.request-timeout=1s"})
+        "courtside.payment.paypal.request-timeout=3s"})
 @Import({FacilityTestFixture.class, IdentityTestFixture.class, CardTestFixture.class, ConfigTestFixture.class,
         CreditTestFixture.class, PaymentTestFixture.class})
 class PayPalCheckoutTest extends AbstractIntegrationTest {
@@ -274,6 +274,31 @@ class PayPalCheckoutTest extends AbstractIntegrationTest {
                         Map.of("kind", "BOOKING_DEBIT", "amount_minor", -1500));
         assertThat(audit("booking.booking.confirmed", booking)).hasSize(1);
         assertThat(audit("payment.paypal.captured", booking)).hasSize(1);
+    }
+
+    @Test
+    void givenACaptureInFlight_whenASecondReturnIsAnsweredAsADuplicate_thenItWaitsAndTheFirstConfirms()
+            throws Exception {
+        // given
+        UUID booking = bookWithOrder();
+        PAYPAL.reply(READ, 200, order("APPROVED", booking, "15.00", null));
+        PAYPAL.reply(CAPTURE, 201, order("COMPLETED", booking, "15.00", capture("COMPLETED", "15.00")));
+        PAYPAL.reply(CAPTURE, 409, "{\"name\":\"RESOURCE_CONFLICT\",\"message\":\"x\","
+                + "\"details\":[{\"issue\":\"PREVIOUS_REQUEST_IN_PROGRESS\"}]}");
+        CountDownLatch firstCapture = PAYPAL.holdFirst(CAPTURE);
+        CompletableFuture<String> first = CompletableFuture.supplyAsync(this::captureOutcome);
+        awaitRequest(CAPTURE);
+
+        // when
+        capture("roe.john").andExpect(status().isOk()).andExpect(jsonPath("$.outcome").value("PROCESSING"));
+
+        // then
+        assertThat(bookingStatus(booking)).as("a duplicate answer never releases the court").isEqualTo("PENDING_PAYMENT");
+        assertThat(orderStatus()).isEqualTo("CREATED");
+        firstCapture.countDown();
+        assertThat(first.get(10, TimeUnit.SECONDS)).isEqualTo("CONFIRMED");
+        assertThat(bookingStatus(booking)).isEqualTo("CONFIRMED");
+        assertThat(entries(booking)).hasSize(2);
     }
 
     @Test
@@ -502,7 +527,7 @@ class PayPalCheckoutTest extends AbstractIntegrationTest {
         UUID booking = bookWithOrder();
         PAYPAL.reply(READ, 200, order("APPROVED", booking, "15.00", null));
         PAYPAL.replyAfter(CAPTURE, 201, order("COMPLETED", booking, "15.00", capture("COMPLETED", "15.00")),
-                Duration.ofSeconds(3));
+                Duration.ofSeconds(5));
 
         // when
         capture("roe.john").andExpect(status().isOk()).andExpect(jsonPath("$.outcome").value("PROCESSING"));
@@ -648,6 +673,13 @@ class PayPalCheckoutTest extends AbstractIntegrationTest {
         }
     }
 
+    private static void awaitRequest(String route) throws InterruptedException {
+        for (int attempt = 0; attempt < 200 && PAYPAL.seen(route).isEmpty(); attempt++) {
+            Thread.sleep(10);
+        }
+        assertThat(PAYPAL.seen(route)).as("the first capture reached PayPal").isNotEmpty();
+    }
+
     private UserDetails account(String username) {
         return userDetails.loadUserByUsername(username);
     }
@@ -717,6 +749,7 @@ class PayPalCheckoutTest extends AbstractIntegrationTest {
         private final List<Seen> seen = new CopyOnWriteArrayList<>();
         private final Map<String, Deque<Reply>> replies = new ConcurrentHashMap<>();
         private final Map<String, CountDownLatch> held = new ConcurrentHashMap<>();
+        private final Map<String, CountDownLatch> firstHeld = new ConcurrentHashMap<>();
         private final HttpServer server;
 
         FakePayPal() {
@@ -732,12 +765,14 @@ class PayPalCheckoutTest extends AbstractIntegrationTest {
                         headers.put(name.toLowerCase(java.util.Locale.ROOT), String.join(",", values)));
                 seen.add(new Seen(route, headers,
                         new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8)));
+                Reply reply = next(route);
+                CountDownLatch first = firstHeld.remove(route);
+                if (first != null) await(first);
                 CountDownLatch together = held.get(route);
                 if (together != null) {
                     together.countDown();
                     await(together);
                 }
-                Reply reply = next(route);
                 try {
                     Thread.sleep(reply.delay().toMillis());
                 } catch (InterruptedException interrupted) {
@@ -769,6 +804,13 @@ class PayPalCheckoutTest extends AbstractIntegrationTest {
             seen.clear();
             replies.clear();
             held.clear();
+            firstHeld.clear();
+        }
+
+        CountDownLatch holdFirst(String route) {
+            CountDownLatch release = new CountDownLatch(1);
+            firstHeld.put(route, release);
+            return release;
         }
 
         void holdUntilBothArrive(String route) {

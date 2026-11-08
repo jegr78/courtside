@@ -43,6 +43,8 @@ public class PayPalClient {
     private static final Pattern ORDER_ID = Pattern.compile("[A-Za-z0-9_-]{1,64}");
     private static final Pattern AMOUNT = Pattern.compile("\\d{1,15}(\\.\\d+)?");
     private static final String ALREADY_CAPTURED = "ORDER_ALREADY_CAPTURED";
+    private static final String DUPLICATE_REQUEST = "DUPLICATE_REQUEST_ID";
+    private static final String REQUEST_IN_PROGRESS = "PREVIOUS_REQUEST_IN_PROGRESS";
     private static final ObjectMapper JSON = new ObjectMapper();
 
     private final PayPalProperties properties;
@@ -87,8 +89,12 @@ public class PayPalClient {
 
     Capture captureOrder(Credentials credentials, String orderId) {
         Answer answer = api(credentials, "POST", orderPath(orderId) + "/capture", "{}", orderId);
-        if (answer.status() == 422 && alreadyCaptured(answer.body())) {
+        if (answer.status() == 422 && hasIssue(answer.body(), ALREADY_CAPTURED)) {
             return captureOf(getOrder(credentials, orderId));
+        }
+        if (answer.status() == 409 || answer.status() / 100 == 4
+                && (hasIssue(answer.body(), DUPLICATE_REQUEST) || hasIssue(answer.body(), REQUEST_IN_PROGRESS))) {
+            throw new PayPalUnavailableException("PayPal is still processing an earlier capture of this order");
         }
         return capture(success(answer)).orElseThrow(() -> new PayPalRefusedException("PayPal order has no capture"));
     }
@@ -189,12 +195,12 @@ public class PayPalClient {
         throw new PayPalRefusedException(reason(status, answer.body()));
     }
 
-    private static boolean alreadyCaptured(byte[] body) {
+    private static boolean hasIssue(byte[] body, String issue) {
         try {
             JsonNode details = JSON.readTree(body).get("details");
             if (details == null || !details.isArray()) return false;
             for (JsonNode detail : details) {
-                if (ALREADY_CAPTURED.equals(text(detail, "issue"))) return true;
+                if (issue.equals(text(detail, "issue"))) return true;
             }
         } catch (JacksonException unstructured) {
             return false;

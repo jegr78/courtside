@@ -192,6 +192,24 @@ class PayPalClientTest {
         assertThat(seen).isEmpty();
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"409:CONFLICT", "422:DUPLICATE_REQUEST_ID", "422:PREVIOUS_REQUEST_IN_PROGRESS",
+            "400:DUPLICATE_REQUEST_ID"})
+    void givenACaptureStillRunningAtPayPal_whenCapturingAgain_thenTheOutcomeIsUnknownRatherThanRefused(String answer)
+            throws IOException {
+        // given
+        String[] parts = answer.split(":");
+        reply("POST /v1/oauth2/token", 200, TOKEN);
+        reply("POST /v2/checkout/orders/ORD1/capture", Integer.parseInt(parts[0]),
+                "{\"name\":\"X\",\"message\":\"x\",\"details\":[{\"issue\":\"" + parts[1] + "\"}]}");
+        PayPalClient client = client(Duration.ofSeconds(2));
+
+        // when / then
+        assertThatThrownBy(() -> client.captureOrder(credentials(), "ORD1"))
+                .as("a capture PayPal may still complete must never read as a refusal")
+                .isInstanceOf(PayPalUnavailableException.class);
+    }
+
     @Test
     void givenAnotherClientError_whenCapturing_thenTheReasonIsPayPalsBoundedPrintableName() throws IOException {
         // given
