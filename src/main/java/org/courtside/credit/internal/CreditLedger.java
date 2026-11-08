@@ -89,7 +89,7 @@ public class CreditLedger implements BookingPayments {
         if (balance + signed < 0) {
             throw new CreditInsufficientException(balance, currency);
         }
-        Recorded recorded = insert(accountId, kind, signed, currency, null, reason);
+        Recorded recorded = insert(accountId, kind, signed, currency, null, reason, null);
         return new LedgerEntry(recorded.id(), kind, signed, currency, balance + signed, recorded.at(), reason, null);
     }
 
@@ -105,7 +105,7 @@ public class CreditLedger implements BookingPayments {
         if (balance < amountMinor) {
             return new BookingDebit(false, balance, code);
         }
-        insert(accountId, CreditEntryKind.BOOKING_DEBIT, -amountMinor, code, bookingId, null);
+        insert(accountId, CreditEntryKind.BOOKING_DEBIT, -amountMinor, code, bookingId, null, null);
         return new BookingDebit(true, balance - amountMinor, code);
     }
 
@@ -169,7 +169,7 @@ public class CreditLedger implements BookingPayments {
                 .param("booking", bookingId).query(Boolean.class).single();
         if (!refunded) {
             insert(debit.get().accountId(), CreditEntryKind.BOOKING_REFUND, -debit.get().amountMinor(),
-                    debit.get().currency(), bookingId, null);
+                    debit.get().currency(), bookingId, null, null);
         }
     }
 
@@ -197,11 +197,6 @@ public class CreditLedger implements BookingPayments {
     private boolean anonymised(UUID accountId) {
         return jdbc.sql("SELECT anonymised_at IS NOT NULL FROM user_account WHERE id = :account")
                 .param("account", accountId).query(Boolean.class).optional().orElse(true);
-    }
-
-    private Recorded insert(UUID accountId, CreditEntryKind kind, int signed, String currency,
-                            @Nullable UUID bookingId, @Nullable String reason) {
-        return insert(accountId, kind, signed, currency, bookingId, reason, null);
     }
 
     private Recorded insert(UUID accountId, CreditEntryKind kind, int signed, String currency,
