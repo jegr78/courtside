@@ -896,6 +896,45 @@
       ]
     },
     {
+      "id": "paypal-settings",
+      "actors": [
+        "TREASURER",
+        "ADMIN"
+      ],
+      "entryPoints": "The treasury's PayPal settings under /api/treasury/paypal and their connection check under /api/treasury/paypal/check.",
+      "operationIds": [
+        "getPayPalSettings",
+        "savePayPalSettings",
+        "removePayPalCredentials",
+        "checkPayPalConnection"
+      ],
+      "backgroundEntryPoints": [],
+      "stateTransitions": [
+        "A treasurer or administrator stores the client id, environment and switch and, when given, a new secret encrypted with the instance keyring, and records one audit entry without client id or secret.",
+        "Removing the credentials deletes the settings row and records one audit entry."
+      ],
+      "alternatePaths": [
+        "A save without a secret keeps the stored one.",
+        "Without stored credentials the settings read as empty and the check answers NOT_CONFIGURED without calling PayPal."
+      ],
+      "failurePaths": [
+        "Accounts without TREASURER or ADMIN are refused under /api/treasury.",
+        "A missing recent authentication and switching PayPal on without a stored secret are refused without writing.",
+        "A refusal by PayPal answers REJECTED with its reason and a timeout or failed connection UNREACHABLE; the check stores nothing."
+      ],
+      "productionPaths": [
+        "src/main/java/org/courtside/payment/web/PayPalSettingsController.java",
+        "src/main/java/org/courtside/payment/internal/PayPalSettingsService.java",
+        "src/main/java/org/courtside/payment/internal/PayPalConnectionCheck.java"
+      ],
+      "evidence": [
+        "src/test/java/org/courtside/payment/PayPalSettingsTest.java#givenATreasurer_whenTheyStoreCredentials_thenTheSettingsShowSinceWhenButNeverTheSecret",
+        "src/test/java/org/courtside/payment/PayPalSettingsTest.java#givenNoRecentProof_whenTheTreasurerStoresCredentials_thenTheyMustProveItFirst",
+        "src/test/java/org/courtside/payment/PayPalSettingsTest.java#givenAWrongSecret_whenChecking_thenPayPalsReasonIsReported",
+        "src/test/java/org/courtside/payment/PayPalSettingsTest.java#givenAMember_whenReadingOrChangingTheSettings_thenTheyAreRefused"
+      ]
+    },
+    {
       "id": "guest-fee-report",
       "actors": [
         "TREASURER",

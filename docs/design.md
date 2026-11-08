@@ -384,6 +384,20 @@ by hand. The confirmation mail names the amount and that it was paid from credit
 cancellation mail tells the booker that the amount is back on their credit; both read the payment
 from the ledger, not from the booking's amount.
 
+`ADMIN` and `TREASURER` keep the club's PayPal credentials in the `payment` module under
+`/api/treasury/paypal`: the client id, sandbox or live, and whether PayPal payment is on. The secret
+is write-only. It is stored encrypted with the instance keyring, never returned and never logged;
+the settings show only since when a secret is stored. A save without a secret keeps the stored one.
+PayPal payment can be on only while a secret is stored, and a new client id or environment needs a
+new secret, so a secret never moves to credentials it was not entered for. Saving and removing the
+credentials require a re-authentication no older than five minutes.
+`payment.paypal.settings.changed` names the environment, the switch and whether the client id or the
+secret changed, never either value, and `payment.paypal.credentials.removed` records the removal.
+The connection check requests an access token from the stored environment with the stored
+credentials and reports `OK`, `REJECTED` with PayPal's own reason or the HTTP status, `UNREACHABLE`
+after 10 seconds or a failed connection, or `NOT_CONFIGURED`. The PayPal endpoints are application
+properties, not request data.
+
 The guest fee report under `/api/treasury` lists, for `TREASURER` and `ADMIN`, each member's charged
 guest places and their sum for a period, by default the current calendar year in the club time
 zone. A guest place counts when its fee is above zero and its booking is confirmed, started within
@@ -1184,16 +1198,21 @@ neither the new address nor any code, so a holder whose mail was redirected lear
 address they still read. A change that only alters letter case, or a person without an account,
 sends no notice.
 
-TOTP secrets use account-bound AES-256-GCM encryption with random nonces. The instance generates its
-keyring automatically and persists it outside PostgreSQL, under a private local directory or a
-separate writable container volume. A database installation ID selects the default key location;
-a canary and encrypted state validate the matching keyring before the instance reports healthy,
-and afterwards health reads the keyring and its canary again once the previous reading is 5 seconds old.
-An operator may supply a private key file. Rotation retains prior keys for existing ciphertext.
-A database with encrypted factors cannot start using missing or mismatched keys. Complete backup
-and restore preserve both the database and key material, and preflight validates them together
-before replacing the target database. A database-only restore with encrypted factors needs the
-matching keys restored separately.
+TOTP secrets use account-bound AES-256-GCM encryption with random nonces. The same instance keyring
+encrypts the PayPal secret through `identity.InstanceSecrets`, which binds every value to the
+purpose it is stored for as associated data, so a TOTP ciphertext never decrypts as a payment secret
+and the reverse. A module that stores such values declares them through
+`identity.EncryptedSecretHolder`. The instance generates its keyring automatically and persists it
+outside PostgreSQL, under a private local directory or a separate writable container volume. A
+database installation ID selects the default key location; a canary and encrypted state validate the
+matching keyring before the instance reports healthy, and afterwards health reads the keyring and
+its canary again once the previous reading is 5 seconds old. An operator may supply a private key
+file. Rotation retains prior keys for existing ciphertext. A database with encrypted factors or a
+stored PayPal secret cannot start using missing or mismatched keys, and start-up decrypts every such
+value once before the instance reports healthy. Complete backup and restore preserve both the
+database and key material, and preflight validates them together before replacing the target
+database. A database-only restore with encrypted factors or a PayPal secret needs the matching keys
+restored separately.
 
 ### Sessions
 

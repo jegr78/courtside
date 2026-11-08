@@ -168,6 +168,8 @@ tags:
     description: What members owe the club, for the treasurer and the administration.
   - name: credit
     description: Money the club holds for an account, and how that balance came about.
+  - name: payment
+    description: The club's payment provider and the credentials Courtside uses with it.
 
 security:
   - sessionCookie: []
@@ -4129,6 +4131,63 @@ components:
           maxLength: 200
           pattern: ".*\\S.*"
           description: Why the entry is made. The account holder sees it.
+
+    PayPalEnvironment:
+      type: string
+      enum: [SANDBOX, LIVE]
+      description: Which PayPal environment the credentials belong to.
+
+    PayPalSettings:
+      type: object
+      additionalProperties: false
+      required: [clientId, environment, enabled, secretStoredAt]
+      properties:
+        clientId:
+          type: [string, "null"]
+          maxLength: 200
+          description: The stored client id, or null when no credentials are stored.
+        environment: { $ref: "#/components/schemas/PayPalEnvironment" }
+        enabled:
+          type: boolean
+          description: Whether external players may pay by PayPal.
+        secretStoredAt:
+          type: [string, "null"]
+          format: date-time
+          description: When the stored secret was entered. The secret itself is never returned.
+
+    PayPalSettingsRequest:
+      type: object
+      additionalProperties: false
+      required: [clientId, environment, enabled]
+      properties:
+        clientId:
+          type: string
+          minLength: 1
+          maxLength: 200
+          pattern: "^\\S+$"
+        environment: { $ref: "#/components/schemas/PayPalEnvironment" }
+        enabled: { type: boolean }
+        secret:
+          type: string
+          minLength: 1
+          maxLength: 500
+          pattern: "^\\S+$"
+          description: A new secret. Left out, the stored one stays.
+
+    PayPalConnectionCheckOutcome:
+      type: string
+      enum: [OK, REJECTED, UNREACHABLE, NOT_CONFIGURED]
+
+    PayPalConnectionCheckResult:
+      type: object
+      additionalProperties: false
+      required: [outcome]
+      properties:
+        outcome: { $ref: "#/components/schemas/PayPalConnectionCheckOutcome" }
+        providerReason:
+          type: string
+          maxLength: 200
+          description: PayPal's own reason for a `REJECTED` outcome, or the HTTP status when it gave none.
 
     GuestFeeReport:
       type: object
@@ -8694,6 +8753,105 @@ paths:
         "429":
           $ref: "#/components/responses/RateLimited"
 
+  /api/treasury/paypal:
+    get:
+      tags: [payment]
+      operationId: getPayPalSettings
+      summary: The stored PayPal settings without the secret.
+      description: |
+        Returns the client id, environment, whether PayPal payment is on and since when a secret is
+        stored. The secret is never returned.
+      responses:
+        "200":
+          description: The settings; without stored credentials the client id and timestamp are null.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PayPalSettings" }
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+    put:
+      tags: [payment]
+      operationId: savePayPalSettings
+      summary: Store the PayPal credentials and switch PayPal payment on or off.
+      description: |
+        Stores the client id, environment and switch. A `secret` replaces the stored one, which is
+        encrypted with the instance key ring; without it the stored secret stays. Switching PayPal
+        on while no secret is stored, or changing the client id or environment of a stored secret
+        without a new one, is refused with `urn:courtside:error:paypal-secret-required`.
+        Requires a re-authentication no older than five minutes. The audit record names what
+        changed, never the secret or the client id.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PayPalSettingsRequest" }
+      responses:
+        "200":
+          description: The stored settings.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PayPalSettings" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+    delete:
+      tags: [payment]
+      operationId: removePayPalCredentials
+      summary: Remove the stored PayPal credentials, which switches PayPal payment off.
+      description: Requires a re-authentication no older than five minutes.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      responses:
+        "204":
+          description: No PayPal credentials are stored any more.
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/treasury/paypal/check:
+    post:
+      tags: [payment]
+      operationId: checkPayPalConnection
+      summary: Ask PayPal whether it accepts the stored credentials.
+      description: |
+        Requests an access token from the stored environment with the stored credentials. The
+        result is not stored. `UNREACHABLE` covers a timeout and a host that could not be reached.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      responses:
+        "200":
+          description: What PayPal answered.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PayPalConnectionCheckResult" }
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
   /api/managed/bookings:
     get:
       tags: [bookings]
@@ -13154,8 +13312,9 @@ paths:
         `rules.ruleSet.changed`, `roster.person.corrected`, `dataexchange.source.described` and
         `notification.template.changed`, each with siblings, `access.grant.retryRequested`, whose
         subject is the booking the retried grant belongs to, `access.control.checkRequested` without a
-        subject, and `credit.entry.recorded`, whose subject is the account a treasurer credited or paid
-        out. The rest is recorded outside those surfaces:
+        subject, `credit.entry.recorded`, whose subject is the account a treasurer credited or paid
+        out, and `payment.paypal.settings.changed` and `payment.paypal.credentials.removed`, whose
+        subject is the stored PayPal settings. The rest is recorded outside those surfaces:
         `booking.booking.confirmed` and the four other booking entries, `access.grant.installed` and
         `access.grant.failing`, and
         `identity.account.credentialsRequested`, which names the account a credential was issued

@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { type Page, type TestInfo } from "@playwright/test";
-import { accessGrantsExample, connectionCheckExample, creditHoldersExample, creditLedgerExample, guestFeesExample, operatorHealthExample } from "./admin-examples";
+import { accessGrantsExample, connectionCheckExample, creditHoldersExample, creditLedgerExample, guestFeesExample, operatorHealthExample, payPalCheckExample, payPalSettingsExample } from "./admin-examples";
 import { backAtTheJourneyInstant, expect, expectAdministrationOverview, onTheVisualDay, selectPreference, test } from "./fixtures";
 
 // The guides are read in the light theme on a page column, in the language its project names, and
@@ -309,6 +309,15 @@ const drivers: Record<string, (page: Page, visualDate: string) => Promise<void>>
     await expect(page.getByTestId("credit-entry")).toHaveCount(3);
     await expect(page.getByTestId("credit-form")).toBeVisible();
   },
+  "paypal": async (page) => {
+    await page.context().route("**/api/treasury/paypal", (route) => route.fulfill({ json: payPalSettingsExample }));
+    await page.context().route("**/api/treasury/paypal/check", (route) => route.fulfill({ json: payPalCheckExample }));
+    await page.getByTestId("admin-paypal-link").click();
+    await expect(page.getByTestId("paypal-client-id"), "the example, not the live instance, is drawn")
+      .toHaveValue("example-sandbox-client");
+    await page.getByTestId("paypal-check").click();
+    await expect(page.getByTestId("paypal-check-result")).toBeVisible();
+  },
   "retention": async (page) => {
     await page.getByTestId("admin-retention-link").click();
     for (const [category, months] of [["BOOKINGS", "24"], ["FORMER_MEMBERS", "12"]]) {
@@ -528,6 +537,16 @@ test("the credit a treasurer keeps for external players is captured", async ({ p
 
   // when / then
   await capture(page, "credit", journeyService.visualDate);
+});
+
+test("the PayPal credentials a treasurer keeps are captured", async ({ page, journeyService }, info) => {
+  // given
+  await prepare(page, localeOf(info));
+  await signIn(page, "configuration-admin", "court-plan-view");
+  await page.getByTestId("administration-link").click();
+
+  // when / then
+  await capture(page, "paypal", journeyService.visualDate);
 });
 
 test("the periods a board keeps personal records for are captured", async ({ page, journeyService }, info) => {

@@ -1,5 +1,6 @@
 package org.courtside.identity.internal;
 
+import org.courtside.identity.EncryptedSecretHolder;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -10,6 +11,7 @@ import java.security.MessageDigest;
 import java.util.List;
 import java.util.UUID;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 final class MfaSecrets {
     private static final byte[] CHECK = "courtside-mfa-key-check-v1".getBytes(StandardCharsets.US_ASCII);
@@ -17,20 +19,30 @@ final class MfaSecrets {
     private final TransactionTemplate transaction;
     private final Path root;
     private final Path suppliedFile;
+    private final Supplier<List<EncryptedSecretHolder>> holders;
 
     MfaSecrets(JdbcClient jdbc, PlatformTransactionManager transactions, Path root, Path suppliedFile) {
-        if (jdbc == null || transactions == null || root == null) {
+        this(jdbc, transactions, root, suppliedFile, List::of);
+    }
+
+    MfaSecrets(JdbcClient jdbc, PlatformTransactionManager transactions, Path root, Path suppliedFile,
+               Supplier<List<EncryptedSecretHolder>> holders) {
+        if (jdbc == null || transactions == null || root == null || holders == null) {
             throw new IllegalStateException("MFA key storage configuration is required");
         }
         this.jdbc = jdbc;
         this.transaction = new TransactionTemplate(transactions);
         this.root = root;
         this.suppliedFile = suppliedFile;
+        this.holders = holders;
     }
 
     void initialize() {
         withKey(keys -> {
             for (EncryptedSecret secret : encryptedSecrets()) keys.decrypt(secret.account(), secret.value());
+            for (EncryptedSecretHolder.StoredSecret secret : heldSecrets()) {
+                keys.decrypt(secret.purpose(), secret.encrypted());
+            }
             return true;
         });
     }
@@ -56,6 +68,14 @@ final class MfaSecrets {
         return withKey(keys -> keys.decrypt(account, encrypted));
     }
 
+    String encrypt(String purpose, byte[] secret) {
+        return withKey(keys -> keys.encrypt(purpose, secret));
+    }
+
+    byte[] decrypt(String purpose, String encrypted) {
+        return withKey(keys -> keys.decrypt(purpose, encrypted));
+    }
+
     void rotate() {
         withKey(keys -> {
             keys.rotate();
@@ -64,7 +84,7 @@ final class MfaSecrets {
     }
 
     private boolean encryptedSecretsExist() {
-        return jdbc.sql("""
+        return !heldSecrets().isEmpty() || jdbc.sql("""
                 SELECT EXISTS (SELECT 1 FROM account_mfa
                     WHERE totp_secret IS NOT NULL OR pending_totp_secret IS NOT NULL)
                 """).query(Boolean.class).single();
@@ -100,6 +120,10 @@ final class MfaSecrets {
 
     private Path location(Installation installation) {
         return suppliedFile == null ? root.resolve(installation.id().toString()).resolve("mfa.keys") : suppliedFile;
+    }
+
+    private List<EncryptedSecretHolder.StoredSecret> heldSecrets() {
+        return holders.get().stream().flatMap(holder -> holder.storedSecrets().stream()).toList();
     }
 
     private List<EncryptedSecret> encryptedSecrets() {

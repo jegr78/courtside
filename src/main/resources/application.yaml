@@ -52,6 +52,11 @@ server:
         same-site: lax
 
 courtside:
+  payment:
+    paypal:
+      sandbox-endpoint: https://api-m.sandbox.paypal.com
+      live-endpoint: https://api-m.paypal.com
+      request-timeout: 10s
   mfa:
     key-root: ${COURTSIDE_MFA_KEY_ROOT:}
     key-file: ${COURTSIDE_MFA_KEY_FILE:}
@@ -150,6 +155,7 @@ courtside:
       operational-log-search: { cost: 10, concurrency: 1 }
       logo-normalization: { cost: 10, concurrency: 1 }
       global-session-revocation: { cost: 5, concurrency: 1 }
+      payment-provider-check: { cost: 5, concurrency: 1 }
   access-control:
     connector: ${COURTSIDE_ACCESS_CONTROL_CONNECTOR:none}
     call-deadline: ${COURTSIDE_ACCESS_CONTROL_CALL_DEADLINE:15s}

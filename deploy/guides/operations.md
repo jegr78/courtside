@@ -1239,7 +1239,7 @@ default.
 | `COURTSIDE_APP_TLS_KEY` | *unset* | Path **inside the container** to the private key belonging to that certificate. `compose.app-tls.yaml` sets it to `/etc/courtside/tls/app/server.key`; set it yourself only when running the image without that overlay. |
 | `COURTSIDE_APP_TLS_MATERIAL` | `/srv/courtside/tls/app` | Host directory holding `server.crt` and `server.key`, the certificate the application serves to the proxy and the key belonging to it. Read by `compose.app-tls.yaml` only. |
 | `COURTSIDE_APP_TLS_AUTHORITY` | `/srv/courtside/tls/app-authority/authority.pem` | Host path to the certificate authority that issued it. Mounted as that single file into both the application and the proxy. |
-| `COURTSIDE_MFA_KEY_ROOT` | `/var/lib/courtside/mfa-keys` when that directory exists, as in the image; `.courtside/keys` otherwise | Private keyring directory. It must be writable on every start. Reference containers mount the persistent `mfa-keys` volume there. |
+| `COURTSIDE_MFA_KEY_ROOT` | `/var/lib/courtside/mfa-keys` when that directory exists, as in the image; `.courtside/keys` otherwise | Private keyring directory for TOTP secrets and the PayPal secret. It must be writable on every start. Reference containers mount the persistent `mfa-keys` volume there. |
 | `COURTSIDE_MFA_KEY_FILE` | *unset* | Optional operator-provided keyring path inside the container. Mount it privately for UID `10001`. Included backups capture this file and restore-check explicitly selects the recovered file. |
 | `COURTSIDE_BACKUP_EVIDENCE_FILE` | *unset* | Path **inside the container** to the JSON file the backup job writes after each successful backup, such as `{"completedAt":"2026-10-17T02:00:00Z"}`. The operator health overview and `courtside.backup.age` read the backup age from it. Unset or missing, the backup counts as unavailable. The reference Compose files pass it on but do not mount the file; [Tell the instance when the last backup finished](#tell-the-instance-when-the-last-backup-finished) shows the mount. |
 | `COURTSIDE_BOOTSTRAP_ADMIN_USERNAME` | *required on an empty account table* | Username of the first local administrator. |
@@ -1626,9 +1626,11 @@ and records `mfa_keys=external-required`. Produce the archive for the external s
 directory must be operator-owned with mode `0700`; the command writes a mode-`0600` file and never
 replaces an existing one. Export again after every key rotation. Pass that archive to
 `restore-check --mfa-keys /private/mfa-keys.tar`. Without it, `restore-check` counts the encrypted
-TOTP enrollments in the restored database and fails with that count when there are any; a unit
-without them passes and its application creates fresh keys. A full-self-hosted backup stops Stalwart once, captures `mail-config` and
-`mail-data` from that same interval, then waits for mail health before publishing the unit.
+TOTP enrollments in the restored database and fails with that count when there are any, and it
+fails as well when the database holds an encrypted PayPal secret; a unit without either passes and
+its application creates fresh keys. A full-self-hosted backup stops Stalwart once, captures
+`mail-config` and `mail-data` from that same interval, then waits for mail health before publishing
+the unit.
 The launcher stages the directory with `mktemp`, checks the dump with `pg_restore --list`, and
 publishes it only with `mv "$temporary" "$backup"` after every artifact is durable. Restore uses
 `pg_restore --clean --if-exists --no-owner --single-transaction --exit-on-error` and starts the
@@ -1674,14 +1676,19 @@ installation UUID selects its own keyring inside the volume, so different databa
 an encryption key. Local development uses the ignored `.courtside/keys` directory.
 
 Keep `database.dump` and `mfa-keys.tar` together in protected recovery storage. The key archive is
-separate from the database and can decrypt that database's TOTP secrets. Restrict access to both.
+separate from the database and can decrypt that database's TOTP secrets and its PayPal secret.
+Restrict access to both.
 `restore-check` validates archive paths and file types, imports keys into its fresh private volume,
 and waits until the matching application has completed its key checks. A missing or wrong key
 prevents health. It never clears enrollments or generates replacement keys over encrypted data.
 Older database dumps without encrypted MFA factors remain importable and initialize keys on start.
 A database-only dump with encrypted TOTP requires the matching keyring, including its old retained
-keys. WebAuthn credentials and recovery-code verifiers reside in the database and cannot replace
-missing encryption keys at startup.
+keys. A PayPal secret needs it as well. When the keyring is lost for good and no TOTP enrollment
+needs it, remove the stored PayPal credentials with
+`docker compose exec -T db psql -U courtside -d courtside -c 'DELETE FROM paypal_settings'` before
+the application starts; the treasurer then enters them again. WebAuthn credentials and
+recovery-code verifiers reside in the database and cannot replace missing encryption keys at
+startup.
 
 For a live recovery, stop the old application and restore the complete unit onto a fresh,
 separate installation. Preserve its database and key volume together. Prove the unit with

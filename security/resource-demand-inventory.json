@@ -60,7 +60,7 @@
     {
       "id": "ordinary-http",
       "kind": "ordinary",
-      "rationale": "These operations perform bounded single-record work or bounded page and calendar reads; their contract limits do not grow into a separate resource-demand decision. MFA administration reads two flags or changes one account state; TOTP setup encrypts one 160-bit key, recovery-code replacement generates ten verifiers and credential renaming/removal addresses one holder-owned record. The access-grant overview reads at most 100 grants and the probe kept in memory, a retry locks one grant row and a connection-check request only sets two flags and wakes the access worker, and reading the latest connection check reads it from memory; none of them calls the access-control system. The occupancy signal reads one key row and one grouped query over the next 24 hours of allocations, answering at most two lines per active court; the occupancy-key administration reads, replaces or deletes that one row. A credit ledger page reads at most 100 entries, a treasury search at most 20 accounts and the balance list only the accounts that hold credit; recording an entry locks one account row and appends one entry.",
+      "rationale": "These operations perform bounded single-record work or bounded page and calendar reads; their contract limits do not grow into a separate resource-demand decision. MFA administration reads two flags or changes one account state; TOTP setup encrypts one 160-bit key, recovery-code replacement generates ten verifiers and credential renaming/removal addresses one holder-owned record. The access-grant overview reads at most 100 grants and the probe kept in memory, a retry locks one grant row and a connection-check request only sets two flags and wakes the access worker, and reading the latest connection check reads it from memory; none of them calls the access-control system. The occupancy signal reads one key row and one grouped query over the next 24 hours of allocations, answering at most two lines per active court; the occupancy-key administration reads, replaces or deletes that one row. A credit ledger page reads at most 100 entries, a treasury search at most 20 accounts and the balance list only the accounts that hold credit; recording an entry locks one account row and appends one entry. The PayPal settings read, replace or delete one row and encrypt at most one secret of 500 characters; none of them calls PayPal.",
       "entryPoints": [
         "addMembershipPeriod",
         "assignMembership",
@@ -206,7 +206,10 @@
         "listCreditHolders",
         "listCreditEntries",
         "recordCreditEntry",
-        "searchCreditAccounts"
+        "searchCreditAccounts",
+        "getPayPalSettings",
+        "savePayPalSettings",
+        "removePayPalCredentials"
       ]
     },
     {
@@ -595,6 +598,30 @@
       ],
       "evidence": [
         "src/test/java/org/courtside/identity/AdminRecentAuthenticationTest.java#givenSeveralAccounts_whenAllSessionsAreEnded_thenTheCallingAdminAlsoLosesAuthority",
+        "src/test/java/org/courtside/shared/web/AdmissionPlanTest.java#whenLoadingTheShippedPlan_thenEveryDemandingClassHasItsDecidedCostAndBulkhead"
+      ]
+    },
+    {
+      "id": "payment-provider-check",
+      "kind": "demanding",
+      "entryPoints": [
+        "checkPayPalConnection"
+      ],
+      "growthDrivers": "One outbound token request to PayPal with the stored credentials; the work does not grow with club data.",
+      "inputOrDataBound": "The request carries no data. The answer is read up to 16 KiB and the reason returned is cut to 200 characters.",
+      "concurrencyOrRateBound": "Only TREASURER and ADMIN can invoke it; admission control runs one check at a time per instance and charges 5 tokens of the caller's request budget.",
+      "executionModel": "The stored settings are read and the secret decrypted outside a long transaction; the token request then runs synchronously in the request thread without holding a database connection.",
+      "failureBehavior": "A refusal by PayPal answers REJECTED with its reason, a timeout or failed connection answers UNREACHABLE; nothing is stored either way.",
+      "consumerTimeoutBehavior": "The token request has its own 10-second deadline, the connection timeout included. The reference proxy sets no response deadline, and a repeated check is safe because it changes nothing.",
+      "productionPaths": [
+        "src/main/java/org/courtside/payment/internal/PayPalConnectionCheck.java",
+        "src/main/java/org/courtside/payment/internal/PayPalSettingsService.java",
+        "src/main/resources/application.yaml",
+        "src/main/java/org/courtside/shared/web/AdmissionControl.java"
+      ],
+      "evidence": [
+        "src/test/java/org/courtside/payment/internal/PayPalConnectionCheckTest.java#givenAProviderThatNeverAnswers_whenChecking_thenTheCheckGivesUpAsUnreachable",
+        "src/test/java/org/courtside/payment/PayPalSettingsTest.java#givenAWrongSecret_whenChecking_thenPayPalsReasonIsReported",
         "src/test/java/org/courtside/shared/web/AdmissionPlanTest.java#whenLoadingTheShippedPlan_thenEveryDemandingClassHasItsDecidedCostAndBulkhead"
       ]
     },

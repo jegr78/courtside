@@ -201,6 +201,7 @@ public class SecurityConfiguration {
                                 "/admin/operator-health",
                                 "/admin/guest-fees",
                                 "/admin/credit",
+                                "/admin/paypal",
                                 "/index.html",
                                 "/assets/**", "/font-licenses.txt", "/icon.svg",
                                 "/manifest.webmanifest", "/sw.js",

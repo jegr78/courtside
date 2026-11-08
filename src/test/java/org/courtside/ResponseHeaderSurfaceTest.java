@@ -26,6 +26,7 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -57,10 +58,11 @@ class ResponseHeaderSurfaceTest extends AbstractIntegrationTest {
     private static final Pattern DISPOSITION = Pattern.compile(
             "attachment; filename=\"bookings-\\d{4}-\\d{2}-\\d{2}-\\d{4}-\\d{2}-\\d{2}\\.csv\"");
 
-    // The outbound lookup builds a java.net.http request, so the two names it sets travel away from
-    // this application rather than back to a caller.
-    private static final String OUTBOUND =
-            "org/courtside/identity/internal/HaveIBeenPwnedPasswordLookup.java";
+    // The outbound clients build java.net.http requests, so the names they set travel away from this
+    // application rather than back to a caller.
+    private static final List<String> OUTBOUND = List.of(
+            "org/courtside/identity/internal/HaveIBeenPwnedPasswordLookup.java",
+            "org/courtside/payment/internal/PayPalConnectionCheck.java");
 
     private static final Map<String, String> REVIEWED_SOURCES = Map.ofEntries(
             Map.entry("org/courtside/booking/web/BookingController.java Location",
@@ -119,16 +121,18 @@ class ResponseHeaderSurfaceTest extends AbstractIntegrationTest {
                 new TreeSet<>(REVIEWED_SOURCES.keySet()));
     }
 
-    // The one file the derivation leaves out has to keep the shape that earned the exemption.
+    // The files the derivation leaves out have to keep the shape that earned the exemption.
     @Test
-    void givenTheOutboundLookupSetsHeadersToo_whenItIsLeftOut_thenItStillWritesNoAnswer()
+    void givenTheOutboundClientsSetHeadersToo_whenTheyAreLeftOut_thenTheyStillWriteNoAnswer()
             throws IOException {
-        // given
-        String source = Files.readString(Path.of("src/main/java", OUTBOUND));
+        for (String outbound : OUTBOUND) {
+            // given
+            String source = Files.readString(Path.of("src/main/java", outbound));
 
-        // when / then
-        assertThat(source).contains("HttpRequest.newBuilder");
-        assertThat(source).doesNotContain("ResponseEntity").doesNotContain("HttpServletResponse");
+            // when / then
+            assertThat(source).as(outbound).contains("HttpRequest.newBuilder");
+            assertThat(source).as(outbound).doesNotContain("ResponseEntity").doesNotContain("HttpServletResponse");
+        }
     }
 
     @Test
@@ -274,7 +278,7 @@ class ResponseHeaderSurfaceTest extends AbstractIntegrationTest {
         try (Stream<Path> files = Files.walk(Path.of("src/main/java"))) {
             return files.filter(path -> path.toString().endsWith(".java"))
                     .filter(path -> !path.toString().contains("org/courtside/api/"))
-                    .filter(path -> !path.toString().endsWith(OUTBOUND))
+                    .filter(path -> OUTBOUND.stream().noneMatch(path.toString()::endsWith))
                     .flatMap(ResponseHeaderSurfaceTest::headersWrittenIn)
                     .collect(Collectors.toCollection(TreeSet::new));
         }

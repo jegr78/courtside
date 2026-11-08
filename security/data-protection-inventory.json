@@ -274,7 +274,8 @@
     "access-grant": "Kept for as long as its booking: the row is never deleted, holds what the access pass last derived and what the access-control system answered, and names a person only through the booking.",
     "access-code": "A grant's current code is detached once no door can accept it any more and the detached row is deleted by the access pass when its hold ends, which is the latest window any install asked for.",
     "registration-verification": "Deleted when the mailed code is redeemed; the identity cleanup sweep removes it together with its unverified account and person once it has lapsed.",
-    "credit-ledger": "Never changed or deleted, which a trigger enforces; anonymising the account deletes the reason text and leaves amounts that name the person only through the anonymised account."
+    "credit-ledger": "Never changed or deleted, which a trigger enforces; anonymising the account deletes the reason text and leaves amounts that name the person only through the anonymised account.",
+    "payment-provider": "One row while the club keeps PayPal credentials; saving replaces it in place and removing the credentials deletes it. Removing a person does not touch it."
   },
   "inMemoryState": {
     "AuditAdminController": {
@@ -2485,6 +2486,44 @@
       "security_epoch": {
         "level": "operational",
         "lifecycle": "registration-verification"
+      }
+    },
+    "paypal_settings": {
+      "client_id": {
+        "level": "operational",
+        "lifecycle": "payment-provider"
+      },
+      "enabled": {
+        "level": "operational",
+        "lifecycle": "payment-provider"
+      },
+      "environment": {
+        "level": "operational",
+        "lifecycle": "payment-provider"
+      },
+      "id": {
+        "level": "operational",
+        "lifecycle": "payment-provider"
+      },
+      "secret_ciphertext": {
+        "level": "secret",
+        "lifecycle": "payment-provider"
+      },
+      "secret_stored_at": {
+        "level": "operational",
+        "lifecycle": "payment-provider"
+      },
+      "singleton": {
+        "level": "operational",
+        "lifecycle": "payment-provider"
+      },
+      "updated_at": {
+        "level": "operational",
+        "lifecycle": "payment-provider"
+      },
+      "updated_by": {
+        "level": "pseudonymous",
+        "lifecycle": "payment-provider"
       }
     }
   }

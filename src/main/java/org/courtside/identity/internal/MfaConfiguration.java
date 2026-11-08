@@ -1,5 +1,7 @@
 package org.courtside.identity.internal;
 
+import org.courtside.identity.EncryptedSecretHolder;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Bean;
@@ -41,9 +43,10 @@ class MfaConfiguration {
     @Bean
     MfaSecrets mfaSecrets(JdbcClient jdbc, PlatformTransactionManager transactions,
                           @Value("${courtside.mfa.key-root:}") String root,
-                          @Value("${courtside.mfa.key-file:}") String suppliedFile) {
+                          @Value("${courtside.mfa.key-file:}") String suppliedFile,
+                          ObjectProvider<EncryptedSecretHolder> holders) {
         return new MfaSecrets(jdbc, transactions, keyRoot(root, IMAGE_KEY_ROOT),
-                suppliedFile.isBlank() ? null : Path.of(suppliedFile));
+                suppliedFile.isBlank() ? null : Path.of(suppliedFile), () -> holders.orderedStream().toList());
     }
 
     @Bean

@@ -90,6 +90,28 @@ describe("AdminNavigation", () => {
     expect(screen.getAllByTestId("admin-credit-link"), "an administrator is offered the link once").toHaveLength(1);
   });
 
+  it("given a treasurer without administration rights, when the PayPal settings are open, then their link is offered and current", () => {
+    // when
+    render(<MemoryRouter initialEntries={["/admin/paypal"]}>
+      <AdminNavigation administrator={false} treasurer appointmentsShown={false} />
+    </MemoryRouter>);
+
+    // then
+    expect(screen.getByTestId("admin-paypal-link")).toHaveAttribute("aria-current", "page");
+    expect(screen.getByTestId("admin-menu")).toHaveTextContent(i18n.t("nav.adminPayPal"));
+  });
+
+  it("given the administration, when the navigation is read, then the PayPal settings follow the credit accounts", () => {
+    // when
+    show("/admin/roster");
+
+    // then
+    const people = within(screen.getByTestId("admin-group-people")).getAllByRole("link").map((link) => link.getAttribute("data-testid"));
+    expect(people.slice(-2)).toEqual(["admin-credit-link", "admin-paypal-link"]);
+    expect(screen.getByTestId("admin-paypal-link")).toHaveAttribute("href", "/admin/paypal");
+    expect(screen.getAllByTestId("admin-paypal-link"), "an administrator is offered the link once").toHaveLength(1);
+  });
+
   it("given an appointment manager who is no treasurer, when the navigation is read, then guest fees are not offered", () => {
     // when
     render(<MemoryRouter initialEntries={["/admin/appointments"]}><AdminNavigation administrator={false} /></MemoryRouter>);
@@ -97,6 +119,7 @@ describe("AdminNavigation", () => {
     // then
     expect(screen.queryByTestId("admin-guest-fees-link")).not.toBeInTheDocument();
     expect(screen.queryByTestId("admin-credit-link")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("admin-paypal-link")).not.toBeInTheDocument();
   });
 
   it("given the administration, when the navigation is read, then the court plan is the way back", () => {

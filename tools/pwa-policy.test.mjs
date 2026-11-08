@@ -25,6 +25,8 @@ const REVIEWED_PASSWORD_FIELDS = [
   "frontend/src/views/AccountSecurityView.tsx#reauthentication-password",
   "frontend/src/views/AdminCreditView.tsx#admin-reauthentication-password",
   "frontend/src/views/AdminMessageWordingView.tsx#admin-reauthentication-password",
+  "frontend/src/views/AdminPayPalView.tsx#admin-reauthentication-password",
+  "frontend/src/views/AdminPayPalView.tsx#paypal-secret",
   "frontend/src/views/AdminPersonView.tsx#admin-reauthentication-password",
   "frontend/src/views/AdminRetentionView.tsx#retention-reauthentication-password",
   "frontend/src/views/DependantsView.tsx#dependant-reauthentication-password",

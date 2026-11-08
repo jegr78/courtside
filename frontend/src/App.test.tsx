@@ -429,7 +429,8 @@ describe("AppRoutes", () => {
     ["/admin/setup", "admin-setup-view"],
     ["/admin/configuration", "admin-configuration-view"],
     ["/admin/facility/opening-hours", "admin-opening-hours-view"],
-    ["/admin/credit", "admin-credit-view"]
+    ["/admin/credit", "admin-credit-view"],
+    ["/admin/paypal", "admin-paypal-view"]
   ])("given a member session, when opening %s, then it is not served", (address, view) => {
     // when
     render(<RoutedShell initialEntries={[address]}><AppRoutes session={{
@@ -494,6 +495,21 @@ describe("AppRoutes", () => {
     // then
     expect(await screen.findByTestId("admin-credit-view")).toBeInTheDocument();
     expect(screen.getByTestId("admin-credit-link")).toHaveAttribute("aria-current", "page");
+  });
+
+  it("given a treasurer, when opening the PayPal settings, then they are served", async () => {
+    // given
+    vi.spyOn(api, "payPalSettings").mockResolvedValue({ clientId: null, environment: "SANDBOX", enabled: false, secretStoredAt: null });
+
+    // when
+    render(<RoutedShell initialEntries={["/admin/paypal"]}><AppRoutes session={{
+      authenticated: true, username: "roe.john", displayName: "John Roe",
+      roles: ["MEMBER", "TREASURER"], passwordChangeRequired: false, managesAppointments: false, createsSeries: false
+    }} refreshSession={() => Promise.resolve()} /></RoutedShell>);
+
+    // then
+    expect(await screen.findByTestId("admin-paypal-view")).toBeInTheDocument();
+    expect(screen.getByTestId("admin-paypal-link")).toHaveAttribute("aria-current", "page");
   });
 
   it("given a treasurer a card names as managing role, when opening club appointments, then the list is served without the series form", async () => {

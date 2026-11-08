@@ -326,6 +326,14 @@
       }
     },
     {
+      "name": "paypal",
+      "surface": "admin-paypal-view",
+      "pages": {
+        "de": "site/board-guide.md",
+        "en": "site/en/board-guide.md"
+      }
+    },
+    {
       "name": "retention",
       "surface": "admin-retention-view",
       "pages": {

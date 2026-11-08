@@ -1129,3 +1129,53 @@ it("given an account's ledger, when it is read for the treasury, then the first 
   // then
   expect(requested).toBe("?limit=50");
 });
+
+it("given PayPal settings without a new secret, when they are saved, then the body carries no secret and the request is protected", async () => {
+  // given
+  document.cookie = "XSRF-TOKEN=test-token";
+  const stored = { clientId: "client-1", environment: "SANDBOX", enabled: true, secretStoredAt: "2026-11-08T10:00:00Z" };
+  let sent: Record<string, unknown> | undefined;
+  server.use(http.put("/api/treasury/paypal", async ({ request }) => {
+    expect(request.headers.get("X-XSRF-TOKEN")).toBe("test-token");
+    expect(request.headers.get("Content-Type")).toBe("application/json");
+    sent = await request.json() as Record<string, unknown>;
+    return HttpResponse.json(stored);
+  }));
+
+  // when
+  const saved = await api.savePayPalSettings({ clientId: "client-1", environment: "SANDBOX", enabled: true });
+
+  // then
+  expect(saved).toEqual(stored);
+  expect(Object.keys(sent ?? {}), "a missing secret keeps the stored one").toEqual(["clientId", "environment", "enabled"]);
+});
+
+it("given stored PayPal credentials, when they are read, removed and checked, then each reaches its endpoint", async () => {
+  // given
+  const calls: string[] = [];
+  server.use(
+    http.get("/api/treasury/paypal", () => {
+      calls.push("read");
+      return HttpResponse.json({ clientId: null, environment: "SANDBOX", enabled: false, secretStoredAt: null });
+    }),
+    http.delete("/api/treasury/paypal", () => {
+      calls.push("remove");
+      return new HttpResponse(null, { status: 204 });
+    }),
+    http.post("/api/treasury/paypal/check", () => {
+      calls.push("check");
+      return HttpResponse.json({ outcome: "REJECTED", providerReason: "invalid_client" });
+    })
+  );
+
+  // when
+  const read = await api.payPalSettings();
+  const removed = await api.removePayPalCredentials();
+  const checked = await api.checkPayPalConnection();
+
+  // then
+  expect(calls).toEqual(["read", "remove", "check"]);
+  expect(read.secretStoredAt).toBeNull();
+  expect(removed).toBeUndefined();
+  expect(checked).toEqual({ outcome: "REJECTED", providerReason: "invalid_client" });
+});

@@ -219,6 +219,10 @@ VALUES ('7f200000-0000-0000-0000-000000000001', '72000000-0000-0000-0000-0000000
 
 INSERT INTO credit_entry_note (entry_id, reason_text) VALUES ('7f200000-0000-0000-0000-000000000001', 'Cash at the clubhouse');
 
+INSERT INTO paypal_settings (id, client_id, environment, enabled, updated_at, updated_by)
+VALUES ('7f300000-0000-0000-0000-000000000001', 'example-sandbox-client', 'SANDBOX', false,
+        '2025-01-01T00:00:00Z', NULL);
+
 INSERT INTO message_optout (user_account_id, kind, created_at)
 VALUES ('72000000-0000-0000-0000-000000000001', 'BOOKING_REMINDER', '2025-01-01T00:00:00Z');
 
