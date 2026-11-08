@@ -5,5 +5,6 @@ public enum CancellationReason {
     WEATHER,
     CLUB_EVENT,
     MAINTENANCE,
-    OTHER
+    OTHER,
+    PAYMENT_EXPIRED
 }

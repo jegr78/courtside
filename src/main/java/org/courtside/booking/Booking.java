@@ -71,6 +71,9 @@ public class Booking implements Persistable<UUID> {
     @Column(name = "cancellation_reason")
     private CancellationReason cancellationReason;
 
+    @Column(name = "payment_expires_at")
+    private Instant paymentExpiresAt;
+
     @Column(name = "moved_at")
     private Instant movedAt;
 
@@ -116,6 +119,29 @@ public class Booking implements Persistable<UUID> {
     public Optional<BookingAmount> amount() {
         return amountMinor == null ? Optional.empty()
                 : Optional.of(new BookingAmount(amountMinor, Currency.getInstance(amountCurrency)));
+    }
+
+    public void awaitPayment(Instant expiresAt) {
+        this.status = BookingStatus.PENDING_PAYMENT;
+        this.paymentExpiresAt = expiresAt;
+        allocations.forEach(CourtAllocation::awaitPayment);
+    }
+
+    public boolean confirmPayment() {
+        if (status != BookingStatus.PENDING_PAYMENT) {
+            return false;
+        }
+        this.status = BookingStatus.CONFIRMED;
+        allocations.forEach(CourtAllocation::confirm);
+        return true;
+    }
+
+    public boolean expirePayment(Instant at, UUID by) {
+        return status == BookingStatus.PENDING_PAYMENT && cancel(by, at, CancellationReason.PAYMENT_EXPIRED);
+    }
+
+    public Optional<Instant> paymentExpiresAt() {
+        return Optional.ofNullable(paymentExpiresAt);
     }
 
     public void actedOnBehalfBy(UUID guardianAccountId) {

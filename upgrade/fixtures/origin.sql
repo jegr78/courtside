@@ -219,6 +219,18 @@ VALUES ('7f200000-0000-0000-0000-000000000001', '72000000-0000-0000-0000-0000000
 
 INSERT INTO credit_entry_note (entry_id, reason_text) VALUES ('7f200000-0000-0000-0000-000000000001', 'Cash at the clubhouse');
 
+INSERT INTO paypal_order (order_id, booking_id, account_id, environment, amount_minor, currency, status, capture_id,
+                          created_at, updated_at)
+VALUES ('EXAMPLEORDER0000001', '7f400000-0000-0000-0000-000000000001', '72000000-0000-0000-0000-000000000001',
+        'SANDBOX', 1500, 'EUR', 'CAPTURED', 'EXAMPLECAPTURE001', '2025-01-01T00:00:00Z', '2025-01-01T00:00:00Z');
+
+INSERT INTO credit_entry (id, account_id, kind, amount_minor, currency, recorded_at, recorded_by, booking_id,
+                          paypal_order_id)
+VALUES ('7f200000-0000-0000-0000-000000000002', '72000000-0000-0000-0000-000000000001', 'PAYPAL_PAYMENT', 1500, 'EUR',
+        '2025-01-01T00:00:00Z', NULL, '7f400000-0000-0000-0000-000000000001', 'EXAMPLEORDER0000001'),
+       ('7f200000-0000-0000-0000-000000000003', '72000000-0000-0000-0000-000000000001', 'PAYPAL_LATE_CAPTURE', 1500,
+        'EUR', '2025-01-01T00:00:00Z', NULL, '7f400000-0000-0000-0000-000000000002', 'EXAMPLEORDER0000002');
+
 INSERT INTO paypal_settings (id, client_id, environment, enabled, updated_at, updated_by)
 VALUES ('7f300000-0000-0000-0000-000000000001', 'example-sandbox-client', 'SANDBOX', false,
         '2025-01-01T00:00:00Z', NULL);

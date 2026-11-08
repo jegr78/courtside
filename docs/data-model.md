@@ -39,8 +39,14 @@ A booking an external booker made carries `amount_minor` and `amount_currency`, 
 card's hourly price came to and the club currency when it was made. Every other booking carries
 neither, and `booking_amount_in_currency` refuses one without the other or a negative amount.
 
-A cancelled booking may carry a `cancellation_reason`, one of five codes chosen by whoever cancelled
-somebody else's booking. It is never free text, so it names nobody. CHECK constraints accept only
+A booking is `PENDING_PAYMENT`, `CONFIRMED` or `CANCELLED`. A pending booking holds its court: the
+exclusion below treats a pending allocation like a confirmed one. `booking_pending_has_expiry`
+requires `payment_expires_at` while it is pending, the value stays after confirmation, and
+`booking_one_pending_per_account` allows one pending booking per `booked_by`.
+
+A cancelled booking may carry a `cancellation_reason`, one of six codes: five chosen by whoever
+cancelled somebody else's booking, and `PAYMENT_EXPIRED` for a hold released unpaid. It is never free
+text, so it names nobody. CHECK constraints accept only
 the known codes and only on a cancelled booking.
 
 **`court_allocation` is where the product's central guarantee lives.** Two confirmed allocations
@@ -437,8 +443,10 @@ a different file than the one previewed is visible after the fact.
 Entries are appended and never changed: the trigger `credit_entry_append_only` refuses every
 `UPDATE` and `DELETE`. `credit_entry_kind_sign` keeps a `CREDIT` and a `BOOKING_REFUND` positive and a
 `PAYOUT` and a `BOOKING_DEBIT` negative, and `credit_entry_amount_bounded` holds an entry the treasury
-records within 10,000.00. `credit_entry_booking_reference` requires `booking_id` exactly on the two
-booking kinds, and the unique index `credit_entry_booking_kind` allows one debit and one refund per
+records within 10,000.00. `PAYPAL_PAYMENT` and `PAYPAL_LATE_CAPTURE` are positive like a `CREDIT`.
+`credit_entry_booking_reference` requires `booking_id` exactly on the four booking kinds,
+`credit_entry_paypal_order_reference` requires `paypal_order_id` exactly on the two PayPal kinds, the
+unique index `credit_entry_paypal_order` allows an order one entry, and the unique index `credit_entry_booking_kind` allows one debit and one refund per
 booking. The balance is the sum of an account's
 entries in the club currency and is stored nowhere. The reason sits in its own table because it is
 free text that may name somebody: anonymising the account deletes it and leaves the entry.
@@ -450,6 +458,11 @@ booking an entry paid leaves the entry.
 | Table | Holds | References |
 |---|---|---|
 | `paypal_settings` | The club's PayPal client id, encrypted secret and since when it is stored, sandbox or live, whether PayPal payment is on, and when and by which account the row last changed | None |
+
+| `paypal_order` | One PayPal order per held booking: order id, booking, account, sandbox or live, amount in the minor unit, currency, status (`CREATED`, `CAPTURED`, `LATE_CAPTURED`, `REJECTED`, `VOIDED`), the capture id and when it was created and last changed | None |
+
+`paypal_order.booking_id` and `account_id` have no foreign key, like `credit_entry.booking_id`, so an
+order outlives the booking or account it paid for. `booking_id` is unique.
 
 `paypal_settings_single_row` keeps at most one row, and removing the credentials deletes it.
 `paypal_settings_secret_stored` keeps the ciphertext and its timestamp together, and

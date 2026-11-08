@@ -888,11 +888,11 @@ components:
         Why somebody other than the holder cancelled a booking, as a code the client and the
         messages translate. There is no free text, so a reason names nobody. It is fixed with the
         cancellation, because the message that names it has already gone out.
-      enum: [COURT_CONDITION, WEATHER, CLUB_EVENT, MAINTENANCE, OTHER]
+      enum: [COURT_CONDITION, WEATHER, CLUB_EVENT, MAINTENANCE, OTHER, PAYMENT_EXPIRED]
 
     BookingStatus:
       type: string
-      enum: [CONFIRMED, CANCELLED]
+      enum: [PENDING_PAYMENT, CONFIRMED, CANCELLED]
 
     Violation:
       type: object
@@ -4038,7 +4038,9 @@ components:
         `CREDIT`: the treasurer credited the account, for example after a cash payment. `PAYOUT`:
         the treasurer paid out part of the balance. `BOOKING_DEBIT`: a booking was paid from the
         balance. `BOOKING_REFUND`: a cancelled booking returned its payment to the balance.
-      enum: [CREDIT, PAYOUT, BOOKING_DEBIT, BOOKING_REFUND]
+        `PAYPAL_PAYMENT`: the booker paid a booking through PayPal. `PAYPAL_LATE_CAPTURE`: PayPal
+        captured a payment after the held court was released, and it became credit.
+      enum: [CREDIT, PAYOUT, BOOKING_DEBIT, BOOKING_REFUND, PAYPAL_PAYMENT, PAYPAL_LATE_CAPTURE]
 
     CreditEntryRequestKind:
       type: string
@@ -4070,7 +4072,7 @@ components:
         bookingId:
           type: [string, "null"]
           format: uuid
-          description: The booking a `BOOKING_DEBIT` or `BOOKING_REFUND` belongs to.
+          description: The booking a booking or PayPal entry belongs to.
 
     CreditLedgerPage:
       type: object
