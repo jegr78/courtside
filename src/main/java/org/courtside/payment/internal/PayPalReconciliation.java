@@ -33,14 +33,18 @@ public class PayPalReconciliation {
     private final PendingPayments pendingPayments;
     private final Clock clock;
     private final Duration reconcileAfter;
+    private final Duration unresolvedReleaseAfter;
 
     PayPalReconciliation(PayPalOrders orders, PayPalCheckout checkout, PendingPayments pendingPayments, Clock clock,
-                         @Value("${courtside.payment.paypal.reconcile-after}") Duration reconcileAfter) {
+                         @Value("${courtside.payment.paypal.reconcile-after}") Duration reconcileAfter,
+                         @Value("${courtside.payment.paypal.unresolved-release-after}")
+                         Duration unresolvedReleaseAfter) {
         this.orders = orders;
         this.checkout = checkout;
         this.pendingPayments = pendingPayments;
         this.clock = clock;
         this.reconcileAfter = reconcileAfter;
+        this.unresolvedReleaseAfter = unresolvedReleaseAfter;
     }
 
     @Scheduled(initialDelay = 30, timeUnit = TimeUnit.SECONDS,
@@ -59,7 +63,9 @@ public class PayPalReconciliation {
         }
         for (String orderId : due) {
             guarded(orderId, () -> {
-                if (checkout.reconcile(orderId).outcome() == Outcome.PROCESSING) orders.checked(orderId, Status.CREATED);
+                if (checkout.reconcile(orderId, unresolvedReleaseAfter).outcome() == Outcome.PROCESSING) {
+                    orders.checked(orderId, Status.CREATED);
+                }
             });
         }
         for (String orderId : orders.voidedAfterCaptureAttempt(now.minus(CAPTURE_WATCH), now.minus(reconcileAfter),

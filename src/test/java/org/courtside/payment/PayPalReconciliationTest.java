@@ -317,7 +317,7 @@ class PayPalReconciliationTest extends AbstractIntegrationTest {
         saveSettings("client-sandbox", "SANDBOX", false, null).andExpect(status().isOk());
 
         // then
-        assertThat(PAYPAL.seen(READ)).as("PayPal is asked before the order is voided").hasSize(1);
+        assertThat(PAYPAL.seen(READ)).as("an order nobody tried to capture holds no money").isEmpty();
         assertThat(bookingStatus(booking)).isEqualTo("CANCELLED");
         assertThat(cancellationReason(booking)).isEqualTo("PAYMENT_EXPIRED");
         assertThat(allocationStatus(booking)).isEqualTo("CANCELLED");
@@ -339,7 +339,7 @@ class PayPalReconciliationTest extends AbstractIntegrationTest {
                 .andExpect(status().isNoContent());
 
         // then
-        assertThat(PAYPAL.seen(READ)).as("the removed credentials still read the order once").hasSize(1);
+        assertThat(PAYPAL.seen(READ)).as("an order nobody tried to capture holds no money").isEmpty();
         assertThat(bookingStatus(booking)).isEqualTo("CANCELLED");
         assertThat(allocationStatus(booking)).isEqualTo("CANCELLED");
         assertThat(orderStatus()).isEqualTo("VOIDED");
@@ -349,22 +349,19 @@ class PayPalReconciliationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void givenAnOpenOrderAndPayPalDown_whenPayPalIsSwitchedOff_thenTheJobVoidsItOncePayPalAnswers() throws Exception {
+    void givenAnUnattemptedOrderAndPayPalDown_whenTheEnvironmentChanges_thenItIsVoidedAndTheCourtIsFree()
+            throws Exception {
         // given
         UUID booking = bookWithOrder();
         PAYPAL.reply(READ, 503, UNAVAILABLE);
-        saveSettings("client-sandbox", "SANDBOX", false, null).andExpect(status().isOk());
-        assertThat(orderStatus()).as("an order PayPal cannot show is not voided").isEqualTo("CREATED");
-        assertThat(bookingStatus(booking)).isEqualTo("PENDING_PAYMENT");
-        age(Duration.ofMinutes(6));
-        PAYPAL.replaceReply(READ, 200, order("APPROVED", booking, null));
 
         // when
-        reconciliation.run();
+        saveSettings("client-live", "LIVE", true, "paypal-secret-live").andExpect(status().isOk());
 
         // then
-        assertThat(PAYPAL.seen(CAPTURE)).as("switched off, PayPal captures nothing more").isEmpty();
+        assertThat(PAYPAL.seen(READ)).as("without a capture call no money can have moved").isEmpty();
         assertThat(bookingStatus(booking)).isEqualTo("CANCELLED");
+        assertThat(cancellationReason(booking)).isEqualTo("PAYMENT_EXPIRED");
         assertThat(orderStatus()).isEqualTo("VOIDED");
         assertThat(entries(booking)).isEmpty();
         assertThat(audit("payment.paypal.rejected", booking)).singleElement().satisfies(payload ->
@@ -372,16 +369,97 @@ class PayPalReconciliationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void givenAnOpenOrderWithACapture_whenTheEnvironmentChanges_thenItIsRecordedNotVoided() throws Exception {
+    void givenAnAttemptedOrderAndPayPalDown_whenTheEnvironmentChanges_thenItStaysOpenWithItsCourt() throws Exception {
         // given
         UUID booking = bookWithOrder();
-        PAYPAL.reply(READ, 200, order("COMPLETED", booking, capture("COMPLETED", "15.00")));
+        timeOutTheCapture(booking);
+        PAYPAL.replaceReply(READ, 503, UNAVAILABLE);
 
         // when
         saveSettings("client-live", "LIVE", true, "paypal-secret-live").andExpect(status().isOk());
 
         // then
-        assertThat(PAYPAL.seen(READ)).as("the order is read with the credentials it was created with").hasSize(1);
+        assertThat(orderStatus()).as("an order that may hold money is never voided unread").isEqualTo("CREATED");
+        assertThat(bookingStatus(booking)).isEqualTo("PENDING_PAYMENT");
+        assertThat(audit("payment.paypal.rejected", booking)).isEmpty();
+    }
+
+    @Test
+    void givenAnAttemptedOrderUnreadableForADay_whenTheJobRuns_thenTheCourtIsFreeAndALaterCaptureBecomesCredit()
+            throws Exception {
+        // given
+        UUID booking = bookWithOrder();
+        timeOutTheCapture(booking);
+        PAYPAL.replaceReply(READ, 503, UNAVAILABLE);
+        age(Duration.ofHours(25));
+        expire(booking, Duration.ofHours(24).plusSeconds(1));
+
+        // when
+        reconciliation.run();
+
+        // then
+        assertThat(bookingStatus(booking)).as("a day after its deadline the court is freed").isEqualTo("CANCELLED");
+        assertThat(cancellationReason(booking)).isEqualTo("PAYMENT_EXPIRED");
+        assertThat(orderStatus()).as("the order stays open for a capture PayPal may still show").isEqualTo("CREATED");
+        assertThat(entries(booking)).isEmpty();
+        PAYPAL.replaceReply(READ, 200, order("COMPLETED", booking, capture("COMPLETED", "15.00")));
+        reconciliation.run();
+        assertThat(orderStatus()).isEqualTo("LATE_CAPTURED");
+        assertThat(entries(booking)).containsExactly(Map.of("kind", "PAYPAL_LATE_CAPTURE", "amount_minor", 1500));
+        assertThat(credit.balance(johnAccount)).isEqualTo(1500);
+    }
+
+    @Test
+    void givenAnAttemptedOrderUnreadableForLessThanADay_whenTheJobRuns_thenTheCourtStaysHeld() throws Exception {
+        // given
+        UUID booking = bookWithOrder();
+        timeOutTheCapture(booking);
+        PAYPAL.replaceReply(READ, 503, UNAVAILABLE);
+        age(Duration.ofHours(23));
+        expire(booking, Duration.ofHours(23));
+
+        // when
+        reconciliation.run();
+
+        // then
+        assertThat(bookingStatus(booking)).isEqualTo("PENDING_PAYMENT");
+        assertThat(orderStatus()).isEqualTo("CREATED");
+    }
+
+    @Test
+    void givenAnUnattemptedApprovedOrderUnreadableForADay_whenTheJobRuns_thenItIsVoidedAndTheCourtIsFree() {
+        // given
+        UUID booking = bookWithOrderQuietly();
+        PAYPAL.reply(READ, 503, UNAVAILABLE);
+        age(Duration.ofHours(25));
+        expire(booking, Duration.ofHours(24).plusSeconds(1));
+
+        // when
+        reconciliation.run();
+
+        // then
+        assertThat(PAYPAL.seen(READ)).as("the job tried to read it first").hasSize(1);
+        assertThat(bookingStatus(booking)).isEqualTo("CANCELLED");
+        assertThat(orderStatus()).isEqualTo("VOIDED");
+        assertThat(entries(booking)).isEmpty();
+        assertThat(audit("payment.paypal.rejected", booking)).singleElement()
+                .satisfies(payload -> assertThat(payload.get("reason").asString()).isEqualTo("HOLD_EXPIRED"));
+    }
+
+    @Test
+    void givenAnOpenOrderWithACapture_whenTheEnvironmentChanges_thenItIsRecordedNotVoided() throws Exception {
+        // given
+        UUID booking = bookWithOrder();
+        timeOutTheCapture(booking);
+        PAYPAL.replaceReply(READ, 200, order("COMPLETED", booking, capture("COMPLETED", "15.00")));
+        int readsBefore = PAYPAL.seen(READ).size();
+
+        // when
+        saveSettings("client-live", "LIVE", true, "paypal-secret-live").andExpect(status().isOk());
+
+        // then
+        assertThat(PAYPAL.seen(READ)).as("the order is read with the credentials it was created with")
+                .hasSize(readsBefore + 1);
         assertThat(PAYPAL.seen(LIVE_READ)).isEmpty();
         assertThat(bookingStatus(booking)).isEqualTo("CONFIRMED");
         assertThat(orderStatus()).isEqualTo("CAPTURED");
@@ -576,8 +654,12 @@ class PayPalReconciliationTest extends AbstractIntegrationTest {
     }
 
     private void expire(UUID booking) {
+        expire(booking, Duration.ofSeconds(1));
+    }
+
+    private void expire(UUID booking, Duration ago) {
         jdbc.sql("UPDATE booking SET payment_expires_at = :at WHERE id = :id")
-                .param("at", Timestamp.from(clock.instant().minusSeconds(1))).param("id", booking).update();
+                .param("at", Timestamp.from(clock.instant().minus(ago))).param("id", booking).update();
     }
 
     private boolean captureAttempted() {

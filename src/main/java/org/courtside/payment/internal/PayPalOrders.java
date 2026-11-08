@@ -21,13 +21,14 @@ import java.util.UUID;
 class PayPalOrders {
 
     private static final String COLUMNS = """
-            SELECT order_id, booking_id, account_id, environment, amount_minor, currency, status, approve_url
+            SELECT order_id, booking_id, account_id, environment, amount_minor, currency, status, approve_url,
+                   capture_attempted_at
             FROM paypal_order
             """;
     private static final RowMapper<StoredOrder> ROW = (rs, n) -> new StoredOrder(rs.getString(1),
             rs.getObject(2, UUID.class), rs.getObject(3, UUID.class), PayPalEnvironment.valueOf(rs.getString(4)),
             rs.getInt(5), Currency.getInstance(rs.getString(6)), Status.valueOf(rs.getString(7)),
-            URI.create(rs.getString(8)));
+            URI.create(rs.getString(8)), rs.getTimestamp(9) == null ? null : rs.getTimestamp(9).toInstant());
 
     private final JdbcClient jdbc;
     private final Clock clock;
@@ -114,6 +115,6 @@ class PayPalOrders {
     enum Status { CREATED, CAPTURED, LATE_CAPTURED, REJECTED, VOIDED }
 
     record StoredOrder(String orderId, UUID bookingId, UUID accountId, PayPalEnvironment environment, int amountMinor,
-                       Currency currency, Status status, URI approveUrl) {
+                       Currency currency, Status status, URI approveUrl, @Nullable Instant captureAttemptedAt) {
     }
 }

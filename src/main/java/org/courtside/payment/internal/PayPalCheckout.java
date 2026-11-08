@@ -19,6 +19,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.net.URI;
 import java.time.Clock;
+import java.time.Duration;
 import java.util.Currency;
 import java.util.Optional;
 import java.util.Set;
@@ -78,7 +79,7 @@ public class PayPalCheckout {
             return new PayPalCheckoutUnavailableException();
         });
         StoredOrder fresh = new StoredOrder(order.id(), bookingId, account, active.environment(),
-                pending.amountMinor(), pending.currency(), Status.CREATED, approveUrl);
+                pending.amountMinor(), pending.currency(), Status.CREATED, approveUrl, null);
         return transactions.execute(status -> {
             if (orders.insert(fresh)) {
                 events.publishEvent(new PaymentEvent.PayPalOrderCreated(bookingId, fresh.orderId(),
@@ -115,7 +116,9 @@ public class PayPalCheckout {
         requireNoTransaction();
         for (StoredOrder stored : orders.open(retired.environment())) {
             try {
-                Settlement settlement = settleOrVoid(stored, retired, Rejection.CREDENTIALS_CHANGED);
+                Settlement settlement = stored.captureAttemptedAt() == null
+                        ? voided(stored, Rejection.CREDENTIALS_CHANGED)
+                        : settleOrVoid(stored, retired, Rejection.CREDENTIALS_CHANGED);
                 log.info("PayPal order {} of booking {} after a credential change: {}", stored.orderId(),
                         stored.bookingId(), settlement.outcome());
             } catch (RuntimeException failed) {
@@ -125,24 +128,25 @@ public class PayPalCheckout {
         }
     }
 
-    /** Settles an open order; an approved one is captured while its booking is held, also past the deadline. */
-    public Settlement reconcile(String orderId) {
+    /** Settles an open order; one PayPal cannot show releases its booking {@code unresolvedAfter} past the deadline. */
+    public Settlement reconcile(String orderId, Duration unresolvedAfter) {
         requireNoTransaction();
         StoredOrder stored = orders.find(orderId).orElseThrow(PayPalOrderNotFoundException::new);
         Optional<Settlement> settled = settled(stored);
         if (settled.isPresent()) return settled.get();
+        Optional<PendingBooking> pending = pendingPayments.pending(stored.bookingId());
+        if (stored.captureAttemptedAt() == null && pending.isEmpty()) return voided(stored, Rejection.BOOKING_RELEASED);
         Optional<PayPalClient.Credentials> readable = credentials.stored(stored.environment());
         if (readable.isEmpty()) {
             log.warn("PayPal order {} of booking {} cannot be read: no stored {} credentials", stored.orderId(),
                     stored.bookingId(), stored.environment());
-            return processing(stored);
+            return unresolved(stored, pending, unresolvedAfter);
         }
         Optional<PayPalClient.Order> order = read(stored, readable.get());
-        if (order.isEmpty()) return processing(stored);
+        if (order.isEmpty()) return unresolved(stored, pending, unresolvedAfter);
         Optional<PayPalClient.Capture> capture = order.get().capture();
         if (capture.isPresent()) return settle(stored, capture.get(), mismatch(stored, order.get()).isEmpty());
         Optional<PayPalClient.Credentials> active = credentials.active(stored.environment());
-        Optional<PendingBooking> pending = pendingPayments.pending(stored.bookingId());
         boolean beforeDeadline = pending.filter(held -> held.expiresAt().isAfter(clock.instant())).isPresent();
         if (active.isPresent() && pending.isPresent()
                 && (beforeDeadline || order.get().status().equals("APPROVED"))) {
@@ -152,6 +156,22 @@ public class PayPalCheckout {
         Rejection reason = active.isEmpty() ? Rejection.CREDENTIALS_CHANGED
                 : pending.isPresent() ? Rejection.HOLD_EXPIRED : Rejection.BOOKING_RELEASED;
         return voided(stored, reason);
+    }
+
+    private Settlement unresolved(StoredOrder stored, Optional<PendingBooking> pending, Duration unresolvedAfter) {
+        boolean overdue = pending.filter(held -> !held.expiresAt().plus(unresolvedAfter).isAfter(clock.instant()))
+                .isPresent();
+        if (!overdue) return processing(stored);
+        if (stored.captureAttemptedAt() == null) return voided(stored, Rejection.HOLD_EXPIRED);
+        return transactions.execute(status -> {
+            StoredOrder locked = lock(stored);
+            if (locked.status() != Status.CREATED) return settled(locked).orElseThrow();
+            if (pendingPayments.release(locked.bookingId())) {
+                log.warn("PayPal order {} could not be read for a day past its deadline; booking {} is released and"
+                        + " the order stays open", locked.orderId(), locked.bookingId());
+            }
+            return processing(locked);
+        });
     }
 
     /** Records a capture PayPal completed after the order was voided; the money becomes credit. */

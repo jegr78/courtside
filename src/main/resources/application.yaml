@@ -59,6 +59,7 @@ courtside:
       request-timeout: 10s
       reconcile-interval: 60s
       reconcile-after: 5m
+      unresolved-release-after: 24h
   mfa:
     key-root: ${COURTSIDE_MFA_KEY_ROOT:}
     key-file: ${COURTSIDE_MFA_KEY_FILE:}

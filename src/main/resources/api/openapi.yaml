@@ -8858,10 +8858,12 @@ paths:
         Requires a re-authentication no older than five minutes. The audit record names what
         changed, never the secret or the client id.
 
-        When the client id or the environment changes or PayPal is switched off, Courtside reads every
-        open order of the former credentials at PayPal after the change is stored. A captured order is
-        recorded as a return would record it; an order without a capture is voided and its court is
-        freed. An order PayPal cannot show stays open and keeps its court for the reconciliation.
+        When the client id or the environment changes or PayPal is switched off, the open orders of the
+        former credentials are ended after the change is stored. An order Courtside never asked PayPal to
+        capture holds no money and is voided at once, freeing its court. An order with a capture attempt
+        is read at PayPal first: a capture is recorded as a return would record it, an order without one
+        is voided. Such an order PayPal cannot show stays open for the reconciliation, which frees its
+        court a day after the payment deadline and still records a capture found later as credit.
       security:
         - sessionCookie: []
           csrfToken: []
@@ -8894,8 +8896,7 @@ paths:
       summary: Remove the stored PayPal credentials, which switches PayPal payment off.
       description: |
         Requires a re-authentication no older than five minutes. Open orders of the removed
-        credentials are read at PayPal and then recorded or voided as on a switch-off; an order
-        PayPal cannot show stays open and keeps its court.
+        credentials are ended as on a switch-off.
       security:
         - sessionCookie: []
           csrfToken: []

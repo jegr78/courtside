@@ -912,7 +912,7 @@
       "stateTransitions": [
         "A treasurer or administrator stores the client id, environment and switch and, when given, a new secret encrypted with the instance keyring, and records one audit entry without client id or secret.",
         "Removing the credentials deletes the settings row and records one audit entry.",
-        "Changing the client id or environment, switching PayPal off or removing the credentials reads every open order of the former credentials at PayPal after the change commits; a capture is recorded as on return, an order without one is voided and its booking released."
+        "Changing the client id or environment, switching PayPal off or removing the credentials ends the open orders of the former credentials after the change commits: an order without a capture attempt is voided and its booking released at once; one with an attempt is read at PayPal, a capture is recorded as on return and an order without one is voided."
       ],
       "alternatePaths": [
         "A save without a secret keeps the stored one.",
@@ -922,7 +922,7 @@
         "Accounts without TREASURER or ADMIN are refused under /api/treasury.",
         "A missing recent authentication and switching PayPal on without a stored secret are refused without writing.",
         "A refusal by PayPal answers REJECTED with its reason and a timeout or failed connection UNREACHABLE; the check stores nothing.",
-        "An open order PayPal cannot show during a credential change stays open with its court held, and the reconciliation reads it with the stored credentials later."
+        "An order with a capture attempt that PayPal cannot show during a credential change stays open with its court held until the reconciliation settles it or releases the booking a day after its deadline."
       ],
       "productionPaths": [
         "src/main/java/org/courtside/payment/web/PayPalSettingsController.java",
@@ -980,7 +980,7 @@
         "A mismatch of booking id, amount or currency refuses the capture, releases the booking and records the reason; no money moves.",
         "A capture PayPal refuses, with the order then showing no capture and a status in which no money moved, rejects the order and releases the booking.",
         "A capture whose outcome is unknown, or an order of credentials that are no longer active, leaves the order open and answers PROCESSING.",
-        "An order PayPal cannot show to the reconciliation keeps its booking held, also past the deadline, until a later run reads it.",
+        "An order PayPal cannot show to the reconciliation keeps its booking held past the deadline for at most 24 hours: then an order without a capture attempt is voided and released, and one with an attempt releases its booking while the order stays open, so a capture read later becomes credit.",
         "Without a public address the order is refused with paypal-public-url-missing; a refused or unreachable create stores nothing."
       ],
       "productionPaths": [

@@ -609,7 +609,7 @@
         "removePayPalCredentials",
         "savePayPalSettings"
       ],
-      "growthDrivers": "A check makes one outbound token request to PayPal with the stored credentials. A save that changes the client id or environment or switches PayPal off, and a removal, read each open order of the former credentials once, with at most a capture-free void or one recorded capture each; an account holds at most one pending booking and a hold lasts 15 minutes.",
+      "growthDrivers": "A check makes one outbound token request to PayPal with the stored credentials. A save that changes the client id or environment or switches PayPal off, and a removal, void each open order of the former credentials without a capture attempt directly and read each one with an attempt once; an account holds at most one pending booking and a hold lasts 15 minutes.",
       "inputOrDataBound": "The check carries no data, and its answer is read up to 16 KiB with the reason cut to 200 characters. A save carries the bounded settings body; each order answer is read up to 64 KiB.",
       "concurrencyOrRateBound": "Only TREASURER and ADMIN can invoke these; admission control runs one of them at a time per instance and charges 5 tokens of the caller's request budget.",
       "executionModel": "The stored settings are read and the secret decrypted outside a long transaction; the token request then runs synchronously in the request thread without holding a database connection. A save or removal commits first and then reads the open orders at PayPal in the request thread, each settled or voided in its own short transaction under the order row lock.",
@@ -667,7 +667,7 @@
       "inputOrDataBound": "Two pages of 50 orders bound the PayPal calls of one run; the held bookings past their deadline are bounded by the accounts holding one pending booking each. Each PayPal answer is read up to 64 KiB.",
       "concurrencyOrRateBound": "Spring's single scheduling thread runs one pass at a time, 60 seconds after the previous one ended. An order PayPal keeps failing to answer is read again on every run, the longest unchecked first.",
       "executionModel": "Every PayPal call runs outside any transaction; each decision then takes the order row lock, the grid lock and the booking row in a short transaction of its own, the same path the return uses.",
-      "failureBehavior": "A PayPal read that fails or a status that leaves the outcome open keeps the order and its court for the next run, also past the deadline. A failure on one order is logged with its id and the run goes on with the next.",
+      "failureBehavior": "A PayPal read that fails or a status that leaves the outcome open keeps the order and its court for the next run, past the deadline for at most 24 hours (courtside.payment.paypal.unresolved-release-after); then the booking is released, and an order with a capture attempt stays open and is read on later runs. A failure on one order is logged with its id and the run goes on with the next.",
       "consumerTimeoutBehavior": "There is no HTTP consumer. Each PayPal request has its own 10-second deadline, so a run of two full pages lasts at most a few hundred requests times that deadline, and the next run starts only after it ended.",
       "productionPaths": [
         "src/main/java/org/courtside/payment/internal/PayPalReconciliation.java",
