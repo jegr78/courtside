@@ -2,9 +2,9 @@
   "schemaVersion": 1,
   "reviewedAt": "2026-11-01",
   "purpose": "This is the normative authorization policy for the shipped Courtside API. OpenAPI defines the transport shape; this policy defines who may perform each operation, which resource attributes narrow that permission, and which protected fields each projection may read or write.",
-  "openApiFieldInventorySha256": "de36eb95b0fa2ac435dd6850a7cb042b856e324368f0214ea8e89e446b0ee56f",
+  "openApiFieldInventorySha256": "3b135927abc5f3e2f490f19d087c6a189138ab4223a4564b0a7fa7055bdd2a3e",
   "protectedFieldInventorySha256": "5295a7c44ccdfbecede95000d5f40299f3bfb9026c9b5b5afde1dc1e58301aa0",
-  "productionAuthorizationSha256": "bea0de7c795d4d0b86b060af69b216e933357ed1264792e293d430d17775a807",
+  "productionAuthorizationSha256": "7b67924b35d1cdfa6ad88715b7509a03d466dbad4ca7ef47262125c8c028055e",
   "ordinaryFields": [
     "Problem.detail",
     "Problem.fieldErrors",
@@ -565,6 +565,16 @@
     "checkIn:response:Violation.code",
     "checkIn:response:Violation.params",
     "checkIn:response:Violation.params.*",
+    "checkPayPalConnection:response:$response.header.Retry-After",
+    "checkPayPalConnection:response:FieldError.code",
+    "checkPayPalConnection:response:FieldError.field",
+    "checkPayPalConnection:response:FieldError.params",
+    "checkPayPalConnection:response:FieldError.params.*",
+    "checkPayPalConnection:response:PayPalConnectionCheckResult.outcome",
+    "checkPayPalConnection:response:PayPalConnectionCheckResult.providerReason",
+    "checkPayPalConnection:response:Violation.code",
+    "checkPayPalConnection:response:Violation.params",
+    "checkPayPalConnection:response:Violation.params.*",
     "chooseOwnMessageChannels:request:MessageChannelChoiceRequest.declined",
     "chooseOwnMessageChannels:response:$response.header.Accept",
     "chooseOwnMessageChannels:response:$response.header.Retry-After",
@@ -1604,6 +1614,18 @@
     "getParticipantCard:response:Violation.code",
     "getParticipantCard:response:Violation.params",
     "getParticipantCard:response:Violation.params.*",
+    "getPayPalSettings:response:$response.header.Retry-After",
+    "getPayPalSettings:response:FieldError.code",
+    "getPayPalSettings:response:FieldError.field",
+    "getPayPalSettings:response:FieldError.params",
+    "getPayPalSettings:response:FieldError.params.*",
+    "getPayPalSettings:response:PayPalSettings.clientId",
+    "getPayPalSettings:response:PayPalSettings.enabled",
+    "getPayPalSettings:response:PayPalSettings.environment",
+    "getPayPalSettings:response:PayPalSettings.secretStoredAt",
+    "getPayPalSettings:response:Violation.code",
+    "getPayPalSettings:response:Violation.params",
+    "getPayPalSettings:response:Violation.params.*",
     "getRuleSet:parameter:$parameter.path.id",
     "getRuleSet:response:$response.header.Retry-After",
     "getRuleSet:response:FieldError.code",
@@ -3156,6 +3178,14 @@
     "removeOwnWebauthnCredential:response:Violation.code",
     "removeOwnWebauthnCredential:response:Violation.params",
     "removeOwnWebauthnCredential:response:Violation.params.*",
+    "removePayPalCredentials:response:$response.header.Retry-After",
+    "removePayPalCredentials:response:FieldError.code",
+    "removePayPalCredentials:response:FieldError.field",
+    "removePayPalCredentials:response:FieldError.params",
+    "removePayPalCredentials:response:FieldError.params.*",
+    "removePayPalCredentials:response:Violation.code",
+    "removePayPalCredentials:response:Violation.params",
+    "removePayPalCredentials:response:Violation.params.*",
     "removeRetentionPolicy:parameter:$parameter.path.category",
     "removeRetentionPolicy:response:$response.header.Retry-After",
     "removeRetentionPolicy:response:FieldError.code",
@@ -3342,6 +3372,23 @@
     "runRetention:response:Violation.code",
     "runRetention:response:Violation.params",
     "runRetention:response:Violation.params.*",
+    "savePayPalSettings:request:PayPalSettingsRequest.clientId",
+    "savePayPalSettings:request:PayPalSettingsRequest.enabled",
+    "savePayPalSettings:request:PayPalSettingsRequest.environment",
+    "savePayPalSettings:request:PayPalSettingsRequest.secret",
+    "savePayPalSettings:response:$response.header.Accept",
+    "savePayPalSettings:response:$response.header.Retry-After",
+    "savePayPalSettings:response:FieldError.code",
+    "savePayPalSettings:response:FieldError.field",
+    "savePayPalSettings:response:FieldError.params",
+    "savePayPalSettings:response:FieldError.params.*",
+    "savePayPalSettings:response:PayPalSettings.clientId",
+    "savePayPalSettings:response:PayPalSettings.enabled",
+    "savePayPalSettings:response:PayPalSettings.environment",
+    "savePayPalSettings:response:PayPalSettings.secretStoredAt",
+    "savePayPalSettings:response:Violation.code",
+    "savePayPalSettings:response:Violation.params",
+    "savePayPalSettings:response:Violation.params.*",
     "searchAuditLog:request:AuditSearchRequest.cursor",
     "searchAuditLog:request:AuditSearchRequest.eventType",
     "searchAuditLog:request:AuditSearchRequest.from",
@@ -3964,6 +4011,10 @@
     {
       "id": "occupancy-key",
       "description": "The board-managed key a building-automation poller presents in the query."
+    },
+    {
+      "id": "stored-provider-secret",
+      "description": "Whether a payment provider secret is stored; no response or log carries its value."
     }
   ],
   "operationRules": [
@@ -5051,6 +5102,39 @@
         "credential-write-only",
         "external-self-registration"
       ]
+    },
+    {
+      "id": "treasury-paypal-settings",
+      "description": "The PayPal settings require an enabled permanent account carrying TREASURER or ADMIN; reading them and checking the connection never return the stored secret.",
+      "operationIds": [
+        "getPayPalSettings",
+        "checkPayPalConnection"
+      ],
+      "actors": [
+        "TREASURER",
+        "ADMIN"
+      ],
+      "decisions": [
+        "treasury-gate",
+        "paypal-secret-write-only"
+      ]
+    },
+    {
+      "id": "treasury-paypal-credentials",
+      "description": "A treasurer or administrator stores, replaces or removes the PayPal credentials after a recent full proof; the secret is write-only.",
+      "operationIds": [
+        "savePayPalSettings",
+        "removePayPalCredentials"
+      ],
+      "actors": [
+        "TREASURER",
+        "ADMIN"
+      ],
+      "decisions": [
+        "treasury-gate",
+        "recent-authentication",
+        "paypal-secret-write-only"
+      ]
     }
   ],
   "decisions": [
@@ -5518,7 +5602,9 @@
         "src/main/java/org/courtside/member/web/RosterAdminController.java#removeGuardianRelationship",
         "src/main/java/org/courtside/member/DependantService.java#requestCredentials",
         "src/main/java/org/courtside/identity/internal/AccountClosure.java#closeOwn",
-        "src/main/java/org/courtside/credit/internal/CreditLedger.java#record"
+        "src/main/java/org/courtside/credit/internal/CreditLedger.java#record",
+        "src/main/java/org/courtside/payment/internal/PayPalSettingsService.java#save",
+        "src/main/java/org/courtside/payment/internal/PayPalSettingsService.java#remove"
       ],
       "positiveTests": [
         "src/test/java/org/courtside/identity/AdminRecentAuthenticationTest.java#givenAnotherAccountsSessions_whenAdminProofIsRefreshed_thenOnlyTheTargetEnds",
@@ -5532,7 +5618,9 @@
         "src/test/java/org/courtside/member/web/DependantControllerTest.java#givenAStaleSignIn_whenTheGuardianAsksForCredentials_thenAFreshProofIsRequiredAndNothingIsIssued",
         "src/test/java/org/courtside/identity/internal/MfaLoginTest.java#givenAnMfaSessionWithExpiredProof_whenOnlyThePasswordIsRepeated_thenSensitiveProofIsNotRenewed",
         "src/test/java/org/courtside/identity/AccountClosureTest.java#givenAnExternalPlayerWithoutARecentProof_whenTheyCloseTheirAccount_thenTheyMustProveItFirst",
-        "src/test/java/org/courtside/credit/CreditLedgerTest.java#givenNoRecentProof_whenTheTreasurerCredits_thenTheyMustProveItFirst"
+        "src/test/java/org/courtside/credit/CreditLedgerTest.java#givenNoRecentProof_whenTheTreasurerCredits_thenTheyMustProveItFirst",
+        "src/test/java/org/courtside/payment/PayPalSettingsTest.java#givenNoRecentProof_whenTheTreasurerStoresCredentials_thenTheyMustProveItFirst",
+        "src/test/java/org/courtside/payment/PayPalSettingsTest.java#givenStoredCredentials_whenRemoved_thenNothingRemainsAndPayPalIsOff"
       ]
     },
     {
@@ -5765,7 +5853,8 @@
       ],
       "negativeTests": [
         "src/test/java/org/courtside/dataexchange/web/GuestFeeReportControllerTest.java#givenAMember_whenTheyAskForTheReport_thenTheyAreRefused",
-        "src/test/java/org/courtside/credit/CreditLedgerTest.java#givenAnExternalPlayer_whenTheyCreditThemselves_thenTheTreasuryIsClosedToThem"
+        "src/test/java/org/courtside/credit/CreditLedgerTest.java#givenAnExternalPlayer_whenTheyCreditThemselves_thenTheTreasuryIsClosedToThem",
+        "src/test/java/org/courtside/payment/PayPalSettingsTest.java#givenAMember_whenReadingOrChangingTheSettings_thenTheyAreRefused"
       ]
     },
     {
@@ -6074,6 +6163,31 @@
         "src/test/java/org/courtside/identity/internal/RegistrationTest.java#givenACodeWhoseRegistrationExpired_whenItIsUsed_thenItIsRefusedAsExpiredAndTheAccountStaysDisabled",
         "src/test/java/org/courtside/identity/internal/RegistrationTest.java#givenOneClientAddress_whenItRegistersPastItsBudget_thenTheNextRegistrationIsRefusedWithRetryAfter",
         "src/test/java/org/courtside/identity/internal/RegistrationTest.java#givenATakenUsername_whenSomebodyRegistersWithIt_thenTheAnswerMatchesAndOnlyAMailToTheSubmittedAddressFollows"
+      ]
+    },
+    {
+      "id": "paypal-secret-write-only",
+      "title": "Write-only PayPal secret",
+      "rule": "The PayPal secret is stored only as instance-keyring ciphertext bound to its purpose, is never returned by any response or written to a log, is kept when a save carries none, and is required by the first save; the connection check uses the stored credentials and reports only an outcome and the provider's reason.",
+      "attributes": [
+        "role",
+        "stored-provider-secret"
+      ],
+      "productionPaths": [
+        "src/main/java/org/courtside/payment/internal/PayPalSettingsService.java#save",
+        "src/main/java/org/courtside/payment/internal/PayPalSettingsService.java#remove",
+        "src/main/java/org/courtside/payment/internal/PayPalSettingsService.java#check",
+        "src/main/java/org/courtside/payment/web/PayPalSettingsController.java#settings"
+      ],
+      "positiveTests": [
+        "src/test/java/org/courtside/payment/PayPalSettingsTest.java#givenATreasurer_whenTheyStoreCredentials_thenTheSettingsShowSinceWhenButNeverTheSecret",
+        "src/test/java/org/courtside/payment/PayPalSettingsTest.java#givenStoredCredentials_whenSavingWithoutASecret_thenTheStoredSecretStaysInUse",
+        "src/test/java/org/courtside/payment/PayPalSettingsTest.java#givenStoredCredentials_whenTheSecretIsReplaced_thenTheCheckSendsTheNewOne"
+      ],
+      "negativeTests": [
+        "src/test/java/org/courtside/payment/PayPalSettingsTest.java#givenNoStoredSecret_whenSwitchingPayPalOnWithoutOne_thenTheSecretIsRequired",
+        "src/test/java/org/courtside/payment/PayPalSettingsTest.java#givenAWrongSecret_whenChecking_thenPayPalsReasonIsReported",
+        "src/test/java/org/courtside/payment/PayPalSettingsTest.java#givenNothingStored_whenChecking_thenThereIsNothingToCheck"
       ]
     }
   ],

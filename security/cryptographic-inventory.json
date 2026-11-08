@@ -198,29 +198,29 @@
     },
     {
       "id": "mfa-secret-encryption",
-      "purpose": "Encrypt account-bound TOTP secrets separately from the database and validate matching instance key material",
+      "purpose": "Encrypt account-bound TOTP secrets and the purpose-bound PayPal secret separately from the database and validate matching instance key material",
       "algorithm": "AES-256-GCM",
       "parameters": {
         "keyBytes": 32,
         "nonceBytes": 12,
         "authenticationTagBits": 128,
-        "associatedData": "courtside-mfa prefix and immutable account UUID"
+        "associatedData": "courtside-mfa prefix and immutable account UUID for TOTP secrets, courtside-secret prefix and the storing purpose for other instance secrets"
       },
       "implementation": "java-runtime",
       "strength": {
         "decidedBy": "repository",
         "bits": 128,
-        "basis": "SecureRandom supplies 256-bit encryption keys and independent 96-bit nonces. GCM uses a 128-bit authentication tag and binds each ciphertext to its account UUID. The tag bounds integrity strength."
+        "basis": "SecureRandom supplies 256-bit encryption keys and independent 96-bit nonces. GCM uses a 128-bit authentication tag and binds each ciphertext to its account UUID or its purpose. The tag bounds integrity strength."
       },
       "class": "credential-protection",
       "owner": "club-operator",
       "storageBoundary": "Private mode-0600 keyrings live outside PostgreSQL in the persistent MFA key directory or an operator-selected file. PostgreSQL stores key identifiers, nonce and ciphertext envelopes plus an encrypted installation canary. Decrypted secrets remain in application memory.",
-      "permittedUse": "Encrypting and decrypting TOTP secrets and the installation canary. File locking serializes key publication and rotation. Constant-time MessageDigest comparison validates the decrypted canary, not a stored password or a content digest.",
+      "permittedUse": "Encrypting and decrypting TOTP secrets, the PayPal secret and the installation canary. File locking serializes key publication and rotation. Constant-time MessageDigest comparison validates the decrypted canary, not a stored password or a content digest.",
       "rotation": "The maintenance rotation atomically publishes a new random active key and retains every earlier key so existing ciphertext and backups remain decryptable.",
-      "revocation": "Removing a factor deletes its active and pending ciphertext. Rotation does not revoke old keys. Retiring a compromised key requires replacing affected enrollments and preserving or retiring backups that still require it.",
-      "recovery": "Complete backup and restore preserve database and matching keyrings together. Startup refuses missing or mismatched keys when encrypted enrollment data exists. A database-only dump requires the matching key material separately.",
+      "revocation": "Removing a factor deletes its active and pending ciphertext, and removing the PayPal credentials deletes theirs. Rotation does not revoke old keys. Retiring a compromised key requires replacing affected enrollments and preserving or retiring backups that still require it.",
+      "recovery": "Complete backup and restore preserve database and matching keyrings together. Startup refuses missing or mismatched keys when encrypted enrollment data or a stored PayPal secret exists. A database-only dump requires the matching key material separately.",
       "retirement": "Retain a key while any live ciphertext or retained backup requires it. Move to a successor encryption format only with a defined migration and matching restore support.",
-      "evidence": "src/test/java/org/courtside/identity/internal/MfaKeyRingTest.java, src/test/java/org/courtside/identity/internal/MfaSecretsTest.java, tools/mfa-operations.test.mjs",
+      "evidence": "src/test/java/org/courtside/identity/internal/MfaKeyRingTest.java, src/test/java/org/courtside/identity/internal/MfaSecretsTest.java, src/test/java/org/courtside/payment/PayPalSettingsTest.java, tools/mfa-operations.test.mjs",
       "detects": [
         "Cipher.getInstance",
         "javax.crypto",

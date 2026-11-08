@@ -92,3 +92,10 @@ export const guestFeesExample = {
   ],
   unassignedGuestPlaces: 1
 };
+
+export const payPalSettingsExample = {
+  clientId: "example-sandbox-client", environment: "SANDBOX", enabled: true,
+  secretStoredAt: "2026-05-01T08:00:00Z"
+};
+
+export const payPalCheckExample = { outcome: "OK" };

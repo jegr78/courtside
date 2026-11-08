@@ -153,6 +153,7 @@ class SafeMethodStateInvarianceTest extends AbstractIntegrationTest {
             entry("/api/my/bookings", read()),
             entry("/api/my/credit", read()),
             entry("/api/treasury/credit/accounts", read()),
+            entry("/api/treasury/paypal", read()),
             entry("/api/treasury/credit/accounts/{accountId}/entries", read("accountId", "")),
             entry("/api/my/door-codes", read()),
             entry("/api/my/dependants", read()),

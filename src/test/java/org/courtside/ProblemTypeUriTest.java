@@ -46,6 +46,7 @@ class ProblemTypeUriTest {
             "urn:courtside:error:account-session-not-found",
             "urn:courtside:error:credential-issue-rate-limited",
             "urn:courtside:error:account-not-found",
+            "urn:courtside:error:paypal-secret-required",
             "urn:courtside:error:password-reuses-credential",
             "urn:courtside:error:password-breach-check-unavailable",
             "urn:courtside:error:password-too-guessable",

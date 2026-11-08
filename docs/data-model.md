@@ -261,7 +261,7 @@ yet; how long a club keeps them belongs to the retention controls by record cate
 | `account_mfa` | One account's encrypted active and pending TOTP secret, last consumed step, pending expiry and controlled-recovery block | `user_account`, cascades on deletion |
 | `mfa_recovery_code` | Single-use code verifiers and their creation times | `user_account`, cascades on deletion |
 | `mfa_challenge` | A pending ceremony's account, security epoch, purpose, session hash, expiry, attempt count and server-generated options | `user_account`, cascades on deletion |
-| `mfa_instance_key` | Singleton database installation UUID and encrypted key-check canary | None |
+| `mfa_instance_key` | Singleton database installation UUID and encrypted key-check canary for the instance keyring, which also encrypts the PayPal secret | None |
 | `user_entities` | Native WebAuthn user handle, opaque account identity and display metadata | `user_account`, one handle per account, cascades on deletion |
 | `user_credentials` | Credential ID, public key, signature counter, user-verification and backup flags, transports, original attestation, timestamps and private label | `user_entities`, cascades on deletion |
 | `account_mfa_recovery` | Current rescue request ID, security epoch, address verifier, optional issued-code verifier and expiry, and creation time | `user_account`, cascades on deletion |
@@ -445,6 +445,20 @@ free text that may name somebody: anonymising the account deletes it and leaves 
 `recorded_by` and `booking_id` have no foreign key, so removing the treasurer who recorded an entry or a
 booking an entry paid leaves the entry.
 
+## Payment provider
+
+| Table | Holds | References |
+|---|---|---|
+| `paypal_settings` | The club's PayPal client id, encrypted secret and since when it is stored, sandbox or live, whether PayPal payment is on, and when and by which account the row last changed | None |
+
+`paypal_settings_single_row` keeps at most one row, and removing the credentials deletes it.
+`paypal_settings_secret_stored` keeps the ciphertext and its timestamp together, and
+`paypal_settings_enabled_with_secret` allows PayPal payment only while a secret is stored.
+`paypal_settings_environment` allows `SANDBOX` and `LIVE`, `paypal_settings_client_id_length` 1 to
+200 characters. `secret_ciphertext` identifies a key in the instance keyring and is bound to its
+purpose; the database contains no decryption key. `updated_by` has no foreign key, so removing the
+account that last saved the settings leaves them.
+
 ## Keeping personal records
 
 | Table | Holds | References |
@@ -505,7 +519,10 @@ which names an access point whose code every current member is told, and `card.b
 which names a card that starts granting access, and `access.grant.retryRequested`, which names the
 access grant a board sent again and its booking. The treasury's credit ledger records
 `credit.entry.recorded`, which names the account, the entry, its kind, amount and currency, the
-booking a payment or refund belongs to, and never the reason. A message wording has no row id of its own, so
+booking a payment or refund belongs to, and never the reason. The PayPal settings record
+`payment.paypal.settings.changed`, which names the environment, the switch and whether the client id or
+the secret changed, and `payment.paypal.credentials.removed`; neither names the client id or the secret.
+A message wording has no row id of its own, so
 its entries name a subject derived from the message kind and language. The other two arrive in the course of ordinary use, because the writer records every
 event a module publishes rather than a list it keeps: `booking.booking.confirmed` and the
 other entries beginning with `booking.`, and `identity.account.credentialsRequested`, which names the account a

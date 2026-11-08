@@ -122,6 +122,10 @@ export type CreditEntryRequest = components["schemas"]["CreditEntryRequest"];
 export type CreditEntryRequestKind = components["schemas"]["CreditEntryRequestKind"];
 export type CreditHolder = components["schemas"]["CreditHolder"];
 export type CreditLedgerPage = components["schemas"]["CreditLedgerPage"];
+export type PayPalEnvironment = components["schemas"]["PayPalEnvironment"];
+export type PayPalSettings = components["schemas"]["PayPalSettings"];
+export type PayPalSettingsRequest = components["schemas"]["PayPalSettingsRequest"];
+export type PayPalConnectionCheckResult = components["schemas"]["PayPalConnectionCheckResult"];
 export type RetentionCategory = components["schemas"]["RetentionCategory"];
 export type RetentionPolicy = components["schemas"]["RetentionPolicy"];
 export type RetentionPreview = components["schemas"]["RetentionPreview"];
@@ -778,6 +782,12 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(entry)
     }),
+  payPalSettings: () => request<PayPalSettings>("/api/treasury/paypal"),
+  savePayPalSettings: (settings: PayPalSettingsRequest) => request<PayPalSettings>("/api/treasury/paypal", {
+    method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(settings)
+  }),
+  removePayPalCredentials: () => request<void>("/api/treasury/paypal", { method: "DELETE" }),
+  checkPayPalConnection: () => request<PayPalConnectionCheckResult>("/api/treasury/paypal/check", { method: "POST" }),
   exportGuestFees: (period: GuestFeePeriod & { separator: string }) => requestFile(
     `/api/treasury/guest-fees/export?${new URLSearchParams(period).toString()}`, { method: "POST" }),
   exportBookings: (parameters: BookingExportParameters) => requestFile(

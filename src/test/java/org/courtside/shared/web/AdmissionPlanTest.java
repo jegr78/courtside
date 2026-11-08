@@ -31,7 +31,8 @@ class AdmissionPlanTest {
                 Map.entry("readUtilisationStatistics", Optional.of(2)),
                 Map.entry("uploadClubLogo", Optional.of(1)),
                 Map.entry("courtImpact", Optional.of(2)),
-                Map.entry("endAllSessions", Optional.of(1)));
+                Map.entry("endAllSessions", Optional.of(1)),
+                Map.entry("checkPayPalConnection", Optional.of(1)));
         Map<String, Integer> costByOperation = Map.ofEntries(
                 Map.entry("changeOwnPassword", 5),
                 Map.entry("executeImportPreview", 20),
@@ -45,7 +46,8 @@ class AdmissionPlanTest {
                 Map.entry("readUtilisationStatistics", 5),
                 Map.entry("uploadClubLogo", 10),
                 Map.entry("courtImpact", 5),
-                Map.entry("endAllSessions", 5));
+                Map.entry("endAllSessions", 5),
+                Map.entry("checkPayPalConnection", 5));
 
         // when
         AdmissionPlan plan = load(ShippedAdmission.defaults());

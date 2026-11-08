@@ -897,6 +897,27 @@ test("given external recovery material with encrypted TOTP enrollments, when res
   });
 });
 
+test("given external recovery material with a stored PayPal secret only, when restore-check runs without keys, then it fails naming the reason", () => {
+  fixture((context) => {
+    // given
+    assert.equal(initialize(context, { recovery_material: "external-verified" }).status, 0);
+    assert.equal(run(context.archive, context.target, ["backup"], context.environment).status, 0);
+    const recovery = join(context.target, "backups", readdirSync(join(context.target, "backups"))[0]);
+    writeFileSync(join(context.root, "docker-encrypted-paypal"), "1\n");
+    rmSync(context.dockerLog, { force: true });
+    // when
+    const result = run(context.archive, context.target, ["restore-check", "--recovery", recovery], {
+      ...context.environment, COURTSIDE_RESTORE_USERNAME: "doe.jane", COURTSIDE_RESTORE_PASSWORD: "private-restore-password"
+    });
+    // then
+    assert.equal(result.status, 2);
+    assert.match(result.stderr, /encrypted PayPal secret.*--mfa-keys/);
+    const calls = readFileSync(context.dockerLog, "utf8");
+    assert.match(calls, /select count\(\*\) from paypal_settings/, "the restored database was never asked for a PayPal secret");
+    assert.doesNotMatch(calls, / up -d --wait app/, "the application must not start without its keys");
+  });
+});
+
 test("given external recovery material, when the operator exports MFA keys, then restore-check accepts that archive", () => {
   fixture((context) => {
     // given

@@ -251,9 +251,12 @@ class MfaKeyRingTest {
         MfaKeyRing keys = MfaKeyRing.open(temporary.resolve("mfa.keys"), false);
         String encrypted = keys.encrypt(ACCOUNT, SECRET);
         // when / then
-        assertThatThrownBy(() -> keys.encrypt(null, SECRET)).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> keys.encrypt((UUID) null, SECRET)).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> keys.encrypt((String) null, SECRET)).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> keys.encrypt(" ", SECRET)).isInstanceOf(IllegalStateException.class);
         assertThatThrownBy(() -> keys.encrypt(ACCOUNT, null)).isInstanceOf(IllegalStateException.class);
-        assertThatThrownBy(() -> keys.decrypt(null, encrypted)).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> keys.decrypt((UUID) null, encrypted)).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> keys.decrypt((String) null, encrypted)).isInstanceOf(IllegalStateException.class);
         assertThatThrownBy(() -> keys.decrypt(ACCOUNT, null)).isInstanceOf(IllegalStateException.class);
         assertThatThrownBy(() -> MfaKeyRing.open(null, false)).isInstanceOf(IllegalStateException.class);
     }

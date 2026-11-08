@@ -1,6 +1,8 @@
 package org.courtside.identity.internal;
 
 import org.courtside.AbstractIntegrationTest;
+import org.courtside.identity.EncryptedSecretHolder;
+import org.courtside.identity.EncryptedSecretHolder.StoredSecret;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -8,13 +10,17 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.transaction.PlatformTransactionManager;
 
 import java.nio.file.Files;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class MfaSecretsTest extends AbstractIntegrationTest {
+    private static final String PURPOSE = "payment:paypal-secret";
+    private static final byte[] PAYMENT_SECRET = "paypal-secret-value".getBytes(StandardCharsets.UTF_8);
     @Autowired private JdbcClient jdbc;
     @Autowired private PlatformTransactionManager transactions;
     @TempDir private Path root;
@@ -134,6 +140,90 @@ class MfaSecretsTest extends AbstractIntegrationTest {
         // when / then
         assertThatThrownBy(secrets::verify).isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("MFA");
+    }
+
+    @Test
+    void givenASecretStoredForAPurpose_whenReopened_thenItDecryptsUnderThatPurposeAlone() {
+        // given
+        MfaSecrets initial = store(root);
+        initial.initialize();
+        String encrypted = initial.encrypt(PURPOSE, PAYMENT_SECRET);
+
+        // when
+        MfaSecrets reopened = new MfaSecrets(jdbc, transactions, root, null, () -> List.of(held(encrypted)));
+        reopened.initialize();
+        reopened.rotate();
+
+        // then
+        assertThat(reopened.decrypt(PURPOSE, encrypted)).isEqualTo(PAYMENT_SECRET);
+        assertThatThrownBy(() -> reopened.decrypt("payment:other", encrypted))
+                .as("a ciphertext is bound to the purpose it was stored for")
+                .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void givenASecondFactorCiphertext_whenReadAsAPurposeSecret_thenItIsRefused() {
+        // given
+        UUID account = UUID.randomUUID();
+        MfaSecrets secrets = store(root);
+        String factor = secrets.encrypt(account, TotpCodes.newSecret());
+
+        // when / then
+        assertThatThrownBy(() -> secrets.decrypt("mfa:" + account, factor)).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> secrets.decrypt(account, secrets.encrypt("mfa:" + account, PAYMENT_SECRET)))
+                .as("a purpose secret never reads as a second factor either")
+                .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void givenOnlyAHeldPurposeSecret_whenStartingWithoutTheKey_thenInitializationFailsWithoutReplacement()
+            throws Exception {
+        // given
+        String encrypted = store(root).encrypt(PURPOSE, PAYMENT_SECRET);
+        Path missing = root.resolve("missing");
+
+        // when / then
+        assertThatThrownBy(() -> new MfaSecrets(jdbc, transactions, missing, null, () -> List.of(held(encrypted)))
+                .initialize()).isInstanceOf(IllegalStateException.class).hasMessageContaining("key file is missing");
+        try (var files = Files.walk(missing)) {
+            assertThat(files.filter(path -> path.toString().endsWith("mfa.keys")).toList()).isEmpty();
+        }
+    }
+
+    @Test
+    void givenAHeldPurposeSecretUnderAnotherKey_whenStarting_thenInitializationFails() {
+        // given
+        MfaSecrets other = store(root.resolve("other"));
+        String encrypted = other.encrypt(PURPOSE, PAYMENT_SECRET);
+        jdbc.sql("DELETE FROM mfa_instance_key").update();
+        MfaSecrets fresh = store(root.resolve("fresh"));
+        fresh.initialize();
+
+        // when / then
+        assertThatThrownBy(() -> new MfaSecrets(jdbc, transactions, root.resolve("fresh"), null,
+                () -> List.of(held(encrypted))).initialize()).isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void givenAHeldPurposeSecret_whenItsKeyFileDisappears_thenVerificationFails() throws Exception {
+        // given
+        jdbc.sql("UPDATE account_mfa SET totp_secret = NULL, pending_totp_secret = NULL").update();
+        MfaSecrets plain = store(root);
+        String encrypted = plain.encrypt(PURPOSE, PAYMENT_SECRET);
+        MfaSecrets holding = new MfaSecrets(jdbc, transactions, root, null, () -> List.of(held(encrypted)));
+        holding.verify();
+        try (var files = Files.walk(root)) {
+            Files.delete(files.filter(path -> path.getFileName().toString().equals("mfa.keys")).findFirst()
+                    .orElseThrow());
+        }
+
+        // when / then
+        assertThatThrownBy(holding::verify).isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("key file is missing");
+    }
+
+    private static EncryptedSecretHolder held(String encrypted) {
+        return () -> List.of(new StoredSecret(PURPOSE, encrypted));
     }
 
     private MfaSecrets store(Path location) {

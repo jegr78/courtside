@@ -53,11 +53,34 @@ final class MfaKeyRing {
 
     String encrypt(UUID account, byte[] value) {
         if (account == null || value == null) throw failure("MFA encryption requires an account and value", null);
+        return seal("courtside-mfa:" + account, value);
+    }
+
+    byte[] decrypt(UUID account, String value) {
+        if (account == null || value == null) throw failure("MFA decryption requires an account and value", null);
+        return open("courtside-mfa:" + account, value);
+    }
+
+    String encrypt(String purpose, byte[] value) {
+        if (purpose == null || purpose.isBlank() || value == null) {
+            throw failure("Instance encryption requires a purpose and value", null);
+        }
+        return seal("courtside-secret:" + purpose, value);
+    }
+
+    byte[] decrypt(String purpose, String value) {
+        if (purpose == null || purpose.isBlank() || value == null) {
+            throw failure("Instance decryption requires a purpose and value", null);
+        }
+        return open("courtside-secret:" + purpose, value);
+    }
+
+    private String seal(String associatedData, byte[] value) {
         State current = current();
         byte[] nonce = new byte[12];
         RANDOM.nextBytes(nonce);
         try {
-            Cipher cipher = cipher(Cipher.ENCRYPT_MODE, current.keys().get(current.active()), nonce, account);
+            Cipher cipher = cipher(Cipher.ENCRYPT_MODE, current.keys().get(current.active()), nonce, associatedData);
             return current.active() + "." + ENCODER.encodeToString(nonce) + "."
                     + ENCODER.encodeToString(cipher.doFinal(value));
         } catch (GeneralSecurityException exception) {
@@ -65,8 +88,7 @@ final class MfaKeyRing {
         }
     }
 
-    byte[] decrypt(UUID account, String value) {
-        if (account == null || value == null) throw failure("MFA decryption requires an account and value", null);
+    private byte[] open(String associatedData, String value) {
         try {
             String[] pieces = value.split("\\.", -1);
             if (pieces.length != 3) throw failure("Invalid encrypted MFA data", null);
@@ -74,7 +96,7 @@ final class MfaKeyRing {
             if (key == null) throw failure("Encrypted MFA data requires an unavailable instance key", null);
             byte[] nonce = DECODER.decode(pieces[1]);
             if (nonce.length != 12) throw failure("Invalid encrypted MFA nonce", null);
-            return cipher(Cipher.DECRYPT_MODE, key, nonce, account).doFinal(DECODER.decode(pieces[2]));
+            return cipher(Cipher.DECRYPT_MODE, key, nonce, associatedData).doFinal(DECODER.decode(pieces[2]));
         } catch (GeneralSecurityException | IllegalArgumentException exception) {
             throw failure("Encrypted MFA data does not match its account and instance key", exception);
         }
@@ -96,11 +118,11 @@ final class MfaKeyRing {
         return locked(file, () -> read(file));
     }
 
-    private static Cipher cipher(int mode, SecretKey key, byte[] nonce, UUID account)
+    private static Cipher cipher(int mode, SecretKey key, byte[] nonce, String associatedData)
             throws GeneralSecurityException {
         Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
         cipher.init(mode, key, new GCMParameterSpec(128, nonce));
-        cipher.updateAAD(("courtside-mfa:" + account).getBytes(StandardCharsets.US_ASCII));
+        cipher.updateAAD(associatedData.getBytes(StandardCharsets.UTF_8));
         return cipher;
     }
 

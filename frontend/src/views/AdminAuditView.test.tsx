@@ -337,7 +337,12 @@ describe("AdminAuditView", () => {
     ["config.club.changed", { changedFields: ["currency", "noMembershipTypeRuleSetId"] }, "Club configuration changed: Currency, Rule set for people without a membership type"],
     ["config.club.changed", { changedFields: ["externalBookings"] }, "Club configuration changed: Admit external bookings"],
     ["credit.entry.recorded", { kind: "PAYOUT", amountMinor: -1250, currency: "EUR" }, "Credit ledger entry recorded: Payout of €12.50"],
-    ["credit.entry.recorded", { kind: "CREDIT", amountMinor: 500, currency: "EUR" }, "Credit ledger entry recorded: Credit of €5.00"]
+    ["credit.entry.recorded", { kind: "CREDIT", amountMinor: 500, currency: "EUR" }, "Credit ledger entry recorded: Credit of €5.00"],
+    ["payment.paypal.settings.changed", { environment: "LIVE", enabled: true, clientIdChanged: true, secretReplaced: false },
+      "PayPal settings changed: Live, PayPal payment on, client id changed, secret kept"],
+    ["payment.paypal.settings.changed", { environment: "SANDBOX", enabled: false, clientIdChanged: false, secretReplaced: true },
+      "PayPal settings changed: Sandbox, PayPal payment off, client id unchanged, secret replaced"],
+    ["payment.paypal.credentials.removed", {}, "PayPal credentials removed"]
   ])("given a %s event, when it is shown, then its interpolated values are resolved, not left as template text", async (eventType, parameters, expected) => {
     // given
     const entry: AuditEntry = { ...courtAdded, eventType, parameters };

@@ -7,6 +7,7 @@ import { AdminConfigurationView } from "./AdminConfigurationView";
 import { AdminExportView } from "./AdminExportView";
 import { AdminCreditView } from "./AdminCreditView";
 import { AdminGuestFeesView } from "./AdminGuestFeesView";
+import { AdminPayPalView } from "./AdminPayPalView";
 import { AdminStatisticsView } from "./AdminStatisticsView";
 import { AdminUsageView } from "./AdminUsageView";
 import { AdminRetentionView } from "./AdminRetentionView";
@@ -47,6 +48,7 @@ export default function AdminRoutes({ configurationChanged, administrator, treas
         createsSeries={createsSeries} administrator={administrator} /> : <Navigate to={landing} replace />} />
       {treasurer && <Route path="guest-fees" element={<AdminGuestFeesView />} />}
       {treasurer && <Route path="credit" element={<AdminCreditView />} />}
+      {treasurer && <Route path="paypal" element={<AdminPayPalView />} />}
       {administrator && <>
       <Route path="setup" element={<AdminSetupView />} />
       <Route path="configuration" element={<AdminConfigurationView configurationChanged={configurationChanged} />} />

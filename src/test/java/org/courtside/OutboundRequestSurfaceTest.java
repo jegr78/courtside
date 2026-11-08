@@ -19,11 +19,12 @@ class OutboundRequestSurfaceTest {
             "WebClient.create", "WebClient.builder", "new RestTemplate", ".openConnection(",
             "new Socket(", "SocketChannel.open");
 
-    // The breach endpoint and the Miniserver, whose destinations are deployment configuration and never a
+    // The breach endpoint, the Miniserver and PayPal, whose destinations are configuration and never a
     // request, and the start-up warm-up, which reaches nothing but this instance's own loopback port.
     private static final List<String> CALLS_OUT = List.of(
             "org/courtside/access/internal/LoxoneClient.java",
             "org/courtside/identity/internal/HaveIBeenPwnedPasswordLookup.java",
+            "org/courtside/payment/internal/PayPalConnectionCheck.java",
             "org/courtside/shared/internal/LoopbackReadStep.java");
 
     private static final Pattern DESTINATION = Pattern.compile(
@@ -61,6 +62,21 @@ class OutboundRequestSurfaceTest {
         // then
         assertThat(properties).contains("breachEndpoint");
         assertThat(defaults).contains("breach-endpoint: ${COURTSIDE_PASSWORD_BREACH_ENDPOINT:");
+    }
+
+    @Test
+    void whenReadingThePayPalClient_thenItsDestinationsComeFromConfigurationAlone() throws IOException {
+        // given
+        String source = Files.readString(
+                Path.of("src/main/java/org/courtside/payment/internal/PayPalConnectionCheck.java"));
+        String defaults = Files.readString(Path.of("src/main/resources/application.yaml"));
+
+        // then
+        assertThat(source).as("the token endpoint is built from the configured base alone")
+                .contains("properties.liveEndpoint()").contains("properties.sandboxEndpoint()")
+                .doesNotContain("new URI(");
+        assertThat(defaults).contains("sandbox-endpoint: https://api-m.sandbox.paypal.com")
+                .contains("live-endpoint: https://api-m.paypal.com");
     }
 
     @Test

@@ -728,6 +728,27 @@ If it does not cover the amount, Courtside refuses the booking. A cancellation b
 returns the amount, a cancellation by the club does until the booking starts. Both entries appear in the ledger as
 *Booking paid* and *Refund after cancellation*. You cannot record either by hand.
 
+## PayPal
+
+The *PayPal* page is open to administrators and the **Treasurer** role and sits next to *Credit*.
+There you enter the client id and secret from the club's PayPal developer account, choose
+**Sandbox** for trying it out or **Live**, and switch payment by PayPal on or off.
+
+![The PayPal settings with client id, environment, switch, secret state and a checked connection.](../screenshots/en/paypal.png)
+
+You can enter the secret but never read it again. Courtside encrypts it with the instance key and
+shows only since when one is stored. Leave the field empty when saving and the stored secret stays.
+You can switch PayPal on only once one is stored. When you change the client id or the environment,
+enter the matching secret again. Saving and removing ask for a fresh password proof. The change log records
+what changed, without the client id and the secret.
+
+**Check connection** asks PayPal with the stored credentials, not with what the form currently
+holds, so save first. If PayPal refuses, Courtside shows the reason PayPal gives. If PayPal cannot
+be reached, Courtside says so.
+
+The instance key is not in the database. Whoever runs the instance backs it up with the database
+backup. If it is missing after a restore, Courtside does not start.
+
 ## Records
 
 The **Records** area has nine views. The next section describes *Retention*.

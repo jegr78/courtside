@@ -67,6 +67,19 @@ function contextFor(entry: AuditEntry): string | undefined {
     && isNullish(entry.parameters[candidate.field]))?.context;
 }
 
+function payPalSettingsLabels(entry: AuditEntry, t: TFunction): Record<string, string> {
+  if (entry.eventType !== "payment.paypal.settings.changed") return {};
+  const { environment, enabled, clientIdChanged, secretReplaced } = entry.parameters;
+  return {
+    ...(typeof environment === "string" ? { environment: t(`admin.paypal.environment.${environment}`) } : {}),
+    ...(typeof enabled === "boolean" ? { enabled: t(enabled ? "admin.paypal.audit.on" : "admin.paypal.audit.off") } : {}),
+    ...(typeof clientIdChanged === "boolean"
+      ? { clientIdChanged: t(clientIdChanged ? "admin.paypal.audit.changed" : "admin.paypal.audit.unchanged") } : {}),
+    ...(typeof secretReplaced === "boolean"
+      ? { secretReplaced: t(secretReplaced ? "admin.paypal.audit.replaced" : "admin.paypal.audit.kept") } : {})
+  };
+}
+
 export function auditMessage(entry: AuditEntry, t: TFunction): string {
   const context = contextFor(entry);
   const weekday = weekdayLabel(entry, t);
@@ -101,6 +114,7 @@ export function auditMessage(entry: AuditEntry, t: TFunction): string {
     ...(amount !== undefined ? { amountMinor: amount } : {}),
     ...(outcome !== undefined ? { outcome } : {}),
     ...(changedFields !== undefined ? { changedFields } : {}),
+    ...payPalSettingsLabels(entry, t),
     ...(context ? { context } : changedFields !== undefined ? { context: "fields" } : {})
   });
 }

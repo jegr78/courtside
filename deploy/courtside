@@ -1303,6 +1303,23 @@ restored_encrypted_enrollments() {
   printf '%s\n' "$count"
 }
 
+restored_paypal_settings() {
+  local present count
+  present=$("${restore_compose[@]}" exec -T db psql -U courtside -d courtside -tAc \
+    "select to_regclass('public.paypal_settings') is not null") || return 1
+  present=${present//[[:space:]]/}
+  if [ "$present" = f ]; then
+    printf '0\n'
+    return 0
+  fi
+  [ "$present" = t ] || return 1
+  count=$("${restore_compose[@]}" exec -T db psql -U courtside -d courtside -tAc \
+    "select count(*) from paypal_settings where secret_ciphertext is not null") || return 1
+  count=${count//[[:space:]]/}
+  [[ "$count" =~ ^[0-9]+$ ]] || return 1
+  printf '%s\n' "$count"
+}
+
 restore_mfa_keys() {
   local archive=$1 name owner
   for name in "${restore_owned_volumes[@]}"; do
@@ -1373,7 +1390,7 @@ create_backup() {
   printf 'Restore with: %s/current/courtside restore-check --recovery %s/backups/<recovery-unit>\n' \
     "$installation_directory" "$installation_directory" > "$staging/restore-instructions.txt"
   if [ "$mfa_keys" = external-required ]; then
-    printf 'Encrypted TOTP enrollments require the matching MFA key archive. Supply it with restore-check --mfa-keys <private-archive>. A database-only backup cannot recover these enrollments.\n' \
+    printf 'Encrypted TOTP enrollments and a stored PayPal secret require the matching MFA key archive. Supply it with restore-check --mfa-keys <private-archive>. A database-only backup cannot recover them.\n' \
       >> "$staging/restore-instructions.txt"
   fi
   chmod -R go-rwx "$staging"
@@ -1892,7 +1909,7 @@ restore_probe() {
 
 command_restore_check() {
   local requested="" requested_mfa_keys="" mfa_keys_archive="" mfa_key_mode=standard mfa_keys_state restore_environment restore_output port cookie_jar username_file password_file
-  local restore_runtime table_count encrypted_enrollments failure="" recovery_source_url recovery_config_recipe helper archive mfa_code mfa_proof_file=""
+  local restore_runtime table_count encrypted_enrollments paypal_settings_rows failure="" recovery_source_url recovery_config_recipe helper archive mfa_code mfa_proof_file=""
   local trusted_recovery_release trusted_manifest_sha configured_manifest_sha recovery_overlays
   local recovery_custom_repository recovery_custom_digest expected_recovery_image expected_image_trust
   while [ $# -gt 0 ]; do
@@ -2044,6 +2061,12 @@ command_restore_check() {
       || failure="the restored database could not be checked for encrypted TOTP enrollments"
     [ -n "$failure" ] || [ "$encrypted_enrollments" = 0 ] \
       || failure="the restored database holds $encrypted_enrollments encrypted TOTP enrollments; supply the matching MFA key archive via --mfa-keys"
+    if [ -z "$failure" ]; then
+      paypal_settings_rows=$(restored_paypal_settings) \
+        || failure="the restored database could not be checked for an encrypted PayPal secret"
+    fi
+    [ -n "$failure" ] || [ "$paypal_settings_rows" = 0 ] \
+      || failure="the restored database holds an encrypted PayPal secret; supply the matching MFA key archive via --mfa-keys"
   fi
   if [ -z "$failure" ] && [ -n "$mfa_keys_archive" ] && ! restore_mfa_keys "$mfa_keys_archive"; then
     failure="the MFA key archive could not be restored"

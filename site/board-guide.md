@@ -766,6 +766,29 @@ ab. Reicht es nicht, lehnt Courtside die Buchung ab. Ein Storno vor der Stornofr
 zurück, ein Storno durch den Verein bis zum Beginn der Buchung immer. Beide Einträge erscheinen im Verlauf als *Buchung bezahlt*
 und *Erstattung nach Storno*. Von Hand kannst du sie nicht anlegen.
 
+## PayPal
+
+Die Seite *PayPal* steht Administratoren und der Rolle **Kassenwart** offen und liegt neben
+*Guthaben*. Dort trägst du die Client-ID und das Secret aus dem PayPal-Entwicklerkonto des Vereins
+ein, wählst zwischen **Sandbox** zum Ausprobieren und **Live** und schaltest die Zahlung per PayPal
+ein oder aus.
+
+![Die PayPal-Einstellungen mit Client-ID, Umgebung, Schalter, Secret-Stand und geprüfter Verbindung.](screenshots/de/paypal.png)
+
+Das Secret kannst du nur eintragen, nie wieder lesen. Courtside verschlüsselt es mit dem
+Instanzschlüssel und zeigt nur, seit wann eines gespeichert ist. Lässt du das Feld beim Speichern
+leer, bleibt das gespeicherte Secret. Einschalten kannst du PayPal erst, wenn eines gespeichert ist. Änderst du Client-ID oder Umgebung,
+gib auch das passende Secret neu ein. Speichern und
+Entfernen verlangen eine frische Passwortbestätigung. Das Änderungsprotokoll hält fest, was sich
+geändert hat, ohne Client-ID und Secret.
+
+**Verbindung prüfen** fragt PayPal mit den gespeicherten Zugangsdaten, nicht mit dem, was gerade im
+Formular steht. Speichere also zuerst. Lehnt PayPal ab, zeigt Courtside den Grund, den PayPal
+nennt. Ist PayPal nicht erreichbar, sagt Courtside auch das.
+
+Der Instanzschlüssel liegt nicht in der Datenbank. Wer den Verein betreibt, sichert ihn mit dem
+Datenbank-Backup. Fehlt er nach einer Wiederherstellung, startet Courtside nicht.
+
 ## Nachweise
 
 Unter **Nachweise** findest du neun Ansichten. Die *Aufbewahrung* beschreibt der nächste Abschnitt.
