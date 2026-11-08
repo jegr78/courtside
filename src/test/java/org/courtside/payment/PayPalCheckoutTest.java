@@ -18,6 +18,8 @@ import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
@@ -519,6 +521,87 @@ class PayPalCheckoutTest extends AbstractIntegrationTest {
         assertThat(bookingStatus(booking)).as("an unknown outcome keeps the court held").isEqualTo("PENDING_PAYMENT");
         assertThat(orderStatus()).isEqualTo("CREATED");
         assertThat(entries(booking)).isEmpty();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"DECLINED", "FAILED"})
+    void givenACaptureThatDidNotGoThrough_whenCapturing_thenItIsRejectedAndTheCourtIsFree(String captureStatus)
+            throws Exception {
+        // given
+        UUID booking = bookWithOrder();
+        PAYPAL.reply(READ, 200, order("APPROVED", booking, "15.00", null));
+        PAYPAL.reply(CAPTURE, 201, order("COMPLETED", booking, "15.00", capture(captureStatus, "15.00")));
+
+        // when
+        capture("roe.john").andExpect(status().isOk()).andExpect(jsonPath("$.outcome").value("REJECTED"));
+
+        // then
+        assertThat(bookingStatus(booking)).isEqualTo("CANCELLED");
+        assertThat(cancellationReason(booking)).isEqualTo("PAYMENT_EXPIRED");
+        assertThat(allocationStatus(booking)).isEqualTo("CANCELLED");
+        assertThat(orderStatus()).isEqualTo("REJECTED");
+        assertThat(entries(booking)).isEmpty();
+    }
+
+    @Test
+    void givenAPendingCapture_whenCapturing_thenTheCourtStaysHeld() throws Exception {
+        // given
+        UUID booking = bookWithOrder();
+        PAYPAL.reply(READ, 200, order("APPROVED", booking, "15.00", null));
+        PAYPAL.reply(CAPTURE, 201, order("COMPLETED", booking, "15.00", capture("PENDING", "15.00")));
+
+        // when
+        capture("roe.john").andExpect(status().isOk()).andExpect(jsonPath("$.outcome").value("PROCESSING"));
+
+        // then
+        assertThat(bookingStatus(booking)).as("PayPal has not settled the money yet").isEqualTo("PENDING_PAYMENT");
+        assertThat(orderStatus()).isEqualTo("CREATED");
+        assertThat(entries(booking)).isEmpty();
+    }
+
+    @Test
+    void givenACaptureInAFormerClubCurrency_whenCapturing_thenItIsRecordedWithoutCredit() throws Exception {
+        // given
+        UUID booking = bookWithOrder();
+        assertThat(pendingPayments.release(booking)).isTrue();
+        config.chargeIn("CHF");
+        PAYPAL.reply(READ, 200, order("APPROVED", booking, "15.00", null));
+        PAYPAL.reply(CAPTURE, 201, order("COMPLETED", booking, "15.00", capture("COMPLETED", "15.00")));
+
+        // when
+        capture("roe.john").andExpect(status().isOk()).andExpect(jsonPath("$.outcome").value("LATE_CREDITED"));
+
+        // then
+        assertThat(bookingStatus(booking)).isEqualTo("CANCELLED");
+        assertThat(allocationStatus(booking)).isEqualTo("CANCELLED");
+        assertThat(orderStatus()).as("the capture stays on record for the treasurer").isEqualTo("LATE_CAPTURED");
+        assertThat(entries(booking)).as("credit is kept in the club currency only").isEmpty();
+        assertThat(audit("payment.paypal.lateCapture", booking)).singleElement()
+                .satisfies(payload -> assertThat(payload.get("credited").asBoolean()).isFalse());
+    }
+
+    @Test
+    void givenACancelWhileACaptureIsInFlight_whenTheCaptureCompletes_thenItBecomesCredit() throws Exception {
+        // given
+        UUID booking = bookWithOrder();
+        PAYPAL.reply(READ, 200, order("APPROVED", booking, "15.00", null));
+        PAYPAL.reply(CAPTURE, 201, order("COMPLETED", booking, "15.00", capture("COMPLETED", "15.00")));
+        CountDownLatch inFlight = PAYPAL.holdFirst(CAPTURE);
+        CompletableFuture<String> returned = CompletableFuture.supplyAsync(this::captureOutcome);
+        awaitRequest(CAPTURE);
+        cancel("roe.john").andExpect(jsonPath("$.outcome").value("REJECTED"));
+        assertThat(orderStatus()).isEqualTo("VOIDED");
+
+        // when
+        inFlight.countDown();
+
+        // then
+        assertThat(returned.get(10, TimeUnit.SECONDS)).isEqualTo("LATE_CREDITED");
+        assertThat(orderStatus()).isEqualTo("LATE_CAPTURED");
+        assertThat(bookingStatus(booking)).isEqualTo("CANCELLED");
+        assertThat(entries(booking)).as("the money is credit, never lost")
+                .containsExactly(Map.of("kind", "PAYPAL_LATE_CAPTURE", "amount_minor", 1500));
+        assertThat(credit.balance(johnAccount)).isEqualTo(1500);
     }
 
     @Test
