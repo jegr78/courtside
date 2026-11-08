@@ -11,6 +11,7 @@ import org.courtside.member.testfixture.MemberTestFixture;
 import org.courtside.rules.BookingCounter;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.shared.TimeSlot;
+import org.assertj.core.api.SoftAssertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,14 +28,17 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.Currency;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -45,6 +49,7 @@ class PendingBookingVisibilityTest extends AbstractIntegrationTest {
     private static final Instant START = Instant.parse("2026-05-12T16:00:00Z");
     private static final Instant END = Instant.parse("2026-05-12T17:00:00Z");
     private static final Instant EXPIRY = Instant.parse("2026-05-12T10:15:00Z");
+    private static final UUID BALL_MACHINE = UUID.fromString("55555555-5555-5555-5555-555555555555");
     private static final TimeSlot SLOT = new TimeSlot(START, END);
 
     @Autowired
@@ -74,6 +79,7 @@ class PendingBookingVisibilityTest extends AbstractIntegrationTest {
 
     private UUID court;
     private UUID holderAccount;
+    private UUID holderPerson;
     private UUID otherPerson;
     private UUID otherAccount;
     private UUID pending;
@@ -84,7 +90,7 @@ class PendingBookingVisibilityTest extends AbstractIntegrationTest {
         for (DayOfWeek day : DayOfWeek.values()) {
             facility.setOpeningHours(day, new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0)));
         }
-        UUID holderPerson = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
+        holderPerson = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
         holderAccount = identity.createEnabledAccount(holderPerson, "doe.jane", Set.of(Role.MEMBER));
         members.holdRunningMembership(holderPerson);
         otherPerson = identity.createPerson("John", "Roe", "john.roe@example.org");
@@ -174,5 +180,68 @@ class PendingBookingVisibilityTest extends AbstractIntegrationTest {
                         userDetails.loadUserByUsername("roe.john"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items").isEmpty());
+    }
+
+    @Test
+    void givenAPendingBooking_whenCardCapacityAndUpcomingGuardsAreRead_thenItCounts() {
+        // given
+        UUID secondCourt = facility.createCourt(2, "Court 2");
+        Booking charged = new Booking(MEMBER_CARD, otherAccount, null, START.minus(Duration.ofDays(3)));
+        charged.allocate(secondCourt, SLOT);
+        charged.addParticipant(ParticipantSpec.card(BALL_MACHINE));
+        charged.charge(new BookingAmount(1500, Currency.getInstance("EUR")));
+        charged.awaitPayment(EXPIRY);
+        bookings.saveAndFlush(charged);
+        Instant now = START.minus(Duration.ofHours(2));
+
+        // when
+        long cardUsage = bookings.countCardUsageOverlapping(BALL_MACHINE, START, END);
+        long cardUsageExcluding = bookings.countCardUsageOverlappingExcluding(BALL_MACHINE, START, END,
+                List.of(UUID.randomUUID()));
+        boolean upcomingBooked = bookings.existsUpcomingBookedBy(otherAccount, now);
+        boolean upcomingCharged = bookings.existsUpcomingCharged(now);
+
+        // then
+        SoftAssertions.assertSoftly(softly -> {
+            softly.assertThat(cardUsage).as("card usage").isEqualTo(1);
+            softly.assertThat(cardUsageExcluding).as("card usage with an exclusion").isEqualTo(1);
+            softly.assertThat(upcomingBooked).as("upcoming booking held by the account").isTrue();
+            softly.assertThat(upcomingCharged).as("upcoming charged booking").isTrue();
+        });
+    }
+
+    @Test
+    void givenAPendingBooking_whenTheBoardReadsItsDetailAndTheSubjectAccessExport_thenBothShowItPending()
+            throws Exception {
+        // given
+        MockMvc mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
+        UUID adminPerson = identity.createPerson("Richard", "Miles", "richard.miles@example.org");
+        identity.createEnabledAccount(adminPerson, "miles.richard", Set.of(Role.ADMIN));
+        var admin = SecurityMockMvcRequestPostProcessors.user(userDetails.loadUserByUsername("miles.richard"));
+
+        // when / then
+        mockMvc.perform(get("/api/managed/bookings/{id}", pending).with(admin))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PENDING_PAYMENT"));
+        mockMvc.perform(post("/api/admin/export/person/{personId}", holderPerson).with(admin).with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.bookingsMade[0].bookingId").value(pending.toString()))
+                .andExpect(jsonPath("$.bookingsMade[0].status").value("PENDING_PAYMENT"));
+    }
+
+    @Test
+    void givenAPendingBookingThatIsThenConfirmed_whenTheOwnerListsTheirBookings_thenTheExpiryIsGone()
+            throws Exception {
+        // given
+        MockMvc mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
+        jdbc.sql("UPDATE court_allocation SET status = 'CONFIRMED' WHERE booking_id = ?").param(pending).update();
+        jdbc.sql("UPDATE booking SET status = 'CONFIRMED' WHERE id = ?").param(pending).update();
+
+        // when / then
+        mockMvc.perform(get("/api/my/bookings").with(SecurityMockMvcRequestPostProcessors.user(
+                        userDetails.loadUserByUsername("doe.jane"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].status").value("CONFIRMED"))
+                .andExpect(jsonPath("$.items[0].paymentExpiresAt").doesNotExist());
     }
 }

@@ -184,7 +184,7 @@ class WaitlistRows {
                 .single();
     }
 
-    boolean confirmedOverlap(UUID courtId, TimeSlot slot, UUID bookedBy) {
+    boolean occupiedOverlap(UUID courtId, TimeSlot slot, UUID bookedBy) {
         return jdbc.sql("""
                         SELECT EXISTS (
                             SELECT 1 FROM court_allocation a JOIN booking b ON b.id = a.booking_id

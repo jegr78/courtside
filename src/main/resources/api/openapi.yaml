@@ -3422,8 +3422,8 @@ components:
           type: [string, "null"]
           format: date-time
           description: |
-            When the hold on a booking awaiting payment ends. Present while the status is
-            PENDING_PAYMENT and kept afterwards; absent on a booking that never awaited payment.
+            When the hold on a booking awaiting payment ends. Present only while the status is
+            PENDING_PAYMENT; absent once the booking is confirmed or cancelled.
 
     BookingAmount:
       type: object
