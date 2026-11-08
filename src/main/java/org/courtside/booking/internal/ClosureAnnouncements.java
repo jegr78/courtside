@@ -1,7 +1,8 @@
 package org.courtside.booking.internal;
 
-import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.courtside.booking.BookingRepository;
+import org.courtside.booking.BookingStatus;
 import org.courtside.booking.PendingPayments;
 import org.courtside.card.CardEvent;
 import org.courtside.config.ClubTimeZone;
@@ -14,9 +15,12 @@ import org.courtside.shared.OpeningWindow;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.event.TransactionalEventListener;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Clock;
 import java.time.DayOfWeek;
@@ -29,8 +33,8 @@ import java.util.UUID;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 
+@Slf4j
 @Component
-@RequiredArgsConstructor
 class ClosureAnnouncements {
 
     private static final int PAGE_SIZE = 100;
@@ -41,6 +45,20 @@ class ClosureAnnouncements {
     private final ClubTimeZone timeZone;
     private final BookingRepository bookings;
     private final PendingPayments pendingPayments;
+    private final TransactionTemplate separately;
+
+    ClosureAnnouncements(ImpactService impact, ApplicationEventPublisher events, Clock clock, ClubTimeZone timeZone,
+                         BookingRepository bookings, PendingPayments pendingPayments,
+                         PlatformTransactionManager transactions) {
+        this.impact = impact;
+        this.events = events;
+        this.clock = clock;
+        this.timeZone = timeZone;
+        this.bookings = bookings;
+        this.pendingPayments = pendingPayments;
+        this.separately = new TransactionTemplate(transactions);
+        this.separately.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+    }
 
     @Async("closureAnnouncementExecutor")
     @TransactionalEventListener
@@ -113,7 +131,7 @@ class ClosureAnnouncements {
     private void announce(List<ImpactService.AffectedBooking> affected, BookingDisplaced.Closure closure) {
         List<UUID> held = new ArrayList<>();
         displace(affected, closure, held);
-        held.forEach(pendingPayments::release);
+        held.forEach(bookingId -> releaseOrDisplace(bookingId, closure));
     }
 
     // One instant for every page: a clock read per page lets a booking that starts in between drop
@@ -134,7 +152,21 @@ class ClosureAnnouncements {
             cursor = impacted.nextCursor();
         } while (cursor != null);
         // Released only after the walk, because the cursor names a booking the next page must still find.
-        held.forEach(pendingPayments::release);
+        held.forEach(bookingId -> releaseOrDisplace(bookingId, closure));
+    }
+
+    // A payment confirmed since the page was read turns the hold into a booking the closure displaces.
+    private void releaseOrDisplace(UUID bookingId, BookingDisplaced.Closure closure) {
+        try {
+            if (Boolean.TRUE.equals(separately.execute(status -> !pendingPayments.release(bookingId)
+                    && bookings.findById(bookingId).filter(booking -> booking.getStatus() == BookingStatus.CONFIRMED)
+                    .isPresent()))) {
+                events.publishEvent(new BookingDisplaced(bookingId, closure));
+            }
+        } catch (RuntimeException failed) {
+            log.warn("A closure could not release pending booking {}; its payment deadline ends the hold", bookingId,
+                    failed);
+        }
     }
 
     // A booking still awaiting its payment was never confirmed, so the closure ends its hold instead.
