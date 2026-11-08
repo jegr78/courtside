@@ -56,6 +56,7 @@ import static org.courtside.payment.FakePayPal.capture;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -316,6 +317,27 @@ class PayPalReconciliationTest extends AbstractIntegrationTest {
         assertThat(PAYPAL.seen(READ)).as("PayPal is asked before the order is voided").hasSize(1);
         assertThat(bookingStatus(booking)).isEqualTo("CANCELLED");
         assertThat(cancellationReason(booking)).isEqualTo("PAYMENT_EXPIRED");
+        assertThat(allocationStatus(booking)).isEqualTo("CANCELLED");
+        assertThat(orderStatus()).isEqualTo("VOIDED");
+        assertThat(entries(booking)).isEmpty();
+        assertThat(audit("payment.paypal.rejected", booking)).singleElement().satisfies(payload ->
+                assertThat(payload.get("reason").asString()).isEqualTo("CREDENTIALS_CHANGED"));
+    }
+
+    @Test
+    void givenAnOpenOrder_whenTheCredentialsAreRemoved_thenItIsVoidedAndTheCourtIsFree() throws Exception {
+        // given
+        UUID booking = bookWithOrder();
+        PAYPAL.reply(READ, 200, order("PAYER_ACTION_REQUIRED", booking, null));
+
+        // when
+        mockMvc.perform(delete("/api/treasury/paypal").with(user(userDetails.loadUserByUsername("miles.richard")))
+                        .with(csrf()).sessionAttr("courtside.authenticated-at", clock.instant().toEpochMilli()))
+                .andExpect(status().isNoContent());
+
+        // then
+        assertThat(PAYPAL.seen(READ)).as("the removed credentials still read the order once").hasSize(1);
+        assertThat(bookingStatus(booking)).isEqualTo("CANCELLED");
         assertThat(allocationStatus(booking)).isEqualTo("CANCELLED");
         assertThat(orderStatus()).isEqualTo("VOIDED");
         assertThat(entries(booking)).isEmpty();

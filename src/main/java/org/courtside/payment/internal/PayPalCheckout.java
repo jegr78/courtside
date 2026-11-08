@@ -114,9 +114,14 @@ public class PayPalCheckout {
     void retire(PayPalClient.Credentials retired) {
         requireNoTransaction();
         for (StoredOrder stored : orders.open(retired.environment())) {
-            Settlement settlement = settleOrVoid(stored, retired, Rejection.CREDENTIALS_CHANGED);
-            log.info("PayPal order {} of booking {} after a credential change: {}", stored.orderId(),
-                    stored.bookingId(), settlement.outcome());
+            try {
+                Settlement settlement = settleOrVoid(stored, retired, Rejection.CREDENTIALS_CHANGED);
+                log.info("PayPal order {} of booking {} after a credential change: {}", stored.orderId(),
+                        stored.bookingId(), settlement.outcome());
+            } catch (RuntimeException failed) {
+                log.error("PayPal order {} of booking {} stays open after a credential change", stored.orderId(),
+                        stored.bookingId(), failed);
+            }
         }
     }
 
