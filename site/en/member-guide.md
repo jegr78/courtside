@@ -203,6 +203,10 @@ members only and do not appear for you. If the booking type has a price for exte
 the dialog shows the amount for the chosen duration before you book. *My bookings* shows it with
 the booking, even if the club changes the price later.
 
+If you gave the club money, for example in cash at the clubhouse, the treasurer adds it to your
+credit. In *My account*, the *Credit* section shows your balance and every entry with date, kind,
+reason, amount and the balance after it, newest first. The treasurer pays credit out on request.
+
 ![The booking fields for members, guests and slot fillers.](../screenshots/en/booking-participants.png)
 
 ## Recorded as a co-player
@@ -449,7 +453,8 @@ The board can correct errors in your name or username from the people administra
 
 As an external player you can close your account yourself. In *My account*, choose the button under
 *Close account* and confirm. If you signed in more than five minutes ago, Courtside asks for your
-password again first. If you still have an upcoming booking, cancel it first. Closing removes your
+password again first. If you still have an upcoming booking, cancel it first. If you still hold
+credit, ask the treasurer to pay it out first. Closing removes your
 name, email address, username and password and signs you out. Past bookings stay with the club
 without your name. Somebody else may register your username afterwards. As a member, the board ends
 your account.

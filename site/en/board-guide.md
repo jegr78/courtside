@@ -11,7 +11,7 @@ roles other than *Member* as a managing role or lets one of their roles book it 
 list. The list shows
 what the managing roles cover, the series form what the booking roles allow. An account no card
 grants either cannot enter, not even by typing the address directly. Board members change this on
-the booking cards. Accounts with the **Treasurer** role also see *Guest fees* in the administration.
+the booking cards. Accounts with the **Treasurer** role also see *Guest fees* and *Credit* in the administration.
 
 The sidebar leads to the overview at the top and divides administration below it into four areas:
 
@@ -19,7 +19,7 @@ The sidebar leads to the overview at the top and divides administration below it
 |---|---|
 | **Club** | Setup, club profile, deadlines and reminders, booking rules, message wording |
 | **Facility** | Courts, opening hours, booking cards and slot fillers |
-| **People** | People, accounts, membership types and imports |
+| **People** | People, accounts, membership types, imports and credit |
 | **Records** | Statistics, usage, data exports, retention, change log and message log |
 
 The same sidebar returns you to the court plan.
@@ -127,7 +127,8 @@ time it opens.
 * The **Booking grid** determines the rows in the court plan and the permitted start times.
 * The **Currency** is a three-letter ISO code such as `EUR` or `CHF`. Guest fees and prices for external players are stated in it.
   A change converts nothing: the fees of the booking types keep their number, and guests already
-  booked keep their amount.
+  booked keep their amount. While any account holds credit, Courtside refuses the change. Pay the
+  credit out first.
 * **Admit external bookings** opens booking cards that name the *External* role to people outside
   the club. Without it nobody with that role books, even on a card that names it. While it is on,
   the sign-in page offers registration, and two fields take the **registration text** in German
@@ -703,6 +704,25 @@ A later correct import does not automatically reactivate accounts or restore rem
 After importing an incomplete file by mistake, enable affected accounts and assign their member
 roles again.
 
+## People → Credit
+
+External players can hold credit with the club, for example after paying cash at the clubhouse. The
+*Credit* page is open to administrators and the **Treasurer** role. Without a search it lists every
+account that holds credit. The search finds external accounts by name, email address or username.
+Administrators find the page under *People*, treasurers directly in the sidebar.
+
+![An external player's credit with balance, entries and the form for credits and payouts.](../screenshots/en/credit.png)
+
+A chosen account shows its entries, newest first, with the balance after each. **Credit** adds money
+to an external account, **Payout** returns credit. An entry lies between 0.01 and 10,000.00 in the
+club currency and needs a reason of at most 200 characters. The player sees it in their account, so
+write nothing they should not read. Courtside refuses a payout beyond the balance. Without a fresh
+password proof Courtside asks for your password.
+
+Entries can be neither changed nor deleted. You correct a mistake with an entry in the other
+direction. The change log records every entry with amount and kind, without the reason. A player
+holding credit cannot close their account until you have paid it out.
+
 ## Records
 
 The **Records** area has nine views. The next section describes *Retention*.
@@ -817,7 +837,8 @@ There are three categories, each with a period in months from 1 to 1200:
 * **External accounts** anonymises the account of an external player without any membership that
   was neither opened nor signed in since the period and has no booking of its own from that day,
   an upcoming one included. Name, email address, username and password go, and its bookings stay
-  without a name. An account the player closed is already anonymous and is not counted.
+  without a name. An account the player closed is already anonymous and is not counted. An account
+  holding credit stays until you have paid it out. Its credit entries stay without their reasons.
 
 Before you set a booking period, know what you lose: for pseudonymised periods the statistics no
 longer count active members, and usage can no longer attribute that capacity to a membership type.
@@ -831,6 +852,7 @@ reach yet, with the reason:
 * An account of the person holds the *Administrator* role.
 * A booking or series that stays still names the person.
 * The person is waiting for a court.
+* An account of the person has credit entries. They are never deleted, so the person stays.
 
 *Open person* takes you to that person so you can resolve the reason. Only after you confirm in the
 form that the run cannot be undone does *Run for good* apply exactly that preview. Without a fresh

@@ -5,6 +5,7 @@ import { AdminAccessGrantsView } from "./AdminAccessGrantsView";
 import { AdminAuditView } from "./AdminAuditView";
 import { AdminConfigurationView } from "./AdminConfigurationView";
 import { AdminExportView } from "./AdminExportView";
+import { AdminCreditView } from "./AdminCreditView";
 import { AdminGuestFeesView } from "./AdminGuestFeesView";
 import { AdminStatisticsView } from "./AdminStatisticsView";
 import { AdminUsageView } from "./AdminUsageView";
@@ -45,6 +46,7 @@ export default function AdminRoutes({ configurationChanged, administrator, treas
       <Route path="appointments" element={appointmentsShown ? <AdminManagedAppointmentsView managesAppointments={managesAppointments}
         createsSeries={createsSeries} administrator={administrator} /> : <Navigate to={landing} replace />} />
       {treasurer && <Route path="guest-fees" element={<AdminGuestFeesView />} />}
+      {treasurer && <Route path="credit" element={<AdminCreditView />} />}
       {administrator && <>
       <Route path="setup" element={<AdminSetupView />} />
       <Route path="configuration" element={<AdminConfigurationView configurationChanged={configurationChanged} />} />

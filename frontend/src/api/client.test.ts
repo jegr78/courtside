@@ -1057,3 +1057,75 @@ it("given controlled account recovery, when starting and redeeming it, then dist
   // then
   expect(calls).toEqual([{ identityChecked: true }, { username: "doe.jane", code: "ABCD-EFGH", password: "clay-court-evening" }]);
 });
+
+it("given a credit cursor, when the own ledger continues, then cursor and bound are sent", async () => {
+  // given
+  let requested: string | undefined;
+  server.use(http.get("/api/my/credit", ({ request }) => {
+    requested = new URL(request.url).search;
+    return HttpResponse.json({ balanceMinor: 0, currency: "EUR", items: [], nextCursor: null });
+  }));
+
+  // when
+  const page = await api.ownCredit({ cursor: "11111111-1111-1111-1111-111111111111", limit: 20 });
+
+  // then
+  expect(requested).toBe("?limit=20&cursor=11111111-1111-1111-1111-111111111111");
+  expect(page.balanceMinor).toBe(0);
+});
+
+it("given a search text, when credit holders are listed, then it travels in the body and an empty search lists the holders", async () => {
+  // given
+  const calls: string[] = [];
+  server.use(
+    http.post("/api/treasury/credit/account-search", async ({ request }) => {
+      calls.push(`search ${JSON.stringify(await request.json())} ${new URL(request.url).search}`);
+      return HttpResponse.json([]);
+    }),
+    http.get("/api/treasury/credit/accounts", ({ request }) => {
+      calls.push(`list ${new URL(request.url).search}`);
+      return HttpResponse.json([]);
+    }));
+
+  // when
+  await api.creditHolders("doe");
+  await api.creditHolders();
+
+  // then
+  expect(calls).toEqual(['search {"query":"doe"} ', "list "]);
+});
+
+it("given a credit entry, when it is recorded, then the account's entries receive it as a protected JSON body", async () => {
+  // given
+  document.cookie = "XSRF-TOKEN=test-token";
+  const entry = { id: "22222222-2222-2222-2222-222222222222", kind: "CREDIT", amountMinor: 1250, currency: "EUR",
+    balanceAfterMinor: 1250, recordedAt: "2026-11-08T10:00:00Z", note: "Cash at the desk" };
+  server.use(http.post("/api/treasury/credit/accounts/33333333-3333-3333-3333-333333333333/entries", async ({ request }) => {
+    expect(request.headers.get("X-XSRF-TOKEN")).toBe("test-token");
+    expect(request.headers.get("Content-Type")).toBe("application/json");
+    expect(await request.json()).toEqual({ kind: "CREDIT", amountMinor: 1250, note: "Cash at the desk" });
+    return HttpResponse.json(entry, { status: 201 });
+  }));
+
+  // when
+  const recorded = await api.recordCreditEntry("33333333-3333-3333-3333-333333333333",
+    { kind: "CREDIT", amountMinor: 1250, note: "Cash at the desk" });
+
+  // then
+  expect(recorded).toEqual(entry);
+});
+
+it("given an account's ledger, when it is read for the treasury, then the first page is bounded", async () => {
+  // given
+  let requested: string | undefined;
+  server.use(http.get("/api/treasury/credit/accounts/33333333-3333-3333-3333-333333333333/entries", ({ request }) => {
+    requested = new URL(request.url).search;
+    return HttpResponse.json({ balanceMinor: 500, currency: "EUR", items: [], nextCursor: null });
+  }));
+
+  // when
+  await api.creditEntries("33333333-3333-3333-3333-333333333333");
+
+  // then
+  expect(requested).toBe("?limit=50");
+});

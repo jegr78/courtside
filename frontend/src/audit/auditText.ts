@@ -1,6 +1,7 @@
 import type { TFunction } from "i18next";
 import type { AuditEntry, DayOfWeek } from "../api/client";
 import i18n from "../i18n";
+import { formatMinor } from "../money";
 import { formatBookingPeriod, formatClockTime } from "../time/clubZone";
 
 const enabledFlagByEventType: Record<string, string> = {
@@ -78,8 +79,12 @@ export function auditMessage(entry: AuditEntry, t: TFunction): string {
   const locale = i18n.resolvedLanguage ?? i18n.language;
   const opensAt = typeof entry.parameters.opensAt === "string" ? formatClockTime(entry.parameters.opensAt, locale) : undefined;
   const closesAt = typeof entry.parameters.closesAt === "string" ? formatClockTime(entry.parameters.closesAt, locale) : undefined;
-  const kind = entry.eventType.startsWith("facility.openingPeriod.") && typeof entry.parameters.kind === "string"
-    ? t(`admin.availability.kind.${entry.parameters.kind}`)
+  const credited = entry.eventType === "credit.entry.recorded";
+  const kind = typeof entry.parameters.kind !== "string" ? undefined
+    : entry.eventType.startsWith("facility.openingPeriod.") ? t(`admin.availability.kind.${entry.parameters.kind}`)
+      : credited ? t(`creditLedger.kind.${entry.parameters.kind}`) : undefined;
+  const amount = credited && typeof entry.parameters.amountMinor === "number" && typeof entry.parameters.currency === "string"
+    ? formatMinor(Math.abs(entry.parameters.amountMinor), locale, entry.parameters.currency)
     : undefined;
   const outcome = typeof entry.parameters.outcome === "string"
     ? t(`managedAppointments.attendance.${entry.parameters.outcome}`)
@@ -93,6 +98,7 @@ export function auditMessage(entry: AuditEntry, t: TFunction): string {
     ...(opensAt !== undefined ? { opensAt } : {}),
     ...(closesAt !== undefined ? { closesAt } : {}),
     ...(kind !== undefined ? { kind } : {}),
+    ...(amount !== undefined ? { amountMinor: amount } : {}),
     ...(outcome !== undefined ? { outcome } : {}),
     ...(changedFields !== undefined ? { changedFields } : {}),
     ...(context ? { context } : changedFields !== undefined ? { context: "fields" } : {})

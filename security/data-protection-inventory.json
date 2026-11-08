@@ -273,7 +273,8 @@
     "mfa-controlled-recovery": "Replaced by a new rescue, invalidated by address correction and removed by successful redemption or account deletion. Expiry denies redemption and retains the recovery block until a new rescue completes.",
     "access-grant": "Kept for as long as its booking: the row is never deleted, holds what the access pass last derived and what the access-control system answered, and names a person only through the booking.",
     "access-code": "A grant's current code is detached once no door can accept it any more and the detached row is deleted by the access pass when its hold ends, which is the latest window any install asked for.",
-    "registration-verification": "Deleted when the mailed code is redeemed; the identity cleanup sweep removes it together with its unverified account and person once it has lapsed."
+    "registration-verification": "Deleted when the mailed code is redeemed; the identity cleanup sweep removes it together with its unverified account and person once it has lapsed.",
+    "credit-ledger": "Never changed or deleted, which a trigger enforces; anonymising the account deletes the reason text and leaves amounts that name the person only through the anonymised account."
   },
   "inMemoryState": {
     "AuditAdminController": {
@@ -355,6 +356,16 @@
       "level": "personal",
       "holds": "The links between a club member number and a person, as one page of them.",
       "bounded": "The request that built it."
+    },
+    "CreditController": {
+      "level": "personal",
+      "holds": "The accounts a treasurer search or the balance list finds, with name and email address, mapped into the response.",
+      "bounded": "The request that reads it."
+    },
+    "CreditLedger": {
+      "level": "personal",
+      "holds": "The accounts a treasurer search or the balance list finds, with name and email address, and one account's ledger entries with their reasons.",
+      "bounded": "The request that reads it."
     },
     "GuestFeeReportService": {
       "level": "personal",
@@ -1228,6 +1239,56 @@
       "window_started_at": {
         "level": "operational",
         "lifecycle": "account-cascade"
+      }
+    },
+    "credit_account": {
+      "account_id": {
+        "level": "pseudonymous",
+        "lifecycle": "credit-ledger"
+      }
+    },
+    "credit_entry": {
+      "account_id": {
+        "level": "pseudonymous",
+        "lifecycle": "credit-ledger"
+      },
+      "amount_minor": {
+        "level": "operational",
+        "lifecycle": "credit-ledger"
+      },
+      "currency": {
+        "level": "operational",
+        "lifecycle": "credit-ledger"
+      },
+      "id": {
+        "level": "operational",
+        "lifecycle": "credit-ledger"
+      },
+      "kind": {
+        "level": "operational",
+        "lifecycle": "credit-ledger"
+      },
+      "position": {
+        "level": "operational",
+        "lifecycle": "credit-ledger"
+      },
+      "recorded_at": {
+        "level": "operational",
+        "lifecycle": "credit-ledger"
+      },
+      "recorded_by": {
+        "level": "pseudonymous",
+        "lifecycle": "credit-ledger"
+      }
+    },
+    "credit_entry_note": {
+      "entry_id": {
+        "level": "operational",
+        "lifecycle": "credit-ledger"
+      },
+      "reason_text": {
+        "level": "personal",
+        "lifecycle": "credit-ledger"
       }
     },
     "domain_event": {

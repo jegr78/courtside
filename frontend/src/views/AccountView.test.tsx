@@ -1,7 +1,7 @@
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, it, vi } from "vitest";
-import { api, ApiError, type SessionStatus } from "../api/client";
+import { api, ApiError, type CreditEntry, type CreditLedgerPage, type SessionStatus } from "../api/client";
 import i18n from "../i18n";
 import { WithClubConfiguration } from "../test/ClubConfiguration";
 import { AccountView } from "./AccountView";
@@ -13,6 +13,7 @@ const actions = { passwordChanged: () => undefined, signedOut: () => undefined }
 beforeEach(async () => {
   vi.restoreAllMocks();
   vi.spyOn(api, "accountSessions").mockImplementation(() => new Promise(() => {}));
+  vi.spyOn(api, "ownCredit").mockResolvedValue({ balanceMinor: 0, currency: "EUR", items: [], nextCursor: null });
   await i18n.changeLanguage("en");
 });
 
@@ -229,4 +230,81 @@ it("given a proved session action is pending, when another account arrives befor
 
   // then
   expect(signedOut, "an action already sent for the former account cannot clear the new identity").not.toHaveBeenCalled();
+});
+
+function creditEntry(id: string, kind: CreditEntry["kind"], amountMinor: number, balanceAfterMinor: number, note: string | null): CreditEntry {
+  return { id, kind, amountMinor, currency: "EUR", balanceAfterMinor, recordedAt: "2026-11-01T09:00:00Z", note };
+}
+
+it("given an account with credit entries, when the account opens and more are requested, then the balance and every entry are shown newest first", async () => {
+  // given
+  const first: CreditLedgerPage = { balanceMinor: 750, currency: "EUR", nextCursor: "00000000-0000-0000-0000-00000000000b",
+    items: [creditEntry("00000000-0000-0000-0000-00000000000c", "PAYOUT", -500, 750, "Paid out in cash")] };
+  const second: CreditLedgerPage = { balanceMinor: 750, currency: "EUR", nextCursor: null,
+    items: [creditEntry("00000000-0000-0000-0000-00000000000b", "CREDIT", 1250, 1250, null)] };
+  const read = vi.spyOn(api, "ownCredit").mockResolvedValueOnce(first).mockResolvedValueOnce(second);
+  render(<WithClubConfiguration><AccountView session={profile} {...actions} /></WithClubConfiguration>);
+  const section = await screen.findByTestId("account-credit");
+
+  // when
+  await userEvent.click(within(section).getByTestId("credit-more"));
+
+  // then
+  await waitFor(() => expect(within(section).getAllByTestId("credit-entry")).toHaveLength(2));
+  expect(read, "the second page continues after the first").toHaveBeenLastCalledWith({ cursor: "00000000-0000-0000-0000-00000000000b" });
+  expect(within(section).getByTestId("credit-balance")).toHaveTextContent("€7.50");
+  const [payout, credit] = within(section).getAllByTestId("credit-entry");
+  expect(within(payout).getByTestId("credit-entry-amount")).toHaveTextContent("-€5.00");
+  expect(within(payout).getByTestId("credit-entry-note")).toHaveTextContent("Paid out in cash");
+  expect(within(payout).getByTestId("credit-entry-balance-after")).toHaveTextContent("€7.50");
+  expect(within(credit).getByTestId("credit-entry-amount")).toHaveTextContent("+€12.50");
+  expect(within(credit).getByTestId("credit-entry-kind")).toHaveTextContent(i18n.t("creditLedger.kind.CREDIT"));
+  expect(within(section).queryByTestId("credit-more"), "the last page offers nothing further").not.toBeInTheDocument();
+});
+
+it("given a member without credit entries, when the account opens, then no credit section is shown", async () => {
+  // given
+  const read = vi.spyOn(api, "ownCredit");
+
+  // when
+  render(<WithClubConfiguration><AccountView session={{ ...profile, memberFeatures: true }} {...actions} /></WithClubConfiguration>);
+
+  // then
+  await waitFor(() => expect(read).toHaveBeenCalled());
+  await act(async () => { await Promise.resolve(); });
+  expect(screen.queryByTestId("account-credit")).not.toBeInTheDocument();
+});
+
+it("given an external account without entries, when the account opens, then its zero balance is shown", async () => {
+  // when
+  render(<WithClubConfiguration><AccountView session={{ ...profile, memberFeatures: false }} {...actions} /></WithClubConfiguration>);
+
+  // then
+  const section = await screen.findByTestId("account-credit");
+  expect(await within(section).findByTestId("credit-balance")).toHaveTextContent("€0.00");
+  expect(within(section).getByTestId("credit-empty")).toBeInTheDocument();
+});
+
+it("given the credit ledger cannot be read, when an external account opens, then the failure is shown instead of a silent gap", async () => {
+  // given
+  vi.spyOn(api, "ownCredit").mockRejectedValue(new ApiError(500, { type: "urn:courtside:error:internal", title: "Internal", status: 500 }));
+
+  // when
+  render(<WithClubConfiguration><AccountView session={{ ...profile, memberFeatures: false }} {...actions} /></WithClubConfiguration>);
+
+  // then
+  const section = await screen.findByTestId("account-credit");
+  expect(await within(section).findByTestId("credit-error")).toBeInTheDocument();
+});
+
+it("given offline booking access, when the account opens, then no credit ledger is requested", () => {
+  // given
+  const read = vi.spyOn(api, "ownCredit");
+
+  // when
+  render(<WithClubConfiguration><AccountView session={{ authenticated: true, roles: ["MEMBER"], passwordChangeRequired: false }} offline {...actions} /></WithClubConfiguration>);
+
+  // then
+  expect(read).not.toHaveBeenCalled();
+  expect(screen.queryByTestId("account-credit")).not.toBeInTheDocument();
 });

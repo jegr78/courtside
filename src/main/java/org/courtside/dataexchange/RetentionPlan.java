@@ -17,7 +17,8 @@ public final class RetentionPlan {
     public enum BlockReason {
         ADMINISTRATOR,
         NAMED_IN_BOOKINGS,
-        ON_A_WAITING_LIST
+        ON_A_WAITING_LIST,
+        HOLDS_A_CREDIT_LEDGER
     }
 
     public record Policy(RetentionCategory category, @Nullable Integer retainMonths) {

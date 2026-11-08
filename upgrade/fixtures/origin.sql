@@ -211,6 +211,14 @@ INSERT INTO registration_verification (account_id, code_hash, security_epoch, cr
 VALUES ('72000000-0000-0000-0000-000000000001', repeat('e', 64), 0, '2025-01-01T00:00:00Z',
         '2025-01-02T00:00:00Z');
 
+INSERT INTO credit_account (account_id) VALUES ('72000000-0000-0000-0000-000000000001');
+
+INSERT INTO credit_entry (id, account_id, kind, amount_minor, currency, recorded_at, recorded_by)
+VALUES ('7f200000-0000-0000-0000-000000000001', '72000000-0000-0000-0000-000000000001', 'CREDIT', 1500, 'EUR',
+        '2025-01-01T00:00:00Z', NULL);
+
+INSERT INTO credit_entry_note (entry_id, reason_text) VALUES ('7f200000-0000-0000-0000-000000000001', 'Cash at the clubhouse');
+
 INSERT INTO message_optout (user_account_id, kind, created_at)
 VALUES ('72000000-0000-0000-0000-000000000001', 'BOOKING_REMINDER', '2025-01-01T00:00:00Z');
 

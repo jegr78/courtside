@@ -5,6 +5,7 @@ import org.courtside.config.BookingSlotDuration;
 import org.courtside.config.CredentialLifetime;
 import org.courtside.config.ReminderLeadTime;
 import org.courtside.config.ResetTokenLifetime;
+import org.courtside.shared.HeldCredit;
 import org.courtside.shared.UnsupportedLanguageException;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationEventPublisher;
@@ -36,7 +37,7 @@ class ConfigServiceTest {
                 .thenReturn(Optional.of(timeZone));
         when(timeZone.getTimeZone()).thenReturn("Europe/Berlin");
         ConfigService service = new ConfigService(configurations, timeZones, mock(),
-                shipping("de", "en"), List.of(), mock(ApplicationEventPublisher.class));
+                shipping("de", "en"), List.of(), mock(ApplicationEventPublisher.class), mock(HeldCredit.class));
 
         // when
         ZoneId result = service.zoneId();
@@ -56,7 +57,7 @@ class ConfigServiceTest {
         when(timeZones.findById(ClubConfiguration.SINGLETON_ID))
                 .thenReturn(Optional.empty());
         ConfigService service = new ConfigService(configurations, timeZones, mock(),
-                shipping("de", "en"), List.of(), mock(ApplicationEventPublisher.class));
+                shipping("de", "en"), List.of(), mock(ApplicationEventPublisher.class), mock(HeldCredit.class));
 
         // when / then
         assertThatThrownBy(service::zoneId)
@@ -79,7 +80,7 @@ class ConfigServiceTest {
         when(constraint.timeZoneConflictCode()).thenReturn(Optional.empty());
         when(constraint.conflictCode(any(), any())).thenReturn(Optional.empty());
         ConfigService service = new ConfigService(configurations, mock(), mock(),
-                shipping("de", "en"), List.of(constraint), mock(ApplicationEventPublisher.class));
+                shipping("de", "en"), List.of(constraint), mock(ApplicationEventPublisher.class), mock(HeldCredit.class));
 
         // when
         service.update(new ChangeClubConfigurationCommand(
@@ -100,7 +101,7 @@ class ConfigServiceTest {
         // given
         ClubConfigurationRepository configurations = mock();
         ConfigService service = new ConfigService(configurations, mock(), mock(),
-                shipping("de", "en"), List.of(), mock(ApplicationEventPublisher.class));
+                shipping("de", "en"), List.of(), mock(ApplicationEventPublisher.class), mock(HeldCredit.class));
 
         // when / then — the guard sits before the row is locked, so no caller can leave it half done
         assertThatThrownBy(() -> service.update(new ChangeClubConfigurationCommand(

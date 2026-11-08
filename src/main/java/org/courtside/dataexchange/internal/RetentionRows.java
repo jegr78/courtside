@@ -214,6 +214,8 @@ public class RetentionRows {
     private static final String INACTIVE_EXTERNAL = """
             u.anonymised_at IS NULL
               AND NOT EXISTS (SELECT 1 FROM member m WHERE m.person_id = u.person_id)
+              AND NOT EXISTS (SELECT 1 FROM credit_entry e WHERE e.account_id = u.id
+                              GROUP BY e.currency HAVING sum(e.amount_minor) <> 0)
               AND NOT EXISTS (SELECT 1 FROM user_account o WHERE o.person_id = u.person_id
                               AND (o.created_at >= :inactiveBefore OR o.last_login_at >= :inactiveBefore
                                    OR NOT EXISTS (SELECT 1 FROM user_account_role r
@@ -221,7 +223,9 @@ public class RetentionRows {
                                    OR EXISTS (SELECT 1 FROM user_account_role r
                                               WHERE r.user_account_id = o.id AND r.role = 'ADMIN')
                                    OR EXISTS (SELECT 1 FROM booking b WHERE b.booked_by = o.id
-                                              AND %s >= :inactiveBefore)))""".formatted(BOOKING_END);
+                                              AND %s >= :inactiveBefore)
+                                   OR EXISTS (SELECT 1 FROM credit_entry e WHERE e.account_id = o.id
+                                              GROUP BY e.currency HAVING sum(e.amount_minor) <> 0)))""".formatted(BOOKING_END);
 
     /** External accounts of people without a membership period that did nothing since the cut-off. */
     public List<UUID> inactiveExternalAccounts(Instant inactiveBefore) {
@@ -284,7 +288,9 @@ public class RetentionRows {
                                                              AND b.pseudonymised_at IS NULL AND %1$s)))) AS named,
                                (EXISTS (SELECT 1 FROM waitlist_participant wp WHERE wp.person_id = p.id)
                                 OR EXISTS (SELECT 1 FROM waitlist_entry we JOIN user_account u ON u.id = we.account_id
-                                           WHERE u.person_id = p.id)) AS waiting
+                                           WHERE u.person_id = p.id)) AS waiting,
+                               EXISTS (SELECT 1 FROM credit_account a JOIN user_account u ON u.id = a.account_id
+                                       WHERE u.person_id = p.id) AS ledger
                         FROM person p WHERE p.id IN (:ids)
                         ORDER BY p.id
                         """.formatted(NOT_COVERED))
@@ -298,6 +304,8 @@ public class RetentionRows {
                         blocks.put(personId, BlockReason.NAMED_IN_BOOKINGS);
                     } else if (rs.getBoolean("waiting")) {
                         blocks.put(personId, BlockReason.ON_A_WAITING_LIST);
+                    } else if (rs.getBoolean("ledger")) {
+                        blocks.put(personId, BlockReason.HOLDS_A_CREDIT_LEDGER);
                     }
                 });
         return blocks;

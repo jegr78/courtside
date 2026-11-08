@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { type Page, type TestInfo } from "@playwright/test";
-import { accessGrantsExample, connectionCheckExample, guestFeesExample, operatorHealthExample } from "./admin-examples";
+import { accessGrantsExample, connectionCheckExample, creditHoldersExample, creditLedgerExample, guestFeesExample, operatorHealthExample } from "./admin-examples";
 import { backAtTheJourneyInstant, expect, expectAdministrationOverview, onTheVisualDay, selectPreference, test } from "./fixtures";
 
 // The guides are read in the light theme on a page column, in the language its project names, and
@@ -300,6 +300,15 @@ const drivers: Record<string, (page: Page, visualDate: string) => Promise<void>>
     await expect(page.getByTestId("guest-fees-row"), "the example, not the live instance, is drawn").toHaveCount(3);
     await expect(page.getByTestId("guest-fees-download")).toBeEnabled();
   },
+  "credit": async (page) => {
+    await page.context().route("**/api/treasury/credit/accounts", (route) => route.fulfill({ json: creditHoldersExample }));
+    await page.context().route("**/api/treasury/credit/accounts/*/entries*", (route) => route.fulfill({ json: creditLedgerExample }));
+    await page.getByTestId("admin-credit-link").click();
+    await expect(page.getByTestId("credit-holder"), "the example, not the live instance, is drawn").toHaveCount(2);
+    await page.getByTestId("credit-holder-open").first().click();
+    await expect(page.getByTestId("credit-entry")).toHaveCount(3);
+    await expect(page.getByTestId("credit-form")).toBeVisible();
+  },
   "retention": async (page) => {
     await page.getByTestId("admin-retention-link").click();
     for (const [category, months] of [["BOOKINGS", "24"], ["FORMER_MEMBERS", "12"]]) {
@@ -509,6 +518,16 @@ test("the guest fees a treasurer settles are captured", async ({ page, journeySe
 
   // when / then
   await capture(page, "guest-fees", journeyService.visualDate);
+});
+
+test("the credit a treasurer keeps for external players is captured", async ({ page, journeyService }, info) => {
+  // given
+  await prepare(page, localeOf(info));
+  await signIn(page, "configuration-admin", "court-plan-view");
+  await page.getByTestId("administration-link").click();
+
+  // when / then
+  await capture(page, "credit", journeyService.visualDate);
 });
 
 test("the periods a board keeps personal records for are captured", async ({ page, journeyService }, info) => {

@@ -1,7 +1,9 @@
-import type { SessionStatus } from "../api/client";
+import { api, type CreditPageOptions, type SessionStatus } from "../api/client";
 import { useLayoutEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { AccountSecurityView } from "./AccountSecurityView";
+import { CreditLedger } from "./CreditLedger";
+import { useCreditLedger } from "./useCreditLedger";
 
 export function AccountView({ session, offline = false, focusSecurity = false, passwordChanged, signedOut }: {
   session: SessionStatus; offline?: boolean; focusSecurity?: boolean;
@@ -10,6 +12,7 @@ export function AccountView({ session, offline = false, focusSecurity = false, p
   const { t } = useTranslation();
   const heading = useRef<HTMLHeadingElement>(null);
   const identified = session.authenticated && !offline && typeof session.username === "string" && session.username.length > 0;
+  const external = identified && session.memberFeatures === false;
   useLayoutEffect(() => {
     if (focusSecurity) return;
     heading.current?.scrollIntoView?.({ block: "start" });
@@ -33,8 +36,23 @@ export function AccountView({ session, offline = false, focusSecurity = false, p
           </ul> : <span data-testid="profile-no-roles">{t("account.noRoles")}</span>}</dd></div>
       </dl> : <p data-testid="profile-unavailable" role="status">{t("account.unavailable")}</p>}
     </section>
+    {identified && <OwnCredit key={session.username} external={external} />}
     <AccountSecurityView key={session.username ?? "unavailable"} embedded focusRequested={focusSecurity}
       passwordChanged={passwordChanged} signedOut={signedOut} mfaEnabled={session.mfaEnabled} username={session.username}
-      closable={identified && session.memberFeatures === false} />
+      closable={external} />
   </div>;
+}
+
+const readOwnCredit = (options: CreditPageOptions) => api.ownCredit(options);
+
+function OwnCredit({ external }: { external: boolean }) {
+  const { t } = useTranslation();
+  const credit = useCreditLedger(readOwnCredit);
+  if (!external && credit.failure === undefined && (credit.page?.items.length ?? 0) === 0) return null;
+  return <section data-testid="account-credit" aria-labelledby="account-credit-title"
+    className="surface-panel grid min-w-0 gap-4 rounded-2xl border p-6 sm:p-8">
+    <h2 id="account-credit-title" className="text-xl font-bold">{t("account.credit.title")}</h2>
+    <p className="text-muted">{t("account.credit.explain")}</p>
+    <CreditLedger ledger={credit} />
+  </section>;
 }

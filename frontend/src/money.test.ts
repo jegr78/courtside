@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatMinor, minorAsDecimal, parseMinor } from "./money";
+import { formatMinor, formatSignedMinor, minorAsDecimal, parseMinor } from "./money";
 
 describe("money", () => {
   it.each([["5", 500], ["5,50", 550], ["5.50", 550], ["0.29", 29], [" 12,5 ", 1250], ["0", 0]])(
@@ -51,5 +51,16 @@ describe("money", () => {
     expect(german).toBe("5,50");
     expect(english).toBe("1234.56");
     expect(parseMinor(german, "EUR")).toBe(550);
+  });
+  it("given a credit and a payout, when they are formatted signed, then each carries its direction and zero carries none", () => {
+    // when
+    const credit = formatSignedMinor(1250, "en", "EUR");
+    const payout = formatSignedMinor(-500, "en", "EUR");
+    const zero = formatSignedMinor(0, "en", "EUR");
+
+    // then
+    expect(credit).toBe("+€12.50");
+    expect(payout).toBe("-€5.00");
+    expect(zero).toBe("€0.00");
   });
 });

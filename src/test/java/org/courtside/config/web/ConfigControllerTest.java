@@ -1,6 +1,10 @@
 package org.courtside.config.web;
 
 import org.courtside.AbstractIntegrationTest;
+import org.courtside.credit.testfixture.CreditTestFixture;
+import org.courtside.identity.Role;
+import org.courtside.identity.testfixture.IdentityTestFixture;
+import org.springframework.context.annotation.Import;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -23,6 +27,8 @@ import java.util.List;
 import java.util.UUID;
 import javax.imageio.ImageIO;
 
+import java.util.Set;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -34,6 +40,7 @@ import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+@Import({IdentityTestFixture.class, CreditTestFixture.class})
 class ConfigControllerTest extends AbstractIntegrationTest {
 
     @Autowired
@@ -41,6 +48,12 @@ class ConfigControllerTest extends AbstractIntegrationTest {
 
     @Autowired
     private JdbcClient jdbc;
+
+    @Autowired
+    private IdentityTestFixture identity;
+
+    @Autowired
+    private CreditTestFixture credit;
 
     private MockMvc mockMvc;
 
@@ -345,6 +358,24 @@ class ConfigControllerTest extends AbstractIntegrationTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.fieldErrors[0].field").value("currency"))
                 .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.Currency"));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAnAccountHoldingCredit_whenTheClubChangesItsCurrency_thenTheChangeWaitsForThePayout() throws Exception {
+        // given
+        UUID person = identity.createPerson("John", "Roe", "john.roe@example.org");
+        credit.credit(identity.createEnabledAccount(person, "roe.john", Set.of(Role.EXTERNAL)), 1500);
+
+        // when / then
+        mockMvc.perform(put("/api/admin/config")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(configJson("Example Tennis Club").replace("\"slotMinutes\": 30,",
+                                "\"slotMinutes\": 30, \"currency\": \"CHF\","))
+                        .with(csrf()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:currency-change-blocked-by-credit"));
+        mockMvc.perform(get("/api/public/config")).andExpect(jsonPath("$.currency").value("EUR"));
     }
 
     @Test

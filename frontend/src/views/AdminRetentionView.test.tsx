@@ -40,9 +40,9 @@ function show(wrapper?: ComponentType<{ children: ReactNode }>) {
   return render(<MemoryRouter><WithClubConfiguration><AdminRetentionView /></WithClubConfiguration></MemoryRouter>, { wrapper });
 }
 
-async function previewed() {
+async function previewed(shown: RetentionPreview = preview) {
   vi.spyOn(api, "retentionPolicies").mockResolvedValue(configured);
-  vi.spyOn(api, "previewRetention").mockResolvedValue(preview);
+  vi.spyOn(api, "previewRetention").mockResolvedValue(shown);
   show();
   await userEvent.click(await screen.findByTestId("retention-preview"));
   await screen.findByTestId("retention-preview-result");
@@ -117,6 +117,15 @@ describe("AdminRetentionView", () => {
     expect(removing).toHaveBeenCalledExactlyOnceWith("FORMER_MEMBERS");
     expect(screen.getByTestId("retention-state-FORMER_MEMBERS")).toHaveAttribute("data-configured", "false");
     expect(screen.queryByTestId("retention-preview-result"), "a preview taken under the old period is not offered").toBeNull();
+  });
+
+  it("given a person whose account holds credit ledger entries, when the preview is shown, then the reason says the entries stay", async () => {
+    // when
+    await previewed({ ...preview, blocked: [{ personId: MARY, reason: "HOLDS_A_CREDIT_LEDGER" }] });
+
+    // then
+    const row = within(screen.getByTestId("retention-blocked")).getByTestId("retention-blocked-row");
+    expect(row).toHaveTextContent("has credit ledger entries that stay");
   });
 
   it("given a preview, when it is shown, then it counts both categories and names each blocked person with the translated reason", async () => {

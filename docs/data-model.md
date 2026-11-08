@@ -308,7 +308,7 @@ name that arrived through a roster import. `user_account.username` is unique; `p
 and the sign-in path answers such a row exactly as it answers a wrong password.
 
 **`user_account.anonymised_at` marks an account that names nobody.** A closed external account keeps
-its `person` and `user_account` rows so bookings still refer to it, but the person's name and email
+its `person` and `user_account` rows so bookings and credit ledger entries still refer to it, but the person's name and email
 and the username are placeholders. `user_account_anonymised_is_disabled` keeps such an account
 disabled and without a password.
 
@@ -426,6 +426,21 @@ A run points at the preview it executed and `import_run_one_per_preview` allows 
 preview a board has read cannot be applied twice. Both carry the file hash, so a run that executed
 a different file than the one previewed is visible after the fact.
 
+## Credit an account holds
+
+| Table | Holds | References |
+|---|---|---|
+| `credit_account` | One row per account that ever had a ledger entry; its row lock serialises every write to that account's balance | `user_account` |
+| `credit_entry` | One change of a balance: kind, signed amount in the minor unit, currency, when it was recorded and by which account, in the order of `position` | `credit_account` |
+| `credit_entry_note` | The reason given for an entry | `credit_entry` |
+
+Entries are appended and never changed: the trigger `credit_entry_append_only` refuses every
+`UPDATE` and `DELETE`. `credit_entry_kind_sign` keeps a `CREDIT` positive and a `PAYOUT` negative, and
+`credit_entry_amount_bounded` holds one entry within 10,000.00. The balance is the sum of an account's
+entries in the club currency and is stored nowhere. The reason sits in its own table because it is
+free text that may name somebody: anonymising the account deletes it and leaves the entry.
+`recorded_by` has no foreign key, so removing the treasurer who recorded an entry leaves the entry.
+
 ## Keeping personal records
 
 | Table | Holds | References |
@@ -484,7 +499,9 @@ fields and never a static code, `card.bookingCard.changed`, `config.club.changed
 which names the access point and the courts its code newly opens, `facility.accessPoint.membersDoorCodeChanged`,
 which names an access point whose code every current member is told, and `card.bookingCard.accessGranted`,
 which names a card that starts granting access, and `access.grant.retryRequested`, which names the
-access grant a board sent again and its booking. A message wording has no row id of its own, so
+access grant a board sent again and its booking. The treasury's credit ledger records
+`credit.entry.recorded`, which names the account, the entry, its kind, amount and currency and never
+the reason. A message wording has no row id of its own, so
 its entries name a subject derived from the message kind and language. The other two arrive in the course of ordinary use, because the writer records every
 event a module publishes rather than a list it keeps: `booking.booking.confirmed` and the
 other entries beginning with `booking.`, and `identity.account.credentialsRequested`, which names the account a

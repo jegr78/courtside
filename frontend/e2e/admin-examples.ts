@@ -54,6 +54,27 @@ export const operationalLogExample = {
   }]
 };
 
+export const creditHoldersExample = [
+  { accountId: "77777777-0000-0000-0000-000000000001", firstName: "Mary", lastName: "Major",
+    email: "mary.major@example.org", balanceMinor: 1500, currency: "EUR" },
+  { accountId: "77777777-0000-0000-0000-000000000002", firstName: "John", lastName: "Roe",
+    email: "john.roe@example.org", balanceMinor: 4000, currency: "EUR" }
+];
+
+export const creditLedgerExample = {
+  balanceMinor: 1500,
+  currency: "EUR",
+  items: [
+    { id: "88888888-0000-0000-0000-000000000003", kind: "PAYOUT", amountMinor: -500, currency: "EUR",
+      balanceAfterMinor: 1500, recordedAt: "2026-05-09T16:20:00Z", note: "Paid back in cash" },
+    { id: "88888888-0000-0000-0000-000000000002", kind: "CREDIT", amountMinor: 1000, currency: "EUR",
+      balanceAfterMinor: 2000, recordedAt: "2026-04-18T10:05:00Z", note: "Cash at the clubhouse" },
+    { id: "88888888-0000-0000-0000-000000000001", kind: "CREDIT", amountMinor: 1000, currency: "EUR",
+      balanceAfterMinor: 1000, recordedAt: "2026-03-02T09:30:00Z", note: "Bank transfer for the spring" }
+  ],
+  nextCursor: null
+};
+
 export const guestFeesExample = {
   from: "2026-01-01",
   to: "2026-12-31",

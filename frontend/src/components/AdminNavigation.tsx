@@ -26,6 +26,7 @@ interface Group {
 const overview: Destination = { to: "/admin", testId: "admin-overview-link", label: "nav.adminOverview" };
 const appointments: Destination = { to: "/admin/appointments", testId: "admin-appointments-link", label: "nav.adminAppointments" };
 const guestFees: Destination = { to: "/admin/guest-fees", testId: "admin-guest-fees-link", label: "nav.adminGuestFees" };
+const credit: Destination = { to: "/admin/credit", testId: "admin-credit-link", label: "nav.adminCredit" };
 
 const groups: Group[] = [
   {
@@ -56,7 +57,8 @@ const groups: Group[] = [
     destinations: [
       { to: "/admin/roster", testId: "admin-roster-link", label: "nav.adminRoster" },
       { to: "/admin/membership-types", testId: "admin-membership-types-link", label: "nav.adminMembershipTypes" },
-      { to: "/admin/import", testId: "admin-import-link", label: "nav.adminImport" }
+      { to: "/admin/import", testId: "admin-import-link", label: "nav.adminImport" },
+      credit
     ]
   },
   {
@@ -83,7 +85,7 @@ function isCurrent(destination: Destination, pathname: string): boolean {
 }
 
 function currentLabel(pathname: string): string | undefined {
-  return [overview, appointments, guestFees, ...groups.flatMap((group) => group.destinations)]
+  return [overview, appointments, guestFees, credit, ...groups.flatMap((group) => group.destinations)]
     .find((destination) => isCurrent(destination, pathname))
     ?.label;
 }
@@ -153,6 +155,7 @@ export function AdminNavigation({ administrator = true, treasurer = false, appoi
       </Link>
       {appointmentsShown && <NavigationLink destination={appointments} pathname={pathname} chosen={() => { if (!laidOpen) setUnfolded(false); }} />}
       {treasurer && !administrator && <NavigationLink destination={guestFees} pathname={pathname} chosen={() => { if (!laidOpen) setUnfolded(false); }} />}
+      {treasurer && !administrator && <NavigationLink destination={credit} pathname={pathname} chosen={() => { if (!laidOpen) setUnfolded(false); }} />}
       {administrator && <NavigationLink destination={overview} pathname={pathname} chosen={() => { if (!laidOpen) setUnfolded(false); }} />}
       {administrator && groups.map((group) => <div key={group.testId} data-testid={group.testId} role="group" aria-labelledby={`${group.testId}-heading`} className="grid gap-2 lg:gap-0.5">
         <p id={`${group.testId}-heading`} className="text-muted text-xs font-bold tracking-wide uppercase">{t(group.heading)}</p>
