@@ -62,6 +62,22 @@ for (const [language, expected] of [
   });
 }
 
+for (const [language, expected] of [
+  ["en", "Your credit of €10.00 does not cover this booking of €19.49."],
+  ["de", "Dein Guthaben von 10,00 € reicht für diese Buchung über 19,49 € nicht."]
+]) {
+  it(`given ${language}, when a booking is refused for short credit, then balance and amount read as money in that language`, async () => {
+    // given
+    await i18n.changeLanguage(language);
+
+    // when
+    const message = violationMessage("booking.payment.creditInsufficient", { amountMinor: 1949, balanceMinor: 1000, currency: "EUR" }, i18n.t);
+
+    // then
+    expect(message.replace(/\s/g, " "), "both sums are formatted, never their minor units").toBe(expected);
+  });
+}
+
 it("given a violation code this client does not carry, when resolving it, then it is told apart from a generic failure", () => {
   // when
   const message = violationMessage("booking.rule.introducedLater", {}, i18n.t);

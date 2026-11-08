@@ -8,7 +8,7 @@ const TYPE_PREFIX = "urn:courtside:error:";
 // A default no bundle carries, so a missing key is told apart from a translation.
 const MISSING = "\u0000missing";
 const clockTimeParams = ["earliestStart", "latestEnd", "opensAt", "closesAt"];
-const moneyParams = ["balanceMinor"];
+const moneyParams = ["balanceMinor", "amountMinor"];
 
 export function isUnauthenticated(failure: unknown): boolean {
   return failure instanceof ApiError && failure.problem?.type === `${TYPE_PREFIX}unauthenticated`;

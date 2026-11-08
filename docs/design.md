@@ -362,11 +362,25 @@ in the club currency. `TREASURER` and `ADMIN` record a `CREDIT`, open only to an
 most 200 characters and after a re-authentication no older than five minutes. A correction is an
 entry in the other direction. Every write locks the account's `credit_account` row `FOR UPDATE` before
 it reads the balance, so two writes against one account run one after the other and a balance never
-goes below zero. `credit.entry.recorded` names the account, the entry, its kind, amount and
-currency, never the reason. The account holder reads its balance and entries, most recent first with
+goes below zero. `credit.entry.recorded` names the account, the entry, its kind, amount, currency
+and booking, never the reason. The account holder reads its balance and entries, most recent first with
 the balance after each, under `/api/my/credit`; the treasury searches external accounts and lists
 every account with a balance under `/api/treasury/credit`. The club currency cannot change while any
-account holds a balance, which `config.currency.creditHeld` reports.
+account holds a balance or any booking with an amount above zero has not ended yet, which
+`config.currency.creditHeld` reports.
+
+A booking with an amount above zero is paid from the booker's credit in the transaction that writes
+it. After the overlap and the rules have passed, `BookingWriter` hands the amount to
+`credit.BookingPayments`, which locks the account like every other ledger write and appends a
+`BOOKING_DEBIT` naming the booking. When the balance falls short, the booking is refused with the
+violation `booking.payment.creditInsufficient`, carrying amount, balance and currency, and nothing is
+written. A booking that costs nothing writes no entry. Cancelling a paid booking appends a
+`BOOKING_REFUND` of the debited amount in the same transaction. The booker can cancel only before the
+cancellation deadline of their rule set, so a refund after the deadline happens only when somebody
+else, the club, cancels the booking. A booking released because nobody turned up is not refunded.
+A unique index allows one debit and one refund per booking. The treasury cannot record either kind
+by hand. The confirmation mail names the amount and that it was paid from credit, and the club's
+cancellation mail tells the booker that the amount is back on their credit.
 
 The guest fee report under `/api/treasury` lists, for `TREASURER` and `ADMIN`, each member's charged
 guest places and their sum for a period, by default the current calendar year in the club time

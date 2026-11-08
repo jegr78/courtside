@@ -262,6 +262,23 @@ it("given an account with credit entries, when the account opens and more are re
   expect(within(section).queryByTestId("credit-more"), "the last page offers nothing further").not.toBeInTheDocument();
 });
 
+it("given a booking paid from credit and refunded after cancellation, when the account opens, then each entry names what happened", async () => {
+  // given
+  vi.spyOn(api, "ownCredit").mockResolvedValue({ balanceMinor: 1949, currency: "EUR", nextCursor: null, items: [
+    creditEntry("00000000-0000-0000-0000-00000000000e", "BOOKING_REFUND", 1949, 1949, null),
+    creditEntry("00000000-0000-0000-0000-00000000000d", "BOOKING_DEBIT", -1949, 0, null)
+  ] });
+
+  // when
+  render(<WithClubConfiguration><AccountView session={{ ...profile, memberFeatures: false }} {...actions} /></WithClubConfiguration>);
+
+  // then
+  const section = await screen.findByTestId("account-credit");
+  const [refund, debit] = await within(section).findAllByTestId("credit-entry");
+  expect(within(refund).getByTestId("credit-entry-kind")).toHaveTextContent("Refund after cancellation");
+  expect(within(debit).getByTestId("credit-entry-kind")).toHaveTextContent("Booking paid");
+});
+
 it("given a member without credit entries, when the account opens, then no credit section is shown", async () => {
   // given
   const read = vi.spyOn(api, "ownCredit");

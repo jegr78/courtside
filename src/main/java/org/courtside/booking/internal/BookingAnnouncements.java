@@ -190,7 +190,12 @@ class BookingAnnouncements implements BookingAnnouncer {
                 allocations.stream().map(allocation -> courtOf.apply(allocation.getCourtId())).toList(),
                 cardLabelOf.apply(booking.getCardId()),
                 booking.getStatus() == BookingStatus.CANCELLED,
-                access, dynamicAccess));
+                access, dynamicAccess,
+                booking.amount().filter(amount -> amount.minor() > 0)
+                        .map(amount -> new BookingAnnouncement.AnnouncedPayment(amount.minor(),
+                                amount.currency().getCurrencyCode(),
+                                BookingAnnouncement.AnnouncedPayment.PaymentMethod.CREDIT))
+                        .orElse(null)));
     }
 
     private static BookingAnnouncement.AnnouncedCourt announcedCourt(Court court) {

@@ -1256,6 +1256,10 @@
         "level": "operational",
         "lifecycle": "credit-ledger"
       },
+      "booking_id": {
+        "level": "operational",
+        "lifecycle": "credit-ledger"
+      },
       "currency": {
         "level": "operational",
         "lifecycle": "credit-ledger"

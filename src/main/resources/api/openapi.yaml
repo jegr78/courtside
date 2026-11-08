@@ -4034,7 +4034,15 @@ components:
       type: string
       description: |
         `CREDIT`: the treasurer credited the account, for example after a cash payment. `PAYOUT`:
-        the treasurer paid out part of the balance.
+        the treasurer paid out part of the balance. `BOOKING_DEBIT`: a booking was paid from the
+        balance. `BOOKING_REFUND`: a cancelled booking returned its payment to the balance.
+      enum: [CREDIT, PAYOUT, BOOKING_DEBIT, BOOKING_REFUND]
+
+    CreditEntryRequestKind:
+      type: string
+      description: |
+        The entries a treasurer records by hand. Booking payments and refunds are written by the
+        booking itself.
       enum: [CREDIT, PAYOUT]
 
     CreditEntry:
@@ -4057,6 +4065,10 @@ components:
           type: [string, "null"]
           maxLength: 200
           description: The reason the treasurer gave. Removed once the account is anonymised.
+        bookingId:
+          type: [string, "null"]
+          format: uuid
+          description: The booking a `BOOKING_DEBIT` or `BOOKING_REFUND` belongs to.
 
     CreditLedgerPage:
       type: object
@@ -4105,7 +4117,7 @@ components:
       additionalProperties: false
       required: [kind, amountMinor, note]
       properties:
-        kind: { $ref: "#/components/schemas/CreditEntryKind" }
+        kind: { $ref: "#/components/schemas/CreditEntryRequestKind" }
         amountMinor:
           type: integer
           minimum: 1

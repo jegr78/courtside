@@ -23,6 +23,7 @@ import org.courtside.config.WaitlistOfferWindow;
 import org.courtside.config.BookingGridCoordination;
 import org.courtside.config.ClubCurrency;
 import org.courtside.shared.HeldCredit;
+import org.courtside.shared.UpcomingBookings;
 import org.courtside.config.ExternalBookings;
 import org.courtside.config.ClubTimeZone;
 import org.courtside.config.ConfigEvent;
@@ -59,6 +60,7 @@ public class ConfigService implements BookingGridSettings, BookingGridCoordinati
     private final List<BookingGridConstraint> bookingGridConstraints;
     private final ApplicationEventPublisher events;
     private final HeldCredit heldCredit;
+    private final UpcomingBookings upcomingBookings;
 
     public ClubConfigurationSnapshot current() {
         return ClubConfigurationSnapshot.from(currentEntity());
@@ -164,7 +166,7 @@ public class ConfigService implements BookingGridSettings, BookingGridCoordinati
         ClubConfiguration configuration = currentEntity();
         Changes changes = changesBetween(configuration, command);
         refuseAConflictingGrid(command, zoneId, changes);
-        if (changes.fields().contains("currency") && heldCredit.heldByAnyone()) {
+        if (changes.fields().contains("currency") && moneyIsHeld()) {
             throw new CurrencyChangeBlockedByCreditException();
         }
         requireAnAvailableRuleSet(configuration, command.noMembershipTypeRuleSetId());
@@ -368,5 +370,9 @@ public class ConfigService implements BookingGridSettings, BookingGridCoordinati
                 .map(question)
                 .flatMap(Optional::stream)
                 .findFirst();
+    }
+
+    private boolean moneyIsHeld() {
+        return heldCredit.heldByAnyone() || upcomingBookings.chargedToAnyone();
     }
 }

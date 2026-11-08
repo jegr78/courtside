@@ -119,6 +119,7 @@ export type GuestFeeMember = components["schemas"]["GuestFeeMember"];
 export type CreditEntry = components["schemas"]["CreditEntry"];
 export type CreditEntryKind = components["schemas"]["CreditEntryKind"];
 export type CreditEntryRequest = components["schemas"]["CreditEntryRequest"];
+export type CreditEntryRequestKind = components["schemas"]["CreditEntryRequestKind"];
 export type CreditHolder = components["schemas"]["CreditHolder"];
 export type CreditLedgerPage = components["schemas"]["CreditLedgerPage"];
 export type RetentionCategory = components["schemas"]["RetentionCategory"];

@@ -426,11 +426,11 @@ A credit reaches only an account holding EXTERNAL that is not anonymised, a payo
 
 Attributes: `role`, `target-account`.
 
-Production: `src/main/java/org/courtside/credit/internal/CreditLedger.java#append`.
+Production: `src/main/java/org/courtside/credit/internal/CreditLedger.java#append`, `src/main/java/org/courtside/credit/internal/CreditLedger.java#insert`.
 
 Positive tests: `src/test/java/org/courtside/credit/CreditLedgerTest.java#givenABalanceCoveringOnlyOnePayout_whenASecondStartsBeforeTheFirstCommits_thenExactlyOneSucceeds`.
 
-Negative tests: `src/test/java/org/courtside/credit/CreditLedgerTest.java#givenABalance_whenThePayoutExceedsIt_thenItIsRefusedAndNothingIsWritten`, `src/test/java/org/courtside/credit/CreditLedgerTest.java#givenAMemberAccount_whenTheTreasurerCreditsIt_thenOnlyAnExternalAccountReceivesCredit`, `src/test/java/org/courtside/credit/CreditLedgerTest.java#givenALedgerEntry_whenItIsChangedOrRemoved_thenTheDatabaseRefuses`.
+Negative tests: `src/test/java/org/courtside/credit/CreditLedgerTest.java#givenABalance_whenThePayoutExceedsIt_thenItIsRefusedAndNothingIsWritten`, `src/test/java/org/courtside/credit/CreditLedgerTest.java#givenAMemberAccount_whenTheTreasurerCreditsIt_thenOnlyAnExternalAccountReceivesCredit`, `src/test/java/org/courtside/credit/CreditLedgerTest.java#givenALedgerEntry_whenItIsChangedOrRemoved_thenTheDatabaseRefuses`, `src/test/java/org/courtside/credit/CreditLedgerTest.java#givenATreasurer_whenTheyRecordABookingRefundByHand_thenTheRequestIsRefused`.
 
 ### Password-first pending MFA login
 

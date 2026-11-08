@@ -8,12 +8,15 @@ import org.courtside.shared.CancellationReason;
 import org.courtside.shared.IssuedAccessCodes;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
+import java.text.NumberFormat;
 import java.time.Instant;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.FormatStyle;
 import java.time.format.TextStyle;
 import java.util.ArrayList;
+import java.util.Currency;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -43,7 +46,29 @@ class BookingWording {
                 "to", time(booking.endsAt()),
                 "courts", courts(booking, locale),
                 "card", booking.cardLabel(),
+                "payment", payment(booking, locale),
                 ACCESS_CODES, "");
+    }
+
+    String refund(BookingAnnouncement booking, UserAccount recipient, Locale locale) {
+        BookingAnnouncement.AnnouncedPayment paid = booking.payment();
+        if (paid == null || !recipient.getId().equals(booking.bookedByAccountId())) {
+            return "";
+        }
+        return "\n\n" + templates.render("booking.payment.refunded", locale, Map.of("amount", money(paid, locale)));
+    }
+
+    private String payment(BookingAnnouncement booking, Locale locale) {
+        BookingAnnouncement.AnnouncedPayment paid = booking.payment();
+        return paid == null ? ""
+                : "\n" + templates.render("booking.payment.credit", locale, Map.of("amount", money(paid, locale)));
+    }
+
+    private static String money(BookingAnnouncement.AnnouncedPayment paid, Locale locale) {
+        Currency currency = Currency.getInstance(paid.currency());
+        NumberFormat format = NumberFormat.getCurrencyInstance(locale);
+        format.setCurrency(currency);
+        return format.format(BigDecimal.valueOf(paid.amountMinor(), currency.getDefaultFractionDigits()));
     }
 
     record AccessLines(String text, boolean codeFollows) {

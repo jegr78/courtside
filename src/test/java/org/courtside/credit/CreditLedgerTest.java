@@ -146,6 +146,16 @@ class CreditLedgerTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenATreasurer_whenTheyRecordABookingRefundByHand_thenTheRequestIsRefused() throws Exception {
+        // when / then
+        record("miles.richard", johnAccount, "BOOKING_REFUND", 1000, "Refund", true)
+                .andExpect(status().isBadRequest());
+        assertThat(entries(johnAccount)).as("only a booking writes its own payment and refund").isZero();
+        assertThatThrownBy(() -> ledger.append(johnAccount, CreditEntryKind.BOOKING_REFUND, 1000, "Refund"))
+                .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
     void givenAnExternalPlayer_whenTheyCreditThemselves_thenTheTreasuryIsClosedToThem() throws Exception {
         // when / then
         record("roe.john", johnAccount, "CREDIT", 1000, "Free money", true).andExpect(status().isForbidden());

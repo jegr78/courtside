@@ -100,6 +100,23 @@ it("given an opened account, when a credit is recorded, then the amount goes out
   expect(screen.getByTestId("credit-form-amount"), "a recorded entry leaves an empty form").toHaveValue("");
 });
 
+it("given an account whose bookings were paid from credit, when the treasurer opens it, then the form offers only the entries a treasurer records", async () => {
+  // given
+  vi.spyOn(api, "creditHolders").mockResolvedValue([holder]);
+  vi.spyOn(api, "creditEntries").mockResolvedValue({ ...ledger, items: [
+    { ...credited, id: "88888888-0000-0000-0000-000000000003", kind: "BOOKING_DEBIT", amountMinor: -1500, balanceAfterMinor: 0, note: null, bookingId: "99999999-0000-0000-0000-000000000001" }
+  ] });
+
+  // when
+  show();
+  const account = await openJane();
+
+  // then
+  expect(await within(account).findByTestId("credit-entry-kind")).toHaveTextContent("Booking paid");
+  const offered = within(screen.getByTestId("credit-form-kind")).getAllByRole("option").map((option) => option.getAttribute("value"));
+  expect(offered, "booking payments and refunds are written by the booking itself").toEqual(["CREDIT", "PAYOUT"]);
+});
+
 it("given a payout above the balance, when it is recorded, then the refusal names the balance", async () => {
   // given
   vi.spyOn(api, "creditHolders").mockResolvedValue([holder]);

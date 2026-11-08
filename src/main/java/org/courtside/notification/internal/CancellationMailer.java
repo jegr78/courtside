@@ -63,6 +63,7 @@ class CancellationMailer implements MessageComposer {
         values.put("firstName", account.getPerson().getFirstName());
         values.put(InstanceLinks.PLACEHOLDER, links.of(message));
         values.put("reason", wording.reason(message.reason(), locale));
+        values.put("refund", wording.refund(booking, account, locale));
         String key = message.kind().templateKey();
         handOver.accept(new OutgoingMail(account.getPerson().getEmail(),
                 templates.render(key + ".subject", locale, values),

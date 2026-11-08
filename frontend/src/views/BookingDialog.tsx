@@ -136,6 +136,18 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
     };
   }, [memberFeatures, memberQuery, report, selectedMembers]);
 
+  const chosenCard = bookingCards.find((card) => card.id === cardId);
+  const pricedForOutsider = !waitlist && !memberFeatures && Boolean(currency) && (chosenCard?.externalPriceMinor ?? 0) > 0;
+  const [credit, setCredit] = useState<{ balanceMinor: number; currency: string }>();
+  useEffect(() => {
+    if (!pricedForOutsider) return;
+    let active = true;
+    void api.ownCredit({ limit: 1 }).then(({ balanceMinor, currency: creditCurrency }) => {
+      if (active) setCredit({ balanceMinor, currency: creditCurrency });
+    }).catch((failure: unknown) => warnAbout("Credit balance read for the booking dialog failed", failure));
+    return () => { active = false; };
+  }, [pricedForOutsider]);
+
   async function submit(event: FormEvent) {
     event.preventDefault();
     setSubmitting(true);
@@ -209,16 +221,17 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
     [waitlist, selection.date, selection.slot, grid.timeZone, selectedDuration]);
   const guestCount = guestNames.filter((name) => name.trim()).length;
   const chosenPlayers = 1 + selectedMembers.length + guestCount + participantCardIds.filter(Boolean).length;
-  const chosenCard = bookingCards.find((card) => card.id === cardId);
   const requiredPlayers = requiredFor(chosenCard, chosenPlayers);
   const guestFee = !waitlist && currency && chosenCard && chosenCard.guestFeeMinor > 0 && guestCount > 0 ? {
     count: guestCount,
     fee: formatMinor(chosenCard.guestFeeMinor, i18n.language, currency),
     total: formatMinor(chosenCard.guestFeeMinor * guestCount, i18n.language, currency)
   } : undefined;
-  const externalAmount = !waitlist && !memberFeatures && currency && chosenCard && chosenCard.externalPriceMinor > 0
-    ? formatMinor(Math.round(chosenCard.externalPriceMinor * courtIds.length * selectedDuration / 60), i18n.language, currency)
-    : undefined;
+  const externalAmountMinor = pricedForOutsider && chosenCard
+    ? Math.round(chosenCard.externalPriceMinor * courtIds.length * selectedDuration / 60) : undefined;
+  const externalAmount = externalAmountMinor !== undefined && currency
+    ? formatMinor(externalAmountMinor, i18n.language, currency) : undefined;
+  const creditShort = externalAmountMinor !== undefined && credit !== undefined && credit.balanceMinor < externalAmountMinor;
 
   return <Modal labelledBy="booking-heading" closed={closed} width="xl" composed testId="booking-dialog">
     <form onSubmit={(event) => void submit(event)} className="flex min-h-0 flex-col">
@@ -353,6 +366,10 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
       <div aria-live="polite">
         {guestFee && <p data-testid="booking-guest-fee" className="mt-4 font-semibold">{t("booking.guestFee", guestFee)}</p>}
         {externalAmount && <p data-testid="booking-amount" className="mt-4 font-semibold">{t("booking.amount", { amount: externalAmount })}</p>}
+        {externalAmount && credit && <p data-testid="booking-balance" className="mt-1">
+          {t("booking.balance", { balance: formatMinor(credit.balanceMinor, i18n.language, credit.currency) })}
+        </p>}
+        {externalAmount && creditShort && <p data-testid="booking-credit-short" className="text-muted mt-1">{t("booking.creditShort")}</p>}
       </div>
       </DialogBody>
       {/* Outside the scrolling form, so a refusal shows beside the button that caused it. */}
@@ -449,6 +466,7 @@ function violationField(code: string): string {
   if (MEMBER_CODES.includes(code)) return "members";
   if (code.startsWith("booking.participants.")) return "participants";
   if (code === "booking.rule.maxOpenBookings.exceeded") return "cardId";
+  if (code === "booking.payment.creditInsufficient") return "general";
   return "startsAt";
 }
 
