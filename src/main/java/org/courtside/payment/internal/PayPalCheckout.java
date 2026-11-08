@@ -204,6 +204,8 @@ public class PayPalCheckout {
             if (paysTheBooking) {
                 ConfirmOutcome outcome = pendingPayments.confirm(locked.bookingId());
                 if (outcome == ConfirmOutcome.ALREADY_CONFIRMED) {
+                    log.error("PayPal order {} with capture {} found its booking confirmed without it",
+                            locked.orderId(), capture.id());
                     throw new IllegalStateException("Booking " + locked.bookingId()
                             + " was confirmed without its PayPal order " + locked.orderId());
                 }

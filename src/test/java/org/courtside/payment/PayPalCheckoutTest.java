@@ -18,9 +18,12 @@ import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -58,6 +61,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -66,6 +70,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+@ExtendWith(OutputCaptureExtension.class)
 @TestPropertySource(properties = {"courtside.public-url=https://courts.example.org",
         "courtside.payment.paypal.request-timeout=3s"})
 @Import({FacilityTestFixture.class, IdentityTestFixture.class, CardTestFixture.class, ConfigTestFixture.class,
@@ -430,6 +435,25 @@ class PayPalCheckoutTest extends AbstractIntegrationTest {
         assertThat(orderStatus()).as("the captured order stays on record for the treasurer").isEqualTo("LATE_CAPTURED");
         assertThat(audit("payment.paypal.lateCapture", booking)).singleElement()
                 .satisfies(payload -> assertThat(payload.get("credited").asBoolean()).isFalse());
+    }
+
+    @Test
+    void givenABookingConfirmedWithoutItsOrder_whenTheCaptureArrives_thenTheIdsAreLoggedAndNothingIsRecorded(
+            CapturedOutput output) throws Exception {
+        // given
+        UUID booking = bookWithOrder();
+        jdbc.sql("UPDATE booking SET status = 'CONFIRMED' WHERE id = :id").param("id", booking).update();
+        jdbc.sql("UPDATE court_allocation SET status = 'CONFIRMED' WHERE booking_id = :id").param("id", booking)
+                .update();
+        PAYPAL.reply(READ, 200, order("APPROVED", booking, "15.00", null));
+        PAYPAL.reply(CAPTURE, 201, order("COMPLETED", booking, "15.00", capture("COMPLETED", "15.00")));
+
+        // when / then
+        assertThatThrownBy(() -> checkout.settle(ORDER)).isInstanceOf(IllegalStateException.class);
+        assertThat(output.getOut()).as("the treasurer can find the captured money by its ids")
+                .contains("PayPal order " + ORDER).contains("capture CAPTURE1");
+        assertThat(orderStatus()).isEqualTo("CREATED");
+        assertThat(entries(booking)).isEmpty();
     }
 
     @Test
