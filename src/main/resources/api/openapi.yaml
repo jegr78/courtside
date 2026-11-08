@@ -9030,9 +9030,13 @@ paths:
       operationId: cancelPayPalOrder
       summary: Give up the signed-in account's unpaid PayPal order and free its court.
       description: |
-        Ends the hold on the booking at once and voids the order, which is never captured
-        afterwards. An order that is already settled or cancelled stays as it is. An order of
-        another account is answered `urn:courtside:error:paypal-order-not-found`.
+        Courtside reads the order at PayPal first. When PayPal shows no money taken, the order is
+        voided, never captured afterwards, and the hold on the booking ends at once: `REJECTED`.
+        When PayPal shows a capture, it is recorded as a return would record it: `CONFIRMED` or
+        `LATE_CREDITED`. When PayPal cannot be read or its state is unclear, the order stays open
+        and the court stays held: `PROCESSING`. An order that is already settled or cancelled
+        is answered from what is stored. An order of another account is answered
+        `urn:courtside:error:paypal-order-not-found`.
       security:
         - sessionCookie: []
           csrfToken: []
@@ -9044,8 +9048,11 @@ paths:
             type: string
             pattern: "^[A-Za-z0-9_-]{1,64}$"
       responses:
-        "204":
-          description: The order is no longer open.
+        "200":
+          description: What became of the order and its booking.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PayPalCapture" }
         "400":
           $ref: "#/components/responses/Invalid"
         "401":

@@ -593,18 +593,88 @@ class PayPalCheckoutTest extends AbstractIntegrationTest {
     void givenAnAbandonedPayment_whenCancelled_thenTheCourtIsFreeAtOnce() throws Exception {
         // given
         UUID booking = bookWithOrder();
+        PAYPAL.reply(READ, 200, order("PAYER_ACTION_REQUIRED", booking, "15.00", null));
 
         // when
-        cancel("roe.john").andExpect(status().isNoContent());
+        cancel("roe.john").andExpect(status().isOk()).andExpect(jsonPath("$.outcome").value("REJECTED"));
 
         // then
         assertThat(bookingStatus(booking)).isEqualTo("CANCELLED");
+        assertThat(cancellationReason(booking)).isEqualTo("PAYMENT_EXPIRED");
         assertThat(allocationStatus(booking)).isEqualTo("CANCELLED");
         assertThat(orderStatus()).isEqualTo("VOIDED");
-        cancel("roe.john").andExpect(status().isNoContent());
+        int reads = PAYPAL.seen(READ).size();
+        cancel("roe.john").andExpect(status().isOk()).andExpect(jsonPath("$.outcome").value("REJECTED"));
         assertThat(audit("booking.payment.expired", booking)).as("a second cancel changes nothing").hasSize(1);
         capture("roe.john").andExpect(jsonPath("$.outcome").value("REJECTED"));
-        assertThat(PAYPAL.seen(READ)).as("a voided order is never captured").isEmpty();
+        assertThat(PAYPAL.seen(READ)).as("a voided order is never read or captured again").hasSize(reads);
+        assertThat(PAYPAL.seen(CAPTURE)).isEmpty();
+    }
+
+    @Test
+    void givenAnApprovedOrderWithoutCapture_whenCancelled_thenItIsVoidedAndTheCourtIsFree() throws Exception {
+        // given
+        UUID booking = bookWithOrder();
+        PAYPAL.reply(READ, 200, order("APPROVED", booking, "15.00", null));
+
+        // when
+        cancel("roe.john").andExpect(status().isOk()).andExpect(jsonPath("$.outcome").value("REJECTED"));
+
+        // then
+        assertThat(orderStatus()).isEqualTo("VOIDED");
+        assertThat(bookingStatus(booking)).isEqualTo("CANCELLED");
+        assertThat(allocationStatus(booking)).isEqualTo("CANCELLED");
+        assertThat(entries(booking)).isEmpty();
+    }
+
+    @Test
+    void givenACaptureTimeoutAndPayPalShowingTheCapture_whenCancelled_thenTheBookingIsConfirmedNotVoided()
+            throws Exception {
+        // given
+        UUID booking = bookWithOrder();
+        timeOutTheCapture(booking);
+        PAYPAL.replaceReply(READ, 200, order("COMPLETED", booking, "15.00", capture("COMPLETED", "15.00")));
+
+        // when
+        cancel("roe.john").andExpect(status().isOk()).andExpect(jsonPath("$.outcome").value("CONFIRMED"));
+
+        // then
+        assertThat(orderStatus()).as("money PayPal took is never voided").isEqualTo("CAPTURED");
+        assertThat(bookingStatus(booking)).isEqualTo("CONFIRMED");
+        assertThat(entries(booking)).containsExactlyInAnyOrder(Map.of("kind", "PAYPAL_PAYMENT", "amount_minor", 1500),
+                Map.of("kind", "BOOKING_DEBIT", "amount_minor", -1500));
+    }
+
+    @Test
+    void givenACaptureTimeoutAndACompletedOrderWithoutCapture_whenCancelled_thenTheCourtStaysHeld()
+            throws Exception {
+        // given
+        UUID booking = bookWithOrder();
+        timeOutTheCapture(booking);
+        PAYPAL.replaceReply(READ, 200, order("COMPLETED", booking, "15.00", null));
+
+        // when
+        cancel("roe.john").andExpect(status().isOk()).andExpect(jsonPath("$.outcome").value("PROCESSING"));
+
+        // then
+        assertThat(orderStatus()).isEqualTo("CREATED");
+        assertThat(bookingStatus(booking)).isEqualTo("PENDING_PAYMENT");
+        assertThat(entries(booking)).isEmpty();
+    }
+
+    @Test
+    void givenAnUnreadableOrder_whenCancelled_thenTheCourtStaysHeld() throws Exception {
+        // given
+        UUID booking = bookWithOrder();
+        PAYPAL.reply(READ, 503, "{}");
+
+        // when
+        cancel("roe.john").andExpect(status().isOk()).andExpect(jsonPath("$.outcome").value("PROCESSING"));
+
+        // then
+        assertThat(orderStatus()).as("an unknown state is never voided").isEqualTo("CREATED");
+        assertThat(bookingStatus(booking)).isEqualTo("PENDING_PAYMENT");
+        assertThat(entries(booking)).isEmpty();
     }
 
     @Test
@@ -616,7 +686,7 @@ class PayPalCheckoutTest extends AbstractIntegrationTest {
         capture("roe.john").andExpect(jsonPath("$.outcome").value("CONFIRMED"));
 
         // when
-        cancel("roe.john").andExpect(status().isNoContent());
+        cancel("roe.john").andExpect(status().isOk()).andExpect(jsonPath("$.outcome").value("CONFIRMED"));
 
         // then
         assertThat(bookingStatus(booking)).isEqualTo("CONFIRMED");
@@ -647,6 +717,13 @@ class PayPalCheckoutTest extends AbstractIntegrationTest {
         PAYPAL.reply(CREATE, 201, order("PAYER_ACTION_REQUIRED", booking, "15.00", null));
         create("roe.john", booking).andExpect(status().isOk());
         return booking;
+    }
+
+    private void timeOutTheCapture(UUID booking) throws Exception {
+        PAYPAL.reply(READ, 200, order("APPROVED", booking, "15.00", null));
+        PAYPAL.replyAfter(CAPTURE, 201, order("COMPLETED", booking, "15.00", capture("COMPLETED", "15.00")),
+                Duration.ofSeconds(5));
+        capture("roe.john").andExpect(jsonPath("$.outcome").value("PROCESSING"));
     }
 
     private ResultActions create(String username, UUID booking) throws Exception {
@@ -827,6 +904,11 @@ class PayPalCheckoutTest extends AbstractIntegrationTest {
 
         void reply(String route, int status, String body) {
             replyAfter(route, status, body, Duration.ZERO);
+        }
+
+        void replaceReply(String route, int status, String body) {
+            replies.remove(route);
+            reply(route, status, body);
         }
 
         void replyAfter(String route, int status, String body, Duration delay) {

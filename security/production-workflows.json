@@ -959,7 +959,7 @@
         "The booker of a pending booking creates one PayPal order carrying the booking id and the amount stored with the booking, and one audit entry.",
         "A capture verifies the order at PayPal, captures it outside any transaction and then, under the order row lock, confirms the booking and records the PayPal payment and the booking debit once.",
         "A capture that finds the booking no longer pending, or a captured amount that differs, releases the booking and credits the captured amount to the booker.",
-        "Cancelling an unpaid order voids it and releases its booking at once."
+        "Cancelling an order reads it at PayPal first; without money taken it is voided and its booking released at once, a capture is recorded as on return, and an unclear state leaves the order open."
       ],
       "alternatePaths": [
         "Creating again for the same booking answers the stored order.",

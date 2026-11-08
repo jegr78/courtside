@@ -30,14 +30,16 @@ class PayPalCheckoutController implements PaymentCheckoutApi {
 
     @Override
     public ResponseEntity<ApiPayPalCapture> capturePayPalOrder(String orderId) {
-        PayPalCheckout.Settlement settlement = checkout.capture(orderId);
-        return ResponseEntity.ok(new ApiPayPalCapture(settlement.bookingId(),
-                ApiPayPalCaptureOutcome.fromValue(settlement.outcome().name())));
+        return ResponseEntity.ok(capture(checkout.capture(orderId)));
     }
 
     @Override
-    public ResponseEntity<Void> cancelPayPalOrder(String orderId) {
-        checkout.cancel(orderId);
-        return ResponseEntity.noContent().build();
+    public ResponseEntity<ApiPayPalCapture> cancelPayPalOrder(String orderId) {
+        return ResponseEntity.ok(capture(checkout.cancel(orderId)));
+    }
+
+    private static ApiPayPalCapture capture(PayPalCheckout.Settlement settlement) {
+        return new ApiPayPalCapture(settlement.bookingId(),
+                ApiPayPalCaptureOutcome.fromValue(settlement.outcome().name()));
     }
 }

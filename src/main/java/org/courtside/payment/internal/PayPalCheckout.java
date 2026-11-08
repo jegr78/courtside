@@ -97,15 +97,37 @@ public class PayPalCheckout {
         return settle(orders.find(orderId).orElseThrow(PayPalOrderNotFoundException::new));
     }
 
-    /** Ends the signed-in booker's unpaid order and frees its court; a settled order stays as it is. */
-    public void cancel(String orderId) {
-        owned(orderId);
-        transactions.executeWithoutResult(status -> orders.lock(orderId)
-                .filter(order -> order.status() == Status.CREATED)
-                .ifPresent(order -> {
-                    orders.mark(orderId, Status.VOIDED, null);
-                    pendingPayments.release(order.bookingId());
-                }));
+    /** Ends the signed-in booker's order when PayPal shows no money taken; otherwise it is settled or left open. */
+    public Settlement cancel(String orderId) {
+        StoredOrder stored = owned(orderId);
+        requireNoTransaction();
+        Optional<Settlement> settled = settled(stored);
+        if (settled.isPresent()) return settled.get();
+        Optional<PayPalClient.Credentials> credentials = settings.activeCredentials()
+                .filter(active -> active.environment() == stored.environment());
+        if (credentials.isEmpty()) return processing(stored);
+        PayPalClient.Order order;
+        try {
+            order = client.getOrder(credentials.get(), stored.orderId());
+        } catch (PayPalUnavailableException | PayPalRefusedException failed) {
+            log.warn("PayPal order {} of booking {} could not be read before its cancel: {}", stored.orderId(),
+                    stored.bookingId(), failed.getMessage());
+            return processing(stored);
+        }
+        if (order.capture().isPresent()) {
+            return settle(stored, order.capture().get(), mismatch(stored, order).isEmpty());
+        }
+        return UNCAPTURED.contains(order.status()) ? voided(stored) : processing(stored);
+    }
+
+    private Settlement voided(StoredOrder stored) {
+        return transactions.execute(status -> {
+            StoredOrder locked = lock(stored);
+            if (locked.status() != Status.CREATED) return settled(locked).orElseThrow();
+            orders.mark(locked.orderId(), Status.VOIDED, null);
+            pendingPayments.release(locked.bookingId());
+            return new Settlement(locked.bookingId(), Outcome.REJECTED);
+        });
     }
 
     private Settlement settle(StoredOrder stored) {
