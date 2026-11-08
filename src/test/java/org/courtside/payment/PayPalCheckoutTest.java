@@ -251,6 +251,24 @@ class PayPalCheckoutTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenAnOrderVoidedWhileTheReturnReads_whenItWouldCapture_thenPayPalIsNotAskedToCapture() throws Exception {
+        // given
+        UUID booking = bookWithOrder();
+        PAYPAL.reply(READ, 200, order("APPROVED", booking, "15.00", null));
+        PAYPAL.onNext(READ, () -> jdbc.sql("UPDATE paypal_order SET status = 'VOIDED'").update());
+
+        // when
+        capture("roe.john").andExpect(status().isOk()).andExpect(jsonPath("$.outcome").value("REJECTED"));
+
+        // then
+        assertThat(PAYPAL.seen(CAPTURE)).as("a voided order is never captured").isEmpty();
+        assertThat(orderStatus()).isEqualTo("VOIDED");
+        assertThat(jdbc.sql("SELECT capture_attempted_at IS NULL FROM paypal_order").query(Boolean.class).single())
+                .as("no attempt is stamped on a voided order").isTrue();
+        assertThat(entries(booking)).isEmpty();
+    }
+
+    @Test
     void givenTwoConcurrentReturns_whenBothCapture_thenOneConfirmationAndOnePayPalPayment() throws Exception {
         // given
         UUID booking = bookWithOrder();

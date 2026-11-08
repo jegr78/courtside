@@ -37,6 +37,7 @@ final class FakePayPal {
     private final Map<String, Deque<Reply>> replies = new ConcurrentHashMap<>();
     private final Map<String, CountDownLatch> held = new ConcurrentHashMap<>();
     private final Map<String, CountDownLatch> firstHeld = new ConcurrentHashMap<>();
+    private final Map<String, Runnable> hooks = new ConcurrentHashMap<>();
     private final HttpServer server;
 
     FakePayPal() {
@@ -53,6 +54,8 @@ final class FakePayPal {
             seen.add(new Seen(route, headers,
                     new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8)));
             Reply reply = next(route);
+            Runnable hook = hooks.remove(route);
+            if (hook != null) hook.run();
             CountDownLatch first = firstHeld.remove(route);
             if (first != null) await(first);
             CountDownLatch together = held.get(route);
@@ -92,6 +95,12 @@ final class FakePayPal {
         replies.clear();
         held.clear();
         firstHeld.clear();
+        hooks.clear();
+    }
+
+    /** Runs the action once while the next request for the route is being answered. */
+    void onNext(String route, Runnable action) {
+        hooks.put(route, action);
     }
 
     CountDownLatch holdFirst(String route) {

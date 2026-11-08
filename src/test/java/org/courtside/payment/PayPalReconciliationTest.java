@@ -236,6 +236,24 @@ class PayPalReconciliationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenACaptureStartingWhileTheJobReads_whenTheJobVoids_thenTheOrderStaysOpenWithItsCourt() throws Exception {
+        // given
+        UUID booking = bookWithOrder();
+        age(Duration.ofMinutes(16));
+        expire(booking);
+        PAYPAL.reply(READ, 200, order("PAYER_ACTION_REQUIRED", booking, null));
+        PAYPAL.onNext(READ, () -> jdbc.sql("UPDATE paypal_order SET capture_attempted_at = now()").update());
+
+        // when
+        reconciliation.run();
+
+        // then
+        assertThat(orderStatus()).as("a capture attempt seen under the lock stops the void").isEqualTo("CREATED");
+        assertThat(bookingStatus(booking)).isEqualTo("PENDING_PAYMENT");
+        assertThat(audit("payment.paypal.voided", booking)).isEmpty();
+    }
+
+    @Test
     void givenAnApprovedOrderAndPayPalDown_whenTheDeadlinePasses_thenTheBookingStaysHeld() throws Exception {
         // given
         UUID booking = bookWithOrder();

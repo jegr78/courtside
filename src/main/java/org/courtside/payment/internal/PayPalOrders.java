@@ -89,9 +89,13 @@ class PayPalOrders {
                 .param("limit", limit).query(String.class).list();
     }
 
-    void markCaptureAttempted(String orderId) {
-        jdbc.sql("UPDATE paypal_order SET capture_attempted_at = :now WHERE order_id = :order")
-                .param("order", orderId).param("now", Timestamp.from(clock.instant())).update();
+    /** Stamps a capture attempt on an open order; false when the order is no longer open. */
+    boolean markCaptureAttempted(String orderId) {
+        return jdbc.sql("""
+                        UPDATE paypal_order SET capture_attempted_at = :now
+                        WHERE order_id = :order AND status = 'CREATED'
+                        """)
+                .param("order", orderId).param("now", Timestamp.from(clock.instant())).update() == 1;
     }
 
     /** Records that an order was looked at without a change, so the next run looks at others first. */

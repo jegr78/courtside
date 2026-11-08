@@ -21,6 +21,7 @@ import java.net.URI;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.Currency;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -208,6 +209,7 @@ public class PayPalCheckout {
         return transactions.execute(status -> {
             StoredOrder locked = lock(stored);
             if (locked.status() != Status.CREATED) return settled(locked).orElseThrow();
+            if (!Objects.equals(locked.captureAttemptedAt(), stored.captureAttemptedAt())) return processing(locked);
             orders.mark(locked.orderId(), Status.VOIDED, null);
             pendingPayments.release(locked.bookingId());
             events.publishEvent(new PaymentEvent.PayPalVoided(locked.bookingId(), locked.orderId(), reason.name()));
@@ -245,7 +247,9 @@ public class PayPalCheckout {
     }
 
     private Settlement capture(StoredOrder stored, PayPalClient.Credentials credentials) {
-        transactions.executeWithoutResult(status -> orders.markCaptureAttempted(stored.orderId()));
+        if (!Boolean.TRUE.equals(transactions.execute(status -> orders.markCaptureAttempted(stored.orderId())))) {
+            return orders.find(stored.orderId()).flatMap(PayPalCheckout::settled).orElseGet(() -> processing(stored));
+        }
         try {
             return settle(stored, client.captureOrder(credentials, stored.orderId()), true);
         } catch (PayPalUnavailableException unknown) {
