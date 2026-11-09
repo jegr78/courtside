@@ -62,7 +62,7 @@ export function CreditLedger({ ledger, refunds }: { ledger: CreditLedgerState; r
               </tr>
             </thead>
             <tbody>
-              {page.items.map((entry) => <tr key={entry.id} data-testid="credit-entry" className="border-b align-top">
+              {page.items.map((entry) => <tr key={entry.id} data-testid="credit-entry" data-kind={entry.kind} className="border-b align-top">
                 <td className="py-2 pr-4 whitespace-nowrap">{formatDateTime(entry.recordedAt, language, timeZone)}</td>
                 <td data-testid="credit-entry-kind" className="py-2 pr-4">{t(`creditLedger.kind.${entry.kind}`)}</td>
                 <td data-testid="credit-entry-note" className="py-2 pr-4 [overflow-wrap:anywhere]">
