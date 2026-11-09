@@ -41,9 +41,10 @@ public class PayPalClient {
     private static final int MAX_TOKEN_BYTES = 16_384;
     private static final int MAX_API_BYTES = 65_536;
     private static final Duration TOKEN_MARGIN = Duration.ofSeconds(60);
-    private static final Pattern ORDER_ID = Pattern.compile("[A-Za-z0-9_-]{1,64}");
+    private static final Pattern ID = Pattern.compile("[A-Za-z0-9_-]{1,64}");
     private static final Pattern AMOUNT = Pattern.compile("\\d{1,15}(\\.\\d+)?");
     private static final String ALREADY_CAPTURED = "ORDER_ALREADY_CAPTURED";
+    private static final String FULLY_REFUNDED = "CAPTURE_FULLY_REFUNDED";
     private static final String DUPLICATE_REQUEST = "DUPLICATE_REQUEST_ID";
     private static final String REQUEST_IN_PROGRESS = "PREVIOUS_REQUEST_IN_PROGRESS";
     private static final ObjectMapper JSON = new ObjectMapper();
@@ -100,6 +101,27 @@ public class PayPalClient {
             throw new PayPalUnavailableException("PayPal is still processing an earlier capture of this order");
         }
         return capture(success(answer)).orElseThrow(() -> new PayPalRefusedException("PayPal order has no capture"));
+    }
+
+    Refund refundCapture(Credentials credentials, String captureId, UUID requestId) {
+        Answer answer = api(credentials, "POST", capturePath(captureId) + "/refund", "{}", requestId.toString());
+        if (answer.status() == 422 && hasIssue(answer.body(), FULLY_REFUNDED)) {
+            throw new PayPalCaptureFullyRefundedException();
+        }
+        if (answer.status() == 409 || answer.status() / 100 == 4
+                && (hasIssue(answer.body(), DUPLICATE_REQUEST) || hasIssue(answer.body(), REQUEST_IN_PROGRESS))) {
+            throw new PayPalUnavailableException("PayPal is still processing an earlier refund of this capture");
+        }
+        return refund(unclearUnlessReadable(answer));
+    }
+
+    Refund getRefund(Credentials credentials, String refundId) {
+        return refund(unclearUnlessReadable(api(credentials, "GET", refundPath(refundId), null, null)));
+    }
+
+    CaptureState getCapture(Credentials credentials, String captureId) {
+        JsonNode body = unclearUnlessReadable(api(credentials, "GET", capturePath(captureId), null, null));
+        return new CaptureState(unclearField(body, "status"), refundId(body.get("links")));
     }
 
     Answer requestToken(PayPalEnvironment environment, String clientId, String secret) {
@@ -196,6 +218,45 @@ public class PayPalClient {
             throw new PayPalUnavailableException("PayPal answered status " + status);
         }
         throw new PayPalRefusedException(reason(status, answer.body()));
+    }
+
+    private static JsonNode unclearUnlessReadable(Answer answer) {
+        try {
+            return success(answer);
+        } catch (PayPalRefusedException unreadable) {
+            if (answer.status() / 100 == 2) {
+                throw new PayPalUnavailableException("PayPal answered with a body that is not an object");
+            }
+            throw unreadable;
+        }
+    }
+
+    private static Refund refund(JsonNode body) {
+        return new Refund(unclearField(body, "id"), unclearField(body, "status"));
+    }
+
+    private static String unclearField(JsonNode body, String field) {
+        String value = text(body, field);
+        if (value.isEmpty()) throw new PayPalUnavailableException("PayPal answered without " + field);
+        return value;
+    }
+
+    private static Optional<String> refundId(@Nullable JsonNode links) {
+        if (links == null || !links.isArray()) return Optional.empty();
+        for (JsonNode link : links) {
+            if (!"refund".equals(text(link, "rel"))) continue;
+            String[] segments;
+            try {
+                segments = URI.create(text(link, "href")).getPath().split("/");
+            } catch (IllegalArgumentException malformed) {
+                throw new PayPalUnavailableException("PayPal sent a refund link that is not a URI");
+            }
+            int last = segments.length - 1;
+            if (last >= 1 && "refunds".equals(segments[last - 1]) && ID.matcher(segments[last]).matches()) {
+                return Optional.of(segments[last]);
+            }
+        }
+        return Optional.empty();
     }
 
     private static boolean hasIssue(byte[] body, String issue) {
@@ -302,10 +363,25 @@ public class PayPalClient {
     }
 
     private static String orderPath(String orderId) {
-        if (orderId == null || !ORDER_ID.matcher(orderId).matches()) {
+        if (orderId == null || !ID.matcher(orderId).matches()) {
             throw new PayPalRefusedException("The PayPal order id is not valid");
         }
         return "/v2/checkout/orders/" + orderId;
+    }
+
+    private static String capturePath(String captureId) {
+        return "/v2/payments/captures/" + id(captureId, "capture");
+    }
+
+    private static String refundPath(String refundId) {
+        return "/v2/payments/refunds/" + id(refundId, "refund");
+    }
+
+    private static String id(String value, String kind) {
+        if (value == null || !ID.matcher(value).matches()) {
+            throw new PayPalRefusedException("The PayPal " + kind + " id is not valid");
+        }
+        return value;
     }
 
     private URI endpoint(PayPalEnvironment environment, String path) {
@@ -374,5 +450,11 @@ public class PayPalClient {
     }
 
     public record Capture(String id, String status, int amountMinor, String currency) {
+    }
+
+    public record Refund(String id, String status) {
+    }
+
+    public record CaptureState(String status, Optional<String> refundId) {
     }
 }

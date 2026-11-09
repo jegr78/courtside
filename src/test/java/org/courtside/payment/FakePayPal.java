@@ -31,6 +31,10 @@ final class FakePayPal {
     static final String READ = "GET /sandbox/v2/checkout/orders/" + ORDER;
     static final String CAPTURE = "POST /sandbox/v2/checkout/orders/" + ORDER + "/capture";
 
+    static final String REFUND = "POST /sandbox/v2/payments/captures/CAPTURE1/refund";
+    static final String REFUND_READ = "GET /sandbox/v2/payments/refunds/REFUND1";
+    static final String CAPTURE_READ = "GET /sandbox/v2/payments/captures/CAPTURE1";
+
     private static final ObjectMapper JSON = new ObjectMapper();
 
     private final List<Seen> seen = new CopyOnWriteArrayList<>();
@@ -163,6 +167,10 @@ final class FakePayPal {
     static String capture(String status, String value) {
         return "{\"id\":\"CAPTURE1\",\"status\":\"" + status + "\",\"amount\":{\"currency_code\":\"EUR\",\"value\":\""
                 + value + "\"}}";
+    }
+
+    static String refund(String status) {
+        return "{\"id\":\"REFUND1\",\"status\":\"" + status + "\"}";
     }
 
     record Reply(int status, String body, Duration delay) {
