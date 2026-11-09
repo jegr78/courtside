@@ -51,5 +51,6 @@ CREATE TABLE paypal_order (
     CONSTRAINT paypal_order_environment CHECK (environment IN ('SANDBOX', 'LIVE')),
     CONSTRAINT paypal_order_amount_positive CHECK (amount_minor > 0),
     CONSTRAINT paypal_order_currency_code CHECK (currency ~ '^[A-Z]{3}$'),
-    CONSTRAINT paypal_order_status CHECK (status IN ('CREATED', 'CAPTURED', 'LATE_CAPTURED', 'REJECTED', 'VOIDED'))
+    CONSTRAINT paypal_order_status CHECK (status IN ('CREATED', 'CAPTURED', 'LATE_CAPTURED', 'REJECTED', 'VOIDED')),
+    CONSTRAINT paypal_order_capture_id CHECK ((status IN ('CAPTURED', 'LATE_CAPTURED')) = (capture_id IS NOT NULL))
 );

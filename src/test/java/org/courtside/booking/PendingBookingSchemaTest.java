@@ -7,6 +7,8 @@ import org.courtside.shared.CancellationReason;
 import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -91,6 +93,22 @@ class PendingBookingSchemaTest extends AbstractIntegrationTest {
                 .update())
                 .isInstanceOf(DataIntegrityViolationException.class)
                 .hasMessageContaining("credit_entry_paypal_order_reference");
+    }
+
+    @ParameterizedTest
+    @CsvSource(value = {"CAPTURED,", "LATE_CAPTURED,", "CREATED,CAPTURE1", "REJECTED,CAPTURE1", "VOIDED,CAPTURE1"})
+    void givenAPayPalOrderStatus_whenItsCaptureIdDisagrees_thenTheCheckRefusesIt(String status, String captureId) {
+        // when / then
+        assertThatThrownBy(() -> jdbc.sql("""
+                        INSERT INTO paypal_order (order_id, booking_id, account_id, environment, amount_minor, currency,
+                                                  status, capture_id, approve_url, created_at, updated_at)
+                        VALUES ('ORDER1', ?, ?, 'SANDBOX', 1500, 'EUR', ?, ?, 'https://www.sandbox.paypal.com/x',
+                                now(), now())
+                        """)
+                .params(UUID.randomUUID(), UUID.randomUUID(), status, captureId)
+                .update())
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .hasMessageContaining("paypal_order_capture_id");
     }
 
     @Test

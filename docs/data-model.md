@@ -470,6 +470,7 @@ account that last saved the settings leaves them.
 
 `paypal_order.booking_id` and `account_id` have no foreign key, like `credit_entry.booking_id`, so an
 order outlives the booking or account it paid for. `booking_id` is unique.
+`paypal_order_capture_id` requires a capture id exactly on `CAPTURED` and `LATE_CAPTURED` orders.
 
 ## Keeping personal records
 
