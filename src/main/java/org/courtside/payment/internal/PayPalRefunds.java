@@ -18,6 +18,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.util.Comparator;
 import java.util.Currency;
 import java.util.HashMap;
 import java.util.List;
@@ -175,9 +176,9 @@ public class PayPalRefunds {
 
     private Resolution askAgain(StoredRefund refund, StoredOrder order, PayPalClient.Credentials readable) {
         PayPalCheckout.requireNoTransaction();
-        Optional<String> completed;
+        Optional<PayPalClient.ListedRefund> listed;
         try {
-            completed = completedRefundOf(readable, refund.orderId());
+            listed = listedRefundOf(refund, readable);
         } catch (PayPalUnavailableException down) {
             log.warn("PayPal order {} of refund {} could not be read before a retry: {}", refund.orderId(),
                     refund.id(), down.getMessage());
@@ -187,20 +188,14 @@ public class PayPalRefunds {
                     refund.id(), refused.reason());
             return answered(view(refund));
         }
-        if (completed.isPresent()) return answered(completed(refund, completed.get()));
-        return ask(refund, order, readable);
-    }
-
-    private Optional<String> completedRefundOf(PayPalClient.Credentials readable, String orderId) {
-        return client.getOrder(readable, orderId).refunds().stream()
-                .filter(listed -> listed.status().equals("COMPLETED")).map(PayPalClient.Refund::id).findFirst();
+        return listed.map(found -> answered(follow(refund, found))).orElseGet(() -> ask(refund, order, readable));
     }
 
     private Resolution refundedElsewhere(StoredRefund refund, PayPalClient.Credentials readable) {
         PayPalCheckout.requireNoTransaction();
-        Optional<String> completed;
+        Optional<PayPalClient.ListedRefund> listed;
         try {
-            completed = completedRefundOf(readable, refund.orderId());
+            listed = listedRefundOf(refund, readable);
         } catch (PayPalUnavailableException down) {
             log.warn("PayPal order {} of refund {} could not be read: {}", refund.orderId(), refund.id(),
                     down.getMessage());
@@ -210,10 +205,24 @@ public class PayPalRefunds {
                     refused.reason());
             return answered(view(refund));
         }
-        if (completed.isPresent()) return answered(completed(refund, completed.get()));
-        log.warn("PayPal reports the capture of order {} as refunded but lists no completed refund; refund {} stays"
-                + " pending", refund.orderId(), refund.id());
+        if (listed.isPresent()) return answered(follow(refund, listed.get()));
+        log.warn("PayPal reports the capture of order {} as refunded but lists no refund of its full amount; refund {}"
+                + " stays pending", refund.orderId(), refund.id());
         return answered(view(refund));
+    }
+
+    /** The full-amount refund PayPal lists on the order that has not failed, a completed one first. */
+    private Optional<PayPalClient.ListedRefund> listedRefundOf(StoredRefund refund,
+                                                               PayPalClient.Credentials readable) {
+        return client.getOrder(readable, refund.orderId()).refunds().stream()
+                .filter(listed -> listed.amountMinor() == refund.amountMinor()
+                        && listed.currency().equals(refund.currency().getCurrencyCode()))
+                .filter(listed -> !listed.status().equals("FAILED") && !listed.status().equals("CANCELLED"))
+                .min(Comparator.comparing(listed -> !listed.status().equals("COMPLETED")));
+    }
+
+    private RefundView follow(StoredRefund refund, PayPalClient.ListedRefund listed) {
+        return listed.status().equals("COMPLETED") ? completed(refund, listed.id()) : pending(refund, listed.id());
     }
 
     private RefundView record(StoredRefund refund, PayPalClient.Refund answer) {

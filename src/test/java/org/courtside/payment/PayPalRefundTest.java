@@ -1,6 +1,5 @@
 package org.courtside.payment;
 
-import com.zaxxer.hikari.HikariDataSource;
 import org.courtside.AbstractIntegrationTest;
 import org.courtside.PostgresDiagnostics;
 import org.courtside.booking.BookingService;
@@ -11,6 +10,7 @@ import org.courtside.credit.testfixture.CreditTestFixture;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
+import org.courtside.payment.internal.PayPalRefunds;
 import org.courtside.payment.testfixture.PaymentTestFixture;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.shared.TimeSlot;
@@ -38,7 +38,6 @@ import org.springframework.web.context.WebApplicationContext;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-import javax.sql.DataSource;
 import java.time.Clock;
 import java.time.DayOfWeek;
 import java.time.Duration;
@@ -63,10 +62,11 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-// Two admission slots let two treasurers' returns meet at the order's row lock.
+// Two admission slots and a larger pool let two treasurers' returns meet at the order's row lock.
 @TestPropertySource(properties = {"courtside.public-url=https://courts.example.org",
         "courtside.payment.paypal.request-timeout=3s", "courtside.admission.classes[payment-provider-check].cost=5",
-        "courtside.admission.classes[payment-provider-check].concurrency=2"})
+        "courtside.admission.classes[payment-provider-check].concurrency=2",
+        "spring.datasource.hikari.maximum-pool-size=6"})
 @Import({FacilityTestFixture.class, IdentityTestFixture.class, CardTestFixture.class, ConfigTestFixture.class,
         CreditTestFixture.class, PaymentTestFixture.class})
 class PayPalRefundTest extends AbstractIntegrationTest {
@@ -110,7 +110,7 @@ class PayPalRefundTest extends AbstractIntegrationTest {
     @Autowired
     private TransactionTemplate transactions;
     @Autowired
-    private DataSource dataSource;
+    private PayPalRefunds payPalRefunds;
     @Autowired
     private Clock clock;
 
@@ -419,7 +419,7 @@ class PayPalRefundTest extends AbstractIntegrationTest {
         // given
         UUID booking = paidAndCancelled();
         PAYPAL.reply(REFUND, 422, FULLY_REFUNDED);
-        PAYPAL.replaceReply(READ, 200, FakePayPal.refundedOrder(booking, "REFUND7", "COMPLETED"));
+        PAYPAL.replaceReply(READ, 200, FakePayPal.refundedOrder(booking, "REFUND7", "COMPLETED", "15.00"));
 
         // when
         refund("miles.richard", ORDER, true)
@@ -440,7 +440,7 @@ class PayPalRefundTest extends AbstractIntegrationTest {
         // given
         UUID booking = paidAndCancelled();
         PAYPAL.reply(REFUND, 422, FULLY_REFUNDED);
-        PAYPAL.replaceReply(READ, 200, FakePayPal.refundedOrder(booking, "REFUND7", "PENDING"));
+        PAYPAL.replaceReply(READ, 200, FakePayPal.refundedOrder(booking, "REFUND7", "PENDING", "15.00"));
 
         // when
         refund("miles.richard", ORDER, true).andExpect(status().isOk())
@@ -448,9 +448,84 @@ class PayPalRefundTest extends AbstractIntegrationTest {
 
         // then
         assertThat(PAYPAL.seen(READ)).as("the order was read for its refunds").isNotEmpty();
-        assertThat(refundRow()).containsEntry("status", "PENDING");
+        assertThat(refundRow()).as("the pending refund PayPal lists is followed from now on")
+                .containsEntry("status", "PENDING").containsEntry("refund_id", "REFUND7");
         assertThat(credit.balance(johnAccount)).isZero();
         assertThat(kinds(booking, "PAYPAL_REFUND_REVERSED")).isZero();
+    }
+
+    @Test
+    void givenACaptureRefundedElsewhereOnlyInPart_whenReturning_thenItStaysPendingWithoutThePartialRefund()
+            throws Exception {
+        // given
+        UUID booking = paidAndCancelled();
+        PAYPAL.reply(REFUND, 422, FULLY_REFUNDED);
+        PAYPAL.replaceReply(READ, 200, FakePayPal.refundedOrder(booking, "REFUND7", "COMPLETED", "5.00"));
+
+        // when
+        refund("miles.richard", ORDER, true).andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PENDING"));
+
+        // then
+        assertThat(refundRow()).as("a partial refund is not this payment's refund")
+                .containsEntry("status", "PENDING");
+        assertThat(refundRow().get("refund_id")).isNull();
+        assertThat(audit("payment.paypal.refunded", booking)).isEmpty();
+        assertThat(kinds(booking, "PAYPAL_REFUND_REVERSED")).isZero();
+    }
+
+    @Test
+    void givenAnUnansweredRefund_whenResolvedAndTheOrderListsItsPendingRefund_thenItIsFollowedWithoutASecondRequest()
+            throws Exception {
+        // given
+        UUID booking = unansweredRefund();
+        PAYPAL.replaceReply(READ, 200, FakePayPal.refundedOrder(booking, "REFUND7", "PENDING", "15.00"));
+
+        // when
+        PayPalRefunds.Resolution resolution = payPalRefunds.resolve(refundId());
+
+        // then
+        assertThat(resolution.refund().status()).isEqualTo(PayPalRefunds.RefundStatus.PENDING);
+        assertThat(refundRow()).containsEntry("status", "PENDING").containsEntry("refund_id", "REFUND7");
+        assertThat(PAYPAL.seen(REFUND)).as("a refund PayPal already holds is never requested again").hasSize(1);
+        assertThat(credit.balance(johnAccount)).isZero();
+        assertThat(kinds(booking, "PAYPAL_REFUND_REVERSED")).isZero();
+    }
+
+    @Test
+    void givenAnUnansweredRefund_whenResolvedAndTheOrderListsItsCompletedRefund_thenItIsCompletedWithoutASecondRequest()
+            throws Exception {
+        // given
+        UUID booking = unansweredRefund();
+        PAYPAL.replaceReply(READ, 200, FakePayPal.refundedOrder(booking, "REFUND7", "COMPLETED", "15.00"));
+
+        // when
+        PayPalRefunds.Resolution resolution = payPalRefunds.resolve(refundId());
+
+        // then
+        assertThat(resolution.refund().status()).isEqualTo(PayPalRefunds.RefundStatus.COMPLETED);
+        assertThat(refundRow()).containsEntry("status", "COMPLETED").containsEntry("refund_id", "REFUND7");
+        assertThat(PAYPAL.seen(REFUND)).hasSize(1);
+        assertThat(audit("payment.paypal.refunded", booking)).hasSize(1);
+    }
+
+    @Test
+    void givenAnUnansweredRefund_whenResolvedAndTheOrderListsOnlyAPartialRefund_thenTheRequestIsRepeated()
+            throws Exception {
+        // given
+        UUID booking = unansweredRefund();
+        PAYPAL.replaceReply(READ, 200, FakePayPal.refundedOrder(booking, "REFUND7", "COMPLETED", "5.00"));
+        PAYPAL.replaceReply(REFUND, 201, FakePayPal.refund("COMPLETED"));
+
+        // when
+        PayPalRefunds.Resolution resolution = payPalRefunds.resolve(refundId());
+
+        // then
+        assertThat(resolution.refund().status()).isEqualTo(PayPalRefunds.RefundStatus.COMPLETED);
+        assertThat(refundRow()).as("the partial refund is never taken for this payment's refund")
+                .containsEntry("status", "COMPLETED").containsEntry("refund_id", "REFUND1");
+        assertThat(PAYPAL.seen(REFUND)).hasSize(2).extracting(request -> request.header("PayPal-Request-Id"))
+                .as("the repeat carries the same request id").containsOnly(refundId().toString());
     }
 
     @ParameterizedTest
@@ -640,6 +715,18 @@ class PayPalRefundTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.items[0].orderId").value(ORDER));
     }
 
+    private UUID unansweredRefund() throws Exception {
+        UUID booking = paidAndCancelled();
+        PAYPAL.reply(REFUND, 500, "{}");
+        refund("miles.richard", ORDER, true).andExpect(jsonPath("$.status").value("PENDING"));
+        assertThat(refundRow().get("refund_id")).isNull();
+        return booking;
+    }
+
+    private UUID refundId() {
+        return (UUID) refundRow().get("id");
+    }
+
     private ResultActions refused(ResultActions answer, String type, String code) throws Exception {
         return answer.andExpect(status().isConflict())
                 .andExpect(jsonPath("$.type").value(type))
@@ -717,7 +804,7 @@ class PayPalRefundTest extends AbstractIntegrationTest {
         return holder;
     }
 
-    private void awaitSessionsBlockedOnALock(int sessions) throws Exception {
+    private void awaitSessionsBlockedOnALock(int sessions) throws InterruptedException {
         long deadline = System.nanoTime() + UNTIL_CONTENTION.toNanos();
         while (System.nanoTime() < deadline) {
             jdbc.sql("SELECT pg_stat_clear_snapshot()").query().singleValue();
@@ -726,12 +813,10 @@ class PayPalRefundTest extends AbstractIntegrationTest {
                             WHERE datname = current_database() AND pid <> pg_backend_pid()
                               AND state = 'active' AND wait_event_type = 'Lock'
                             """).query(Integer.class).single();
-            int awaitingConnection = dataSource.unwrap(HikariDataSource.class).getHikariPoolMXBean()
-                    .getThreadsAwaitingConnection();
-            if (blocked >= 1 && blocked + awaitingConnection >= sessions) return;
+            if (blocked >= sessions) return;
             Thread.sleep(20);
         }
-        throw new AssertionError("Both requests never waited on the held row or a connection. "
+        throw new AssertionError("Both requests never waited on the held row. "
                 + PostgresDiagnostics.waitsAndLocks(jdbc));
     }
 

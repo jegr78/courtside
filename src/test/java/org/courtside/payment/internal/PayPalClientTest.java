@@ -336,14 +336,16 @@ class PayPalClientTest {
     void givenAnOrderWithACompletedRefund_whenReadingIt_thenItListsTheRefund() throws IOException {
         // given
         reply("POST /v1/oauth2/token", 200, TOKEN);
-        reply("GET /v2/checkout/orders/ORD1", 200, orderWithRefunds("[{\"id\":\"REF1\",\"status\":\"COMPLETED\"}]"));
+        reply("GET /v2/checkout/orders/ORD1", 200, orderWithRefunds("[{\"id\":\"REF1\",\"status\":\"COMPLETED\","
+                + "\"amount\":{\"currency_code\":\"EUR\",\"value\":\"12.34\"}}]"));
         PayPalClient client = client(Duration.ofSeconds(2));
 
         // when
         PayPalClient.Order order = client.getOrder(credentials(), "ORD1");
 
         // then
-        assertThat(order.refunds()).containsExactly(new PayPalClient.Refund("REF1", "COMPLETED", null));
+        assertThat(order.refunds())
+                .containsExactly(new PayPalClient.ListedRefund("REF1", "COMPLETED", 1234, "EUR"));
     }
 
     @Test
@@ -362,7 +364,9 @@ class PayPalClientTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"[{\"status\":\"COMPLETED\"}]", "[{\"id\":\"REF1\"}]", "[\"REF1\"]"})
+    @ValueSource(strings = {"[{\"status\":\"COMPLETED\"}]", "[{\"id\":\"REF1\"}]", "[\"REF1\"]",
+            "[{\"id\":\"REF1\",\"status\":\"COMPLETED\"}]",
+            "[{\"id\":\"REF1\",\"status\":\"COMPLETED\",\"amount\":{\"currency_code\":\"EUR\",\"value\":\"x\"}}]"})
     void givenAnOrderWithAMalformedRefund_whenReadingIt_thenPayPalCountsAsUnavailable(String refunds)
             throws IOException {
         // given
@@ -372,7 +376,7 @@ class PayPalClientTest {
 
         // when / then
         assertThatThrownBy(() -> client.getOrder(credentials(), "ORD1"))
-                .as("a refund PayPal lists without id or status is unclear, never skipped")
+                .as("a refund PayPal lists without id, status or a readable amount is unclear, never skipped")
                 .isInstanceOf(PayPalUnavailableException.class);
     }
 

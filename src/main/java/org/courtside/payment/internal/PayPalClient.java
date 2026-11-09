@@ -279,12 +279,20 @@ public class PayPalClient {
                 captured.currency()));
     }
 
-    private static List<Refund> refunds(JsonNode body) {
+    private static List<ListedRefund> refunds(JsonNode body) {
         JsonNode refunds = firstUnit(body).path("payments").path("refunds");
         if (!refunds.isArray()) return List.of();
-        List<Refund> listed = new ArrayList<>();
+        List<ListedRefund> listed = new ArrayList<>();
         for (JsonNode refund : refunds) {
-            listed.add(refund(refund));
+            Refund read = refund(refund);
+            Money amount;
+            try {
+                amount = money(refund.get("amount"));
+            } catch (PayPalRefusedException unreadable) {
+                throw new PayPalUnavailableException("PayPal listed refund " + read.id()
+                        + " without a readable amount");
+            }
+            listed.add(new ListedRefund(read.id(), read.status(), amount.minor(), amount.currency()));
         }
         return List.copyOf(listed);
     }
@@ -441,13 +449,16 @@ public class PayPalClient {
     }
 
     public record Order(String id, String status, String customId, int amountMinor, String currency,
-                        Optional<URI> approveUrl, Optional<Capture> capture, List<Refund> refunds) {
+                        Optional<URI> approveUrl, Optional<Capture> capture, List<ListedRefund> refunds) {
     }
 
     public record Capture(String id, String status, int amountMinor, String currency) {
     }
 
     public record Refund(String id, String status, @Nullable String reason) {
+    }
+
+    public record ListedRefund(String id, String status, int amountMinor, String currency) {
     }
 
 }

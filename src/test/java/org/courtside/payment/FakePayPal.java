@@ -163,9 +163,12 @@ final class FakePayPal {
                 + "}],\"links\":[{\"rel\":\"payer-action\",\"href\":\"" + APPROVE + "\"}]}";
     }
 
-    static String refundedOrder(UUID booking, String refundId, String status) {
-        return order("COMPLETED", booking, "10.00", capture("COMPLETED", "10.00")).replace("}]}}],\"links\"",
-                "}],\"refunds\":[{\"id\":\"" + refundId + "\",\"status\":\"" + status + "\"}]}}],\"links\"");
+    static String refundedOrder(UUID booking, String refundId, String status, String value) {
+        String refunded = order("COMPLETED", booking, "15.00", capture("COMPLETED", "15.00"))
+                .replace("}]}}],\"links\"", "}],\"refunds\":[{\"id\":\"" + refundId + "\",\"status\":\"" + status
+                        + "\",\"amount\":{\"currency_code\":\"EUR\",\"value\":\"" + value + "\"}}]}}],\"links\"");
+        assertThat(refunded).as("the refund is listed in the order").contains("\"refunds\":[{\"id\":\"" + refundId);
+        return refunded;
     }
 
     static String capture(String status, String value) {
