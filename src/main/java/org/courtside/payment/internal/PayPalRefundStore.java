@@ -59,6 +59,12 @@ class PayPalRefundStore {
                 .param("before", Timestamp.from(before)).param("limit", limit).query(UUID.class).list();
     }
 
+    /** Moves a still pending refund behind the others for the next page of the job. */
+    void checked(UUID id) {
+        jdbc.sql("UPDATE paypal_refund SET updated_at = :now WHERE id = :id AND status = 'PENDING'")
+                .param("id", id).param("now", Timestamp.from(clock.instant())).update();
+    }
+
     void pending(UUID id, String refundId) {
         update(id, RefundStatus.PENDING, refundId, null);
     }

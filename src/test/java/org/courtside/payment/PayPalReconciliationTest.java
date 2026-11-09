@@ -17,7 +17,10 @@ import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -51,6 +54,8 @@ import static org.courtside.payment.FakePayPal.CAPTURE;
 import static org.courtside.payment.FakePayPal.CREATE;
 import static org.courtside.payment.FakePayPal.ORDER;
 import static org.courtside.payment.FakePayPal.READ;
+import static org.courtside.payment.FakePayPal.REFUND;
+import static org.courtside.payment.FakePayPal.REFUND_READ;
 import static org.courtside.payment.FakePayPal.TOKEN;
 import static org.courtside.payment.FakePayPal.capture;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -71,6 +76,8 @@ class PayPalReconciliationTest extends AbstractIntegrationTest {
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final String LIVE_READ = "GET /live/v2/checkout/orders/" + ORDER;
     private static final String UNAVAILABLE = "{\"name\":\"SERVICE_UNAVAILABLE\",\"message\":\"down\"}";
+    private static final String FULLY_REFUNDED = "{\"name\":\"UNPROCESSABLE_ENTITY\",\"message\":\"refunded\","
+            + "\"details\":[{\"issue\":\"CAPTURE_FULLY_REFUNDED\"}]}";
     private static final Instant TOMORROW_AFTERNOON = Instant.parse("2026-05-13T16:00:00Z");
     private static final FakePayPal PAYPAL = new FakePayPal();
 
@@ -270,6 +277,128 @@ class PayPalReconciliationTest extends AbstractIntegrationTest {
                 .as("an outage costs a run at most three PayPal calls").isEqualTo(3);
         assertThat(jdbc.sql("SELECT count(*) FROM paypal_order WHERE status = 'CREATED'").query(Integer.class).single())
                 .isEqualTo(5);
+    }
+
+    @Test
+    void givenAPendingRefundWithoutAnswer_whenTheJobRuns_thenItRetriesWithTheSameRequestIdAndRecordsTheRefund()
+            throws Exception {
+        // given
+        UUID booking = pendingRefund(500, "{}");
+        PAYPAL.replaceReply(READ, 200, order("COMPLETED", booking, capture("COMPLETED", "15.00")));
+        PAYPAL.replaceReply(REFUND, 201, FakePayPal.refund("COMPLETED"));
+        int asked = PAYPAL.seen(REFUND).size();
+
+        // when
+        reconciliation.run();
+
+        // then
+        assertThat(PAYPAL.seen(REFUND)).as("the job repeats the unanswered request").hasSize(asked + 1)
+                .extracting(request -> request.header("PayPal-Request-Id"))
+                .as("the repeat carries the same request id").containsOnly(refundRow().get("id").toString());
+        assertThat(refundRow()).containsEntry("status", "COMPLETED").containsEntry("refund_id", "REFUND1");
+        assertThat(credit.balance(johnAccount)).isZero();
+        assertThat(audit("payment.paypal.refunded", booking)).hasSize(1);
+    }
+
+    @Test
+    void givenAPendingRefundPayPalCompleted_whenTheJobRuns_thenItIsCompleted() throws Exception {
+        // given
+        UUID booking = pendingRefund(201, FakePayPal.refund("PENDING"));
+        PAYPAL.reply(REFUND_READ, 200, FakePayPal.refund("COMPLETED"));
+
+        // when
+        reconciliation.run();
+
+        // then
+        assertThat(PAYPAL.seen(REFUND_READ)).as("a known refund is read, not requested again").hasSize(1);
+        assertThat(PAYPAL.seen(REFUND)).hasSize(1);
+        assertThat(refundRow()).containsEntry("status", "COMPLETED").containsEntry("refund_id", "REFUND1");
+        assertThat(credit.balance(johnAccount)).isZero();
+        assertThat(audit("payment.paypal.refunded", booking)).hasSize(1);
+    }
+
+    @Test
+    void givenAPendingRefundPayPalFailed_whenTheJobRuns_thenTheCreditIsRestored() throws Exception {
+        // given
+        UUID booking = pendingRefund(201, FakePayPal.refund("PENDING"));
+        PAYPAL.reply(REFUND_READ, 200, FakePayPal.refund("FAILED"));
+
+        // when
+        reconciliation.run();
+
+        // then
+        assertThat(refundRow()).containsEntry("status", "FAILED").containsEntry("refund_id", "REFUND1")
+                .containsEntry("failure_reason", "PayPal reports the refund as FAILED");
+        assertThat(credit.balance(johnAccount)).as("a failed refund gives the credit back").isEqualTo(1500);
+        assertThat(entries(booking)).contains(Map.of("kind", "PAYPAL_REFUND_REVERSED", "amount_minor", 1500));
+        assertThat(audit("payment.paypal.refundFailed", booking)).hasSize(1);
+    }
+
+    @Test
+    void givenAPendingRefundAnsweredFullyRefunded_whenTheJobRuns_thenItIsCompletedWithoutRestoringCredit()
+            throws Exception {
+        // given
+        UUID booking = pendingRefund(500, "{}");
+        PAYPAL.replaceReply(READ, 200, order("COMPLETED", booking, capture("COMPLETED", "15.00")));
+        PAYPAL.reply(READ, 200, FakePayPal.refundedOrder(booking, "REFUND7", "COMPLETED", "15.00"));
+        PAYPAL.replaceReply(REFUND, 422, FULLY_REFUNDED);
+
+        // when
+        reconciliation.run();
+
+        // then
+        assertThat(refundRow()).containsEntry("status", "COMPLETED").containsEntry("refund_id", "REFUND7");
+        assertThat(credit.balance(johnAccount)).as("the credit stays taken").isZero();
+        assertThat(entries(booking)).noneMatch(entry -> entry.get("kind").equals("PAYPAL_REFUND_REVERSED"));
+        assertThat(audit("payment.paypal.refunded", booking)).singleElement()
+                .satisfies(payload -> assertThat(payload.get("refundId").asString()).isEqualTo("REFUND7"));
+    }
+
+    @Test
+    @ExtendWith(OutputCaptureExtension.class)
+    void givenPayPalDown_whenTheJobRuns_thenThePendingRefundStaysAndTheRunStops(CapturedOutput output) {
+        // given
+        List<String> open = List.of("ORDERA", "ORDERB");
+        open.forEach(orderId -> {
+            storeAttemptedOrder(orderId, "EUR");
+            PAYPAL.reply(readOf(orderId), 503, UNAVAILABLE);
+        });
+        List<String> refunded = List.of("ORDERR", "ORDERS", "ORDERT");
+        List<UUID> refunds = refunded.stream().map(orderId -> storePendingRefund(orderId, refunded.indexOf(orderId)))
+                .toList();
+        refunded.forEach(orderId -> PAYPAL.reply(refundReadOf(orderId), 503, UNAVAILABLE));
+
+        // when
+        reconciliation.run();
+
+        // then
+        assertThat(refunded.stream().map(orderId -> PAYPAL.seen(refundReadOf(orderId)).size()))
+                .as("the orders' outage counts toward the refunds' stop").containsExactly(1, 0, 0);
+        assertThat(jdbc.sql("SELECT status FROM paypal_refund").query(String.class).list())
+                .as("an unreachable PayPal leaves every refund pending").containsOnly("PENDING").hasSize(3);
+        assertThat(refundUpdatedAt(refunds.getFirst())).as("the unread refund moves to the back")
+                .isEqualTo(clock.instant());
+        assertThat(refundUpdatedAt(refunds.get(1))).as("an unasked refund keeps its place")
+                .isBefore(clock.instant());
+        assertThat(output.getOut()).as("each unread refund leaves a warning naming it and its order")
+                .contains("PayPal refund " + refunds.getFirst() + " of order ORDERR could not be read");
+    }
+
+    @Test
+    void givenAPendingRefundPayPalWillNotShow_whenTheJobRuns_thenItStaysPendingAndMovesToTheBackOfThePage()
+            throws Exception {
+        // given
+        UUID booking = pendingRefund(201, FakePayPal.refund("PENDING"));
+        PAYPAL.reply(REFUND_READ, 403, "{\"name\":\"NOT_AUTHORIZED\",\"message\":\"denied\"}");
+
+        // when
+        reconciliation.run();
+
+        // then
+        assertThat(refundRow()).containsEntry("status", "PENDING");
+        assertThat(refundUpdatedAt((UUID) refundRow().get("id"))).as("a refund still unclear is touched so others"
+                + " come first").isEqualTo(clock.instant());
+        assertThat(entries(booking)).noneMatch(entry -> entry.get("kind").equals("PAYPAL_REFUND_REVERSED"));
     }
 
     @Test
@@ -863,6 +992,64 @@ class PayPalReconciliationTest extends AbstractIntegrationTest {
                         """)
                 .param("order", orderId).param("account", johnAccount).param("currency", currency)
                 .param("old", Timestamp.from(clock.instant().minus(Duration.ofHours(1)))).update();
+    }
+
+    private UUID pendingRefund(int status, String answer) throws Exception {
+        UUID booking = bookWithOrder();
+        PAYPAL.reply(READ, 200, order("APPROVED", booking, null));
+        PAYPAL.reply(CAPTURE, 201, order("COMPLETED", booking, capture("COMPLETED", "15.00")));
+        assertThat(captureOutcome()).isEqualTo("CONFIRMED");
+        bookingService.cancel(booking, johnAccount, Set.of(Role.EXTERNAL));
+        PAYPAL.reply(REFUND, status, answer);
+        mockMvc.perform(post("/api/treasury/paypal/refunds").with(csrf())
+                        .with(user(userDetails.loadUserByUsername("miles.richard")))
+                        .sessionAttr("courtside.authenticated-at", clock.instant().toEpochMilli())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"orderId\":\"" + ORDER + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PENDING"));
+        assertThat(credit.balance(johnAccount)).as("the refund took the credit").isZero();
+        jdbc.sql("""
+                        UPDATE paypal_refund SET requested_at = requested_at - interval '6 minutes',
+                                                 updated_at = updated_at - interval '6 minutes'
+                        """).update();
+        return booking;
+    }
+
+    private UUID storePendingRefund(String orderId, int minutesUnchecked) {
+        jdbc.sql("""
+                        INSERT INTO paypal_order (order_id, booking_id, account_id, environment, amount_minor, currency,
+                                                  status, capture_id, approve_url, created_at, updated_at)
+                        VALUES (:order, gen_random_uuid(), :account, 'SANDBOX', 1500, 'EUR', 'CAPTURED', :capture,
+                                'https://paypal.example.org/checkoutnow', :old, :old)
+                        """)
+                .param("order", orderId).param("account", johnAccount).param("capture", "CAPTURE-" + orderId)
+                .param("old", Timestamp.from(clock.instant().minus(Duration.ofHours(1)))).update();
+        UUID id = UUID.randomUUID();
+        jdbc.sql("""
+                        INSERT INTO paypal_refund (id, order_id, account_id, amount_minor, currency, status, refund_id,
+                                                   requested_by, requested_at, updated_at)
+                        VALUES (:id, :order, :account, 1500, 'EUR', 'PENDING', :refund, :by, :requested, :checked)
+                        """)
+                .param("id", id).param("order", orderId).param("account", johnAccount)
+                .param("refund", "REFUND-" + orderId).param("by", adminAccount)
+                .param("requested", Timestamp.from(clock.instant().minus(Duration.ofHours(1))))
+                .param("checked", Timestamp.from(clock.instant().minus(Duration.ofMinutes(10 - minutesUnchecked))))
+                .update();
+        return id;
+    }
+
+    private static String refundReadOf(String orderId) {
+        return "GET /sandbox/v2/payments/refunds/REFUND-" + orderId;
+    }
+
+    private Instant refundUpdatedAt(UUID refund) {
+        return jdbc.sql("SELECT updated_at FROM paypal_refund WHERE id = :id").param("id", refund)
+                .query(Timestamp.class).single().toInstant();
+    }
+
+    private Map<String, Object> refundRow() {
+        return jdbc.sql("SELECT id, status, refund_id, failure_reason FROM paypal_refund WHERE order_id = :order")
+                .param("order", ORDER).query().singleRow();
     }
 
     private static String readOf(String orderId) {
