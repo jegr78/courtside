@@ -960,7 +960,8 @@
       "alternatePaths": [
         "PayPal answering that the capture is already fully refunded is resolved by reading the order: a completed refund it lists is recorded as completed, otherwise the refund stays pending.",
         "A refund PayPal holds as pending keeps its refund id and stays pending with the credit taken.",
-        "A retry of a refund whose first request went unanswered reads the order first and records a completed refund it lists instead of asking again."
+        "A retry of a refund whose first request went unanswered reads the order first and records a completed refund it lists instead of asking again.",
+        "A refund request PayPal refuses restores the credit only after the order has been read and lists no refund of the full amount that has not failed; a listed one is followed instead, and an unreadable order leaves the refund pending."
       ],
       "failurePaths": [
         "Accounts without TREASURER or ADMIN are refused under /api/treasury.",

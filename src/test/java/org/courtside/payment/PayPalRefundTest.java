@@ -82,6 +82,8 @@ class PayPalRefundTest extends AbstractIntegrationTest {
     private static final String UNAVAILABLE = "urn:courtside:error:paypal-refund-unavailable";
     private static final String FULLY_REFUNDED = "{\"name\":\"UNPROCESSABLE_ENTITY\",\"message\":\"refunded\","
             + "\"details\":[{\"issue\":\"CAPTURE_FULLY_REFUNDED\"}]}";
+    private static final String REFUND_REFUSED = "{\"name\":\"UNPROCESSABLE_ENTITY\",\"message\":\"Refund refused\","
+            + "\"details\":[{\"issue\":\"REFUND_NOT_ALLOWED\"}]}";
     private static final Instant TOMORROW_AFTERNOON = Instant.parse("2026-05-13T16:00:00Z");
     private static final Duration UNTIL_CONTENTION = Duration.ofSeconds(4);
     private static final ExecutorService THREADS = Executors.newCachedThreadPool();
@@ -300,6 +302,69 @@ class PayPalRefundTest extends AbstractIntegrationTest {
         assertThat(audit("payment.paypal.refunded", booking)).isEmpty();
         refused(refund("miles.richard", ORDER, true), REFUSED, "payment.paypal.refund.alreadyRefunded");
         assertThat(PAYPAL.seen(REFUND)).as("a failed refund is final").hasSize(1);
+    }
+
+    @Test
+    void givenARefusedRefundWhileTheOrderListsAPendingFullRefund_whenReturning_thenThatRefundIsFollowed()
+            throws Exception {
+        // given
+        UUID booking = paidAndCancelled();
+        PAYPAL.reply(REFUND, 422, REFUND_REFUSED);
+        PAYPAL.replaceReply(READ, 200, FakePayPal.refundedOrder(booking, "REFUND7", "PENDING", "15.00"));
+
+        // when
+        refund("miles.richard", ORDER, true)
+
+                // then
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PENDING"));
+        assertThat(refundRow()).as("a refund PayPal already holds keeps the credit taken")
+                .containsEntry("status", "PENDING").containsEntry("refund_id", "REFUND7");
+        assertThat(credit.balance(johnAccount)).isZero();
+        assertThat(kinds(booking, "PAYPAL_REFUND_REVERSED")).isZero();
+        assertThat(audit("payment.paypal.refundFailed", booking)).isEmpty();
+    }
+
+    @Test
+    void givenARefusedRefundAndAnUnreadableOrder_whenReturning_thenTheRefundIsPendingAndTheCreditStaysTaken()
+            throws Exception {
+        // given
+        UUID booking = paidAndCancelled();
+        PAYPAL.reply(REFUND, 422, REFUND_REFUSED);
+        PAYPAL.replaceReply(READ, 503, "{}");
+
+        // when
+        refund("miles.richard", ORDER, true)
+
+                // then
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PENDING"));
+        assertThat(refundRow()).containsEntry("status", "PENDING");
+        assertThat(credit.balance(johnAccount)).as("a refusal is only trusted once the order shows no refund")
+                .isZero();
+        assertThat(kinds(booking, "PAYPAL_REFUND_REVERSED")).isZero();
+        assertThat(audit("payment.paypal.refundFailed", booking)).isEmpty();
+    }
+
+    @Test
+    void givenARefusedRefundWhileTheOrderListsOnlyAFailedFullRefund_whenReturning_thenTheCreditIsRestored()
+            throws Exception {
+        // given
+        UUID booking = paidAndCancelled();
+        PAYPAL.reply(REFUND, 422, REFUND_REFUSED);
+        PAYPAL.replaceReply(READ, 200, FakePayPal.refundedOrder(booking, "REFUND7", "FAILED", "15.00"));
+        int readsBefore = PAYPAL.seen(READ).size();
+
+        // when
+        refund("miles.richard", ORDER, true)
+
+                // then
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("FAILED"));
+        assertThat(PAYPAL.seen(READ)).as("the order was read before the credit went back").hasSize(readsBefore + 1);
+        assertThat(credit.balance(johnAccount)).isEqualTo(1500);
+        assertThat(kinds(booking, "PAYPAL_REFUND_REVERSED")).isEqualTo(1);
+        assertThat(refundRow().get("refund_id")).as("a failed listed refund is never adopted").isNull();
     }
 
     @ParameterizedTest

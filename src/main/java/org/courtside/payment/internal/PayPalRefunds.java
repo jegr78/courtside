@@ -161,7 +161,7 @@ public class PayPalRefunds {
             return refundedElsewhere(refund, readable);
         } catch (PayPalRefundRefusedException refused) {
             log.warn("PayPal refused refund {} of order {}: {}", refund.id(), refund.orderId(), refused.reason());
-            return answered(failed(refund, null, refused.reason()));
+            return refusedUnlessListed(refund, readable, refused.reason());
         } catch (PayPalRefusedException unclear) {
             log.warn("PayPal refund {} of order {} was not answered by the refund itself and stays pending: {}",
                     refund.id(), refund.orderId(), unclear.reason());
@@ -209,6 +209,23 @@ public class PayPalRefunds {
         log.warn("PayPal reports the capture of order {} as refunded but lists no refund of its full amount; refund {}"
                 + " stays pending", refund.orderId(), refund.id());
         return answered(view(refund));
+    }
+
+    private Resolution refusedUnlessListed(StoredRefund refund, PayPalClient.Credentials readable, String reason) {
+        PayPalCheckout.requireNoTransaction();
+        Optional<PayPalClient.ListedRefund> listed;
+        try {
+            listed = listedRefundOf(refund, readable);
+        } catch (PayPalUnavailableException down) {
+            log.warn("PayPal order {} of refused refund {} could not be read: {}", refund.orderId(), refund.id(),
+                    down.getMessage());
+            return unreachable(refund);
+        } catch (PayPalRefusedException unread) {
+            log.warn("PayPal order {} of refused refund {} could not be read: {}", refund.orderId(), refund.id(),
+                    unread.reason());
+            return answered(view(refund));
+        }
+        return answered(listed.map(found -> follow(refund, found)).orElseGet(() -> failed(refund, null, reason)));
     }
 
     /** The full-amount refund PayPal lists on the order that has not failed, a completed one first. */
