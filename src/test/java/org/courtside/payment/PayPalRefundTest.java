@@ -18,6 +18,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
@@ -517,6 +518,27 @@ class PayPalRefundTest extends AbstractIntegrationTest {
         assertThat(kinds(booking, "PAYPAL_REFUND_REVERSED")).isZero();
         assertThat(audit("payment.paypal.refunded", booking)).singleElement()
                 .satisfies(payload -> assertThat(payload.get("refundId").asString()).isEqualTo("REFUND7"));
+    }
+
+    @ParameterizedTest(name = "{0} with an order read answering {1}")
+    @CsvSource({"fully refunded, 503", "fully refunded, 404", "refused, 404"})
+    void givenAnAnswerThatNeedsTheOrder_whenTheOrderCannotBeRead_thenTheRefundIsPendingAndTheCreditStaysTaken(
+            String answer, int orderRead) throws Exception {
+        // given
+        UUID booking = paidAndCancelled();
+        PAYPAL.reply(REFUND, 422, answer.equals("refused") ? REFUND_REFUSED : FULLY_REFUNDED);
+        PAYPAL.replaceReply(READ, orderRead, "{}");
+
+        // when
+        refund("miles.richard", ORDER, true)
+
+                // then
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PENDING"));
+        assertThat(PAYPAL.seen(READ)).as("the order was asked for its refunds").isNotEmpty();
+        assertThat(refundRow()).as("an unread order decides nothing").containsEntry("status", "PENDING");
+        assertThat(credit.balance(johnAccount)).isZero();
+        assertThat(kinds(booking, "PAYPAL_REFUND_REVERSED")).isZero();
     }
 
     @Test
