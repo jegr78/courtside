@@ -753,8 +753,9 @@ payments.
 While a player pays at PayPal, Courtside holds their court for 15 minutes. If you cancel such a
 booking or close the court, the hold ends without a message. When you change the client id or the
 environment, switch PayPal off or remove the credentials, Courtside ends the open payments of the
-old credentials and frees their courts. If PayPal had already collected money, the player gets
-their booking or credit as soon as PayPal shows the payment.
+old credentials and frees their courts. If PayPal had already collected money, the player usually
+gets their booking or credit as soon as PayPal shows the payment. In rare cases the payment shows
+only in the club's PayPal account, and the club returns it there.
 
 **Check connection** asks PayPal with the stored credentials, not with what the form currently
 holds, so save first. If PayPal refuses, Courtside shows the reason PayPal gives. If PayPal cannot

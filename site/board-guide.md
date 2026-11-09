@@ -794,7 +794,9 @@ Während ein Spieler bei PayPal zahlt, hält Courtside seinen Platz 15 Minuten. 
 solche Buchung oder sperrst den Platz, wird die Reservierung ohne Nachricht beendet. Änderst du
 Client-ID oder Umgebung, schaltest PayPal aus oder entfernst die Zugangsdaten, beendet Courtside die
 offenen Zahlungen der alten Zugangsdaten und gibt ihre Plätze frei. Hat PayPal dabei schon Geld
-eingezogen, bekommt der Spieler seine Buchung oder Guthaben, sobald PayPal die Zahlung zeigt.
+eingezogen, bekommt der Spieler meist seine Buchung oder Guthaben, sobald PayPal die Zahlung zeigt.
+In seltenen Fällen erscheint die Zahlung nur im PayPal-Konto des Vereins, und der Verein gibt sie
+dort zurück.
 
 **Verbindung prüfen** fragt PayPal mit den gespeicherten Zugangsdaten, nicht mit dem, was gerade im
 Formular steht. Speichere also zuerst. Lehnt PayPal ab, zeigt Courtside den Grund, den PayPal
