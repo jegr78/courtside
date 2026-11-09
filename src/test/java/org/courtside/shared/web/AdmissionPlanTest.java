@@ -35,6 +35,7 @@ class AdmissionPlanTest {
                 Map.entry("checkPayPalConnection", Optional.of(1)),
                 Map.entry("savePayPalSettings", Optional.of(1)),
                 Map.entry("removePayPalCredentials", Optional.of(1)),
+                Map.entry("refundPayPalPayment", Optional.of(1)),
                 Map.entry("createPayPalOrder", Optional.empty()),
                 Map.entry("capturePayPalOrder", Optional.empty()),
                 Map.entry("cancelPayPalOrder", Optional.empty()));
@@ -55,6 +56,7 @@ class AdmissionPlanTest {
                 Map.entry("checkPayPalConnection", 5),
                 Map.entry("savePayPalSettings", 5),
                 Map.entry("removePayPalCredentials", 5),
+                Map.entry("refundPayPalPayment", 5),
                 Map.entry("createPayPalOrder", 2),
                 Map.entry("capturePayPalOrder", 2),
                 Map.entry("cancelPayPalOrder", 2));

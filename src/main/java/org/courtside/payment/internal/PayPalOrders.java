@@ -22,13 +22,14 @@ class PayPalOrders {
 
     private static final String COLUMNS = """
             SELECT order_id, booking_id, account_id, environment, amount_minor, currency, status, approve_url,
-                   capture_attempted_at
+                   capture_attempted_at, capture_id
             FROM paypal_order
             """;
     private static final RowMapper<StoredOrder> ROW = (rs, n) -> new StoredOrder(rs.getString(1),
             rs.getObject(2, UUID.class), rs.getObject(3, UUID.class), PayPalEnvironment.valueOf(rs.getString(4)),
             rs.getInt(5), Currency.getInstance(rs.getString(6)), Status.valueOf(rs.getString(7)),
-            URI.create(rs.getString(8)), rs.getTimestamp(9) == null ? null : rs.getTimestamp(9).toInstant());
+            URI.create(rs.getString(8)), rs.getTimestamp(9) == null ? null : rs.getTimestamp(9).toInstant(),
+            rs.getString(10));
 
     private final JdbcClient jdbc;
     private final Clock clock;
@@ -62,6 +63,15 @@ class PayPalOrders {
     Optional<StoredOrder> lock(String orderId) {
         return jdbc.sql(COLUMNS + "WHERE order_id = :order FOR UPDATE").param("order", orderId).query(ROW)
                 .optional();
+    }
+
+    /** The account's captured orders, newest first. */
+    List<StoredOrder> capturedOf(UUID accountId, int limit) {
+        return jdbc.sql(COLUMNS + """
+                        WHERE account_id = :account AND status IN ('CAPTURED', 'LATE_CAPTURED')
+                        ORDER BY created_at DESC, order_id LIMIT :limit
+                        """)
+                .param("account", accountId).param("limit", limit).query(ROW).list();
     }
 
     List<StoredOrder> open(PayPalEnvironment environment) {
@@ -119,6 +129,7 @@ class PayPalOrders {
     enum Status { CREATED, CAPTURED, LATE_CAPTURED, REJECTED, VOIDED }
 
     record StoredOrder(String orderId, UUID bookingId, UUID accountId, PayPalEnvironment environment, int amountMinor,
-                       Currency currency, Status status, URI approveUrl, @Nullable Instant captureAttemptedAt) {
+                       Currency currency, Status status, URI approveUrl, @Nullable Instant captureAttemptedAt,
+                       @Nullable String captureId) {
     }
 }

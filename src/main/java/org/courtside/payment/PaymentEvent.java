@@ -116,4 +116,52 @@ public sealed interface PaymentEvent extends DomainEventRecord {
             return bookingId;
         }
     }
+
+    record PayPalRefundRequested(UUID bookingId, String orderId, PayPalEnvironment environment, int amountMinor,
+                                 String currency) implements PaymentEvent {
+
+        static final String TYPE = "payment.paypal.refund.requested";
+
+        @Override
+        public String eventType() {
+            return TYPE;
+        }
+
+        @Override
+        public UUID subjectId() {
+            return bookingId;
+        }
+    }
+
+    record PayPalRefunded(UUID bookingId, UUID accountId, String orderId, String refundId, int amountMinor,
+                          String currency, boolean anonymised) implements PaymentEvent {
+
+        static final String TYPE = "payment.paypal.refunded";
+
+        @Override
+        public String eventType() {
+            return TYPE;
+        }
+
+        @Override
+        public UUID subjectId() {
+            return bookingId;
+        }
+    }
+
+    record PayPalRefundFailed(UUID bookingId, String orderId, PayPalEnvironment environment, int amountMinor,
+                              String currency, String reason) implements PaymentEvent {
+
+        static final String TYPE = "payment.paypal.refundFailed";
+
+        @Override
+        public String eventType() {
+            return TYPE;
+        }
+
+        @Override
+        public UUID subjectId() {
+            return bookingId;
+        }
+    }
 }

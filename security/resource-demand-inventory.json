@@ -61,7 +61,7 @@
     {
       "id": "ordinary-http",
       "kind": "ordinary",
-      "rationale": "These operations perform bounded single-record work or bounded page and calendar reads; their contract limits do not grow into a separate resource-demand decision. MFA administration reads two flags or changes one account state; TOTP setup encrypts one 160-bit key, recovery-code replacement generates ten verifiers and credential renaming/removal addresses one holder-owned record. The access-grant overview reads at most 100 grants and the probe kept in memory, a retry locks one grant row and a connection-check request only sets two flags and wakes the access worker, and reading the latest connection check reads it from memory; none of them calls the access-control system. The occupancy signal reads one key row and one grouped query over the next 24 hours of allocations, answering at most two lines per active court; the occupancy-key administration reads, replaces or deletes that one row. A credit ledger page reads at most 100 entries, a treasury search at most 20 accounts and the balance list only the accounts that hold credit; recording an entry locks one account row and appends one entry. The PayPal settings read, replace or delete one row and encrypt at most one secret of 500 characters; none of them calls PayPal. Reading whether PayPal payment is available reads one settings row and does not call PayPal.",
+      "rationale": "These operations perform bounded single-record work or bounded page and calendar reads; their contract limits do not grow into a separate resource-demand decision. MFA administration reads two flags or changes one account state; TOTP setup encrypts one 160-bit key, recovery-code replacement generates ten verifiers and credential renaming/removal addresses one holder-owned record. The access-grant overview reads at most 100 grants and the probe kept in memory, a retry locks one grant row and a connection-check request only sets two flags and wakes the access worker, and reading the latest connection check reads it from memory; none of them calls the access-control system. The occupancy signal reads one key row and one grouped query over the next 24 hours of allocations, answering at most two lines per active court; the occupancy-key administration reads, replaces or deletes that one row. A credit ledger page reads at most 100 entries, a treasury search at most 20 accounts and the balance list only the accounts that hold credit; recording an entry locks one account row and appends one entry. The PayPal settings read, replace or delete one row and encrypt at most one secret of 500 characters; none of them calls PayPal. Reading whether PayPal payment is available reads one settings row and does not call PayPal. The PayPal refund list of one account reads at most its newest 1000 captured orders, each with its refund, its credit entry and the balance, and does not call PayPal.",
       "entryPoints": [
         "addMembershipPeriod",
         "assignMembership",
@@ -209,7 +209,8 @@
         "recordCreditEntry",
         "searchCreditAccounts",
         "getPayPalAvailability",
-        "getPayPalSettings"
+        "getPayPalSettings",
+        "listPayPalRefunds"
       ]
     },
     {
@@ -606,19 +607,21 @@
       "kind": "demanding",
       "entryPoints": [
         "checkPayPalConnection",
+        "refundPayPalPayment",
         "removePayPalCredentials",
         "savePayPalSettings"
       ],
-      "growthDrivers": "A check makes one outbound token request to PayPal with the stored credentials. A save that changes the client id or environment or switches PayPal off, and a removal, void each open order of the former credentials without a capture attempt directly and read each one with an attempt once; an account holds at most one pending booking and a hold lasts 15 minutes.",
-      "inputOrDataBound": "The check carries no data, and its answer is read up to 16 KiB with the reason cut to 200 characters. A save carries the bounded settings body; each order answer is read up to 64 KiB.",
+      "growthDrivers": "A check makes one outbound token request to PayPal with the stored credentials. A save that changes the client id or environment or switches PayPal off, and a removal, void each open order of the former credentials without a capture attempt directly and read each one with an attempt once; an account holds at most one pending booking and a hold lasts 15 minutes. A refund sends a token request and the refund, and one order read when PayPal answers that the capture is already fully refunded, plus one repeated token request and call when PayPal refuses a cached token.",
+      "inputOrDataBound": "The check carries no data, and its answer is read up to 16 KiB with the reason cut to 200 characters. A save carries the bounded settings body; each order answer is read up to 64 KiB. A refund carries an order id of at most 64 characters and its answer is read up to 64 KiB.",
       "concurrencyOrRateBound": "Only TREASURER and ADMIN can invoke these; admission control runs one of them at a time per instance and charges 5 tokens of the caller's request budget.",
-      "executionModel": "The stored settings are read and the secret decrypted outside a long transaction; the token request then runs synchronously in the request thread without holding a database connection. A save or removal commits first and then reads the open orders at PayPal in the request thread, each settled or voided in its own short transaction under the order row lock.",
-      "failureBehavior": "A refusal by PayPal answers REJECTED with its reason, a timeout or failed connection answers UNREACHABLE; nothing is stored either way. An open order PayPal cannot show during a save or removal stays open with its court held for the reconciliation; the stored settings are kept.",
-      "consumerTimeoutBehavior": "The token request has its own 10-second deadline, the connection timeout included. The reference proxy sets no response deadline, and a repeated check is safe because it changes nothing.",
+      "executionModel": "The stored settings are read and the secret decrypted outside a long transaction; the token request then runs synchronously in the request thread without holding a database connection. A save or removal commits first and then reads the open orders at PayPal in the request thread, each settled or voided in its own short transaction under the order row lock. A refund takes the credit back and stores a pending refund in one short transaction under the order row lock and then the account lock, calls PayPal in the request thread without a database connection held, and records the answer in another short transaction under the order row lock.",
+      "failureBehavior": "A refusal by PayPal answers REJECTED with its reason, a timeout or failed connection answers UNREACHABLE; nothing is stored either way. An open order PayPal cannot show during a save or removal stays open with its court held for the reconciliation; the stored settings are kept. A refund that PayPal refuses clearly is recorded as failed and its credit restored; no answer, a timeout, 429, 5xx or an unreadable answer leaves it pending with the credit taken.",
+      "consumerTimeoutBehavior": "The token request has its own 10-second deadline, the connection timeout included. The reference proxy sets no response deadline, and a repeated check is safe because it changes nothing. A repeated refund is refused as already refunded, and PayPal deduplicates a repeated refund request by the refund's id.",
       "productionPaths": [
         "src/main/java/org/courtside/payment/internal/PayPalClient.java",
         "src/main/java/org/courtside/payment/internal/PayPalConnectionCheck.java",
         "src/main/java/org/courtside/payment/internal/PayPalSettingsService.java",
+        "src/main/java/org/courtside/payment/internal/PayPalRefunds.java",
         "src/main/java/org/courtside/payment/internal/PayPalCheckout.java",
         "src/main/resources/application.yaml",
         "src/main/java/org/courtside/shared/web/AdmissionControl.java"
@@ -626,6 +629,7 @@
       "evidence": [
         "src/test/java/org/courtside/payment/internal/PayPalConnectionCheckTest.java#givenAProviderThatNeverAnswers_whenChecking_thenTheCheckGivesUpAsUnreachable",
         "src/test/java/org/courtside/payment/PayPalSettingsTest.java#givenAWrongSecret_whenChecking_thenPayPalsReasonIsReported",
+        "src/test/java/org/courtside/payment/PayPalRefundTest.java#givenNoAnswerOrAnUnreadableAnswer_whenReturning_thenTheRefundIsPendingAndTheCreditStaysTaken",
         "src/test/java/org/courtside/payment/PayPalReconciliationTest.java#givenAnOpenOrder_whenPayPalIsSwitchedOff_thenItIsVoidedAndTheCourtIsFree",
         "src/test/java/org/courtside/shared/web/AdmissionPlanTest.java#whenLoadingTheShippedPlan_thenEveryDemandingClassHasItsDecidedCostAndBulkhead"
       ]

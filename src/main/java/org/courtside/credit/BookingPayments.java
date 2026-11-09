@@ -24,6 +24,8 @@ public interface BookingPayments {
 
     void restoreAfterPayPalRefund(UUID accountId, UUID bookingId, String orderId, int amountMinor, Currency currency);
 
+    long balanceMinor(UUID accountId, Currency currency);
+
     record BookingDebit(boolean covered, long balanceMinor, String currency) {
     }
 

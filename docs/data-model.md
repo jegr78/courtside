@@ -544,6 +544,9 @@ access grant a board sent again and its booking. The treasury's credit ledger re
 booking a payment or refund belongs to, and never the reason. The PayPal settings record
 `payment.paypal.settings.changed`, which names the environment, the switch and whether the client id or
 the secret changed, and `payment.paypal.credentials.removed`; neither names the client id or the secret.
+A PayPal refund records `payment.paypal.refund.requested` with the order id, amount, currency and
+environment, then `payment.paypal.refunded` with PayPal's refund id and the payer's account, or
+`payment.paypal.refundFailed` with PayPal's reason; none of them names a person.
 A message wording has no row id of its own, so
 its entries name a subject derived from the message kind and language. The other two arrive in the course of ordinary use, because the writer records every
 event a module publishes rather than a list it keeps: `booking.booking.confirmed` and the

@@ -243,6 +243,15 @@ public class CreditLedger implements BookingPayments {
                 null, orderId);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public long balanceMinor(UUID accountId, Currency currency) {
+        if (accountId == null || currency == null) {
+            throw new IllegalStateException("A balance belongs to an account and a currency");
+        }
+        return balance(accountId, currency.getCurrencyCode());
+    }
+
     private static void requirePayPalRefund(UUID accountId, UUID bookingId, String orderId, int amountMinor,
                                             Currency currency) {
         if (accountId == null || bookingId == null || orderId == null || orderId.isBlank() || currency == null

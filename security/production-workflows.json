@@ -941,6 +941,49 @@
       ]
     },
     {
+      "id": "paypal-refund",
+      "actors": [
+        "TREASURER",
+        "ADMIN"
+      ],
+      "entryPoints": "Returning a PayPal payment through PayPal under /api/treasury/paypal/refunds, and the list of an account's PayPal payments that says whether and why each can be returned.",
+      "operationIds": [
+        "listPayPalRefunds",
+        "refundPayPalPayment"
+      ],
+      "backgroundEntryPoints": [],
+      "stateTransitions": [
+        "A return locks the PayPal order and then the payer's credit account, takes the payment's amount off the balance with a PAYPAL_REFUND entry, stores a PENDING refund and records one audit entry, all in one transaction.",
+        "PayPal is then asked outside any transaction to refund the capture in full with the refund's id as its request id.",
+        "A completed refund is recorded under the order lock and audited; a clear refusal or a refund PayPal reports as failed or cancelled marks the refund FAILED, restores the credit with a PAYPAL_REFUND_REVERSED entry and is audited."
+      ],
+      "alternatePaths": [
+        "PayPal answering that the capture is already fully refunded is resolved by reading the order: a completed refund it lists is recorded as completed, otherwise the refund stays pending.",
+        "A refund PayPal holds as pending keeps its refund id and stays pending with the credit taken."
+      ],
+      "failurePaths": [
+        "Accounts without TREASURER or ADMIN are refused under /api/treasury.",
+        "A missing recent authentication, a payment that was not captured, not cancelled or not credited back, a payment returned before and a balance that no longer covers the amount are refused before anything is written.",
+        "PayPal switched off or an order of the other environment is refused as unavailable and takes nothing.",
+        "No answer, a timeout, 429, 5xx or an unreadable answer leaves the refund pending with its credit taken; credit is restored only on a clear refusal."
+      ],
+      "productionPaths": [
+        "src/main/java/org/courtside/payment/web/PayPalRefundController.java",
+        "src/main/java/org/courtside/payment/internal/PayPalRefunds.java",
+        "src/main/java/org/courtside/payment/internal/PayPalRefundStore.java",
+        "src/main/java/org/courtside/payment/internal/PayPalOrders.java",
+        "src/main/java/org/courtside/payment/internal/PayPalClient.java",
+        "src/main/java/org/courtside/credit/internal/CreditLedger.java"
+      ],
+      "evidence": [
+        "src/test/java/org/courtside/payment/PayPalRefundTest.java#givenACancelledPayPalBooking_whenTheTreasurerReturnsIt_thenPayPalRefundsAndTheBalanceDropsByTheAmount",
+        "src/test/java/org/courtside/payment/PayPalRefundTest.java#givenARefusedRefund_whenReturning_thenTheCreditIsRestoredAndTheReasonShown",
+        "src/test/java/org/courtside/payment/PayPalRefundTest.java#givenTwoConcurrentReturns_whenBothRun_thenOnePayPalRefundAndOneEntry",
+        "src/test/java/org/courtside/payment/PayPalRefundTest.java#givenAMember_whenReturning_thenItIsForbidden",
+        "src/test/java/org/courtside/payment/PayPalRefundTest.java#givenAnAccount_whenTheTreasurerListsItsRefunds_thenEachPaymentSaysWhetherAndWhyItCanBeReturned"
+      ]
+    },
+    {
       "id": "paypal-checkout",
       "actors": [
         "MEMBER",
