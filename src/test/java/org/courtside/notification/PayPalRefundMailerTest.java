@@ -67,22 +67,43 @@ class PayPalRefundMailerTest extends AbstractIntegrationTest {
         // then
         MimeMessage mail = sentTo("jane.doe@example.org");
         assertThat(mail.getSubject()).as("the subject says the PayPal payment went back")
-                .contains("PayPal-Zahlung").contains("zurückgezahlt");
+                .startsWith("Courtside: ").contains("PayPal-Zahlung").contains("zurückgezahlt");
         assertThat(bodyOf(mail)).as("the body names the amount, PayPal and the dropped credit")
                 .contains("12,50").contains("PayPal").contains("Guthaben");
     }
 
     @Test
-    void givenAnAnonymisedAccount_whenTheRefundCompletes_thenNoMessageIsQueued() {
+    void givenAnEnglishAccount_whenTheRefundCompletes_thenTheMailIsEnglish() throws Exception {
         // given
-        UUID bookingId = UUID.randomUUID();
+        identity.changeLocale(janeAccount, "en");
 
         // when
-        publish(refunded(bookingId, true));
+        publish(refunded(UUID.randomUUID(), false));
 
         // then
-        assertThat(jdbc.sql("SELECT count(*) FROM message_record WHERE kind = 'PAYPAL_REFUNDED'")
-                .query(Long.class).single()).as("an anonymised account is told nothing").isZero();
+        MimeMessage mail = sentTo("jane.doe@example.org");
+        assertThat(mail.getSubject()).as("the English subject").contains("Your PayPal payment was refunded");
+        assertThat(bodyOf(mail)).as("the English body names the amount").contains("12.50").contains("refunded");
+    }
+
+    @Test
+    void givenAnAnonymisedAccount_whenTheRefundCompletes_thenNoMessageIsQueued() {
+        // given
+        publish(refunded(UUID.randomUUID(), false));
+        long queuedForAPlayerWhoIsKnown = queuedFor(janeAccount);
+
+        // when
+        publish(refunded(UUID.randomUUID(), true));
+
+        // then
+        assertThat(queuedForAPlayerWhoIsKnown).as("a refund for a known account queues a message").isEqualTo(1);
+        assertThat(queuedFor(janeAccount)).as("an anonymised account is told nothing")
+                .isEqualTo(queuedForAPlayerWhoIsKnown);
+    }
+
+    private long queuedFor(UUID accountId) {
+        return jdbc.sql("SELECT count(*) FROM message_record WHERE kind = 'PAYPAL_REFUNDED' AND account_id = :account")
+                .param("account", accountId).query(Long.class).single();
     }
 
     private PaymentEvent.PayPalRefunded refunded(UUID bookingId, boolean anonymised) {
