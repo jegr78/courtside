@@ -494,9 +494,10 @@ order of credentials no longer active are voided, their booking released and aud
 calling PayPal. When PayPal cannot show an order or shows it still unresolved, such as a pending
 capture, the booking stays held for at most 24 hours past its deadline and never past its start.
 Then an unreadable order without a capture attempt is voided, and any other releases its booking, is
-marked as attempted and stays open, so a capture read later becomes credit. A capture that completes
-after the booking's start never confirms it and becomes credit as well. For 72 hours the job also
-rereads voided orders whose capture was attempted, at most once per five minutes each, and records a
+marked as attempted and stays open, so a capture read later becomes credit. Once PayPal shows such an
+order as merely approved again, or its booking has started, the job voids it locally without calling
+PayPal. A capture that completes after the booking's start never confirms it and becomes credit as
+well. For 72 hours the job also rereads voided orders whose capture was attempted, at most once per five minutes each, and records a
 capture PayPal completed after all as a late capture. A run stops after three consecutive orders
 PayPal does not answer. A hold therefore ends at its deadline plus at most one run while PayPal
 answers clearly, and in every case at the earlier of 24 hours past its deadline and the
