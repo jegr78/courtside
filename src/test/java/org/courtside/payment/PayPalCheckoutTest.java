@@ -38,6 +38,8 @@ import org.springframework.web.context.WebApplicationContext;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
+import java.sql.Timestamp;
+import java.time.Clock;
 import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.Instant;
@@ -103,6 +105,8 @@ class PayPalCheckoutTest extends AbstractIntegrationTest {
     private PaymentTestFixture payment;
     @Autowired
     private JdbcClient jdbc;
+    @Autowired
+    private Clock clock;
 
     private MockMvc mockMvc;
     private UUID courtId;
@@ -404,12 +408,52 @@ class PayPalCheckoutTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void givenAReleasedBooking_whenItsOrderIsCaptured_thenTheAmountBecomesCredit() throws Exception {
+    void givenAReleasedBooking_whenThePayerReturnsWithAnApprovedOrder_thenItIsVoidedWithoutACapture()
+            throws Exception {
         // given
         UUID booking = bookWithOrder();
         assertThat(pendingPayments.release(booking)).isTrue();
         PAYPAL.reply(READ, 200, order("APPROVED", booking, "15.00", null));
-        PAYPAL.reply(CAPTURE, 201, order("COMPLETED", booking, "15.00", capture("COMPLETED", "15.00")));
+
+        // when
+        capture("roe.john").andExpect(jsonPath("$.outcome").value("REJECTED"));
+
+        // then
+        assertThat(PAYPAL.seen(CAPTURE)).as("a released court is never charged").isEmpty();
+        assertThat(orderStatus()).isEqualTo("VOIDED");
+        assertThat(entries(booking)).isEmpty();
+        assertThat(audit("payment.paypal.voided", booking)).singleElement()
+                .satisfies(payload -> assertThat(payload.get("reason").asString()).isEqualTo("BOOKING_RELEASED"));
+    }
+
+    @Test
+    void givenABookingThatHasStarted_whenThePayerReturnsWithAnApprovedOrder_thenItIsVoidedWithoutACapture()
+            throws Exception {
+        // given
+        UUID booking = bookWithOrder();
+        PAYPAL.reply(READ, 200, order("APPROVED", booking, "15.00", null));
+        jdbc.sql("UPDATE court_allocation SET starts_at = :start WHERE booking_id = :id")
+                .param("start", Timestamp.from(clock.instant().minus(Duration.ofMinutes(1)))).param("id", booking)
+                .update();
+
+        // when
+        capture("roe.john").andExpect(jsonPath("$.outcome").value("REJECTED"));
+
+        // then
+        assertThat(PAYPAL.seen(CAPTURE)).as("a session that has begun is never charged").isEmpty();
+        assertThat(bookingStatus(booking)).isEqualTo("CANCELLED");
+        assertThat(orderStatus()).isEqualTo("VOIDED");
+        assertThat(audit("payment.paypal.voided", booking)).singleElement()
+                .satisfies(payload -> assertThat(payload.get("reason").asString()).isEqualTo("HOLD_EXPIRED"));
+    }
+
+    @Test
+    void givenAReleasedBooking_whenThePayerReturnsToAnOrderPayPalCompleted_thenTheAmountBecomesCredit()
+            throws Exception {
+        // given
+        UUID booking = bookWithOrder();
+        assertThat(pendingPayments.release(booking)).isTrue();
+        PAYPAL.reply(READ, 200, order("COMPLETED", booking, "15.00", capture("COMPLETED", "15.00")));
 
         // when
         capture("roe.john").andExpect(jsonPath("$.outcome").value("LATE_CREDITED"));
@@ -431,8 +475,7 @@ class PayPalCheckoutTest extends AbstractIntegrationTest {
         assertThat(pendingPayments.release(booking)).isTrue();
         jdbc.sql("UPDATE user_account SET anonymised_at = now(), enabled = false, password_hash = NULL WHERE id = :id")
                 .param("id", johnAccount).update();
-        PAYPAL.reply(READ, 200, order("APPROVED", booking, "15.00", null));
-        PAYPAL.reply(CAPTURE, 201, order("COMPLETED", booking, "15.00", capture("COMPLETED", "15.00")));
+        PAYPAL.reply(READ, 200, order("COMPLETED", booking, "15.00", capture("COMPLETED", "15.00")));
 
         // when
         PayPalCheckout.Settlement settlement = checkout.settle(ORDER);
@@ -453,8 +496,7 @@ class PayPalCheckoutTest extends AbstractIntegrationTest {
         jdbc.sql("UPDATE booking SET status = 'CONFIRMED' WHERE id = :id").param("id", booking).update();
         jdbc.sql("UPDATE court_allocation SET status = 'CONFIRMED' WHERE booking_id = :id").param("id", booking)
                 .update();
-        PAYPAL.reply(READ, 200, order("APPROVED", booking, "15.00", null));
-        PAYPAL.reply(CAPTURE, 201, order("COMPLETED", booking, "15.00", capture("COMPLETED", "15.00")));
+        PAYPAL.reply(READ, 200, order("COMPLETED", booking, "15.00", capture("COMPLETED", "15.00")));
 
         // when / then
         assertThatThrownBy(() -> checkout.settle(ORDER)).isInstanceOf(IllegalStateException.class);
@@ -597,8 +639,7 @@ class PayPalCheckoutTest extends AbstractIntegrationTest {
         UUID booking = bookWithOrder();
         assertThat(pendingPayments.release(booking)).isTrue();
         config.chargeIn("CHF");
-        PAYPAL.reply(READ, 200, order("APPROVED", booking, "15.00", null));
-        PAYPAL.reply(CAPTURE, 201, order("COMPLETED", booking, "15.00", capture("COMPLETED", "15.00")));
+        PAYPAL.reply(READ, 200, order("COMPLETED", booking, "15.00", capture("COMPLETED", "15.00")));
 
         // when
         capture("roe.john").andExpect(status().isOk()).andExpect(jsonPath("$.outcome").value("LATE_CREDITED"));

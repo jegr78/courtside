@@ -287,10 +287,18 @@ public class PayPalCheckout {
         }
         if (mismatch.isPresent()) return reject(stored, mismatch.get());
         return switch (order.status()) {
-            case "APPROVED" -> capture(stored, active);
+            case "APPROVED" -> captureWhileHeld(stored, active);
             case "VOIDED" -> reject(stored, Rejection.ORDER_VOIDED);
             default -> processing(stored);
         };
+    }
+
+    private Settlement captureWhileHeld(StoredOrder stored, PayPalClient.Credentials active) {
+        if (stored.captureAttemptedAt() != null) return capture(stored, active);
+        Optional<PendingBooking> pending = pendingPayments.pending(stored.bookingId());
+        if (pending.isEmpty()) return voided(stored, VoidReason.BOOKING_RELEASED);
+        if (!pending.get().startsAt().isAfter(clock.instant())) return voided(stored, VoidReason.HOLD_EXPIRED);
+        return capture(stored, active);
     }
 
     private Settlement capture(StoredOrder stored, PayPalClient.Credentials credentials) {

@@ -449,7 +449,9 @@ the reconciliation job, and confirms a booking only after it holds the captured 
    ended signs in first and is brought back to the same address.
 4. The return calls `POST /api/payments/paypal/orders/{orderId}/capture`. Courtside first reads the
    order at PayPal and checks `custom_id`, amount, currency and status `APPROVED`; a mismatch marks
-   the order `REJECTED`, releases the booking and moves no money. It then stamps
+   the order `REJECTED`, releases the booking and moves no money. A booking that is no longer held or
+   has started is never charged: without an earlier capture attempt its order is voided and the
+   return answers `REJECTED`. Otherwise it stamps
    `capture_attempted_at` in a short transaction of its own and asks PayPal to capture, with the order
    id as `PayPal-Request-Id`. Only after PayPal answered does one transaction lock the order row, the
    booking grid and the booking, confirm the booking and append `PAYPAL_PAYMENT` and `BOOKING_DEBIT`
