@@ -131,6 +131,7 @@ export type PayPalOrder = components["schemas"]["PayPalOrder"];
 export type PayPalRefund = components["schemas"]["PayPalRefund"];
 export type PayPalRefundOption = components["schemas"]["PayPalRefundOption"];
 export type PayPalRefundOptions = components["schemas"]["PayPalRefundOptions"];
+export type PayPalRefundStatus = components["schemas"]["PayPalRefundStatus"];
 export type PayPalCapture = components["schemas"]["PayPalCapture"];
 export type PayPalCaptureOutcome = components["schemas"]["PayPalCaptureOutcome"];
 export type RetentionCategory = components["schemas"]["RetentionCategory"];

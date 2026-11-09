@@ -329,7 +329,7 @@ class PayPalClientTest {
         PayPalClient.Refund refund = client.refundCapture(credentials(), "CAP1", UUID.randomUUID());
 
         // then
-        assertThat(refund).isEqualTo(new PayPalClient.Refund("REF1", "FAILED", "ECHECK"));
+        assertThat(refund).isEqualTo(new PayPalClient.Refund("REF1", "FAILED", "ECHECK", null, null));
     }
 
     @Test
@@ -394,17 +394,18 @@ class PayPalClientTest {
     }
 
     @Test
-    void givenARefundId_whenReadingIt_thenStatusAndIdAreReturned() throws IOException {
+    void givenARefundId_whenReadingIt_thenStatusIdAndAmountAreReturned() throws IOException {
         // given
         reply("POST /v1/oauth2/token", 200, TOKEN);
-        reply("GET /v2/payments/refunds/REF1", 200, "{\"id\":\"REF1\",\"status\":\"PENDING\"}");
+        reply("GET /v2/payments/refunds/REF1", 200,
+                "{\"id\":\"REF1\",\"status\":\"PENDING\",\"amount\":{\"currency_code\":\"EUR\",\"value\":\"15.00\"}}");
         PayPalClient client = client(Duration.ofSeconds(2));
 
         // when
         PayPalClient.Refund refund = client.getRefund(credentials(), "REF1");
 
         // then
-        assertThat(refund).isEqualTo(new PayPalClient.Refund("REF1", "PENDING", null));
+        assertThat(refund).isEqualTo(new PayPalClient.Refund("REF1", "PENDING", null, 1500, "EUR"));
     }
 
     @Test

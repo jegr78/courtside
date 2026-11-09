@@ -20,7 +20,7 @@ function RefundCell({ entry, refunds }: { entry: CreditEntry; refunds: PayPalRef
   const { t } = useTranslation();
   const option = entry.paypalOrderId ? refunds.options.get(entry.paypalOrderId) : undefined;
   if (!option) return null;
-  if (REFUND_KINDS.includes(entry.kind)) {
+  if (REFUND_KINDS.includes(entry.kind) || option.status) {
     return option.status && <span data-testid="paypal-refund-state" data-status={option.status}>
       {t(`paypalRefund.state.${option.status}`, { reason: option.failureReason ?? "" })}
     </span>;

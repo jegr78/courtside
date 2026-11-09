@@ -1,9 +1,10 @@
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { api, ApiError, type CreditEntry, type CreditEntryRequest, type CreditEntryRequestKind, type CreditHolder, type CreditPageOptions, type PayPalRefundOption } from "../api/client";
+import { api, ApiError, type CreditEntry, type CreditEntryRequest, type CreditEntryRequestKind, type CreditHolder, type CreditPageOptions, type PayPalRefundOption, type PayPalRefundStatus } from "../api/client";
 import { problemMessage } from "../api/problem-message";
 import { useClubConfiguration } from "../club/registry";
 import { Alert } from "../components/Alert";
+import type { AlertTone } from "../components/noticeTones";
 import { Button } from "../components/Button";
 import { Modal } from "../components/Modal";
 import { ReauthenticationCode } from "../components/ReauthenticationCode";
@@ -100,6 +101,8 @@ export function AdminCreditView() {
   </section>;
 }
 
+const OUTCOME_TONES: Record<PayPalRefundStatus, AlertTone> = { COMPLETED: "success", PENDING: "warning", FAILED: "error" };
+
 function CreditAccount({ holder, recorded }: { holder: CreditHolder; recorded: () => void }) {
   const { t, i18n } = useTranslation();
   const language = i18n.resolvedLanguage ?? "de";
@@ -117,7 +120,7 @@ function CreditAccount({ holder, recorded }: { holder: CreditHolder; recorded: (
   const [refundOptionsFailure, setRefundOptionsFailure] = useState<string>();
   const [refunding, setRefunding] = useState<CreditEntry>();
   const [refundError, setRefundError] = useState<string>();
-  const [refundOutcome, setRefundOutcome] = useState<string>();
+  const [refundOutcome, setRefundOutcome] = useState<{ tone: AlertTone; text: string }>();
   const [reauthenticationFailure, setReauthenticationFailure] = useState<string>();
   const currency = ledger.page?.currency ?? club?.currency ?? holder.currency;
   const name = `${holder.firstName} ${holder.lastName}`;
@@ -141,12 +144,17 @@ function CreditAccount({ holder, recorded }: { holder: CreditHolder; recorded: (
     try {
       const refunded = await api.refundPayPalPayment(orderId);
       setRefunding(undefined);
-      setRefundOutcome(t(`paypalRefund.state.${refunded.status}`, { reason: refunded.failureReason ?? "" }));
+      setRefundOutcome({ tone: OUTCOME_TONES[refunded.status],
+        text: t(`paypalRefund.state.${refunded.status}`, { reason: refunded.failureReason ?? "" }) });
       recorded();
       await Promise.all([ledger.reload(), loadRefundOptions()]);
     } catch (failure) {
-      if (failure instanceof ApiError && failure.problem?.type === RECENT_AUTH) setRetry({ send: () => refund(orderId) });
-      else setRefundError(problemMessage(failure, t));
+      if (failure instanceof ApiError && failure.problem?.type === RECENT_AUTH) {
+        setRetry({ send: () => refund(orderId) });
+      } else {
+        setRefundError(problemMessage(failure, t));
+        await Promise.all([ledger.reload(), loadRefundOptions()]);
+      }
     } finally {
       setPending(false);
     }
@@ -224,7 +232,7 @@ function CreditAccount({ holder, recorded }: { holder: CreditHolder; recorded: (
   return <section data-testid="credit-account" aria-labelledby="credit-account-title" className="grid min-w-0 gap-6 rounded-xl border p-4 sm:p-6">
     <h2 id="credit-account-title" className="text-2xl font-bold [overflow-wrap:anywhere]">{t("admin.credit.ledgerOf", { name })}</h2>
     {refundOptionsFailure && <Alert testId="paypal-refund-options-error">{refundOptionsFailure}</Alert>}
-    {refundOutcome && <SuccessFeedback testId="paypal-refund-outcome">{refundOutcome}</SuccessFeedback>}
+    {refundOutcome && <Alert tone={refundOutcome.tone} testId="paypal-refund-outcome">{refundOutcome.text}</Alert>}
     <CreditLedger ledger={ledger} refunds={refunds} />
     <form noValidate {...entryForm.form} onSubmit={submit} data-testid="credit-form" aria-labelledby="credit-entry-title"
       className="grid gap-3 rounded-xl border p-4">

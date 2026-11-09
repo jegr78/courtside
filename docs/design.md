@@ -522,7 +522,7 @@ entry; and when PayPal is on with the environment the order was created in. Othe
 `POST /api/treasury/paypal/refunds` refuses it with `payment.paypal.refund.notRefundable`,
 `payment.paypal.refund.alreadyRefunded`, `payment.paypal.refund.creditSpent` with amount, balance
 and currency, or `payment.paypal.refund.unavailable`, and writes nothing. The request needs a
-recent authentication. An anonymised account's payment can be returned too.
+recent authentication.
 
 The return runs in three steps, and no database lock is held across the PayPal call:
 
@@ -544,8 +544,9 @@ PayPal's reason, appends a `PAYPAL_REFUND_REVERSED` of the amount and is audited
 `payment.paypal.refundFailed`. `FAILED` is final for the order; the treasurer then pays out by hand.
 A capture PayPal reports as already fully refunded, for example after a refund in the PayPal
 account, is resolved by reading the order: a completed refund listed there is recorded as completed,
-otherwise the refund stays pending. Every other answer, including no answer, a timeout, a 5xx and a
-body Courtside cannot read, leaves the refund `PENDING` with its credit taken.
+otherwise the refund stays pending. Every other answer, including no answer, a timeout, a 5xx, a
+body Courtside cannot read and a completed refund of an amount other than the payment's, leaves the
+refund `PENDING` with its credit taken.
 
 `PayPalReconciliation` also resolves `PENDING` refunds older than five minutes, up to 50 per run and
 longest unchecked first: one without a PayPal refund id is requested again with the same request id

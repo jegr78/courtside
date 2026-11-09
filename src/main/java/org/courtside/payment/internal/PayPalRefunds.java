@@ -244,7 +244,8 @@ public class PayPalRefunds {
 
     private RefundView record(StoredRefund refund, PayPalClient.Refund answer) {
         return switch (answer.status()) {
-            case "COMPLETED" -> completed(refund, answer.id());
+            case "COMPLETED" -> answer.mayCover(refund.amountMinor(), refund.currency().getCurrencyCode())
+                    ? completed(refund, answer.id()) : partial(refund, answer);
             case "FAILED", "CANCELLED" -> failed(refund, answer.id(), "PayPal reports the refund as "
                     + answer.status() + (answer.reason() == null ? "" : ": " + answer.reason()));
             default -> pending(refund, answer.id());
@@ -279,6 +280,13 @@ public class PayPalRefunds {
             log.warn("PayPal refund {} of order {} failed and its credit is restored", current.id(), current.orderId());
             return new RefundView(current.orderId(), RefundStatus.FAILED, reason);
         });
+    }
+
+    private RefundView partial(StoredRefund refund, PayPalClient.Refund answer) {
+        log.warn("PayPal completed refund {} of order {} for {} {} instead of {} {}; it stays pending", answer.id(),
+                refund.orderId(), answer.amountMinor(), answer.currency(), refund.amountMinor(),
+                refund.currency().getCurrencyCode());
+        return pending(refund, answer.id());
     }
 
     private RefundView pending(StoredRefund refund, String refundId) {

@@ -161,12 +161,31 @@ class PayPalRefundTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenACaptureRefundedInPartAtPayPal_whenPayPalCompletesOnlyTheRest_thenTheRefundStaysPendingWithItsCreditTaken()
+            throws Exception {
+        // given
+        UUID booking = paidAndCancelled();
+        PAYPAL.reply(REFUND, 201, FakePayPal.refund("COMPLETED", "5.00"));
+
+        // when
+        refund("miles.richard", ORDER, true)
+
+                // then
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PENDING"));
+        assertThat(refundRow()).as("a refund of less than the payment is not the return Courtside took credit for")
+                .containsEntry("status", "PENDING").containsEntry("refund_id", "REFUND1");
+        assertThat(credit.balance(johnAccount)).isZero();
+        assertThat(audit("payment.paypal.refunded", booking)).as("nothing claims the payment went back").isEmpty();
+    }
+
+    @Test
     void givenACancelledPayPalBooking_whenTheTreasurerReturnsIt_thenPayPalRefundsAndTheBalanceDropsByTheAmount()
             throws Exception {
         // given
         UUID booking = paidAndCancelled();
         assertThat(credit.balance(johnAccount)).isEqualTo(1500);
-        PAYPAL.reply(REFUND, 201, FakePayPal.refund("COMPLETED"));
+        PAYPAL.reply(REFUND, 201, FakePayPal.refund("COMPLETED", "15.00"));
 
         // when
         refund("miles.richard", ORDER, true)

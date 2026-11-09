@@ -180,6 +180,11 @@ final class FakePayPal {
         return "{\"id\":\"REFUND1\",\"status\":\"" + status + "\"}";
     }
 
+    static String refund(String status, String value) {
+        return "{\"id\":\"REFUND1\",\"status\":\"" + status + "\",\"amount\":{\"currency_code\":\"EUR\",\"value\":\""
+                + value + "\"}}";
+    }
+
     record Reply(int status, String body, Duration delay) {
     }
 

@@ -234,8 +234,18 @@ public class PayPalClient {
 
     private static Refund refund(JsonNode body) {
         String reason = text(body.get("status_details"), "reason");
-        return new Refund(unclearField(body, "id"), unclearField(body, "status"),
-                reason.isEmpty() ? null : bounded(reason));
+        String id = unclearField(body, "id");
+        JsonNode amount = body.get("amount");
+        Money refunded = null;
+        if (amount != null && !amount.isNull()) {
+            try {
+                refunded = money(amount);
+            } catch (PayPalRefusedException unreadable) {
+                throw new PayPalUnavailableException("PayPal answered refund " + id + " without a readable amount");
+            }
+        }
+        return new Refund(id, unclearField(body, "status"), reason.isEmpty() ? null : bounded(reason),
+                refunded == null ? null : refunded.minor(), refunded == null ? null : refunded.currency());
     }
 
     private static String unclearField(JsonNode body, String field) {
@@ -455,7 +465,13 @@ public class PayPalClient {
     public record Capture(String id, String status, int amountMinor, String currency) {
     }
 
-    public record Refund(String id, String status, @Nullable String reason) {
+    public record Refund(String id, String status, @Nullable String reason, @Nullable Integer amountMinor,
+                         @Nullable String currency) {
+
+        /** False only when PayPal names an amount other than the given one. */
+        boolean mayCover(int expectedMinor, String expectedCurrency) {
+            return amountMinor == null || amountMinor == expectedMinor && expectedCurrency.equals(currency);
+        }
     }
 
     public record ListedRefund(String id, String status, int amountMinor, String currency) {
