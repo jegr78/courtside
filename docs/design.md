@@ -402,8 +402,8 @@ booker pays the whole amount by PayPal; a booking is never split between credit 
 payment is available when the club switched it on, a secret is stored and the instance knows its
 public address. `booking` reads that through its own port `PaymentMethods`, which the `payment`
 module implements. Only an outsider booking a single booking for themselves gets this choice. When
-PayPal is not available, or the outsider books for a dependant, the booking is refused with the
-violation `booking.payment.creditInsufficient`, carrying amount, balance and currency, and nothing
+PayPal is not available, or somebody else books on the outsider's behalf, the booking is refused
+with the violation `booking.payment.creditInsufficient`, carrying amount, balance and currency, and nothing
 is written. A booking that costs nothing writes no entry. Cancelling a paid booking before it starts
 appends a `BOOKING_REFUND` of the debited amount in the same transaction. The booker can cancel only
 before the cancellation deadline of their rule set, so a refund after the deadline happens only when
@@ -493,8 +493,7 @@ open orders of the former credentials after the change commits. An order without
 cannot have moved money, so it is voided and its booking released without asking PayPal. One with
 an attempt is read at PayPal with the former credentials: a capture is recorded, an uncaptured
 order voided, and an unreadable one stays open for the reconciliation. An order keeps the
-environment it was created in. Sandbox works on every instance; the PayPal page warns that sandbox
-bookings are confirmed with test money.
+environment it was created in, and sandbox credentials work on every instance.
 
 Courtside stores nothing from PayPal's payer object. The audit events of the checkout name the
 booking, the order, the environment, amounts and reasons, never payer data.
