@@ -23,6 +23,7 @@ import java.time.Instant;
 import java.util.Base64;
 import java.util.Currency;
 import java.util.HexFormat;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -49,16 +50,18 @@ public class PayPalClient {
 
     private final PayPalProperties properties;
     private final Clock clock;
+    private final boolean production;
     private final HttpClient client;
     private final Map<String, CachedToken> tokens = new ConcurrentHashMap<>();
 
-    PayPalClient(PayPalProperties properties) {
-        this(properties, Clock.systemUTC());
+    PayPalClient(PayPalProperties properties, boolean production) {
+        this(properties, Clock.systemUTC(), production);
     }
 
-    PayPalClient(PayPalProperties properties, Clock clock) {
+    PayPalClient(PayPalProperties properties, Clock clock, boolean production) {
         this.properties = properties;
         this.clock = clock;
+        this.production = production;
         this.client = HttpClient.newBuilder().connectTimeout(properties.requestTimeout()).build();
     }
 
@@ -212,7 +215,7 @@ public class PayPalClient {
         return order.capture().orElseThrow(() -> new PayPalRefusedException("PayPal order has no capture"));
     }
 
-    private static Order order(JsonNode body) {
+    private Order order(JsonNode body) {
         String id = required(body, "id");
         String status = required(body, "status");
         JsonNode unit = firstUnit(body);
@@ -238,7 +241,7 @@ public class PayPalClient {
         return units.get(0);
     }
 
-    private static Optional<URI> approveUrl(@Nullable JsonNode links) {
+    private Optional<URI> approveUrl(@Nullable JsonNode links) {
         if (links == null || !links.isArray()) return Optional.empty();
         for (String rel : new String[]{"payer-action", "approve"}) {
             for (JsonNode link : links) {
@@ -248,14 +251,26 @@ public class PayPalClient {
         return Optional.empty();
     }
 
-    private static URI href(String href) {
+    private URI href(String href) {
+        URI uri;
         try {
-            URI uri = URI.create(href);
-            if (("https".equals(uri.getScheme()) || "http".equals(uri.getScheme())) && uri.getHost() != null) return uri;
+            uri = URI.create(href);
         } catch (IllegalArgumentException malformed) {
             log.debug("PayPal sent an approve link that is not a URI");
+            throw new PayPalRefusedException("PayPal sent an approve link that is not a web address");
         }
-        throw new PayPalRefusedException("PayPal sent an approve link that is not a web address");
+        if (!("https".equals(uri.getScheme()) || "http".equals(uri.getScheme())) || uri.getHost() == null) {
+            throw new PayPalRefusedException("PayPal sent an approve link that is not a web address");
+        }
+        if (production && !("https".equals(uri.getScheme()) && onPayPal(uri.getHost()))) {
+            throw new PayPalRefusedException("PayPal sent an approve link outside paypal.com");
+        }
+        return uri;
+    }
+
+    private static boolean onPayPal(String host) {
+        String name = host.toLowerCase(Locale.ROOT);
+        return name.equals("paypal.com") || name.endsWith(".paypal.com");
     }
 
     private static Money money(@Nullable JsonNode amount) {

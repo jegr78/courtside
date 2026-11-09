@@ -5,6 +5,7 @@ import org.courtside.payment.PayPalEnvironment;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -390,6 +391,40 @@ class PayPalClientTest {
         assertThatThrownBy(() -> client.getOrder(credentials(), "ORD1")).isInstanceOf(PayPalRefusedException.class);
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"http://www.paypal.com/checkoutnow?token=ORD1", "https://paypal.com.example.org/x",
+            "https://example.org/checkoutnow", "https://evilpaypal.com/checkoutnow"})
+    void givenProductionAndAnApproveLinkOffPayPal_whenReadingAnOrder_thenItIsRefused(String href) throws IOException {
+        // given
+        reply("POST /v1/oauth2/token", 200, TOKEN);
+        reply("GET /v2/checkout/orders/ORD1", 200, order("ORD1", "CREATED", UUID.randomUUID(), "1.00", "EUR", null,
+                "[{\"rel\":\"approve\",\"href\":\"" + href + "\"}]"));
+        PayPalClient client = client(Duration.ofSeconds(2), new MutableClock(), true);
+
+        // when / then
+        assertThatThrownBy(() -> client.getOrder(credentials(), "ORD1")).isInstanceOf(PayPalRefusedException.class)
+                .hasMessage("PayPal sent an approve link outside paypal.com");
+    }
+
+    @ParameterizedTest
+    @CsvSource({"true,https://www.sandbox.paypal.com/checkoutnow?token=ORD1",
+            "true,https://PayPal.com/checkoutnow?token=ORD1",
+            "false,http://paypal-sandbox.test:8080/approve?token=ORD1"})
+    void givenAnApproveLinkTheEnvironmentAllows_whenReadingAnOrder_thenItIsKept(boolean production, String href)
+            throws IOException {
+        // given
+        reply("POST /v1/oauth2/token", 200, TOKEN);
+        reply("GET /v2/checkout/orders/ORD1", 200, order("ORD1", "CREATED", UUID.randomUUID(), "1.00", "EUR", null,
+                "[{\"rel\":\"approve\",\"href\":\"" + href + "\"}]"));
+        PayPalClient client = client(Duration.ofSeconds(2), new MutableClock(), production);
+
+        // when
+        PayPalClient.Order order = client.getOrder(credentials(), "ORD1");
+
+        // then
+        assertThat(order.approveUrl()).contains(URI.create(href));
+    }
+
     @Test
     void givenAnOrderIdThatIsNotAnIdentifier_whenCalling_thenNothingIsSent() throws IOException {
         // given
@@ -420,6 +455,10 @@ class PayPalClientTest {
     }
 
     private PayPalClient client(Duration timeout, Clock clock) throws IOException {
+        return client(timeout, clock, false);
+    }
+
+    private PayPalClient client(Duration timeout, Clock clock, boolean production) throws IOException {
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/", exchange -> {
             String route = exchange.getRequestMethod() + " " + exchange.getRequestURI().getPath();
@@ -444,7 +483,7 @@ class PayPalClientTest {
         server.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
         server.start();
         URI endpoint = URI.create("http://127.0.0.1:" + server.getAddress().getPort());
-        return new PayPalClient(new PayPalProperties(endpoint, endpoint, timeout), clock);
+        return new PayPalClient(new PayPalProperties(endpoint, endpoint, timeout), clock, production);
     }
 
     private void reply(String route, int status, String body) {

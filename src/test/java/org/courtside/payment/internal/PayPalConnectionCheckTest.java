@@ -113,7 +113,7 @@ class PayPalConnectionCheckTest {
     }
 
     private static PayPalConnectionCheck connectionCheck(PayPalProperties properties) {
-        return new PayPalConnectionCheck(new PayPalClient(properties));
+        return new PayPalConnectionCheck(new PayPalClient(properties, false));
     }
 
     private URI serve(int status, String body, Duration delay) throws IOException {

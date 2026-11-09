@@ -16,11 +16,11 @@ class PaymentConfiguration {
 
     @Bean
     PayPalClient payPalClient(PayPalProperties properties, @Value("${courtside.environment}") String environment) {
-        if ("PRODUCTION".equalsIgnoreCase(environment)
-                && (!SANDBOX.equals(properties.sandboxEndpoint()) || !LIVE.equals(properties.liveEndpoint()))) {
+        boolean production = "PRODUCTION".equalsIgnoreCase(environment);
+        if (production && (!SANDBOX.equals(properties.sandboxEndpoint()) || !LIVE.equals(properties.liveEndpoint()))) {
             throw new IllegalStateException("Configured PayPal endpoints cannot override PayPal in production");
         }
-        return new PayPalClient(properties);
+        return new PayPalClient(properties, production);
     }
 
     @Bean

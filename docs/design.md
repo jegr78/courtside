@@ -429,6 +429,8 @@ The connection check requests an access token from the stored environment with t
 credentials and reports `OK`, `REJECTED` with PayPal's own reason or the HTTP status, `UNREACHABLE`
 after 10 seconds or a failed connection, or `NOT_CONFIGURED`. The PayPal endpoints are application
 properties, not request data, and production refuses to start with any other host than PayPal's.
+In production an approve link PayPal sends must also use `https` on `paypal.com` or one of its
+subdomains, or the order is refused before the browser is sent there.
 
 #### Paying a booking with PayPal
 
