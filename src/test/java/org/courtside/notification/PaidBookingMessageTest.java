@@ -158,8 +158,8 @@ class PaidBookingMessageTest extends AbstractIntegrationTest {
 
         // when
         transactions.executeWithoutResult(status -> {
-            bookingPayments.payByPayPal(johnAccount, booking, "ORDER-1", 1500, Currency.getInstance("EUR"));
             pendingPayments.confirm(booking);
+            bookingPayments.payByPayPal(johnAccount, booking, "ORDER-1", 1500, Currency.getInstance("EUR"));
         });
 
         // then
