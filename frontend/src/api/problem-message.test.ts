@@ -4,6 +4,7 @@ import de from "../locales/de";
 import en from "../locales/en";
 import { ApiError } from "./client";
 import { problemMessage, violationMessage } from "./problem-message";
+import { formatClockTime, formatTime } from "../time/clubZone";
 
 beforeEach(async () => {
   await i18n.changeLanguage("en");
@@ -11,6 +12,7 @@ beforeEach(async () => {
 
 afterEach(() => {
   vi.unstubAllEnvs();
+  vi.useRealTimers();
 });
 
 it("given a coded violation, when resolving the problem, then its i18n key is translated", () => {
@@ -297,4 +299,33 @@ it.each([
   // then
   expect(i18n.exists(code), `${code} has an English text`).toBe(true);
   expect(message).toBe(i18n.t(code, params));
+});
+
+it("given a pending PayPal booking that holds its court until later, when a second booking is refused, then the refusal names the time the hold ends", async () => {
+  // given
+  await i18n.changeLanguage("de");
+  vi.useFakeTimers({ now: Date.parse("2026-05-12T10:05:00Z"), toFake: ["Date"] });
+  const expiresAt = "2026-05-12T10:15:00Z";
+  const time = formatClockTime(formatTime(expiresAt, Intl.DateTimeFormat().resolvedOptions().timeZone), "de");
+
+  // when
+  const message = violationMessage("booking.payment.pendingExists", { expiresAt }, i18n.t);
+
+  // then
+  expect(message, "the hold's end reads as a clock time").toBe(i18n.t("booking.payment.pendingExists", { expiresAt: time }));
+  expect(message).toContain(time);
+  expect(message, "the raw instant never reaches the player").not.toContain("2026-05-12");
+});
+
+it("given a pending PayPal booking whose hold has already ended, when a second booking is refused, then the refusal says the hold is ending instead of a time gone by", async () => {
+  // given
+  await i18n.changeLanguage("en");
+  vi.useFakeTimers({ now: Date.parse("2026-05-12T10:16:00Z"), toFake: ["Date"] });
+
+  // when
+  const message = violationMessage("booking.payment.pendingExists", { expiresAt: "2026-05-12T10:15:00Z" }, i18n.t);
+
+  // then
+  expect(message, "a past deadline is not offered as a time to wait for").toBe(i18n.t("booking.payment.pendingExists_past"));
+  expect(message).not.toBe(i18n.t("booking.payment.pendingExists", { expiresAt: "" }));
 });

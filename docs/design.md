@@ -380,7 +380,8 @@ before the cancellation deadline of their rule set, so a refund after the deadli
 somebody else, the club, cancels the booking. Once the booking has started nothing is refunded, nor
 is a booking released because nobody turned up, nor one whose account has been anonymised since.
 A unique index allows one debit and one refund per booking. The treasury cannot record either kind
-by hand. The confirmation mail names the amount and that it was paid from credit, and the club's
+by hand. The confirmation mail names the amount and whether it was paid from credit or by PayPal,
+read from a `PAYPAL_PAYMENT` entry for the booking, and the club's
 cancellation mail tells the booker that the amount is back on their credit; both read the payment
 from the ledger, not from the booking's amount.
 
@@ -390,7 +391,8 @@ is write-only. It is stored encrypted with the instance keyring, never returned 
 the settings show only since when a secret is stored. A save without a secret keeps the stored one.
 PayPal payment can be on only while a secret is stored, and a new client id or environment needs a
 new secret, so a secret never moves to credentials it was not entered for. Saving and removing the
-credentials require a re-authentication no older than five minutes.
+credentials require a re-authentication no older than five minutes. While sandbox credentials are
+stored, the page warns that bookings are confirmed with test money.
 `payment.paypal.settings.changed` names the environment, the switch and whether the client id or the
 secret changed, never either value, and `payment.paypal.credentials.removed` records the removal.
 The connection check requests an access token from the stored environment with the stored

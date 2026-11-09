@@ -25,6 +25,7 @@ beforeEach(async () => {
   vi.spyOn(api, "participantCards").mockResolvedValue([]);
   vi.spyOn(api, "participantMembers").mockResolvedValue([]);
   vi.spyOn(api, "ownCredit").mockResolvedValue(creditOf(0));
+  vi.spyOn(api, "payPalAvailability").mockResolvedValue({ available: false });
 });
 
 it("given a mouse, when the dialog opens, then it says the plan can be dragged across", async () => {
@@ -380,11 +381,11 @@ function creditOf(balanceMinor: number) {
   return { balanceMinor, currency: "EUR", items: [], nextCursor: null };
 }
 
-async function showExternal(externalPriceMinor: number) {
+async function showExternal(externalPriceMinor: number, created: () => Promise<void> = () => Promise.resolve()) {
   vi.spyOn(api, "bookingCards").mockResolvedValue([{ ...cardWithGuestFee(0), externalPriceMinor }]);
   render(<BookingDialog selection={{ date: "2026-08-10", slot: "10:00", courtId: court.id }} grid={grid as never}
     courts={[court]} allocations={[]} canChooseSeveralCourts={false} memberFeatures={false} currency="EUR"
-    closed={() => undefined} created={() => Promise.resolve()} conflicted={() => Promise.resolve()} />);
+    closed={() => undefined} created={created} conflicted={() => Promise.resolve()} />);
   await screen.findByTestId("booking-card");
   await act(() => new Promise((settled) => setTimeout(settled, 0)));
 }
@@ -471,4 +472,126 @@ it("given credit short of the amount, when the club refuses the booking, then th
     .toHaveTextContent("Dein Guthaben von 10,00 € reicht für diese Buchung über 19,49 € nicht.");
   expect(document.getElementById("booking-startsAt-errors"), "short credit is no fault of the chosen time").toBeNull();
   expect(screen.queryByTestId("booking-refusal"), "the refusal is stated once").toBeNull();
+});
+
+function stubbedAssign() {
+  const assign = vi.fn();
+  const realLocation = window.location;
+  Object.defineProperty(window, "location", { configurable: true, value: Object.assign(new URL(realLocation.href), { assign }) });
+  onTestFinished(() => { Object.defineProperty(window, "location", { configurable: true, value: realLocation }); });
+  return assign;
+}
+
+it("given credit short of the amount and PayPal available, when the dialog opens, then the booking is offered as a PayPal payment in place of the shortfall hint", async () => {
+  // given
+  vi.spyOn(api, "ownCredit").mockResolvedValue(creditOf(100));
+  vi.spyOn(api, "payPalAvailability").mockResolvedValue({ available: true });
+
+  // when
+  await showExternal(1299);
+
+  // then
+  await waitFor(() => expect(screen.getByTestId("booking-submit")).toHaveTextContent("Mit PayPal bezahlen"));
+  expect(screen.getByTestId("booking-submit")).toHaveAttribute("data-payment", "PAYPAL");
+  expect(screen.queryByTestId("booking-credit-short"), "PayPal answers the shortfall").toBeNull();
+  expect(screen.getByTestId("booking-paypal-hint")).toHaveTextContent(i18n.t("booking.payPalHint"));
+});
+
+it("given credit short of the amount and PayPal unavailable, when the dialog opens, then the booking keeps its ordinary action and the shortfall hint", async () => {
+  // given
+  vi.spyOn(api, "ownCredit").mockResolvedValue(creditOf(100));
+
+  // when
+  await showExternal(1299);
+
+  // then
+  expect(await screen.findByTestId("booking-credit-short")).toBeInTheDocument();
+  expect(screen.getByTestId("booking-submit")).toHaveTextContent(i18n.t("booking.submit"));
+  expect(screen.queryByTestId("booking-paypal-hint")).toBeNull();
+});
+
+it("given credit that covers the amount, when the dialog opens, then PayPal is not offered even though it is available", async () => {
+  // given
+  vi.spyOn(api, "ownCredit").mockResolvedValue(creditOf(5000));
+  vi.spyOn(api, "payPalAvailability").mockResolvedValue({ available: true });
+
+  // when
+  await showExternal(1299);
+
+  // then
+  expect(await screen.findByTestId("booking-balance")).toBeInTheDocument();
+  expect(screen.getByTestId("booking-submit"), "credit pays the booking").toHaveTextContent(i18n.t("booking.submit"));
+});
+
+it("given a card priced for external players, when a member opens the dialog, then PayPal availability is not read", async () => {
+  // given
+  vi.spyOn(api, "bookingCards").mockResolvedValue([{ ...cardWithGuestFee(0), externalPriceMinor: 1299 }]);
+
+  // when
+  show("EUR");
+  await screen.findByTestId("booking-card");
+  await act(() => new Promise((settled) => setTimeout(settled, 0)));
+
+  // then
+  expect(api.payPalAvailability, "members never pay by PayPal").not.toHaveBeenCalled();
+});
+
+it("given a booking the server holds for a PayPal payment, when it is created, then the order is created and the browser goes to PayPal", async () => {
+  // given
+  vi.spyOn(api, "ownCredit").mockResolvedValue(creditOf(100));
+  vi.spyOn(api, "payPalAvailability").mockResolvedValue({ available: true });
+  vi.spyOn(api, "createBooking").mockResolvedValue({ id: "55555555-5555-5555-5555-555555555555", status: "PENDING_PAYMENT",
+    paymentExpiresAt: "2026-08-10T08:15:00Z" });
+  const order = vi.spyOn(api, "createPayPalOrder").mockResolvedValue({ orderId: "ORDER-1", approveUrl: "https://paypal.example.org/approve/ORDER-1" });
+  const assign = stubbedAssign();
+  const created = vi.fn(() => Promise.resolve());
+  await showExternal(1299, created);
+
+  // when
+  fireEvent.click(screen.getByTestId("booking-submit"));
+
+  // then
+  await waitFor(() => expect(assign).toHaveBeenCalledWith("https://paypal.example.org/approve/ORDER-1"));
+  expect(order).toHaveBeenCalledWith("55555555-5555-5555-5555-555555555555");
+  expect(created, "the page leaves for PayPal instead of reporting a confirmed booking").not.toHaveBeenCalled();
+  expect(screen.queryByTestId("booking-paypal-failed"), "a page leaving for PayPal reports no failure").toBeNull();
+});
+
+it("given a booking held for PayPal, when the order cannot be created, then the dialog says the court is held and the payment continues from my bookings", async () => {
+  // given
+  vi.spyOn(api, "ownCredit").mockResolvedValue(creditOf(100));
+  vi.spyOn(api, "payPalAvailability").mockResolvedValue({ available: true });
+  vi.spyOn(api, "createBooking").mockResolvedValue({ id: "55555555-5555-5555-5555-555555555555", status: "PENDING_PAYMENT",
+    paymentExpiresAt: "2026-08-10T08:15:00Z" });
+  vi.spyOn(api, "createPayPalOrder").mockRejectedValue(new ApiError(503, {
+    type: "urn:courtside:error:paypal-public-url-missing", title: "Unavailable", status: 503
+  }));
+  const assign = stubbedAssign();
+  await showExternal(1299);
+
+  // when
+  fireEvent.click(screen.getByTestId("booking-submit"));
+
+  // then
+  const held = await screen.findByTestId("booking-paypal-failed");
+  expect(held).toHaveTextContent(i18n.t("booking.payPalOrderFailed"));
+  expect(screen.getByTestId("booking-refusal")).toHaveTextContent(i18n.t("error.type.paypal-public-url-missing"));
+  expect(screen.getByTestId("booking-submit"), "a second submit would only meet the pending booking").toBeDisabled();
+  expect(assign).not.toHaveBeenCalled();
+});
+
+it("given a pending PayPal booking elsewhere, when another booking is refused for it, then the refusal stands beside the button and not at the time", async () => {
+  // given
+  vi.spyOn(api, "createBooking").mockRejectedValue(new ApiError(422, {
+    type: "urn:courtside:error:booking-rules-violated", title: "Booking rules violated", status: 422,
+    violations: [{ code: "booking.payment.pendingExists", params: { expiresAt: "2999-01-01T10:15:00Z" } }]
+  }));
+  await showExternal(1299);
+
+  // when
+  fireEvent.click(screen.getByTestId("booking-submit"));
+
+  // then
+  expect(await screen.findByTestId("booking-outcome")).toHaveTextContent(/PayPal/);
+  expect(document.getElementById("booking-startsAt-errors"), "a pending payment is no fault of the chosen time").toBeNull();
 });

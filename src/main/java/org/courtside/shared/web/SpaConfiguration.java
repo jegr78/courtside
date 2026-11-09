@@ -48,6 +48,8 @@ class SpaConfiguration {
             "/my-bookings",
             "/my-messages",
             "/my-dependants",
+            "/payment/paypal/return",
+            "/payment/paypal/cancel",
             "/account",
             "/account/security",
             "/admin",

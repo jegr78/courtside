@@ -202,7 +202,10 @@ class BookingAnnouncements implements BookingAnnouncer {
         }
         return payments.paymentOf(booking.getId())
                 .map(paid -> new BookingAnnouncement.AnnouncedPayment(paid.amountMinor(), paid.currency(),
-                        BookingAnnouncement.AnnouncedPayment.PaymentMethod.CREDIT, paid.refunded()))
+                        paid.method() == BookingPayments.PaymentMethod.PAYPAL
+                                ? BookingAnnouncement.AnnouncedPayment.PaymentMethod.PAYPAL
+                                : BookingAnnouncement.AnnouncedPayment.PaymentMethod.CREDIT,
+                        paid.refunded()))
                 .orElse(null);
     }
 

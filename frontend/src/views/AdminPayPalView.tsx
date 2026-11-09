@@ -142,6 +142,8 @@ export function AdminPayPalView() {
       ? <LoadFailure message={loadError} retry={() => { setLoadError(undefined); setLoads((count) => count + 1); }} />
       : <p role="status">{t("status.loading")}</p>)}
     {settings && <>
+      {stored && settings.environment === "SANDBOX"
+        && <Alert tone="warning" testId="paypal-sandbox-warning">{t("admin.paypal.sandboxWarning")}</Alert>}
       <form key={generation} noValidate {...settingsForm.form} onSubmit={submit} data-testid="paypal-form" className="grid gap-4">
         {error && <Alert testId="paypal-form-error">{error}</Alert>}
         {success && <SuccessFeedback testId="paypal-form-success">{success}</SuccessFeedback>}

@@ -7,12 +7,15 @@ import org.courtside.AbstractIntegrationTest;
 import org.courtside.booking.BookingService;
 import org.courtside.booking.CreateBookingCommand;
 import org.courtside.booking.ParticipantSpec;
+import org.courtside.booking.PendingPayments;
 import org.courtside.card.testfixture.CardTestFixture;
 import org.courtside.config.testfixture.ConfigTestFixture;
+import org.courtside.credit.BookingPayments;
 import org.courtside.credit.testfixture.CreditTestFixture;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
+import org.courtside.payment.testfixture.PaymentTestFixture;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.BeforeEach;
@@ -21,12 +24,15 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalTime;
+import java.util.Currency;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -39,10 +45,12 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
+@TestPropertySource(properties = "courtside.public-url=https://courts.example.org")
 @Import({FacilityTestFixture.class, IdentityTestFixture.class, CardTestFixture.class, ConfigTestFixture.class,
-        CreditTestFixture.class})
+        CreditTestFixture.class, PaymentTestFixture.class})
 class PaidBookingMessageTest extends AbstractIntegrationTest {
 
     private static final TimeSlot SIX_TO_SEVEN =
@@ -63,6 +71,14 @@ class PaidBookingMessageTest extends AbstractIntegrationTest {
     private ConfigTestFixture config;
     @Autowired
     private CreditTestFixture credit;
+    @Autowired
+    private PaymentTestFixture payment;
+    @Autowired
+    private PendingPayments pendingPayments;
+    @Autowired
+    private BookingPayments bookingPayments;
+    @Autowired
+    private TransactionTemplate transactions;
     @Autowired
     private JdbcClient jdbc;
 
@@ -132,6 +148,45 @@ class PaidBookingMessageTest extends AbstractIntegrationTest {
         assertThat(textOf(firstMailTo("john.roe@example.org")))
                 .as("a booking made before payments existed was never debited, so nothing returns")
                 .doesNotContain("Guthaben");
+    }
+
+    @Test
+    void givenABookingAwaitingPayPal_whenThePaymentIsConfirmed_thenTheConfirmationSaysItWasPaidByPayPal()
+            throws Exception {
+        // given
+        UUID booking = bookPending();
+
+        // when
+        transactions.executeWithoutResult(status -> {
+            bookingPayments.payByPayPal(johnAccount, booking, "ORDER-1", 1500, Currency.getInstance("EUR"));
+            pendingPayments.confirm(booking);
+        });
+
+        // then
+        assertThat(textOf(firstMailTo("john.roe@example.org")))
+                .contains("Per PayPal bezahlt: 15,00 €")
+                .doesNotContain("Bezahlt aus deinem Guthaben");
+    }
+
+    @Test
+    void givenABookingAwaitingPayPal_whenItsHoldEnds_thenTheBookerGetsNoMailForIt() {
+        // given
+        UUID booking = bookPending();
+
+        // when
+        pendingPayments.release(booking);
+
+        // then
+        await().during(Duration.ofSeconds(2)).atMost(Duration.ofSeconds(3)).untilAsserted(() ->
+                verify(sender, never()).send(any(MimeMessage.class)));
+    }
+
+    private UUID bookPending() {
+        payment.storePayPal(true);
+        credit.payOut(johnAccount, 1000);
+        UUID booking = book();
+        assertThat(pendingPayments.pending(booking)).as("short credit with PayPal on holds the court").isPresent();
+        return booking;
     }
 
     private UUID book() {

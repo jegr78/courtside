@@ -24,7 +24,7 @@ public record BookingAnnouncement(UUID bookedByAccountId, List<UUID> playerPerso
     public record AnnouncedPayment(int amountMinor, String currency, PaymentMethod method, boolean refunded) {
 
         public enum PaymentMethod {
-            CREDIT
+            CREDIT, PAYPAL
         }
     }
 

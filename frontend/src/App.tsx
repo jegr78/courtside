@@ -44,6 +44,8 @@ const MyMessagesView = lazySurface<Record<string, never>>(() =>
   import("./views/MyMessagesView").then((loaded) => ({ default: loaded.MyMessagesView })));
 const DependantsView = lazySurface<Record<string, never>>(() =>
   import("./views/DependantsView").then((loaded) => ({ default: loaded.DependantsView })));
+const PayPalPaymentView = lazySurface<{ mode: "return" | "cancel" }>(() =>
+  import("./views/PayPalPaymentView").then((loaded) => ({ default: loaded.PayPalPaymentView })));
 const AccountView = lazySurface<ComponentProps<typeof AccountSurface>>(() =>
   import("./views/AccountView").then((loaded) => ({ default: loaded.AccountView })));
 
@@ -102,6 +104,12 @@ export function AppRoutes({ session, refreshSession, passwordChanged, initialPas
     <Route path="/my-dependants" element={!session.authenticated
       ? signInFirst
       : session.memberFeatures === false ? <Navigate to="/my-bookings" replace /> : <DependantsView />} />
+    <Route path="/payment/paypal/return" element={session.authenticated
+      ? <PayPalPaymentView mode="return" />
+      : signInFirst} />
+    <Route path="/payment/paypal/cancel" element={session.authenticated
+      ? <PayPalPaymentView mode="cancel" />
+      : signInFirst} />
     <Route path="/account" element={session.authenticated
       ? <AccountView key={address.key} session={session} offline={offline} passwordChanged={() => initialPasswordChanged?.()}
         signedOut={(preserve) => signedOut?.(preserve)} />

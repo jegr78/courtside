@@ -126,6 +126,10 @@ export type PayPalEnvironment = components["schemas"]["PayPalEnvironment"];
 export type PayPalSettings = components["schemas"]["PayPalSettings"];
 export type PayPalSettingsRequest = components["schemas"]["PayPalSettingsRequest"];
 export type PayPalConnectionCheckResult = components["schemas"]["PayPalConnectionCheckResult"];
+export type PayPalAvailability = components["schemas"]["PayPalAvailability"];
+export type PayPalOrder = components["schemas"]["PayPalOrder"];
+export type PayPalCapture = components["schemas"]["PayPalCapture"];
+export type PayPalCaptureOutcome = components["schemas"]["PayPalCaptureOutcome"];
 export type RetentionCategory = components["schemas"]["RetentionCategory"];
 export type RetentionPolicy = components["schemas"]["RetentionPolicy"];
 export type RetentionPreview = components["schemas"]["RetentionPreview"];
@@ -788,6 +792,14 @@ export const api = {
   }),
   removePayPalCredentials: () => request<void>("/api/treasury/paypal", { method: "DELETE" }),
   checkPayPalConnection: () => request<PayPalConnectionCheckResult>("/api/treasury/paypal/check", { method: "POST" }),
+  payPalAvailability: () => request<PayPalAvailability>("/api/payments/paypal/availability"),
+  createPayPalOrder: (bookingId: string) => request<PayPalOrder>("/api/payments/paypal/orders", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ bookingId })
+  }),
+  capturePayPalOrder: (orderId: string) => request<PayPalCapture>(
+    `/api/payments/paypal/orders/${encodeURIComponent(orderId)}/capture`, { method: "POST" }),
+  cancelPayPalOrder: (orderId: string) => request<PayPalCapture>(
+    `/api/payments/paypal/orders/${encodeURIComponent(orderId)}/cancel`, { method: "POST" }),
   exportGuestFees: (period: GuestFeePeriod & { separator: string }) => requestFile(
     `/api/treasury/guest-fees/export?${new URLSearchParams(period).toString()}`, { method: "POST" }),
   exportBookings: (parameters: BookingExportParameters) => requestFile(

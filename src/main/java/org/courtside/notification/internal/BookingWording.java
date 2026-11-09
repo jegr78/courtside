@@ -60,8 +60,12 @@ class BookingWording {
 
     private String payment(BookingAnnouncement booking, Locale locale) {
         BookingAnnouncement.AnnouncedPayment paid = booking.payment();
-        return paid == null ? ""
-                : "\n" + templates.render("booking.payment.credit", locale, Map.of("amount", money(paid, locale)));
+        if (paid == null) {
+            return "";
+        }
+        String key = paid.method() == BookingAnnouncement.AnnouncedPayment.PaymentMethod.PAYPAL
+                ? "booking.payment.paypal" : "booking.payment.credit";
+        return "\n" + templates.render(key, locale, Map.of("amount", money(paid, locale)));
     }
 
     private static String money(BookingAnnouncement.AnnouncedPayment paid, Locale locale) {
