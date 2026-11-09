@@ -10,7 +10,5 @@
   "getBookingCard": "The admin list already answers with every field of every one of these, active or not, so a second call would fetch what the page is already holding.",
   "getParticipantCard": "The admin list already answers with every field of every one of these, active or not, so a second call would fetch what the page is already holding.",
   "getRuleSet": "The admin list already answers with every field of every rule set, active or not, so a second call would fetch what the page is already holding.",
-  "getCourtOccupancy": "Building automation polls this with the occupancy key; the board's page creates the key and shows the address, and no view reads occupancy through it.",
-  "listPayPalRefunds": "The treasurer credit page has no PayPal refund action yet; the change that adds it calls this and removes the entry.",
-  "refundPayPalPayment": "The treasurer credit page has no PayPal refund action yet; the change that adds it calls this and removes the entry."
+  "getCourtOccupancy": "Building automation polls this with the occupancy key; the board's page creates the key and shows the address, and no view reads occupancy through it."
 }

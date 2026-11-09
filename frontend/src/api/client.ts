@@ -128,6 +128,9 @@ export type PayPalSettingsRequest = components["schemas"]["PayPalSettingsRequest
 export type PayPalConnectionCheckResult = components["schemas"]["PayPalConnectionCheckResult"];
 export type PayPalAvailability = components["schemas"]["PayPalAvailability"];
 export type PayPalOrder = components["schemas"]["PayPalOrder"];
+export type PayPalRefund = components["schemas"]["PayPalRefund"];
+export type PayPalRefundOption = components["schemas"]["PayPalRefundOption"];
+export type PayPalRefundOptions = components["schemas"]["PayPalRefundOptions"];
 export type PayPalCapture = components["schemas"]["PayPalCapture"];
 export type PayPalCaptureOutcome = components["schemas"]["PayPalCaptureOutcome"];
 export type RetentionCategory = components["schemas"]["RetentionCategory"];
@@ -786,6 +789,11 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(entry)
     }),
+  payPalRefundOptions: (accountId: string) => request<PayPalRefundOptions>(
+    `/api/treasury/paypal/refunds?${new URLSearchParams({ accountId }).toString()}`),
+  refundPayPalPayment: (orderId: string) => request<PayPalRefund>("/api/treasury/paypal/refunds", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ orderId })
+  }),
   payPalSettings: () => request<PayPalSettings>("/api/treasury/paypal"),
   savePayPalSettings: (settings: PayPalSettingsRequest) => request<PayPalSettings>("/api/treasury/paypal", {
     method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(settings)

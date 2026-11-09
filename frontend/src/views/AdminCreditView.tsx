@@ -1,6 +1,6 @@
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { api, ApiError, type CreditEntryRequest, type CreditEntryRequestKind, type CreditHolder, type CreditPageOptions } from "../api/client";
+import { api, ApiError, type CreditEntry, type CreditEntryRequest, type CreditEntryRequestKind, type CreditHolder, type CreditPageOptions, type PayPalRefundOption } from "../api/client";
 import { problemMessage } from "../api/problem-message";
 import { useClubConfiguration } from "../club/registry";
 import { Alert } from "../components/Alert";
@@ -17,7 +17,7 @@ import { reauthenticateForm } from "../security/reauthentication";
 import { useProofContinuation } from "../security/useProofContinuation";
 import { securityKeyFailure } from "../security/webauthn";
 import { useUnsavedForm } from "../unsaved/useUnsavedForm";
-import { CreditLedger } from "./CreditLedger";
+import { CreditLedger, type PayPalRefunds } from "./CreditLedger";
 import { useCreditLedger } from "./useCreditLedger";
 
 const RECENT_AUTH = "urn:courtside:error:recent-authentication-required";
@@ -101,7 +101,8 @@ export function AdminCreditView() {
 }
 
 function CreditAccount({ holder, recorded }: { holder: CreditHolder; recorded: () => void }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const language = i18n.resolvedLanguage ?? "de";
   const { club } = useClubConfiguration();
   const { accountId } = holder;
   const load = useCallback((options: CreditPageOptions) => api.creditEntries(accountId, options), [accountId]);
@@ -111,10 +112,45 @@ function CreditAccount({ holder, recorded }: { holder: CreditHolder; recorded: (
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string>();
   const [success, setSuccess] = useState<string>();
-  const [retry, setRetry] = useState<CreditEntryRequest>();
+  const [retry, setRetry] = useState<{ send: () => Promise<void> }>();
+  const [refundOptions, setRefundOptions] = useState<ReadonlyMap<string, PayPalRefundOption>>(new Map());
+  const [refundOptionsFailure, setRefundOptionsFailure] = useState<string>();
+  const [refunding, setRefunding] = useState<CreditEntry>();
+  const [refundError, setRefundError] = useState<string>();
+  const [refundOutcome, setRefundOutcome] = useState<string>();
   const [reauthenticationFailure, setReauthenticationFailure] = useState<string>();
   const currency = ledger.page?.currency ?? club?.currency ?? holder.currency;
   const name = `${holder.firstName} ${holder.lastName}`;
+
+  const loadRefundOptions = useCallback(async () => {
+    try {
+      const read = await api.payPalRefundOptions(accountId);
+      setRefundOptions(new Map(read.items.map((option) => [option.orderId, option])));
+      setRefundOptionsFailure(undefined);
+    } catch (failure) {
+      setRefundOptionsFailure(problemMessage(failure, t));
+    }
+  }, [accountId, t]);
+
+  useEffect(() => { void loadRefundOptions(); }, [loadRefundOptions]);
+
+  async function refund(orderId: string) {
+    setPending(true);
+    setRefundError(undefined);
+    setRefundOutcome(undefined);
+    try {
+      const refunded = await api.refundPayPalPayment(orderId);
+      setRefunding(undefined);
+      setRefundOutcome(t(`paypalRefund.state.${refunded.status}`, { reason: refunded.failureReason ?? "" }));
+      recorded();
+      await Promise.all([ledger.reload(), loadRefundOptions()]);
+    } catch (failure) {
+      if (failure instanceof ApiError && failure.problem?.type === RECENT_AUTH) setRetry({ send: () => refund(orderId) });
+      else setRefundError(problemMessage(failure, t));
+    } finally {
+      setPending(false);
+    }
+  }
 
   async function send(entry: CreditEntryRequest) {
     setPending(true);
@@ -128,7 +164,7 @@ function CreditAccount({ holder, recorded }: { holder: CreditHolder; recorded: (
       recorded();
       await ledger.reload();
     } catch (failure) {
-      if (failure instanceof ApiError && failure.problem?.type === RECENT_AUTH) setRetry(entry);
+      if (failure instanceof ApiError && failure.problem?.type === RECENT_AUTH) setRetry({ send: () => send(entry) });
       else setError(problemMessage(failure, t));
     } finally {
       setPending(false);
@@ -172,12 +208,24 @@ function CreditAccount({ holder, recorded }: { holder: CreditHolder; recorded: (
     }
     if (!ownsProof()) return;
     setRetry(undefined);
-    await send(requested);
+    await requested.send();
   }
+
+  const refunds: PayPalRefunds = {
+    options: refundOptions,
+    busy: pending,
+    request: (entry) => {
+      setRefundError(undefined);
+      setRefundOutcome(undefined);
+      setRefunding(entry);
+    }
+  };
 
   return <section data-testid="credit-account" aria-labelledby="credit-account-title" className="grid min-w-0 gap-6 rounded-xl border p-4 sm:p-6">
     <h2 id="credit-account-title" className="text-2xl font-bold [overflow-wrap:anywhere]">{t("admin.credit.ledgerOf", { name })}</h2>
-    <CreditLedger ledger={ledger} />
+    {refundOptionsFailure && <Alert testId="paypal-refund-options-error">{refundOptionsFailure}</Alert>}
+    {refundOutcome && <SuccessFeedback testId="paypal-refund-outcome">{refundOutcome}</SuccessFeedback>}
+    <CreditLedger ledger={ledger} refunds={refunds} />
     <form noValidate {...entryForm.form} onSubmit={submit} data-testid="credit-form" aria-labelledby="credit-entry-title"
       className="grid gap-3 rounded-xl border p-4">
       <h3 id="credit-entry-title" className="text-xl font-bold">{t("admin.credit.entryTitle")}</h3>
@@ -200,6 +248,20 @@ function CreditAccount({ holder, recorded }: { holder: CreditHolder; recorded: (
         {t("admin.credit.record")}
       </Button>
     </form>
+    {refunding?.paypalOrderId && !retry && <Modal labelledBy="paypal-refund-title" closed={() => setRefunding(undefined)}>
+      <div className="grid gap-4">
+        <h2 id="paypal-refund-title" className="text-2xl font-bold">{t("paypalRefund.action")}</h2>
+        <p>{t("paypalRefund.confirm", { amount: formatMinor(refunding.amountMinor, language, refunding.currency) })}</p>
+        {refundError && <Alert testId="paypal-refund-error">{refundError}</Alert>}
+        <div className="flex flex-wrap gap-3">
+          <Button variant="primary" data-testid="paypal-refund-confirm" type="button" disabled={pending}
+            onClick={() => void refund(refunding.paypalOrderId ?? "")}>{t("paypalRefund.confirmAction")}</Button>
+          <Button variant="secondary" data-testid="paypal-refund-cancel" type="button" onClick={() => setRefunding(undefined)}>
+            {t("paypalRefund.cancel")}
+          </Button>
+        </div>
+      </div>
+    </Modal>}
     {retry && <Modal labelledBy="admin-reauthentication-title" closed={() => {
       proofContinuation.cancel();
       setPending(false);
