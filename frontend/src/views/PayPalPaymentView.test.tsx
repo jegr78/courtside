@@ -193,3 +193,17 @@ it("given a cancel at PayPal that found the money already taken, when the page s
   expect(screen.getByRole("heading", { level: 1 }), "a confirmed booking was not cancelled").toHaveTextContent(i18n.t("paypalPayment.title"));
   expect(screen.getByRole("heading", { level: 1 })).not.toHaveTextContent(/abgebrochen/);
 });
+
+it.each(["de", "en"].flatMap((language) => (["return", "cancel"] as const).map((mode) => [language, mode] as const)))("given %s and the %s page, when a late capture is explained, then it names no cause the server did not report", async (language, mode) => {
+  // given
+  await i18n.changeLanguage(language);
+  vi.spyOn(api, mode === "return" ? "capturePayPalOrder" : "cancelPayPalOrder").mockResolvedValue({ bookingId, outcome: "LATE_CREDITED" });
+
+  // when
+  show(mode, `/payment/paypal/${mode}?token=ORDER-1`);
+
+  // then
+  const outcome = await screen.findByTestId("paypal-outcome");
+  expect(outcome.textContent, "a released court has more causes than an expired hold").not.toMatch(/abgelaufen|ended|expired/i);
+  expect(outcome.textContent, "the credit or the club's follow-up stays").toMatch(/Guthaben|credit/);
+});
