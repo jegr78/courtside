@@ -20,6 +20,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import java.net.URI;
 import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Currency;
 import java.util.Objects;
 import java.util.Optional;
@@ -129,7 +130,7 @@ public class PayPalCheckout {
         }
     }
 
-    /** Settles an open order; one PayPal cannot show releases its booking {@code unresolvedAfter} past the deadline. */
+    /** Settles an open order; one still unresolved releases its booking {@code unresolvedAfter} past the deadline. */
     public Reconciled reconcile(String orderId, Duration unresolvedAfter) {
         requireNoTransaction();
         StoredOrder stored = orders.find(orderId).orElseThrow(PayPalOrderNotFoundException::new);
@@ -157,15 +158,22 @@ public class PayPalCheckout {
                     refused.getMessage());
             return Reconciled.answered(unresolved(stored, pending, unresolvedAfter));
         }
-        return Reconciled.answered(decide(stored, pending, order));
+        Settlement decided = decide(stored, pending, order);
+        if (decided.outcome() != Outcome.PROCESSING || !overdue(pending, unresolvedAfter)) {
+            return Reconciled.answered(decided);
+        }
+        return Reconciled.answered(releaseKeepingOrder(stored));
     }
 
     private Settlement decide(StoredOrder stored, Optional<PendingBooking> pending, PayPalClient.Order order) {
         Optional<PayPalClient.Capture> capture = order.capture();
         if (capture.isPresent()) return settle(stored, capture.get(), mismatch(stored, order).isEmpty());
         Optional<PayPalClient.Credentials> active = credentials.active(stored.environment());
-        boolean beforeDeadline = pending.filter(held -> held.expiresAt().isAfter(clock.instant())).isPresent();
-        if (active.isPresent() && pending.isPresent() && (beforeDeadline || order.status().equals("APPROVED"))) {
+        Instant now = clock.instant();
+        boolean beforeDeadline = pending.filter(held -> held.expiresAt().isAfter(now)).isPresent();
+        boolean started = pending.filter(held -> !held.startsAt().isAfter(now)).isPresent();
+        if (active.isPresent() && pending.isPresent() && !started
+                && (beforeDeadline || order.status().equals("APPROVED"))) {
             return settle(stored, active.get(), order);
         }
         if (!UNCAPTURED.contains(order.status())) return processing(stored);
@@ -175,15 +183,29 @@ public class PayPalCheckout {
     }
 
     private Settlement unresolved(StoredOrder stored, Optional<PendingBooking> pending, Duration unresolvedAfter) {
-        boolean overdue = pending.filter(held -> !held.expiresAt().plus(unresolvedAfter).isAfter(clock.instant()))
-                .isPresent();
-        if (!overdue) return processing(stored);
+        if (!overdue(pending, unresolvedAfter)) return processing(stored);
         if (stored.captureAttemptedAt() == null) return voided(stored, VoidReason.HOLD_EXPIRED);
+        return releaseKeepingOrder(stored);
+    }
+
+    private boolean overdue(Optional<PendingBooking> pending, Duration unresolvedAfter) {
+        Instant now = clock.instant();
+        return pending.filter(held -> !releaseAt(held, unresolvedAfter).isAfter(now)).isPresent();
+    }
+
+    private static Instant releaseAt(PendingBooking held, Duration unresolvedAfter) {
+        Instant bound = held.expiresAt().plus(unresolvedAfter);
+        return bound.isBefore(held.startsAt()) ? bound : held.startsAt();
+    }
+
+    private Settlement releaseKeepingOrder(StoredOrder stored) {
         return transactions.execute(status -> {
             StoredOrder locked = lock(stored);
             if (locked.status() != Status.CREATED) return settled(locked).orElseThrow();
+            // The order may hold money, so the job must keep reading it instead of voiding it unread.
+            if (locked.captureAttemptedAt() == null) orders.markCaptureAttempted(locked.orderId());
             if (pendingPayments.release(locked.bookingId())) {
-                log.warn("PayPal order {} could not be read for a day past its deadline; booking {} is released and"
+                log.warn("PayPal order {} is still unresolved at the end of its hold; booking {} is released and"
                         + " the order stays open", locked.orderId(), locked.bookingId());
             }
             return processing(locked);

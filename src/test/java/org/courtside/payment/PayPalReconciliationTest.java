@@ -646,6 +646,132 @@ class PayPalReconciliationTest extends AbstractIntegrationTest {
         assertThat(entries(booking)).isEmpty();
     }
 
+    @Test
+    void givenACapturePendingAtPayPal_whenADayPassesAfterTheDeadline_thenTheCourtIsFreeAndALaterCompletionIsCredit()
+            throws Exception {
+        // given
+        UUID booking = bookWithOrder();
+        pendTheCapture(booking);
+        age(Duration.ofHours(24));
+        expire(booking, Duration.ofHours(23));
+        reconciliation.run();
+        assertThat(bookingStatus(booking)).as("within a day of its deadline the court stays held")
+                .isEqualTo("PENDING_PAYMENT");
+        expire(booking, Duration.ofHours(24).plusSeconds(1));
+
+        // when
+        reconciliation.run();
+
+        // then
+        assertThat(bookingStatus(booking)).as("a capture PayPal keeps pending holds the court no longer than a day")
+                .isEqualTo("CANCELLED");
+        assertThat(orderStatus()).as("the order stays open for the capture to finish").isEqualTo("CREATED");
+        assertThat(entries(booking)).isEmpty();
+        PAYPAL.replaceReply(READ, 200, order("COMPLETED", booking, capture("COMPLETED", "15.00")));
+        age(Duration.ofMinutes(6));
+        reconciliation.run();
+        assertThat(orderStatus()).isEqualTo("LATE_CAPTURED");
+        assertThat(entries(booking)).containsExactly(Map.of("kind", "PAYPAL_LATE_CAPTURE", "amount_minor", 1500));
+        assertThat(credit.balance(johnAccount)).isEqualTo(1500);
+    }
+
+    @Test
+    void givenACompletedOrderWithoutAVisibleCapture_whenADayPassesAfterTheDeadline_thenTheOrderIsStillReadLater()
+            throws Exception {
+        // given
+        UUID booking = bookWithOrder();
+        PAYPAL.reply(READ, 200, order("COMPLETED", booking, null));
+        age(Duration.ofHours(25));
+        expire(booking, Duration.ofHours(24).plusSeconds(1));
+
+        // when
+        reconciliation.run();
+
+        // then
+        assertThat(bookingStatus(booking)).isEqualTo("CANCELLED");
+        assertThat(orderStatus()).isEqualTo("CREATED");
+        assertThat(captureAttempted()).as("an order that may hold money is never voided unread").isTrue();
+        PAYPAL.replaceReply(READ, 200, order("COMPLETED", booking, capture("COMPLETED", "15.00")));
+        age(Duration.ofMinutes(6));
+        reconciliation.run();
+        assertThat(orderStatus()).isEqualTo("LATE_CAPTURED");
+        assertThat(credit.balance(johnAccount)).isEqualTo(1500);
+    }
+
+    @Test
+    void givenACapturePendingAtPayPalForABookingSoonToStart_whenItStarts_thenTheCourtIsFree() throws Exception {
+        // given
+        UUID booking = bookWithOrder();
+        pendTheCapture(booking);
+        age(Duration.ofMinutes(20));
+        expire(booking, Duration.ofMinutes(5));
+        startIn(booking, Duration.ofHours(2));
+        reconciliation.run();
+        assertThat(bookingStatus(booking)).as("before its start the court stays held").isEqualTo("PENDING_PAYMENT");
+        startIn(booking, Duration.ofMinutes(-1));
+
+        // when
+        reconciliation.run();
+
+        // then
+        assertThat(bookingStatus(booking)).as("a hold never outlives the start of its booking").isEqualTo("CANCELLED");
+        assertThat(orderStatus()).isEqualTo("CREATED");
+    }
+
+    @Test
+    void givenACaptureCompletingAfterTheBookingStarted_whenTheJobRecordsIt_thenItIsCreditAndNotAConfirmation()
+            throws Exception {
+        // given
+        UUID booking = bookWithOrder();
+        timeOutTheCapture(booking);
+        PAYPAL.replaceReply(READ, 200, order("COMPLETED", booking, capture("COMPLETED", "15.00")));
+        age(Duration.ofMinutes(6));
+        startIn(booking, Duration.ofMinutes(-1));
+
+        // when
+        reconciliation.run();
+
+        // then
+        assertThat(bookingStatus(booking)).as("a session that has begun is never confirmed").isEqualTo("CANCELLED");
+        assertThat(orderStatus()).isEqualTo("LATE_CAPTURED");
+        assertThat(entries(booking)).containsExactly(Map.of("kind", "PAYPAL_LATE_CAPTURE", "amount_minor", 1500));
+        assertThat(credit.balance(johnAccount)).isEqualTo(1500);
+        assertThat(audit("booking.booking.confirmed", booking))
+                .as("the confirmation mail follows only this event").isEmpty();
+    }
+
+    @Test
+    void givenAnApprovedOrderOfABookingThatHasStarted_whenTheJobRuns_thenNothingIsCapturedAndTheCourtIsFree()
+            throws Exception {
+        // given
+        UUID booking = bookWithOrder();
+        PAYPAL.reply(READ, 200, order("APPROVED", booking, null));
+        age(Duration.ofMinutes(6));
+        startIn(booking, Duration.ofMinutes(-1));
+
+        // when
+        reconciliation.run();
+
+        // then
+        assertThat(PAYPAL.seen(CAPTURE)).as("a session that has begun is never charged").isEmpty();
+        assertThat(bookingStatus(booking)).isEqualTo("CANCELLED");
+        assertThat(orderStatus()).isEqualTo("VOIDED");
+    }
+
+    private void pendTheCapture(UUID booking) throws Exception {
+        PAYPAL.reply(READ, 200, order("APPROVED", booking, null));
+        PAYPAL.reply(CAPTURE, 201, order("COMPLETED", booking, capture("PENDING", "15.00")));
+        captureRequest().andExpect(jsonPath("$.outcome").value("PROCESSING"));
+        PAYPAL.replaceReply(READ, 200, order("COMPLETED", booking, capture("PENDING", "15.00")));
+    }
+
+    private void startIn(UUID booking, Duration fromNow) {
+        Instant start = clock.instant().plus(fromNow);
+        jdbc.sql("UPDATE court_allocation SET starts_at = :start, ends_at = :end WHERE booking_id = :id")
+                .param("start", Timestamp.from(start)).param("end", Timestamp.from(start.plus(Duration.ofHours(1))))
+                .param("id", booking).update();
+    }
+
     private UUID book() {
         return bookingService.create(new CreateBookingCommand(List.of(courtId), winterHall,
                 new TimeSlot(TOMORROW_AFTERNOON, TOMORROW_AFTERNOON.plus(Duration.ofHours(1))), johnAccount,

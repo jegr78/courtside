@@ -268,7 +268,7 @@ class PendingPaymentWriteTest extends AbstractIntegrationTest {
 
         // then
         assertThat(pending).contains(new PendingPayments.PendingBooking(booking, johnAccount, 1500,
-                Currency.getInstance("EUR"), EXPIRY));
+                Currency.getInstance("EUR"), EXPIRY, slot(0).start()));
         assertThat(pendingPayments.pendingSince(NOW)).as("created at the instant, not before it").isEmpty();
         assertThat(pendingPayments.pendingSince(NOW.plusSeconds(1))).containsExactly(booking);
         assertThat(pendingPayments.expiredAt(EXPIRY.minusSeconds(1))).isEmpty();

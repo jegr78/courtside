@@ -477,16 +477,19 @@ Every order endpoint answers only the signed-in booker; another account's order 
 open order older than five minutes, and every open order whose booking is past its deadline,
 longest unchecked first and 50 per run. A capture found is recorded through the same locked
 transition as the return. An `APPROVED` order is captured while its booking is still pending, also
-past the deadline, because the court was never given away. An unapproved order whose hold ended, an
+past the deadline, because the court was never given away, but never once the booking has started. An unapproved order whose hold ended, an
 order whose booking was released by somebody else and an order of credentials no longer active are
 voided, their booking released and audited as `payment.paypal.voided`. A pending booking past its
-deadline without an order is released without calling PayPal. When PayPal cannot show an order,
-the booking stays held for at most 24 hours past its deadline; then an order without a capture
-attempt is voided and one with an attempt releases its booking and stays open, so a capture read
-later becomes credit. For 72 hours the job also rereads voided orders whose capture was attempted,
+deadline without an order is released without calling PayPal. When PayPal cannot show an order or
+shows it still unresolved, such as a pending capture, the booking stays held for at most 24 hours
+past its deadline and never past its start. Then an unreadable order without a capture attempt is
+voided, and any other releases its booking, is marked as attempted and stays open, so a capture read
+later becomes credit. A capture that completes after the booking's start never confirms it and
+becomes credit as well. For 72 hours the job also rereads voided orders whose capture was attempted,
 at most once per five minutes each, and records a capture PayPal completed after all as a late
-capture. A run stops after three consecutive orders PayPal does not answer. The hold is therefore
-a soft bound: 15 minutes plus at most one run while PayPal answers.
+capture. A run stops after three consecutive orders PayPal does not answer. A hold therefore ends 15
+minutes after the booking plus at most one run while PayPal answers clearly, and in every case at
+the earlier of 24 hours past its deadline and the booking's start.
 
 Changing the client id or environment, switching PayPal off or removing the credentials ends the
 open orders of the former credentials after the change commits. An order without a capture attempt

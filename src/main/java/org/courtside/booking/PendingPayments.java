@@ -10,7 +10,7 @@ public interface PendingPayments {
 
     Optional<PendingBooking> pending(UUID bookingId);
 
-    /** Confirms a pending booking inside the caller's transaction, holding its row until that commits. */
+    /** Confirms a pending booking inside the caller's transaction; one whose start has passed is released instead. */
     ConfirmOutcome confirm(UUID bookingId);
 
     /** Ends the hold, frees the court and reports it; false when the booking is no longer pending. */
@@ -20,7 +20,8 @@ public interface PendingPayments {
 
     List<UUID> expiredAt(Instant now);
 
-    record PendingBooking(UUID bookingId, UUID bookedBy, int amountMinor, Currency currency, Instant expiresAt) {
+    record PendingBooking(UUID bookingId, UUID bookedBy, int amountMinor, Currency currency, Instant expiresAt,
+                          Instant startsAt) {
     }
 
     enum ConfirmOutcome { CONFIRMED, ALREADY_CONFIRMED, NOT_PENDING }

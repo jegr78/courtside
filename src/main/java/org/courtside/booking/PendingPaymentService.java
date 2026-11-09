@@ -43,11 +43,11 @@ class PendingPaymentService implements PendingPayments {
         if (bookingId == null) {
             return Optional.empty();
         }
-        return bookings.findById(bookingId)
+        return bookings.findWithAllocationsById(bookingId)
                 .filter(booking -> booking.getStatus() == BookingStatus.PENDING_PAYMENT)
                 .flatMap(booking -> booking.amount().flatMap(amount -> booking.paymentExpiresAt()
-                        .map(expiresAt -> new PendingBooking(booking.getId(), booking.getBookedBy(), amount.minor(),
-                                amount.currency(), expiresAt))));
+                        .flatMap(expiresAt -> startOf(booking).map(startsAt -> new PendingBooking(booking.getId(),
+                                booking.getBookedBy(), amount.minor(), amount.currency(), expiresAt, startsAt)))));
     }
 
     @Override
@@ -61,6 +61,11 @@ class PendingPaymentService implements PendingPayments {
         entityManager.clear();
         Booking booking = bookings.findWithAllocationsById(bookingId)
                 .orElseThrow(() -> new BookingNotFoundException("No booking with id " + bookingId));
+        if (booking.getStatus() == BookingStatus.PENDING_PAYMENT
+                && startOf(booking).filter(start -> start.isAfter(clock.instant())).isEmpty()) {
+            releaseLocked(booking, null);
+            return ConfirmOutcome.NOT_PENDING;
+        }
         if (!booking.confirmPayment()) {
             return booking.getStatus() == BookingStatus.CONFIRMED && booking.paymentExpiresAt().isPresent()
                     ? ConfirmOutcome.ALREADY_CONFIRMED : ConfirmOutcome.NOT_PENDING;
@@ -117,6 +122,10 @@ class PendingPaymentService implements PendingPayments {
                 .collect(Collectors.groupingBy(allocation -> new TimeSlot(allocation.getStartsAt(), allocation.getEndsAt()),
                         Collectors.mapping(CourtAllocation::getCourtId, Collectors.toList())))
                 .forEach((slot, courtIds) -> reservations.released(courtIds, slot));
+    }
+
+    private static Optional<Instant> startOf(Booking booking) {
+        return booking.getAllocations().stream().map(CourtAllocation::getStartsAt).min(Instant::compareTo);
     }
 
     void countCreatedOnCommit() {
