@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { api, type AccessCode, type AccessGrant, type BookingGrid, type EmergencyAccess, type Participation, type PayPalCapture, type PersonalBooking, type PublicCourt } from "../api/client";
+import { api, type AccessCode, type AccessGrant, type BookingGrid, type EmergencyAccess, type Participation, type PersonalBooking, type PublicCourt } from "../api/client";
 import { useReportedFailure } from "../failures/useReportedFailure";
 import { Alert } from "../components/Alert";
 import { LoadFailure } from "../components/LoadFailure";
@@ -44,7 +44,7 @@ export function MyBookingsView({ now, offline = false, memberFeatures = true }: 
   const { message: error, report, clear } = useReportedFailure();
   const { message: loadError, report: reportLoad, clear: clearLoad } = useReportedFailure();
   const [success, setSuccess] = useState<string>();
-  const [payPalSettled, setPayPalSettled] = useState<PayPalCapture>();
+  const [payPalAbandoned, setPayPalAbandoned] = useState(false);
   const [action, setAction] = useState<{ kind: "cancel" | "move"; booking: PersonalBooking }>();
   const loadVersion = useRef(0);
 
@@ -200,7 +200,7 @@ export function MyBookingsView({ now, offline = false, memberFeatures = true }: 
   const payPal = {
     proceed: async (booking: PersonalBooking) => {
       setSuccess(undefined);
-      setPayPalSettled(undefined);
+      setPayPalAbandoned(false);
       try {
         const order = await api.createPayPalOrder(booking.id);
         clear();
@@ -211,12 +211,12 @@ export function MyBookingsView({ now, offline = false, memberFeatures = true }: 
     },
     abandon: async (booking: PersonalBooking) => {
       setSuccess(undefined);
-      setPayPalSettled(undefined);
+      setPayPalAbandoned(false);
       try {
-        const order = await api.createPayPalOrder(booking.id);
-        const settled = await api.cancelPayPalOrder(order.orderId);
+        // Cancelling the booking needs no PayPal, and reconciliation voids or credits its order afterwards.
+        await api.cancelBooking(booking.id);
         clear();
-        setPayPalSettled(settled);
+        setPayPalAbandoned(true);
         await load();
       } catch (failure) {
         report(failure);
@@ -225,6 +225,7 @@ export function MyBookingsView({ now, offline = false, memberFeatures = true }: 
   };
   const chooseAction = (chosen: { kind: "cancel" | "move"; booking: PersonalBooking }) => {
     setSuccess(undefined);
+    setPayPalAbandoned(false);
     setAction(chosen);
   };
   return <section className="mt-4 sm:mt-8" aria-labelledby="my-bookings-title">
@@ -244,8 +245,8 @@ export function MyBookingsView({ now, offline = false, memberFeatures = true }: 
     {loadError && <LoadFailure message={loadError} retry={() => { clearLoad(); void load(); }} />}
     {error && <Alert>{error}</Alert>}
     {success && <SuccessFeedback>{success}</SuccessFeedback>}
-    {payPalSettled && <div data-testid="paypal-outcome" data-outcome={payPalSettled.outcome} className="mt-4">
-      <Alert tone={payPalOutcomeTone("cancel", payPalSettled.outcome)}>{t(payPalOutcomeKey("cancel", payPalSettled.outcome))}</Alert>
+    {payPalAbandoned && <div data-testid="paypal-outcome" data-outcome="REJECTED" className="mt-4">
+      <Alert tone={payPalOutcomeTone("cancel", "REJECTED")}>{t(payPalOutcomeKey("cancel", "REJECTED"))}</Alert>
     </div>}
     {loading && !loaded ? <p aria-live="polite">{t("status.loading")}</p> : grid && <div className="mt-4 grid gap-6">
       <BookingSection testId="upcoming-bookings" title={t("myBookings.upcoming")} titleHidden empty={t("myBookings.noUpcoming")} bookings={sections.upcoming} courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone} actionable={!offline && !loading} busy={loading} action={chooseAction} searchPartner={memberFeatures ? searchPartner : undefined} checkIn={checkIn} payPal={payPal} reference={reference} t={t} />

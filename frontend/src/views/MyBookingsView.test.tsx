@@ -1430,11 +1430,12 @@ it("given a booking awaiting its PayPal payment, when the player continues to Pa
   expect(order).toHaveBeenCalledWith(upcomingId);
 });
 
-it("given a booking awaiting its PayPal payment, when the player gives it up, then its order is cancelled and the outcome is shown", async () => {
+it("given a booking awaiting its PayPal payment, when the player gives it up, then the booking is cancelled without asking PayPal and the court is reported free", async () => {
   // given
   pendingBooking("2026-08-11T12:10:00Z");
-  vi.spyOn(api, "createPayPalOrder").mockResolvedValue({ orderId: "ORDER-1", approveUrl: "https://paypal.example.org/approve/ORDER-1" });
-  const cancel = vi.spyOn(api, "cancelPayPalOrder").mockResolvedValue({ bookingId: upcomingId, outcome: "REJECTED" });
+  const order = vi.spyOn(api, "createPayPalOrder");
+  const cancelOrder = vi.spyOn(api, "cancelPayPalOrder");
+  const cancel = vi.spyOn(api, "cancelBooking").mockResolvedValue(undefined);
   render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} memberFeatures={false} />);
   const reads = vi.mocked(api.personalBookings).mock.calls.length;
 
@@ -1445,7 +1446,9 @@ it("given a booking awaiting its PayPal payment, when the player gives it up, th
   const outcome = await screen.findByTestId("paypal-outcome");
   expect(outcome).toHaveAttribute("data-outcome", "REJECTED");
   expect(outcome).toHaveTextContent(i18n.t("paypalPayment.cancel.REJECTED"));
-  expect(cancel).toHaveBeenCalledWith("ORDER-1");
+  expect(cancel).toHaveBeenCalledWith(upcomingId);
+  expect(order, "giving up works while PayPal is off or down").not.toHaveBeenCalled();
+  expect(cancelOrder).not.toHaveBeenCalled();
   await waitFor(() => expect(vi.mocked(api.personalBookings).mock.calls.length, "the list is read again").toBeGreaterThan(reads));
 });
 

@@ -14,6 +14,7 @@ import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.courtside.payment.testfixture.PaymentTestFixture;
 import org.courtside.rules.RuleViolation;
+import org.courtside.rules.testfixture.RulesTestFixture;
 import org.courtside.shared.CancellationReason;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.shared.TimeSlot;
@@ -50,13 +51,14 @@ import static org.assertj.core.api.Assertions.catchThrowableOfType;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @TestPropertySource(properties = "courtside.public-url=https://courts.example.org")
 @Import({FacilityTestFixture.class, IdentityTestFixture.class, CardTestFixture.class, ConfigTestFixture.class,
-        CreditTestFixture.class, PaymentTestFixture.class, BookingTestFixture.class})
+        CreditTestFixture.class, PaymentTestFixture.class, BookingTestFixture.class, RulesTestFixture.class})
 class PendingPaymentWriteTest extends AbstractIntegrationTest {
 
     private static final Instant NOW = Instant.parse("2026-05-12T10:00:00Z");
@@ -86,6 +88,8 @@ class PendingPaymentWriteTest extends AbstractIntegrationTest {
     private PaymentTestFixture payment;
     @Autowired
     private BookingTestFixture bookingFixture;
+    @Autowired
+    private RulesTestFixture rules;
     @Autowired
     private JdbcClient jdbc;
     @Autowired
@@ -324,6 +328,32 @@ class PendingPaymentWriteTest extends AbstractIntegrationTest {
         assertThat(cancellation(booking)).containsEntry("cancellation_reason", "PAYMENT_EXPIRED");
         assertThat(events("booking.booking.cancelled", booking)).isZero();
         assertThat(events("booking.payment.expired", booking)).isEqualTo(1);
+    }
+
+    @Test
+    void givenAPendingBookingPastItsCancellationDeadline_whenItsOwnerCancelsItOverHttp_thenTheCourtIsFreeAtOnce()
+            throws Exception {
+        // given
+        payment.storePayPal(true);
+        UUID ruleSet = rules.activeRuleSet("Without membership");
+        rules.setCancellationDeadline(ruleSet, 525600);
+        config.bindPeopleWithoutAMembershipTypeTo(ruleSet);
+        UUID booking = book(0);
+        MockMvc mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
+
+        // when
+        var cancelled = mockMvc.perform(delete("/api/bookings/{id}", booking)
+                .with(user("roe.john").roles("EXTERNAL")).with(csrf()));
+
+        // then
+        cancelled.andExpect(status().isNoContent());
+        assertThat(cancellation(booking)).as("an unpaid hold is given up whatever the deadline says")
+                .containsEntry("status", "CANCELLED").containsEntry("cancellation_reason", "PAYMENT_EXPIRED")
+                .containsEntry("allocation_status", "CANCELLED");
+        UUID next = bookingService.create(new CreateBookingCommand(List.of(courtId), winterHall, slot(0),
+                adminAccount, adminPerson, Set.of(Role.MEMBER, Role.ADMIN), null, List.of(), null));
+        assertThat(cancellation(next)).as("the released court takes the next booking")
+                .containsEntry("status", "CONFIRMED");
     }
 
     @Test
