@@ -1468,3 +1468,27 @@ it("given PayPal does not answer, when the player continues to PayPal, then the 
   expect(await screen.findByRole("alert")).toHaveTextContent(i18n.t("error.type.paypal-unavailable"));
   expect(assign).not.toHaveBeenCalled();
 });
+
+it("given a booking awaiting its PayPal payment, when the page stays open, then the minutes left count down", async () => {
+  // given
+  vi.useFakeTimers({ now: Date.parse("2026-08-11T12:00:00Z"), toFake: ["Date", "setInterval", "clearInterval"] });
+  onTestFinished(() => { vi.useRealTimers(); });
+  pendingBooking("2026-08-11T12:10:00Z");
+  render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} memberFeatures={false} />);
+  const pending = within(await screen.findByTestId(`booking-${upcomingId}`)).getByTestId("booking-payment-pending");
+  expect(pending).toHaveTextContent(i18n.t("myBookings.paymentPending", { count: 10 }));
+
+  // when
+  act(() => { vi.advanceTimersByTime(4 * 60_000); });
+
+  // then
+  expect(within(screen.getByTestId(`booking-${upcomingId}`)).getByTestId("booking-payment-pending"),
+    "four minutes later six are left").toHaveTextContent(i18n.t("myBookings.paymentPending", { count: 6 }));
+
+  // when
+  act(() => { vi.advanceTimersByTime(7 * 60_000); });
+
+  // then
+  expect(within(screen.getByTestId(`booking-${upcomingId}`)).getByTestId("booking-payment-pending"))
+    .toHaveTextContent(i18n.t("myBookings.paymentExpiring"));
+});

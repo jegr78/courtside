@@ -25,6 +25,14 @@ export function MyBookingsView({ now, offline = false, memberFeatures = true }: 
 }) {
   const { t, i18n } = useTranslation();
   const [reference] = useState(() => now ?? new Date());
+  const [mountedAt] = useState(() => Date.now());
+  const [paymentClock, setPaymentClock] = useState(reference);
+  const tickPaymentClock = useCallback(() =>
+    setPaymentClock(new Date(reference.getTime() + Date.now() - mountedAt)), [mountedAt, reference]);
+  useEffect(() => {
+    const ticking = window.setInterval(tickPaymentClock, 30_000);
+    return () => window.clearInterval(ticking);
+  }, [tickPaymentClock]);
   const [bookings, setBookings] = useState<PersonalBooking[]>([]);
   const [cancelled, setCancelled] = useState<PersonalBooking[]>([]);
   const [cancelledNextCursor, setCancelledNextCursor] = useState<string>();
@@ -55,6 +63,7 @@ export function MyBookingsView({ now, offline = false, memberFeatures = true }: 
     setNextCursor(undefined);
     try {
       const page = await api.personalBookings();
+      tickPaymentClock();
       setBookings(page.items);
       setRefreshedAt(page.refreshedAt);
       setNextCursor(page.nextCursor ?? undefined);
@@ -86,7 +95,7 @@ export function MyBookingsView({ now, offline = false, memberFeatures = true }: 
       setLoading(false);
       setLoaded(true);
     }
-  }, [clearLoad, offline, reportLoad]);
+  }, [clearLoad, offline, reportLoad, tickPaymentClock]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -249,7 +258,7 @@ export function MyBookingsView({ now, offline = false, memberFeatures = true }: 
       <Alert tone={payPalOutcomeTone("cancel", "REJECTED")}>{t(payPalOutcomeKey("cancel", "REJECTED"))}</Alert>
     </div>}
     {loading && !loaded ? <p aria-live="polite">{t("status.loading")}</p> : grid && <div className="mt-4 grid gap-6">
-      <BookingSection testId="upcoming-bookings" title={t("myBookings.upcoming")} titleHidden empty={t("myBookings.noUpcoming")} bookings={sections.upcoming} courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone} actionable={!offline && !loading} busy={loading} action={chooseAction} searchPartner={memberFeatures ? searchPartner : undefined} checkIn={checkIn} payPal={payPal} reference={reference} t={t} />
+      <BookingSection testId="upcoming-bookings" title={t("myBookings.upcoming")} titleHidden empty={t("myBookings.noUpcoming")} bookings={sections.upcoming} courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone} actionable={!offline && !loading} busy={loading} action={chooseAction} searchPartner={memberFeatures ? searchPartner : undefined} checkIn={checkIn} payPal={payPal} paymentClock={paymentClock} reference={reference} t={t} />
       {!offline && nextCursor && <Button variant="secondary" data-testid="load-more-bookings" className="justify-self-start" disabled={loadingMore} onClick={() => void loadMore()}>{t("myBookings.loadMore")}</Button>}
       {cancelled.length > 0 && <details data-testid="cancelled-bookings">
         <summary data-testid="cancelled-bookings-summary" className="cursor-pointer font-semibold">{t(cancelledNextCursor ? "myBookings.cancelledCountMore" : "myBookings.cancelledCount", { count: cancelled.length })}</summary>
@@ -327,12 +336,12 @@ function ParticipationSection({ participations, courtNames, locale, timeZone, re
 
 type Translate = ReturnType<typeof useTranslation>["t"];
 
-export function BookingSection({ testId, title, titleHidden = false, empty, bookings, courtNames, locale, timeZone, actionable = false, movable = true, busy = false, action, searchPartner, checkIn, payPal, reference, t }: {
+export function BookingSection({ testId, title, titleHidden = false, empty, bookings, courtNames, locale, timeZone, actionable = false, movable = true, busy = false, action, searchPartner, checkIn, payPal, paymentClock, reference, t }: {
   testId: string; title?: string; titleHidden?: boolean; empty: string; bookings: PersonalBooking[]; courtNames: Map<string, string>;
   locale: string; timeZone: string; actionable?: boolean; movable?: boolean; busy?: boolean; action: (value: { kind: "cancel" | "move"; booking: PersonalBooking }) => void;
   searchPartner?: (booking: PersonalBooking, publish: boolean) => Promise<void>; checkIn?: (booking: PersonalBooking) => Promise<void>;
   payPal?: { proceed: (booking: PersonalBooking) => Promise<void>; abandon: (booking: PersonalBooking) => Promise<void> };
-  reference?: Date; t: Translate;
+  paymentClock?: Date; reference?: Date; t: Translate;
 }) {
   const groups = groupBookings(bookings);
   return <section data-testid={testId} aria-busy={busy || undefined}>
@@ -351,7 +360,7 @@ export function BookingSection({ testId, title, titleHidden = false, empty, book
           </span>
           {booking.status === "CANCELLED" && <span>{t(booking.released ? "myBookings.released" : "myBookings.cancelled")}</span>}
           {booking.amount && booking.amount.minor > 0 && <span data-testid="booking-amount">{t("myBookings.amount", { amount: formatMinor(booking.amount.minor, locale, booking.amount.currency) })}</span>}
-          {booking.status === "PENDING_PAYMENT" && <PaymentPending booking={booking} reference={reference} t={t} />}
+          {booking.status === "PENDING_PAYMENT" && <PaymentPending booking={booking} reference={paymentClock ?? reference} t={t} />}
           {booking.partnerSearch === "PUBLISHED" && <span data-testid="partner-search-published">{t("myBookings.partnerSearchPublished")}</span>}
           {booking.checkIn?.checkedIn && <span data-testid="checked-in">{t("myBookings.checkedIn")}</span>}
           {booking.access && <AccessCodes access={booking.access} reference={reference} locale={locale} timeZone={timeZone} t={t}
