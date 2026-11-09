@@ -381,11 +381,12 @@ function creditOf(balanceMinor: number) {
   return { balanceMinor, currency: "EUR", items: [], nextCursor: null };
 }
 
-async function showExternal(externalPriceMinor: number, created: () => Promise<void> = () => Promise.resolve()) {
+async function showExternal(externalPriceMinor: number, created: () => Promise<void> = () => Promise.resolve(),
+  conflicted: () => Promise<void> = () => Promise.resolve()) {
   vi.spyOn(api, "bookingCards").mockResolvedValue([{ ...cardWithGuestFee(0), externalPriceMinor }]);
   render(<BookingDialog selection={{ date: "2026-08-10", slot: "10:00", courtId: court.id }} grid={grid as never}
     courts={[court]} allocations={[]} canChooseSeveralCourts={false} memberFeatures={false} currency="EUR"
-    closed={() => undefined} created={created} conflicted={() => Promise.resolve()} />);
+    closed={() => undefined} created={created} conflicted={conflicted} />);
   await screen.findByTestId("booking-card");
   await act(() => new Promise((settled) => setTimeout(settled, 0)));
 }
@@ -567,13 +568,15 @@ it("given a booking held for PayPal, when the order cannot be created, then the 
     type: "urn:courtside:error:paypal-public-url-missing", title: "Unavailable", status: 503
   }));
   const assign = stubbedAssign();
-  await showExternal(1299);
+  const refreshed = vi.fn(() => Promise.resolve());
+  await showExternal(1299, () => Promise.resolve(), refreshed);
 
   // when
   fireEvent.click(screen.getByTestId("booking-submit"));
 
   // then
   const held = await screen.findByTestId("booking-paypal-failed");
+  expect(refreshed, "the held slot shows as taken in the plan behind the dialog").toHaveBeenCalledTimes(1);
   expect(held).toHaveTextContent(i18n.t("booking.payPalOrderFailed"));
   expect(screen.getByTestId("booking-refusal")).toHaveTextContent(i18n.t("error.type.paypal-public-url-missing"));
   expect(screen.getByTestId("booking-submit"), "a second submit would only meet the pending booking").toBeDisabled();

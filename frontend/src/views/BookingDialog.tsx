@@ -191,7 +191,10 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
       }
       await created();
     } catch (failure) {
-      if (held) setPayPalOrderFailed(true);
+      if (held) {
+        setPayPalOrderFailed(true);
+        await conflicted().catch((refreshFailure: unknown) => warnAbout("Court plan refresh after a held booking failed", refreshFailure));
+      }
       if (failure instanceof ApiError && failure.problem?.type === COURT_UNAVAILABLE) setRefusedAsTaken({ refreshFailed: false });
       if (failure instanceof ApiError && failure.status === 409) {
         await conflicted().catch((refreshFailure: unknown) => {
