@@ -364,7 +364,7 @@ class PayPalReconciliationTest extends AbstractIntegrationTest {
             PAYPAL.reply(readOf(orderId), 503, UNAVAILABLE);
         });
         List<String> refunded = List.of("ORDERR", "ORDERS", "ORDERT");
-        List<UUID> refunds = refunded.stream().map(orderId -> storePendingRefund(orderId, refunded.indexOf(orderId)))
+        List<UUID> refunds = refunded.stream().map(orderId -> storePendingRefund(orderId, "EUR", refunded.indexOf(orderId)))
                 .toList();
         refunded.forEach(orderId -> PAYPAL.reply(refundReadOf(orderId), 503, UNAVAILABLE));
 
@@ -399,6 +399,20 @@ class PayPalReconciliationTest extends AbstractIntegrationTest {
         assertThat(refundUpdatedAt((UUID) refundRow().get("id"))).as("a refund still unclear is touched so others"
                 + " come first").isEqualTo(clock.instant());
         assertThat(entries(booking)).noneMatch(entry -> entry.get("kind").equals("PAYPAL_REFUND_REVERSED"));
+    }
+
+    @Test
+    void givenAPendingRefundThatFailsEveryRun_whenTheJobRuns_thenItMovesToTheBackOfThePage() {
+        // given
+        UUID refund = storePendingRefund("ORDERQ", "QQQ", 0);
+
+        // when
+        reconciliation.run();
+
+        // then
+        assertThat(refundUpdatedAt(refund)).as("a failing refund is touched so others come first")
+                .isEqualTo(clock.instant());
+        assertThat(jdbc.sql("SELECT status FROM paypal_refund").query(String.class).single()).isEqualTo("PENDING");
     }
 
     @Test
@@ -1015,7 +1029,7 @@ class PayPalReconciliationTest extends AbstractIntegrationTest {
         return booking;
     }
 
-    private UUID storePendingRefund(String orderId, int minutesUnchecked) {
+    private UUID storePendingRefund(String orderId, String currency, int minutesUnchecked) {
         jdbc.sql("""
                         INSERT INTO paypal_order (order_id, booking_id, account_id, environment, amount_minor, currency,
                                                   status, capture_id, approve_url, created_at, updated_at)
@@ -1028,9 +1042,10 @@ class PayPalReconciliationTest extends AbstractIntegrationTest {
         jdbc.sql("""
                         INSERT INTO paypal_refund (id, order_id, account_id, amount_minor, currency, status, refund_id,
                                                    requested_by, requested_at, updated_at)
-                        VALUES (:id, :order, :account, 1500, 'EUR', 'PENDING', :refund, :by, :requested, :checked)
+                        VALUES (:id, :order, :account, 1500, :currency, 'PENDING', :refund, :by, :requested,
+                                :checked)
                         """)
-                .param("id", id).param("order", orderId).param("account", johnAccount)
+                .param("id", id).param("order", orderId).param("account", johnAccount).param("currency", currency)
                 .param("refund", "REFUND-" + orderId).param("by", adminAccount)
                 .param("requested", Timestamp.from(clock.instant().minus(Duration.ofHours(1))))
                 .param("checked", Timestamp.from(clock.instant().minus(Duration.ofMinutes(10 - minutesUnchecked))))
