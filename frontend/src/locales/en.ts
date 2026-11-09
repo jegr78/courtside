@@ -1473,6 +1473,7 @@ const en: Record<keyof typeof de, string> = {
   "managedAppointments.participants_one": "{{count}} participant",
   "managedAppointments.participants_other": "{{count}} participants",
   "managedAppointments.details": "Details",
+  "managedAppointments.paymentPending": "Awaiting PayPal payment",
   "managedAppointments.detailTitle": "Appointment details",
   "managedAppointments.note": "Internal note",
   "managedAppointments.noNote": "No internal note.",

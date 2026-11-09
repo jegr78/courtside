@@ -304,7 +304,8 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
                 SELECT c.id FROM BookingCard c JOIN c.managingRoles role
                 WHERE c.id = b.cardId AND role IN :roles
             ))
-              AND b.status = org.courtside.booking.BookingStatus.CONFIRMED
+              AND b.status IN (org.courtside.booking.BookingStatus.CONFIRMED,
+                               org.courtside.booking.BookingStatus.PENDING_PAYMENT)
               AND (SELECT max(a.endsAt) FROM CourtAllocation a WHERE a.booking = b) >= :now
               AND (:courtId IS NULL OR EXISTS (
                     SELECT selectedCourt.id FROM CourtAllocation selectedCourt

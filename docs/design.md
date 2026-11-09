@@ -292,7 +292,7 @@ does every rule that counts a player's bookings or hours. Everything that follow
 mail, `BookingConfirmed`, reminders, access codes and grants, emergency codes, attendance,
 partner search, the occupancy signal, statistics, the usage report and the booking exports. Other
 members see its slot as occupied and nothing more; its owner sees it in *Meine Buchungen* with the
-remaining time. The subject access export lists it with its status.
+remaining time, and the board's list of managed appointments shows it marked as awaiting payment. The subject access export lists it with its status.
 
 `booking.payment_expires_at` stores the end of the hold, 15 minutes after the booking was written.
 An account holds at most one pending booking: a second attempt is refused with the violation

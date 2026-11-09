@@ -1471,6 +1471,7 @@ const de = {
   "managedAppointments.participants_one": "{{count}} Teilnehmer",
   "managedAppointments.participants_other": "{{count}} Teilnehmer",
   "managedAppointments.details": "Details",
+  "managedAppointments.paymentPending": "Wartet auf PayPal-Zahlung",
   "managedAppointments.detailTitle": "Termindetails",
   "managedAppointments.note": "Interne Notiz",
   "managedAppointments.noNote": "Keine interne Notiz.",

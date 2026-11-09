@@ -189,6 +189,28 @@ describe("AdminManagedAppointmentsView", () => {
       "the list keeps the loaded order").toBeTruthy();
   });
 
+  it("given a booking still awaiting its PayPal payment, when the list loads, then its row is marked pending and a confirmed one is not", async () => {
+    // given
+    const confirmed: ManagedAppointment = {
+      ...first, id: "66666666-6666-6666-6666-666666666666", seriesId: null, ownBooking: false
+    };
+    const pending: ManagedAppointment = {
+      ...confirmed, id: "77777777-7777-7777-7777-777777777777", status: "PENDING_PAYMENT",
+      startsAt: "2026-10-02T16:00:00Z", endsAt: "2026-10-02T17:00:00Z"
+    };
+    vi.mocked(api.managedAppointments).mockResolvedValue({ series: [], items: [confirmed, pending] });
+
+    // when
+    show();
+
+    // then
+    const row = await screen.findByTestId(`booking-${pending.id}`);
+    expect(row).toHaveAttribute("data-status", "PENDING_PAYMENT");
+    expect(within(row).getByTestId("managed-payment-pending")).toHaveTextContent(i18n.t("managedAppointments.paymentPending"));
+    expect(within(row).queryByTestId("managed-actions"), "a hold ends by itself, so it offers no board actions").not.toBeInTheDocument();
+    expect(within(screen.getByTestId(`booking-${confirmed.id}`)).queryByTestId("managed-payment-pending")).not.toBeInTheDocument();
+  });
+
   it("given single appointments between and after two series, when the list loads, then no region and no heading repeats", async () => {
     // given
     const between: ManagedAppointment = {

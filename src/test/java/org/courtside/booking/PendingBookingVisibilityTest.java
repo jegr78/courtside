@@ -230,6 +230,22 @@ class PendingBookingVisibilityTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenAPendingBooking_whenTheBoardListsUpcomingAppointments_thenItIsListedWithItsStatus() throws Exception {
+        // given
+        MockMvc mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
+        UUID adminPerson = identity.createPerson("Richard", "Miles", "richard.miles@example.org");
+        identity.createEnabledAccount(adminPerson, "miles.richard", Set.of(Role.ADMIN));
+        var admin = SecurityMockMvcRequestPostProcessors.user(userDetails.loadUserByUsername("miles.richard"));
+
+        // when / then
+        mockMvc.perform(get("/api/managed/bookings").with(admin))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(1))
+                .andExpect(jsonPath("$.items[0].id").value(pending.toString()))
+                .andExpect(jsonPath("$.items[0].status").value("PENDING_PAYMENT"));
+    }
+
+    @Test
     void givenAPendingBookingThatIsThenConfirmed_whenTheOwnerListsTheirBookings_thenTheExpiryIsGone()
             throws Exception {
         // given
