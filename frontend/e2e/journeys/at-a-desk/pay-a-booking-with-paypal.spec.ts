@@ -67,6 +67,13 @@ test("given a club that takes PayPal and an external player without credit, when
 
     // then
     await expect(page.getByTestId("paypal-outcome")).toHaveAttribute("data-outcome", "CONFIRMED");
+    const toBooking = page.getByTestId("paypal-to-bookings");
+    const bookingId = (await toBooking.getAttribute("href"))?.split("#booking-")[1];
+    expect(bookingId, "the return names the paid booking").toBeTruthy();
+    await activate(toBooking);
+    const row = page.getByTestId(`booking-${bookingId}`);
+    await expect(row, "My bookings shows the paid booking as confirmed").toHaveAttribute("data-status", "CONFIRMED");
+    await expect(row.getByTestId("booking-payment-pending"), "a paid booking no longer counts down its hold").toHaveCount(0);
     await activate(page.getByTestId("court-plan-link"));
     await expect(page.getByTestId("court-plan-view")).toBeVisible();
     await expect(paid, "the paid court is no longer free").toHaveCount(0);
