@@ -32,7 +32,7 @@ export function PayPalPaymentView({ mode }: { mode: PayPalPaymentMode }) {
   const confirmed = settled?.outcome === "CONFIRMED";
   return <section data-testid="paypal-payment-view" aria-labelledby="paypal-payment-title"
     className="surface-panel w-full max-w-md rounded-2xl border p-6 shadow-[0_20px_50px_var(--cs-shadow)] sm:p-8">
-    <h1 id="paypal-payment-title" className="text-2xl font-bold">{t(`paypalPayment.${mode}.title`)}</h1>
+    <h1 id="paypal-payment-title" className="text-2xl font-bold">{t("paypalPayment.title")}</h1>
     <div className="mt-4 grid gap-4">
       {!settled && !failure && <p data-testid="paypal-processing" role="status">{t(`paypalPayment.${mode}.processing`)}</p>}
       {settled && <div data-testid="paypal-outcome" data-outcome={settled.outcome}>

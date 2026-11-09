@@ -180,3 +180,16 @@ it("given a signed-in booker, when PayPal sends them back, then the return page 
   // then
   expect(await screen.findByTestId("paypal-outcome")).toHaveAttribute("data-outcome", "CONFIRMED");
 });
+
+it("given a cancel at PayPal that found the money already taken, when the page shows it, then its heading does not claim a cancelled payment", async () => {
+  // given
+  vi.spyOn(api, "cancelPayPalOrder").mockResolvedValue({ bookingId, outcome: "CONFIRMED" });
+
+  // when
+  show("cancel", "/payment/paypal/cancel?token=ORDER-1");
+
+  // then
+  await screen.findByTestId("paypal-outcome");
+  expect(screen.getByRole("heading", { level: 1 }), "a confirmed booking was not cancelled").toHaveTextContent(i18n.t("paypalPayment.title"));
+  expect(screen.getByRole("heading", { level: 1 })).not.toHaveTextContent(/abgebrochen/);
+});
