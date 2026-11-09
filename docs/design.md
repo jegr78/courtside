@@ -287,8 +287,8 @@ participant list and one entry in booking views.
 A booking and its allocations are `CONFIRMED`, `CANCELLED` or `PENDING_PAYMENT`. A pending booking
 is one an outsider still pays for by PayPal. It occupies its courts like a confirmed one: the
 exclusion constraint, the overlap pre-check, the court plan, participant-card capacity and the
-waitlist's free-slot detection all count it, and so does every rule that counts a player's bookings
-or hours. Everything that follows a confirmed booking does not exist for it yet: the confirmation
+waitlist's free-slot detection all count it, so do the guards on grid and time-zone changes, and so
+does every rule that counts a player's bookings or hours. Everything that follows a confirmed booking does not exist for it yet: the confirmation
 mail, `BookingConfirmed`, reminders, access codes and grants, emergency codes, attendance,
 partner search, the occupancy signal, statistics, the usage report and the booking exports. Other
 members see its slot as occupied and nothing more; its owner sees it in *Meine Buchungen* with the
@@ -1016,8 +1016,8 @@ Creating and revoking are audited as `booking.occupancyKey.created` and
 `key=` query value it collects.
 
 Grid changes are refused when active or future bookings, or the opening hours, seasons and holidays
-in force today or scheduled after it, no longer align. Time-zone changes are refused while a confirmed booking has not
-ended. These writes serialize with booking and opening-hours changes through the club configuration
+in force today or scheduled after it, no longer align. Time-zone changes are refused while a
+confirmed or pending booking has not ended. These writes serialize with booking and opening-hours changes through the club configuration
 row.
 
 The setup checklist derives progress from current configuration, facilities, membership types and

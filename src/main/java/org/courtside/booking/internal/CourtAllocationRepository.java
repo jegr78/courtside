@@ -49,7 +49,7 @@ public interface CourtAllocationRepository extends JpaRepository<CourtAllocation
     @Query(value = """
             SELECT EXISTS (
                 SELECT 1 FROM court_allocation a
-                WHERE a.status = 'CONFIRMED'
+                WHERE a.status IN ('CONFIRMED', 'PENDING_PAYMENT')
                   AND a.ends_at > :from
                   AND (
                     MOD(EXTRACT(EPOCH FROM
@@ -65,7 +65,7 @@ public interface CourtAllocationRepository extends JpaRepository<CourtAllocation
                                          @Param("zone") String zone,
                                          @Param("slotSeconds") int slotSeconds);
 
-    boolean existsByStatusAndEndsAtAfter(org.courtside.booking.BookingStatus status, Instant from);
+    boolean existsByStatusInAndEndsAtAfter(Collection<org.courtside.booking.BookingStatus> statuses, Instant from);
 
     @Query("""
             SELECT a FROM CourtAllocation a
