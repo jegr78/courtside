@@ -293,37 +293,60 @@ class PayPalClientTest {
     }
 
     @Test
-    void givenARefundedCapture_whenReadingIt_thenTheRefundIdComesFromItsLinks() throws IOException {
+    void givenAnOrderWithACompletedRefund_whenReadingIt_thenItListsTheRefund() throws IOException {
         // given
         reply("POST /v1/oauth2/token", 200, TOKEN);
-        reply("GET /v2/payments/captures/CAP1", 200, "{\"id\":\"CAP1\",\"status\":\"REFUNDED\",\"links\":["
-                + "{\"rel\":\"self\",\"href\":\"https://api.example.org/v2/payments/captures/CAP1\"},"
-                + "{\"rel\":\"refund\",\"href\":\"https://api.example.org/v2/payments/refunds/REF1?x=1\"}]}");
+        reply("GET /v2/checkout/orders/ORD1", 200, orderWithRefunds("[{\"id\":\"REF1\",\"status\":\"COMPLETED\"}]"));
         PayPalClient client = client(Duration.ofSeconds(2));
 
         // when
-        PayPalClient.CaptureState state = client.getCapture(credentials(), "CAP1");
+        PayPalClient.Order order = client.getOrder(credentials(), "ORD1");
 
         // then
-        assertThat(state.status()).isEqualTo("REFUNDED");
-        assertThat(state.refundId()).contains("REF1");
+        assertThat(order.refunds()).containsExactly(new PayPalClient.Refund("REF1", "COMPLETED"));
     }
 
     @Test
-    void givenACaptureWithoutRefund_whenReadingIt_thenNoRefundIdIsReported() throws IOException {
+    void givenAnOrderWithoutRefunds_whenReadingIt_thenTheListIsEmpty() throws IOException {
         // given
         reply("POST /v1/oauth2/token", 200, TOKEN);
-        reply("GET /v2/payments/captures/CAP1", 200, "{\"id\":\"CAP1\",\"status\":\"COMPLETED\",\"links\":["
-                + "{\"rel\":\"self\",\"href\":\"https://api.example.org/v2/payments/captures/CAP1\"},"
-                + "{\"rel\":\"refund\",\"href\":\"https://api.example.org/v2/payments/captures/CAP1/refund\"}]}");
+        reply("GET /v2/checkout/orders/ORD1", 200, order("ORD1", "COMPLETED", UUID.randomUUID(), "1.00", "EUR", null,
+                "[]"));
         PayPalClient client = client(Duration.ofSeconds(2));
 
         // when
-        PayPalClient.CaptureState state = client.getCapture(credentials(), "CAP1");
+        PayPalClient.Order order = client.getOrder(credentials(), "ORD1");
 
         // then
-        assertThat(state.status()).isEqualTo("COMPLETED");
-        assertThat(state.refundId()).isEmpty();
+        assertThat(order.refunds()).isEmpty();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"[{\"status\":\"COMPLETED\"}]", "[{\"id\":\"REF1\"}]", "[\"REF1\"]"})
+    void givenAnOrderWithAMalformedRefund_whenReadingIt_thenPayPalCountsAsUnavailable(String refunds)
+            throws IOException {
+        // given
+        reply("POST /v1/oauth2/token", 200, TOKEN);
+        reply("GET /v2/checkout/orders/ORD1", 200, orderWithRefunds(refunds));
+        PayPalClient client = client(Duration.ofSeconds(2));
+
+        // when / then
+        assertThatThrownBy(() -> client.getOrder(credentials(), "ORD1"))
+                .as("a refund PayPal lists without id or status is unclear, never skipped")
+                .isInstanceOf(PayPalUnavailableException.class);
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {500, 503, 429})
+    void givenPayPalIsBusy_whenRefunding_thenPayPalCountsAsUnavailable(int status) throws IOException {
+        // given
+        reply("POST /v1/oauth2/token", 200, TOKEN);
+        reply("POST /v2/payments/captures/CAP1/refund", status, "{}");
+        PayPalClient client = client(Duration.ofSeconds(2));
+
+        // when / then
+        assertThatThrownBy(() -> client.refundCapture(credentials(), "CAP1", UUID.randomUUID()))
+                .isInstanceOf(PayPalUnavailableException.class);
     }
 
     @Test
@@ -626,6 +649,11 @@ class PayPalClientTest {
     private Seen seenFor(String route) {
         return seen.stream().filter(request -> request.route().equals(route)).findFirst()
                 .orElseThrow(() -> new AssertionError("no request for " + route));
+    }
+
+    private static String orderWithRefunds(String refunds) {
+        return order("ORD1", "COMPLETED", UUID.randomUUID(), "1.00", "EUR", null, "[]")
+                .replace("}}],\"links\"", "},\"payments\":{\"refunds\":" + refunds + "}}],\"links\"");
     }
 
     private static String order(String id, String status, UUID booking, String value, String currency, String capture,

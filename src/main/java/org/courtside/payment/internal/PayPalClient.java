@@ -20,9 +20,11 @@ import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Currency;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
@@ -117,11 +119,6 @@ public class PayPalClient {
 
     Refund getRefund(Credentials credentials, String refundId) {
         return refund(unclearUnlessReadable(api(credentials, "GET", refundPath(refundId), null, null)));
-    }
-
-    CaptureState getCapture(Credentials credentials, String captureId) {
-        JsonNode body = unclearUnlessReadable(api(credentials, "GET", capturePath(captureId), null, null));
-        return new CaptureState(unclearField(body, "status"), refundId(body.get("links")));
     }
 
     Answer requestToken(PayPalEnvironment environment, String clientId, String secret) {
@@ -241,24 +238,6 @@ public class PayPalClient {
         return value;
     }
 
-    private static Optional<String> refundId(@Nullable JsonNode links) {
-        if (links == null || !links.isArray()) return Optional.empty();
-        for (JsonNode link : links) {
-            if (!"refund".equals(text(link, "rel"))) continue;
-            String[] segments;
-            try {
-                segments = URI.create(text(link, "href")).getPath().split("/");
-            } catch (IllegalArgumentException malformed) {
-                throw new PayPalUnavailableException("PayPal sent a refund link that is not a URI");
-            }
-            int last = segments.length - 1;
-            if (last >= 1 && "refunds".equals(segments[last - 1]) && ID.matcher(segments[last]).matches()) {
-                return Optional.of(segments[last]);
-            }
-        }
-        return Optional.empty();
-    }
-
     private static boolean hasIssue(byte[] body, String issue) {
         try {
             JsonNode details = JSON.readTree(body).get("details");
@@ -282,7 +261,7 @@ public class PayPalClient {
         JsonNode unit = firstUnit(body);
         Money amount = money(unit.get("amount"));
         return new Order(id, status, text(unit, "custom_id"), amount.minor(), amount.currency(),
-                approveUrl(body.get("links")), capture(body));
+                approveUrl(body.get("links")), capture(body), refunds(body));
     }
 
     private static Optional<Capture> capture(JsonNode body) {
@@ -292,6 +271,16 @@ public class PayPalClient {
         Money captured = money(first.get("amount"));
         return Optional.of(new Capture(required(first, "id"), required(first, "status"), captured.minor(),
                 captured.currency()));
+    }
+
+    private static List<Refund> refunds(JsonNode body) {
+        JsonNode refunds = firstUnit(body).path("payments").path("refunds");
+        if (!refunds.isArray()) return List.of();
+        List<Refund> listed = new ArrayList<>();
+        for (JsonNode refund : refunds) {
+            listed.add(refund(refund));
+        }
+        return List.copyOf(listed);
     }
 
     private static JsonNode firstUnit(JsonNode body) {
@@ -446,7 +435,7 @@ public class PayPalClient {
     }
 
     public record Order(String id, String status, String customId, int amountMinor, String currency,
-                        Optional<URI> approveUrl, Optional<Capture> capture) {
+                        Optional<URI> approveUrl, Optional<Capture> capture, List<Refund> refunds) {
     }
 
     public record Capture(String id, String status, int amountMinor, String currency) {
@@ -455,6 +444,4 @@ public class PayPalClient {
     public record Refund(String id, String status) {
     }
 
-    public record CaptureState(String status, Optional<String> refundId) {
-    }
 }

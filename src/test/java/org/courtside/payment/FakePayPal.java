@@ -33,7 +33,6 @@ final class FakePayPal {
 
     static final String REFUND = "POST /sandbox/v2/payments/captures/CAPTURE1/refund";
     static final String REFUND_READ = "GET /sandbox/v2/payments/refunds/REFUND1";
-    static final String CAPTURE_READ = "GET /sandbox/v2/payments/captures/CAPTURE1";
 
     private static final ObjectMapper JSON = new ObjectMapper();
 
@@ -162,6 +161,11 @@ final class FakePayPal {
         return "{\"id\":\"" + ORDER + "\",\"status\":\"" + status + "\",\"purchase_units\":[{\"custom_id\":\""
                 + booking + "\",\"amount\":{\"currency_code\":\"EUR\",\"value\":\"" + value + "\"}" + payments
                 + "}],\"links\":[{\"rel\":\"payer-action\",\"href\":\"" + APPROVE + "\"}]}";
+    }
+
+    static String refundedOrder(UUID booking, String refundId, String status) {
+        return order("COMPLETED", booking, "10.00", capture("COMPLETED", "10.00")).replace("}]}}],\"links\"",
+                "}],\"refunds\":[{\"id\":\"" + refundId + "\",\"status\":\"" + status + "\"}]}}],\"links\"");
     }
 
     static String capture(String status, String value) {
