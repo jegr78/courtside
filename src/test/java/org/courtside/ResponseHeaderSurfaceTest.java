@@ -62,7 +62,7 @@ class ResponseHeaderSurfaceTest extends AbstractIntegrationTest {
     // application rather than back to a caller.
     private static final List<String> OUTBOUND = List.of(
             "org/courtside/identity/internal/HaveIBeenPwnedPasswordLookup.java",
-            "org/courtside/payment/internal/PayPalConnectionCheck.java");
+            "org/courtside/payment/internal/PayPalClient.java");
 
     private static final Map<String, String> REVIEWED_SOURCES = Map.ofEntries(
             Map.entry("org/courtside/booking/web/BookingController.java Location",

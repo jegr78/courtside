@@ -9,6 +9,10 @@ public interface BookingPayments {
 
     BookingDebit debit(UUID accountId, UUID bookingId, int amountMinor, Currency currency);
 
+    void payByPayPal(UUID accountId, UUID bookingId, String orderId, int amountMinor, Currency currency);
+
+    boolean creditLateCapture(UUID accountId, UUID bookingId, String orderId, int amountMinor, Currency currency);
+
     void refund(UUID bookingId);
 
     Optional<Payment> paymentOf(UUID bookingId);
@@ -16,6 +20,8 @@ public interface BookingPayments {
     record BookingDebit(boolean covered, long balanceMinor, String currency) {
     }
 
-    record Payment(int amountMinor, String currency, boolean refunded) {
+    enum PaymentMethod { CREDIT, PAYPAL }
+
+    record Payment(int amountMinor, String currency, PaymentMethod method, boolean refunded) {
     }
 }

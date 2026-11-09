@@ -97,7 +97,10 @@ class PersonalBookingPages {
                             .access(toAccess(booking.getId(), access.get(booking.getId()),
                                     dynamic.get(booking.getId())))
                             .amount(booking.amount().map(amount -> new ApiBookingAmount(amount.minor(),
-                                    amount.currency().getCurrencyCode())).orElse(null));
+                                    amount.currency().getCurrencyCode())).orElse(null))
+                            .paymentExpiresAt(booking.getStatus() == BookingStatus.PENDING_PAYMENT
+                                    ? booking.paymentExpiresAt().map(WireTypes::toOffsetDateTime).orElse(null)
+                                    : null);
                 })
                 .toList();
         List<ApiPublicCourt> courtLabels = facility.allCourts().stream()

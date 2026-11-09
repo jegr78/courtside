@@ -24,7 +24,7 @@ class OutboundRequestSurfaceTest {
     private static final List<String> CALLS_OUT = List.of(
             "org/courtside/access/internal/LoxoneClient.java",
             "org/courtside/identity/internal/HaveIBeenPwnedPasswordLookup.java",
-            "org/courtside/payment/internal/PayPalConnectionCheck.java",
+            "org/courtside/payment/internal/PayPalClient.java",
             "org/courtside/shared/internal/LoopbackReadStep.java");
 
     private static final Pattern DESTINATION = Pattern.compile(
@@ -68,7 +68,7 @@ class OutboundRequestSurfaceTest {
     void whenReadingThePayPalClient_thenItsDestinationsComeFromConfigurationAlone() throws IOException {
         // given
         String source = Files.readString(
-                Path.of("src/main/java/org/courtside/payment/internal/PayPalConnectionCheck.java"));
+                Path.of("src/main/java/org/courtside/payment/internal/PayPalClient.java"));
         String defaults = Files.readString(Path.of("src/main/resources/application.yaml"));
 
         // then

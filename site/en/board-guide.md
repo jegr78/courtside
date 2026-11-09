@@ -33,7 +33,8 @@ The same sidebar returns you to the court plan.
 further matches page by page. Loaded occurrences of one series start grouped and collapsed. A
 series heading names its first and last date and counts all of its appointments, past and cancelled
 ones included, however many are loaded. *Details* remains directly available; *Cancel* sits under
-*Actions*. Create a new series at the top of the page.
+*Actions*. A booking still waiting for its PayPal payment is marked as such and has no actions; its
+hold ends by itself. Create a new series at the top of the page.
 
 When you cancel somebody else's appointment, you may choose a reason: court condition, weather, club
 event, maintenance work or another reason. The member who booked and the players are told it. There
@@ -454,8 +455,8 @@ Opening hours and the booking grid apply across the club, so they sit outside ru
 hours narrow the opening hours for one membership type and never widen them. With the facility
 open until 11:00 PM, for example, a youth rule set can allow bookings until 8:00 PM. Like the opening
 hours, booking hours end at 11:59 PM at the latest. For a window that lasts until closing, enter the
-facility's closing time as the latest end. The weekly booked hours count the confirmed bookings a
-member booked, by the week they start in. Cancelled bookings and booking kinds that do not count
+facility's closing time as the latest end. The weekly booked hours count the confirmed bookings and
+those awaiting payment that a member booked, by the week they start in. Cancelled bookings and booking kinds that do not count
 against limits, such as training or closures, stay out. Administrators may override the booking
 prohibition, the booking hours, the weekly booked hours and the minimum duration for
 administrative work. Time and court constraints still apply to them.
@@ -724,9 +725,13 @@ direction. The change log records every entry with amount and kind, without the 
 holding credit cannot close their account until you have paid it out.
 
 When an external player books a priced booking type, Courtside takes the amount from their credit.
-If it does not cover the amount, Courtside refuses the booking. A cancellation before the deadline
+If it does not cover the amount, they pay the whole amount by PayPal when you have switched PayPal
+on; otherwise Courtside refuses the booking. A cancellation before the deadline
 returns the amount, a cancellation by the club does until the booking starts. Both entries appear in the ledger as
-*Booking paid* and *Refund after cancellation*. You cannot record either by hand.
+*Booking paid* and *Refund after cancellation*. You cannot record either by hand. A PayPal payment
+appears as *Paid with PayPal* next to *Booking paid*, so the balance stays the same. A PayPal payment
+that arrives after Courtside has released the court becomes credit and appears as *Late PayPal
+payment as credit*.
 
 ## PayPal
 
@@ -734,13 +739,24 @@ The *PayPal* page is open to administrators and the **Treasurer** role and sits 
 There you enter the client id and secret from the club's PayPal developer account, choose
 **Sandbox** for trying it out or **Live**, and switch payment by PayPal on or off.
 
-![The PayPal settings with client id, environment, switch, secret state and a checked connection.](../screenshots/en/paypal.png)
+![The PayPal settings with the sandbox warning, client id, environment, switch, secret state and a checked connection.](../screenshots/en/paypal.png)
 
 You can enter the secret but never read it again. Courtside encrypts it with the instance key and
 shows only since when one is stored. Leave the field empty when saving and the stored secret stays.
 You can switch PayPal on only once one is stored. When you change the client id or the environment,
 enter the matching secret again. Saving and removing ask for a fresh password proof. The change log records
 what changed, without the client id and the secret.
+
+While sandbox credentials are stored, the page warns you: in the sandbox Courtside confirms
+bookings with test money, and the club receives no real money for them. Switch to **Live** for real
+payments.
+
+While a player pays at PayPal, Courtside holds their court for 15 minutes, at most until the
+booking starts. If you cancel such a booking or close the court, the hold ends without a message. When you change the client id or the
+environment, switch PayPal off or remove the credentials, Courtside ends the open payments of the
+old credentials and frees their courts. If PayPal had already collected money, the player usually
+gets their booking or credit as soon as PayPal shows the payment. In rare cases the payment shows
+only in the club's PayPal account, and the club returns it there.
 
 **Check connection** asks PayPal with the stored credentials, not with what the form currently
 holds, so save first. If PayPal refuses, Courtside shows the reason PayPal gives. If PayPal cannot

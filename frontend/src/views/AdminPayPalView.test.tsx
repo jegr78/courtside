@@ -262,3 +262,27 @@ it("given the settings cannot be read, when the page opens, then the failure off
   expect(await screen.findByTestId("paypal-form")).toBeInTheDocument();
   expect(read).toHaveBeenCalledTimes(2);
 });
+
+it("given stored sandbox credentials, when the page opens, then it warns that bookings are confirmed with test money", async () => {
+  // when
+  await opened(stored);
+
+  // then
+  expect(screen.getByTestId("paypal-sandbox-warning")).toHaveTextContent(i18n.t("admin.paypal.sandboxWarning"));
+});
+
+it("given stored live credentials, when the page opens, then no sandbox warning shows", async () => {
+  // when
+  await opened({ ...stored, environment: "LIVE" });
+
+  // then
+  expect(screen.queryByTestId("paypal-sandbox-warning"), "live money confirms bookings for real").toBeNull();
+});
+
+it("given nothing stored, when the page opens, then no sandbox warning shows", async () => {
+  // when
+  await opened(nothingStored);
+
+  // then
+  expect(screen.queryByTestId("paypal-sandbox-warning"), "without credentials nothing is confirmed at all").toBeNull();
+});

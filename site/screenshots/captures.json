@@ -62,6 +62,14 @@
       }
     },
     {
+      "name": "paypal-return",
+      "surface": "paypal-payment-view",
+      "pages": {
+        "de": "site/member-guide.md",
+        "en": "site/en/member-guide.md"
+      }
+    },
+    {
       "name": "participations",
       "surface": "participations",
       "pages": {

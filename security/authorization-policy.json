@@ -2,9 +2,9 @@
   "schemaVersion": 1,
   "reviewedAt": "2026-11-01",
   "purpose": "This is the normative authorization policy for the shipped Courtside API. OpenAPI defines the transport shape; this policy defines who may perform each operation, which resource attributes narrow that permission, and which protected fields each projection may read or write.",
-  "openApiFieldInventorySha256": "3b135927abc5f3e2f490f19d087c6a189138ab4223a4564b0a7fa7055bdd2a3e",
+  "openApiFieldInventorySha256": "aafc7b9cd8f803e5bad3a0a62a1ce1e01fa613b320aeda06d759a5fcb8b00d14",
   "protectedFieldInventorySha256": "5295a7c44ccdfbecede95000d5f40299f3bfb9026c9b5b5afde1dc1e58301aa0",
-  "productionAuthorizationSha256": "7b67924b35d1cdfa6ad88715b7509a03d466dbad4ca7ef47262125c8c028055e",
+  "productionAuthorizationSha256": "64a2a8114dc8c6f9624bf263ac1a9c731f05b80a31198f1c9826aae966f69730",
   "ordinaryFields": [
     "Problem.detail",
     "Problem.fieldErrors",
@@ -28,6 +28,8 @@
     "acceptWaitlistOffer:response:$response.header.Location",
     "acceptWaitlistOffer:response:$response.header.Retry-After",
     "acceptWaitlistOffer:response:BookingCreated.id",
+    "acceptWaitlistOffer:response:BookingCreated.paymentExpiresAt",
+    "acceptWaitlistOffer:response:BookingCreated.status",
     "acceptWaitlistOffer:response:FieldError.code",
     "acceptWaitlistOffer:response:FieldError.field",
     "acceptWaitlistOffer:response:FieldError.params",
@@ -154,6 +156,17 @@
     "cancelDependantBooking:response:Violation.code",
     "cancelDependantBooking:response:Violation.params",
     "cancelDependantBooking:response:Violation.params.*",
+    "cancelPayPalOrder:parameter:$parameter.path.orderId",
+    "cancelPayPalOrder:response:$response.header.Retry-After",
+    "cancelPayPalOrder:response:FieldError.code",
+    "cancelPayPalOrder:response:FieldError.field",
+    "cancelPayPalOrder:response:FieldError.params",
+    "cancelPayPalOrder:response:FieldError.params.*",
+    "cancelPayPalOrder:response:PayPalCapture.bookingId",
+    "cancelPayPalOrder:response:PayPalCapture.outcome",
+    "cancelPayPalOrder:response:Violation.code",
+    "cancelPayPalOrder:response:Violation.params",
+    "cancelPayPalOrder:response:Violation.params.*",
     "cancelSeries:parameter:$parameter.path.id",
     "cancelSeries:parameter:$parameter.query.fromBookingId",
     "cancelSeries:parameter:$parameter.query.reason",
@@ -166,6 +179,17 @@
     "cancelSeries:response:Violation.code",
     "cancelSeries:response:Violation.params",
     "cancelSeries:response:Violation.params.*",
+    "capturePayPalOrder:parameter:$parameter.path.orderId",
+    "capturePayPalOrder:response:$response.header.Retry-After",
+    "capturePayPalOrder:response:FieldError.code",
+    "capturePayPalOrder:response:FieldError.field",
+    "capturePayPalOrder:response:FieldError.params",
+    "capturePayPalOrder:response:FieldError.params.*",
+    "capturePayPalOrder:response:PayPalCapture.bookingId",
+    "capturePayPalOrder:response:PayPalCapture.outcome",
+    "capturePayPalOrder:response:Violation.code",
+    "capturePayPalOrder:response:Violation.params",
+    "capturePayPalOrder:response:Violation.params.*",
     "changeAccessPoint:parameter:$parameter.path.id",
     "changeAccessPoint:request:AccessPointRequest.courtIds",
     "changeAccessPoint:request:AccessPointRequest.loxoneGroup",
@@ -743,6 +767,8 @@
     "createBooking:response:$response.header.Location",
     "createBooking:response:$response.header.Retry-After",
     "createBooking:response:BookingCreated.id",
+    "createBooking:response:BookingCreated.paymentExpiresAt",
+    "createBooking:response:BookingCreated.status",
     "createBooking:response:FieldError.code",
     "createBooking:response:FieldError.field",
     "createBooking:response:FieldError.params",
@@ -831,6 +857,8 @@
     "createDependantBooking:response:$response.header.Location",
     "createDependantBooking:response:$response.header.Retry-After",
     "createDependantBooking:response:BookingCreated.id",
+    "createDependantBooking:response:BookingCreated.paymentExpiresAt",
+    "createDependantBooking:response:BookingCreated.status",
     "createDependantBooking:response:FieldError.code",
     "createDependantBooking:response:FieldError.field",
     "createDependantBooking:response:FieldError.params",
@@ -1025,6 +1053,18 @@
     "createParticipantCard:response:Violation.code",
     "createParticipantCard:response:Violation.params",
     "createParticipantCard:response:Violation.params.*",
+    "createPayPalOrder:request:PayPalOrderRequest.bookingId",
+    "createPayPalOrder:response:$response.header.Accept",
+    "createPayPalOrder:response:$response.header.Retry-After",
+    "createPayPalOrder:response:FieldError.code",
+    "createPayPalOrder:response:FieldError.field",
+    "createPayPalOrder:response:FieldError.params",
+    "createPayPalOrder:response:FieldError.params.*",
+    "createPayPalOrder:response:PayPalOrder.approveUrl",
+    "createPayPalOrder:response:PayPalOrder.orderId",
+    "createPayPalOrder:response:Violation.code",
+    "createPayPalOrder:response:Violation.params",
+    "createPayPalOrder:response:Violation.params.*",
     "createPerson:response:$response.header.Accept",
     "createPerson:response:$response.header.Location",
     "createPerson:response:$response.header.Retry-After",
@@ -1614,6 +1654,15 @@
     "getParticipantCard:response:Violation.code",
     "getParticipantCard:response:Violation.params",
     "getParticipantCard:response:Violation.params.*",
+    "getPayPalAvailability:response:$response.header.Retry-After",
+    "getPayPalAvailability:response:FieldError.code",
+    "getPayPalAvailability:response:FieldError.field",
+    "getPayPalAvailability:response:FieldError.params",
+    "getPayPalAvailability:response:FieldError.params.*",
+    "getPayPalAvailability:response:PayPalAvailability.available",
+    "getPayPalAvailability:response:Violation.code",
+    "getPayPalAvailability:response:Violation.params",
+    "getPayPalAvailability:response:Violation.params.*",
     "getPayPalSettings:response:$response.header.Retry-After",
     "getPayPalSettings:response:FieldError.code",
     "getPayPalSettings:response:FieldError.field",
@@ -1980,6 +2029,7 @@
     "listDependantBookings:response:PersonalBooking.courtIds",
     "listDependantBookings:response:PersonalBooking.endsAt",
     "listDependantBookings:response:PersonalBooking.partnerSearch",
+    "listDependantBookings:response:PersonalBooking.paymentExpiresAt",
     "listDependantBookings:response:PersonalBooking.released",
     "listDependantBookings:response:PersonalBooking.startsAt",
     "listDependantBookings:response:PersonalBooking.status",
@@ -2432,6 +2482,7 @@
     "listPersonalBookings:response:PersonalBooking.courtIds",
     "listPersonalBookings:response:PersonalBooking.endsAt",
     "listPersonalBookings:response:PersonalBooking.partnerSearch",
+    "listPersonalBookings:response:PersonalBooking.paymentExpiresAt",
     "listPersonalBookings:response:PersonalBooking.released",
     "listPersonalBookings:response:PersonalBooking.startsAt",
     "listPersonalBookings:response:PersonalBooking.status",
@@ -5120,6 +5171,49 @@
       ]
     },
     {
+      "id": "own-paypal-checkout",
+      "description": "A permanent account creates, captures and cancels only the PayPal order of its own booking that awaits payment.",
+      "operationIds": [
+        "createPayPalOrder",
+        "capturePayPalOrder",
+        "cancelPayPalOrder"
+      ],
+      "actors": [
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN",
+        "EXTERNAL"
+      ],
+      "decisions": [
+        "permanent-account-gate",
+        "paypal-order-ownership"
+      ]
+    },
+    {
+      "id": "paypal-availability",
+      "description": "A permanent account reads whether PayPal payment is available; the answer names no account and no credentials.",
+      "operationIds": [
+        "getPayPalAvailability"
+      ],
+      "actors": [
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN",
+        "EXTERNAL"
+      ],
+      "decisions": [
+        "permanent-account-gate"
+      ]
+    },
+    {
       "id": "treasury-paypal-credentials",
       "description": "A treasurer or administrator stores, replaces or removes the PayPal credentials after a recent full proof; the secret is write-only.",
       "operationIds": [
@@ -5380,6 +5474,30 @@
         "src/test/java/org/courtside/booking/attendance/AttendanceTest.java#givenSomebodyElsesBooking_whenAMemberChecksIn_thenItIsAnsweredLikeABookingThatDoesNotExist",
         "src/test/java/org/courtside/booking/ParticipationServiceTest.java#givenACancelledBooking_whenSomebodyItNeverNamedWithdraws_thenItIsNotFoundRatherThanCancelled",
         "src/test/java/org/courtside/booking/ParticipationWithdrawalConcurrencyTest.java#givenACancellationHoldingTheBooking_whenTheCoPlayerWithdraws_thenTheWithdrawalWaitsAndIsRefused"
+      ]
+    },
+    {
+      "id": "paypal-order-ownership",
+      "title": "PayPal order ownership",
+      "rule": "Creating, capturing and cancelling a PayPal order require the signed-in account that booked the pending booking. The account comes from the session and is compared with the booking's booker on create and with the order's stored account on capture and cancel; any other booking or order answers as not found before PayPal is called.",
+      "attributes": [
+        "current-account",
+        "booking-owner"
+      ],
+      "productionPaths": [
+        "src/main/java/org/courtside/payment/internal/PayPalCheckout.java#create",
+        "src/main/java/org/courtside/payment/internal/PayPalCheckout.java#cancel",
+        "src/main/java/org/courtside/payment/internal/PayPalCheckout.java#owned",
+        "src/main/java/org/courtside/payment/internal/PayPalCheckout.java#signedIn",
+        "src/main/java/org/courtside/payment/web/PayPalCheckoutController.java#capturePayPalOrder"
+      ],
+      "positiveTests": [
+        "src/test/java/org/courtside/payment/PayPalCheckoutTest.java#givenAnApprovedOrder_whenTheBookerReturns_thenTheBookingIsConfirmedWithTwoLedgerEntries",
+        "src/test/java/org/courtside/payment/PayPalCheckoutTest.java#givenAnAbandonedPayment_whenCancelled_thenTheCourtIsFreeAtOnce"
+      ],
+      "negativeTests": [
+        "src/test/java/org/courtside/payment/PayPalCheckoutTest.java#givenAnotherAccount_whenCapturingOrCancelling_thenTheOrderIsNotFound",
+        "src/test/java/org/courtside/payment/PayPalCheckoutTest.java#givenNoSession_whenCreatingAnOrder_thenItIsUnauthenticated"
       ]
     },
     {

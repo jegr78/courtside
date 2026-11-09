@@ -170,6 +170,8 @@ tags:
     description: Money the club holds for an account, and how that balance came about.
   - name: payment
     description: The club's payment provider and the credentials Courtside uses with it.
+  - name: payment-checkout
+    description: An external player paying a held booking by PayPal.
 
 security:
   - sessionCookie: []
@@ -888,11 +890,11 @@ components:
         Why somebody other than the holder cancelled a booking, as a code the client and the
         messages translate. There is no free text, so a reason names nobody. It is fixed with the
         cancellation, because the message that names it has already gone out.
-      enum: [COURT_CONDITION, WEATHER, CLUB_EVENT, MAINTENANCE, OTHER]
+      enum: [COURT_CONDITION, WEATHER, CLUB_EVENT, MAINTENANCE, OTHER, PAYMENT_EXPIRED]
 
     BookingStatus:
       type: string
-      enum: [CONFIRMED, CANCELLED]
+      enum: [PENDING_PAYMENT, CONFIRMED, CANCELLED]
 
     Violation:
       type: object
@@ -3385,9 +3387,16 @@ components:
 
     BookingCreated:
       type: object
-      required: [id]
+      required: [id, status]
       properties:
         id: { type: string, format: uuid }
+        status: { $ref: "#/components/schemas/BookingStatus" }
+        paymentExpiresAt:
+          type: [string, "null"]
+          format: date-time
+          description: |
+            When the hold on a booking awaiting a PayPal payment ends. Present only while the status
+            is PENDING_PAYMENT.
 
     PersonalBooking:
       type: object
@@ -3418,6 +3427,12 @@ components:
           $ref: "#/components/schemas/AccessGrant"
         amount:
           $ref: "#/components/schemas/BookingAmount"
+        paymentExpiresAt:
+          type: [string, "null"]
+          format: date-time
+          description: |
+            When the hold on a booking awaiting payment ends. Present only while the status is
+            PENDING_PAYMENT; absent once the booking is confirmed or cancelled.
 
     BookingAmount:
       type: object
@@ -4038,7 +4053,9 @@ components:
         `CREDIT`: the treasurer credited the account, for example after a cash payment. `PAYOUT`:
         the treasurer paid out part of the balance. `BOOKING_DEBIT`: a booking was paid from the
         balance. `BOOKING_REFUND`: a cancelled booking returned its payment to the balance.
-      enum: [CREDIT, PAYOUT, BOOKING_DEBIT, BOOKING_REFUND]
+        `PAYPAL_PAYMENT`: the booker paid a booking through PayPal. `PAYPAL_LATE_CAPTURE`: PayPal
+        captured a payment after the held court was released, and it became credit.
+      enum: [CREDIT, PAYOUT, BOOKING_DEBIT, BOOKING_REFUND, PAYPAL_PAYMENT, PAYPAL_LATE_CAPTURE]
 
     CreditEntryRequestKind:
       type: string
@@ -4070,7 +4087,7 @@ components:
         bookingId:
           type: [string, "null"]
           format: uuid
-          description: The booking a `BOOKING_DEBIT` or `BOOKING_REFUND` belongs to.
+          description: The booking a booking or PayPal entry belongs to.
 
     CreditLedgerPage:
       type: object
@@ -4188,6 +4205,60 @@ components:
           type: string
           maxLength: 200
           description: PayPal's own reason for a `REJECTED` outcome, or the HTTP status when it gave none.
+
+    PayPalAvailability:
+      type: object
+      additionalProperties: false
+      required: [available]
+      properties:
+        available:
+          type: boolean
+          description: |
+            Whether PayPal payment is switched on with a stored secret and this instance knows the
+            public address PayPal sends the payer back to.
+
+    PayPalOrderRequest:
+      type: object
+      additionalProperties: false
+      required: [bookingId]
+      properties:
+        bookingId:
+          type: string
+          format: uuid
+          description: The signed-in account's booking that awaits its PayPal payment.
+
+    PayPalOrder:
+      type: object
+      additionalProperties: false
+      required: [orderId, approveUrl]
+      properties:
+        orderId:
+          type: string
+          pattern: "^[A-Za-z0-9_-]{1,64}$"
+          description: PayPal's id of the order.
+        approveUrl:
+          type: string
+          format: uri
+          description: Where the browser goes to approve the payment at PayPal.
+
+    PayPalCaptureOutcome:
+      type: string
+      enum: [CONFIRMED, LATE_CREDITED, REJECTED, PROCESSING]
+      description: |
+        `CONFIRMED`: the payment was captured and the booking is confirmed. `LATE_CREDITED`: the
+        payment was captured after the hold had ended, so the booking is gone and the amount is
+        recorded for the account instead. `REJECTED`: the order did not match its booking, was
+        cancelled or PayPal refused to capture it; no money moved and the court is free.
+        `PROCESSING`: PayPal has not settled the payment yet or could not be reached; the court
+        stays held and Courtside keeps asking PayPal.
+
+    PayPalCapture:
+      type: object
+      additionalProperties: false
+      required: [bookingId, outcome]
+      properties:
+        bookingId: { type: string, format: uuid }
+        outcome: { $ref: "#/components/schemas/PayPalCaptureOutcome" }
 
     GuestFeeReport:
       type: object
@@ -7309,6 +7380,8 @@ paths:
         Non-overlap is decided by the database, not by a check beforehand — time passes between
         checking and inserting. A collision is a `409`, and it is authoritative. Every booking
         attempt carries an idempotency key; retrying the same request returns the original booking.
+        An external player whose credit does not cover the price, while the club accepts PayPal,
+        receives a booking in `PENDING_PAYMENT` that holds the court until `paymentExpiresAt`.
       security:
         - sessionCookie: []
           csrfToken: []
@@ -8784,6 +8857,13 @@ paths:
         without a new one, is refused with `urn:courtside:error:paypal-secret-required`.
         Requires a re-authentication no older than five minutes. The audit record names what
         changed, never the secret or the client id.
+
+        When the client id or the environment changes or PayPal is switched off, the open orders of the
+        former credentials are ended after the change is stored. An order Courtside never asked PayPal to
+        capture holds no money and is voided at once, freeing its court. An order with a capture attempt
+        is read at PayPal first: a capture is recorded as a return would record it, an order without one
+        is voided. Such an order PayPal cannot show stays open for the reconciliation, which frees its
+        court a day after the payment deadline and still records a capture found later as credit.
       security:
         - sessionCookie: []
           csrfToken: []
@@ -8814,7 +8894,9 @@ paths:
       tags: [payment]
       operationId: removePayPalCredentials
       summary: Remove the stored PayPal credentials, which switches PayPal payment off.
-      description: Requires a re-authentication no older than five minutes.
+      description: |
+        Requires a re-authentication no older than five minutes. Open orders of the removed
+        credentials are ended as on a switch-off.
       security:
         - sessionCookie: []
           csrfToken: []
@@ -8849,6 +8931,145 @@ paths:
           $ref: "#/components/responses/Unauthenticated"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/payments/paypal/availability:
+    get:
+      tags: [payment-checkout]
+      operationId: getPayPalAvailability
+      summary: Whether the signed-in account can pay a booking by PayPal right now.
+      description: |
+        `true` when PayPal payment is switched on, a secret is stored and the instance's public
+        address is configured. The booking dialog offers PayPal only then.
+      responses:
+        "200":
+          description: Whether PayPal payment is available.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PayPalAvailability" }
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/payments/paypal/orders:
+    post:
+      tags: [payment-checkout]
+      operationId: createPayPalOrder
+      summary: Create the PayPal order for the signed-in account's booking that awaits payment.
+      description: |
+        Courtside takes the amount and currency stored with the booking, so the request names
+        neither. The order carries the booking id, and PayPal sends the payer back to
+        `/payment/paypal/return` or `/payment/paypal/cancel` on this instance. A booking has at most
+        one order: calling this again answers the stored one. A booking that does not belong to the
+        signed-in account or no longer awaits payment is answered
+        `urn:courtside:error:paypal-order-not-found`. Without a configured public address the answer
+        is `urn:courtside:error:paypal-public-url-missing`; when PayPal is switched off or does not
+        answer, `urn:courtside:error:paypal-unavailable`.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PayPalOrderRequest" }
+      responses:
+        "200":
+          description: The order and where the payer approves it.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PayPalOrder" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /api/payments/paypal/orders/{orderId}/capture:
+    post:
+      tags: [payment-checkout]
+      operationId: capturePayPalOrder
+      summary: Capture the signed-in account's approved PayPal order and confirm its booking.
+      description: |
+        Courtside reads the order at PayPal first and captures it only when it carries the booking
+        id, amount and currency stored with it; a mismatch frees the court without moving money. A
+        settled order is answered from what is stored, so repeating the call is safe. An order of
+        another account is answered `urn:courtside:error:paypal-order-not-found`.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^[A-Za-z0-9_-]{1,64}$"
+      responses:
+        "200":
+          description: What became of the payment and its booking.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PayPalCapture" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/payments/paypal/orders/{orderId}/cancel:
+    post:
+      tags: [payment-checkout]
+      operationId: cancelPayPalOrder
+      summary: Give up the signed-in account's unpaid PayPal order and free its court.
+      description: |
+        Courtside reads the order at PayPal first. When PayPal shows no money taken, the order is
+        voided, never captured afterwards, and the hold on the booking ends at once: `REJECTED`.
+        When PayPal shows a capture, it is recorded as a return would record it: `CONFIRMED` or
+        `LATE_CREDITED`. When PayPal cannot be read or its state is unclear, the order stays open
+        and the court stays held: `PROCESSING`. An order that is already settled or cancelled
+        is answered from what is stored. An order of another account is answered
+        `urn:courtside:error:paypal-order-not-found`.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^[A-Za-z0-9_-]{1,64}$"
+      responses:
+        "200":
+          description: What became of the order and its booking.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PayPalCapture" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
         "429":
           $ref: "#/components/responses/RateLimited"
 
@@ -13315,7 +13536,10 @@ paths:
         subject, `credit.entry.recorded`, whose subject is the account a treasurer credited or paid
         out, and `payment.paypal.settings.changed` and `payment.paypal.credentials.removed`, whose
         subject is the stored PayPal settings. The rest is recorded outside those surfaces:
-        `booking.booking.confirmed` and the four other booking entries, `access.grant.installed` and
+        `booking.booking.confirmed` and the four other booking entries, `payment.paypal.order.created`,
+        `payment.paypal.captured`, `payment.paypal.lateCapture`, `payment.paypal.rejected` and
+        `payment.paypal.voided`, whose
+        subject is the booking a PayPal order pays for, `access.grant.installed` and
         `access.grant.failing`, and
         `identity.account.credentialsRequested`, which names the account a credential was issued
         for. Treat `eventType` as an open set — a page may carry a name this description does not

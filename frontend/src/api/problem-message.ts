@@ -1,7 +1,7 @@
 import type { TFunction } from "i18next";
 import i18n from "../i18n";
 import { formatMinor } from "../money";
-import { formatClockTime } from "../time/clubZone";
+import { formatClockTime, formatTime } from "../time/clubZone";
 import { ApiError, type Problem } from "./client";
 
 const TYPE_PREFIX = "urn:courtside:error:";
@@ -9,6 +9,7 @@ const TYPE_PREFIX = "urn:courtside:error:";
 const MISSING = "\u0000missing";
 const clockTimeParams = ["earliestStart", "latestEnd", "opensAt", "closesAt"];
 const moneyParams = ["balanceMinor", "amountMinor"];
+const instantParams = ["expiresAt"];
 
 export function isUnauthenticated(failure: unknown): boolean {
   return failure instanceof ApiError && failure.problem?.type === `${TYPE_PREFIX}unauthenticated`;
@@ -41,7 +42,9 @@ export function failureReference(failure: unknown): string | undefined {
 }
 
 export function violationMessage(code: string, params: Record<string, unknown>, t: (key: string, options?: Record<string, unknown>) => string): string {
-  const message = t(code, { ...params, ...clockTimes(params), ...amounts(params), defaultValue: MISSING });
+  const message = t(code, {
+    ...params, ...clockTimes(params), ...amounts(params), ...instants(params), defaultValue: MISSING
+  });
   if (message !== MISSING) return message;
   const unknown = t("error.unknownViolation");
   return import.meta.env.DEV ? `${unknown} [${code}]` : unknown;
@@ -53,6 +56,19 @@ function amounts(params: Record<string, unknown>): Record<string, string> {
   if (typeof currency !== "string") return {};
   return Object.fromEntries(moneyParams.filter((name) => typeof params[name] === "number")
     .map((name) => [name.slice(0, -"Minor".length), formatMinor(params[name] as number, locale, currency)]));
+}
+
+// A deadline already behind the reader picks the key's "_past" wording instead of naming a time gone by.
+function instants(params: Record<string, unknown>): Record<string, string> {
+  const locale = i18n.resolvedLanguage ?? i18n.language;
+  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const present = instantParams.flatMap((name) => {
+    const value = params[name];
+    return typeof value === "string" && !Number.isNaN(Date.parse(value)) ? [[name, value] as const] : [];
+  });
+  const formatted = Object.fromEntries(present
+    .map(([name, value]) => [name, formatClockTime(formatTime(value, timeZone), locale)]));
+  return present.some(([, value]) => Date.parse(value) <= Date.now()) ? { ...formatted, context: "past" } : formatted;
 }
 
 function clockTimes(params: Record<string, unknown>): Record<string, string> {

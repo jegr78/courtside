@@ -17,6 +17,7 @@ import org.courtside.booking.internal.ParticipantsInvalidException;
 import org.courtside.booking.internal.SeriesOccurrenceCancellation;
 import org.courtside.booking.internal.UnattendedRelease;
 import org.courtside.booking.internal.IdempotencyKeyRaceException;
+import org.courtside.booking.internal.PendingPaymentRaceException;
 import org.courtside.card.BookingCard;
 import org.courtside.card.CardService;
 import org.courtside.config.ClubCurrency;
@@ -36,17 +37,15 @@ import org.courtside.shared.DomainFailure;
 import org.courtside.shared.BookingConfirmed;
 import org.courtside.shared.ParticipantRecorded;
 import org.courtside.shared.SqlConstraintViolation;
-import org.courtside.shared.TimeSlot;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -65,6 +64,8 @@ class BookingWriter implements SeriesOccurrenceCancellation, BookingDrafts, Unat
 
     private static final String OVERLAP_CONSTRAINT = "court_allocation_no_overlap";
     private static final String IDEMPOTENCY_CONSTRAINT = "booking_idempotency_by_account";
+    private static final String PENDING_CONSTRAINT = "booking_one_pending_per_account";
+    private static final Duration PAYMENT_HOLD = Duration.ofMinutes(15);
 
     private final BookingRepository bookings;
     private final CourtAllocationRepository allocations;
@@ -85,6 +86,8 @@ class BookingWriter implements SeriesOccurrenceCancellation, BookingDrafts, Unat
     private final CourtReservations reservations;
     private final ClubCurrency currency;
     private final BookingPayments payments;
+    private final PaymentMethods paymentMethods;
+    private final PendingPaymentService pendingPayments;
 
     @Override
     public UUID write(CreateBookingCommand command) {
@@ -164,11 +167,12 @@ class BookingWriter implements SeriesOccurrenceCancellation, BookingDrafts, Unat
             throw e;
         }
         Optional<BookingAmount> amount = booking.amount().filter(charged -> charged.minor() > 0);
-        if (amount.isPresent()) {
-            payFromCredit(command.bookedBy(), booking.getId(), amount.get());
-        }
+        boolean awaitingPayment = amount.isPresent() && !payFromCredit(command, booking, amount.get());
         reservations.booked(command.bookedBy(), booking.getId(), command.courtIds(), command.slot());
-        countCreatedOnCommit();
+        if (awaitingPayment) {
+            return booking.getId();
+        }
+        pendingPayments.countCreatedOnCommit();
         // A series is one decision and gets one message of its own, not one per occurrence.
         if (command.seriesId() == null) {
             events.publishEvent(new BookingConfirmed(booking.getId()));
@@ -177,26 +181,37 @@ class BookingWriter implements SeriesOccurrenceCancellation, BookingDrafts, Unat
         return booking.getId();
     }
 
-    private void payFromCredit(UUID bookedBy, UUID bookingId, BookingAmount amount) {
-        BookingPayments.BookingDebit debit = payments.debit(bookedBy, bookingId, amount.minor(), amount.currency());
-        if (!debit.covered()) {
+    /** Debits the amount, or holds the court for a PayPal payment and answers false. */
+    private boolean payFromCredit(CreateBookingCommand command, Booking booking, BookingAmount amount) {
+        BookingPayments.BookingDebit debit = payments.debit(command.bookedBy(), booking.getId(), amount.minor(),
+                amount.currency());
+        if (debit.covered()) {
+            return true;
+        }
+        if (command.actedBy() != null || command.seriesId() != null || !paymentMethods.payPalAvailable()) {
             throw new BookingRulesViolatedException(List.of(new RuleViolation("booking.payment.creditInsufficient",
                     Map.of("amountMinor", amount.minor(), "balanceMinor", debit.balanceMinor(),
                             "currency", debit.currency()))));
         }
-    }
-
-    private void countCreatedOnCommit() {
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override
-            public void afterCommit() {
-                meters.counter("courtside.bookings.created").increment();
-            }
+        bookings.findPendingExpiryOf(command.bookedBy()).ifPresent(expiresAt -> {
+            throw new BookingRulesViolatedException(List.of(new RuleViolation("booking.payment.pendingExists",
+                    Map.of("expiresAt", expiresAt.toString()))));
         });
+        Instant held = booking.getCreatedAt().plus(PAYMENT_HOLD);
+        booking.awaitPayment(held.isBefore(command.slot().start()) ? held : command.slot().start());
+        try {
+            bookings.saveAndFlush(booking);
+        } catch (DataIntegrityViolationException e) {
+            if (isConstraint(e, PENDING_CONSTRAINT)) {
+                throw new PendingPaymentRaceException(e);
+            }
+            throw e;
+        }
+        return false;
     }
 
     private void requireAvailableCourts(CreateBookingCommand command, String idempotencyKey) {
-        if (!allocations.existsConfirmedOverlapping(command.courtIds(), command.slot().start(), command.slot().end())) {
+        if (!allocations.existsOccupyingOverlapping(command.courtIds(), command.slot().start(), command.slot().end())) {
             return;
         }
         if (idempotencyKey != null
@@ -240,8 +255,15 @@ class BookingWriter implements SeriesOccurrenceCancellation, BookingDrafts, Unat
         Booking booking = bookings.findWithAllocationsById(bookingId)
                 .orElseThrow(() -> new BookingNotFoundException("No booking with id " + bookingId));
         accessControl.requireManagementAccess(booking, cancelledBy, cancellerRoles);
+        if (reason == CancellationReason.PAYMENT_EXPIRED) {
+            throw CancellationReasonNotAllowedException.reserved();
+        }
         if (reason != null && cancelledBy.equals(booking.getBookedBy())) {
             throw new CancellationReasonNotAllowedException();
+        }
+        if (booking.getStatus() == BookingStatus.PENDING_PAYMENT) {
+            pendingPayments.releaseLocked(booking, cancelledBy);
+            return false;
         }
         Instant cancelledAt = clock.instant();
         try {
@@ -255,7 +277,7 @@ class BookingWriter implements SeriesOccurrenceCancellation, BookingDrafts, Unat
         boolean changed = booking.cancel(cancelledBy, cancelledAt, reason);
         bookings.saveAndFlush(booking);
         if (changed) {
-            releaseCourtsOf(booking);
+            pendingPayments.releaseCourtsOf(booking);
             if (cancelledAt.isBefore(startOf(booking))) {
                 payments.refund(bookingId);
             }
@@ -281,15 +303,8 @@ class BookingWriter implements SeriesOccurrenceCancellation, BookingDrafts, Unat
             return false;
         }
         bookings.saveAndFlush(booking);
-        releaseCourtsOf(booking);
+        pendingPayments.releaseCourtsOf(booking);
         return true;
-    }
-
-    private void releaseCourtsOf(Booking booking) {
-        booking.getAllocations().stream()
-                .collect(Collectors.groupingBy(allocation -> new TimeSlot(allocation.getStartsAt(), allocation.getEndsAt()),
-                        Collectors.mapping(CourtAllocation::getCourtId, Collectors.toList())))
-                .forEach((slot, courtIds) -> reservations.released(courtIds, slot));
     }
 
     private boolean isOverlap(DataIntegrityViolationException e) {

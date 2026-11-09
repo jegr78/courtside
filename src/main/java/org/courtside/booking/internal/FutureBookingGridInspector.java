@@ -1,5 +1,6 @@
 package org.courtside.booking.internal;
 
+import org.courtside.booking.BookingStatus;
 import org.courtside.config.BookingGridConstraint;
 import org.courtside.config.BookingSlotDuration;
 import org.springframework.stereotype.Component;
@@ -7,10 +8,12 @@ import org.springframework.stereotype.Component;
 import java.time.Clock;
 import java.time.ZoneId;
 import java.util.Optional;
-import org.courtside.booking.BookingStatus;
+import java.util.Set;
 
 @Component
 class FutureBookingGridInspector implements BookingGridConstraint {
+
+    private static final Set<BookingStatus> OCCUPYING = Set.of(BookingStatus.CONFIRMED, BookingStatus.PENDING_PAYMENT);
 
     private final CourtAllocationRepository allocations;
     private final Clock clock;
@@ -30,7 +33,7 @@ class FutureBookingGridInspector implements BookingGridConstraint {
 
     @Override
     public Optional<String> timeZoneConflictCode() {
-        return allocations.existsByStatusAndEndsAtAfter(BookingStatus.CONFIRMED, clock.instant())
+        return allocations.existsByStatusInAndEndsAtAfter(OCCUPYING, clock.instant())
                 ? Optional.of("config.timeZone.futureBookingConflict")
                 : Optional.empty();
     }

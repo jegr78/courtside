@@ -119,7 +119,7 @@ class BookingConflictPrecheckTest extends AbstractIntegrationTest {
                 .isInstanceOfSatisfying(BookingRulesViolatedException.class, failure ->
                         assertThat(failure.getViolations()).extracting(RuleViolation::code)
                                 .contains("booking.rule.openingHours.outside", "booking.rule.slotGrid.misaligned"));
-        verify(allocations, never()).existsConfirmedOverlapping(any(), any(), any());
+        verify(allocations, never()).existsOccupyingOverlapping(any(), any(), any());
         assertThat(bookings.count()).isEqualTo(1);
     }
 
@@ -134,7 +134,7 @@ class BookingConflictPrecheckTest extends AbstractIntegrationTest {
             assertThat((Boolean) occupied).isFalse();
             competing.executeWithoutResult(status -> insertCompetingAllocation());
             return occupied;
-        }).when(allocations).existsConfirmedOverlapping(List.of(court), START, END);
+        }).when(allocations).existsOccupyingOverlapping(List.of(court), START, END);
         double conflictsBefore = conflicts();
 
         // when / then
@@ -152,12 +152,12 @@ class BookingConflictPrecheckTest extends AbstractIntegrationTest {
         UUID booking = service.create(command(START, END));
 
         // when
-        boolean overlapping = allocations.existsConfirmedOverlapping(List.of(court), START.plusSeconds(1800), END);
-        boolean adjacent = allocations.existsConfirmedOverlapping(List.of(court), END, END.plusSeconds(3600));
-        boolean anotherCourt = allocations.existsConfirmedOverlapping(List.of(UUID.randomUUID()), START, END);
-        boolean multipleCourts = allocations.existsConfirmedOverlapping(List.of(UUID.randomUUID(), court), START, END);
+        boolean overlapping = allocations.existsOccupyingOverlapping(List.of(court), START.plusSeconds(1800), END);
+        boolean adjacent = allocations.existsOccupyingOverlapping(List.of(court), END, END.plusSeconds(3600));
+        boolean anotherCourt = allocations.existsOccupyingOverlapping(List.of(UUID.randomUUID()), START, END);
+        boolean multipleCourts = allocations.existsOccupyingOverlapping(List.of(UUID.randomUUID(), court), START, END);
         service.cancel(booking, UUID.randomUUID(), Set.of(Role.ADMIN));
-        boolean cancelled = allocations.existsConfirmedOverlapping(List.of(court), START, END);
+        boolean cancelled = allocations.existsOccupyingOverlapping(List.of(court), START, END);
 
         // then
         assertThat(overlapping).isTrue();

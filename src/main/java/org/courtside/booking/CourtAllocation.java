@@ -52,6 +52,14 @@ public class CourtAllocation {
         this.status = BookingStatus.CONFIRMED;
     }
 
+    void awaitPayment() {
+        this.status = BookingStatus.PENDING_PAYMENT;
+    }
+
+    void confirm() {
+        this.status = BookingStatus.CONFIRMED;
+    }
+
     void cancel() {
         this.status = BookingStatus.CANCELLED;
     }

@@ -34,8 +34,9 @@ Unter *Vereinstermine* stehen zunächst höchstens 20 anstehende Termine, der n�
 Buchungsart und lade weitere Treffer seitenweise nach. Geladene Termine derselben Serie sind
 eingeklappt zusammengefasst. Der Kopf einer Serie nennt ihren ersten und letzten Termin und zählt
 alle ihre Termine, auch die vergangenen und abgesagten, unabhängig davon, wie viele geladen sind.
-*Details* bleibt direkt erreichbar; *Stornieren* liegt unter *Aktionen*. Neue Serien legst du am
-Anfang der Seite an.
+*Details* bleibt direkt erreichbar; *Stornieren* liegt unter *Aktionen*. Eine Buchung, die noch auf
+ihre PayPal-Zahlung wartet, ist als solche markiert und hat keine Aktionen, ihre Reservierung endet
+von selbst. Neue Serien legst du am Anfang der Seite an.
 
 Stornierst du den Termin einer anderen Person, kannst du einen Grund wählen: Zustand des Platzes,
 Wetter, Veranstaltung des Vereins, Wartungsarbeiten oder ein anderer Grund. Die Person, die gebucht
@@ -482,8 +483,8 @@ Regelwerke. Buchungszeiten engen die Öffnungszeiten für eine Mitgliedsart ein,
 nie. Hat die Anlage zum Beispiel bis 23:00 Uhr geöffnet, kann ein Jugendregelwerk Buchungen bis
 20:00 Uhr erlauben. Wie die Öffnungszeiten enden Buchungszeiten spätestens um 23:59 Uhr. Gilt ein
 Fenster bis Betriebsschluss, trage die Schließzeit der Anlage als spätestes Ende ein.
-Die gebuchten Stunden pro Woche zählen die bestätigten Buchungen, die ein Mitglied selbst gebucht
-hat, nach der Woche ihres Beginns. Stornierte Buchungen und Buchungsarten, die nicht gegen Limits
+Die gebuchten Stunden pro Woche zählen die bestätigten und die noch auf Zahlung wartenden Buchungen,
+die ein Mitglied selbst gebucht hat, nach der Woche ihres Beginns. Stornierte Buchungen und Buchungsarten, die nicht gegen Limits
 zählen, wie Training oder Sperrungen, bleiben außen vor. Administratoren können das Buchungsverbot,
 die Buchungszeiten, die gebuchten Stunden pro Woche und die Mindestdauer für Verwaltungsaufgaben
 übergehen. Das Zeit- und Platzraster gilt auch für sie.
@@ -762,9 +763,13 @@ andere Richtung. Das Änderungsprotokoll hält jeden Eintrag mit Betrag und Art 
 Begründung. Ein Spieler mit Guthaben kann sein Konto nicht schließen, bis du es ausgezahlt hast.
 
 Bucht ein externer Spieler eine Buchungsart mit Preis, zieht Courtside den Betrag von seinem Guthaben
-ab. Reicht es nicht, lehnt Courtside die Buchung ab. Ein Storno vor der Stornofrist bucht den Betrag
+ab. Reicht es nicht, bezahlt er den ganzen Betrag per PayPal, wenn ihr PayPal eingeschaltet habt,
+sonst lehnt Courtside die Buchung ab. Ein Storno vor der Stornofrist bucht den Betrag
 zurück, ein Storno durch den Verein bis zum Beginn der Buchung immer. Beide Einträge erscheinen im Verlauf als *Buchung bezahlt*
-und *Erstattung nach Storno*. Von Hand kannst du sie nicht anlegen.
+und *Erstattung nach Storno*. Von Hand kannst du sie nicht anlegen. Eine PayPal-Zahlung steht im Verlauf
+als *Per PayPal bezahlt* und daneben als *Buchung bezahlt*, der Stand bleibt also gleich. Kommt eine
+PayPal-Zahlung erst an, nachdem Courtside den Platz wieder freigegeben hat, wird sie zu Guthaben und
+steht als *Späte PayPal-Zahlung als Guthaben* im Verlauf.
 
 ## PayPal
 
@@ -773,7 +778,7 @@ Die Seite *PayPal* steht Administratoren und der Rolle **Kassenwart** offen und 
 ein, wählst zwischen **Sandbox** zum Ausprobieren und **Live** und schaltest die Zahlung per PayPal
 ein oder aus.
 
-![Die PayPal-Einstellungen mit Client-ID, Umgebung, Schalter, Secret-Stand und geprüfter Verbindung.](screenshots/de/paypal.png)
+![Die PayPal-Einstellungen mit Sandbox-Warnung, Client-ID, Umgebung, Schalter, Secret-Stand und geprüfter Verbindung.](screenshots/de/paypal.png)
 
 Das Secret kannst du nur eintragen, nie wieder lesen. Courtside verschlüsselt es mit dem
 Instanzschlüssel und zeigt nur, seit wann eines gespeichert ist. Lässt du das Feld beim Speichern
@@ -781,6 +786,19 @@ leer, bleibt das gespeicherte Secret. Einschalten kannst du PayPal erst, wenn ei
 gib auch das passende Secret neu ein. Speichern und
 Entfernen verlangen eine frische Passwortbestätigung. Das Änderungsprotokoll hält fest, was sich
 geändert hat, ohne Client-ID und Secret.
+
+Solange Sandbox-Zugangsdaten gespeichert sind, warnt die Seite: In der Sandbox bestätigt Courtside
+Buchungen mit Testgeld, und der Verein bekommt dafür kein echtes Geld. Schalte für echte Zahlungen auf
+**Live** um.
+
+Während ein Spieler bei PayPal zahlt, hält Courtside seinen Platz 15 Minuten, höchstens bis zum
+Beginn der Buchung. Stornierst du eine solche Buchung oder sperrst den Platz, wird die Reservierung
+ohne Nachricht beendet. Änderst du
+Client-ID oder Umgebung, schaltest PayPal aus oder entfernst die Zugangsdaten, beendet Courtside die
+offenen Zahlungen der alten Zugangsdaten und gibt ihre Plätze frei. Hat PayPal dabei schon Geld
+eingezogen, bekommt der Spieler meist seine Buchung oder Guthaben, sobald PayPal die Zahlung zeigt.
+In seltenen Fällen erscheint die Zahlung nur im PayPal-Konto des Vereins, und der Verein gibt sie
+dort zurück.
 
 **Verbindung prüfen** fragt PayPal mit den gespeicherten Zugangsdaten, nicht mit dem, was gerade im
 Formular steht. Speichere also zuerst. Lehnt PayPal ab, zeigt Courtside den Grund, den PayPal

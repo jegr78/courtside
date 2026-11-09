@@ -1,7 +1,7 @@
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, it, onTestFinished, vi } from "vitest";
-import { api, type MovePreview } from "../api/client";
+import { ApiError, api, type MovePreview } from "../api/client";
 import i18n from "../i18n";
 import { MyBookingsView } from "./MyBookingsView";
 
@@ -1364,4 +1364,131 @@ it("given an external player's booking with a stamped amount, when the bookings 
   // then
   expect(within(await screen.findByTestId(`booking-${upcomingId}`)).getByTestId("booking-amount"))
     .toHaveTextContent("Amount: €19.49");
+});
+
+function pendingBooking(paymentExpiresAt: string) {
+  vi.mocked(api.personalBookings).mockImplementation((options) => Promise.resolve(options?.view === "UPCOMING" || !options?.view
+    ? { items: [{
+      id: upcomingId, courtIds: ["33333333-3333-3333-3333-333333333333"],
+      startsAt: "2026-08-12T16:00:00Z", endsAt: "2026-08-12T17:00:00Z",
+      cardLabel: "Winter hall", cardColor: "#176b55", status: "PENDING_PAYMENT",
+      amount: { minor: 1500, currency: "EUR" }, paymentExpiresAt
+    }] }
+    : { items: [] }));
+}
+
+function stubbedAssign() {
+  const assign = vi.fn();
+  const realLocation = window.location;
+  Object.defineProperty(window, "location", { configurable: true, value: Object.assign(new URL(realLocation.href), { assign }) });
+  onTestFinished(() => { Object.defineProperty(window, "location", { configurable: true, value: realLocation }); });
+  return assign;
+}
+
+it("given a booking awaiting its PayPal payment, when the bookings load, then it shows the minutes left and offers to pay or give up instead of cancelling", async () => {
+  // given
+  await i18n.changeLanguage("de");
+  pendingBooking("2026-08-11T12:09:30Z");
+
+  // when
+  render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} memberFeatures={false} />);
+
+  // then
+  const row = await screen.findByTestId(`booking-${upcomingId}`);
+  expect(row).toHaveAttribute("data-status", "PENDING_PAYMENT");
+  expect(within(row).getByTestId("booking-payment-pending")).toHaveTextContent(i18n.t("myBookings.paymentPending", { count: 10 }));
+  expect(within(row).getByTestId("continue-paypal")).toHaveTextContent(i18n.t("myBookings.continuePayPal"));
+  expect(within(row).getByTestId("abandon-paypal")).toHaveTextContent(i18n.t("myBookings.abandonPayPal"));
+  expect(within(row).queryByTestId("personal-cancel"), "an unpaid booking is given up, not cancelled").toBeNull();
+});
+
+it("given a hold whose deadline has passed, when the bookings load, then the row says it is expiring and never counts below zero", async () => {
+  // given
+  pendingBooking("2026-08-11T11:58:00Z");
+
+  // when
+  render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} memberFeatures={false} />);
+
+  // then
+  const pending = within(await screen.findByTestId(`booking-${upcomingId}`)).getByTestId("booking-payment-pending");
+  expect(pending).toHaveTextContent(i18n.t("myBookings.paymentExpiring"));
+  expect(pending.textContent, "a past deadline is not a negative count").not.toMatch(/-\d/);
+});
+
+it("given a booking awaiting its PayPal payment, when the player continues to PayPal, then the order is asked for again and the browser goes to PayPal", async () => {
+  // given
+  pendingBooking("2026-08-11T12:10:00Z");
+  const assign = stubbedAssign();
+  const order = vi.spyOn(api, "createPayPalOrder").mockResolvedValue({ orderId: "ORDER-1", approveUrl: "https://paypal.example.org/approve/ORDER-1" });
+  render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} memberFeatures={false} />);
+
+  // when
+  await userEvent.click(await screen.findByTestId("continue-paypal"));
+
+  // then
+  await waitFor(() => expect(assign).toHaveBeenCalledWith("https://paypal.example.org/approve/ORDER-1"));
+  expect(order).toHaveBeenCalledWith(upcomingId);
+});
+
+it("given a booking awaiting its PayPal payment, when the player gives it up, then the booking is cancelled without asking PayPal and the court is reported free", async () => {
+  // given
+  pendingBooking("2026-08-11T12:10:00Z");
+  const order = vi.spyOn(api, "createPayPalOrder");
+  const cancelOrder = vi.spyOn(api, "cancelPayPalOrder");
+  const cancel = vi.spyOn(api, "cancelBooking").mockResolvedValue(undefined);
+  render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} memberFeatures={false} />);
+  const reads = vi.mocked(api.personalBookings).mock.calls.length;
+
+  // when
+  await userEvent.click(await screen.findByTestId("abandon-paypal"));
+
+  // then
+  const outcome = await screen.findByTestId("paypal-outcome");
+  expect(outcome).toHaveAttribute("data-outcome", "REJECTED");
+  expect(outcome).toHaveTextContent(i18n.t("paypalPayment.cancel.REJECTED"));
+  expect(cancel).toHaveBeenCalledWith(upcomingId);
+  expect(order, "giving up works while PayPal is off or down").not.toHaveBeenCalled();
+  expect(cancelOrder).not.toHaveBeenCalled();
+  await waitFor(() => expect(vi.mocked(api.personalBookings).mock.calls.length, "the list is read again").toBeGreaterThan(reads));
+});
+
+it("given PayPal does not answer, when the player continues to PayPal, then the refusal is shown and the browser stays", async () => {
+  // given
+  pendingBooking("2026-08-11T12:10:00Z");
+  const assign = stubbedAssign();
+  vi.spyOn(api, "createPayPalOrder").mockRejectedValue(new ApiError(503, {
+    type: "urn:courtside:error:paypal-unavailable", title: "Unavailable", status: 503
+  }));
+  render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} memberFeatures={false} />);
+
+  // when
+  await userEvent.click(await screen.findByTestId("continue-paypal"));
+
+  // then
+  expect(await screen.findByRole("alert")).toHaveTextContent(i18n.t("error.type.paypal-unavailable"));
+  expect(assign).not.toHaveBeenCalled();
+});
+
+it("given a booking awaiting its PayPal payment, when the page stays open, then the minutes left count down", async () => {
+  // given
+  vi.useFakeTimers({ now: Date.parse("2026-08-11T12:00:00Z"), toFake: ["Date", "setInterval", "clearInterval"] });
+  onTestFinished(() => { vi.useRealTimers(); });
+  pendingBooking("2026-08-11T12:10:00Z");
+  render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} memberFeatures={false} />);
+  const pending = within(await screen.findByTestId(`booking-${upcomingId}`)).getByTestId("booking-payment-pending");
+  expect(pending).toHaveTextContent(i18n.t("myBookings.paymentPending", { count: 10 }));
+
+  // when
+  act(() => { vi.advanceTimersByTime(4 * 60_000); });
+
+  // then
+  expect(within(screen.getByTestId(`booking-${upcomingId}`)).getByTestId("booking-payment-pending"),
+    "four minutes later six are left").toHaveTextContent(i18n.t("myBookings.paymentPending", { count: 6 }));
+
+  // when
+  act(() => { vi.advanceTimersByTime(7 * 60_000); });
+
+  // then
+  expect(within(screen.getByTestId(`booking-${upcomingId}`)).getByTestId("booking-payment-pending"))
+    .toHaveTextContent(i18n.t("myBookings.paymentExpiring"));
 });

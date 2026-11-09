@@ -147,7 +147,7 @@ class BookingController implements BookingsApi {
                 null), idempotencyKey);
 
         return ResponseEntity.created(URI.create("/api/bookings/" + id))
-                .body(new ApiBookingCreated(id));
+                .body(BookingCreatedResponses.of(bookings.booking(id)));
     }
 
     @Override

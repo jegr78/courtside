@@ -10,10 +10,18 @@ public class CancellationReasonNotAllowedException extends CodedDomainFailure {
 
     public static final ProblemType PROBLEM_TYPE = new ProblemType(
             "cancellation-reason-not-allowed", HttpStatus.BAD_REQUEST,
-            "Cancellation reason not allowed", "Only somebody cancelling another holder's booking names a reason");
+            "Cancellation reason not allowed", "This cancellation cannot name that reason");
 
     public CancellationReasonNotAllowedException() {
-        super("booking.cancellationReason.ownBooking", Map.of());
+        this("booking.cancellationReason.ownBooking");
+    }
+
+    private CancellationReasonNotAllowedException(String code) {
+        super(code, Map.of());
+    }
+
+    public static CancellationReasonNotAllowedException reserved() {
+        return new CancellationReasonNotAllowedException("booking.cancellationReason.reserved");
     }
 
     @Override

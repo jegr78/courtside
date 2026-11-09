@@ -15,12 +15,16 @@ class PaymentConfiguration {
     private static final URI LIVE = URI.create("https://api-m.paypal.com");
 
     @Bean
-    PayPalConnectionCheck payPalConnectionCheck(PayPalProperties properties,
-                                                @Value("${courtside.environment}") String environment) {
-        if ("PRODUCTION".equalsIgnoreCase(environment)
-                && (!SANDBOX.equals(properties.sandboxEndpoint()) || !LIVE.equals(properties.liveEndpoint()))) {
+    PayPalClient payPalClient(PayPalProperties properties, @Value("${courtside.environment}") String environment) {
+        boolean production = "PRODUCTION".equalsIgnoreCase(environment);
+        if (production && (!SANDBOX.equals(properties.sandboxEndpoint()) || !LIVE.equals(properties.liveEndpoint()))) {
             throw new IllegalStateException("Configured PayPal endpoints cannot override PayPal in production");
         }
-        return new PayPalConnectionCheck(properties);
+        return new PayPalClient(properties, production);
+    }
+
+    @Bean
+    PayPalConnectionCheck payPalConnectionCheck(PayPalClient client) {
+        return new PayPalConnectionCheck(client);
     }
 }

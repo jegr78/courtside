@@ -64,7 +64,7 @@ class BookingStatisticsService implements BookingStatistics {
                 FROM court_allocation a
                 JOIN booking b ON b.id = a.booking_id
                 CROSS JOIN bounds
-                WHERE a.status <> 'CANCELLED'
+                WHERE a.status = 'CONFIRMED'
                   AND tstzrange(a.starts_at, a.ends_at, '[)')
                       && tstzrange(timezone(:zone, CAST(:fromDay AS timestamp)),
                                    timezone(:zone, CAST(:toDay AS timestamp) + interval '1 day'), '[)')

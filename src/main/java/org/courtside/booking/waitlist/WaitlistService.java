@@ -37,11 +37,11 @@ public class WaitlistService {
         outsiders.refuse(command.accountId(), command.roles());
         grid.lock();
         drafts.requireBookable(command.asBooking());
-        if (rows.confirmedOverlap(command.courtId(), command.slot(), command.accountId())
+        if (rows.occupiedOverlap(command.courtId(), command.slot(), command.accountId())
                 || rows.offerOverlap(command.courtId(), command.slot(), command.accountId())) {
             throw WaitlistSlotNotTakenException.own();
         }
-        if (!rows.confirmedOverlap(command.courtId(), command.slot(), null)
+        if (!rows.occupiedOverlap(command.courtId(), command.slot(), null)
                 && !rows.offerOverlap(command.courtId(), command.slot(), null)) {
             throw WaitlistSlotNotTakenException.free();
         }

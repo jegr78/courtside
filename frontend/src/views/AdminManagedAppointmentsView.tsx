@@ -244,6 +244,7 @@ function AppointmentRow({ appointment, courtNames, locale, timeZone, actionsOpen
     <div className="grid text-sm">
       <span className="flex items-center gap-2"><span aria-hidden="true" className="inline-block size-3 rounded-sm border" style={{ backgroundColor: appointment.cardColor }} />{appointment.cardLabel}
         {appointment.seriesId && <span data-testid="series-marker" className="rounded-full border px-2 font-semibold">{t("myBookings.series")}</span>}
+        {appointment.status === "PENDING_PAYMENT" && <span data-testid="managed-payment-pending" className="rounded-full border px-2 font-semibold">{t("managedAppointments.paymentPending")}</span>}
       </span>
       <span className="text-muted">{t("managedAppointments.participants", { count: appointment.participantCount })}</span>
     </div>

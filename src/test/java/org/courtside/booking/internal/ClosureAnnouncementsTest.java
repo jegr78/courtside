@@ -1,11 +1,15 @@
 package org.courtside.booking.internal;
 
+import org.courtside.booking.Booking;
+import org.courtside.booking.BookingRepository;
+import org.courtside.booking.PendingPayments;
 import org.courtside.card.CardEvent;
 import org.courtside.facility.FacilityEvent;
 import org.courtside.shared.BookingDisplaced;
 import org.courtside.shared.OpeningWindow;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.transaction.PlatformTransactionManager;
 
 import java.time.Clock;
 import java.time.DayOfWeek;
@@ -14,12 +18,14 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -34,7 +40,8 @@ class ClosureAnnouncementsTest {
         ImpactService impact = mock(ImpactService.class);
         ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
         ClosureAnnouncements announcements = new ClosureAnnouncements(
-                impact, events, Clock.fixed(NOW, ZoneOffset.UTC), () -> ZoneOffset.UTC);
+                impact, events, Clock.fixed(NOW, ZoneOffset.UTC), () -> ZoneOffset.UTC,
+                mock(BookingRepository.class), mock(PendingPayments.class), mock(PlatformTransactionManager.class));
         UUID firstBooking = UUID.randomUUID();
         UUID secondBooking = UUID.randomUUID();
         UUID cursor = UUID.randomUUID();
@@ -65,7 +72,8 @@ class ClosureAnnouncementsTest {
         ImpactService impact = mock(ImpactService.class);
         ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
         ClosureAnnouncements announcements = new ClosureAnnouncements(
-                impact, events, Clock.fixed(NOW, ZoneOffset.UTC), () -> ZoneOffset.UTC);
+                impact, events, Clock.fixed(NOW, ZoneOffset.UTC), () -> ZoneOffset.UTC,
+                mock(BookingRepository.class), mock(PendingPayments.class), mock(PlatformTransactionManager.class));
         UUID courtId = UUID.randomUUID();
         UUID cardId = UUID.randomUUID();
         when(impact.pageOfDeactivating(courtId, NOW, null, 100))
@@ -92,7 +100,8 @@ class ClosureAnnouncementsTest {
         // given
         ImpactService impact = mock(ImpactService.class);
         ClosureAnnouncements announcements = new ClosureAnnouncements(impact,
-                mock(ApplicationEventPublisher.class), Clock.fixed(NOW, ZoneOffset.UTC), () -> ZoneOffset.UTC);
+                mock(ApplicationEventPublisher.class), Clock.fixed(NOW, ZoneOffset.UTC), () -> ZoneOffset.UTC,
+                mock(BookingRepository.class), mock(PendingPayments.class), mock(PlatformTransactionManager.class));
         OpeningWindow window = new OpeningWindow(LocalTime.of(10, 0), LocalTime.of(18, 0));
         ImpactService.Period winter = new ImpactService.Period(
                 Instant.parse("2026-11-01T00:00:00Z"), Instant.parse("2027-03-01T00:00:00Z"));
@@ -106,6 +115,77 @@ class ClosureAnnouncementsTest {
 
         // then
         verify(impact).pageOfOpeningHours(DayOfWeek.MONDAY, window, winter, null, 100);
+    }
+
+    @Test
+    void givenAHeldBookingConfirmedDuringTheWalk_whenTheReleaseFindsItConfirmed_thenTheClosureDisplacesIt() {
+        // given
+        UUID courtId = UUID.randomUUID();
+        UUID held = UUID.randomUUID();
+        Fixture fixture = new Fixture();
+        when(fixture.impact.pageOfDeactivating(courtId, NOW, null, 100))
+                .thenReturn(new ImpactService.ImpactPage(null, List.of(affected(held))));
+        when(fixture.bookings.findPendingAmong(List.of(held))).thenReturn(List.of(held));
+        when(fixture.pendingPayments.release(held)).thenReturn(false);
+        when(fixture.bookings.findById(held)).thenReturn(Optional.of(
+                new Booking(UUID.randomUUID(), UUID.randomUUID(), null, NOW)));
+
+        // when
+        fixture.announcements.on(new FacilityEvent.CourtAvailabilityChanged(courtId, false));
+
+        // then
+        verify(fixture.events).publishEvent(new BookingDisplaced(held, BookingDisplaced.Closure.COURT_OUT_OF_SERVICE));
+    }
+
+    @Test
+    void givenAHeldBookingTheClosureReleases_whenAnnouncing_thenItIsNotDisplaced() {
+        // given
+        UUID courtId = UUID.randomUUID();
+        UUID held = UUID.randomUUID();
+        Fixture fixture = new Fixture();
+        when(fixture.impact.pageOfDeactivating(courtId, NOW, null, 100))
+                .thenReturn(new ImpactService.ImpactPage(null, List.of(affected(held))));
+        when(fixture.bookings.findPendingAmong(List.of(held))).thenReturn(List.of(held));
+        when(fixture.pendingPayments.release(held)).thenReturn(true);
+
+        // when
+        fixture.announcements.on(new FacilityEvent.CourtAvailabilityChanged(courtId, false));
+
+        // then
+        verify(fixture.events, never()).publishEvent(any(BookingDisplaced.class));
+    }
+
+    @Test
+    void givenAReleaseThatFails_whenAnnouncing_thenTheOtherBookingsAreStillDisplacedAndReleased() {
+        // given
+        UUID courtId = UUID.randomUUID();
+        UUID confirmed = UUID.randomUUID();
+        UUID failing = UUID.randomUUID();
+        UUID held = UUID.randomUUID();
+        Fixture fixture = new Fixture();
+        when(fixture.impact.pageOfDeactivating(courtId, NOW, null, 100)).thenReturn(new ImpactService.ImpactPage(
+                null, List.of(affected(confirmed), affected(failing), affected(held))));
+        when(fixture.bookings.findPendingAmong(List.of(confirmed, failing, held))).thenReturn(List.of(failing, held));
+        when(fixture.pendingPayments.release(failing)).thenThrow(new IllegalStateException("lock timeout"));
+        when(fixture.pendingPayments.release(held)).thenReturn(true);
+
+        // when
+        fixture.announcements.on(new FacilityEvent.CourtAvailabilityChanged(courtId, false));
+
+        // then
+        verify(fixture.events).publishEvent(
+                new BookingDisplaced(confirmed, BookingDisplaced.Closure.COURT_OUT_OF_SERVICE));
+        verify(fixture.pendingPayments).release(held);
+    }
+
+    private static final class Fixture {
+        final ImpactService impact = mock(ImpactService.class);
+        final ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
+        final BookingRepository bookings = mock(BookingRepository.class);
+        final PendingPayments pendingPayments = mock(PendingPayments.class);
+        final ClosureAnnouncements announcements = new ClosureAnnouncements(impact, events,
+                Clock.fixed(NOW, ZoneOffset.UTC), () -> ZoneOffset.UTC, bookings, pendingPayments,
+                mock(PlatformTransactionManager.class));
     }
 
     private static ImpactService.AffectedBooking affected(UUID bookingId) {

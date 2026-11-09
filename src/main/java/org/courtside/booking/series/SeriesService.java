@@ -233,6 +233,9 @@ public class SeriesService {
         bookingRepository.lockBySeriesId(seriesId);
         discardPreLockState();
         requireManagementAccessTo(seriesId, fromBookingId, cancelledBy, cancellerRoles);
+        if (reason == CancellationReason.PAYMENT_EXPIRED) {
+            throw CancellationReasonNotAllowedException.reserved();
+        }
         if (reason != null && cancelledBy.equals(series.getCreatedBy())) {
             throw new CancellationReasonNotAllowedException();
         }

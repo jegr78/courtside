@@ -61,7 +61,7 @@ it("given an offer the club took the court from, when the section shows, then it
 
 it("given an open offer, when the member books it, then the acceptance is sent and the bookings reload", async () => {
   // given
-  const accepting = vi.spyOn(api, "acceptWaitlistOffer").mockResolvedValue({ id: "bbbbbbbb-0000-0000-0000-000000000001" });
+  const accepting = vi.spyOn(api, "acceptWaitlistOffer").mockResolvedValue({ id: "bbbbbbbb-0000-0000-0000-000000000001", status: "CONFIRMED" });
   const { booked } = show();
 
   // when

@@ -2,6 +2,7 @@ package org.courtside.booking.web;
 
 import lombok.RequiredArgsConstructor;
 import org.courtside.api.ApiBookingCreated;
+import org.courtside.booking.BookingService;
 import org.courtside.api.ApiJoinWaitlistRequest;
 import org.courtside.api.ApiReservedSlot;
 import org.courtside.api.ApiWaitlistEntry;
@@ -37,6 +38,7 @@ import java.util.stream.Collectors;
 class WaitlistController implements WaitlistApi {
 
     private final WaitlistService waitlist;
+    private final BookingService bookings;
     private final CurrentUser currentUser;
     private final CardService cards;
     private final ClubTimeZone timeZone;
@@ -86,7 +88,7 @@ class WaitlistController implements WaitlistApi {
     public ResponseEntity<ApiBookingCreated> acceptWaitlistOffer(UUID entryId) {
         UserAccount account = currentUser.requireAccount();
         UUID bookingId = waitlist.accept(entryId, account.getId(), account.getPerson().getId(), account.getRoles());
-        return ResponseEntity.created(URI.create("/api/bookings/" + bookingId)).body(new ApiBookingCreated(bookingId));
+        return ResponseEntity.created(URI.create("/api/bookings/" + bookingId)).body(BookingCreatedResponses.of(bookings.booking(bookingId)));
     }
 
     @Override

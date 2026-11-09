@@ -182,6 +182,7 @@ public class SecurityConfiguration {
                         .requestMatchers("/", "/courts", "/login", "/initial-password", "/my-bookings",
                                 "/my-messages", "/my-dependants", "/account", "/account/security", "/account-recovery",
                                 "/register", "/registration/verify",
+                                "/payment/paypal/return", "/payment/paypal/cancel",
                                 "/admin", "/admin/appointments", "/admin/setup",
                                 "/admin/configuration", "/admin/deadlines", "/admin/rule-sets", "/admin/message-wording",
                                 "/admin/facility",

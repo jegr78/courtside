@@ -521,9 +521,10 @@ class ConfigControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.Pattern"));
     }
 
-    @Test
+    @ParameterizedTest
+    @ValueSource(strings = {"CONFIRMED", "PENDING_PAYMENT"})
     @WithMockUser(username = "admin", roles = "ADMIN")
-    void givenAFutureBookingOutsideTheNewGrid_whenChangingTheSlotDuration_thenItIsRejected()
+    void givenAFutureBookingOutsideTheNewGrid_whenChangingTheSlotDuration_thenItIsRejected(String status)
             throws Exception {
         // given
         jdbc.sql("""
@@ -531,17 +532,18 @@ class ConfigControllerTest extends AbstractIntegrationTest {
                 VALUES ('dddddddd-0000-0000-0000-000000000001', 1, true)
                 """).update();
         jdbc.sql("""
-                INSERT INTO booking (id, card_id, status)
+                INSERT INTO booking (id, card_id, status, payment_expires_at)
                 VALUES ('aaaaaaaa-0000-0000-0000-000000000001',
-                        '11111111-1111-1111-1111-111111111111', 'CONFIRMED')
-                """).update();
+                        '11111111-1111-1111-1111-111111111111', :status,
+                        CASE WHEN :status = 'PENDING_PAYMENT' THEN TIMESTAMPTZ '2026-05-12T10:15:00Z' END)
+                """).param("status", status).update();
         jdbc.sql("""
                 INSERT INTO court_allocation (id, booking_id, court_id, starts_at, ends_at, status)
                 VALUES ('bbbbbbbb-0000-0000-0000-000000000001',
                         'aaaaaaaa-0000-0000-0000-000000000001',
                         'dddddddd-0000-0000-0000-000000000001',
-                        '2026-05-12T16:30:00Z', '2026-05-12T17:00:00Z', 'CONFIRMED')
-                """).update();
+                        '2026-05-12T16:30:00Z', '2026-05-12T17:00:00Z', :status)
+                """).param("status", status).update();
 
         // when / then
         mockMvc.perform(put("/api/admin/config")
@@ -554,26 +556,28 @@ class ConfigControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.violations[0].params.slotMinutes").value(60));
     }
 
-    @Test
+    @ParameterizedTest
+    @ValueSource(strings = {"CONFIRMED", "PENDING_PAYMENT"})
     @WithMockUser(username = "admin", roles = "ADMIN")
-    void givenAFutureBooking_whenChangingTheTimeZone_thenItIsRejected() throws Exception {
+    void givenAFutureBooking_whenChangingTheTimeZone_thenItIsRejected(String status) throws Exception {
         // given
         jdbc.sql("""
                 INSERT INTO court (id, number, active)
                 VALUES ('dddddddd-0000-0000-0000-000000000001', 1, true)
                 """).update();
         jdbc.sql("""
-                INSERT INTO booking (id, card_id, status)
+                INSERT INTO booking (id, card_id, status, payment_expires_at)
                 VALUES ('aaaaaaaa-0000-0000-0000-000000000001',
-                        '11111111-1111-1111-1111-111111111111', 'CONFIRMED')
-                """).update();
+                        '11111111-1111-1111-1111-111111111111', :status,
+                        CASE WHEN :status = 'PENDING_PAYMENT' THEN TIMESTAMPTZ '2026-05-12T10:15:00Z' END)
+                """).param("status", status).update();
         jdbc.sql("""
                 INSERT INTO court_allocation (id, booking_id, court_id, starts_at, ends_at, status)
                 VALUES ('bbbbbbbb-0000-0000-0000-000000000001',
                         'aaaaaaaa-0000-0000-0000-000000000001',
                         'dddddddd-0000-0000-0000-000000000001',
-                        '2026-09-12T16:30:00Z', '2026-09-12T17:00:00Z', 'CONFIRMED')
-                """).update();
+                        '2026-09-12T16:30:00Z', '2026-09-12T17:00:00Z', :status)
+                """).param("status", status).update();
 
         // when / then
         mockMvc.perform(put("/api/admin/config")

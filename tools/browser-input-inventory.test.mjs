@@ -153,6 +153,16 @@ const BOUNDARIES = {
     classification: "sent once to the verification endpoint, which decides whether it is valid, and never stored or rendered",
     test: "src/views/RegisterView.test.tsx#given a link with its code, when the page opens, then the code is verified once and the account is announced active"
   },
+  "src/views/BookingDialog.tsx location": {
+    value: "no external value",
+    classification: "assigns the approve address the instance answered for the player's own pending booking, and reads nothing off the location itself",
+    test: "src/views/BookingDialog.test.tsx#given a booking the server holds for a PayPal payment, when it is created, then the order is created and the browser goes to PayPal"
+  },
+  "src/views/PayPalPaymentView.tsx useSearchParams": {
+    value: "the order id PayPal put into the token parameter of the return or cancel address",
+    classification: "sent once to the capture or cancel endpoint, which answers an order of another account as not found, and never rendered",
+    test: "src/views/PayPalPaymentView.test.tsx#given an order of another account, when the capture is refused, then the page shows the refusal"
+  },
   "src/views/MyBookingsView.tsx location": {
     value: "the fragment a notification link put on the address",
     classification: "names an element id the page looks up among the bookings it already shows, so an unknown id moves nothing and reaches no data",

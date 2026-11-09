@@ -47,6 +47,11 @@
       "class": "identifier"
     },
     {
+      "name": "orderId",
+      "in": "path",
+      "class": "identifier"
+    },
+    {
       "name": "id",
       "in": "path",
       "class": "identifier"
@@ -812,6 +817,10 @@
       "pseudonymised_at": {
         "level": "operational",
         "lifecycle": "booking-pseudonymisation"
+      },
+      "payment_expires_at": {
+        "level": "operational",
+        "lifecycle": "booking-pseudonymisation"
       }
     },
     "booking_attendance": {
@@ -1283,6 +1292,10 @@
       },
       "recorded_by": {
         "level": "pseudonymous",
+        "lifecycle": "credit-ledger"
+      },
+      "paypal_order_id": {
+        "level": "operational",
         "lifecycle": "credit-ledger"
       }
     },
@@ -2523,6 +2536,56 @@
       },
       "updated_by": {
         "level": "pseudonymous",
+        "lifecycle": "payment-provider"
+      }
+    },
+    "paypal_order": {
+      "account_id": {
+        "level": "pseudonymous",
+        "lifecycle": "payment-provider"
+      },
+      "amount_minor": {
+        "level": "operational",
+        "lifecycle": "payment-provider"
+      },
+      "approve_url": {
+        "level": "operational",
+        "lifecycle": "payment-provider"
+      },
+      "booking_id": {
+        "level": "operational",
+        "lifecycle": "payment-provider"
+      },
+      "capture_attempted_at": {
+        "level": "operational",
+        "lifecycle": "payment-provider"
+      },
+      "capture_id": {
+        "level": "operational",
+        "lifecycle": "payment-provider"
+      },
+      "created_at": {
+        "level": "operational",
+        "lifecycle": "payment-provider"
+      },
+      "currency": {
+        "level": "operational",
+        "lifecycle": "payment-provider"
+      },
+      "environment": {
+        "level": "operational",
+        "lifecycle": "payment-provider"
+      },
+      "order_id": {
+        "level": "operational",
+        "lifecycle": "payment-provider"
+      },
+      "status": {
+        "level": "operational",
+        "lifecycle": "payment-provider"
+      },
+      "updated_at": {
+        "level": "operational",
         "lifecycle": "payment-provider"
       }
     }

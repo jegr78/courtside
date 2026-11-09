@@ -406,3 +406,36 @@ changes the password through account recovery; the attacker can then no longer s
 the pause stops growing. This bounds guessing to a few attempts per day after the first hours.
 Reconsider this bound if the product gains a way to prove the holder's identity that an attacker
 with the password lacks, such as a pause that a recovery code lifts.
+
+## A PayPal capture that completes after three days is not recorded
+
+PayPal can answer a capture with `PENDING` and complete it later. While the order is open, the
+reconciliation reads it every run and records a completed capture as a booking or as credit. Once
+the order is voided, the job rereads it only for 72 hours after the capture attempt. A capture PayPal
+completes after that window takes the payer's money without a booking and without a credit entry in
+Courtside. Nobody needs access to cause this; it depends on how long PayPal holds a capture in review.
+The treasurer sees the payment in the club's PayPal account and can return it there, and the order,
+its booking and the attempt stay in `paypal_order`. Reconsider this bound when PayPal webhooks become
+part of the product, or when the club's PayPal reports show captures completing after 72 hours.
+
+## A PayPal order the former credentials alone can read may never become credit
+
+An order keeps the environment it was created in, but Courtside does not keep the client id and
+secret that created it. When a treasurer changes the environment or the client id or removes the
+credentials while an order with a capture attempt cannot be read at PayPal, the order stays open and
+the reconciliation can no longer read it with the credentials now stored. Its booking is released 24
+hours after its deadline, so no court stays held. If PayPal had taken the money, that payment appears
+neither as a booking nor as credit in Courtside. Causing it needs the `TREASURER` or `ADMIN` role and a
+PayPal outage or a capture whose outcome is unknown during the change. The order stays in
+`paypal_order` for the treasurer to settle in the PayPal account. Reconsider this bound if Courtside
+keeps retired credentials until their open orders are settled, or receives PayPal webhooks.
+
+## Sandbox credentials confirm bookings with test money
+
+PayPal's sandbox accepts payments with test accounts that move no real money. Courtside allows
+sandbox credentials on every instance, so a club that leaves PayPal in sandbox mode confirms real
+bookings that nobody paid for. Choosing the environment needs the `TREASURER` or `ADMIN` role and a
+fresh password proof; the PayPal page warns while sandbox credentials are stored, every order records
+its environment, and the change log records each switch of the environment. A player alone cannot
+choose sandbox. Reconsider this bound if a club reports bookings paid in sandbox by mistake, or if
+the product separates a test instance from the production one.

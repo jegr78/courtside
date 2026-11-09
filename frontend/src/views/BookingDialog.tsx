@@ -147,12 +147,24 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
     }).catch((failure: unknown) => warnAbout("Credit balance read for the booking dialog failed", failure));
     return () => { active = false; };
   }, [pricedForOutsider]);
+  const [payPalAvailable, setPayPalAvailable] = useState(false);
+  useEffect(() => {
+    if (!pricedForOutsider) return;
+    let active = true;
+    void api.payPalAvailability().then(({ available }) => {
+      if (active) setPayPalAvailable(available);
+    }).catch((failure: unknown) => warnAbout("PayPal availability read for the booking dialog failed", failure));
+    return () => { active = false; };
+  }, [pricedForOutsider]);
+  const [heldForPayPal, setHeldForPayPal] = useState(false);
+  const [payPalOrderFailed, setPayPalOrderFailed] = useState(false);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     setSubmitting(true);
     clear();
     setViolations([]);
+    let held = false;
     try {
       const { startsAt, endsAt } = waitlist ?? bookingTimeSlot(
         selection.date, selection.slot, grid.timeZone, selectedDuration
@@ -168,10 +180,21 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
         });
       } else {
         const booking = { courtIds, cardId, startsAt, endsAt, note: note.trim() || undefined, participants };
-        await (bookFor ? api.createDependantBooking(bookFor, booking, requestKey) : api.createBooking(booking, requestKey));
+        const written = await (bookFor ? api.createDependantBooking(bookFor, booking, requestKey) : api.createBooking(booking, requestKey));
+        if (written.status === "PENDING_PAYMENT") {
+          held = true;
+          setHeldForPayPal(true);
+          const order = await api.createPayPalOrder(written.id);
+          window.location.assign(order.approveUrl);
+          return;
+        }
       }
       await created();
     } catch (failure) {
+      if (held) {
+        setPayPalOrderFailed(true);
+        await conflicted().catch((refreshFailure: unknown) => warnAbout("Court plan refresh after a held booking failed", refreshFailure));
+      }
       if (failure instanceof ApiError && failure.problem?.type === COURT_UNAVAILABLE) setRefusedAsTaken({ refreshFailed: false });
       if (failure instanceof ApiError && failure.status === 409) {
         await conflicted().catch((refreshFailure: unknown) => {
@@ -233,6 +256,7 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
     ? formatMinor(externalAmountMinor, i18n.language, currency) : undefined;
   const creditShort = externalAmountMinor !== undefined && credit !== undefined
     && (credit.currency !== currency || credit.balanceMinor < externalAmountMinor);
+  const paysByPayPal = creditShort && payPalAvailable && !bookFor;
 
   return <Modal labelledBy="booking-heading" closed={closed} width="xl" composed testId="booking-dialog">
     <form onSubmit={(event) => void submit(event)} className="flex min-h-0 flex-col">
@@ -370,11 +394,13 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
         {externalAmount && credit && <p data-testid="booking-balance" className="mt-1">
           {t("booking.balance", { balance: formatMinor(credit.balanceMinor, i18n.language, credit.currency) })}
         </p>}
-        {externalAmount && creditShort && <p data-testid="booking-credit-short" className="text-muted mt-1">{t("booking.creditShort")}</p>}
+        {externalAmount && creditShort && !paysByPayPal && <p data-testid="booking-credit-short" className="text-muted mt-1">{t("booking.creditShort")}</p>}
+        {externalAmount && paysByPayPal && <p data-testid="booking-paypal-hint" className="text-muted mt-1">{t("booking.payPalHint")}</p>}
       </div>
       </DialogBody>
       {/* Outside the scrolling form, so a refusal shows beside the button that caused it. */}
-      {(fieldViolations("general").length > 0 || error || reference) && <div data-testid="booking-outcome" className="shrink-0 grid gap-2 px-4 pt-3 sm:px-6">
+      {(fieldViolations("general").length > 0 || error || reference || payPalOrderFailed) && <div data-testid="booking-outcome" className="shrink-0 grid gap-2 px-4 pt-3 sm:px-6">
+        {payPalOrderFailed && <Alert tone="warning" testId="booking-paypal-failed">{t("booking.payPalOrderFailed")}</Alert>}
         <FieldViolations id="booking-general-errors" violations={fieldViolations("general")} />
         {(error || reference) && <Alert>
           {error && <p data-testid="booking-refusal">{error}</p>}
@@ -386,7 +412,7 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
       </div>}
       <div className="dialog-footer surface-panel border-structural flex shrink-0 flex-wrap justify-end gap-3 border-t px-4 py-4 whitespace-nowrap sm:px-6">
         <Button variant="secondary" type="button" data-testid="booking-close" onClick={closed}>{t("booking.close")}</Button>
-        <Button variant="primary" type="submit" data-testid="booking-submit" disabled={submitting || courtIds.length === 0 || !cardId || boundLeavesNoPeriod || minimumLeavesNoPeriod || outsideHours || (refusedAsTaken !== undefined && !waitlist)}>{t(waitlist ? "waitlist.submit" : "booking.submit")}</Button>
+        <Button variant="primary" type="submit" data-testid="booking-submit" data-payment={paysByPayPal ? "PAYPAL" : undefined} disabled={submitting || heldForPayPal || courtIds.length === 0 || !cardId || boundLeavesNoPeriod || minimumLeavesNoPeriod || outsideHours || (refusedAsTaken !== undefined && !waitlist)}>{t(waitlist ? "waitlist.submit" : paysByPayPal ? "booking.payWithPayPal" : "booking.submit")}</Button>
       </div>
     </form>
   </Modal>;
@@ -467,7 +493,7 @@ function violationField(code: string): string {
   if (MEMBER_CODES.includes(code)) return "members";
   if (code.startsWith("booking.participants.")) return "participants";
   if (code === "booking.rule.maxOpenBookings.exceeded") return "cardId";
-  if (code === "booking.payment.creditInsufficient") return "general";
+  if (code === "booking.payment.creditInsufficient" || code === "booking.payment.pendingExists") return "general";
   return "startsAt";
 }
 

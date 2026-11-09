@@ -80,8 +80,8 @@ beforeEach(async () => {
   }]);
   vi.spyOn(api, "participantMembers").mockResolvedValue([]);
   vi.spyOn(api, "bookingEligibility").mockResolvedValue({ violations: [] });
-  vi.spyOn(api, "createBooking").mockResolvedValue({ id: "77777777-7777-7777-7777-777777777777" });
-  vi.spyOn(api, "createDependantBooking").mockResolvedValue({ id: "77777777-7777-7777-7777-777777777778" });
+  vi.spyOn(api, "createBooking").mockResolvedValue({ id: "77777777-7777-7777-7777-777777777777", status: "CONFIRMED" });
+  vi.spyOn(api, "createDependantBooking").mockResolvedValue({ id: "77777777-7777-7777-7777-777777777778", status: "CONFIRMED" });
   vi.spyOn(api, "dependants").mockResolvedValue([]);
   vi.spyOn(api, "cancelBooking").mockResolvedValue(undefined);
   vi.spyOn(api, "reservedSlots").mockResolvedValue([]);
@@ -1346,7 +1346,7 @@ it("given a free slot, when booking it with a guest, then the refreshed allocati
   let created = false;
   vi.mocked(api.createBooking).mockImplementation(() => {
     created = true;
-    return Promise.resolve({ id: "77777777-7777-7777-7777-777777777777" });
+    return Promise.resolve({ id: "77777777-7777-7777-7777-777777777777", status: "CONFIRMED" });
   });
   vi.mocked(api.allocations).mockImplementation((date) => Promise.resolve(created && date === "2026-08-10" ? [{
     bookingId: "77777777-7777-7777-7777-777777777777",

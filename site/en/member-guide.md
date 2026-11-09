@@ -209,11 +209,26 @@ reason, amount and the balance after it, newest first. The treasurer pays credit
 
 You pay a priced booking from your credit. Before you book, the dialog shows your balance next to
 the amount. If it covers the amount, Courtside takes it when you book, and the confirmation states
-the amount and how you paid. If it does not, Courtside refuses the booking and takes nothing. If you
+the amount and how you paid. If it does not and your club accepts PayPal, the button reads **Pay
+with PayPal**. You then pay the whole amount by PayPal, never a part of it. Without PayPal, Courtside
+refuses the booking and takes nothing.
+
+**Pay with PayPal** holds the court for you for 15 minutes, at most until the booking starts, and
+sends you to PayPal. Once you approve
+the payment there, you come back to Courtside and see "Payment is being processed" until Courtside
+has collected the money. Only then is the booking confirmed, and the confirmation email says "Paid by
+PayPal". If you cancel at PayPal, the court is free again at once and nothing is charged. If you close
+the page after approving, the payment is not lost: Courtside asks PayPal itself after a few minutes
+and confirms the booking. While the payment is open, *My bookings* lists the booking as "Payment
+pending" with the minutes left. There, **Continue to PayPal** takes you back to the payment and
+**Cancel payment** gives the court up. You can have one open payment at a time. If you pay only after
+the hold has ended, Courtside keeps the money as credit for you, or the club gets in touch with you. If you
 cancel before your club's cancellation deadline, the full amount goes back to your credit. After the
 deadline you can no longer cancel. If the club cancels your booking before it starts, you always get
 the amount back. If you do not turn up and Courtside releases the court for that reason, the club keeps the
 amount.
+
+![The page after returning from PayPal: the payment arrived and the booking is confirmed.](../screenshots/en/paypal-return.png)
 
 ![The booking fields for members, guests and slot fillers.](../screenshots/en/booking-participants.png)
 
