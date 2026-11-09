@@ -111,6 +111,27 @@ class CreditLedgerTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenATakenPayPalRefund_whenThePlayerReadsTheirCredit_thenTheRefundNamesItsOrder() throws Exception {
+        // given
+        UUID booking = UUID.randomUUID();
+        Currency euro = Currency.getInstance("EUR");
+        transactions.executeWithoutResult(status -> {
+            ledger.payByPayPal(johnAccount, booking, "ORDER-LEDGER-1", 1500, euro);
+            ledger.refund(booking);
+            ledger.takeForPayPalRefund(johnAccount, booking, "ORDER-LEDGER-1", 1500, euro);
+        });
+
+        // when / then
+        mockMvc.perform(get("/api/my/credit").with(user(userDetails.loadUserByUsername("roe.john"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.balanceMinor").value(0))
+                .andExpect(jsonPath("$.items[0].kind").value("PAYPAL_REFUND"))
+                .andExpect(jsonPath("$.items[0].amountMinor").value(-1500))
+                .andExpect(jsonPath("$.items[0].paypalOrderId").value("ORDER-LEDGER-1"))
+                .andExpect(jsonPath("$.items[0].bookingId").value(booking.toString()));
+    }
+
+    @Test
     void givenABalance_whenThePayoutExceedsIt_thenItIsRefusedAndNothingIsWritten() throws Exception {
         // given
         credit.credit(johnAccount, 1000);

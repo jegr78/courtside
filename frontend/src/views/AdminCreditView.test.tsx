@@ -3,7 +3,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, expect, it, vi } from "vitest";
-import { api, ApiError, type CreditEntry, type CreditHolder, type CreditLedgerPage } from "../api/client";
+import { api, ApiError, type CreditEntry, type CreditHolder, type CreditLedgerPage, type PayPalRefundOption } from "../api/client";
 import i18n from "../i18n";
 import { WithClubConfiguration } from "../test/ClubConfiguration";
 import { proofOwnerHarness } from "../test/ProofOwner";
@@ -22,8 +22,20 @@ const recorded: CreditEntry = { ...credited, id: "88888888-0000-0000-0000-000000
 const recentAuthenticationRequired = () => new ApiError(403,
   { type: "urn:courtside:error:recent-authentication-required", title: "Recent authentication required", status: 403 });
 
+const orderId = "ORDER-1";
+const payment: CreditEntry = { ...credited, id: "88888888-0000-0000-0000-000000000010", kind: "PAYPAL_PAYMENT", amountMinor: 2000,
+  balanceAfterMinor: 2000, note: null, paypalOrderId: orderId };
+const refundRow: CreditEntry = { ...payment, id: "88888888-0000-0000-0000-000000000011", kind: "PAYPAL_REFUND", amountMinor: -2000,
+  balanceAfterMinor: 0 };
+const paypalLedger = (...items: CreditEntry[]): CreditLedgerPage => ({ ...ledger, items });
+
+function refundOptions(option: Partial<PayPalRefundOption>) {
+  vi.spyOn(api, "payPalRefundOptions").mockResolvedValue({ items: [{ orderId, refundable: false, ...option }] });
+}
+
 beforeEach(async () => {
   vi.restoreAllMocks();
+  vi.spyOn(api, "payPalRefundOptions").mockResolvedValue({ items: [] });
   await i18n.changeLanguage("en");
 });
 
@@ -193,4 +205,188 @@ it("given a fresh proof is requested, when the dialog is dismissed, then the ent
   await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
   expect(record).toHaveBeenCalledOnce();
   expect(screen.getByTestId("credit-form-note")).toHaveValue("Season refund");
+});
+
+it("given a refundable PayPal payment, when the treasurer confirms, then the order is posted and ledger and options are read again", async () => {
+  // given
+  vi.spyOn(api, "creditHolders").mockResolvedValue([holder]);
+  const read = vi.spyOn(api, "creditEntries").mockResolvedValueOnce(paypalLedger(payment))
+    .mockResolvedValueOnce(paypalLedger(refundRow, payment));
+  const options = vi.spyOn(api, "payPalRefundOptions").mockResolvedValueOnce({ items: [{ orderId, refundable: true }] })
+    .mockResolvedValueOnce({ items: [{ orderId, refundable: false, status: "COMPLETED", blockedBy: "payment.paypal.refund.alreadyRefunded" }] });
+  const refund = vi.spyOn(api, "refundPayPalPayment").mockResolvedValue({ orderId, status: "COMPLETED" });
+  show();
+  const account = await openJane();
+
+  // when
+  await userEvent.click(await within(account).findByTestId("paypal-refund"));
+  const dialog = await screen.findByRole("dialog");
+  expect(dialog, "the dialog names the amount and the credit taken back").toHaveTextContent("€20.00");
+  expect(refund).not.toHaveBeenCalled();
+  await userEvent.click(within(dialog).getByTestId("paypal-refund-confirm"));
+
+  // then
+  await waitFor(() => expect(within(account).queryByTestId("paypal-refund")).not.toBeInTheDocument());
+  expect(refund).toHaveBeenCalledExactlyOnceWith(orderId);
+  expect(read).toHaveBeenCalledTimes(2);
+  expect(options).toHaveBeenCalledTimes(2);
+  expect(options).toHaveBeenLastCalledWith(accountId);
+  expect(within(account).getAllByTestId("paypal-refund-state").map((state) => state.getAttribute("data-status"))).toContain("COMPLETED");
+});
+
+it("given a refundable PayPal payment, when the dialog is cancelled, then nothing is posted", async () => {
+  // given
+  vi.spyOn(api, "creditHolders").mockResolvedValue([holder]);
+  vi.spyOn(api, "creditEntries").mockResolvedValue(paypalLedger(payment));
+  refundOptions({ refundable: true });
+  const refund = vi.spyOn(api, "refundPayPalPayment");
+  show();
+  const account = await openJane();
+  await userEvent.click(await within(account).findByTestId("paypal-refund"));
+
+  // when
+  await userEvent.click(within(await screen.findByRole("dialog")).getByTestId("paypal-refund-cancel"));
+
+  // then
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  expect(refund).not.toHaveBeenCalled();
+});
+
+it("given a payment whose credit was spent, when the ledger shows it, then the reason replaces the action", async () => {
+  // given
+  vi.spyOn(api, "creditHolders").mockResolvedValue([holder]);
+  vi.spyOn(api, "creditEntries").mockResolvedValue(paypalLedger(payment));
+  refundOptions({ blockedBy: "payment.paypal.refund.creditSpent" });
+
+  // when
+  show();
+  const account = await openJane();
+
+  // then
+  expect(await within(account).findByTestId("paypal-refund-blocked")).toHaveTextContent(i18n.t("payment.paypal.refund.creditSpent"));
+  expect(within(account).queryByTestId("paypal-refund")).not.toBeInTheDocument();
+});
+
+it.each([
+  ["PENDING", undefined, "unclear, check the PayPal account"],
+  ["COMPLETED", undefined, "Returned through PayPal"],
+  ["FAILED", "INSTRUMENT_DECLINED", "INSTRUMENT_DECLINED"]
+] as const)("given a refund in state %s, when the ledger shows it, then the row says so", async (status, failureReason, text) => {
+  // given
+  vi.spyOn(api, "creditHolders").mockResolvedValue([holder]);
+  vi.spyOn(api, "creditEntries").mockResolvedValue(paypalLedger(refundRow));
+  refundOptions({ status, failureReason });
+
+  // when
+  show();
+  const account = await openJane();
+
+  // then
+  const state = await within(account).findByTestId("paypal-refund-state");
+  expect(state).toHaveAttribute("data-status", status);
+  expect(state).toHaveTextContent(text);
+});
+
+it("given a refund that needs a fresh proof, when the treasurer confirms the password, then the same order is posted again", async () => {
+  // given
+  const owner = proofOwnerHarness();
+  vi.spyOn(api, "creditHolders").mockResolvedValue([holder]);
+  vi.spyOn(api, "creditEntries").mockResolvedValue(paypalLedger(payment));
+  refundOptions({ refundable: true });
+  const proved = vi.spyOn(api, "reauthenticate").mockResolvedValue(undefined);
+  const refund = vi.spyOn(api, "refundPayPalPayment").mockRejectedValueOnce(recentAuthenticationRequired())
+    .mockResolvedValueOnce({ orderId, status: "COMPLETED" });
+  show(owner.Wrapper);
+  const account = await openJane();
+  await userEvent.click(await within(account).findByTestId("paypal-refund"));
+  await userEvent.click(within(await screen.findByRole("dialog")).getByTestId("paypal-refund-confirm"));
+
+  // when
+  await userEvent.type(await screen.findByTestId("admin-reauthentication-password"), "current-password");
+  await userEvent.click(screen.getByTestId("admin-reauthentication-submit"));
+
+  // then
+  await waitFor(() => expect(refund).toHaveBeenCalledTimes(2));
+  expect(proved).toHaveBeenCalledWith("current-password");
+  expect(refund.mock.calls[1]).toEqual([orderId]);
+  await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+});
+
+it("given PayPal refuses the refund, when the treasurer confirms, then the violation is shown translated", async () => {
+  // given
+  vi.spyOn(api, "creditHolders").mockResolvedValue([holder]);
+  vi.spyOn(api, "creditEntries").mockResolvedValue(paypalLedger(payment));
+  refundOptions({ refundable: true });
+  vi.spyOn(api, "refundPayPalPayment").mockRejectedValue(new ApiError(409, {
+    type: "urn:courtside:error:paypal-refund-refused", title: "Refused", status: 409,
+    violations: [{ code: "payment.paypal.refund.creditSpent", params: { amountMinor: 2000, balanceMinor: 0, currency: "EUR" } }]
+  }));
+  show();
+  const account = await openJane();
+  await userEvent.click(await within(account).findByTestId("paypal-refund"));
+
+  // when
+  await userEvent.click(within(await screen.findByRole("dialog")).getByTestId("paypal-refund-confirm"));
+
+  // then
+  expect(await screen.findByTestId("paypal-refund-error")).toHaveTextContent(i18n.t("payment.paypal.refund.creditSpent"));
+});
+
+it("given PayPal answers the refund as failed, when the treasurer confirms, then the outcome is announced as a problem", async () => {
+  // given
+  vi.spyOn(api, "creditHolders").mockResolvedValue([holder]);
+  vi.spyOn(api, "creditEntries").mockResolvedValue(paypalLedger(payment));
+  refundOptions({ refundable: true });
+  vi.spyOn(api, "refundPayPalPayment").mockResolvedValue({ orderId, status: "FAILED", failureReason: "INSTRUMENT_DECLINED" });
+  show();
+  const account = await openJane();
+  await userEvent.click(await within(account).findByTestId("paypal-refund"));
+
+  // when
+  await userEvent.click(within(await screen.findByRole("dialog")).getByTestId("paypal-refund-confirm"));
+
+  // then
+  const outcome = await within(account).findByTestId("paypal-refund-outcome");
+  expect(outcome, "a refused refund is not reported as a success").toHaveAttribute("role", "alert");
+  expect(outcome).toHaveTextContent("INSTRUMENT_DECLINED");
+});
+
+it("given another treasurer returned the payment first, when this one confirms, then the error shows and ledger and options are read again", async () => {
+  // given
+  vi.spyOn(api, "creditHolders").mockResolvedValue([holder]);
+  const read = vi.spyOn(api, "creditEntries").mockResolvedValue(paypalLedger(payment));
+  const options = vi.spyOn(api, "payPalRefundOptions").mockResolvedValueOnce({ items: [{ orderId, refundable: true }] })
+    .mockResolvedValue({ items: [{ orderId, refundable: false, status: "COMPLETED", blockedBy: "payment.paypal.refund.alreadyRefunded" }] });
+  vi.spyOn(api, "refundPayPalPayment").mockRejectedValue(new ApiError(409, {
+    type: "urn:courtside:error:paypal-refund-refused", title: "Refused", status: 409,
+    violations: [{ code: "payment.paypal.refund.alreadyRefunded", params: {} }]
+  }));
+  show();
+  const account = await openJane();
+  await userEvent.click(await within(account).findByTestId("paypal-refund"));
+
+  // when
+  await userEvent.click(within(await screen.findByRole("dialog")).getByTestId("paypal-refund-confirm"));
+
+  // then
+  expect(await screen.findByTestId("paypal-refund-error")).toHaveTextContent(i18n.t("payment.paypal.refund.alreadyRefunded"));
+  await waitFor(() => expect(options, "the options no longer offer what was returned").toHaveBeenCalledTimes(2));
+  expect(read).toHaveBeenCalledTimes(2);
+});
+
+it("given a refund PayPal refused, when the ledger shows the payment, then its row shows the failure rather than an earlier return", async () => {
+  // given
+  vi.spyOn(api, "creditHolders").mockResolvedValue([holder]);
+  vi.spyOn(api, "creditEntries").mockResolvedValue(paypalLedger(refundRow, payment));
+  refundOptions({ status: "FAILED", failureReason: "INSTRUMENT_DECLINED", blockedBy: "payment.paypal.refund.alreadyRefunded" });
+
+  // when
+  show();
+  const account = await openJane();
+
+  // then
+  await waitFor(() => expect(within(account).getAllByTestId("paypal-refund-state")).toHaveLength(2));
+  expect(within(account).queryByTestId("paypal-refund-blocked")).not.toBeInTheDocument();
+  expect(within(account).getAllByTestId("paypal-refund-state").map((state) => state.getAttribute("data-status")))
+    .toEqual(["FAILED", "FAILED"]);
 });

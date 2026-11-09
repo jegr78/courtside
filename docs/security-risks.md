@@ -430,6 +430,18 @@ PayPal outage or a capture whose outcome is unknown during the change. The order
 `paypal_order` for the treasurer to settle in the PayPal account. Reconsider this bound if Courtside
 keeps retired credentials until their open orders are settled, or receives PayPal webhooks.
 
+## An unclear PayPal refund keeps the player's credit taken
+
+Returning a PayPal payment takes the credit back before Courtside asks PayPal, and gives it back only
+when PayPal clearly refuses the refund. When PayPal does not answer, answers something Courtside
+cannot read, or never settles the refund, the refund stays pending and the player's balance stays
+lower by the amount, although PayPal may not have sent the money. The reconciliation keeps asking,
+and the treasurer page shows the refund as unclear. Causing it needs no access beyond a treasurer
+starting a refund during a PayPal outage, and the player loses at most the one payment's amount
+until somebody acts. The treasurer checks the club's PayPal account and, if the money did not go
+back, corrects the balance with a `CREDIT` entry and a note. Reconsider this bound when PayPal
+webhooks become part of the product, or when clubs report refunds that stay pending for days.
+
 ## Sandbox credentials confirm bookings with test money
 
 PayPal's sandbox accepts payments with test accounts that move no real money. Courtside allows

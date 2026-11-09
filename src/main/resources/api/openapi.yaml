@@ -172,6 +172,8 @@ tags:
     description: The club's payment provider and the credentials Courtside uses with it.
   - name: payment-checkout
     description: An external player paying a held booking by PayPal.
+  - name: payment-refund
+    description: The treasurer returning a PayPal payment through PayPal.
 
 security:
   - sessionCookie: []
@@ -4054,8 +4056,11 @@ components:
         the treasurer paid out part of the balance. `BOOKING_DEBIT`: a booking was paid from the
         balance. `BOOKING_REFUND`: a cancelled booking returned its payment to the balance.
         `PAYPAL_PAYMENT`: the booker paid a booking through PayPal. `PAYPAL_LATE_CAPTURE`: PayPal
-        captured a payment after the held court was released, and it became credit.
-      enum: [CREDIT, PAYOUT, BOOKING_DEBIT, BOOKING_REFUND, PAYPAL_PAYMENT, PAYPAL_LATE_CAPTURE]
+        captured a payment after the held court was released, and it became credit. `PAYPAL_REFUND`:
+        the treasurer returned a PayPal payment through PayPal and its credit was taken back.
+        `PAYPAL_REFUND_REVERSED`: PayPal refused that refund and the credit was restored.
+      enum: [CREDIT, PAYOUT, BOOKING_DEBIT, BOOKING_REFUND, PAYPAL_PAYMENT, PAYPAL_LATE_CAPTURE, PAYPAL_REFUND,
+             PAYPAL_REFUND_REVERSED]
 
     CreditEntryRequestKind:
       type: string
@@ -4088,6 +4093,9 @@ components:
           type: [string, "null"]
           format: uuid
           description: The booking a booking or PayPal entry belongs to.
+        paypalOrderId:
+          type: [string, "null"]
+          description: The PayPal order a PayPal entry belongs to.
 
     CreditLedgerPage:
       type: object
@@ -4259,6 +4267,70 @@ components:
       properties:
         bookingId: { type: string, format: uuid }
         outcome: { $ref: "#/components/schemas/PayPalCaptureOutcome" }
+
+    PayPalRefundRequest:
+      type: object
+      additionalProperties: false
+      required: [orderId]
+      properties:
+        orderId:
+          type: string
+          pattern: "^[A-Za-z0-9_-]{1,64}$"
+          description: PayPal's id of the order whose payment goes back.
+
+    PayPalRefundStatus:
+      type: string
+      enum: [PENDING, COMPLETED, FAILED]
+
+    PayPalRefund:
+      type: object
+      additionalProperties: false
+      required: [orderId, status]
+      properties:
+        orderId:
+          type: string
+          pattern: "^[A-Za-z0-9_-]{1,64}$"
+        status: { $ref: "#/components/schemas/PayPalRefundStatus" }
+        failureReason:
+          type: string
+          maxLength: 200
+          description: PayPal's reason for a `FAILED` refund.
+
+    PayPalRefundBlock:
+      type: string
+      enum:
+        - payment.paypal.refund.notRefundable
+        - payment.paypal.refund.alreadyRefunded
+        - payment.paypal.refund.creditSpent
+        - payment.paypal.refund.unavailable
+      description: The violation a return of this payment would be refused with.
+
+    PayPalRefundOption:
+      type: object
+      additionalProperties: false
+      required: [orderId, refundable]
+      properties:
+        orderId:
+          type: string
+          pattern: "^[A-Za-z0-9_-]{1,64}$"
+        refundable: { type: boolean }
+        status: { $ref: "#/components/schemas/PayPalRefundStatus" }
+        failureReason:
+          type: string
+          maxLength: 200
+          description: PayPal's reason for a `FAILED` refund.
+        blockedBy: { $ref: "#/components/schemas/PayPalRefundBlock" }
+
+    PayPalRefundOptions:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          maxItems: 1000
+          description: At most the newest 1000 payments.
+          items: { $ref: "#/components/schemas/PayPalRefundOption" }
 
     GuestFeeReport:
       type: object
@@ -4876,7 +4948,8 @@ components:
              BOOKING_REMINDER, BOOKING_CANCELLED, BOOKING_CANCELLED_BY_CLUB, BOOKING_RELEASED,
              BOOKING_SERIES_CREATED, BOOKING_SERIES_CANCELLED_BY_CLUB, BOOKING_SERIES_MOVED_BY_CLUB,
              WAITLIST_OFFER, BOOKING_PARTNER_FOUND, BOOKING_PLACE_TAKEN, ACCESS_CODE_CHANGED,
-             ACCESS_CODE_READY, MEMBERS_DOOR_CODE_CHANGED, REGISTRATION_VERIFICATION, REGISTRATION_NAME_TAKEN]
+             ACCESS_CODE_READY, MEMBERS_DOOR_CODE_CHANGED, REGISTRATION_VERIFICATION, REGISTRATION_NAME_TAKEN,
+             PAYPAL_REFUNDED]
 
     MessageTemplateLanguage:
       type: string
@@ -8933,6 +9006,81 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "429":
           $ref: "#/components/responses/RateLimited"
+
+  /api/treasury/paypal/refunds:
+    get:
+      tags: [payment-refund]
+      operationId: listPayPalRefunds
+      summary: Whether and why each PayPal payment of one account can be returned through PayPal.
+      description: |
+        One item per PayPal payment the account made, captured or captured late. A payment that can
+        be returned reads `refundable: true`. Otherwise `blockedBy` names the violation a return would
+        be refused with, and a payment already returned carries the status of its refund and, for a
+        failed one, PayPal's reason.
+      parameters:
+        - name: accountId
+          in: query
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: The account's PayPal payments, newest first.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PayPalRefundOptions" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+    post:
+      tags: [payment-refund]
+      operationId: refundPayPalPayment
+      summary: Return the whole amount of one PayPal payment through PayPal and take its credit back.
+      description: |
+        Takes the credit the payment left behind off the payer's balance and asks PayPal to refund the
+        capture in full. A payment whose order was not captured, whose booking was not cancelled or
+        that never became credit is refused with `payment.paypal.refund.notRefundable`; a payment
+        returned before, in any status, with `payment.paypal.refund.alreadyRefunded`; a balance that no
+        longer covers the amount with `payment.paypal.refund.creditSpent`. Each of these answers
+        `urn:courtside:error:paypal-refund-refused`. PayPal switched off, or an order of the other
+        environment, answers `urn:courtside:error:paypal-refund-unavailable` and takes nothing.
+
+        `COMPLETED` means PayPal returned the money. `FAILED` means PayPal refused the refund, the
+        credit is restored and `failureReason` carries PayPal's reason; a failed refund is final.
+        `PENDING` means PayPal has not answered clearly yet: the credit stays taken until the
+        reconciliation reads the outcome. Requires a re-authentication no older than five minutes.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PayPalRefundRequest" }
+      responses:
+        "200":
+          description: The refund and its status.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PayPalRefund" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
 
   /api/payments/paypal/availability:
     get:

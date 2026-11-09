@@ -31,6 +31,9 @@ final class FakePayPal {
     static final String READ = "GET /sandbox/v2/checkout/orders/" + ORDER;
     static final String CAPTURE = "POST /sandbox/v2/checkout/orders/" + ORDER + "/capture";
 
+    static final String REFUND = "POST /sandbox/v2/payments/captures/CAPTURE1/refund";
+    static final String REFUND_READ = "GET /sandbox/v2/payments/refunds/REFUND1";
+
     private static final ObjectMapper JSON = new ObjectMapper();
 
     private final List<Seen> seen = new CopyOnWriteArrayList<>();
@@ -160,8 +163,25 @@ final class FakePayPal {
                 + "}],\"links\":[{\"rel\":\"payer-action\",\"href\":\"" + APPROVE + "\"}]}";
     }
 
+    static String refundedOrder(UUID booking, String refundId, String status, String value) {
+        String refunded = order("COMPLETED", booking, "15.00", capture("COMPLETED", "15.00"))
+                .replace("}]}}],\"links\"", "}],\"refunds\":[{\"id\":\"" + refundId + "\",\"status\":\"" + status
+                        + "\",\"amount\":{\"currency_code\":\"EUR\",\"value\":\"" + value + "\"}}]}}],\"links\"");
+        assertThat(refunded).as("the refund is listed in the order").contains("\"refunds\":[{\"id\":\"" + refundId);
+        return refunded;
+    }
+
     static String capture(String status, String value) {
         return "{\"id\":\"CAPTURE1\",\"status\":\"" + status + "\",\"amount\":{\"currency_code\":\"EUR\",\"value\":\""
+                + value + "\"}}";
+    }
+
+    static String refund(String status) {
+        return "{\"id\":\"REFUND1\",\"status\":\"" + status + "\"}";
+    }
+
+    static String refund(String status, String value) {
+        return "{\"id\":\"REFUND1\",\"status\":\"" + status + "\",\"amount\":{\"currency_code\":\"EUR\",\"value\":\""
                 + value + "\"}}";
     }
 

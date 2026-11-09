@@ -233,6 +233,12 @@ VALUES ('7f200000-0000-0000-0000-000000000002', '72000000-0000-0000-0000-0000000
        ('7f200000-0000-0000-0000-000000000003', '72000000-0000-0000-0000-000000000001', 'PAYPAL_LATE_CAPTURE', 1500,
         'EUR', '2025-01-01T00:00:00Z', NULL, '7f400000-0000-0000-0000-000000000002', 'EXAMPLEORDER0000002');
 
+INSERT INTO paypal_refund (id, order_id, account_id, amount_minor, currency, status, refund_id, failure_reason,
+                           requested_by, requested_at, updated_at)
+VALUES ('7f500000-0000-0000-0000-000000000001', 'EXAMPLEORDER0000001', '72000000-0000-0000-0000-000000000001', 1500,
+        'EUR', 'COMPLETED', 'EXAMPLEREFUND0001', NULL, '72000000-0000-0000-0000-000000000001', '2025-01-02T00:00:00Z',
+        '2025-01-02T00:00:00Z');
+
 INSERT INTO paypal_settings (id, client_id, environment, enabled, updated_at, updated_by)
 VALUES ('7f300000-0000-0000-0000-000000000001', 'example-sandbox-client', 'SANDBOX', false,
         '2025-01-01T00:00:00Z', NULL);

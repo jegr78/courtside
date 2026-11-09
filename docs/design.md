@@ -510,8 +510,53 @@ an attempt is read at PayPal with the former credentials: a capture is recorded,
 order voided, and an unreadable one stays open for the reconciliation. An order keeps the
 environment it was created in, and sandbox credentials work on every instance.
 
-Courtside stores nothing from PayPal's payer object. The audit events of the checkout name the
-booking, the order, the environment, amounts and reasons, never payer data.
+#### Returning a PayPal payment
+
+`TREASURER` and `ADMIN` return one whole PayPal payment through PayPal from the treasurer credit
+page; a partial refund does not exist. `GET /api/treasury/paypal/refunds?accountId=` lists an
+account's PayPal payments and says for each whether it can be returned, and why not when it cannot.
+A payment can be returned when its order is `CAPTURED` and its booking was cancelled with a
+`BOOKING_REFUND`, or `LATE_CAPTURED` and credited with a `PAYPAL_LATE_CAPTURE`; when the order has
+no refund in any status; when the payer's balance still covers the amount of the order's credit
+entry; and when PayPal is on with the environment the order was created in. Otherwise
+`POST /api/treasury/paypal/refunds` refuses it with `payment.paypal.refund.notRefundable`,
+`payment.paypal.refund.alreadyRefunded`, `payment.paypal.refund.creditSpent` with amount, balance
+and currency, or `payment.paypal.refund.unavailable`, and writes nothing. The request needs a
+recent authentication.
+
+The return runs in three steps, and no database lock is held across the PayPal call:
+
+1. One transaction locks the `paypal_order` row and then the payer's credit account, checks the
+   conditions, appends a `PAYPAL_REFUND` entry of minus the amount, stores a `PENDING`
+   `paypal_refund` and audits `payment.paypal.refund.requested`.
+2. Courtside asks PayPal to refund the capture in full, with the `paypal_refund` id as
+   `PayPal-Request-Id`, so a repeated request cannot refund twice.
+3. The answer is recorded under the order's row lock. A completed refund becomes `COMPLETED` with
+   PayPal's refund id, is audited as `payment.paypal.refunded` and tells the payer that the amount
+   went back to PayPal; this message kind cannot be declined. A refund PayPal holds as pending keeps
+   its refund id and stays `PENDING`.
+
+Credit comes back only on a clear refusal: a 4xx answer to the refund request other than 401, 403,
+409, 429, a duplicate or in-progress request and an already fully refunded capture, or a refund
+PayPal reports as `FAILED` or `CANCELLED`. Before restoring it Courtside reads the order, and follows
+a refund of the full amount PayPal lists there instead. A refusal marks the refund `FAILED` with
+PayPal's reason, appends a `PAYPAL_REFUND_REVERSED` of the amount and is audited as
+`payment.paypal.refundFailed`. `FAILED` is final for the order; the treasurer then pays out by hand.
+A capture PayPal reports as already fully refunded, for example after a refund in the PayPal
+account, is resolved by reading the order: a completed refund listed there is recorded as completed,
+otherwise the refund stays pending. Every other answer, including no answer, a timeout, a 5xx, a
+body Courtside cannot read and a completed refund of an amount other than the payment's, leaves the
+refund `PENDING` with its credit taken.
+
+`PayPalReconciliation` also resolves `PENDING` refunds older than five minutes, up to 50 per run and
+longest unchecked first: one without a PayPal refund id is requested again with the same request id
+after reading the order, one with an id is read at PayPal, and the answer is recorded as in step 3.
+These calls count towards the run's stop after three unanswered reads. A refund that stays unclear
+keeps its credit taken, and the treasurer page shows it as unclear with the advice to check the
+PayPal account.
+
+Courtside stores nothing from PayPal's payer object. The audit events of the checkout and the refund
+name the booking, the order, the environment, amounts and reasons, never payer data.
 
 The guest fee report under `/api/treasury` lists, for `TREASURER` and `ADMIN`, each member's charged
 guest places and their sum for a period, by default the current calendar year in the club time
@@ -1519,8 +1564,8 @@ leaving the queue is how a member stops it. It always reaches the centre, follow
 choice and is handed to the relay before ordinary booking mail because it runs out within minutes.
 A mail composed after the offer was taken, declined or expired fails instead of being sent.
 The welcome, credentials, displacement, participant-addition notices, the club's cancellations,
-freed bookings and series moves cannot be disabled as kinds, because no other product path tells the member that
-somebody else wrote them into a booking, took one away or moved it. A holder's own cancellation and the
+freed bookings, series moves and a returned PayPal payment cannot be disabled as kinds, because no other product
+path tells the member that somebody else wrote them into a booking, took one away, moved it or sent their money back. A holder's own cancellation and the
 series summary can be declined, like the confirmation: My bookings already shows what they say. A
 declined email channel stops the mail for displacement, participant-addition notices and the club's
 cancellations and moves as well; the centre then replaces it, and every centre page carries the

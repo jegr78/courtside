@@ -712,7 +712,7 @@ External players can hold credit with the club, for example after paying cash at
 account that holds credit. The search finds external accounts by name, email address or username.
 Administrators find the page under *People*, treasurers directly in the sidebar.
 
-![An external player's credit with balance, entries and the form for credits and payouts.](../screenshots/en/credit.png)
+![An external player's credit with balance, entries, a cancelled PayPal payment to return and the form for credits and payouts.](../screenshots/en/credit.png)
 
 A chosen account shows its entries, newest first, with the balance after each. **Credit** adds money
 to an external account, **Payout** returns credit. An entry lies between 0.01 and 10,000.00 in the
@@ -732,6 +732,26 @@ returns the amount, a cancellation by the club does until the booking starts. Bo
 appears as *Paid with PayPal* next to *Booking paid*, so the balance stays the same. A PayPal payment
 that arrives after Courtside has released the court becomes credit and appears as *Late PayPal
 payment as credit*.
+
+### Returning a PayPal payment
+
+When a player wants the money of a cancelled PayPal booking back in their PayPal account instead of
+as credit, you return the whole payment through PayPal. Such a payment shows **Return to PayPal** in
+the ledger. Courtside names the amount first and takes the credit from the payment back in the same
+step, shown as *PayPal refund*. Without a fresh password confirmation, Courtside asks for your
+password.
+
+You can only return a payment whose booking was cancelled and refunded, or a late PayPal payment that
+became credit. There are no partial amounts. When the player has already spent the credit, the ledger
+shows the reason instead of the button. The same applies when PayPal is switched off or the payment
+comes from the other environment. Each payment can be returned once.
+
+Next to the refund the ledger shows how it ended. *Returned through PayPal* means the money is on its
+way and the player gets a message. When PayPal refuses, the reason appears next to it and Courtside
+puts the credit back as *PayPal refund reversed*. Another attempt through PayPal is then not possible,
+so pay out by hand. *Unclear, check the PayPal account* means PayPal gave no clear answer. Courtside
+asks again every few minutes and keeps the credit taken meanwhile. If it stays unclear, look in the
+club's PayPal account. If the money did not go back, put the amount back with a **Credit** entry.
 
 ## PayPal
 

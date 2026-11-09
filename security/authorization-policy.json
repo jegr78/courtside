@@ -2,9 +2,9 @@
   "schemaVersion": 1,
   "reviewedAt": "2026-11-01",
   "purpose": "This is the normative authorization policy for the shipped Courtside API. OpenAPI defines the transport shape; this policy defines who may perform each operation, which resource attributes narrow that permission, and which protected fields each projection may read or write.",
-  "openApiFieldInventorySha256": "aafc7b9cd8f803e5bad3a0a62a1ce1e01fa613b320aeda06d759a5fcb8b00d14",
+  "openApiFieldInventorySha256": "68542ab8a7635eae64feadf756c3901452f227aed78f579b6a11c37643d4701e",
   "protectedFieldInventorySha256": "5295a7c44ccdfbecede95000d5f40299f3bfb9026c9b5b5afde1dc1e58301aa0",
-  "productionAuthorizationSha256": "64a2a8114dc8c6f9624bf263ac1a9c731f05b80a31198f1c9826aae966f69730",
+  "productionAuthorizationSha256": "d8c861466a472a4c5768428363b8a8c3210d2fe40be19309cf9cd75ae37994ab",
   "ordinaryFields": [
     "Problem.detail",
     "Problem.fieldErrors",
@@ -1966,6 +1966,7 @@
     "listCreditEntries:response:CreditEntry.id",
     "listCreditEntries:response:CreditEntry.kind",
     "listCreditEntries:response:CreditEntry.note",
+    "listCreditEntries:response:CreditEntry.paypalOrderId",
     "listCreditEntries:response:CreditEntry.recordedAt",
     "listCreditEntries:response:CreditLedgerPage.balanceMinor",
     "listCreditEntries:response:CreditLedgerPage.currency",
@@ -2332,6 +2333,7 @@
     "listOwnCredit:response:CreditEntry.id",
     "listOwnCredit:response:CreditEntry.kind",
     "listOwnCredit:response:CreditEntry.note",
+    "listOwnCredit:response:CreditEntry.paypalOrderId",
     "listOwnCredit:response:CreditEntry.recordedAt",
     "listOwnCredit:response:CreditLedgerPage.balanceMinor",
     "listOwnCredit:response:CreditLedgerPage.currency",
@@ -2462,6 +2464,21 @@
     "listParticipantCardsForAdmin:response:Violation.code",
     "listParticipantCardsForAdmin:response:Violation.params",
     "listParticipantCardsForAdmin:response:Violation.params.*",
+    "listPayPalRefunds:parameter:$parameter.query.accountId",
+    "listPayPalRefunds:response:$response.header.Retry-After",
+    "listPayPalRefunds:response:FieldError.code",
+    "listPayPalRefunds:response:FieldError.field",
+    "listPayPalRefunds:response:FieldError.params",
+    "listPayPalRefunds:response:FieldError.params.*",
+    "listPayPalRefunds:response:PayPalRefundOption.blockedBy",
+    "listPayPalRefunds:response:PayPalRefundOption.failureReason",
+    "listPayPalRefunds:response:PayPalRefundOption.orderId",
+    "listPayPalRefunds:response:PayPalRefundOption.refundable",
+    "listPayPalRefunds:response:PayPalRefundOption.status",
+    "listPayPalRefunds:response:PayPalRefundOptions.items",
+    "listPayPalRefunds:response:Violation.code",
+    "listPayPalRefunds:response:Violation.params",
+    "listPayPalRefunds:response:Violation.params.*",
     "listPersonalBookings:parameter:$parameter.query.cursor",
     "listPersonalBookings:parameter:$parameter.query.limit",
     "listPersonalBookings:parameter:$parameter.query.view",
@@ -3119,6 +3136,7 @@
     "recordCreditEntry:response:CreditEntry.id",
     "recordCreditEntry:response:CreditEntry.kind",
     "recordCreditEntry:response:CreditEntry.note",
+    "recordCreditEntry:response:CreditEntry.paypalOrderId",
     "recordCreditEntry:response:CreditEntry.recordedAt",
     "recordCreditEntry:response:FieldError.code",
     "recordCreditEntry:response:FieldError.field",
@@ -3145,6 +3163,19 @@
     "redeemPasswordReset:response:Violation.code",
     "redeemPasswordReset:response:Violation.params",
     "redeemPasswordReset:response:Violation.params.*",
+    "refundPayPalPayment:request:PayPalRefundRequest.orderId",
+    "refundPayPalPayment:response:$response.header.Accept",
+    "refundPayPalPayment:response:$response.header.Retry-After",
+    "refundPayPalPayment:response:FieldError.code",
+    "refundPayPalPayment:response:FieldError.field",
+    "refundPayPalPayment:response:FieldError.params",
+    "refundPayPalPayment:response:FieldError.params.*",
+    "refundPayPalPayment:response:PayPalRefund.failureReason",
+    "refundPayPalPayment:response:PayPalRefund.orderId",
+    "refundPayPalPayment:response:PayPalRefund.status",
+    "refundPayPalPayment:response:Violation.code",
+    "refundPayPalPayment:response:Violation.params",
+    "refundPayPalPayment:response:Violation.params.*",
     "registerExternalAccount:response:$response.header.Accept",
     "registerExternalAccount:response:$response.header.Retry-After",
     "registerExternalAccount:response:FieldError.code",
@@ -4785,11 +4816,12 @@
     },
     {
       "id": "treasury-credit-ledger",
-      "description": "The credit ledger administration requires an enabled permanent account carrying TREASURER or ADMIN; it names accounts with their email addresses and balances and shows one account's entries with their reasons.",
+      "description": "The credit ledger administration requires an enabled permanent account carrying TREASURER or ADMIN; it names accounts with their email addresses and balances, shows one account's entries with their reasons and says whether each of its PayPal payments can be returned.",
       "operationIds": [
         "listCreditHolders",
         "listCreditEntries",
-        "searchCreditAccounts"
+        "searchCreditAccounts",
+        "listPayPalRefunds"
       ],
       "actors": [
         "TREASURER",
@@ -5228,6 +5260,21 @@
         "treasury-gate",
         "recent-authentication",
         "paypal-secret-write-only"
+      ]
+    },
+    {
+      "id": "treasury-paypal-refund",
+      "description": "A treasurer or administrator returns one PayPal payment through PayPal after a recent full proof; the payment's credit is taken back in the same step and nothing else is refunded.",
+      "operationIds": [
+        "refundPayPalPayment"
+      ],
+      "actors": [
+        "TREASURER",
+        "ADMIN"
+      ],
+      "decisions": [
+        "treasury-gate",
+        "recent-authentication"
       ]
     }
   ],
@@ -5722,7 +5769,8 @@
         "src/main/java/org/courtside/identity/internal/AccountClosure.java#closeOwn",
         "src/main/java/org/courtside/credit/internal/CreditLedger.java#record",
         "src/main/java/org/courtside/payment/internal/PayPalSettingsService.java#save",
-        "src/main/java/org/courtside/payment/internal/PayPalSettingsService.java#remove"
+        "src/main/java/org/courtside/payment/internal/PayPalSettingsService.java#remove",
+        "src/main/java/org/courtside/payment/internal/PayPalRefunds.java#refund"
       ],
       "positiveTests": [
         "src/test/java/org/courtside/identity/AdminRecentAuthenticationTest.java#givenAnotherAccountsSessions_whenAdminProofIsRefreshed_thenOnlyTheTargetEnds",
@@ -5738,7 +5786,8 @@
         "src/test/java/org/courtside/identity/AccountClosureTest.java#givenAnExternalPlayerWithoutARecentProof_whenTheyCloseTheirAccount_thenTheyMustProveItFirst",
         "src/test/java/org/courtside/credit/CreditLedgerTest.java#givenNoRecentProof_whenTheTreasurerCredits_thenTheyMustProveItFirst",
         "src/test/java/org/courtside/payment/PayPalSettingsTest.java#givenNoRecentProof_whenTheTreasurerStoresCredentials_thenTheyMustProveItFirst",
-        "src/test/java/org/courtside/payment/PayPalSettingsTest.java#givenStoredCredentials_whenRemoved_thenNothingRemainsAndPayPalIsOff"
+        "src/test/java/org/courtside/payment/PayPalSettingsTest.java#givenStoredCredentials_whenRemoved_thenNothingRemainsAndPayPalIsOff",
+        "src/test/java/org/courtside/payment/PayPalRefundTest.java#givenNoRecentAuthentication_whenReturning_thenItIsRefusedAndNothingIsTaken"
       ]
     },
     {

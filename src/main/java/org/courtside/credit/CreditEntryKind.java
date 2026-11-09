@@ -6,10 +6,11 @@ public enum CreditEntryKind {
     BOOKING_DEBIT,
     BOOKING_REFUND,
     PAYPAL_PAYMENT,
-    PAYPAL_LATE_CAPTURE;
+    PAYPAL_LATE_CAPTURE,
+    PAYPAL_REFUND,
+    PAYPAL_REFUND_REVERSED;
 
     public boolean forBooking() {
-        return this == BOOKING_DEBIT || this == BOOKING_REFUND || this == PAYPAL_PAYMENT
-                || this == PAYPAL_LATE_CAPTURE;
+        return this != CREDIT && this != PAYOUT;
     }
 }

@@ -17,11 +17,26 @@ public interface BookingPayments {
 
     Optional<Payment> paymentOf(UUID bookingId);
 
+    Optional<PayPalCredit> payPalCreditOf(String orderId);
+
+    RefundReservation takeForPayPalRefund(UUID accountId, UUID bookingId, String orderId, int amountMinor,
+                                          Currency currency);
+
+    void restoreAfterPayPalRefund(UUID accountId, UUID bookingId, String orderId, int amountMinor, Currency currency);
+
+    long balanceMinor(UUID accountId, Currency currency);
+
     record BookingDebit(boolean covered, long balanceMinor, String currency) {
     }
 
     enum PaymentMethod { CREDIT, PAYPAL }
 
     record Payment(int amountMinor, String currency, PaymentMethod method, boolean refunded) {
+    }
+
+    record PayPalCredit(UUID accountId, UUID bookingId, int amountMinor, String currency, boolean creditedBack) {
+    }
+
+    record RefundReservation(boolean taken, long balanceMinor, String currency) {
     }
 }

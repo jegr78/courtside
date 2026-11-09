@@ -149,6 +149,133 @@ class PayPalLedgerTest extends AbstractIntegrationTest {
                 .isInstanceOf(IllegalStateException.class);
     }
 
+    @Test
+    void givenACoveredBalance_whenTakenForAPayPalRefund_thenARefundEntryOfMinusTheAmountIsRecorded() {
+        // given
+        UUID booking = cancelledPayPalBooking("ORDER-8", 1500);
+
+        // when
+        var reservation = transactions.execute(status ->
+                ledger.takeForPayPalRefund(johnAccount, booking, "ORDER-8", 1500, EURO));
+
+        // then
+        assertThat(reservation).isEqualTo(new BookingPayments.RefundReservation(true, 0, "EUR"));
+        assertThat(jdbc.sql("""
+                        SELECT amount_minor || ':' || paypal_order_id || ':' || booking_id FROM credit_entry
+                        WHERE account_id = :a AND kind = 'PAYPAL_REFUND'
+                        """)
+                .param("a", johnAccount).query(String.class).single())
+                .as("the refund entry takes the amount back and names the order and the booking")
+                .isEqualTo("-1500:ORDER-8:" + booking);
+        assertThat(credit.balance(johnAccount)).isZero();
+    }
+
+    @Test
+    void givenASpentCredit_whenTakenForAPayPalRefund_thenNothingIsRecordedAndTheBalanceIsReported() {
+        // given
+        UUID booking = cancelledPayPalBooking("ORDER-9", 1500);
+        transactions.executeWithoutResult(status -> ledger.debit(johnAccount, UUID.randomUUID(), 1000, EURO));
+
+        // when
+        var reservation = transactions.execute(status ->
+                ledger.takeForPayPalRefund(johnAccount, booking, "ORDER-9", 1500, EURO));
+
+        // then
+        assertThat(reservation).isEqualTo(new BookingPayments.RefundReservation(false, 500, "EUR"));
+        assertThat(kindsOf(booking)).as("a refused reservation writes nothing").doesNotContain("PAYPAL_REFUND:-1500");
+        assertThat(credit.balance(johnAccount)).isEqualTo(500);
+    }
+
+    @Test
+    void givenATakenRefund_whenRestored_thenTheBalanceIsWhole() {
+        // given
+        UUID booking = cancelledPayPalBooking("ORDER-10", 1500);
+        transactions.executeWithoutResult(status ->
+                ledger.takeForPayPalRefund(johnAccount, booking, "ORDER-10", 1500, EURO));
+
+        // when
+        transactions.executeWithoutResult(status ->
+                ledger.restoreAfterPayPalRefund(johnAccount, booking, "ORDER-10", 1500, EURO));
+
+        // then
+        assertThat(credit.balance(johnAccount)).isEqualTo(1500);
+        assertThat(kindsOf(booking)).contains("PAYPAL_REFUND:-1500", "PAYPAL_REFUND_REVERSED:1500");
+    }
+
+    @Test
+    void givenACancelledPayPalBooking_whenItsCreditIsRead_thenItIsCreditedBackWithTheEntryAmount() {
+        // given
+        UUID booking = cancelledPayPalBooking("ORDER-11", 1500);
+
+        // when
+        var paid = ledger.payPalCreditOf("ORDER-11");
+
+        // then
+        assertThat(paid).contains(new BookingPayments.PayPalCredit(johnAccount, booking, 1500, "EUR", true));
+    }
+
+    @Test
+    void givenAConfirmedPayPalBooking_whenItsCreditIsRead_thenItIsNotCreditedBack() {
+        // given
+        UUID booking = UUID.randomUUID();
+        transactions.executeWithoutResult(status -> ledger.payByPayPal(johnAccount, booking, "ORDER-12", 1500, EURO));
+
+        // when
+        var paid = ledger.payPalCreditOf("ORDER-12");
+
+        // then
+        assertThat(paid).contains(new BookingPayments.PayPalCredit(johnAccount, booking, 1500, "EUR", false));
+        assertThat(ledger.payPalCreditOf("ORDER-UNKNOWN")).as("an order without a ledger entry has no credit").isEmpty();
+    }
+
+    @Test
+    void givenALateCapture_whenItsCreditIsRead_thenItCarriesTheCapturedAmount() {
+        // given
+        UUID booking = UUID.randomUUID();
+        transactions.execute(status -> ledger.creditLateCapture(johnAccount, booking, "ORDER-13", 1750, EURO));
+
+        // when
+        var paid = ledger.payPalCreditOf("ORDER-13");
+
+        // then
+        assertThat(paid).contains(new BookingPayments.PayPalCredit(johnAccount, booking, 1750, "EUR", true));
+    }
+
+    @Test
+    void givenAPayPalRefund_whenAppendedByHand_thenItIsRefused() {
+        // when / then
+        assertThatThrownBy(() -> ledger.append(johnAccount, CreditEntryKind.PAYPAL_REFUND, 1500, "By hand"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("not tied to a booking");
+    }
+
+    @Test
+    void givenASecondRefundEntryForOneOrder_whenInserted_thenTheIndexRefusesIt() {
+        // given
+        UUID booking = cancelledPayPalBooking("ORDER-14", 1500);
+        transactions.executeWithoutResult(status ->
+                ledger.takeForPayPalRefund(johnAccount, booking, "ORDER-14", 1500, EURO));
+
+        // when / then
+        assertThatThrownBy(() -> jdbc.sql("""
+                        INSERT INTO credit_entry (id, account_id, kind, amount_minor, currency, recorded_at, booking_id,
+                                                  paypal_order_id)
+                        VALUES (:id, :a, 'PAYPAL_REFUND', -1500, 'EUR', now(), :b, 'ORDER-14')
+                        """)
+                .param("id", UUID.randomUUID()).param("a", johnAccount).param("b", UUID.randomUUID()).update())
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .hasMessageContaining("credit_entry_paypal_order_kind");
+    }
+
+    private UUID cancelledPayPalBooking(String orderId, int amountMinor) {
+        UUID booking = UUID.randomUUID();
+        transactions.executeWithoutResult(status -> {
+            ledger.payByPayPal(johnAccount, booking, orderId, amountMinor, EURO);
+            ledger.refund(booking);
+        });
+        return booking;
+    }
+
     private List<String> kindsOf(UUID booking) {
         return jdbc.sql("SELECT kind || ':' || amount_minor FROM credit_entry WHERE booking_id = :b")
                 .param("b", booking).query(String.class).list();

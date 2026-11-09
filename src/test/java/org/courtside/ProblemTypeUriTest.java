@@ -50,6 +50,8 @@ class ProblemTypeUriTest {
             "urn:courtside:error:paypal-public-url-missing",
             "urn:courtside:error:paypal-order-not-found",
             "urn:courtside:error:paypal-unavailable",
+            "urn:courtside:error:paypal-refund-refused",
+            "urn:courtside:error:paypal-refund-unavailable",
             "urn:courtside:error:password-reuses-credential",
             "urn:courtside:error:password-breach-check-unavailable",
             "urn:courtside:error:password-too-guessable",

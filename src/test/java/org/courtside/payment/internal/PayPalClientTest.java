@@ -212,6 +212,203 @@ class PayPalClientTest {
     }
 
     @Test
+    void givenACompletedRefund_whenRefunding_thenItCarriesTheIdAndTheRequestId() throws IOException {
+        // given
+        UUID requestId = UUID.randomUUID();
+        reply("POST /v1/oauth2/token", 200, TOKEN);
+        reply("POST /v2/payments/captures/CAP1/refund", 201, "{\"id\":\"REF1\",\"status\":\"COMPLETED\"}");
+        PayPalClient client = client(Duration.ofSeconds(2));
+
+        // when
+        PayPalClient.Refund refund = client.refundCapture(credentials(), "CAP1", requestId);
+
+        // then
+        Seen sent = seenFor("POST /v2/payments/captures/CAP1/refund");
+        assertThat(sent.body()).isEqualTo("{}");
+        assertThat(sent.header("PayPal-Request-Id")).isEqualTo(requestId.toString());
+        assertThat(refund.id()).isEqualTo("REF1");
+        assertThat(refund.status()).isEqualTo("COMPLETED");
+    }
+
+    @Test
+    void givenAFullyRefundedCapture_whenRefunding_thenTheAnswerSaysSo() throws IOException {
+        // given
+        reply("POST /v1/oauth2/token", 200, TOKEN);
+        reply("POST /v2/payments/captures/CAP1/refund", 422,
+                "{\"name\":\"UNPROCESSABLE_ENTITY\",\"details\":[{\"issue\":\"CAPTURE_FULLY_REFUNDED\"}]}");
+        PayPalClient client = client(Duration.ofSeconds(2));
+
+        // when / then
+        assertThatThrownBy(() -> client.refundCapture(credentials(), "CAP1", UUID.randomUUID()))
+                .isInstanceOf(PayPalCaptureFullyRefundedException.class);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"{\"status\":\"COMPLETED\"}", "{\"id\":\"REF1\"}", "[]", "not json", ""})
+    void givenARefundAnsweredWithoutAnId_whenRefunding_thenPayPalCountsAsUnavailable(String answer)
+            throws IOException {
+        // given
+        reply("POST /v1/oauth2/token", 200, TOKEN);
+        reply("POST /v2/payments/captures/CAP1/refund", 201, answer);
+        PayPalClient client = client(Duration.ofSeconds(2));
+
+        // when / then
+        assertThatThrownBy(() -> client.refundCapture(credentials(), "CAP1", UUID.randomUUID()))
+                .as("an unreadable answer to a refund is unclear, never a refusal")
+                .isInstanceOf(PayPalUnavailableException.class);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"409:CONFLICT", "422:DUPLICATE_REQUEST_ID", "422:PREVIOUS_REQUEST_IN_PROGRESS",
+            "400:DUPLICATE_REQUEST_ID"})
+    void givenAConflictOrDuplicateRequest_whenRefunding_thenPayPalCountsAsUnavailable(String answer)
+            throws IOException {
+        // given
+        String[] parts = answer.split(":");
+        reply("POST /v1/oauth2/token", 200, TOKEN);
+        reply("POST /v2/payments/captures/CAP1/refund", Integer.parseInt(parts[0]),
+                "{\"name\":\"X\",\"details\":[{\"issue\":\"" + parts[1] + "\"}]}");
+        PayPalClient client = client(Duration.ofSeconds(2));
+
+        // when / then
+        assertThatThrownBy(() -> client.refundCapture(credentials(), "CAP1", UUID.randomUUID()))
+                .as("a refund PayPal may still complete must never read as a refusal")
+                .isInstanceOf(PayPalUnavailableException.class);
+    }
+
+    @Test
+    void givenARefusedRefund_whenRefunding_thenTheReasonIsKept() throws IOException {
+        // given
+        reply("POST /v1/oauth2/token", 200, TOKEN);
+        reply("POST /v2/payments/captures/CAP1/refund", 422,
+                "{\"name\":\"UNPROCESSABLE_ENTITY\",\"message\":\"REFUND_NOT_ALLOWED\","
+                        + "\"details\":[{\"issue\":\"REFUND_NOT_ALLOWED\"}]}");
+        PayPalClient client = client(Duration.ofSeconds(2));
+
+        // when / then
+        assertThatThrownBy(() -> client.refundCapture(credentials(), "CAP1", UUID.randomUUID()))
+                .as("only the refund request's own clear refusal reads as a refused refund")
+                .isInstanceOf(PayPalRefundRefusedException.class)
+                .satisfies(failure -> assertThat(((PayPalRefundRefusedException) failure).reason())
+                        .isEqualTo("UNPROCESSABLE_ENTITY: REFUND_NOT_ALLOWED"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"token 401", "token without a token", "refund 401", "refund 403", "malformed capture id"})
+    void givenARefusalThatIsNotTheRefundsOwn_whenRefunding_thenItIsNotARefusedRefund(String cause)
+            throws IOException {
+        // given
+        String captureId = cause.equals("malformed capture id") ? "CAP/1" : "CAP1";
+        switch (cause) {
+            case "token 401" -> reply("POST /v1/oauth2/token", 401, "{\"error\":\"invalid_client\"}");
+            case "token without a token" -> reply("POST /v1/oauth2/token", 200, "{\"expires_in\":3600}");
+            default -> reply("POST /v1/oauth2/token", 200, TOKEN);
+        }
+        if (cause.startsWith("refund")) {
+            reply("POST /v2/payments/captures/CAP1/refund", Integer.parseInt(cause.substring(7)),
+                    "{\"name\":\"NOT_AUTHORIZED\",\"message\":\"denied\"}");
+        }
+        PayPalClient client = client(Duration.ofSeconds(2));
+
+        // when / then
+        assertThatThrownBy(() -> client.refundCapture(credentials(), captureId, UUID.randomUUID()))
+                .as("%s says nothing about the refund, so it must never restore credit", cause)
+                .isInstanceOf(PayPalRefusedException.class)
+                .isNotInstanceOf(PayPalRefundRefusedException.class);
+    }
+
+    @Test
+    void givenAFailedRefundWithAReason_whenRefunding_thenPayPalsReasonIsKept() throws IOException {
+        // given
+        reply("POST /v1/oauth2/token", 200, TOKEN);
+        reply("POST /v2/payments/captures/CAP1/refund", 201,
+                "{\"id\":\"REF1\",\"status\":\"FAILED\",\"status_details\":{\"reason\":\"ECHECK\"}}");
+        PayPalClient client = client(Duration.ofSeconds(2));
+
+        // when
+        PayPalClient.Refund refund = client.refundCapture(credentials(), "CAP1", UUID.randomUUID());
+
+        // then
+        assertThat(refund).isEqualTo(new PayPalClient.Refund("REF1", "FAILED", "ECHECK", null, null));
+    }
+
+    @Test
+    void givenAnOrderWithACompletedRefund_whenReadingIt_thenItListsTheRefund() throws IOException {
+        // given
+        reply("POST /v1/oauth2/token", 200, TOKEN);
+        reply("GET /v2/checkout/orders/ORD1", 200, orderWithRefunds("[{\"id\":\"REF1\",\"status\":\"COMPLETED\","
+                + "\"amount\":{\"currency_code\":\"EUR\",\"value\":\"12.34\"}}]"));
+        PayPalClient client = client(Duration.ofSeconds(2));
+
+        // when
+        PayPalClient.Order order = client.getOrder(credentials(), "ORD1");
+
+        // then
+        assertThat(order.refunds())
+                .containsExactly(new PayPalClient.ListedRefund("REF1", "COMPLETED", 1234, "EUR"));
+    }
+
+    @Test
+    void givenAnOrderWithoutRefunds_whenReadingIt_thenTheListIsEmpty() throws IOException {
+        // given
+        reply("POST /v1/oauth2/token", 200, TOKEN);
+        reply("GET /v2/checkout/orders/ORD1", 200, order("ORD1", "COMPLETED", UUID.randomUUID(), "1.00", "EUR", null,
+                "[]"));
+        PayPalClient client = client(Duration.ofSeconds(2));
+
+        // when
+        PayPalClient.Order order = client.getOrder(credentials(), "ORD1");
+
+        // then
+        assertThat(order.refunds()).isEmpty();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"[{\"status\":\"COMPLETED\"}]", "[{\"id\":\"REF1\"}]", "[\"REF1\"]",
+            "[{\"id\":\"REF1\",\"status\":\"COMPLETED\"}]",
+            "[{\"id\":\"REF1\",\"status\":\"COMPLETED\",\"amount\":{\"currency_code\":\"EUR\",\"value\":\"x\"}}]"})
+    void givenAnOrderWithAMalformedRefund_whenReadingIt_thenPayPalCountsAsUnavailable(String refunds)
+            throws IOException {
+        // given
+        reply("POST /v1/oauth2/token", 200, TOKEN);
+        reply("GET /v2/checkout/orders/ORD1", 200, orderWithRefunds(refunds));
+        PayPalClient client = client(Duration.ofSeconds(2));
+
+        // when / then
+        assertThatThrownBy(() -> client.getOrder(credentials(), "ORD1"))
+                .as("a refund PayPal lists without id, status or a readable amount is unclear, never skipped")
+                .isInstanceOf(PayPalUnavailableException.class);
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {500, 503, 429})
+    void givenPayPalIsBusy_whenRefunding_thenPayPalCountsAsUnavailable(int status) throws IOException {
+        // given
+        reply("POST /v1/oauth2/token", 200, TOKEN);
+        reply("POST /v2/payments/captures/CAP1/refund", status, "{}");
+        PayPalClient client = client(Duration.ofSeconds(2));
+
+        // when / then
+        assertThatThrownBy(() -> client.refundCapture(credentials(), "CAP1", UUID.randomUUID()))
+                .isInstanceOf(PayPalUnavailableException.class);
+    }
+
+    @Test
+    void givenARefundId_whenReadingIt_thenStatusIdAndAmountAreReturned() throws IOException {
+        // given
+        reply("POST /v1/oauth2/token", 200, TOKEN);
+        reply("GET /v2/payments/refunds/REF1", 200,
+                "{\"id\":\"REF1\",\"status\":\"PENDING\",\"amount\":{\"currency_code\":\"EUR\",\"value\":\"15.00\"}}");
+        PayPalClient client = client(Duration.ofSeconds(2));
+
+        // when
+        PayPalClient.Refund refund = client.getRefund(credentials(), "REF1");
+
+        // then
+        assertThat(refund).isEqualTo(new PayPalClient.Refund("REF1", "PENDING", null, 1500, "EUR"));
+    }
+
+    @Test
     void givenAnotherClientError_whenCapturing_thenTheReasonIsPayPalsBoundedPrintableName() throws IOException {
         // given
         reply("POST /v1/oauth2/token", 200, TOKEN);
@@ -497,6 +694,11 @@ class PayPalClientTest {
     private Seen seenFor(String route) {
         return seen.stream().filter(request -> request.route().equals(route)).findFirst()
                 .orElseThrow(() -> new AssertionError("no request for " + route));
+    }
+
+    private static String orderWithRefunds(String refunds) {
+        return order("ORD1", "COMPLETED", UUID.randomUUID(), "1.00", "EUR", null, "[]")
+                .replace("}}],\"links\"", "},\"payments\":{\"refunds\":" + refunds + "}}],\"links\"");
     }
 
     private static String order(String id, String status, UUID booking, String value, String currency, String capture,

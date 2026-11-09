@@ -81,7 +81,7 @@ public class PayPalCheckout {
             return new PayPalCheckoutUnavailableException();
         });
         StoredOrder fresh = new StoredOrder(order.id(), bookingId, account, active.environment(),
-                pending.amountMinor(), pending.currency(), Status.CREATED, approveUrl, null);
+                pending.amountMinor(), pending.currency(), Status.CREATED, approveUrl, null, null);
         return transactions.execute(status -> {
             if (orders.insert(fresh)) {
                 events.publishEvent(new PaymentEvent.PayPalOrderCreated(bookingId, fresh.orderId(),
@@ -440,7 +440,7 @@ public class PayPalCheckout {
         return new CreatedOrder(order.orderId(), order.approveUrl());
     }
 
-    private static void requireNoTransaction() {
+    static void requireNoTransaction() {
         if (TransactionSynchronizationManager.isActualTransactionActive()) {
             throw new IllegalStateException("PayPal is never called while a transaction holds database locks");
         }

@@ -40,7 +40,8 @@ public class CreditLedger implements BookingPayments {
     private static final int HOLDER_SEARCH_LIMIT = 20;
 
     private static final String ENTRIES = """
-            SELECT e.id, e.position, e.kind, e.amount_minor, e.currency, e.recorded_at, e.booking_id, n.reason_text,
+            SELECT e.id, e.position, e.kind, e.amount_minor, e.currency, e.recorded_at, e.booking_id, e.paypal_order_id,
+                   n.reason_text,
                    sum(e.amount_minor) OVER (PARTITION BY e.currency ORDER BY e.position) AS balance_after
             FROM credit_entry e LEFT JOIN credit_entry_note n ON n.entry_id = e.id
             WHERE e.account_id = :account
@@ -90,7 +91,8 @@ public class CreditLedger implements BookingPayments {
             throw new CreditInsufficientException(balance, currency);
         }
         Recorded recorded = insert(accountId, kind, signed, currency, null, reason, null);
-        return new LedgerEntry(recorded.id(), kind, signed, currency, balance + signed, recorded.at(), reason, null);
+        return new LedgerEntry(recorded.id(), kind, signed, currency, balance + signed, recorded.at(), reason, null,
+                null);
     }
 
     @Override
@@ -192,6 +194,70 @@ public class CreditLedger implements BookingPayments {
                         rs.getBoolean("paypal") ? PaymentMethod.PAYPAL : PaymentMethod.CREDIT,
                         rs.getBoolean("refunded")))
                 .optional();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<PayPalCredit> payPalCreditOf(String orderId) {
+        if (orderId == null || orderId.isBlank()) {
+            throw new IllegalStateException("A PayPal credit belongs to an order");
+        }
+        return jdbc.sql("""
+                        SELECT e.account_id, e.booking_id, e.amount_minor, e.currency,
+                               e.kind = 'PAYPAL_LATE_CAPTURE'
+                               OR EXISTS (SELECT 1 FROM credit_entry r
+                                          WHERE r.booking_id = e.booking_id AND r.kind = 'BOOKING_REFUND')
+                                   AS credited_back
+                        FROM credit_entry e
+                        WHERE e.paypal_order_id = :order AND e.kind IN ('PAYPAL_PAYMENT', 'PAYPAL_LATE_CAPTURE')
+                        """)
+                .param("order", orderId)
+                .query((rs, row) -> new PayPalCredit(rs.getObject("account_id", UUID.class),
+                        rs.getObject("booking_id", UUID.class), rs.getInt("amount_minor"), rs.getString("currency"),
+                        rs.getBoolean("credited_back")))
+                .optional();
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public RefundReservation takeForPayPalRefund(UUID accountId, UUID bookingId, String orderId, int amountMinor,
+                                                 Currency currency) {
+        requirePayPalRefund(accountId, bookingId, orderId, amountMinor, currency);
+        lock(accountId);
+        String code = currency.getCurrencyCode();
+        long balance = balance(accountId, code);
+        if (balance < amountMinor) {
+            return new RefundReservation(false, balance, code);
+        }
+        insert(accountId, CreditEntryKind.PAYPAL_REFUND, -amountMinor, code, bookingId, null, orderId);
+        return new RefundReservation(true, balance - amountMinor, code);
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void restoreAfterPayPalRefund(UUID accountId, UUID bookingId, String orderId, int amountMinor,
+                                         Currency currency) {
+        requirePayPalRefund(accountId, bookingId, orderId, amountMinor, currency);
+        lock(accountId);
+        insert(accountId, CreditEntryKind.PAYPAL_REFUND_REVERSED, amountMinor, currency.getCurrencyCode(), bookingId,
+                null, orderId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public long balanceMinor(UUID accountId, Currency currency) {
+        if (accountId == null || currency == null) {
+            throw new IllegalStateException("A balance belongs to an account and a currency");
+        }
+        return balance(accountId, currency.getCurrencyCode());
+    }
+
+    private static void requirePayPalRefund(UUID accountId, UUID bookingId, String orderId, int amountMinor,
+                                            Currency currency) {
+        if (accountId == null || bookingId == null || orderId == null || orderId.isBlank() || currency == null
+                || amountMinor < 1) {
+            throw new IllegalStateException("A PayPal refund needs an account, a booking, an order and a positive amount");
+        }
     }
 
     private boolean anonymised(UUID accountId) {
@@ -310,7 +376,7 @@ public class CreditLedger implements BookingPayments {
         return new LedgerEntry(rs.getObject("id", UUID.class), CreditEntryKind.valueOf(rs.getString("kind")),
                 rs.getInt("amount_minor"), rs.getString("currency"), rs.getLong("balance_after"),
                 rs.getTimestamp("recorded_at").toInstant(), rs.getString("reason_text"),
-                rs.getObject("booking_id", UUID.class));
+                rs.getObject("booking_id", UUID.class), rs.getString("paypal_order_id"));
     }
 
     private static String escaped(String value) {
@@ -324,7 +390,8 @@ public class CreditLedger implements BookingPayments {
     }
 
     public record LedgerEntry(UUID id, CreditEntryKind kind, int amountMinor, String currency, long balanceAfterMinor,
-                        Instant recordedAt, @Nullable String note, @Nullable UUID bookingId) {
+                        Instant recordedAt, @Nullable String note, @Nullable UUID bookingId,
+                        @Nullable String paypalOrderId) {
     }
 
     public record LedgerPage(long balanceMinor, String currency, List<LedgerEntry> items, @Nullable UUID nextCursor) {

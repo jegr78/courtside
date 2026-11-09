@@ -89,12 +89,12 @@ qualified by silently mixing incompatible assets.
 
 ## The journey catalogue
 
-Nineteen journeys walk a club's way through the product, one per case: installing the instance,
+Thirty-one journeys walk a club's way through the product, one per case: installing the instance,
 importing a member list, booking as a member, a trainer, a sport director and a groundskeeper,
-looking after an account, and reading what the club did. Ten of them are things somebody does at
-the club with a phone in their hand and run on the desktop and on both emulated phones; the nine a
-board does at a desk run on the desktop alone. Every journey runs in German and in English, which
-is 78 runs, executed serially.
+paying and returning a booking by PayPal, looking after an account, and reading what the club did.
+Eleven of them are things somebody does at the club with a phone in their hand and run on the desktop
+and on both emulated phones; the twenty a board does at a desk run on the desktop alone. Every
+journey runs in German and in English, which is 106 runs, executed serially.
 
 A journey may only open the application, activate something a person can see, and type into
 something a person can type into. `journey-policy.ts` refuses navigation by address, `fill`,

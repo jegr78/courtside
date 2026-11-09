@@ -13,7 +13,7 @@ interface StubAnswer {
   access_token?: string;
   expires_in?: unknown;
   links: { rel: string; href: string }[];
-  purchase_units: { custom_id: string; amount: unknown; payments?: { captures: unknown[] } }[];
+  purchase_units: { custom_id: string; amount: unknown; payments?: { captures: { id: string }[]; refunds?: unknown[] } }[];
   details: { issue: string }[];
 }
 
@@ -89,5 +89,27 @@ describe("the PayPal stub the journeys pay at", () => {
     expect(page.text).toContain(`href="${CANCEL_URL}?token=${order.id}"`);
     expect(page.text).toContain('data-testid="paypal-stub-approve"');
     expect(read.status, "an order the payer left is one Courtside may void").toBe("PAYER_ACTION_REQUIRED");
+  });
+
+  it("given a captured order, when Courtside refunds its capture, then the refund completes, the order lists it and a second refund is refused as PayPal refuses it", async () => {
+    // given
+    const base = await startStub();
+    const order = await createOrder(base);
+    await call(base, "GET", `/approve/confirm?token=${order.id}`);
+    const captureId = (await call(base, "POST", `/v2/checkout/orders/${order.id}/capture`, {})).json()
+      .purchase_units[0].payments!.captures[0].id;
+
+    // when
+    const refunded = await call(base, "POST", `/v2/payments/captures/${captureId}/refund`, {});
+    const again = await call(base, "POST", `/v2/payments/captures/${captureId}/refund`, {});
+    const read = (await call(base, "GET", `/v2/checkout/orders/${order.id}`)).json();
+    const lookup = await call(base, "GET", `/v2/payments/refunds/${refunded.json().id}`);
+
+    // then
+    expect(refunded.status).toBe(201);
+    expect(refunded.json()).toMatchObject({ status: "COMPLETED", amount: { currency_code: "EUR", value: "18.00" } });
+    expect(again.json().details[0].issue, "a refunded capture is not refunded twice").toBe("CAPTURE_FULLY_REFUNDED");
+    expect(read.purchase_units[0].payments?.refunds, "the order lists the refund").toEqual([refunded.json()]);
+    expect(lookup.json(), "the refund can be read by its id").toEqual(refunded.json());
   });
 });

@@ -56,15 +56,25 @@ export const operationalLogExample = {
 
 export const creditHoldersExample = [
   { accountId: "77777777-0000-0000-0000-000000000001", firstName: "Mary", lastName: "Major",
-    email: "mary.major@example.org", balanceMinor: 1500, currency: "EUR" },
+    email: "mary.major@example.org", balanceMinor: 3300, currency: "EUR" },
   { accountId: "77777777-0000-0000-0000-000000000002", firstName: "John", lastName: "Roe",
     email: "john.roe@example.org", balanceMinor: 4000, currency: "EUR" }
 ];
 
+const PAYPAL_EXAMPLE_ORDER = "5O190127TN364715T";
+const PAYPAL_EXAMPLE_BOOKING = "7f400000-0000-0000-0000-000000000002";
+
 export const creditLedgerExample = {
-  balanceMinor: 1500,
+  balanceMinor: 3300,
   currency: "EUR",
   items: [
+    { id: "88888888-0000-0000-0000-000000000006", kind: "BOOKING_REFUND", amountMinor: 1800, currency: "EUR",
+      balanceAfterMinor: 3300, recordedAt: "2026-05-11T07:45:00Z", bookingId: PAYPAL_EXAMPLE_BOOKING },
+    { id: "88888888-0000-0000-0000-000000000005", kind: "BOOKING_DEBIT", amountMinor: -1800, currency: "EUR",
+      balanceAfterMinor: 1500, recordedAt: "2026-05-10T17:00:00Z", bookingId: PAYPAL_EXAMPLE_BOOKING },
+    { id: "88888888-0000-0000-0000-000000000004", kind: "PAYPAL_PAYMENT", amountMinor: 1800, currency: "EUR",
+      balanceAfterMinor: 3300, recordedAt: "2026-05-10T17:00:00Z", bookingId: PAYPAL_EXAMPLE_BOOKING,
+      paypalOrderId: PAYPAL_EXAMPLE_ORDER },
     { id: "88888888-0000-0000-0000-000000000003", kind: "PAYOUT", amountMinor: -500, currency: "EUR",
       balanceAfterMinor: 1500, recordedAt: "2026-05-09T16:20:00Z", note: "Paid back in cash" },
     { id: "88888888-0000-0000-0000-000000000002", kind: "CREDIT", amountMinor: 1000, currency: "EUR",
@@ -74,6 +84,8 @@ export const creditLedgerExample = {
   ],
   nextCursor: null
 };
+
+export const payPalRefundOptionsExample = { items: [{ orderId: PAYPAL_EXAMPLE_ORDER, refundable: true }] };
 
 export const guestFeesExample = {
   from: "2026-01-01",

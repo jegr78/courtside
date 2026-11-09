@@ -941,6 +941,57 @@
       ]
     },
     {
+      "id": "paypal-refund",
+      "actors": [
+        "TREASURER",
+        "ADMIN"
+      ],
+      "entryPoints": "Returning a PayPal payment through PayPal under /api/treasury/paypal/refunds, and the list of an account's PayPal payments that says whether and why each can be returned.",
+      "operationIds": [
+        "listPayPalRefunds",
+        "refundPayPalPayment"
+      ],
+      "backgroundEntryPoints": [
+        "PayPalRefundMailer#on(PaymentEvent.PayPalRefunded)"
+      ],
+      "stateTransitions": [
+        "A return locks the PayPal order and then the payer's credit account, takes the payment's amount off the balance with a PAYPAL_REFUND entry, stores a PENDING refund and records one audit entry, all in one transaction.",
+        "PayPal is then asked outside any transaction to refund the capture in full with the refund's id as its request id.",
+        "A completed refund is recorded under the order lock and audited; a clear 4xx refusal of the refund request itself, other than 401, 403, 409, 429, a duplicate or in-progress request and an already fully refunded capture, or a refund PayPal reports as failed or cancelled, marks the refund FAILED, restores the credit with a PAYPAL_REFUND_REVERSED entry and is audited."
+      ],
+      "alternatePaths": [
+        "PayPal answering that the capture is already fully refunded is resolved by reading the order: a completed refund it lists is recorded as completed, otherwise the refund stays pending.",
+        "A refund PayPal holds as pending keeps its refund id and stays pending with the credit taken.",
+        "A refund PayPal completes for an amount other than the payment's keeps its refund id and stays pending with the credit taken.",
+        "A retry of a refund whose first request went unanswered reads the order first and records a completed refund it lists instead of asking again.",
+        "A refund request PayPal refuses restores the credit only after the order has been read and lists no refund of the full amount that has not failed; a listed one is followed instead, and an unreadable order leaves the refund pending."
+      ],
+      "failurePaths": [
+        "Accounts without TREASURER or ADMIN are refused under /api/treasury.",
+        "A missing recent authentication, a payment that was not captured, not cancelled or not credited back, a payment returned before and a balance that no longer covers the amount are refused before anything is written.",
+        "PayPal switched off or an order of the other environment is refused as unavailable and takes nothing.",
+        "No answer, a timeout, 429, 5xx, 409, a duplicate or in-progress request, an unreadable answer, a refused or unusable token, a 401 or 403 on the refund and a malformed capture id leave the refund pending with its credit taken."
+      ],
+      "productionPaths": [
+        "src/main/java/org/courtside/payment/web/PayPalRefundController.java",
+        "src/main/java/org/courtside/payment/internal/PayPalRefunds.java",
+        "src/main/java/org/courtside/payment/internal/PayPalRefundStore.java",
+        "src/main/java/org/courtside/payment/internal/PayPalOrders.java",
+        "src/main/java/org/courtside/payment/internal/PayPalClient.java",
+        "src/main/java/org/courtside/credit/internal/CreditLedger.java",
+        "src/main/java/org/courtside/notification/internal/PayPalRefundMailer.java"
+      ],
+      "evidence": [
+        "src/test/java/org/courtside/payment/PayPalRefundTest.java#givenACancelledPayPalBooking_whenTheTreasurerReturnsIt_thenPayPalRefundsAndTheBalanceDropsByTheAmount",
+        "src/test/java/org/courtside/payment/PayPalRefundTest.java#givenACaptureRefundedInPartAtPayPal_whenPayPalCompletesOnlyTheRest_thenTheRefundStaysPendingWithItsCreditTaken",
+        "src/test/java/org/courtside/notification/PayPalRefundMailerTest.java#givenACompletedRefund_whenRecorded_thenThePlayerGetsTheAmountAndThePayPalWording",
+        "src/test/java/org/courtside/payment/PayPalRefundTest.java#givenARefusedRefund_whenReturning_thenTheCreditIsRestoredAndTheReasonShown",
+        "src/test/java/org/courtside/payment/PayPalRefundTest.java#givenTwoConcurrentReturns_whenBothRun_thenOnePayPalRefundAndOneEntry",
+        "src/test/java/org/courtside/payment/PayPalRefundTest.java#givenAMember_whenReturning_thenItIsForbidden",
+        "src/test/java/org/courtside/payment/PayPalRefundTest.java#givenAnAccount_whenTheTreasurerListsItsRefunds_thenEachPaymentSaysWhetherAndWhyItCanBeReturned"
+      ]
+    },
+    {
       "id": "paypal-checkout",
       "actors": [
         "MEMBER",

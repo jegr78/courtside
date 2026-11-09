@@ -117,6 +117,11 @@
       "class": "identifier"
     },
     {
+      "name": "accountId",
+      "in": "query",
+      "class": "identifier"
+    },
+    {
       "name": "cardId",
       "in": "query",
       "class": "identifier"
@@ -2578,6 +2583,52 @@
       },
       "order_id": {
         "level": "operational",
+        "lifecycle": "payment-provider"
+      },
+      "status": {
+        "level": "operational",
+        "lifecycle": "payment-provider"
+      },
+      "updated_at": {
+        "level": "operational",
+        "lifecycle": "payment-provider"
+      }
+    },
+    "paypal_refund": {
+      "account_id": {
+        "level": "pseudonymous",
+        "lifecycle": "payment-provider"
+      },
+      "amount_minor": {
+        "level": "operational",
+        "lifecycle": "payment-provider"
+      },
+      "currency": {
+        "level": "operational",
+        "lifecycle": "payment-provider"
+      },
+      "failure_reason": {
+        "level": "operational",
+        "lifecycle": "payment-provider"
+      },
+      "id": {
+        "level": "operational",
+        "lifecycle": "payment-provider"
+      },
+      "order_id": {
+        "level": "operational",
+        "lifecycle": "payment-provider"
+      },
+      "refund_id": {
+        "level": "operational",
+        "lifecycle": "payment-provider"
+      },
+      "requested_at": {
+        "level": "operational",
+        "lifecycle": "payment-provider"
+      },
+      "requested_by": {
+        "level": "pseudonymous",
         "lifecycle": "payment-provider"
       },
       "status": {

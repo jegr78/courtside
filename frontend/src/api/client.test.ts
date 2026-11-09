@@ -1179,3 +1179,35 @@ it("given stored PayPal credentials, when they are read, removed and checked, th
   expect(removed).toBeUndefined();
   expect(checked).toEqual({ outcome: "REJECTED", providerReason: "invalid_client" });
 });
+
+it("given an account, when its PayPal refund options are read, then the account id goes out as the query", async () => {
+  // given
+  let requested: string | undefined;
+  server.use(http.get("/api/treasury/paypal/refunds", ({ request }) => {
+    requested = new URL(request.url).search;
+    return HttpResponse.json({ items: [{ orderId: "ORDER-1", refundable: true }] });
+  }));
+
+  // when
+  const options = await api.payPalRefundOptions("33333333-3333-3333-3333-333333333333");
+
+  // then
+  expect(requested).toBe("?accountId=33333333-3333-3333-3333-333333333333");
+  expect(options.items).toEqual([{ orderId: "ORDER-1", refundable: true }]);
+});
+
+it("given an order, when it is refunded, then the order id is posted and the refund returned", async () => {
+  // given
+  let body: unknown;
+  server.use(http.post("/api/treasury/paypal/refunds", async ({ request }) => {
+    body = await request.json();
+    return HttpResponse.json({ orderId: "ORDER-1", status: "PENDING" });
+  }));
+
+  // when
+  const refund = await api.refundPayPalPayment("ORDER-1");
+
+  // then
+  expect(body).toEqual({ orderId: "ORDER-1" });
+  expect(refund).toEqual({ orderId: "ORDER-1", status: "PENDING" });
+});

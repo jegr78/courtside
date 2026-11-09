@@ -9,6 +9,7 @@ export const PAYPAL_STUB_SCRIPT = `const http = require("node:http");
 const { randomUUID } = require("node:crypto");
 const browserOrigin = process.argv[1];
 const orders = new Map();
+const refunds = new Map();
 const json = (response, status, body) => {
   response.writeHead(status, { "content-type": "application/json" });
   response.end(JSON.stringify(body));
@@ -19,7 +20,7 @@ const representation = (order) => ({
   purchase_units: [{
     custom_id: order.customId,
     amount: order.amount,
-    ...order.capture ? { payments: { captures: [order.capture] } } : {}
+    ...order.capture ? { payments: { captures: [order.capture], ...order.refund ? { refunds: [order.refund] } : {} } } : {}
   }],
   links: [{ rel: "payer-action", href: browserOrigin + "/approve?token=" + order.id, method: "GET" }]
 });
@@ -34,6 +35,9 @@ const server = http.createServer(async (request, response) => {
   const body = await read(request);
   const capture = url.pathname.match(/^\\/v2\\/checkout\\/orders\\/([A-Za-z0-9-]+)\\/capture$/);
   const lookup = url.pathname.match(/^\\/v2\\/checkout\\/orders\\/([A-Za-z0-9-]+)$/);
+  const refund = url.pathname.match(/^\\/v2\\/payments\\/captures\\/([A-Za-z0-9-]+)\\/refund$/);
+  const refundLookup = url.pathname.match(/^\\/v2\\/payments\\/refunds\\/([A-Za-z0-9-]+)$/);
+  const captured = refund && [...orders.values()].find((candidate) => candidate.capture?.id === refund[1]);
   if (request.method === "POST" && url.pathname === "/v1/oauth2/token") {
     return json(response, 200, { access_token: randomUUID(), token_type: "Bearer", expires_in: 32400 });
   }
@@ -60,6 +64,18 @@ const server = http.createServer(async (request, response) => {
     order.status = "COMPLETED";
     order.capture = { id: "CAPTURE" + order.id.slice(4), status: "COMPLETED", amount: order.amount };
     return json(response, 201, representation(order));
+  }
+  if (request.method === "POST" && captured) {
+    if (captured.refund) {
+      return json(response, 422, { name: "UNPROCESSABLE_ENTITY", details: [{ issue: "CAPTURE_FULLY_REFUNDED" }] });
+    }
+    captured.refund = { id: "REFUND" + captured.id.slice(4), status: "COMPLETED", amount: captured.capture.amount };
+    captured.capture.status = "REFUNDED";
+    refunds.set(captured.refund.id, captured.refund);
+    return json(response, 201, captured.refund);
+  }
+  if (request.method === "GET" && refundLookup && refunds.has(refundLookup[1])) {
+    return json(response, 200, refunds.get(refundLookup[1]));
   }
   const order = orders.get(url.searchParams.get("token") ?? "");
   if (request.method === "GET" && url.pathname === "/approve" && order) {

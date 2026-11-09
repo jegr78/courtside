@@ -5,6 +5,7 @@ import org.courtside.booking.PendingPayments;
 import org.courtside.payment.internal.PayPalCheckout.Outcome;
 import org.courtside.payment.internal.PayPalOrders.Status;
 import org.courtside.payment.internal.PayPalOrders.StoredOrder;
+import org.courtside.payment.internal.PayPalRefunds.RefundStatus;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -19,7 +20,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
-/** Settles open PayPal orders the return never settled and ends holds whose deadline has passed. */
+/** Settles open PayPal orders and pending refunds the request never settled and ends holds past their deadline. */
 @Slf4j
 @Component
 @Profile("!journey")
@@ -32,17 +33,22 @@ public class PayPalReconciliation {
     private final PayPalOrders orders;
     private final PayPalCheckout checkout;
     private final PendingPayments pendingPayments;
+    private final PayPalRefunds refunds;
+    private final PayPalRefundStore refundStore;
     private final Clock clock;
     private final Duration reconcileAfter;
     private final Duration unresolvedReleaseAfter;
 
-    PayPalReconciliation(PayPalOrders orders, PayPalCheckout checkout, PendingPayments pendingPayments, Clock clock,
+    PayPalReconciliation(PayPalOrders orders, PayPalCheckout checkout, PendingPayments pendingPayments,
+                         PayPalRefunds refunds, PayPalRefundStore refundStore, Clock clock,
                          @Value("${courtside.payment.paypal.reconcile-after}") Duration reconcileAfter,
                          @Value("${courtside.payment.paypal.unresolved-release-after}")
                          Duration unresolvedReleaseAfter) {
         this.orders = orders;
         this.checkout = checkout;
         this.pendingPayments = pendingPayments;
+        this.refunds = refunds;
+        this.refundStore = refundStore;
         this.clock = clock;
         this.reconcileAfter = reconcileAfter;
         this.unresolvedReleaseAfter = unresolvedReleaseAfter;
@@ -81,9 +87,19 @@ public class PayPalReconciliation {
                 }, () -> orders.checked(orderId, Status.VOIDED));
             }
         }
+        if (!unreachable.outage()) {
+            for (UUID refundId : refundStore.pendingSince(now.minus(reconcileAfter), PAGE_SIZE)) {
+                if (unreachable.outage()) break;
+                guarded("refund " + refundId, () -> {
+                    PayPalRefunds.Resolution resolution = refunds.resolve(refundId);
+                    unreachable.count(resolution.payPalUnreachable());
+                    if (resolution.refund().status() == RefundStatus.PENDING) refundStore.checked(refundId);
+                }, () -> refundStore.checked(refundId));
+            }
+        }
         if (unreachable.outage()) {
-            log.warn("PayPal did not answer {} reads in a row; the remaining orders wait for the next run",
-                    OUTAGE_AFTER);
+            log.warn("PayPal did not answer {} reads in a row; the remaining orders and refunds wait for the next"
+                    + " run", OUTAGE_AFTER);
         }
     }
 
