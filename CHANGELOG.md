@@ -1,5 +1,44 @@
 # Changelog
 
+## 0.5.0 (2026-11-09)
+
+### Features
+
+* anonymise external accounts that stayed inactive past the club's period ([#1902](https://github.com/jegr78/courtside/issues/1902)) ([ded8b3b](https://github.com/jegr78/courtside/commit/ded8b3b2e5cf08c414947111ed89fdc441688e32))
+* describe the club in the booking page the server delivers ([#1883](https://github.com/jegr78/courtside/issues/1883)) ([1a9baae](https://github.com/jegr78/courtside/commit/1a9baae324f23c477dfbc5174740de9246db65bb))
+* keep an append-only credit ledger per account ([#1905](https://github.com/jegr78/courtside/issues/1905)) ([c16c7d1](https://github.com/jegr78/courtside/commit/c16c7d124d3e76298ff20ffff7ca795fad5a3fe9))
+* keep member names and member-only features away from external accounts ([#1891](https://github.com/jegr78/courtside/issues/1891)) ([bbab0f2](https://github.com/jegr78/courtside/commit/bbab0f2b3a49b74f6285f0c91055e563db3e9fc4))
+* keep the club's PayPal credentials in the admin UI ([#1907](https://github.com/jegr78/courtside/issues/1907)) ([c0f01d8](https://github.com/jegr78/courtside/commit/c0f01d895835b85374045cc07ad0e112f4f6cb26)), closes [#1863](https://github.com/jegr78/courtside/issues/1863)
+* let a club switch external bookings on and open cards to an external role ([#1889](https://github.com/jegr78/courtside/issues/1889)) ([64e9e3f](https://github.com/jegr78/courtside/commit/64e9e3fd2d4820cbd361ff3065cfd7cb12f81fb0))
+* let an external player close their own account ([#1900](https://github.com/jegr78/courtside/issues/1900)) ([2f09e5d](https://github.com/jegr78/courtside/commit/2f09e5d266c74b710eae252c0c1216e6353e086a)), closes [#1858](https://github.com/jegr78/courtside/issues/1858)
+* let an external player pay a booking with PayPal ([#1908](https://github.com/jegr78/courtside/issues/1908)) ([1dc6eb8](https://github.com/jegr78/courtside/commit/1dc6eb8a101922eec685293cc3333a0e1a3d5ce9))
+* let an external player register with a verified email address ([#1892](https://github.com/jegr78/courtside/issues/1892)) ([e521014](https://github.com/jegr78/courtside/commit/e521014a577387e3e2d32cd256b2a27738d78ba6)), closes [#1855](https://github.com/jegr78/courtside/issues/1855)
+* let the board attach a membership to an existing external person ([#1903](https://github.com/jegr78/courtside/issues/1903)) ([20d41e5](https://github.com/jegr78/courtside/commit/20d41e5fcc25eedef4b872364a47aee620402844))
+* let the treasurer return a PayPal payment through PayPal ([#1913](https://github.com/jegr78/courtside/issues/1913)) ([2f3f3f5](https://github.com/jegr78/courtside/commit/2f3f3f5542b1119e8c510f95e906e406692bbb22))
+* pay an external booking from credit and refund it on cancellation ([#1906](https://github.com/jegr78/courtside/issues/1906)) ([fe71fd8](https://github.com/jegr78/courtside/commit/fe71fd87f9b831dd6c708cc925b5440aea4aa59e))
+* price a card for external bookers per hour ([#1904](https://github.com/jegr78/courtside/issues/1904)) ([b07d9fe](https://github.com/jegr78/courtside/commit/b07d9fe7119be7c8a87910071583ee5d5d3a452f)), closes [#1860](https://github.com/jegr78/courtside/issues/1860)
+* record a guest fee per guest place on a booking card ([#1886](https://github.com/jegr78/courtside/issues/1886)) ([df28b00](https://github.com/jegr78/courtside/commit/df28b00558f03fb74ffca2215880589705a1e12e))
+* report the guest fees each member owes for a period ([#1887](https://github.com/jegr78/courtside/issues/1887)) ([127d59e](https://github.com/jegr78/courtside/commit/127d59e53bb9c9fe222f3c2c0b47679537674858))
+* show an external booker the clubhouse door codes while their booking opens them ([#1899](https://github.com/jegr78/courtside/issues/1899)) ([d67cf10](https://github.com/jegr78/courtside/commit/d67cf10272e1e32050cb08b896827a6baaa6d12b)), closes [#1857](https://github.com/jegr78/courtside/issues/1857)
+* split an import category into membership types by birth year ([#1888](https://github.com/jegr78/courtside/issues/1888)) ([4232267](https://github.com/jegr78/courtside/commit/42322672e14c9bf5693008af984f53c4a83ae2eb))
+
+### Bug fixes
+
+* book cards without a role list only with a running membership ([#1882](https://github.com/jegr78/courtside/issues/1882)) ([6abc723](https://github.com/jegr78/courtside/commit/6abc7232f8086ba9b2bc73ad8b6e58a80aa10a6e))
+* bump lighthouse from 13.5.0 to 13.6.0 in /lighthouse ([#1874](https://github.com/jegr78/courtside/issues/1874)) ([c8ffa1a](https://github.com/jegr78/courtside/commit/c8ffa1a98b0a74b5583760c5b69c4a99834755da))
+* bump the deployment images, frontend packages, CI actions and the OpenAPI generator ([#1898](https://github.com/jegr78/courtside/issues/1898)) ([4d40d0e](https://github.com/jegr78/courtside/commit/4d40d0e735df03de0d9a418051c28cb30a994188))
+* bump the deployment-images group in /deploy with 5 updates ([#1876](https://github.com/jegr78/courtside/issues/1876)) ([b5cc7d6](https://github.com/jegr78/courtside/commit/b5cc7d63d922e6af3af8d8d88cf189cb3f368d9e))
+* bump the frontend-minor-and-patch group in /frontend with 4 updates ([#1875](https://github.com/jegr78/courtside/issues/1875)) ([189d4e4](https://github.com/jegr78/courtside/commit/189d4e4bb7b592bda0f26f43bfee92edc155bbd7))
+* keep every word of the phone court plan at a readable size ([#1885](https://github.com/jegr78/courtside/issues/1885)) ([5943e7e](https://github.com/jegr78/courtside/commit/5943e7e986a20fe72d913f9435841d8c18886b77))
+
+### Performance
+
+* load the account area only when a member opens it ([#1884](https://github.com/jegr78/courtside/issues/1884)) ([d582269](https://github.com/jegr78/courtside/commit/d5822698344072e1457d3f30f3e705b56de8428e))
+
+### Chores
+
+* open the 0.5.0 candidate line ([#1866](https://github.com/jegr78/courtside/issues/1866)) ([f1faef0](https://github.com/jegr78/courtside/commit/f1faef0fc97a755e32e60e715ba097b7b64548ac))
+
 ## 0.4.0 (2026-11-04)
 
 ### Features
