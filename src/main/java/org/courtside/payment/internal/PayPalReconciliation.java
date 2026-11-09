@@ -59,7 +59,7 @@ public class PayPalReconciliation {
                 due.add(order.get().orderId());
             } else if (order.isEmpty() || order.get().status() == Status.REJECTED
                     || order.get().status() == Status.VOIDED) {
-                guarded(bookingId.toString(), () -> pendingPayments.release(bookingId));
+                guarded(bookingId.toString(), () -> pendingPayments.release(bookingId), () -> { });
             }
         }
         Unreachable unreachable = new Unreachable();
@@ -69,7 +69,7 @@ public class PayPalReconciliation {
                 PayPalCheckout.Reconciled reconciled = checkout.reconcile(orderId, unresolvedReleaseAfter);
                 unreachable.count(reconciled.payPalUnreachable());
                 if (reconciled.outcome() == Outcome.PROCESSING) orders.checked(orderId, Status.CREATED);
-            });
+            }, () -> orders.checked(orderId, Status.CREATED));
         }
         if (!unreachable.outage()) {
             for (String orderId : orders.voidedAfterCaptureAttempt(now.minus(CAPTURE_WATCH),
@@ -78,7 +78,7 @@ public class PayPalReconciliation {
                 guarded(orderId, () -> {
                     unreachable.count(!checkout.recheckVoided(orderId));
                     orders.checked(orderId, Status.VOIDED);
-                });
+                }, () -> orders.checked(orderId, Status.VOIDED));
             }
         }
         if (unreachable.outage()) {
@@ -87,11 +87,16 @@ public class PayPalReconciliation {
         }
     }
 
-    private static void guarded(String subject, Runnable step) {
+    private static void guarded(String subject, Runnable step, Runnable afterFailure) {
         try {
             step.run();
         } catch (RuntimeException failed) {
             log.error("PayPal reconciliation failed for {} and retries on the next run", subject, failed);
+            try {
+                afterFailure.run();
+            } catch (RuntimeException alsoFailed) {
+                log.error("PayPal reconciliation could not move {} back in the queue", subject, alsoFailed);
+            }
         }
     }
 

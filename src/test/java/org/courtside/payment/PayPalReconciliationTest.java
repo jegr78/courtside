@@ -273,6 +273,19 @@ class PayPalReconciliationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenAnOrderThatFailsEveryRun_whenTheJobRuns_thenItMovesToTheBackOfThePage() {
+        // given
+        storeAttemptedOrder("ORDERQ", "QQQ");
+
+        // when
+        reconciliation.run();
+
+        // then
+        assertThat(jdbc.sql("SELECT updated_at FROM paypal_order WHERE order_id = 'ORDERQ'").query(Timestamp.class)
+                .single().toInstant()).as("a failing order is touched so others come first").isEqualTo(clock.instant());
+    }
+
+    @Test
     void givenAnApprovedOrderAndPayPalDown_whenTheDeadlinePasses_thenTheBookingStaysHeld() throws Exception {
         // given
         UUID booking = bookWithOrder();
