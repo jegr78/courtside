@@ -1,3 +1,3 @@
 @org.springframework.modulith.ApplicationModule(
-        allowedDependencies = {"access", "config", "identity", "facility", "member"})
+        allowedDependencies = {"access", "config", "identity", "facility", "member", "payment"})
 package org.courtside.notification;

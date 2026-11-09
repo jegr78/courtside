@@ -29,7 +29,8 @@ public enum MessageKind {
     ACCESS_CODE_READY("booking.accessCodeReady", false, false),
     MEMBERS_DOOR_CODE_CHANGED("members.doorCodeChanged", false, false),
     REGISTRATION_VERIFICATION("account.registrationVerification", false, true),
-    REGISTRATION_NAME_TAKEN("account.registrationNameTaken", false, true);
+    REGISTRATION_NAME_TAKEN("account.registrationNameTaken", false, true),
+    PAYPAL_REFUNDED("payment.paypalRefunded", false, false);
 
     private final String templateKey;
     private final boolean declinable;

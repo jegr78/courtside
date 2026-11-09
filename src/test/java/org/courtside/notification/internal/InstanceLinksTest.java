@@ -111,6 +111,7 @@ class InstanceLinksTest {
         expected.put(MessageKind.BOOKING_PLACE_TAKEN, booking);
         expected.put(MessageKind.ACCESS_CODE_CHANGED, booking);
         expected.put(MessageKind.ACCESS_CODE_READY, booking);
+        expected.put(MessageKind.PAYPAL_REFUNDED, booking);
         expected.put(MessageKind.BOOKING_CANCELLED, bookings);
         expected.put(MessageKind.BOOKING_CANCELLED_BY_CLUB, bookings);
         expected.put(MessageKind.BOOKING_RELEASED, bookings);

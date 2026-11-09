@@ -69,10 +69,14 @@ class BookingWording {
     }
 
     private static String money(BookingAnnouncement.AnnouncedPayment paid, Locale locale) {
-        Currency currency = Currency.getInstance(paid.currency());
+        return money(paid.amountMinor(), paid.currency(), locale);
+    }
+
+    static String money(int amountMinor, String currencyCode, Locale locale) {
+        Currency currency = Currency.getInstance(currencyCode);
         NumberFormat format = NumberFormat.getCurrencyInstance(locale);
         format.setCurrency(currency);
-        return format.format(BigDecimal.valueOf(paid.amountMinor(), currency.getDefaultFractionDigits()));
+        return format.format(BigDecimal.valueOf(amountMinor, currency.getDefaultFractionDigits()));
     }
 
     record AccessLines(String text, boolean codeFollows) {
