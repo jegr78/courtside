@@ -236,6 +236,12 @@ Frist kannst du nicht mehr stornieren. Storniert der Verein deine Buchung vor ih
 du den Betrag immer zurück. Erscheinst du nicht und gibt Courtside den Platz deshalb frei, bleibt der Betrag beim
 Verein.
 
+Möchtest du das Geld einer stornierten PayPal-Buchung lieber auf dein PayPal-Konto zurück, frag den
+Kassenwart. Er zahlt die ganze Zahlung über PayPal zurück, und dein Guthaben sinkt um denselben
+Betrag. Im Verlauf steht das als *PayPal-Erstattung*, und du bekommst eine Nachricht, sobald PayPal das
+Geld zurückgeschickt hat. Lehnt PayPal ab, kommt der Betrag als *PayPal-Erstattung zurückgebucht*
+wieder auf dein Guthaben.
+
 ![Die Seite nach der Rückkehr von PayPal: die Zahlung ist eingegangen und die Buchung bestätigt.](screenshots/de/paypal-return.png)
 
 ![Der Bereich für Mitspieler, Gäste und Platzfüller im Buchungsdialog.](screenshots/de/booking-participants.png)

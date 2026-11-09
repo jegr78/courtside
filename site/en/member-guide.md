@@ -228,6 +228,11 @@ deadline you can no longer cancel. If the club cancels your booking before it st
 the amount back. If you do not turn up and Courtside releases the court for that reason, the club keeps the
 amount.
 
+If you would rather have the money of a cancelled PayPal booking back in your PayPal account, ask the
+treasurer. They return the whole payment through PayPal, and your credit drops by the same amount. The
+ledger shows this as *PayPal refund*, and you get a message once PayPal has sent the money back. If
+PayPal refuses, the amount comes back to your credit as *PayPal refund reversed*.
+
 ![The page after returning from PayPal: the payment arrived and the booking is confirmed.](../screenshots/en/paypal-return.png)
 
 ![The booking fields for members, guests and slot fillers.](../screenshots/en/booking-participants.png)

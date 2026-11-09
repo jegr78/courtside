@@ -749,7 +749,7 @@ jedes Konto mit Guthaben. Die Suche findet externe Konten nach Name, E-Mail-Adre
 Benutzername. Administratoren finden die Seite unter *Mitglieder*, Kassenwarte direkt in der
 Seitenleiste.
 
-![Das Guthaben eines externen Spielers mit Stand, Einträgen und dem Formular für Gutschrift und Auszahlung.](screenshots/de/credit.png)
+![Das Guthaben eines externen Spielers mit Stand, Einträgen, einer stornierten PayPal-Zahlung zum Zurückzahlen und dem Formular für Gutschrift und Auszahlung.](screenshots/de/credit.png)
 
 Ein gewähltes Konto zeigt seine Einträge, die neuesten zuerst, mit dem Stand nach jedem Eintrag.
 Mit **Gutschrift** buchst du Geld auf ein externes Konto, mit **Auszahlung** gibst du Guthaben
@@ -770,6 +770,28 @@ und *Erstattung nach Storno*. Von Hand kannst du sie nicht anlegen. Eine PayPal-
 als *Per PayPal bezahlt* und daneben als *Buchung bezahlt*, der Stand bleibt also gleich. Kommt eine
 PayPal-Zahlung erst an, nachdem Courtside den Platz wieder freigegeben hat, wird sie zu Guthaben und
 steht als *Späte PayPal-Zahlung als Guthaben* im Verlauf.
+
+### Eine PayPal-Zahlung zurückzahlen
+
+Möchte ein Spieler das Geld einer stornierten PayPal-Buchung auf seinem PayPal-Konto statt als
+Guthaben, zahlst du die ganze Zahlung über PayPal zurück. Neben einer solchen Zahlung steht im Verlauf
+**An PayPal zurückzahlen**. Courtside nennt dir vorher den Betrag und bucht das Guthaben aus der
+Zahlung im selben Schritt ab, im Verlauf als *PayPal-Erstattung*. Fehlt eine frische
+Passwortbestätigung, fragt Courtside dein Passwort ab.
+
+Zurückzahlen kannst du nur eine Zahlung, deren Buchung storniert und erstattet wurde, oder eine späte
+PayPal-Zahlung, die zu Guthaben wurde. Teilbeträge gibt es nicht. Hat der Spieler das Guthaben schon
+wieder ausgegeben, zeigt der Verlauf statt der Schaltfläche den Grund. Dasselbe gilt, wenn PayPal
+ausgeschaltet ist oder die Zahlung aus der anderen Umgebung stammt. Jede Zahlung lässt sich nur
+einmal zurückzahlen.
+
+Neben der Erstattung steht, wie es ausging. *Über PayPal zurückgezahlt* heißt, das Geld ist
+unterwegs, und der Spieler bekommt eine Nachricht. Lehnt PayPal ab, steht der Grund daneben, und
+Courtside bucht das Guthaben als *PayPal-Erstattung zurückgebucht* wieder auf. Ein zweiter Versuch
+über PayPal geht dann nicht mehr, zahl in diesem Fall von Hand aus. *Unklar, im PayPal-Konto prüfen*
+heißt, PayPal hat nicht eindeutig geantwortet. Courtside fragt alle paar Minuten nach und lässt das
+Guthaben so lange abgebucht. Bleibt es unklar, sieh im PayPal-Konto des Vereins nach. Ist das Geld
+nicht zurückgegangen, buchst du den Betrag mit einer **Gutschrift** wieder auf.
 
 ## PayPal
 

@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { type Page, type TestInfo } from "@playwright/test";
-import { accessGrantsExample, connectionCheckExample, creditHoldersExample, creditLedgerExample, guestFeesExample, operatorHealthExample, payPalCaptureExample, payPalCheckExample, payPalSettingsExample } from "./admin-examples";
+import { accessGrantsExample, connectionCheckExample, creditHoldersExample, creditLedgerExample, guestFeesExample, operatorHealthExample, payPalCaptureExample, payPalCheckExample, payPalRefundOptionsExample, payPalSettingsExample } from "./admin-examples";
 import { backAtTheJourneyInstant, expect, expectAdministrationOverview, onTheVisualDay, selectPreference, test } from "./fixtures";
 
 // The guides are read in the light theme on a page column, in the language its project names, and
@@ -308,10 +308,12 @@ const drivers: Record<string, (page: Page, visualDate: string) => Promise<void>>
   "credit": async (page) => {
     await page.context().route("**/api/treasury/credit/accounts", (route) => route.fulfill({ json: creditHoldersExample }));
     await page.context().route("**/api/treasury/credit/accounts/*/entries*", (route) => route.fulfill({ json: creditLedgerExample }));
+    await page.context().route("**/api/treasury/paypal/refunds?*", (route) => route.fulfill({ json: payPalRefundOptionsExample }));
     await page.getByTestId("admin-credit-link").click();
     await expect(page.getByTestId("credit-holder"), "the example, not the live instance, is drawn").toHaveCount(2);
     await page.getByTestId("credit-holder-open").first().click();
-    await expect(page.getByTestId("credit-entry")).toHaveCount(3);
+    await expect(page.getByTestId("credit-entry")).toHaveCount(6);
+    await expect(page.getByTestId("paypal-refund"), "the cancelled PayPal booking offers its return").toBeVisible();
     await expect(page.getByTestId("credit-form")).toBeVisible();
   },
   "paypal": async (page) => {
