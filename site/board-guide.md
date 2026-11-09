@@ -777,7 +777,7 @@ Die Seite *PayPal* steht Administratoren und der Rolle **Kassenwart** offen und 
 ein, wählst zwischen **Sandbox** zum Ausprobieren und **Live** und schaltest die Zahlung per PayPal
 ein oder aus.
 
-![Die PayPal-Einstellungen mit Client-ID, Umgebung, Schalter, Secret-Stand und geprüfter Verbindung.](screenshots/de/paypal.png)
+![Die PayPal-Einstellungen mit Sandbox-Warnung, Client-ID, Umgebung, Schalter, Secret-Stand und geprüfter Verbindung.](screenshots/de/paypal.png)
 
 Das Secret kannst du nur eintragen, nie wieder lesen. Courtside verschlüsselt es mit dem
 Instanzschlüssel und zeigt nur, seit wann eines gespeichert ist. Lässt du das Feld beim Speichern

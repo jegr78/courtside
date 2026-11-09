@@ -738,7 +738,7 @@ The *PayPal* page is open to administrators and the **Treasurer** role and sits 
 There you enter the client id and secret from the club's PayPal developer account, choose
 **Sandbox** for trying it out or **Live**, and switch payment by PayPal on or off.
 
-![The PayPal settings with client id, environment, switch, secret state and a checked connection.](../screenshots/en/paypal.png)
+![The PayPal settings with the sandbox warning, client id, environment, switch, secret state and a checked connection.](../screenshots/en/paypal.png)
 
 You can enter the secret but never read it again. Courtside encrypts it with the instance key and
 shows only since when one is stored. Leave the field empty when saving and the stored secret stays.
