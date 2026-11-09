@@ -220,8 +220,8 @@ Betrag und Zahlweg. Reicht er nicht und nimmt dein Verein PayPal an, heißt die 
 PayPal bezahlen**. Du zahlst dann den ganzen Betrag per PayPal, nicht einen Teil davon. Ohne PayPal
 lehnt Courtside die Buchung ab und zieht nichts ab.
 
-Mit **Mit PayPal bezahlen** reserviert Courtside den Platz 15 Minuten für dich und schickt dich zu
-PayPal. Gibst du die Zahlung dort frei, kommst du zurück zu Courtside und siehst "Zahlung wird
+Mit **Mit PayPal bezahlen** reserviert Courtside den Platz 15 Minuten für dich, höchstens bis zum
+Beginn der Buchung, und schickt dich zu PayPal. Gibst du die Zahlung dort frei, kommst du zurück zu Courtside und siehst "Zahlung wird
 verarbeitet", bis Courtside das Geld eingezogen hat. Erst dann ist die Buchung bestätigt, und die
 Bestätigung per E-Mail sagt "Per PayPal bezahlt". Brichst du bei PayPal ab, ist der Platz sofort
 wieder frei und es wurde nichts abgebucht. Schließt du die Seite nach der Freigabe, geht die Zahlung

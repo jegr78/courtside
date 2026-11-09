@@ -213,7 +213,8 @@ the amount and how you paid. If it does not and your club accepts PayPal, the bu
 with PayPal**. You then pay the whole amount by PayPal, never a part of it. Without PayPal, Courtside
 refuses the booking and takes nothing.
 
-**Pay with PayPal** holds the court for you for 15 minutes and sends you to PayPal. Once you approve
+**Pay with PayPal** holds the court for you for 15 minutes, at most until the booking starts, and
+sends you to PayPal. Once you approve
 the payment there, you come back to Courtside and see "Payment is being processed" until Courtside
 has collected the money. Only then is the booking confirmed, and the confirmation email says "Paid by
 PayPal". If you cancel at PayPal, the court is free again at once and nothing is charged. If you close

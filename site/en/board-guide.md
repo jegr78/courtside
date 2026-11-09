@@ -33,7 +33,8 @@ The same sidebar returns you to the court plan.
 further matches page by page. Loaded occurrences of one series start grouped and collapsed. A
 series heading names its first and last date and counts all of its appointments, past and cancelled
 ones included, however many are loaded. *Details* remains directly available; *Cancel* sits under
-*Actions*. Create a new series at the top of the page.
+*Actions*. A booking still waiting for its PayPal payment is marked as such and has no actions; its
+hold ends by itself. Create a new series at the top of the page.
 
 When you cancel somebody else's appointment, you may choose a reason: court condition, weather, club
 event, maintenance work or another reason. The member who booked and the players are told it. There
@@ -454,8 +455,8 @@ Opening hours and the booking grid apply across the club, so they sit outside ru
 hours narrow the opening hours for one membership type and never widen them. With the facility
 open until 11:00 PM, for example, a youth rule set can allow bookings until 8:00 PM. Like the opening
 hours, booking hours end at 11:59 PM at the latest. For a window that lasts until closing, enter the
-facility's closing time as the latest end. The weekly booked hours count the confirmed bookings a
-member booked, by the week they start in. Cancelled bookings and booking kinds that do not count
+facility's closing time as the latest end. The weekly booked hours count the confirmed bookings and
+those awaiting payment that a member booked, by the week they start in. Cancelled bookings and booking kinds that do not count
 against limits, such as training or closures, stay out. Administrators may override the booking
 prohibition, the booking hours, the weekly booked hours and the minimum duration for
 administrative work. Time and court constraints still apply to them.

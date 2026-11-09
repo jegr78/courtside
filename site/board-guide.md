@@ -34,8 +34,9 @@ Unter *Vereinstermine* stehen zunächst höchstens 20 anstehende Termine, der n�
 Buchungsart und lade weitere Treffer seitenweise nach. Geladene Termine derselben Serie sind
 eingeklappt zusammengefasst. Der Kopf einer Serie nennt ihren ersten und letzten Termin und zählt
 alle ihre Termine, auch die vergangenen und abgesagten, unabhängig davon, wie viele geladen sind.
-*Details* bleibt direkt erreichbar; *Stornieren* liegt unter *Aktionen*. Neue Serien legst du am
-Anfang der Seite an.
+*Details* bleibt direkt erreichbar; *Stornieren* liegt unter *Aktionen*. Eine Buchung, die noch auf
+ihre PayPal-Zahlung wartet, ist als solche markiert und hat keine Aktionen, ihre Reservierung endet
+von selbst. Neue Serien legst du am Anfang der Seite an.
 
 Stornierst du den Termin einer anderen Person, kannst du einen Grund wählen: Zustand des Platzes,
 Wetter, Veranstaltung des Vereins, Wartungsarbeiten oder ein anderer Grund. Die Person, die gebucht
@@ -482,8 +483,8 @@ Regelwerke. Buchungszeiten engen die Öffnungszeiten für eine Mitgliedsart ein,
 nie. Hat die Anlage zum Beispiel bis 23:00 Uhr geöffnet, kann ein Jugendregelwerk Buchungen bis
 20:00 Uhr erlauben. Wie die Öffnungszeiten enden Buchungszeiten spätestens um 23:59 Uhr. Gilt ein
 Fenster bis Betriebsschluss, trage die Schließzeit der Anlage als spätestes Ende ein.
-Die gebuchten Stunden pro Woche zählen die bestätigten Buchungen, die ein Mitglied selbst gebucht
-hat, nach der Woche ihres Beginns. Stornierte Buchungen und Buchungsarten, die nicht gegen Limits
+Die gebuchten Stunden pro Woche zählen die bestätigten und die noch auf Zahlung wartenden Buchungen,
+die ein Mitglied selbst gebucht hat, nach der Woche ihres Beginns. Stornierte Buchungen und Buchungsarten, die nicht gegen Limits
 zählen, wie Training oder Sperrungen, bleiben außen vor. Administratoren können das Buchungsverbot,
 die Buchungszeiten, die gebuchten Stunden pro Woche und die Mindestdauer für Verwaltungsaufgaben
 übergehen. Das Zeit- und Platzraster gilt auch für sie.
