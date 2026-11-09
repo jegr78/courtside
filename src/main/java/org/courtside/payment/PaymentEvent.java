@@ -133,8 +133,9 @@ public sealed interface PaymentEvent extends DomainEventRecord {
         }
     }
 
-    record PayPalRefunded(UUID bookingId, UUID accountId, String orderId, String refundId, int amountMinor,
-                          String currency, boolean anonymised) implements PaymentEvent {
+    record PayPalRefunded(UUID bookingId, UUID accountId, String orderId, PayPalEnvironment environment,
+                          String refundId, int amountMinor, String currency, boolean anonymised)
+            implements PaymentEvent {
 
         static final String TYPE = "payment.paypal.refunded";
 

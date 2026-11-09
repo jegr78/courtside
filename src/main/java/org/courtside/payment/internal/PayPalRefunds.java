@@ -18,7 +18,10 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.util.Currency;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -70,7 +73,7 @@ public class PayPalRefunds {
                     refund.orderId(), order.environment());
             return answered(view(refund));
         }
-        if (refund.refundId() == null) return ask(refund, order, readable.get());
+        if (refund.refundId() == null) return askAgain(refund, order, readable.get());
         try {
             return answered(record(refund, client.getRefund(readable.get(), refund.refundId())));
         } catch (PayPalUnavailableException down) {
@@ -88,10 +91,13 @@ public class PayPalRefunds {
     public List<RefundOption> ofAccount(UUID accountId) {
         if (accountId == null) throw new IllegalStateException("PayPal refunds are listed for an account");
         Optional<PayPalClient.Credentials> active = credentials.active();
-        return orders.capturedOf(accountId, MAX_OPTIONS).stream().map(order -> option(order, active)).toList();
+        Map<Currency, Long> balances = new HashMap<>();
+        return orders.capturedOf(accountId, MAX_OPTIONS).stream()
+                .map(order -> option(order, active, balances)).toList();
     }
 
-    private RefundOption option(StoredOrder order, Optional<PayPalClient.Credentials> active) {
+    private RefundOption option(StoredOrder order, Optional<PayPalClient.Credentials> active,
+                                Map<Currency, Long> balances) {
         Optional<StoredRefund> refund = refunds.ofOrder(order.orderId());
         if (refund.isPresent()) {
             return new RefundOption(order.orderId(), false, refund.get().status(), refund.get().failureReason(),
@@ -102,7 +108,9 @@ public class PayPalRefunds {
         if (active.filter(credentials -> credentials.environment() == order.environment()).isEmpty()) {
             return blocked(order, UNAVAILABLE);
         }
-        if (bookingPayments.balanceMinor(credit.get().accountId(), order.currency()) < credit.get().amountMinor()) {
+        long balance = balances.computeIfAbsent(order.currency(),
+                currency -> bookingPayments.balanceMinor(order.accountId(), currency));
+        if (balance < credit.get().amountMinor()) {
             return blocked(order, CREDIT_SPENT);
         }
         return new RefundOption(order.orderId(), true, null, null, null);
@@ -150,9 +158,13 @@ public class PayPalRefunds {
             answer = client.refundCapture(readable, captureOf(order), refund.id());
         } catch (PayPalCaptureFullyRefundedException fullyRefunded) {
             return refundedElsewhere(refund, readable);
-        } catch (PayPalRefusedException refused) {
+        } catch (PayPalRefundRefusedException refused) {
             log.warn("PayPal refused refund {} of order {}: {}", refund.id(), refund.orderId(), refused.reason());
             return answered(failed(refund, null, refused.reason()));
+        } catch (PayPalRefusedException unclear) {
+            log.warn("PayPal refund {} of order {} was not answered by the refund itself and stays pending: {}",
+                    refund.id(), refund.orderId(), unclear.reason());
+            return answered(view(refund));
         } catch (PayPalUnavailableException unknown) {
             log.warn("PayPal refund {} of order {} has no known outcome yet: {}", refund.id(), refund.orderId(),
                     unknown.getMessage());
@@ -161,12 +173,34 @@ public class PayPalRefunds {
         return answered(record(refund, answer));
     }
 
+    private Resolution askAgain(StoredRefund refund, StoredOrder order, PayPalClient.Credentials readable) {
+        PayPalCheckout.requireNoTransaction();
+        Optional<String> completed;
+        try {
+            completed = completedRefundOf(readable, refund.orderId());
+        } catch (PayPalUnavailableException down) {
+            log.warn("PayPal order {} of refund {} could not be read before a retry: {}", refund.orderId(),
+                    refund.id(), down.getMessage());
+            return unreachable(refund);
+        } catch (PayPalRefusedException refused) {
+            log.warn("PayPal order {} of refund {} could not be read before a retry: {}", refund.orderId(),
+                    refund.id(), refused.reason());
+            return answered(view(refund));
+        }
+        if (completed.isPresent()) return answered(completed(refund, completed.get()));
+        return ask(refund, order, readable);
+    }
+
+    private Optional<String> completedRefundOf(PayPalClient.Credentials readable, String orderId) {
+        return client.getOrder(readable, orderId).refunds().stream()
+                .filter(listed -> listed.status().equals("COMPLETED")).map(PayPalClient.Refund::id).findFirst();
+    }
+
     private Resolution refundedElsewhere(StoredRefund refund, PayPalClient.Credentials readable) {
         PayPalCheckout.requireNoTransaction();
         Optional<String> completed;
         try {
-            completed = client.getOrder(readable, refund.orderId()).refunds().stream()
-                    .filter(listed -> listed.status().equals("COMPLETED")).map(PayPalClient.Refund::id).findFirst();
+            completed = completedRefundOf(readable, refund.orderId());
         } catch (PayPalUnavailableException down) {
             log.warn("PayPal order {} of refund {} could not be read: {}", refund.orderId(), refund.id(),
                     down.getMessage());
@@ -185,8 +219,8 @@ public class PayPalRefunds {
     private RefundView record(StoredRefund refund, PayPalClient.Refund answer) {
         return switch (answer.status()) {
             case "COMPLETED" -> completed(refund, answer.id());
-            case "FAILED", "CANCELLED" -> failed(refund, answer.id(),
-                    "PayPal reports the refund as " + answer.status());
+            case "FAILED", "CANCELLED" -> failed(refund, answer.id(), "PayPal reports the refund as "
+                    + answer.status() + (answer.reason() == null ? "" : ": " + answer.reason()));
             default -> pending(refund, answer.id());
         };
     }
@@ -198,8 +232,8 @@ public class PayPalRefunds {
             if (current.status() != RefundStatus.PENDING) return view(current);
             refunds.completed(current.id(), refundId);
             events.publishEvent(new PaymentEvent.PayPalRefunded(locked.bookingId(), current.accountId(),
-                    current.orderId(), refundId, current.amountMinor(), current.currency().getCurrencyCode(),
-                    anonymised(current.accountId())));
+                    current.orderId(), locked.environment(), refundId, current.amountMinor(),
+                    current.currency().getCurrencyCode(), anonymised(current.accountId())));
             log.info("PayPal completed refund {} of order {}", current.id(), current.orderId());
             return new RefundView(current.orderId(), RefundStatus.COMPLETED, null);
         });

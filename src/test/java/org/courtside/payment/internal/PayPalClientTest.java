@@ -287,9 +287,49 @@ class PayPalClientTest {
 
         // when / then
         assertThatThrownBy(() -> client.refundCapture(credentials(), "CAP1", UUID.randomUUID()))
-                .isInstanceOf(PayPalRefusedException.class)
-                .satisfies(failure -> assertThat(((PayPalRefusedException) failure).reason())
+                .as("only the refund request's own clear refusal reads as a refused refund")
+                .isInstanceOf(PayPalRefundRefusedException.class)
+                .satisfies(failure -> assertThat(((PayPalRefundRefusedException) failure).reason())
                         .isEqualTo("UNPROCESSABLE_ENTITY: REFUND_NOT_ALLOWED"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"token 401", "token without a token", "refund 401", "refund 403", "malformed capture id"})
+    void givenARefusalThatIsNotTheRefundsOwn_whenRefunding_thenItIsNotARefusedRefund(String cause)
+            throws IOException {
+        // given
+        String captureId = cause.equals("malformed capture id") ? "CAP/1" : "CAP1";
+        switch (cause) {
+            case "token 401" -> reply("POST /v1/oauth2/token", 401, "{\"error\":\"invalid_client\"}");
+            case "token without a token" -> reply("POST /v1/oauth2/token", 200, "{\"expires_in\":3600}");
+            default -> reply("POST /v1/oauth2/token", 200, TOKEN);
+        }
+        if (cause.startsWith("refund")) {
+            reply("POST /v2/payments/captures/CAP1/refund", Integer.parseInt(cause.substring(7)),
+                    "{\"name\":\"NOT_AUTHORIZED\",\"message\":\"denied\"}");
+        }
+        PayPalClient client = client(Duration.ofSeconds(2));
+
+        // when / then
+        assertThatThrownBy(() -> client.refundCapture(credentials(), captureId, UUID.randomUUID()))
+                .as("%s says nothing about the refund, so it must never restore credit", cause)
+                .isInstanceOf(PayPalRefusedException.class)
+                .isNotInstanceOf(PayPalRefundRefusedException.class);
+    }
+
+    @Test
+    void givenAFailedRefundWithAReason_whenRefunding_thenPayPalsReasonIsKept() throws IOException {
+        // given
+        reply("POST /v1/oauth2/token", 200, TOKEN);
+        reply("POST /v2/payments/captures/CAP1/refund", 201,
+                "{\"id\":\"REF1\",\"status\":\"FAILED\",\"status_details\":{\"reason\":\"ECHECK\"}}");
+        PayPalClient client = client(Duration.ofSeconds(2));
+
+        // when
+        PayPalClient.Refund refund = client.refundCapture(credentials(), "CAP1", UUID.randomUUID());
+
+        // then
+        assertThat(refund).isEqualTo(new PayPalClient.Refund("REF1", "FAILED", "ECHECK"));
     }
 
     @Test
@@ -303,7 +343,7 @@ class PayPalClientTest {
         PayPalClient.Order order = client.getOrder(credentials(), "ORD1");
 
         // then
-        assertThat(order.refunds()).containsExactly(new PayPalClient.Refund("REF1", "COMPLETED"));
+        assertThat(order.refunds()).containsExactly(new PayPalClient.Refund("REF1", "COMPLETED", null));
     }
 
     @Test
@@ -360,7 +400,7 @@ class PayPalClientTest {
         PayPalClient.Refund refund = client.getRefund(credentials(), "REF1");
 
         // then
-        assertThat(refund).isEqualTo(new PayPalClient.Refund("REF1", "PENDING"));
+        assertThat(refund).isEqualTo(new PayPalClient.Refund("REF1", "PENDING", null));
     }
 
     @Test

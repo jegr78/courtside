@@ -114,6 +114,10 @@ public class PayPalClient {
                 && (hasIssue(answer.body(), DUPLICATE_REQUEST) || hasIssue(answer.body(), REQUEST_IN_PROGRESS))) {
             throw new PayPalUnavailableException("PayPal is still processing an earlier refund of this capture");
         }
+        if (answer.status() / 100 == 4 && answer.status() != 401 && answer.status() != 403
+                && answer.status() != 429) {
+            throw new PayPalRefundRefusedException(reason(answer.status(), answer.body()));
+        }
         return refund(unclearUnlessReadable(answer));
     }
 
@@ -229,7 +233,9 @@ public class PayPalClient {
     }
 
     private static Refund refund(JsonNode body) {
-        return new Refund(unclearField(body, "id"), unclearField(body, "status"));
+        String reason = text(body.get("status_details"), "reason");
+        return new Refund(unclearField(body, "id"), unclearField(body, "status"),
+                reason.isEmpty() ? null : bounded(reason));
     }
 
     private static String unclearField(JsonNode body, String field) {
@@ -441,7 +447,7 @@ public class PayPalClient {
     public record Capture(String id, String status, int amountMinor, String currency) {
     }
 
-    public record Refund(String id, String status) {
+    public record Refund(String id, String status, @Nullable String reason) {
     }
 
 }

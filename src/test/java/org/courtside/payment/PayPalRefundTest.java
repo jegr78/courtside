@@ -1,5 +1,6 @@
 package org.courtside.payment;
 
+import com.zaxxer.hikari.HikariDataSource;
 import org.courtside.AbstractIntegrationTest;
 import org.courtside.PostgresDiagnostics;
 import org.courtside.booking.BookingService;
@@ -37,6 +38,7 @@ import org.springframework.web.context.WebApplicationContext;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
+import javax.sql.DataSource;
 import java.time.Clock;
 import java.time.DayOfWeek;
 import java.time.Duration;
@@ -48,6 +50,8 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -59,8 +63,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+// Two admission slots let two treasurers' returns meet at the order's row lock.
 @TestPropertySource(properties = {"courtside.public-url=https://courts.example.org",
-        "courtside.payment.paypal.request-timeout=3s"})
+        "courtside.payment.paypal.request-timeout=3s", "courtside.admission.classes[payment-provider-check].cost=5",
+        "courtside.admission.classes[payment-provider-check].concurrency=2"})
 @Import({FacilityTestFixture.class, IdentityTestFixture.class, CardTestFixture.class, ConfigTestFixture.class,
         CreditTestFixture.class, PaymentTestFixture.class})
 class PayPalRefundTest extends AbstractIntegrationTest {
@@ -77,7 +83,8 @@ class PayPalRefundTest extends AbstractIntegrationTest {
     private static final String FULLY_REFUNDED = "{\"name\":\"UNPROCESSABLE_ENTITY\",\"message\":\"refunded\","
             + "\"details\":[{\"issue\":\"CAPTURE_FULLY_REFUNDED\"}]}";
     private static final Instant TOMORROW_AFTERNOON = Instant.parse("2026-05-13T16:00:00Z");
-    private static final Duration UNTIL_CONTENTION = Duration.ofSeconds(10);
+    private static final Duration UNTIL_CONTENTION = Duration.ofSeconds(4);
+    private static final ExecutorService THREADS = Executors.newCachedThreadPool();
     private static final FakePayPal PAYPAL = new FakePayPal();
 
     @Autowired
@@ -103,6 +110,8 @@ class PayPalRefundTest extends AbstractIntegrationTest {
     @Autowired
     private TransactionTemplate transactions;
     @Autowired
+    private DataSource dataSource;
+    @Autowired
     private Clock clock;
 
     private MockMvc mockMvc;
@@ -122,6 +131,7 @@ class PayPalRefundTest extends AbstractIntegrationTest {
     @AfterAll
     static void stop() {
         PAYPAL.stop();
+        THREADS.close();
     }
 
     @BeforeEach
@@ -140,6 +150,8 @@ class PayPalRefundTest extends AbstractIntegrationTest {
                 Set.of(Role.MEMBER, Role.TREASURER));
         identity.createEnabledAccount(identity.createPerson("Mary", "Major", "mary.major@example.org"),
                 "major.mary", Set.of(Role.MEMBER));
+        identity.createEnabledAccount(identity.createPerson("Jane", "Doe", "jane.doe@example.org"), "doe.jane",
+                Set.of(Role.MEMBER, Role.TREASURER));
         config.admitExternalBookings(true);
         winterHall = cards.createBookingCard("Winter hall", Set.of(Role.EXTERNAL, Role.MEMBER), Set.of());
         cards.priceForExternals(winterHall, 1500);
@@ -182,6 +194,7 @@ class PayPalRefundTest extends AbstractIntegrationTest {
             assertThat(payload.get("accountId").asString()).isEqualTo(johnAccount.toString());
             assertThat(payload.get("amountMinor").asInt()).isEqualTo(1500);
             assertThat(payload.get("anonymised").asBoolean()).isFalse();
+            assertThat(payload.get("environment").asString()).isEqualTo("SANDBOX");
         });
         assertThat(audit("payment.paypal.refundFailed", booking)).isEmpty();
     }
@@ -310,7 +323,7 @@ class PayPalRefundTest extends AbstractIntegrationTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"delayed past the timeout", "2xx without id", "500", "429"})
+    @ValueSource(strings = {"delayed past the timeout", "2xx without id", "500", "429", "409"})
     void givenNoAnswerOrAnUnreadableAnswer_whenReturning_thenTheRefundIsPendingAndTheCreditStaysTaken(String answer)
             throws Exception {
         // given
@@ -334,6 +347,54 @@ class PayPalRefundTest extends AbstractIntegrationTest {
         assertThat(refundRow().get("refund_id")).isNull();
         assertThat(audit("payment.paypal.refunded", booking)).isEmpty();
         assertThat(audit("payment.paypal.refundFailed", booking)).isEmpty();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"token refused", "refund answers 401 twice", "refund answers 403"})
+    void givenARefusalThatIsNotTheRefundsOwn_whenReturning_thenTheRefundIsPendingAndTheCreditStaysTaken(String cause)
+            throws Exception {
+        // given
+        UUID booking = paidAndCancelled();
+        String denied = "{\"name\":\"NOT_AUTHORIZED\",\"message\":\"denied\"}";
+        switch (cause) {
+            case "token refused" -> {
+                PAYPAL.reply(REFUND, 401, denied);
+                PAYPAL.replaceReply(TOKEN, 401, "{\"error\":\"invalid_client\"}");
+            }
+            case "refund answers 401 twice" -> PAYPAL.reply(REFUND, 401, denied);
+            default -> PAYPAL.reply(REFUND, 403, denied);
+        }
+
+        // when
+        refund("miles.richard", ORDER, true)
+
+                // then
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PENDING"))
+                .andExpect(jsonPath("$.failureReason").doesNotExist());
+        assertThat(PAYPAL.seen(REFUND)).as("a 401 retries once with a new token")
+                .hasSize(cause.equals("refund answers 401 twice") ? 2 : 1);
+        assertThat(credit.balance(johnAccount)).as("%s never restores credit", cause).isZero();
+        assertThat(kinds(booking, "PAYPAL_REFUND_REVERSED")).isZero();
+        assertThat(refundRow()).containsEntry("status", "PENDING");
+        assertThat(audit("payment.paypal.refundFailed", booking)).isEmpty();
+        assertThat(audit("payment.paypal.refunded", booking)).isEmpty();
+    }
+
+    @Test
+    void givenAFailedRefundWithPayPalsReason_whenReturning_thenTheReasonIsShown() throws Exception {
+        // given
+        paidAndCancelled();
+        PAYPAL.reply(REFUND, 201, "{\"id\":\"REFUND1\",\"status\":\"FAILED\","
+                + "\"status_details\":{\"reason\":\"ECHECK\"}}");
+
+        // when
+        refund("miles.richard", ORDER, true)
+
+                // then
+                .andExpect(jsonPath("$.status").value("FAILED"))
+                .andExpect(jsonPath("$.failureReason").value("PayPal reports the refund as FAILED: ECHECK"));
+        assertThat(credit.balance(johnAccount)).isEqualTo(1500);
     }
 
     @Test
@@ -424,8 +485,8 @@ class PayPalRefundTest extends AbstractIntegrationTest {
                 + ORDER + "' FOR UPDATE", release);
 
         // when
-        CompletableFuture<MvcResult> first = CompletableFuture.supplyAsync(this::proven);
-        CompletableFuture<MvcResult> second = CompletableFuture.supplyAsync(this::proven);
+        CompletableFuture<MvcResult> first = CompletableFuture.supplyAsync(() -> proven("miles.richard"), THREADS);
+        CompletableFuture<MvcResult> second = CompletableFuture.supplyAsync(() -> proven("doe.jane"), THREADS);
         awaitSessionsBlockedOnALock(2);
         release.countDown();
         orderHeld.get(10, TimeUnit.SECONDS);
@@ -454,9 +515,9 @@ class PayPalRefundTest extends AbstractIntegrationTest {
                 + johnAccount + "' FOR UPDATE", release);
 
         // when
-        CompletableFuture<MvcResult> refund = CompletableFuture.supplyAsync(this::proven);
+        CompletableFuture<MvcResult> refund = CompletableFuture.supplyAsync(() -> proven("miles.richard"), THREADS);
         CompletableFuture<UUID> second = CompletableFuture.supplyAsync(() -> book(TOMORROW_AFTERNOON.plus(
-                Duration.ofHours(2))));
+                Duration.ofHours(2))), THREADS);
         awaitSessionsBlockedOnALock(2);
         release.countDown();
         accountHeld.get(10, TimeUnit.SECONDS);
@@ -633,9 +694,9 @@ class PayPalRefundTest extends AbstractIntegrationTest {
                 ? request.sessionAttr("courtside.authenticated-at", clock.instant().toEpochMilli()) : request);
     }
 
-    private MvcResult proven() {
+    private MvcResult proven(String username) {
         try {
-            return refund("miles.richard", ORDER, true).andReturn();
+            return refund(username, ORDER, true).andReturn();
         } catch (Exception failed) {
             throw new IllegalStateException(failed);
         }
@@ -651,12 +712,12 @@ class PayPalRefundTest extends AbstractIntegrationTest {
             } catch (InterruptedException interrupted) {
                 Thread.currentThread().interrupt();
             }
-        }));
+        }), THREADS);
         assertThat(held.await(10, TimeUnit.SECONDS)).as("the row is held").isTrue();
         return holder;
     }
 
-    private void awaitSessionsBlockedOnALock(int sessions) throws InterruptedException {
+    private void awaitSessionsBlockedOnALock(int sessions) throws Exception {
         long deadline = System.nanoTime() + UNTIL_CONTENTION.toNanos();
         while (System.nanoTime() < deadline) {
             jdbc.sql("SELECT pg_stat_clear_snapshot()").query().singleValue();
@@ -665,10 +726,12 @@ class PayPalRefundTest extends AbstractIntegrationTest {
                             WHERE datname = current_database() AND pid <> pg_backend_pid()
                               AND state = 'active' AND wait_event_type = 'Lock'
                             """).query(Integer.class).single();
-            if (blocked >= sessions) return;
+            int awaitingConnection = dataSource.unwrap(HikariDataSource.class).getHikariPoolMXBean()
+                    .getThreadsAwaitingConnection();
+            if (blocked >= 1 && blocked + awaitingConnection >= sessions) return;
             Thread.sleep(20);
         }
-        throw new AssertionError("Both requests never waited on the held row. "
+        throw new AssertionError("Both requests never waited on the held row or a connection. "
                 + PostgresDiagnostics.waitsAndLocks(jdbc));
     }
 
