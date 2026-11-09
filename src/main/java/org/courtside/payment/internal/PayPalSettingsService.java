@@ -1,6 +1,7 @@
 package org.courtside.payment.internal;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.courtside.identity.CurrentUser;
 import org.courtside.identity.InstanceSecrets;
 import org.courtside.identity.RecentAuthentication;
@@ -20,6 +21,7 @@ import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class PayPalSettingsService {
@@ -49,7 +51,7 @@ public class PayPalSettingsService {
         recentAuthentication.requireRecent();
         @Nullable UUID actor = currentUser.accountId().orElse(null);
         Saved saved = transactions.execute(status -> write(clientId, environment, enabled, secret, actor));
-        saved.retired().ifPresent(checkout::retire);
+        saved.retired().ifPresent(this::retire);
         return saved.settings();
     }
 
@@ -123,7 +125,16 @@ public class PayPalSettingsService {
                     .ifPresent(id -> events.publishEvent(new PaymentEvent.PayPalCredentialsRemoved(id)));
             return removed;
         });
-        retired.ifPresent(checkout::retire);
+        retired.ifPresent(this::retire);
+    }
+
+    private void retire(PayPalClient.Credentials former) {
+        try {
+            checkout.retire(former);
+        } catch (RuntimeException failed) {
+            log.error("Open PayPal orders of the former {} credentials stay open for the reconciliation",
+                    former.environment(), failed);
+        }
     }
 
     public PayPalConnectionCheck.Result check() {

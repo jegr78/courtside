@@ -286,6 +286,21 @@ class PayPalReconciliationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenAnOpenOrderThatCannotBeRead_whenTheEnvironmentChanges_thenTheSaveStillSucceeds() throws Exception {
+        // given
+        storeAttemptedOrder("ORDERQ", "QQQ");
+
+        // when
+        saveSettings("client-live", "LIVE", true, "paypal-secret-live")
+
+                // then
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.environment").value("LIVE"));
+        assertThat(jdbc.sql("SELECT status FROM paypal_order WHERE order_id = 'ORDERQ'").query(String.class).single())
+                .as("the order is left to the job").isEqualTo("CREATED");
+    }
+
+    @Test
     void givenAnApprovedOrderAndPayPalDown_whenTheDeadlinePasses_thenTheBookingStaysHeld() throws Exception {
         // given
         UUID booking = bookWithOrder();
