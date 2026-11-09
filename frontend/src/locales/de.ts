@@ -27,6 +27,8 @@ const de = {
   "creditLedger.kind.BOOKING_REFUND": "Erstattung nach Storno",
   "creditLedger.kind.PAYPAL_PAYMENT": "Per PayPal bezahlt",
   "creditLedger.kind.PAYPAL_LATE_CAPTURE": "Späte PayPal-Zahlung als Guthaben",
+  "creditLedger.kind.PAYPAL_REFUND": "PayPal-Erstattung",
+  "creditLedger.kind.PAYPAL_REFUND_REVERSED": "PayPal-Erstattung zurückgebucht",
   "creditLedger.note": "Grund",
   "creditLedger.noNote": "ohne Angabe",
   "creditLedger.amount": "Betrag",

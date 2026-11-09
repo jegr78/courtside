@@ -443,10 +443,12 @@ a different file than the one previewed is visible after the fact.
 Entries are appended and never changed: the trigger `credit_entry_append_only` refuses every
 `UPDATE` and `DELETE`. `credit_entry_kind_sign` keeps a `CREDIT` and a `BOOKING_REFUND` positive and a
 `PAYOUT` and a `BOOKING_DEBIT` negative, and `credit_entry_amount_bounded` holds an entry the treasury
-records within 10,000.00. `PAYPAL_PAYMENT` and `PAYPAL_LATE_CAPTURE` are positive like a `CREDIT`.
-`credit_entry_booking_reference` requires `booking_id` exactly on the four booking kinds,
-`credit_entry_paypal_order_reference` requires `paypal_order_id` exactly on the two PayPal kinds, the
-unique index `credit_entry_paypal_order` allows an order one entry, and the unique index
+records within 10,000.00. `PAYPAL_PAYMENT`, `PAYPAL_LATE_CAPTURE` and `PAYPAL_REFUND_REVERSED` are
+positive like a `CREDIT`, `PAYPAL_REFUND` is negative like a `PAYOUT`.
+`credit_entry_booking_reference` requires `booking_id` exactly on the booking and PayPal kinds,
+`credit_entry_paypal_order_reference` requires `paypal_order_id` exactly on the four PayPal kinds, the
+unique index `credit_entry_paypal_order` allows an order one payment or late capture,
+`credit_entry_paypal_order_kind` one entry of each kind per order, and the unique index
 `credit_entry_booking_kind` allows one debit and one refund per booking. The balance is the sum of an
 account's entries in the club currency and is stored nowhere. The reason sits in its own table because it is
 free text that may name somebody: anonymising the account deletes it and leaves the entry.
@@ -459,6 +461,7 @@ booking an entry paid leaves the entry.
 |---|---|---|
 | `paypal_settings` | The club's PayPal client id, encrypted secret and since when it is stored, sandbox or live, whether PayPal payment is on, and when and by which account the row last changed | None |
 | `paypal_order` | One PayPal order per held booking: order id, booking, account, sandbox or live, amount in the minor unit, currency, status (`CREATED`, `CAPTURED`, `LATE_CAPTURED`, `REJECTED`, `VOIDED`), the capture id, when Courtside last asked PayPal to capture it or released its booking while PayPal still showed it unresolved, the address PayPal sends the payer to for approval, and when it was created and last changed or checked | None |
+| `paypal_refund` | One refund of a captured order through PayPal: the order, the paying account, amount in the minor unit, currency, status (`PENDING`, `COMPLETED`, `FAILED`), PayPal's refund id, PayPal's reason for a failure, which account asked for it and when, and when it last changed | `paypal_order` |
 
 `paypal_settings_single_row` keeps at most one row, and removing the credentials deletes it.
 `paypal_settings_secret_stored` keeps the ciphertext and its timestamp together, and
@@ -471,6 +474,12 @@ account that last saved the settings leaves them.
 `paypal_order.booking_id` and `account_id` have no foreign key, like `credit_entry.booking_id`, so an
 order outlives the booking or account it paid for. `booking_id` is unique.
 `paypal_order_capture_id` requires a capture id exactly on `CAPTURED` and `LATE_CAPTURED` orders.
+
+`paypal_refund_one_per_order` allows an order one refund in any status. `paypal_refund_status` allows
+`PENDING`, `COMPLETED` and `FAILED`, `paypal_refund_completed_has_id` requires PayPal's refund id on a
+completed refund, and `paypal_refund_failure_reason` requires a reason exactly on a failed one, of 1 to
+200 characters by `paypal_refund_failure_reason_length`. `account_id` and `requested_by` have no
+foreign key, like those of `paypal_order`.
 
 ## Keeping personal records
 

@@ -29,6 +29,8 @@ const en: Record<keyof typeof de, string> = {
   "creditLedger.kind.BOOKING_REFUND": "Refund after cancellation",
   "creditLedger.kind.PAYPAL_PAYMENT": "Paid with PayPal",
   "creditLedger.kind.PAYPAL_LATE_CAPTURE": "Late PayPal payment as credit",
+  "creditLedger.kind.PAYPAL_REFUND": "PayPal refund",
+  "creditLedger.kind.PAYPAL_REFUND_REVERSED": "PayPal refund reversed",
   "creditLedger.note": "Reason",
   "creditLedger.noNote": "not stated",
   "creditLedger.amount": "Amount",

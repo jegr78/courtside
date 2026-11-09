@@ -4054,8 +4054,11 @@ components:
         the treasurer paid out part of the balance. `BOOKING_DEBIT`: a booking was paid from the
         balance. `BOOKING_REFUND`: a cancelled booking returned its payment to the balance.
         `PAYPAL_PAYMENT`: the booker paid a booking through PayPal. `PAYPAL_LATE_CAPTURE`: PayPal
-        captured a payment after the held court was released, and it became credit.
-      enum: [CREDIT, PAYOUT, BOOKING_DEBIT, BOOKING_REFUND, PAYPAL_PAYMENT, PAYPAL_LATE_CAPTURE]
+        captured a payment after the held court was released, and it became credit. `PAYPAL_REFUND`:
+        the treasurer returned a PayPal payment through PayPal and its credit was taken back.
+        `PAYPAL_REFUND_REVERSED`: PayPal refused that refund and the credit was restored.
+      enum: [CREDIT, PAYOUT, BOOKING_DEBIT, BOOKING_REFUND, PAYPAL_PAYMENT, PAYPAL_LATE_CAPTURE, PAYPAL_REFUND,
+             PAYPAL_REFUND_REVERSED]
 
     CreditEntryRequestKind:
       type: string
@@ -4088,6 +4091,9 @@ components:
           type: [string, "null"]
           format: uuid
           description: The booking a booking or PayPal entry belongs to.
+        paypalOrderId:
+          type: [string, "null"]
+          description: The PayPal order a PayPal entry belongs to.
 
     CreditLedgerPage:
       type: object

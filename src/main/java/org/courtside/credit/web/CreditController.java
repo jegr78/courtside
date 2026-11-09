@@ -72,6 +72,7 @@ class CreditController implements CreditApi {
         return new ApiCreditEntry(entry.id(), ApiCreditEntryKind.fromValue(entry.kind().name()), entry.amountMinor(),
                 entry.currency(), entry.balanceAfterMinor(), entry.recordedAt().atOffset(ZoneOffset.UTC))
                 .note(entry.note())
-                .bookingId(entry.bookingId());
+                .bookingId(entry.bookingId())
+                .paypalOrderId(entry.paypalOrderId());
     }
 }
