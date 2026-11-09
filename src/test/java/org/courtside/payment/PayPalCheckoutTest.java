@@ -883,6 +883,31 @@ class PayPalCheckoutTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.available").value(false));
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"switched off", "down", "no approve link"})
+    void givenPayPalCannotStartThePayment_whenTheOrderIsCreated_thenItIsUnavailableAndTheCourtStaysHeld(String cause)
+            throws Exception {
+        // given
+        UUID booking = book();
+        switch (cause) {
+            case "switched off" -> jdbc.sql("UPDATE paypal_settings SET enabled = false").update();
+            case "down" -> PAYPAL.reply(CREATE, 500, "{}");
+            default -> PAYPAL.reply(CREATE, 201, order("PAYER_ACTION_REQUIRED", booking, "15.00", null)
+                    .replace("\"payer-action\"", "\"self\""));
+        }
+
+        // when
+        create("roe.john", booking)
+
+                // then
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:paypal-unavailable"))
+                .andExpect(jsonPath("$.violations[0].code").value("payment.paypal.unavailable"));
+        assertThat(jdbc.sql("SELECT count(*) FROM paypal_order").query(Long.class).single())
+                .as("no order is stored when PayPal cannot start the payment (%s)", cause).isZero();
+        assertThat(bookingStatus(booking)).as("the hold stays for another attempt").isEqualTo("PENDING_PAYMENT");
+    }
+
     private UUID book() {
         return bookingService.create(new CreateBookingCommand(List.of(courtId), winterHall,
                 new TimeSlot(TOMORROW_AFTERNOON, TOMORROW_AFTERNOON.plus(Duration.ofHours(1))), johnAccount,
