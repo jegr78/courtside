@@ -236,6 +236,8 @@ Frist kannst du nicht mehr stornieren. Storniert der Verein deine Buchung vor ih
 du den Betrag immer zurück. Erscheinst du nicht und gibt Courtside den Platz deshalb frei, bleibt der Betrag beim
 Verein.
 
+![Die Seite nach der Rückkehr von PayPal: die Zahlung ist eingegangen und die Buchung bestätigt.](screenshots/de/paypal-return.png)
+
 ![Der Bereich für Mitspieler, Gäste und Platzfüller im Buchungsdialog.](screenshots/de/booking-participants.png)
 
 ## Als Mitspieler eingetragen

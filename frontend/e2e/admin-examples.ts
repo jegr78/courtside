@@ -99,3 +99,5 @@ export const payPalSettingsExample = {
 };
 
 export const payPalCheckExample = { outcome: "OK" };
+
+export const payPalCaptureExample = { bookingId: "7f400000-0000-0000-0000-000000000001", outcome: "CONFIRMED" };

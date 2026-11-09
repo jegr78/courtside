@@ -227,6 +227,8 @@ deadline you can no longer cancel. If the club cancels your booking before it st
 the amount back. If you do not turn up and Courtside releases the court for that reason, the club keeps the
 amount.
 
+![The page after returning from PayPal: the payment arrived and the booking is confirmed.](../screenshots/en/paypal-return.png)
+
 ![The booking fields for members, guests and slot fillers.](../screenshots/en/booking-participants.png)
 
 ## Recorded as a co-player

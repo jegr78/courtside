@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { type Page, type TestInfo } from "@playwright/test";
-import { accessGrantsExample, connectionCheckExample, creditHoldersExample, creditLedgerExample, guestFeesExample, operatorHealthExample, payPalCheckExample, payPalSettingsExample } from "./admin-examples";
+import { accessGrantsExample, connectionCheckExample, creditHoldersExample, creditLedgerExample, guestFeesExample, operatorHealthExample, payPalCaptureExample, payPalCheckExample, payPalSettingsExample } from "./admin-examples";
 import { backAtTheJourneyInstant, expect, expectAdministrationOverview, onTheVisualDay, selectPreference, test } from "./fixtures";
 
 // The guides are read in the light theme on a page column, in the language its project names, and
@@ -100,6 +100,11 @@ const drivers: Record<string, (page: Page, visualDate: string) => Promise<void>>
   "members-door-codes": async (page) => {
     await page.getByTestId("my-bookings-link").click();
     await expect(page.getByTestId("members-door-code")).toHaveCount(1);
+  },
+  "paypal-return": async (page) => {
+    await page.context().route("**/api/payments/paypal/orders/*/capture", (route) => route.fulfill({ json: payPalCaptureExample }));
+    await page.goto("/payment/paypal/return?token=EXAMPLEORDER0000001");
+    await expect(page.getByTestId("paypal-outcome")).toHaveAttribute("data-outcome", "CONFIRMED");
   },
   "participations": async (page) => {
     await expect(page.getByTestId("participations")).toBeVisible();
@@ -413,6 +418,15 @@ test("the refusal a booking rule writes is captured", async ({ page, journeyServ
 
   // when / then
   await capture(page, "refused-booking", journeyService.visualDate);
+});
+
+test("the return from PayPal a player has paid at is captured", async ({ page, journeyService }, info) => {
+  // given
+  await prepare(page, localeOf(info));
+  await signIn(page, "doe.jane", "court-plan-view");
+
+  // when / then
+  await capture(page, "paypal-return", journeyService.visualDate);
 });
 
 test("the series a trainer arranges is captured", async ({ page, journeyService }, info) => {
