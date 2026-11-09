@@ -21,6 +21,7 @@ import {
   type BrowserFailureReason
 } from "./browser-diagnostics";
 import { startJourneyControl } from "./journey-control";
+import { startPayPalStub, type StartedPayPalStub } from "./paypal-stub";
 import { browserExitState, BrowserLifecycleRecorder, browserResourceUsage } from "./browser-lifecycle";
 import { completeCleanup } from "./resource-cleanup";
 import { runJourneyProcess } from "./process-command";
@@ -673,6 +674,7 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
   let clubNetwork: StartedNetwork | undefined;
   let clubProxy: StartedTestContainer | undefined;
   let mailSink: StartedTestContainer | undefined;
+  let payPalStub: StartedPayPalStub | undefined;
   let secondPeer: StartedTestContainer | undefined;
   let startingSecondPeer: Promise<StartedTestContainer> | undefined;
   const stopContainers = async () => {
@@ -684,6 +686,7 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
       async () => { await secondPeer?.stop(); },
       async () => { await clubProxy?.stop(); },
       async () => { await mailSink?.stop(); },
+      async () => { await payPalStub?.container.stop(); },
       async () => { await postgres?.stop(); },
       async () => { await clubNetwork?.stop(); }
     ]);
@@ -724,6 +727,8 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
       .withWaitStrategy(Wait.forHttp("/readyz", 8025))
       .start();
     const mailboxURL = `http://${mailSink.getHost()}:${mailSink.getMappedPort(8025)}`;
+    clubNetwork = await new Network().start();
+    payPalStub = await startPayPalStub(clubNetwork);
     const java = process.env.JAVA_HOME ? `${process.env.JAVA_HOME}/bin/java` : "java";
     requireBuiltAfterItsSources(resolve("dist"), resolve("src"), "npm run build");
     requireBuiltAfterItsSources(applicationJar(), resolve("../src/main"), "./mvnw package -DskipTests");
@@ -760,6 +765,7 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
       COURTSIDE_MAIL_TRUST_RELAY_CERTIFICATE: "true",
       COURTSIDE_MAIL_FROM: "no-reply@example.org",
       COURTSIDE_MAIL_REPLY_TO: "board@example.org",
+      COURTSIDE_PAYMENT_PAYPAL_SANDBOX_ENDPOINT: payPalStub.endpoint,
       SPRING_WEB_RESOURCES_STATIC_LOCATIONS: `file:${staticDirectory}/,classpath:/static/`
     };
     const startApplication = async () => {
@@ -858,7 +864,6 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
       await snapshotJourneyData(postgres, schema);
       seededPerLanguage.set(language, schema);
     }
-    clubNetwork = await new Network().start();
     clubProxy = await new GenericContainer(deployedProxyImage())
       .withNetwork(clubNetwork)
       .withNetworkAliases(CLUB_HOST, ATTACKER_HOST, PROXY_BOUNDARY_HOST)
