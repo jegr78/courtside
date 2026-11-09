@@ -199,7 +199,7 @@ Spring Modulith's event publication registry, whose incomplete publications rema
 a restart.
 
 `booking` publishes an event when a booking is confirmed, cancelled or displaced or falls due for
-its reminder, when a participant is recorded or withdraws, when a series is created, cancelled
+its reminder, when a booking held for payment is released unpaid, when a participant is recorded or withdraws, when a series is created, cancelled
 or moved, and when a freed slot is offered to a waiting member. A series change is one event naming the series and every occurrence it touched, and no
 occurrence announces itself beside it. Cancelling an occurrence as a single booking announces that
 booking alone. Cancellations and moves name the acting account, so a consumer can tell an owner's
@@ -284,6 +284,30 @@ checks improve the response, but the database is the final concurrency guard.
 A multi-court appointment is one booking with several allocations. It has one cancellation, one
 participant list and one entry in booking views.
 
+A booking and its allocations are `CONFIRMED`, `CANCELLED` or `PENDING_PAYMENT`. A pending booking
+is one an outsider still pays for by PayPal. It occupies its courts like a confirmed one: the
+exclusion constraint, the overlap pre-check, the court plan, participant-card capacity and the
+waitlist's free-slot detection all count it, and so does every rule that counts a player's bookings
+or hours. Everything that follows a confirmed booking does not exist for it yet: the confirmation
+mail, `BookingConfirmed`, reminders, access codes and grants, emergency codes, attendance,
+partner search, the occupancy signal, statistics, the usage report and the booking exports. Other
+members see its slot as occupied and nothing more; its owner sees it in *Meine Buchungen* with the
+remaining time. The subject access export lists it with its status.
+
+`booking.payment_expires_at` stores the end of the hold, 15 minutes after the booking was written.
+An account holds at most one pending booking: a second attempt is refused with the violation
+`booking.payment.pendingExists`, carrying the first one's expiry, and the partial unique index
+`booking_one_pending_per_account` gives the same answer below the service. A hold ends in one of
+two ways. `PendingPayments.confirm` turns the booking and its allocations `CONFIRMED` and starts
+the work a confirmed write starts. `PendingPayments.release` cancels them with the reason
+`PAYMENT_EXPIRED`, publishes `BookingPaymentExpired` instead of `BookingCancelled`, audited as
+`booking.payment.expired`, sends no mail and offers the freed slot to the waitlist at once. The
+owner's own cancel, a board cancel and a court closure release a pending booking the same way, the owner's
+also past the cancellation deadline; a board cancel records `PAYMENT_EXPIRED` rather than the
+reason it chose. The impact preview of a closure, an opening-hours change or a card change lists
+pending bookings beside confirmed ones. A pending booking never belongs to a series, so no move
+reaches it.
+
 ### Cards and participant slots
 
 A booking card controls its name and colour, allowed player counts, guest use, whether it counts
@@ -313,7 +337,7 @@ audited as `roster.account.rolesChanged`; `EXTERNAL` stays until the board remov
 writes accepts an anonymised person. The import's membership writes add no role.
 An outsider closes its own account with `DELETE /api/account` after a re-authentication no older
 than five minutes; a member's account ends through the board. `AccountClosure` refuses anyone else
-with `identity.account.closureNotOpen` and an outsider holding a confirmed booking of its own that has
+with `identity.account.closureNotOpen` and an outsider holding a confirmed or pending booking of its own that has
 not ended, read through `shared.UpcomingBookings`, with `identity.account.closureBlockedByBooking`.
 An outsider whose credit ledger still holds a balance, read through `shared.HeldCredit`, is refused
 with `identity.account.closureBlockedByCredit` and asks the treasurer for a payout first.
@@ -370,11 +394,17 @@ account holds a balance or any booking with an amount above zero has not ended y
 `config.currency.creditHeld` reports.
 
 A booking with an amount above zero is paid from the booker's credit in the transaction that writes
-it. After the overlap and the rules have passed, `BookingWriter` hands the amount to
-`credit.BookingPayments`, which locks the account like every other ledger write and appends a
-`BOOKING_DEBIT` naming the booking. When the balance falls short, the booking is refused with the
-violation `booking.payment.creditInsufficient`, carrying amount, balance and currency, and nothing is
-written. A booking that costs nothing writes no entry. Cancelling a paid booking before it starts
+it, or by PayPal when the credit falls short. After the overlap and the rules have passed,
+`BookingWriter` hands the amount to `credit.BookingPayments`, which locks the account like every
+other ledger write and appends a `BOOKING_DEBIT` naming the booking. When the balance falls short
+and PayPal payment is available, the booking is written `PENDING_PAYMENT` with no entry, and the
+booker pays the whole amount by PayPal; a booking is never split between credit and PayPal. PayPal
+payment is available when the club switched it on, a secret is stored and the instance knows its
+public address. `booking` reads that through its own port `PaymentMethods`, which the `payment`
+module implements. Only an outsider booking a single booking for themselves gets this choice. When
+PayPal is not available, or the outsider books for a dependant, the booking is refused with the
+violation `booking.payment.creditInsufficient`, carrying amount, balance and currency, and nothing
+is written. A booking that costs nothing writes no entry. Cancelling a paid booking before it starts
 appends a `BOOKING_REFUND` of the debited amount in the same transaction. The booker can cancel only
 before the cancellation deadline of their rule set, so a refund after the deadline happens only when
 somebody else, the club, cancels the booking. Once the booking has started nothing is refunded, nor
@@ -398,7 +428,76 @@ secret changed, never either value, and `payment.paypal.credentials.removed` rec
 The connection check requests an access token from the stored environment with the stored
 credentials and reports `OK`, `REJECTED` with PayPal's own reason or the HTTP status, `UNREACHABLE`
 after 10 seconds or a failed connection, or `NOT_CONFIGURED`. The PayPal endpoints are application
-properties, not request data.
+properties, not request data, and production refuses to start with any other host than PayPal's.
+
+#### Paying a booking with PayPal
+
+There are no webhooks. Courtside captures every payment itself, on the payer's return or through
+the reconciliation job, and confirms a booking only after it holds the captured money.
+
+1. `POST /api/bookings` answers the pending booking with its `paymentExpiresAt`.
+2. `POST /api/payments/paypal/orders` with the booking id creates a PayPal order through Orders v2:
+   intent `CAPTURE`, one purchase unit carrying the booking id as `custom_id` and the amount and
+   currency stored with the booking, and return and cancel addresses built from the instance's
+   public address. The request carries the booking id and nothing else, so the client never names
+   an amount.
+   The order is stored in `paypal_order` with the environment it was created in and audited as
+   `payment.paypal.order.created`; calling again for the same booking answers the stored order.
+   Without a public address the request is refused with `payment.paypal.publicUrlMissing`.
+3. The browser goes to PayPal's approve link and comes back to the shell routes
+   `/payment/paypal/return` or `/payment/paypal/cancel` with the order id. A payer whose session
+   ended signs in first and is brought back to the same address.
+4. The return calls `POST /api/payments/paypal/orders/{orderId}/capture`. Courtside first reads the
+   order at PayPal and checks `custom_id`, amount, currency and status `APPROVED`; a mismatch marks
+   the order `REJECTED`, releases the booking and moves no money. It then stamps
+   `capture_attempted_at` in a short transaction of its own and asks PayPal to capture, with the order
+   id as `PayPal-Request-Id`. Only after PayPal answered does one transaction lock the order row, the
+   booking grid and the booking, confirm the booking and append `PAYPAL_PAYMENT` and `BOOKING_DEBIT`
+   of the amount, so the balance stays as it was and the refund on cancellation works unchanged. No
+   database lock is held across a PayPal call. A second return, or one that finds PayPal's
+   `ORDER_ALREADY_CAPTURED`, is answered from the stored result and records nothing twice.
+5. The cancel route calls `POST /api/payments/paypal/orders/{orderId}/cancel`. It reads the order
+   first: without money taken the order is voided and its booking released at once, a capture found
+   there is recorded as on return, and anything unclear leaves the order open.
+
+Capture and cancel answer one of four outcomes. `CONFIRMED` means the booking is paid.
+`LATE_CREDITED` means PayPal took the money but the booking was no longer held, or the captured
+amount differed: the booking stays released and the amount is appended to the booker's credit as
+`PAYPAL_LATE_CAPTURE` and audited as `payment.paypal.lateCapture`, so money is never neither a
+booking nor credit. When the account was anonymised or the club currency changed since, the order is marked
+`LATE_CAPTURED` without credit and the audit says so, for the treasurer to return it. `REJECTED`
+means no money moved and the court is free: PayPal declined, the order did not match or the payer
+turned back. `PROCESSING` means the outcome is not known yet, because PayPal did not answer, the
+capture timed out, a capture is still pending at PayPal or the credentials are no longer active;
+the order stays open and the court stays held for the reconciliation. A PayPal refusal with HTTP
+409, `DUPLICATE_REQUEST_ID` or `PREVIOUS_REQUEST_IN_PROGRESS` counts as unknown, never as a decline.
+Every order endpoint answers only the signed-in booker; another account's order is not found.
+
+`PayPalReconciliation` runs every 60 seconds. It reads at PayPal every
+open order older than five minutes, and every open order whose booking is past its deadline,
+longest unchecked first and 50 per run. A capture found is recorded through the same locked
+transition as the return. An `APPROVED` order is captured while its booking is still pending, also
+past the deadline, because the court was never given away. An unapproved order whose hold ended, an
+order whose booking was released by somebody else and an order of credentials no longer active are
+voided, their booking released and audited as `payment.paypal.voided`. A pending booking past its
+deadline without an order is released without calling PayPal. When PayPal cannot show an order,
+the booking stays held for at most 24 hours past its deadline; then an order without a capture
+attempt is voided and one with an attempt releases its booking and stays open, so a capture read
+later becomes credit. For 72 hours the job also rereads voided orders whose capture was attempted,
+at most once per five minutes each, and records a capture PayPal completed after all as a late
+capture. A run stops after three consecutive orders PayPal does not answer. The hold is therefore
+a soft bound: 15 minutes plus at most one run while PayPal answers.
+
+Changing the client id or environment, switching PayPal off or removing the credentials ends the
+open orders of the former credentials after the change commits. An order without a capture attempt
+cannot have moved money, so it is voided and its booking released without asking PayPal. One with
+an attempt is read at PayPal with the former credentials: a capture is recorded, an uncaptured
+order voided, and an unreadable one stays open for the reconciliation. An order keeps the
+environment it was created in. Sandbox works on every instance; the PayPal page warns that sandbox
+bookings are confirmed with test money.
+
+Courtside stores nothing from PayPal's payer object. The audit events of the checkout name the
+booking, the order, the environment, amounts and reasons, never payer data.
 
 The guest fee report under `/api/treasury` lists, for `TREASURER` and `ADMIN`, each member's charged
 guest places and their sum for a period, by default the current calendar year in the club time
@@ -454,7 +553,7 @@ calendar and are not. `NO_COURT_BOOKING`, `MAX_BOOKING_DURATION`, `MIN_BOOKING_D
 `BOOKING_HOURS` and `WEEKLY_BOOKED_HOURS` also apply when a member moves an existing booking.
 
 `WEEKLY_BOOKED_HOURS` measures the club-local week, Monday 00:00 to Monday 00:00 in the club time
-zone. It sums the confirmed bookings the member booked on cards that count against limits, each
+zone. It sums the confirmed and pending bookings the member booked on cards that count against limits, each
 with its duration once whatever the number of courts, by the week its start falls in. A booking on
 a card that does not count against limits is not judged. Bookings judged together, such as the
 occurrences of a series, count for each other, and a move leaves the moved bookings out of the
@@ -1337,7 +1436,8 @@ names the person who acted. Whoever cancels somebody else's booking or series ma
 from a fixed list of codes, never free text. The booking keeps the code, the event and the centre
 entry carry it, and the club's message names it or, without one, refers the member to the club. A
 holder cancelling their own booking cannot name a reason; the request is refused and cancels
-nothing.
+nothing. `PAYMENT_EXPIRED` is reserved for releasing an unpaid hold: no cancel request may name it,
+and a release sends no message at all.
 
 When somebody other than the holder cancels or moves occurrences of a series, only the holder
 receives one message for the whole change, never one per occurrence. It names the card, weekdays,

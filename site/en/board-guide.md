@@ -724,9 +724,13 @@ direction. The change log records every entry with amount and kind, without the 
 holding credit cannot close their account until you have paid it out.
 
 When an external player books a priced booking type, Courtside takes the amount from their credit.
-If it does not cover the amount, Courtside refuses the booking. A cancellation before the deadline
+If it does not cover the amount, they pay the whole amount by PayPal when you have switched PayPal
+on; otherwise Courtside refuses the booking. A cancellation before the deadline
 returns the amount, a cancellation by the club does until the booking starts. Both entries appear in the ledger as
-*Booking paid* and *Refund after cancellation*. You cannot record either by hand.
+*Booking paid* and *Refund after cancellation*. You cannot record either by hand. A PayPal payment
+appears as *Paid with PayPal* next to *Booking paid*, so the balance stays the same. A PayPal payment
+that arrives after Courtside has released the court becomes credit and appears as *Late PayPal
+payment as credit*.
 
 ## PayPal
 
@@ -741,6 +745,16 @@ shows only since when one is stored. Leave the field empty when saving and the s
 You can switch PayPal on only once one is stored. When you change the client id or the environment,
 enter the matching secret again. Saving and removing ask for a fresh password proof. The change log records
 what changed, without the client id and the secret.
+
+While sandbox credentials are stored, the page warns you: in the sandbox Courtside confirms
+bookings with test money, and the club receives no real money for them. Switch to **Live** for real
+payments.
+
+While a player pays at PayPal, Courtside holds their court for 15 minutes. If you cancel such a
+booking or close the court, the hold ends without a message. When you change the client id or the
+environment, switch PayPal off or remove the credentials, Courtside ends the open payments of the
+old credentials and frees their courts. If PayPal had already collected money, the player gets
+their booking or credit as soon as PayPal shows the payment.
 
 **Check connection** asks PayPal with the stored credentials, not with what the form currently
 holds, so save first. If PayPal refuses, Courtside shows the reason PayPal gives. If PayPal cannot

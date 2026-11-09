@@ -762,9 +762,13 @@ andere Richtung. Das Änderungsprotokoll hält jeden Eintrag mit Betrag und Art 
 Begründung. Ein Spieler mit Guthaben kann sein Konto nicht schließen, bis du es ausgezahlt hast.
 
 Bucht ein externer Spieler eine Buchungsart mit Preis, zieht Courtside den Betrag von seinem Guthaben
-ab. Reicht es nicht, lehnt Courtside die Buchung ab. Ein Storno vor der Stornofrist bucht den Betrag
+ab. Reicht es nicht, bezahlt er den ganzen Betrag per PayPal, wenn ihr PayPal eingeschaltet habt,
+sonst lehnt Courtside die Buchung ab. Ein Storno vor der Stornofrist bucht den Betrag
 zurück, ein Storno durch den Verein bis zum Beginn der Buchung immer. Beide Einträge erscheinen im Verlauf als *Buchung bezahlt*
-und *Erstattung nach Storno*. Von Hand kannst du sie nicht anlegen.
+und *Erstattung nach Storno*. Von Hand kannst du sie nicht anlegen. Eine PayPal-Zahlung steht im Verlauf
+als *Per PayPal bezahlt* und daneben als *Buchung bezahlt*, der Stand bleibt also gleich. Kommt eine
+PayPal-Zahlung erst an, nachdem Courtside den Platz wieder freigegeben hat, wird sie zu Guthaben und
+steht als *Späte PayPal-Zahlung als Guthaben* im Verlauf.
 
 ## PayPal
 
@@ -781,6 +785,16 @@ leer, bleibt das gespeicherte Secret. Einschalten kannst du PayPal erst, wenn ei
 gib auch das passende Secret neu ein. Speichern und
 Entfernen verlangen eine frische Passwortbestätigung. Das Änderungsprotokoll hält fest, was sich
 geändert hat, ohne Client-ID und Secret.
+
+Solange Sandbox-Zugangsdaten gespeichert sind, warnt die Seite: In der Sandbox bestätigt Courtside
+Buchungen mit Testgeld, und der Verein bekommt dafür kein echtes Geld. Schalte für echte Zahlungen auf
+**Live** um.
+
+Während ein Spieler bei PayPal zahlt, hält Courtside seinen Platz 15 Minuten. Stornierst du eine
+solche Buchung oder sperrst den Platz, wird die Reservierung ohne Nachricht beendet. Änderst du
+Client-ID oder Umgebung, schaltest PayPal aus oder entfernst die Zugangsdaten, beendet Courtside die
+offenen Zahlungen der alten Zugangsdaten und gibt ihre Plätze frei. Hat PayPal dabei schon Geld
+eingezogen, bekommt der Spieler seine Buchung oder Guthaben, sobald PayPal die Zahlung zeigt.
 
 **Verbindung prüfen** fragt PayPal mit den gespeicherten Zugangsdaten, nicht mit dem, was gerade im
 Formular steht. Speichere also zuerst. Lehnt PayPal ab, zeigt Courtside den Grund, den PayPal

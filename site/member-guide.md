@@ -216,7 +216,21 @@ Kassenwart.
 
 Eine Buchung mit Preis bezahlst du aus deinem Guthaben. Der Dialog zeigt vor dem Buchen neben dem
 Betrag deinen Stand. Reicht er, zieht Courtside den Betrag beim Buchen ab, und die Bestätigung nennt
-Betrag und Zahlweg. Reicht er nicht, lehnt Courtside die Buchung ab und zieht nichts ab. Stornierst
+Betrag und Zahlweg. Reicht er nicht und nimmt dein Verein PayPal an, heißt die Schaltfläche **Mit
+PayPal bezahlen**. Du zahlst dann den ganzen Betrag per PayPal, nicht einen Teil davon. Ohne PayPal
+lehnt Courtside die Buchung ab und zieht nichts ab.
+
+Mit **Mit PayPal bezahlen** reserviert Courtside den Platz 15 Minuten für dich und schickt dich zu
+PayPal. Gibst du die Zahlung dort frei, kommst du zurück zu Courtside und siehst "Zahlung wird
+verarbeitet", bis Courtside das Geld eingezogen hat. Erst dann ist die Buchung bestätigt, und die
+Bestätigung per E-Mail sagt "Per PayPal bezahlt". Brichst du bei PayPal ab, ist der Platz sofort
+wieder frei und es wurde nichts abgebucht. Schließt du die Seite nach der Freigabe, geht die Zahlung
+nicht verloren: Courtside fragt PayPal nach einigen Minuten selbst und bestätigt die Buchung. Solange
+die Zahlung offen ist, steht die Buchung unter *Meine Buchungen* mit "Zahlung ausstehend" und den
+verbleibenden Minuten. Dort kommst du mit **Weiter zu PayPal** zurück zur Zahlung oder gibst den
+Platz mit **Abbrechen** frei. Du kannst nur eine Buchung zur Zeit offen haben. Zahlst du erst, nachdem
+die Reservierung abgelaufen ist, behält Courtside das Geld als Guthaben für dich, oder der Verein
+meldet sich bei dir. Stornierst
 du vor der Stornofrist deines Vereins, kommt der volle Betrag zurück auf dein Guthaben. Nach der
 Frist kannst du nicht mehr stornieren. Storniert der Verein deine Buchung vor ihrem Beginn, bekommst
 du den Betrag immer zurück. Erscheinst du nicht und gibt Courtside den Platz deshalb frei, bleibt der Betrag beim
