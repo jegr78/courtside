@@ -60,7 +60,7 @@ public class PayPalCheckout {
         URI origin = instance.origin().orElseThrow(PayPalPublicUrlMissingException::new);
         UUID account = signedIn();
         PendingBooking pending = pendingPayments.pending(bookingId)
-                .filter(booking -> booking.bookedBy().equals(account))
+                .filter(booking -> account.equals(booking.bookedBy()))
                 .orElseThrow(PayPalOrderNotFoundException::new);
         Optional<StoredOrder> existing = orders.ofBooking(bookingId);
         if (existing.isPresent()) return created(existing.get());
