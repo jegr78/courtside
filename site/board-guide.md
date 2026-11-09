@@ -791,8 +791,9 @@ Solange Sandbox-Zugangsdaten gespeichert sind, warnt die Seite: In der Sandbox b
 Buchungen mit Testgeld, und der Verein bekommt dafür kein echtes Geld. Schalte für echte Zahlungen auf
 **Live** um.
 
-Während ein Spieler bei PayPal zahlt, hält Courtside seinen Platz 15 Minuten. Stornierst du eine
-solche Buchung oder sperrst den Platz, wird die Reservierung ohne Nachricht beendet. Änderst du
+Während ein Spieler bei PayPal zahlt, hält Courtside seinen Platz 15 Minuten, höchstens bis zum
+Beginn der Buchung. Stornierst du eine solche Buchung oder sperrst den Platz, wird die Reservierung
+ohne Nachricht beendet. Änderst du
 Client-ID oder Umgebung, schaltest PayPal aus oder entfernst die Zugangsdaten, beendet Courtside die
 offenen Zahlungen der alten Zugangsdaten und gibt ihre Plätze frei. Hat PayPal dabei schon Geld
 eingezogen, bekommt der Spieler meist seine Buchung oder Guthaben, sobald PayPal die Zahlung zeigt.

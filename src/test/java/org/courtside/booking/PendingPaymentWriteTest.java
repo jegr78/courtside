@@ -138,6 +138,22 @@ class PendingPaymentWriteTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenABookingStartingNow_whenItAwaitsPayPal_thenTheHoldEndsAtItsStart() {
+        // given
+        payment.storePayPal(true);
+        Instant start = NOW;
+
+        // when
+        UUID booking = bookingService.create(new CreateBookingCommand(List.of(courtId), winterHall,
+                new TimeSlot(start, start.plus(Duration.ofHours(1))), johnAccount, johnPerson,
+                Set.of(Role.EXTERNAL), null, List.of(), null));
+
+        // then
+        assertThat(row(booking)).as("the hold never outlasts the booking's start")
+                .containsEntry("status", "PENDING_PAYMENT").containsEntry("payment_expires_at", start);
+    }
+
+    @Test
     void givenShortCreditAndPayPalOff_whenAnOutsiderBooks_thenCreditInsufficientIsReported() {
         // given
         payment.storePayPal(false);

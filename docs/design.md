@@ -297,7 +297,8 @@ owner sees it in *Meine Buchungen* with the remaining time, and the board's list
 appointments shows it marked as awaiting payment. The subject access export lists it with its
 status.
 
-`booking.payment_expires_at` stores the end of the hold, 15 minutes after the booking was written.
+`booking.payment_expires_at` stores the end of the hold, 15 minutes after the booking was written or
+the booking's start if that comes first.
 An account holds at most one pending booking: a second attempt is refused with the violation
 `booking.payment.pendingExists`, carrying the first one's expiry, and the partial unique index
 `booking_one_pending_per_account` gives the same answer below the service. A hold ends in one of
@@ -497,8 +498,8 @@ marked as attempted and stays open, so a capture read later becomes credit. A ca
 after the booking's start never confirms it and becomes credit as well. For 72 hours the job also
 rereads voided orders whose capture was attempted, at most once per five minutes each, and records a
 capture PayPal completed after all as a late capture. A run stops after three consecutive orders
-PayPal does not answer. A hold therefore ends 15 minutes after the booking plus at most one run
-while PayPal answers clearly, and in every case at the earlier of 24 hours past its deadline and the
+PayPal does not answer. A hold therefore ends at its deadline plus at most one run while PayPal
+answers clearly, and in every case at the earlier of 24 hours past its deadline and the
 booking's start.
 
 Changing the client id or environment, switching PayPal off or removing the credentials ends the

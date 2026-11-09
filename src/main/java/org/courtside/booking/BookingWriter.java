@@ -197,7 +197,8 @@ class BookingWriter implements SeriesOccurrenceCancellation, BookingDrafts, Unat
             throw new BookingRulesViolatedException(List.of(new RuleViolation("booking.payment.pendingExists",
                     Map.of("expiresAt", expiresAt.toString()))));
         });
-        booking.awaitPayment(booking.getCreatedAt().plus(PAYMENT_HOLD));
+        Instant held = booking.getCreatedAt().plus(PAYMENT_HOLD);
+        booking.awaitPayment(held.isBefore(command.slot().start()) ? held : command.slot().start());
         try {
             bookings.saveAndFlush(booking);
         } catch (DataIntegrityViolationException e) {
