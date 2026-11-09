@@ -171,7 +171,7 @@ public class PayPalCheckout {
         Optional<PayPalClient.Credentials> active = credentials.active(stored.environment());
         Instant now = clock.instant();
         boolean beforeDeadline = pending.filter(held -> held.expiresAt().isAfter(now)).isPresent();
-        boolean started = pending.filter(held -> !held.startsAt().isAfter(now)).isPresent();
+        boolean started = pending.filter(held -> held.startsAt().isBefore(now)).isPresent();
         if (active.isPresent() && pending.isPresent() && !started
                 && (beforeDeadline || order.status().equals("APPROVED"))) {
             return settle(stored, active.get(), order);
@@ -190,7 +190,7 @@ public class PayPalCheckout {
 
     private boolean overdue(Optional<PendingBooking> pending, Duration unresolvedAfter) {
         Instant now = clock.instant();
-        return pending.filter(held -> !releaseAt(held, unresolvedAfter).isAfter(now)).isPresent();
+        return pending.filter(held -> releaseAt(held, unresolvedAfter).isBefore(now)).isPresent();
     }
 
     private static Instant releaseAt(PendingBooking held, Duration unresolvedAfter) {
@@ -297,7 +297,7 @@ public class PayPalCheckout {
         if (stored.captureAttemptedAt() != null) return capture(stored, active);
         Optional<PendingBooking> pending = pendingPayments.pending(stored.bookingId());
         if (pending.isEmpty()) return voided(stored, VoidReason.BOOKING_RELEASED);
-        if (!pending.get().startsAt().isAfter(clock.instant())) return voided(stored, VoidReason.HOLD_EXPIRED);
+        if (pending.get().startsAt().isBefore(clock.instant())) return voided(stored, VoidReason.HOLD_EXPIRED);
         return capture(stored, active);
     }
 

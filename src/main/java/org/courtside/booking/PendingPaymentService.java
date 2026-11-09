@@ -62,7 +62,7 @@ class PendingPaymentService implements PendingPayments {
         Booking booking = bookings.findWithAllocationsById(bookingId)
                 .orElseThrow(() -> new BookingNotFoundException("No booking with id " + bookingId));
         if (booking.getStatus() == BookingStatus.PENDING_PAYMENT
-                && startOf(booking).filter(start -> start.isAfter(clock.instant())).isEmpty()) {
+                && startOf(booking).filter(start -> !start.isBefore(clock.instant())).isEmpty()) {
             releaseLocked(booking, null);
             return ConfirmOutcome.NOT_PENDING;
         }

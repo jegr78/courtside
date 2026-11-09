@@ -448,6 +448,24 @@ class PayPalCheckoutTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenABookingStartingAtThisInstant_whenThePayerReturnsWithAnApprovedOrder_thenItIsConfirmed()
+            throws Exception {
+        // given
+        UUID booking = bookWithOrder();
+        PAYPAL.reply(READ, 200, order("APPROVED", booking, "15.00", null));
+        PAYPAL.reply(CAPTURE, 201, order("COMPLETED", booking, "15.00", capture("COMPLETED", "15.00")));
+        jdbc.sql("UPDATE court_allocation SET starts_at = :start WHERE booking_id = :id")
+                .param("start", Timestamp.from(clock.instant())).param("id", booking).update();
+
+        // when
+        capture("roe.john").andExpect(jsonPath("$.outcome").value("CONFIRMED"));
+
+        // then
+        assertThat(bookingStatus(booking)).as("a slot the booking rules accept as not past is not started")
+                .isEqualTo("CONFIRMED");
+    }
+
+    @Test
     void givenAReleasedBooking_whenThePayerReturnsToAnOrderPayPalCompleted_thenTheAmountBecomesCredit()
             throws Exception {
         // given
