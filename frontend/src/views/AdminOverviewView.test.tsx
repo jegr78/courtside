@@ -13,7 +13,7 @@ import { AdminOverviewView } from "./AdminOverviewView";
 const club: ClubConfig = {
   clubName: "Example Tennis Club", primaryColor: "#000000", accentColor: "#ffffff",
   logoUrl: null, imprintUrl: null, defaultLocale: "en", supportedLocales: ["de", "en"],
-  slotMinutes: 60, timeZone: "Europe/Berlin", currency: "EUR"
+  slotMinutes: 60, timeZone: "Europe/Berlin", currency: "EUR", currencyFractionDigits: 2
 };
 
 const configured: AdminClubConfig = {
@@ -21,7 +21,7 @@ const configured: AdminClubConfig = {
   imprintUrl: null, privacyUrl: null, documentationUrl: null, shortName: null, defaultLocale: "en",
   supportedLocales: ["de", "en"], slotMinutes: 30, timeZone: "Europe/Berlin", newAccountCredentialHours: 168,
   passwordResetCredentialHours: 24, passwordResetTokenMinutes: 60, bookingReminderHours: 24, waitlistOfferMinutes: 15, accessLeadMinutes: 15, accessLagMinutes: 15, accessCodeLength: 6,
-  logoUploaded: false, externalBookings: false, logoFallbackUrl: null, noMembershipTypeRuleSetId: null, currency: "EUR"
+  logoUploaded: false, externalBookings: false, logoFallbackUrl: null, noMembershipTypeRuleSetId: null, currency: "EUR", currencyFractionDigits: 2
 };
 
 const currentMember: RosterEntry = {

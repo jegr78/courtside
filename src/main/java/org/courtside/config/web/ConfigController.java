@@ -162,12 +162,21 @@ class ConfigController implements ClubConfigApi, AdminConfigApi, ManifestApi {
                 .body(new ByteArrayResource(icon.content()));
     }
 
+    private static int fractionDigitsOf(String currency) {
+        int digits = Currency.getInstance(currency).getDefaultFractionDigits();
+        if (digits < 0) {
+            throw new IllegalStateException("The club currency " + currency + " has no minor unit");
+        }
+        return digits;
+    }
+
     private ApiClubConfig toResponse(ClubConfigurationSnapshot configuration) {
         return new ApiClubConfig(
                 configuration.clubName(), configuration.primaryColor(),
                 configuration.accentColor(), configuration.defaultLocale(),
                 languages.tags(),
-                configuration.slotMinutes(), configuration.timeZone(), configuration.currency())
+                configuration.slotMinutes(), configuration.timeZone(), configuration.currency(),
+                fractionDigitsOf(configuration.currency()))
                 .logoUrl(configuration.headerLogoUrl())
                 .imprintUrl(configuration.imprintUrl())
                 .privacyUrl(configuration.privacyUrl())
@@ -183,6 +192,7 @@ class ConfigController implements ClubConfigApi, AdminConfigApi, ManifestApi {
                 configuration.accentColor(), configuration.defaultLocale(),
                 languages.tags(),
                 configuration.slotMinutes(), configuration.timeZone(), configuration.currency(),
+                fractionDigitsOf(configuration.currency()),
                 configuration.logoUploaded(), configuration.externalBookings(),
                 configuration.newAccountCredentialHours(),
                 configuration.passwordResetCredentialHours(),

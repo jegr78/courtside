@@ -1496,7 +1496,7 @@ components:
     ClubConfig:
       type: object
       required: [clubName, primaryColor, accentColor, defaultLocale, supportedLocales, slotMinutes,
-                 timeZone, currency]
+                 timeZone, currency, currencyFractionDigits]
       properties:
         clubName: { type: string }
         installedAppName:
@@ -1565,6 +1565,15 @@ components:
             The ISO 4217 code every amount of this instance is stated in, such as a booking card's
             guest fee. Amounts travel in the currency's minor unit.
           example: EUR
+        currencyFractionDigits:
+          type: integer
+          minimum: 0
+          maximum: 4
+          description: |
+            How many digits of `currency` follow the decimal point, as ISO 4217 states them. Every amount
+            the server stores, charges and formats in this currency uses this scale, so a client reads and
+            writes amounts with it instead of a locale library's own count.
+          example: 2
 
     AdminClubConfig:
       description: |

@@ -4,12 +4,13 @@ import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api, type ClubConfig } from "../api/client";
 import i18n from "../i18n";
+import { parseMinor } from "../money";
 import { ClubConfigurationProvider } from "./ClubConfigurationProvider";
 import { useClubConfiguration } from "./registry";
 
 const club: ClubConfig = {
   clubName: "Example Tennis Club", primaryColor: "#b85c38", accentColor: "#d7e24b",
-  defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30, timeZone: "Pacific/Auckland", currency: "EUR"
+  defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30, timeZone: "Pacific/Auckland", currency: "EUR", currencyFractionDigits: 2
 };
 
 // The element appears only once there is something to say, so a test that waits for it waits for
@@ -43,6 +44,18 @@ describe("ClubConfiguration", () => {
   beforeEach(async () => {
     vi.restoreAllMocks();
     await i18n.changeLanguage("en");
+  });
+
+  it("given a club charging in leks, when its configuration arrives, then amounts are read with the server's fraction digits", async () => {
+    // given
+    vi.spyOn(api, "config").mockResolvedValue({ ...club, currency: "ALL", currencyFractionDigits: 2 });
+
+    // when
+    show(<Zone testId="zone" />);
+    await screen.findByTestId("zone");
+
+    // then
+    expect(parseMinor("15,50", "ALL"), "the browser alone knows no fraction for leks").toBe(1550);
   });
 
   it("given two views that need the club, when both are shown, then the configuration is asked for once", async () => {

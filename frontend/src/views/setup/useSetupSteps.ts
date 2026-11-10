@@ -41,6 +41,7 @@ const factoryConfiguration = {
   accessLagMinutes: 15,
   accessCodeLength: 6,
   currency: "EUR",
+  currencyFractionDigits: 2,
   externalBookings: false,
   registrationTextDe: null,
   registrationTextEn: null,

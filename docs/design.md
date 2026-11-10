@@ -373,6 +373,11 @@ count do not track participants.
 
 A booking card carries a guest fee per guest place, zero by default, in the currency of the club
 configuration. Amounts are stored and exchanged in the currency's minor unit, cents for the euro.
+The minor unit is the one ISO 4217 states, as Java's `Currency` reports it; the club configuration
+carries its digits as `currencyFractionDigits`, and the client reads and writes amounts in the club
+currency with them instead of the browser's own count, which differs for currencies such as the
+Albanian lek. An amount in another currency, such as a ledger entry from before a currency change,
+is shown with the browser's count.
 When a booking names a guest, `BookingWriter` stamps the card's current fee and the club currency
 on that guest, so a later fee change or currency change leaves every booked guest with what applied
 when it was booked. Changing the currency converts nothing: card fees keep their number. The booking

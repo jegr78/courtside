@@ -9,7 +9,7 @@ import { AdminOperatorHealthView } from "./AdminOperatorHealthView";
 const club: ClubConfig = {
   clubName: "Example Tennis Club", primaryColor: "#000000", accentColor: "#ffffff",
   logoUrl: null, imprintUrl: null, defaultLocale: "en", supportedLocales: ["de", "en"],
-  slotMinutes: 60, timeZone: "Europe/Berlin", currency: "EUR"
+  slotMinutes: 60, timeZone: "Europe/Berlin", currency: "EUR", currencyFractionDigits: 2
 };
 
 function overview(overrides: Partial<OperatorHealth> = {}): OperatorHealth {
