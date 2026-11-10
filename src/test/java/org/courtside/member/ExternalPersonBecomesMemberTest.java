@@ -7,6 +7,7 @@ import org.courtside.booking.CreateBookingCommand;
 import org.courtside.booking.testfixture.BookingTestFixture;
 import org.courtside.card.testfixture.CardTestFixture;
 import org.courtside.config.testfixture.ConfigTestFixture;
+import org.courtside.credit.testfixture.CreditTestFixture;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.identity.AccountAnonymisation;
 import org.courtside.identity.Role;
@@ -78,6 +79,9 @@ class ExternalPersonBecomesMemberTest extends AbstractIntegrationTest {
 
     @Autowired
     private BookingService bookingService;
+
+    @Autowired
+    private CreditTestFixture credit;
 
     @Autowired
     private AccountAnonymisation anonymisation;
@@ -240,6 +244,42 @@ class ExternalPersonBecomesMemberTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.matching").value(1))
                 .andExpect(jsonPath("$.entries[0].personId").value(john.toString()));
+    }
+
+    @Test
+    void givenAnOutsiderWithCreditAPaidAndAPendingBooking_whenTheBoardAddsAMembership_thenTheMoneyStaysReachable()
+            throws Exception {
+        // given
+        UUID hall = cards.createBookingCard("Winter hall", Set.of(Role.EXTERNAL, Role.MEMBER), Set.of());
+        cards.priceForExternals(hall, 1500);
+        credit.credit(johnAccount, 4000);
+        UUID paid = bookingService.create(new CreateBookingCommand(List.of(court), hall,
+                new TimeSlot(TOMORROW, TOMORROW.plusSeconds(3600)), johnAccount, john, Set.of(Role.EXTERNAL), null,
+                List.of(), null));
+        UUID pending = bookings.createPendingBooking(court, hall,
+                new TimeSlot(TOMORROW.plusSeconds(7200), TOMORROW.plusSeconds(10800)), johnAccount,
+                clock.instant().plusSeconds(900));
+
+        // when
+        asBoard(post("/api/admin/roster/{id}/membership-periods", john)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"membershipTypeId\":\"" + ACTIVE + "\",\"startedOn\":\"2026-05-01\",\"endedOn\":null}"))
+                .andExpect(status().isCreated());
+
+        // then
+        asBoard(get("/api/treasury/credit/accounts"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.accountId == '" + johnAccount + "')].balanceMinor").value(2500));
+        asBoard(post("/api/treasury/credit/accounts/{id}/entries", johnAccount)
+                .header("Idempotency-Key", "payout-1").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"kind\":\"PAYOUT\",\"amountMinor\":1000,\"note\":\"Paid out in cash\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.balanceAfterMinor").value(1500));
+        bookingService.cancel(paid, johnAccount, Set.of(Role.MEMBER, Role.EXTERNAL));
+        assertThat(credit.balance(johnAccount)).as("the member's cancellation returns what the outsider paid")
+                .isEqualTo(3000);
+        assertThat(jdbc.sql("SELECT status FROM booking WHERE id = :id").param("id", pending).query(String.class)
+                .single()).as("the booking awaiting PayPal still awaits it").isEqualTo("PENDING_PAYMENT");
     }
 
     private ResultActions asBoard(org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder request)
