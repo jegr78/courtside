@@ -97,11 +97,6 @@ public class PayPalCheckout {
         return settle(owned(orderId));
     }
 
-    /** Captures an order on nobody's behalf, as reconciliation does. */
-    public Settlement settle(String orderId) {
-        return settle(orders.find(orderId).orElseThrow(PayPalOrderNotFoundException::new));
-    }
-
     /** Ends the signed-in booker's order when PayPal shows no money taken; otherwise it is settled or left open. */
     public Settlement cancel(String orderId) {
         StoredOrder stored = owned(orderId);

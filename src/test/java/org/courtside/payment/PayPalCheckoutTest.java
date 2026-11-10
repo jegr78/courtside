@@ -69,6 +69,7 @@ class PayPalCheckoutTest extends PayPalIntegrationTest {
     private static final String DECLINED = "{\"name\":\"UNPROCESSABLE_ENTITY\",\"message\":\"declined\","
             + "\"details\":[{\"issue\":\"INSTRUMENT_DECLINED\"}]}";
     private static final Instant TOMORROW_AFTERNOON = Instant.parse("2026-05-13T16:00:00Z");
+    private static final Duration UNRESOLVED_RELEASE = Duration.ofHours(24);
 
     @Autowired
     private WebApplicationContext context;
@@ -469,13 +470,14 @@ class PayPalCheckoutTest extends PayPalIntegrationTest {
         assertThat(pendingPayments.release(booking)).isTrue();
         jdbc.sql("UPDATE user_account SET anonymised_at = now(), enabled = false, password_hash = NULL WHERE id = :id")
                 .param("id", johnAccount).update();
+        markCaptureAttempted();
         PAYPAL.reply(READ, 200, order("COMPLETED", booking, "15.00", capture("COMPLETED", "15.00")));
 
         // when
-        PayPalCheckout.Settlement settlement = checkout.settle(ORDER);
+        PayPalCheckout.Reconciled reconciled = checkout.reconcile(ORDER, UNRESOLVED_RELEASE);
 
         // then
-        assertThat(settlement.outcome()).isEqualTo(PayPalCheckout.Outcome.LATE_CREDITED);
+        assertThat(reconciled.outcome()).isEqualTo(PayPalCheckout.Outcome.LATE_CREDITED);
         assertThat(entries(booking)).as("an anonymised account receives no credit").isEmpty();
         assertThat(orderStatus()).as("the captured order stays on record for the treasurer").isEqualTo("LATE_CAPTURED");
         assertThat(audit("payment.paypal.lateCapture", booking)).singleElement()
@@ -490,10 +492,12 @@ class PayPalCheckoutTest extends PayPalIntegrationTest {
         jdbc.sql("UPDATE booking SET status = 'CONFIRMED' WHERE id = :id").param("id", booking).update();
         jdbc.sql("UPDATE court_allocation SET status = 'CONFIRMED' WHERE booking_id = :id").param("id", booking)
                 .update();
+        markCaptureAttempted();
         PAYPAL.reply(READ, 200, order("COMPLETED", booking, "15.00", capture("COMPLETED", "15.00")));
 
         // when / then
-        assertThatThrownBy(() -> checkout.settle(ORDER)).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> checkout.reconcile(ORDER, UNRESOLVED_RELEASE))
+                .isInstanceOf(IllegalStateException.class);
         assertThat(output.getOut()).as("the treasurer can find the captured money by its ids")
                 .contains("PayPal order " + ORDER).contains("capture CAPTURE1");
         assertThat(orderStatus()).isEqualTo("CREATED");
@@ -506,7 +510,8 @@ class PayPalCheckoutTest extends PayPalIntegrationTest {
         UUID booking = bookWithOrder();
         PAYPAL.reply(READ, 200, order("APPROVED", booking, "15.00", null));
         PAYPAL.reply(CAPTURE, 201, order("COMPLETED", booking, "15.00", capture("COMPLETED", "15.00")));
-        assertThat(checkout.settle(ORDER).outcome()).isEqualTo(PayPalCheckout.Outcome.CONFIRMED);
+        assertThat(checkout.reconcile(ORDER, UNRESOLVED_RELEASE).outcome())
+                .isEqualTo(PayPalCheckout.Outcome.CONFIRMED);
         int calls = PAYPAL.all().size();
 
         // when
@@ -902,6 +907,10 @@ class PayPalCheckoutTest extends PayPalIntegrationTest {
         PAYPAL.replyAfter(CAPTURE, 201, order("COMPLETED", booking, "15.00", capture("COMPLETED", "15.00")),
                 Duration.ofSeconds(2));
         capture("roe.john").andExpect(jsonPath("$.outcome").value("PROCESSING"));
+    }
+
+    private void markCaptureAttempted() {
+        jdbc.sql("UPDATE paypal_order SET capture_attempted_at = now()").update();
     }
 
     private ResultActions create(String username, UUID booking) throws Exception {
