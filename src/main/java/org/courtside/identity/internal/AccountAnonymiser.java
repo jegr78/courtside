@@ -41,6 +41,18 @@ class AccountAnonymiser implements AccountAnonymisation {
         }
         jdbc.sql("DELETE FROM credit_entry_note n USING credit_entry e WHERE n.entry_id = e.id AND e.account_id = :id")
                 .param("id", accountId).update();
+        jdbc.sql("""
+                        UPDATE booking_participant p SET guest_name = '' FROM booking b
+                        WHERE p.booking_id = b.id AND b.booked_by = :id AND p.kind = 'GUEST'
+                        """)
+                .param("id", accountId).update();
+        jdbc.sql("UPDATE booking SET note = NULL WHERE booked_by = :id").param("id", accountId).update();
+        jdbc.sql("""
+                        UPDATE waitlist_participant p SET guest_name = '' FROM waitlist_entry e
+                        WHERE p.entry_id = e.id AND e.account_id = :id AND p.kind = 'GUEST'
+                        """)
+                .param("id", accountId).update();
+        jdbc.sql("UPDATE waitlist_entry SET note = NULL WHERE account_id = :id").param("id", accountId).update();
         jdbc.sql("DELETE FROM import_external_reference WHERE person_id = :person")
                 .param("person", account.getPerson().getId()).update();
     }

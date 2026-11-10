@@ -1,6 +1,7 @@
 package org.courtside.identity;
 
 import org.courtside.AbstractIntegrationTest;
+import org.courtside.TestClock;
 import org.courtside.booking.testfixture.BookingTestFixture;
 import org.courtside.card.testfixture.CardTestFixture;
 import org.courtside.config.testfixture.ConfigTestFixture;
@@ -78,6 +79,9 @@ class AccountClosureTest extends AbstractIntegrationTest {
 
     @Autowired
     private Clock clock;
+
+    @Autowired
+    private TestClock testClock;
 
     @Autowired
     private CreditTestFixture credit;
@@ -190,6 +194,55 @@ class AccountClosureTest extends AbstractIntegrationTest {
         // when / then
         close(userDetails.loadUserByUsername("roe.john"), true).andExpect(status().isNoContent());
         assertThat(identity.isAccountEnabled(johnAccount)).as("a past booking does not hold the account").isFalse();
+    }
+
+    @Test
+    void givenAPlayedBookingWithANoteAndAGuest_whenThePlayerClosesTheirAccount_thenNeitherNamesAnybodyAnyMore()
+            throws Exception {
+        // given
+        UUID played = bookings.createBookingWithGuest(court, winterDoubles, EVENING, johnAccount, john,
+                Set.of(Role.EXTERNAL), "Bring the racket for John Roe", "Mary Major");
+        testClock.set(EVENING.end().plusSeconds(3600));
+
+        // when
+        close(userDetails.loadUserByUsername("roe.john"), true).andExpect(status().isNoContent());
+
+        // then
+        assertThat(jdbc.sql("SELECT note FROM booking WHERE id = :id").param("id", played).query(String.class)
+                .optional()).as("the note the player typed is gone").isEmpty();
+        assertThat(jdbc.sql("SELECT guest_name FROM booking_participant WHERE booking_id = :id AND kind = 'GUEST'")
+                .param("id", played).query(String.class).list())
+                .as("the guest stays counted without the name the player typed").containsExactly("");
+    }
+
+    @Test
+    void givenAWaitlistEntryFromAnEarlierMembership_whenThePlayerClosesTheirAccount_thenItNamesNobodyAnyMore()
+            throws Exception {
+        // given
+        UUID entry = UUID.randomUUID();
+        jdbc.sql("""
+                INSERT INTO waitlist_entry (id, account_id, court_id, card_id, starts_at, ends_at, note, state,
+                                            joined_at, closed_at)
+                VALUES (:id, :account, :court, :card, :startsAt, :endsAt, 'Bring the racket for John Roe', 'ENDED',
+                        :startsAt, :endsAt)
+                """).param("id", entry).param("account", johnAccount).param("court", court)
+                .param("card", winterDoubles)
+                .param("startsAt", java.sql.Timestamp.from(Instant.parse("2026-03-01T16:00:00Z")))
+                .param("endsAt", java.sql.Timestamp.from(Instant.parse("2026-03-01T17:00:00Z"))).update();
+        jdbc.sql("""
+                INSERT INTO waitlist_participant (entry_id, position, kind, guest_name)
+                VALUES (:id, 1, 'GUEST', 'Mary Major')
+                """).param("id", entry).update();
+
+        // when
+        close(userDetails.loadUserByUsername("roe.john"), true).andExpect(status().isNoContent());
+
+        // then
+        assertThat(jdbc.sql("SELECT note FROM waitlist_entry WHERE id = :id").param("id", entry)
+                .query(String.class).optional()).as("the waitlist note the player typed is gone").isEmpty();
+        assertThat(jdbc.sql("SELECT guest_name FROM waitlist_participant WHERE entry_id = :id")
+                .param("id", entry).query(String.class).list())
+                .as("the waiting guest stays without the name the player typed").containsExactly("");
     }
 
     @Test

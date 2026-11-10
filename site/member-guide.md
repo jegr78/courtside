@@ -509,7 +509,8 @@ Courtside vorher erneut nach deinem Passwort. Hast du noch eine anstehende Buchu
 zuerst. Hast du noch Guthaben, lass es dir vorher vom Kassenwart auszahlen. Hat PayPal eine Zahlung
 oder Erstattung von dir noch nicht abgeschlossen, warte, bis das geschehen ist. Beim Schließen entfernt
 Courtside deinen Namen, deine E-Mail-Adresse, deinen Benutzernamen und dein Passwort und meldet dich
-ab. Vergangene Buchungen bleiben ohne deinen Namen beim Verein. Deinen
+ab. Vergangene Buchungen bleiben ohne deinen Namen, ohne deine Notizen und ohne die Namen deiner
+Gäste beim Verein. Deinen
 Benutzernamen kann danach jemand neu registrieren. Als Mitglied beendet der Vorstand dein Konto.
 
 ![Die Kontosicherheit mit Zwei-Faktor-Authentifizierung, Sicherheitsschlüsseln, aktiven Sitzungen und Passwortänderung.](screenshots/de/account-security.png)

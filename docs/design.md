@@ -355,7 +355,8 @@ a refund or capture holding the ledger lock commits first. A late capture reads 
 `AccountAnonymisation`: the person's name and email become placeholders, the username becomes
 `anonymised-` and the account id so the name is free again, the account is disabled and records
 `anonymised_at`, its password, second factors, challenges, reset code, queued messages, notification
-entries, import references and the reasons of its credit ledger entries are deleted and its sessions
+entries, import references and the reasons of its credit ledger entries are deleted, the notes of
+the bookings and waitlist entries it made are cleared and their guests lose the names it typed, and its sessions
 end after commit. Person and account rows stay, so bookings keep a reference that names nobody.
 `identity.account.closed` names the account id only. The roster refuses to change, enable or issue
 credentials to an anonymised account with `identity.account.anonymised`, a roster synchronisation
